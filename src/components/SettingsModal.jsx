@@ -408,38 +408,46 @@ export function SettingsModal() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-3 gap-3 pt-2 border-t border-slate-800">
-                        <div>
-                          <label className="block text-xs font-medium text-amber-300 mb-1">As Of Date</label>
+                      <div className="pt-2 border-t border-slate-800 space-y-3">
+                        <div className="flex items-center gap-2">
                           <input
-                            type="date"
-                            value={newAccForm.balanceAsOfDate || new Date().toISOString().split('T')[0]}
-                            onChange={e => setNewAccForm({ ...newAccForm, balanceAsOfDate: e.target.value })}
-                            className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-100 font-mono focus:outline-none focus:border-blue-500"
+                            type="checkbox"
+                            id="chk-new-extra"
+                            checked={newAccForm.enableExtraSavings !== false}
+                            onChange={e => setNewAccForm({ ...newAccForm, enableExtraSavings: e.target.checked })}
+                            className="rounded bg-slate-950 border-slate-700 text-indigo-500 focus:ring-0 cursor-pointer"
                           />
+                          <label htmlFor="chk-new-extra" className="text-xs font-medium text-slate-300 cursor-pointer">
+                            Track Extra Savings Bucket
+                          </label>
                         </div>
-                        <div>
-                          <label className="block text-xs font-medium text-indigo-300 mb-1">Save Extra Target ($/mo)</label>
-                          <input
-                            type="number"
-                            step="10"
-                            placeholder="0"
-                            value={newAccForm.saveExtraMonthly || 0}
-                            onChange={e => setNewAccForm({ ...newAccForm, saveExtraMonthly: parseFloat(e.target.value) || 0 })}
-                            className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-emerald-400 font-mono font-bold focus:outline-none focus:border-blue-500"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-slate-400 mb-1">Extra Current Balance ($)</label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            placeholder="0.00"
-                            value={newAccForm.extraStartingBalance || 0}
-                            onChange={e => setNewAccForm({ ...newAccForm, extraStartingBalance: parseFloat(e.target.value) || 0 })}
-                            className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-200 font-mono focus:outline-none focus:border-blue-500"
-                          />
-                        </div>
+
+                        {newAccForm.enableExtraSavings !== false && (
+                          <div className="grid grid-cols-2 gap-3 p-3 bg-slate-950/60 border border-slate-800 rounded-xl">
+                            <div>
+                              <label className="block text-xs font-medium text-indigo-300 mb-1">Save Extra Target ($/mo)</label>
+                              <input
+                                type="number"
+                                step="10"
+                                placeholder="0"
+                                value={newAccForm.saveExtraMonthly || 0}
+                                onChange={e => setNewAccForm({ ...newAccForm, saveExtraMonthly: parseFloat(e.target.value) || 0 })}
+                                className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-emerald-400 font-mono font-bold focus:outline-none focus:border-blue-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-slate-400 mb-1">Extra Current Balance ($)</label>
+                              <input
+                                type="number"
+                                step="0.01"
+                                placeholder="0.00"
+                                value={newAccForm.extraStartingBalance || 0}
+                                onChange={e => setNewAccForm({ ...newAccForm, extraStartingBalance: parseFloat(e.target.value) || 0 })}
+                                className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-200 font-mono focus:outline-none focus:border-blue-500"
+                              />
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
@@ -521,41 +529,43 @@ export function SettingsModal() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3 text-xs pt-1 border-t border-slate-800/80">
-                        <div>
-                          <label className="text-indigo-300 font-medium block">Save Extra Target ($/mo)</label>
-                          <input
-                            type="number"
-                            step="10"
-                            value={acc.saveExtraMonthly || 0}
-                            onChange={e => updateAccount(acc.id, { saveExtraMonthly: parseFloat(e.target.value) || 0 })}
-                            className="mt-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-emerald-400 font-mono font-bold w-full focus:outline-none focus:border-blue-500"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-slate-400 block font-medium">Extra Current Balance ($)</label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={acc.extraStartingBalance || 0}
-                            onChange={e => updateAccount(acc.id, { extraStartingBalance: parseFloat(e.target.value) || 0 })}
-                            className="mt-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-slate-200 font-mono w-full focus:outline-none focus:border-blue-500"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 pt-1">
+                      <div className="flex items-center gap-2 pt-1 border-t border-slate-800/80">
                         <input
                           type="checkbox"
                           id={`chk-extra-${acc.id}`}
                           checked={acc.enableExtraSavings !== false}
                           onChange={e => updateAccount(acc.id, { enableExtraSavings: e.target.checked })}
-                          className="rounded bg-slate-900 border-slate-700 text-indigo-500 focus:ring-0"
+                          className="rounded bg-slate-900 border-slate-700 text-indigo-500 focus:ring-0 cursor-pointer"
                         />
                         <label htmlFor={`chk-extra-${acc.id}`} className="text-xs text-slate-400 cursor-pointer">
                           Track Extra Savings Bucket
                         </label>
                       </div>
+
+                      {acc.enableExtraSavings !== false && (
+                        <div className="grid grid-cols-2 gap-3 text-xs p-2.5 bg-slate-950/40 border border-slate-800 rounded-lg">
+                          <div>
+                            <label className="text-indigo-300 font-medium block">Save Extra Target ($/mo)</label>
+                            <input
+                              type="number"
+                              step="10"
+                              value={acc.saveExtraMonthly || 0}
+                              onChange={e => updateAccount(acc.id, { saveExtraMonthly: parseFloat(e.target.value) || 0 })}
+                              className="mt-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-emerald-400 font-mono font-bold w-full focus:outline-none focus:border-blue-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-slate-400 block font-medium">Extra Current Balance ($)</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={acc.extraStartingBalance || 0}
+                              onChange={e => updateAccount(acc.id, { extraStartingBalance: parseFloat(e.target.value) || 0 })}
+                              className="mt-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-slate-200 font-mono w-full focus:outline-none focus:border-blue-500"
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

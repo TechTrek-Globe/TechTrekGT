@@ -8,10 +8,10 @@
 | Styling | Tailwind CSS 3.4 | Responsive, utility-first, dark theme |
 | Charts | Recharts 2.15 | Lightweight, composable SVG charts |
 | Icons | Lucide React | Consistent icon set |
-| State | React Context + useState | Local-first, no external deps for MVP |
-| Auth (future) | Supabase Auth | OAuth, magic links, RBAC |
-| Database (future) | Supabase (PostgreSQL) | Row-Level Security, real-time sync |
-| ORM (future) | Prisma | Type-safe schema, migrations |
+| State | React Context + useState | Local-first + Cloudflare sync |
+| Auth | Cloudflare Workers + WebCrypto | Free PBKDF2 hashing & JWT sessions |
+| Database | Cloudflare D1 (SQLite) | Edge serverless database, 100% free |
+
 
 ## 2. Current Data Model (LocalStorage)
 

@@ -1,11 +1,15 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { initialBudgetData } from '../initialData';
+import { useAuth } from './AuthContext';
 
 const BudgetContext = createContext();
 
 const STORAGE_KEY = 'personal_budget_app_data_v1';
 
 export function BudgetProvider({ children }) {
+  const { token, user } = useAuth();
+  const [selectedPersonId, setSelectedPersonId] = useState('all');
+
   const [budget, setBudget] = useState(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -21,6 +25,29 @@ export function BudgetProvider({ children }) {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState('accounts'); // 'accounts' | 'people' | 'bills' | 'splits' | 'data'
   const [activeView, setActiveView] = useState('dashboard'); // 'dashboard' | 'main_budget' | 'ledger' | 'amortization'
+  const isInitialCloudFetch = useRef(true);
+
+  // Fetch Cloud Budget when user logs in
+  useEffect(() => {
+    async function fetchCloudBudget() {
+      if (!token) return;
+      try {
+        const res = await fetch('/api/budget', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.budget) {
+            setBudget(data.budget);
+            isInitialCloudFetch.current = true;
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch budget from Cloudflare D1:', err);
+      }
+    }
+    fetchCloudBudget();
+  }, [token]);
 
   // Persist to localStorage whenever budget state changes
   useEffect(() => {
@@ -30,6 +57,34 @@ export function BudgetProvider({ children }) {
       console.error('Failed to save budget to localStorage:', e);
     }
   }, [budget]);
+
+  // Sync to Cloudflare D1 database when budget updates (debounced)
+  useEffect(() => {
+    if (!token) return;
+    
+    // Skip initial trigger right after loading cloud data
+    if (isInitialCloudFetch.current) {
+      isInitialCloudFetch.current = false;
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        await fetch('/api/budget', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ budget })
+        });
+      } catch (err) {
+        console.error('Failed to sync budget to Cloudflare D1:', err);
+      }
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [budget, token]);
 
   // Account Operations
   const addAccount = (accountData) => {
@@ -464,6 +519,8 @@ export function BudgetProvider({ children }) {
     <BudgetContext.Provider
       value={{
         budget,
+        selectedPersonId,
+        setSelectedPersonId,
         activeView,
         setActiveView,
         isSettingsOpen,

@@ -1,5 +1,6 @@
 import React from 'react';
 import { useBudget } from '../context/BudgetContext';
+import { useAuth } from '../context/AuthContext';
 import { 
   LayoutDashboard, 
   ReceiptText, 
@@ -9,7 +10,12 @@ import {
   Download, 
   RotateCcw,
   TrendingUp,
-  DollarSign
+  DollarSign,
+  User,
+  Users,
+  LogOut,
+  LogIn,
+  ShieldCheck
 } from 'lucide-react';
 
 export function Navbar() {
@@ -18,11 +24,15 @@ export function Navbar() {
     activeView, 
     setActiveView, 
     setIsSettingsOpen,
+    selectedPersonId,
+    setSelectedPersonId,
     getTotalMonthlyNetIncome,
     getTotalMonthlyExpenses,
     getTotalCashOnHand,
     resetToDefaults
   } = useBudget();
+
+  const { user, setIsAuthModalOpen, logout } = useAuth();
 
   const netIncome = getTotalMonthlyNetIncome();
   const expenses = getTotalMonthlyExpenses();
@@ -66,30 +76,72 @@ export function Navbar() {
             </div>
           </div>
 
-          {/* Quick Metrics Bar */}
-          <div className="hidden lg:flex items-center space-x-4 bg-slate-900/80 px-4 py-1.5 rounded-full border border-slate-800">
-            <div className="flex items-center space-x-2 text-xs">
-              <span className="text-slate-400">Net Income:</span>
-              <span className="font-semibold text-emerald-400">${netIncome.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          {/* Person View Selector & Auth Actions */}
+          <div className="flex items-center space-x-3">
+            
+            {/* Person View Filter */}
+            {budget.people && budget.people.length > 0 && (
+              <div className="flex items-center space-x-2 bg-slate-900/90 border border-slate-800 px-3 py-1.5 rounded-xl text-xs">
+                <Users className="w-3.5 h-3.5 text-indigo-400" />
+                <span className="text-slate-400 hidden sm:inline">View As:</span>
+                <select
+                  value={selectedPersonId}
+                  onChange={(e) => setSelectedPersonId(e.target.value)}
+                  className="bg-transparent text-slate-200 font-medium focus:outline-none cursor-pointer"
+                >
+                  <option value="all" className="bg-slate-900 text-slate-200">All Household</option>
+                  {budget.people.map(p => (
+                    <option key={p.id} value={p.id} className="bg-slate-900 text-slate-200">
+                      {p.name} ({p.role})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Quick Metrics Bar */}
+            <div className="hidden xl:flex items-center space-x-4 bg-slate-900/80 px-4 py-1.5 rounded-full border border-slate-800">
+              <div className="flex items-center space-x-2 text-xs">
+                <span className="text-slate-400">Net Income:</span>
+                <span className="font-semibold text-emerald-400">${netIncome.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </div>
+              <div className="h-3 w-px bg-slate-800" />
+              <div className="flex items-center space-x-2 text-xs">
+                <span className="text-slate-400">Expenses:</span>
+                <span className="font-semibold text-rose-400">${expenses.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </div>
+              <div className="h-3 w-px bg-slate-800" />
+              <div className="flex items-center space-x-2 text-xs">
+                <span className="text-slate-400">Net Flow:</span>
+                <span className={`font-semibold ${netCashFlow >= 0 ? 'text-blue-400' : 'text-rose-400'}`}>
+                  ${netCashFlow.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
             </div>
-            <div className="h-3 w-px bg-slate-800" />
-            <div className="flex items-center space-x-2 text-xs">
-              <span className="text-slate-400">Expenses:</span>
-              <span className="font-semibold text-rose-400">${expenses.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-            </div>
-            <div className="h-3 w-px bg-slate-800" />
-            <div className="flex items-center space-x-2 text-xs">
-              <span className="text-slate-400">Net Flow:</span>
-              <span className={`font-semibold ${netCashFlow >= 0 ? 'text-blue-400' : 'text-rose-400'}`}>
-                ${netCashFlow.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
-            </div>
-            <div className="h-3 w-px bg-slate-800" />
-            <div className="flex items-center space-x-2 text-xs">
-              <TrendingUp className="w-3.5 h-3.5 text-indigo-400" />
-              <span className="text-slate-400">Savings Rate:</span>
-              <span className="font-semibold text-indigo-300">{savingsRate}%</span>
-            </div>
+
+            {/* User Auth Control */}
+            {user ? (
+              <div className="flex items-center space-x-2 bg-emerald-950/40 border border-emerald-800/60 px-3 py-1.5 rounded-xl text-xs text-emerald-300">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                <span className="font-medium hidden sm:inline">{user.name}</span>
+                <button
+                  onClick={logout}
+                  title="Sign Out"
+                  className="p-1 text-emerald-400 hover:text-emerald-200 hover:bg-emerald-900/50 rounded transition-colors"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setIsAuthModalOpen(true)}
+                className="flex items-center space-x-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium px-3.5 py-1.5 rounded-xl shadow-md transition-all cursor-pointer"
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                <span>Sign In</span>
+              </button>
+            )}
+
           </div>
         </div>
 

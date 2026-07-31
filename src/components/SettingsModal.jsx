@@ -941,15 +941,15 @@ export function SettingsModal() {
                       {/* Account Bills Table */}
                       <div className="overflow-x-auto">
                         <table className="w-full text-left text-xs text-slate-300">
-                          <thead>
-                            <tr className="border-b border-slate-800 text-slate-400 uppercase font-medium text-[10px]">
-                              <th className="p-3 sticky top-[37px] z-10 bg-slate-900 shadow-sm">Bill Name</th>
-                              <th className="p-3 sticky top-[37px] z-10 bg-slate-900 shadow-sm">Amount</th>
-                              <th className="p-3 sticky top-[37px] z-10 bg-slate-900 shadow-sm">Period</th>
-                              <th className="p-3 sticky top-[37px] z-10 bg-slate-900 shadow-sm">Assigned Account</th>
-                              <th className="p-3 sticky top-[37px] z-10 bg-slate-900 shadow-sm">Due Day</th>
-                              <th className="p-3 sticky top-[37px] z-10 bg-slate-900 shadow-sm">Payment Notes</th>
-                              <th className="p-3 text-right sticky top-[37px] z-10 bg-slate-900 shadow-sm">Actions</th>
+                          <thead className="bg-slate-900 text-slate-400 uppercase font-medium text-[10px] border-b border-slate-800">
+                            <tr>
+                              <th className="p-3">Bill Name</th>
+                              <th className="p-3">Amount</th>
+                              <th className="p-3">Period</th>
+                              <th className="p-3">Assigned Account</th>
+                              <th className="p-3">Due Day</th>
+                              <th className="p-3">Payment Notes</th>
+                              <th className="p-3 text-right">Actions</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-800 bg-slate-950/40">
@@ -1098,15 +1098,15 @@ export function SettingsModal() {
                       {/* Account Splits Table */}
                       <div className="overflow-x-auto">
                         <table className="w-full text-left text-xs text-slate-300 min-w-[700px]">
-                          <thead>
-                            <tr className="border-b border-slate-800 text-slate-400 uppercase font-medium text-[10px]">
-                              <th className="p-3 sticky top-[37px] z-10 bg-slate-900 shadow-sm">Bill Name</th>
-                              <th className="p-3 sticky top-[37px] z-10 bg-slate-900 shadow-sm">Monthly Cost</th>
+                          <thead className="bg-slate-900 text-slate-400 uppercase font-medium text-[10px] border-b border-slate-800">
+                            <tr>
+                              <th className="p-3">Bill Name</th>
+                              <th className="p-3">Monthly Cost</th>
                               {budget.people.map(p => (
-                                <th key={p.id} className="p-3 text-center sticky top-[37px] z-10 bg-slate-900 shadow-sm">{p.name} Split (%)</th>
+                                <th key={p.id} className="p-3 text-center">{p.name} Split (%)</th>
                               ))}
-                              <th className="p-3 text-center sticky top-[37px] z-10 bg-slate-900 shadow-sm">Status</th>
-                              <th className="p-3 text-right sticky top-[37px] z-10 bg-slate-900 shadow-sm">Quick Presets</th>
+                              <th className="p-3 text-center">Status</th>
+                              <th className="p-3 text-right">Quick Presets</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-800 bg-slate-950/40">

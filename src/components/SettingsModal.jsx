@@ -48,6 +48,9 @@ export function SettingsModal() {
   } = useBudget();
 
   // Local form state for new item creation
+  const [isAddAccountModalOpen, setIsAddAccountModalOpen] = useState(false);
+  const [isAddPersonModalOpen, setIsAddPersonModalOpen] = useState(false);
+  const [isAddBillModalOpen, setIsAddBillModalOpen] = useState(false);
   const [newAccForm, setNewAccForm] = useState({ name: '', type: 'checking', startingBalance: 0, color: 'blue', notes: '' });
   const [newPersonForm, setNewPersonForm] = useState({ name: '', role: 'Member', payFrequency: 'bi-weekly', grossPerPay: 0, netPerPay: 0, payDay1: 15, payDay2: 'last' });
   const [newBillForm, setNewBillForm] = useState({ name: '', amount: 0, period: 'Monthly', accountId: budget.accounts[0]?.id || '', dueDay: 1, paymentSource: 'Auto Pay', notes: '' });
@@ -320,56 +323,135 @@ export function SettingsModal() {
           {/* TAB 1: ACCOUNTS */}
           {settingsTab === 'accounts' && (
             <div className="space-y-6">
-              {/* Add Account Form */}
-              <form onSubmit={handleAddAccount} className="p-4 rounded-xl glass-card border border-slate-800 space-y-4">
-                <h3 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
-                  <Plus className="w-4 h-4 text-blue-400" />
-                  Add New Checking or Savings Account
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                  <div>
-                    <label className="block text-xs text-slate-400 mb-1">Account Name</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Chase Bills Checking"
-                      value={newAccForm.name}
-                      onChange={e => setNewAccForm({ ...newAccForm, name: e.target.value })}
-                      className="w-full px-3 py-1.5 text-sm bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-slate-400 mb-1">Type</label>
-                    <select
-                      value={newAccForm.type}
-                      onChange={e => setNewAccForm({ ...newAccForm, type: e.target.value })}
-                      className="w-full px-3 py-1.5 text-sm bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:border-blue-500"
-                    >
-                      <option value="checking">Checking</option>
-                      <option value="savings">Savings</option>
-                      <option value="credit">Credit Card</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs text-slate-400 mb-1">Starting Balance ($)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      placeholder="0.00"
-                      value={newAccForm.startingBalance}
-                      onChange={e => setNewAccForm({ ...newAccForm, startingBalance: e.target.value })}
-                      className="w-full px-3 py-1.5 text-sm bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
-                  <div className="flex items-end">
-                    <button
-                      type="submit"
-                      className="w-full py-1.5 px-4 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors"
-                    >
-                      Add Account
-                    </button>
+              {/* Header & Add Account Button */}
+              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
+                    <CreditCard className="w-4 h-4 text-blue-400" />
+                    Active Household Accounts ({budget.accounts.length})
+                  </h3>
+                  <p className="text-xs text-slate-400">Configure checking, savings, and credit card accounts</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsAddAccountModalOpen(true)}
+                  className="flex items-center gap-2 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-md shadow-blue-600/20 transition-all cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Account
+                </button>
+              </div>
+
+              {/* Pop-up Modal: Add New Account */}
+              {isAddAccountModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-5">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                      <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-blue-600/20 flex items-center justify-center text-blue-400">
+                          <Plus className="w-4 h-4" />
+                        </div>
+                        Add New Account
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => setIsAddAccountModalOpen(false)}
+                        className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <form onSubmit={(e) => {
+                      e.preventDefault();
+                      if (!newAccForm.name) return;
+                      addAccount(newAccForm);
+                      setNewAccForm({ name: '', type: 'checking', startingBalance: 0, saveExtraMonthly: 0, extraStartingBalance: 0, enableExtraSavings: true, color: 'blue', notes: '' });
+                      setIsAddAccountModalOpen(false);
+                    }} className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1">Account Name *</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. USAA Bills Checking - 7071"
+                          value={newAccForm.name}
+                          onChange={e => setNewAccForm({ ...newAccForm, name: e.target.value })}
+                          className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-blue-500"
+                          autoFocus
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-slate-300 mb-1">Account Type</label>
+                          <select
+                            value={newAccForm.type}
+                            onChange={e => setNewAccForm({ ...newAccForm, type: e.target.value })}
+                            className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-blue-500"
+                          >
+                            <option value="checking">Checking Account</option>
+                            <option value="savings">Savings Account</option>
+                            <option value="credit">Credit Card Account</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-slate-300 mb-1">Starting Balance ($)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            placeholder="0.00"
+                            value={newAccForm.startingBalance}
+                            onChange={e => setNewAccForm({ ...newAccForm, startingBalance: parseFloat(e.target.value) || 0 })}
+                            className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-100 font-mono focus:outline-none focus:border-blue-500"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-800">
+                        <div>
+                          <label className="block text-xs font-medium text-indigo-300 mb-1">Save Extra Target ($/mo)</label>
+                          <input
+                            type="number"
+                            step="10"
+                            placeholder="0"
+                            value={newAccForm.saveExtraMonthly || 0}
+                            onChange={e => setNewAccForm({ ...newAccForm, saveExtraMonthly: parseFloat(e.target.value) || 0 })}
+                            className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-emerald-400 font-mono font-bold focus:outline-none focus:border-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-slate-400 mb-1">Extra Starting Balance ($)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            placeholder="0.00"
+                            value={newAccForm.extraStartingBalance || 0}
+                            onChange={e => setNewAccForm({ ...newAccForm, extraStartingBalance: parseFloat(e.target.value) || 0 })}
+                            className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-200 font-mono focus:outline-none focus:border-blue-500"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+                        <button
+                          type="button"
+                          onClick={() => setIsAddAccountModalOpen(false)}
+                          className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          className="px-5 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/20 transition-all cursor-pointer"
+                        >
+                          Create Account
+                        </button>
+                      </div>
+                    </form>
                   </div>
                 </div>
-              </form>
+              )}
 
               {/* Accounts List */}
               <div className="space-y-3">
@@ -465,56 +547,134 @@ export function SettingsModal() {
           {/* TAB 2: PEOPLE & INCOME */}
           {settingsTab === 'people' && (
             <div className="space-y-6">
-              {/* Add Person Form */}
-              <form onSubmit={handleAddPerson} className="p-4 rounded-xl glass-card border border-slate-800 space-y-4">
-                <h3 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
-                  <Plus className="w-4 h-4 text-purple-400" />
-                  Add Household Member / Income Contributor
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                  <div>
-                    <label className="block text-xs text-slate-400 mb-1">Name</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Jon Kemp"
-                      value={newPersonForm.name}
-                      onChange={e => setNewPersonForm({ ...newPersonForm, name: e.target.value })}
-                      className="w-full px-3 py-1.5 text-sm bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:border-purple-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-slate-400 mb-1">Pay Schedule</label>
-                    <select
-                      value={newPersonForm.payFrequency}
-                      onChange={e => setNewPersonForm({ ...newPersonForm, payFrequency: e.target.value })}
-                      className="w-full px-3 py-1.5 text-sm bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:outline-none"
-                    >
-                      <option value="bi-weekly">Bi-weekly (26/yr)</option>
-                      <option value="monthly">Monthly (12/yr)</option>
-                      <option value="weekly">Weekly (52/yr)</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs text-slate-400 mb-1">Net Pay Per Paycheck ($)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      placeholder="2200.00"
-                      value={newPersonForm.netPerPay}
-                      onChange={e => setNewPersonForm({ ...newPersonForm, netPerPay: e.target.value })}
-                      className="w-full px-3 py-1.5 text-sm bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:outline-none"
-                    />
-                  </div>
-                  <div className="flex items-end">
-                    <button
-                      type="submit"
-                      className="w-full py-1.5 px-4 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-sm font-medium transition-colors"
-                    >
-                      Add Member
-                    </button>
+              {/* Header & Add Member Button */}
+              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
+                    <Users className="w-4 h-4 text-purple-400" />
+                    Household Members & Earners ({budget.people.length})
+                  </h3>
+                  <p className="text-xs text-slate-400">Configure household members, pay frequencies, and income</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsAddPersonModalOpen(true)}
+                  className="flex items-center gap-2 px-3.5 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-semibold shadow-md shadow-purple-600/20 transition-all cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Member
+                </button>
+              </div>
+
+              {/* Pop-up Modal: Add New Person */}
+              {isAddPersonModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-5">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                      <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-purple-600/20 flex items-center justify-center text-purple-400">
+                          <Plus className="w-4 h-4" />
+                        </div>
+                        Add Household Member
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => setIsAddPersonModalOpen(false)}
+                        className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <form onSubmit={(e) => {
+                      e.preventDefault();
+                      if (!newPersonForm.name) return;
+                      addPerson(newPersonForm);
+                      setNewPersonForm({ name: '', role: 'Member', payFrequency: 'bi-weekly', grossPerPay: 0, netPerPay: 0, payDay1: 15, payDay2: 'last' });
+                      setIsAddPersonModalOpen(false);
+                    }} className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1">Member Name *</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Jon Kemp"
+                          value={newPersonForm.name}
+                          onChange={e => setNewPersonForm({ ...newPersonForm, name: e.target.value })}
+                          className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-purple-500"
+                          autoFocus
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-slate-300 mb-1">Pay Schedule</label>
+                          <select
+                            value={newPersonForm.payFrequency}
+                            onChange={e => setNewPersonForm({ ...newPersonForm, payFrequency: e.target.value })}
+                            className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-purple-500"
+                          >
+                            <option value="bi-weekly">Bi-weekly (26/yr)</option>
+                            <option value="monthly">Monthly (12/yr)</option>
+                            <option value="weekly">Weekly (52/yr)</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-slate-300 mb-1">Role / Title</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Primary Earner"
+                            value={newPersonForm.role || ''}
+                            onChange={e => setNewPersonForm({ ...newPersonForm, role: e.target.value })}
+                            className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-purple-500"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-800">
+                        <div>
+                          <label className="block text-xs font-medium text-slate-300 mb-1">Gross Per Paycheck ($)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            placeholder="3000.00"
+                            value={newPersonForm.grossPerPay || 0}
+                            onChange={e => setNewPersonForm({ ...newPersonForm, grossPerPay: parseFloat(e.target.value) || 0 })}
+                            className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-100 font-mono focus:outline-none focus:border-purple-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-slate-300 mb-1">Net Per Paycheck ($)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            placeholder="2200.00"
+                            value={newPersonForm.netPerPay || 0}
+                            onChange={e => setNewPersonForm({ ...newPersonForm, netPerPay: parseFloat(e.target.value) || 0 })}
+                            className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-emerald-400 font-mono font-bold focus:outline-none focus:border-purple-500"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+                        <button
+                          type="button"
+                          onClick={() => setIsAddPersonModalOpen(false)}
+                          className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          className="px-5 py-2 rounded-xl text-xs font-semibold bg-purple-600 hover:bg-purple-500 text-white shadow-md shadow-purple-600/20 transition-all cursor-pointer"
+                        >
+                          Add Member
+                        </button>
+                      </div>
+                    </form>
                   </div>
                 </div>
-              </form>
+              )}
 
               {/* People List */}
               <div className="space-y-4">
@@ -593,59 +753,8 @@ export function SettingsModal() {
           {/* TAB 3: BILLS & ACCOUNT ASSIGNMENTS */}
           {settingsTab === 'bills' && (
             <div className="space-y-6">
-              {/* Add Bill Form */}
-              <form onSubmit={handleAddBill} className="p-4 rounded-xl glass-card border border-slate-800 space-y-4">
-                <h3 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
-                  <Plus className="w-4 h-4 text-emerald-400" />
-                  Add New Bill & Assign to Account
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-                  <div className="md:col-span-2">
-                    <label className="block text-xs text-slate-400 mb-1">Bill Name</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Comcast Cable / Electric"
-                      value={newBillForm.name}
-                      onChange={e => setNewBillForm({ ...newBillForm, name: e.target.value })}
-                      className="w-full px-3 py-1.5 text-sm bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-slate-400 mb-1">Amount ($)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      placeholder="100.00"
-                      value={newBillForm.amount}
-                      onChange={e => setNewBillForm({ ...newBillForm, amount: e.target.value })}
-                      className="w-full px-3 py-1.5 text-sm bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-slate-400 mb-1">Assigned Account</label>
-                    <select
-                      value={newBillForm.accountId}
-                      onChange={e => setNewBillForm({ ...newBillForm, accountId: e.target.value })}
-                      className="w-full px-3 py-1.5 text-sm bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:outline-none"
-                    >
-                      {budget.accounts.map(acc => (
-                        <option key={acc.id} value={acc.id}>{acc.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="flex items-end">
-                    <button
-                      type="submit"
-                      className="w-full py-1.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors"
-                    >
-                      Add Bill
-                    </button>
-                  </div>
-                </div>
-              </form>
-
-              {/* Active / Archived Bills Filter Bar */}
-              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+              {/* Active / Archived Bills Filter Bar & Add Bill Button */}
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
@@ -670,12 +779,139 @@ export function SettingsModal() {
                     Archived Bills ({budget.bills.filter(b => b.isArchived).length})
                   </button>
                 </div>
-                {billFilterTab === 'archived' && (
-                  <span className="text-[10px] text-amber-400 font-mono">
-                    Archived bills are hidden from active budget schedules while keeping historical register data intact.
-                  </span>
-                )}
+                <button
+                  type="button"
+                  onClick={() => setIsAddBillModalOpen(true)}
+                  className="flex items-center gap-2 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Bill
+                </button>
               </div>
+
+              {/* Pop-up Modal: Add New Bill */}
+              {isAddBillModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-5">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                      <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-emerald-600/20 flex items-center justify-center text-emerald-400">
+                          <Plus className="w-4 h-4" />
+                        </div>
+                        Add New Bill & Assign to Account
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => setIsAddBillModalOpen(false)}
+                        className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <form onSubmit={(e) => {
+                      e.preventDefault();
+                      if (!newBillForm.name) return;
+                      addBill(newBillForm);
+                      setNewBillForm({ name: '', amount: 0, period: 'Monthly', accountId: budget.accounts[0]?.id || '', dueDay: 1, paymentSource: 'Auto Pay', notes: '' });
+                      setIsAddBillModalOpen(false);
+                    }} className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1">Bill Name *</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Comcast Cable / Electric Utility"
+                          value={newBillForm.name}
+                          onChange={e => setNewBillForm({ ...newBillForm, name: e.target.value })}
+                          className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-emerald-500"
+                          autoFocus
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-slate-300 mb-1">Amount ($)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            placeholder="100.00"
+                            value={newBillForm.amount}
+                            onChange={e => setNewBillForm({ ...newBillForm, amount: parseFloat(e.target.value) || 0 })}
+                            className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-100 font-mono focus:outline-none focus:border-emerald-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-slate-300 mb-1">Billing Period</label>
+                          <select
+                            value={newBillForm.period}
+                            onChange={e => setNewBillForm({ ...newBillForm, period: e.target.value })}
+                            className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-emerald-500"
+                          >
+                            <option value="Monthly">Monthly</option>
+                            <option value="Semi-Annual">Semi-Annual</option>
+                            <option value="Annual">Annual</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-800">
+                        <div>
+                          <label className="block text-xs font-medium text-slate-300 mb-1">Assigned Account</label>
+                          <select
+                            value={newBillForm.accountId}
+                            onChange={e => setNewBillForm({ ...newBillForm, accountId: e.target.value })}
+                            className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-emerald-500"
+                          >
+                            {budget.accounts.map(acc => (
+                              <option key={acc.id} value={acc.id}>{acc.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-slate-300 mb-1">Due Day (1-31)</label>
+                          <input
+                            type="number"
+                            min="1"
+                            max="31"
+                            placeholder="15"
+                            value={newBillForm.dueDay}
+                            onChange={e => setNewBillForm({ ...newBillForm, dueDay: parseInt(e.target.value) || 1 })}
+                            className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-100 font-mono text-center focus:outline-none focus:border-emerald-500"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1">Payment Notes / Method</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Auto Pay / Credit Card"
+                          value={newBillForm.paymentSource || ''}
+                          onChange={e => setNewBillForm({ ...newBillForm, paymentSource: e.target.value, paymentNotes: e.target.value })}
+                          className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+                        <button
+                          type="button"
+                          onClick={() => setIsAddBillModalOpen(false)}
+                          className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          className="px-5 py-2 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
+                        >
+                          Add Bill
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
 
               {/* Bills List Grouped by Assigned Account */}
               <div className="space-y-6">

@@ -660,7 +660,7 @@ export function SettingsModal() {
                             </button>
                           </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-3 gap-3">
                           <div>
                             <label className="block text-[10px] text-slate-400 mb-1">Pay Date 1 (e.g. 1st / 1)</label>
                             <input
@@ -680,6 +680,19 @@ export function SettingsModal() {
                               onChange={e => setNewPersonForm({ ...newPersonForm, payDay2: e.target.value })}
                               className="w-full px-3 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:border-purple-500 font-mono"
                             />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] text-amber-300 font-semibold mb-1">Early Pay Deposit Offset</label>
+                            <select
+                              value={newPersonForm.payOffsetDays ?? 0}
+                              onChange={e => setNewPersonForm({ ...newPersonForm, payOffsetDays: parseInt(e.target.value) || 0 })}
+                              className="w-full px-3 py-1.5 text-xs bg-slate-900 border border-amber-500/40 rounded-lg text-amber-200 focus:outline-none focus:border-purple-500 font-mono"
+                            >
+                              <option value={0}>Exact Payday (0 Days)</option>
+                              <option value={-1}>1 Day Early (-1 Day)</option>
+                              <option value={-2}>2 Days Early (-2 Days e.g. USAA)</option>
+                              <option value={-3}>3 Days Early (-3 Days)</option>
+                            </select>
                           </div>
                         </div>
                       </div>
@@ -745,6 +758,11 @@ export function SettingsModal() {
                         <span className="text-xs px-2 py-0.5 rounded bg-purple-950 text-purple-300 border border-purple-800">
                           {person.payFrequency}
                         </span>
+                        {person.payOffsetDays ? (
+                          <span className="text-[10px] px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800 font-mono">
+                            {person.payOffsetDays}d Early Deposit
+                          </span>
+                        ) : null}
                       </div>
                       <button
                         onClick={() => deletePerson(person.id)}
@@ -791,10 +809,10 @@ export function SettingsModal() {
                         </div>
                       </div>
 
-                      {/* Pay Dates Bar with Presets & Custom Fields */}
+                      {/* Pay Dates Bar with Presets & Custom Fields & Early Deposit Offset */}
                       <div className="p-2.5 bg-slate-950/40 border border-slate-800 rounded-lg space-y-2">
                         <div className="flex items-center justify-between">
-                          <span className="text-[11px] font-semibold text-purple-300">Payment Dates & Schedule Rules:</span>
+                          <span className="text-[11px] font-semibold text-purple-300">Payment Dates & Deposit Schedule:</span>
                           <div className="flex items-center gap-1.5">
                             <button
                               type="button"
@@ -819,7 +837,7 @@ export function SettingsModal() {
                             </button>
                           </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-3 text-xs">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
                           <div>
                             <label className="text-slate-400 text-[10px]">Pay Date 1 (e.g. 1st / 1)</label>
                             <input
@@ -839,6 +857,19 @@ export function SettingsModal() {
                               className="mt-0.5 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-200 font-mono w-full focus:outline-none focus:border-purple-500"
                               placeholder="e.g. 15th or 15"
                             />
+                          </div>
+                          <div>
+                            <label className="text-amber-300 text-[10px] font-semibold">Early Direct Deposit Offset</label>
+                            <select
+                              value={person.payOffsetDays ?? 0}
+                              onChange={e => updatePerson(person.id, { payOffsetDays: parseInt(e.target.value) || 0 })}
+                              className="mt-0.5 bg-slate-900 border border-amber-500/40 rounded px-2 py-1 text-amber-200 font-mono w-full focus:outline-none focus:border-purple-500"
+                            >
+                              <option value={0}>Exact Payday (0 Days)</option>
+                              <option value={-1}>1 Day Early (-1 Day)</option>
+                              <option value={-2}>2 Days Early (-2 Days e.g. USAA)</option>
+                              <option value={-3}>3 Days Early (-3 Days)</option>
+                            </select>
                           </div>
                         </div>
                       </div>

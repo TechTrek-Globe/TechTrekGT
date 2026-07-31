@@ -393,7 +393,8 @@ async function onRequestGet(context) {
       headers: { "Content-Type": "application/json" }
     });
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message || "Failed to fetch budget" }), {
+    const errorMessage = err instanceof Error ? err.message : String(err || "Failed to fetch budget");
+    return new Response(JSON.stringify({ error: errorMessage }), {
       status: 500,
       headers: { "Content-Type": "application/json" }
     });
@@ -534,18 +535,21 @@ async function onRequestPost(context) {
       headers: { "Content-Type": "application/json" }
     });
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message || "Failed to sync budget" }), {
+    const errorMessage = err instanceof Error ? err.message : String(err || "Failed to sync budget");
+    return new Response(JSON.stringify({ error: errorMessage }), {
       status: 500,
       headers: { "Content-Type": "application/json" }
     });
   }
 }
-function addSecurityHeaders(response) {
+function addSecurityHeaders(response, isLocalhost = false) {
   const newHeaders = new Headers(response.headers);
-  newHeaders.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  if (!isLocalhost) {
+    newHeaders.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+    newHeaders.set("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self';");
+  }
   newHeaders.set("X-Content-Type-Options", "nosniff");
   newHeaders.set("X-Frame-Options", "DENY");
-  newHeaders.set("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self';");
   return new Response(response.body, {
     status: response.status,
     statusText: response.statusText,
@@ -561,7 +565,8 @@ const worker = {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const context = { request, env, ctx };
-    if (url.protocol === "http:" || request.headers.get("x-forwarded-proto") === "http") {
+    const isLocalhost = url.hostname === "localhost" || url.hostname === "127.0.0.1";
+    if (!isLocalhost && (url.protocol === "http:" || request.headers.get("x-forwarded-proto") === "http")) {
       url.protocol = "https:";
       return Response.redirect(url.toString(), 301);
     }
@@ -592,7 +597,7 @@ const worker = {
         headers: { "Content-Type": "application/json" }
       });
     }
-    return addSecurityHeaders(response);
+    return addSecurityHeaders(response, isLocalhost);
   }
 };
 const workerEntry = worker ?? {};

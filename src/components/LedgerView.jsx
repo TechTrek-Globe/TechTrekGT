@@ -256,47 +256,41 @@ function DailySpreadsheetMatrix() {
     : (selectedAccount?.enableExtraSavings !== false);
 
   return (
-    <div className="space-y-4">
+    <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
 
-      {/* KPI Summary Strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="p-3.5 rounded-2xl glass-panel space-y-0.5">
-          <span className="text-[11px] text-slate-400 block">Month Start Balance</span>
-          <span className="text-lg font-black text-slate-100 font-mono block">
-            ${(matrixData[0]?.regBeg || 0).toFixed(2)}
-          </span>
-        </div>
-
-        <div className="p-3.5 rounded-2xl glass-panel space-y-0.5">
-          <span className="text-[11px] text-slate-400 block">Total Deposits (+)</span>
-          <span className="text-lg font-black text-emerald-400 font-mono block">
-            +${columnTotals.totalRegCredits.toFixed(2)}
-          </span>
-        </div>
-
-        <div className="p-3.5 rounded-2xl glass-panel space-y-0.5">
-          <span className="text-[11px] text-slate-400 block">Total Bill Deductions (-)</span>
-          <span className="text-lg font-black text-rose-400 font-mono block">
-            -${columnTotals.totalBills.toFixed(2)}
-          </span>
-        </div>
-
-        <div className="p-3.5 rounded-2xl glass-panel space-y-0.5">
-          <span className="text-[11px] text-slate-400 block">Month End Total Balance</span>
-          <span className={`text-lg font-black font-mono block ${finalEndingBalance < 0 ? 'text-rose-400' : 'text-blue-400'}`}>
-            ${finalEndingBalance.toFixed(2)}
-          </span>
-        </div>
-      </div>
-
-      {/* SPREADSHEET MATRIX TABLE CONTAINER (Sticky at top-14 Red Line) */}
-      <div className="sticky top-14 z-30 overflow-auto max-h-[calc(100vh-75px)] min-h-[500px] rounded-2xl border border-slate-800 glass-panel shadow-2xl relative">
+      {/* SPREADSHEET MATRIX TABLE CONTAINER (Top-Level Viewport Locked) */}
+      <div className="flex-1 min-h-0 overflow-auto rounded-2xl border border-slate-800 glass-panel shadow-2xl relative">
 
         {/* Compact Sticky Toolbar - Tier 1 (top-0 z-40) */}
-        <div className="sticky top-0 z-40 bg-slate-900/95 backdrop-blur border-b border-slate-800 px-4 py-2 flex flex-wrap items-center justify-between gap-3 shadow-md">
+        <div className="sticky top-0 z-40 bg-slate-900/95 backdrop-blur border-b border-slate-800 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 shadow-md">
           <div className="flex items-center gap-2">
             <Wallet className="w-4 h-4 text-emerald-400" />
             <h3 className="text-xs font-black text-slate-100 uppercase tracking-wider">Daily Register Matrix &amp; Cash Flow</h3>
+          </div>
+
+          {/* Integrated KPI Metrics Pill Bar */}
+          <div className="hidden xl:flex items-center gap-3 bg-slate-950 px-3 py-1 rounded-xl border border-slate-800 text-[11px] font-mono">
+            <div className="flex items-center gap-1">
+              <span className="text-slate-400">Start:</span>
+              <span className="text-slate-200 font-bold">${(matrixData[0]?.regBeg || 0).toFixed(2)}</span>
+            </div>
+            <div className="h-3 w-px bg-slate-800" />
+            <div className="flex items-center gap-1">
+              <span className="text-slate-400">Deposits:</span>
+              <span className="text-emerald-400 font-bold">+${columnTotals.totalRegCredits.toFixed(2)}</span>
+            </div>
+            <div className="h-3 w-px bg-slate-800" />
+            <div className="flex items-center gap-1">
+              <span className="text-slate-400">Bills:</span>
+              <span className="text-rose-400 font-bold">-${columnTotals.totalBills.toFixed(2)}</span>
+            </div>
+            <div className="h-3 w-px bg-slate-800" />
+            <div className="flex items-center gap-1">
+              <span className="text-slate-400">End Total:</span>
+              <span className={`font-bold ${finalEndingBalance < 0 ? 'text-rose-400' : 'text-blue-400'}`}>
+                ${finalEndingBalance.toFixed(2)}
+              </span>
+            </div>
           </div>
 
           <div className="flex items-center gap-2.5">
@@ -551,7 +545,7 @@ function DailySpreadsheetMatrix() {
 // ==========================================
 export function LedgerView() {
   return (
-    <div className="space-y-4 pb-[300px]">
+    <div className="h-[calc(100vh-100px)] flex flex-col overflow-hidden">
       <DailySpreadsheetMatrix />
     </div>
   );

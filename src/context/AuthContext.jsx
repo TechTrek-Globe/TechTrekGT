@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
-const AuthContext = createContext();
+const AuthContext = createContext(null);
 
 const AUTH_TOKEN_KEY = 'personal_budget_auth_token_v1';
 
@@ -16,6 +16,7 @@ export function AuthProvider({ children }) {
     async function verifyCurrentSession() {
       if (!token) {
         setIsLoading(false);
+        setIsAuthModalOpen(true);
         return;
       }
 
@@ -34,6 +35,7 @@ export function AuthProvider({ children }) {
           setToken(null);
           setUser(null);
           setHouseholdId(null);
+          setIsAuthModalOpen(true);
         }
       } catch (err) {
         console.error('Failed to verify authentication session:', err);

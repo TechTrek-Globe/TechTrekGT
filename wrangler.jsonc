@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "personal-budget-app",
+  "name": "techtrek-budget",
   "compatibility_date": "2026-07-31",
   "observability": {
     "enabled": true

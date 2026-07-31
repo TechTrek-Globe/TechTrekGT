@@ -1,11 +1,77 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useCallback } from 'react';
 import { useBudget } from '../context/BudgetContext';
-import { ReceiptText, Pencil, Check, X, AlertTriangle } from 'lucide-react';
+import {
+  ReceiptText,
+  Pencil,
+  Check,
+  X,
+  AlertTriangle,
+  ChevronDown,
+  ChevronRight,
+  ArrowUpDown
+} from 'lucide-react';
 
 const MONTHS = [
   'January','February','March','April','May','June',
   'July','August','September','October','November','December'
 ];
+
+// Inline mini progress bar
+function MiniBar({ pct, overBudget }) {
+  const clamped = Math.min(120, Math.max(0, pct));
+  return (
+    <div className="h-1 w-14 bg-slate-800 rounded-full overflow-hidden">
+      <div
+        className={`h-full rounded-full transition-all duration-500 ${overBudget ? 'bg-rose-500' : 'bg-emerald-500'}`}
+        style={{ width: `${Math.min(100, clamped)}%` }}
+      />
+    </div>
+  );
+}
+
+// Single editable cell
+function ActualCell({ bill, projected, actual, isEditing, editValue, onEdit, onCommit, onCancel, onChange }) {
+  const isOverridden = actual !== projected;
+  const inputRef = useRef(null);
+
+  return isEditing ? (
+    <div className="inline-flex items-center gap-1 editing-cell">
+      <span className="text-slate-500 text-xs">$</span>
+      <input
+        ref={inputRef}
+        type="number"
+        step="0.01"
+        min="0"
+        value={editValue}
+        onChange={e => onChange(e.target.value)}
+        onKeyDown={e => {
+          if (e.key === 'Enter')  { e.preventDefault(); onCommit(); }
+          if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
+        }}
+        className="w-20 bg-slate-800 border border-emerald-500/70 rounded px-1.5 py-0.5 text-emerald-300 text-xs text-right font-mono focus:outline-none focus:border-emerald-400"
+        autoFocus
+      />
+      <button onClick={onCommit} className="p-0.5 text-emerald-400 hover:text-emerald-300 transition-colors" title="Commit (Enter)">
+        <Check className="w-3 h-3" />
+      </button>
+      <button onClick={onCancel} className="p-0.5 text-slate-400 hover:text-rose-400 transition-colors" title="Cancel (Esc)">
+        <X className="w-3 h-3" />
+      </button>
+    </div>
+  ) : (
+    <button
+      onClick={() => onEdit(bill.id, actual)}
+      className="group/cell flex items-center gap-1.5 text-right w-full justify-end"
+      title="Click to edit actual amount"
+    >
+      <span className={`font-mono text-xs ${isOverridden ? 'text-emerald-300 font-bold' : 'text-slate-400'}`}>
+        ${actual.toFixed(2)}
+        {isOverridden && <span className="ml-1 text-[9px] text-blue-400 font-normal">(actual)</span>}
+      </span>
+      <Pencil className="w-2.5 h-2.5 text-slate-600 group-hover/cell:text-emerald-400 transition-colors opacity-0 group-hover/cell:opacity-100 flex-shrink-0" />
+    </button>
+  );
+}
 
 export function InteractiveBudgetView() {
   const {
@@ -18,66 +84,66 @@ export function InteractiveBudgetView() {
     getAccountActualExpenses,
     getAccountProjectedEndBalance,
     getAccountActualEndBalance,
-    getBillPersonMonthlyPortion
+    getBillPersonMonthlyPortion,
   } = useBudget();
 
   const today = new Date();
   const [selectedMonth, setSelectedMonth] = useState(today.getMonth());
-  const [selectedYear, setSelectedYear] = useState(today.getFullYear());
-  const [editingCell, setEditingCell] = useState(null); // { billId: string } or null
-  const [editValue, setEditValue] = useState('');
+  const [selectedYear,  setSelectedYear]  = useState(today.getFullYear());
+  const [editingCell,   setEditingCell]   = useState(null);
+  const [editValue,     setEditValue]     = useState('');
+  const [collapsedAccounts, setCollapsedAccounts] = useState({});
 
   const monthKey = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`;
 
   const totalProjected = useMemo(() => getTotalMonthlyExpenses(), [budget.bills]);
-  const totalActual = useMemo(() => getTotalActualExpenses(monthKey), [budget.lineItems, budget.bills, monthKey]);
-  const variance = totalActual - totalProjected;
+  const totalActual    = useMemo(() => getTotalActualExpenses(monthKey), [budget.lineItems, budget.bills, monthKey]);
+  const variance       = totalActual - totalProjected;
 
-  const openEditor = (billId, currentEffective) => {
+  const openEditor = useCallback((billId, currentActual) => {
     setEditingCell(billId);
-    setEditValue(currentEffective.toFixed(2));
-  };
+    setEditValue(currentActual.toFixed(2));
+  }, []);
 
-  const commitEdit = (billId) => {
+  const commitEdit = useCallback((billId) => {
     const val = parseFloat(editValue);
     if (!isNaN(val) && val >= 0) {
       upsertLineItem(billId, monthKey, val);
     }
     setEditingCell(null);
     setEditValue('');
-  };
+  }, [editValue, monthKey, upsertLineItem]);
 
-  const cancelEdit = () => {
+  const cancelEdit = useCallback(() => {
     setEditingCell(null);
     setEditValue('');
-  };
+  }, []);
 
-  const clearOverride = (billId) => {
-    upsertLineItem(billId, monthKey, getBillMonthlyCost(budget.bills.find(b => b.id === billId)));
-    setEditingCell(null);
+  const toggleAccount = (accountId) => {
+    setCollapsedAccounts(prev => ({ ...prev, [accountId]: !prev[accountId] }));
   };
 
   return (
-    <div className="space-y-8 animate-fade-in pb-16">
+    <div className="space-y-6 animate-fade-in pb-16">
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-6 rounded-2xl bg-slate-900 border border-slate-800">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2">
+          <h2 className="text-xl font-black text-slate-100 flex items-center gap-2">
             <ReceiptText className="w-5 h-5 text-emerald-400" />
             Interactive Budget Ledger
           </h2>
-          <p className="text-xs text-slate-400 mt-1">
-            Inline edit actual amounts &mdash; projected vs actual with real-time recalculation
+          <p className="text-xs text-slate-400 mt-0.5">
+            Click any actual amount cell to edit &mdash; changes update Dashboard in real time
           </p>
         </div>
 
-        {/* Month/Year Selector */}
-        <div className="flex items-center gap-3">
+        {/* Month / Year picker */}
+        <div className="flex items-center gap-2">
           <select
             value={selectedMonth}
             onChange={e => setSelectedMonth(parseInt(e.target.value))}
-            className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
+            className="bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-emerald-500 transition-colors"
           >
             {MONTHS.map((m, i) => (
               <option key={i} value={i}>{m}</option>
@@ -87,218 +153,213 @@ export function InteractiveBudgetView() {
             type="number"
             value={selectedYear}
             onChange={e => setSelectedYear(parseInt(e.target.value) || today.getFullYear())}
-            className="w-20 bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-200 font-mono focus:outline-none focus:border-emerald-500 text-center"
+            className="w-20 bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-emerald-500 text-center transition-colors"
           />
         </div>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="p-5 rounded-2xl glass-panel space-y-1">
-          <span className="text-xs text-slate-400">Projected Expenses</span>
-          <span className="text-2xl font-bold text-slate-100 font-mono">
-            ${totalProjected.toFixed(2)}
-          </span>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="p-4 rounded-2xl glass-panel space-y-1">
+          <span className="text-xs text-slate-400">Projected</span>
+          <span className="text-2xl font-black text-slate-100 font-mono block">${totalProjected.toFixed(2)}</span>
+          <div className="h-1 bg-slate-700 rounded-full" />
         </div>
-        <div className="p-5 rounded-2xl glass-panel space-y-1">
-          <span className="text-xs text-slate-400">Actual Expenses</span>
-          <span className="text-2xl font-bold text-emerald-400 font-mono">
-            ${totalActual.toFixed(2)}
-          </span>
+        <div className="p-4 rounded-2xl glass-panel space-y-1">
+          <span className="text-xs text-slate-400">Actual ({MONTHS[selectedMonth].slice(0,3)})</span>
+          <span className="text-2xl font-black text-emerald-400 font-mono block">${totalActual.toFixed(2)}</span>
+          <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all duration-700"
+              style={{
+                width: `${Math.min(100, totalProjected > 0 ? (totalActual / totalProjected) * 100 : 0)}%`,
+                backgroundColor: totalActual > totalProjected ? '#f43f5e' : '#10b981'
+              }}
+            />
+          </div>
         </div>
-        <div className={`p-5 rounded-2xl glass-panel space-y-1 ${Math.abs(variance) < 0.01 ? '' : variance > 0 ? 'border-rose-800/60' : 'border-emerald-800/60'}`}>
+        <div className={`p-4 rounded-2xl glass-panel space-y-1 ${
+          Math.abs(variance) < 0.01 ? '' : variance > 0 ? 'border-rose-800/50' : 'border-emerald-800/50'
+        }`}>
           <span className="text-xs text-slate-400">Variance (Actual - Projected)</span>
-          <span className={`text-2xl font-bold font-mono ${Math.abs(variance) < 0.01 ? 'text-slate-400' : variance > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+          <span className={`text-2xl font-black font-mono block ${
+            Math.abs(variance) < 0.01 ? 'text-slate-400' : variance > 0 ? 'text-rose-400' : 'text-emerald-400'
+          }`}>
             {variance >= 0 ? '+' : ''}{variance.toFixed(2)}
           </span>
+          <div className="text-[10px] text-slate-500">
+            {Math.abs(variance) < 0.01 ? 'On budget' : variance > 0 ? 'Over budget' : 'Under budget'}
+          </div>
         </div>
       </div>
 
-      {/* Tables Grouped by Account */}
+      {/* Tables grouped by Account */}
       {budget.accounts.map(account => {
-        const accountBills = budget.bills.filter(b => b.accountId === account.id);
+        const accountBills     = budget.bills.filter(b => b.accountId === account.id);
         if (accountBills.length === 0) return null;
 
-        const accountProjTotal = accountBills.reduce((sum, b) => sum + getBillMonthlyCost(b), 0);
-        const accountActualTotal = getAccountActualExpenses(account.id, monthKey);
-        const projEndBal = getAccountProjectedEndBalance(account.id, monthKey);
-        const actualEndBal = getAccountActualEndBalance(account.id, monthKey);
-        const balVariance = actualEndBal - projEndBal;
+        const accountProjTotal = accountBills.reduce((s, b) => s + getBillMonthlyCost(b), 0);
+        const accountActual    = getAccountActualExpenses(account.id, monthKey);
+        const projEndBal       = getAccountProjectedEndBalance(account.id, monthKey);
+        const actualEndBal     = getAccountActualEndBalance(account.id, monthKey);
+        const isCollapsed      = collapsedAccounts[account.id];
+        const overBudget       = accountActual > accountProjTotal;
 
         return (
-          <div key={account.id} className="space-y-3">
-            {/* Account Header */}
-            <div className="flex items-center justify-between px-2">
-              <div className="flex items-center gap-3">
-                <div className="w-3 h-3 rounded-full bg-blue-500" />
-                <h3 className="text-base font-bold text-slate-200">{account.name}</h3>
-                <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400 capitalize">
-                  {account.type}
+          <div key={account.id} className="space-y-0">
+            {/* Account Section Header */}
+            <button
+              onClick={() => toggleAccount(account.id)}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-t-2xl bg-slate-900/90 border border-slate-800 hover:bg-slate-900 transition-colors text-left"
+            >
+              {isCollapsed ? <ChevronRight className="w-4 h-4 text-slate-500" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}
+              <div className="w-3 h-3 rounded-full bg-blue-500 flex-shrink-0" />
+              <h3 className="text-sm font-bold text-slate-200 flex-1">{account.name}</h3>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 capitalize flex-shrink-0">{account.type}</span>
+              <div className="flex items-center gap-4 text-xs ml-auto">
+                <span className="text-slate-500">
+                  Start: <span className="font-mono text-slate-300">${(account.startingBalance || 0).toFixed(2)}</span>
                 </span>
+                <span className="text-slate-500">
+                  Proj end: <span className={`font-mono ${projEndBal < 0 ? 'text-rose-400' : 'text-slate-300'}`}>${projEndBal.toFixed(2)}</span>
+                </span>
+                <span className="text-slate-500">
+                  Actual end: <span className={`font-mono ${actualEndBal < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>${actualEndBal.toFixed(2)}</span>
+                </span>
+                {overBudget && (
+                  <span className="text-[9px] px-2 py-0.5 rounded-full bg-rose-950 text-rose-300 border border-rose-800 font-semibold">Over</span>
+                )}
               </div>
-              <div className="flex items-center gap-4 text-xs">
-                <span className="text-slate-400">
-                  Start: <span className="font-mono text-slate-200">${(account.startingBalance || 0).toFixed(2)}</span>
-                </span>
-                <span className="text-slate-400">
-                  Proj End: <span className={`font-mono ${projEndBal < 0 ? 'text-rose-400' : 'text-slate-200'}`}>
-                    ${projEndBal.toFixed(2)}
-                  </span>
-                </span>
-                <span className="text-slate-400">
-                  Actual End: <span className={`font-mono ${actualEndBal < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
-                    ${actualEndBal.toFixed(2)}
-                  </span>
-                </span>
-              </div>
-            </div>
+            </button>
 
             {/* Bills Table */}
-            <div className="overflow-x-auto rounded-2xl border border-slate-800 glass-panel">
-              <table className="w-full text-left text-xs text-slate-300">
-                <thead className="bg-slate-900/90 text-slate-400 uppercase font-medium text-[11px] border-b border-slate-800">
-                  <tr>
-                    <th className="p-3.5 w-1/4">Bill Name</th>
-                    <th className="p-3.5 text-right">Projected</th>
-                    <th className="p-3.5 text-right">Actual</th>
-                    <th className="p-3.5 text-right">Variance</th>
-                    <th className="p-3.5 text-right">Due Day</th>
-                    {budget.people.map(p => (
-                      <th key={p.id} className="p-3.5 text-right">{p.name}</th>
-                    ))}
-                    <th className="p-3.5">Notes</th>
-                    <th className="p-3.5 text-center">Edit</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/60 bg-slate-950/20">
-                  {accountBills.map(bill => {
-                    const projected = getBillMonthlyCost(bill);
-                    const li = getLineItem(bill.id, monthKey);
-                    const actual = li ? li.actualAmount : projected;
-                    const billVariance = actual - projected;
-                    const isEditing = editingCell === bill.id;
-                    const isOverridden = li !== undefined;
-
-                    return (
-                      <tr key={bill.id} className={`hover:bg-slate-900/40 transition-colors ${isOverridden ? 'bg-blue-950/20' : ''}`}>
-                        <td className="p-3.5 font-semibold text-slate-200">{bill.name}</td>
-                        <td className="p-3.5 text-right font-mono text-slate-300">
-                          ${projected.toFixed(2)}
-                        </td>
-                        <td className="p-3.5 text-right font-mono">
-                          {isEditing ? (
-                            <div className="inline-flex items-center gap-1">
-                              <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={editValue}
-                                onChange={e => setEditValue(e.target.value)}
-                                onKeyDown={e => {
-                                  if (e.key === 'Enter') commitEdit(bill.id);
-                                  if (e.key === 'Escape') cancelEdit();
-                                }}
-                                className="w-20 bg-slate-800 border border-emerald-600 rounded px-2 py-1 text-emerald-300 text-xs text-right font-mono focus:outline-none"
-                                autoFocus
-                              />
-                              <button onClick={() => commitEdit(bill.id)} className="p-0.5 text-emerald-400 hover:text-emerald-300"><Check className="w-3.5 h-3.5" /></button>
-                              <button onClick={cancelEdit} className="p-0.5 text-slate-400 hover:text-rose-400"><X className="w-3.5 h-3.5" /></button>
-                            </div>
-                          ) : (
-                            <span className={`${isOverridden ? 'text-emerald-300 font-bold' : 'text-slate-400'}`}>
-                              ${actual.toFixed(2)}
-                              {isOverridden && <span className="ml-1 text-[10px] text-blue-400 font-normal">(override)</span>}
-                            </span>
-                          )}
-                        </td>
-                        <td className="p-3.5 text-right font-mono">
-                          {Math.abs(billVariance) < 0.01 ? (
-                            <span className="text-slate-500">&mdash;</span>
-                          ) : billVariance > 0 ? (
-                            <span className="text-rose-400">+{billVariance.toFixed(2)}</span>
-                          ) : (
-                            <span className="text-emerald-400">{billVariance.toFixed(2)}</span>
-                          )}
-                        </td>
-                        <td className="p-3.5 text-right font-mono text-slate-400">Day {bill.dueDay}</td>
-                        {budget.people.map(p => {
-                          const portion = getBillPersonMonthlyPortion(bill, p.id);
-                          return (
-                            <td key={p.id} className="p-3.5 text-right font-mono text-purple-300">
-                              ${portion.toFixed(2)}
-                            </td>
-                          );
-                        })}
-                        <td className="p-3.5 text-slate-400 italic max-w-xs truncate">{bill.notes || '&mdash;'}</td>
-                        <td className="p-3.5 text-center">
-                          {isEditing ? null : (
-                            <button
-                              onClick={() => openEditor(bill.id, actual)}
-                              className="p-1 text-slate-500 hover:text-emerald-400 rounded transition-colors"
-                              title="Edit actual amount"
-                            >
-                              <Pencil className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-                {/* Account Subtotal Row */}
-                <tfoot className="bg-slate-900/80 font-bold border-t border-slate-800 text-slate-200">
-                  <tr>
-                    <td className="p-3.5 text-slate-300">Account Subtotal</td>
-                    <td className="p-3.5 text-right font-mono text-slate-100">
-                      ${accountProjTotal.toFixed(2)}
-                    </td>
-                    <td className="p-3.5 text-right font-mono text-emerald-400">
-                      ${accountActualTotal.toFixed(2)}
-                    </td>
-                    <td className="p-3.5 text-right font-mono">
-                      {Math.abs(accountActualTotal - accountProjTotal) < 0.01 ? (
-                        <span className="text-slate-500">&mdash;</span>
-                      ) : (
-                        <span className={accountActualTotal > accountProjTotal ? 'text-rose-400' : 'text-emerald-400'}>
-                          ${(accountActualTotal - accountProjTotal).toFixed(2)}
+            {!isCollapsed && (
+              <div className="overflow-x-auto border border-t-0 border-slate-800 rounded-b-2xl glass-panel">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-900/90 text-slate-500 uppercase font-semibold text-[10px] border-b border-slate-800">
+                    <tr>
+                      <th className="p-3 w-1/4">Bill Name</th>
+                      <th className="p-3 text-center w-20">Progress</th>
+                      <th className="p-3 text-right">Projected</th>
+                      <th className="p-3 text-right">
+                        <span className="flex items-center gap-1 justify-end">
+                          Actual
+                          <Pencil className="w-2.5 h-2.5 text-emerald-600" />
                         </span>
-                      )}
-                    </td>
-                    <td colSpan={3 + budget.people.length}></td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
+                      </th>
+                      <th className="p-3 text-right">Variance</th>
+                      <th className="p-3 text-right">Due Day</th>
+                      {budget.people.map(p => (
+                        <th key={p.id} className="p-3 text-right">{p.name.split(' ')[0]}</th>
+                      ))}
+                      <th className="p-3 text-left">Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/50">
+                    {accountBills.map(bill => {
+                      const projected    = getBillMonthlyCost(bill);
+                      const li           = getLineItem(bill.id, monthKey);
+                      const actual       = li ? li.actualAmount : projected;
+                      const billVariance = actual - projected;
+                      const isEditing    = editingCell === bill.id;
+                      const isOverridden = li !== undefined;
+                      const barPct       = projected > 0 ? (actual / projected) * 100 : 0;
+
+                      return (
+                        <tr
+                          key={bill.id}
+                          className={`hover:bg-slate-900/30 transition-colors relative ${isOverridden ? 'row-overridden' : ''}`}
+                        >
+                          <td className="p-3 font-semibold text-slate-200 pl-5">{bill.name}</td>
+                          <td className="p-3 text-center">
+                            <div className="flex justify-center">
+                              <MiniBar pct={barPct} overBudget={actual > projected} />
+                            </div>
+                          </td>
+                          <td className="p-3 text-right font-mono text-slate-400">${projected.toFixed(2)}</td>
+                          <td className="p-3 text-right">
+                            <ActualCell
+                              bill={bill}
+                              projected={projected}
+                              actual={actual}
+                              isEditing={isEditing}
+                              editValue={editValue}
+                              onEdit={openEditor}
+                              onCommit={() => commitEdit(bill.id)}
+                              onCancel={cancelEdit}
+                              onChange={setEditValue}
+                            />
+                          </td>
+                          <td className="p-3 text-right font-mono">
+                            {Math.abs(billVariance) < 0.01 ? (
+                              <span className="text-slate-600">&mdash;</span>
+                            ) : billVariance > 0 ? (
+                              <span className="text-rose-400">+{billVariance.toFixed(2)}</span>
+                            ) : (
+                              <span className="text-emerald-400">{billVariance.toFixed(2)}</span>
+                            )}
+                          </td>
+                          <td className="p-3 text-right font-mono text-slate-500">Day {bill.dueDay}</td>
+                          {budget.people.map(p => {
+                            const portion = getBillPersonMonthlyPortion(bill, p.id);
+                            return (
+                              <td key={p.id} className="p-3 text-right font-mono text-purple-300/80">${portion.toFixed(2)}</td>
+                            );
+                          })}
+                          <td className="p-3 text-slate-500 italic max-w-xs truncate">{bill.notes || <span className="text-slate-700">&mdash;</span>}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot className="bg-slate-900/80 font-bold border-t border-slate-700/80 text-slate-200">
+                    <tr>
+                      <td className="p-3 text-slate-400 pl-5" colSpan={2}>Account Subtotal</td>
+                      <td className="p-3 text-right font-mono">${accountProjTotal.toFixed(2)}</td>
+                      <td className="p-3 text-right font-mono text-emerald-400">${accountActual.toFixed(2)}</td>
+                      <td className="p-3 text-right font-mono">
+                        {Math.abs(accountActual - accountProjTotal) < 0.01 ? (
+                          <span className="text-slate-600">&mdash;</span>
+                        ) : (
+                          <span className={accountActual > accountProjTotal ? 'text-rose-400' : 'text-emerald-400'}>
+                            {accountActual > accountProjTotal ? '+' : ''}{(accountActual - accountProjTotal).toFixed(2)}
+                          </span>
+                        )}
+                      </td>
+                      <td colSpan={2 + budget.people.length} />
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
           </div>
         );
       })}
 
       {/* Grand Totals Footer */}
-      <div className="p-6 rounded-2xl glass-panel border border-slate-800">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="p-5 rounded-2xl glass-panel border border-slate-800/80">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
           <div>
             <span className="text-xs text-slate-400 block">Total Projected</span>
-            <span className="text-2xl font-black text-slate-100 font-mono">
-              ${totalProjected.toFixed(2)}
-            </span>
+            <span className="text-2xl font-black text-slate-100 font-mono">${totalProjected.toFixed(2)}</span>
           </div>
           <div>
-            <span className="text-xs text-slate-400 block">Total Actual ({MONTHS[selectedMonth]} {selectedYear})</span>
-            <span className="text-2xl font-black text-emerald-400 font-mono">
-              ${totalActual.toFixed(2)}
-            </span>
+            <span className="text-xs text-slate-400 block">Total Actual &mdash; {MONTHS[selectedMonth]} {selectedYear}</span>
+            <span className="text-2xl font-black text-emerald-400 font-mono">${totalActual.toFixed(2)}</span>
           </div>
           <div>
             <span className="text-xs text-slate-400 block">Net Variance</span>
-            <span className={`text-2xl font-black font-mono ${Math.abs(variance) < 0.01 ? 'text-slate-400' : variance > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+            <span className={`text-2xl font-black font-mono ${
+              Math.abs(variance) < 0.01 ? 'text-slate-400' : variance > 0 ? 'text-rose-400' : 'text-emerald-400'
+            }`}>
               {variance >= 0 ? '+' : ''}{variance.toFixed(2)}
             </span>
           </div>
         </div>
-        <div className="mt-4 pt-4 border-t border-slate-800 text-xs text-slate-400">
-          <span className="flex items-center gap-2">
-            <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
-            Actual overrides are per-bill, per-month. Empty cells use projected defaults.
+        <div className="mt-4 pt-4 border-t border-slate-800 text-[10px] text-slate-500 flex items-center gap-2">
+          <AlertTriangle className="w-3 h-3 text-amber-400 flex-shrink-0" />
+          <span>
+            Click any Actual cell to override for {MONTHS[selectedMonth]} {selectedYear}. Overrides persist per-bill, per-month.
+            Rows with a green left border have been overridden from the projected default.
           </span>
         </div>
       </div>

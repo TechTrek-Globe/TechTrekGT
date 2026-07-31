@@ -1,9 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
+/** @type {React.Context<any>} */
 const AuthContext = createContext(null);
 
 const AUTH_TOKEN_KEY = 'personal_budget_auth_token_v1';
 
+/**
+ * @param {{ children: React.ReactNode }} props
+ */
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(() => localStorage.getItem(AUTH_TOKEN_KEY) || null);
@@ -47,6 +51,10 @@ export function AuthProvider({ children }) {
     verifyCurrentSession();
   }, [token]);
 
+  /**
+   * @param {string} email
+   * @param {string} password
+   */
   const login = async (email, password) => {
     const res = await fetch('/api/auth/login', {
       method: 'POST',
@@ -67,6 +75,11 @@ export function AuthProvider({ children }) {
     return data;
   };
 
+  /**
+   * @param {string} name
+   * @param {string} email
+   * @param {string} password
+   */
   const register = async (name, email, password) => {
     const res = await fetch('/api/auth/register', {
       method: 'POST',

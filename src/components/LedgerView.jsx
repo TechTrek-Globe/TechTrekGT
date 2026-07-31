@@ -12,7 +12,9 @@ import {
   Sparkles,
   ArrowUpRight,
   ArrowDownRight,
-  Info
+  Info,
+  Archive,
+  RotateCcw
 } from 'lucide-react';
 import { InlineEdit } from './InlineEdit';
 
@@ -70,6 +72,8 @@ function DailySpreadsheetMatrix() {
     getDailyMatrixCell,
     updateDailyMatrixCell,
     updateBill,
+    archiveBill,
+    unarchiveBill,
     updateAccount
   } = useBudget();
 
@@ -77,30 +81,37 @@ function DailySpreadsheetMatrix() {
   const [selectedAccountId, setSelectedAccountId] = useState(budget.accounts[1]?.id || budget.accounts[0]?.id || 'all');
   const [selectedMonth, setSelectedMonth] = useState(today.getMonth());
   const [selectedYear, setSelectedYear] = useState(today.getFullYear());
+  const [showArchivedBills, setShowArchivedBills] = useState(false);
 
   const monthKey = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`;
   const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
 
-  const [historyMonthsBefore, setHistoryMonthsBefore] = useState(6);
   const todayRowRef = useRef(null);
-  const containerRef = useRef(null);
 
   // Active account(s)
   const selectedAccount = budget.accounts.find(a => a.id === selectedAccountId);
 
   // Today's date matching
   const todayObj = useMemo(() => new Date(), []);
+  const isCurrentMonthView = todayObj.getMonth() === selectedMonth && todayObj.getFullYear() === selectedYear;
+  const currentDayNum = todayObj.getDate();
 
-  // Relevant bills assigned to this account
+  // Relevant active bills assigned to this account
   const accountBills = useMemo(() => {
-    if (selectedAccountId === 'all') return budget.bills;
-    return budget.bills.filter(b => b.accountId === selectedAccountId);
+    if (selectedAccountId === 'all') return budget.bills.filter(b => !b.isArchived);
+    return budget.bills.filter(b => b.accountId === selectedAccountId && !b.isArchived);
+  }, [budget.bills, selectedAccountId]);
+
+  // Archived bills list for this account
+  const archivedBills = useMemo(() => {
+    if (selectedAccountId === 'all') return budget.bills.filter(b => b.isArchived);
+    return budget.bills.filter(b => b.accountId === selectedAccountId && b.isArchived);
   }, [budget.bills, selectedAccountId]);
 
   // Household earners
   const people = budget.people || [];
 
-  // Generate continuous multi-month daily matrix timeline
+  // Generate daily matrix rows for selected month
   const matrixData = useMemo(() => {
     const rows = [];
 
@@ -113,107 +124,94 @@ function DailySpreadsheetMatrix() {
       ? budget.accounts.reduce((sum, a) => sum + (parseFloat(a.extraStartingBalance) || 0), 0)
       : (parseFloat(selectedAccount?.extraStartingBalance) || 0);
 
-    // Range of months: (selectedMonth - historyMonthsBefore) up to (selectedMonth + 1)
-    for (let mOffset = -historyMonthsBefore; mOffset <= 1; mOffset++) {
-      const targetDate = new Date(selectedYear, selectedMonth + mOffset, 1);
-      const mYear = targetDate.getFullYear();
-      const mMonth = targetDate.getMonth();
-      const mKey = `${mYear}-${String(mMonth + 1).padStart(2, '0')}`;
-      const mDaysCount = new Date(mYear, mMonth + 1, 0).getDate();
-      const monthName = MONTHS[mMonth];
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateObj = new Date(selectedYear, selectedMonth, day);
+      const dayOfWeekName = DAYS_OF_WEEK[dateObj.getDay()];
+      const isMonday = dateObj.getDay() === 1;
+      const isFirstOr15th = day === 1 || day === 15;
+      const isPayday = isMonday || isFirstOr15th;
+      const isToday = isCurrentMonthView && day === currentDayNum;
 
-      for (let day = 1; day <= mDaysCount; day++) {
-        const dateObj = new Date(mYear, mMonth, day);
-        const dayOfWeekName = DAYS_OF_WEEK[dateObj.getDay()];
-        const isMonday = dateObj.getDay() === 1;
-        const isFirstOr15th = day === 1 || day === 15;
-        const isPayday = isMonday || isFirstOr15th;
-        const isToday = todayObj.getDate() === day && todayObj.getMonth() === mMonth && todayObj.getFullYear() === mYear;
+      // 1. Credits (Deposits)
+      const personCredits = {};
+      const personExtraCredits = {};
 
-        // 1. Credits (Deposits)
-        const personCredits = {};
-        const personExtraCredits = {};
+      people.forEach(p => {
+        const customCredit = getDailyMatrixCell(selectedAccountId, monthKey, day, `credit_${p.id}`);
+        const customExtraCredit = getDailyMatrixCell(selectedAccountId, monthKey, day, `extra_credit_${p.id}`);
 
-        people.forEach(p => {
-          const customCredit = getDailyMatrixCell(selectedAccountId, mKey, day, `credit_${p.id}`);
-          const customExtraCredit = getDailyMatrixCell(selectedAccountId, mKey, day, `extra_credit_${p.id}`);
-
-          if (customCredit !== undefined) {
-            personCredits[p.id] = parseFloat(customCredit) || 0;
-          } else {
-            let autoDep = 0;
-            if (p.payFrequency === 'bi-weekly' && (day === 15 || day === 28 || (isMonday && day <= 14))) {
-              autoDep = p.netPerPay || 0;
-            } else if (p.payFrequency === 'monthly' && day === 1) {
-              autoDep = p.netPerPay || 0;
-            }
-            personCredits[p.id] = autoDep;
+        if (customCredit !== undefined) {
+          personCredits[p.id] = parseFloat(customCredit) || 0;
+        } else {
+          // Auto-calculate payday deposits
+          let autoDep = 0;
+          if (p.payFrequency === 'bi-weekly' && (day === 15 || day === 28 || (isMonday && day <= 14))) {
+            autoDep = p.netPerPay || 0;
+          } else if (p.payFrequency === 'monthly' && day === 1) {
+            autoDep = p.netPerPay || 0;
           }
+          personCredits[p.id] = autoDep;
+        }
 
-          personExtraCredits[p.id] = customExtraCredit !== undefined ? (parseFloat(customExtraCredit) || 0) : 0;
-        });
+        personExtraCredits[p.id] = customExtraCredit !== undefined ? (parseFloat(customExtraCredit) || 0) : 0;
+      });
 
-        const totalRegCredits = Object.values(personCredits).reduce((s, v) => s + v, 0);
-        const totalExtraCredits = Object.values(personExtraCredits).reduce((s, v) => s + v, 0);
+      const totalRegCredits = Object.values(personCredits).reduce((s, v) => s + v, 0);
+      const totalExtraCredits = Object.values(personExtraCredits).reduce((s, v) => s + v, 0);
 
-        // 2. Individual Bill Deductions
-        const billValues = {};
-        let totalDayBills = 0;
+      // 2. Individual Bill Deductions
+      const billValues = {};
+      let totalDayBills = 0;
 
-        accountBills.forEach(b => {
-          const customBillVal = getDailyMatrixCell(selectedAccountId, mKey, day, `bill_${b.id}`);
-          let amt = 0;
+      accountBills.forEach(b => {
+        const customBillVal = getDailyMatrixCell(selectedAccountId, monthKey, day, `bill_${b.id}`);
+        let amt = 0;
 
-          if (customBillVal !== undefined) {
-            amt = parseFloat(customBillVal) || 0;
-          } else if (parseInt(b.dueDay) === day) {
-            amt = getBillMonthlyCost(b);
-          }
+        if (customBillVal !== undefined) {
+          amt = parseFloat(customBillVal) || 0;
+        } else if (parseInt(b.dueDay) === day) {
+          amt = getBillMonthlyCost(b);
+        }
 
-          billValues[b.id] = amt;
-          totalDayBills += amt;
-        });
+        billValues[b.id] = amt;
+        totalDayBills += amt;
+      });
 
-        // 3. Other Expense
-        const customOther = getDailyMatrixCell(selectedAccountId, mKey, day, 'other_amount');
-        const otherAmt = customOther !== undefined ? (parseFloat(customOther) || 0) : 0;
-        const customOtherDesc = getDailyMatrixCell(selectedAccountId, mKey, day, 'other_desc') || '';
-        totalDayBills += otherAmt;
+      // 3. Other Expense
+      const customOther = getDailyMatrixCell(selectedAccountId, monthKey, day, 'other_amount');
+      const otherAmt = customOther !== undefined ? (parseFloat(customOther) || 0) : 0;
+      const customOtherDesc = getDailyMatrixCell(selectedAccountId, monthKey, day, 'other_desc') || '';
+      totalDayBills += otherAmt;
 
-        // 4. Calculate Ending Balances
-        const regEnding = runningRegBeg + totalRegCredits - totalDayBills;
-        const extraEnding = runningExtraBeg + totalExtraCredits;
-        const totalEnd = regEnding + extraEnding;
+      // 4. Calculate Ending Balances
+      const regEnding = runningRegBeg + totalRegCredits - totalDayBills;
+      const extraEnding = runningExtraBeg + totalExtraCredits;
+      const totalEnd = regEnding + extraEnding;
 
-        rows.push({
-          rowKey: `${mKey}-${day}`,
-          day,
-          monthName,
-          yearNum: mYear,
-          isMonthStart: day === 1,
-          dateFormatted: `${mMonth + 1}/${day}/${mYear}`,
-          dayOfWeekName,
-          isPayday,
-          isToday,
-          regBeg: runningRegBeg,
-          extraBeg: runningExtraBeg,
-          personCredits,
-          personExtraCredits,
-          totalRegCredits,
-          totalExtraCredits,
-          billValues,
-          otherAmt,
-          otherDesc: customOtherDesc,
-          regEnding,
-          extraEnding,
-          totalEnd,
-          isDeficit: totalEnd < 0
-        });
+      rows.push({
+        day,
+        dateFormatted: `${selectedMonth + 1}/${day}/${selectedYear}`,
+        dayOfWeekName,
+        isPayday,
+        isToday,
+        regBeg: runningRegBeg,
+        extraBeg: runningExtraBeg,
+        personCredits,
+        personExtraCredits,
+        totalRegCredits,
+        totalExtraCredits,
+        billValues,
+        otherAmt,
+        otherDesc: customOtherDesc,
+        regEnding,
+        extraEnding,
+        totalEnd,
+        isDeficit: totalEnd < 0
+      });
 
-        // Carry forward
-        runningRegBeg = regEnding;
-        runningExtraBeg = extraEnding;
-      }
+      // Carry forward to next day
+      runningRegBeg = regEnding;
+      runningExtraBeg = extraEnding;
     }
 
     return rows;
@@ -221,22 +219,16 @@ function DailySpreadsheetMatrix() {
     selectedAccountId,
     selectedMonth,
     selectedYear,
-    historyMonthsBefore,
+    daysInMonth,
     selectedAccount,
     budget.accounts,
     accountBills,
     people,
     getDailyMatrixCell,
     getBillMonthlyCost,
-    todayObj
+    isCurrentMonthView,
+    currentDayNum
   ]);
-
-  // Handle scrolling up near top to continuously expand history
-  const handleScroll = useCallback((e) => {
-    if (e.target.scrollTop < 60) {
-      setHistoryMonthsBefore(prev => prev + 6);
-    }
-  }, []);
 
   // Auto-scroll to today's row when matrix loads or filters change
   useEffect(() => {
@@ -296,20 +288,13 @@ function DailySpreadsheetMatrix() {
     <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
 
       {/* SPREADSHEET MATRIX TABLE CONTAINER (Top-Level Viewport Locked) */}
-      <div
-        ref={containerRef}
-        onScroll={handleScroll}
-        className="flex-1 min-h-0 overflow-auto matrix-scrollbar rounded-2xl border border-slate-800 glass-panel shadow-2xl relative"
-      >
+      <div className="flex-1 min-h-0 overflow-auto matrix-scrollbar rounded-2xl border border-slate-800 glass-panel shadow-2xl relative">
 
         {/* Compact Sticky Toolbar - Tier 1 (top-0 z-40) */}
         <div className="sticky top-0 z-40 bg-slate-900/95 backdrop-blur border-b border-slate-800 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 shadow-md">
           <div className="flex items-center gap-2">
             <Wallet className="w-4 h-4 text-emerald-400" />
             <h3 className="text-xs font-black text-slate-100 uppercase tracking-wider">Daily Register Matrix &amp; Cash Flow</h3>
-            <span className="ml-2 text-[10px] bg-blue-500/20 text-blue-300 border border-blue-500/40 px-2 py-0.5 rounded-full font-mono">
-              Infinite History Active
-            </span>
           </div>
 
           {/* Integrated KPI Metrics Pill Bar */}
@@ -339,41 +324,103 @@ function DailySpreadsheetMatrix() {
 
           <div className="flex items-center gap-2.5">
             {/* Account Selector */}
-            <div className="flex items-center gap-1.5 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800 text-xs">
-              <Filter className="w-3 h-3 text-slate-400" />
+            <div className="flex items-center gap-1.5 bg-slate-800/90 hover:bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-700 hover:border-blue-500/50 shadow-sm transition-all text-xs">
+              <Filter className="w-3.5 h-3.5 text-blue-400" />
               <select
                 value={selectedAccountId}
                 onChange={e => setSelectedAccountId(e.target.value)}
-                className="bg-transparent text-xs font-bold text-slate-100 focus:outline-none"
+                className="bg-transparent text-xs font-bold text-slate-100 focus:outline-none cursor-pointer"
               >
-                <option value="all">All Accounts Combined</option>
+                <option value="all" className="bg-slate-900 text-slate-100 py-1">All Accounts Combined</option>
                 {budget.accounts.map(acc => (
-                  <option key={acc.id} value={acc.id}>{acc.name}</option>
+                  <option key={acc.id} value={acc.id} className="bg-slate-900 text-slate-100 py-1">{acc.name}</option>
                 ))}
               </select>
             </div>
 
             {/* Month / Year Selector */}
-            <div className="flex items-center gap-1.5 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800 text-xs">
-              <Calendar className="w-3 h-3 text-slate-400" />
+            <div className="flex items-center gap-1.5 bg-slate-800/90 hover:bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-700 hover:border-blue-500/50 shadow-sm transition-all text-xs">
+              <Calendar className="w-3.5 h-3.5 text-blue-400" />
               <select
                 value={selectedMonth}
                 onChange={e => setSelectedMonth(parseInt(e.target.value))}
-                className="bg-transparent text-xs font-semibold text-slate-200 focus:outline-none"
+                className="bg-transparent text-xs font-bold text-slate-100 focus:outline-none cursor-pointer"
               >
                 {MONTHS.map((m, i) => (
-                  <option key={i} value={i}>{m}</option>
+                  <option key={i} value={i} className="bg-slate-900 text-slate-100 py-1">{m}</option>
                 ))}
               </select>
               <input
                 type="number"
                 value={selectedYear}
-                onChange={e => setSelectedYear(parseInt(e.target.value) || today.getFullYear())}
-                className="w-14 bg-transparent text-xs font-mono text-slate-200 focus:outline-none text-center"
+                onChange={e => setSelectedYear(parseInt(e.target.value) || todayObj.getFullYear())}
+                className="w-14 bg-slate-900/60 border border-slate-700/80 rounded px-1 py-0.5 text-xs font-mono text-slate-100 font-bold focus:outline-none text-center focus:border-blue-400"
               />
             </div>
+
+            {/* Today Quick-Jump Button */}
+            <button
+              onClick={() => {
+                const now = new Date();
+                setSelectedMonth(now.getMonth());
+                setSelectedYear(now.getFullYear());
+                setTimeout(() => {
+                  if (todayRowRef.current) {
+                    todayRowRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  }
+                }, 50);
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/50 hover:border-amber-400 font-bold text-xs shadow-sm transition-all cursor-pointer active:scale-95"
+              title="Jump to Today's Date"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <span>Today</span>
+            </button>
+
+            {/* Archived Bills Drawer Toggle */}
+            {archivedBills.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowArchivedBills(!showArchivedBills)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border font-bold text-xs shadow-sm transition-all cursor-pointer ${
+                  showArchivedBills
+                    ? 'bg-amber-600/20 text-amber-300 border-amber-500/60'
+                    : 'bg-slate-800/90 hover:bg-slate-800 text-amber-400 border-slate-700'
+                }`}
+                title="View & Restore Archived Bills"
+              >
+                <Archive className="w-3.5 h-3.5 text-amber-400" />
+                <span>Archived Bills ({archivedBills.length})</span>
+              </button>
+            )}
           </div>
         </div>
+
+        {/* ARCHIVED BILLS RESTORATION DRAWER */}
+        {showArchivedBills && archivedBills.length > 0 && (
+          <div className="p-3 bg-amber-950/20 border-b border-amber-800/40 flex flex-wrap items-center justify-between gap-2 text-xs animate-fade-in">
+            <div className="flex items-center gap-2 text-amber-300 font-bold">
+              <Archive className="w-4 h-4 text-amber-400" />
+              <span>Archived Bills (Preserved in Historical Matrix)</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {archivedBills.map(b => (
+                <div key={b.id} className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-900 border border-slate-700 rounded-lg text-slate-200 font-medium text-xs">
+                  <span>{b.name} (${b.amount})</span>
+                  <button
+                    type="button"
+                    onClick={() => unarchiveBill(b.id)}
+                    className="p-0.5 text-emerald-400 hover:text-emerald-300 transition-colors flex items-center gap-1 font-bold text-[10px]"
+                    title="Restore Bill Column to Active Register"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>Restore</span>
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <table className="w-full text-left text-xs border-collapse">
           {/* Header Row 1 & 2: Sticky Tier 2 (top-[37px] z-30) */}
@@ -413,8 +460,18 @@ function DailySpreadsheetMatrix() {
 
               {/* Bill Columns */}
               {accountBills.map(b => (
-                <th key={`hdr-bill-${b.id}`} className="p-2.5 text-right min-w-[110px] text-rose-300 bg-slate-900">
-                  {b.name}
+                <th key={`hdr-bill-${b.id}`} className="p-2.5 text-right min-w-[120px] text-rose-300 bg-slate-900 group">
+                  <div className="flex items-center justify-end gap-1">
+                    <span className="truncate">{b.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => archiveBill(b.id)}
+                      className="opacity-70 group-hover:opacity-100 hover:scale-110 p-0.5 text-slate-400 hover:text-amber-400 transition-all rounded"
+                      title={`Archive bill "${b.name}" (hide column from active register, keep history)`}
+                    >
+                      <Archive className="w-3 h-3" />
+                    </button>
+                  </div>
                 </th>
               ))}
               <th className="p-2.5 text-right min-w-[85px] text-rose-300 bg-slate-900 border-r border-slate-800">Other</th>
@@ -434,41 +491,26 @@ function DailySpreadsheetMatrix() {
           {/* Matrix Rows (Continuous Multi-Month Stream) */}
           <tbody className="divide-y divide-slate-800/50 font-mono text-[11px]">
             {matrixData.map(row => (
-              <React.Fragment key={row.rowKey}>
-                {row.isMonthStart && (
-                  <tr className="bg-slate-950 text-slate-200 border-t-2 border-b border-slate-700 text-xs font-black uppercase tracking-wider">
-                    <td colSpan={100} className="p-2.5 bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-blue-300">
-                      <div className="flex items-center justify-between">
-                        <span className="flex items-center gap-2">
-                          <Calendar className="w-4 h-4 text-blue-400" />
-                          <span>{row.monthName} {row.yearNum}</span>
-                        </span>
-                        <span className="text-[10px] text-slate-400 font-normal font-mono">
-                          Month Beg: ${(row.regBeg + row.extraBeg).toFixed(2)}
-                        </span>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-                <tr
-                  ref={row.isToday ? todayRowRef : null}
-                  className={`transition-colors ${
-                    row.isToday
-                      ? 'bg-indigo-950/80 border-l-4 border-l-amber-400 ring-1 ring-amber-400/40 shadow-lg font-bold'
-                      : row.isDeficit
-                        ? 'bg-rose-950/30 hover:bg-slate-800/40'
-                        : row.isPayday
-                          ? 'bg-emerald-950/25 border-l-4 border-l-emerald-500 hover:bg-slate-800/40'
-                          : 'hover:bg-slate-800/40'
-                  }`}
-                >
+              <tr
+                key={row.day}
+                ref={row.isToday ? todayRowRef : null}
+                className={`transition-colors ${
+                  row.isToday
+                    ? 'bg-amber-950/70 border-l-8 border-l-amber-400 border-r-4 border-r-amber-400 border-y-2 border-y-amber-400/80 ring-2 ring-amber-400/50 shadow-[0_0_25px_rgba(251,191,36,0.45)] font-extrabold text-amber-100 z-20'
+                    : row.isDeficit
+                      ? 'bg-rose-950/30 hover:bg-slate-800/40'
+                      : row.isPayday
+                        ? 'bg-emerald-950/25 border-l-4 border-l-emerald-500 hover:bg-slate-800/40'
+                        : 'hover:bg-slate-800/40'
+                }`}
+              >
                   {/* Date (Frozen Left & Today Highlight) */}
-                  <td className={`p-2.5 font-semibold whitespace-nowrap min-w-[85px] w-[85px] sticky left-0 z-20 shadow-[2px_0_5px_rgba(0,0,0,0.4)] ${
-                    row.isToday ? 'bg-indigo-950 text-amber-300 font-extrabold' : 'bg-slate-900 text-slate-300'
+                  <td className={`p-2.5 font-black whitespace-nowrap min-w-[85px] w-[85px] sticky left-0 z-20 shadow-[2px_0_5px_rgba(0,0,0,0.4)] ${
+                    row.isToday ? 'bg-amber-950 text-amber-300 border-l-8 border-l-amber-400 border-y-2 border-y-amber-400/80' : 'bg-slate-900 text-slate-300'
                   }`}>
                     <span>{row.dateFormatted}</span>
                     {row.isToday && (
-                      <span className="ml-1.5 px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-300 border border-amber-400/60 text-[9px] font-black uppercase tracking-wider shadow-sm">
+                      <span className="ml-1.5 px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[10px] font-black uppercase tracking-wider shadow-[0_0_12px_rgba(251,191,36,0.9)] animate-pulse inline-block">
                         TODAY
                       </span>
                     )}
@@ -476,25 +518,29 @@ function DailySpreadsheetMatrix() {
 
                   {/* Day of Week (Frozen Left & Today Highlight) */}
                   <td className={`p-2.5 whitespace-nowrap min-w-[95px] w-[95px] border-r border-slate-700 sticky left-[85px] z-20 shadow-[4px_0_8px_rgba(0,0,0,0.5)] ${
-                    row.isToday ? 'bg-indigo-950 text-amber-300' : 'bg-slate-900 text-slate-300'
+                    row.isToday ? 'bg-amber-950 text-amber-300 border-y-2 border-y-amber-400/80' : 'bg-slate-900 text-slate-300'
                   }`}>
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
+                    <span className={`px-2 py-0.5 rounded text-[10px] ${
                       row.isToday
-                        ? 'bg-amber-400/20 text-amber-300 border border-amber-400/50'
+                        ? 'bg-amber-400 text-slate-950 font-black shadow-md'
                         : row.isPayday
-                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                          : 'text-slate-400'
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-semibold'
+                          : 'text-slate-400 font-semibold'
                     }`}>
                       {row.dayOfWeekName}
                     </span>
                   </td>
 
                   {/* Beg Balance (High Contrast Blue) */}
-                  <td className="p-2.5 text-right font-extrabold text-blue-200 bg-blue-950/40 border-r border-blue-900/60">${row.regBeg.toFixed(2)}</td>
+                  <td className={`p-2.5 text-right font-black border-r border-blue-900/60 ${
+                    row.isToday ? 'bg-amber-950/90 text-amber-200 border-y-2 border-y-amber-400/80' : 'bg-blue-950/40 text-blue-200'
+                  }`}>${row.regBeg.toFixed(2)}</td>
 
                   {/* Extra Beg Balance (High Contrast Blue) */}
                   {showExtraColumns && (
-                    <td className="p-2.5 text-right font-extrabold text-blue-200 bg-blue-950/40 border-r-2 border-blue-600/80">${row.extraBeg.toFixed(2)}</td>
+                    <td className={`p-2.5 text-right font-black border-r-2 border-blue-600/80 ${
+                      row.isToday ? 'bg-amber-950/90 text-amber-200 border-y-2 border-y-amber-400/80' : 'bg-blue-950/40 text-blue-200'
+                    }`}>${row.extraBeg.toFixed(2)}</td>
                   )}
 
                 {/* Earner Credits (Inline Editable) */}
@@ -563,7 +609,6 @@ function DailySpreadsheetMatrix() {
                   />
                 </td>
               </tr>
-            </React.Fragment>
           ))}
         </tbody>
 

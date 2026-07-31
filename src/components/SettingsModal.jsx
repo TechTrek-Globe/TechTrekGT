@@ -10,6 +10,7 @@ import {
   PieChart, 
   Save, 
   RotateCcw,
+  Archive,
   CheckCircle2,
   AlertTriangle,
   FileCode
@@ -31,6 +32,8 @@ export function SettingsModal() {
     addBill,
     updateBill,
     deleteBill,
+    archiveBill,
+    unarchiveBill,
     updateBillSplits,
     resetToDefaults,
     importBudgetJson
@@ -40,6 +43,7 @@ export function SettingsModal() {
   const [newAccForm, setNewAccForm] = useState({ name: '', type: 'checking', startingBalance: 0, color: 'blue', notes: '' });
   const [newPersonForm, setNewPersonForm] = useState({ name: '', role: 'Member', payFrequency: 'bi-weekly', grossPerPay: 0, netPerPay: 0, payDay1: 15, payDay2: 'last' });
   const [newBillForm, setNewBillForm] = useState({ name: '', amount: 0, period: 'Monthly', accountId: budget.accounts[0]?.id || '', dueDay: 1, paymentSource: 'Auto Pay', notes: '' });
+  const [billFilterTab, setBillFilterTab] = useState('active'); // 'active' | 'archived'
   const [jsonInput, setJsonInput] = useState('');
   const [jsonStatus, setJsonStatus] = useState(null);
 
@@ -464,6 +468,39 @@ export function SettingsModal() {
                 </div>
               </form>
 
+              {/* Active / Archived Bills Filter Bar */}
+              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setBillFilterTab('active')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                      billFilterTab === 'active'
+                        ? 'bg-blue-600 text-white shadow-sm'
+                        : 'bg-slate-900 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Active Bills ({budget.bills.filter(b => !b.isArchived).length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBillFilterTab('archived')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                      billFilterTab === 'archived'
+                        ? 'bg-amber-600 text-white shadow-sm'
+                        : 'bg-slate-900 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Archived Bills ({budget.bills.filter(b => b.isArchived).length})
+                  </button>
+                </div>
+                {billFilterTab === 'archived' && (
+                  <span className="text-[10px] text-amber-400 font-mono">
+                    Archived bills are hidden from active budget schedules while keeping historical register data intact.
+                  </span>
+                )}
+              </div>
+
               {/* Bills List Table */}
               <div className="overflow-x-auto rounded-xl border border-slate-800">
                 <table className="w-full text-left text-xs text-slate-300">
@@ -479,75 +516,100 @@ export function SettingsModal() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800 bg-slate-950/40">
-                    {budget.bills.map(bill => (
-                      <tr key={bill.id} className="hover:bg-slate-900/60 transition-colors">
-                        <td className="p-3 font-semibold text-slate-200">
-                          <input
-                            type="text"
-                            value={bill.name}
-                            onChange={e => updateBill(bill.id, { name: e.target.value })}
-                            className="bg-transparent border-b border-transparent hover:border-slate-700 focus:border-emerald-500 focus:outline-none"
-                          />
-                        </td>
-                        <td className="p-3">
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={bill.amount}
-                            onChange={e => updateBill(bill.id, { amount: parseFloat(e.target.value) || 0 })}
-                            className="w-20 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-200"
-                          />
-                        </td>
-                        <td className="p-3">
-                          <select
-                            value={bill.period}
-                            onChange={e => updateBill(bill.id, { period: e.target.value })}
-                            className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-200"
-                          >
-                            <option value="Monthly">Monthly</option>
-                            <option value="Semi-Annual">Semi-Annual</option>
-                            <option value="Annual">Annual</option>
-                          </select>
-                        </td>
-                        <td className="p-3">
-                          <select
-                            value={bill.accountId}
-                            onChange={e => updateBill(bill.id, { accountId: e.target.value })}
-                            className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-200 text-xs"
-                          >
-                            {budget.accounts.map(acc => (
-                              <option key={acc.id} value={acc.id}>{acc.name}</option>
-                            ))}
-                          </select>
-                        </td>
-                        <td className="p-3">
-                          <input
-                            type="number"
-                            min="1"
-                            max="31"
-                            value={bill.dueDay}
-                            onChange={e => updateBill(bill.id, { dueDay: parseInt(e.target.value) || 1 })}
-                            className="w-14 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-200 text-center"
-                          />
-                        </td>
-                        <td className="p-3">
-                          <input
-                            type="text"
-                            value={bill.paymentSource}
-                            onChange={e => updateBill(bill.id, { paymentSource: e.target.value })}
-                            className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-200 w-32"
-                          />
-                        </td>
-                        <td className="p-3 text-right">
-                          <button
-                            onClick={() => deleteBill(bill.id)}
-                            className="p-1 text-slate-500 hover:text-rose-400 rounded transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                    {budget.bills
+                      .filter(b => billFilterTab === 'archived' ? b.isArchived : !b.isArchived)
+                      .map(bill => (
+                        <tr key={bill.id} className="hover:bg-slate-900/60 transition-colors">
+                          <td className="p-3 font-semibold text-slate-200">
+                            <input
+                              type="text"
+                              value={bill.name}
+                              onChange={e => updateBill(bill.id, { name: e.target.value })}
+                              className="bg-transparent border-b border-transparent hover:border-slate-700 focus:border-emerald-500 focus:outline-none"
+                            />
+                          </td>
+                          <td className="p-3">
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={bill.amount}
+                              onChange={e => updateBill(bill.id, { amount: parseFloat(e.target.value) || 0 })}
+                              className="w-20 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-200"
+                            />
+                          </td>
+                          <td className="p-3">
+                            <select
+                              value={bill.period}
+                              onChange={e => updateBill(bill.id, { period: e.target.value })}
+                              className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-200"
+                            >
+                              <option value="Monthly">Monthly</option>
+                              <option value="Semi-Annual">Semi-Annual</option>
+                              <option value="Annual">Annual</option>
+                            </select>
+                          </td>
+                          <td className="p-3">
+                            <select
+                              value={bill.accountId}
+                              onChange={e => updateBill(bill.id, { accountId: e.target.value })}
+                              className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-200 text-xs"
+                            >
+                              {budget.accounts.map(acc => (
+                                <option key={acc.id} value={acc.id}>{acc.name}</option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="p-3">
+                            <input
+                              type="number"
+                              min="1"
+                              max="31"
+                              value={bill.dueDay}
+                              onChange={e => updateBill(bill.id, { dueDay: parseInt(e.target.value) || 1 })}
+                              className="w-14 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-200 text-center"
+                            />
+                          </td>
+                          <td className="p-3">
+                            <input
+                              type="text"
+                              value={bill.paymentSource}
+                              onChange={e => updateBill(bill.id, { paymentSource: e.target.value })}
+                              className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-200 w-32"
+                            />
+                          </td>
+                          <td className="p-3 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              {bill.isArchived ? (
+                                <button
+                                  type="button"
+                                  onClick={() => unarchiveBill(bill.id)}
+                                  className="p-1 text-emerald-400 hover:text-emerald-300 rounded transition-colors"
+                                  title="Restore Bill to Active Schedule"
+                                >
+                                  <RotateCcw className="w-4 h-4" />
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => archiveBill(bill.id)}
+                                  className="p-1 text-amber-400 hover:text-amber-300 rounded transition-colors"
+                                  title="Archive Bill (Hide from active schedule, preserve history)"
+                                >
+                                  <Archive className="w-4 h-4" />
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => deleteBill(bill.id)}
+                                className="p-1 text-slate-500 hover:text-rose-400 rounded transition-colors"
+                                title="Delete Bill Permanently"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
                   </tbody>
                 </table>
               </div>

@@ -204,13 +204,18 @@ export const initialBudgetData = {
       splits: { 'person-1': 50, 'person-2': 50 }
     }
   ],
-  loan: {
-    description: 'Home Loan Mortgage',
-    principal: 285000,
-    annualInterestRate: 6.25,
-    termMonths: 360,
-    monthlyPayment: 1756.20,
-    extraPayment: 200,
-    startDate: '2024-01-01'
-  }
+  loans: [
+    {
+      id: 'loan-1',
+      name: 'Primary Mortgage',
+      description: 'Home Loan Mortgage',
+      principal: 285000,
+      annualInterestRate: 6.25,
+      termMonths: 360,
+      monthlyPayment: 1756.20,
+      extraPayment: 200,
+      accountId: 'acc-2',
+      startDate: '2024-01-01'
+    }
+  ]
 };

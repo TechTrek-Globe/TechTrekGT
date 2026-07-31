@@ -156,12 +156,83 @@ export function BudgetProvider({ children }) {
     }));
   };
 
-  // Loan Operations
-  const updateLoan = (loanData) => {
+  const archiveBill = (id) => {
     setBudget(prev => ({
       ...prev,
-      loan: { ...prev.loan, ...loanData }
+      bills: prev.bills.map(b => b.id === id ? { ...b, isArchived: true } : b)
     }));
+  };
+
+  const unarchiveBill = (id) => {
+    setBudget(prev => ({
+      ...prev,
+      bills: prev.bills.map(b => b.id === id ? { ...b, isArchived: false } : b)
+    }));
+  };
+
+  // Loan Operations
+  const addLoan = (loanData) => {
+    const newLoan = {
+      id: `loan-${Date.now()}`,
+      name: loanData?.name || 'New Loan',
+      description: loanData?.description || 'Loan Amortization',
+      principal: parseFloat(loanData?.principal) || 250000,
+      annualInterestRate: parseFloat(loanData?.annualInterestRate) || 6.25,
+      termMonths: parseInt(loanData?.termMonths) || 360,
+      monthlyPayment: parseFloat(loanData?.monthlyPayment) || 0,
+      extraPayment: parseFloat(loanData?.extraPayment) || 0,
+      accountId: loanData?.accountId || '',
+      isArchived: false,
+      startDate: loanData?.startDate || '2024-01-01'
+    };
+    setBudget(prev => {
+      const existingLoans = prev.loans || (prev.loan ? [{ id: 'loan-1', name: 'Primary Mortgage', ...prev.loan, accountId: 'acc-2' }] : initialBudgetData.loans);
+      return {
+        ...prev,
+        loans: [...existingLoans, newLoan]
+      };
+    });
+  };
+
+  const updateLoan = (id, loanData) => {
+    setBudget(prev => {
+      const existingLoans = prev.loans || (prev.loan ? [{ id: 'loan-1', name: 'Primary Mortgage', ...prev.loan, accountId: 'acc-2' }] : initialBudgetData.loans);
+      return {
+        ...prev,
+        loans: existingLoans.map(l => l.id === id ? { ...l, ...loanData } : l)
+      };
+    });
+  };
+
+  const archiveLoan = (id) => {
+    setBudget(prev => {
+      const existingLoans = prev.loans || (prev.loan ? [{ id: 'loan-1', name: 'Primary Mortgage', ...prev.loan, accountId: 'acc-2' }] : initialBudgetData.loans);
+      return {
+        ...prev,
+        loans: existingLoans.map(l => l.id === id ? { ...l, isArchived: true } : l)
+      };
+    });
+  };
+
+  const unarchiveLoan = (id) => {
+    setBudget(prev => {
+      const existingLoans = prev.loans || (prev.loan ? [{ id: 'loan-1', name: 'Primary Mortgage', ...prev.loan, accountId: 'acc-2' }] : initialBudgetData.loans);
+      return {
+        ...prev,
+        loans: existingLoans.map(l => l.id === id ? { ...l, isArchived: false } : l)
+      };
+    });
+  };
+
+  const deleteLoan = (id) => {
+    setBudget(prev => {
+      const existingLoans = prev.loans || (prev.loan ? [{ id: 'loan-1', name: 'Primary Mortgage', ...prev.loan, accountId: 'acc-2' }] : initialBudgetData.loans);
+      if (existingLoans.length <= 1) return prev; // Keep at least 1 loan
+      return {
+        ...prev,
+        loans: existingLoans.filter(l => l.id !== id)
+      };
+    });
   };
 
   // Reset to default spreadsheet data
@@ -384,8 +455,14 @@ export function BudgetProvider({ children }) {
         addBill,
         updateBill,
         deleteBill,
+        archiveBill,
+        unarchiveBill,
         updateBillSplits,
+        addLoan,
         updateLoan,
+        archiveLoan,
+        unarchiveLoan,
+        deleteLoan,
         resetToDefaults,
         importBudgetJson,
         // line-item operations

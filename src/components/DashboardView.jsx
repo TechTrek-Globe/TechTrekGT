@@ -398,8 +398,8 @@ export function DashboardView() {
         </div>
       </div>
 
-      {/* Row 2: Projected vs Actual bars + Pie Chart + Per Paycheck */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      {/* Row 2: Projected vs Actual bars + Pie Chart + Monthly Split */}
+      <div className={`grid grid-cols-1 ${budget.people.length > 1 ? 'lg:grid-cols-3' : 'lg:grid-cols-2'} gap-4`}>
 
         {/* Projected vs Actual Bar Chart */}
         <div className="lg:col-span-1 p-5 rounded-2xl glass-panel space-y-4">
@@ -497,57 +497,54 @@ export function DashboardView() {
           </div>
         </div>
 
-        {/* Per Paycheck Split by Person */}
-        <div className="p-5 rounded-2xl glass-panel space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-              <Users className="w-4 h-4 text-indigo-400" />
-              Per Paycheck Splits
-            </h3>
-            <button
-              onClick={() => { setSettingsTab('splits'); setIsSettingsOpen(true); }}
-              className="text-[10px] text-indigo-400 hover:text-indigo-300 transition-colors"
-            >
-              Configure
-            </button>
-          </div>
+        {/* Monthly Split by Person (Shown ONLY if multiple people exist) */}
+        {budget.people.length > 1 && (
+          <div className="p-5 rounded-2xl glass-panel space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                <Users className="w-4 h-4 text-indigo-400" />
+                Monthly Split
+              </h3>
+              <button
+                onClick={() => { setSettingsTab('splits'); setIsSettingsOpen(true); }}
+                className="text-[10px] text-indigo-400 hover:text-indigo-300 transition-colors font-medium"
+              >
+                Configure
+              </button>
+            </div>
 
-          <div className="space-y-3">
-            {budget.people.map(person => {
-              const monthlyTotal = getPersonMonthlyTotal(person.id);
-              const perPaycheck  = getPersonPerPaycheckTotal(person.id);
-              const monthlyNet   = (person.netPerPay * (person.payFrequency === 'bi-weekly' ? 26 : 12)) / 12;
-              const pctOfNet     = monthlyNet > 0 ? (monthlyTotal / monthlyNet) * 100 : 0;
+            <div className="space-y-3">
+              {budget.people.map(person => {
+                const monthlyNet = (person.netPerPay * (person.payFrequency === 'bi-weekly' ? 26 : 12)) / 12;
+                const splitPct   = netIncome > 0 ? (monthlyNet / netIncome) * 100 : 0;
 
-              return (
-                <div key={person.id} className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800/60 space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="text-xs font-bold text-slate-200">{person.name}</h4>
-                      <span className="text-[10px] text-slate-500 capitalize">{person.payFrequency}</span>
+                return (
+                  <div key={person.id} className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800/60 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-200">{person.name}</h4>
+                        <span className="text-[10px] text-slate-500 capitalize">{person.payFrequency}</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[9px] text-slate-500 block">Monthly Net Income</span>
+                        <div className="text-sm font-black text-indigo-400 font-mono">
+                          ${monthlyNet.toFixed(2)}
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <span className="text-[9px] text-slate-500 block">Net pay / paycheck</span>
-                      <InlineEdit
-                        value={person.netPerPay}
-                        type="currency"
-                        onCommit={v => updatePerson(person.id, { netPerPay: v })}
-                        className="text-sm font-black text-indigo-400 font-mono justify-end"
-                      />
+                    <div className="space-y-1">
+                      <ProgressBar pct={splitPct} colorClass="bg-indigo-500" />
+                      <div className="flex justify-between text-[10px]">
+                        <span className="text-slate-500">Household contribution</span>
+                        <span className="font-semibold text-indigo-400">{splitPct.toFixed(1)}% share</span>
+                      </div>
                     </div>
                   </div>
-                  <div className="space-y-1">
-                    <ProgressBar pct={pctOfNet} colorClass="bg-indigo-500" />
-                    <div className="flex justify-between text-[10px]">
-                      <span className="text-slate-500">Monthly share: ${monthlyTotal.toFixed(2)}</span>
-                      <span className={`font-semibold ${pctOfNet > 80 ? 'text-rose-400' : 'text-indigo-400'}`}>{pctOfNet.toFixed(1)}% of net</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
 
       </div>
     </div>

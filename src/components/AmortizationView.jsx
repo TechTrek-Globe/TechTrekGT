@@ -5,9 +5,9 @@ import { Calculator, DollarSign, TrendingDown, Clock, ShieldCheck, Sparkles, Plu
 export function AmortizationView() {
   const { budget, addLoan, updateLoan, archiveLoan, unarchiveLoan, deleteLoan, addBill, updateBill } = useBudget();
 
-  // Normalize loans array (backward compatibility with legacy budget.loan)
+  // Normalize loans array
   const loans = useMemo(() => {
-    if (budget.loans && budget.loans.length > 0) return budget.loans;
+    if (Array.isArray(budget.loans)) return budget.loans;
     if (budget.loan) {
       return [{
         id: 'loan-1',
@@ -26,22 +26,7 @@ export function AmortizationView() {
         startDate: budget.loan.startDate || '2024-01-01'
       }];
     }
-    return [{
-      id: 'loan-1',
-      name: 'Primary Mortgage',
-      description: 'Home Loan Mortgage',
-      principal: 285000,
-      annualInterestRate: 6.25,
-      termMonths: 360,
-      monthlyPayment: 1756.20,
-      extraPayment: 200,
-      accountId: 'acc-2',
-      interestCompounding: 'monthly',
-      paymentFrequency: 'monthly',
-      paymentType: 'amortizing',
-      isArchived: false,
-      startDate: '2024-01-01'
-    }];
+    return [];
   }, [budget.loans, budget.loan]);
 
   const activeLoans = useMemo(() => loans.filter(l => !l.isArchived), [loans]);

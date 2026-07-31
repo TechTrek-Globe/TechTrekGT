@@ -742,21 +742,21 @@ export function SettingsModal() {
 
               <div className="p-4 rounded-xl border border-amber-800/40 bg-amber-950/20 space-y-3">
                 <h3 className="text-sm font-semibold text-amber-300 flex items-center gap-2">
-                  <RotateCcw className="w-4 h-4" /> Reset to Original Excel Spreadsheet Preset
+                  <RotateCcw className="w-4 h-4" /> Reset Budget Data to Cleared Defaults
                 </h3>
                 <p className="text-xs text-amber-200/80">
-                  Resets accounts, Jon & Ronnie bi-weekly pay schedules, bills checking, mortgage checking, and HOA savings default amounts extracted from <code>Personal Budget.xlsx</code>.
+                  Clears all accounts, members, bills, loans, and register entries to a clean slate.
                 </p>
                 <button
                   onClick={() => {
-                    if (window.confirm('Are you sure you want to reset all budget data?')) {
+                    if (window.confirm('Are you sure you want to clear all budget data?')) {
                       resetToDefaults();
-                      setJsonStatus({ type: 'success', message: 'Reset to Excel defaults.' });
+                      setJsonStatus({ type: 'success', message: 'Cleared all budget data.' });
                     }
                   }}
                   className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-sm font-medium transition-colors"
                 >
-                  Restore Excel Defaults
+                  Clear All Budget Data
                 </button>
               </div>
             </div>

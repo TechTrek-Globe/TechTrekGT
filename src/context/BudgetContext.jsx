@@ -186,7 +186,7 @@ export function BudgetProvider({ children }) {
       startDate: loanData?.startDate || '2024-01-01'
     };
     setBudget(prev => {
-      const existingLoans = prev.loans || (prev.loan ? [{ id: 'loan-1', name: 'Primary Mortgage', ...prev.loan, accountId: 'acc-2' }] : initialBudgetData.loans);
+      const existingLoans = prev.loans || [];
       return {
         ...prev,
         loans: [...existingLoans, newLoan]
@@ -196,7 +196,7 @@ export function BudgetProvider({ children }) {
 
   const updateLoan = (id, loanData) => {
     setBudget(prev => {
-      const existingLoans = prev.loans || (prev.loan ? [{ id: 'loan-1', name: 'Primary Mortgage', ...prev.loan, accountId: 'acc-2' }] : initialBudgetData.loans);
+      const existingLoans = prev.loans || [];
       return {
         ...prev,
         loans: existingLoans.map(l => l.id === id ? { ...l, ...loanData } : l)
@@ -206,7 +206,7 @@ export function BudgetProvider({ children }) {
 
   const archiveLoan = (id) => {
     setBudget(prev => {
-      const existingLoans = prev.loans || (prev.loan ? [{ id: 'loan-1', name: 'Primary Mortgage', ...prev.loan, accountId: 'acc-2' }] : initialBudgetData.loans);
+      const existingLoans = prev.loans || [];
       return {
         ...prev,
         loans: existingLoans.map(l => l.id === id ? { ...l, isArchived: true } : l)
@@ -216,7 +216,7 @@ export function BudgetProvider({ children }) {
 
   const unarchiveLoan = (id) => {
     setBudget(prev => {
-      const existingLoans = prev.loans || (prev.loan ? [{ id: 'loan-1', name: 'Primary Mortgage', ...prev.loan, accountId: 'acc-2' }] : initialBudgetData.loans);
+      const existingLoans = prev.loans || [];
       return {
         ...prev,
         loans: existingLoans.map(l => l.id === id ? { ...l, isArchived: false } : l)
@@ -226,8 +226,7 @@ export function BudgetProvider({ children }) {
 
   const deleteLoan = (id) => {
     setBudget(prev => {
-      const existingLoans = prev.loans || (prev.loan ? [{ id: 'loan-1', name: 'Primary Mortgage', ...prev.loan, accountId: 'acc-2' }] : initialBudgetData.loans);
-      if (existingLoans.length <= 1) return prev; // Keep at least 1 loan
+      const existingLoans = prev.loans || [];
       return {
         ...prev,
         loans: existingLoans.filter(l => l.id !== id)

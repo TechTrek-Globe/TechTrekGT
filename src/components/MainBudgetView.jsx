@@ -24,7 +24,7 @@ export function MainBudgetView() {
         <div>
           <h2 className="text-xl font-black text-slate-100 flex items-center gap-2">
             <ReceiptText className="w-5 h-5 text-blue-400" />
-            Budget Plan
+            Bills &amp; Allocations
           </h2>
           <p className="text-xs text-slate-400 mt-0.5">
             Click any <span className="text-blue-400 font-medium">name</span>,{' '}

@@ -1,5 +1,8 @@
 import { verifyToken } from '../utils/auth.js';
 
+/**
+ * @param {{ request: Request, env: Record<string, any> }} context
+ */
 export async function onRequestGet(context) {
   const { request, env } = context;
 
@@ -32,7 +35,7 @@ export async function onRequestGet(context) {
 
     // Query Accounts
     const accRows = await env.DB.prepare('SELECT * FROM accounts WHERE household_id = ?').bind(householdId).all();
-    const accounts = (accRows.results || []).map(a => ({
+    const accounts = (accRows.results || []).map((/** @type {any} */ a) => ({
       id: a.id,
       name: a.name,
       type: a.type,
@@ -46,7 +49,7 @@ export async function onRequestGet(context) {
 
     // Query People
     const peopleRows = await env.DB.prepare('SELECT * FROM people WHERE household_id = ?').bind(householdId).all();
-    const people = (peopleRows.results || []).map(p => ({
+    const people = (peopleRows.results || []).map((/** @type {any} */ p) => ({
       id: p.id,
       name: p.name,
       role: p.role,
@@ -66,13 +69,14 @@ export async function onRequestGet(context) {
       'SELECT bs.bill_id, bs.person_id, bs.percentage FROM bill_splits bs JOIN bills b ON bs.bill_id = b.id WHERE b.household_id = ?'
     ).bind(householdId).all();
 
+    /** @type {Record<string, Record<string, number>>} */
     const splitsByBill = {};
-    (splitRows.results || []).forEach(s => {
+    (splitRows.results || []).forEach((/** @type {any} */ s) => {
       if (!splitsByBill[s.bill_id]) splitsByBill[s.bill_id] = {};
       splitsByBill[s.bill_id][s.person_id] = s.percentage;
     });
 
-    const bills = (billRows.results || []).map(b => ({
+    const bills = (billRows.results || []).map((/** @type {any} */ b) => ({
       id: b.id,
       accountId: b.account_id,
       name: b.name,
@@ -89,7 +93,7 @@ export async function onRequestGet(context) {
       'SELECT li.bill_id, li.month_key, li.actual_amount, li.updated_at FROM line_items li JOIN bills b ON li.bill_id = b.id WHERE b.household_id = ?'
     ).bind(householdId).all();
 
-    const lineItems = (lineItemRows.results || []).map(li => ({
+    const lineItems = (lineItemRows.results || []).map((/** @type {any} */ li) => ({
       billId: li.bill_id,
       monthKey: li.month_key,
       actualAmount: li.actual_amount,
@@ -131,13 +135,17 @@ export async function onRequestGet(context) {
     });
 
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message || 'Failed to fetch budget' }), {
+    const errorMessage = err instanceof Error ? err.message : String(err || 'Failed to fetch budget');
+    return new Response(JSON.stringify({ error: errorMessage }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }
     });
   }
 }
 
+/**
+ * @param {{ request: Request, env: Record<string, any> }} context
+ */
 export async function onRequestPost(context) {
   const { request, env } = context;
 
@@ -233,7 +241,7 @@ export async function onRequestPost(context) {
       // If bills weren't passed in this payload, fetch valid ones from DB
       if (!Array.isArray(budget.bills)) {
         const existingBills = await env.DB.prepare('SELECT id FROM bills WHERE household_id = ?').bind(householdId).all();
-        (existingBills.results || []).forEach(b => validBillIds.add(b.id));
+        (existingBills.results || []).forEach((/** @type {any} */ b) => validBillIds.add(b.id));
       }
 
       // Clear line items for household's bills
@@ -269,7 +277,8 @@ export async function onRequestPost(context) {
     });
 
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message || 'Failed to sync budget' }), {
+    const errorMessage = err instanceof Error ? err.message : String(err || 'Failed to sync budget');
+    return new Response(JSON.stringify({ error: errorMessage }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }
     });

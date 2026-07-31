@@ -1,4 +1,3 @@
-const JWT_SECRET = "personal-budget-secret-key-change-in-production";
 async function hashPassword(password) {
   const enc = new TextEncoder();
   const salt = crypto.getRandomValues(new Uint8Array(16));
@@ -65,7 +64,8 @@ function base64UrlDecode(str) {
   }
   return atob(base64);
 }
-async function createToken(payload, secret = JWT_SECRET) {
+async function createToken(payload, secret) {
+  if (!secret) throw new Error("JWT_SECRET is not defined in environment variables");
   const header = { alg: "HS256", typ: "JWT" };
   const encodedHeader = base64UrlEncode(JSON.stringify(header));
   const encodedPayload = base64UrlEncode(JSON.stringify({
@@ -87,8 +87,8 @@ async function createToken(payload, secret = JWT_SECRET) {
   const encodedSignature = base64UrlEncode(signatureHex);
   return `${dataToSign}.${encodedSignature}`;
 }
-async function verifyToken(token, secret = JWT_SECRET) {
-  if (!token) return null;
+async function verifyToken(token, secret) {
+  if (!secret || !token) return null;
   const parts = token.split(".");
   if (parts.length !== 3) return null;
   const [encodedHeader, encodedPayload, encodedSignature] = parts;
@@ -125,6 +125,18 @@ async function onRequestPost$2(context) {
         headers: { "Content-Type": "application/json" }
       });
     }
+    if (password.length < 8) {
+      return new Response(JSON.stringify({ error: "Password must be at least 8 characters long." }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+    if (!/[A-Z]/.test(password) || !/[0-9]/.test(password)) {
+      return new Response(JSON.stringify({ error: "Password must contain at least one uppercase letter and one number." }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
     const cleanEmail = email.trim().toLowerCase();
     if (!env.DB) {
       return new Response(JSON.stringify({ error: "Database binding DB not available" }), {
@@ -156,7 +168,13 @@ async function onRequestPost$2(context) {
     await env.DB.prepare(
       "INSERT INTO people (id, household_id, name, role, pay_frequency, pay_day1, pay_day2, gross_per_pay, net_per_pay, color) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     ).bind(person1Id, householdId, name.trim(), "Primary", "bi-weekly", "15", "last", 0, 0, "purple").run();
-    const token = await createToken({ userId, email: cleanEmail, householdId, name: name.trim() });
+    if (!env.JWT_SECRET) {
+      return new Response(JSON.stringify({ error: "Server misconfiguration: missing JWT_SECRET" }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+    const token = await createToken({ userId, email: cleanEmail, householdId, name: name.trim() }, env.JWT_SECRET);
     return new Response(JSON.stringify({
       success: true,
       user: { id: userId, email: cleanEmail, name: name.trim() },
@@ -209,7 +227,13 @@ async function onRequestPost$1(context) {
       "SELECT household_id FROM household_members WHERE user_id = ?"
     ).bind(user.id).first();
     const householdId = member ? member.household_id : null;
-    const token = await createToken({ userId: user.id, email: user.email, householdId, name: user.name });
+    if (!env.JWT_SECRET) {
+      return new Response(JSON.stringify({ error: "Server misconfiguration: missing JWT_SECRET" }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+    const token = await createToken({ userId: user.id, email: user.email, householdId, name: user.name }, env.JWT_SECRET);
     return new Response(JSON.stringify({
       success: true,
       user: { id: user.id, email: user.email, name: user.name },
@@ -227,7 +251,7 @@ async function onRequestPost$1(context) {
   }
 }
 async function onRequestGet$1(context) {
-  const { request } = context;
+  const { request, env } = context;
   try {
     const authHeader = request.headers.get("Authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -237,7 +261,7 @@ async function onRequestGet$1(context) {
       });
     }
     const token = authHeader.split(" ")[1];
-    const payload = await verifyToken(token);
+    const payload = await verifyToken(token, env.JWT_SECRET);
     if (!payload) {
       return new Response(JSON.stringify({ error: "Unauthorized: Invalid or expired token" }), {
         status: 401,
@@ -270,7 +294,7 @@ async function onRequestGet(context) {
       });
     }
     const token = authHeader.split(" ")[1];
-    const payload = await verifyToken(token);
+    const payload = await verifyToken(token, env.JWT_SECRET);
     if (!payload || !payload.householdId) {
       return new Response(JSON.stringify({ error: "Unauthorized: Invalid token" }), {
         status: 401,
@@ -386,7 +410,7 @@ async function onRequestPost(context) {
       });
     }
     const token = authHeader.split(" ")[1];
-    const payload = await verifyToken(token);
+    const payload = await verifyToken(token, env.JWT_SECRET);
     if (!payload || !payload.householdId) {
       return new Response(JSON.stringify({ error: "Unauthorized: Invalid token" }), {
         status: 401,
@@ -446,9 +470,11 @@ async function onRequestPost(context) {
         ).run();
       }
     }
+    let validBillIds = /* @__PURE__ */ new Set();
     if (Array.isArray(budget.bills)) {
       await env.DB.prepare("DELETE FROM bills WHERE household_id = ?").bind(householdId).run();
       for (const b of budget.bills) {
+        validBillIds.add(b.id);
         await env.DB.prepare(
           "INSERT INTO bills (id, household_id, account_id, name, amount, period, due_day, payment_source, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
         ).bind(
@@ -472,10 +498,15 @@ async function onRequestPost(context) {
       }
     }
     if (Array.isArray(budget.lineItems)) {
+      if (!Array.isArray(budget.bills)) {
+        const existingBills = await env.DB.prepare("SELECT id FROM bills WHERE household_id = ?").bind(householdId).all();
+        (existingBills.results || []).forEach((b) => validBillIds.add(b.id));
+      }
       await env.DB.prepare(
         "DELETE FROM line_items WHERE bill_id IN (SELECT id FROM bills WHERE household_id = ?)"
       ).bind(householdId).run();
       for (const li of budget.lineItems) {
+        if (!validBillIds.has(li.billId)) continue;
         await env.DB.prepare(
           "INSERT INTO line_items (bill_id, month_key, actual_amount, updated_at) VALUES (?, ?, ?, ?)"
         ).bind(li.billId, li.monthKey, li.actualAmount ?? null, li.updatedAt || Date.now()).run();
@@ -509,6 +540,18 @@ async function onRequestPost(context) {
     });
   }
 }
+function addSecurityHeaders(response) {
+  const newHeaders = new Headers(response.headers);
+  newHeaders.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  newHeaders.set("X-Content-Type-Options", "nosniff");
+  newHeaders.set("X-Frame-Options", "DENY");
+  newHeaders.set("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self';");
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: newHeaders
+  });
+}
 const worker = {
   /**
    * @param {Request} request
@@ -522,34 +565,34 @@ const worker = {
       url.protocol = "https:";
       return Response.redirect(url.toString(), 301);
     }
+    let response;
     try {
       if (url.pathname === "/api/auth/register" && request.method === "POST") {
-        return await onRequestPost$2(context);
-      }
-      if (url.pathname === "/api/auth/login" && request.method === "POST") {
-        return await onRequestPost$1(context);
-      }
-      if (url.pathname === "/api/auth/me" && request.method === "GET") {
-        return await onRequestGet$1(context);
-      }
-      if (url.pathname === "/api/budget") {
-        if (request.method === "GET") return await onRequestGet(context);
-        if (request.method === "POST") return await onRequestPost(context);
-      }
-      if (url.pathname.startsWith("/api/")) {
-        return new Response(JSON.stringify({ error: "Endpoint not found" }), {
+        response = await onRequestPost$2(context);
+      } else if (url.pathname === "/api/auth/login" && request.method === "POST") {
+        response = await onRequestPost$1(context);
+      } else if (url.pathname === "/api/auth/me" && request.method === "GET") {
+        response = await onRequestGet$1(context);
+      } else if (url.pathname === "/api/budget") {
+        if (request.method === "GET") response = await onRequestGet(context);
+        else if (request.method === "POST") response = await onRequestPost(context);
+        else response = new Response("Method not allowed", { status: 405 });
+      } else if (url.pathname.startsWith("/api/")) {
+        response = new Response(JSON.stringify({ error: "Endpoint not found" }), {
           status: 404,
           headers: { "Content-Type": "application/json" }
         });
+      } else {
+        response = await env.ASSETS.fetch(request);
       }
-      return await env.ASSETS.fetch(request);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err || "Server error");
-      return new Response(JSON.stringify({ error: errorMessage }), {
+      response = new Response(JSON.stringify({ error: errorMessage }), {
         status: 500,
         headers: { "Content-Type": "application/json" }
       });
     }
+    return addSecurityHeaders(response);
   }
 };
 const workerEntry = worker ?? {};

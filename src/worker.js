@@ -3,6 +3,9 @@ import { onRequestPost as loginHandler } from '../functions/api/auth/login.js';
 import { onRequestGet as meHandler } from '../functions/api/auth/me.js';
 import { onRequestGet as getBudgetHandler, onRequestPost as postBudgetHandler } from '../functions/api/budget.js';
 
+/**
+ * @param {Response} response
+ */
 function addSecurityHeaders(response) {
   const newHeaders = new Headers(response.headers);
   newHeaders.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');

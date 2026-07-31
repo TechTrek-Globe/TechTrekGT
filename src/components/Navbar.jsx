@@ -52,8 +52,8 @@ export function Navbar() {
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'main_budget', label: 'Budget Plan', icon: ReceiptText },
-    { id: 'ledger', label: 'Cash Flow Register', icon: Wallet },
+    { id: 'ledger', label: 'Ledger & Cash Flow', icon: Wallet },
+    { id: 'main_budget', label: 'Accounts & Bill Plan', icon: ReceiptText },
     { id: 'amortization', label: 'Loan Amortization', icon: Calculator },
     { id: 'settings', label: 'Settings', icon: Settings, isSettings: true }
   ];

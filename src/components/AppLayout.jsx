@@ -16,11 +16,11 @@ import {
 } from 'lucide-react';
 
 const NAV_ITEMS = [
-  { id: 'dashboard',   label: 'Dashboard',        icon: LayoutDashboard, color: 'text-blue-400' },
-  { id: 'main_budget', label: 'Budget Plan',       icon: ReceiptText,     color: 'text-violet-400' },
-  { id: 'ledger',      label: 'Ledger & Cash Flow',icon: TrendingUp,      color: 'text-emerald-400' },
-  { id: 'amortization',label: 'Loan Amortization', icon: Calculator,      color: 'text-rose-400' },
-  { id: 'settings',    label: 'Settings',          icon: Settings,        color: 'text-amber-400', isSettings: true },
+  { id: 'dashboard',   label: 'Dashboard',            icon: LayoutDashboard, color: 'text-blue-400' },
+  { id: 'ledger',      label: 'Ledger & Cash Flow',    icon: TrendingUp,      color: 'text-emerald-400' },
+  { id: 'main_budget', label: 'Accounts & Bill Plan',  icon: ReceiptText,     color: 'text-violet-400' },
+  { id: 'amortization',label: 'Loan Amortization',     icon: Calculator,      color: 'text-rose-400' },
+  { id: 'settings',    label: 'Settings',              icon: Settings,        color: 'text-amber-400', isSettings: true },
 ];
 
 const SIDEBAR_KEY = 'trekledger_sidebar_collapsed';

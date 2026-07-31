@@ -17,6 +17,25 @@ import { Pencil, Check, X } from 'lucide-react';
  *   inputClass  - extra classes on the input element
  *   dimmed      - if true, uses muted text color for display (derived/secondary fields)
  */
+/**
+ * @typedef {Object} InlineEditProps
+ * @property {any} value
+ * @property {(val: any) => void} onCommit
+ * @property {'currency' | 'integer' | 'percent' | 'text'} [type]
+ * @property {string} [prefix]
+ * @property {string} [suffix]
+ * @property {number} [min]
+ * @property {number} [max]
+ * @property {number | string} [step]
+ * @property {(val: any) => string} [displayFn]
+ * @property {string} [className]
+ * @property {string} [inputClass]
+ * @property {boolean} [dimmed]
+ */
+
+/**
+ * @param {InlineEditProps} props
+ */
 export function InlineEdit({
   value,
   onCommit,

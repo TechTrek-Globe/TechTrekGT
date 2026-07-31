@@ -42,10 +42,10 @@ export function MainBudgetView() {
       </div>
 
       {/* Per-account tables */}
-      {budget.accounts.map(account => {
-        const accountBills = budget.bills.filter(b => b.accountId === account.id);
+      {budget.accounts.map((/** @type {any} */ account) => {
+        const accountBills = budget.bills.filter((/** @type {any} */ b) => b.accountId === account.id);
         if (accountBills.length === 0) return null;
-        const accountTotal = accountBills.reduce((sum, b) => sum + getBillMonthlyCost(b), 0);
+        const accountTotal = accountBills.reduce((/** @type {number} */ sum, /** @type {any} */ b) => sum + getBillMonthlyCost(b), 0);
 
         return (
           <div key={account.id} className="space-y-2">
@@ -67,7 +67,7 @@ export function MainBudgetView() {
                     <th className="p-3.5">Bill Name</th>
                     <th className="p-3.5 text-right">Monthly Amount</th>
                     <th className="p-3.5 text-right">Bi-Weekly (Per Pay)</th>
-                    {budget.people.map(p => (
+                    {budget.people.map((/** @type {any} */ p) => (
                       <th key={p.id} className="p-3.5 text-right">{p.name.split(' ')[0]} Portion</th>
                     ))}
                     <th className="p-3.5 text-center">Due Day</th>
@@ -76,7 +76,7 @@ export function MainBudgetView() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">
-                  {accountBills.map(bill => {
+                  {accountBills.map((/** @type {any} */ bill) => {
                     const monthlyCost  = getBillMonthlyCost(bill);
                     const biWeeklyCost = monthlyCost / 2;
 
@@ -88,7 +88,7 @@ export function MainBudgetView() {
                           <InlineEdit
                             value={bill.name}
                             type="text"
-                            onCommit={v => updateBill(bill.id, { name: v })}
+                            onCommit={(/** @type {string} */ v) => updateBill(bill.id, { name: v })}
                             className="text-slate-200 font-semibold text-xs"
                           />
                         </td>
@@ -98,7 +98,7 @@ export function MainBudgetView() {
                           <InlineEdit
                             value={bill.amount}
                             type="currency"
-                            onCommit={v => updateBill(bill.id, { amount: v })}
+                            onCommit={(/** @type {number} */ v) => updateBill(bill.id, { amount: v })}
                             className="font-mono text-slate-100 text-xs justify-end"
                           />
                         </td>
@@ -109,7 +109,7 @@ export function MainBudgetView() {
                         </td>
 
                         {/* Person portions - derived */}
-                        {budget.people.map(p => {
+                        {budget.people.map((/** @type {any} */ p) => {
                           const portion = getBillPersonMonthlyPortion(bill, p.id);
                           return (
                             <td key={p.id} className="p-3.5 text-right font-mono text-purple-300 text-xs">
@@ -126,7 +126,7 @@ export function MainBudgetView() {
                             prefix="Day "
                             min={1}
                             max={31}
-                            onCommit={v => updateBill(bill.id, { dueDay: v })}
+                            onCommit={(/** @type {number} */ v) => updateBill(bill.id, { dueDay: v })}
                             className="font-mono text-slate-400 text-xs justify-center"
                           />
                         </td>
@@ -136,9 +136,9 @@ export function MainBudgetView() {
                           <InlineEdit
                             value={bill.paymentNotes || bill.paymentSource || ''}
                             type="text"
-                            onCommit={v => updateBill(bill.id, { paymentNotes: v, paymentSource: v })}
+                            onCommit={(/** @type {string} */ v) => updateBill(bill.id, { paymentNotes: v, paymentSource: v })}
                             className="text-slate-300 text-xs"
-                            displayFn={v => v || '—'}
+                            displayFn={(/** @type {string} */ v) => v || '—'}
                           />
                         </td>
 
@@ -147,9 +147,9 @@ export function MainBudgetView() {
                           <InlineEdit
                             value={bill.notes || ''}
                             type="text"
-                            onCommit={v => updateBill(bill.id, { notes: v })}
+                            onCommit={(/** @type {string} */ v) => updateBill(bill.id, { notes: v })}
                             className="text-slate-500 italic max-w-xs truncate text-xs"
-                            displayFn={v => v || '—'}
+                            displayFn={(/** @type {string} */ v) => v || '—'}
                           />
                         </td>
                       </tr>
@@ -161,8 +161,8 @@ export function MainBudgetView() {
                     <td className="p-3.5 text-slate-400">Account Subtotal</td>
                     <td className="p-3.5 text-right font-mono text-rose-400">${accountTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                     <td className="p-3.5 text-right font-mono text-blue-400">${(accountTotal / 2).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                    {budget.people.map(p => {
-                      const pTotal = accountBills.reduce((s, b) => s + getBillPersonMonthlyPortion(b, p.id), 0);
+                    {budget.people.map((/** @type {any} */ p) => {
+                      const pTotal = accountBills.reduce((/** @type {number} */ s, /** @type {any} */ b) => s + getBillPersonMonthlyPortion(b, p.id), 0);
                       return (
                         <td key={p.id} className="p-3.5 text-right font-mono text-purple-300">${pTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                       );

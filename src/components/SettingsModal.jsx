@@ -615,6 +615,7 @@ export function SettingsModal() {
                             className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-purple-500"
                           >
                             <option value="bi-weekly">Bi-weekly (26/yr)</option>
+                            <option value="semi-monthly">Semi-Monthly (24/yr)</option>
                             <option value="monthly">Monthly (12/yr)</option>
                             <option value="weekly">Weekly (52/yr)</option>
                           </select>
@@ -628,6 +629,58 @@ export function SettingsModal() {
                             onChange={e => setNewPersonForm({ ...newPersonForm, role: e.target.value })}
                             className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-purple-500"
                           />
+                        </div>
+                      </div>
+
+                      {/* Pay Dates Customization & Presets */}
+                      <div className="p-3 bg-slate-950/60 border border-slate-800 rounded-xl space-y-2">
+                        <div className="flex items-center justify-between">
+                          <label className="block text-xs font-semibold text-purple-300">Payment Dates / Schedule</label>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => setNewPersonForm({ ...newPersonForm, payDay1: '1st', payDay2: '15th' })}
+                              className="px-2 py-0.5 text-[10px] rounded bg-purple-950/80 hover:bg-purple-900 text-purple-300 border border-purple-800 transition-colors"
+                            >
+                              1st & 15th
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setNewPersonForm({ ...newPersonForm, payDay1: '15th', payDay2: 'End of Month' })}
+                              className="px-2 py-0.5 text-[10px] rounded bg-purple-950/80 hover:bg-purple-900 text-purple-300 border border-purple-800 transition-colors"
+                            >
+                              15th & End
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setNewPersonForm({ ...newPersonForm, payDay1: 'Every 2 Wks', payDay2: 'Fridays' })}
+                              className="px-2 py-0.5 text-[10px] rounded bg-purple-950/80 hover:bg-purple-900 text-purple-300 border border-purple-800 transition-colors"
+                            >
+                              Bi-Weekly
+                            </button>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[10px] text-slate-400 mb-1">Pay Date 1 (e.g. 1st / 1)</label>
+                            <input
+                              type="text"
+                              placeholder="e.g. 1st or 1"
+                              value={newPersonForm.payDay1 || ''}
+                              onChange={e => setNewPersonForm({ ...newPersonForm, payDay1: e.target.value })}
+                              className="w-full px-3 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:border-purple-500 font-mono"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] text-slate-400 mb-1">Pay Date 2 (e.g. 15th / 15)</label>
+                            <input
+                              type="text"
+                              placeholder="e.g. 15th or 15"
+                              value={newPersonForm.payDay2 || ''}
+                              onChange={e => setNewPersonForm({ ...newPersonForm, payDay2: e.target.value })}
+                              className="w-full px-3 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:border-purple-500 font-mono"
+                            />
+                          </div>
                         </div>
                       </div>
 
@@ -679,7 +732,7 @@ export function SettingsModal() {
               {/* People List */}
               <div className="space-y-4">
                 {budget.people.map(person => (
-                  <div key={person.id} className="p-4 rounded-xl glass-card border border-slate-800 space-y-3">
+                  <div key={person.id} className="p-4 rounded-xl glass-card border border-slate-800 space-y-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <Users className="w-5 h-5 text-purple-400" />
@@ -700,48 +753,94 @@ export function SettingsModal() {
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
-                      <div>
-                        <label className="text-slate-500">Pay Frequency</label>
-                        <select
-                          value={person.payFrequency}
-                          onChange={e => updatePerson(person.id, { payFrequency: e.target.value })}
-                          className="mt-1 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-200 w-full"
-                        >
-                          <option value="bi-weekly">Bi-weekly (26/yr)</option>
-                          <option value="monthly">Monthly (12/yr)</option>
-                          <option value="weekly">Weekly (52/yr)</option>
-                        </select>
+
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                        <div>
+                          <label className="text-slate-500 font-medium">Pay Frequency</label>
+                          <select
+                            value={person.payFrequency}
+                            onChange={e => updatePerson(person.id, { payFrequency: e.target.value })}
+                            className="mt-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-slate-200 w-full focus:outline-none focus:border-purple-500"
+                          >
+                            <option value="bi-weekly">Bi-weekly (26/yr)</option>
+                            <option value="semi-monthly">Semi-Monthly (24/yr)</option>
+                            <option value="monthly">Monthly (12/yr)</option>
+                            <option value="weekly">Weekly (52/yr)</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-slate-500 font-medium">Gross Per Pay ($)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={person.grossPerPay}
+                            onChange={e => updatePerson(person.id, { grossPerPay: parseFloat(e.target.value) || 0 })}
+                            className="mt-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-slate-200 font-mono w-full focus:outline-none focus:border-purple-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-slate-500 font-medium">Net Per Pay ($)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={person.netPerPay}
+                            onChange={e => updatePerson(person.id, { netPerPay: parseFloat(e.target.value) || 0 })}
+                            className="mt-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-emerald-400 font-bold font-mono w-full focus:outline-none focus:border-purple-500"
+                          />
+                        </div>
                       </div>
-                      <div>
-                        <label className="text-slate-500">Gross Per Pay ($)</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={person.grossPerPay}
-                          onChange={e => updatePerson(person.id, { grossPerPay: parseFloat(e.target.value) || 0 })}
-                          className="mt-1 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-200 w-full"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-slate-500">Net Per Pay ($)</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={person.netPerPay}
-                          onChange={e => updatePerson(person.id, { netPerPay: parseFloat(e.target.value) || 0 })}
-                          className="mt-1 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-200 w-full"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-slate-500">Pay Day 1 / Date</label>
-                        <input
-                          type="text"
-                          value={person.payDay1}
-                          onChange={e => updatePerson(person.id, { payDay1: e.target.value })}
-                          className="mt-1 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-200 w-full"
-                          placeholder="e.g. 15th"
-                        />
+
+                      {/* Pay Dates Bar with Presets & Custom Fields */}
+                      <div className="p-2.5 bg-slate-950/40 border border-slate-800 rounded-lg space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-semibold text-purple-300">Payment Dates & Schedule Rules:</span>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => updatePerson(person.id, { payDay1: '1st', payDay2: '15th' })}
+                              className="px-2 py-0.5 text-[10px] rounded bg-purple-950/80 hover:bg-purple-900 text-purple-300 border border-purple-800 transition-colors"
+                            >
+                              1st & 15th
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => updatePerson(person.id, { payDay1: '15th', payDay2: 'End of Month' })}
+                              className="px-2 py-0.5 text-[10px] rounded bg-purple-950/80 hover:bg-purple-900 text-purple-300 border border-purple-800 transition-colors"
+                            >
+                              15th & End
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => updatePerson(person.id, { payDay1: 'Every 2 Wks', payDay2: 'Fridays' })}
+                              className="px-2 py-0.5 text-[10px] rounded bg-purple-950/80 hover:bg-purple-900 text-purple-300 border border-purple-800 transition-colors"
+                            >
+                              Bi-Weekly
+                            </button>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3 text-xs">
+                          <div>
+                            <label className="text-slate-400 text-[10px]">Pay Date 1 (e.g. 1st / 1)</label>
+                            <input
+                              type="text"
+                              value={person.payDay1 || ''}
+                              onChange={e => updatePerson(person.id, { payDay1: e.target.value })}
+                              className="mt-0.5 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-200 font-mono w-full focus:outline-none focus:border-purple-500"
+                              placeholder="e.g. 1st or 1"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-slate-400 text-[10px]">Pay Date 2 (e.g. 15th / 15)</label>
+                            <input
+                              type="text"
+                              value={person.payDay2 || ''}
+                              onChange={e => updatePerson(person.id, { payDay2: e.target.value })}
+                              className="mt-0.5 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-200 font-mono w-full focus:outline-none focus:border-purple-500"
+                              placeholder="e.g. 15th or 15"
+                            />
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>

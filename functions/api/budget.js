@@ -1,5 +1,19 @@
 import { verifyToken } from '../utils/auth.js';
 
+async function ensureSchema(db) {
+  if (!db) return;
+  try {
+    await db.prepare('ALTER TABLE people ADD COLUMN pay_offset_days INTEGER DEFAULT 0').run();
+  } catch (e) {
+    // Column already exists
+  }
+  try {
+    await db.prepare('ALTER TABLE accounts ADD COLUMN balance_as_of_date TEXT').run();
+  } catch (e) {
+    // Column already exists
+  }
+}
+
 /**
  * @param {{ request: Request, env: Record<string, any> }} context
  */
@@ -33,6 +47,8 @@ export async function onRequestGet(context) {
       });
     }
 
+    await ensureSchema(env.DB);
+
     // Query Accounts
     const accRows = await env.DB.prepare('SELECT * FROM accounts WHERE household_id = ?').bind(householdId).all();
     const accounts = (accRows.results || []).map((/** @type {any} */ a) => ({
@@ -40,6 +56,7 @@ export async function onRequestGet(context) {
       name: a.name,
       type: a.type,
       startingBalance: a.starting_balance,
+      balanceAsOfDate: a.balance_as_of_date || '',
       extraStartingBalance: a.extra_starting_balance || 0,
       saveExtraMonthly: a.save_extra_monthly || 0,
       enableExtraSavings: Boolean(a.enable_extra_savings),
@@ -56,6 +73,7 @@ export async function onRequestGet(context) {
       payFrequency: p.pay_frequency,
       payDay1: isNaN(p.pay_day1) ? p.pay_day1 : Number(p.pay_day1),
       payDay2: isNaN(p.pay_day2) ? p.pay_day2 : Number(p.pay_day2),
+      payOffsetDays: p.pay_offset_days !== undefined && p.pay_offset_days !== null ? Number(p.pay_offset_days) : 0,
       grossPerPay: p.gross_per_pay,
       netPerPay: p.net_per_pay,
       color: p.color
@@ -185,15 +203,17 @@ export async function onRequestPost(context) {
       });
     }
 
+    await ensureSchema(env.DB);
+
     // Sync Accounts
     if (Array.isArray(budget.accounts)) {
       await env.DB.prepare('DELETE FROM accounts WHERE household_id = ?').bind(householdId).run();
       for (const acc of budget.accounts) {
         await env.DB.prepare(
-          'INSERT INTO accounts (id, household_id, name, type, starting_balance, extra_starting_balance, save_extra_monthly, enable_extra_savings, color, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+          'INSERT INTO accounts (id, household_id, name, type, starting_balance, balance_as_of_date, extra_starting_balance, save_extra_monthly, enable_extra_savings, color, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         ).bind(
           acc.id, householdId, acc.name, acc.type || 'checking',
-          acc.startingBalance || 0, acc.extraStartingBalance || 0, acc.saveExtraMonthly || 0,
+          acc.startingBalance || 0, acc.balanceAsOfDate || '', acc.extraStartingBalance || 0, acc.saveExtraMonthly || 0,
           acc.enableExtraSavings ? 1 : 0, acc.color || 'blue', acc.notes || ''
         ).run();
       }
@@ -204,10 +224,10 @@ export async function onRequestPost(context) {
       await env.DB.prepare('DELETE FROM people WHERE household_id = ?').bind(householdId).run();
       for (const p of budget.people) {
         await env.DB.prepare(
-          'INSERT INTO people (id, household_id, name, role, pay_frequency, pay_day1, pay_day2, gross_per_pay, net_per_pay, color) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+          'INSERT INTO people (id, household_id, name, role, pay_frequency, pay_day1, pay_day2, pay_offset_days, gross_per_pay, net_per_pay, color) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         ).bind(
           p.id, householdId, p.name, p.role || 'Member', p.payFrequency || 'bi-weekly',
-          String(p.payDay1 || '15'), String(p.payDay2 || 'last'),
+          String(p.payDay1 || '15'), String(p.payDay2 || 'last'), Number(p.payOffsetDays || 0),
           p.grossPerPay || 0, p.netPerPay || 0, p.color || 'purple'
         ).run();
       }

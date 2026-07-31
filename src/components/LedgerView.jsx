@@ -18,6 +18,8 @@ import {
 } from 'lucide-react';
 import { InlineEdit } from './InlineEdit';
 
+import { fmtMoney, fmtNum } from '../utils/formatters';
+
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'
@@ -25,12 +27,12 @@ const MONTHS = [
 
 const DAYS_OF_WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-// Helper to format currency for grid display ($100.00 or $ -)
+// Helper to format currency for grid display ($1,000.00 or $ -)
 function fmtGrid(val) {
   if (val === undefined || val === null || isNaN(val) || val === 0) {
     return '$ -';
   }
-  return `$${val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return fmtMoney(val);
 }
 
 // Inline cell editor for matrix cells
@@ -301,23 +303,23 @@ function DailySpreadsheetMatrix() {
           <div className="hidden xl:flex items-center gap-3 bg-slate-950 px-3 py-1 rounded-xl border border-slate-800 text-[11px] font-mono">
             <div className="flex items-center gap-1">
               <span className="text-slate-400">Start:</span>
-              <span className="text-slate-200 font-bold">${(matrixData[0]?.regBeg || 0).toFixed(2)}</span>
+              <span className="text-slate-200 font-bold">{fmtMoney(matrixData[0]?.regBeg || 0)}</span>
             </div>
             <div className="h-3 w-px bg-slate-800" />
             <div className="flex items-center gap-1">
               <span className="text-slate-400">Deposits:</span>
-              <span className="text-emerald-400 font-bold">+${columnTotals.totalRegCredits.toFixed(2)}</span>
+              <span className="text-emerald-400 font-bold">+{fmtMoney(columnTotals.totalRegCredits)}</span>
             </div>
             <div className="h-3 w-px bg-slate-800" />
             <div className="flex items-center gap-1">
               <span className="text-slate-400">Bills:</span>
-              <span className="text-rose-400 font-bold">-${columnTotals.totalBills.toFixed(2)}</span>
+              <span className="text-rose-400 font-bold">-{fmtMoney(columnTotals.totalBills)}</span>
             </div>
             <div className="h-3 w-px bg-slate-800" />
             <div className="flex items-center gap-1">
               <span className="text-slate-400">End Total:</span>
               <span className={`font-bold ${finalEndingBalance < 0 ? 'text-rose-400' : 'text-blue-400'}`}>
-                ${finalEndingBalance.toFixed(2)}
+                {fmtMoney(finalEndingBalance)}
               </span>
             </div>
           </div>

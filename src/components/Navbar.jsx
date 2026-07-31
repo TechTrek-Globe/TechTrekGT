@@ -43,9 +43,9 @@ export function Navbar() {
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'main_budget', label: 'Budget Plan', icon: ReceiptText },
-    { id: 'interactive_budget', label: 'Interactive Ledger', icon: TrendingUp },
     { id: 'ledger', label: 'Cash Flow Register', icon: Wallet },
-    { id: 'amortization', label: 'Loan Amortization', icon: Calculator }
+    { id: 'amortization', label: 'Loan Amortization', icon: Calculator },
+    { id: 'settings', label: 'Settings', icon: Settings, isSettings: true }
   ];
 
   return (
@@ -91,48 +91,23 @@ export function Navbar() {
               <span className="font-semibold text-indigo-300">{savingsRate}%</span>
             </div>
           </div>
-
-          {/* Action Buttons */}
-          <div className="flex items-center space-x-3">
-            <button
-              onClick={exportConfig}
-              title="Export Budget Configuration JSON"
-              className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/80 transition-colors"
-            >
-              <Download className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => {
-                if (window.confirm('Reset all budget data to original Excel spreadsheet values?')) {
-                  resetToDefaults();
-                }
-              }}
-              title="Reset to Excel Defaults"
-              className="p-2 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-slate-800/80 transition-colors"
-            >
-              <RotateCcw className="w-4 h-4" />
-            </button>
-
-            {/* Dynamic Settings Button */}
-            <button
-              onClick={() => setIsSettingsOpen(true)}
-              className="flex items-center space-x-2 px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-sm font-medium shadow-lg shadow-blue-600/25 transition-all transform hover:-translate-y-0.5 active:translate-y-0"
-            >
-              <Settings className="w-4 h-4 animate-spin-slow" />
-              <span>Budget Settings</span>
-            </button>
-          </div>
         </div>
 
         {/* View Navigation Tabs */}
         <div className="flex space-x-1 border-t border-slate-800/60 pt-2 pb-2">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = activeView === item.id;
+            const isActive = item.isSettings ? false : activeView === item.id;
             return (
               <button
                 key={item.id}
-                onClick={() => setActiveView(item.id)}
+                onClick={() => {
+                  if (item.isSettings) {
+                    setIsSettingsOpen(true);
+                  } else {
+                    setActiveView(item.id);
+                  }
+                }}
                 className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${
                   isActive
                     ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30 shadow-inner'

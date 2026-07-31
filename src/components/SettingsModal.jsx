@@ -15,8 +15,10 @@ import {
   AlertTriangle,
   FileCode,
   Upload,
+  Download,
   FileSpreadsheet
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { parseSpreadsheet } from '../utils/spreadsheetParser';
 
 export function SettingsModal() {
@@ -87,6 +89,86 @@ export function SettingsModal() {
     }
   };
 
+  const handleExportExcel = () => {
+    try {
+      const wb = XLSX.utils.book_new();
+
+      // 1. Accounts Sheet
+      const accsData = budget.accounts.map(a => ({
+        ID: a.id,
+        Name: a.name,
+        Type: a.type,
+        'Starting Balance': a.startingBalance,
+        'Extra Starting Balance': a.extraStartingBalance || 0,
+        'Save Extra Monthly': a.saveExtraMonthly || 0
+      }));
+      const wsAccs = XLSX.utils.json_to_sheet(accsData);
+      XLSX.utils.book_append_sheet(wb, wsAccs, 'Accounts');
+
+      // 2. People / Income Sheet
+      const peopleData = budget.people.map(p => ({
+        ID: p.id,
+        Name: p.name,
+        Role: p.role,
+        'Pay Frequency': p.payFrequency,
+        'Gross Per Pay': p.grossPerPay,
+        'Net Per Pay': p.netPerPay
+      }));
+      const wsPeople = XLSX.utils.json_to_sheet(peopleData);
+      XLSX.utils.book_append_sheet(wb, wsPeople, 'People & Income');
+
+      // 3. Bills Sheet
+      const billsData = budget.bills.map(b => {
+        const acc = budget.accounts.find(a => a.id === b.accountId);
+        return {
+          ID: b.id,
+          Name: b.name,
+          Amount: b.amount,
+          Period: b.period,
+          'Due Day': b.dueDay,
+          Account: acc ? acc.name : b.accountId,
+          'Payment Source': b.paymentSource
+        };
+      });
+      const wsBills = XLSX.utils.json_to_sheet(billsData);
+      XLSX.utils.book_append_sheet(wb, wsBills, 'Bills');
+
+      // 4. Loans Sheet
+      if (budget.loans && budget.loans.length > 0) {
+        const loansData = budget.loans.map(l => ({
+          ID: l.id,
+          Name: l.name,
+          Principal: l.principal,
+          'Annual Rate (%)': l.annualInterestRate,
+          'Term (Months)': l.termMonths,
+          'Monthly Extra': l.extraPayment
+        }));
+        const wsLoans = XLSX.utils.json_to_sheet(loansData);
+        XLSX.utils.book_append_sheet(wb, wsLoans, 'Loans');
+      }
+
+      XLSX.writeFile(wb, `Personal_Budget_Export_${new Date().toISOString().split('T')[0]}.xlsx`);
+      setJsonStatus({ type: 'success', message: 'Exported Excel workbook (.xlsx) successfully!' });
+    } catch (err) {
+      setJsonStatus({ type: 'error', message: `Export failed: ${err.message}` });
+    }
+  };
+
+  const handleExportJson = () => {
+    try {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(budget, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `Personal_Budget_Backup_${new Date().toISOString().split('T')[0]}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      setJsonStatus({ type: 'success', message: 'Downloaded JSON backup successfully!' });
+    } catch (err) {
+      setJsonStatus({ type: 'error', message: `JSON export failed: ${err.message}` });
+    }
+  };
+
   if (!isSettingsOpen) return null;
 
   const tabs = [
@@ -94,7 +176,8 @@ export function SettingsModal() {
     { id: 'people', label: 'People & Income', icon: Users, count: budget.people.length },
     { id: 'bills', label: 'Bills & Assignments', icon: Receipt, count: budget.bills.length },
     { id: 'splits', label: 'Bill Splitting', icon: PieChart },
-    { id: 'data', label: 'Backup & Presets', icon: FileCode }
+    { id: 'import', label: 'Import', icon: Upload },
+    { id: 'export', label: 'Export', icon: Download }
   ];
 
   const handleAddAccount = (e) => {
@@ -712,8 +795,8 @@ export function SettingsModal() {
                                 <CheckCircle2 className="w-4 h-4" /> 100%
                               </span>
                             ) : (
-                              <span className="inline-flex items-center text-amber-400 gap-1 font-medium" title={`Total is ${totalPct}%`}>
-                                <AlertTriangle className="w-4 h-4" /> {totalPct}%
+                              <span className="inline-flex items-center text-amber-400 gap-1 font-medium" title={`Total is ${totalPct.toLocaleString('en-US')}%`}>
+                                <AlertTriangle className="w-4 h-4" /> {totalPct.toLocaleString('en-US')}%
                               </span>
                             )}
                           </td>
@@ -753,8 +836,8 @@ export function SettingsModal() {
             </div>
           )}
 
-          {/* TAB 5: BACKUP & PRESETS */}
-          {settingsTab === 'data' && (
+          {/* TAB 5: IMPORT */}
+          {settingsTab === 'import' && (
             <div className="space-y-6">
               
               {/* Excel (.xlsx / .csv) Spreadsheet Importer Card */}
@@ -894,6 +977,73 @@ export function SettingsModal() {
                   Clear All Budget Data
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* TAB 6: EXPORT */}
+          {settingsTab === 'export' && (
+            <div className="space-y-6">
+              
+              {/* Export to Excel Workbook Card */}
+              <div className="p-5 rounded-xl glass-card border border-blue-800/60 bg-blue-950/10 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-blue-300 flex items-center gap-2">
+                    <FileSpreadsheet className="w-5 h-5 text-blue-400" />
+                    Export Active Budget to Excel (.xlsx) Workbook
+                  </h3>
+                  <span className="text-[10px] font-mono text-blue-400 bg-blue-950 px-2.5 py-1 rounded-full border border-blue-800">
+                    Multi-Tab Excel Format
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Downloads a structured Excel workbook with dedicated sheets for Accounts, People &amp; Income, Bills, and Loans. Compatible with Microsoft Excel, Google Sheets, and Apple Numbers.
+                </p>
+
+                <div className="flex items-center justify-between pt-2">
+                  <div className="text-xs text-slate-400 font-mono">
+                    Includes {budget.accounts.length} accounts, {budget.bills.length} bills, {budget.people.length} earners
+                  </div>
+                  <button
+                    onClick={handleExportExcel}
+                    className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2 cursor-pointer"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Download Excel Workbook (.xlsx)</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Export to JSON Backup Card */}
+              <div className="p-5 rounded-xl glass-card border border-purple-800/60 bg-purple-950/10 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-purple-300 flex items-center gap-2">
+                    <FileCode className="w-5 h-5 text-purple-400" />
+                    Download Complete JSON Backup File
+                  </h3>
+                  <span className="text-[10px] font-mono text-purple-400 bg-purple-950 px-2.5 py-1 rounded-full border border-purple-800">
+                    Full Snapshot Backup
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Generates a full JSON backup file containing all configuration settings, line item registers, custom splits, and loan schedules. Perfect for restoring or transferring to another device.
+                </p>
+
+                <div className="flex items-center justify-between pt-2">
+                  {jsonStatus && (
+                    <span className={`text-xs ${jsonStatus.type === 'success' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      {jsonStatus.message}
+                    </span>
+                  )}
+                  <button
+                    onClick={handleExportJson}
+                    className="px-5 py-2.5 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2 cursor-pointer ml-auto"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Download JSON Backup File</span>
+                  </button>
+                </div>
+              </div>
+
             </div>
           )}
 

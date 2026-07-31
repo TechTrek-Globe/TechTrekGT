@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef, useCallback } from 'react';
 import { useBudget } from '../context/BudgetContext';
+import { fmtMoney, fmtNum } from '../utils/formatters';
 import {
   ReceiptText,
   Pencil,
@@ -162,12 +163,12 @@ export function InteractiveBudgetView() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="p-4 rounded-2xl glass-panel space-y-1">
           <span className="text-xs text-slate-400">Projected</span>
-          <span className="text-2xl font-black text-slate-100 font-mono block">${totalProjected.toFixed(2)}</span>
+          <span className="text-2xl font-black text-slate-100 font-mono block">{fmtMoney(totalProjected)}</span>
           <div className="h-1 bg-slate-700 rounded-full" />
         </div>
         <div className="p-4 rounded-2xl glass-panel space-y-1">
           <span className="text-xs text-slate-400">Actual ({MONTHS[selectedMonth].slice(0,3)})</span>
-          <span className="text-2xl font-black text-emerald-400 font-mono block">${totalActual.toFixed(2)}</span>
+          <span className="text-2xl font-black text-emerald-400 font-mono block">{fmtMoney(totalActual)}</span>
           <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
             <div
               className="h-full rounded-full transition-all duration-700"
@@ -185,7 +186,7 @@ export function InteractiveBudgetView() {
           <span className={`text-2xl font-black font-mono block ${
             Math.abs(variance) < 0.01 ? 'text-slate-400' : variance > 0 ? 'text-rose-400' : 'text-emerald-400'
           }`}>
-            {variance >= 0 ? '+' : ''}{variance.toFixed(2)}
+            {variance >= 0 ? '+' : '-'}{fmtMoney(Math.abs(variance))}
           </span>
           <div className="text-[10px] text-slate-500">
             {Math.abs(variance) < 0.01 ? 'On budget' : variance > 0 ? 'Over budget' : 'Under budget'}
@@ -218,13 +219,13 @@ export function InteractiveBudgetView() {
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 capitalize flex-shrink-0">{account.type}</span>
               <div className="flex items-center gap-4 text-xs ml-auto">
                 <span className="text-slate-500">
-                  Start: <span className="font-mono text-slate-300">${(account.startingBalance || 0).toFixed(2)}</span>
+                  Start: <span className="font-mono text-slate-300">{fmtMoney(account.startingBalance || 0)}</span>
                 </span>
                 <span className="text-slate-500">
-                  Proj end: <span className={`font-mono ${projEndBal < 0 ? 'text-rose-400' : 'text-slate-300'}`}>${projEndBal.toFixed(2)}</span>
+                  Proj end: <span className={`font-mono ${projEndBal < 0 ? 'text-rose-400' : 'text-slate-300'}`}>{fmtMoney(projEndBal)}</span>
                 </span>
                 <span className="text-slate-500">
-                  Actual end: <span className={`font-mono ${actualEndBal < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>${actualEndBal.toFixed(2)}</span>
+                  Actual end: <span className={`font-mono ${actualEndBal < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>{fmtMoney(actualEndBal)}</span>
                 </span>
                 {overBudget && (
                   <span className="text-[9px] px-2 py-0.5 rounded-full bg-rose-950 text-rose-300 border border-rose-800 font-semibold">Over</span>
@@ -276,7 +277,7 @@ export function InteractiveBudgetView() {
                               <MiniBar pct={barPct} overBudget={actual > projected} />
                             </div>
                           </td>
-                          <td className="p-3 text-right font-mono text-slate-400">${projected.toFixed(2)}</td>
+                          <td className="p-3 text-right font-mono text-slate-400">{fmtMoney(projected)}</td>
                           <td className="p-3 text-right">
                             <ActualCell
                               bill={bill}
@@ -294,16 +295,16 @@ export function InteractiveBudgetView() {
                             {Math.abs(billVariance) < 0.01 ? (
                               <span className="text-slate-600">&mdash;</span>
                             ) : billVariance > 0 ? (
-                              <span className="text-rose-400">+{billVariance.toFixed(2)}</span>
+                              <span className="text-rose-400">+{fmtMoney(billVariance)}</span>
                             ) : (
-                              <span className="text-emerald-400">{billVariance.toFixed(2)}</span>
+                              <span className="text-emerald-400">-{fmtMoney(Math.abs(billVariance))}</span>
                             )}
                           </td>
                           <td className="p-3 text-right font-mono text-slate-500">Day {bill.dueDay}</td>
                           {budget.people.map(p => {
                             const portion = getBillPersonMonthlyPortion(bill, p.id);
                             return (
-                              <td key={p.id} className="p-3 text-right font-mono text-purple-300/80">${portion.toFixed(2)}</td>
+                              <td key={p.id} className="p-3 text-right font-mono text-purple-300/80">{fmtMoney(portion)}</td>
                             );
                           })}
                           <td className="p-3 text-slate-500 italic max-w-xs truncate">{bill.notes || <span className="text-slate-700">&mdash;</span>}</td>
@@ -314,14 +315,14 @@ export function InteractiveBudgetView() {
                   <tfoot className="bg-slate-900/80 font-bold border-t border-slate-700/80 text-slate-200">
                     <tr>
                       <td className="p-3 text-slate-400 pl-5" colSpan={2}>Account Subtotal</td>
-                      <td className="p-3 text-right font-mono">${accountProjTotal.toFixed(2)}</td>
-                      <td className="p-3 text-right font-mono text-emerald-400">${accountActual.toFixed(2)}</td>
+                      <td className="p-3 text-right font-mono">{fmtMoney(accountProjTotal)}</td>
+                      <td className="p-3 text-right font-mono text-emerald-400">{fmtMoney(accountActual)}</td>
                       <td className="p-3 text-right font-mono">
                         {Math.abs(accountActual - accountProjTotal) < 0.01 ? (
                           <span className="text-slate-600">&mdash;</span>
                         ) : (
                           <span className={accountActual > accountProjTotal ? 'text-rose-400' : 'text-emerald-400'}>
-                            {accountActual > accountProjTotal ? '+' : ''}{(accountActual - accountProjTotal).toFixed(2)}
+                            {accountActual > accountProjTotal ? '+' : '-'}{fmtMoney(Math.abs(accountActual - accountProjTotal))}
                           </span>
                         )}
                       </td>
@@ -340,18 +341,18 @@ export function InteractiveBudgetView() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
           <div>
             <span className="text-xs text-slate-400 block">Total Projected</span>
-            <span className="text-2xl font-black text-slate-100 font-mono">${totalProjected.toFixed(2)}</span>
+            <span className="text-2xl font-black text-slate-100 font-mono">{fmtMoney(totalProjected)}</span>
           </div>
           <div>
             <span className="text-xs text-slate-400 block">Total Actual &mdash; {MONTHS[selectedMonth]} {selectedYear}</span>
-            <span className="text-2xl font-black text-emerald-400 font-mono">${totalActual.toFixed(2)}</span>
+            <span className="text-2xl font-black text-emerald-400 font-mono">{fmtMoney(totalActual)}</span>
           </div>
           <div>
             <span className="text-xs text-slate-400 block">Net Variance</span>
             <span className={`text-2xl font-black font-mono ${
               Math.abs(variance) < 0.01 ? 'text-slate-400' : variance > 0 ? 'text-rose-400' : 'text-emerald-400'
             }`}>
-              {variance >= 0 ? '+' : ''}{variance.toFixed(2)}
+              {variance >= 0 ? '+' : '-'}{fmtMoney(Math.abs(variance))}
             </span>
           </div>
         </div>

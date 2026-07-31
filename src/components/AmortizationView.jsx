@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { fmtMoney } from '../utils/formatters';
 import { useBudget } from '../context/BudgetContext';
 import { Calculator, DollarSign, TrendingDown, Clock, ShieldCheck, Sparkles, Plus, Trash2, Edit2, Check, CreditCard, Building, RefreshCw, Layers, Archive, RotateCcw } from 'lucide-react';
 
@@ -680,12 +681,12 @@ export function AmortizationView() {
               {withExtraResult.schedule.slice(0, 36).map(row => (
                 <tr key={row.period} className="hover:bg-slate-900/40 transition-colors">
                   <td className="p-3 font-semibold text-slate-300">#{row.period}</td>
-                  <td className="p-3 text-right text-slate-300">${row.beginningBalance.toFixed(2)}</td>
-                  <td className="p-3 text-right text-slate-300">${row.scheduledPayment.toFixed(2)}</td>
-                  <td className="p-3 text-right text-indigo-400 font-bold">${row.extraPayment.toFixed(2)}</td>
-                  <td className="p-3 text-right text-emerald-400">${row.principalPortion.toFixed(2)}</td>
-                  <td className="p-3 text-right text-rose-400">${row.interestPortion.toFixed(2)}</td>
-                  <td className="p-3 text-right text-slate-100 font-bold">${row.endingBalance.toFixed(2)}</td>
+                  <td className="p-3 text-right text-slate-300">{fmtMoney(row.beginningBalance)}</td>
+                  <td className="p-3 text-right text-slate-300">{fmtMoney(row.scheduledPayment)}</td>
+                  <td className="p-3 text-right text-indigo-400 font-bold">{fmtMoney(row.extraPayment)}</td>
+                  <td className="p-3 text-right text-emerald-400">{fmtMoney(row.principalPortion)}</td>
+                  <td className="p-3 text-right text-rose-400">{fmtMoney(row.interestPortion)}</td>
+                  <td className="p-3 text-right text-slate-100 font-bold">{fmtMoney(row.endingBalance)}</td>
                 </tr>
               ))}
             </tbody>

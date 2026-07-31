@@ -20,6 +20,7 @@ const NAV_ITEMS = [
   { id: 'main_budget', label: 'Budget Plan',       icon: ReceiptText,     color: 'text-violet-400' },
   { id: 'ledger',      label: 'Ledger & Cash Flow',icon: TrendingUp,      color: 'text-emerald-400' },
   { id: 'amortization',label: 'Loan Amortization', icon: Calculator,      color: 'text-rose-400' },
+  { id: 'settings',    label: 'Settings',          icon: Settings,        color: 'text-amber-400', isSettings: true },
 ];
 
 const SIDEBAR_KEY = 'trekledger_sidebar_collapsed';
@@ -98,11 +99,17 @@ export function AppLayout({ children }) {
         )}
         {NAV_ITEMS.map((item) => {
           const Icon = item.icon;
-          const isActive = activeView === item.id;
+          const isActive = item.isSettings ? false : activeView === item.id;
           return (
             <button
               key={item.id}
-              onClick={() => setActiveView(item.id)}
+              onClick={() => {
+                if (item.isSettings) {
+                  setIsSettingsOpen(true);
+                } else {
+                  setActiveView(item.id);
+                }
+              }}
               title={collapsed ? item.label : undefined}
               className={`sidebar-nav-item w-full text-left ${isActive ? 'active' : 'text-slate-400'} ${collapsed ? 'justify-center px-2' : ''}`}
             >
@@ -118,7 +125,7 @@ export function AppLayout({ children }) {
 
       {/* Quick KPIs at bottom */}
       {!collapsed && (
-        <div className="mx-3 mb-3 p-3 rounded-xl bg-slate-900/60 border border-slate-800/60 space-y-2 animate-fade-in">
+        <div className="mx-3 mb-4 p-3 rounded-xl bg-slate-900/60 border border-slate-800/60 space-y-2 animate-fade-in">
           <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Quick Stats</p>
           <div className="space-y-1.5">
             <div className="flex justify-between items-center">
@@ -142,28 +149,6 @@ export function AppLayout({ children }) {
           </div>
         </div>
       )}
-
-      {/* Action Buttons */}
-      <div className={`px-3 pb-4 border-t border-slate-800/60 pt-3 flex ${collapsed ? 'flex-col items-center gap-2' : 'items-center gap-2'}`}>
-        <button
-          onClick={exportConfig}
-          title="Export JSON"
-          className="flex-1 flex items-center justify-center gap-2 px-2 py-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/70 transition-colors text-xs"
-        >
-          <Download className="w-3.5 h-3.5 flex-shrink-0" />
-          {!collapsed && <span>Export</span>}
-        </button>
-        <button
-          onClick={() => {
-            if (window.confirm('Reset all data to original Excel defaults?')) resetToDefaults();
-          }}
-          title="Reset to defaults"
-          className="flex-1 flex items-center justify-center gap-2 px-2 py-2 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-slate-800/70 transition-colors text-xs"
-        >
-          <RotateCcw className="w-3.5 h-3.5 flex-shrink-0" />
-          {!collapsed && <span>Reset</span>}
-        </button>
-      </div>
     </div>
   );
 

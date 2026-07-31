@@ -41,9 +41,9 @@ export function InlineEdit({
     : type === 'currency'
       ? `$${parseFloat(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
       : type === 'percent'
-        ? `${parseFloat(value || 0).toFixed(2)}%`
+        ? `${parseFloat(value || 0).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 2 })}%`
         : type === 'integer'
-          ? `${prefix}${parseInt(value || 0, 10)}${suffix}`
+          ? `${prefix}${parseInt(value || 0, 10).toLocaleString('en-US')}${suffix}`
           : `${prefix}${value}${suffix}`;
 
   const open = useCallback(() => {

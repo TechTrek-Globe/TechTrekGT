@@ -132,6 +132,11 @@ export function DashboardView() {
 
   const fmtCurrency = (n) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const fmtShort    = (n) => n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  const fmtPct      = (n, decimals = 1) => {
+    const val = parseFloat(n);
+    if (isNaN(val)) return '0%';
+    return `${val.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}%`;
+  };
 
   return (
     <div className="space-y-6 animate-fade-in pb-16">
@@ -215,7 +220,7 @@ export function DashboardView() {
           <div className="space-y-1">
             <div className="flex justify-between text-[10px] text-slate-500">
               <span>{budget.bills.length} bills</span>
-              <span className="text-rose-400">{netIncome > 0 ? ((totalExpenses / netIncome) * 100).toFixed(1) : '0'}% of income</span>
+              <span className="text-rose-400">{netIncome > 0 ? fmtPct((totalExpenses / netIncome) * 100) : '0%'} of income</span>
             </div>
             <ProgressBar pct={netIncome > 0 ? (totalExpenses / netIncome) * 100 : 0} colorClass={totalExpenses > netIncome ? 'bg-rose-500' : 'bg-rose-400'} />
           </div>
@@ -236,7 +241,7 @@ export function DashboardView() {
             <div className="flex justify-between text-[10px] text-slate-500">
               <span>Savings rate</span>
               <span className={savingsRate >= 20 ? 'text-emerald-400' : savingsRate >= 10 ? 'text-amber-400' : 'text-rose-400'}>
-                {savingsRate.toFixed(1)}%
+                {fmtPct(savingsRate)}
               </span>
             </div>
             <ProgressBar pct={Math.max(0, savingsRate)} colorClass={savingsRate >= 20 ? 'bg-emerald-500' : savingsRate >= 10 ? 'bg-amber-500' : 'bg-rose-500'} />
@@ -251,7 +256,7 @@ export function DashboardView() {
               <PieIcon className="w-3.5 h-3.5 text-purple-400" />
             </div>
           </div>
-          <div className="text-2xl font-black text-purple-400 font-mono">{savingsRate.toFixed(1)}%</div>
+          <div className="text-2xl font-black text-purple-400 font-mono">{fmtPct(savingsRate)}</div>
           <div className="space-y-1">
             <div className="flex justify-between text-[10px] text-slate-500">
               <span>Target: 20%</span>
@@ -536,7 +541,7 @@ export function DashboardView() {
                       <ProgressBar pct={splitPct} colorClass="bg-indigo-500" />
                       <div className="flex justify-between text-[10px]">
                         <span className="text-slate-500">Household contribution</span>
-                        <span className="font-semibold text-indigo-400">{splitPct.toFixed(1)}% share</span>
+                        <span className="font-semibold text-indigo-400">{fmtPct(splitPct)} share</span>
                       </div>
                     </div>
                   </div>

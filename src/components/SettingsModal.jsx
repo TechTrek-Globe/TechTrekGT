@@ -42,6 +42,7 @@ export function SettingsModal() {
     updateBillSplits,
     resetToDefaults,
     clearAllData,
+    loadDemoPreset,
     importBudgetJson,
     importParsedSpreadsheet
   } = useBudget();
@@ -58,6 +59,7 @@ export function SettingsModal() {
   const [spreadsheetFileName, setSpreadsheetFileName] = useState('');
   const [confirmClearAll, setConfirmClearAll] = useState(false);
   const [confirmResetDefaults, setConfirmResetDefaults] = useState(false);
+  const [confirmLoadDemo, setConfirmLoadDemo] = useState(false);
 
   const handleFileUpload = (e) => {
     const file = e.target.files?.[0];
@@ -1085,24 +1087,76 @@ export function SettingsModal() {
                 </div>
               </div>
 
-              {/* Option B: Reset to Starter Preset */}
+              {/* Option B: Load 100% Fake Demo Dataset */}
+              <div className="p-5 rounded-xl glass-card border border-indigo-800/60 bg-indigo-950/10 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-indigo-300 flex items-center gap-2">
+                    <FileSpreadsheet className="w-5 h-5 text-indigo-400" />
+                    Load 100% Fake Demo Dataset
+                  </h3>
+                  <span className="text-[10px] font-mono text-indigo-400 bg-indigo-950 px-2.5 py-1 rounded-full border border-indigo-800">
+                    Full Demo Household
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Populates a full demonstration household with 100% fictional data: 2 earners (Alex &amp; Taylor), 3 mock accounts (Apex Checking, Emergency Savings, Sapphire Credit), recurring rent/utility bills, custom split allocations, and a mortgage loan schedule.
+                </p>
+
+                <div className="flex items-center justify-between pt-2">
+                  <div className="text-xs text-slate-400 font-mono">
+                    Includes 3 demo accounts, 6 sample bills, 2 earners, and 1 mortgage schedule
+                  </div>
+
+                  {confirmLoadDemo ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-indigo-400 font-medium">Load fake demo data?</span>
+                      <button
+                        onClick={() => {
+                          loadDemoPreset();
+                          setConfirmLoadDemo(false);
+                          setJsonStatus({ type: 'success', message: 'Loaded 100% fake demo dataset successfully!' });
+                        }}
+                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer"
+                      >
+                        Yes, Load Fake Demo Data
+                      </button>
+                      <button
+                        onClick={() => setConfirmLoadDemo(false)}
+                        className="px-3 py-2 bg-slate-800 text-slate-300 hover:bg-slate-700 rounded-xl text-xs font-medium"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmLoadDemo(true)}
+                      className="px-5 py-2.5 bg-indigo-600/80 hover:bg-indigo-600 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2 cursor-pointer"
+                    >
+                      <FileSpreadsheet className="w-4 h-4" />
+                      <span>Load Fake Demo Data</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Option C: Reset to Starter Empty Preset */}
               <div className="p-5 rounded-xl glass-card border border-amber-800/60 bg-amber-950/10 space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-bold text-amber-300 flex items-center gap-2">
                     <RotateCcw className="w-5 h-5 text-amber-400" />
-                    Reset to Starter Sample Preset
+                    Reset to Empty Starter Template
                   </h3>
                   <span className="text-[10px] font-mono text-amber-400 bg-amber-950 px-2.5 py-1 rounded-full border border-amber-800">
-                    Sample Template
+                    Blank Starter
                   </span>
                 </div>
                 <p className="text-xs text-slate-300 leading-relaxed">
-                  Restores default starter demo data (sample checking accounts, earners, and recurring bills). Useful if you want to explore the budget features with pre-filled sample figures.
+                  Resets to a clean starter template with zero pre-filled balances or bills.
                 </p>
 
                 <div className="flex items-center justify-between pt-2">
                   <div className="text-xs text-slate-400">
-                    Restores demo accounts, sample income, and default split percentages.
+                    Resets active household to empty defaults.
                   </div>
 
                   {confirmResetDefaults ? (
@@ -1116,7 +1170,7 @@ export function SettingsModal() {
                         }}
                         className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer"
                       >
-                        Yes, Restore Sample Data
+                        Yes, Restore Blank Template
                       </button>
                       <button
                         onClick={() => setConfirmResetDefaults(false)}
@@ -1131,7 +1185,7 @@ export function SettingsModal() {
                       className="px-5 py-2.5 bg-amber-600/80 hover:bg-amber-600 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2 cursor-pointer"
                     >
                       <RotateCcw className="w-4 h-4" />
-                      <span>Reset to Sample Preset</span>
+                      <span>Reset to Empty Starter</span>
                     </button>
                   )}
                 </div>

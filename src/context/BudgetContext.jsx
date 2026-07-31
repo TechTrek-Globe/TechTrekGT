@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { initialBudgetData } from '../initialData';
+import { fakeDemoBudgetData } from '../demoPresetData';
 import { useAuth } from './AuthContext';
 
 const BudgetContext = createContext();
@@ -289,6 +290,11 @@ export function BudgetProvider({ children }) {
     });
   };
 
+  // Load 100% Fake Demo Preset Data
+  const loadDemoPreset = () => {
+    setBudget(fakeDemoBudgetData);
+  };
+
   // Reset to default spreadsheet data
   const resetToDefaults = () => {
     setBudget(initialBudgetData);
@@ -559,6 +565,7 @@ export function BudgetProvider({ children }) {
         deleteLoan,
         resetToDefaults,
         clearAllData,
+        loadDemoPreset,
         importParsedSpreadsheet,
         // line-item operations
         upsertLineItem,

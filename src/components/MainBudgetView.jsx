@@ -48,9 +48,9 @@ export function MainBudgetView() {
         const accountTotal = accountBills.reduce((sum, b) => sum + getBillMonthlyCost(b), 0);
 
         return (
-          <div key={account.id} className="rounded-2xl border border-slate-800 glass-panel overflow-hidden">
+          <div key={account.id} className="rounded-2xl border border-slate-800 glass-panel">
             {/* Account Sticky Header Bar */}
-            <div className="sticky top-14 z-20 bg-slate-900 px-4 py-3 border-b border-slate-800 flex items-center justify-between shadow-md">
+            <div className="sticky top-14 z-20 bg-slate-900 px-4 py-3 border-b border-slate-800 flex items-center justify-between shadow-md rounded-t-2xl">
               <div className="flex items-center gap-3">
                 <div className="w-3 h-3 rounded-full bg-blue-500" />
                 <h3 className="text-sm font-bold text-slate-200">{account.name}</h3>
@@ -65,15 +65,15 @@ export function MainBudgetView() {
               <table className="w-full text-left text-xs text-slate-300">
                 <thead>
                   <tr className="border-b border-slate-800 text-slate-500 uppercase font-semibold text-[10px]">
-                    <th className="p-3.5 sticky top-[98px] z-10 bg-slate-900 shadow-sm">Bill Name</th>
-                    <th className="p-3.5 text-right sticky top-[98px] z-10 bg-slate-900 shadow-sm">Monthly Amount</th>
-                    <th className="p-3.5 text-right sticky top-[98px] z-10 bg-slate-900 shadow-sm">Bi-Weekly (Per Pay)</th>
+                    <th className="p-3.5 sticky top-[100px] z-10 bg-slate-900 shadow-sm">Bill Name</th>
+                    <th className="p-3.5 text-right sticky top-[100px] z-10 bg-slate-900 shadow-sm">Monthly Amount</th>
+                    <th className="p-3.5 text-right sticky top-[100px] z-10 bg-slate-900 shadow-sm">Bi-Weekly (Per Pay)</th>
                     {budget.people.map(p => (
-                      <th key={p.id} className="p-3.5 text-right sticky top-[98px] z-10 bg-slate-900 shadow-sm">{p.name.split(' ')[0]} Portion</th>
+                      <th key={p.id} className="p-3.5 text-right sticky top-[100px] z-10 bg-slate-900 shadow-sm">{p.name.split(' ')[0]} Portion</th>
                     ))}
-                    <th className="p-3.5 text-center sticky top-[98px] z-10 bg-slate-900 shadow-sm">Due Day</th>
-                    <th className="p-3.5 sticky top-[98px] z-10 bg-slate-900 shadow-sm">Payment Notes</th>
-                    <th className="p-3.5 sticky top-[98px] z-10 bg-slate-900 shadow-sm">Notes</th>
+                    <th className="p-3.5 text-center sticky top-[100px] z-10 bg-slate-900 shadow-sm">Due Day</th>
+                    <th className="p-3.5 sticky top-[100px] z-10 bg-slate-900 shadow-sm">Payment Notes</th>
+                    <th className="p-3.5 sticky top-[100px] z-10 bg-slate-900 shadow-sm">Notes</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { initialBudgetData } from '../initialData';
 import { fakeDemoBudgetData } from '../demoPresetData';

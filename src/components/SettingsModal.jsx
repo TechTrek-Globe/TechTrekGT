@@ -278,7 +278,7 @@ export function SettingsModal() {
               <span className="p-2 rounded-lg bg-blue-600/20 text-blue-400">
                 <Receipt className="w-5 h-5" />
               </span>
-              Dynamic Budget Settings
+              Setup Accounts, People, Bills, Splits
             </h2>
             <p className="text-xs text-slate-400">Configure accounts, income, bills, and household split ratios</p>
           </div>

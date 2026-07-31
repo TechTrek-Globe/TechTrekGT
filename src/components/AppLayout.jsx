@@ -20,7 +20,7 @@ const NAV_ITEMS = [
   { id: 'ledger',      label: 'Ledger & Cash Flow',    icon: TrendingUp,      color: 'text-emerald-400' },
   { id: 'main_budget', label: 'Bills & Allocations',   icon: ReceiptText,     color: 'text-violet-400' },
   { id: 'amortization',label: 'Loan Amortization',     icon: Calculator,      color: 'text-rose-400' },
-  { id: 'settings',    label: 'Settings',              icon: Settings,        color: 'text-amber-400', isSettings: true },
+  { id: 'settings',    label: 'Setup Accounts, People, Bills, Splits', icon: Settings, color: 'text-amber-400', isSettings: true },
 ];
 
 const SIDEBAR_KEY = 'trekledger_sidebar_collapsed';

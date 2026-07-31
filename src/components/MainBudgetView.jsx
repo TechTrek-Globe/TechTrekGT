@@ -48,31 +48,32 @@ export function MainBudgetView() {
         const accountTotal = accountBills.reduce((sum, b) => sum + getBillMonthlyCost(b), 0);
 
         return (
-          <div key={account.id} className="space-y-2">
-            <div className="flex items-center justify-between px-1">
+          <div key={account.id} className="rounded-2xl border border-slate-800 glass-panel overflow-hidden">
+            {/* Account Sticky Header Bar */}
+            <div className="sticky top-[104px] z-20 bg-slate-900/95 backdrop-blur-md px-4 py-3 border-b border-slate-800 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-3 h-3 rounded-full bg-blue-500" />
                 <h3 className="text-sm font-bold text-slate-200">{account.name}</h3>
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 capitalize">{account.type}</span>
               </div>
               <span className="text-xs text-slate-400">
-                Subtotal: <span className="font-bold text-rose-400 font-mono">${accountTotal.toFixed(2)}/mo</span>
+                Subtotal: <span className="font-bold text-rose-400 font-mono">${accountTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/mo</span>
               </span>
             </div>
 
-            <div className="overflow-x-auto rounded-2xl border border-slate-800 glass-panel">
+            <div className="overflow-x-auto">
               <table className="w-full text-left text-xs text-slate-300">
-                <thead className="bg-slate-900/90 text-slate-500 uppercase font-semibold text-[10px] border-b border-slate-800">
+                <thead className="sticky top-[148px] z-10 bg-slate-900/95 backdrop-blur-md text-slate-500 uppercase font-semibold text-[10px] border-b border-slate-800">
                   <tr>
-                    <th className="p-3.5">Bill Name</th>
-                    <th className="p-3.5 text-right">Monthly Amount</th>
-                    <th className="p-3.5 text-right">Bi-Weekly (Per Pay)</th>
+                    <th className="p-3.5 bg-slate-900/95">Bill Name</th>
+                    <th className="p-3.5 text-right bg-slate-900/95">Monthly Amount</th>
+                    <th className="p-3.5 text-right bg-slate-900/95">Bi-Weekly (Per Pay)</th>
                     {budget.people.map(p => (
-                      <th key={p.id} className="p-3.5 text-right">{p.name.split(' ')[0]} Portion</th>
+                      <th key={p.id} className="p-3.5 text-right bg-slate-900/95">{p.name.split(' ')[0]} Portion</th>
                     ))}
-                    <th className="p-3.5 text-center">Due Day</th>
-                    <th className="p-3.5">Payment Source</th>
-                    <th className="p-3.5">Notes</th>
+                    <th className="p-3.5 text-center bg-slate-900/95">Due Day</th>
+                    <th className="p-3.5 bg-slate-900/95">Payment Notes</th>
+                    <th className="p-3.5 bg-slate-900/95">Notes</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">
@@ -105,7 +106,7 @@ export function MainBudgetView() {
 
                         {/* Bi-weekly - derived, read-only */}
                         <td className="p-3.5 text-right font-mono text-blue-400 text-xs">
-                          ${biWeeklyCost.toFixed(2)}
+                          ${biWeeklyCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </td>
 
                         {/* Person portions - derived */}
@@ -113,7 +114,7 @@ export function MainBudgetView() {
                           const portion = getBillPersonMonthlyPortion(bill, p.id);
                           return (
                             <td key={p.id} className="p-3.5 text-right font-mono text-purple-300 text-xs">
-                              ${portion.toFixed(2)}
+                              ${portion.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </td>
                           );
                         })}
@@ -131,11 +132,27 @@ export function MainBudgetView() {
                           />
                         </td>
 
-                        {/* Payment Source - read-only display */}
-                        <td className="p-3.5 text-slate-300 text-xs">{bill.paymentSource || '—'}</td>
+                        {/* Payment Notes - inline editable */}
+                        <td className="p-3.5 text-slate-300 text-xs">
+                          <InlineEdit
+                            value={bill.paymentNotes || bill.paymentSource || ''}
+                            type="text"
+                            onCommit={v => updateBill(bill.id, { paymentNotes: v, paymentSource: v })}
+                            className="text-slate-300 text-xs"
+                            displayFn={v => v || '—'}
+                          />
+                        </td>
 
                         {/* Notes */}
-                        <td className="p-3.5 text-slate-500 italic max-w-xs truncate text-xs">{bill.notes || '—'}</td>
+                        <td className="p-3.5 text-slate-500 italic max-w-xs truncate text-xs">
+                          <InlineEdit
+                            value={bill.notes || ''}
+                            type="text"
+                            onCommit={v => updateBill(bill.id, { notes: v })}
+                            className="text-slate-500 italic max-w-xs truncate text-xs"
+                            displayFn={v => v || '—'}
+                          />
+                        </td>
                       </tr>
                     );
                   })}
@@ -143,12 +160,12 @@ export function MainBudgetView() {
                 <tfoot className="bg-slate-900/80 font-bold border-t border-slate-700/80 text-slate-200">
                   <tr>
                     <td className="p-3.5 text-slate-400">Account Subtotal</td>
-                    <td className="p-3.5 text-right font-mono text-rose-400">${accountTotal.toFixed(2)}</td>
-                    <td className="p-3.5 text-right font-mono text-blue-400">${(accountTotal / 2).toFixed(2)}</td>
+                    <td className="p-3.5 text-right font-mono text-rose-400">${accountTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td className="p-3.5 text-right font-mono text-blue-400">${(accountTotal / 2).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                     {budget.people.map(p => {
                       const pTotal = accountBills.reduce((s, b) => s + getBillPersonMonthlyPortion(b, p.id), 0);
                       return (
-                        <td key={p.id} className="p-3.5 text-right font-mono text-purple-300">${pTotal.toFixed(2)}</td>
+                        <td key={p.id} className="p-3.5 text-right font-mono text-purple-300">${pTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                       );
                     })}
                     <td colSpan={3} />

@@ -687,7 +687,7 @@ export function SettingsModal() {
                       <th className="p-3">Period</th>
                       <th className="p-3">Assigned Account</th>
                       <th className="p-3">Due Day</th>
-                      <th className="p-3">Payment Source</th>
+                      <th className="p-3">Payment Notes</th>
                       <th className="p-3 text-right">Actions</th>
                     </tr>
                   </thead>
@@ -748,8 +748,8 @@ export function SettingsModal() {
                           <td className="p-3">
                             <input
                               type="text"
-                              value={bill.paymentSource}
-                              onChange={e => updateBill(bill.id, { paymentSource: e.target.value })}
+                              value={bill.paymentNotes || bill.paymentSource || ''}
+                              onChange={e => updateBill(bill.id, { paymentNotes: e.target.value, paymentSource: e.target.value })}
                               className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-200 w-32"
                             />
                           </td>

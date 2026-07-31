@@ -4,6 +4,7 @@ import { Navbar } from './components/Navbar';
 import { SettingsModal } from './components/SettingsModal';
 import { DashboardView } from './components/DashboardView';
 import { MainBudgetView } from './components/MainBudgetView';
+import { InteractiveBudgetView } from './components/InteractiveBudgetView';
 import { AccountLedgerView } from './components/AccountLedgerView';
 import { AmortizationView } from './components/AmortizationView';
 
@@ -14,6 +15,7 @@ function MainContent() {
     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {activeView === 'dashboard' && <DashboardView />}
       {activeView === 'main_budget' && <MainBudgetView />}
+      {activeView === 'interactive_budget' && <InteractiveBudgetView />}
       {activeView === 'ledger' && <AccountLedgerView />}
       {activeView === 'amortization' && <AmortizationView />}
       <SettingsModal />

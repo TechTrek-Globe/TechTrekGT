@@ -42,7 +42,8 @@ export function Navbar() {
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'main_budget', label: 'Main Budget', icon: ReceiptText },
+    { id: 'main_budget', label: 'Budget Plan', icon: ReceiptText },
+    { id: 'interactive_budget', label: 'Interactive Ledger', icon: TrendingUp },
     { id: 'ledger', label: 'Cash Flow Register', icon: Wallet },
     { id: 'amortization', label: 'Loan Amortization', icon: Calculator }
   ];

@@ -4,6 +4,11 @@ import { onRequestGet as meHandler } from '../functions/api/auth/me.js';
 import { onRequestGet as getBudgetHandler, onRequestPost as postBudgetHandler } from '../functions/api/budget.js';
 
 export default {
+  /**
+   * @param {Request} request
+   * @param {Record<string, any>} env
+   * @param {any} ctx
+   */
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const context = { request, env, ctx };
@@ -39,7 +44,8 @@ export default {
       return await env.ASSETS.fetch(request);
 
     } catch (err) {
-      return new Response(JSON.stringify({ error: err.message || 'Server error' }), {
+      const errorMessage = err instanceof Error ? err.message : String(err || 'Server error');
+      return new Response(JSON.stringify({ error: errorMessage }), {
         status: 500,
         headers: { 'Content-Type': 'application/json' }
       });

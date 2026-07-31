@@ -315,7 +315,7 @@ export function SettingsModal() {
         </div>
 
         {/* Tab Contents Area */}
-        <div className="flex-1 overflow-y-auto p-6 bg-slate-950/20">
+        <div className="flex-1 overflow-auto p-6 bg-slate-950/20">
 
           {/* TAB 1: ACCOUNTS */}
           {settingsTab === 'accounts' && (
@@ -836,90 +836,126 @@ export function SettingsModal() {
                 </div>
               </div>
 
-              <div className="overflow-x-auto rounded-xl border border-slate-800">
-                <table className="w-full text-left text-xs text-slate-300">
-                  <thead className="bg-slate-900 text-slate-400 uppercase font-medium">
-                    <tr>
-                      <th className="p-3">Bill Name</th>
-                      <th className="p-3">Monthly Cost</th>
-                      {budget.people.map(p => (
-                        <th key={p.id} className="p-3 text-center">{p.name} Split (%)</th>
-                      ))}
-                      <th className="p-3 text-center">Status</th>
-                      <th className="p-3 text-right">Quick Presets</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800 bg-slate-950/40">
-                    {budget.bills.map(bill => {
-                      const totalPct = budget.people.reduce((sum, p) => sum + (parseFloat(bill.splits?.[p.id]) || 0), 0);
-                      const isValid = Math.abs(totalPct - 100) < 0.1;
+              {/* Bills Split Matrix Grouped by Assigned Account */}
+              <div className="space-y-6">
+                {budget.accounts.map(account => {
+                  const accountBills = budget.bills.filter(b => b.accountId === account.id);
+                  const accountTotal = accountBills.reduce((sum, b) => {
+                    const amt = b.amount || 0;
+                    return sum + (b.period === 'Annual' ? amt / 12 : b.period === 'Semi-Annual' ? amt / 6 : amt);
+                  }, 0);
 
-                      return (
-                        <tr key={bill.id} className="hover:bg-slate-900/60 transition-colors">
-                          <td className="p-3 font-semibold text-slate-200">{bill.name}</td>
-                          <td className="p-3 font-mono">${bill.amount.toFixed(2)}</td>
-                          {budget.people.map(p => (
-                            <td key={p.id} className="p-3 text-center">
-                              <div className="inline-flex items-center gap-1">
-                                <input
-                                  type="number"
-                                  min="0"
-                                  max="100"
-                                  value={bill.splits?.[p.id] ?? 0}
-                                  onChange={e => {
-                                    const val = parseFloat(e.target.value) || 0;
-                                    const newSplits = { ...bill.splits, [p.id]: val };
-                                    updateBillSplits(bill.id, newSplits);
-                                  }}
-                                  className="w-16 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-100 font-semibold text-center"
-                                />
-                                <span className="text-slate-500">%</span>
-                              </div>
-                            </td>
-                          ))}
-                          <td className="p-3 text-center">
-                            {isValid ? (
-                              <span className="inline-flex items-center text-emerald-400 gap-1 font-medium">
-                                <CheckCircle2 className="w-4 h-4" /> 100%
-                              </span>
+                  return (
+                    <div key={account.id} className="rounded-xl border border-slate-800 glass-card overflow-hidden">
+                      {/* Account Sticky Header Bar */}
+                      <div className="sticky top-0 z-20 bg-slate-900/95 backdrop-blur-md px-4 py-2.5 border-b border-slate-800 flex items-center justify-between">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+                          <h4 className="text-xs font-bold text-slate-200">{account.name}</h4>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 capitalize">{account.type}</span>
+                        </div>
+                        <span className="text-xs text-slate-400">
+                          Subtotal: <span className="font-bold text-rose-400 font-mono">${accountTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/mo</span>
+                        </span>
+                      </div>
+
+                      {/* Account Splits Table */}
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs text-slate-300 min-w-[700px]">
+                          <thead className="sticky top-[37px] z-10 bg-slate-900 text-slate-400 uppercase font-medium text-[10px] border-b border-slate-800">
+                            <tr>
+                              <th className="p-3 bg-slate-900">Bill Name</th>
+                              <th className="p-3 bg-slate-900">Monthly Cost</th>
+                              {budget.people.map(p => (
+                                <th key={p.id} className="p-3 text-center bg-slate-900">{p.name} Split (%)</th>
+                              ))}
+                              <th className="p-3 text-center bg-slate-900">Status</th>
+                              <th className="p-3 text-right bg-slate-900">Quick Presets</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-800 bg-slate-950/40">
+                            {accountBills.length === 0 ? (
+                              <tr>
+                                <td colSpan={4 + budget.people.length} className="p-3 text-center text-slate-500 italic">
+                                  No bills assigned to this account
+                                </td>
+                              </tr>
                             ) : (
-                              <span className="inline-flex items-center text-amber-400 gap-1 font-medium" title={`Total is ${totalPct.toLocaleString('en-US')}%`}>
-                                <AlertTriangle className="w-4 h-4" /> {totalPct.toLocaleString('en-US')}%
-                              </span>
+                              accountBills.map(bill => {
+                                const totalPct = budget.people.reduce((sum, p) => sum + (parseFloat(bill.splits?.[p.id]) || 0), 0);
+                                const isValid = Math.abs(totalPct - 100) < 0.1;
+
+                                return (
+                                  <tr key={bill.id} className="hover:bg-slate-900/60 transition-colors">
+                                    <td className="p-3 font-semibold text-slate-200">{bill.name}</td>
+                                    <td className="p-3 font-mono">${(bill.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                    {budget.people.map(p => (
+                                      <td key={p.id} className="p-3 text-center">
+                                        <div className="inline-flex items-center gap-1">
+                                          <input
+                                            type="number"
+                                            min="0"
+                                            max="100"
+                                            value={bill.splits?.[p.id] ?? 0}
+                                            onChange={e => {
+                                              const val = parseFloat(e.target.value) || 0;
+                                              const newSplits = { ...bill.splits, [p.id]: val };
+                                              updateBillSplits(bill.id, newSplits);
+                                            }}
+                                            className="w-16 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-100 font-semibold text-center font-mono"
+                                          />
+                                          <span className="text-slate-500">%</span>
+                                        </div>
+                                      </td>
+                                    ))}
+                                    <td className="p-3 text-center">
+                                      {isValid ? (
+                                        <span className="inline-flex items-center text-emerald-400 gap-1 font-medium">
+                                          <CheckCircle2 className="w-4 h-4" /> 100%
+                                        </span>
+                                      ) : (
+                                        <span className="inline-flex items-center text-amber-400 gap-1 font-medium" title={`Total is ${totalPct.toLocaleString('en-US')}%`}>
+                                          <AlertTriangle className="w-4 h-4" /> {totalPct.toLocaleString('en-US')}%
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="p-3 text-right">
+                                      <div className="flex justify-end gap-1">
+                                        <button
+                                          onClick={() => {
+                                            const splits = {};
+                                            const count = budget.people.length || 1;
+                                            budget.people.forEach(p => splits[p.id] = 100 / count);
+                                            updateBillSplits(bill.id, splits);
+                                          }}
+                                          className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[10px]"
+                                        >
+                                          Equal
+                                        </button>
+                                        {budget.people[0] && (
+                                          <button
+                                            onClick={() => {
+                                              const splits = {};
+                                              budget.people.forEach(p => splits[p.id] = p.id === budget.people[0].id ? 100 : 0);
+                                              updateBillSplits(bill.id, splits);
+                                            }}
+                                            className="px-2 py-1 bg-blue-900/60 hover:bg-blue-800/80 text-blue-300 rounded text-[10px]"
+                                          >
+                                            100% {budget.people[0].name.split(' ')[0]}
+                                          </button>
+                                        )}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })
                             )}
-                          </td>
-                          <td className="p-3 text-right">
-                            <div className="flex justify-end gap-1">
-                              <button
-                                onClick={() => {
-                                  const splits = {};
-                                  const count = budget.people.length || 1;
-                                  budget.people.forEach(p => splits[p.id] = 100 / count);
-                                  updateBillSplits(bill.id, splits);
-                                }}
-                                className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[10px]"
-                              >
-                                Equal
-                              </button>
-                              {budget.people[0] && (
-                                <button
-                                  onClick={() => {
-                                    const splits = {};
-                                    budget.people.forEach(p => splits[p.id] = p.id === budget.people[0].id ? 100 : 0);
-                                    updateBillSplits(bill.id, splits);
-                                  }}
-                                  className="px-2 py-1 bg-blue-900/60 hover:bg-blue-800/80 text-blue-300 rounded text-[10px]"
-                                >
-                                  100% {budget.people[0].name.split(' ')[0]}
-                                </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

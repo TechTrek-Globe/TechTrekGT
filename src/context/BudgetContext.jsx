@@ -38,6 +38,9 @@ export function BudgetProvider({ children }) {
       name: accountData.name || 'New Account',
       type: accountData.type || 'checking',
       startingBalance: parseFloat(accountData.startingBalance) || 0,
+      extraStartingBalance: parseFloat(accountData.extraStartingBalance) || 0,
+      saveExtraMonthly: parseFloat(accountData.saveExtraMonthly) || 0,
+      enableExtraSavings: accountData.enableExtraSavings ?? true,
       color: accountData.color || 'blue',
       notes: accountData.notes || ''
     };
@@ -344,6 +347,23 @@ export function BudgetProvider({ children }) {
     return budget.accounts.reduce((sum, acc) => sum + (parseFloat(acc.startingBalance) || 0), 0);
   };
 
+  // --- Daily Matrix Operations (Per-day spreadsheet cell overrides) ---
+  const getDailyMatrixCell = (accountId, monthKey, day, field) => {
+    const key = `${accountId}_${monthKey}_${day}_${field}`;
+    return budget.dailyMatrix?.[key];
+  };
+
+  const updateDailyMatrixCell = (accountId, monthKey, day, field, value) => {
+    const key = `${accountId}_${monthKey}_${day}_${field}`;
+    setBudget(prev => ({
+      ...prev,
+      dailyMatrix: {
+        ...(prev.dailyMatrix || {}),
+        [key]: value
+      }
+    }));
+  };
+
   return (
     <BudgetContext.Provider
       value={{
@@ -377,6 +397,8 @@ export function BudgetProvider({ children }) {
         getAccountActualExpenses,
         getAccountProjectedEndBalance,
         getAccountActualEndBalance,
+        getDailyMatrixCell,
+        updateDailyMatrixCell,
         // calculations
         getMonthlyNetIncome,
         getMonthlyGrossIncome,

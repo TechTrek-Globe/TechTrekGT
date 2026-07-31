@@ -239,6 +239,42 @@ export function SettingsModal() {
                           />
                         </div>
                       </div>
+
+                      <div className="grid grid-cols-2 gap-3 text-xs pt-1 border-t border-slate-800/80">
+                        <div>
+                          <label className="text-indigo-300 font-medium block">Save Extra Target ($/mo)</label>
+                          <input
+                            type="number"
+                            step="10"
+                            value={acc.saveExtraMonthly || 0}
+                            onChange={e => updateAccount(acc.id, { saveExtraMonthly: parseFloat(e.target.value) || 0 })}
+                            className="mt-1 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-emerald-400 font-mono font-bold w-full"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-slate-500 block">Extra Beg Balance ($)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={acc.extraStartingBalance || 0}
+                            onChange={e => updateAccount(acc.id, { extraStartingBalance: parseFloat(e.target.value) || 0 })}
+                            className="mt-1 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-200 font-mono w-full"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 pt-1">
+                        <input
+                          type="checkbox"
+                          id={`chk-extra-${acc.id}`}
+                          checked={acc.enableExtraSavings !== false}
+                          onChange={e => updateAccount(acc.id, { enableExtraSavings: e.target.checked })}
+                          className="rounded bg-slate-900 border-slate-700 text-indigo-500 focus:ring-0"
+                        />
+                        <label htmlFor={`chk-extra-${acc.id}`} className="text-xs text-slate-400 cursor-pointer">
+                          Track Extra Savings Bucket
+                        </label>
+                      </div>
                     </div>
                   ))}
                 </div>

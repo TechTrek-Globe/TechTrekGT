@@ -7,6 +7,9 @@ export const initialBudgetData = {
       name: 'USAA Bills Checking - 7071',
       type: 'checking',
       startingBalance: 257.50,
+      extraStartingBalance: 0,
+      saveExtraMonthly: 0,
+      enableExtraSavings: false,
       color: 'blue',
       notes: 'Personal expenses & subscriptions'
     },
@@ -15,6 +18,9 @@ export const initialBudgetData = {
       name: 'USAA Mortgage Checking - 3223',
       type: 'checking',
       startingBalance: 200.00,
+      extraStartingBalance: 100.00,
+      saveExtraMonthly: 200.00,
+      enableExtraSavings: true,
       color: 'purple',
       notes: 'Joint mortgage & household utilities (50/50)'
     },
@@ -23,6 +29,9 @@ export const initialBudgetData = {
       name: 'USAA HOA Savings - 9575',
       type: 'savings',
       startingBalance: 150.00,
+      extraStartingBalance: 100.00,
+      saveExtraMonthly: 50.00,
+      enableExtraSavings: true,
       color: 'emerald',
       notes: 'HOA Dues & Reserve Fund (50/50)'
     }

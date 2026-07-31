@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { useBudget } from '../context/BudgetContext';
+import { InlineEdit } from './InlineEdit';
 import {
   DollarSign,
   TrendingUp,
@@ -79,6 +80,8 @@ export function DashboardView() {
     getBillMonthlyCost,
     getTotalActualExpenses,
     getAccountActualExpenses,
+    updateAccount,
+    updatePerson,
   } = useBudget();
 
   const today    = new Date();
@@ -296,11 +299,23 @@ export function DashboardView() {
                   <div className="flex items-start justify-between">
                     <div>
                       <h4 className="text-xs font-bold text-slate-200 leading-tight">{acc.name}</h4>
-                      <span className="text-[10px] text-slate-500 capitalize">{acc.type}</span>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-[10px] text-slate-500 capitalize">{acc.type}</span>
+                        {acc.enableExtraSavings !== false && (acc.saveExtraMonthly > 0) && (
+                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-indigo-950 text-indigo-300 border border-indigo-800/80 font-mono font-semibold">
+                            +${acc.saveExtraMonthly}/mo extra
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <span className="text-sm font-black text-slate-100 font-mono">
-                      ${fmtCurrency(acc.startingBalance || 0)}
-                    </span>
+                    <div className="text-right">
+                      <InlineEdit
+                        value={acc.startingBalance || 0}
+                        type="currency"
+                        onCommit={v => updateAccount(acc.id, { startingBalance: v })}
+                        className="text-sm font-black text-slate-100 font-mono justify-end"
+                      />
+                    </div>
                   </div>
                   <div className="space-y-1">
                     <div className="flex justify-between text-[10px]">
@@ -512,8 +527,13 @@ export function DashboardView() {
                       <span className="text-[10px] text-slate-500 capitalize">{person.payFrequency}</span>
                     </div>
                     <div className="text-right">
-                      <span className="text-xs text-slate-500 block">Per paycheck</span>
-                      <span className="text-sm font-black text-indigo-400 font-mono">${fmtCurrency(perPaycheck)}</span>
+                      <span className="text-[9px] text-slate-500 block">Net pay / paycheck</span>
+                      <InlineEdit
+                        value={person.netPerPay}
+                        type="currency"
+                        onCommit={v => updatePerson(person.id, { netPerPay: v })}
+                        className="text-sm font-black text-indigo-400 font-mono justify-end"
+                      />
                     </div>
                   </div>
                   <div className="space-y-1">

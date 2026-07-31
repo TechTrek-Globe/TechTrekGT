@@ -1,6 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "techtrek-budget",
+  "main": "src/worker.js",
   "compatibility_date": "2026-07-31",
   "observability": {
     "enabled": true
@@ -15,7 +16,7 @@
     {
       "binding": "DB",
       "database_name": "personal-budget-db",
-      "database_id": "local-db-id"
+      "database_id": "10f220d4-1c10-49e9-b63e-5d4cb08d599f"
     }
   ]
 }

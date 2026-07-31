@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS people (
   pay_day1 TEXT NOT NULL DEFAULT '15',
   pay_day2 TEXT DEFAULT 'last',
   pay_offset_days INTEGER NOT NULL DEFAULT 0,
+  account_allocations TEXT DEFAULT '{}',
   gross_per_pay REAL NOT NULL DEFAULT 0.0,
   net_per_pay REAL NOT NULL DEFAULT 0.0,
   color TEXT NOT NULL DEFAULT 'purple',

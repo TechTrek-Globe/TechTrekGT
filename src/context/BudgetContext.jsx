@@ -135,6 +135,7 @@ export function BudgetProvider({ children }) {
       payDay1: personData.payDay1 || 15,
       payDay2: personData.payDay2 || 'last',
       payOffsetDays: personData.payOffsetDays ?? 0,
+      accountAllocations: personData.accountAllocations || {},
       grossPerPay: parseFloat(personData.grossPerPay) || 0,
       netPerPay: parseFloat(personData.netPerPay) || 0,
       color: personData.color || 'purple'

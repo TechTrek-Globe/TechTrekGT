@@ -738,6 +738,55 @@ export function SettingsModal() {
                         );
                       })()}
 
+                      {/* Per-Account Direct Deposit Allocations (if multiple accounts exist) */}
+                      {budget.accounts.length > 1 && (
+                        <div className="p-3 bg-slate-950/60 border border-slate-800 rounded-xl space-y-2">
+                          <div className="flex items-center justify-between">
+                            <label className="block text-xs font-semibold text-purple-300">Direct Deposit Allocations (Per Paycheck)</label>
+                            {(() => {
+                              const totalAllocated = Object.values(newPersonForm.accountAllocations || {}).reduce((/** @type {number} */ sum, /** @type {any} */ val) => sum + (parseFloat(val) || 0), 0);
+                              const netPay = parseFloat(newPersonForm.netPerPay) || 0;
+                              return (
+                                <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
+                                  Math.abs(totalAllocated - netPay) < 0.01 && netPay > 0
+                                    ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                                    : 'bg-amber-950 text-amber-300 border border-amber-800'
+                                }`}>
+                                  Allocated: ${totalAllocated.toLocaleString('en-US', { minimumFractionDigits: 2 })} / ${netPay.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                </span>
+                              );
+                            })()}
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            {budget.accounts.map(acc => {
+                              const val = newPersonForm.accountAllocations?.[acc.id] ?? '';
+                              return (
+                                <div key={acc.id} className="flex items-center justify-between p-2 bg-slate-900/80 border border-slate-800 rounded-lg text-xs">
+                                  <span className="text-slate-300 font-medium truncate max-w-[130px]">{acc.name}</span>
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-slate-500 font-mono">$</span>
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      placeholder="0.00"
+                                      value={val}
+                                      onChange={e => {
+                                        const amount = parseFloat(e.target.value) || 0;
+                                        setNewPersonForm({
+                                          ...newPersonForm,
+                                          accountAllocations: { ...(newPersonForm.accountAllocations || {}), [acc.id]: amount }
+                                        });
+                                      }}
+                                      className="w-24 px-2 py-1 bg-slate-950 border border-slate-700 rounded text-right text-slate-100 font-mono focus:outline-none focus:border-purple-500"
+                                    />
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
                       <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-800">
                         <div>
                           <label className="block text-xs font-medium text-slate-300 mb-1">Gross Per Paycheck ($)</label>
@@ -787,6 +836,7 @@ export function SettingsModal() {
               <div className="space-y-4">
                 {budget.people.map(person => {
                   const isMulti = person.payFrequency === 'bi-weekly' || person.payFrequency === 'semi-monthly';
+                  const totalAllocated = Object.values(person.accountAllocations || {}).reduce((/** @type {number} */ sum, /** @type {any} */ val) => sum + (parseFloat(val) || 0), 0);
 
                   return (
                     <div key={person.id} className="p-4 rounded-xl glass-card border border-slate-800 space-y-4">
@@ -923,6 +973,46 @@ export function SettingsModal() {
                             </div>
                           </div>
                         </div>
+
+                        {/* Per-Account Direct Deposit Allocations (if multiple accounts exist) */}
+                        {budget.accounts.length > 1 && (
+                          <div className="p-2.5 bg-slate-950/40 border border-slate-800 rounded-lg space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] font-semibold text-purple-300">Direct Deposit Account Allocations (Per Paycheck):</span>
+                              <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
+                                Math.abs(totalAllocated - (person.netPerPay || 0)) < 0.01 && (person.netPerPay || 0) > 0
+                                  ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                                  : 'bg-amber-950 text-amber-300 border border-amber-800'
+                              }`}>
+                                Allocated: ${totalAllocated.toLocaleString('en-US', { minimumFractionDigits: 2 })} / ${(person.netPerPay || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                              {budget.accounts.map(acc => {
+                                const allocatedVal = person.accountAllocations?.[acc.id] ?? 0;
+                                return (
+                                  <div key={acc.id} className="flex items-center justify-between p-2 bg-slate-900/80 border border-slate-800 rounded-lg">
+                                    <span className="text-slate-300 font-medium truncate max-w-[130px]">{acc.name}</span>
+                                    <div className="flex items-center gap-1">
+                                      <span className="text-slate-500 font-mono">$</span>
+                                      <input
+                                        type="number"
+                                        step="0.01"
+                                        value={allocatedVal}
+                                        onChange={e => {
+                                          const val = parseFloat(e.target.value) || 0;
+                                          const newAlloc = { ...(person.accountAllocations || {}), [acc.id]: val };
+                                          updatePerson(person.id, { accountAllocations: newAlloc });
+                                        }}
+                                        className="w-24 px-2 py-1 bg-slate-950 border border-slate-700 rounded text-right text-slate-100 font-mono focus:outline-none focus:border-purple-500"
+                                      />
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );

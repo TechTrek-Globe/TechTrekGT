@@ -290,6 +290,10 @@ async function ensureSchema(db) {
   } catch (e) {
   }
   try {
+    await db.prepare("ALTER TABLE people ADD COLUMN account_allocations TEXT DEFAULT '{}'").run();
+  } catch (e) {
+  }
+  try {
     await db.prepare("ALTER TABLE accounts ADD COLUMN balance_as_of_date TEXT").run();
   } catch (e) {
   }
@@ -342,6 +346,13 @@ async function onRequestGet(context) {
       payDay1: isNaN(p.pay_day1) ? p.pay_day1 : Number(p.pay_day1),
       payDay2: isNaN(p.pay_day2) ? p.pay_day2 : Number(p.pay_day2),
       payOffsetDays: p.pay_offset_days !== void 0 && p.pay_offset_days !== null ? Number(p.pay_offset_days) : 0,
+      accountAllocations: (() => {
+        try {
+          return p.account_allocations ? JSON.parse(p.account_allocations) : {};
+        } catch (e) {
+          return {};
+        }
+      })(),
       grossPerPay: p.gross_per_pay,
       netPerPay: p.net_per_pay,
       color: p.color
@@ -472,7 +483,7 @@ async function onRequestPost(context) {
       await env.DB.prepare("DELETE FROM people WHERE household_id = ?").bind(householdId).run();
       for (const p of budget.people) {
         await env.DB.prepare(
-          "INSERT INTO people (id, household_id, name, role, pay_frequency, pay_day1, pay_day2, pay_offset_days, gross_per_pay, net_per_pay, color) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+          "INSERT INTO people (id, household_id, name, role, pay_frequency, pay_day1, pay_day2, pay_offset_days, account_allocations, gross_per_pay, net_per_pay, color) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         ).bind(
           p.id,
           householdId,
@@ -482,6 +493,7 @@ async function onRequestPost(context) {
           String(p.payDay1 || "15"),
           String(p.payDay2 || "last"),
           Number(p.payOffsetDays || 0),
+          JSON.stringify(p.accountAllocations || {}),
           p.grossPerPay || 0,
           p.netPerPay || 0,
           p.color || "purple"

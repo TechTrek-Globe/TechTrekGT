@@ -107,13 +107,13 @@ export async function onRequestGet(context) {
       extraPayment: loanRow.extra_payment || 0,
       startDate: loanRow.start_date || ''
     } : {
-      description: 'Home Mortgage',
-      principal: 250000,
-      annualInterestRate: 6.5,
-      termMonths: 360,
-      monthlyPayment: 1580.17,
-      extraPayment: 200,
-      startDate: '2024-01-01'
+      description: '',
+      principal: 0,
+      annualInterestRate: 0,
+      termMonths: 0,
+      monthlyPayment: 0,
+      extraPayment: 0,
+      startDate: ''
     };
 
     return new Response(JSON.stringify({

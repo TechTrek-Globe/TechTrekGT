@@ -294,6 +294,18 @@ export function BudgetProvider({ children }) {
     setBudget(initialBudgetData);
   };
 
+  // Clear all data (100% clean slate)
+  const clearAllData = () => {
+    setBudget({
+      accounts: [],
+      people: [],
+      bills: [],
+      lineItems: [],
+      loans: [],
+      dailyMatrix: {}
+    });
+  };
+
   // Import Parsed Spreadsheet Data (replace or merge)
   const importParsedSpreadsheet = (parsedData, mode = 'replace') => {
     if (!parsedData || !parsedData.accounts) return { success: false, error: 'Invalid parsed data.' };
@@ -546,6 +558,7 @@ export function BudgetProvider({ children }) {
         unarchiveLoan,
         deleteLoan,
         resetToDefaults,
+        clearAllData,
         importParsedSpreadsheet,
         // line-item operations
         upsertLineItem,

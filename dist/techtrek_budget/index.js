@@ -152,29 +152,10 @@ async function onRequestPost$2(context) {
     await env.DB.prepare(
       "INSERT INTO household_members (id, household_id, user_id, role) VALUES (?, ?, ?, ?)"
     ).bind(memberId, householdId, userId, "owner").run();
-    const acc1Id = `acc-${Date.now()}-1`;
-    const acc2Id = `acc-${Date.now()}-2`;
-    const acc3Id = `acc-${Date.now()}-3`;
-    await env.DB.prepare(
-      "INSERT INTO accounts (id, household_id, name, type, starting_balance, color) VALUES (?, ?, ?, ?, ?, ?)"
-    ).bind(acc1Id, householdId, "Checking - Main", "checking", 2500, "blue").run();
-    await env.DB.prepare(
-      "INSERT INTO accounts (id, household_id, name, type, starting_balance, color) VALUES (?, ?, ?, ?, ?, ?)"
-    ).bind(acc2Id, householdId, "Emergency Savings", "savings", 1e4, "emerald").run();
-    await env.DB.prepare(
-      "INSERT INTO accounts (id, household_id, name, type, starting_balance, color) VALUES (?, ?, ?, ?, ?, ?)"
-    ).bind(acc3Id, householdId, "Rewards Credit Card", "credit", 0, "purple").run();
     const person1Id = `person-${Date.now()}-1`;
     await env.DB.prepare(
       "INSERT INTO people (id, household_id, name, role, pay_frequency, pay_day1, pay_day2, gross_per_pay, net_per_pay, color) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-    ).bind(person1Id, householdId, name.trim(), "Primary", "bi-weekly", "15", "last", 3e3, 2200, "purple").run();
-    const bill1Id = `bill-${Date.now()}-1`;
-    await env.DB.prepare(
-      "INSERT INTO bills (id, household_id, account_id, name, amount, period, due_day, payment_source) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-    ).bind(bill1Id, householdId, acc1Id, "Housing / Rent", 1500, "Monthly", 1, "Auto Pay").run();
-    await env.DB.prepare(
-      "INSERT INTO bill_splits (bill_id, person_id, percentage) VALUES (?, ?, ?)"
-    ).bind(bill1Id, person1Id, 100).run();
+    ).bind(person1Id, householdId, name.trim(), "Primary", "bi-weekly", "15", "last", 0, 0, "purple").run();
     const token = await createToken({ userId, email: cleanEmail, householdId, name: name.trim() });
     return new Response(JSON.stringify({
       success: true,
@@ -366,13 +347,13 @@ async function onRequestGet(context) {
       extraPayment: loanRow.extra_payment || 0,
       startDate: loanRow.start_date || ""
     } : {
-      description: "Home Mortgage",
-      principal: 25e4,
-      annualInterestRate: 6.5,
-      termMonths: 360,
-      monthlyPayment: 1580.17,
-      extraPayment: 200,
-      startDate: "2024-01-01"
+      description: "",
+      principal: 0,
+      annualInterestRate: 0,
+      termMonths: 0,
+      monthlyPayment: 0,
+      extraPayment: 0,
+      startDate: ""
     };
     return new Response(JSON.stringify({
       success: true,
@@ -537,6 +518,10 @@ const worker = {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const context = { request, env, ctx };
+    if (url.protocol === "http:" || request.headers.get("x-forwarded-proto") === "http") {
+      url.protocol = "https:";
+      return Response.redirect(url.toString(), 301);
+    }
     try {
       if (url.pathname === "/api/auth/register" && request.method === "POST") {
         return await onRequestPost$2(context);

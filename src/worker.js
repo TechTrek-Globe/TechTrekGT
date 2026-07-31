@@ -13,6 +13,12 @@ export default {
     const url = new URL(request.url);
     const context = { request, env, ctx };
 
+    // Force HTTPS redirect if accessed via HTTP
+    if (url.protocol === 'http:' || request.headers.get('x-forwarded-proto') === 'http') {
+      url.protocol = 'https:';
+      return Response.redirect(url.toString(), 301);
+    }
+
     try {
       // API Route Routing
       if (url.pathname === '/api/auth/register' && request.method === 'POST') {

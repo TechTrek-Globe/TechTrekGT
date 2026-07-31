@@ -41,6 +41,7 @@ export function SettingsModal() {
     unarchiveBill,
     updateBillSplits,
     resetToDefaults,
+    clearAllData,
     importBudgetJson,
     importParsedSpreadsheet
   } = useBudget();
@@ -55,6 +56,8 @@ export function SettingsModal() {
   const [spreadsheetPreview, setSpreadsheetPreview] = useState(null);
   const [spreadsheetMode, setSpreadsheetMode] = useState('replace'); // 'replace' | 'merge'
   const [spreadsheetFileName, setSpreadsheetFileName] = useState('');
+  const [confirmClearAll, setConfirmClearAll] = useState(false);
+  const [confirmResetDefaults, setConfirmResetDefaults] = useState(false);
 
   const handleFileUpload = (e) => {
     const file = e.target.files?.[0];
@@ -98,59 +101,37 @@ export function SettingsModal() {
         ID: a.id,
         Name: a.name,
         Type: a.type,
-        'Starting Balance': a.startingBalance,
-        'Extra Starting Balance': a.extraStartingBalance || 0,
-        'Save Extra Monthly': a.saveExtraMonthly || 0
+        StartingBalance: a.startingBalance,
+        Notes: a.notes
       }));
-      const wsAccs = XLSX.utils.json_to_sheet(accsData);
-      XLSX.utils.book_append_sheet(wb, wsAccs, 'Accounts');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(accsData), 'Accounts');
 
-      // 2. People / Income Sheet
+      // 2. People Sheet
       const peopleData = budget.people.map(p => ({
         ID: p.id,
         Name: p.name,
         Role: p.role,
-        'Pay Frequency': p.payFrequency,
-        'Gross Per Pay': p.grossPerPay,
-        'Net Per Pay': p.netPerPay
+        PayFrequency: p.payFrequency,
+        GrossPerPay: p.grossPerPay,
+        NetPerPay: p.netPerPay
       }));
-      const wsPeople = XLSX.utils.json_to_sheet(peopleData);
-      XLSX.utils.book_append_sheet(wb, wsPeople, 'People & Income');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(peopleData), 'People');
 
       // 3. Bills Sheet
-      const billsData = budget.bills.map(b => {
-        const acc = budget.accounts.find(a => a.id === b.accountId);
-        return {
-          ID: b.id,
-          Name: b.name,
-          Amount: b.amount,
-          Period: b.period,
-          'Due Day': b.dueDay,
-          Account: acc ? acc.name : b.accountId,
-          'Payment Source': b.paymentSource
-        };
-      });
-      const wsBills = XLSX.utils.json_to_sheet(billsData);
-      XLSX.utils.book_append_sheet(wb, wsBills, 'Bills');
-
-      // 4. Loans Sheet
-      if (budget.loans && budget.loans.length > 0) {
-        const loansData = budget.loans.map(l => ({
-          ID: l.id,
-          Name: l.name,
-          Principal: l.principal,
-          'Annual Rate (%)': l.annualInterestRate,
-          'Term (Months)': l.termMonths,
-          'Monthly Extra': l.extraPayment
-        }));
-        const wsLoans = XLSX.utils.json_to_sheet(loansData);
-        XLSX.utils.book_append_sheet(wb, wsLoans, 'Loans');
-      }
+      const billsData = budget.bills.map(b => ({
+        ID: b.id,
+        Name: b.name,
+        Amount: b.amount,
+        Period: b.period,
+        DueDay: b.dueDay,
+        PaymentSource: b.paymentSource
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(billsData), 'Bills');
 
       XLSX.writeFile(wb, `Personal_Budget_Export_${new Date().toISOString().split('T')[0]}.xlsx`);
-      setJsonStatus({ type: 'success', message: 'Exported Excel workbook (.xlsx) successfully!' });
+      setJsonStatus({ type: 'success', message: 'Exported Excel workbook successfully!' });
     } catch (err) {
-      setJsonStatus({ type: 'error', message: `Export failed: ${err.message}` });
+      setJsonStatus({ type: 'error', message: `Excel export failed: ${err.message}` });
     }
   };
 
@@ -173,11 +154,12 @@ export function SettingsModal() {
 
   const tabs = [
     { id: 'accounts', label: 'Accounts', icon: CreditCard, count: budget.accounts.length },
-    { id: 'people', label: 'People & Income', icon: Users, count: budget.people.length },
-    { id: 'bills', label: 'Bills & Assignments', icon: Receipt, count: budget.bills.length },
-    { id: 'splits', label: 'Bill Splitting', icon: PieChart },
+    { id: 'people', label: 'People', icon: Users, count: budget.people.length },
+    { id: 'bills', label: 'Bills', icon: Receipt, count: budget.bills.length },
+    { id: 'splits', label: 'Splits', icon: PieChart },
     { id: 'import', label: 'Import', icon: Upload },
-    { id: 'export', label: 'Export', icon: Download }
+    { id: 'export', label: 'Export', icon: Download },
+    { id: 'reset', label: 'Reset', icon: RotateCcw }
   ];
 
   const handleAddAccount = (e) => {
@@ -235,7 +217,7 @@ export function SettingsModal() {
         </div>
 
         {/* Settings Navigation Tabs */}
-        <div className="flex border-b border-slate-800 bg-slate-950/40 px-6 gap-2 overflow-x-auto">
+        <div className="grid grid-cols-7 border-b border-slate-800 bg-slate-950/60 p-1.5 gap-1">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = settingsTab === tab.id;
@@ -243,16 +225,16 @@ export function SettingsModal() {
               <button
                 key={tab.id}
                 onClick={() => setSettingsTab(tab.id)}
-                className={`flex items-center space-x-2 py-3 px-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                className={`flex items-center justify-center space-x-1.5 py-2 px-2 text-xs font-semibold rounded-lg transition-all ${
                   isActive
-                    ? 'border-blue-500 text-blue-400 bg-blue-500/10'
-                    : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
+                    ? 'bg-blue-600/25 text-blue-400 border border-blue-500/40 shadow-inner'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
                 }`}
               >
-                <Icon className="w-4 h-4" />
-                <span>{tab.label}</span>
+                <Icon className="w-3.5 h-3.5 flex-shrink-0" />
+                <span className="truncate">{tab.label}</span>
                 {tab.count !== undefined && (
-                  <span className="px-2 py-0.5 text-xs rounded-full bg-slate-800 text-slate-300">
+                  <span className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] rounded-full bg-slate-800 text-slate-300 font-mono">
                     {tab.count}
                   </span>
                 )}
@@ -1041,6 +1023,117 @@ export function SettingsModal() {
                     <Download className="w-4 h-4" />
                     <span>Download JSON Backup File</span>
                   </button>
+                </div>
+              </div>
+
+            </div>
+          )}
+
+          {/* TAB 7: RESET DATA */}
+          {settingsTab === 'reset' && (
+            <div className="space-y-6">
+              
+              {/* Option A: Clear All Data (Clean Slate) */}
+              <div className="p-5 rounded-xl glass-card border border-rose-800/60 bg-rose-950/10 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-rose-300 flex items-center gap-2">
+                    <Trash2 className="w-5 h-5 text-rose-400" />
+                    Clear All Budget Data (Clean Slate)
+                  </h3>
+                  <span className="text-[10px] font-mono text-rose-400 bg-rose-950 px-2.5 py-1 rounded-full border border-rose-800">
+                    Empty Household
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Deletes all accounts, earners, recurring bills, monthly line items, and loan schedules. This will wipe your active budget and leave a completely empty household dashboard.
+                </p>
+
+                <div className="flex items-center justify-between pt-2">
+                  <div className="text-xs text-slate-400 font-mono">
+                    Will remove {budget.accounts.length} accounts, {budget.bills.length} bills, {budget.people.length} earners
+                  </div>
+                  
+                  {confirmClearAll ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-rose-400 font-medium">Are you sure?</span>
+                      <button
+                        onClick={() => {
+                          clearAllData();
+                          setConfirmClearAll(false);
+                          setJsonStatus({ type: 'success', message: 'All budget data cleared successfully!' });
+                        }}
+                        className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer"
+                      >
+                        Yes, Delete Everything
+                      </button>
+                      <button
+                        onClick={() => setConfirmClearAll(false)}
+                        className="px-3 py-2 bg-slate-800 text-slate-300 hover:bg-slate-700 rounded-xl text-xs font-medium"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmClearAll(true)}
+                      className="px-5 py-2.5 bg-rose-600/80 hover:bg-rose-600 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2 cursor-pointer"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      <span>Clear All Data</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Option B: Reset to Starter Preset */}
+              <div className="p-5 rounded-xl glass-card border border-amber-800/60 bg-amber-950/10 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-amber-300 flex items-center gap-2">
+                    <RotateCcw className="w-5 h-5 text-amber-400" />
+                    Reset to Starter Sample Preset
+                  </h3>
+                  <span className="text-[10px] font-mono text-amber-400 bg-amber-950 px-2.5 py-1 rounded-full border border-amber-800">
+                    Sample Template
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Restores default starter demo data (sample checking accounts, earners, and recurring bills). Useful if you want to explore the budget features with pre-filled sample figures.
+                </p>
+
+                <div className="flex items-center justify-between pt-2">
+                  <div className="text-xs text-slate-400">
+                    Restores demo accounts, sample income, and default split percentages.
+                  </div>
+
+                  {confirmResetDefaults ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-amber-400 font-medium">Replace current data?</span>
+                      <button
+                        onClick={() => {
+                          resetToDefaults();
+                          setConfirmResetDefaults(false);
+                          setJsonStatus({ type: 'success', message: 'Reset to starter preset successfully!' });
+                        }}
+                        className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer"
+                      >
+                        Yes, Restore Sample Data
+                      </button>
+                      <button
+                        onClick={() => setConfirmResetDefaults(false)}
+                        className="px-3 py-2 bg-slate-800 text-slate-300 hover:bg-slate-700 rounded-xl text-xs font-medium"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmResetDefaults(true)}
+                      className="px-5 py-2.5 bg-amber-600/80 hover:bg-amber-600 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2 cursor-pointer"
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                      <span>Reset to Sample Preset</span>
+                    </button>
+                  )}
                 </div>
               </div>
 

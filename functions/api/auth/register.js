@@ -14,6 +14,20 @@ export async function onRequestPost(context) {
       });
     }
 
+    if (password.length < 8) {
+      return new Response(JSON.stringify({ error: 'Password must be at least 8 characters long.' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    
+    if (!/[A-Z]/.test(password) || !/[0-9]/.test(password)) {
+      return new Response(JSON.stringify({ error: 'Password must contain at least one uppercase letter and one number.' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
     const cleanEmail = email.trim().toLowerCase();
 
     // Check if DB binding exists
@@ -59,8 +73,15 @@ export async function onRequestPost(context) {
       'INSERT INTO people (id, household_id, name, role, pay_frequency, pay_day1, pay_day2, gross_per_pay, net_per_pay, color) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     ).bind(person1Id, householdId, name.trim(), 'Primary', 'bi-weekly', '15', 'last', 0, 0, 'purple').run();
 
+    if (!env.JWT_SECRET) {
+      return new Response(JSON.stringify({ error: 'Server misconfiguration: missing JWT_SECRET' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
     // Create JWT token
-    const token = await createToken({ userId, email: cleanEmail, householdId, name: name.trim() });
+    const token = await createToken({ userId, email: cleanEmail, householdId, name: name.trim() }, env.JWT_SECRET);
 
     return new Response(JSON.stringify({
       success: true,

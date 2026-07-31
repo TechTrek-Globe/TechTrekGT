@@ -13,7 +13,7 @@ export async function onRequestGet(context) {
     }
 
     const token = authHeader.split(' ')[1];
-    const payload = await verifyToken(token);
+    const payload = await verifyToken(token, env.JWT_SECRET);
     if (!payload || !payload.householdId) {
       return new Response(JSON.stringify({ error: 'Unauthorized: Invalid token' }), {
         status: 401,
@@ -151,7 +151,7 @@ export async function onRequestPost(context) {
     }
 
     const token = authHeader.split(' ')[1];
-    const payload = await verifyToken(token);
+    const payload = await verifyToken(token, env.JWT_SECRET);
     if (!payload || !payload.householdId) {
       return new Response(JSON.stringify({ error: 'Unauthorized: Invalid token' }), {
         status: 401,
@@ -206,9 +206,11 @@ export async function onRequestPost(context) {
     }
 
     // Sync Bills & Bill Splits
+    let validBillIds = new Set();
     if (Array.isArray(budget.bills)) {
       await env.DB.prepare('DELETE FROM bills WHERE household_id = ?').bind(householdId).run();
       for (const b of budget.bills) {
+        validBillIds.add(b.id);
         await env.DB.prepare(
           'INSERT INTO bills (id, household_id, account_id, name, amount, period, due_day, payment_source, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
         ).bind(
@@ -228,12 +230,19 @@ export async function onRequestPost(context) {
 
     // Sync Line Items
     if (Array.isArray(budget.lineItems)) {
+      // If bills weren't passed in this payload, fetch valid ones from DB
+      if (!Array.isArray(budget.bills)) {
+        const existingBills = await env.DB.prepare('SELECT id FROM bills WHERE household_id = ?').bind(householdId).all();
+        (existingBills.results || []).forEach(b => validBillIds.add(b.id));
+      }
+
       // Clear line items for household's bills
       await env.DB.prepare(
         'DELETE FROM line_items WHERE bill_id IN (SELECT id FROM bills WHERE household_id = ?)'
       ).bind(householdId).run();
 
       for (const li of budget.lineItems) {
+        if (!validBillIds.has(li.billId)) continue; // IDOR Protection: skip line items for unowned bills
         await env.DB.prepare(
           'INSERT INTO line_items (bill_id, month_key, actual_amount, updated_at) VALUES (?, ?, ?, ?)'
         ).bind(li.billId, li.monthKey, li.actualAmount ?? null, li.updatedAt || Date.now()).run();

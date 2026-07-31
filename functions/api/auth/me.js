@@ -1,7 +1,7 @@
 import { verifyToken } from '../../utils/auth.js';
 
 export async function onRequestGet(context) {
-  const { request } = context;
+  const { request, env } = context;
 
   try {
     const authHeader = request.headers.get('Authorization');
@@ -13,7 +13,7 @@ export async function onRequestGet(context) {
     }
 
     const token = authHeader.split(' ')[1];
-    const payload = await verifyToken(token);
+    const payload = await verifyToken(token, env.JWT_SECRET);
 
     if (!payload) {
       return new Response(JSON.stringify({ error: 'Unauthorized: Invalid or expired token' }), {

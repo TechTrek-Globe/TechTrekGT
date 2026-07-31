@@ -1,7 +1,5 @@
 // WebCrypto Authentication & JWT helper utilities for Cloudflare Workers / D1
 
-const JWT_SECRET = 'personal-budget-secret-key-change-in-production';
-
 // Generate PBKDF2 Password Hash
 export async function hashPassword(password) {
   const enc = new TextEncoder();
@@ -87,7 +85,8 @@ function base64UrlDecode(str) {
 }
 
 // Create Signed JWT Token
-export async function createToken(payload, secret = JWT_SECRET) {
+export async function createToken(payload, secret) {
+  if (!secret) throw new Error("JWT_SECRET is not defined in environment variables");
   const header = { alg: 'HS256', typ: 'JWT' };
   const encodedHeader = base64UrlEncode(JSON.stringify(header));
   const encodedPayload = base64UrlEncode(JSON.stringify({
@@ -114,8 +113,8 @@ export async function createToken(payload, secret = JWT_SECRET) {
 }
 
 // Verify JWT Token
-export async function verifyToken(token, secret = JWT_SECRET) {
-  if (!token) return null;
+export async function verifyToken(token, secret) {
+  if (!secret || !token) return null;
   const parts = token.split('.');
   if (parts.length !== 3) return null;
 

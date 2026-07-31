@@ -48,8 +48,15 @@ export async function onRequestPost(context) {
 
     const householdId = member ? member.household_id : null;
 
+    if (!env.JWT_SECRET) {
+      return new Response(JSON.stringify({ error: 'Server misconfiguration: missing JWT_SECRET' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
     // Create JWT token
-    const token = await createToken({ userId: user.id, email: user.email, householdId, name: user.name });
+    const token = await createToken({ userId: user.id, email: user.email, householdId, name: user.name }, env.JWT_SECRET);
 
     return new Response(JSON.stringify({
       success: true,

@@ -94,6 +94,7 @@ export function BudgetProvider({ children }) {
       name: accountData.name || 'New Account',
       type: accountData.type || 'checking',
       startingBalance: parseFloat(accountData.startingBalance) || 0,
+      balanceAsOfDate: accountData.balanceAsOfDate || new Date().toISOString().split('T')[0],
       extraStartingBalance: parseFloat(accountData.extraStartingBalance) || 0,
       saveExtraMonthly: parseFloat(accountData.saveExtraMonthly) || 0,
       enableExtraSavings: accountData.enableExtraSavings ?? true,
@@ -132,6 +133,7 @@ export function BudgetProvider({ children }) {
       payFrequency: personData.payFrequency || 'bi-weekly',
       payDay1: personData.payDay1 || 15,
       payDay2: personData.payDay2 || 'last',
+      payOffsetDays: personData.payOffsetDays ?? 0,
       grossPerPay: parseFloat(personData.grossPerPay) || 0,
       netPerPay: parseFloat(personData.netPerPay) || 0,
       color: personData.color || 'purple'

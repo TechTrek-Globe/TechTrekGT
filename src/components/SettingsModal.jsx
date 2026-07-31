@@ -51,8 +51,8 @@ export function SettingsModal() {
   const [isAddAccountModalOpen, setIsAddAccountModalOpen] = useState(false);
   const [isAddPersonModalOpen, setIsAddPersonModalOpen] = useState(false);
   const [isAddBillModalOpen, setIsAddBillModalOpen] = useState(false);
-  const [newAccForm, setNewAccForm] = useState({ name: '', type: 'checking', startingBalance: 0, color: 'blue', notes: '' });
-  const [newPersonForm, setNewPersonForm] = useState({ name: '', role: 'Member', payFrequency: 'bi-weekly', grossPerPay: 0, netPerPay: 0, payDay1: 15, payDay2: 'last' });
+  const [newAccForm, setNewAccForm] = useState({ name: '', type: 'checking', startingBalance: 0, balanceAsOfDate: new Date().toISOString().split('T')[0], saveExtraMonthly: 0, extraStartingBalance: 0, enableExtraSavings: true, color: 'blue', notes: '' });
+  const [newPersonForm, setNewPersonForm] = useState({ name: '', role: 'Member', payFrequency: 'bi-weekly', grossPerPay: 0, netPerPay: 0, payDay1: 15, payDay2: 'last', payOffsetDays: 0 });
   const [newBillForm, setNewBillForm] = useState({ name: '', amount: 0, period: 'Monthly', accountId: budget.accounts[0]?.id || '', dueDay: 1, paymentSource: 'Auto Pay', notes: '' });
   const [billFilterTab, setBillFilterTab] = useState('active'); // 'active' | 'archived'
   const [jsonInput, setJsonInput] = useState('');
@@ -366,7 +366,7 @@ export function SettingsModal() {
                       e.preventDefault();
                       if (!newAccForm.name) return;
                       addAccount(newAccForm);
-                      setNewAccForm({ name: '', type: 'checking', startingBalance: 0, saveExtraMonthly: 0, extraStartingBalance: 0, enableExtraSavings: true, color: 'blue', notes: '' });
+                      setNewAccForm({ name: '', type: 'checking', startingBalance: 0, balanceAsOfDate: new Date().toISOString().split('T')[0], saveExtraMonthly: 0, extraStartingBalance: 0, enableExtraSavings: true, color: 'blue', notes: '' });
                       setIsAddAccountModalOpen(false);
                     }} className="space-y-4">
                       <div>
@@ -619,7 +619,7 @@ export function SettingsModal() {
                       e.preventDefault();
                       if (!newPersonForm.name) return;
                       addPerson(newPersonForm);
-                      setNewPersonForm({ name: '', role: 'Member', payFrequency: 'bi-weekly', grossPerPay: 0, netPerPay: 0, payDay1: 15, payDay2: 'last' });
+                      setNewPersonForm({ name: '', role: 'Member', payFrequency: 'bi-weekly', grossPerPay: 0, netPerPay: 0, payDay1: 15, payDay2: 'last', payOffsetDays: 0 });
                       setIsAddPersonModalOpen(false);
                     }} className="space-y-4">
                       <div>

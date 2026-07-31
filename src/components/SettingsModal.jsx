@@ -13,8 +13,11 @@ import {
   Archive,
   CheckCircle2,
   AlertTriangle,
-  FileCode
+  FileCode,
+  Upload,
+  FileSpreadsheet
 } from 'lucide-react';
+import { parseSpreadsheet } from '../utils/spreadsheetParser';
 
 export function SettingsModal() {
   const { 
@@ -36,7 +39,8 @@ export function SettingsModal() {
     unarchiveBill,
     updateBillSplits,
     resetToDefaults,
-    importBudgetJson
+    importBudgetJson,
+    importParsedSpreadsheet
   } = useBudget();
 
   // Local form state for new item creation
@@ -46,6 +50,42 @@ export function SettingsModal() {
   const [billFilterTab, setBillFilterTab] = useState('active'); // 'active' | 'archived'
   const [jsonInput, setJsonInput] = useState('');
   const [jsonStatus, setJsonStatus] = useState(null);
+  const [spreadsheetPreview, setSpreadsheetPreview] = useState(null);
+  const [spreadsheetMode, setSpreadsheetMode] = useState('replace'); // 'replace' | 'merge'
+  const [spreadsheetFileName, setSpreadsheetFileName] = useState('');
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setSpreadsheetFileName(file.name);
+    const reader = new FileReader();
+
+    reader.onload = (evt) => {
+      const arrayBuffer = evt.target.result;
+      const res = parseSpreadsheet(arrayBuffer, file.name);
+      if (res.success) {
+        setSpreadsheetPreview(res.budget);
+        setJsonStatus({ type: 'success', message: `Parsed ${file.name} successfully!` });
+      } else {
+        setJsonStatus({ type: 'error', message: res.error });
+      }
+    };
+
+    reader.readAsArrayBuffer(file);
+  };
+
+  const handleApplySpreadsheet = () => {
+    if (!spreadsheetPreview) return;
+    const res = importParsedSpreadsheet(spreadsheetPreview, spreadsheetMode);
+    if (res.success) {
+      setJsonStatus({ type: 'success', message: `Imported ${spreadsheetFileName} (${spreadsheetMode} mode)!` });
+      setSpreadsheetPreview(null);
+      setSpreadsheetFileName('');
+    } else {
+      setJsonStatus({ type: 'error', message: res.error });
+    }
+  };
 
   if (!isSettingsOpen) return null;
 
@@ -716,10 +756,104 @@ export function SettingsModal() {
           {/* TAB 5: BACKUP & PRESETS */}
           {settingsTab === 'data' && (
             <div className="space-y-6">
+              
+              {/* Excel (.xlsx / .csv) Spreadsheet Importer Card */}
+              <div className="p-5 rounded-xl glass-card border border-emerald-800/60 bg-emerald-950/10 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-emerald-300 flex items-center gap-2">
+                    <FileSpreadsheet className="w-5 h-5 text-emerald-400" />
+                    Import Excel (.xlsx) or CSV Spreadsheet
+                  </h3>
+                  <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950 px-2.5 py-1 rounded-full border border-emerald-800">
+                    100% Client-Side Local Parser
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Select or drag &amp; drop your budget spreadsheet (e.g. <code>Personal Budget.xlsx</code> or custom CSV). The parser automatically extracts Accounts, Income/Contributors, Bills, and Loan schedules directly in your browser.
+                </p>
+
+                {/* Dropzone File Input */}
+                <div className="relative border-2 border-dashed border-emerald-600/50 hover:border-emerald-400 rounded-xl p-6 text-center transition-colors bg-slate-900/60">
+                  <input
+                    type="file"
+                    accept=".xlsx, .xls, .csv"
+                    onChange={handleFileUpload}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                  />
+                  <div className="flex flex-col items-center justify-center space-y-2">
+                    <Upload className="w-8 h-8 text-emerald-400 animate-bounce" />
+                    <div className="text-xs font-bold text-slate-200">
+                      {spreadsheetFileName ? (
+                        <span className="text-emerald-400 font-mono">Selected: {spreadsheetFileName}</span>
+                      ) : (
+                        <span>Click to choose or drop <strong>.xlsx / .csv</strong> file here</span>
+                      )}
+                    </div>
+                    <span className="text-[10px] text-slate-400">Supports multi-tab workbooks &amp; standard register formats</span>
+                  </div>
+                </div>
+
+                {/* Live Parser Breakdown Preview */}
+                {spreadsheetPreview && (
+                  <div className="p-4 rounded-xl bg-slate-900 border border-slate-700 space-y-3 animate-fade-in">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                      <span className="text-xs font-bold text-slate-200">Detected Spreadsheet Elements:</span>
+                      <div className="flex items-center gap-2 text-xs">
+                        <label className="text-slate-400">Import Mode:</label>
+                        <select
+                          value={spreadsheetMode}
+                          onChange={e => setSpreadsheetMode(e.target.value)}
+                          className="bg-slate-800 text-slate-100 border border-slate-700 rounded px-2 py-0.5 font-bold text-xs"
+                        >
+                          <option value="replace">Replace Current Budget</option>
+                          <option value="merge">Merge with Existing</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
+                      <div className="p-2 rounded bg-slate-950 border border-slate-800">
+                        <span className="text-slate-400 block text-[10px]">Accounts</span>
+                        <span className="text-lg font-black text-blue-400">{spreadsheetPreview.accounts.length}</span>
+                      </div>
+                      <div className="p-2 rounded bg-slate-950 border border-slate-800">
+                        <span className="text-slate-400 block text-[10px]">People</span>
+                        <span className="text-lg font-black text-purple-400">{spreadsheetPreview.people.length}</span>
+                      </div>
+                      <div className="p-2 rounded bg-slate-950 border border-slate-800">
+                        <span className="text-slate-400 block text-[10px]">Bills</span>
+                        <span className="text-lg font-black text-emerald-400">{spreadsheetPreview.bills.length}</span>
+                      </div>
+                      <div className="p-2 rounded bg-slate-950 border border-slate-800">
+                        <span className="text-slate-400 block text-[10px]">Loans</span>
+                        <span className="text-lg font-black text-indigo-400">{spreadsheetPreview.loans.length}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 pt-1">
+                      <button
+                        onClick={() => setSpreadsheetPreview(null)}
+                        className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleApplySpreadsheet}
+                        className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5"
+                      >
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span>Apply Loaded Spreadsheet ({spreadsheetMode})</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* JSON Import Card */}
               <div className="p-4 rounded-xl glass-card border border-slate-800 space-y-4">
                 <h3 className="text-sm font-semibold text-slate-200">Import Custom JSON Budget Configuration</h3>
                 <textarea
-                  rows={6}
+                  rows={4}
                   placeholder="Paste JSON budget configuration here..."
                   value={jsonInput}
                   onChange={e => setJsonInput(e.target.value)}
@@ -740,6 +874,7 @@ export function SettingsModal() {
                 </div>
               </div>
 
+              {/* Clear Budget Card */}
               <div className="p-4 rounded-xl border border-amber-800/40 bg-amber-950/20 space-y-3">
                 <h3 className="text-sm font-semibold text-amber-300 flex items-center gap-2">
                   <RotateCcw className="w-4 h-4" /> Reset Budget Data to Cleared Defaults

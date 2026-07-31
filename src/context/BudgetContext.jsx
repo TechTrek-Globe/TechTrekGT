@@ -239,18 +239,44 @@ export function BudgetProvider({ children }) {
     setBudget(initialBudgetData);
   };
 
-  // Import JSON Config
-  const importBudgetJson = (jsonString) => {
-    try {
-      const parsed = JSON.parse(jsonString);
-      if (parsed.accounts && parsed.people && parsed.bills) {
-        setBudget(parsed);
-        return { success: true };
+  // Import Parsed Spreadsheet Data (replace or merge)
+  const importParsedSpreadsheet = (parsedData, mode = 'replace') => {
+    if (!parsedData || !parsedData.accounts) return { success: false, error: 'Invalid parsed data.' };
+
+    setBudget(prev => {
+      if (mode === 'replace') {
+        return {
+          lineItems: [],
+          accounts: parsedData.accounts || [],
+          people: parsedData.people || [],
+          bills: parsedData.bills || [],
+          loans: parsedData.loans || []
+        };
       }
-      return { success: false, error: 'Invalid budget JSON schema.' };
-    } catch (err) {
-      return { success: false, error: err.message };
-    }
+
+      // Merge Mode
+      const existingAccNames = new Set(prev.accounts.map(a => a.name.toLowerCase()));
+      const newAccs = (parsedData.accounts || []).filter(a => !existingAccNames.has(a.name.toLowerCase()));
+
+      const existingBillNames = new Set(prev.bills.map(b => b.name.toLowerCase()));
+      const newBills = (parsedData.bills || []).filter(b => !existingBillNames.has(b.name.toLowerCase()));
+
+      const existingPeopleNames = new Set(prev.people.map(p => p.name.toLowerCase()));
+      const newPeople = (parsedData.people || []).filter(p => !existingPeopleNames.has(p.name.toLowerCase()));
+
+      const existingLoanNames = new Set((prev.loans || []).map(l => l.name.toLowerCase()));
+      const newLoans = (parsedData.loans || []).filter(l => !existingLoanNames.has(l.name.toLowerCase()));
+
+      return {
+        ...prev,
+        accounts: [...prev.accounts, ...newAccs],
+        people: [...prev.people, ...newPeople],
+        bills: [...prev.bills, ...newBills],
+        loans: [...(prev.loans || []), ...newLoans]
+      };
+    });
+
+    return { success: true };
   };
 
   // --- Line Item Operations (Actual vs. Projected) ---
@@ -463,7 +489,7 @@ export function BudgetProvider({ children }) {
         unarchiveLoan,
         deleteLoan,
         resetToDefaults,
-        importBudgetJson,
+        importParsedSpreadsheet,
         // line-item operations
         upsertLineItem,
         getLineItem,

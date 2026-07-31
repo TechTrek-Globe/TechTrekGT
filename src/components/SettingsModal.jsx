@@ -61,6 +61,12 @@ export function SettingsModal() {
   const [confirmResetDefaults, setConfirmResetDefaults] = useState(false);
   const [confirmLoadDemo, setConfirmLoadDemo] = useState(false);
 
+  // Granular import selection state
+  const [selectedImportAccounts, setSelectedImportAccounts] = useState(new Set());
+  const [selectedImportPeople, setSelectedImportPeople] = useState(new Set());
+  const [selectedImportBills, setSelectedImportBills] = useState(new Set());
+  const [selectedImportLoans, setSelectedImportLoans] = useState(new Set());
+
   const handleFileUpload = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -71,9 +77,13 @@ export function SettingsModal() {
     reader.onload = (evt) => {
       const arrayBuffer = evt.target.result;
       const res = parseSpreadsheet(arrayBuffer, file.name);
-      if (res.success) {
+      if (res.success && res.budget) {
         setSpreadsheetPreview(res.budget);
-        setJsonStatus({ type: 'success', message: `Parsed ${file.name} successfully!` });
+        setSelectedImportAccounts(new Set(res.budget.accounts.map(a => a.id)));
+        setSelectedImportPeople(new Set(res.budget.people.map(p => p.id)));
+        setSelectedImportBills(new Set(res.budget.bills.map(b => b.id)));
+        setSelectedImportLoans(new Set(res.budget.loans.map(l => l.id)));
+        setJsonStatus({ type: 'success', message: `Parsed ${file.name} successfully! Select items to import below.` });
       } else {
         setJsonStatus({ type: 'error', message: res.error });
       }
@@ -84,13 +94,72 @@ export function SettingsModal() {
 
   const handleApplySpreadsheet = () => {
     if (!spreadsheetPreview) return;
-    const res = importParsedSpreadsheet(spreadsheetPreview, spreadsheetMode);
+
+    const filteredBudget = {
+      accounts: spreadsheetPreview.accounts.filter(a => selectedImportAccounts.has(a.id)),
+      people: spreadsheetPreview.people.filter(p => selectedImportPeople.has(p.id)),
+      bills: spreadsheetPreview.bills.filter(b => selectedImportBills.has(b.id)),
+      loans: spreadsheetPreview.loans.filter(l => selectedImportLoans.has(l.id))
+    };
+
+    const res = importParsedSpreadsheet(filteredBudget, spreadsheetMode);
     if (res.success) {
-      setJsonStatus({ type: 'success', message: `Imported ${spreadsheetFileName} (${spreadsheetMode} mode)!` });
+      setJsonStatus({
+        type: 'success',
+        message: `Successfully imported ${filteredBudget.accounts.length} accounts, ${filteredBudget.people.length} earners, and ${filteredBudget.bills.length} bills!`
+      });
       setSpreadsheetPreview(null);
       setSpreadsheetFileName('');
     } else {
       setJsonStatus({ type: 'error', message: res.error });
+    }
+  };
+
+  const toggleAccountSelection = (id) => {
+    setSelectedImportAccounts(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAllAccounts = (selectAll) => {
+    if (selectAll && spreadsheetPreview) {
+      setSelectedImportAccounts(new Set(spreadsheetPreview.accounts.map(a => a.id)));
+    } else {
+      setSelectedImportAccounts(new Set());
+    }
+  };
+
+  const toggleBillSelection = (id) => {
+    setSelectedImportBills(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAllBills = (selectAll) => {
+    if (selectAll && spreadsheetPreview) {
+      setSelectedImportBills(new Set(spreadsheetPreview.bills.map(b => b.id)));
+    } else {
+      setSelectedImportBills(new Set());
+    }
+  };
+
+  const togglePersonSelection = (id) => {
+    setSelectedImportPeople(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAllPeople = (selectAll) => {
+    if (selectAll && spreadsheetPreview) {
+      setSelectedImportPeople(new Set(spreadsheetPreview.people.map(p => p.id)));
+    } else {
+      setSelectedImportPeople(new Set());
     }
   };
 
@@ -860,17 +929,25 @@ export function SettingsModal() {
                   </div>
                 </div>
 
-                {/* Live Parser Breakdown Preview */}
+                {/* Live Granular Item Selection Checklist */}
                 {spreadsheetPreview && (
-                  <div className="p-4 rounded-xl bg-slate-900 border border-slate-700 space-y-3 animate-fade-in">
-                    <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                      <span className="text-xs font-bold text-slate-200">Detected Spreadsheet Elements:</span>
+                  <div className="p-4 rounded-xl bg-slate-900 border border-slate-700 space-y-4 animate-fade-in">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-100 flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                          Select Items to Import from {spreadsheetFileName}
+                        </h4>
+                        <p className="text-[11px] text-slate-400">
+                          Uncheck any items you do not wish to import into your budget.
+                        </p>
+                      </div>
                       <div className="flex items-center gap-2 text-xs">
-                        <label className="text-slate-400">Import Mode:</label>
+                        <label className="text-slate-400 font-medium">Mode:</label>
                         <select
                           value={spreadsheetMode}
                           onChange={e => setSpreadsheetMode(e.target.value)}
-                          className="bg-slate-800 text-slate-100 border border-slate-700 rounded px-2 py-0.5 font-bold text-xs"
+                          className="bg-slate-800 text-slate-100 border border-slate-700 rounded-lg px-2.5 py-1 font-bold text-xs focus:outline-none focus:border-emerald-500"
                         >
                           <option value="replace">Replace Current Budget</option>
                           <option value="merge">Merge with Existing</option>
@@ -878,38 +955,211 @@ export function SettingsModal() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
-                      <div className="p-2 rounded bg-slate-950 border border-slate-800">
-                        <span className="text-slate-400 block text-[10px]">Accounts</span>
-                        <span className="text-lg font-black text-blue-400">{spreadsheetPreview.accounts.length}</span>
+                    {/* Category Selection Summary Tabs */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+                      <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center justify-between">
+                        <span className="text-slate-400 text-[11px] font-medium">Accounts Selected</span>
+                        <span className="font-bold text-blue-400">{selectedImportAccounts.size} / {spreadsheetPreview.accounts.length}</span>
                       </div>
-                      <div className="p-2 rounded bg-slate-950 border border-slate-800">
-                        <span className="text-slate-400 block text-[10px]">People</span>
-                        <span className="text-lg font-black text-purple-400">{spreadsheetPreview.people.length}</span>
+                      <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center justify-between">
+                        <span className="text-slate-400 text-[11px] font-medium">Earners Selected</span>
+                        <span className="font-bold text-purple-400">{selectedImportPeople.size} / {spreadsheetPreview.people.length}</span>
                       </div>
-                      <div className="p-2 rounded bg-slate-950 border border-slate-800">
-                        <span className="text-slate-400 block text-[10px]">Bills</span>
-                        <span className="text-lg font-black text-emerald-400">{spreadsheetPreview.bills.length}</span>
-                      </div>
-                      <div className="p-2 rounded bg-slate-950 border border-slate-800">
-                        <span className="text-slate-400 block text-[10px]">Loans</span>
-                        <span className="text-lg font-black text-indigo-400">{spreadsheetPreview.loans.length}</span>
+                      <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center justify-between col-span-2 sm:col-span-1">
+                        <span className="text-slate-400 text-[11px] font-medium">Bills Selected</span>
+                        <span className="font-bold text-emerald-400">{selectedImportBills.size} / {spreadsheetPreview.bills.length}</span>
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-end gap-2 pt-1">
+                    {/* SECTION 1: ACCOUNTS CHECKLIST */}
+                    {spreadsheetPreview.accounts.length > 0 && (
+                      <div className="space-y-2 border border-slate-800 rounded-xl p-3 bg-slate-950/40">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-blue-300">
+                            Bank Accounts ({selectedImportAccounts.size} of {spreadsheetPreview.accounts.length})
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => toggleAllAccounts(true)}
+                              className="text-[10px] text-blue-400 hover:underline cursor-pointer font-medium"
+                            >
+                              Select All
+                            </button>
+                            <span className="text-slate-600 text-[10px]">|</span>
+                            <button
+                              type="button"
+                              onClick={() => toggleAllAccounts(false)}
+                              className="text-[10px] text-slate-400 hover:underline cursor-pointer font-medium"
+                            >
+                              Deselect All
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="max-h-36 overflow-y-auto space-y-1 pr-1">
+                          {spreadsheetPreview.accounts.map(acc => {
+                            const isChecked = selectedImportAccounts.has(acc.id);
+                            return (
+                              <label
+                                key={acc.id}
+                                className={`flex items-center justify-between p-2 rounded-lg text-xs cursor-pointer border transition-all ${
+                                  isChecked
+                                    ? 'bg-blue-950/40 border-blue-800/60 text-slate-200'
+                                    : 'bg-slate-900/60 border-slate-800 text-slate-500 opacity-60'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2.5">
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    onChange={() => toggleAccountSelection(acc.id)}
+                                    className="rounded border-slate-700 bg-slate-900 text-blue-500 focus:ring-0 cursor-pointer"
+                                  />
+                                  <span className="font-semibold">{acc.name}</span>
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 capitalize text-slate-400">{acc.type}</span>
+                                </div>
+                                <span className="font-mono text-xs font-bold text-blue-300">${acc.startingBalance.toFixed(2)}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* SECTION 2: EARNERS / PEOPLE CHECKLIST */}
+                    {spreadsheetPreview.people.length > 0 && (
+                      <div className="space-y-2 border border-slate-800 rounded-xl p-3 bg-slate-950/40">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-purple-300">
+                            Household Earners ({selectedImportPeople.size} of {spreadsheetPreview.people.length})
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => toggleAllPeople(true)}
+                              className="text-[10px] text-purple-400 hover:underline cursor-pointer font-medium"
+                            >
+                              Select All
+                            </button>
+                            <span className="text-slate-600 text-[10px]">|</span>
+                            <button
+                              type="button"
+                              onClick={() => toggleAllPeople(false)}
+                              className="text-[10px] text-slate-400 hover:underline cursor-pointer font-medium"
+                            >
+                              Deselect All
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="max-h-36 overflow-y-auto space-y-1 pr-1">
+                          {spreadsheetPreview.people.map(person => {
+                            const isChecked = selectedImportPeople.has(person.id);
+                            return (
+                              <label
+                                key={person.id}
+                                className={`flex items-center justify-between p-2 rounded-lg text-xs cursor-pointer border transition-all ${
+                                  isChecked
+                                    ? 'bg-purple-950/40 border-purple-800/60 text-slate-200'
+                                    : 'bg-slate-900/60 border-slate-800 text-slate-500 opacity-60'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2.5">
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    onChange={() => togglePersonSelection(person.id)}
+                                    className="rounded border-slate-700 bg-slate-900 text-purple-500 focus:ring-0 cursor-pointer"
+                                  />
+                                  <span className="font-semibold">{person.name}</span>
+                                </div>
+                                <span className="text-[10px] px-2 py-0.5 rounded bg-purple-950 text-purple-300 border border-purple-800">{person.role}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* SECTION 3: RECURRING BILLS CHECKLIST */}
+                    {spreadsheetPreview.bills.length > 0 && (
+                      <div className="space-y-2 border border-slate-800 rounded-xl p-3 bg-slate-950/40">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-emerald-300">
+                            Recurring Bills ({selectedImportBills.size} of {spreadsheetPreview.bills.length})
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => toggleAllBills(true)}
+                              className="text-[10px] text-emerald-400 hover:underline cursor-pointer font-medium"
+                            >
+                              Select All
+                            </button>
+                            <span className="text-slate-600 text-[10px]">|</span>
+                            <button
+                              type="button"
+                              onClick={() => toggleAllBills(false)}
+                              className="text-[10px] text-slate-400 hover:underline cursor-pointer font-medium"
+                            >
+                              Deselect All
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="max-h-48 overflow-y-auto space-y-1 pr-1">
+                          {spreadsheetPreview.bills.map(bill => {
+                            const isChecked = selectedImportBills.has(bill.id);
+                            const acc = spreadsheetPreview.accounts.find(a => a.id === bill.accountId);
+                            return (
+                              <label
+                                key={bill.id}
+                                className={`flex items-center justify-between p-2 rounded-lg text-xs cursor-pointer border transition-all ${
+                                  isChecked
+                                    ? 'bg-emerald-950/30 border-emerald-800/60 text-slate-200'
+                                    : 'bg-slate-900/60 border-slate-800 text-slate-500 opacity-60'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    onChange={() => toggleBillSelection(bill.id)}
+                                    className="rounded border-slate-700 bg-slate-900 text-emerald-500 focus:ring-0 cursor-pointer shrink-0"
+                                  />
+                                  <span className="font-semibold truncate">{bill.name}</span>
+                                  {acc && (
+                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 truncate shrink-0 max-w-[120px]">
+                                      {acc.name}
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="font-mono text-xs font-bold text-emerald-300 shrink-0 font-mono">${bill.amount.toFixed(2)}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Action Bar */}
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-800">
                       <button
+                        type="button"
                         onClick={() => setSpreadsheetPreview(null)}
-                        className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium"
+                        className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-medium cursor-pointer"
                       >
                         Cancel
                       </button>
                       <button
+                        type="button"
                         onClick={handleApplySpreadsheet}
-                        className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5"
+                        disabled={selectedImportAccounts.size === 0 && selectedImportPeople.size === 0 && selectedImportBills.size === 0}
+                        className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
                       >
                         <CheckCircle2 className="w-4 h-4" />
-                        <span>Apply Loaded Spreadsheet ({spreadsheetMode})</span>
+                        <span>Import Selected Items ({selectedImportAccounts.size + selectedImportPeople.size + selectedImportBills.size})</span>
                       </button>
                     </div>
                   </div>

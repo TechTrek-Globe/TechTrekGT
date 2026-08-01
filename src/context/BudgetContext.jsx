@@ -572,14 +572,33 @@ export function BudgetProvider({ children }) {
     updateDashboardWidgets(updated);
   };
 
-  const resetDashboardWidgets = () => {
-    updateDashboardWidgets(DEFAULT_DASHBOARD_WIDGETS);
+  const theme = budget.theme || 'dark';
+
+  const setTheme = (newTheme) => {
+    setBudget(prev => ({
+      ...prev,
+      theme: newTheme
+    }));
   };
+
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      if (theme === 'light') {
+        document.documentElement.classList.add('light');
+        document.documentElement.classList.remove('dark');
+      } else {
+        document.documentElement.classList.add('dark');
+        document.documentElement.classList.remove('light');
+      }
+    }
+  }, [theme]);
 
   return (
     <BudgetContext.Provider
       value={{
         budget,
+        theme,
+        setTheme,
         dashboardWidgets: getDashboardWidgets(),
         updateDashboardWidgets,
         toggleDashboardWidgetVisibility,

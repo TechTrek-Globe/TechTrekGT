@@ -12,7 +12,9 @@ import {
   ChevronRight,
   DollarSign,
   Menu,
-  X
+  X,
+  Sun,
+  Moon
 } from 'lucide-react';
 
 const NAV_ITEMS = [
@@ -28,6 +30,8 @@ const SIDEBAR_KEY = 'trekledger_sidebar_collapsed';
 export function AppLayout({ children }) {
   const {
     budget,
+    theme,
+    setTheme,
     activeView,
     setActiveView,
     setIsSettingsOpen,
@@ -153,7 +157,7 @@ export function AppLayout({ children }) {
   );
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-blue-500 selection:text-white flex">
+    <div className={`min-h-screen font-sans selection:bg-blue-500 selection:text-white flex ${theme === 'light' ? 'bg-slate-50 text-slate-900 light' : 'bg-slate-950 text-slate-100 dark'}`}>
 
       {/* Desktop Sidebar */}
       <aside
@@ -226,6 +230,15 @@ export function AppLayout({ children }) {
               {netFlow >= 0 ? '+' : ''}{netFlow.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           </div>
+
+          <button
+            type="button"
+            onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+            className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 text-slate-200 border border-slate-700 transition-colors flex items-center justify-center"
+            title={theme === 'light' ? 'Switch to Dark Theme (Black Background)' : 'Switch to Light Theme (White Background)'}
+          >
+            {theme === 'light' ? <Sun className="w-4 h-4 text-amber-500" /> : <Moon className="w-4 h-4 text-blue-400" />}
+          </button>
 
           <button
             onClick={() => setIsSettingsOpen(true)}

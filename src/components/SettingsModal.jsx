@@ -21,7 +21,9 @@ import {
   LayoutDashboard,
   Eye,
   EyeOff,
-  GripVertical
+  GripVertical,
+  Sun,
+  Moon
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { parseSpreadsheet } from '../utils/spreadsheetParser';
@@ -29,6 +31,8 @@ import { parseSpreadsheet } from '../utils/spreadsheetParser';
 export function SettingsModal() {
   const { 
     budget, 
+    theme,
+    setTheme,
     dashboardWidgets,
     toggleDashboardWidgetVisibility,
     setDashboardWidgetWidth,
@@ -334,6 +338,62 @@ export function SettingsModal() {
           {/* TAB 0: DASHBOARD WIDGETS MANAGER */}
           {settingsTab === 'dashboard' && (
             <div className="space-y-6 animate-fade-in">
+              {/* Color Theme Preference Selector */}
+              <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
+                <div>
+                  <h4 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                    {theme === 'light' ? <Sun className="w-4 h-4 text-amber-500" /> : <Moon className="w-4 h-4 text-blue-400" />}
+                    App Color Theme
+                  </h4>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Choose your preferred application background appearance and visual style.
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setTheme('dark')}
+                    className={`p-3.5 rounded-xl border transition-all text-left flex items-center justify-between ${
+                      theme !== 'light'
+                        ? 'bg-slate-950 text-slate-100 border-blue-500 shadow-md shadow-blue-950/40 ring-1 ring-blue-500'
+                        : 'bg-slate-950/60 text-slate-400 border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-slate-950 border border-slate-700 flex items-center justify-center">
+                        <Moon className="w-4 h-4 text-blue-400" />
+                      </div>
+                      <div>
+                        <span className="text-xs font-bold block">Dark Theme</span>
+                        <span className="text-[10px] text-slate-400">Black/slate background</span>
+                      </div>
+                    </div>
+                    {theme !== 'light' && <CheckCircle2 className="w-4 h-4 text-blue-400" />}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setTheme('light')}
+                    className={`p-3.5 rounded-xl border transition-all text-left flex items-center justify-between ${
+                      theme === 'light'
+                        ? 'bg-white text-slate-900 border-blue-500 shadow-md ring-1 ring-blue-500'
+                        : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-slate-100 border border-slate-300 flex items-center justify-center">
+                        <Sun className="w-4 h-4 text-amber-500" />
+                      </div>
+                      <div>
+                        <span className="text-xs font-bold block text-slate-900">Light Theme</span>
+                        <span className="text-[10px] text-slate-500">White background</span>
+                      </div>
+                    </div>
+                    {theme === 'light' && <CheckCircle2 className="w-4 h-4 text-blue-500" />}
+                  </button>
+                </div>
+              </div>
+
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl bg-slate-900 border border-slate-800">
                 <div>
                   <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">

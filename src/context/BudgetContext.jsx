@@ -415,29 +415,29 @@ export function BudgetProvider({ children }) {
   };
 
   const getTotalActualExpenses = (monthKey) => {
-    return budget.bills.reduce((sum, b) => {
+    return (budget.bills || []).reduce((sum, b) => {
       const li = getLineItem(b.id, monthKey);
       return sum + (li ? li.actualAmount : getBillMonthlyCost(b));
     }, 0);
   };
 
   const getAccountActualExpenses = (accountId, monthKey) => {
-    return budget.bills
+    return (budget.bills || [])
       .filter(b => b.accountId === accountId)
       .reduce((sum, b) => sum + getEffectiveAmount(b, monthKey), 0);
   };
 
   const getAccountProjectedEndBalance = (accountId, monthKey) => {
-    const acc = budget.accounts.find(a => a.id === accountId);
+    const acc = (budget.accounts || []).find(a => a.id === accountId);
     if (!acc) return 0;
-    const projectedExpenses = budget.bills
+    const projectedExpenses = (budget.bills || [])
       .filter(b => b.accountId === accountId)
       .reduce((sum, b) => sum + getBillMonthlyCost(b), 0);
     return (acc.startingBalance || 0) - projectedExpenses;
   };
 
   const getAccountActualEndBalance = (accountId, monthKey) => {
-    const acc = budget.accounts.find(a => a.id === accountId);
+    const acc = (budget.accounts || []).find(a => a.id === accountId);
     if (!acc) return 0;
     const actualExpenses = getAccountActualExpenses(accountId, monthKey);
     return (acc.startingBalance || 0) - actualExpenses;
@@ -445,6 +445,7 @@ export function BudgetProvider({ children }) {
 
   // Calculation Utilities
   const getMonthlyNetIncome = (person) => {
+    if (!person) return 0;
     const net = parseFloat(person.netPerPay) || 0;
     if (person.payFrequency === 'bi-weekly') {
       return (net * 26) / 12; // Standard bi-weekly annual to monthly
@@ -455,6 +456,7 @@ export function BudgetProvider({ children }) {
   };
 
   const getMonthlyGrossIncome = (person) => {
+    if (!person) return 0;
     const gross = parseFloat(person.grossPerPay) || 0;
     if (person.payFrequency === 'bi-weekly') {
       return (gross * 26) / 12;
@@ -465,14 +467,15 @@ export function BudgetProvider({ children }) {
   };
 
   const getTotalMonthlyNetIncome = () => {
-    return budget.people.reduce((sum, p) => sum + getMonthlyNetIncome(p), 0);
+    return (budget.people || []).reduce((sum, p) => sum + getMonthlyNetIncome(p), 0);
   };
 
   const getTotalMonthlyGrossIncome = () => {
-    return budget.people.reduce((sum, p) => sum + getMonthlyGrossIncome(p), 0);
+    return (budget.people || []).reduce((sum, p) => sum + getMonthlyGrossIncome(p), 0);
   };
 
   const getBillMonthlyCost = (bill) => {
+    if (!bill) return 0;
     const amt = parseFloat(bill.amount) || 0;
     if (bill.period === 'Semi-Annual') return amt / 6;
     if (bill.period === 'Annual') return amt / 12;
@@ -481,27 +484,28 @@ export function BudgetProvider({ children }) {
   };
 
   const getTotalMonthlyExpenses = () => {
-    return budget.bills.reduce((sum, b) => sum + getBillMonthlyCost(b), 0);
+    return (budget.bills || []).reduce((sum, b) => sum + getBillMonthlyCost(b), 0);
   };
 
   const getAccountMonthlyExpenses = (accountId) => {
-    return budget.bills
+    return (budget.bills || [])
       .filter(b => b.accountId === accountId)
       .reduce((sum, b) => sum + getBillMonthlyCost(b), 0);
   };
 
   const getBillPersonMonthlyPortion = (bill, personId) => {
+    if (!bill) return 0;
     const monthlyCost = getBillMonthlyCost(bill);
     const pct = parseFloat(bill.splits?.[personId]) || 0;
     return (monthlyCost * pct) / 100;
   };
 
   const getPersonMonthlyTotal = (personId) => {
-    return budget.bills.reduce((sum, b) => sum + getBillPersonMonthlyPortion(b, personId), 0);
+    return (budget.bills || []).reduce((sum, b) => sum + getBillPersonMonthlyPortion(b, personId), 0);
   };
 
   const getPersonPerPaycheckTotal = (personId) => {
-    const person = budget.people.find(p => p.id === personId);
+    const person = (budget.people || []).find(p => p.id === personId);
     if (!person) return 0;
     const monthlyTotal = getPersonMonthlyTotal(personId);
     if (person.payFrequency === 'bi-weekly') {
@@ -518,7 +522,7 @@ export function BudgetProvider({ children }) {
     const currentMonth = today.getMonth();
     const currentYear = today.getFullYear();
 
-    const mapped = budget.bills.map(bill => {
+    const mapped = (budget.bills || []).map(bill => {
       const dueDay = parseInt(bill.dueDay) || 1;
       let dueDate;
       if (dueDay >= currentDay) {
@@ -530,7 +534,7 @@ export function BudgetProvider({ children }) {
       const diffTime = dueDate.getTime() - today.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       
-      const acc = budget.accounts.find(a => a.id === bill.accountId);
+      const acc = (budget.accounts || []).find(a => a.id === bill.accountId);
 
       return {
         ...bill,
@@ -546,7 +550,7 @@ export function BudgetProvider({ children }) {
   };
 
   const getTotalCashOnHand = () => {
-    return budget.accounts.reduce((sum, acc) => sum + (parseFloat(acc.startingBalance) || 0), 0);
+    return (budget.accounts || []).reduce((sum, acc) => sum + (parseFloat(acc.startingBalance) || 0), 0);
   };
 
   // --- Daily Matrix Operations (Per-day spreadsheet cell overrides) ---

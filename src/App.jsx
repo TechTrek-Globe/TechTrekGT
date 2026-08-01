@@ -34,11 +34,21 @@ class ErrorBoundary extends React.Component {
     if (this.state.hasError) {
       return (
         <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-6 text-center font-sans">
-          <div className="max-w-md p-8 rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl space-y-4">
-            <h2 className="text-xl font-black text-rose-400">Something went wrong</h2>
-            <p className="text-xs text-slate-400">
+          <div className="max-w-xl p-8 rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl space-y-4 text-left">
+            <h2 className="text-xl font-black text-rose-400 text-center">Something went wrong</h2>
+            <p className="text-xs text-slate-400 text-center">
               An unexpected error occurred while loading the application. You can reload the page or reset the app cache to restore defaults.
             </p>
+            
+            {this.state.error && (
+              <div className="p-3 rounded-xl bg-slate-950 border border-rose-900/50 text-[11px] font-mono text-rose-300 overflow-x-auto max-h-40">
+                <p className="font-bold">{this.state.error.toString()}</p>
+                {this.state.error.stack && (
+                  <pre className="text-[10px] text-slate-400 mt-1 whitespace-pre-wrap">{this.state.error.stack}</pre>
+                )}
+              </div>
+            )}
+
             <div className="flex items-center justify-center gap-3 pt-2">
               <button
                 onClick={() => window.location.reload()}
@@ -50,7 +60,7 @@ class ErrorBoundary extends React.Component {
                 onClick={this.handleReset}
                 className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl border border-slate-700"
               >
-                Reset App Cache
+                Reset App Cache &amp; Reload
               </button>
             </div>
           </div>

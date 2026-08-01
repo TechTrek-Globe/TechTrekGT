@@ -99,7 +99,7 @@ export function DashboardView() {
     } else { score -= 30; }
     if (savingsRate < 10) score -= 15;
     else if (savingsRate < 20) score -= 5;
-    budget.accounts.forEach(acc => {
+    (budget?.accounts || []).forEach(acc => {
       const expenses = getAccountMonthlyExpenses(acc.id);
       if ((acc.startingBalance || 0) - expenses < 0) score -= 10;
     });
@@ -107,14 +107,14 @@ export function DashboardView() {
   }, [budget, netIncome, totalExpenses, savingsRate]);
 
   // Chart data
-  const accountChartData = budget.accounts.map((acc, i) => ({
-    name: acc.name.split('-')[0].trim(),
+  const accountChartData = (budget?.accounts || []).map((acc, i) => ({
+    name: (acc.name || '').split('-')[0].trim(),
     value: parseFloat(getAccountMonthlyExpenses(acc.id).toFixed(2)),
     color: ACCOUNT_COLORS[i % ACCOUNT_COLORS.length]
   })).filter(d => d.value > 0);
 
-  const projActualData = budget.accounts.map((acc, i) => ({
-    name: acc.name.split('-')[0].trim(),
+  const projActualData = (budget?.accounts || []).map((acc, i) => ({
+    name: (acc.name || '').split('-')[0].trim(),
     projected: parseFloat(getAccountMonthlyExpenses(acc.id).toFixed(2)),
     actual: parseFloat(getAccountActualExpenses(acc.id, monthKey).toFixed(2)),
   })).filter(d => d.projected > 0);
@@ -198,7 +198,7 @@ export function DashboardView() {
                 </div>
                 <div className="flex items-center gap-2 mt-1.5 text-[10px]">
                   <span className="text-slate-500">Earners:</span>
-                  <span className="font-semibold text-slate-300">{budget.people.length} members</span>
+                  <span className="font-semibold text-slate-300">{(budget?.people || []).length} members</span>
                 </div>
               </div>
               <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center">
@@ -230,7 +230,7 @@ export function DashboardView() {
       case 'account_cards':
         return (
           <div className={`grid gap-3 ${isCompact ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'}`}>
-            {budget.accounts.map((acc, i) => {
+            {(budget?.accounts || []).map((acc, i) => {
               const monthlyCost = getAccountMonthlyExpenses(acc.id);
               const projEnd     = (acc.startingBalance || 0) - monthlyCost;
               const accentColor = ACCOUNT_COLORS[i % ACCOUNT_COLORS.length];
@@ -277,7 +277,7 @@ export function DashboardView() {
       case 'upcoming_bills':
         return (
           <div className="space-y-2">
-            {upcomingBills.map(bill => (
+            {(upcomingBills || []).map(bill => (
               <div key={bill.id} className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80 flex items-center justify-between gap-2 text-xs">
                 <div className="min-w-0">
                   <h4 className="font-bold text-slate-200 truncate text-[11px]">{bill.name}</h4>
@@ -372,9 +372,9 @@ export function DashboardView() {
       case 'earner_splits':
         return (
           <div className={`grid gap-3 ${isCompact ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2'}`}>
-            {budget.people.map(p => {
+            {(budget?.people || []).map(p => {
               const monthlyInc = getPersonMonthlyTotal(p.id);
-              const billPortionSum = budget.bills.reduce((sum, b) => sum + getBillPersonMonthlyPortion(b, p.id), 0);
+              const billPortionSum = (budget?.bills || []).reduce((sum, b) => sum + getBillPersonMonthlyPortion(b, p.id), 0);
               const pctOfNet = monthlyInc > 0 ? (billPortionSum / monthlyInc) * 100 : 0;
 
               return (
@@ -411,7 +411,7 @@ export function DashboardView() {
         return (
           <div className="space-y-2 text-xs font-mono">
             <p className="text-[10px] text-slate-400 font-sans">Upcoming Earner Paydays &amp; Scheduled Deductions</p>
-            {budget.people.map(p => (
+            {(budget?.people || []).map(p => (
               <div key={p.id} className="p-2 rounded-lg bg-slate-900/60 border border-slate-800 flex items-center justify-between">
                 <span className="text-slate-300 font-sans font-medium text-[11px]">{p.name} ({p.payFrequency})</span>
                 <span className="text-emerald-400 font-bold">{fmtMoney(getPersonPerPaycheckTotal(p.id))}</span>

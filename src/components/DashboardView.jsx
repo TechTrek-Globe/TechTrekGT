@@ -183,53 +183,53 @@ export function DashboardView() {
     switch (id) {
       case 'kpi_hero':
         return (
-          <div className="flex flex-wrap gap-3">
-            <div className="flex-1 min-w-[200px] p-4 rounded-2xl glass-panel border border-blue-900/30 flex items-center justify-between gap-3 overflow-hidden">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {/* Box 1: Total Cash on Hand */}
+            <div className="p-3.5 rounded-2xl glass-panel border border-blue-900/40 bg-blue-950/20 flex items-center justify-between gap-2 overflow-hidden min-w-0">
               <div className="min-w-0 flex-1">
-                <span className="text-[11px] font-medium text-slate-400 block truncate">Total Cash on Hand</span>
-                <div className="text-xl font-black text-slate-100 font-mono mt-1 truncate">{fmtMoney(cashOnHand)}</div>
-                <div className="flex items-center gap-2 mt-1.5 text-[10px]">
-                  <span className="text-slate-500 flex-shrink-0">Net Flow:</span>
-                  <span className={`font-mono font-bold truncate ${netCashFlow >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                <span className="text-[11px] font-semibold text-slate-400 block truncate">Total Cash on Hand</span>
+                <div className="text-lg font-black text-slate-100 font-mono mt-0.5 truncate">{fmtMoney(cashOnHand)}</div>
+                <div className="flex items-center gap-1.5 mt-1 text-[10px] truncate">
+                  <span className="text-slate-500">Net Flow:</span>
+                  <span className={`font-mono font-bold ${netCashFlow >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                     {netCashFlow >= 0 ? '+' : ''}{fmtMoney(netCashFlow)}
                   </span>
                 </div>
               </div>
-              <div className="w-9 h-9 rounded-xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center flex-shrink-0">
-                <DollarSign className="w-5 h-5 text-blue-400" />
+              <div className="w-8 h-8 rounded-xl bg-blue-500/20 border border-blue-500/40 flex items-center justify-center flex-shrink-0">
+                <DollarSign className="w-4 h-4 text-blue-400" />
               </div>
             </div>
 
-            <div className="flex-1 min-w-[200px] p-4 rounded-2xl glass-panel border border-emerald-900/30 flex items-center justify-between gap-3 overflow-hidden">
+            {/* Box 2: Monthly Income vs Expenses */}
+            <div className="p-3.5 rounded-2xl glass-panel border border-emerald-900/40 bg-emerald-950/20 flex items-center justify-between gap-2 overflow-hidden min-w-0">
               <div className="min-w-0 flex-1">
-                <span className="text-[11px] font-medium text-slate-400 block truncate">Monthly Income vs Expenses</span>
-                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 mt-1 min-w-0">
-                  <span className="text-xl font-black text-emerald-400 font-mono">{fmtMoney(netIncome)}</span>
-                  <span className="text-[10px] text-slate-500 font-mono truncate">/ {fmtMoney(totalExpenses)} exp</span>
-                </div>
-                <div className="flex items-center gap-2 mt-1.5 text-[10px]">
-                  <span className="text-slate-500 flex-shrink-0">Earners:</span>
-                  <span className="font-semibold text-slate-300 truncate">{(budget?.people || []).length} members</span>
+                <span className="text-[11px] font-semibold text-slate-400 block truncate">Monthly Income vs Expenses</span>
+                <div className="text-lg font-black text-emerald-400 font-mono mt-0.5 truncate">{fmtMoney(netIncome)}</div>
+                <div className="flex items-center gap-1.5 mt-1 text-[10px] truncate">
+                  <span className="text-slate-400 font-mono">Exp: <span className="font-bold text-rose-400">{fmtMoney(totalExpenses)}</span></span>
+                  <span className="text-slate-500 font-sans">&bull; {(budget?.people || []).length} earners</span>
                 </div>
               </div>
-              <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center flex-shrink-0">
-                <TrendingUp className="w-5 h-5 text-emerald-400" />
+              <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center flex-shrink-0">
+                <TrendingUp className="w-4 h-4 text-emerald-400" />
               </div>
             </div>
 
-            <div className="flex-1 min-w-[200px] p-4 rounded-2xl glass-panel border border-purple-900/30 flex items-center justify-between gap-3 overflow-hidden">
+            {/* Box 3: Savings Rate */}
+            <div className="p-3.5 rounded-2xl glass-panel border border-purple-900/40 bg-purple-950/20 flex items-center justify-between gap-2 overflow-hidden min-w-0">
               <div className="min-w-0 flex-1">
-                <span className="text-[11px] font-medium text-slate-400 block truncate">Savings Rate</span>
-                <div className="text-xl font-black text-purple-400 font-mono mt-1 truncate">{fmtPct(savingsRate)}</div>
-                <div className="flex items-center gap-2 mt-1.5 text-[10px]">
-                  <span className="text-slate-500 font-medium flex-shrink-0">Target 20%:</span>
-                  <span className={`font-semibold truncate ${savingsRate >= 20 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                <span className="text-[11px] font-semibold text-slate-400 block truncate">Savings Rate</span>
+                <div className="text-lg font-black text-purple-400 font-mono mt-0.5 truncate">{fmtPct(savingsRate)}</div>
+                <div className="flex items-center gap-1.5 mt-1 text-[10px] truncate">
+                  <span className="text-slate-500">Target 20%:</span>
+                  <span className={`font-semibold ${savingsRate >= 20 ? 'text-emerald-400' : 'text-amber-400'}`}>
                     {savingsRate >= 20 ? 'On Target' : 'Below Target'}
                   </span>
                 </div>
               </div>
-              <div className="w-9 h-9 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center flex-shrink-0">
-                <PieIcon className="w-5 h-5 text-purple-400" />
+              <div className="w-8 h-8 rounded-xl bg-purple-500/20 border border-purple-500/40 flex items-center justify-center flex-shrink-0">
+                <PieIcon className="w-4 h-4 text-purple-400" />
               </div>
             </div>
           </div>
@@ -468,7 +468,7 @@ export function DashboardView() {
         </div>
       </div>
 
-      {/* Dynamic Responsive Grid for Dashboard Boxes */}
+      {/* Dynamic Responsive Masonry Columns for Dashboard Boxes */}
       <div
         onDragOver={(e) => {
           e.preventDefault();
@@ -479,24 +479,15 @@ export function DashboardView() {
           setDraggedIdx(null);
           setDragOverIdx(null);
         }}
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start [grid-auto-flow:dense]"
+        className="columns-1 md:columns-2 lg:columns-3 gap-6"
       >
         {dashboardWidgets.map((widget, idx) => {
           if (!widget.visible) return null;
           const currentWidth = widget.width || 'third';
           const customSize = resizingSizes[widget.id] || { customWidth: widget.customWidth, customHeight: widget.customHeight };
 
-          // Dynamically compute column span based on preset OR custom pixel width
-          let colSpanClass = getWidthClass(currentWidth);
-          if (customSize.customWidth) {
-            if (customSize.customWidth > 780) {
-              colSpanClass = 'col-span-1 md:col-span-2 lg:col-span-3';
-            } else if (customSize.customWidth > 440) {
-              colSpanClass = 'col-span-1 md:col-span-2 lg:col-span-2';
-            } else {
-              colSpanClass = 'col-span-1';
-            }
-          }
+          const isFullWidth = currentWidth === 'full' || (customSize.customWidth && customSize.customWidth > 780);
+          const columnSpanClass = isFullWidth ? '[column-span:all] w-full mb-6' : 'break-inside-avoid inline-block w-full mb-6';
 
           const isBeingDragged = draggedIdx === idx;
           const isDragOverTarget = dragOverIdx === idx && draggedIdx !== idx;
@@ -540,7 +531,7 @@ export function DashboardView() {
                 setDragOverIdx(null);
               }}
               style={cardStyle}
-              className={`relative ${colSpanClass} bg-slate-900/90 rounded-2xl border ${
+              className={`relative ${columnSpanClass} bg-slate-900/90 rounded-2xl border ${
                 isDragOverTarget
                   ? 'border-blue-500 ring-2 ring-blue-500/80 shadow-2xl scale-[1.01] bg-slate-800/95'
                   : isBeingDragged

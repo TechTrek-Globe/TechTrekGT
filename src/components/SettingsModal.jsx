@@ -23,7 +23,8 @@ import {
   EyeOff,
   GripVertical,
   Sun,
-  Moon
+  Moon,
+  ShieldCheck
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { parseSpreadsheet } from '../utils/spreadsheetParser';

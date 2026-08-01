@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { initialBudgetData } from '../initialData';
+import { initialBudgetData, DEFAULT_DASHBOARD_WIDGETS } from '../initialData';
 import { fakeDemoBudgetData } from '../demoPresetData';
 import { useAuth } from './AuthContext';
 import { isPersonDepositDay, getPersonDepositAmountForAccount } from '../utils/paydayUtils';
@@ -538,10 +538,47 @@ export function BudgetProvider({ children }) {
     }));
   };
 
+  const getDashboardWidgets = () => {
+    if (budget.dashboardWidgets && Array.isArray(budget.dashboardWidgets) && budget.dashboardWidgets.length > 0) {
+      return budget.dashboardWidgets;
+    }
+    return DEFAULT_DASHBOARD_WIDGETS;
+  };
+
+  const updateDashboardWidgets = (newWidgets) => {
+    setBudget(prev => ({
+      ...prev,
+      dashboardWidgets: newWidgets
+    }));
+  };
+
+  const toggleDashboardWidgetVisibility = (id) => {
+    const current = getDashboardWidgets();
+    const updated = current.map(w => w.id === id ? { ...w, visible: !w.visible } : w);
+    updateDashboardWidgets(updated);
+  };
+
+  const reorderDashboardWidgets = (fromIndex, toIndex) => {
+    const current = [...getDashboardWidgets()];
+    if (fromIndex < 0 || fromIndex >= current.length || toIndex < 0 || toIndex >= current.length) return;
+    const [moved] = current.splice(fromIndex, 1);
+    current.splice(toIndex, 0, moved);
+    updateDashboardWidgets(current);
+  };
+
+  const resetDashboardWidgets = () => {
+    updateDashboardWidgets(DEFAULT_DASHBOARD_WIDGETS);
+  };
+
   return (
     <BudgetContext.Provider
       value={{
         budget,
+        dashboardWidgets: getDashboardWidgets(),
+        updateDashboardWidgets,
+        toggleDashboardWidgetVisibility,
+        reorderDashboardWidgets,
+        resetDashboardWidgets,
         selectedPersonId,
         setSelectedPersonId,
         activeView,

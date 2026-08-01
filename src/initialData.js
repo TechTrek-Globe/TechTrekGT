@@ -1,8 +1,20 @@
+export const DEFAULT_DASHBOARD_WIDGETS = [
+  { id: 'kpi_hero', title: 'Executive KPI Summary', description: 'Total Cash, Net Monthly Income, Monthly Expenses, Net Cash Flow, Savings Rate', category: 'Financial Vitals', visible: true },
+  { id: 'transfer_summary', title: 'Account Funding & Transfer Breakdown', description: 'Calculates transfer amounts per earner allocation for each account', category: 'Core Transfers', visible: true },
+  { id: 'account_cards', title: 'Account Balances Snapshot', description: 'Cards showing current balance, monthly obligations, and projected end balance', category: 'Account Vitals', visible: true },
+  { id: 'upcoming_bills', title: 'Upcoming Bills Timeline', description: 'List of upcoming bills due with days remaining countdown badges', category: 'Bills & Schedules', visible: true },
+  { id: 'expenses_pie', title: 'Expenses by Account (Pie Chart)', description: 'Visual distribution of monthly bill expenses across your accounts', category: 'Charts & Analytics', visible: true },
+  { id: 'proj_vs_actual', title: 'Projected vs Actual Spending (Bar Chart)', description: 'Bar chart comparing planned budget vs actual monthly spending', category: 'Charts & Analytics', visible: true },
+  { id: 'budget_health', title: 'Budget Health Score & Vitals', description: 'Radial SVG health score gauge and financial checklist', category: 'Financial Vitals', visible: true },
+  { id: 'earner_splits', title: 'Earner Income & Contribution Splits', description: 'Per-person monthly income and bill split contribution shares', category: 'Earner Splits', visible: true },
+  { id: 'recent_activity', title: 'Payday & Deposit Activity', description: 'Preview of upcoming payday deposits and scheduled bill deductions', category: 'Ledger & Cash Flow', visible: false }
+];
+
 export const initialBudgetData = {
-  // Line items track actual vs projected per bill-month
   lineItems: [],
   accounts: [],
   people: [],
   bills: [],
-  loans: []
+  loans: [],
+  dashboardWidgets: DEFAULT_DASHBOARD_WIDGETS
 };

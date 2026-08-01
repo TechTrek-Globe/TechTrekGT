@@ -17,7 +17,11 @@ import {
   FileCode,
   Upload,
   Download,
-  FileSpreadsheet
+  FileSpreadsheet,
+  LayoutDashboard,
+  Eye,
+  EyeOff,
+  GripVertical
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { parseSpreadsheet } from '../utils/spreadsheetParser';
@@ -25,6 +29,10 @@ import { parseSpreadsheet } from '../utils/spreadsheetParser';
 export function SettingsModal() {
   const { 
     budget, 
+    dashboardWidgets,
+    toggleDashboardWidgetVisibility,
+    reorderDashboardWidgets,
+    resetDashboardWidgets,
     isSettingsOpen, 
     setIsSettingsOpen,
     settingsTab,
@@ -228,6 +236,7 @@ export function SettingsModal() {
   if (!isSettingsOpen) return null;
 
   const tabs = [
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'accounts', label: 'Accounts', icon: CreditCard, count: budget.accounts.length },
     { id: 'people', label: 'People', icon: Users, count: budget.people.length },
     { id: 'bills', label: 'Bills', icon: Receipt, count: budget.bills.length },
@@ -292,7 +301,7 @@ export function SettingsModal() {
         </div>
 
         {/* Settings Navigation Tabs */}
-        <div className="grid grid-cols-7 border-b border-slate-800 bg-slate-950/60 p-1.5 gap-1">
+        <div className="grid grid-cols-4 sm:grid-cols-8 border-b border-slate-800 bg-slate-950/60 p-1.5 gap-1">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = settingsTab === tab.id;
@@ -320,6 +329,94 @@ export function SettingsModal() {
 
         {/* Tab Contents Area */}
         <div className="flex-1 overflow-auto p-6 bg-slate-950/20">
+
+          {/* TAB 0: DASHBOARD WIDGETS MANAGER */}
+          {settingsTab === 'dashboard' && (
+            <div className="space-y-6 animate-fade-in">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl bg-slate-900 border border-slate-800">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                    <LayoutDashboard className="w-4 h-4 text-blue-400" />
+                    Dashboard Widget Visibility &amp; Placement Order
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Toggle which data widgets appear on your Financial Dashboard and arrange their display placement order.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={resetDashboardWidgets}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-medium border border-slate-700 transition-colors"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  Reset Defaults
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                {dashboardWidgets.map((widget, idx) => (
+                  <div
+                    key={widget.id}
+                    className={`p-4 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
+                      widget.visible
+                        ? 'bg-slate-900/90 border-slate-700/80 shadow-md'
+                        : 'bg-slate-950/40 border-slate-800/60 opacity-60'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      {/* Reorder Buttons */}
+                      <div className="flex flex-col gap-1">
+                        <button
+                          type="button"
+                          disabled={idx === 0}
+                          onClick={() => reorderDashboardWidgets(idx, idx - 1)}
+                          className="p-1 rounded bg-slate-800 text-slate-300 hover:bg-slate-700 disabled:opacity-30 disabled:hover:bg-slate-800 transition-colors text-[10px]"
+                          title="Move Up"
+                        >
+                          ▲
+                        </button>
+                        <button
+                          type="button"
+                          disabled={idx === dashboardWidgets.length - 1}
+                          onClick={() => reorderDashboardWidgets(idx, idx + 1)}
+                          className="p-1 rounded bg-slate-800 text-slate-300 hover:bg-slate-700 disabled:opacity-30 disabled:hover:bg-slate-800 transition-colors text-[10px]"
+                          title="Move Down"
+                        >
+                          ▼
+                        </button>
+                      </div>
+
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-slate-200">{widget.title}</span>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-semibold border border-slate-700">
+                            {widget.category}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-400 mt-0.5">{widget.description}</p>
+                      </div>
+                    </div>
+
+                    {/* Visibility Toggle */}
+                    <div className="flex items-center gap-3 self-end sm:self-center">
+                      <button
+                        type="button"
+                        onClick={() => toggleDashboardWidgetVisibility(widget.id)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                          widget.visible
+                            ? 'bg-emerald-950 text-emerald-300 border border-emerald-800 shadow-sm'
+                            : 'bg-slate-900 text-slate-500 border border-slate-800'
+                        }`}
+                      >
+                        {widget.visible ? <Eye className="w-3.5 h-3.5 text-emerald-400" /> : <EyeOff className="w-3.5 h-3.5 text-slate-500" />}
+                        {widget.visible ? 'Visible' : 'Hidden'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* TAB 1: ACCOUNTS */}
           {settingsTab === 'accounts' && (

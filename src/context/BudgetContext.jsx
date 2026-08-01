@@ -568,7 +568,13 @@ export function BudgetProvider({ children }) {
 
   const setDashboardWidgetWidth = (id, width) => {
     const current = getDashboardWidgets();
-    const updated = current.map(w => w.id === id ? { ...w, width } : w);
+    const updated = current.map(w => w.id === id ? { ...w, width, customWidth: undefined, customHeight: undefined } : w);
+    updateDashboardWidgets(updated);
+  };
+
+  const setDashboardWidgetCustomSize = (id, customSize) => {
+    const current = getDashboardWidgets();
+    const updated = current.map(w => w.id === id ? { ...w, customWidth: customSize?.customWidth, customHeight: customSize?.customHeight } : w);
     updateDashboardWidgets(updated);
   };
 
@@ -603,6 +609,7 @@ export function BudgetProvider({ children }) {
         updateDashboardWidgets,
         toggleDashboardWidgetVisibility,
         setDashboardWidgetWidth,
+        setDashboardWidgetCustomSize,
         reorderDashboardWidgets,
         resetDashboardWidgets,
         selectedPersonId,

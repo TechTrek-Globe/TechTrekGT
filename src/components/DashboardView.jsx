@@ -58,6 +58,7 @@ export function DashboardView() {
     dashboardWidgets,
     toggleDashboardWidgetVisibility,
     setDashboardWidgetWidth,
+    setDashboardWidgetCustomSize,
     reorderDashboardWidgets,
     setIsSettingsOpen,
     setSettingsTab,
@@ -75,6 +76,7 @@ export function DashboardView() {
   } = useBudget();
 
   const [draggedIdx, setDraggedIdx] = useState(null);
+  const [resizingSizes, setResizingSizes] = useState({});
 
   const today    = new Date();
   const monthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
@@ -127,6 +129,40 @@ export function DashboardView() {
       default:
         return 'col-span-1';
     }
+  };
+
+  // Interactive Corner Drag Resizer Logic
+  const startCornerResize = (e, widgetId, initialWidth, initialHeight) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const cardElement = e.currentTarget.parentElement;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const rect = cardElement.getBoundingClientRect();
+    const startW = initialWidth || rect.width;
+    const startH = initialHeight || rect.height;
+
+    const onMouseMove = (moveEvent) => {
+      const newWidth = Math.max(260, Math.round(startW + (moveEvent.clientX - startX)));
+      const newHeight = Math.max(140, Math.round(startH + (moveEvent.clientY - startY)));
+      setResizingSizes(prev => ({
+        ...prev,
+        [widgetId]: { customWidth: newWidth, customHeight: newHeight }
+      }));
+    };
+
+    const onMouseUp = (upEvent) => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+
+      const finalWidth = Math.max(260, Math.round(startW + (upEvent.clientX - startX)));
+      const finalHeight = Math.max(140, Math.round(startH + (upEvent.clientY - startY)));
+      setDashboardWidgetCustomSize(widgetId, { customWidth: finalWidth, customHeight: finalHeight });
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
   };
 
   // Render widget body content based on widget ID
@@ -399,7 +435,7 @@ export function DashboardView() {
             <span>Financial Dashboard</span>
           </h2>
           <p className="text-xs text-slate-400 mt-1">
-            {MONTHS[today.getMonth()]} {today.getFullYear()} &bull; Drag to reorder or click size buttons (1/3 Small, 1/2 Medium, Full) on any box
+            {MONTHS[today.getMonth()]} {today.getFullYear()} &bull; Grab the bottom-right corner of any box to resize to any custom size, or drag headers to reorder
           </p>
         </div>
 
@@ -428,6 +464,13 @@ export function DashboardView() {
           const currentWidth = widget.width || 'third';
           const colSpanClass = getWidthClass(currentWidth);
 
+          const customSize = resizingSizes[widget.id] || { customWidth: widget.customWidth, customHeight: widget.customHeight };
+          const cardStyle = {
+            width: customSize.customWidth ? `${customSize.customWidth}px` : undefined,
+            minHeight: customSize.customHeight ? `${customSize.customHeight}px` : undefined,
+            maxWidth: '100%'
+          };
+
           return (
             <div
               key={widget.id}
@@ -445,7 +488,8 @@ export function DashboardView() {
                 }
                 setDraggedIdx(null);
               }}
-              className={`${colSpanClass} bg-slate-900/90 rounded-2xl border border-slate-800/90 shadow-xl overflow-hidden transition-all duration-300 hover:border-slate-700`}
+              style={cardStyle}
+              className={`relative ${customSize.customWidth ? '' : colSpanClass} bg-slate-900/90 rounded-2xl border border-slate-800/90 shadow-xl overflow-hidden transition-all duration-300 hover:border-slate-700 group/card`}
             >
               {/* Header Drag, Reorder & Size Bar */}
               <div className="flex items-center justify-between bg-slate-950/80 px-4 py-2 border-b border-slate-800 text-xs">
@@ -462,7 +506,7 @@ export function DashboardView() {
                       type="button"
                       onClick={() => setDashboardWidgetWidth(widget.id, 'third')}
                       className={`px-1.5 py-0.5 text-[9px] font-bold rounded ${
-                        currentWidth === 'third'
+                        currentWidth === 'third' && !customSize.customWidth
                           ? 'bg-blue-600 text-white'
                           : 'text-slate-400 hover:text-slate-200'
                       }`}
@@ -474,7 +518,7 @@ export function DashboardView() {
                       type="button"
                       onClick={() => setDashboardWidgetWidth(widget.id, 'half')}
                       className={`px-1.5 py-0.5 text-[9px] font-bold rounded ${
-                        currentWidth === 'half'
+                        currentWidth === 'half' && !customSize.customWidth
                           ? 'bg-blue-600 text-white'
                           : 'text-slate-400 hover:text-slate-200'
                       }`}
@@ -486,7 +530,7 @@ export function DashboardView() {
                       type="button"
                       onClick={() => setDashboardWidgetWidth(widget.id, 'full')}
                       className={`px-1.5 py-0.5 text-[9px] font-bold rounded ${
-                        currentWidth === 'full'
+                        currentWidth === 'full' && !customSize.customWidth
                           ? 'bg-blue-600 text-white'
                           : 'text-slate-400 hover:text-slate-200'
                       }`}
@@ -531,6 +575,17 @@ export function DashboardView() {
               {/* Widget Body */}
               <div className="p-4">
                 {renderWidgetContent(widget.id, currentWidth)}
+              </div>
+
+              {/* Interactive Bottom-Right Corner Drag-to-Resize Handle */}
+              <div
+                onMouseDown={(e) => startCornerResize(e, widget.id, customSize.customWidth, customSize.customHeight)}
+                className="absolute bottom-1 right-1 w-5 h-5 cursor-se-resize flex items-center justify-center text-slate-500 hover:text-blue-400 opacity-40 group-hover/card:opacity-100 transition-all select-none z-20"
+                title="Click and drag corner to resize this box to any custom width or height"
+              >
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M10 2L2 10M10 6L6 10M10 10L10 10" strokeLinecap="round" />
+                </svg>
               </div>
             </div>
           );

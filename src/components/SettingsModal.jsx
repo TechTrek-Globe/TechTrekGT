@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { parseSpreadsheet } from '../utils/spreadsheetParser';
+import { MONTH_SHORT_NAMES, getBillDueMonths, formatBillDueMonths } from '../utils/paydayUtils';
 
 export function SettingsModal() {
   const { 
@@ -67,7 +68,7 @@ export function SettingsModal() {
   const [isAddBillModalOpen, setIsAddBillModalOpen] = useState(false);
   const [newAccForm, setNewAccForm] = useState({ name: '', type: 'checking', startingBalance: 0, balanceAsOfDate: new Date().toISOString().split('T')[0], saveExtraMonthly: 0, extraStartingBalance: 0, enableExtraSavings: true, color: 'blue', notes: '' });
   const [newPersonForm, setNewPersonForm] = useState({ name: '', role: 'Member', payFrequency: 'bi-weekly', grossPerPay: 0, netPerPay: 0, payDay1: 15, payDay2: 'last', payOffsetDays: 0 });
-  const [newBillForm, setNewBillForm] = useState({ name: '', amount: 0, period: 'Monthly', accountId: budget.accounts[0]?.id || '', dueDay: 1, paymentSource: 'Auto Pay', notes: '' });
+  const [newBillForm, setNewBillForm] = useState({ name: '', amount: 0, period: 'Monthly', accountId: budget.accounts[0]?.id || '', dueDay: 1, dueMonths: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], paymentSource: 'Auto Pay', notes: '' });
   const [billFilterTab, setBillFilterTab] = useState('active'); // 'active' | 'archived'
   const [jsonInput, setJsonInput] = useState('');
   const [jsonStatus, setJsonStatus] = useState(null);
@@ -269,7 +270,7 @@ export function SettingsModal() {
     e.preventDefault();
     if (!newBillForm.name) return;
     addBill(newBillForm);
-    setNewBillForm({ name: '', amount: 0, period: 'Monthly', accountId: budget.accounts[0]?.id || '', dueDay: 1, paymentSource: 'Auto Pay', notes: '' });
+    setNewBillForm({ name: '', amount: 0, period: 'Monthly', accountId: budget.accounts[0]?.id || '', dueDay: 1, dueMonths: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], paymentSource: 'Auto Pay', notes: '' });
   };
 
   const handleImportJson = () => {
@@ -1314,15 +1315,61 @@ export function SettingsModal() {
                           <label className="block text-xs font-medium text-slate-300 mb-1">Billing Period</label>
                           <select
                             value={newBillForm.period}
-                            onChange={e => setNewBillForm({ ...newBillForm, period: e.target.value })}
+                            onChange={e => {
+                              const p = e.target.value;
+                              let defaultM = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+                              if (p === 'Annual') defaultM = [1];
+                              else if (p === 'Semi-Annual') defaultM = [1, 7];
+                              else if (p === 'Quarterly') defaultM = [1, 4, 7, 10];
+                              setNewBillForm({ ...newBillForm, period: p, dueMonths: defaultM });
+                            }}
                             className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-emerald-500"
                           >
                             <option value="Monthly">Monthly</option>
+                            <option value="Quarterly">Quarterly</option>
                             <option value="Semi-Annual">Semi-Annual</option>
                             <option value="Annual">Annual</option>
                           </select>
                         </div>
                       </div>
+
+                      {newBillForm.period !== 'Monthly' && (
+                        <div className="pt-2 border-t border-slate-800">
+                          <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                            Due Month(s) <span className="text-emerald-400 font-normal">({newBillForm.period})</span>
+                          </label>
+                          <div className="grid grid-cols-6 gap-1.5">
+                            {MONTH_SHORT_NAMES.map((mName, idx) => {
+                              const mNum = idx + 1;
+                              const isSelected = (newBillForm.dueMonths || []).includes(mNum);
+                              return (
+                                <button
+                                  key={mNum}
+                                  type="button"
+                                  onClick={() => {
+                                    const current = newBillForm.dueMonths || [];
+                                    let updated;
+                                    if (current.includes(mNum)) {
+                                      if (current.length === 1) return;
+                                      updated = current.filter(m => m !== mNum);
+                                    } else {
+                                      updated = [...current, mNum].sort((a, b) => a - b);
+                                    }
+                                    setNewBillForm({ ...newBillForm, dueMonths: updated });
+                                  }}
+                                  className={`px-2 py-1 rounded text-xs font-semibold text-center transition-all cursor-pointer ${
+                                    isSelected
+                                      ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
+                                      : 'bg-slate-900 text-slate-400 hover:bg-slate-800 hover:text-slate-200 border border-slate-800'
+                                  }`}
+                                >
+                                  {mName}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
 
                       <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-800">
                         <div>
@@ -1416,7 +1463,7 @@ export function SettingsModal() {
                               <th className="p-3">Amount</th>
                               <th className="p-3">Period</th>
                               <th className="p-3">Assigned Account</th>
-                              <th className="p-3">Due Day</th>
+                              <th className="p-3">Due Day & Month(s)</th>
                               <th className="p-3">Payment Notes</th>
                               <th className="p-3 text-right">Actions</th>
                             </tr>
@@ -1451,10 +1498,18 @@ export function SettingsModal() {
                                   <td className="p-3">
                                     <select
                                       value={bill.period}
-                                      onChange={e => updateBill(bill.id, { period: e.target.value })}
+                                      onChange={e => {
+                                        const p = e.target.value;
+                                        let defaultM = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+                                        if (p === 'Annual') defaultM = [1];
+                                        else if (p === 'Semi-Annual') defaultM = [1, 7];
+                                        else if (p === 'Quarterly') defaultM = [1, 4, 7, 10];
+                                        updateBill(bill.id, { period: p, dueMonths: bill.dueMonths || defaultM });
+                                      }}
                                       className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-200"
                                     >
                                       <option value="Monthly">Monthly</option>
+                                      <option value="Quarterly">Quarterly</option>
                                       <option value="Semi-Annual">Semi-Annual</option>
                                       <option value="Annual">Annual</option>
                                     </select>
@@ -1471,14 +1526,52 @@ export function SettingsModal() {
                                     </select>
                                   </td>
                                   <td className="p-3">
-                                    <input
-                                      type="number"
-                                      min="1"
-                                      max="31"
-                                      value={bill.dueDay}
-                                      onChange={e => updateBill(bill.id, { dueDay: parseInt(e.target.value) || 1 })}
-                                      className="w-14 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-200 text-center font-mono"
-                                    />
+                                    <div className="flex flex-col gap-1 items-start">
+                                      <div className="flex items-center gap-1">
+                                        <span className="text-[10px] text-slate-400 font-medium">Day</span>
+                                        <input
+                                          type="number"
+                                          min="1"
+                                          max="31"
+                                          value={bill.dueDay}
+                                          onChange={e => updateBill(bill.id, { dueDay: parseInt(e.target.value) || 1 })}
+                                          className="w-12 bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-slate-200 text-center font-mono text-xs"
+                                        />
+                                      </div>
+                                      {bill.period !== 'Monthly' && (
+                                        <div className="flex flex-wrap gap-0.5 max-w-[150px]">
+                                          {MONTH_SHORT_NAMES.map((mName, idx) => {
+                                            const mNum = idx + 1;
+                                            const currentMonths = getBillDueMonths(bill);
+                                            const isSelected = currentMonths.includes(mNum);
+                                            return (
+                                              <button
+                                                key={mNum}
+                                                type="button"
+                                                onClick={() => {
+                                                  let updated;
+                                                  if (isSelected) {
+                                                    if (currentMonths.length === 1) return;
+                                                    updated = currentMonths.filter(m => m !== mNum);
+                                                  } else {
+                                                    updated = [...currentMonths, mNum].sort((a, b) => a - b);
+                                                  }
+                                                  updateBill(bill.id, { dueMonths: updated });
+                                                }}
+                                                title={`Toggle ${mName}`}
+                                                className={`px-1 py-0.5 rounded text-[9px] font-semibold transition-colors cursor-pointer ${
+                                                  isSelected
+                                                    ? 'bg-emerald-600 text-white font-bold'
+                                                    : 'bg-slate-900 text-slate-500 hover:text-slate-300 border border-slate-800'
+                                                }`}
+                                              >
+                                                {mName}
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+                                      )}
+                                    </div>
                                   </td>
                                   <td className="p-3">
                                     <input

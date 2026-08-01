@@ -19,6 +19,7 @@ import {
 import { InlineEdit } from './InlineEdit';
 
 import { fmtMoney, fmtNum } from '../utils/formatters';
+import { isBillDueInMonth } from '../utils/paydayUtils';
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -82,7 +83,7 @@ function DailySpreadsheetMatrix() {
   } = useBudget();
 
   const today = new Date();
-  const [selectedAccountId, setSelectedAccountId] = useState(budget.accounts[1]?.id || budget.accounts[0]?.id || 'all');
+  const [selectedAccountId, setSelectedAccountId] = useState(budget.accounts[0]?.id || 'all');
   const [selectedMonth, setSelectedMonth] = useState(today.getMonth());
   const [selectedYear, setSelectedYear] = useState(today.getFullYear());
   const [showArchivedBills, setShowArchivedBills] = useState(false);
@@ -167,8 +168,8 @@ function DailySpreadsheetMatrix() {
 
         if (customBillVal !== undefined) {
           amt = parseFloat(customBillVal) || 0;
-        } else if (parseInt(b.dueDay) === day) {
-          amt = getBillMonthlyCost(b);
+        } else if (parseInt(b.dueDay) === day && isBillDueInMonth(b, selectedMonth, true)) {
+          amt = parseFloat(b.amount) || 0;
         }
 
         billValues[b.id] = amt;

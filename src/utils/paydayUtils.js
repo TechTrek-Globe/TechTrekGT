@@ -141,3 +141,103 @@ export function getPersonDepositAmountForAccount(person, selectedAccountId = 'al
 
   return netPay;
 }
+
+export const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+];
+
+export const MONTH_SHORT_NAMES = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+];
+
+/**
+ * Returns an array of 1-based month indices (1..12) when a bill is due.
+ * @param {object} bill
+ * @returns {number[]}
+ */
+export function getBillDueMonths(bill) {
+  if (!bill) return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+  
+  if (Array.isArray(bill.dueMonths) && bill.dueMonths.length > 0) {
+    return bill.dueMonths.map(Number).filter(m => m >= 1 && m <= 12).sort((a, b) => a - b);
+  }
+  
+  if (bill.dueMonth) {
+    const m = parseInt(bill.dueMonth, 10);
+    if (!isNaN(m) && m >= 1 && m <= 12) return [m];
+  }
+
+  const period = bill.period || 'Monthly';
+  if (period === 'Annual') return [1];
+  if (period === 'Semi-Annual') return [1, 7];
+  if (period === 'Quarterly') return [1, 4, 7, 10];
+  
+  return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+}
+
+/**
+ * Checks if a bill is due in a given month (1-based 1..12 or 0-based 0..11 if isZeroBased=true).
+ * @param {object} bill
+ * @param {number} monthNum - Month index
+ * @param {boolean} [isZeroBased=false]
+ * @returns {boolean}
+ */
+export function isBillDueInMonth(bill, monthNum, isZeroBased = false) {
+  const m1Based = isZeroBased ? monthNum + 1 : monthNum;
+  const period = bill?.period || 'Monthly';
+  if (period === 'Monthly') return true;
+  const dueMonths = getBillDueMonths(bill);
+  return dueMonths.includes(m1Based);
+}
+
+/**
+ * Computes the exact next upcoming due Date for a bill relative to refDate.
+ * @param {object} bill
+ * @param {Date} [refDate=new Date()]
+ * @returns {Date}
+ */
+export function getNextBillDueDate(bill, refDate = new Date()) {
+  const dueDay = parseInt(bill?.dueDay, 10) || 1;
+  const dueMonths = getBillDueMonths(bill); // 1..12
+  
+  const refYear = refDate.getFullYear();
+  const refMonth = refDate.getMonth(); // 0..11
+
+  // Search forward up to 2 years
+  for (let y = refYear; y <= refYear + 2; y++) {
+    for (let m = 1; m <= 12; m++) {
+      if (y === refYear && (m - 1) < refMonth) continue;
+      
+      if (dueMonths.includes(m)) {
+        const daysInCandidateMonth = new Date(y, m, 0).getDate();
+        const actualDay = Math.min(dueDay, daysInCandidateMonth);
+        const candidate = new Date(y, m - 1, actualDay);
+        
+        // Compare dates normalized to 00:00:00 vs 23:59:59
+        const candCopy = new Date(candidate.getFullYear(), candidate.getMonth(), candidate.getDate(), 23, 59, 59);
+        const refCopy = new Date(refDate.getFullYear(), refDate.getMonth(), refDate.getDate(), 0, 0, 0);
+        
+        if (candCopy >= refCopy) {
+          return candidate;
+        }
+      }
+    }
+  }
+
+  return new Date(refYear, refMonth, dueDay);
+}
+
+/**
+ * Formats due month(s) description for display (e.g. "Nov", "Jan, Jul", "Jan, Apr, Jul, Oct").
+ * @param {object} bill
+ * @returns {string}
+ */
+export function formatBillDueMonths(bill) {
+  const period = bill?.period || 'Monthly';
+  if (period === 'Monthly') return 'Every Month';
+  const dueMonths = getBillDueMonths(bill);
+  return dueMonths.map(m => MONTH_SHORT_NAMES[m - 1]).join(', ');
+}
+

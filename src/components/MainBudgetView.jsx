@@ -3,6 +3,7 @@ import { useBudget } from '../context/BudgetContext';
 import { ReceiptText, Plus } from 'lucide-react';
 import { InlineEdit } from './InlineEdit';
 import { AccountTransferSummary } from './AccountTransferSummary';
+import { formatBillDueMonths } from '../utils/paydayUtils';
 
 export function MainBudgetView() {
   const {
@@ -124,15 +125,22 @@ export function MainBudgetView() {
 
                         {/* Due Day - inline editable */}
                         <td className="p-3.5 text-center">
-                          <InlineEdit
-                            value={bill.dueDay}
-                            type="integer"
-                            prefix="Day "
-                            min={1}
-                            max={31}
-                            onCommit={(/** @type {number} */ v) => updateBill(bill.id, { dueDay: v })}
-                            className="font-mono text-slate-400 text-xs justify-center"
-                          />
+                          <div className="flex flex-col items-center gap-0.5">
+                            <InlineEdit
+                              value={bill.dueDay}
+                              type="integer"
+                              prefix="Day "
+                              min={1}
+                              max={31}
+                              onCommit={(/** @type {number} */ v) => updateBill(bill.id, { dueDay: v })}
+                              className="font-mono text-slate-400 text-xs justify-center"
+                            />
+                            {bill.period !== 'Monthly' && (
+                              <span className="text-[10px] text-emerald-400 font-semibold px-1.5 py-0.2 rounded bg-emerald-950/60 border border-emerald-800/40">
+                                {formatBillDueMonths(bill)}
+                              </span>
+                            )}
+                          </div>
                         </td>
 
                         {/* Payment Notes - inline editable */}

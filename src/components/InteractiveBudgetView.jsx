@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef, useCallback } from 'react';
 import { useBudget } from '../context/BudgetContext';
 import { fmtMoney, fmtNum } from '../utils/formatters';
+import { formatBillDueMonths } from '../utils/paydayUtils';
 import {
   ReceiptText,
   Pencil,
@@ -300,7 +301,12 @@ export function InteractiveBudgetView() {
                               <span className="text-emerald-400">-{fmtMoney(Math.abs(billVariance))}</span>
                             )}
                           </td>
-                          <td className="p-3 text-right font-mono text-slate-500">Day {bill.dueDay}</td>
+                          <td className="p-3 text-right font-mono text-slate-500">
+                            Day {bill.dueDay}
+                            {bill.period !== 'Monthly' && (
+                              <span className="block text-[10px] text-emerald-400 font-sans font-semibold">{formatBillDueMonths(bill)}</span>
+                            )}
+                          </td>
                           {budget.people.map(p => {
                             const portion = getBillPersonMonthlyPortion(bill, p.id);
                             return (

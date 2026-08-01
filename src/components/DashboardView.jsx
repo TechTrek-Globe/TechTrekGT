@@ -76,6 +76,7 @@ export function DashboardView() {
     getPersonPerPaycheckTotal,
     getTotalActualExpenses,
     getAccountActualExpenses,
+    getAccountActualEndBalance,
     updateAccount,
   } = useBudget();
 
@@ -253,8 +254,11 @@ export function DashboardView() {
           <div className={`grid gap-3 ${isCompact ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'}`}>
             {(budget?.accounts || []).map((acc, i) => {
               const monthlyCost = getAccountMonthlyExpenses(acc.id);
+              const actualCost  = getAccountActualExpenses(acc.id, monthKey);
+              const actualEnd   = getAccountActualEndBalance(acc.id, monthKey);
               const projEnd     = (acc.startingBalance || 0) - monthlyCost;
               const accentColor = ACCOUNT_COLORS[i % ACCOUNT_COLORS.length];
+              const hasActualOverride = Math.abs(monthlyCost - actualCost) > 0.001;
 
               return (
                 <div
@@ -280,13 +284,18 @@ export function DashboardView() {
 
                   <div className="pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] font-mono">
                     <span className="text-slate-400 font-sans">Monthly Exp:</span>
-                    <span className="text-rose-400 font-bold">{fmtMoney(monthlyCost)}</span>
+                    <div className="text-right">
+                      <span className="text-rose-400 font-bold">{fmtMoney(actualCost)}</span>
+                      {hasActualOverride && (
+                        <span className="text-[9px] text-slate-500 block font-sans">Proj: {fmtMoney(monthlyCost)}</span>
+                      )}
+                    </div>
                   </div>
 
                   <div className="flex items-center justify-between text-[11px] font-mono">
-                    <span className="text-slate-400 font-sans">Projected End:</span>
-                    <span className={`font-bold ${projEnd < 0 ? 'text-rose-400' : 'text-slate-200'}`}>
-                      {fmtMoney(projEnd)}
+                    <span className="text-slate-400 font-sans">End Balance (Actual):</span>
+                    <span className={`font-bold ${actualEnd < 0 ? 'text-rose-400' : 'text-slate-200'}`}>
+                      {fmtMoney(actualEnd)}
                     </span>
                   </div>
                 </div>

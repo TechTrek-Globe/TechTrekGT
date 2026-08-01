@@ -188,6 +188,8 @@ export function parseSpreadsheet(fileData, fileName = '') {
             const paymentSource = row[8] || row[7] || row[9] || 'Auto Pay';
             const notes = row[9] || row[10] || '';
 
+            const defaultDueMonths = periodStr === 'Annual' ? [1] : periodStr === 'Semi-Annual' ? [1, 7] : periodStr === 'Quarterly' ? [1, 4, 7, 10] : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+
             // Check if already added
             const existingBill = billsList.find(b => b.name.toLowerCase() === billName.toLowerCase());
             if (!existingBill && billName) {
@@ -198,6 +200,7 @@ export function parseSpreadsheet(fileData, fileName = '') {
                 amount,
                 period: periodStr,
                 dueDay: Math.max(1, Math.min(31, dueDay)),
+                dueMonths: defaultDueMonths,
                 paymentSource,
                 notes,
                 splits: {

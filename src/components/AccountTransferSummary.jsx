@@ -158,15 +158,21 @@ export function AccountTransferSummary() {
             </span>
             <button
               type="button"
-              onClick={() => setBasisMode(prev => (prev === 'bills' ? 'direct_deposit' : 'bills'))}
+              onClick={() => setBasisMode(prev => {
+                if (prev === 'auto') return 'bills';
+                if (prev === 'bills') return 'direct_deposit';
+                return 'auto';
+              })}
               className={`px-2 py-0.5 text-[10px] rounded-lg font-bold transition-all ${
                 basisMode === 'bills'
                   ? isLight ? 'bg-purple-100 text-purple-800 border border-purple-300' : 'bg-purple-950 text-purple-300 border border-purple-800'
-                  : isLight ? 'bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-sm' : 'bg-emerald-950 text-emerald-300 border border-emerald-800/80 shadow-sm'
+                  : basisMode === 'direct_deposit'
+                    ? isLight ? 'bg-blue-100 text-blue-800 border border-blue-300' : 'bg-blue-950 text-blue-300 border border-blue-800'
+                    : isLight ? 'bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-sm' : 'bg-emerald-950 text-emerald-300 border border-emerald-800/80 shadow-sm'
               }`}
-              title="Click to toggle between Direct Deposit allocations and Bill Split percentages"
+              title="Click to cycle basis: Auto -> Bill Split Ratios -> Direct Deposit -> Auto"
             >
-              {basisMode === 'bills' ? 'Bill Split Ratios' : 'Direct Deposit Setup'}
+              {basisMode === 'bills' ? 'Bill Split Ratios' : basisMode === 'direct_deposit' ? 'Direct Deposit' : 'Auto Setup'}
             </button>
           </div>
 

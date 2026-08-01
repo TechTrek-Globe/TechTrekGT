@@ -3,7 +3,7 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import { initialBudgetData, DEFAULT_DASHBOARD_WIDGETS } from '../initialData';
 import { fakeDemoBudgetData } from '../demoPresetData';
 import { useAuth } from './AuthContext';
-import { isPersonDepositDay, getPersonDepositAmountForAccount } from '../utils/paydayUtils';
+import { isPersonDepositDay, getPersonDepositAmountForAccount, getNextBillDueDate, getBillDueMonths, isBillDueInMonth, formatBillDueMonths } from '../utils/paydayUtils';
 
 const BudgetContext = createContext();
 
@@ -11,7 +11,10 @@ const STORAGE_KEY = 'personal_budget_app_data_v1';
 
 export function BudgetProvider({ children }) {
   const { token, user } = useAuth();
-  const [selectedPersonId, setSelectedPersonId] = useState('all');
+  const [selectedPersonId, setSelectedPersonId] = useState(() => {
+    try { return localStorage.getItem('trekledger_selected_person_id') || 'all'; }
+    catch { return 'all'; }
+  });
 
   const [budget, setBudget] = useState(() => {
     try {
@@ -22,6 +25,7 @@ export function BudgetProvider({ children }) {
           return {
             ...initialBudgetData,
             ...parsed,
+            dailyMatrix: (parsed.dailyMatrix && typeof parsed.dailyMatrix === 'object') ? parsed.dailyMatrix : {},
             lineItems: Array.isArray(parsed.lineItems) ? parsed.lineItems : [],
             accounts: Array.isArray(parsed.accounts) ? parsed.accounts : [],
             people: Array.isArray(parsed.people) ? parsed.people : [],
@@ -43,8 +47,21 @@ export function BudgetProvider({ children }) {
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState('accounts'); // 'accounts' | 'people' | 'bills' | 'splits' | 'data'
-  const [activeView, setActiveView] = useState('dashboard'); // 'dashboard' | 'main_budget' | 'ledger' | 'amortization'
+  const [activeView, setActiveView] = useState(() => {
+    try { return localStorage.getItem('trekledger_active_view') || 'dashboard'; }
+    catch { return 'dashboard'; }
+  });
   const isInitialCloudFetch = useRef(true);
+
+  useEffect(() => {
+    try { localStorage.setItem('trekledger_selected_person_id', selectedPersonId); }
+    catch { /* ignore */ }
+  }, [selectedPersonId]);
+
+  useEffect(() => {
+    try { localStorage.setItem('trekledger_active_view', activeView); }
+    catch { /* ignore */ }
+  }, [activeView]);
 
   // Fetch Cloud Budget when user logs in
   useEffect(() => {
@@ -58,9 +75,11 @@ export function BudgetProvider({ children }) {
           const data = await res.json();
           if (data.success && data.budget) {
             const b = data.budget;
+            isInitialCloudFetch.current = true;
             setBudget({
               ...initialBudgetData,
               ...b,
+              dailyMatrix: (b.dailyMatrix && typeof b.dailyMatrix === 'object') ? b.dailyMatrix : {},
               lineItems: Array.isArray(b.lineItems) ? b.lineItems : [],
               accounts: Array.isArray(b.accounts) ? b.accounts : [],
               people: Array.isArray(b.people) ? b.people : [],
@@ -72,7 +91,6 @@ export function BudgetProvider({ children }) {
               theme: b.theme || 'dark',
               hideDashboardHeader: Boolean(b.hideDashboardHeader)
             });
-            isInitialCloudFetch.current = true;
           }
         }
       } catch (err) {
@@ -202,28 +220,39 @@ export function BudgetProvider({ children }) {
 
   // Bill Operations
   const addBill = (billData) => {
-    const initialSplits = {};
-    const count = budget.people.length || 1;
-    budget.people.forEach(p => {
-      initialSplits[p.id] = Math.round(100 / count);
+    setBudget(prev => {
+      const count = prev.people.length || 1;
+      const initialSplits = {};
+      prev.people.forEach(p => {
+        initialSplits[p.id] = Math.round(100 / count);
+      });
+
+      const defaultDueMonths = billData.dueMonths || (
+        billData.dueMonth ? [parseInt(billData.dueMonth)] :
+        billData.period === 'Annual' ? [1] :
+        billData.period === 'Semi-Annual' ? [1, 7] :
+        billData.period === 'Quarterly' ? [1, 4, 7, 10] :
+        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+      );
+
+      const newBill = {
+        id: `bill-${Date.now()}`,
+        name: billData.name || 'New Bill',
+        amount: parseFloat(billData.amount) || 0,
+        period: billData.period || 'Monthly',
+        accountId: billData.accountId || prev.accounts[0]?.id || '',
+        dueDay: parseInt(billData.dueDay) || 1,
+        dueMonths: defaultDueMonths,
+        paymentSource: billData.paymentSource || 'Auto Pay',
+        notes: billData.notes || '',
+        splits: billData.splits || initialSplits
+      };
+
+      return {
+        ...prev,
+        bills: [...prev.bills, newBill]
+      };
     });
-
-    const newBill = {
-      id: `bill-${Date.now()}`,
-      name: billData.name || 'New Bill',
-      amount: parseFloat(billData.amount) || 0,
-      period: billData.period || 'Monthly',
-      accountId: billData.accountId || budget.accounts[0]?.id || '',
-      dueDay: parseInt(billData.dueDay) || 1,
-      paymentSource: billData.paymentSource || 'Auto Pay',
-      notes: billData.notes || '',
-      splits: billData.splits || initialSplits
-    };
-
-    setBudget(prev => ({
-      ...prev,
-      bills: [...prev.bills, newBill]
-    }));
   };
 
   const updateBill = (id, updatedData) => {
@@ -337,14 +366,15 @@ export function BudgetProvider({ children }) {
 
   // Clear all data (100% clean slate)
   const clearAllData = () => {
-    setBudget({
+    setBudget(prev => ({
+      ...prev,
       accounts: [],
       people: [],
       bills: [],
       lineItems: [],
       loans: [],
       dailyMatrix: {}
-    });
+    }));
   };
 
   // Import Parsed Spreadsheet Data (replace or merge)
@@ -354,11 +384,13 @@ export function BudgetProvider({ children }) {
     setBudget(prev => {
       if (mode === 'replace') {
         return {
+          ...prev,
           lineItems: [],
           accounts: parsedData.accounts || [],
           people: parsedData.people || [],
           bills: parsedData.bills || [],
-          loans: parsedData.loans || []
+          loans: parsedData.loans || [],
+          dailyMatrix: {}
         };
       }
 
@@ -432,9 +464,7 @@ export function BudgetProvider({ children }) {
   const getAccountProjectedEndBalance = (accountId, monthKey) => {
     const acc = (budget.accounts || []).find(a => a.id === accountId);
     if (!acc) return 0;
-    const projectedExpenses = (budget.bills || [])
-      .filter(b => b.accountId === accountId)
-      .reduce((sum, b) => sum + getBillMonthlyCost(b), 0);
+    const projectedExpenses = monthKey ? getAccountActualExpenses(accountId, monthKey) : getAccountMonthlyExpenses(accountId);
     return (acc.startingBalance || 0) - projectedExpenses;
   };
 
@@ -485,6 +515,7 @@ export function BudgetProvider({ children }) {
     const amt = parseFloat(bill.amount) || 0;
     if (bill.period === 'Semi-Annual') return amt / 6;
     if (bill.period === 'Annual') return amt / 12;
+    if (bill.period === 'Quarterly') return amt / 3;
     if (bill.period === 'Weekly') return (amt * 52) / 12;
     return amt; // Monthly
   };
@@ -524,19 +555,9 @@ export function BudgetProvider({ children }) {
 
   const getUpcomingBills = (limit = 5) => {
     const today = new Date();
-    const currentDay = today.getDate();
-    const currentMonth = today.getMonth();
-    const currentYear = today.getFullYear();
 
     const mapped = (budget.bills || []).map(bill => {
-      const dueDay = parseInt(bill.dueDay) || 1;
-      let dueDate;
-      if (dueDay >= currentDay) {
-        dueDate = new Date(currentYear, currentMonth, dueDay);
-      } else {
-        dueDate = new Date(currentYear, currentMonth + 1, dueDay);
-      }
-
+      const dueDate = getNextBillDueDate(bill, today);
       const diffTime = dueDate.getTime() - today.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       

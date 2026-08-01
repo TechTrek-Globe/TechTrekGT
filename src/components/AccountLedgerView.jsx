@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useBudget } from '../context/BudgetContext';
 import { Wallet, Calendar, AlertCircle, ArrowDownRight, ArrowUpRight, Filter } from 'lucide-react';
 import { fmtMoney } from '../utils/formatters';
+import { isBillDueInMonth } from '../utils/paydayUtils';
 
 export function AccountLedgerView() {
   const { budget, getBillMonthlyCost, isPersonDepositDay, getPersonDepositAmountForAccount } = useBudget();
@@ -16,8 +17,8 @@ export function AccountLedgerView() {
     
     // Filter bills relevant to account selection
     const relevantBills = selectedAccountId === 'all' 
-      ? budget.bills 
-      : budget.bills.filter(b => b.accountId === selectedAccountId);
+      ? budget.bills.filter(b => !b.isArchived)
+      : budget.bills.filter(b => b.accountId === selectedAccountId && !b.isArchived);
 
     // Initial balance sum
     let currentBalance = selectedAccountId === 'all'
@@ -52,8 +53,8 @@ export function AccountLedgerView() {
 
       // Check bill payment deductions on this day
       relevantBills.forEach(bill => {
-        if (bill.dueDay === dayOfMonth) {
-          const cost = getBillMonthlyCost(bill);
+        if (parseInt(bill.dueDay) === dayOfMonth && isBillDueInMonth(bill, date.getMonth(), true)) {
+          const cost = parseFloat(bill.amount) || 0;
           dailyDeductions += cost;
           transactions.push({
             title: bill.name,

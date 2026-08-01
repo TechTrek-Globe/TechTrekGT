@@ -16,6 +16,7 @@ export const initialBudgetData = {
   people: [],
   bills: [],
   loans: [],
+  dailyMatrix: {},
   dashboardWidgets: DEFAULT_DASHBOARD_WIDGETS,
   theme: 'dark',
   hideDashboardHeader: false

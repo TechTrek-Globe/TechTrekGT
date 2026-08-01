@@ -157,6 +157,36 @@ export const fakeDemoBudgetData = {
         'person-demo-1': 0,
         'person-demo-2': 100
       }
+    },
+    {
+      id: 'bill-demo-7',
+      accountId: 'acc-demo-1',
+      name: 'Auto Insurance Premium',
+      amount: 750.00,
+      period: 'Semi-Annual',
+      dueDay: 10,
+      dueMonths: [3, 9],
+      paymentSource: 'Auto Pay',
+      notes: 'Bi-annual vehicle coverage (March & September)',
+      splits: {
+        'person-demo-1': 50,
+        'person-demo-2': 50
+      }
+    },
+    {
+      id: 'bill-demo-8',
+      accountId: 'acc-demo-1',
+      name: 'Amazon Prime & Cloud Vault',
+      amount: 179.00,
+      period: 'Annual',
+      dueDay: 20,
+      dueMonths: [11],
+      paymentSource: 'Credit Card',
+      notes: 'Annual membership renewal (November)',
+      splits: {
+        'person-demo-1': 50,
+        'person-demo-2': 50
+      }
     }
   ],
 

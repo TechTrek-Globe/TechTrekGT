@@ -65,6 +65,7 @@ export function DashboardView() {
     reorderDashboardWidgets,
     setIsSettingsOpen,
     setSettingsTab,
+    getMonthlyNetIncome,
     getTotalMonthlyNetIncome,
     getTotalMonthlyExpenses,
     getTotalCashOnHand,
@@ -393,8 +394,9 @@ export function DashboardView() {
         return (
           <div className={`grid gap-3 ${isCompact ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2'}`}>
             {(budget?.people || []).map(p => {
-              const monthlyInc = getPersonMonthlyTotal(p.id);
-              const billPortionSum = (budget?.bills || []).reduce((sum, b) => sum + getBillPersonMonthlyPortion(b, p.id), 0);
+              const monthlyInc = getMonthlyNetIncome(p);
+              const billPortionSum = getPersonMonthlyTotal(p.id);
+              const perPaycheckBill = getPersonPerPaycheckTotal(p.id);
               const pctOfNet = monthlyInc > 0 ? (billPortionSum / monthlyInc) * 100 : 0;
 
               return (
@@ -418,8 +420,12 @@ export function DashboardView() {
                   </div>
 
                   <div className="pt-2 border-t border-slate-800 flex items-center justify-between font-mono text-[11px]">
-                    <span className="text-slate-400 font-sans">Bill Share:</span>
+                    <span className="text-slate-400 font-sans">Monthly Bill Share:</span>
                     <span className="text-purple-300 font-bold">{fmtMoney(billPortionSum)} ({fmtPct(pctOfNet)})</span>
+                  </div>
+                  <div className="flex items-center justify-between font-mono text-[10px]">
+                    <span className="text-slate-400 font-sans">Per Paycheck Target:</span>
+                    <span className="text-blue-300 font-bold">{fmtMoney(perPaycheckBill)}</span>
                   </div>
                 </div>
               );

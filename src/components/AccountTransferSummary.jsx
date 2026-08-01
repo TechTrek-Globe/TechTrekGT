@@ -67,8 +67,11 @@ export function AccountTransferSummary() {
     const earnerPortions = {};
     visiblePeople.forEach(p => {
       const monthlyPortion = accountBills.reduce((sum, b) => sum + getBillPersonMonthlyPortion(b, p.id), 0);
-      const mode = personPortionModes[p.id] || (p.payFrequency === 'bi-weekly' ? 'paycheck' : 'monthly');
-      earnerPortions[p.id] = mode === 'paycheck' ? (monthlyPortion / 2) : monthlyPortion;
+      const mode = personPortionModes[p.id] || 'monthly';
+      const rawPortion = mode === 'paycheck'
+        ? (p.payFrequency === 'weekly' ? (monthlyPortion * 12) / 52 : monthlyPortion / 2)
+        : monthlyPortion;
+      earnerPortions[p.id] = Math.round(rawPortion * 100) / 100;
     });
 
     const regBal = parseFloat(acc.startingBalance) || 0;
@@ -157,7 +160,7 @@ export function AccountTransferSummary() {
             <tr>
               <th className="p-3 bg-emerald-950 text-emerald-200">Account Name</th>
               {visiblePeople.map(p => {
-                const mode = personPortionModes[p.id] || (p.payFrequency === 'bi-weekly' ? 'paycheck' : 'monthly');
+                const mode = personPortionModes[p.id] || 'monthly';
                 const isPerPaycheck = mode === 'paycheck';
                 return (
                   <th key={`hdr-p-${p.id}`} className="p-3 text-right bg-emerald-950">

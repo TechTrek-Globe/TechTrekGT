@@ -9,35 +9,36 @@ export async function hashPassword(password) {
     enc.encode(password),
     { name: 'PBKDF2' },
     false,
-    ['deriveBits', 'deriveKey']
+    ['deriveBits']
   );
   
-  const key = await crypto.subtle.deriveKey(
+  const derivedBits = await crypto.subtle.deriveBits(
     {
       name: 'PBKDF2',
       salt: salt,
-      iterations: 100000,
+      iterations: 310000,
       hash: 'SHA-256'
     },
     keyMaterial,
-    { name: 'HMAC', hash: 'SHA-256', length: 256 },
-    true,
-    ['sign', 'verify']
+    256
   );
 
-  const exported = await crypto.subtle.exportKey('raw', key);
-  const hashHex = Array.from(new Uint8Array(exported)).map(b => b.toString(16).padStart(2, '0')).join('');
+  const hashHex = Array.from(new Uint8Array(derivedBits)).map(b => b.toString(16).padStart(2, '0')).join('');
   const saltHex = Array.from(salt).map(b => b.toString(16).padStart(2, '0')).join('');
   
-  return `${saltHex}:${hashHex}`;
+  return `${saltHex}:310000:${hashHex}`;
 }
 
 // Verify PBKDF2 Password Hash
 export async function verifyPassword(password, storedHash) {
   const parts = storedHash.split(':');
-  if (parts.length !== 2) return false;
+  // Support both old 2-part format and new 3-part format
+  const [saltHex, iterationsOrHash, maybeHash] = parts;
+  const iterations = parts.length === 3 ? parseInt(iterationsOrHash, 10) : 100000;
+  const originalHashHex = parts.length === 3 ? maybeHash : iterationsOrHash;
+
+  if (!saltHex || !originalHashHex) return false;
   
-  const [saltHex, originalHashHex] = parts;
   const salt = new Uint8Array(saltHex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
   const enc = new TextEncoder();
   
@@ -46,26 +47,28 @@ export async function verifyPassword(password, storedHash) {
     enc.encode(password),
     { name: 'PBKDF2' },
     false,
-    ['deriveBits', 'deriveKey']
+    ['deriveBits']
   );
   
-  const key = await crypto.subtle.deriveKey(
+  const derivedBits = await crypto.subtle.deriveBits(
     {
       name: 'PBKDF2',
       salt: salt,
-      iterations: 100000,
+      iterations: iterations,
       hash: 'SHA-256'
     },
     keyMaterial,
-    { name: 'HMAC', hash: 'SHA-256', length: 256 },
-    true,
-    ['sign', 'verify']
+    256
   );
 
-  const exported = await crypto.subtle.exportKey('raw', key);
-  const hashHex = Array.from(new Uint8Array(exported)).map(b => b.toString(16).padStart(2, '0')).join('');
+  const hashHex = Array.from(new Uint8Array(derivedBits)).map(b => b.toString(16).padStart(2, '0')).join('');
   
-  return hashHex === originalHashHex;
+  if (hashHex.length !== originalHashHex.length) return false;
+  let diff = 0;
+  for (let i = 0; i < hashHex.length; i++) {
+    diff |= hashHex.charCodeAt(i) ^ originalHashHex.charCodeAt(i);
+  }
+  return diff === 0;
 }
 
 // Helper: Base64URL encoding/decoding
@@ -91,7 +94,7 @@ export async function createToken(payload, secret) {
   const encodedHeader = base64UrlEncode(JSON.stringify(header));
   const encodedPayload = base64UrlEncode(JSON.stringify({
     ...payload,
-    exp: Math.floor(Date.now() / 1000) + (5 * 24 * 60 * 60) // 5 days expiration
+    exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60) // 24 hours expiration
   }));
 
   const dataToSign = `${encodedHeader}.${encodedPayload}`;
@@ -106,8 +109,10 @@ export async function createToken(payload, secret) {
   );
 
   const signature = await crypto.subtle.sign('HMAC', cryptoKey, enc.encode(dataToSign));
-  const signatureHex = Array.from(new Uint8Array(signature)).map(b => String.fromCharCode(b)).join('');
-  const encodedSignature = base64UrlEncode(signatureHex);
+  const encodedSignature = btoa(String.fromCharCode(...new Uint8Array(signature)))
+    .replace(/=/g, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_');
 
   return `${dataToSign}.${encodedSignature}`;
 }
@@ -131,7 +136,10 @@ export async function verifyToken(token, secret) {
       ['verify']
     );
 
-    const signatureBytes = Uint8Array.from(base64UrlDecode(encodedSignature), c => c.charCodeAt(0));
+    const signatureBytes = new Uint8Array(
+      atob(encodedSignature.replace(/-/g, '+').replace(/_/g, '/'))
+        .split('').map(c => c.charCodeAt(0))
+    );
     const isValid = await crypto.subtle.verify('HMAC', cryptoKey, signatureBytes, enc.encode(dataToSign));
 
     if (!isValid) return null;
@@ -145,4 +153,16 @@ export async function verifyToken(token, secret) {
   } catch (err) {
     return null;
   }
+}
+
+// Extract token from request cookie or Authorization header
+export function getTokenFromRequest(request) {
+  const authHeader = request.headers.get('Authorization');
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return authHeader.split(' ')[1];
+  }
+
+  const cookieHeader = request.headers.get('Cookie') || '';
+  const match = cookieHeader.match(/(?:^|;\s*)auth_token=([^;]+)/);
+  return match ? match[1] : null;
 }

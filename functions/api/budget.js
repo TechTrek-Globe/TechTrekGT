@@ -1,4 +1,6 @@
-import { verifyToken } from '../utils/auth.js';
+import { verifyToken, getTokenFromRequest } from '../utils/auth.js';
+
+let schemaEnsured = false;
 
 async function ensureSchema(db) {
   if (!db) return;
@@ -41,15 +43,14 @@ export async function onRequestGet(context) {
   const { request, env } = context;
 
   try {
-    const authHeader = request.headers.get('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    const token = getTokenFromRequest(request);
+    if (!token) {
       return new Response(JSON.stringify({ error: 'Unauthorized: Missing token' }), {
         status: 401,
         headers: { 'Content-Type': 'application/json' }
       });
     }
 
-    const token = authHeader.split(' ')[1];
     const payload = await verifyToken(token, env.JWT_SECRET);
     if (!payload || !payload.householdId) {
       return new Response(JSON.stringify({ error: 'Unauthorized: Invalid token' }), {
@@ -67,7 +68,10 @@ export async function onRequestGet(context) {
       });
     }
 
-    await ensureSchema(env.DB);
+    if (!schemaEnsured) {
+      await ensureSchema(env.DB);
+      schemaEnsured = true;
+    }
 
     // Query Accounts
     const accRows = await env.DB.prepare('SELECT * FROM accounts WHERE household_id = ?').bind(householdId).all();
@@ -98,6 +102,7 @@ export async function onRequestGet(context) {
         try {
           return p.account_allocations ? JSON.parse(p.account_allocations) : {};
         } catch (e) {
+          console.error('[budget] failed to parse account_allocations:', e);
           return {};
         }
       })(),
@@ -202,8 +207,8 @@ export async function onRequestGet(context) {
     });
 
   } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : String(err || 'Failed to fetch budget');
-    return new Response(JSON.stringify({ error: errorMessage }), {
+    console.error('[budget GET] handler error:', err);
+    return new Response(JSON.stringify({ error: 'An internal error occurred.' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }
     });
@@ -217,15 +222,14 @@ export async function onRequestPost(context) {
   const { request, env } = context;
 
   try {
-    const authHeader = request.headers.get('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    const token = getTokenFromRequest(request);
+    if (!token) {
       return new Response(JSON.stringify({ error: 'Unauthorized: Missing token' }), {
         status: 401,
         headers: { 'Content-Type': 'application/json' }
       });
     }
 
-    const token = authHeader.split(' ')[1];
     const payload = await verifyToken(token, env.JWT_SECRET);
     if (!payload || !payload.householdId) {
       return new Response(JSON.stringify({ error: 'Unauthorized: Invalid token' }), {
@@ -252,7 +256,10 @@ export async function onRequestPost(context) {
       });
     }
 
-    await ensureSchema(env.DB);
+    if (!schemaEnsured) {
+      await ensureSchema(env.DB);
+      schemaEnsured = true;
+    }
 
     // Sync Accounts
     if (Array.isArray(budget.accounts)) {
@@ -344,7 +351,7 @@ export async function onRequestPost(context) {
       }
     } else if (budget.loan) {
       await env.DB.prepare('DELETE FROM loans WHERE household_id = ?').bind(householdId).run();
-      const loanId = budget.loan.id || `loan-${Date.now()}`;
+      const loanId = `loan-${crypto.randomUUID()}`;
       await env.DB.prepare(
         'INSERT INTO loans (id, household_id, name, description, principal, annual_interest_rate, term_months, monthly_payment, extra_payment, start_date, is_archived, interest_compounding, payment_frequency, payment_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
       ).bind(
@@ -386,8 +393,8 @@ export async function onRequestPost(context) {
     });
 
   } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : String(err || 'Failed to sync budget');
-    return new Response(JSON.stringify({ error: errorMessage }), {
+    console.error('[budget POST] handler error:', err);
+    return new Response(JSON.stringify({ error: 'An internal error occurred.' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }
     });

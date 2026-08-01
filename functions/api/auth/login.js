@@ -1,7 +1,22 @@
 import { verifyPassword, createToken } from '../../utils/auth.js';
+import { checkRateLimit } from '../../utils/rateLimit.js';
 
 export async function onRequestPost(context) {
   const { request, env } = context;
+
+  const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+  const rlKey = `login:${ip}`;
+  const { allowed, retryAfter } = await checkRateLimit(env.RATE_LIMIT_KV, rlKey, 10, 60);
+
+  if (!allowed) {
+    return new Response(JSON.stringify({ error: 'Too many login attempts. Please wait.' }), {
+      status: 429,
+      headers: {
+        'Content-Type': 'application/json',
+        'Retry-After': String(retryAfter)
+      }
+    });
+  }
 
   try {
     const body = await request.json();
@@ -57,19 +72,31 @@ export async function onRequestPost(context) {
 
     // Create JWT token
     const token = await createToken({ userId: user.id, email: user.email, householdId, name: user.name }, env.JWT_SECRET);
+    
+    const cookieOptions = [
+      `auth_token=${token}`,
+      'HttpOnly',
+      'Secure',
+      'SameSite=Strict',
+      'Path=/',
+      `Max-Age=${body.rememberMe ? 5 * 24 * 3600 : 0}`
+    ].join('; ');
 
     return new Response(JSON.stringify({
       success: true,
       user: { id: user.id, email: user.email, name: user.name },
-      token,
       householdId
     }), {
       status: 200,
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 
+        'Content-Type': 'application/json',
+        'Set-Cookie': cookieOptions
+      }
     });
 
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message || 'Login failed' }), {
+    console.error('[login] handler error:', err);
+    return new Response(JSON.stringify({ error: 'An internal error occurred. Please try again.' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }
     });

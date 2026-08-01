@@ -18,5 +18,12 @@
       "database_name": "personal-budget-db",
       "database_id": "10f220d4-1c10-49e9-b63e-5d4cb08d599f"
     }
+  ],
+  "kv_namespaces": [
+    // {
+    //   "binding": "RATE_LIMIT_KV",
+    //   "id": "<YOUR_KV_NAMESPACE_ID_HERE>",
+    //   "comment": "Run `npx wrangler kv:namespace create RATE_LIMIT_KV` and paste the ID above"
+    // }
   ]
 }

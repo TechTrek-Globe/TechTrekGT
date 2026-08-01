@@ -3,11 +3,11 @@ import { useAuth } from '../context/AuthContext';
 import { X, Lock, Mail, User, ShieldCheck, ArrowRight, Loader2 } from 'lucide-react';
 
 export default function AuthModal() {
-  const { isAuthModalOpen, setIsAuthModalOpen, login, register } = useAuth();
+  const { user, isAuthModalOpen, setIsAuthModalOpen, login, register } = useAuth();
   const [isRegistering, setIsRegistering] = useState(false);
   
   const [name, setName] = useState('');
-  const [email, setEmail] = useState(() => localStorage.getItem('personal_budget_saved_email') || '');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
@@ -57,7 +57,11 @@ export default function AuthModal() {
             </div>
           </div>
           <button
-            onClick={() => setIsAuthModalOpen(false)}
+            onClick={() => {
+              if (user) {
+                setIsAuthModalOpen(false);
+              }
+            }}
             className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors"
           >
             <X className="w-5 h-5" />
@@ -112,7 +116,7 @@ export default function AuthModal() {
               <input
                 type="password"
                 required
-                minLength={6}
+                minLength={8}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"

@@ -1,18 +1,16 @@
-import { verifyToken } from '../../utils/auth.js';
+import { verifyToken, getTokenFromRequest } from '../../utils/auth.js';
 
 export async function onRequestGet(context) {
   const { request, env } = context;
 
   try {
-    const authHeader = request.headers.get('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    const token = getTokenFromRequest(request);
+    if (!token) {
       return new Response(JSON.stringify({ error: 'Unauthorized: Missing token' }), {
         status: 401,
         headers: { 'Content-Type': 'application/json' }
       });
     }
-
-    const token = authHeader.split(' ')[1];
     const payload = await verifyToken(token, env.JWT_SECRET);
 
     if (!payload) {
@@ -32,7 +30,8 @@ export async function onRequestGet(context) {
     });
 
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message || 'Auth check failed' }), {
+    console.error('[me] handler error:', err);
+    return new Response(JSON.stringify({ error: 'An internal error occurred.' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }
     });

@@ -3,54 +3,37 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 /** @type {React.Context<any>} */
 const AuthContext = createContext(null);
 
-const AUTH_TOKEN_KEY = 'personal_budget_auth_token_v1';
-
 /**
  * @param {{ children: React.ReactNode }} props
  */
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(() => {
-    return localStorage.getItem(AUTH_TOKEN_KEY) || sessionStorage.getItem(AUTH_TOKEN_KEY) || null;
-  });
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [householdId, setHouseholdId] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
-  // Validate token on mount
+  // Validate session on mount via HttpOnly cookie
   useEffect(() => {
     async function verifyCurrentSession() {
-      if (!token) {
-        setIsLoading(false);
-        setIsAuthModalOpen(true);
-        return;
-      }
-
       try {
-        const res = await fetch('/api/auth/me', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-
+        const res = await fetch('/api/auth/me');
         if (res.ok) {
           const data = await res.json();
           setUser(data.user);
           setHouseholdId(data.householdId);
+          setIsAuthenticated(true);
         } else {
-          // Token expired or invalid
-          localStorage.removeItem(AUTH_TOKEN_KEY);
-          sessionStorage.removeItem(AUTH_TOKEN_KEY);
-          setToken(null);
           setUser(null);
           setHouseholdId(null);
+          setIsAuthenticated(false);
           setIsAuthModalOpen(true);
         }
       } catch (err) {
         console.error('Failed to verify authentication session:', err);
-        localStorage.removeItem(AUTH_TOKEN_KEY);
-        sessionStorage.removeItem(AUTH_TOKEN_KEY);
-        setToken(null);
         setUser(null);
         setHouseholdId(null);
+        setIsAuthenticated(false);
         setIsAuthModalOpen(true);
       } finally {
         setIsLoading(false);
@@ -58,29 +41,29 @@ export function AuthProvider({ children }) {
     }
 
     verifyCurrentSession();
-  }, [token]);
+  }, []);
 
   // Inactivity timeout handler
   useEffect(() => {
-    if (!token) return;
+    if (!isAuthenticated) return;
 
     const INACTIVITY_TIMEOUT = 15 * 60 * 1000; // 15 minutes
     
     const interval = setInterval(() => {
-      const lastActivity = localStorage.getItem('personal_budget_last_activity');
+      const lastActivity = sessionStorage.getItem('personal_budget_last_activity');
       if (lastActivity) {
         const timeElapsed = Date.now() - parseInt(lastActivity, 10);
         if (timeElapsed > INACTIVITY_TIMEOUT) {
           logout();
-          alert('You have been logged out due to inactivity.');
+          setIsAuthModalOpen(true);
         }
       } else {
-        localStorage.setItem('personal_budget_last_activity', Date.now().toString());
+        sessionStorage.setItem('personal_budget_last_activity', Date.now().toString());
       }
     }, 10000);
 
     const updateActivity = () => {
-      localStorage.setItem('personal_budget_last_activity', Date.now().toString());
+      sessionStorage.setItem('personal_budget_last_activity', Date.now().toString());
     };
 
     const activityEvents = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
@@ -96,7 +79,7 @@ export function AuthProvider({ children }) {
         window.removeEventListener(event, updateActivity);
       });
     };
-  }, [token]);
+  }, [isAuthenticated]);
 
   /**
    * @param {string} email
@@ -107,7 +90,7 @@ export function AuthProvider({ children }) {
     const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify({ email, password, rememberMe })
     });
 
     const data = await res.json();
@@ -115,13 +98,7 @@ export function AuthProvider({ children }) {
       throw new Error(data.error || 'Login failed');
     }
 
-    if (rememberMe) {
-      localStorage.setItem(AUTH_TOKEN_KEY, data.token);
-    } else {
-      sessionStorage.setItem(AUTH_TOKEN_KEY, data.token);
-    }
-    localStorage.setItem('personal_budget_saved_email', email);
-    setToken(data.token);
+    setIsAuthenticated(true);
     setUser(data.user);
     setHouseholdId(data.householdId);
     setIsAuthModalOpen(false);
@@ -138,7 +115,7 @@ export function AuthProvider({ children }) {
     const res = await fetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, password })
+      body: JSON.stringify({ name, email, password, rememberMe })
     });
 
     const data = await res.json();
@@ -146,32 +123,29 @@ export function AuthProvider({ children }) {
       throw new Error(data.error || 'Registration failed');
     }
 
-    if (rememberMe) {
-      localStorage.setItem(AUTH_TOKEN_KEY, data.token);
-    } else {
-      sessionStorage.setItem(AUTH_TOKEN_KEY, data.token);
-    }
-    localStorage.setItem('personal_budget_saved_email', email);
-    setToken(data.token);
+    setIsAuthenticated(true);
     setUser(data.user);
     setHouseholdId(data.householdId);
     setIsAuthModalOpen(false);
     return data;
   };
 
-  const logout = () => {
-    localStorage.removeItem(AUTH_TOKEN_KEY);
-    sessionStorage.removeItem(AUTH_TOKEN_KEY);
-    localStorage.removeItem('personal_budget_last_activity');
-    setToken(null);
+  const logout = async () => {
+    sessionStorage.removeItem('personal_budget_last_activity');
+    setIsAuthenticated(false);
     setUser(null);
     setHouseholdId(null);
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch (e) {
+      // ignore
+    }
   };
 
   return (
     <AuthContext.Provider value={{
       user,
-      token,
+      token: isAuthenticated ? 'cookie-active' : null, // alias for backwards compatibility with BudgetContext
       householdId,
       isLoading,
       isAuthModalOpen,

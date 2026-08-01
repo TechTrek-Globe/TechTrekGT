@@ -6,29 +6,28 @@ async function hashPassword(password) {
     enc.encode(password),
     { name: "PBKDF2" },
     false,
-    ["deriveBits", "deriveKey"]
+    ["deriveBits"]
   );
-  const key = await crypto.subtle.deriveKey(
+  const derivedBits = await crypto.subtle.deriveBits(
     {
       name: "PBKDF2",
       salt,
-      iterations: 1e5,
+      iterations: 31e4,
       hash: "SHA-256"
     },
     keyMaterial,
-    { name: "HMAC", hash: "SHA-256", length: 256 },
-    true,
-    ["sign", "verify"]
+    256
   );
-  const exported = await crypto.subtle.exportKey("raw", key);
-  const hashHex = Array.from(new Uint8Array(exported)).map((b) => b.toString(16).padStart(2, "0")).join("");
+  const hashHex = Array.from(new Uint8Array(derivedBits)).map((b) => b.toString(16).padStart(2, "0")).join("");
   const saltHex = Array.from(salt).map((b) => b.toString(16).padStart(2, "0")).join("");
-  return `${saltHex}:${hashHex}`;
+  return `${saltHex}:310000:${hashHex}`;
 }
 async function verifyPassword(password, storedHash) {
   const parts = storedHash.split(":");
-  if (parts.length !== 2) return false;
-  const [saltHex, originalHashHex] = parts;
+  const [saltHex, iterationsOrHash, maybeHash] = parts;
+  const iterations = parts.length === 3 ? parseInt(iterationsOrHash, 10) : 1e5;
+  const originalHashHex = parts.length === 3 ? maybeHash : iterationsOrHash;
+  if (!saltHex || !originalHashHex) return false;
   const salt = new Uint8Array(saltHex.match(/.{1,2}/g).map((byte) => parseInt(byte, 16)));
   const enc = new TextEncoder();
   const keyMaterial = await crypto.subtle.importKey(
@@ -36,23 +35,25 @@ async function verifyPassword(password, storedHash) {
     enc.encode(password),
     { name: "PBKDF2" },
     false,
-    ["deriveBits", "deriveKey"]
+    ["deriveBits"]
   );
-  const key = await crypto.subtle.deriveKey(
+  const derivedBits = await crypto.subtle.deriveBits(
     {
       name: "PBKDF2",
       salt,
-      iterations: 1e5,
+      iterations,
       hash: "SHA-256"
     },
     keyMaterial,
-    { name: "HMAC", hash: "SHA-256", length: 256 },
-    true,
-    ["sign", "verify"]
+    256
   );
-  const exported = await crypto.subtle.exportKey("raw", key);
-  const hashHex = Array.from(new Uint8Array(exported)).map((b) => b.toString(16).padStart(2, "0")).join("");
-  return hashHex === originalHashHex;
+  const hashHex = Array.from(new Uint8Array(derivedBits)).map((b) => b.toString(16).padStart(2, "0")).join("");
+  if (hashHex.length !== originalHashHex.length) return false;
+  let diff = 0;
+  for (let i = 0; i < hashHex.length; i++) {
+    diff |= hashHex.charCodeAt(i) ^ originalHashHex.charCodeAt(i);
+  }
+  return diff === 0;
 }
 function base64UrlEncode(str) {
   return btoa(str).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
@@ -70,8 +71,8 @@ async function createToken(payload, secret) {
   const encodedHeader = base64UrlEncode(JSON.stringify(header));
   const encodedPayload = base64UrlEncode(JSON.stringify({
     ...payload,
-    exp: Math.floor(Date.now() / 1e3) + 5 * 24 * 60 * 60
-    // 5 days expiration
+    exp: Math.floor(Date.now() / 1e3) + 24 * 60 * 60
+    // 24 hours expiration
   }));
   const dataToSign = `${encodedHeader}.${encodedPayload}`;
   const enc = new TextEncoder();
@@ -83,8 +84,7 @@ async function createToken(payload, secret) {
     ["sign"]
   );
   const signature = await crypto.subtle.sign("HMAC", cryptoKey, enc.encode(dataToSign));
-  const signatureHex = Array.from(new Uint8Array(signature)).map((b) => String.fromCharCode(b)).join("");
-  const encodedSignature = base64UrlEncode(signatureHex);
+  const encodedSignature = btoa(String.fromCharCode(...new Uint8Array(signature))).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
   return `${dataToSign}.${encodedSignature}`;
 }
 async function verifyToken(token, secret) {
@@ -102,7 +102,9 @@ async function verifyToken(token, secret) {
       false,
       ["verify"]
     );
-    const signatureBytes = Uint8Array.from(base64UrlDecode(encodedSignature), (c) => c.charCodeAt(0));
+    const signatureBytes = new Uint8Array(
+      atob(encodedSignature.replace(/-/g, "+").replace(/_/g, "/")).split("").map((c) => c.charCodeAt(0))
+    );
     const isValid = await crypto.subtle.verify("HMAC", cryptoKey, signatureBytes, enc.encode(dataToSign));
     if (!isValid) return null;
     const payload = JSON.parse(base64UrlDecode(encodedPayload));
@@ -114,13 +116,67 @@ async function verifyToken(token, secret) {
     return null;
   }
 }
-async function onRequestPost$2(context) {
+function getTokenFromRequest(request) {
+  const authHeader = request.headers.get("Authorization");
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    return authHeader.split(" ")[1];
+  }
+  const cookieHeader = request.headers.get("Cookie") || "";
+  const match = cookieHeader.match(/(?:^|;\s*)auth_token=([^;]+)/);
+  return match ? match[1] : null;
+}
+async function checkRateLimit(kv, key, maxRequests, windowSeconds) {
+  if (!kv) return { allowed: true };
+  const now = Math.floor(Date.now() / 1e3);
+  const windowKey = `rl:${key}:${Math.floor(now / windowSeconds)}`;
+  try {
+    const current = parseInt(await kv.get(windowKey) || "0", 10);
+    if (current >= maxRequests) {
+      return { allowed: false, retryAfter: windowSeconds - now % windowSeconds };
+    }
+    await kv.put(windowKey, String(current + 1), { expirationTtl: windowSeconds * 2 });
+    return { allowed: true };
+  } catch (err) {
+    console.error("[rateLimit] failed to check KV:", err);
+    return { allowed: true };
+  }
+}
+async function onRequestPost$3(context) {
   const { request, env } = context;
+  const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+  const rlKey = `register:${ip}`;
+  const { allowed, retryAfter } = await checkRateLimit(env.RATE_LIMIT_KV, rlKey, 5, 60);
+  if (!allowed) {
+    return new Response(JSON.stringify({ error: "Too many registration attempts. Please wait." }), {
+      status: 429,
+      headers: {
+        "Content-Type": "application/json",
+        "Retry-After": String(retryAfter)
+      }
+    });
+  }
   try {
     const body = await request.json();
     const { email, password, name } = body;
     if (!email || !password || !name) {
       return new Response(JSON.stringify({ error: "Name, email, and password are required" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+    const MAX_NAME_LEN = 100;
+    const MAX_EMAIL_LEN = 254;
+    const MAX_PASS_LEN = 128;
+    if (name.length > MAX_NAME_LEN || email.length > MAX_EMAIL_LEN || password.length > MAX_PASS_LEN) {
+      return new Response(JSON.stringify({ error: "Input exceeds maximum allowed length." }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+    const cleanEmail = email.trim().toLowerCase();
+    const EMAIL_REGEX = /^[^\s@]{1,64}@[^\s@]{1,253}\.[^\s@]{2,}$/;
+    if (!EMAIL_REGEX.test(cleanEmail)) {
+      return new Response(JSON.stringify({ error: "Invalid email address format." }), {
         status: 400,
         headers: { "Content-Type": "application/json" }
       });
@@ -137,7 +193,6 @@ async function onRequestPost$2(context) {
         headers: { "Content-Type": "application/json" }
       });
     }
-    const cleanEmail = email.trim().toLowerCase();
     if (!env.DB) {
       return new Response(JSON.stringify({ error: "Database binding DB not available" }), {
         status: 500,
@@ -151,8 +206,8 @@ async function onRequestPost$2(context) {
         headers: { "Content-Type": "application/json" }
       });
     }
-    const userId = `usr-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-    const householdId = `hh-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const userId = `usr-${crypto.randomUUID()}`;
+    const householdId = `hh-${crypto.randomUUID()}`;
     const passwordHash = await hashPassword(password);
     await env.DB.prepare(
       "INSERT INTO users (id, email, password_hash, name) VALUES (?, ?, ?, ?)"
@@ -160,11 +215,11 @@ async function onRequestPost$2(context) {
     await env.DB.prepare(
       "INSERT INTO households (id, name) VALUES (?, ?)"
     ).bind(householdId, `${name.trim()}'s Household`).run();
-    const memberId = `hm-${Date.now()}`;
+    const memberId = `hm-${crypto.randomUUID()}`;
     await env.DB.prepare(
       "INSERT INTO household_members (id, household_id, user_id, role) VALUES (?, ?, ?, ?)"
     ).bind(memberId, householdId, userId, "owner").run();
-    const person1Id = `person-${Date.now()}-1`;
+    const person1Id = `person-${crypto.randomUUID()}`;
     await env.DB.prepare(
       "INSERT INTO people (id, household_id, name, role, pay_frequency, pay_day1, pay_day2, gross_per_pay, net_per_pay, color) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     ).bind(person1Id, householdId, name.trim(), "Primary", "bi-weekly", "15", "last", 0, 0, "purple").run();
@@ -175,24 +230,47 @@ async function onRequestPost$2(context) {
       });
     }
     const token = await createToken({ userId, email: cleanEmail, householdId, name: name.trim() }, env.JWT_SECRET);
+    const cookieOptions = [
+      `auth_token=${token}`,
+      "HttpOnly",
+      "Secure",
+      "SameSite=Strict",
+      "Path=/",
+      `Max-Age=${body.rememberMe ? 5 * 24 * 3600 : 0}`
+    ].join("; ");
     return new Response(JSON.stringify({
       success: true,
       user: { id: userId, email: cleanEmail, name: name.trim() },
-      token,
       householdId
     }), {
       status: 201,
-      headers: { "Content-Type": "application/json" }
+      headers: {
+        "Content-Type": "application/json",
+        "Set-Cookie": cookieOptions
+      }
     });
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message || "Registration failed" }), {
+    console.error("[register] handler error:", err);
+    return new Response(JSON.stringify({ error: "An internal error occurred. Please try again." }), {
       status: 500,
       headers: { "Content-Type": "application/json" }
     });
   }
 }
-async function onRequestPost$1(context) {
+async function onRequestPost$2(context) {
   const { request, env } = context;
+  const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+  const rlKey = `login:${ip}`;
+  const { allowed, retryAfter } = await checkRateLimit(env.RATE_LIMIT_KV, rlKey, 10, 60);
+  if (!allowed) {
+    return new Response(JSON.stringify({ error: "Too many login attempts. Please wait." }), {
+      status: 429,
+      headers: {
+        "Content-Type": "application/json",
+        "Retry-After": String(retryAfter)
+      }
+    });
+  }
   try {
     const body = await request.json();
     const { email, password } = body;
@@ -234,17 +312,28 @@ async function onRequestPost$1(context) {
       });
     }
     const token = await createToken({ userId: user.id, email: user.email, householdId, name: user.name }, env.JWT_SECRET);
+    const cookieOptions = [
+      `auth_token=${token}`,
+      "HttpOnly",
+      "Secure",
+      "SameSite=Strict",
+      "Path=/",
+      `Max-Age=${body.rememberMe ? 5 * 24 * 3600 : 0}`
+    ].join("; ");
     return new Response(JSON.stringify({
       success: true,
       user: { id: user.id, email: user.email, name: user.name },
-      token,
       householdId
     }), {
       status: 200,
-      headers: { "Content-Type": "application/json" }
+      headers: {
+        "Content-Type": "application/json",
+        "Set-Cookie": cookieOptions
+      }
     });
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message || "Login failed" }), {
+    console.error("[login] handler error:", err);
+    return new Response(JSON.stringify({ error: "An internal error occurred. Please try again." }), {
       status: 500,
       headers: { "Content-Type": "application/json" }
     });
@@ -253,14 +342,13 @@ async function onRequestPost$1(context) {
 async function onRequestGet$1(context) {
   const { request, env } = context;
   try {
-    const authHeader = request.headers.get("Authorization");
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    const token = getTokenFromRequest(request);
+    if (!token) {
       return new Response(JSON.stringify({ error: "Unauthorized: Missing token" }), {
         status: 401,
         headers: { "Content-Type": "application/json" }
       });
     }
-    const token = authHeader.split(" ")[1];
     const payload = await verifyToken(token, env.JWT_SECRET);
     if (!payload) {
       return new Response(JSON.stringify({ error: "Unauthorized: Invalid or expired token" }), {
@@ -277,12 +365,31 @@ async function onRequestGet$1(context) {
       headers: { "Content-Type": "application/json" }
     });
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message || "Auth check failed" }), {
+    console.error("[me] handler error:", err);
+    return new Response(JSON.stringify({ error: "An internal error occurred." }), {
       status: 500,
       headers: { "Content-Type": "application/json" }
     });
   }
 }
+async function onRequestPost$1() {
+  const cookieOptions = [
+    "auth_token=",
+    "HttpOnly",
+    "Secure",
+    "SameSite=Strict",
+    "Path=/",
+    "Max-Age=0"
+  ].join("; ");
+  return new Response(JSON.stringify({ success: true }), {
+    status: 200,
+    headers: {
+      "Content-Type": "application/json",
+      "Set-Cookie": cookieOptions
+    }
+  });
+}
+let schemaEnsured = false;
 async function ensureSchema(db) {
   if (!db) return;
   try {
@@ -329,14 +436,13 @@ async function ensureSchema(db) {
 async function onRequestGet(context) {
   const { request, env } = context;
   try {
-    const authHeader = request.headers.get("Authorization");
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    const token = getTokenFromRequest(request);
+    if (!token) {
       return new Response(JSON.stringify({ error: "Unauthorized: Missing token" }), {
         status: 401,
         headers: { "Content-Type": "application/json" }
       });
     }
-    const token = authHeader.split(" ")[1];
     const payload = await verifyToken(token, env.JWT_SECRET);
     if (!payload || !payload.householdId) {
       return new Response(JSON.stringify({ error: "Unauthorized: Invalid token" }), {
@@ -351,7 +457,10 @@ async function onRequestGet(context) {
         headers: { "Content-Type": "application/json" }
       });
     }
-    await ensureSchema(env.DB);
+    if (!schemaEnsured) {
+      await ensureSchema(env.DB);
+      schemaEnsured = true;
+    }
     const accRows = await env.DB.prepare("SELECT * FROM accounts WHERE household_id = ?").bind(householdId).all();
     const accounts = (accRows.results || []).map((a) => ({
       id: a.id,
@@ -378,6 +487,7 @@ async function onRequestGet(context) {
         try {
           return p.account_allocations ? JSON.parse(p.account_allocations) : {};
         } catch (e) {
+          console.error("[budget] failed to parse account_allocations:", e);
           return {};
         }
       })(),
@@ -468,8 +578,8 @@ async function onRequestGet(context) {
       headers: { "Content-Type": "application/json" }
     });
   } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : String(err || "Failed to fetch budget");
-    return new Response(JSON.stringify({ error: errorMessage }), {
+    console.error("[budget GET] handler error:", err);
+    return new Response(JSON.stringify({ error: "An internal error occurred." }), {
       status: 500,
       headers: { "Content-Type": "application/json" }
     });
@@ -478,14 +588,13 @@ async function onRequestGet(context) {
 async function onRequestPost(context) {
   const { request, env } = context;
   try {
-    const authHeader = request.headers.get("Authorization");
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    const token = getTokenFromRequest(request);
+    if (!token) {
       return new Response(JSON.stringify({ error: "Unauthorized: Missing token" }), {
         status: 401,
         headers: { "Content-Type": "application/json" }
       });
     }
-    const token = authHeader.split(" ")[1];
     const payload = await verifyToken(token, env.JWT_SECRET);
     if (!payload || !payload.householdId) {
       return new Response(JSON.stringify({ error: "Unauthorized: Invalid token" }), {
@@ -508,7 +617,10 @@ async function onRequestPost(context) {
         headers: { "Content-Type": "application/json" }
       });
     }
-    await ensureSchema(env.DB);
+    if (!schemaEnsured) {
+      await ensureSchema(env.DB);
+      schemaEnsured = true;
+    }
     if (Array.isArray(budget.accounts)) {
       await env.DB.prepare("DELETE FROM accounts WHERE household_id = ?").bind(householdId).run();
       for (const acc of budget.accounts) {
@@ -617,7 +729,7 @@ async function onRequestPost(context) {
       }
     } else if (budget.loan) {
       await env.DB.prepare("DELETE FROM loans WHERE household_id = ?").bind(householdId).run();
-      const loanId = budget.loan.id || `loan-${Date.now()}`;
+      const loanId = `loan-${crypto.randomUUID()}`;
       await env.DB.prepare(
         "INSERT INTO loans (id, household_id, name, description, principal, annual_interest_rate, term_months, monthly_payment, extra_payment, start_date, is_archived, interest_compounding, payment_frequency, payment_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
       ).bind(
@@ -657,8 +769,8 @@ async function onRequestPost(context) {
       headers: { "Content-Type": "application/json" }
     });
   } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : String(err || "Failed to sync budget");
-    return new Response(JSON.stringify({ error: errorMessage }), {
+    console.error("[budget POST] handler error:", err);
+    return new Response(JSON.stringify({ error: "An internal error occurred." }), {
       status: 500,
       headers: { "Content-Type": "application/json" }
     });
@@ -668,10 +780,28 @@ function addSecurityHeaders(response, isLocalhost = false) {
   const newHeaders = new Headers(response.headers);
   if (!isLocalhost) {
     newHeaders.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
-    newHeaders.set("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self';");
+    newHeaders.set("Content-Security-Policy", [
+      "default-src 'self'",
+      "style-src 'self' 'unsafe-inline'",
+      "script-src 'self'",
+      "connect-src 'self'",
+      "img-src 'self' data: blob:",
+      "font-src 'self' data:",
+      "frame-ancestors 'none'",
+      "form-action 'self'",
+      "base-uri 'self'"
+    ].join("; "));
   }
   newHeaders.set("X-Content-Type-Options", "nosniff");
   newHeaders.set("X-Frame-Options", "DENY");
+  newHeaders.set("X-XSS-Protection", "0");
+  newHeaders.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  newHeaders.set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()");
+  response.headers.get("Origin");
+  newHeaders.set("Access-Control-Allow-Origin", "https://techtrek-budget.pages.dev");
+  newHeaders.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  newHeaders.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  newHeaders.set("Access-Control-Max-Age", "86400");
   const contentType = newHeaders.get("content-type") || "";
   if (contentType.includes("text/html")) {
     newHeaders.set("Cache-Control", "no-cache, no-store, must-revalidate");
@@ -701,11 +831,13 @@ const worker = {
     let response;
     try {
       if (url.pathname === "/api/auth/register" && request.method === "POST") {
-        response = await onRequestPost$2(context);
+        response = await onRequestPost$3(context);
       } else if (url.pathname === "/api/auth/login" && request.method === "POST") {
-        response = await onRequestPost$1(context);
+        response = await onRequestPost$2(context);
       } else if (url.pathname === "/api/auth/me" && request.method === "GET") {
         response = await onRequestGet$1(context);
+      } else if (url.pathname === "/api/auth/logout" && request.method === "POST") {
+        response = await onRequestPost$1(context);
       } else if (url.pathname === "/api/budget") {
         if (request.method === "GET") response = await onRequestGet(context);
         else if (request.method === "POST") response = await onRequestPost(context);

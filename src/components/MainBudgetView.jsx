@@ -2,6 +2,7 @@ import React from 'react';
 import { useBudget } from '../context/BudgetContext';
 import { ReceiptText, Plus } from 'lucide-react';
 import { InlineEdit } from './InlineEdit';
+import { AccountTransferSummary } from './AccountTransferSummary';
 
 export function MainBudgetView() {
   const {
@@ -40,6 +41,9 @@ export function MainBudgetView() {
           Add / Edit Bills
         </button>
       </div>
+
+      {/* Account Funding & Transfer Summary Table */}
+      <AccountTransferSummary />
 
       {/* Per-account tables */}
       {budget.accounts.map((/** @type {any} */ account) => {

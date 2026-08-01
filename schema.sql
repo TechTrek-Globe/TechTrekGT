@@ -67,6 +67,7 @@ CREATE TABLE IF NOT EXISTS bills (
   due_day INTEGER NOT NULL DEFAULT 1,
   payment_source TEXT NOT NULL DEFAULT 'Auto Pay',
   notes TEXT,
+  is_archived INTEGER NOT NULL DEFAULT 0,
   FOREIGN KEY (household_id) REFERENCES households(id) ON DELETE CASCADE,
   FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE
 );
@@ -92,6 +93,7 @@ CREATE TABLE IF NOT EXISTS line_items (
 CREATE TABLE IF NOT EXISTS loans (
   id TEXT PRIMARY KEY,
   household_id TEXT NOT NULL,
+  name TEXT NOT NULL DEFAULT 'New Loan',
   description TEXT,
   principal REAL NOT NULL DEFAULT 0.0,
   annual_interest_rate REAL NOT NULL DEFAULT 0.0,
@@ -99,5 +101,17 @@ CREATE TABLE IF NOT EXISTS loans (
   monthly_payment REAL NOT NULL DEFAULT 0.0,
   extra_payment REAL NOT NULL DEFAULT 0.0,
   start_date TEXT NOT NULL,
+  is_archived INTEGER NOT NULL DEFAULT 0,
+  interest_compounding TEXT NOT NULL DEFAULT 'monthly',
+  payment_frequency TEXT NOT NULL DEFAULT 'monthly',
+  payment_type TEXT NOT NULL DEFAULT 'amortizing',
+  FOREIGN KEY (household_id) REFERENCES households(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS household_settings (
+  household_id TEXT PRIMARY KEY,
+  theme TEXT NOT NULL DEFAULT 'dark',
+  dashboard_widgets TEXT,
+  hide_dashboard_header INTEGER NOT NULL DEFAULT 0,
   FOREIGN KEY (household_id) REFERENCES households(id) ON DELETE CASCADE
 );

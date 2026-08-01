@@ -301,6 +301,30 @@ async function ensureSchema(db) {
     await db.prepare("CREATE TABLE IF NOT EXISTS household_settings (household_id TEXT PRIMARY KEY, theme TEXT, dashboard_widgets TEXT, hide_dashboard_header INTEGER DEFAULT 0)").run();
   } catch (e) {
   }
+  try {
+    await db.prepare("ALTER TABLE bills ADD COLUMN is_archived INTEGER DEFAULT 0").run();
+  } catch (e) {
+  }
+  try {
+    await db.prepare("ALTER TABLE loans ADD COLUMN name TEXT DEFAULT 'New Loan'").run();
+  } catch (e) {
+  }
+  try {
+    await db.prepare("ALTER TABLE loans ADD COLUMN is_archived INTEGER DEFAULT 0").run();
+  } catch (e) {
+  }
+  try {
+    await db.prepare("ALTER TABLE loans ADD COLUMN interest_compounding TEXT DEFAULT 'monthly'").run();
+  } catch (e) {
+  }
+  try {
+    await db.prepare("ALTER TABLE loans ADD COLUMN payment_frequency TEXT DEFAULT 'monthly'").run();
+  } catch (e) {
+  }
+  try {
+    await db.prepare("ALTER TABLE loans ADD COLUMN payment_type TEXT DEFAULT 'amortizing'").run();
+  } catch (e) {
+  }
 }
 async function onRequestGet(context) {
   const { request, env } = context;
@@ -379,6 +403,7 @@ async function onRequestGet(context) {
       dueDay: b.due_day,
       paymentSource: b.payment_source,
       notes: b.notes || "",
+      isArchived: Boolean(b.is_archived),
       splits: splitsByBill[b.id] || {}
     }));
     const lineItemRows = await env.DB.prepare(
@@ -390,24 +415,22 @@ async function onRequestGet(context) {
       actualAmount: li.actual_amount,
       updatedAt: li.updated_at
     }));
-    const loanRow = await env.DB.prepare("SELECT * FROM loans WHERE household_id = ?").bind(householdId).first();
-    const loan = loanRow ? {
-      description: loanRow.description || "",
-      principal: loanRow.principal || 0,
-      annualInterestRate: loanRow.annual_interest_rate || 0,
-      termMonths: loanRow.term_months || 0,
-      monthlyPayment: loanRow.monthly_payment || 0,
-      extraPayment: loanRow.extra_payment || 0,
-      startDate: loanRow.start_date || ""
-    } : {
-      description: "",
-      principal: 0,
-      annualInterestRate: 0,
-      termMonths: 0,
-      monthlyPayment: 0,
-      extraPayment: 0,
-      startDate: ""
-    };
+    const loanRows = await env.DB.prepare("SELECT * FROM loans WHERE household_id = ?").bind(householdId).all();
+    const loans = (loanRows.results || []).map((l) => ({
+      id: l.id,
+      name: l.name || "",
+      description: l.description || "",
+      principal: l.principal || 0,
+      annualInterestRate: l.annual_interest_rate || 0,
+      termMonths: l.term_months || 0,
+      monthlyPayment: l.monthly_payment || 0,
+      extraPayment: l.extra_payment || 0,
+      startDate: l.start_date || "",
+      isArchived: Boolean(l.is_archived),
+      interestCompounding: l.interest_compounding || "monthly",
+      paymentFrequency: l.payment_frequency || "monthly",
+      paymentType: l.payment_type || "amortizing"
+    }));
     let theme = "dark";
     let dashboardWidgets = null;
     let hideDashboardHeader = false;
@@ -434,7 +457,8 @@ async function onRequestGet(context) {
         people,
         bills,
         lineItems,
-        loan,
+        loan: loans[0] || null,
+        loans,
         theme,
         dashboardWidgets,
         hideDashboardHeader
@@ -532,7 +556,7 @@ async function onRequestPost(context) {
       for (const b of budget.bills) {
         validBillIds.add(b.id);
         await env.DB.prepare(
-          "INSERT INTO bills (id, household_id, account_id, name, amount, period, due_day, payment_source, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+          "INSERT INTO bills (id, household_id, account_id, name, amount, period, due_day, payment_source, notes, is_archived) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         ).bind(
           b.id,
           householdId,
@@ -542,7 +566,8 @@ async function onRequestPost(context) {
           b.period || "Monthly",
           b.dueDay || 1,
           b.paymentSource || "Auto Pay",
-          b.notes || ""
+          b.notes || "",
+          b.isArchived ? 1 : 0
         ).run();
         if (b.splits && typeof b.splits === "object") {
           for (const [personId, percentage] of Object.entries(b.splits)) {
@@ -568,21 +593,48 @@ async function onRequestPost(context) {
         ).bind(li.billId, li.monthKey, li.actualAmount ?? null, li.updatedAt || Date.now()).run();
       }
     }
-    if (budget.loan) {
+    if (Array.isArray(budget.loans)) {
       await env.DB.prepare("DELETE FROM loans WHERE household_id = ?").bind(householdId).run();
-      const loanId = `loan-${Date.now()}`;
+      for (const l of budget.loans) {
+        await env.DB.prepare(
+          "INSERT INTO loans (id, household_id, name, description, principal, annual_interest_rate, term_months, monthly_payment, extra_payment, start_date, is_archived, interest_compounding, payment_frequency, payment_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        ).bind(
+          l.id,
+          householdId,
+          l.name || "New Loan",
+          l.description || "",
+          l.principal || 0,
+          l.annualInterestRate || 0,
+          l.termMonths || 0,
+          l.monthlyPayment || 0,
+          l.extraPayment || 0,
+          l.startDate || "2024-01-01",
+          l.isArchived ? 1 : 0,
+          l.interestCompounding || "monthly",
+          l.paymentFrequency || "monthly",
+          l.paymentType || "amortizing"
+        ).run();
+      }
+    } else if (budget.loan) {
+      await env.DB.prepare("DELETE FROM loans WHERE household_id = ?").bind(householdId).run();
+      const loanId = budget.loan.id || `loan-${Date.now()}`;
       await env.DB.prepare(
-        "INSERT INTO loans (id, household_id, description, principal, annual_interest_rate, term_months, monthly_payment, extra_payment, start_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        "INSERT INTO loans (id, household_id, name, description, principal, annual_interest_rate, term_months, monthly_payment, extra_payment, start_date, is_archived, interest_compounding, payment_frequency, payment_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
       ).bind(
         loanId,
         householdId,
-        budget.loan.description || "Home Loan",
+        budget.loan.name || "New Loan",
+        budget.loan.description || "",
         budget.loan.principal || 0,
         budget.loan.annualInterestRate || 0,
         budget.loan.termMonths || 0,
         budget.loan.monthlyPayment || 0,
         budget.loan.extraPayment || 0,
-        budget.loan.startDate || "2024-01-01"
+        budget.loan.startDate || "2024-01-01",
+        budget.loan.isArchived ? 1 : 0,
+        budget.loan.interestCompounding || "monthly",
+        budget.loan.paymentFrequency || "monthly",
+        budget.loan.paymentType || "amortizing"
       ).run();
     }
     if (budget.theme !== void 0 || budget.dashboardWidgets !== void 0 || budget.hideDashboardHeader !== void 0) {

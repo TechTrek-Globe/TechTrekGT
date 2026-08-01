@@ -43,6 +43,11 @@ export function AuthProvider({ children }) {
         }
       } catch (err) {
         console.error('Failed to verify authentication session:', err);
+        localStorage.removeItem(AUTH_TOKEN_KEY);
+        setToken(null);
+        setUser(null);
+        setHouseholdId(null);
+        setIsAuthModalOpen(true);
       } finally {
         setIsLoading(false);
       }

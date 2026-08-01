@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useBudget } from '../context/BudgetContext';
 import { InlineEdit } from './InlineEdit';
+import { AccountTransferSummary } from './AccountTransferSummary';
 import {
   DollarSign,
   TrendingUp,
@@ -67,8 +68,6 @@ function HealthGauge({ score }) {
     </div>
   );
 }
-
-import { AccountTransferSummary } from './AccountTransferSummary';
 
 const ACCOUNT_COLORS = ['#3b82f6', '#a855f7', '#10b981', '#f59e0b', '#ec4899', '#06b6d4'];
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];

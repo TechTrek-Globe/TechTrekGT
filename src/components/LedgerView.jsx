@@ -76,7 +76,9 @@ function DailySpreadsheetMatrix() {
     updateBill,
     archiveBill,
     unarchiveBill,
-    updateAccount
+    updateAccount,
+    isPersonDepositDay,
+    getPersonDepositAmountForAccount
   } = useBudget();
 
   const today = new Date();
@@ -130,8 +132,7 @@ function DailySpreadsheetMatrix() {
       const dateObj = new Date(selectedYear, selectedMonth, day);
       const dayOfWeekName = DAYS_OF_WEEK[dateObj.getDay()];
       const isMonday = dateObj.getDay() === 1;
-      const isFirstOr15th = day === 1 || day === 15;
-      const isPayday = isMonday || isFirstOr15th;
+      const isPayday = people.some(p => isPersonDepositDay(p, selectedYear, selectedMonth, day));
       const isToday = isCurrentMonthView && day === currentDayNum;
 
       // 1. Credits (Deposits)
@@ -145,14 +146,9 @@ function DailySpreadsheetMatrix() {
         if (customCredit !== undefined) {
           personCredits[p.id] = parseFloat(customCredit) || 0;
         } else {
-          // Auto-calculate payday deposits
-          let autoDep = 0;
-          if (p.payFrequency === 'bi-weekly' && (day === 15 || day === 28 || (isMonday && day <= 14))) {
-            autoDep = p.netPerPay || 0;
-          } else if (p.payFrequency === 'monthly' && day === 1) {
-            autoDep = p.netPerPay || 0;
-          }
-          personCredits[p.id] = autoDep;
+          // Auto-calculate payday deposits based on user-configured schedule & account allocations
+          const isDepDay = isPersonDepositDay(p, selectedYear, selectedMonth, day);
+          personCredits[p.id] = isDepDay ? getPersonDepositAmountForAccount(p, selectedAccountId) : 0;
         }
 
         personExtraCredits[p.id] = customExtraCredit !== undefined ? (parseFloat(customExtraCredit) || 0) : 0;

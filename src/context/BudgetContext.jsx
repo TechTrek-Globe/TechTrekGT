@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import { initialBudgetData } from '../initialData';
 import { fakeDemoBudgetData } from '../demoPresetData';
 import { useAuth } from './AuthContext';
+import { isPersonDepositDay, getPersonDepositAmountForAccount } from '../utils/paydayUtils';
 
 const BudgetContext = createContext();
 
@@ -594,7 +595,9 @@ export function BudgetProvider({ children }) {
         getPersonMonthlyTotal,
         getPersonPerPaycheckTotal,
         getUpcomingBills,
-        getTotalCashOnHand
+        getTotalCashOnHand,
+        isPersonDepositDay,
+        getPersonDepositAmountForAccount
       }}
     >
       {children}

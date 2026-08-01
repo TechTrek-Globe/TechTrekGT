@@ -3,7 +3,7 @@ import { useBudget } from '../context/BudgetContext';
 import { Wallet, Calendar, AlertCircle, ArrowDownRight, ArrowUpRight, Filter } from 'lucide-react';
 
 export function AccountLedgerView() {
-  const { budget, getBillMonthlyCost } = useBudget();
+  const { budget, getBillMonthlyCost, isPersonDepositDay, getPersonDepositAmountForAccount } = useBudget();
   const [selectedAccountId, setSelectedAccountId] = useState(budget.accounts[0]?.id || 'all');
 
   const selectedAccount = budget.accounts.find(a => a.id === selectedAccountId);
@@ -35,23 +35,17 @@ export function AccountLedgerView() {
 
       // Check paycheck deposits
       budget.people.forEach(person => {
-        const netPay = person.netPerPay;
-        if (person.payFrequency === 'bi-weekly') {
-          if (dayOfMonth === 15 || isLastDay) {
-            dailyDeposits += netPay;
+        const isDepDay = isPersonDepositDay(person, date.getFullYear(), date.getMonth(), dayOfMonth);
+        if (isDepDay) {
+          const depositAmt = getPersonDepositAmountForAccount(person, selectedAccountId);
+          if (depositAmt > 0) {
+            dailyDeposits += depositAmt;
             transactions.push({
               title: `Paycheck Deposit - ${person.name}`,
-              amount: netPay,
+              amount: depositAmt,
               type: 'deposit'
             });
           }
-        } else if (person.payFrequency === 'monthly' && dayOfMonth === 1) {
-          dailyDeposits += netPay;
-          transactions.push({
-            title: `Monthly Income - ${person.name}`,
-            amount: netPay,
-            type: 'deposit'
-          });
         }
       });
 

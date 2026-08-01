@@ -29,6 +29,7 @@ import {
 import * as XLSX from 'xlsx';
 import { parseSpreadsheet } from '../utils/spreadsheetParser';
 import { MONTH_SHORT_NAMES, getBillDueMonths, formatBillDueMonths } from '../utils/paydayUtils';
+import { NoYearCalendarPicker } from './NoYearCalendarPicker';
 import { useAuth } from '../context/AuthContext';
 import { PRESET_SECURITY_QUESTIONS } from './AuthModal';
 
@@ -1416,15 +1417,13 @@ export function SettingsModal() {
                           </select>
                         </div>
                         <div>
-                          <label className="block text-xs font-medium text-slate-300 mb-1">Due Day (1-31)</label>
-                          <input
-                            type="number"
-                            min="1"
-                            max="31"
-                            placeholder="15"
-                            value={newBillForm.dueDay}
-                            onChange={e => setNewBillForm({ ...newBillForm, dueDay: parseInt(e.target.value) || 1 })}
-                            className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-100 font-mono text-center focus:outline-none focus:border-emerald-500"
+                          <label className="block text-xs font-medium text-slate-300 mb-1">Due Date & Months</label>
+                          <NoYearCalendarPicker
+                            dueDay={newBillForm.dueDay}
+                            dueMonths={newBillForm.dueMonths}
+                            period={newBillForm.period}
+                            onChange={({ dueDay, dueMonths }) => setNewBillForm({ ...newBillForm, dueDay, dueMonths })}
+                            className="w-full justify-between px-3 py-2 bg-slate-950 rounded-xl"
                           />
                         </div>
                       </div>
@@ -1557,52 +1556,12 @@ export function SettingsModal() {
                                     </select>
                                   </td>
                                   <td className="p-3">
-                                    <div className="flex flex-col gap-1 items-start">
-                                      <div className="flex items-center gap-1">
-                                        <span className="text-[10px] text-slate-400 font-medium">Day</span>
-                                        <input
-                                          type="number"
-                                          min="1"
-                                          max="31"
-                                          value={bill.dueDay}
-                                          onChange={e => updateBill(bill.id, { dueDay: parseInt(e.target.value) || 1 })}
-                                          className="w-12 bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-slate-200 text-center font-mono text-xs"
-                                        />
-                                      </div>
-                                      {bill.period !== 'Monthly' && (
-                                        <div className="flex flex-wrap gap-0.5 max-w-[150px]">
-                                          {MONTH_SHORT_NAMES.map((mName, idx) => {
-                                            const mNum = idx + 1;
-                                            const currentMonths = getBillDueMonths(bill);
-                                            const isSelected = currentMonths.includes(mNum);
-                                            return (
-                                              <button
-                                                key={mNum}
-                                                type="button"
-                                                onClick={() => {
-                                                  let updated;
-                                                  if (isSelected) {
-                                                    if (currentMonths.length === 1) return;
-                                                    updated = currentMonths.filter(m => m !== mNum);
-                                                  } else {
-                                                    updated = [...currentMonths, mNum].sort((a, b) => a - b);
-                                                  }
-                                                  updateBill(bill.id, { dueMonths: updated });
-                                                }}
-                                                title={`Toggle ${mName}`}
-                                                className={`px-1 py-0.5 rounded text-[9px] font-semibold transition-colors cursor-pointer ${
-                                                  isSelected
-                                                    ? 'bg-emerald-600 text-white font-bold'
-                                                    : 'bg-slate-900 text-slate-500 hover:text-slate-300 border border-slate-800'
-                                                }`}
-                                              >
-                                                {mName}
-                                              </button>
-                                            );
-                                          })}
-                                        </div>
-                                      )}
-                                    </div>
+                                    <NoYearCalendarPicker
+                                      dueDay={bill.dueDay}
+                                      dueMonths={bill.dueMonths}
+                                      period={bill.period}
+                                      onChange={({ dueDay, dueMonths }) => updateBill(bill.id, { dueDay, dueMonths })}
+                                    />
                                   </td>
                                   <td className="p-3">
                                     <input

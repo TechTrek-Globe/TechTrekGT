@@ -9,6 +9,7 @@ export default function AuthModal() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -21,9 +22,9 @@ export default function AuthModal() {
 
     try {
       if (isRegistering) {
-        await register(name, email, password);
+        await register(name, email, password, rememberMe);
       } else {
-        await login(email, password);
+        await login(email, password, rememberMe);
       }
     } catch (err) {
       setError(err.message || 'An error occurred. Please try again.');
@@ -118,6 +119,20 @@ export default function AuthModal() {
                 className="w-full pl-10 pr-4 py-2.5 bg-slate-950/80 border border-slate-800 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500/80 focus:ring-1 focus:ring-emerald-500/80 transition-all"
               />
             </div>
+          </div>
+
+          <div className="flex items-center pt-1">
+            <input
+              id="remember_me"
+              name="remember_me"
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              className="h-4 w-4 rounded border-slate-800 bg-slate-950/80 text-emerald-600 focus:ring-emerald-500 focus:ring-opacity-25 accent-emerald-600 cursor-pointer"
+            />
+            <label htmlFor="remember_me" className="ml-2 block text-xs text-slate-300 select-none cursor-pointer">
+              Remember me
+            </label>
           </div>
 
           <button

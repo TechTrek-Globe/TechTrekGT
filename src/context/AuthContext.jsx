@@ -10,7 +10,9 @@ const AUTH_TOKEN_KEY = 'personal_budget_auth_token_v1';
  */
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(() => localStorage.getItem(AUTH_TOKEN_KEY) || null);
+  const [token, setToken] = useState(() => {
+    return localStorage.getItem(AUTH_TOKEN_KEY) || sessionStorage.getItem(AUTH_TOKEN_KEY) || null;
+  });
   const [householdId, setHouseholdId] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -36,6 +38,7 @@ export function AuthProvider({ children }) {
         } else {
           // Token expired or invalid
           localStorage.removeItem(AUTH_TOKEN_KEY);
+          sessionStorage.removeItem(AUTH_TOKEN_KEY);
           setToken(null);
           setUser(null);
           setHouseholdId(null);
@@ -44,6 +47,7 @@ export function AuthProvider({ children }) {
       } catch (err) {
         console.error('Failed to verify authentication session:', err);
         localStorage.removeItem(AUTH_TOKEN_KEY);
+        sessionStorage.removeItem(AUTH_TOKEN_KEY);
         setToken(null);
         setUser(null);
         setHouseholdId(null);
@@ -56,11 +60,50 @@ export function AuthProvider({ children }) {
     verifyCurrentSession();
   }, [token]);
 
+  // Inactivity timeout handler
+  useEffect(() => {
+    if (!token) return;
+
+    const INACTIVITY_TIMEOUT = 15 * 60 * 1000; // 15 minutes
+    
+    const interval = setInterval(() => {
+      const lastActivity = localStorage.getItem('personal_budget_last_activity');
+      if (lastActivity) {
+        const timeElapsed = Date.now() - parseInt(lastActivity, 10);
+        if (timeElapsed > INACTIVITY_TIMEOUT) {
+          logout();
+          alert('You have been logged out due to inactivity.');
+        }
+      } else {
+        localStorage.setItem('personal_budget_last_activity', Date.now().toString());
+      }
+    }, 10000);
+
+    const updateActivity = () => {
+      localStorage.setItem('personal_budget_last_activity', Date.now().toString());
+    };
+
+    const activityEvents = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
+    activityEvents.forEach(event => {
+      window.addEventListener(event, updateActivity);
+    });
+
+    updateActivity();
+
+    return () => {
+      clearInterval(interval);
+      activityEvents.forEach(event => {
+        window.removeEventListener(event, updateActivity);
+      });
+    };
+  }, [token]);
+
   /**
    * @param {string} email
    * @param {string} password
+   * @param {boolean} rememberMe
    */
-  const login = async (email, password) => {
+  const login = async (email, password, rememberMe = false) => {
     const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -72,7 +115,11 @@ export function AuthProvider({ children }) {
       throw new Error(data.error || 'Login failed');
     }
 
-    localStorage.setItem(AUTH_TOKEN_KEY, data.token);
+    if (rememberMe) {
+      localStorage.setItem(AUTH_TOKEN_KEY, data.token);
+    } else {
+      sessionStorage.setItem(AUTH_TOKEN_KEY, data.token);
+    }
     setToken(data.token);
     setUser(data.user);
     setHouseholdId(data.householdId);
@@ -84,8 +131,9 @@ export function AuthProvider({ children }) {
    * @param {string} name
    * @param {string} email
    * @param {string} password
+   * @param {boolean} rememberMe
    */
-  const register = async (name, email, password) => {
+  const register = async (name, email, password, rememberMe = false) => {
     const res = await fetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -97,7 +145,11 @@ export function AuthProvider({ children }) {
       throw new Error(data.error || 'Registration failed');
     }
 
-    localStorage.setItem(AUTH_TOKEN_KEY, data.token);
+    if (rememberMe) {
+      localStorage.setItem(AUTH_TOKEN_KEY, data.token);
+    } else {
+      sessionStorage.setItem(AUTH_TOKEN_KEY, data.token);
+    }
     setToken(data.token);
     setUser(data.user);
     setHouseholdId(data.householdId);
@@ -107,6 +159,8 @@ export function AuthProvider({ children }) {
 
   const logout = () => {
     localStorage.removeItem(AUTH_TOKEN_KEY);
+    sessionStorage.removeItem(AUTH_TOKEN_KEY);
+    localStorage.removeItem('personal_budget_last_activity');
     setToken(null);
     setUser(null);
     setHouseholdId(null);

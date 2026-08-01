@@ -91,7 +91,7 @@ export async function createToken(payload, secret) {
   const encodedHeader = base64UrlEncode(JSON.stringify(header));
   const encodedPayload = base64UrlEncode(JSON.stringify({
     ...payload,
-    exp: Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60) // 30 days expiration
+    exp: Math.floor(Date.now() / 1000) + (5 * 24 * 60 * 60) // 5 days expiration
   }));
 
   const dataToSign = `${encodedHeader}.${encodedPayload}`;

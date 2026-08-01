@@ -610,6 +610,10 @@ export function BudgetProvider({ children }) {
     updateDashboardWidgets(updated);
   };
 
+  const resetDashboardWidgets = () => {
+    updateDashboardWidgets(DEFAULT_DASHBOARD_WIDGETS);
+  };
+
   const theme = budget.theme || 'dark';
 
   const setTheme = (newTheme) => {

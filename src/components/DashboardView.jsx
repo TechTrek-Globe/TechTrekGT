@@ -427,6 +427,25 @@ export function DashboardView() {
                     <span className="text-slate-400 font-sans">Per Paycheck Target:</span>
                     <span className="text-blue-300 font-bold">{fmtMoney(perPaycheckBill)}</span>
                   </div>
+
+                  {p.accountAllocations && typeof p.accountAllocations === 'object' && Object.values(p.accountAllocations).some(v => parseFloat(v) > 0) && (
+                    <div className="pt-2 border-t border-slate-800 space-y-1">
+                      <span className="text-[10px] text-purple-300 font-semibold block font-sans">Direct Deposit Allocations (Per Paycheck):</span>
+                      <div className="space-y-0.5 font-mono text-[10px]">
+                        {Object.entries(p.accountAllocations).map(([accId, amt]) => {
+                          const val = parseFloat(amt) || 0;
+                          if (val <= 0) return null;
+                          const acc = (budget?.accounts || []).find(a => a.id === accId);
+                          return (
+                            <div key={accId} className="flex items-center justify-between text-slate-300">
+                              <span className="font-sans text-slate-400 truncate max-w-[140px]">{acc?.name || 'Account'}:</span>
+                              <span className="font-bold text-emerald-400">{fmtMoney(val)}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}

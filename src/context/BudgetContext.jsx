@@ -449,7 +449,9 @@ export function BudgetProvider({ children }) {
   const getMonthlyNetIncome = (person) => {
     if (!person) return 0;
     const net = parseFloat(person.netPerPay) || 0;
-    if (person.payFrequency === 'bi-weekly') {
+    if (person.payFrequency === 'semi-monthly') {
+      return net * 2;
+    } else if (person.payFrequency === 'bi-weekly') {
       return (net * 26) / 12; // Standard bi-weekly annual to monthly
     } else if (person.payFrequency === 'weekly') {
       return (net * 52) / 12;
@@ -460,7 +462,9 @@ export function BudgetProvider({ children }) {
   const getMonthlyGrossIncome = (person) => {
     if (!person) return 0;
     const gross = parseFloat(person.grossPerPay) || 0;
-    if (person.payFrequency === 'bi-weekly') {
+    if (person.payFrequency === 'semi-monthly') {
+      return gross * 2;
+    } else if (person.payFrequency === 'bi-weekly') {
       return (gross * 26) / 12;
     } else if (person.payFrequency === 'weekly') {
       return (gross * 52) / 12;
@@ -510,7 +514,7 @@ export function BudgetProvider({ children }) {
     const person = (budget.people || []).find(p => p.id === personId);
     if (!person) return 0;
     const monthlyTotal = getPersonMonthlyTotal(personId);
-    if (person.payFrequency === 'bi-weekly') {
+    if (person.payFrequency === 'semi-monthly' || person.payFrequency === 'bi-weekly') {
       return monthlyTotal / 2;
     } else if (person.payFrequency === 'weekly') {
       return (monthlyTotal * 12) / 52;

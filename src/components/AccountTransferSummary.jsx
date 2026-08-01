@@ -16,13 +16,16 @@ export function AccountTransferSummary() {
     budget,
     getAccountMonthlyExpenses,
     getBillPersonMonthlyPortion,
-    getTotalMonthlyExpenses
+    getTotalMonthlyExpenses,
+    getPersonDepositAmountForAccount
   } = useBudget();
 
   // State to toggle which earner columns are visible in this table
   const [visiblePersonIds, setVisiblePersonIds] = useState(() => new Set(budget.people.map(p => p.id)));
   // State for earner portion mode override: personId -> 'monthly' | 'paycheck'
   const [personPortionModes, setPersonPortionModes] = useState({});
+  // Calculation Basis: 'auto' | 'direct_deposit' | 'bills'
+  const [basisMode, setBasisMode] = useState('auto');
 
   // Keep visiblePersonIds in sync if people change
   useEffect(() => {
@@ -66,11 +69,33 @@ export function AccountTransferSummary() {
     // Earner portions for this account
     const earnerPortions = {};
     visiblePeople.forEach(p => {
-      const monthlyPortion = accountBills.reduce((sum, b) => sum + getBillPersonMonthlyPortion(b, p.id), 0);
-      const mode = personPortionModes[p.id] || 'monthly';
-      const rawPortion = mode === 'paycheck'
-        ? (p.payFrequency === 'weekly' ? (monthlyPortion * 12) / 52 : monthlyPortion / 2)
-        : monthlyPortion;
+      const defaultMode = (p.payFrequency === 'bi-weekly' || p.payFrequency === 'semi-monthly' || p.payFrequency === 'weekly') ? 'paycheck' : 'monthly';
+      const mode = personPortionModes[p.id] || defaultMode;
+      const hasAllocations = p.accountAllocations && typeof p.accountAllocations === 'object' && Object.values(p.accountAllocations).some(v => parseFloat(v) > 0);
+
+      let rawPortion = 0;
+      if (basisMode === 'direct_deposit' || (basisMode === 'auto' && hasAllocations)) {
+        const perPaycheckDeposit = getPersonDepositAmountForAccount(p, acc.id);
+        if (mode === 'paycheck') {
+          rawPortion = perPaycheckDeposit;
+        } else {
+          if (p.payFrequency === 'bi-weekly') {
+            rawPortion = (perPaycheckDeposit * 26) / 12;
+          } else if (p.payFrequency === 'weekly') {
+            rawPortion = (perPaycheckDeposit * 52) / 12;
+          } else if (p.payFrequency === 'semi-monthly') {
+            rawPortion = perPaycheckDeposit * 2;
+          } else {
+            rawPortion = perPaycheckDeposit;
+          }
+        }
+      } else {
+        const monthlyPortion = accountBills.reduce((sum, b) => sum + getBillPersonMonthlyPortion(b, p.id), 0);
+        rawPortion = mode === 'paycheck'
+          ? (p.payFrequency === 'weekly' ? (monthlyPortion * 12) / 52 : monthlyPortion / 2)
+          : monthlyPortion;
+      }
+
       earnerPortions[p.id] = Math.round(rawPortion * 100) / 100;
     });
 
@@ -118,37 +143,61 @@ export function AccountTransferSummary() {
             Account Funding &amp; Transfer Breakdown
           </h3>
           <p className={`text-[11px] mt-0.5 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-            Calculates funds to transfer into separate accounts based on earner bill split allocations
+            Calculates funds to transfer into separate accounts based on {basisMode === 'bills' ? 'earner bill split allocations' : 'earner Direct Deposit per-account setup'}
           </p>
         </div>
 
-        {/* Earner Column Display Options */}
-        <div className={`flex flex-wrap items-center gap-2 px-3 py-1.5 rounded-xl border ${
-          isLight ? 'bg-slate-100 border-slate-200' : 'bg-slate-950/80 border-slate-800'
-        }`}>
-          <span className={`text-[10px] font-semibold flex items-center gap-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
-            <Filter className="w-3 h-3 text-emerald-500" />
-            Tracked Earners:
-          </span>
-          {budget.people.map(p => {
-            const isVisible = visiblePersonIds.has(p.id);
-            return (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => togglePersonVisibility(p.id)}
-                className={`px-2 py-0.5 text-[10px] rounded-lg font-medium transition-all flex items-center gap-1.5 ${
-                  isVisible
-                    ? isLight ? 'bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-sm' : 'bg-emerald-950 text-emerald-300 border border-emerald-800/80 shadow-sm'
-                    : isLight ? 'bg-slate-200 text-slate-400 border border-slate-300 line-through opacity-60' : 'bg-slate-900 text-slate-500 border border-slate-800 line-through opacity-60'
-                }`}
-                title={isVisible ? `Hide ${p.name} from transfer summary` : `Show ${p.name} in transfer summary`}
-              >
-                {isVisible ? <Eye className="w-2.5 h-2.5 text-emerald-500" /> : <EyeOff className="w-2.5 h-2.5" />}
-                {p.name.split(' ')[0]}
-              </button>
-            );
-          })}
+        {/* Control Options */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Basis Mode Toggle Pill */}
+          <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border ${
+            isLight ? 'bg-slate-100 border-slate-200' : 'bg-slate-950/80 border-slate-800'
+          }`}>
+            <span className={`text-[10px] font-semibold ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+              Basis:
+            </span>
+            <button
+              type="button"
+              onClick={() => setBasisMode(prev => (prev === 'bills' ? 'direct_deposit' : 'bills'))}
+              className={`px-2 py-0.5 text-[10px] rounded-lg font-bold transition-all ${
+                basisMode === 'bills'
+                  ? isLight ? 'bg-purple-100 text-purple-800 border border-purple-300' : 'bg-purple-950 text-purple-300 border border-purple-800'
+                  : isLight ? 'bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-sm' : 'bg-emerald-950 text-emerald-300 border border-emerald-800/80 shadow-sm'
+              }`}
+              title="Click to toggle between Direct Deposit allocations and Bill Split percentages"
+            >
+              {basisMode === 'bills' ? 'Bill Split Ratios' : 'Direct Deposit Setup'}
+            </button>
+          </div>
+
+          {/* Earner Column Display Options */}
+          <div className={`flex flex-wrap items-center gap-2 px-3 py-1.5 rounded-xl border ${
+            isLight ? 'bg-slate-100 border-slate-200' : 'bg-slate-950/80 border-slate-800'
+          }`}>
+            <span className={`text-[10px] font-semibold flex items-center gap-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+              <Filter className="w-3 h-3 text-emerald-500" />
+              Tracked Earners:
+            </span>
+            {budget.people.map(p => {
+              const isVisible = visiblePersonIds.has(p.id);
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => togglePersonVisibility(p.id)}
+                  className={`px-2 py-0.5 text-[10px] rounded-lg font-medium transition-all flex items-center gap-1.5 ${
+                    isVisible
+                      ? isLight ? 'bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-sm' : 'bg-emerald-950 text-emerald-300 border border-emerald-800/80 shadow-sm'
+                      : isLight ? 'bg-slate-200 text-slate-400 border border-slate-300 line-through opacity-60' : 'bg-slate-900 text-slate-500 border border-slate-800 line-through opacity-60'
+                  }`}
+                  title={isVisible ? `Hide ${p.name} from transfer summary` : `Show ${p.name} in transfer summary`}
+                >
+                  {isVisible ? <Eye className="w-2.5 h-2.5 text-emerald-500" /> : <EyeOff className="w-2.5 h-2.5" />}
+                  {p.name.split(' ')[0]}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
@@ -160,8 +209,12 @@ export function AccountTransferSummary() {
             <tr>
               <th className="p-3 bg-emerald-950 text-emerald-200">Account Name</th>
               {visiblePeople.map(p => {
-                const mode = personPortionModes[p.id] || 'monthly';
+                const defaultMode = (p.payFrequency === 'bi-weekly' || p.payFrequency === 'semi-monthly' || p.payFrequency === 'weekly') ? 'paycheck' : 'monthly';
+                const mode = personPortionModes[p.id] || defaultMode;
                 const isPerPaycheck = mode === 'paycheck';
+                const labelText = isPerPaycheck
+                  ? (p.payFrequency === 'semi-monthly' ? 'Semi-Monthly' : 'Per Paycheck')
+                  : 'Monthly';
                 return (
                   <th key={`hdr-p-${p.id}`} className="p-3 text-right bg-emerald-950">
                     <div className="flex flex-col items-end">
@@ -172,7 +225,7 @@ export function AccountTransferSummary() {
                         className="text-[9px] font-mono text-emerald-400 hover:text-emerald-200 underline transition-colors"
                         title="Click to toggle between Monthly and Per-Paycheck target"
                       >
-                        ({isPerPaycheck ? 'Per Paycheck' : 'Monthly'})
+                        ({labelText})
                       </button>
                     </div>
                   </th>

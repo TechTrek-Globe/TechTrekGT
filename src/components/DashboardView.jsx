@@ -17,6 +17,7 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis } from 'recharts';
+import { fmtMoney, fmtPct } from '../utils/formatters';
 
 // Mini horizontal progress bar
 function ProgressBar({ pct, colorClass = 'bg-blue-500', trackClass = 'bg-slate-800' }) {
@@ -325,13 +326,13 @@ export function DashboardView() {
                   <div className="space-y-1">
                     <div className="flex justify-between text-[10px]">
                       <span className="text-slate-500">Monthly expenses</span>
-                      <span className="font-mono text-rose-400">${monthlyCost.toFixed(2)}</span>
+                      <span className="font-mono text-rose-400">{fmtMoney(monthlyCost)}</span>
                     </div>
                     <ProgressBar pct={pct} colorClass="bg-emerald-500" trackClass="bg-slate-800" />
                     <div className="flex justify-between text-[10px]">
                       <span className="text-slate-500">Proj. end balance</span>
                       <span className={`font-mono font-semibold ${projEnd < 0 ? 'text-rose-400' : 'text-slate-400'}`}>
-                        ${projEnd.toFixed(2)}
+                        {fmtMoney(projEnd)}
                       </span>
                     </div>
                   </div>
@@ -359,7 +360,7 @@ export function DashboardView() {
                   <p className="text-[10px] text-slate-500">{bill.dueDateFormatted}</p>
                 </div>
                 <div className="text-right flex-shrink-0">
-                  <span className="text-xs font-bold text-rose-400 font-mono block">${bill.monthlyCost.toFixed(2)}</span>
+                  <span className="text-xs font-bold text-rose-400 font-mono block">{fmtMoney(bill.monthlyCost)}</span>
                   <span className={`inline-block text-[9px] px-1.5 py-0.5 rounded-full font-semibold mt-0.5 ${
                     bill.daysUntilDue <= 3
                       ? 'bg-rose-950/80 text-rose-300 border border-rose-800'
@@ -533,7 +534,7 @@ export function DashboardView() {
                       <div className="text-right">
                         <span className="text-[9px] text-slate-500 block">Monthly Net Income</span>
                         <div className="text-sm font-black text-indigo-400 font-mono">
-                          ${monthlyNet.toFixed(2)}
+                          {fmtMoney(monthlyNet)}
                         </div>
                       </div>
                     </div>

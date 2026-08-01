@@ -532,13 +532,13 @@ function DailySpreadsheetMatrix() {
                   {/* Beg Balance (High Contrast Blue) */}
                   <td className={`p-2.5 text-right font-black border-r border-blue-900/60 ${
                     row.isToday ? 'bg-amber-950/90 text-amber-200 border-y-2 border-y-amber-400/80' : 'bg-blue-950/40 text-blue-200'
-                  }`}>${row.regBeg.toFixed(2)}</td>
+                  }`}>{fmtMoney(row.regBeg)}</td>
 
                   {/* Extra Beg Balance (High Contrast Blue) */}
                   {showExtraColumns && (
                     <td className={`p-2.5 text-right font-black border-r-2 border-blue-600/80 ${
                       row.isToday ? 'bg-amber-950/90 text-amber-200 border-y-2 border-y-amber-400/80' : 'bg-blue-950/40 text-blue-200'
-                    }`}>${row.extraBeg.toFixed(2)}</td>
+                    }`}>{fmtMoney(row.extraBeg)}</td>
                   )}
 
                 {/* Earner Credits (Inline Editable) */}
@@ -584,16 +584,16 @@ function DailySpreadsheetMatrix() {
                 </td>
 
                 {/* Regular Ending Balance */}
-                <td className="p-2.5 text-right font-bold text-slate-200">${row.regEnding.toFixed(2)}</td>
+                <td className="p-2.5 text-right font-bold text-slate-200">{fmtMoney(row.regEnding)}</td>
 
                 {/* Extra Ending Balance */}
                 {showExtraColumns && (
-                  <td className="p-2.5 text-right text-slate-300">${row.extraEnding.toFixed(2)}</td>
+                  <td className="p-2.5 text-right text-slate-300">{fmtMoney(row.extraEnding)}</td>
                 )}
 
                 {/* Total End Balance */}
                 <td className={`p-2.5 text-right font-extrabold border-r border-slate-800/80 ${row.isDeficit ? 'text-rose-400 animate-pulse' : 'text-blue-300'}`}>
-                  ${row.totalEnd.toFixed(2)}
+                  {fmtMoney(row.totalEnd)}
                 </td>
 
                 {/* Other Description */}
@@ -622,23 +622,23 @@ function DailySpreadsheetMatrix() {
               {/* Credit Subtotals */}
               {people.map(p => (
                 <td key={`tot-cred-${p.id}`} className="p-3 text-right text-emerald-400 font-mono bg-slate-900">
-                  +${columnTotals.regCredits[p.id].toFixed(2)}
+                  +{fmtMoney(columnTotals.regCredits[p.id])}
                 </td>
               ))}
               {showExtraColumns && people.map(p => (
                 <td key={`tot-ext-cred-${p.id}`} className="p-3 text-right text-emerald-300 font-mono bg-slate-900 border-r border-slate-800">
-                  +${columnTotals.extraCredits[p.id].toFixed(2)}
+                  +{fmtMoney(columnTotals.extraCredits[p.id])}
                 </td>
               ))}
 
               {/* Bill Subtotals */}
               {accountBills.map(b => (
                 <td key={`tot-bill-${b.id}`} className="p-3 text-right text-rose-400 font-mono bg-slate-900">
-                  -${columnTotals.bills[b.id].toFixed(2)}
+                  -{fmtMoney(columnTotals.bills[b.id])}
                 </td>
               ))}
               <td className="p-3 text-right text-rose-300 font-mono bg-slate-900 border-r border-slate-800">
-                -${columnTotals.other.toFixed(2)}
+                -{fmtMoney(columnTotals.other)}
               </td>
 
               {/* Ending Balances Subtotals */}
@@ -647,7 +647,7 @@ function DailySpreadsheetMatrix() {
                 <td className="p-3 text-right font-mono text-slate-200 bg-slate-900">&mdash;</td>
               )}
               <td className="p-3 text-right font-mono text-blue-400 font-black bg-slate-900 border-r border-slate-800">
-                ${finalEndingBalance.toFixed(2)}
+                {fmtMoney(finalEndingBalance)}
               </td>
               <td className="p-3 bg-slate-900">&mdash;</td>
             </tr>

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useBudget } from '../context/BudgetContext';
 import { Wallet, Calendar, AlertCircle, ArrowDownRight, ArrowUpRight, Filter } from 'lucide-react';
+import { fmtMoney } from '../utils/formatters';
 
 export function AccountLedgerView() {
   const { budget, getBillMonthlyCost, isPersonDepositDay, getPersonDepositAmountForAccount } = useBudget();
@@ -161,14 +162,14 @@ export function AccountLedgerView() {
                   )}
                 </td>
                 <td className="p-3.5 text-right font-mono font-semibold text-emerald-400">
-                  {day.dailyDeposits > 0 ? `+$${day.dailyDeposits.toFixed(2)}` : '—'}
+                  {day.dailyDeposits > 0 ? `+${fmtMoney(day.dailyDeposits)}` : '—'}
                 </td>
                 <td className="p-3.5 text-right font-mono font-semibold text-rose-400">
-                  {day.dailyDeductions > 0 ? `-$${day.dailyDeductions.toFixed(2)}` : '—'}
+                  {day.dailyDeductions > 0 ? `-${fmtMoney(day.dailyDeductions)}` : '—'}
                 </td>
                 <td className="p-3.5 text-right font-mono font-bold">
                   <span className={day.isNegative ? 'text-rose-400 animate-pulse' : 'text-slate-100'}>
-                    ${day.endingBal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {fmtMoney(day.endingBal)}
                   </span>
                   {day.isNegative && (
                     <span className="ml-2 inline-flex items-center text-[10px] text-rose-400">

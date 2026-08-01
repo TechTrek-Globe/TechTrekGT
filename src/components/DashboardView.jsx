@@ -13,7 +13,8 @@ import {
   EyeOff,
   SlidersHorizontal,
   Maximize2,
-  Minimize2
+  Minimize2,
+  X
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis } from 'recharts';
 import { fmtMoney, fmtPct } from '../utils/formatters';
@@ -78,6 +79,23 @@ export function DashboardView() {
   const [draggedIdx, setDraggedIdx] = useState(null);
   const [dragOverIdx, setDragOverIdx] = useState(null);
   const [resizingSizes, setResizingSizes] = useState({});
+
+  const isLight = budget?.theme === 'light';
+
+  const [hideDashboardHeader, setHideDashboardHeader] = useState(() => {
+    try {
+      return localStorage.getItem('hide_dashboard_header') === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
+
+  const dismissHeader = () => {
+    setHideDashboardHeader(true);
+    try {
+      localStorage.setItem('hide_dashboard_header', 'true');
+    } catch (e) {}
+  };
 
   const today    = new Date();
   const monthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
@@ -440,33 +458,49 @@ export function DashboardView() {
     <div className="space-y-6 animate-fade-in pb-16">
 
       {/* Page Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-slate-900/80 p-6 rounded-2xl border border-slate-800 shadow-xl">
-        <div>
-          <h2 className="text-2xl font-black text-slate-100 flex items-center gap-2">
-            <span>Financial Dashboard</span>
-          </h2>
-          <p className="text-xs text-slate-400 mt-1">
-            {MONTHS[today.getMonth()]} {today.getFullYear()} &bull; Grab the bottom-right corner of any box to resize to any custom size, or drag headers to reorder
-          </p>
-        </div>
+      {!hideDashboardHeader && (
+        <div className={`flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-6 rounded-2xl border shadow-xl relative transition-all ${
+          isLight ? 'bg-white border-slate-200 text-slate-900 shadow-slate-200/50' : 'bg-slate-900/80 border-slate-800 text-slate-100 shadow-slate-950/50'
+        }`}>
+          <div>
+            <h2 className="text-2xl font-black flex items-center gap-2">
+              <span>Financial Dashboard</span>
+            </h2>
+            <p className={`text-xs mt-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+              {MONTHS[today.getMonth()]} {today.getFullYear()} &bull; Drag bottom-right corner to resize, drag headers to reorder
+            </p>
+          </div>
 
-        {/* Header Action Controls */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => { setSettingsTab('dashboard'); setIsSettingsOpen(true); }}
-            className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-blue-900/30 transition-colors flex items-center gap-1.5"
-          >
-            <SlidersHorizontal className="w-3.5 h-3.5" />
-            Customize Layout
-          </button>
-          <button
-            onClick={() => { setSettingsTab('bills'); setIsSettingsOpen(true); }}
-            className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold border border-slate-700 transition-colors"
-          >
-            Manage Bills
-          </button>
+          {/* Header Action Controls */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => { setSettingsTab('dashboard'); setIsSettingsOpen(true); }}
+              className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-blue-900/30 transition-colors flex items-center gap-1.5"
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+              Customize Layout
+            </button>
+            <button
+              onClick={() => { setSettingsTab('bills'); setIsSettingsOpen(true); }}
+              className={`px-3.5 py-2 rounded-xl text-xs font-semibold border transition-colors ${
+                isLight ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300' : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+              }`}
+            >
+              Manage Bills
+            </button>
+            <button
+              type="button"
+              onClick={dismissHeader}
+              className={`p-2 rounded-xl border transition-colors ${
+                isLight ? 'bg-slate-100 hover:bg-rose-100 text-slate-500 hover:text-rose-600 border-slate-300' : 'bg-slate-800 hover:bg-rose-900/50 text-slate-400 hover:text-rose-300 border-slate-700'
+              }`}
+              title="Close / Hide Financial Dashboard header banner (Click X to dismiss)"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Dynamic Responsive Masonry Columns for Dashboard Boxes */}
       <div
@@ -491,6 +525,10 @@ export function DashboardView() {
 
           const isBeingDragged = draggedIdx === idx;
           const isDragOverTarget = dragOverIdx === idx && draggedIdx !== idx;
+
+          const widgetTitle = widget.id === 'kpi_hero' || widget.title === 'Executive KPI Summary'
+            ? 'Key Financial Summary'
+            : widget.title;
 
           const cardStyle = {
             width: customSize.customWidth ? `${customSize.customWidth}px` : undefined,
@@ -531,32 +569,42 @@ export function DashboardView() {
                 setDragOverIdx(null);
               }}
               style={cardStyle}
-              className={`relative ${columnSpanClass} bg-slate-900/90 rounded-2xl border ${
-                isDragOverTarget
-                  ? 'border-blue-500 ring-2 ring-blue-500/80 shadow-2xl scale-[1.01] bg-slate-800/95'
-                  : isBeingDragged
-                  ? 'border-dashed border-blue-400 opacity-40'
-                  : 'border-slate-800/90 shadow-xl hover:border-slate-700'
+              className={`relative ${columnSpanClass} rounded-2xl border ${
+                isLight
+                  ? isDragOverTarget
+                    ? 'bg-blue-50/90 border-blue-500 ring-2 ring-blue-500/80 shadow-2xl scale-[1.01]'
+                    : 'bg-white border-slate-200 shadow-md hover:border-slate-300 text-slate-900'
+                  : isDragOverTarget
+                    ? 'border-blue-500 ring-2 ring-blue-500/80 shadow-2xl scale-[1.01] bg-slate-800/95 text-slate-100'
+                    : 'bg-slate-900/90 border-slate-800/90 shadow-xl hover:border-slate-700 text-slate-100'
               } overflow-hidden transition-all duration-200 group/card`}
             >
               {/* Header Drag, Reorder & Size Bar */}
-              <div className="flex items-center justify-between bg-slate-950/80 px-4 py-2 border-b border-slate-800 text-xs">
-                <div className="flex items-center gap-2 text-slate-300 font-bold cursor-grab active:cursor-grabbing select-none truncate">
-                  <GripVertical className="w-4 h-4 text-slate-500 hover:text-blue-400 transition-colors flex-shrink-0" />
-                  <span className="truncate">{widget.title}</span>
+              <div className={`flex items-center justify-between px-4 py-2 border-b text-xs ${
+                isLight ? 'bg-slate-100/90 border-slate-200 text-slate-700' : 'bg-slate-950/80 border-slate-800 text-slate-300'
+              }`}>
+                <div className={`flex items-center gap-2 font-bold cursor-grab active:cursor-grabbing select-none truncate ${
+                  isLight ? 'text-slate-800' : 'text-slate-300'
+                }`}>
+                  <GripVertical className={`w-4 h-4 flex-shrink-0 transition-colors ${
+                    isLight ? 'text-slate-400 hover:text-blue-600' : 'text-slate-500 hover:text-blue-400'
+                  }`} />
+                  <span className="truncate">{widgetTitle}</span>
                 </div>
 
                 {/* Size Selector, Move Up/Down & Hide Controls */}
                 <div className="flex items-center gap-1.5 flex-shrink-0" onMouseDown={(e) => e.stopPropagation()}>
                   {/* Quick Box Sizing Pill */}
-                  <div className="flex items-center gap-0.5 bg-slate-900 px-1 py-0.5 rounded-lg border border-slate-800">
+                  <div className={`flex items-center gap-0.5 px-1 py-0.5 rounded-lg border ${
+                    isLight ? 'bg-slate-200/80 border-slate-300' : 'bg-slate-900 border-slate-800'
+                  }`}>
                     <button
                       type="button"
                       onClick={() => handlePresetWidth(widget.id, 'third')}
                       className={`px-1.5 py-0.5 text-[9px] font-bold rounded ${
                         currentWidth === 'third' && !customSize.customWidth
                           ? 'bg-blue-600 text-white'
-                          : 'text-slate-400 hover:text-slate-200'
+                          : isLight ? 'text-slate-600 hover:text-slate-900' : 'text-slate-400 hover:text-slate-200'
                       }`}
                       title="Make Box Small (1/3 Width Side Card)"
                     >
@@ -568,7 +616,7 @@ export function DashboardView() {
                       className={`px-1.5 py-0.5 text-[9px] font-bold rounded ${
                         currentWidth === 'half' && !customSize.customWidth
                           ? 'bg-blue-600 text-white'
-                          : 'text-slate-400 hover:text-slate-200'
+                          : isLight ? 'text-slate-600 hover:text-slate-900' : 'text-slate-400 hover:text-slate-200'
                       }`}
                       title="Make Box Medium (1/2 Width)"
                     >
@@ -580,7 +628,7 @@ export function DashboardView() {
                       className={`px-1.5 py-0.5 text-[9px] font-bold rounded ${
                         currentWidth === 'full' && !customSize.customWidth
                           ? 'bg-blue-600 text-white'
-                          : 'text-slate-400 hover:text-slate-200'
+                          : isLight ? 'text-slate-600 hover:text-slate-900' : 'text-slate-400 hover:text-slate-200'
                       }`}
                       title="Make Box Full Width"
                     >
@@ -593,7 +641,9 @@ export function DashboardView() {
                     type="button"
                     disabled={idx === 0}
                     onClick={() => reorderDashboardWidgets(idx, idx - 1)}
-                    className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-30 disabled:hover:bg-slate-800 transition-colors text-[10px] font-mono"
+                    className={`px-1.5 py-0.5 rounded disabled:opacity-30 transition-colors text-[10px] font-mono ${
+                      isLight ? 'bg-slate-200 hover:bg-slate-300 text-slate-700' : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                    }`}
                     title="Move Up"
                   >
                     ▲
@@ -602,20 +652,26 @@ export function DashboardView() {
                     type="button"
                     disabled={idx === dashboardWidgets.length - 1}
                     onClick={() => reorderDashboardWidgets(idx, idx + 1)}
-                    className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-30 disabled:hover:bg-slate-800 transition-colors text-[10px] font-mono"
+                    className={`px-1.5 py-0.5 rounded disabled:opacity-30 transition-colors text-[10px] font-mono ${
+                      isLight ? 'bg-slate-200 hover:bg-slate-300 text-slate-700' : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                    }`}
                     title="Move Down"
                   >
                     ▼
                   </button>
 
-                  {/* Hide */}
+                  {/* Hide / X button */}
                   <button
                     type="button"
                     onClick={() => toggleDashboardWidgetVisibility(widget.id)}
-                    className="p-1 rounded bg-slate-800 hover:bg-rose-900/50 text-slate-400 hover:text-rose-300 transition-colors"
-                    title="Hide this box from Dashboard"
+                    className={`p-1 rounded transition-colors ${
+                      isLight
+                        ? 'bg-slate-200 hover:bg-rose-100 text-slate-600 hover:text-rose-600'
+                        : 'bg-slate-800 hover:bg-rose-900/50 text-slate-400 hover:text-rose-300'
+                    }`}
+                    title="Close / Hide this box from Dashboard (Click X to close)"
                   >
-                    <EyeOff className="w-3.5 h-3.5" />
+                    <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>

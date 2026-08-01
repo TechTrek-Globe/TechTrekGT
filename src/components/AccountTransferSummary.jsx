@@ -99,24 +99,32 @@ export function AccountTransferSummary() {
     earnerGrandTotals[p.id] = accountRows.reduce((sum, r) => sum + (r.earnerPortions[p.id] || 0), 0);
   });
 
+  const isLight = budget?.theme === 'light';
+
   return (
-    <div className="p-5 rounded-2xl glass-panel space-y-4 border border-emerald-900/40 bg-gradient-to-b from-slate-900/90 to-slate-950/90">
+    <div className={`p-5 rounded-2xl space-y-4 border ${
+      isLight ? 'bg-white border-slate-200 text-slate-900 shadow-md' : 'border-emerald-900/40 bg-gradient-to-b from-slate-900/90 to-slate-950/90 text-slate-100'
+    }`}>
       {/* Header & Controls Bar */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 pb-2 border-b border-slate-800">
+      <div className={`flex flex-col md:flex-row md:items-center md:justify-between gap-3 pb-2 border-b ${
+        isLight ? 'border-slate-200' : 'border-slate-800'
+      }`}>
         <div>
-          <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-            <ArrowRightLeft className="w-4 h-4 text-emerald-400" />
+          <h3 className={`text-sm font-bold flex items-center gap-2 ${isLight ? 'text-slate-900' : 'text-slate-100'}`}>
+            <ArrowRightLeft className="w-4 h-4 text-emerald-500" />
             Account Funding &amp; Transfer Breakdown
           </h3>
-          <p className="text-[11px] text-slate-400 mt-0.5">
+          <p className={`text-[11px] mt-0.5 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
             Calculates funds to transfer into separate accounts based on earner bill split allocations
           </p>
         </div>
 
         {/* Earner Column Display Options */}
-        <div className="flex flex-wrap items-center gap-2 bg-slate-950/80 px-3 py-1.5 rounded-xl border border-slate-800">
-          <span className="text-[10px] font-semibold text-slate-400 flex items-center gap-1">
-            <Filter className="w-3 h-3 text-emerald-400" />
+        <div className={`flex flex-wrap items-center gap-2 px-3 py-1.5 rounded-xl border ${
+          isLight ? 'bg-slate-100 border-slate-200' : 'bg-slate-950/80 border-slate-800'
+        }`}>
+          <span className={`text-[10px] font-semibold flex items-center gap-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+            <Filter className="w-3 h-3 text-emerald-500" />
             Tracked Earners:
           </span>
           {budget.people.map(p => {
@@ -128,12 +136,12 @@ export function AccountTransferSummary() {
                 onClick={() => togglePersonVisibility(p.id)}
                 className={`px-2 py-0.5 text-[10px] rounded-lg font-medium transition-all flex items-center gap-1.5 ${
                   isVisible
-                    ? 'bg-emerald-950 text-emerald-300 border border-emerald-800/80 shadow-sm'
-                    : 'bg-slate-900 text-slate-500 border border-slate-800 line-through opacity-60'
+                    ? isLight ? 'bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-sm' : 'bg-emerald-950 text-emerald-300 border border-emerald-800/80 shadow-sm'
+                    : isLight ? 'bg-slate-200 text-slate-400 border border-slate-300 line-through opacity-60' : 'bg-slate-900 text-slate-500 border border-slate-800 line-through opacity-60'
                 }`}
                 title={isVisible ? `Hide ${p.name} from transfer summary` : `Show ${p.name} in transfer summary`}
               >
-                {isVisible ? <Eye className="w-2.5 h-2.5 text-emerald-400" /> : <EyeOff className="w-2.5 h-2.5" />}
+                {isVisible ? <Eye className="w-2.5 h-2.5 text-emerald-500" /> : <EyeOff className="w-2.5 h-2.5" />}
                 {p.name.split(' ')[0]}
               </button>
             );
@@ -142,10 +150,10 @@ export function AccountTransferSummary() {
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto rounded-xl border border-slate-800/80 shadow-lg">
+      <div className={`overflow-x-auto rounded-xl border shadow-lg ${isLight ? 'border-slate-200' : 'border-slate-800/80'}`}>
         <table className="w-full text-left text-xs border-collapse">
-          {/* Header Row: High-Contrast Deep Green Header Bar */}
-          <thead className="bg-emerald-950/90 text-emerald-100 font-extrabold text-[11px] border-b border-emerald-800/60">
+          {/* Header Row: High-Contrast Green Header Bar */}
+          <thead className={`${isLight ? 'bg-emerald-800 text-white' : 'bg-emerald-950/90 text-emerald-100'} font-extrabold text-[11px] border-b ${isLight ? 'border-emerald-700' : 'border-emerald-800/60'}`}>
             <tr>
               <th className="p-3 bg-emerald-950 text-emerald-200">Account Name</th>
               {visiblePeople.map(p => {

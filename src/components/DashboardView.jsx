@@ -56,6 +56,8 @@ function HealthGauge({ score }) {
 export function DashboardView() {
   const {
     budget,
+    hideDashboardHeader,
+    toggleHideDashboardHeader,
     dashboardWidgets,
     toggleDashboardWidgetVisibility,
     setDashboardWidgetWidth,
@@ -82,19 +84,8 @@ export function DashboardView() {
 
   const isLight = budget?.theme === 'light';
 
-  const [hideDashboardHeader, setHideDashboardHeader] = useState(() => {
-    try {
-      return localStorage.getItem('hide_dashboard_header') === 'true';
-    } catch (e) {
-      return false;
-    }
-  });
-
   const dismissHeader = () => {
-    setHideDashboardHeader(true);
-    try {
-      localStorage.setItem('hide_dashboard_header', 'true');
-    } catch (e) {}
+    toggleHideDashboardHeader(true);
   };
 
   const today    = new Date();

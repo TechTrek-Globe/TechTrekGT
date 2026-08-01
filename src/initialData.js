@@ -17,5 +17,6 @@ export const initialBudgetData = {
   bills: [],
   loans: [],
   dashboardWidgets: DEFAULT_DASHBOARD_WIDGETS,
-  theme: 'dark'
+  theme: 'dark',
+  hideDashboardHeader: false
 };

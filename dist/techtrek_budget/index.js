@@ -297,6 +297,10 @@ async function ensureSchema(db) {
     await db.prepare("ALTER TABLE accounts ADD COLUMN balance_as_of_date TEXT").run();
   } catch (e) {
   }
+  try {
+    await db.prepare("CREATE TABLE IF NOT EXISTS household_settings (household_id TEXT PRIMARY KEY, theme TEXT, dashboard_widgets TEXT, hide_dashboard_header INTEGER DEFAULT 0)").run();
+  } catch (e) {
+  }
 }
 async function onRequestGet(context) {
   const { request, env } = context;
@@ -404,6 +408,25 @@ async function onRequestGet(context) {
       extraPayment: 0,
       startDate: ""
     };
+    let theme = "dark";
+    let dashboardWidgets = null;
+    let hideDashboardHeader = false;
+    try {
+      const settingsRow = await env.DB.prepare(
+        "SELECT theme, dashboard_widgets, hide_dashboard_header FROM household_settings WHERE household_id = ?"
+      ).bind(householdId).first();
+      if (settingsRow) {
+        if (settingsRow.theme) theme = settingsRow.theme;
+        if (settingsRow.dashboard_widgets) {
+          try {
+            dashboardWidgets = JSON.parse(settingsRow.dashboard_widgets);
+          } catch (e) {
+          }
+        }
+        hideDashboardHeader = Boolean(settingsRow.hide_dashboard_header);
+      }
+    } catch (e) {
+    }
     return new Response(JSON.stringify({
       success: true,
       budget: {
@@ -411,7 +434,10 @@ async function onRequestGet(context) {
         people,
         bills,
         lineItems,
-        loan
+        loan,
+        theme,
+        dashboardWidgets,
+        hideDashboardHeader
       }
     }), {
       status: 200,
@@ -558,6 +584,21 @@ async function onRequestPost(context) {
         budget.loan.extraPayment || 0,
         budget.loan.startDate || "2024-01-01"
       ).run();
+    }
+    if (budget.theme !== void 0 || budget.dashboardWidgets !== void 0 || budget.hideDashboardHeader !== void 0) {
+      try {
+        const existingSettings = await env.DB.prepare(
+          "SELECT theme, dashboard_widgets, hide_dashboard_header FROM household_settings WHERE household_id = ?"
+        ).bind(householdId).first();
+        const themeVal = budget.theme || existingSettings?.theme || "dark";
+        const widgetsVal = budget.dashboardWidgets ? JSON.stringify(budget.dashboardWidgets) : existingSettings?.dashboard_widgets || "[]";
+        const hideHeaderVal = budget.hideDashboardHeader !== void 0 ? budget.hideDashboardHeader ? 1 : 0 : existingSettings?.hide_dashboard_header || 0;
+        await env.DB.prepare(
+          "INSERT INTO household_settings (household_id, theme, dashboard_widgets, hide_dashboard_header) VALUES (?, ?, ?, ?) ON CONFLICT(household_id) DO UPDATE SET theme = excluded.theme, dashboard_widgets = excluded.dashboard_widgets, hide_dashboard_header = excluded.hide_dashboard_header"
+        ).bind(householdId, themeVal, widgetsVal, hideHeaderVal).run();
+      } catch (e) {
+        console.error("Failed to sync household settings to D1:", e);
+      }
     }
     return new Response(JSON.stringify({ success: true, syncedAt: Date.now() }), {
       status: 200,

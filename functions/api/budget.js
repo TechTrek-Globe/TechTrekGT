@@ -17,6 +17,11 @@ async function ensureSchema(db) {
   } catch (e) {
     // Column already exists
   }
+  try {
+    await db.prepare('CREATE TABLE IF NOT EXISTS household_settings (household_id TEXT PRIMARY KEY, theme TEXT, dashboard_widgets TEXT, hide_dashboard_header INTEGER DEFAULT 0)').run();
+  } catch (e) {
+    // Table already exists
+  }
 }
 
 /**
@@ -150,6 +155,25 @@ export async function onRequestGet(context) {
       startDate: ''
     };
 
+    // Query Household Settings (theme, dashboardWidgets, hideDashboardHeader)
+    let theme = 'dark';
+    let dashboardWidgets = null;
+    let hideDashboardHeader = false;
+    try {
+      const settingsRow = await env.DB.prepare(
+        'SELECT theme, dashboard_widgets, hide_dashboard_header FROM household_settings WHERE household_id = ?'
+      ).bind(householdId).first();
+      if (settingsRow) {
+        if (settingsRow.theme) theme = settingsRow.theme;
+        if (settingsRow.dashboard_widgets) {
+          try { dashboardWidgets = JSON.parse(settingsRow.dashboard_widgets); } catch (e) {}
+        }
+        hideDashboardHeader = Boolean(settingsRow.hide_dashboard_header);
+      }
+    } catch (e) {
+      // Table might not exist yet
+    }
+
     return new Response(JSON.stringify({
       success: true,
       budget: {
@@ -157,7 +181,10 @@ export async function onRequestGet(context) {
         people,
         bills,
         lineItems,
-        loan
+        loan,
+        theme,
+        dashboardWidgets,
+        hideDashboardHeader
       }
     }), {
       status: 200,
@@ -302,6 +329,29 @@ export async function onRequestPost(context) {
         budget.loan.termMonths || 0, budget.loan.monthlyPayment || 0,
         budget.loan.extraPayment || 0, budget.loan.startDate || '2024-01-01'
       ).run();
+    }
+
+    // Sync Household Settings (theme, dashboardWidgets, hideDashboardHeader)
+    if (budget.theme !== undefined || budget.dashboardWidgets !== undefined || budget.hideDashboardHeader !== undefined) {
+      try {
+        const existingSettings = await env.DB.prepare(
+          'SELECT theme, dashboard_widgets, hide_dashboard_header FROM household_settings WHERE household_id = ?'
+        ).bind(householdId).first();
+
+        const themeVal = budget.theme || existingSettings?.theme || 'dark';
+        const widgetsVal = budget.dashboardWidgets
+          ? JSON.stringify(budget.dashboardWidgets)
+          : (existingSettings?.dashboard_widgets || '[]');
+        const hideHeaderVal = budget.hideDashboardHeader !== undefined
+          ? (budget.hideDashboardHeader ? 1 : 0)
+          : (existingSettings?.hide_dashboard_header || 0);
+
+        await env.DB.prepare(
+          'INSERT INTO household_settings (household_id, theme, dashboard_widgets, hide_dashboard_header) VALUES (?, ?, ?, ?) ON CONFLICT(household_id) DO UPDATE SET theme = excluded.theme, dashboard_widgets = excluded.dashboard_widgets, hide_dashboard_header = excluded.hide_dashboard_header'
+        ).bind(householdId, themeVal, widgetsVal, hideHeaderVal).run();
+      } catch (e) {
+        console.error('Failed to sync household settings to D1:', e);
+      }
     }
 
     return new Response(JSON.stringify({ success: true, syncedAt: Date.now() }), {

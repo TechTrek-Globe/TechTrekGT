@@ -30,7 +30,8 @@ export function BudgetProvider({ children }) {
             dashboardWidgets: (Array.isArray(parsed.dashboardWidgets) && parsed.dashboardWidgets.length > 0)
               ? parsed.dashboardWidgets
               : DEFAULT_DASHBOARD_WIDGETS,
-            theme: parsed.theme || 'dark'
+            theme: parsed.theme || 'dark',
+            hideDashboardHeader: Boolean(parsed.hideDashboardHeader)
           };
         }
       }
@@ -68,7 +69,8 @@ export function BudgetProvider({ children }) {
               dashboardWidgets: (Array.isArray(b.dashboardWidgets) && b.dashboardWidgets.length > 0)
                 ? b.dashboardWidgets
                 : DEFAULT_DASHBOARD_WIDGETS,
-              theme: b.theme || 'dark'
+              theme: b.theme || 'dark',
+              hideDashboardHeader: Boolean(b.hideDashboardHeader)
             });
             isInitialCloudFetch.current = true;
           }
@@ -614,6 +616,13 @@ export function BudgetProvider({ children }) {
     updateDashboardWidgets(DEFAULT_DASHBOARD_WIDGETS);
   };
 
+  const toggleHideDashboardHeader = (hideVal) => {
+    setBudget(prev => ({
+      ...prev,
+      hideDashboardHeader: hideVal !== undefined ? Boolean(hideVal) : !prev.hideDashboardHeader
+    }));
+  };
+
   const theme = budget.theme || 'dark';
 
   const setTheme = (newTheme) => {
@@ -641,6 +650,8 @@ export function BudgetProvider({ children }) {
         budget,
         theme,
         setTheme,
+        hideDashboardHeader: Boolean(budget?.hideDashboardHeader),
+        toggleHideDashboardHeader,
         dashboardWidgets: getDashboardWidgets(),
         updateDashboardWidgets,
         toggleDashboardWidgetVisibility,

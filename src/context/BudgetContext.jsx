@@ -17,7 +17,22 @@ export function BudgetProvider({ children }) {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object') {
+          return {
+            ...initialBudgetData,
+            ...parsed,
+            lineItems: Array.isArray(parsed.lineItems) ? parsed.lineItems : [],
+            accounts: Array.isArray(parsed.accounts) ? parsed.accounts : [],
+            people: Array.isArray(parsed.people) ? parsed.people : [],
+            bills: Array.isArray(parsed.bills) ? parsed.bills : [],
+            loans: Array.isArray(parsed.loans) ? parsed.loans : [],
+            dashboardWidgets: (Array.isArray(parsed.dashboardWidgets) && parsed.dashboardWidgets.length > 0)
+              ? parsed.dashboardWidgets
+              : DEFAULT_DASHBOARD_WIDGETS,
+            theme: parsed.theme || 'dark'
+          };
+        }
       }
     } catch (e) {
       console.error('Failed to load budget from localStorage:', e);
@@ -41,7 +56,20 @@ export function BudgetProvider({ children }) {
         if (res.ok) {
           const data = await res.json();
           if (data.success && data.budget) {
-            setBudget(data.budget);
+            const b = data.budget;
+            setBudget({
+              ...initialBudgetData,
+              ...b,
+              lineItems: Array.isArray(b.lineItems) ? b.lineItems : [],
+              accounts: Array.isArray(b.accounts) ? b.accounts : [],
+              people: Array.isArray(b.people) ? b.people : [],
+              bills: Array.isArray(b.bills) ? b.bills : [],
+              loans: Array.isArray(b.loans) ? b.loans : [],
+              dashboardWidgets: (Array.isArray(b.dashboardWidgets) && b.dashboardWidgets.length > 0)
+                ? b.dashboardWidgets
+                : DEFAULT_DASHBOARD_WIDGETS,
+              theme: b.theme || 'dark'
+            });
             isInitialCloudFetch.current = true;
           }
         }

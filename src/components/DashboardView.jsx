@@ -76,6 +76,7 @@ export function DashboardView() {
   } = useBudget();
 
   const [draggedIdx, setDraggedIdx] = useState(null);
+  const [dragOverIdx, setDragOverIdx] = useState(null);
   const [resizingSizes, setResizingSizes] = useState({});
 
   const today    = new Date();
@@ -182,52 +183,52 @@ export function DashboardView() {
     switch (id) {
       case 'kpi_hero':
         return (
-          <div className={`grid gap-4 ${isCompact ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-3'}`}>
-            <div className="p-4 rounded-2xl glass-panel border border-blue-900/30 flex items-center justify-between">
-              <div>
-                <span className="text-[11px] font-medium text-slate-400 block">Total Cash on Hand</span>
-                <div className="text-xl font-black text-slate-100 font-mono mt-1">{fmtMoney(cashOnHand)}</div>
+          <div className="flex flex-wrap gap-3">
+            <div className="flex-1 min-w-[200px] p-4 rounded-2xl glass-panel border border-blue-900/30 flex items-center justify-between gap-3 overflow-hidden">
+              <div className="min-w-0 flex-1">
+                <span className="text-[11px] font-medium text-slate-400 block truncate">Total Cash on Hand</span>
+                <div className="text-xl font-black text-slate-100 font-mono mt-1 truncate">{fmtMoney(cashOnHand)}</div>
                 <div className="flex items-center gap-2 mt-1.5 text-[10px]">
-                  <span className="text-slate-500">Net Flow:</span>
-                  <span className={`font-mono font-bold ${netCashFlow >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  <span className="text-slate-500 flex-shrink-0">Net Flow:</span>
+                  <span className={`font-mono font-bold truncate ${netCashFlow >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                     {netCashFlow >= 0 ? '+' : ''}{fmtMoney(netCashFlow)}
                   </span>
                 </div>
               </div>
-              <div className="w-9 h-9 rounded-xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center">
+              <div className="w-9 h-9 rounded-xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center flex-shrink-0">
                 <DollarSign className="w-5 h-5 text-blue-400" />
               </div>
             </div>
 
-            <div className="p-4 rounded-2xl glass-panel border border-emerald-900/30 flex items-center justify-between">
-              <div>
-                <span className="text-[11px] font-medium text-slate-400 block">Monthly Income vs Expenses</span>
-                <div className="flex items-baseline gap-2 mt-1">
+            <div className="flex-1 min-w-[200px] p-4 rounded-2xl glass-panel border border-emerald-900/30 flex items-center justify-between gap-3 overflow-hidden">
+              <div className="min-w-0 flex-1">
+                <span className="text-[11px] font-medium text-slate-400 block truncate">Monthly Income vs Expenses</span>
+                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 mt-1 min-w-0">
                   <span className="text-xl font-black text-emerald-400 font-mono">{fmtMoney(netIncome)}</span>
-                  <span className="text-[10px] text-slate-500 font-mono">/ {fmtMoney(totalExpenses)} exp</span>
+                  <span className="text-[10px] text-slate-500 font-mono truncate">/ {fmtMoney(totalExpenses)} exp</span>
                 </div>
                 <div className="flex items-center gap-2 mt-1.5 text-[10px]">
-                  <span className="text-slate-500">Earners:</span>
-                  <span className="font-semibold text-slate-300">{(budget?.people || []).length} members</span>
+                  <span className="text-slate-500 flex-shrink-0">Earners:</span>
+                  <span className="font-semibold text-slate-300 truncate">{(budget?.people || []).length} members</span>
                 </div>
               </div>
-              <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center">
+              <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center flex-shrink-0">
                 <TrendingUp className="w-5 h-5 text-emerald-400" />
               </div>
             </div>
 
-            <div className="p-4 rounded-2xl glass-panel border border-purple-900/30 flex items-center justify-between">
-              <div>
-                <span className="text-[11px] font-medium text-slate-400 block">Savings Rate</span>
-                <div className="text-xl font-black text-purple-400 font-mono mt-1">{fmtPct(savingsRate)}</div>
+            <div className="flex-1 min-w-[200px] p-4 rounded-2xl glass-panel border border-purple-900/30 flex items-center justify-between gap-3 overflow-hidden">
+              <div className="min-w-0 flex-1">
+                <span className="text-[11px] font-medium text-slate-400 block truncate">Savings Rate</span>
+                <div className="text-xl font-black text-purple-400 font-mono mt-1 truncate">{fmtPct(savingsRate)}</div>
                 <div className="flex items-center gap-2 mt-1.5 text-[10px]">
-                  <span className="text-slate-500 font-medium">Target 20%:</span>
-                  <span className={savingsRate >= 20 ? 'text-emerald-400 font-semibold' : 'text-amber-400 font-semibold'}>
+                  <span className="text-slate-500 font-medium flex-shrink-0">Target 20%:</span>
+                  <span className={`font-semibold truncate ${savingsRate >= 20 ? 'text-emerald-400' : 'text-amber-400'}`}>
                     {savingsRate >= 20 ? 'On Target' : 'Below Target'}
                   </span>
                 </div>
               </div>
-              <div className="w-9 h-9 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center">
+              <div className="w-9 h-9 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center flex-shrink-0">
                 <PieIcon className="w-5 h-5 text-purple-400" />
               </div>
             </div>
@@ -468,7 +469,18 @@ export function DashboardView() {
       </div>
 
       {/* Dynamic Responsive Grid for Dashboard Boxes */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start">
+      <div
+        onDragOver={(e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDraggedIdx(null);
+          setDragOverIdx(null);
+        }}
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start [grid-auto-flow:dense]"
+      >
         {dashboardWidgets.map((widget, idx) => {
           if (!widget.visible) return null;
           const currentWidth = widget.width || 'third';
@@ -486,6 +498,9 @@ export function DashboardView() {
             }
           }
 
+          const isBeingDragged = draggedIdx === idx;
+          const isDragOverTarget = dragOverIdx === idx && draggedIdx !== idx;
+
           const cardStyle = {
             width: customSize.customWidth ? `${customSize.customWidth}px` : undefined,
             minHeight: customSize.customHeight ? `${customSize.customHeight}px` : undefined,
@@ -500,18 +515,38 @@ export function DashboardView() {
               onDragStart={(e) => {
                 setDraggedIdx(idx);
                 e.dataTransfer.setData('text/plain', idx.toString());
+                e.dataTransfer.effectAllowed = 'move';
               }}
-              onDragOver={(e) => e.preventDefault()}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                if (dragOverIdx !== idx) {
+                  setDragOverIdx(idx);
+                }
+              }}
+              onDragLeave={() => {
+                if (dragOverIdx === idx) {
+                  setDragOverIdx(null);
+                }
+              }}
               onDrop={(e) => {
                 e.preventDefault();
+                e.stopPropagation();
                 const fromIdx = draggedIdx ?? parseInt(e.dataTransfer.getData('text/plain'), 10);
                 if (!isNaN(fromIdx) && fromIdx !== idx) {
                   reorderDashboardWidgets(fromIdx, idx);
                 }
                 setDraggedIdx(null);
+                setDragOverIdx(null);
               }}
               style={cardStyle}
-              className={`relative ${colSpanClass} bg-slate-900/90 rounded-2xl border border-slate-800/90 shadow-xl overflow-hidden transition-all duration-300 hover:border-slate-700 group/card`}
+              className={`relative ${colSpanClass} bg-slate-900/90 rounded-2xl border ${
+                isDragOverTarget
+                  ? 'border-blue-500 ring-2 ring-blue-500/80 shadow-2xl scale-[1.01] bg-slate-800/95'
+                  : isBeingDragged
+                  ? 'border-dashed border-blue-400 opacity-40'
+                  : 'border-slate-800/90 shadow-xl hover:border-slate-700'
+              } overflow-hidden transition-all duration-200 group/card`}
             >
               {/* Header Drag, Reorder & Size Bar */}
               <div className="flex items-center justify-between bg-slate-950/80 px-4 py-2 border-b border-slate-800 text-xs">
@@ -521,7 +556,7 @@ export function DashboardView() {
                 </div>
 
                 {/* Size Selector, Move Up/Down & Hide Controls */}
-                <div className="flex items-center gap-1.5 flex-shrink-0">
+                <div className="flex items-center gap-1.5 flex-shrink-0" onMouseDown={(e) => e.stopPropagation()}>
                   {/* Quick Box Sizing Pill */}
                   <div className="flex items-center gap-0.5 bg-slate-900 px-1 py-0.5 rounded-lg border border-slate-800">
                     <button
@@ -615,6 +650,25 @@ export function DashboardView() {
             </div>
           );
         })}
+
+        {/* Drop Zone Placeholder when dragging a box */}
+        {draggedIdx !== null && (
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = 'move';
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              reorderDashboardWidgets(draggedIdx, dashboardWidgets.length - 1);
+              setDraggedIdx(null);
+              setDragOverIdx(null);
+            }}
+            className="col-span-1 md:col-span-2 lg:col-span-3 border-2 border-dashed border-blue-500/60 bg-blue-950/20 rounded-2xl p-6 flex items-center justify-center text-blue-400 font-bold text-xs shadow-inner animate-pulse cursor-pointer"
+          >
+            Drop box here to move it to the bottom
+          </div>
+        )}
       </div>
 
     </div>

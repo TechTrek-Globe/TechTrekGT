@@ -23,11 +23,16 @@ class ErrorBoundary extends React.Component {
     console.error("Uncaught runtime error:", error, errorInfo);
   }
 
+  handleReload = () => {
+    window.location.href = window.location.origin + window.location.pathname + '?v=' + Date.now();
+  };
+
   handleReset = () => {
     try {
       localStorage.removeItem('personal_budget_app_data_v1');
+      sessionStorage.clear();
     } catch (e) {}
-    window.location.reload();
+    window.location.href = window.location.origin + window.location.pathname + '?v=' + Date.now();
   };
 
   render() {
@@ -51,7 +56,7 @@ class ErrorBoundary extends React.Component {
 
             <div className="flex items-center justify-center gap-3 pt-2">
               <button
-                onClick={() => window.location.reload()}
+                onClick={this.handleReload}
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-xl"
               >
                 Reload Page

@@ -5,21 +5,15 @@ import { AccountTransferSummary } from './AccountTransferSummary';
 import {
   DollarSign,
   TrendingUp,
-  TrendingDown,
   Clock,
   PieChart as PieIcon,
   ShieldCheck,
   Zap,
-  CreditCard,
   GripVertical,
   EyeOff,
-  LayoutDashboard,
-  Users,
-  Calendar,
-  ArrowUpRight,
-  CheckCircle2,
-  AlertTriangle,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Maximize2,
+  Minimize2
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis } from 'recharts';
 import { fmtMoney, fmtPct } from '../utils/formatters';
@@ -63,6 +57,7 @@ export function DashboardView() {
     budget,
     dashboardWidgets,
     toggleDashboardWidgetVisibility,
+    setDashboardWidgetWidth,
     reorderDashboardWidgets,
     setIsSettingsOpen,
     setSettingsTab,
@@ -122,60 +117,72 @@ export function DashboardView() {
     actual: parseFloat(getAccountActualExpenses(acc.id, monthKey).toFixed(2)),
   })).filter(d => d.projected > 0);
 
-  const visibleWidgets = dashboardWidgets.filter(w => w.visible);
+  const getWidthClass = (w) => {
+    switch (w) {
+      case 'full':
+        return 'col-span-1 md:col-span-2 lg:col-span-3';
+      case 'half':
+        return 'col-span-1 md:col-span-2 lg:col-span-2';
+      case 'third':
+      default:
+        return 'col-span-1';
+    }
+  };
 
   // Render widget body content based on widget ID
-  const renderWidgetContent = (id) => {
+  const renderWidgetContent = (id, width) => {
+    const isCompact = width === 'third';
+
     switch (id) {
       case 'kpi_hero':
         return (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-5 rounded-2xl glass-panel border border-blue-900/30 flex items-center justify-between">
+          <div className={`grid gap-4 ${isCompact ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-3'}`}>
+            <div className="p-4 rounded-2xl glass-panel border border-blue-900/30 flex items-center justify-between">
               <div>
-                <span className="text-xs font-medium text-slate-400 block">Total Cash on Hand</span>
-                <div className="text-2xl font-black text-slate-100 font-mono mt-1">{fmtMoney(cashOnHand)}</div>
-                <div className="flex items-center gap-2 mt-2 text-[11px]">
+                <span className="text-[11px] font-medium text-slate-400 block">Total Cash on Hand</span>
+                <div className="text-xl font-black text-slate-100 font-mono mt-1">{fmtMoney(cashOnHand)}</div>
+                <div className="flex items-center gap-2 mt-1.5 text-[10px]">
                   <span className="text-slate-500">Net Flow:</span>
                   <span className={`font-mono font-bold ${netCashFlow >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                     {netCashFlow >= 0 ? '+' : ''}{fmtMoney(netCashFlow)}
                   </span>
                 </div>
               </div>
-              <div className="w-11 h-11 rounded-2xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center">
-                <DollarSign className="w-5.5 h-5.5 text-blue-400" />
+              <div className="w-9 h-9 rounded-xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center">
+                <DollarSign className="w-5 h-5 text-blue-400" />
               </div>
             </div>
 
-            <div className="p-5 rounded-2xl glass-panel border border-emerald-900/30 flex items-center justify-between">
+            <div className="p-4 rounded-2xl glass-panel border border-emerald-900/30 flex items-center justify-between">
               <div>
-                <span className="text-xs font-medium text-slate-400 block">Monthly Income vs Expenses</span>
+                <span className="text-[11px] font-medium text-slate-400 block">Monthly Income vs Expenses</span>
                 <div className="flex items-baseline gap-2 mt-1">
-                  <span className="text-2xl font-black text-emerald-400 font-mono">{fmtMoney(netIncome)}</span>
-                  <span className="text-xs text-slate-500 font-mono">/ {fmtMoney(totalExpenses)} exp</span>
+                  <span className="text-xl font-black text-emerald-400 font-mono">{fmtMoney(netIncome)}</span>
+                  <span className="text-[10px] text-slate-500 font-mono">/ {fmtMoney(totalExpenses)} exp</span>
                 </div>
-                <div className="flex items-center gap-2 mt-2 text-[11px]">
+                <div className="flex items-center gap-2 mt-1.5 text-[10px]">
                   <span className="text-slate-500">Earners:</span>
                   <span className="font-semibold text-slate-300">{budget.people.length} members</span>
                 </div>
               </div>
-              <div className="w-11 h-11 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center">
-                <TrendingUp className="w-5.5 h-5.5 text-emerald-400" />
+              <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center">
+                <TrendingUp className="w-5 h-5 text-emerald-400" />
               </div>
             </div>
 
-            <div className="p-5 rounded-2xl glass-panel border border-purple-900/30 flex items-center justify-between">
+            <div className="p-4 rounded-2xl glass-panel border border-purple-900/30 flex items-center justify-between">
               <div>
-                <span className="text-xs font-medium text-slate-400 block">Savings Rate</span>
-                <div className="text-2xl font-black text-purple-400 font-mono mt-1">{fmtPct(savingsRate)}</div>
-                <div className="flex items-center gap-2 mt-2 text-[11px]">
+                <span className="text-[11px] font-medium text-slate-400 block">Savings Rate</span>
+                <div className="text-xl font-black text-purple-400 font-mono mt-1">{fmtPct(savingsRate)}</div>
+                <div className="flex items-center gap-2 mt-1.5 text-[10px]">
                   <span className="text-slate-500 font-medium">Target 20%:</span>
                   <span className={savingsRate >= 20 ? 'text-emerald-400 font-semibold' : 'text-amber-400 font-semibold'}>
                     {savingsRate >= 20 ? 'On Target' : 'Below Target'}
                   </span>
                 </div>
               </div>
-              <div className="w-11 h-11 rounded-2xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center">
-                <PieIcon className="w-5.5 h-5.5 text-purple-400" />
+              <div className="w-9 h-9 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center">
+                <PieIcon className="w-5 h-5 text-purple-400" />
               </div>
             </div>
           </div>
@@ -186,7 +193,7 @@ export function DashboardView() {
 
       case 'account_cards':
         return (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className={`grid gap-3 ${isCompact ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'}`}>
             {budget.accounts.map((acc, i) => {
               const monthlyCost = getAccountMonthlyExpenses(acc.id);
               const projEnd     = (acc.startingBalance || 0) - monthlyCost;
@@ -195,7 +202,7 @@ export function DashboardView() {
               return (
                 <div
                   key={acc.id}
-                  className="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-3 hover:border-slate-700 transition-all"
+                  className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-2.5 hover:border-slate-700 transition-all"
                   style={{ borderLeftColor: accentColor, borderLeftWidth: '4px' }}
                 >
                   <div className="flex items-start justify-between">
@@ -208,19 +215,19 @@ export function DashboardView() {
                         value={acc.startingBalance || 0}
                         type="currency"
                         onCommit={v => updateAccount(acc.id, { startingBalance: v })}
-                        className="text-sm font-black text-slate-100 font-mono justify-end"
+                        className="text-xs font-black text-slate-100 font-mono justify-end"
                       />
                       <span className="text-[9px] text-slate-500 block mt-0.5">Current Balance</span>
                     </div>
                   </div>
 
-                  <div className="pt-2 border-t border-slate-800/60 flex items-center justify-between text-xs font-mono">
-                    <span className="text-slate-400 font-sans text-[11px]">Monthly Obligations:</span>
+                  <div className="pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] font-mono">
+                    <span className="text-slate-400 font-sans">Monthly Exp:</span>
                     <span className="text-rose-400 font-bold">{fmtMoney(monthlyCost)}</span>
                   </div>
 
-                  <div className="flex items-center justify-between text-xs font-mono">
-                    <span className="text-slate-400 font-sans text-[11px]">Projected End Bal:</span>
+                  <div className="flex items-center justify-between text-[11px] font-mono">
+                    <span className="text-slate-400 font-sans">Projected End:</span>
                     <span className={`font-bold ${projEnd < 0 ? 'text-rose-400' : 'text-slate-200'}`}>
                       {fmtMoney(projEnd)}
                     </span>
@@ -233,21 +240,21 @@ export function DashboardView() {
 
       case 'upcoming_bills':
         return (
-          <div className="space-y-2.5">
+          <div className="space-y-2">
             {upcomingBills.map(bill => (
-              <div key={bill.id} className="p-3 rounded-xl bg-slate-900/60 border border-slate-800/80 flex items-center justify-between gap-3">
+              <div key={bill.id} className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80 flex items-center justify-between gap-2 text-xs">
                 <div className="min-w-0">
-                  <h4 className="text-xs font-bold text-slate-200 truncate">{bill.name}</h4>
+                  <h4 className="font-bold text-slate-200 truncate text-[11px]">{bill.name}</h4>
                   <p className="text-[10px] text-slate-400">{bill.dueDateFormatted}</p>
                 </div>
                 <div className="text-right flex-shrink-0">
-                  <span className="text-xs font-bold text-rose-400 font-mono block">{fmtMoney(bill.monthlyCost)}</span>
-                  <span className={`inline-block text-[9px] px-2 py-0.5 rounded-full font-bold mt-0.5 ${
+                  <span className="font-bold text-rose-400 font-mono text-[11px] block">{fmtMoney(bill.monthlyCost)}</span>
+                  <span className={`inline-block text-[8px] px-1.5 py-0.2 rounded font-bold mt-0.5 ${
                     bill.daysUntilDue <= 3
                       ? 'bg-rose-950 text-rose-300 border border-rose-800'
                       : 'bg-amber-950 text-amber-300 border border-amber-800'
                   }`}>
-                    {bill.daysUntilDue === 0 ? 'Due Today' : `${bill.daysUntilDue} days left`}
+                    {bill.daysUntilDue === 0 ? 'Due Today' : `${bill.daysUntilDue}d left`}
                   </span>
                 </div>
               </div>
@@ -257,26 +264,26 @@ export function DashboardView() {
 
       case 'expenses_pie':
         return (
-          <div className="space-y-4">
-            <div className="h-56">
+          <div className="space-y-3">
+            <div className="h-48">
               {accountChartData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={accountChartData} cx="50%" cy="50%" innerRadius={60} outerRadius={85} paddingAngle={4} dataKey="value">
+                    <Pie data={accountChartData} cx="50%" cy="50%" innerRadius={50} outerRadius={70} paddingAngle={4} dataKey="value">
                       {accountChartData.map((entry, i) => <Cell key={`cell-${i}`} fill={entry.color} />)}
                     </Pie>
                     <Tooltip formatter={(v) => [`$${v.toFixed(2)}`, '']} contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '10px', fontSize: '11px' }} />
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
-                <p className="text-xs text-slate-500 text-center py-12">No expense data available</p>
+                <p className="text-xs text-slate-500 text-center py-10">No expense data</p>
               )}
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2 border-t border-slate-800">
+            <div className="grid grid-cols-2 gap-1.5 pt-2 border-t border-slate-800 text-[11px]">
               {accountChartData.map((d, i) => (
-                <div key={i} className="flex items-center justify-between p-2 bg-slate-900/60 rounded-lg text-xs">
-                  <div className="flex items-center gap-2 truncate">
-                    <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: d.color }} />
+                <div key={i} className="flex items-center justify-between p-1.5 bg-slate-900/60 rounded-lg">
+                  <div className="flex items-center gap-1.5 truncate">
+                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: d.color }} />
                     <span className="text-slate-300 font-medium truncate">{d.name}</span>
                   </div>
                   <span className="font-mono text-slate-200 font-bold">{fmtMoney(d.value)}</span>
@@ -288,30 +295,30 @@ export function DashboardView() {
 
       case 'proj_vs_actual':
         return (
-          <div className="h-64">
+          <div className="h-52">
             {projActualData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={projActualData} barGap={6} barCategoryGap="25%">
-                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} width={50} tickFormatter={v => `$${v >= 1000 ? (v/1000).toFixed(1)+'k' : v}`} />
+                <BarChart data={projActualData} barGap={4} barCategoryGap="20%">
+                  <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 9, fill: '#94a3b8' }} axisLine={false} tickLine={false} width={45} tickFormatter={v => `$${v >= 1000 ? (v/1000).toFixed(1)+'k' : v}`} />
                   <Tooltip formatter={(v) => [`$${v.toFixed(2)}`, '']} contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '10px', fontSize: '11px' }} />
-                  <Bar dataKey="projected" fill="#334155" radius={[4, 4, 0, 0]} name="Projected" />
-                  <Bar dataKey="actual" fill="#10b981" radius={[4, 4, 0, 0]} name="Actual" />
+                  <Bar dataKey="projected" fill="#334155" radius={[3, 3, 0, 0]} name="Projected" />
+                  <Bar dataKey="actual" fill="#10b981" radius={[3, 3, 0, 0]} name="Actual" />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <p className="text-xs text-slate-500 text-center py-12">No data available</p>
+              <p className="text-xs text-slate-500 text-center py-10">No data available</p>
             )}
           </div>
         );
 
       case 'budget_health':
         return (
-          <div className="flex flex-col md:flex-row items-center gap-6">
+          <div className={`flex items-center gap-4 ${isCompact ? 'flex-col text-center' : 'flex-row'}`}>
             <HealthGauge score={healthScore} />
             <div className="flex-1 space-y-2 text-xs w-full">
               <div className="flex items-center justify-between p-2 rounded-lg bg-slate-900/60">
-                <span className="text-slate-400">Savings Rate Target (20%):</span>
+                <span className="text-slate-400">Savings Target (20%):</span>
                 <span className={savingsRate >= 20 ? 'text-emerald-400 font-bold' : 'text-amber-400 font-bold'}>
                   {savingsRate >= 20 ? 'Met' : 'Below Target'}
                 </span>
@@ -319,12 +326,8 @@ export function DashboardView() {
               <div className="flex items-center justify-between p-2 rounded-lg bg-slate-900/60">
                 <span className="text-slate-400">Expense Limit vs Income:</span>
                 <span className={totalExpenses <= netIncome ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
-                  {totalExpenses <= netIncome ? 'Within Limits' : 'Exceeds Net Income'}
+                  {totalExpenses <= netIncome ? 'Within Limits' : 'Exceeds'}
                 </span>
-              </div>
-              <div className="flex items-center justify-between p-2 rounded-lg bg-slate-900/60">
-                <span className="text-slate-400">Account Balances Health:</span>
-                <span className="text-emerald-400 font-bold">All Solvent</span>
               </div>
             </div>
           </div>
@@ -332,36 +335,34 @@ export function DashboardView() {
 
       case 'earner_splits':
         return (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className={`grid gap-3 ${isCompact ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2'}`}>
             {budget.people.map(p => {
               const monthlyInc = getPersonMonthlyTotal(p.id);
-              const perPayInc = getPersonPerPaycheckTotal(p.id);
-              // Calculate earner total bill obligations
               const billPortionSum = budget.bills.reduce((sum, b) => sum + getBillPersonMonthlyPortion(b, p.id), 0);
               const pctOfNet = monthlyInc > 0 ? (billPortionSum / monthlyInc) * 100 : 0;
 
               return (
-                <div key={p.id} className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-3">
+                <div key={p.id} className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2.5 text-xs">
                   <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-bold text-slate-200">{p.name}</h4>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-950 text-purple-300 border border-purple-800 font-semibold capitalize">
+                    <h4 className="font-bold text-slate-200">{p.name}</h4>
+                    <span className="text-[9px] px-2 py-0.5 rounded-full bg-purple-950 text-purple-300 border border-purple-800 font-semibold capitalize">
                       {p.payFrequency}
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 text-[11px] font-mono pt-1">
+                  <div className="grid grid-cols-2 gap-2 text-[10px] font-mono pt-1">
                     <div>
-                      <span className="text-slate-500 block text-[9px] font-sans">Net / Paycheck:</span>
+                      <span className="text-slate-500 block font-sans">Net / Pay:</span>
                       <span className="text-slate-200 font-bold">{fmtMoney(p.netPerPay || 0)}</span>
                     </div>
                     <div>
-                      <span className="text-slate-500 block text-[9px] font-sans">Monthly Net Income:</span>
+                      <span className="text-slate-500 block font-sans">Monthly Net:</span>
                       <span className="text-emerald-400 font-bold">{fmtMoney(monthlyInc)}</span>
                     </div>
                   </div>
 
-                  <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-xs font-mono">
-                    <span className="text-slate-400 font-sans text-[11px]">Monthly Bill Share:</span>
+                  <div className="pt-2 border-t border-slate-800 flex items-center justify-between font-mono text-[11px]">
+                    <span className="text-slate-400 font-sans">Bill Share:</span>
                     <span className="text-purple-300 font-bold">{fmtMoney(billPortionSum)} ({fmtPct(pctOfNet)})</span>
                   </div>
                 </div>
@@ -373,10 +374,10 @@ export function DashboardView() {
       case 'recent_activity':
         return (
           <div className="space-y-2 text-xs font-mono">
-            <p className="text-[11px] text-slate-400 font-sans">Upcoming Earner Paydays &amp; Automated Bill Deductions</p>
+            <p className="text-[10px] text-slate-400 font-sans">Upcoming Earner Paydays &amp; Scheduled Deductions</p>
             {budget.people.map(p => (
-              <div key={p.id} className="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800 flex items-center justify-between">
-                <span className="text-slate-300 font-sans font-medium">{p.name} Payday ({p.payFrequency})</span>
+              <div key={p.id} className="p-2 rounded-lg bg-slate-900/60 border border-slate-800 flex items-center justify-between">
+                <span className="text-slate-300 font-sans font-medium text-[11px]">{p.name} ({p.payFrequency})</span>
                 <span className="text-emerald-400 font-bold">{fmtMoney(getPersonPerPaycheckTotal(p.id))}</span>
               </div>
             ))}
@@ -398,7 +399,7 @@ export function DashboardView() {
             <span>Financial Dashboard</span>
           </h2>
           <p className="text-xs text-slate-400 mt-1">
-            {MONTHS[today.getMonth()]} {today.getFullYear()} &bull; Drag or customize placement of any box on your screen
+            {MONTHS[today.getMonth()]} {today.getFullYear()} &bull; Drag to reorder or click size buttons (1/3 Small, 1/2 Medium, Full) on any box
           </p>
         </div>
 
@@ -420,10 +421,12 @@ export function DashboardView() {
         </div>
       </div>
 
-      {/* Dynamic Widget List with Placement Drag & Drop */}
-      <div className="space-y-6">
+      {/* Dynamic Responsive Grid for Dashboard Boxes */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start">
         {dashboardWidgets.map((widget, idx) => {
           if (!widget.visible) return null;
+          const currentWidth = widget.width || 'third';
+          const colSpanClass = getWidthClass(currentWidth);
 
           return (
             <div
@@ -442,25 +445,63 @@ export function DashboardView() {
                 }
                 setDraggedIdx(null);
               }}
-              className="bg-slate-900/90 rounded-2xl border border-slate-800/90 shadow-xl overflow-hidden transition-all duration-300 hover:border-slate-700"
+              className={`${colSpanClass} bg-slate-900/90 rounded-2xl border border-slate-800/90 shadow-xl overflow-hidden transition-all duration-300 hover:border-slate-700`}
             >
-              {/* Header Drag & Reorder Bar */}
-              <div className="flex items-center justify-between bg-slate-950/80 px-4 py-2.5 border-b border-slate-800 text-xs">
-                <div className="flex items-center gap-2.5 text-slate-300 font-bold cursor-grab active:cursor-grabbing select-none">
-                  <GripVertical className="w-4 h-4 text-slate-500 hover:text-blue-400 transition-colors" />
-                  <span>{widget.title}</span>
-                  <span className="text-[9px] px-2 py-0.5 rounded-full bg-slate-900 text-slate-500 font-normal border border-slate-800 hidden sm:inline-block">
-                    {widget.category}
-                  </span>
+              {/* Header Drag, Reorder & Size Bar */}
+              <div className="flex items-center justify-between bg-slate-950/80 px-4 py-2 border-b border-slate-800 text-xs">
+                <div className="flex items-center gap-2 text-slate-300 font-bold cursor-grab active:cursor-grabbing select-none truncate">
+                  <GripVertical className="w-4 h-4 text-slate-500 hover:text-blue-400 transition-colors flex-shrink-0" />
+                  <span className="truncate">{widget.title}</span>
                 </div>
 
-                {/* Move Up / Down & Hide Controls */}
-                <div className="flex items-center gap-1.5">
+                {/* Size Selector, Move Up/Down & Hide Controls */}
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  {/* Quick Box Sizing Pill */}
+                  <div className="flex items-center gap-0.5 bg-slate-900 px-1 py-0.5 rounded-lg border border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => setDashboardWidgetWidth(widget.id, 'third')}
+                      className={`px-1.5 py-0.5 text-[9px] font-bold rounded ${
+                        currentWidth === 'third'
+                          ? 'bg-blue-600 text-white'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                      title="Make Box Small (1/3 Width Side Card)"
+                    >
+                      1/3
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDashboardWidgetWidth(widget.id, 'half')}
+                      className={`px-1.5 py-0.5 text-[9px] font-bold rounded ${
+                        currentWidth === 'half'
+                          ? 'bg-blue-600 text-white'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                      title="Make Box Medium (1/2 Width)"
+                    >
+                      1/2
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDashboardWidgetWidth(widget.id, 'full')}
+                      className={`px-1.5 py-0.5 text-[9px] font-bold rounded ${
+                        currentWidth === 'full'
+                          ? 'bg-blue-600 text-white'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                      title="Make Box Full Width"
+                    >
+                      Full
+                    </button>
+                  </div>
+
+                  {/* Move Up/Down */}
                   <button
                     type="button"
                     disabled={idx === 0}
                     onClick={() => reorderDashboardWidgets(idx, idx - 1)}
-                    className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-30 disabled:hover:bg-slate-800 transition-colors text-[10px] font-mono"
+                    className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-30 disabled:hover:bg-slate-800 transition-colors text-[10px] font-mono"
                     title="Move Up"
                   >
                     ▲
@@ -469,15 +510,17 @@ export function DashboardView() {
                     type="button"
                     disabled={idx === dashboardWidgets.length - 1}
                     onClick={() => reorderDashboardWidgets(idx, idx + 1)}
-                    className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-30 disabled:hover:bg-slate-800 transition-colors text-[10px] font-mono"
+                    className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-30 disabled:hover:bg-slate-800 transition-colors text-[10px] font-mono"
                     title="Move Down"
                   >
                     ▼
                   </button>
+
+                  {/* Hide */}
                   <button
                     type="button"
                     onClick={() => toggleDashboardWidgetVisibility(widget.id)}
-                    className="p-1 rounded bg-slate-800 hover:bg-rose-900/50 text-slate-400 hover:text-rose-300 transition-colors ml-1"
+                    className="p-1 rounded bg-slate-800 hover:bg-rose-900/50 text-slate-400 hover:text-rose-300 transition-colors"
                     title="Hide this box from Dashboard"
                   >
                     <EyeOff className="w-3.5 h-3.5" />
@@ -486,8 +529,8 @@ export function DashboardView() {
               </div>
 
               {/* Widget Body */}
-              <div className="p-5">
-                {renderWidgetContent(widget.id)}
+              <div className="p-4">
+                {renderWidgetContent(widget.id, currentWidth)}
               </div>
             </div>
           );

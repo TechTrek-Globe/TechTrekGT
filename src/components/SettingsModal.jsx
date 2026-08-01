@@ -31,6 +31,7 @@ export function SettingsModal() {
     budget, 
     dashboardWidgets,
     toggleDashboardWidgetVisibility,
+    setDashboardWidgetWidth,
     reorderDashboardWidgets,
     resetDashboardWidgets,
     isSettingsOpen, 
@@ -397,8 +398,48 @@ export function SettingsModal() {
                       </div>
                     </div>
 
-                    {/* Visibility Toggle */}
+                    {/* Width Selector & Visibility Toggle */}
                     <div className="flex items-center gap-3 self-end sm:self-center">
+                      <div className="flex items-center gap-1 bg-slate-950 px-2 py-1 rounded-xl border border-slate-800">
+                        <span className="text-[10px] text-slate-500 font-semibold mr-1">Size:</span>
+                        <button
+                          type="button"
+                          onClick={() => setDashboardWidgetWidth(widget.id, 'third')}
+                          className={`px-2 py-0.5 text-[10px] font-bold rounded-lg transition-all ${
+                            (widget.width || 'third') === 'third'
+                              ? 'bg-blue-600 text-white shadow-sm'
+                              : 'bg-slate-900 text-slate-400 hover:text-slate-200'
+                          }`}
+                          title="Small (1/3 width side card)"
+                        >
+                          1/3 Small
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDashboardWidgetWidth(widget.id, 'half')}
+                          className={`px-2 py-0.5 text-[10px] font-bold rounded-lg transition-all ${
+                            widget.width === 'half'
+                              ? 'bg-blue-600 text-white shadow-sm'
+                              : 'bg-slate-900 text-slate-400 hover:text-slate-200'
+                          }`}
+                          title="Medium (1/2 width card)"
+                        >
+                          1/2 Medium
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDashboardWidgetWidth(widget.id, 'full')}
+                          className={`px-2 py-0.5 text-[10px] font-bold rounded-lg transition-all ${
+                            widget.width === 'full'
+                              ? 'bg-blue-600 text-white shadow-sm'
+                              : 'bg-slate-900 text-slate-400 hover:text-slate-200'
+                          }`}
+                          title="Full Width"
+                        >
+                          Full
+                        </button>
+                      </div>
+
                       <button
                         type="button"
                         onClick={() => toggleDashboardWidgetVisibility(widget.id)}

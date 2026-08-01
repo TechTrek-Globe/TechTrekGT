@@ -566,6 +566,12 @@ export function BudgetProvider({ children }) {
     updateDashboardWidgets(current);
   };
 
+  const setDashboardWidgetWidth = (id, width) => {
+    const current = getDashboardWidgets();
+    const updated = current.map(w => w.id === id ? { ...w, width } : w);
+    updateDashboardWidgets(updated);
+  };
+
   const resetDashboardWidgets = () => {
     updateDashboardWidgets(DEFAULT_DASHBOARD_WIDGETS);
   };
@@ -577,6 +583,7 @@ export function BudgetProvider({ children }) {
         dashboardWidgets: getDashboardWidgets(),
         updateDashboardWidgets,
         toggleDashboardWidgetVisibility,
+        setDashboardWidgetWidth,
         reorderDashboardWidgets,
         resetDashboardWidgets,
         selectedPersonId,

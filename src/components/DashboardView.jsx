@@ -165,9 +165,19 @@ export function DashboardView() {
     window.addEventListener('mouseup', onMouseUp);
   };
 
+  const handlePresetWidth = (widgetId, widthType) => {
+    setResizingSizes(prev => {
+      const next = { ...prev };
+      delete next[widgetId];
+      return next;
+    });
+    setDashboardWidgetWidth(widgetId, widthType);
+  };
+
   // Render widget body content based on widget ID
-  const renderWidgetContent = (id, width) => {
-    const isCompact = width === 'third';
+  const renderWidgetContent = (id, width, customWidth) => {
+    const effectiveWidth = customWidth || (width === 'full' ? 900 : width === 'half' ? 600 : 320);
+    const isCompact = effectiveWidth < 520;
 
     switch (id) {
       case 'kpi_hero':
@@ -462,12 +472,24 @@ export function DashboardView() {
         {dashboardWidgets.map((widget, idx) => {
           if (!widget.visible) return null;
           const currentWidth = widget.width || 'third';
-          const colSpanClass = getWidthClass(currentWidth);
-
           const customSize = resizingSizes[widget.id] || { customWidth: widget.customWidth, customHeight: widget.customHeight };
+
+          // Dynamically compute column span based on preset OR custom pixel width
+          let colSpanClass = getWidthClass(currentWidth);
+          if (customSize.customWidth) {
+            if (customSize.customWidth > 780) {
+              colSpanClass = 'col-span-1 md:col-span-2 lg:col-span-3';
+            } else if (customSize.customWidth > 440) {
+              colSpanClass = 'col-span-1 md:col-span-2 lg:col-span-2';
+            } else {
+              colSpanClass = 'col-span-1';
+            }
+          }
+
           const cardStyle = {
             width: customSize.customWidth ? `${customSize.customWidth}px` : undefined,
             minHeight: customSize.customHeight ? `${customSize.customHeight}px` : undefined,
+            height: customSize.customHeight ? `${customSize.customHeight}px` : undefined,
             maxWidth: '100%'
           };
 
@@ -489,7 +511,7 @@ export function DashboardView() {
                 setDraggedIdx(null);
               }}
               style={cardStyle}
-              className={`relative ${customSize.customWidth ? '' : colSpanClass} bg-slate-900/90 rounded-2xl border border-slate-800/90 shadow-xl overflow-hidden transition-all duration-300 hover:border-slate-700 group/card`}
+              className={`relative ${colSpanClass} bg-slate-900/90 rounded-2xl border border-slate-800/90 shadow-xl overflow-hidden transition-all duration-300 hover:border-slate-700 group/card`}
             >
               {/* Header Drag, Reorder & Size Bar */}
               <div className="flex items-center justify-between bg-slate-950/80 px-4 py-2 border-b border-slate-800 text-xs">
@@ -504,7 +526,7 @@ export function DashboardView() {
                   <div className="flex items-center gap-0.5 bg-slate-900 px-1 py-0.5 rounded-lg border border-slate-800">
                     <button
                       type="button"
-                      onClick={() => setDashboardWidgetWidth(widget.id, 'third')}
+                      onClick={() => handlePresetWidth(widget.id, 'third')}
                       className={`px-1.5 py-0.5 text-[9px] font-bold rounded ${
                         currentWidth === 'third' && !customSize.customWidth
                           ? 'bg-blue-600 text-white'
@@ -516,7 +538,7 @@ export function DashboardView() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setDashboardWidgetWidth(widget.id, 'half')}
+                      onClick={() => handlePresetWidth(widget.id, 'half')}
                       className={`px-1.5 py-0.5 text-[9px] font-bold rounded ${
                         currentWidth === 'half' && !customSize.customWidth
                           ? 'bg-blue-600 text-white'
@@ -528,7 +550,7 @@ export function DashboardView() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setDashboardWidgetWidth(widget.id, 'full')}
+                      onClick={() => handlePresetWidth(widget.id, 'full')}
                       className={`px-1.5 py-0.5 text-[9px] font-bold rounded ${
                         currentWidth === 'full' && !customSize.customWidth
                           ? 'bg-blue-600 text-white'
@@ -573,8 +595,11 @@ export function DashboardView() {
               </div>
 
               {/* Widget Body */}
-              <div className="p-4">
-                {renderWidgetContent(widget.id, currentWidth)}
+              <div
+                className="p-4 overflow-y-auto"
+                style={{ maxHeight: customSize.customHeight ? `${customSize.customHeight - 42}px` : undefined }}
+              >
+                {renderWidgetContent(widget.id, currentWidth, customSize.customWidth)}
               </div>
 
               {/* Interactive Bottom-Right Corner Drag-to-Resize Handle */}

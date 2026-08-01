@@ -20,9 +20,27 @@ export async function onRequestGet(context) {
       });
     }
 
+    let userDetails = { id: payload.userId, email: payload.email, name: payload.name };
+    if (env.DB) {
+      try {
+        const dbUser = await env.DB.prepare('SELECT id, email, name, security_question, security_answer_hash FROM users WHERE id = ?').bind(payload.userId).first();
+        if (dbUser) {
+          userDetails = {
+            id: dbUser.id,
+            email: dbUser.email,
+            name: dbUser.name,
+            securityQuestion: dbUser.security_question || null,
+            hasSecurityQuestion: Boolean(dbUser.security_question && dbUser.security_answer_hash)
+          };
+        }
+      } catch (e) {
+        // Fallback to JWT payload if query fails
+      }
+    }
+
     return new Response(JSON.stringify({
       success: true,
-      user: { id: payload.userId, email: payload.email, name: payload.name },
+      user: userDetails,
       householdId: payload.householdId
     }), {
       status: 200,

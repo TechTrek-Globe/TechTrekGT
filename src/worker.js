@@ -2,6 +2,10 @@ import { onRequestPost as registerHandler } from '../functions/api/auth/register
 import { onRequestPost as loginHandler } from '../functions/api/auth/login.js';
 import { onRequestGet as meHandler } from '../functions/api/auth/me.js';
 import { onRequestPost as logoutHandler } from '../functions/api/auth/logout.js';
+import { onRequestPost as forgotPasswordHandler } from '../functions/api/auth/forgot-password.js';
+import { onRequestPost as resetPasswordHandler } from '../functions/api/auth/reset-password.js';
+import { onRequestPost as securityQuestionHandler } from '../functions/api/auth/security-question.js';
+import { onRequestPost as updateProfileHandler } from '../functions/api/auth/update-profile.js';
 import { onRequestGet as getBudgetHandler, onRequestPost as postBudgetHandler } from '../functions/api/budget.js';
 
 /**
@@ -79,6 +83,14 @@ export default {
         response = await registerHandler(context);
       } else if (url.pathname === '/api/auth/login' && request.method === 'POST') {
         response = await loginHandler(context);
+      } else if (url.pathname === '/api/auth/forgot-password' && request.method === 'POST') {
+        response = await forgotPasswordHandler(context);
+      } else if (url.pathname === '/api/auth/reset-password' && request.method === 'POST') {
+        response = await resetPasswordHandler(context);
+      } else if (url.pathname === '/api/auth/security-question' && request.method === 'POST') {
+        response = await securityQuestionHandler(context);
+      } else if (url.pathname === '/api/auth/update-profile' && request.method === 'POST') {
+        response = await updateProfileHandler(context);
       } else if (url.pathname === '/api/auth/me' && request.method === 'GET') {
         response = await meHandler(context);
       } else if (url.pathname === '/api/auth/logout' && request.method === 'POST') {

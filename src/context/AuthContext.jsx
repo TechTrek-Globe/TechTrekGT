@@ -109,13 +109,15 @@ export function AuthProvider({ children }) {
    * @param {string} name
    * @param {string} email
    * @param {string} password
+   * @param {string} securityQuestion
+   * @param {string} securityAnswer
    * @param {boolean} rememberMe
    */
-  const register = async (name, email, password, rememberMe = false) => {
+  const register = async (name, email, password, securityQuestion, securityAnswer, rememberMe = false) => {
     const res = await fetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, password, rememberMe })
+      body: JSON.stringify({ name, email, password, securityQuestion, securityAnswer, rememberMe })
     });
 
     const data = await res.json();
@@ -127,6 +129,65 @@ export function AuthProvider({ children }) {
     setUser(data.user);
     setHouseholdId(data.householdId);
     setIsAuthModalOpen(false);
+    return data;
+  };
+
+  const getSecurityQuestion = async (email) => {
+    const res = await fetch('/api/auth/security-question', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Failed to fetch security question');
+    }
+    return data;
+  };
+
+  const forgotPassword = async (email, securityAnswer) => {
+    const res = await fetch('/api/auth/forgot-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, securityAnswer })
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Failed to generate reset code');
+    }
+    return data;
+  };
+
+  const resetPassword = async (email, token, newPassword) => {
+    const res = await fetch('/api/auth/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, token, newPassword })
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Failed to reset password');
+    }
+    return data;
+  };
+
+  const updateProfile = async (profileData) => {
+    const res = await fetch('/api/auth/update-profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(profileData)
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Failed to update profile');
+    }
+    if (data.user) {
+      setUser(data.user);
+    }
     return data;
   };
 
@@ -152,6 +213,10 @@ export function AuthProvider({ children }) {
       setIsAuthModalOpen,
       login,
       register,
+      getSecurityQuestion,
+      forgotPassword,
+      resetPassword,
+      updateProfile,
       logout
     }}>
       {children}

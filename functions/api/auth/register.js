@@ -1,6 +1,16 @@
 import { hashPassword, createToken } from '../../utils/auth.js';
 import { checkRateLimit } from '../../utils/rateLimit.js';
 
+async function ensureUserSchema(db) {
+  if (!db) return;
+  try {
+    await db.prepare('ALTER TABLE users ADD COLUMN security_question TEXT').run();
+  } catch (e) {}
+  try {
+    await db.prepare('ALTER TABLE users ADD COLUMN security_answer_hash TEXT').run();
+  } catch (e) {}
+}
+
 export async function onRequestPost(context) {
   const { request, env } = context;
 
@@ -20,10 +30,10 @@ export async function onRequestPost(context) {
 
   try {
     const body = await request.json();
-    const { email, password, name } = body;
+    const { email, password, name, securityQuestion, securityAnswer } = body;
 
-    if (!email || !password || !name) {
-      return new Response(JSON.stringify({ error: 'Name, email, and password are required' }), {
+    if (!email || !password || !name || !securityQuestion || !securityAnswer) {
+      return new Response(JSON.stringify({ error: 'Name, email, password, security question, and security answer are required.' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' }
       });
@@ -69,6 +79,8 @@ export async function onRequestPost(context) {
       });
     }
 
+    await ensureUserSchema(env.DB);
+
     // Check existing user
     const existing = await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(cleanEmail).first();
     if (existing) {
@@ -81,11 +93,14 @@ export async function onRequestPost(context) {
     const userId = `usr-${crypto.randomUUID()}`;
     const householdId = `hh-${crypto.randomUUID()}`;
     const passwordHash = await hashPassword(password);
+    const cleanSecurityQuestion = securityQuestion.trim();
+    const cleanSecurityAnswer = securityAnswer.trim().toLowerCase();
+    const securityAnswerHash = await hashPassword(cleanSecurityAnswer);
 
-    // Insert User
+    // Insert User with security question and answer hash
     await env.DB.prepare(
-      'INSERT INTO users (id, email, password_hash, name) VALUES (?, ?, ?, ?)'
-    ).bind(userId, cleanEmail, passwordHash, name.trim()).run();
+      'INSERT INTO users (id, email, password_hash, name, security_question, security_answer_hash) VALUES (?, ?, ?, ?, ?, ?)'
+    ).bind(userId, cleanEmail, passwordHash, name.trim(), cleanSecurityQuestion, securityAnswerHash).run();
 
     // Insert Household
     await env.DB.prepare(

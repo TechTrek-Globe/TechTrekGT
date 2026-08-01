@@ -141,7 +141,18 @@ async function checkRateLimit(kv, key, maxRequests, windowSeconds) {
     return { allowed: true };
   }
 }
-async function onRequestPost$3(context) {
+async function ensureUserSchema(db) {
+  if (!db) return;
+  try {
+    await db.prepare("ALTER TABLE users ADD COLUMN security_question TEXT").run();
+  } catch (e) {
+  }
+  try {
+    await db.prepare("ALTER TABLE users ADD COLUMN security_answer_hash TEXT").run();
+  } catch (e) {
+  }
+}
+async function onRequestPost$7(context) {
   const { request, env } = context;
   const ip = request.headers.get("CF-Connecting-IP") || "unknown";
   const rlKey = `register:${ip}`;
@@ -157,9 +168,9 @@ async function onRequestPost$3(context) {
   }
   try {
     const body = await request.json();
-    const { email, password, name } = body;
-    if (!email || !password || !name) {
-      return new Response(JSON.stringify({ error: "Name, email, and password are required" }), {
+    const { email, password, name, securityQuestion, securityAnswer } = body;
+    if (!email || !password || !name || !securityQuestion || !securityAnswer) {
+      return new Response(JSON.stringify({ error: "Name, email, password, security question, and security answer are required." }), {
         status: 400,
         headers: { "Content-Type": "application/json" }
       });
@@ -199,6 +210,7 @@ async function onRequestPost$3(context) {
         headers: { "Content-Type": "application/json" }
       });
     }
+    await ensureUserSchema(env.DB);
     const existing = await env.DB.prepare("SELECT id FROM users WHERE email = ?").bind(cleanEmail).first();
     if (existing) {
       return new Response(JSON.stringify({ error: "User with this email already exists" }), {
@@ -209,9 +221,12 @@ async function onRequestPost$3(context) {
     const userId = `usr-${crypto.randomUUID()}`;
     const householdId = `hh-${crypto.randomUUID()}`;
     const passwordHash = await hashPassword(password);
+    const cleanSecurityQuestion = securityQuestion.trim();
+    const cleanSecurityAnswer = securityAnswer.trim().toLowerCase();
+    const securityAnswerHash = await hashPassword(cleanSecurityAnswer);
     await env.DB.prepare(
-      "INSERT INTO users (id, email, password_hash, name) VALUES (?, ?, ?, ?)"
-    ).bind(userId, cleanEmail, passwordHash, name.trim()).run();
+      "INSERT INTO users (id, email, password_hash, name, security_question, security_answer_hash) VALUES (?, ?, ?, ?, ?, ?)"
+    ).bind(userId, cleanEmail, passwordHash, name.trim(), cleanSecurityQuestion, securityAnswerHash).run();
     await env.DB.prepare(
       "INSERT INTO households (id, name) VALUES (?, ?)"
     ).bind(householdId, `${name.trim()}'s Household`).run();
@@ -257,7 +272,7 @@ async function onRequestPost$3(context) {
     });
   }
 }
-async function onRequestPost$2(context) {
+async function onRequestPost$6(context) {
   const { request, env } = context;
   const ip = request.headers.get("CF-Connecting-IP") || "unknown";
   const rlKey = `login:${ip}`;
@@ -356,9 +371,25 @@ async function onRequestGet$1(context) {
         headers: { "Content-Type": "application/json" }
       });
     }
+    let userDetails = { id: payload.userId, email: payload.email, name: payload.name };
+    if (env.DB) {
+      try {
+        const dbUser = await env.DB.prepare("SELECT id, email, name, security_question, security_answer_hash FROM users WHERE id = ?").bind(payload.userId).first();
+        if (dbUser) {
+          userDetails = {
+            id: dbUser.id,
+            email: dbUser.email,
+            name: dbUser.name,
+            securityQuestion: dbUser.security_question || null,
+            hasSecurityQuestion: Boolean(dbUser.security_question && dbUser.security_answer_hash)
+          };
+        }
+      } catch (e) {
+      }
+    }
     return new Response(JSON.stringify({
       success: true,
-      user: { id: payload.userId, email: payload.email, name: payload.name },
+      user: userDetails,
       householdId: payload.householdId
     }), {
       status: 200,
@@ -372,7 +403,7 @@ async function onRequestGet$1(context) {
     });
   }
 }
-async function onRequestPost$1() {
+async function onRequestPost$5() {
   const cookieOptions = [
     "auth_token=",
     "HttpOnly",
@@ -388,6 +419,401 @@ async function onRequestPost$1() {
       "Set-Cookie": cookieOptions
     }
   });
+}
+async function ensureResetTable(db) {
+  if (!db) return;
+  try {
+    await db.prepare(`
+      CREATE TABLE IF NOT EXISTS password_resets (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        email TEXT NOT NULL,
+        token TEXT NOT NULL,
+        expires_at INTEGER NOT NULL,
+        used INTEGER DEFAULT 0,
+        created_at INTEGER NOT NULL
+      )
+    `).run();
+  } catch (e) {
+  }
+}
+async function onRequestPost$4(context) {
+  const { request, env } = context;
+  const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+  const rlKey = `forgot:${ip}`;
+  const { allowed, retryAfter } = await checkRateLimit(env.RATE_LIMIT_KV, rlKey, 5, 600);
+  if (!allowed) {
+    return new Response(JSON.stringify({ error: "Too many reset attempts. Please wait." }), {
+      status: 429,
+      headers: {
+        "Content-Type": "application/json",
+        "Retry-After": String(retryAfter)
+      }
+    });
+  }
+  try {
+    const body = await request.json();
+    const { email, securityAnswer } = body;
+    if (!email) {
+      return new Response(JSON.stringify({ error: "Email address is required." }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+    const cleanEmail = email.trim().toLowerCase();
+    const EMAIL_REGEX = /^[^\s@]{1,64}@[^\s@]{1,253}\.[^\s@]{2,}$/;
+    if (!EMAIL_REGEX.test(cleanEmail)) {
+      return new Response(JSON.stringify({ error: "Invalid email address format." }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+    if (!env.DB) {
+      return new Response(JSON.stringify({ error: "Database binding DB not available." }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+    await ensureResetTable(env.DB);
+    const user = await env.DB.prepare(
+      "SELECT id, email, name, security_question, security_answer_hash FROM users WHERE email = ?"
+    ).bind(cleanEmail).first();
+    if (!user) {
+      return new Response(JSON.stringify({ error: "No account found with this email address." }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+    if (user.security_answer_hash) {
+      if (!securityAnswer) {
+        return new Response(JSON.stringify({ error: "Security answer is required." }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+      const cleanAnswer = securityAnswer.trim().toLowerCase();
+      const isValidAnswer = await verifyPassword(cleanAnswer, user.security_answer_hash);
+      if (!isValidAnswer) {
+        return new Response(JSON.stringify({ error: "Incorrect security answer. Please try again." }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+    }
+    const randomArray = new Uint32Array(1);
+    crypto.getRandomValues(randomArray);
+    const resetCode = String(randomArray[0] % 9e5 + 1e5);
+    const resetId = `rst-${crypto.randomUUID()}`;
+    const now = Date.now();
+    const expiresAt = now + 15 * 60 * 1e3;
+    await env.DB.prepare("UPDATE password_resets SET used = 1 WHERE email = ? AND used = 0").bind(cleanEmail).run();
+    await env.DB.prepare(
+      "INSERT INTO password_resets (id, user_id, email, token, expires_at, used, created_at) VALUES (?, ?, ?, ?, ?, 0, ?)"
+    ).bind(resetId, user.id, cleanEmail, resetCode, expiresAt, now).run();
+    return new Response(JSON.stringify({
+      success: true,
+      message: "Password reset code generated successfully.",
+      resetToken: resetCode,
+      email: cleanEmail
+    }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" }
+    });
+  } catch (err) {
+    console.error("[forgot-password] error:", err);
+    return new Response(JSON.stringify({ error: "An internal error occurred. Please try again." }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" }
+    });
+  }
+}
+async function onRequestPost$3(context) {
+  const { request, env } = context;
+  const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+  const rlKey = `reset:${ip}`;
+  const { allowed, retryAfter } = await checkRateLimit(env.RATE_LIMIT_KV, rlKey, 5, 600);
+  if (!allowed) {
+    return new Response(JSON.stringify({ error: "Too many password reset attempts. Please wait." }), {
+      status: 429,
+      headers: {
+        "Content-Type": "application/json",
+        "Retry-After": String(retryAfter)
+      }
+    });
+  }
+  try {
+    const body = await request.json();
+    const { email, token, newPassword } = body;
+    if (!email || !token || !newPassword) {
+      return new Response(JSON.stringify({ error: "Email, reset token, and new password are required." }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanToken = token.trim();
+    if (newPassword.length < 8) {
+      return new Response(JSON.stringify({ error: "New password must be at least 8 characters long." }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+    if (!/[A-Z]/.test(newPassword) || !/[0-9]/.test(newPassword)) {
+      return new Response(JSON.stringify({ error: "New password must contain at least one uppercase letter and one number." }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+    if (newPassword.length > 128) {
+      return new Response(JSON.stringify({ error: "Password exceeds maximum allowed length." }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+    if (!env.DB) {
+      return new Response(JSON.stringify({ error: "Database binding DB not available." }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+    const resetRecord = await env.DB.prepare(
+      "SELECT * FROM password_resets WHERE email = ? AND token = ? AND used = 0"
+    ).bind(cleanEmail, cleanToken).first();
+    if (!resetRecord) {
+      return new Response(JSON.stringify({ error: "Invalid or expired password reset token." }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+    if (resetRecord.expires_at < Date.now()) {
+      await env.DB.prepare("UPDATE password_resets SET used = 1 WHERE id = ?").bind(resetRecord.id).run();
+      return new Response(JSON.stringify({ error: "Password reset token has expired. Please request a new code." }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+    const user = await env.DB.prepare("SELECT id FROM users WHERE email = ?").bind(cleanEmail).first();
+    if (!user) {
+      return new Response(JSON.stringify({ error: "User account not found." }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+    const newPasswordHash = await hashPassword(newPassword);
+    await env.DB.prepare(
+      "UPDATE users SET password_hash = ? WHERE id = ?"
+    ).bind(newPasswordHash, user.id).run();
+    await env.DB.prepare("UPDATE password_resets SET used = 1 WHERE id = ?").bind(resetRecord.id).run();
+    return new Response(JSON.stringify({
+      success: true,
+      message: "Password reset successfully. You can now sign in with your new password."
+    }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" }
+    });
+  } catch (err) {
+    console.error("[reset-password] error:", err);
+    return new Response(JSON.stringify({ error: "An internal error occurred. Please try again." }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" }
+    });
+  }
+}
+async function onRequestPost$2(context) {
+  const { request, env } = context;
+  const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+  const rlKey = `sec-q:${ip}`;
+  const { allowed, retryAfter } = await checkRateLimit(env.RATE_LIMIT_KV, rlKey, 10, 60);
+  if (!allowed) {
+    return new Response(JSON.stringify({ error: "Too many requests. Please wait." }), {
+      status: 429,
+      headers: {
+        "Content-Type": "application/json",
+        "Retry-After": String(retryAfter)
+      }
+    });
+  }
+  try {
+    const body = await request.json();
+    const { email } = body;
+    if (!email) {
+      return new Response(JSON.stringify({ error: "Email address is required." }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+    const cleanEmail = email.trim().toLowerCase();
+    if (!env.DB) {
+      return new Response(JSON.stringify({ error: "Database binding DB not available." }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+    const user = await env.DB.prepare(
+      "SELECT security_question FROM users WHERE email = ?"
+    ).bind(cleanEmail).first();
+    if (!user) {
+      return new Response(JSON.stringify({ error: "No account found with this email address." }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+    return new Response(JSON.stringify({
+      success: true,
+      email: cleanEmail,
+      securityQuestion: user.security_question || null,
+      hasSecurityQuestion: Boolean(user.security_question)
+    }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" }
+    });
+  } catch (err) {
+    console.error("[security-question] error:", err);
+    return new Response(JSON.stringify({ error: "An internal error occurred." }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" }
+    });
+  }
+}
+async function onRequestPost$1(context) {
+  const { request, env } = context;
+  try {
+    const token = getTokenFromRequest(request);
+    if (!token) {
+      return new Response(JSON.stringify({ error: "Unauthorized: Missing token" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+    const payload = await verifyToken(token, env.JWT_SECRET);
+    if (!payload || !payload.userId) {
+      return new Response(JSON.stringify({ error: "Unauthorized: Invalid token" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+    if (!env.DB) {
+      return new Response(JSON.stringify({ error: "Database binding DB not available." }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+    const body = await request.json();
+    const { name, email, securityQuestion, securityAnswer, currentPassword, newPassword } = body;
+    const user = await env.DB.prepare("SELECT * FROM users WHERE id = ?").bind(payload.userId).first();
+    if (!user) {
+      return new Response(JSON.stringify({ error: "User not found." }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+    let updatedName = user.name;
+    let updatedEmail = user.email;
+    let updatedQuestion = user.security_question;
+    let updatedAnswerHash = user.security_answer_hash;
+    let updatedPasswordHash = user.password_hash;
+    if (name && typeof name === "string" && name.trim()) {
+      updatedName = name.trim();
+    }
+    if (email && typeof email === "string" && email.trim()) {
+      const cleanEmail = email.trim().toLowerCase();
+      const EMAIL_REGEX = /^[^\s@]{1,64}@[^\s@]{1,253}\.[^\s@]{2,}$/;
+      if (!EMAIL_REGEX.test(cleanEmail)) {
+        return new Response(JSON.stringify({ error: "Invalid email address format." }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+      if (cleanEmail !== user.email) {
+        const existing = await env.DB.prepare("SELECT id FROM users WHERE email = ? AND id != ?").bind(cleanEmail, user.id).first();
+        if (existing) {
+          return new Response(JSON.stringify({ error: "Email address is already in use by another account." }), {
+            status: 409,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+        updatedEmail = cleanEmail;
+      }
+    }
+    if (securityQuestion && typeof securityQuestion === "string" && securityQuestion.trim()) {
+      updatedQuestion = securityQuestion.trim();
+      if (securityAnswer && typeof securityAnswer === "string" && securityAnswer.trim()) {
+        const cleanAnswer = securityAnswer.trim().toLowerCase();
+        updatedAnswerHash = await hashPassword(cleanAnswer);
+      }
+    }
+    if (newPassword && typeof newPassword === "string" && newPassword.length > 0) {
+      if (user.password_hash) {
+        if (!currentPassword) {
+          return new Response(JSON.stringify({ error: "Current password is required to set a new password." }), {
+            status: 400,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+        const isCurrentValid = await verifyPassword(currentPassword, user.password_hash);
+        if (!isCurrentValid) {
+          return new Response(JSON.stringify({ error: "Current password is incorrect." }), {
+            status: 400,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+      }
+      if (newPassword.length < 8) {
+        return new Response(JSON.stringify({ error: "New password must be at least 8 characters long." }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+      if (!/[A-Z]/.test(newPassword) || !/[0-9]/.test(newPassword)) {
+        return new Response(JSON.stringify({ error: "New password must contain at least one uppercase letter and one number." }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+      updatedPasswordHash = await hashPassword(newPassword);
+    }
+    await env.DB.prepare(`
+      UPDATE users 
+      SET name = ?, email = ?, security_question = ?, security_answer_hash = ?, password_hash = ?
+      WHERE id = ?
+    `).bind(updatedName, updatedEmail, updatedQuestion, updatedAnswerHash, updatedPasswordHash, user.id).run();
+    const newToken = await createToken({
+      userId: user.id,
+      email: updatedEmail,
+      householdId: payload.householdId,
+      name: updatedName
+    }, env.JWT_SECRET);
+    const cookieOptions = [
+      `auth_token=${newToken}`,
+      "HttpOnly",
+      "Secure",
+      "SameSite=Strict",
+      "Path=/"
+    ].join("; ");
+    return new Response(JSON.stringify({
+      success: true,
+      message: "Profile updated successfully.",
+      user: {
+        id: user.id,
+        email: updatedEmail,
+        name: updatedName,
+        securityQuestion: updatedQuestion,
+        hasSecurityQuestion: Boolean(updatedQuestion && updatedAnswerHash)
+      }
+    }), {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        "Set-Cookie": cookieOptions
+      }
+    });
+  } catch (err) {
+    console.error("[update-profile] error:", err);
+    return new Response(JSON.stringify({ error: "An internal error occurred." }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" }
+    });
+  }
 }
 let schemaEnsured = false;
 async function ensureSchema(db) {
@@ -831,13 +1257,21 @@ const worker = {
     let response;
     try {
       if (url.pathname === "/api/auth/register" && request.method === "POST") {
-        response = await onRequestPost$3(context);
+        response = await onRequestPost$7(context);
       } else if (url.pathname === "/api/auth/login" && request.method === "POST") {
+        response = await onRequestPost$6(context);
+      } else if (url.pathname === "/api/auth/forgot-password" && request.method === "POST") {
+        response = await onRequestPost$4(context);
+      } else if (url.pathname === "/api/auth/reset-password" && request.method === "POST") {
+        response = await onRequestPost$3(context);
+      } else if (url.pathname === "/api/auth/security-question" && request.method === "POST") {
         response = await onRequestPost$2(context);
+      } else if (url.pathname === "/api/auth/update-profile" && request.method === "POST") {
+        response = await onRequestPost$1(context);
       } else if (url.pathname === "/api/auth/me" && request.method === "GET") {
         response = await onRequestGet$1(context);
       } else if (url.pathname === "/api/auth/logout" && request.method === "POST") {
-        response = await onRequestPost$1(context);
+        response = await onRequestPost$5(context);
       } else if (url.pathname === "/api/budget") {
         if (request.method === "GET") response = await onRequestGet(context);
         else if (request.method === "POST") response = await onRequestPost(context);

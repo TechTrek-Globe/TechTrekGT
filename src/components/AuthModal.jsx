@@ -7,7 +7,7 @@ export default function AuthModal() {
   const [isRegistering, setIsRegistering] = useState(false);
   
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(() => localStorage.getItem('personal_budget_saved_email') || '');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');

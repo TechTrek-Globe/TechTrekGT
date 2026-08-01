@@ -120,6 +120,7 @@ export function AuthProvider({ children }) {
     } else {
       sessionStorage.setItem(AUTH_TOKEN_KEY, data.token);
     }
+    localStorage.setItem('personal_budget_saved_email', email);
     setToken(data.token);
     setUser(data.user);
     setHouseholdId(data.householdId);
@@ -150,6 +151,7 @@ export function AuthProvider({ children }) {
     } else {
       sessionStorage.setItem(AUTH_TOKEN_KEY, data.token);
     }
+    localStorage.setItem('personal_budget_saved_email', email);
     setToken(data.token);
     setUser(data.user);
     setHouseholdId(data.householdId);

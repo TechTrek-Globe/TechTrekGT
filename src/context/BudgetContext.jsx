@@ -76,20 +76,34 @@ export function BudgetProvider({ children }) {
           if (data.success && data.budget) {
             const b = data.budget;
             isInitialCloudFetch.current = true;
-            setBudget({
-              ...initialBudgetData,
-              ...b,
-              dailyMatrix: (b.dailyMatrix && typeof b.dailyMatrix === 'object') ? b.dailyMatrix : {},
-              lineItems: Array.isArray(b.lineItems) ? b.lineItems : [],
-              accounts: Array.isArray(b.accounts) ? b.accounts : [],
-              people: Array.isArray(b.people) ? b.people : [],
-              bills: Array.isArray(b.bills) ? b.bills : [],
-              loans: Array.isArray(b.loans) ? b.loans : [],
-              dashboardWidgets: (Array.isArray(b.dashboardWidgets) && b.dashboardWidgets.length > 0)
-                ? b.dashboardWidgets
-                : DEFAULT_DASHBOARD_WIDGETS,
-              theme: b.theme || 'dark',
-              hideDashboardHeader: Boolean(b.hideDashboardHeader)
+            setBudget(prev => {
+              const cloudBills = Array.isArray(b.bills) ? b.bills : [];
+              const cloudAccounts = Array.isArray(b.accounts) ? b.accounts : [];
+              const cloudPeople = Array.isArray(b.people) ? b.people : [];
+
+              // Crucial Safety Guard: Never overwrite non-empty local state with empty cloud state
+              const mergedBills = (cloudBills.length === 0 && prev.bills && prev.bills.length > 0)
+                ? prev.bills : cloudBills;
+              const mergedAccounts = (cloudAccounts.length === 0 && prev.accounts && prev.accounts.length > 0)
+                ? prev.accounts : cloudAccounts;
+              const mergedPeople = (cloudPeople.length === 0 && prev.people && prev.people.length > 0)
+                ? prev.people : cloudPeople;
+
+              return {
+                ...initialBudgetData,
+                ...b,
+                dailyMatrix: (b.dailyMatrix && typeof b.dailyMatrix === 'object') ? b.dailyMatrix : (prev.dailyMatrix || {}),
+                lineItems: Array.isArray(b.lineItems) && b.lineItems.length > 0 ? b.lineItems : (prev.lineItems || []),
+                accounts: mergedAccounts,
+                people: mergedPeople,
+                bills: mergedBills,
+                loans: Array.isArray(b.loans) && b.loans.length > 0 ? b.loans : (prev.loans || []),
+                dashboardWidgets: (Array.isArray(b.dashboardWidgets) && b.dashboardWidgets.length > 0)
+                  ? b.dashboardWidgets
+                  : (prev.dashboardWidgets || DEFAULT_DASHBOARD_WIDGETS),
+                theme: b.theme || prev.theme || 'dark',
+                hideDashboardHeader: b.hideDashboardHeader !== undefined ? Boolean(b.hideDashboardHeader) : Boolean(prev.hideDashboardHeader)
+              };
             });
           }
         }
@@ -100,14 +114,51 @@ export function BudgetProvider({ children }) {
     fetchCloudBudget();
   }, [isAuthenticated]);
 
-  // Persist to localStorage whenever budget state changes
+  // Persist to localStorage and preserve automated backup whenever budget state changes
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(budget));
+      if (Array.isArray(budget.bills) && budget.bills.length > 0) {
+        localStorage.setItem('personal_budget_backup_last_valid', JSON.stringify(budget));
+      }
     } catch (e) {
       console.error('Failed to save budget to localStorage:', e);
     }
   }, [budget]);
+
+  // Restore helper from last valid local backup
+  const restoreLastBackup = () => {
+    try {
+      const backup = localStorage.getItem('personal_budget_backup_last_valid');
+      if (backup) {
+        const parsed = JSON.parse(backup);
+        if (parsed && typeof parsed === 'object') {
+          const hasBills = Array.isArray(parsed.bills) && parsed.bills.length > 0;
+          const hasAccounts = Array.isArray(parsed.accounts) && parsed.accounts.length > 0;
+          if (hasBills || hasAccounts) {
+            setBudget(prev => ({
+              ...initialBudgetData,
+              ...parsed,
+              bills: hasBills ? parsed.bills : (prev.bills || []),
+              accounts: hasAccounts ? parsed.accounts : (prev.accounts || []),
+              people: Array.isArray(parsed.people) && parsed.people.length > 0 ? parsed.people : (prev.people || [])
+            }));
+            return true;
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Failed to restore from backup:', e);
+    }
+    return false;
+  };
+
+  // Auto-recover bills from backup if state bills are empty
+  useEffect(() => {
+    if (!budget.bills || budget.bills.length === 0) {
+      restoreLastBackup();
+    }
+  }, [budget.bills]);
 
   // Sync to Cloudflare D1 database when budget updates (debounced)
   useEffect(() => {
@@ -718,6 +769,7 @@ export function BudgetProvider({ children }) {
         deleteLoan,
         resetToDefaults,
         clearAllData,
+        restoreLastBackup,
         loadDemoPreset,
         importParsedSpreadsheet,
         // line-item operations

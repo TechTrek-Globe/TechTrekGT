@@ -71,7 +71,7 @@ export function Navbar() {
               </div>
             </div>
             <div>
-              <h1 className="text-lg font-bold gradient-text">Budget OS</h1>
+              <h1 className="text-lg font-bold gradient-text">TechTrek Finance</h1>
               <p className="text-xs text-slate-400">Personal Cash Flow & Split Engine</p>
             </div>
           </div>

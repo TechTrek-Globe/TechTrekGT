@@ -31,8 +31,12 @@ export function BudgetProvider({ children }) {
             people: Array.isArray(parsed.people) ? parsed.people : [],
             bills: Array.isArray(parsed.bills) ? parsed.bills : [],
             loans: Array.isArray(parsed.loans) ? parsed.loans : [],
-            dashboardWidgets: (Array.isArray(parsed.dashboardWidgets) && parsed.dashboardWidgets.length > 0)
-              ? parsed.dashboardWidgets
+            dashboardWidgets: Array.isArray(parsed.dashboardWidgets)
+              ? (() => {
+                  const existingIds = new Set(parsed.dashboardWidgets.map(w => w.id));
+                  const missing = DEFAULT_DASHBOARD_WIDGETS.filter(w => !existingIds.has(w.id));
+                  return [...parsed.dashboardWidgets, ...missing];
+                })()
               : DEFAULT_DASHBOARD_WIDGETS,
             theme: parsed.theme || 'dark',
             hideDashboardHeader: Boolean(parsed.hideDashboardHeader)

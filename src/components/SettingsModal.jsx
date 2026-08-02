@@ -74,6 +74,8 @@ export function SettingsModal() {
   const [newPersonForm, setNewPersonForm] = useState({ name: '', role: 'Member', payFrequency: 'bi-weekly', grossPerPay: 0, netPerPay: 0, payDay1: 15, payDay2: 'last', payOffsetDays: 0 });
   const [newBillForm, setNewBillForm] = useState({ name: '', amount: 0, period: 'Monthly', accountId: budget.accounts[0]?.id || '', dueDay: 1, dueMonths: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], paymentSource: 'Auto Pay', notes: '' });
   const [billFilterTab, setBillFilterTab] = useState('active'); // 'active' | 'archived'
+  const [setupSubTab, setSetupSubTab] = useState('accounts'); // 'accounts' | 'bills'
+  const [billsSubView, setBillsSubView] = useState('list'); // 'list' | 'splits'
   const [jsonInput, setJsonInput] = useState('');
   const [jsonStatus, setJsonStatus] = useState(null);
   const [spreadsheetPreview, setSpreadsheetPreview] = useState(null);
@@ -272,17 +274,40 @@ export function SettingsModal() {
 
   if (!isSettingsOpen) return null;
 
-  const tabs = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'accounts', label: 'Accounts', icon: CreditCard, count: budget.accounts.length },
-    { id: 'people', label: 'People', icon: Users, count: budget.people.length },
-    { id: 'bills', label: 'Bills', icon: Receipt, count: budget.bills.length },
-    { id: 'splits', label: 'Splits', icon: PieChart },
-    { id: 'security', label: 'Security & Profile', icon: ShieldCheck },
-    { id: 'import', label: 'Import', icon: Upload },
-    { id: 'export', label: 'Export', icon: Download },
-    { id: 'reset', label: 'Reset', icon: RotateCcw }
+  const SETUP_TABS = ['accounts', 'people', 'splits', 'bills'];
+  const DATA_TABS  = ['import', 'export', 'reset'];
+  const activeSection =
+    SETUP_TABS.includes(settingsTab) ? 'setup' :
+    DATA_TABS.includes(settingsTab)  ? 'data'  :
+    settingsTab;
+
+  const knownAccountIds = new Set(budget.accounts.map(a => a.id));
+  const hasOrphanedBills = budget.bills.some(b => !knownAccountIds.has(b.accountId));
+  const displayAccounts = hasOrphanedBills 
+    ? [...budget.accounts, { id: 'unassigned', name: 'Unassigned / Orphaned Bills', type: 'system' }]
+    : budget.accounts;
+
+  const sidebarNav = [
+    { id: 'setup',     label: 'Setup',     icon: Users,          desc: 'Accounts, Earners & Bills', badge: budget.accounts.length + budget.people.length + budget.bills.filter(b => !b.isArchived).length },
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, desc: 'Widgets & Theme',          badge: null },
+    { id: 'data',      label: 'Data',      icon: Archive,        desc: 'Import, Export & Reset',    badge: null },
+    { id: 'security',  label: 'Security',  icon: ShieldCheck,    desc: 'Profile & Password',        badge: null },
   ];
+
+  const setupSubNavItems = [
+    { id: 'accounts', label: 'Accounts & Earners', icon: Users,    count: budget.accounts.length + budget.people.length },
+    { id: 'bills',    label: 'Bills & Splits',     icon: Receipt,  count: budget.bills.filter(b => !b.isArchived).length },
+  ];
+
+  const handleSidebarNav = (sectionId) => {
+    if (sectionId === 'setup') {
+      setSettingsTab(SETUP_TABS.includes(settingsTab) ? settingsTab : setupSubTab);
+    } else if (sectionId === 'data') {
+      setSettingsTab('import');
+    } else {
+      setSettingsTab(sectionId);
+    }
+  };
 
   const handleAddAccount = (e) => {
     e.preventDefault();
@@ -318,56 +343,128 @@ export function SettingsModal() {
   return (
     <div className="fixed inset-0 z-50 bg-slate-950 flex flex-col animate-fade-in w-screen h-screen overflow-hidden text-slate-100">
       <div className="bg-slate-900 w-full h-full flex flex-col overflow-hidden">
-        
-        {/* Compact Single-Row Header Bar */}
-        <div className="flex items-center justify-between px-4 py-2 bg-slate-950 border-b border-slate-800 gap-3 flex-shrink-0">
-          <div className="flex items-center gap-2 flex-shrink-0">
+
+        {/* Slim Top Bar */}
+        <div className="flex items-center justify-between px-4 py-2.5 bg-slate-950 border-b border-slate-800 flex-shrink-0">
+          <div className="flex items-center gap-2.5">
             <span className="p-1.5 rounded-lg bg-blue-600/20 text-blue-400">
               <Receipt className="w-4 h-4" />
             </span>
-            <span className="font-bold text-xs sm:text-sm text-slate-100 hidden md:inline">Settings &amp; Setup</span>
+            <span className="font-bold text-sm text-slate-100">Settings &amp; Setup</span>
           </div>
-
-          {/* Compact Navigation Tab Pills */}
-          <div className="flex items-center gap-1 overflow-x-auto py-0.5 no-scrollbar scrollbar-none flex-1 justify-center max-w-4xl">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              const isActive = settingsTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setSettingsTab(tab.id)}
-                  className={`flex items-center gap-1.5 py-1 px-2.5 text-xs font-semibold rounded-lg transition-all flex-shrink-0 cursor-pointer ${
-                    isActive
-                      ? 'bg-blue-600 text-white shadow-sm font-bold'
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-                  }`}
-                >
-                  <Icon className="w-3.5 h-3.5 flex-shrink-0" />
-                  <span className="truncate">{tab.label}</span>
-                  {tab.count !== undefined && (
-                    <span className={`px-1.5 py-0.2 text-[10px] rounded-full font-mono ${
-                      isActive ? 'bg-blue-700 text-blue-100' : 'bg-slate-800 text-slate-400'
-                    }`}>
-                      {tab.count}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-
           <button
             onClick={() => setIsSettingsOpen(false)}
-            className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer flex-shrink-0"
+            className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
             title="Close Settings (Esc)"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Tab Contents Area */}
-        <div className="flex-1 overflow-auto p-4 sm:p-5 bg-slate-950/20">
+        {/* Body: Left Sidebar + Scrollable Content */}
+        <div className="flex flex-1 overflow-hidden">
+
+          {/* Left Sidebar Navigation */}
+          <aside className="flex-shrink-0 w-14 sm:w-52 bg-slate-950/70 border-r border-slate-800 flex flex-col py-3 overflow-y-auto">
+            <div className="px-2 space-y-0.5">
+              {sidebarNav.map(section => {
+                const Icon = section.icon;
+                const isActive = activeSection === section.id;
+                return (
+                  <div key={section.id}>
+                    <button
+                      onClick={() => handleSidebarNav(section.id)}
+                      className={`w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-xl transition-all cursor-pointer text-left ${
+                        isActive
+                          ? 'bg-blue-600/15 text-blue-300 border border-blue-600/25'
+                          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-transparent'
+                      }`}
+                    >
+                      <span className={`p-1.5 rounded-lg flex-shrink-0 transition-colors ${
+                        isActive ? 'bg-blue-600/25 text-blue-400' : 'bg-slate-800 text-slate-400'
+                      }`}>
+                        <Icon className="w-3.5 h-3.5" />
+                      </span>
+                      <div className="hidden sm:block min-w-0 flex-1">
+                        <div className={`text-xs font-bold truncate ${
+                          isActive ? 'text-blue-200' : 'text-slate-200'
+                        }`}>{section.label}</div>
+                        <div className="text-[10px] text-slate-500 truncate leading-tight">{section.desc}</div>
+                      </div>
+                      {section.badge !== null && section.badge > 0 && (
+                        <span className={`hidden sm:inline ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold flex-shrink-0 ${
+                          isActive ? 'bg-blue-600/30 text-blue-200' : 'bg-slate-800 text-slate-400'
+                        }`}>{section.badge}</span>
+                      )}
+                    </button>
+
+                    {/* Setup sub-items - shown inline in sidebar on sm+ */}
+                    {section.id === 'setup' && isActive && (
+                      <div className="hidden sm:block ml-4 mt-0.5 mb-1 space-y-0.5">
+                        {setupSubNavItems.map(sub => {
+                          const SubIcon = sub.icon;
+                          const isSubActive = settingsTab === sub.id;
+                          return (
+                            <button
+                              key={sub.id}
+                              onClick={() => { setSettingsTab(sub.id); setSetupSubTab(sub.id); }}
+                              className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all cursor-pointer text-left ${
+                                isSubActive
+                                  ? 'bg-slate-800 text-slate-100'
+                                  : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/50'
+                              }`}
+                            >
+                              <SubIcon className="w-3 h-3 flex-shrink-0" />
+                              <span className="truncate">{sub.label}</span>
+                              {sub.count !== null && (
+                                <span className={`ml-auto text-[10px] font-mono ${
+                                  isSubActive ? 'text-slate-400' : 'text-slate-600'
+                                }`}>{sub.count}</span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex-1" />
+            <div className="hidden sm:flex items-center justify-center px-3 py-2 text-[10px] text-slate-700">
+              Esc to close
+            </div>
+          </aside>
+
+          {/* Scrollable Content Area */}
+          <div className="flex-1 overflow-auto p-4 sm:p-5 bg-slate-950/20">
+
+            {/* Mobile sub-nav for Setup section (icon-only sidebar on xs screens) */}
+            {activeSection === 'setup' && (
+              <div className="flex sm:hidden items-center gap-1 mb-4 p-1 bg-slate-900 rounded-xl border border-slate-800">
+                {setupSubNavItems.map(sub => {
+                  const SubIcon = sub.icon;
+                  const isSubActive = settingsTab === sub.id;
+                  return (
+                    <button
+                      key={sub.id}
+                      onClick={() => { setSettingsTab(sub.id); setSetupSubTab(sub.id); }}
+                      className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                        isSubActive ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      <SubIcon className="w-3.5 h-3.5" />
+                      <span>{sub.label}</span>
+                      {sub.count !== null && (
+                        <span className={`text-[10px] font-mono ${
+                          isSubActive ? 'opacity-80' : 'text-slate-500'
+                        }`}>({sub.count})</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
           {/* TAB 0: DASHBOARD WIDGETS MANAGER */}
           {settingsTab === 'dashboard' && (
@@ -553,8 +650,8 @@ export function SettingsModal() {
             </div>
           )}
 
-          {/* TAB 1: ACCOUNTS */}
-          {settingsTab === 'accounts' && (
+          {/* SETUP: ACCOUNTS & EARNERS */}
+          {(settingsTab === 'accounts' || settingsTab === 'people') && (
             <div className="space-y-6">
               {/* Header & Add Account Button */}
               <div className="flex items-center justify-between pb-2 border-b border-slate-800">
@@ -1005,9 +1102,9 @@ export function SettingsModal() {
             </div>
           )}
 
-          {/* TAB 2: PEOPLE & INCOME */}
-          {settingsTab === 'people' && (
-            <div className="space-y-6">
+          {/* SETUP: EARNERS (stacked below Accounts in Accounts & Earners view) */}
+          {(settingsTab === 'accounts' || settingsTab === 'people') && (
+            <div className="space-y-6 mt-8 pt-6 border-t border-slate-700">
               {/* Header & Add Member Button */}
               <div className="flex items-center justify-between pb-2 border-b border-slate-800">
                 <div>
@@ -1539,9 +1636,36 @@ export function SettingsModal() {
             </div>
           )}
 
-          {/* TAB 3: BILLS & ACCOUNT ASSIGNMENTS */}
-          {settingsTab === 'bills' && (
+          {/* SETUP: BILLS & SPLITS */}
+          {(settingsTab === 'bills' || settingsTab === 'splits') && (
             <div className="space-y-4">
+              {/* Sub-view toggle: Bill List | Split Matrix */}
+              <div className="flex items-center gap-2 mb-2">
+                <div className="flex items-center p-1 bg-slate-900 rounded-xl border border-slate-800">
+                  <button
+                    onClick={() => setBillsSubView('list')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                      billsSubView === 'list' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <Receipt className="w-3.5 h-3.5" />
+                    Bill List
+                  </button>
+                  <button
+                    onClick={() => setBillsSubView('splits')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                      billsSubView === 'splits' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <PieChart className="w-3.5 h-3.5" />
+                    Split %
+                  </button>
+                </div>
+              </div>
+
+              {/* BILL LIST VIEW */}
+              {billsSubView === 'list' && (
+              <>
               {/* Active / Archived Bills Filter Bar & Add Bill Button */}
               <div className="flex items-center justify-between border-b border-slate-800 pb-2">
                 <div className="flex items-center gap-2">
@@ -1748,9 +1872,10 @@ export function SettingsModal() {
 
               {/* Bills List Grouped by Assigned Account */}
               <div className="space-y-6">
-                {budget.accounts.map(account => {
+                {displayAccounts.map(account => {
                   const accountBills = budget.bills.filter(b => 
-                    b.accountId === account.id && (billFilterTab === 'archived' ? b.isArchived : !b.isArchived)
+                    (account.id === 'unassigned' ? !knownAccountIds.has(b.accountId) : b.accountId === account.id) && 
+                    (billFilterTab === 'archived' ? b.isArchived : !b.isArchived)
                   );
                   const accountTotal = accountBills.reduce((sum, b) => {
                     const amt = b.amount || 0;
@@ -1898,13 +2023,15 @@ export function SettingsModal() {
                     </div>
                   );
                 })}
-              </div>
-            </div>
-          )}
+                      </div>
+              </>
+            )}
 
-          {/* TAB 4: BILL SPLITTING MATRIX */}
-          {settingsTab === 'splits' && (
-            <div className="space-y-6">
+
+
+              {/* SPLIT MATRIX VIEW */}
+              {billsSubView === 'splits' && (
+              <div className="space-y-6">
               <div className="p-4 rounded-xl bg-blue-950/40 border border-blue-800/60 text-xs text-blue-200 flex items-center justify-between">
                 <div>
                   <span className="font-semibold">Dynamic Household Bill Split Engine:</span> Define what percentage of each bill is split between members.
@@ -1913,8 +2040,10 @@ export function SettingsModal() {
 
               {/* Bills Split Matrix Grouped by Assigned Account */}
               <div className="space-y-6">
-                {budget.accounts.map(account => {
-                  const accountBills = budget.bills.filter(b => b.accountId === account.id);
+                {displayAccounts.map(account => {
+                  const accountBills = budget.bills.filter(b => 
+                    account.id === 'unassigned' ? !knownAccountIds.has(b.accountId) : b.accountId === account.id
+                  );
                   const accountTotal = accountBills.reduce((sum, b) => {
                     const amt = b.amount || 0;
                     return sum + (b.period === 'Annual' ? amt / 12 : b.period === 'Semi-Annual' ? amt / 6 : amt);
@@ -2035,8 +2164,11 @@ export function SettingsModal() {
             </div>
           )}
 
+            </div>
+          )}
+
           {/* TAB 5: IMPORT */}
-          {settingsTab === 'import' && (
+          {activeSection === 'data' && (
             <div className="space-y-6">
               
               {/* Excel (.xlsx / .csv) Spreadsheet Importer Card */}
@@ -2360,9 +2492,9 @@ export function SettingsModal() {
             </div>
           )}
 
-          {/* TAB 6: EXPORT */}
-          {settingsTab === 'export' && (
-            <div className="space-y-6">
+          {/* DATA: EXPORT */}
+          {activeSection === 'data' && (
+            <div className="space-y-4 mt-4 pt-4 border-t border-slate-800">
               
               {/* Export to Excel Workbook Card */}
               <div className="p-5 rounded-xl glass-card border border-blue-800/60 bg-blue-950/10 space-y-4">
@@ -2550,9 +2682,13 @@ export function SettingsModal() {
             </div>
           )}
 
-          {/* TAB 7: RESET DATA */}
-          {settingsTab === 'reset' && (
-            <div className="space-y-6">
+          {/* DATA: DANGER ZONE */}
+          {activeSection === 'data' && (
+            <div className="space-y-4 mt-4 pt-4 border-t border-slate-800">
+              <div className="flex items-center gap-2 mb-1">
+                <RotateCcw className="w-4 h-4 text-amber-400" />
+                <h3 className="text-xs font-bold text-amber-300 uppercase tracking-wider">Danger Zone</h3>
+              </div>
               
               {/* Option A: Clear All Data (Clean Slate) */}
               <div className="p-5 rounded-xl glass-card border border-rose-800/60 bg-rose-950/10 space-y-4">
@@ -2713,7 +2849,8 @@ export function SettingsModal() {
             </div>
           )}
 
-        </div>
+          </div>{/* end content area */}
+        </div>{/* end sidebar + content body */}
 
         {/* Modal Footer */}
         <div className="flex items-center justify-between px-6 py-4 border-t border-slate-800 bg-slate-900/90">

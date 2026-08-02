@@ -73,6 +73,7 @@ export function DashboardView() {
     getTotalCashOnHand,
     getAccountMonthlyExpenses,
     getUpcomingBills,
+    getBillMonthlyCost,
     getBillPersonMonthlyPortion,
     getPersonMonthlyTotal,
     getPersonPerPaycheckTotal,
@@ -408,51 +409,6 @@ export function DashboardView() {
         const totalTargetMonthly = peopleList.reduce((sum, p) => sum + getPersonMonthlyTotal(p.id), 0);
         const totalSurplusMonthly = totalNetMonthly - totalTargetMonthly;
 
-        // Group bills by split pairing combination
-        const splitGroups = {};
-        (budget?.bills || []).filter(b => !b.isArchived).forEach(b => {
-          const monthlyCost = getBillMonthlyCost(b);
-          const splits = b.splits || {};
-          const activeEntries = Object.entries(splits).filter(([_, pct]) => parseFloat(pct) > 0);
-
-          let groupLabel = 'Unassigned';
-          if (activeEntries.length === 1) {
-            const pId = activeEntries[0][0];
-            const person = (budget?.people || []).find(p => p.id === pId);
-            groupLabel = `100% ${person ? person.name : pId}`;
-          } else if (activeEntries.length > 1) {
-            const names = activeEntries.map(([pId]) => {
-              const person = (budget?.people || []).find(p => p.id === pId);
-              return person ? person.name : pId;
-            });
-            groupLabel = names.join(' & ');
-          }
-
-          if (!splitGroups[groupLabel]) {
-            splitGroups[groupLabel] = {
-              label: groupLabel,
-              totalMonthlyCost: 0,
-              billsCount: 0,
-              participantPortions: {}
-            };
-          }
-
-          splitGroups[groupLabel].totalMonthlyCost += monthlyCost;
-          splitGroups[groupLabel].billsCount += 1;
-
-          if (activeEntries.length > 0) {
-            activeEntries.forEach(([pId, pct]) => {
-              const person = (budget?.people || []).find(p => p.id === pId);
-              const pName = person ? person.name : pId;
-              const portion = (monthlyCost * (parseFloat(pct) || 0)) / 100;
-              if (!splitGroups[groupLabel].participantPortions[pName]) {
-                splitGroups[groupLabel].participantPortions[pName] = 0;
-              }
-              splitGroups[groupLabel].participantPortions[pName] += portion;
-            });
-          }
-        });
-
         return (
           <div className="space-y-3">
             {peopleList.length > 0 && Math.abs(totalSurplusMonthly) >= 0.01 && (
@@ -547,74 +503,187 @@ export function DashboardView() {
                         </div>
                         {p.payFrequency !== 'monthly' && (
                           <div className="pt-1.5 mt-1 border-t border-slate-800/80 flex items-center justify-between font-mono text-[10px]">
-                            <span className="text-slate-400 font-sans font-medium">Total Monthly Deposit:</span>
-                            <span className="text-emerald-400 font-bold">{fmtMoney(totalMonthlyDeposit)}</span>
+                            <span className="text-slate-400 font-sans font-medium">Total Per Paycheck:</span>
+                            <span className="text-emerald-400 font-bold">{fmtMoney(totalPerPaycheckDeposit)}</span>
                           </div>
                         )}
+                        <div className={p.payFrequency !== 'monthly' ? "pt-1 flex items-center justify-between font-mono text-[10px]" : "pt-1.5 mt-1 border-t border-slate-800/80 flex items-center justify-between font-mono text-[10px]"}>
+                          <span className="text-slate-400 font-sans font-medium">Total Monthly Deposit:</span>
+                          <span className="text-emerald-400 font-bold">{fmtMoney(totalMonthlyDeposit)}</span>
+                        </div>
                       </div>
                     )}
                   </div>
                 );
               })}
             </div>
+          </div>
+        );
+      }
 
-            {/* Grouped Split Pairings Breakdown */}
-            {Object.keys(splitGroups).length > 0 && (
-              <div className="pt-2.5 border-t border-slate-800/80 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-slate-300 font-sans flex items-center gap-1.5">
-                    <Users className="w-3.5 h-3.5 text-indigo-400" />
-                    Split Pairings &amp; Combined Bill Totals
-                  </span>
-                  <span className="text-[9px] font-mono text-slate-400">
-                    {Object.keys(splitGroups).length} Combination{Object.keys(splitGroups).length !== 1 ? 's' : ''}
-                  </span>
-                </div>
+      case 'split_pairings': {
+        const splitGroups = {};
 
-                <div className="grid gap-2 grid-cols-1 sm:grid-cols-2">
-                  {Object.values(splitGroups).map(group => (
-                    <div key={group.label} className="p-3 rounded-xl bg-slate-900/50 border border-slate-800 space-y-2 text-xs font-mono">
-                      <div className="flex items-center justify-between pb-1.5 border-b border-slate-800/80">
-                        <span className="font-sans font-bold text-purple-300 text-[11px]">{group.label}</span>
-                        <span className="font-bold text-emerald-400 text-[11px]">
-                          {fmtMoney(group.totalMonthlyCost)}
-                          <span className="text-[9px] text-slate-400 font-normal font-sans ml-1">/ mo ({group.billsCount} bill{group.billsCount !== 1 ? 's' : ''})</span>
-                        </span>
-                      </div>
+        // 1. Group Bills
+        (budget?.bills || []).filter(b => !b.isArchived).forEach(b => {
+          const monthlyCost = getBillMonthlyCost(b);
+          if (monthlyCost <= 0) return;
+          const splits = b.splits || {};
+          const activeEntries = Object.entries(splits).filter(([_, pct]) => parseFloat(pct) > 0);
 
-                      <div className="space-y-1 text-[10px]">
-                        {Object.entries(group.participantPortions).map(([pName, portionAmt]) => {
-                          const person = (budget?.people || []).find(p => p.name === pName || p.id === pName);
-                          const isNonMonthly = person && (person.payFrequency === 'semi-monthly' || person.payFrequency === 'bi-weekly' || person.payFrequency === 'weekly');
-                          
-                          let perPaycheckAmt = portionAmt;
-                          if (person?.payFrequency === 'semi-monthly' || person?.payFrequency === 'bi-weekly') {
-                            perPaycheckAmt = portionAmt / 2;
-                          } else if (person?.payFrequency === 'weekly') {
-                            perPaycheckAmt = (portionAmt * 12) / 52;
-                          }
+          let groupLabel = 'Unassigned';
+          if (activeEntries.length === 1) {
+            const pId = activeEntries[0][0];
+            const person = (budget?.people || []).find(p => p.id === pId);
+            groupLabel = `100% ${person ? person.name : pId}`;
+          } else if (activeEntries.length > 1) {
+            const names = activeEntries.map(([pId]) => {
+              const person = (budget?.people || []).find(p => p.id === pId);
+              return person ? person.name : pId;
+            });
+            groupLabel = names.join(' & ');
+          }
 
-                          return (
-                            <div key={pName} className="flex items-center justify-between text-slate-300">
-                              <span className="font-sans text-slate-400">{pName}:</span>
-                              <span className="font-bold text-slate-200">
-                                {fmtMoney(portionAmt)}
-                                <span className="text-[9px] text-slate-400 font-normal ml-1">/mo</span>
-                                {isNonMonthly && (
-                                  <span className="text-[9px] text-blue-300/90 font-normal ml-1.5">
-                                    ({fmtMoney(perPaycheckAmt)}/pay)
-                                  </span>
-                                )}
+          if (!splitGroups[groupLabel]) {
+            splitGroups[groupLabel] = {
+              label: groupLabel,
+              totalMonthlyCost: 0,
+              billsCount: 0,
+              savingsCount: 0,
+              participantPortions: {}
+            };
+          }
+
+          splitGroups[groupLabel].totalMonthlyCost += monthlyCost;
+          splitGroups[groupLabel].billsCount += 1;
+
+          activeEntries.forEach(([pId, pct]) => {
+            const person = (budget?.people || []).find(p => p.id === pId);
+            const pName = person ? person.name : pId;
+            const portion = (monthlyCost * (parseFloat(pct) || 0)) / 100;
+            if (!splitGroups[groupLabel].participantPortions[pName]) {
+              splitGroups[groupLabel].participantPortions[pName] = 0;
+            }
+            splitGroups[groupLabel].participantPortions[pName] += portion;
+          });
+        });
+
+        // 2. Group Account Extra Savings
+        (budget?.accounts || []).filter(acc => acc.saveExtraMonthly > 0 && acc.enableExtraSavings !== false).forEach(acc => {
+          const extraAmt = parseFloat(acc.saveExtraMonthly) || 0;
+          if (extraAmt <= 0) return;
+
+          const splits = acc.saveExtraSplits || {};
+          const people = budget?.people || [];
+          let activeEntries = Object.entries(splits).filter(([_, val]) => parseFloat(val) > 0);
+
+          if (activeEntries.length === 0 && people.length > 0) {
+            const equalPct = 100 / people.length;
+            activeEntries = people.map(p => [p.id, equalPct]);
+          }
+
+          let groupLabel = 'Unassigned Savings';
+          if (activeEntries.length === 1) {
+            const pId = activeEntries[0][0];
+            const person = (budget?.people || []).find(p => p.id === pId);
+            groupLabel = `100% ${person ? person.name : pId}`;
+          } else if (activeEntries.length > 1) {
+            const names = activeEntries.map(([pId]) => {
+              const person = (budget?.people || []).find(p => p.id === pId);
+              return person ? person.name : pId;
+            });
+            groupLabel = names.join(' & ');
+          }
+
+          if (!splitGroups[groupLabel]) {
+            splitGroups[groupLabel] = {
+              label: groupLabel,
+              totalMonthlyCost: 0,
+              billsCount: 0,
+              savingsCount: 0,
+              participantPortions: {}
+            };
+          }
+
+          splitGroups[groupLabel].totalMonthlyCost += extraAmt;
+          splitGroups[groupLabel].savingsCount += 1;
+
+          activeEntries.forEach(([pId, val]) => {
+            const person = (budget?.people || []).find(p => p.id === pId);
+            const pName = person ? person.name : pId;
+            const splitType = acc.saveExtraSplitType || 'percentage';
+            let portion = 0;
+            if (splitType === 'amount') {
+              portion = parseFloat(val) || 0;
+            } else {
+              portion = (extraAmt * (parseFloat(val) || 0)) / 100;
+            }
+            if (!splitGroups[groupLabel].participantPortions[pName]) {
+              splitGroups[groupLabel].participantPortions[pName] = 0;
+            }
+            splitGroups[groupLabel].participantPortions[pName] += portion;
+          });
+        });
+
+        const groupsList = Object.values(splitGroups);
+
+        if (groupsList.length === 0) {
+          return (
+            <div className="p-4 text-center text-xs text-slate-500 font-mono">
+              No split bills or extra savings items found.
+            </div>
+          );
+        }
+
+        return (
+          <div className="grid gap-2.5 grid-cols-1 sm:grid-cols-2">
+            {groupsList.map(group => {
+              const itemsCountText = [
+                group.billsCount > 0 ? `${group.billsCount} bill${group.billsCount !== 1 ? 's' : ''}` : '',
+                group.savingsCount > 0 ? `${group.savingsCount} savings bucket${group.savingsCount !== 1 ? 's' : ''}` : ''
+              ].filter(Boolean).join(' + ');
+
+              return (
+                <div key={group.label} className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2.5 text-xs font-mono">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
+                    <span className="font-sans font-bold text-purple-300 text-[12px]">{group.label}</span>
+                    <span className="font-bold text-emerald-400 text-[12px]">
+                      {fmtMoney(group.totalMonthlyCost)}
+                      <span className="text-[9px] text-slate-400 font-normal font-sans ml-1">/ mo ({itemsCountText})</span>
+                    </span>
+                  </div>
+
+                  <div className="space-y-1.5 text-[11px]">
+                    {Object.entries(group.participantPortions).map(([pName, portionAmt]) => {
+                      const person = (budget?.people || []).find(p => p.name === pName || p.id === pName);
+                      const isNonMonthly = person && (person.payFrequency === 'semi-monthly' || person.payFrequency === 'bi-weekly' || person.payFrequency === 'weekly');
+                      
+                      let perPaycheckAmt = portionAmt;
+                      if (person?.payFrequency === 'semi-monthly' || person?.payFrequency === 'bi-weekly') {
+                        perPaycheckAmt = portionAmt / 2;
+                      } else if (person?.payFrequency === 'weekly') {
+                        perPaycheckAmt = (portionAmt * 12) / 52;
+                      }
+
+                      return (
+                        <div key={pName} className="flex items-center justify-between text-slate-300">
+                          <span className="font-sans text-slate-400 font-medium">{pName}:</span>
+                          <span className="font-bold text-slate-200">
+                            {fmtMoney(portionAmt)}
+                            <span className="text-[9px] text-slate-400 font-normal ml-1">/mo</span>
+                            {isNonMonthly && (
+                              <span className="text-[9px] text-blue-300 font-normal ml-1.5">
+                                ({fmtMoney(perPaycheckAmt)}/pay)
                               </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
+                            )}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })}
           </div>
         );
       }

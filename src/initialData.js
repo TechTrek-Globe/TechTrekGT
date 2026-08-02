@@ -7,6 +7,7 @@ export const DEFAULT_DASHBOARD_WIDGETS = [
   { id: 'proj_vs_actual', title: 'Projected vs Actual Spending (Bar Chart)', description: 'Bar chart comparing planned budget vs actual monthly spending', category: 'Charts & Analytics', visible: true, width: 'half' },
   { id: 'budget_health', title: 'Budget Health Score & Vitals', description: 'Radial SVG health score gauge and financial checklist', category: 'Financial Vitals', visible: true, width: 'third' },
   { id: 'earner_splits', title: 'Earner Income & Contribution Splits', description: 'Per-person monthly income and bill split contribution shares', category: 'Earner Splits', visible: true, width: 'half' },
+  { id: 'split_pairings', title: 'Split Pairings & Combined Totals', description: 'Grouped bills and extra savings totals by earner split combination', category: 'Earner Splits', visible: true, width: 'half' },
   { id: 'recent_activity', title: 'Payday & Deposit Activity', description: 'Preview of upcoming payday deposits and scheduled bill deductions', category: 'Ledger & Cash Flow', visible: false, width: 'third' }
 ];
 

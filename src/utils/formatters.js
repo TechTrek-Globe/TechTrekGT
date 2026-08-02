@@ -8,6 +8,9 @@
 export function fmtMoney(val) {
   const num = parseFloat(val);
   if (isNaN(num)) return '$0.00';
+  if (num < 0) {
+    return `-$${Math.abs(num).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
   return `$${num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 

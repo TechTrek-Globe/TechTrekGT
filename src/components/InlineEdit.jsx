@@ -144,11 +144,11 @@ export function InlineEdit({
   return (
     <button
       onClick={open}
-      className={`group/ie inline-flex items-center gap-1 text-left hover:opacity-90 transition-opacity ${className}`}
+      className={`group/ie flex items-center justify-end w-full hover:opacity-90 transition-opacity relative ${className}`}
       title="Click to edit"
     >
       <span className={dimmed ? 'text-slate-400 font-mono text-xs' : ''}>{formatted}</span>
-      <Pencil className="w-2.5 h-2.5 text-slate-600 opacity-0 group-hover/ie:opacity-100 group-hover/ie:text-blue-400 transition-all flex-shrink-0" />
+      <Pencil className="w-2.5 h-2.5 text-slate-600 opacity-0 group-hover/ie:opacity-100 group-hover/ie:text-blue-400 transition-all absolute -left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
     </button>
   );
 }

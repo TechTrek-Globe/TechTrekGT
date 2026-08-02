@@ -63,14 +63,14 @@ function ActualCell({ bill, projected, actual, isEditing, editValue, onEdit, onC
   ) : (
     <button
       onClick={() => onEdit(bill.id, actual)}
-      className="group/cell flex items-center gap-1.5 text-right w-full justify-end"
+      className="group/cell flex items-center text-right w-full justify-end relative"
       title="Click to edit actual amount"
     >
       <span className={`font-mono text-xs ${isOverridden ? 'text-emerald-300 font-bold' : 'text-slate-400'}`}>
         ${actual.toFixed(2)}
         {isOverridden && <span className="ml-1 text-[9px] text-blue-400 font-normal">(actual)</span>}
       </span>
-      <Pencil className="w-2.5 h-2.5 text-slate-600 group-hover/cell:text-emerald-400 transition-colors opacity-0 group-hover/cell:opacity-100 flex-shrink-0" />
+      <Pencil className="w-2.5 h-2.5 text-slate-600 group-hover/cell:text-emerald-400 transition-colors opacity-0 group-hover/cell:opacity-100 absolute -left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
     </button>
   );
 }
@@ -243,12 +243,7 @@ export function InteractiveBudgetView() {
                       <th className="p-3 w-1/4">Bill Name</th>
                       <th className="p-3 text-center w-20">Progress</th>
                       <th className="p-3 text-right">Projected</th>
-                      <th className="p-3 text-right">
-                        <span className="flex items-center gap-1 justify-end">
-                          Actual
-                          <Pencil className="w-2.5 h-2.5 text-emerald-600" />
-                        </span>
-                      </th>
+                      <th className="p-3 text-right">Actual</th>
                       <th className="p-3 text-right">Variance</th>
                       <th className="p-3 text-right">Due Day</th>
                       {budget.people.map(p => (

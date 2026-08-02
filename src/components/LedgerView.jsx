@@ -535,10 +535,10 @@ function DailySpreadsheetMatrix() {
             {/* Header Row 1: Category Banners & Spanning Headers */}
             <tr className="bg-slate-950 text-slate-300 uppercase font-extrabold text-[9px] tracking-wider h-6">
               {/* Date & Day (Frozen Left Spanning Both Rows) */}
-              <th rowSpan={2} className="p-1 min-w-[70px] w-[70px] max-w-[70px] bg-slate-950 text-slate-200 font-bold sticky left-0 top-[36px] z-50 align-middle text-center border-b-2 border-blue-500 shadow-[2px_0_5px_rgba(0,0,0,0.5)]">
+              <th rowSpan={2} className="p-1 min-w-[90px] w-[90px] max-w-[90px] bg-slate-950 text-slate-200 font-bold sticky left-0 top-[36px] z-50 align-middle text-center border-b-2 border-blue-500 shadow-[2px_0_5px_rgba(0,0,0,0.5)]">
                 Date
               </th>
-              <th rowSpan={2} className="p-1 min-w-[48px] w-[48px] max-w-[48px] bg-slate-950 text-slate-200 font-bold border-r border-slate-700 sticky left-[70px] top-[36px] z-50 align-middle text-center border-b-2 border-blue-500 shadow-[4px_0_8px_rgba(0,0,0,0.5)]">
+              <th rowSpan={2} className="p-1 min-w-[48px] w-[48px] max-w-[48px] bg-slate-950 text-slate-200 font-bold border-r border-slate-700 sticky left-[90px] top-[36px] z-50 align-middle text-center border-b-2 border-blue-500 shadow-[4px_0_8px_rgba(0,0,0,0.5)]">
                 Day
               </th>
 
@@ -593,21 +593,19 @@ function DailySpreadsheetMatrix() {
 
               {/* Bill Columns */}
               {accountBills.map(b => (
-                <th key={`hdr-bill-${b.id}`} className="p-1 text-right min-w-[70px] max-w-[80px] text-rose-300 bg-slate-950 group align-bottom sticky top-[60px] z-35 border-b-2 border-blue-500">
-                  <div className="flex items-end justify-end gap-0.5">
-                    <div className="flex flex-col items-end leading-none text-right break-words text-[9px] max-w-[60px]">
-                      {b.name.split(' ').map((word, idx) => (
-                        <span key={idx} className="block truncate max-w-[60px]">{word}</span>
-                      ))}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => archiveBill(b.id)}
-                      className="opacity-70 group-hover:opacity-100 hover:scale-110 p-0.5 text-slate-400 hover:text-amber-400 transition-all rounded mb-0.5 flex-shrink-0"
-                      title={`Archive bill "${b.name}"`}
-                    >
-                      <Archive className="w-2.5 h-2.5" />
-                    </button>
+                <th key={`hdr-bill-${b.id}`} className="p-1 text-right min-w-[70px] text-rose-300 bg-slate-950 group align-bottom sticky top-[60px] z-35 border-b-2 border-blue-500 relative">
+                  <button
+                    type="button"
+                    onClick={() => archiveBill(b.id)}
+                    className="opacity-0 group-hover:opacity-100 hover:scale-110 p-0.5 text-slate-400 hover:text-amber-400 transition-all rounded mb-0.5 absolute top-0.5 left-0.5 z-10"
+                    title={`Archive bill "${b.name}"`}
+                  >
+                    <Archive className="w-2.5 h-2.5" />
+                  </button>
+                  <div className="flex flex-col items-end leading-none text-right text-[9px] w-full">
+                    {b.name.split(' ').map((word, idx) => (
+                      <span key={idx} className="block truncate max-w-full">{word}</span>
+                    ))}
                   </div>
                 </th>
               ))}
@@ -679,19 +677,21 @@ function DailySpreadsheetMatrix() {
                     }`}
                   >
                       {/* Date (Frozen Left & Today Highlight) */}
-                      <td className={`p-1 font-black whitespace-nowrap min-w-[70px] w-[70px] max-w-[70px] sticky left-0 z-20 shadow-[2px_0_5px_rgba(0,0,0,0.4)] ${
+                      <td className={`p-1 font-black whitespace-nowrap min-w-[90px] w-[90px] max-w-[90px] sticky left-0 z-20 shadow-[2px_0_5px_rgba(0,0,0,0.4)] ${
                         row.isToday ? 'bg-amber-950 text-amber-300 border-l-4 border-l-amber-400 border-y border-y-amber-400/80' : 'bg-slate-900 text-slate-300'
                       }`}>
-                        <span>{row.dateFormatted}</span>
-                        {row.isToday && (
-                          <span className="ml-1 px-1 py-0.2 rounded bg-amber-400 text-slate-950 text-[8px] font-black uppercase tracking-wider animate-pulse inline-block">
-                            NOW
-                          </span>
-                        )}
+                        <div className="flex items-center justify-between gap-1">
+                          <span>{row.dateFormatted}</span>
+                          {row.isToday && (
+                            <span className="px-1 py-0.2 rounded bg-amber-400 text-slate-950 text-[8px] font-black uppercase tracking-wider animate-pulse flex-shrink-0">
+                              NOW
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       {/* Day of Week (Frozen Left & Today Highlight) */}
-                      <td className={`p-1 whitespace-nowrap min-w-[48px] w-[48px] max-w-[48px] border-r border-slate-700 sticky left-[70px] z-20 shadow-[4px_0_8px_rgba(0,0,0,0.5)] ${
+                      <td className={`p-1 whitespace-nowrap min-w-[48px] w-[48px] max-w-[48px] border-r border-slate-700 sticky left-[90px] z-20 shadow-[4px_0_8px_rgba(0,0,0,0.5)] ${
                         row.isToday ? 'bg-amber-950 text-amber-300 border-y border-y-amber-400/80' : 'bg-slate-900 text-slate-300'
                       }`}>
                         <span className={`px-1 py-0.5 rounded text-[9px] ${
@@ -719,7 +719,7 @@ function DailySpreadsheetMatrix() {
 
                       {/* Earner Credits */}
                       {people.map(p => (
-                        <td key={`cred-${row.rowKey}-${p.id}`} className="p-1 text-right">
+                        <td key={`cred-${row.rowKey}-${p.id}`} className="p-1 text-right min-w-[60px]">
                           <MatrixCell
                             value={row.personCredits[p.id]}
                             isCredit
@@ -730,7 +730,7 @@ function DailySpreadsheetMatrix() {
 
                       {/* Earner Extra Credits */}
                       {showExtraColumns && people.map(p => (
-                        <td key={`ext-cred-${row.rowKey}-${p.id}`} className="p-1 text-right border-r border-slate-800/80">
+                        <td key={`ext-cred-${row.rowKey}-${p.id}`} className="p-1 text-right border-r border-slate-800/80 min-w-[60px]">
                           <MatrixCell
                             value={row.personExtraCredits[p.id]}
                             isCredit
@@ -741,7 +741,7 @@ function DailySpreadsheetMatrix() {
 
                       {/* Individual Bill Columns */}
                       {accountBills.map(b => (
-                        <td key={`bill-${row.rowKey}-${b.id}`} className="p-1 text-right">
+                        <td key={`bill-${row.rowKey}-${b.id}`} className="p-1 text-right min-w-[70px]">
                           <MatrixCell
                             value={row.billValues[b.id]}
                             isBill
@@ -751,7 +751,7 @@ function DailySpreadsheetMatrix() {
                       ))}
 
                       {/* Other Expense Column */}
-                      <td className="p-1 text-right border-r border-slate-800/80">
+                      <td className="p-1 text-right border-r border-slate-800/80 min-w-[55px]">
                         <MatrixCell
                           value={row.otherAmt}
                           isBill
@@ -798,24 +798,30 @@ function DailySpreadsheetMatrix() {
               )}
 
               {/* Credit Subtotals */}
-              {people.map(p => (
-                <td key={`tot-cred-${p.id}`} className="p-1 text-right text-emerald-400 font-mono bg-slate-900">
-                  +{fmtMoney(columnTotals.regCredits[p.id])}
-                </td>
-              ))}
-              {showExtraColumns && people.map(p => (
-                <td key={`tot-ext-cred-${p.id}`} className="p-1 text-right text-emerald-300 font-mono bg-slate-900 border-r border-slate-800">
-                  +{fmtMoney(columnTotals.extraCredits[p.id])}
-                </td>
-              ))}
+              {people.map(p => {
+                const tot = columnTotals.regCredits[p.id] || 0;
+                return (
+                  <td key={`tot-cred-${p.id}`} className={`p-1 text-right font-mono bg-slate-900 min-w-[60px] ${tot < 0 ? 'text-rose-400 font-bold' : 'text-emerald-400'}`}>
+                    {tot >= 0 ? `+${fmtMoney(tot)}` : fmtMoney(tot)}
+                  </td>
+                );
+              })}
+              {showExtraColumns && people.map(p => {
+                const tot = columnTotals.extraCredits[p.id] || 0;
+                return (
+                  <td key={`tot-ext-cred-${p.id}`} className={`p-1 text-right font-mono bg-slate-900 border-r border-slate-800 min-w-[60px] ${tot < 0 ? 'text-rose-400 font-bold' : 'text-emerald-300'}`}>
+                    {tot >= 0 ? `+${fmtMoney(tot)}` : fmtMoney(tot)}
+                  </td>
+                );
+              })}
 
               {/* Bill Subtotals */}
               {accountBills.map(b => (
-                <td key={`tot-bill-${b.id}`} className="p-1 text-right text-rose-400 font-mono bg-slate-900">
+                <td key={`tot-bill-${b.id}`} className="p-1 text-right text-rose-400 font-mono bg-slate-900 min-w-[70px]">
                   -{fmtMoney(columnTotals.bills[b.id])}
                 </td>
               ))}
-              <td className="p-1 text-right text-rose-300 font-mono bg-slate-900 border-r border-slate-800">
+              <td className="p-1 text-right text-rose-300 font-mono bg-slate-900 border-r border-slate-800 min-w-[55px]">
                 -{fmtMoney(columnTotals.other)}
               </td>
 

@@ -117,13 +117,19 @@ async function verifyToken(token, secret) {
   }
 }
 function getTokenFromRequest(request) {
-  const authHeader = request.headers.get("Authorization");
-  if (authHeader && authHeader.startsWith("Bearer ")) {
-    return authHeader.split(" ")[1];
-  }
   const cookieHeader = request.headers.get("Cookie") || "";
   const match = cookieHeader.match(/(?:^|;\s*)auth_token=([^;]+)/);
-  return match ? match[1] : null;
+  if (match && match[1]) {
+    return match[1];
+  }
+  const authHeader = request.headers.get("Authorization");
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    const token = authHeader.split(" ")[1];
+    if (token && token !== "cookie-active" && token !== "null" && token !== "undefined") {
+      return token;
+    }
+  }
+  return null;
 }
 async function checkRateLimit(kv, key, maxRequests, windowSeconds) {
   if (!kv) return { allowed: true };

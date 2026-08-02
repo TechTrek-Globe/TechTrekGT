@@ -556,17 +556,17 @@ function DailySpreadsheetMatrix() {
             </tr>
 
             {/* Header Row 2: Individual Columns (Stacked titles) */}
-            <tr className="bg-slate-950 text-slate-300 font-bold text-[10px]">
+            <tr className="bg-slate-950 text-slate-300 font-bold text-[9px] h-10">
               {/* Beg Balances */}
               <th className="p-1 text-right min-w-[65px] bg-blue-950 text-blue-200 font-extrabold border-r border-blue-900/60 align-bottom sticky top-[60px] z-35 border-b-2 border-blue-500">
-                <div className="flex flex-col items-end leading-tight text-[10px]">
+                <div className="flex flex-col items-end leading-none text-[9px]">
                   <span>Beg</span>
                   <span>Bal</span>
                 </div>
               </th>
               {showExtraColumns && (
                 <th className="p-1 text-right min-w-[65px] border-r-2 border-blue-600 bg-blue-950 text-blue-200 font-extrabold align-bottom sticky top-[60px] z-35 border-b-2 border-blue-500">
-                  <div className="flex flex-col items-end leading-tight text-[10px]">
+                  <div className="flex flex-col items-end leading-none text-[9px]">
                     <span>Extra</span>
                     <span>Beg</span>
                   </div>
@@ -576,7 +576,7 @@ function DailySpreadsheetMatrix() {
               {/* Credits */}
               {people.map(p => (
                 <th key={`hdr-cred-${p.id}`} className="p-1 text-right min-w-[60px] text-emerald-400 bg-slate-950 align-bottom sticky top-[60px] z-35 border-b-2 border-blue-500">
-                  <div className="flex flex-col items-end leading-tight text-[10px]">
+                  <div className="flex flex-col items-end leading-none text-[9px]">
                     <span>{p.name.split(' ')[0]}</span>
                     <span>Credit</span>
                   </div>
@@ -584,7 +584,7 @@ function DailySpreadsheetMatrix() {
               ))}
               {showExtraColumns && people.map(p => (
                 <th key={`hdr-ext-cred-${p.id}`} className="p-1 text-right min-w-[60px] text-emerald-300 bg-slate-950 border-r border-slate-800 align-bottom sticky top-[60px] z-35 border-b-2 border-blue-500">
-                  <div className="flex flex-col items-end leading-tight text-[10px]">
+                  <div className="flex flex-col items-end leading-none text-[9px]">
                     <span>{p.name.split(' ')[0]}</span>
                     <span>Extra</span>
                   </div>
@@ -595,7 +595,7 @@ function DailySpreadsheetMatrix() {
               {accountBills.map(b => (
                 <th key={`hdr-bill-${b.id}`} className="p-1 text-right min-w-[70px] max-w-[80px] text-rose-300 bg-slate-950 group align-bottom sticky top-[60px] z-35 border-b-2 border-blue-500">
                   <div className="flex items-end justify-end gap-0.5">
-                    <div className="flex flex-col items-end leading-tight text-right break-words text-[10px] max-w-[60px]">
+                    <div className="flex flex-col items-end leading-none text-right break-words text-[9px] max-w-[60px]">
                       {b.name.split(' ').map((word, idx) => (
                         <span key={idx} className="block truncate max-w-[60px]">{word}</span>
                       ))}
@@ -612,28 +612,28 @@ function DailySpreadsheetMatrix() {
                 </th>
               ))}
               <th className="p-1 text-right min-w-[55px] text-rose-300 bg-slate-950 border-r border-slate-800 align-bottom sticky top-[60px] z-35 border-b-2 border-blue-500">
-                <div className="flex flex-col items-end leading-tight text-[10px]">
+                <div className="flex flex-col items-end leading-none text-[9px]">
                   <span>Other</span>
                 </div>
               </th>
 
               {/* Ending Balances */}
               <th className="p-1 text-right min-w-[65px] text-slate-200 bg-slate-950 align-bottom sticky top-[60px] z-35 border-b-2 border-blue-500">
-                <div className="flex flex-col items-end leading-tight text-[10px]">
+                <div className="flex flex-col items-end leading-none text-[9px]">
                   <span>Reg</span>
                   <span>Ending</span>
                 </div>
               </th>
               {showExtraColumns && (
                 <th className="p-1 text-right min-w-[65px] text-slate-200 bg-slate-950 align-bottom sticky top-[60px] z-35 border-b-2 border-blue-500">
-                  <div className="flex flex-col items-end leading-tight text-[10px]">
+                  <div className="flex flex-col items-end leading-none text-[9px]">
                     <span>Extra</span>
                     <span>Ending</span>
                   </div>
                 </th>
               )}
               <th className="p-1 text-right min-w-[65px] text-blue-300 font-extrabold bg-slate-950 border-r border-slate-800 align-bottom sticky top-[60px] z-35 border-b-2 border-blue-500">
-                <div className="flex flex-col items-end leading-tight text-[10px]">
+                <div className="flex flex-col items-end leading-none text-[9px]">
                   <span>Total</span>
                   <span>End</span>
                 </div>
@@ -645,10 +645,10 @@ function DailySpreadsheetMatrix() {
           {monthGroups.map(group => (
             <tbody key={group.monthKey} className="divide-y divide-slate-800/50 font-mono text-[10px]">
               {/* Sticky Month Divider Bar pinned right beneath the table header */}
-              <tr className="sticky top-[86px] z-30 shadow-md">
+              <tr className="sticky top-[100px] z-30 shadow-md">
                 <td
                   colSpan={100}
-                  className="py-1 px-3 bg-blue-950 text-blue-200 border-y border-blue-700/80 sticky left-0 top-[86px] z-30 shadow-sm"
+                  className="py-1 px-3 bg-blue-950 text-blue-200 border-y border-blue-700/80 sticky left-0 top-[100px] z-30 shadow-sm"
                 >
                   <div className="flex items-center gap-2 font-mono uppercase tracking-widest text-[11px] font-black">
                     <Calendar className="w-3.5 h-3.5 text-blue-400" />

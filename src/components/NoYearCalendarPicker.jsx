@@ -18,14 +18,40 @@ export function NoYearCalendarPicker({
   dueMonths,
   period = 'Monthly',
   onChange,
-  className = ''
+  className = '',
+  dropUp = false
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [placement, setPlacement] = useState(dropUp ? 'top' : 'bottom');
   const containerRef = useRef(null);
 
   // Compute normalized dueMonths using paydayUtils helper
   const currentMonths = getBillDueMonths({ period, dueMonths });
   const safeDay = Math.max(1, Math.min(31, parseInt(dueDay, 10) || 1));
+
+  // Auto-detect placement based on viewport space
+  useEffect(() => {
+    if (!isOpen || !containerRef.current) return;
+
+    const calculatePlacement = () => {
+      if (dropUp) {
+        setPlacement('top');
+        return;
+      }
+      const rect = containerRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      if (spaceBelow < 340 && spaceAbove > spaceBelow) {
+        setPlacement('top');
+      } else {
+        setPlacement('bottom');
+      }
+    };
+
+    calculatePlacement();
+    window.addEventListener('resize', calculatePlacement);
+    return () => window.removeEventListener('resize', calculatePlacement);
+  }, [isOpen, dropUp]);
 
   // Close popup when clicking outside or pressing Escape
   useEffect(() => {
@@ -147,7 +173,11 @@ export function NoYearCalendarPicker({
 
       {/* Calendar Popover Modal */}
       {isOpen && (
-        <div className="absolute left-0 top-full mt-1.5 z-50 w-72 p-3.5 bg-slate-900 border border-slate-700/90 rounded-xl shadow-2xl shadow-black/90 backdrop-blur-md animate-in fade-in zoom-in-95 duration-100">
+        <div className={`absolute z-50 w-72 p-3.5 bg-slate-900 border border-slate-700/90 rounded-xl shadow-2xl shadow-black/90 backdrop-blur-md animate-in fade-in zoom-in-95 duration-100 max-h-[80vh] overflow-y-auto ${
+          placement === 'top'
+            ? 'bottom-full mb-1.5 right-0 sm:right-auto sm:left-0'
+            : 'top-full mt-1.5 left-0'
+        }`}>
           {/* Header */}
           <div className="flex items-center justify-between pb-2 mb-3 border-b border-slate-800">
             <div className="flex items-center gap-2">

@@ -1404,7 +1404,7 @@ export function SettingsModal() {
                       addBill(newBillForm);
                       setNewBillForm({ name: '', amount: 0, period: 'Monthly', accountId: budget.accounts[0]?.id || '', dueDay: 1, paymentSource: 'Auto Pay', notes: '' });
                       setIsAddBillModalOpen(false);
-                    }} className="space-y-4">
+                    }} className="space-y-4 pb-12">
                       <div>
                         <label className="block text-xs font-medium text-slate-300 mb-1">Bill Name *</label>
                         <input
@@ -1509,6 +1509,7 @@ export function SettingsModal() {
                             dueDay={newBillForm.dueDay}
                             dueMonths={newBillForm.dueMonths}
                             period={newBillForm.period}
+                            dropUp={true}
                             onChange={({ dueDay, dueMonths }) => setNewBillForm({ ...newBillForm, dueDay, dueMonths })}
                             className="w-full justify-between px-3 py-2 bg-slate-950 rounded-xl"
                           />

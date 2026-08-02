@@ -15,7 +15,8 @@ import {
   SlidersHorizontal,
   Maximize2,
   Minimize2,
-  X
+  X,
+  Users
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis } from 'recharts';
 import { fmtMoney, fmtPct } from '../utils/formatters';
@@ -407,8 +408,53 @@ export function DashboardView() {
         const totalTargetMonthly = peopleList.reduce((sum, p) => sum + getPersonMonthlyTotal(p.id), 0);
         const totalSurplusMonthly = totalNetMonthly - totalTargetMonthly;
 
+        // Group bills by split pairing combination
+        const splitGroups = {};
+        (budget?.bills || []).filter(b => !b.isArchived).forEach(b => {
+          const monthlyCost = getBillMonthlyCost(b);
+          const splits = b.splits || {};
+          const activeEntries = Object.entries(splits).filter(([_, pct]) => parseFloat(pct) > 0);
+
+          let groupLabel = 'Unassigned';
+          if (activeEntries.length === 1) {
+            const pId = activeEntries[0][0];
+            const person = (budget?.people || []).find(p => p.id === pId);
+            groupLabel = `100% ${person ? person.name : pId}`;
+          } else if (activeEntries.length > 1) {
+            const names = activeEntries.map(([pId]) => {
+              const person = (budget?.people || []).find(p => p.id === pId);
+              return person ? person.name : pId;
+            });
+            groupLabel = names.join(' & ');
+          }
+
+          if (!splitGroups[groupLabel]) {
+            splitGroups[groupLabel] = {
+              label: groupLabel,
+              totalMonthlyCost: 0,
+              billsCount: 0,
+              participantPortions: {}
+            };
+          }
+
+          splitGroups[groupLabel].totalMonthlyCost += monthlyCost;
+          splitGroups[groupLabel].billsCount += 1;
+
+          if (activeEntries.length > 0) {
+            activeEntries.forEach(([pId, pct]) => {
+              const person = (budget?.people || []).find(p => p.id === pId);
+              const pName = person ? person.name : pId;
+              const portion = (monthlyCost * (parseFloat(pct) || 0)) / 100;
+              if (!splitGroups[groupLabel].participantPortions[pName]) {
+                splitGroups[groupLabel].participantPortions[pName] = 0;
+              }
+              splitGroups[groupLabel].participantPortions[pName] += portion;
+            });
+          }
+        });
+
         return (
-          <div className="space-y-2.5">
+          <div className="space-y-3">
             {peopleList.length > 0 && Math.abs(totalSurplusMonthly) >= 0.01 && (
               <div className={`p-2.5 rounded-xl flex items-center justify-between font-mono text-xs ${
                 totalSurplusMonthly > 0 
@@ -511,6 +557,64 @@ export function DashboardView() {
                 );
               })}
             </div>
+
+            {/* Grouped Split Pairings Breakdown */}
+            {Object.keys(splitGroups).length > 0 && (
+              <div className="pt-2.5 border-t border-slate-800/80 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-300 font-sans flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5 text-indigo-400" />
+                    Split Pairings &amp; Combined Bill Totals
+                  </span>
+                  <span className="text-[9px] font-mono text-slate-400">
+                    {Object.keys(splitGroups).length} Combination{Object.keys(splitGroups).length !== 1 ? 's' : ''}
+                  </span>
+                </div>
+
+                <div className="grid gap-2 grid-cols-1 sm:grid-cols-2">
+                  {Object.values(splitGroups).map(group => (
+                    <div key={group.label} className="p-3 rounded-xl bg-slate-900/50 border border-slate-800 space-y-2 text-xs font-mono">
+                      <div className="flex items-center justify-between pb-1.5 border-b border-slate-800/80">
+                        <span className="font-sans font-bold text-purple-300 text-[11px]">{group.label}</span>
+                        <span className="font-bold text-emerald-400 text-[11px]">
+                          {fmtMoney(group.totalMonthlyCost)}
+                          <span className="text-[9px] text-slate-400 font-normal font-sans ml-1">/ mo ({group.billsCount} bill{group.billsCount !== 1 ? 's' : ''})</span>
+                        </span>
+                      </div>
+
+                      <div className="space-y-1 text-[10px]">
+                        {Object.entries(group.participantPortions).map(([pName, portionAmt]) => {
+                          const person = (budget?.people || []).find(p => p.name === pName || p.id === pName);
+                          const isNonMonthly = person && (person.payFrequency === 'semi-monthly' || person.payFrequency === 'bi-weekly' || person.payFrequency === 'weekly');
+                          
+                          let perPaycheckAmt = portionAmt;
+                          if (person?.payFrequency === 'semi-monthly' || person?.payFrequency === 'bi-weekly') {
+                            perPaycheckAmt = portionAmt / 2;
+                          } else if (person?.payFrequency === 'weekly') {
+                            perPaycheckAmt = (portionAmt * 12) / 52;
+                          }
+
+                          return (
+                            <div key={pName} className="flex items-center justify-between text-slate-300">
+                              <span className="font-sans text-slate-400">{pName}:</span>
+                              <span className="font-bold text-slate-200">
+                                {fmtMoney(portionAmt)}
+                                <span className="text-[9px] text-slate-400 font-normal ml-1">/mo</span>
+                                {isNonMonthly && (
+                                  <span className="text-[9px] text-blue-300/90 font-normal ml-1.5">
+                                    ({fmtMoney(perPaycheckAmt)}/pay)
+                                  </span>
+                                )}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         );
       }

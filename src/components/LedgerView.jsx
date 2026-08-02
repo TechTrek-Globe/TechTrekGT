@@ -261,6 +261,26 @@ function DailySpreadsheetMatrix() {
     todayObj
   ]);
 
+  // Group matrix rows by month so each month gets its own tbody with a sticky month banner
+  const monthGroups = useMemo(() => {
+    const groups = [];
+    let currentGroup = null;
+    matrixData.forEach(row => {
+      if (!currentGroup || currentGroup.monthKey !== row.monthKey) {
+        currentGroup = {
+          monthKey: row.monthKey,
+          month: row.month,
+          year: row.year,
+          monthLabel: row.monthLabel,
+          rows: []
+        };
+        groups.push(currentGroup);
+      }
+      currentGroup.rows.push(row);
+    });
+    return groups;
+  }, [matrixData]);
+
   const containerRef = useRef(null);
 
   // Sync toolbar Month & Year selector to currently visible row as user scrolls
@@ -621,25 +641,29 @@ function DailySpreadsheetMatrix() {
             </tr>
           </thead>
 
-          {/* Matrix Rows (Continuous Multi-Month Stream) */}
-          <tbody className="divide-y divide-slate-800/50 font-mono text-[10px]">
-            {matrixData.map(row => {
-              const isFirstSelectedDay = row.month === selectedMonth && row.year === selectedYear && row.day === 1;
-              const rowRef = row.isToday ? todayRowRef : (isFirstSelectedDay ? firstSelectedMonthRowRef : null);
+          {/* Matrix Rows (Continuous Multi-Month Stream with Sticky Month Banners) */}
+          {monthGroups.map(group => (
+            <tbody key={group.monthKey} className="divide-y divide-slate-800/50 font-mono text-[10px]">
+              {/* Sticky Month Divider Bar pinned right beneath the table header */}
+              <tr className="sticky top-[86px] z-30 shadow-md">
+                <td
+                  colSpan={100}
+                  className="py-1 px-3 bg-blue-950 text-blue-200 border-y border-blue-700/80 sticky left-0 top-[86px] z-30 shadow-sm"
+                >
+                  <div className="flex items-center gap-2 font-mono uppercase tracking-widest text-[11px] font-black">
+                    <Calendar className="w-3.5 h-3.5 text-blue-400" />
+                    <span>{group.monthLabel}</span>
+                  </div>
+                </td>
+              </tr>
 
-              return (
-                <React.Fragment key={row.rowKey}>
-                  {row.isFirstDayOfMonth && (
-                    <tr className="bg-slate-900 border-y-2 border-blue-600/80 font-black text-xs text-blue-200 shadow-md">
-                      <td colSpan={100} className="py-1.5 px-3 bg-blue-950/90 text-blue-200 border-y border-blue-800/80 sticky left-0 z-20">
-                        <div className="flex items-center gap-2 font-mono uppercase tracking-widest text-[11px] font-black">
-                          <Calendar className="w-3.5 h-3.5 text-blue-400" />
-                          <span>{row.monthLabel}</span>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
+              {group.rows.map(row => {
+                const isFirstSelectedDay = row.month === selectedMonth && row.year === selectedYear && row.day === 1;
+                const rowRef = row.isToday ? todayRowRef : (isFirstSelectedDay ? firstSelectedMonthRowRef : null);
+
+                return (
                   <tr
+                    key={row.rowKey}
                     ref={rowRef}
                     data-month={row.month}
                     data-year={row.year}
@@ -759,10 +783,10 @@ function DailySpreadsheetMatrix() {
                         />
                       </td>
                     </tr>
-                </React.Fragment>
-              );
-            })}
-          </tbody>
+                );
+              })}
+            </tbody>
+          ))}
 
           {/* Matrix Footers (Sticky Totals) */}
           <tfoot className="sticky bottom-0 z-30 bg-slate-900 font-extrabold text-[10px] text-slate-100 border-t-2 border-slate-700 shadow-lg">

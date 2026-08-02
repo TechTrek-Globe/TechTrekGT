@@ -117,6 +117,7 @@ function DailySpreadsheetMatrix() {
   const people = budget.people || [];
 
   const isProgrammaticScrollRef = useRef(false);
+  const firstSelectedMonthRowRef = useRef(null);
 
   // Generous continuous 36-month timeline window (18 months back, 18 months forward)
   const monthList = useMemo(() => {
@@ -376,30 +377,30 @@ function DailySpreadsheetMatrix() {
         className="flex-1 min-h-0 overflow-auto matrix-scrollbar rounded-2xl border border-slate-800 glass-panel shadow-2xl relative"
       >
 
-        {/* Compact Sticky Toolbar - Tier 1 (top-0 z-40) */}
-        <div className="sticky top-0 z-40 bg-slate-900/95 backdrop-blur border-b border-slate-800 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 shadow-md">
-          <div className="flex items-center gap-2">
-            <Wallet className="w-4 h-4 text-emerald-400" />
-            <h3 className="text-xs font-black text-slate-100 uppercase tracking-wider">Daily Register Matrix &amp; Cash Flow</h3>
+        {/* Compact Sticky Toolbar - Tier 1 (top-0 z-40 h-9) */}
+        <div className="sticky top-0 z-40 bg-slate-950 border-b border-slate-800 px-3 py-1 h-9 flex items-center justify-between gap-2 shadow-md overflow-x-auto whitespace-nowrap text-xs">
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <Wallet className="w-3.5 h-3.5 text-emerald-400" />
+            <h3 className="text-[11px] font-black text-slate-100 uppercase tracking-wider hidden sm:inline">Daily Register Matrix</h3>
           </div>
 
           {/* Integrated KPI Metrics Pill Bar */}
-          <div className="hidden xl:flex items-center gap-3 bg-slate-950 px-3 py-1 rounded-xl border border-slate-800 text-[11px] font-mono">
+          <div className="hidden xl:flex items-center gap-2.5 bg-slate-900 px-2.5 py-0.5 rounded-lg border border-slate-800 text-[10px] font-mono flex-shrink-0">
             <div className="flex items-center gap-1">
               <span className="text-slate-400">Start:</span>
               <span className="text-slate-200 font-bold">{fmtMoney(matrixData[0]?.regBeg || 0)}</span>
             </div>
-            <div className="h-3 w-px bg-slate-800" />
+            <div className="h-2.5 w-px bg-slate-800" />
             <div className="flex items-center gap-1">
               <span className="text-slate-400">Deposits:</span>
               <span className="text-emerald-400 font-bold">+{fmtMoney(columnTotals.totalRegCredits)}</span>
             </div>
-            <div className="h-3 w-px bg-slate-800" />
+            <div className="h-2.5 w-px bg-slate-800" />
             <div className="flex items-center gap-1">
               <span className="text-slate-400">Bills:</span>
               <span className="text-rose-400 font-bold">-{fmtMoney(columnTotals.totalBills)}</span>
             </div>
-            <div className="h-3 w-px bg-slate-800" />
+            <div className="h-2.5 w-px bg-slate-800" />
             <div className="flex items-center gap-1">
               <span className="text-slate-400">End Total:</span>
               <span className={`font-bold ${finalEndingBalance < 0 ? 'text-rose-400' : 'text-blue-400'}`}>
@@ -408,14 +409,14 @@ function DailySpreadsheetMatrix() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2 flex-shrink-0">
             {/* Account Selector */}
-            <div className="flex items-center gap-1.5 bg-slate-800/90 hover:bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-700 hover:border-blue-500/50 shadow-sm transition-all text-xs">
-              <Filter className="w-3.5 h-3.5 text-blue-400" />
+            <div className="flex items-center gap-1 bg-slate-800/90 hover:bg-slate-800 px-2 py-0.5 rounded-lg border border-slate-700 hover:border-blue-500/50 shadow-sm transition-all text-xs">
+              <Filter className="w-3 h-3 text-blue-400" />
               <select
                 value={selectedAccountId}
                 onChange={e => setSelectedAccountId(e.target.value)}
-                className="bg-transparent text-xs font-bold text-slate-100 focus:outline-none cursor-pointer"
+                className="bg-transparent text-[11px] font-bold text-slate-100 focus:outline-none cursor-pointer"
               >
                 <option value="all" className="bg-slate-900 text-slate-100 py-1">All Accounts Combined</option>
                 {budget.accounts.map(acc => (
@@ -425,12 +426,12 @@ function DailySpreadsheetMatrix() {
             </div>
 
             {/* Month / Year Selector */}
-            <div className="flex items-center gap-1.5 bg-slate-800/90 hover:bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-700 hover:border-blue-500/50 shadow-sm transition-all text-xs">
-              <Calendar className="w-3.5 h-3.5 text-blue-400" />
+            <div className="flex items-center gap-1 bg-slate-800/90 hover:bg-slate-800 px-2 py-0.5 rounded-lg border border-slate-700 hover:border-blue-500/50 shadow-sm transition-all text-xs">
+              <Calendar className="w-3 h-3 text-blue-400" />
               <select
                 value={selectedMonth}
                 onChange={e => handleMonthSelect(parseInt(e.target.value))}
-                className="bg-transparent text-xs font-bold text-slate-100 focus:outline-none cursor-pointer"
+                className="bg-transparent text-[11px] font-bold text-slate-100 focus:outline-none cursor-pointer"
               >
                 {MONTHS.map((m, i) => (
                   <option key={i} value={i} className="bg-slate-900 text-slate-100 py-1">{m}</option>
@@ -440,7 +441,7 @@ function DailySpreadsheetMatrix() {
                 type="number"
                 value={selectedYear}
                 onChange={e => handleYearSelect(parseInt(e.target.value) || todayObj.getFullYear())}
-                className="w-14 bg-slate-900/60 border border-slate-700/80 rounded px-1 py-0.5 text-xs font-mono text-slate-100 font-bold focus:outline-none text-center focus:border-blue-400"
+                className="w-12 bg-slate-900/60 border border-slate-700/80 rounded px-1 py-0.5 text-[11px] font-mono text-slate-100 font-bold focus:outline-none text-center focus:border-blue-400"
               />
             </div>
 
@@ -456,10 +457,10 @@ function DailySpreadsheetMatrix() {
                   }
                 }, 50);
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/50 hover:border-amber-400 font-bold text-xs shadow-sm transition-all cursor-pointer active:scale-95"
+              className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/50 hover:border-amber-400 font-bold text-[11px] shadow-sm transition-all cursor-pointer active:scale-95"
               title="Jump to Today's Date"
             >
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <Sparkles className="w-3 h-3 text-amber-400" />
               <span>Today</span>
             </button>
 
@@ -468,15 +469,15 @@ function DailySpreadsheetMatrix() {
               <button
                 type="button"
                 onClick={() => setShowArchivedBills(!showArchivedBills)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border font-bold text-xs shadow-sm transition-all cursor-pointer ${
+                className={`flex items-center gap-1 px-2 py-0.5 rounded-lg border font-bold text-[11px] shadow-sm transition-all cursor-pointer ${
                   showArchivedBills
                     ? 'bg-amber-600/20 text-amber-300 border-amber-500/60'
                     : 'bg-slate-800/90 hover:bg-slate-800 text-amber-400 border-slate-700'
                 }`}
                 title="View & Restore Archived Bills"
               >
-                <Archive className="w-3.5 h-3.5 text-amber-400" />
-                <span>Archived Bills ({archivedBills.length})</span>
+                <Archive className="w-3 h-3 text-amber-400" />
+                <span>Archived ({archivedBills.length})</span>
               </button>
             )}
           </div>
@@ -484,14 +485,14 @@ function DailySpreadsheetMatrix() {
 
         {/* ARCHIVED BILLS RESTORATION DRAWER */}
         {showArchivedBills && archivedBills.length > 0 && (
-          <div className="p-3 bg-amber-950/20 border-b border-amber-800/40 flex flex-wrap items-center justify-between gap-2 text-xs animate-fade-in">
+          <div className="p-2 bg-amber-950/20 border-b border-amber-800/40 flex flex-wrap items-center justify-between gap-2 text-xs animate-fade-in">
             <div className="flex items-center gap-2 text-amber-300 font-bold">
-              <Archive className="w-4 h-4 text-amber-400" />
-              <span>Archived Bills (Preserved in Historical Matrix)</span>
+              <Archive className="w-3.5 h-3.5 text-amber-400" />
+              <span>Archived Bills</span>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {archivedBills.map(b => (
-                <div key={b.id} className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-900 border border-slate-700 rounded-lg text-slate-200 font-medium text-xs">
+                <div key={b.id} className="flex items-center gap-1.5 px-2 py-0.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-200 font-medium text-[11px]">
                   <span>{b.name} (${b.amount})</span>
                   <button
                     type="button"
@@ -508,33 +509,34 @@ function DailySpreadsheetMatrix() {
           </div>
         )}
 
-        <table className="w-full text-left text-[10px] border-collapse">
-          {/* Header Row 1 & 2: Sticky Tier 2 (top-[37px] z-30) */}
-          <thead className="sticky top-[37px] z-30 bg-slate-900 shadow-md">
-            <tr className="bg-slate-900 text-slate-400 uppercase font-extrabold text-[9px] tracking-wider border-b border-slate-800">
-              <th colSpan={2} className="p-1 text-center border-r border-slate-700 bg-slate-900 sticky left-0 z-40 shadow-[4px_0_8px_rgba(0,0,0,0.5)]">Date &amp; Day</th>
-              <th colSpan={showExtraColumns ? 2 : 1} className="p-1 text-center border-r-2 border-blue-600 bg-blue-900/90 text-blue-100 font-black shadow-sm">Beg Balances</th>
-              <th colSpan={people.length * (showExtraColumns ? 2 : 1)} className="p-1 text-center border-r border-slate-800 bg-emerald-950/80 text-emerald-300">Credits (Deposits)</th>
-              <th colSpan={accountBills.length + 1} className="p-1 text-center border-r border-slate-800 bg-rose-950/80 text-rose-300">Bills &amp; Deductions</th>
-              <th colSpan={showExtraColumns ? 3 : 2} className="p-1 text-center border-r border-slate-800 bg-purple-950/80 text-purple-300">Ending Balances</th>
-              <th className="p-1 text-center bg-slate-900">Notes</th>
+        <table className="w-full text-left text-[10px] border-separate border-spacing-0">
+          {/* Header Row 1 & 2: Sticky Tier 2 */}
+          <thead>
+            {/* Header Row 1: Category Banners */}
+            <tr className="bg-slate-950 text-slate-400 uppercase font-extrabold text-[9px] tracking-wider h-6">
+              <th colSpan={2} className="p-1 text-center border-r border-slate-700 bg-slate-950 sticky left-0 top-[36px] z-45 shadow-[4px_0_8px_rgba(0,0,0,0.5)]">Date &amp; Day</th>
+              <th colSpan={showExtraColumns ? 2 : 1} className="p-1 text-center border-r-2 border-blue-600 bg-blue-950 text-blue-100 font-black shadow-sm sticky top-[36px] z-35">Beg Balances</th>
+              <th colSpan={people.length * (showExtraColumns ? 2 : 1)} className="p-1 text-center border-r border-slate-800 bg-emerald-950 text-emerald-300 sticky top-[36px] z-35">Credits (Deposits)</th>
+              <th colSpan={accountBills.length + 1} className="p-1 text-center border-r border-slate-800 bg-rose-950 text-rose-300 sticky top-[36px] z-35">Bills &amp; Deductions</th>
+              <th colSpan={showExtraColumns ? 3 : 2} className="p-1 text-center border-r border-slate-800 bg-purple-950 text-purple-300 sticky top-[36px] z-35">Ending Balances</th>
+              <th className="p-1 text-center bg-slate-950 sticky top-[36px] z-35">Notes</th>
             </tr>
 
             {/* Header Row 2: Individual Columns (Stacked titles) */}
-            <tr className="bg-slate-900 text-slate-300 font-bold text-[10px] border-b border-slate-800">
+            <tr className="bg-slate-950 text-slate-300 font-bold text-[10px]">
               {/* Date & Day (Frozen Left) */}
-              <th className="p-1 min-w-[55px] w-[55px] bg-slate-900 sticky left-0 z-30 align-bottom shadow-[2px_0_5px_rgba(0,0,0,0.4)]">Date</th>
-              <th className="p-1 min-w-[55px] w-[55px] bg-slate-900 border-r border-slate-700 sticky left-[55px] z-30 align-bottom shadow-[4px_0_8px_rgba(0,0,0,0.5)]">Day</th>
+              <th className="p-1 min-w-[55px] w-[55px] bg-slate-950 sticky left-0 top-[60px] z-45 align-bottom shadow-[2px_0_5px_rgba(0,0,0,0.4)] border-b-2 border-blue-500">Date</th>
+              <th className="p-1 min-w-[55px] w-[55px] bg-slate-950 border-r border-slate-700 sticky left-[55px] top-[60px] z-45 align-bottom shadow-[4px_0_8px_rgba(0,0,0,0.5)] border-b-2 border-blue-500">Day</th>
 
               {/* Beg Balances */}
-              <th className="p-1 text-right min-w-[65px] bg-blue-950/90 text-blue-200 font-extrabold border-r border-blue-900/60 align-bottom">
+              <th className="p-1 text-right min-w-[65px] bg-blue-950 text-blue-200 font-extrabold border-r border-blue-900/60 align-bottom sticky top-[60px] z-35 border-b-2 border-blue-500">
                 <div className="flex flex-col items-end leading-tight text-[10px]">
                   <span>Beg</span>
                   <span>Bal</span>
                 </div>
               </th>
               {showExtraColumns && (
-                <th className="p-1 text-right min-w-[65px] border-r-2 border-blue-600 bg-blue-950/90 text-blue-200 font-extrabold align-bottom">
+                <th className="p-1 text-right min-w-[65px] border-r-2 border-blue-600 bg-blue-950 text-blue-200 font-extrabold align-bottom sticky top-[60px] z-35 border-b-2 border-blue-500">
                   <div className="flex flex-col items-end leading-tight text-[10px]">
                     <span>Extra</span>
                     <span>Beg</span>
@@ -544,7 +546,7 @@ function DailySpreadsheetMatrix() {
 
               {/* Credits */}
               {people.map(p => (
-                <th key={`hdr-cred-${p.id}`} className="p-1 text-right min-w-[60px] text-emerald-400 bg-slate-900 align-bottom">
+                <th key={`hdr-cred-${p.id}`} className="p-1 text-right min-w-[60px] text-emerald-400 bg-slate-950 align-bottom sticky top-[60px] z-35 border-b-2 border-blue-500">
                   <div className="flex flex-col items-end leading-tight text-[10px]">
                     <span>{p.name.split(' ')[0]}</span>
                     <span>Credit</span>
@@ -552,7 +554,7 @@ function DailySpreadsheetMatrix() {
                 </th>
               ))}
               {showExtraColumns && people.map(p => (
-                <th key={`hdr-ext-cred-${p.id}`} className="p-1 text-right min-w-[60px] text-emerald-300 bg-slate-900 border-r border-slate-800 align-bottom">
+                <th key={`hdr-ext-cred-${p.id}`} className="p-1 text-right min-w-[60px] text-emerald-300 bg-slate-950 border-r border-slate-800 align-bottom sticky top-[60px] z-35 border-b-2 border-blue-500">
                   <div className="flex flex-col items-end leading-tight text-[10px]">
                     <span>{p.name.split(' ')[0]}</span>
                     <span>Extra</span>
@@ -562,7 +564,7 @@ function DailySpreadsheetMatrix() {
 
               {/* Bill Columns */}
               {accountBills.map(b => (
-                <th key={`hdr-bill-${b.id}`} className="p-1 text-right min-w-[70px] max-w-[80px] text-rose-300 bg-slate-900 group align-bottom">
+                <th key={`hdr-bill-${b.id}`} className="p-1 text-right min-w-[70px] max-w-[80px] text-rose-300 bg-slate-950 group align-bottom sticky top-[60px] z-35 border-b-2 border-blue-500">
                   <div className="flex items-end justify-end gap-0.5">
                     <div className="flex flex-col items-end leading-tight text-right break-words text-[10px] max-w-[60px]">
                       {b.name.split(' ').map((word, idx) => (
@@ -580,28 +582,28 @@ function DailySpreadsheetMatrix() {
                   </div>
                 </th>
               ))}
-              <th className="p-1 text-right min-w-[55px] text-rose-300 bg-slate-900 border-r border-slate-800 align-bottom">
+              <th className="p-1 text-right min-w-[55px] text-rose-300 bg-slate-950 border-r border-slate-800 align-bottom sticky top-[60px] z-35 border-b-2 border-blue-500">
                 <div className="flex flex-col items-end leading-tight text-[10px]">
                   <span>Other</span>
                 </div>
               </th>
 
               {/* Ending Balances */}
-              <th className="p-1 text-right min-w-[65px] text-slate-200 bg-slate-900 align-bottom">
+              <th className="p-1 text-right min-w-[65px] text-slate-200 bg-slate-950 align-bottom sticky top-[60px] z-35 border-b-2 border-blue-500">
                 <div className="flex flex-col items-end leading-tight text-[10px]">
                   <span>Reg</span>
                   <span>Ending</span>
                 </div>
               </th>
               {showExtraColumns && (
-                <th className="p-1 text-right min-w-[65px] text-slate-200 bg-slate-900 align-bottom">
+                <th className="p-1 text-right min-w-[65px] text-slate-200 bg-slate-950 align-bottom sticky top-[60px] z-35 border-b-2 border-blue-500">
                   <div className="flex flex-col items-end leading-tight text-[10px]">
                     <span>Extra</span>
                     <span>Ending</span>
                   </div>
                 </th>
               )}
-              <th className="p-1 text-right min-w-[65px] text-blue-300 font-extrabold bg-slate-900 border-r border-slate-800 align-bottom">
+              <th className="p-1 text-right min-w-[65px] text-blue-300 font-extrabold bg-slate-950 border-r border-slate-800 align-bottom sticky top-[60px] z-35 border-b-2 border-blue-500">
                 <div className="flex flex-col items-end leading-tight text-[10px]">
                   <span>Total</span>
                   <span>End</span>
@@ -609,7 +611,7 @@ function DailySpreadsheetMatrix() {
               </th>
 
               {/* Notes */}
-              <th className="p-1 min-w-[90px] bg-slate-900 align-bottom">
+              <th className="p-1 min-w-[90px] bg-slate-950 align-bottom sticky top-[60px] z-35 border-b-2 border-blue-500">
                 <div className="flex flex-col items-start leading-tight text-[10px]">
                   <span>Other</span>
                   <span>Desc</span>

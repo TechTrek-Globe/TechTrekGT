@@ -512,22 +512,31 @@ function DailySpreadsheetMatrix() {
         <table className="w-full text-left text-[10px] border-separate border-spacing-0">
           {/* Header Row 1 & 2: Sticky Tier 2 */}
           <thead>
-            {/* Header Row 1: Category Banners */}
-            <tr className="bg-slate-950 text-slate-400 uppercase font-extrabold text-[9px] tracking-wider h-6">
-              <th colSpan={2} className="p-1 text-center border-r border-slate-700 bg-slate-950 sticky left-0 top-[36px] z-45 shadow-[4px_0_8px_rgba(0,0,0,0.5)]">Date &amp; Day</th>
+            {/* Header Row 1: Category Banners & Spanning Headers */}
+            <tr className="bg-slate-950 text-slate-300 uppercase font-extrabold text-[9px] tracking-wider h-6">
+              {/* Date & Day (Frozen Left Spanning Both Rows) */}
+              <th rowSpan={2} className="p-1 min-w-[70px] w-[70px] max-w-[70px] bg-slate-950 text-slate-200 font-bold sticky left-0 top-[36px] z-50 align-middle text-center border-b-2 border-blue-500 shadow-[2px_0_5px_rgba(0,0,0,0.5)]">
+                Date
+              </th>
+              <th rowSpan={2} className="p-1 min-w-[48px] w-[48px] max-w-[48px] bg-slate-950 text-slate-200 font-bold border-r border-slate-700 sticky left-[70px] top-[36px] z-50 align-middle text-center border-b-2 border-blue-500 shadow-[4px_0_8px_rgba(0,0,0,0.5)]">
+                Day
+              </th>
+
+              {/* Beg Balances Banner */}
               <th colSpan={showExtraColumns ? 2 : 1} className="p-1 text-center border-r-2 border-blue-600 bg-blue-950 text-blue-100 font-black shadow-sm sticky top-[36px] z-35">Beg Balances</th>
               <th colSpan={people.length * (showExtraColumns ? 2 : 1)} className="p-1 text-center border-r border-slate-800 bg-emerald-950 text-emerald-300 sticky top-[36px] z-35">Credits (Deposits)</th>
               <th colSpan={accountBills.length + 1} className="p-1 text-center border-r border-slate-800 bg-rose-950 text-rose-300 sticky top-[36px] z-35">Bills &amp; Deductions</th>
               <th colSpan={showExtraColumns ? 3 : 2} className="p-1 text-center border-r border-slate-800 bg-purple-950 text-purple-300 sticky top-[36px] z-35">Ending Balances</th>
-              <th className="p-1 text-center bg-slate-950 sticky top-[36px] z-35">Notes</th>
+              <th rowSpan={2} className="p-1 min-w-[90px] bg-slate-950 text-slate-300 font-bold sticky top-[36px] z-35 align-middle text-left border-b-2 border-blue-500">
+                <div className="flex flex-col items-start leading-tight text-[10px]">
+                  <span>Other</span>
+                  <span>Desc</span>
+                </div>
+              </th>
             </tr>
 
             {/* Header Row 2: Individual Columns (Stacked titles) */}
             <tr className="bg-slate-950 text-slate-300 font-bold text-[10px]">
-              {/* Date & Day (Frozen Left) */}
-              <th className="p-1 min-w-[55px] w-[55px] bg-slate-950 sticky left-0 top-[60px] z-45 align-bottom shadow-[2px_0_5px_rgba(0,0,0,0.4)] border-b-2 border-blue-500">Date</th>
-              <th className="p-1 min-w-[55px] w-[55px] bg-slate-950 border-r border-slate-700 sticky left-[55px] top-[60px] z-45 align-bottom shadow-[4px_0_8px_rgba(0,0,0,0.5)] border-b-2 border-blue-500">Day</th>
-
               {/* Beg Balances */}
               <th className="p-1 text-right min-w-[65px] bg-blue-950 text-blue-200 font-extrabold border-r border-blue-900/60 align-bottom sticky top-[60px] z-35 border-b-2 border-blue-500">
                 <div className="flex flex-col items-end leading-tight text-[10px]">
@@ -609,14 +618,6 @@ function DailySpreadsheetMatrix() {
                   <span>End</span>
                 </div>
               </th>
-
-              {/* Notes */}
-              <th className="p-1 min-w-[90px] bg-slate-950 align-bottom sticky top-[60px] z-35 border-b-2 border-blue-500">
-                <div className="flex flex-col items-start leading-tight text-[10px]">
-                  <span>Other</span>
-                  <span>Desc</span>
-                </div>
-              </th>
             </tr>
           </thead>
 
@@ -654,7 +655,7 @@ function DailySpreadsheetMatrix() {
                     }`}
                   >
                       {/* Date (Frozen Left & Today Highlight) */}
-                      <td className={`p-1 font-black whitespace-nowrap min-w-[55px] w-[55px] sticky left-0 z-20 shadow-[2px_0_5px_rgba(0,0,0,0.4)] ${
+                      <td className={`p-1 font-black whitespace-nowrap min-w-[70px] w-[70px] max-w-[70px] sticky left-0 z-20 shadow-[2px_0_5px_rgba(0,0,0,0.4)] ${
                         row.isToday ? 'bg-amber-950 text-amber-300 border-l-4 border-l-amber-400 border-y border-y-amber-400/80' : 'bg-slate-900 text-slate-300'
                       }`}>
                         <span>{row.dateFormatted}</span>
@@ -666,7 +667,7 @@ function DailySpreadsheetMatrix() {
                       </td>
 
                       {/* Day of Week (Frozen Left & Today Highlight) */}
-                      <td className={`p-1 whitespace-nowrap min-w-[55px] w-[55px] border-r border-slate-700 sticky left-[55px] z-20 shadow-[4px_0_8px_rgba(0,0,0,0.5)] ${
+                      <td className={`p-1 whitespace-nowrap min-w-[48px] w-[48px] max-w-[48px] border-r border-slate-700 sticky left-[70px] z-20 shadow-[4px_0_8px_rgba(0,0,0,0.5)] ${
                         row.isToday ? 'bg-amber-950 text-amber-300 border-y border-y-amber-400/80' : 'bg-slate-900 text-slate-300'
                       }`}>
                         <span className={`px-1 py-0.5 rounded text-[9px] ${

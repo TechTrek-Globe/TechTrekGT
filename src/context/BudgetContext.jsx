@@ -51,21 +51,18 @@ export function BudgetProvider({ children }) {
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState('accounts'); // 'accounts' | 'people' | 'bills' | 'splits' | 'data'
-  const [activeView, setActiveView] = useState(() => {
-    try { return localStorage.getItem('trekledger_active_view') || 'dashboard'; }
-    catch { return 'dashboard'; }
-  });
+  const [activeView, setActiveView] = useState('dashboard');
   const isInitialCloudFetch = useRef(true);
+
+  useEffect(() => {
+    try { localStorage.removeItem('trekledger_active_view'); }
+    catch { /* ignore */ }
+  }, []);
 
   useEffect(() => {
     try { localStorage.setItem('trekledger_selected_person_id', selectedPersonId); }
     catch { /* ignore */ }
   }, [selectedPersonId]);
-
-  useEffect(() => {
-    try { localStorage.setItem('trekledger_active_view', activeView); }
-    catch { /* ignore */ }
-  }, [activeView]);
 
   // Fetch Cloud Budget when user logs in
   useEffect(() => {

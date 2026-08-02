@@ -3,7 +3,7 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import { initialBudgetData, DEFAULT_DASHBOARD_WIDGETS } from '../initialData';
 import { fakeDemoBudgetData } from '../demoPresetData';
 import { useAuth } from './AuthContext';
-import { isPersonDepositDay, getPersonDepositAmountForAccount, getNextBillDueDate, getBillDueMonths, isBillDueInMonth, formatBillDueMonths } from '../utils/paydayUtils';
+import { isPersonDepositDay, getPersonDepositAmountForAccount, getAccountSaveExtraPersonPortion, getNextBillDueDate, getBillDueMonths, isBillDueInMonth, formatBillDueMonths } from '../utils/paydayUtils';
 
 const BudgetContext = createContext();
 
@@ -538,7 +538,13 @@ export function BudgetProvider({ children }) {
   };
 
   const getPersonMonthlyTotal = (personId) => {
-    return (budget.bills || []).reduce((sum, b) => sum + getBillPersonMonthlyPortion(b, personId), 0);
+    const person = (budget.people || []).find(p => p.id === personId);
+    const billsTotal = (budget.bills || []).reduce((sum, b) => sum + getBillPersonMonthlyPortion(b, personId), 0);
+    if (!person) return billsTotal;
+    const extraSavingsTotal = (budget.accounts || []).reduce((sum, acc) => {
+      return sum + getAccountSaveExtraPersonPortion(acc, person, budget);
+    }, 0);
+    return billsTotal + extraSavingsTotal;
   };
 
   const getPersonPerPaycheckTotal = (personId) => {

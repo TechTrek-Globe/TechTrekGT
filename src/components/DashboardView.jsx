@@ -410,6 +410,18 @@ export function DashboardView() {
               const perPaycheckBill = getPersonPerPaycheckTotal(p.id);
               const pctOfNet = monthlyInc > 0 ? (billPortionSum / monthlyInc) * 100 : 0;
 
+              const netPerPay = parseFloat(p.netPerPay) || 0;
+              const perPaycheckDiff = netPerPay - perPaycheckBill;
+              const monthlyDiff = monthlyInc - billPortionSum;
+
+              const totalPerPaycheckDeposit = (budget?.accounts || []).reduce((sum, acc) => {
+                return sum + getPersonDepositAmountForAccount(p, acc.id);
+              }, 0);
+              let totalMonthlyDeposit = totalPerPaycheckDeposit;
+              if (p.payFrequency === 'semi-monthly') totalMonthlyDeposit = totalPerPaycheckDeposit * 2;
+              else if (p.payFrequency === 'bi-weekly') totalMonthlyDeposit = (totalPerPaycheckDeposit * 26) / 12;
+              else if (p.payFrequency === 'weekly') totalMonthlyDeposit = (totalPerPaycheckDeposit * 52) / 12;
+
               return (
                 <div key={p.id} className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2.5 text-xs">
                   <div className="flex items-center justify-between">
@@ -431,13 +443,37 @@ export function DashboardView() {
                   </div>
 
                   <div className="pt-2 border-t border-slate-800 flex items-center justify-between font-mono text-[11px]">
-                    <span className="text-slate-400 font-sans">Monthly Bill Share:</span>
+                    <span className="text-slate-400 font-sans">Monthly Bill &amp; Savings Share:</span>
                     <span className="text-purple-300 font-bold">{fmtMoney(billPortionSum)} ({fmtPct(pctOfNet)})</span>
                   </div>
                   <div className="flex items-center justify-between font-mono text-[10px]">
                     <span className="text-slate-400 font-sans">Per Paycheck Target:</span>
                     <span className="text-blue-300 font-bold">{fmtMoney(perPaycheckBill)}</span>
                   </div>
+
+                  {Math.abs(monthlyDiff) >= 0.01 && (
+                    monthlyDiff > 0 ? (
+                      <div className="pt-1.5 pb-1 px-2.5 rounded-lg bg-emerald-950/50 border border-emerald-800/60 flex items-center justify-between font-mono text-[10px]">
+                        <span className="text-emerald-300 font-sans font-semibold">Available for Savings:</span>
+                        <span className="text-emerald-400 font-bold">
+                          +{fmtMoney(perPaycheckDiff)}
+                          {p.payFrequency !== 'monthly' && (
+                            <span className="text-[9px] text-emerald-300/80 font-normal ml-1">({fmtMoney(monthlyDiff)}/mo)</span>
+                          )}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="pt-1.5 pb-1 px-2.5 rounded-lg bg-rose-950/50 border border-rose-800/60 flex items-center justify-between font-mono text-[10px]">
+                        <span className="text-rose-300 font-sans font-semibold">Paycheck Shortfall:</span>
+                        <span className="text-rose-400 font-bold">
+                          {fmtMoney(perPaycheckDiff)}
+                          {p.payFrequency !== 'monthly' && (
+                            <span className="text-[9px] text-rose-300/80 font-normal ml-1">({fmtMoney(monthlyDiff)}/mo)</span>
+                          )}
+                        </span>
+                      </div>
+                    )
+                  )}
 
                   {p.accountAllocations && typeof p.accountAllocations === 'object' && Object.values(p.accountAllocations).some(v => parseFloat(v) > 0 || v === 'remaining') && (
                     <div className="pt-2 border-t border-slate-800 space-y-1">
@@ -450,17 +486,31 @@ export function DashboardView() {
                           if (depositAmt <= 0 && rawVal !== 'remaining') return null;
                           const isRemaining = rawVal === 'remaining';
 
+                          let monthlyAccDeposit = depositAmt;
+                          if (p.payFrequency === 'semi-monthly') monthlyAccDeposit = depositAmt * 2;
+                          else if (p.payFrequency === 'bi-weekly') monthlyAccDeposit = (depositAmt * 26) / 12;
+                          else if (p.payFrequency === 'weekly') monthlyAccDeposit = (depositAmt * 52) / 12;
+
                           return (
                             <div key={acc.id} className="flex items-center justify-between text-slate-300">
                               <span className="font-sans text-slate-400 truncate max-w-[140px]">{acc.name}:</span>
-                              <span className="font-bold text-emerald-400">
-                                {fmtMoney(depositAmt)}
+                              <div className="text-right">
+                                <span className="font-bold text-emerald-400">{fmtMoney(depositAmt)}</span>
                                 {isRemaining && <span className="text-[9px] text-emerald-300/80 font-normal ml-1">(Remaining)</span>}
-                              </span>
+                                {p.payFrequency !== 'monthly' && (
+                                  <span className="text-[9px] text-slate-400 font-normal ml-1.5">({fmtMoney(monthlyAccDeposit)}/mo)</span>
+                                )}
+                              </div>
                             </div>
                           );
                         })}
                       </div>
+                      {p.payFrequency !== 'monthly' && (
+                        <div className="pt-1.5 mt-1 border-t border-slate-800/80 flex items-center justify-between font-mono text-[10px]">
+                          <span className="text-slate-400 font-sans font-medium">Total Monthly Deposit:</span>
+                          <span className="text-emerald-400 font-bold">{fmtMoney(totalMonthlyDeposit)}</span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

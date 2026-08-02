@@ -749,7 +749,7 @@ function DailySpreadsheetMatrix() {
                   colSpan={100}
                   className="py-1 px-3 bg-blue-950 text-blue-200 border-b border-blue-700/80 sticky left-0 top-[68px] z-30 shadow-sm"
                 >
-                  <div className="sticky left-[146px] inline-flex items-center gap-2 font-mono uppercase tracking-widest text-[11px] font-black z-30">
+                  <div className="sticky left-3 inline-flex items-center gap-2 font-mono uppercase tracking-widest text-[11px] font-black z-30">
                     <Calendar className="w-3.5 h-3.5 text-blue-400" />
                     <span>{group.monthLabel}</span>
                   </div>

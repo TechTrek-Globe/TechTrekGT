@@ -155,14 +155,22 @@ export async function verifyToken(token, secret) {
   }
 }
 
-// Extract token from request cookie or Authorization header
 export function getTokenFromRequest(request) {
-  const authHeader = request.headers.get('Authorization');
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    return authHeader.split(' ')[1];
-  }
-
+  // Check Cookie header first for auth_token
   const cookieHeader = request.headers.get('Cookie') || '';
   const match = cookieHeader.match(/(?:^|;\s*)auth_token=([^;]+)/);
-  return match ? match[1] : null;
+  if (match && match[1]) {
+    return match[1];
+  }
+
+  // Fall back to Authorization Bearer header if token is valid
+  const authHeader = request.headers.get('Authorization');
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.split(' ')[1];
+    if (token && token !== 'cookie-active' && token !== 'null' && token !== 'undefined') {
+      return token;
+    }
+  }
+
+  return null;
 }

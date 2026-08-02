@@ -160,19 +160,38 @@ export const MONTH_SHORT_NAMES = [
 export function getBillDueMonths(bill) {
   if (!bill) return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
   
+  const period = bill.period || 'Monthly';
+  if (period === 'Monthly') return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+
+  let rawMonths = [];
   if (Array.isArray(bill.dueMonths) && bill.dueMonths.length > 0) {
-    return bill.dueMonths.map(Number).filter(m => m >= 1 && m <= 12).sort((a, b) => a - b);
-  }
-  
-  if (bill.dueMonth) {
+    rawMonths = bill.dueMonths.map(Number).filter(m => m >= 1 && m <= 12).sort((a, b) => a - b);
+  } else if (bill.dueMonth) {
     const m = parseInt(bill.dueMonth, 10);
-    if (!isNaN(m) && m >= 1 && m <= 12) return [m];
+    if (!isNaN(m) && m >= 1 && m <= 12) rawMonths = [m];
   }
 
-  const period = bill.period || 'Monthly';
-  if (period === 'Annual') return [1];
-  if (period === 'Semi-Annual') return [1, 7];
-  if (period === 'Quarterly') return [1, 4, 7, 10];
+  if (period === 'Annual') {
+    return rawMonths.length > 0 ? [rawMonths[0]] : [1];
+  }
+
+  if (period === 'Semi-Annual') {
+    if (rawMonths.length === 2) return rawMonths;
+    if (rawMonths.length > 0 && rawMonths.length < 2) {
+      const secondMonth = ((rawMonths[0] + 5) % 12) + 1;
+      return [rawMonths[0], secondMonth].sort((a, b) => a - b);
+    }
+    return [1, 7];
+  }
+
+  if (period === 'Quarterly') {
+    if (rawMonths.length === 4) return rawMonths;
+    if (rawMonths.length > 0 && rawMonths.length < 4) {
+      const m1 = rawMonths[0];
+      return [m1, ((m1 + 2) % 12) + 1, ((m1 + 5) % 12) + 1, ((m1 + 8) % 12) + 1].sort((a, b) => a - b);
+    }
+    return [1, 4, 7, 10];
+  }
   
   return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 }

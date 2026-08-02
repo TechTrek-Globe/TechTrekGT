@@ -10,7 +10,7 @@ const BudgetContext = createContext();
 const STORAGE_KEY = 'personal_budget_app_data_v1';
 
 export function BudgetProvider({ children }) {
-  const { token, user } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [selectedPersonId, setSelectedPersonId] = useState(() => {
     try { return localStorage.getItem('trekledger_selected_person_id') || 'all'; }
     catch { return 'all'; }
@@ -66,10 +66,10 @@ export function BudgetProvider({ children }) {
   // Fetch Cloud Budget when user logs in
   useEffect(() => {
     async function fetchCloudBudget() {
-      if (!token) return;
+      if (!isAuthenticated) return;
       try {
         const res = await fetch('/api/budget', {
-          headers: { Authorization: `Bearer ${token}` }
+          credentials: 'include'
         });
         if (res.ok) {
           const data = await res.json();
@@ -98,7 +98,7 @@ export function BudgetProvider({ children }) {
       }
     }
     fetchCloudBudget();
-  }, [token]);
+  }, [isAuthenticated]);
 
   // Persist to localStorage whenever budget state changes
   useEffect(() => {
@@ -111,7 +111,7 @@ export function BudgetProvider({ children }) {
 
   // Sync to Cloudflare D1 database when budget updates (debounced)
   useEffect(() => {
-    if (!token) return;
+    if (!isAuthenticated) return;
     
     // Skip initial trigger right after loading cloud data
     if (isInitialCloudFetch.current) {
@@ -124,9 +124,9 @@ export function BudgetProvider({ children }) {
         await fetch('/api/budget', {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`
+            'Content-Type': 'application/json'
           },
+          credentials: 'include',
           body: JSON.stringify({ budget })
         });
       } catch (err) {
@@ -135,7 +135,7 @@ export function BudgetProvider({ children }) {
     }, 1000);
 
     return () => clearTimeout(timer);
-  }, [budget, token]);
+  }, [budget, isAuthenticated]);
 
   // Account Operations
   const addAccount = (accountData) => {

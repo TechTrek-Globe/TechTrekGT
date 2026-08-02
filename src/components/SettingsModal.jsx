@@ -1531,10 +1531,10 @@ export function SettingsModal() {
                                       onChange={e => {
                                         const p = e.target.value;
                                         let defaultM = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-                                        if (p === 'Annual') defaultM = [1];
+                                        if (p === 'Annual') defaultM = [(bill.dueMonths?.[0]) || 1];
                                         else if (p === 'Semi-Annual') defaultM = [1, 7];
                                         else if (p === 'Quarterly') defaultM = [1, 4, 7, 10];
-                                        updateBill(bill.id, { period: p, dueMonths: bill.dueMonths || defaultM });
+                                        updateBill(bill.id, { period: p, dueMonths: defaultM });
                                       }}
                                       className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-200"
                                     >

@@ -64,7 +64,7 @@ export function AppLayout({ children }) {
     const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(budget, null, 2));
     const a = document.createElement('a');
     a.setAttribute('href', dataStr);
-    a.setAttribute('download', `trekledger_${new Date().toISOString().split('T')[0]}.json`);
+    a.setAttribute('download', `techtrek_finance_${new Date().toISOString().split('T')[0]}.json`);
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -83,7 +83,7 @@ export function AppLayout({ children }) {
         </div>
         {!collapsed && (
           <div className="animate-fade-in overflow-hidden">
-            <h1 className="text-base font-black gradient-text leading-none">TrekLedger</h1>
+            <h1 className="text-base font-black gradient-text leading-none">TechTrek Finance</h1>
             <p className="text-[10px] text-slate-500 mt-0.5 leading-none">Personal Finance OS</p>
           </div>
         )}
@@ -212,15 +212,6 @@ export function AppLayout({ children }) {
             <Menu className="w-5 h-5" />
           </button>
 
-          {/* Breadcrumb */}
-          <div className="flex items-center gap-2 text-sm">
-            <span className={`text-xs font-medium ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>TrekLedger</span>
-            <span className={isLight ? 'text-slate-300' : 'text-slate-700'}>/</span>
-            <span className={`font-semibold flex items-center gap-1.5 ${isLight ? 'text-slate-900' : 'text-slate-200'}`}>
-              {currentNav && <currentNav.icon className={`w-3.5 h-3.5 ${currentNav.color}`} />}
-              {currentNav?.label ?? 'Dashboard'}
-            </span>
-          </div>
 
           {/* Spacer */}
           <div className="flex-1" />

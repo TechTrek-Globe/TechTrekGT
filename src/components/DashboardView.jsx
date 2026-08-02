@@ -711,14 +711,14 @@ export function DashboardView() {
 
       {/* Page Header */}
       {!hideDashboardHeader && (
-        <div className={`flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-6 rounded-2xl border shadow-xl relative transition-all ${
+        <div className={`flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-4 py-3 rounded-xl border shadow-md relative transition-all ${
           isLight ? 'bg-white border-slate-200 text-slate-900 shadow-slate-200/50' : 'bg-slate-900/80 border-slate-800 text-slate-100 shadow-slate-950/50'
         }`}>
           <div>
-            <h2 className="text-2xl font-black flex items-center gap-2">
+            <h2 className="text-lg font-black flex items-center gap-2">
               <span>Financial Dashboard</span>
             </h2>
-            <p className={`text-xs mt-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+            <p className={`text-[11px] mt-0.5 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
               {MONTHS[today.getMonth()]} {today.getFullYear()} &bull; Drag bottom-right corner to resize, drag headers to reorder
             </p>
           </div>
@@ -727,14 +727,14 @@ export function DashboardView() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => { setSettingsTab('dashboard'); setIsSettingsOpen(true); }}
-              className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-blue-900/30 transition-colors flex items-center gap-1.5"
+              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-[11px] font-semibold shadow shadow-blue-900/30 transition-colors flex items-center gap-1.5"
             >
               <SlidersHorizontal className="w-3.5 h-3.5" />
               Customize Layout
             </button>
             <button
               onClick={() => { setSettingsTab('bills'); setIsSettingsOpen(true); }}
-              className={`px-3.5 py-2 rounded-xl text-xs font-semibold border transition-colors ${
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold border transition-colors ${
                 isLight ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300' : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
               }`}
             >
@@ -743,12 +743,12 @@ export function DashboardView() {
             <button
               type="button"
               onClick={dismissHeader}
-              className={`p-2 rounded-xl border transition-colors ${
+              className={`p-1.5 rounded-lg border transition-colors ${
                 isLight ? 'bg-slate-100 hover:bg-rose-100 text-slate-500 hover:text-rose-600 border-slate-300' : 'bg-slate-800 hover:bg-rose-900/50 text-slate-400 hover:text-rose-300 border-slate-700'
               }`}
               title="Close / Hide Financial Dashboard header banner (Click X to dismiss)"
             >
-              <X className="w-4 h-4" />
+              <X className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>

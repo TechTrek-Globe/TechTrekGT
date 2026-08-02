@@ -401,123 +401,119 @@ export function DashboardView() {
           </div>
         );
 
-      case 'earner_splits':
+      case 'earner_splits': {
+        const peopleList = budget?.people || [];
+        const totalNetMonthly = peopleList.reduce((sum, p) => sum + getMonthlyNetIncome(p), 0);
+        const totalTargetMonthly = peopleList.reduce((sum, p) => sum + getPersonMonthlyTotal(p.id), 0);
+        const totalSurplusMonthly = totalNetMonthly - totalTargetMonthly;
+
         return (
-          <div className={`grid gap-3 ${isCompact ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2'}`}>
-            {(budget?.people || []).map(p => {
-              const monthlyInc = getMonthlyNetIncome(p);
-              const billPortionSum = getPersonMonthlyTotal(p.id);
-              const perPaycheckBill = getPersonPerPaycheckTotal(p.id);
-              const pctOfNet = monthlyInc > 0 ? (billPortionSum / monthlyInc) * 100 : 0;
+          <div className="space-y-2.5">
+            {peopleList.length > 0 && Math.abs(totalSurplusMonthly) >= 0.01 && (
+              <div className={`p-2.5 rounded-xl flex items-center justify-between font-mono text-xs ${
+                totalSurplusMonthly > 0 
+                  ? 'bg-emerald-950/50 border border-emerald-800/60 text-emerald-200' 
+                  : 'bg-rose-950/50 border border-rose-800/60 text-rose-200'
+              }`}>
+                <span className="font-sans font-semibold text-slate-300">
+                  {totalSurplusMonthly > 0 ? 'Total Household Available for Savings:' : 'Household Budget Shortfall:'}
+                </span>
+                <span className="font-bold text-sm">
+                  {totalSurplusMonthly > 0 ? `+${fmtMoney(totalSurplusMonthly)}` : fmtMoney(totalSurplusMonthly)}
+                  <span className="text-[10px] font-normal text-slate-400 ml-1">/ mo</span>
+                </span>
+              </div>
+            )}
 
-              const netPerPay = parseFloat(p.netPerPay) || 0;
-              const perPaycheckDiff = netPerPay - perPaycheckBill;
-              const monthlyDiff = monthlyInc - billPortionSum;
+            <div className={`grid gap-3 ${isCompact ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2'}`}>
+              {peopleList.map(p => {
+                const monthlyInc = getMonthlyNetIncome(p);
+                const billPortionSum = getPersonMonthlyTotal(p.id);
+                const perPaycheckBill = getPersonPerPaycheckTotal(p.id);
+                const pctOfNet = monthlyInc > 0 ? (billPortionSum / monthlyInc) * 100 : 0;
 
-              const totalPerPaycheckDeposit = (budget?.accounts || []).reduce((sum, acc) => {
-                return sum + getPersonDepositAmountForAccount(p, acc.id);
-              }, 0);
-              let totalMonthlyDeposit = totalPerPaycheckDeposit;
-              if (p.payFrequency === 'semi-monthly') totalMonthlyDeposit = totalPerPaycheckDeposit * 2;
-              else if (p.payFrequency === 'bi-weekly') totalMonthlyDeposit = (totalPerPaycheckDeposit * 26) / 12;
-              else if (p.payFrequency === 'weekly') totalMonthlyDeposit = (totalPerPaycheckDeposit * 52) / 12;
+                const totalPerPaycheckDeposit = (budget?.accounts || []).reduce((sum, acc) => {
+                  return sum + getPersonDepositAmountForAccount(p, acc.id);
+                }, 0);
+                let totalMonthlyDeposit = totalPerPaycheckDeposit;
+                if (p.payFrequency === 'semi-monthly') totalMonthlyDeposit = totalPerPaycheckDeposit * 2;
+                else if (p.payFrequency === 'bi-weekly') totalMonthlyDeposit = (totalPerPaycheckDeposit * 26) / 12;
+                else if (p.payFrequency === 'weekly') totalMonthlyDeposit = (totalPerPaycheckDeposit * 52) / 12;
 
-              return (
-                <div key={p.id} className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2.5 text-xs">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-bold text-slate-200">{p.name}</h4>
-                    <span className="text-[9px] px-2 py-0.5 rounded-full bg-purple-950 text-purple-300 border border-purple-800 font-semibold capitalize">
-                      {p.payFrequency}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 text-[10px] font-mono pt-1">
-                    <div>
-                      <span className="text-slate-500 block font-sans">Net / Pay:</span>
-                      <span className="text-slate-200 font-bold">{fmtMoney(p.netPerPay || 0)}</span>
+                return (
+                  <div key={p.id} className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2.5 text-xs">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-bold text-slate-200">{p.name}</h4>
+                      <span className="text-[9px] px-2 py-0.5 rounded-full bg-purple-950 text-purple-300 border border-purple-800 font-semibold capitalize">
+                        {p.payFrequency}
+                      </span>
                     </div>
-                    <div>
-                      <span className="text-slate-500 block font-sans">Monthly Net:</span>
-                      <span className="text-emerald-400 font-bold">{fmtMoney(monthlyInc)}</span>
+
+                    <div className="grid grid-cols-2 gap-2 text-[10px] font-mono pt-1">
+                      <div>
+                        <span className="text-slate-500 block font-sans">Net / Pay:</span>
+                        <span className="text-slate-200 font-bold">{fmtMoney(p.netPerPay || 0)}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block font-sans">Monthly Net:</span>
+                        <span className="text-emerald-400 font-bold">{fmtMoney(monthlyInc)}</span>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="pt-2 border-t border-slate-800 flex items-center justify-between font-mono text-[11px]">
-                    <span className="text-slate-400 font-sans">Monthly Bill &amp; Savings Share:</span>
-                    <span className="text-purple-300 font-bold">{fmtMoney(billPortionSum)} ({fmtPct(pctOfNet)})</span>
-                  </div>
-                  <div className="flex items-center justify-between font-mono text-[10px]">
-                    <span className="text-slate-400 font-sans">Per Paycheck Target:</span>
-                    <span className="text-blue-300 font-bold">{fmtMoney(perPaycheckBill)}</span>
-                  </div>
+                    <div className="pt-2 border-t border-slate-800 flex items-center justify-between font-mono text-[11px]">
+                      <span className="text-slate-400 font-sans">Monthly Bill &amp; Savings Share:</span>
+                      <span className="text-purple-300 font-bold">{fmtMoney(billPortionSum)} ({fmtPct(pctOfNet)})</span>
+                    </div>
+                    <div className="flex items-center justify-between font-mono text-[10px]">
+                      <span className="text-slate-400 font-sans">Per Paycheck Target:</span>
+                      <span className="text-blue-300 font-bold">{fmtMoney(perPaycheckBill)}</span>
+                    </div>
 
-                  {Math.abs(monthlyDiff) >= 0.01 && (
-                    monthlyDiff > 0 ? (
-                      <div className="pt-1.5 pb-1 px-2.5 rounded-lg bg-emerald-950/50 border border-emerald-800/60 flex items-center justify-between font-mono text-[10px]">
-                        <span className="text-emerald-300 font-sans font-semibold">Available for Savings:</span>
-                        <span className="text-emerald-400 font-bold">
-                          +{fmtMoney(perPaycheckDiff)}
-                          {p.payFrequency !== 'monthly' && (
-                            <span className="text-[9px] text-emerald-300/80 font-normal ml-1">({fmtMoney(monthlyDiff)}/mo)</span>
-                          )}
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="pt-1.5 pb-1 px-2.5 rounded-lg bg-rose-950/50 border border-rose-800/60 flex items-center justify-between font-mono text-[10px]">
-                        <span className="text-rose-300 font-sans font-semibold">Paycheck Shortfall:</span>
-                        <span className="text-rose-400 font-bold">
-                          {fmtMoney(perPaycheckDiff)}
-                          {p.payFrequency !== 'monthly' && (
-                            <span className="text-[9px] text-rose-300/80 font-normal ml-1">({fmtMoney(monthlyDiff)}/mo)</span>
-                          )}
-                        </span>
-                      </div>
-                    )
-                  )}
+                    {p.accountAllocations && typeof p.accountAllocations === 'object' && Object.values(p.accountAllocations).some(v => parseFloat(v) > 0 || v === 'remaining') && (
+                      <div className="pt-2 border-t border-slate-800 space-y-1">
+                        <span className="text-[10px] text-purple-300 font-semibold block font-sans">Direct Deposit Allocations (Per Paycheck):</span>
+                        <div className="space-y-0.5 font-mono text-[10px]">
+                          {(budget?.accounts || []).map(acc => {
+                            const rawVal = p.accountAllocations?.[acc.id];
+                            if (!rawVal && rawVal !== 0 && rawVal !== 'remaining') return null;
+                            const depositAmt = getPersonDepositAmountForAccount(p, acc.id);
+                            if (depositAmt <= 0 && rawVal !== 'remaining') return null;
+                            const isRemaining = rawVal === 'remaining';
 
-                  {p.accountAllocations && typeof p.accountAllocations === 'object' && Object.values(p.accountAllocations).some(v => parseFloat(v) > 0 || v === 'remaining') && (
-                    <div className="pt-2 border-t border-slate-800 space-y-1">
-                      <span className="text-[10px] text-purple-300 font-semibold block font-sans">Direct Deposit Allocations (Per Paycheck):</span>
-                      <div className="space-y-0.5 font-mono text-[10px]">
-                        {(budget?.accounts || []).map(acc => {
-                          const rawVal = p.accountAllocations?.[acc.id];
-                          if (!rawVal && rawVal !== 0 && rawVal !== 'remaining') return null;
-                          const depositAmt = getPersonDepositAmountForAccount(p, acc.id);
-                          if (depositAmt <= 0 && rawVal !== 'remaining') return null;
-                          const isRemaining = rawVal === 'remaining';
+                            let monthlyAccDeposit = depositAmt;
+                            if (p.payFrequency === 'semi-monthly') monthlyAccDeposit = depositAmt * 2;
+                            else if (p.payFrequency === 'bi-weekly') monthlyAccDeposit = (depositAmt * 26) / 12;
+                            else if (p.payFrequency === 'weekly') monthlyAccDeposit = (depositAmt * 52) / 12;
 
-                          let monthlyAccDeposit = depositAmt;
-                          if (p.payFrequency === 'semi-monthly') monthlyAccDeposit = depositAmt * 2;
-                          else if (p.payFrequency === 'bi-weekly') monthlyAccDeposit = (depositAmt * 26) / 12;
-                          else if (p.payFrequency === 'weekly') monthlyAccDeposit = (depositAmt * 52) / 12;
-
-                          return (
-                            <div key={acc.id} className="flex items-center justify-between text-slate-300">
-                              <span className="font-sans text-slate-400 truncate max-w-[140px]">{acc.name}:</span>
-                              <div className="text-right">
-                                <span className="font-bold text-emerald-400">{fmtMoney(depositAmt)}</span>
-                                {isRemaining && <span className="text-[9px] text-emerald-300/80 font-normal ml-1">(Remaining)</span>}
-                                {p.payFrequency !== 'monthly' && (
-                                  <span className="text-[9px] text-slate-400 font-normal ml-1.5">({fmtMoney(monthlyAccDeposit)}/mo)</span>
-                                )}
+                            return (
+                              <div key={acc.id} className="flex items-center justify-between text-slate-300">
+                                <span className="font-sans text-slate-400 truncate max-w-[140px]">{acc.name}:</span>
+                                <div className="text-right">
+                                  <span className="font-bold text-emerald-400">{fmtMoney(depositAmt)}</span>
+                                  {isRemaining && <span className="text-[9px] text-emerald-300/80 font-normal ml-1">(Remaining)</span>}
+                                  {p.payFrequency !== 'monthly' && (
+                                    <span className="text-[9px] text-slate-400 font-normal ml-1.5">({fmtMoney(monthlyAccDeposit)}/mo)</span>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                      {p.payFrequency !== 'monthly' && (
-                        <div className="pt-1.5 mt-1 border-t border-slate-800/80 flex items-center justify-between font-mono text-[10px]">
-                          <span className="text-slate-400 font-sans font-medium">Total Monthly Deposit:</span>
-                          <span className="text-emerald-400 font-bold">{fmtMoney(totalMonthlyDeposit)}</span>
+                            );
+                          })}
                         </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                        {p.payFrequency !== 'monthly' && (
+                          <div className="pt-1.5 mt-1 border-t border-slate-800/80 flex items-center justify-between font-mono text-[10px]">
+                            <span className="text-slate-400 font-sans font-medium">Total Monthly Deposit:</span>
+                            <span className="text-emerald-400 font-bold">{fmtMoney(totalMonthlyDeposit)}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         );
+      }
 
       case 'recent_activity':
         return (

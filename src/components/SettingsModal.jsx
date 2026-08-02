@@ -316,57 +316,58 @@ export function SettingsModal() {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in overflow-y-auto">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-5xl h-[85vh] max-h-[90vh] flex flex-col shadow-2xl overflow-hidden my-auto">
+    <div className="fixed inset-0 z-50 bg-slate-950 flex flex-col animate-fade-in w-screen h-screen overflow-hidden text-slate-100">
+      <div className="bg-slate-900 w-full h-full flex flex-col overflow-hidden">
         
-        {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/90">
-          <div>
-            <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2">
-              <span className="p-2 rounded-lg bg-blue-600/20 text-blue-400">
-                <Receipt className="w-5 h-5" />
-              </span>
-              Setup Accounts, People, Bills, Splits
-            </h2>
-            <p className="text-xs text-slate-400">Configure accounts, income, bills, and household split ratios</p>
+        {/* Compact Single-Row Header Bar */}
+        <div className="flex items-center justify-between px-4 py-2 bg-slate-950 border-b border-slate-800 gap-3 flex-shrink-0">
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span className="p-1.5 rounded-lg bg-blue-600/20 text-blue-400">
+              <Receipt className="w-4 h-4" />
+            </span>
+            <span className="font-bold text-xs sm:text-sm text-slate-100 hidden md:inline">Settings &amp; Setup</span>
           </div>
+
+          {/* Compact Navigation Tab Pills */}
+          <div className="flex items-center gap-1 overflow-x-auto py-0.5 no-scrollbar scrollbar-none flex-1 justify-center max-w-4xl">
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = settingsTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setSettingsTab(tab.id)}
+                  className={`flex items-center gap-1.5 py-1 px-2.5 text-xs font-semibold rounded-lg transition-all flex-shrink-0 cursor-pointer ${
+                    isActive
+                      ? 'bg-blue-600 text-white shadow-sm font-bold'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span className="truncate">{tab.label}</span>
+                  {tab.count !== undefined && (
+                    <span className={`px-1.5 py-0.2 text-[10px] rounded-full font-mono ${
+                      isActive ? 'bg-blue-700 text-blue-100' : 'bg-slate-800 text-slate-400'
+                    }`}>
+                      {tab.count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
           <button
             onClick={() => setIsSettingsOpen(false)}
-            className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors"
+            className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer flex-shrink-0"
+            title="Close Settings (Esc)"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Settings Navigation Tabs */}
-        <div className="grid grid-cols-4 sm:grid-cols-8 border-b border-slate-800 bg-slate-950/60 p-1.5 gap-1">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = settingsTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setSettingsTab(tab.id)}
-                className={`flex items-center justify-center space-x-1.5 py-2 px-2 text-xs font-semibold rounded-lg transition-all ${
-                  isActive
-                    ? 'bg-blue-600/25 text-blue-400 border border-blue-500/40 shadow-inner'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-                }`}
-              >
-                <Icon className="w-3.5 h-3.5 flex-shrink-0" />
-                <span className="truncate">{tab.label}</span>
-                {tab.count !== undefined && (
-                  <span className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] rounded-full bg-slate-800 text-slate-300 font-mono">
-                    {tab.count}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-
         {/* Tab Contents Area */}
-        <div className="flex-1 overflow-auto p-6 bg-slate-950/20">
+        <div className="flex-1 overflow-auto p-4 sm:p-5 bg-slate-950/20">
 
           {/* TAB 0: DASHBOARD WIDGETS MANAGER */}
           {settingsTab === 'dashboard' && (
@@ -1341,9 +1342,9 @@ export function SettingsModal() {
 
           {/* TAB 3: BILLS & ACCOUNT ASSIGNMENTS */}
           {settingsTab === 'bills' && (
-            <div className="space-y-6">
+            <div className="space-y-4">
               {/* Active / Archived Bills Filter Bar & Add Bill Button */}
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
                 <div className="flex items-center gap-2">
                   <button
                     type="button"

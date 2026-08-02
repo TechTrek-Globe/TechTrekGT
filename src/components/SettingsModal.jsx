@@ -316,8 +316,8 @@ export function SettingsModal() {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-5xl h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in overflow-y-auto">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-5xl h-[85vh] max-h-[90vh] flex flex-col shadow-2xl overflow-hidden my-auto">
         
         {/* Modal Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/90">
@@ -576,8 +576,8 @@ export function SettingsModal() {
 
               {/* Pop-up Modal: Add New Account */}
               {isAddAccountModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
-                  <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-5">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in overflow-y-auto">
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto my-auto">
                     <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                       <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
                         <div className="w-8 h-8 rounded-lg bg-blue-600/20 flex items-center justify-center text-blue-400">
@@ -829,8 +829,8 @@ export function SettingsModal() {
 
               {/* Pop-up Modal: Add New Person */}
               {isAddPersonModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
-                  <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-5">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in overflow-y-auto">
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto my-auto">
                     <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                       <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
                         <div className="w-8 h-8 rounded-lg bg-purple-600/20 flex items-center justify-center text-purple-400">
@@ -975,41 +975,83 @@ export function SettingsModal() {
                           <div className="flex items-center justify-between">
                             <label className="block text-xs font-semibold text-purple-300">Direct Deposit Allocations (Per Paycheck)</label>
                             {(() => {
-                              const totalAllocated = Object.values(newPersonForm.accountAllocations || {}).reduce((/** @type {number} */ sum, /** @type {any} */ val) => sum + (parseFloat(val) || 0), 0);
+                              const allocs = newPersonForm.accountAllocations || {};
+                              const totalAllocated = Object.values(allocs).reduce((/** @type {number} */ sum, /** @type {any} */ val) => sum + (val === 'remaining' ? 0 : (parseFloat(val) || 0)), 0);
+                              const hasRemaining = Object.values(allocs).includes('remaining');
                               const netPay = parseFloat(newPersonForm.netPerPay) || 0;
+                              const remVal = Math.max(0, netPay - totalAllocated);
+                              const isBalanced = (hasRemaining && totalAllocated <= netPay) || (Math.abs(totalAllocated - netPay) < 0.01 && netPay > 0);
                               return (
                                 <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
-                                  Math.abs(totalAllocated - netPay) < 0.01 && netPay > 0
+                                  isBalanced
                                     ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
                                     : 'bg-amber-950 text-amber-300 border border-amber-800'
                                 }`}>
-                                  Allocated: ${totalAllocated.toLocaleString('en-US', { minimumFractionDigits: 2 })} / ${netPay.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                  Allocated: ${totalAllocated.toLocaleString('en-US', { minimumFractionDigits: 2 })} {hasRemaining ? `+ Remaining ($${remVal.toLocaleString('en-US', { minimumFractionDigits: 2 })})` : `/ $${netPay.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
                                 </span>
                               );
                             })()}
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                             {budget.accounts.map(acc => {
-                              const val = newPersonForm.accountAllocations?.[acc.id] ?? '';
+                              const rawVal = newPersonForm.accountAllocations?.[acc.id];
+                              const isRemaining = rawVal === 'remaining';
+                              const val = isRemaining ? '' : (rawVal ?? '');
                               return (
-                                <div key={acc.id} className="flex items-center justify-between p-2 bg-slate-900/80 border border-slate-800 rounded-lg text-xs">
-                                  <span className="text-slate-300 font-medium truncate max-w-[130px]">{acc.name}</span>
-                                  <div className="flex items-center gap-1">
-                                    <span className="text-slate-500 font-mono">$</span>
-                                    <input
-                                      type="number"
-                                      step="0.01"
-                                      placeholder="0.00"
-                                      value={val}
-                                      onChange={e => {
-                                        const amount = parseFloat(e.target.value) || 0;
+                                <div key={acc.id} className={`flex items-center justify-between p-2 rounded-lg text-xs transition-colors ${
+                                  isRemaining ? 'bg-emerald-950/40 border border-emerald-800/60' : 'bg-slate-900/80 border border-slate-800'
+                                }`}>
+                                  <span className="text-slate-300 font-medium truncate max-w-[110px]">{acc.name}</span>
+                                  <div className="flex items-center gap-1.5">
+                                    {!isRemaining ? (
+                                      <>
+                                        <span className="text-slate-500 font-mono">$</span>
+                                        <input
+                                          type="number"
+                                          step="0.01"
+                                          placeholder="0.00"
+                                          value={val}
+                                          onChange={e => {
+                                            const amount = parseFloat(e.target.value) || 0;
+                                            setNewPersonForm({
+                                              ...newPersonForm,
+                                              accountAllocations: { ...(newPersonForm.accountAllocations || {}), [acc.id]: amount }
+                                            });
+                                          }}
+                                          className="w-20 px-2 py-1 bg-slate-950 border border-slate-700 rounded text-right text-slate-100 font-mono focus:outline-none focus:border-purple-500"
+                                        />
+                                      </>
+                                    ) : (
+                                      <span className="text-[10px] font-mono font-semibold text-emerald-400 px-1.5 py-0.5 bg-emerald-950 border border-emerald-800 rounded">
+                                        Remaining
+                                      </span>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const currentAlloc = { ...(newPersonForm.accountAllocations || {}) };
+                                        if (isRemaining) {
+                                          delete currentAlloc[acc.id];
+                                        } else {
+                                          Object.keys(currentAlloc).forEach(k => {
+                                            if (currentAlloc[k] === 'remaining') delete currentAlloc[k];
+                                          });
+                                          currentAlloc[acc.id] = 'remaining';
+                                        }
                                         setNewPersonForm({
                                           ...newPersonForm,
-                                          accountAllocations: { ...(newPersonForm.accountAllocations || {}), [acc.id]: amount }
+                                          accountAllocations: currentAlloc
                                         });
                                       }}
-                                      className="w-24 px-2 py-1 bg-slate-950 border border-slate-700 rounded text-right text-slate-100 font-mono focus:outline-none focus:border-purple-500"
-                                    />
+                                      className={`px-2 py-1 text-[10px] font-semibold rounded transition-colors ${
+                                        isRemaining
+                                          ? 'bg-emerald-500 text-slate-950 hover:bg-emerald-400'
+                                          : 'bg-slate-800 text-slate-300 hover:bg-purple-950 hover:text-purple-300 border border-slate-700'
+                                      }`}
+                                      title="Toggle Remaining (allocates all unallocated paycheck income to this account)"
+                                    >
+                                      {isRemaining ? 'Remaining ✓' : 'Set Remaining'}
+                                    </button>
                                   </div>
                                 </div>
                               );
@@ -1210,33 +1252,78 @@ export function SettingsModal() {
                           <div className="p-2.5 bg-slate-950/40 border border-slate-800 rounded-lg space-y-2">
                             <div className="flex items-center justify-between">
                               <span className="text-[11px] font-semibold text-purple-300">Direct Deposit Account Allocations (Per Paycheck):</span>
-                              <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
-                                Math.abs(totalAllocated - (person.netPerPay || 0)) < 0.01 && (person.netPerPay || 0) > 0
-                                  ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
-                                  : 'bg-amber-950 text-amber-300 border border-amber-800'
-                              }`}>
-                                Allocated: ${totalAllocated.toLocaleString('en-US', { minimumFractionDigits: 2 })} / ${(person.netPerPay || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                              </span>
+                              {(() => {
+                                const allocs = person.accountAllocations || {};
+                                const totalAlloc = Object.values(allocs).reduce((sum, val) => sum + (val === 'remaining' ? 0 : (parseFloat(val) || 0)), 0);
+                                const hasRem = Object.values(allocs).includes('remaining');
+                                const netPay = parseFloat(person.netPerPay) || 0;
+                                const remVal = Math.max(0, netPay - totalAlloc);
+                                const isBalanced = (hasRem && totalAlloc <= netPay) || (Math.abs(totalAlloc - netPay) < 0.01 && netPay > 0);
+                                return (
+                                  <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
+                                    isBalanced
+                                      ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                                      : 'bg-amber-950 text-amber-300 border border-amber-800'
+                                  }`}>
+                                    Allocated: ${totalAlloc.toLocaleString('en-US', { minimumFractionDigits: 2 })} {hasRem ? `+ Remaining ($${remVal.toLocaleString('en-US', { minimumFractionDigits: 2 })})` : `/ $${netPay.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+                                  </span>
+                                );
+                              })()}
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
                               {budget.accounts.map(acc => {
-                                const allocatedVal = person.accountAllocations?.[acc.id] ?? 0;
+                                const rawVal = person.accountAllocations?.[acc.id];
+                                const isRemaining = rawVal === 'remaining';
+                                const allocatedVal = isRemaining ? '' : (rawVal ?? '');
                                 return (
-                                  <div key={acc.id} className="flex items-center justify-between p-2 bg-slate-900/80 border border-slate-800 rounded-lg">
-                                    <span className="text-slate-300 font-medium truncate max-w-[130px]">{acc.name}</span>
-                                    <div className="flex items-center gap-1">
-                                      <span className="text-slate-500 font-mono">$</span>
-                                      <input
-                                        type="number"
-                                        step="0.01"
-                                        value={allocatedVal}
-                                        onChange={e => {
-                                          const val = parseFloat(e.target.value) || 0;
-                                          const newAlloc = { ...(person.accountAllocations || {}), [acc.id]: val };
+                                  <div key={acc.id} className={`flex items-center justify-between p-2 rounded-lg border transition-colors ${
+                                    isRemaining ? 'bg-emerald-950/40 border border-emerald-800/60' : 'bg-slate-900/80 border border-slate-800'
+                                  }`}>
+                                    <span className="text-slate-300 font-medium truncate max-w-[110px]">{acc.name}</span>
+                                    <div className="flex items-center gap-1.5">
+                                      {!isRemaining ? (
+                                        <>
+                                          <span className="text-slate-500 font-mono">$</span>
+                                          <input
+                                            type="number"
+                                            step="0.01"
+                                            value={allocatedVal}
+                                            onChange={e => {
+                                              const val = parseFloat(e.target.value) || 0;
+                                              const newAlloc = { ...(person.accountAllocations || {}), [acc.id]: val };
+                                              updatePerson(person.id, { accountAllocations: newAlloc });
+                                            }}
+                                            className="w-20 px-2 py-1 bg-slate-950 border border-slate-700 rounded text-right text-slate-100 font-mono focus:outline-none focus:border-purple-500"
+                                          />
+                                        </>
+                                      ) : (
+                                        <span className="text-[10px] font-mono font-semibold text-emerald-400 px-1.5 py-0.5 bg-emerald-950 border border-emerald-800 rounded">
+                                          Remaining
+                                        </span>
+                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const newAlloc = { ...(person.accountAllocations || {}) };
+                                          if (isRemaining) {
+                                            delete newAlloc[acc.id];
+                                          } else {
+                                            Object.keys(newAlloc).forEach(k => {
+                                              if (newAlloc[k] === 'remaining') delete newAlloc[k];
+                                            });
+                                            newAlloc[acc.id] = 'remaining';
+                                          }
                                           updatePerson(person.id, { accountAllocations: newAlloc });
                                         }}
-                                        className="w-24 px-2 py-1 bg-slate-950 border border-slate-700 rounded text-right text-slate-100 font-mono focus:outline-none focus:border-purple-500"
-                                      />
+                                        className={`px-2 py-1 text-[10px] font-semibold rounded transition-colors ${
+                                          isRemaining
+                                            ? 'bg-emerald-500 text-slate-950 hover:bg-emerald-400'
+                                            : 'bg-slate-800 text-slate-300 hover:bg-purple-950 hover:text-purple-300 border border-slate-700'
+                                        }`}
+                                        title="Toggle Remaining (allocates all unallocated paycheck income to this account)"
+                                      >
+                                        {isRemaining ? 'Remaining ✓' : 'Set Remaining'}
+                                      </button>
                                     </div>
                                   </div>
                                 );
@@ -1293,8 +1380,8 @@ export function SettingsModal() {
 
               {/* Pop-up Modal: Add New Bill */}
               {isAddBillModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
-                  <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-5">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in overflow-y-auto">
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto my-auto">
                     <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                       <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
                         <div className="w-8 h-8 rounded-lg bg-emerald-600/20 flex items-center justify-center text-emerald-400">

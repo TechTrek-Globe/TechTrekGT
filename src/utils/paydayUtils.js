@@ -129,14 +129,39 @@ export function getPersonDepositAmountForAccount(person, selectedAccountId = 'al
 
   const allocations = person.accountAllocations;
   if (allocations && typeof allocations === 'object' && Object.keys(allocations).length > 0) {
-    const allocated = parseFloat(allocations[selectedAccountId]);
-    if (!isNaN(allocated) && allocated > 0) {
-      return allocated;
+    let fixedSum = 0;
+    let hasAllocations = false;
+    let remainingAccountsCount = 0;
+
+    Object.entries(allocations).forEach(([accId, val]) => {
+      if (val === 'remaining') {
+        remainingAccountsCount++;
+        hasAllocations = true;
+      } else {
+        const amt = parseFloat(val);
+        if (!isNaN(amt) && amt > 0) {
+          fixedSum += amt;
+          hasAllocations = true;
+        }
+      }
+    });
+
+    if (!hasAllocations) {
+      return netPay;
     }
-    const totalAllocated = Object.values(allocations).reduce((sum, v) => sum + (parseFloat(v) || 0), 0);
-    if (totalAllocated > 0) {
-      return 0;
+
+    const targetVal = allocations[selectedAccountId];
+    if (targetVal === 'remaining') {
+      const remainingTotal = Math.max(0, netPay - fixedSum);
+      return remainingAccountsCount > 0 ? remainingTotal / remainingAccountsCount : remainingTotal;
     }
+
+    const allocatedNum = parseFloat(targetVal);
+    if (!isNaN(allocatedNum) && allocatedNum > 0) {
+      return allocatedNum;
+    }
+
+    return 0;
   }
 
   return netPay;

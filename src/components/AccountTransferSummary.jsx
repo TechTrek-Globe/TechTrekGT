@@ -71,7 +71,7 @@ export function AccountTransferSummary() {
     visiblePeople.forEach(p => {
       const defaultMode = (p.payFrequency === 'bi-weekly' || p.payFrequency === 'semi-monthly' || p.payFrequency === 'weekly') ? 'paycheck' : 'monthly';
       const mode = personPortionModes[p.id] || defaultMode;
-      const hasAllocations = p.accountAllocations && typeof p.accountAllocations === 'object' && Object.values(p.accountAllocations).some(v => parseFloat(v) > 0);
+      const hasAllocations = p.accountAllocations && typeof p.accountAllocations === 'object' && Object.values(p.accountAllocations).some(v => parseFloat(v) > 0 || v === 'remaining');
 
       let rawPortion = 0;
       if (basisMode === 'direct_deposit' || (basisMode === 'auto' && hasAllocations)) {

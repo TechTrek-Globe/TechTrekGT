@@ -58,6 +58,10 @@ export const fakeDemoBudgetData = {
       payDay2: 'last',
       grossPerPay: 3600.00,
       netPerPay: 2750.00,
+      accountAllocations: {
+        'acc-demo-1': 'remaining',
+        'acc-demo-2': 500.00
+      },
       color: 'purple'
     },
     {
@@ -69,6 +73,10 @@ export const fakeDemoBudgetData = {
       payDay2: 'last',
       grossPerPay: 4200.00,
       netPerPay: 3150.00,
+      accountAllocations: {
+        'acc-demo-1': 'remaining',
+        'acc-demo-2': 750.00
+      },
       color: 'emerald'
     }
   ],

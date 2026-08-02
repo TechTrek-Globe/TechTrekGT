@@ -800,47 +800,202 @@ export function SettingsModal() {
                             </div>
                           </div>
 
-                          {/* Save Extra Earner Split Breakdown */}
-                          {acc.saveExtraMonthly > 0 && (budget.people || []).length > 0 && (
-                            <div className="pt-2 border-t border-slate-800/80 space-y-1.5">
-                              <div className="flex items-center justify-between text-[11px]">
-                                <span className="font-semibold text-indigo-300">Earner Extra Savings Split:</span>
-                                <span className="text-[10px] text-slate-400 font-mono">
-                                  Total: ${acc.saveExtraMonthly.toLocaleString('en-US', { minimumFractionDigits: 2 })}/mo
-                                </span>
-                              </div>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                {budget.people.map(p => {
-                                  const monthlyPortion = getAccountSaveExtraPersonPortion(acc, p, budget);
-                                  const paycheckPortion = (p.payFrequency === 'bi-weekly' || p.payFrequency === 'semi-monthly')
-                                    ? monthlyPortion / 2
-                                    : p.payFrequency === 'weekly'
-                                      ? (monthlyPortion * 12) / 52
-                                      : monthlyPortion;
-                                  const pct = acc.saveExtraMonthly > 0 ? (monthlyPortion / acc.saveExtraMonthly) * 100 : 0;
+                          {/* Save Extra Earner Split Breakdown & % / $ Validation */}
+                          {acc.saveExtraMonthly > 0 && (budget.people || []).length > 0 && (() => {
+                            const people = budget.people || [];
+                            const splitType = acc.saveExtraSplitType || 'percentage'; // 'percentage' | 'amount'
+                            const isMultiPerson = people.length > 1;
 
-                                  return (
-                                    <div key={p.id} className="p-2 rounded bg-slate-900 border border-slate-800 flex items-center justify-between">
-                                      <div>
-                                        <span className="text-xs font-bold text-slate-200 block">{p.name}</span>
-                                        <span className="text-[10px] text-indigo-300 font-mono font-semibold">
-                                          ${monthlyPortion.toFixed(2)}/mo ({pct.toFixed(0)}%)
-                                        </span>
-                                      </div>
-                                      <div className="text-right">
-                                        <span className="text-emerald-400 font-mono font-bold text-xs block">
-                                          ${paycheckPortion.toFixed(2)}
-                                        </span>
-                                        <span className="text-[9px] text-slate-500 font-sans uppercase">
-                                          / {p.payFrequency === 'bi-weekly' ? 'check' : p.payFrequency === 'weekly' ? 'wk' : 'check'}
-                                        </span>
-                                      </div>
+                            // Compute current split values
+                            const currentSplits = acc.saveExtraSplits || {};
+                            
+                            // Calculate total split allocated
+                            let totalAllocated = 0;
+                            people.forEach(p => {
+                              if (currentSplits[p.id] !== undefined) {
+                                totalAllocated += parseFloat(currentSplits[p.id]) || 0;
+                              } else {
+                                if (splitType === 'percentage') {
+                                  totalAllocated += 100 / people.length;
+                                } else {
+                                  totalAllocated += acc.saveExtraMonthly / people.length;
+                                }
+                              }
+                            });
+
+                            const isValid = splitType === 'percentage'
+                              ? Math.abs(totalAllocated - 100) < 0.1
+                              : Math.abs(totalAllocated - acc.saveExtraMonthly) < 0.05;
+
+                            return (
+                              <div className="pt-2.5 border-t border-slate-800/80 space-y-2">
+                                {/* Header & Mode Switcher */}
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-[11px]">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-semibold text-indigo-300">Earner Extra Savings Split:</span>
+                                    {isValid ? (
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-800">
+                                        <CheckCircle2 className="w-3 h-3 text-emerald-400" /> {splitType === 'percentage' ? '100% Valid' : `$${totalAllocated.toFixed(2)} Valid`}
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-400 bg-rose-950/80 px-2 py-0.5 rounded border border-rose-800 animate-pulse">
+                                        <AlertTriangle className="w-3 h-3 text-rose-400" />
+                                        {splitType === 'percentage' ? `${totalAllocated.toFixed(1)}% (Must equal 100%)` : `$${totalAllocated.toFixed(2)} (Must equal $${acc.saveExtraMonthly.toFixed(2)})`}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {/* % vs $ Toggle */}
+                                  {isMultiPerson && (
+                                    <div className="flex items-center gap-1 bg-slate-900 p-0.5 rounded-lg border border-slate-800">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const newSplits = {};
+                                          people.forEach(p => {
+                                            newSplits[p.id] = Math.round((100 / people.length) * 10) / 10;
+                                          });
+                                          updateAccount(acc.id, { saveExtraSplitType: 'percentage', saveExtraSplits: newSplits });
+                                        }}
+                                        className={`px-2 py-0.5 text-[10px] font-bold rounded transition-all ${
+                                          splitType === 'percentage'
+                                            ? 'bg-blue-600 text-white shadow-sm'
+                                            : 'text-slate-400 hover:text-slate-200'
+                                        }`}
+                                      >
+                                        % Percentage
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const newSplits = {};
+                                          people.forEach(p => {
+                                            newSplits[p.id] = Math.round((acc.saveExtraMonthly / people.length) * 100) / 100;
+                                          });
+                                          updateAccount(acc.id, { saveExtraSplitType: 'amount', saveExtraSplits: newSplits });
+                                        }}
+                                        className={`px-2 py-0.5 text-[10px] font-bold rounded transition-all ${
+                                          splitType === 'amount'
+                                            ? 'bg-blue-600 text-white shadow-sm'
+                                            : 'text-slate-400 hover:text-slate-200'
+                                        }`}
+                                      >
+                                        $ Amount
+                                      </button>
                                     </div>
-                                  );
-                                })}
+                                  )}
+                                </div>
+
+                                {/* Quick Presets for Multi-Person */}
+                                {isMultiPerson && (
+                                  <div className="flex items-center justify-end gap-1.5 text-[10px]">
+                                    <span className="text-slate-500">Presets:</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const newSplits = {};
+                                        people.forEach(p => {
+                                          newSplits[p.id] = splitType === 'percentage'
+                                            ? Math.round((100 / people.length) * 10) / 10
+                                            : Math.round((acc.saveExtraMonthly / people.length) * 100) / 100;
+                                        });
+                                        updateAccount(acc.id, { saveExtraSplits: newSplits });
+                                      }}
+                                      className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-300 hover:text-white transition-colors"
+                                    >
+                                      Equal Split
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const totalNet = people.reduce((sum, p) => {
+                                          const net = parseFloat(p.netPerPay) || 0;
+                                          const freq = p.payFrequency || 'bi-weekly';
+                                          const mNet = freq === 'bi-weekly' ? (net * 26) / 12 : freq === 'weekly' ? (net * 52) / 12 : net * 2;
+                                          return sum + mNet;
+                                        }, 0);
+
+                                        const newSplits = {};
+                                        people.forEach(p => {
+                                          const net = parseFloat(p.netPerPay) || 0;
+                                          const freq = p.payFrequency || 'bi-weekly';
+                                          const mNet = freq === 'bi-weekly' ? (net * 26) / 12 : freq === 'weekly' ? (net * 52) / 12 : net * 2;
+                                          const ratio = totalNet > 0 ? mNet / totalNet : 1 / people.length;
+
+                                          newSplits[p.id] = splitType === 'percentage'
+                                            ? Math.round(ratio * 1000) / 10
+                                            : Math.round((acc.saveExtraMonthly * ratio) * 100) / 100;
+                                        });
+                                        updateAccount(acc.id, { saveExtraSplits: newSplits });
+                                      }}
+                                      className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-300 hover:text-white transition-colors"
+                                    >
+                                      Income Ratio
+                                    </button>
+                                  </div>
+                                )}
+
+                                {/* Per-Earner Editable Input Fields */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                  {people.map(p => {
+                                    const monthlyPortion = getAccountSaveExtraPersonPortion(acc, p, budget);
+                                    const paycheckPortion = (p.payFrequency === 'bi-weekly' || p.payFrequency === 'semi-monthly')
+                                      ? monthlyPortion / 2
+                                      : p.payFrequency === 'weekly'
+                                        ? (monthlyPortion * 12) / 52
+                                        : monthlyPortion;
+
+                                    const defaultVal = splitType === 'percentage'
+                                      ? Math.round((100 / people.length) * 10) / 10
+                                      : Math.round((acc.saveExtraMonthly / people.length) * 100) / 100;
+
+                                    const currentVal = currentSplits[p.id] !== undefined ? currentSplits[p.id] : defaultVal;
+
+                                    return (
+                                      <div key={p.id} className="p-2 rounded bg-slate-900 border border-slate-800 flex items-center justify-between gap-2">
+                                        <div className="flex-1 min-w-0">
+                                          <span className="text-xs font-bold text-slate-200 block truncate">{p.name}</span>
+                                          <span className="text-[10px] text-indigo-300 font-mono font-semibold">
+                                            ${monthlyPortion.toFixed(2)}/mo
+                                          </span>
+                                        </div>
+
+                                        {/* Editable Input for % or $ */}
+                                        {isMultiPerson ? (
+                                          <div className="flex items-center gap-1">
+                                            {splitType === 'amount' && <span className="text-xs text-slate-400 font-mono">$</span>}
+                                            <input
+                                              type="number"
+                                              step={splitType === 'percentage' ? '1' : '5'}
+                                              min="0"
+                                              max={splitType === 'percentage' ? '100' : acc.saveExtraMonthly}
+                                              value={currentVal}
+                                              onChange={e => {
+                                                const val = parseFloat(e.target.value) || 0;
+                                                const updated = { ...currentSplits, [p.id]: val };
+                                                updateAccount(acc.id, { saveExtraSplits: updated });
+                                              }}
+                                              className="w-16 bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-xs font-bold font-mono text-emerald-400 text-center focus:outline-none focus:border-blue-500"
+                                            />
+                                            {splitType === 'percentage' && <span className="text-xs text-slate-400">%</span>}
+                                          </div>
+                                        ) : (
+                                          <div className="text-right">
+                                            <span className="text-emerald-400 font-mono font-bold text-xs block">
+                                              ${paycheckPortion.toFixed(2)}
+                                            </span>
+                                            <span className="text-[9px] text-slate-500 font-sans uppercase">
+                                              / {p.payFrequency === 'bi-weekly' ? 'check' : p.payFrequency === 'weekly' ? 'wk' : 'check'}
+                                            </span>
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
                               </div>
-                            </div>
-                          )}
+                            );
+                          })()}
                         </div>
                       )}
                     </div>

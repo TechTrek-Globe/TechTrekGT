@@ -180,9 +180,16 @@ export function getAccountSaveExtraPersonPortion(account, person, budget) {
   const totalExtra = parseFloat(account.saveExtraMonthly) || 0;
   if (totalExtra <= 0 || !person) return 0;
 
-  if (account.saveExtraSplits && typeof account.saveExtraSplits === 'object' && account.saveExtraSplits[person.id] !== undefined) {
-    const pct = parseFloat(account.saveExtraSplits[person.id]) || 0;
-    return (totalExtra * pct) / 100;
+  const splits = account.saveExtraSplits;
+  const splitType = account.saveExtraSplitType || 'percentage';
+
+  if (splits && typeof splits === 'object' && splits[person.id] !== undefined) {
+    const val = parseFloat(splits[person.id]) || 0;
+    if (splitType === 'amount') {
+      return val;
+    } else {
+      return (totalExtra * val) / 100;
+    }
   }
 
   const people = budget?.people || [];

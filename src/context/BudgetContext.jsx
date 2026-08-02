@@ -655,6 +655,36 @@ export function BudgetProvider({ children }) {
     }));
   };
 
+  const updateDailyMatrixCells = (updates) => {
+    setBudget(prev => ({
+      ...prev,
+      dailyMatrix: {
+        ...(prev.dailyMatrix || {}),
+        ...updates
+      }
+    }));
+  };
+
+  const moveDailyMatrixCell = (accountId, sourceMonthKey, sourceDay, targetMonthKey, targetDay, field, value, extraData = {}) => {
+    const sourceKey = `${accountId}_${sourceMonthKey}_${sourceDay}_${field}`;
+    const targetKey = `${accountId}_${targetMonthKey}_${targetDay}_${field}`;
+
+    const updates = {
+      [sourceKey]: 0,
+      [targetKey]: value
+    };
+
+    if (field === 'other_amount') {
+      const sourceDescKey = `${accountId}_${sourceMonthKey}_${sourceDay}_other_desc`;
+      const targetDescKey = `${accountId}_${targetMonthKey}_${targetDay}_other_desc`;
+      const sourceDesc = extraData.otherDesc ?? (budget.dailyMatrix?.[sourceDescKey] || '');
+      updates[sourceDescKey] = '';
+      updates[targetDescKey] = sourceDesc;
+    }
+
+    updateDailyMatrixCells(updates);
+  };
+
   const getDashboardWidgets = () => {
     if (budget.dashboardWidgets && Array.isArray(budget.dashboardWidgets) && budget.dashboardWidgets.length > 0) {
       return budget.dashboardWidgets;
@@ -784,6 +814,8 @@ export function BudgetProvider({ children }) {
         getAccountActualEndBalance,
         getDailyMatrixCell,
         updateDailyMatrixCell,
+        updateDailyMatrixCells,
+        moveDailyMatrixCell,
         // calculations
         getMonthlyNetIncome,
         getMonthlyGrossIncome,

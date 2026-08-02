@@ -14,7 +14,8 @@ import {
   ArrowDownRight,
   Info,
   Archive,
-  RotateCcw
+  RotateCcw,
+  GripVertical
 } from 'lucide-react';
 import { InlineEdit } from './InlineEdit';
 
@@ -36,34 +37,58 @@ function fmtGrid(val) {
   return fmtMoney(val);
 }
 
-// Inline cell editor for matrix cells
-function MatrixCell({ value, onCommit, isCredit = false, isBill = false, isTotal = false, isNegative = false }) {
+// Inline cell editor for matrix cells with Drag & Drop capability
+const MatrixCell = React.memo(function MatrixCell({
+  value,
+  onCommit,
+  isCredit = false,
+  isBill = false,
+  isTotal = false,
+  isNegative = false,
+  draggable = false,
+  onDragStart,
+  onDragEnd,
+  isDragging = false
+}) {
   const isZero = !value || value === 0;
 
   return (
-    <InlineEdit
-      value={value || 0}
-      type="currency"
-      onCommit={onCommit}
-      displayFn={() => (
-        <span
-          className={`font-mono text-[10px] ${
-            isTotal
-              ? isNegative ? 'text-rose-400 font-bold' : 'text-slate-100 font-bold'
-              : isCredit
-                ? isZero ? 'text-slate-600' : 'text-emerald-400 font-semibold'
-                : isBill
-                  ? isZero ? 'text-slate-600' : 'text-rose-300 font-semibold'
-                  : isZero ? 'text-slate-600' : 'text-slate-300'
-          }`}
-        >
-          {fmtGrid(value)}
-        </span>
+    <div
+      draggable={draggable}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      className={`group/matrix relative flex items-center justify-end w-full ${
+        draggable ? 'cursor-grab active:cursor-grabbing select-none' : ''
+      } ${isDragging ? 'opacity-30 scale-90' : ''}`}
+      title={draggable ? 'Drag to move to a different date line, or click to edit' : undefined}
+    >
+      {draggable && (
+        <GripVertical className="w-2.5 h-2.5 text-slate-500 opacity-0 group-hover/matrix:opacity-70 transition-opacity absolute -left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
       )}
-      className="justify-end w-full"
-    />
+      <InlineEdit
+        value={value || 0}
+        type="currency"
+        onCommit={onCommit}
+        displayFn={() => (
+          <span
+            className={`font-mono text-[10px] ${
+              isTotal
+                ? isNegative ? 'text-rose-400 font-bold' : 'text-slate-100 font-bold'
+                : isCredit
+                  ? isZero ? 'text-slate-600' : 'text-emerald-400 font-semibold'
+                  : isBill
+                    ? isZero ? 'text-slate-600' : 'text-rose-300 font-semibold'
+                    : isZero ? 'text-slate-600' : 'text-slate-300'
+            }`}
+          >
+            {fmtGrid(value)}
+          </span>
+        )}
+        className="justify-end w-full"
+      />
+    </div>
   );
-}
+});
 
 // ==========================================
 // 1. MULTI-COLUMN DAILY SPREADSHEET MATRIX
@@ -74,6 +99,7 @@ function DailySpreadsheetMatrix() {
     getBillMonthlyCost,
     getDailyMatrixCell,
     updateDailyMatrixCell,
+    moveDailyMatrixCell,
     updateBill,
     archiveBill,
     unarchiveBill,
@@ -87,6 +113,85 @@ function DailySpreadsheetMatrix() {
   const [selectedMonth, setSelectedMonth] = useState(today.getMonth());
   const [selectedYear, setSelectedYear] = useState(today.getFullYear());
   const [showArchivedBills, setShowArchivedBills] = useState(false);
+
+  // Timeline window state (default 3 months back to 6 months forward relative to selected month for 75% faster DOM rendering)
+  const [monthsBack, setMonthsBack] = useState(3);
+  const [monthsForward, setMonthsForward] = useState(6);
+
+  // Drag and drop state for per-day matrix values
+  const [draggedCell, setDraggedCell] = useState(null);
+  const [dropTarget, setDropTarget] = useState(null);
+
+  const handleDragStart = useCallback((e, row, field, value, extraData = {}, label = '') => {
+    const payload = {
+      accountId: selectedAccountId,
+      sourceMonthKey: row.monthKey,
+      sourceDay: row.day,
+      field,
+      value,
+      extraData,
+      label
+    };
+    setDraggedCell(payload);
+    e.dataTransfer.effectAllowed = 'move';
+    try {
+      e.dataTransfer.setData('text/plain', JSON.stringify(payload));
+    } catch {
+      // ignore
+    }
+  }, [selectedAccountId]);
+
+  const handleDragEnd = useCallback(() => {
+    setDraggedCell(null);
+    setDropTarget(null);
+  }, []);
+
+  const handleDragOver = useCallback((e, row, field) => {
+    if (!draggedCell || draggedCell.field !== field) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  }, [draggedCell]);
+
+  const handleDragEnter = useCallback((e, row, field) => {
+    if (!draggedCell || draggedCell.field !== field) return;
+    e.preventDefault();
+    setDropTarget(prev => (prev?.rowKey === row.rowKey && prev?.field === field ? prev : { rowKey: row.rowKey, field }));
+  }, [draggedCell]);
+
+  const handleDragLeave = useCallback((e, row, field) => {
+    setDropTarget(prev => (prev?.rowKey === row.rowKey && prev?.field === field ? null : prev));
+  }, []);
+
+  const handleDrop = useCallback((e, targetRow, field) => {
+    e.preventDefault();
+    setDropTarget(null);
+    let payload = draggedCell;
+    if (!payload) {
+      try {
+        const raw = e.dataTransfer.getData('text/plain');
+        if (raw) payload = JSON.parse(raw);
+      } catch {
+        // ignore
+      }
+    }
+    if (!payload || payload.field !== field) return;
+    if (payload.sourceMonthKey === targetRow.monthKey && payload.sourceDay === targetRow.day) {
+      setDraggedCell(null);
+      return;
+    }
+
+    moveDailyMatrixCell(
+      selectedAccountId,
+      payload.sourceMonthKey,
+      payload.sourceDay,
+      targetRow.monthKey,
+      targetRow.day,
+      field,
+      payload.value,
+      payload.extraData
+    );
+    setDraggedCell(null);
+  }, [draggedCell, moveDailyMatrixCell, selectedAccountId]);
 
   const monthKey = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`;
   const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
@@ -119,15 +224,14 @@ function DailySpreadsheetMatrix() {
   const isProgrammaticScrollRef = useRef(false);
   const firstSelectedMonthRowRef = useRef(null);
 
-  // Generous continuous 36-month timeline window (18 months back, 18 months forward)
+  // Optimized continuous timeline window around current selected month
   const monthList = useMemo(() => {
     const list = [];
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth();
-    const startBase = new Date(currentYear, currentMonth - 18, 1);
+    const baseDate = new Date(selectedYear, selectedMonth, 1);
+    const startBase = new Date(baseDate.getFullYear(), baseDate.getMonth() - monthsBack, 1);
+    const totalCount = monthsBack + 1 + monthsForward;
 
-    for (let offset = 0; offset <= 36; offset++) {
+    for (let offset = 0; offset < totalCount; offset++) {
       const d = new Date(startBase.getFullYear(), startBase.getMonth() + offset, 1);
       const mYear = d.getFullYear();
       const mMonth = d.getMonth();
@@ -142,7 +246,7 @@ function DailySpreadsheetMatrix() {
       });
     }
     return list;
-  }, []);
+  }, [selectedYear, selectedMonth, monthsBack, monthsForward]);
 
   // Generate continuous daily matrix rows across monthList
   const matrixData = useMemo(() => {
@@ -719,43 +823,102 @@ function DailySpreadsheetMatrix() {
 
                       {/* Earner Credits */}
                       {people.map(p => (
-                        <td key={`cred-${row.rowKey}-${p.id}`} className="p-1 text-right min-w-[60px]">
+                        <td
+                          key={`cred-${row.rowKey}-${p.id}`}
+                          className={`p-1 text-right min-w-[60px] transition-colors relative ${
+                            dropTarget?.rowKey === row.rowKey && dropTarget?.field === `credit_${p.id}`
+                              ? 'bg-emerald-500/30 ring-2 ring-emerald-400 ring-inset shadow-[0_0_10px_rgba(16,185,129,0.3)]'
+                              : ''
+                          }`}
+                          onDragOver={e => handleDragOver(e, row, `credit_${p.id}`)}
+                          onDragEnter={e => handleDragEnter(e, row, `credit_${p.id}`)}
+                          onDragLeave={e => handleDragLeave(e, row, `credit_${p.id}`)}
+                          onDrop={e => handleDrop(e, row, `credit_${p.id}`)}
+                        >
                           <MatrixCell
                             value={row.personCredits[p.id]}
                             isCredit
                             onCommit={val => updateDailyMatrixCell(selectedAccountId, row.monthKey, row.day, `credit_${p.id}`, val)}
+                            draggable={Boolean(row.personCredits[p.id] && row.personCredits[p.id] > 0)}
+                            onDragStart={e => handleDragStart(e, row, `credit_${p.id}`, row.personCredits[p.id], {}, `${p.name.split(' ')[0]} Credit`)}
+                            onDragEnd={handleDragEnd}
+                            isDragging={draggedCell?.sourceMonthKey === row.monthKey && draggedCell?.sourceDay === row.day && draggedCell?.field === `credit_${p.id}`}
                           />
                         </td>
                       ))}
 
                       {/* Earner Extra Credits */}
                       {showExtraColumns && people.map(p => (
-                        <td key={`ext-cred-${row.rowKey}-${p.id}`} className="p-1 text-right border-r border-slate-800/80 min-w-[60px]">
+                        <td
+                          key={`ext-cred-${row.rowKey}-${p.id}`}
+                          className={`p-1 text-right border-r border-slate-800/80 min-w-[60px] transition-colors relative ${
+                            dropTarget?.rowKey === row.rowKey && dropTarget?.field === `extra_credit_${p.id}`
+                              ? 'bg-emerald-500/30 ring-2 ring-emerald-400 ring-inset shadow-[0_0_10px_rgba(16,185,129,0.3)]'
+                              : ''
+                          }`}
+                          onDragOver={e => handleDragOver(e, row, `extra_credit_${p.id}`)}
+                          onDragEnter={e => handleDragEnter(e, row, `extra_credit_${p.id}`)}
+                          onDragLeave={e => handleDragLeave(e, row, `extra_credit_${p.id}`)}
+                          onDrop={e => handleDrop(e, row, `extra_credit_${p.id}`)}
+                        >
                           <MatrixCell
                             value={row.personExtraCredits[p.id]}
                             isCredit
                             onCommit={val => updateDailyMatrixCell(selectedAccountId, row.monthKey, row.day, `extra_credit_${p.id}`, val)}
+                            draggable={Boolean(row.personExtraCredits[p.id] && row.personExtraCredits[p.id] > 0)}
+                            onDragStart={e => handleDragStart(e, row, `extra_credit_${p.id}`, row.personExtraCredits[p.id], {}, `${p.name.split(' ')[0]} Extra`)}
+                            onDragEnd={handleDragEnd}
+                            isDragging={draggedCell?.sourceMonthKey === row.monthKey && draggedCell?.sourceDay === row.day && draggedCell?.field === `extra_credit_${p.id}`}
                           />
                         </td>
                       ))}
 
                       {/* Individual Bill Columns */}
                       {accountBills.map(b => (
-                        <td key={`bill-${row.rowKey}-${b.id}`} className="p-1 text-right min-w-[70px]">
+                        <td
+                          key={`bill-${row.rowKey}-${b.id}`}
+                          className={`p-1 text-right min-w-[70px] transition-colors relative ${
+                            dropTarget?.rowKey === row.rowKey && dropTarget?.field === `bill_${b.id}`
+                              ? 'bg-rose-500/30 ring-2 ring-rose-400 ring-inset shadow-[0_0_10px_rgba(244,63,94,0.3)]'
+                              : ''
+                          }`}
+                          onDragOver={e => handleDragOver(e, row, `bill_${b.id}`)}
+                          onDragEnter={e => handleDragEnter(e, row, `bill_${b.id}`)}
+                          onDragLeave={e => handleDragLeave(e, row, `bill_${b.id}`)}
+                          onDrop={e => handleDrop(e, row, `bill_${b.id}`)}
+                        >
                           <MatrixCell
                             value={row.billValues[b.id]}
                             isBill
                             onCommit={val => updateDailyMatrixCell(selectedAccountId, row.monthKey, row.day, `bill_${b.id}`, val)}
+                            draggable={Boolean(row.billValues[b.id] && row.billValues[b.id] > 0)}
+                            onDragStart={e => handleDragStart(e, row, `bill_${b.id}`, row.billValues[b.id], {}, b.name)}
+                            onDragEnd={handleDragEnd}
+                            isDragging={draggedCell?.sourceMonthKey === row.monthKey && draggedCell?.sourceDay === row.day && draggedCell?.field === `bill_${b.id}`}
                           />
                         </td>
                       ))}
 
                       {/* Other Expense Column */}
-                      <td className="p-1 text-right border-r border-slate-800/80 min-w-[55px]">
+                      <td
+                        className={`p-1 text-right border-r border-slate-800/80 min-w-[55px] transition-colors relative ${
+                          dropTarget?.rowKey === row.rowKey && dropTarget?.field === 'other_amount'
+                            ? 'bg-rose-500/30 ring-2 ring-rose-400 ring-inset shadow-[0_0_10px_rgba(244,63,94,0.3)]'
+                            : ''
+                        }`}
+                        onDragOver={e => handleDragOver(e, row, 'other_amount')}
+                        onDragEnter={e => handleDragEnter(e, row, 'other_amount')}
+                        onDragLeave={e => handleDragLeave(e, row, 'other_amount')}
+                        onDrop={e => handleDrop(e, row, 'other_amount')}
+                      >
                         <MatrixCell
                           value={row.otherAmt}
                           isBill
                           onCommit={val => updateDailyMatrixCell(selectedAccountId, row.monthKey, row.day, 'other_amount', val)}
+                          draggable={Boolean(row.otherAmt && row.otherAmt > 0)}
+                          onDragStart={e => handleDragStart(e, row, 'other_amount', row.otherAmt, { otherDesc: row.otherDesc }, row.otherDesc ? `Other (${row.otherDesc})` : 'Other Expense')}
+                          onDragEnd={handleDragEnd}
+                          isDragging={draggedCell?.sourceMonthKey === row.monthKey && draggedCell?.sourceDay === row.day && draggedCell?.field === 'other_amount'}
                         />
                       </td>
 
@@ -839,6 +1002,13 @@ function DailySpreadsheetMatrix() {
         </table>
       </div>
 
+      {/* Floating Drag Indicator Pill */}
+      {draggedCell && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 border border-blue-500/80 text-blue-100 px-4 py-2 rounded-full shadow-2xl backdrop-blur flex items-center gap-2 text-xs font-medium pointer-events-none animate-bounce">
+          <Sparkles className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+          <span>Moving <strong>{draggedCell.label} ({fmtMoney(draggedCell.value)})</strong>: drop onto any date line to move</span>
+        </div>
+      )}
     </div>
   );
 }

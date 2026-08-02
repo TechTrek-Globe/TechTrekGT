@@ -28,7 +28,7 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { parseSpreadsheet } from '../utils/spreadsheetParser';
-import { MONTH_SHORT_NAMES, getBillDueMonths, formatBillDueMonths } from '../utils/paydayUtils';
+import { MONTH_SHORT_NAMES, getBillDueMonths, formatBillDueMonths, getAccountSaveExtraPersonPortion } from '../utils/paydayUtils';
 import { NoYearCalendarPicker } from './NoYearCalendarPicker';
 import { useAuth } from '../context/AuthContext';
 import { PRESET_SECURITY_QUESTIONS } from './AuthModal';
@@ -776,27 +776,71 @@ export function SettingsModal() {
                       </div>
 
                       {acc.enableExtraSavings !== false && (
-                        <div className="grid grid-cols-2 gap-3 text-xs p-2.5 bg-slate-950/40 border border-slate-800 rounded-lg">
-                          <div>
-                            <label className="text-indigo-300 font-medium block">Save Extra Target ($/mo)</label>
-                            <input
-                              type="number"
-                              step="10"
-                              value={acc.saveExtraMonthly || 0}
-                              onChange={e => updateAccount(acc.id, { saveExtraMonthly: parseFloat(e.target.value) || 0 })}
-                              className="mt-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-emerald-400 font-mono font-bold w-full focus:outline-none focus:border-blue-500"
-                            />
+                        <div className="space-y-3 p-3 bg-slate-950/40 border border-slate-800 rounded-lg">
+                          <div className="grid grid-cols-2 gap-3 text-xs">
+                            <div>
+                              <label className="text-indigo-300 font-medium block">Save Extra Target ($/mo)</label>
+                              <input
+                                type="number"
+                                step="10"
+                                value={acc.saveExtraMonthly || 0}
+                                onChange={e => updateAccount(acc.id, { saveExtraMonthly: parseFloat(e.target.value) || 0 })}
+                                className="mt-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-emerald-400 font-mono font-bold w-full focus:outline-none focus:border-blue-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-slate-400 block font-medium">Extra Current Balance ($)</label>
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={acc.extraStartingBalance || 0}
+                                onChange={e => updateAccount(acc.id, { extraStartingBalance: parseFloat(e.target.value) || 0 })}
+                                className="mt-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-slate-200 font-mono w-full focus:outline-none focus:border-blue-500"
+                              />
+                            </div>
                           </div>
-                          <div>
-                            <label className="text-slate-400 block font-medium">Extra Current Balance ($)</label>
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={acc.extraStartingBalance || 0}
-                              onChange={e => updateAccount(acc.id, { extraStartingBalance: parseFloat(e.target.value) || 0 })}
-                              className="mt-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-slate-200 font-mono w-full focus:outline-none focus:border-blue-500"
-                            />
-                          </div>
+
+                          {/* Save Extra Earner Split Breakdown */}
+                          {acc.saveExtraMonthly > 0 && (budget.people || []).length > 0 && (
+                            <div className="pt-2 border-t border-slate-800/80 space-y-1.5">
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="font-semibold text-indigo-300">Earner Extra Savings Split:</span>
+                                <span className="text-[10px] text-slate-400 font-mono">
+                                  Total: ${acc.saveExtraMonthly.toLocaleString('en-US', { minimumFractionDigits: 2 })}/mo
+                                </span>
+                              </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                {budget.people.map(p => {
+                                  const monthlyPortion = getAccountSaveExtraPersonPortion(acc, p, budget);
+                                  const paycheckPortion = (p.payFrequency === 'bi-weekly' || p.payFrequency === 'semi-monthly')
+                                    ? monthlyPortion / 2
+                                    : p.payFrequency === 'weekly'
+                                      ? (monthlyPortion * 12) / 52
+                                      : monthlyPortion;
+                                  const pct = acc.saveExtraMonthly > 0 ? (monthlyPortion / acc.saveExtraMonthly) * 100 : 0;
+
+                                  return (
+                                    <div key={p.id} className="p-2 rounded bg-slate-900 border border-slate-800 flex items-center justify-between">
+                                      <div>
+                                        <span className="text-xs font-bold text-slate-200 block">{p.name}</span>
+                                        <span className="text-[10px] text-indigo-300 font-mono font-semibold">
+                                          ${monthlyPortion.toFixed(2)}/mo ({pct.toFixed(0)}%)
+                                        </span>
+                                      </div>
+                                      <div className="text-right">
+                                        <span className="text-emerald-400 font-mono font-bold text-xs block">
+                                          ${paycheckPortion.toFixed(2)}
+                                        </span>
+                                        <span className="text-[9px] text-slate-500 font-sans uppercase">
+                                          / {p.payFrequency === 'bi-weekly' ? 'check' : p.payFrequency === 'weekly' ? 'wk' : 'check'}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -1510,7 +1554,6 @@ export function SettingsModal() {
                             dueDay={newBillForm.dueDay}
                             dueMonths={newBillForm.dueMonths}
                             period={newBillForm.period}
-                            dropUp={true}
                             onChange={({ dueDay, dueMonths }) => setNewBillForm({ ...newBillForm, dueDay, dueMonths })}
                             className="w-full justify-between px-3 py-2 bg-slate-950 rounded-xl"
                           />

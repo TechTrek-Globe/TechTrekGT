@@ -167,6 +167,42 @@ export function getPersonDepositAmountForAccount(person, selectedAccountId = 'al
   return netPay;
 }
 
+/**
+ * Calculates the monthly extra savings portion for a given person and account based on split percentages or income ratio.
+ *
+ * @param {object} account
+ * @param {object} person
+ * @param {object} budget
+ * @returns {number}
+ */
+export function getAccountSaveExtraPersonPortion(account, person, budget) {
+  if (!account || !account.saveExtraMonthly || account.enableExtraSavings === false) return 0;
+  const totalExtra = parseFloat(account.saveExtraMonthly) || 0;
+  if (totalExtra <= 0 || !person) return 0;
+
+  if (account.saveExtraSplits && typeof account.saveExtraSplits === 'object' && account.saveExtraSplits[person.id] !== undefined) {
+    const pct = parseFloat(account.saveExtraSplits[person.id]) || 0;
+    return (totalExtra * pct) / 100;
+  }
+
+  const people = budget?.people || [];
+  if (people.length === 0) return totalExtra;
+
+  const totalNet = people.reduce((sum, p) => {
+    const net = parseFloat(p.netPerPay) || 0;
+    const freq = p.payFrequency || 'bi-weekly';
+    const mNet = freq === 'bi-weekly' ? (net * 26) / 12 : freq === 'weekly' ? (net * 52) / 12 : net * 2;
+    return sum + mNet;
+  }, 0);
+
+  const net = parseFloat(person.netPerPay) || 0;
+  const freq = person.payFrequency || 'bi-weekly';
+  const pNet = freq === 'bi-weekly' ? (net * 26) / 12 : freq === 'weekly' ? (net * 52) / 12 : net * 2;
+
+  const ratio = totalNet > 0 ? pNet / totalNet : 1 / people.length;
+  return totalExtra * ratio;
+}
+
 export const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'

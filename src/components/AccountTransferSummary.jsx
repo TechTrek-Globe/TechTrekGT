@@ -9,6 +9,7 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { fmtMoney } from '../utils/formatters';
+import { getAccountSaveExtraPersonPortion } from '../utils/paydayUtils';
 
 // Account Funding & Transfer Breakdown Component
 export function AccountTransferSummary() {
@@ -90,7 +91,8 @@ export function AccountTransferSummary() {
           }
         }
       } else {
-        const monthlyPortion = accountBills.reduce((sum, b) => sum + getBillPersonMonthlyPortion(b, p.id), 0);
+        const extraPortion = getAccountSaveExtraPersonPortion(acc, p, budget);
+        const monthlyPortion = accountBills.reduce((sum, b) => sum + getBillPersonMonthlyPortion(b, p.id), 0) + extraPortion;
         rawPortion = mode === 'paycheck'
           ? (p.payFrequency === 'weekly' ? (monthlyPortion * 12) / 52 : monthlyPortion / 2)
           : monthlyPortion;

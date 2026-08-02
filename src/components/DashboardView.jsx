@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useBudget } from '../context/BudgetContext';
 import { InlineEdit } from './InlineEdit';
 import { AccountTransferSummary } from './AccountTransferSummary';
+import { getPersonDepositAmountForAccount } from '../utils/paydayUtils';
 import {
   DollarSign,
   TrendingUp,
@@ -78,6 +79,7 @@ export function DashboardView() {
     getAccountActualExpenses,
     getAccountActualEndBalance,
     updateAccount,
+    getPersonDepositAmountForAccount
   } = useBudget();
 
   const [draggedIdx, setDraggedIdx] = useState(null);

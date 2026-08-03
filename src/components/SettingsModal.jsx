@@ -712,7 +712,7 @@ export function SettingsModal() {
                         />
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-3 gap-3">
                         <div>
                           <label className="block text-xs font-medium text-slate-300 mb-1">Account Type</label>
                           <select
@@ -734,6 +734,15 @@ export function SettingsModal() {
                             value={newAccForm.startingBalance}
                             onChange={e => setNewAccForm({ ...newAccForm, startingBalance: parseFloat(e.target.value) || 0 })}
                             className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-100 font-mono focus:outline-none focus:border-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-amber-300 mb-1">Start Date / Day</label>
+                          <input
+                            type="date"
+                            value={newAccForm.balanceAsOfDate || new Date().toISOString().split('T')[0]}
+                            onChange={e => setNewAccForm({ ...newAccForm, balanceAsOfDate: e.target.value })}
+                            className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-amber-200 font-mono focus:outline-none focus:border-blue-500"
                           />
                         </div>
                       </div>
@@ -849,7 +858,7 @@ export function SettingsModal() {
                           />
                         </div>
                         <div>
-                          <label className="text-amber-300 font-semibold block">As Of Date</label>
+                          <label className="text-amber-300 font-semibold block">Start Date / Day</label>
                           <input
                             type="date"
                             value={acc.balanceAsOfDate || new Date().toISOString().split('T')[0]}

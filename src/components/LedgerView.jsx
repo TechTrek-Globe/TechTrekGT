@@ -221,20 +221,51 @@ function DailySpreadsheetMatrix() {
   // Household earners
   const people = budget.people || [];
 
+  // Effective start date based on selected account (or earliest account date when All Accounts is selected)
+  const effectiveStartDateStr = useMemo(() => {
+    if (selectedAccountId === 'all') {
+      if (!budget.accounts || budget.accounts.length === 0) return '2024-01-01';
+      const dates = budget.accounts
+        .map(a => a.balanceAsOfDate || a.startDate)
+        .filter(Boolean)
+        .sort();
+      return dates[0] || '2024-01-01';
+    }
+    return selectedAccount?.balanceAsOfDate || selectedAccount?.startDate || '2024-01-01';
+  }, [selectedAccountId, selectedAccount, budget.accounts]);
+
+  const startDateObj = useMemo(() => {
+    const parts = (effectiveStartDateStr || '').split('-');
+    if (parts.length === 3) {
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10) - 1;
+      const d = parseInt(parts[2], 10);
+      if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+        return new Date(y, m, d);
+      }
+    }
+    return new Date(2024, 0, 1);
+  }, [effectiveStartDateStr]);
+
   const isProgrammaticScrollRef = useRef(false);
   const firstSelectedMonthRowRef = useRef(null);
 
-  // Optimized continuous timeline window around current selected month
+  // Optimized continuous timeline window starting from effective start month
   const monthList = useMemo(() => {
     const list = [];
     const baseDate = new Date(selectedYear, selectedMonth, 1);
-    const startBase = new Date(baseDate.getFullYear(), baseDate.getMonth() - monthsBack, 1);
-    const totalCount = monthsBack + 1 + monthsForward;
+    const startMonthDate = new Date(startDateObj.getFullYear(), startDateObj.getMonth(), 1);
+    let startBase = new Date(baseDate.getFullYear(), baseDate.getMonth() - monthsBack, 1);
+    if (startBase < startMonthDate) {
+      startBase = startMonthDate;
+    }
+    const endBase = new Date(baseDate.getFullYear(), baseDate.getMonth() + monthsForward + 1, 1);
 
-    for (let offset = 0; offset < totalCount; offset++) {
-      const d = new Date(startBase.getFullYear(), startBase.getMonth() + offset, 1);
-      const mYear = d.getFullYear();
-      const mMonth = d.getMonth();
+    let cur = new Date(startBase);
+    let offset = 0;
+    while (cur <= endBase) {
+      const mYear = cur.getFullYear();
+      const mMonth = cur.getMonth();
       const mKey = `${mYear}-${String(mMonth + 1).padStart(2, '0')}`;
       const mDays = new Date(mYear, mMonth + 1, 0).getDate();
       list.push({
@@ -242,13 +273,14 @@ function DailySpreadsheetMatrix() {
         month: mMonth,
         monthKey: mKey,
         daysInMonth: mDays,
-        offset
+        offset: offset++
       });
+      cur.setMonth(cur.getMonth() + 1);
     }
     return list;
-  }, [selectedYear, selectedMonth, monthsBack, monthsForward]);
+  }, [selectedYear, selectedMonth, monthsBack, monthsForward, startDateObj]);
 
-  // Generate continuous daily matrix rows across monthList
+  // Generate continuous daily matrix rows across monthList (starting on startDateObj with no prior dates)
   const matrixData = useMemo(() => {
     const rows = [];
     if (monthList.length === 0) return rows;
@@ -261,11 +293,30 @@ function DailySpreadsheetMatrix() {
       ? budget.accounts.reduce((sum, a) => sum + (parseFloat(a.extraStartingBalance) || 0), 0)
       : (parseFloat(selectedAccount?.extraStartingBalance) || 0);
 
+    let isFirstRow = true;
+
     monthList.forEach(mItem => {
       const { year, month, monthKey, daysInMonth } = mItem;
 
       for (let day = 1; day <= daysInMonth; day++) {
         const dateObj = new Date(year, month, day);
+
+        // Filter out dates before startDateObj - nothing before start date
+        if (dateObj < startDateObj) {
+          continue;
+        }
+
+        if (isFirstRow) {
+          isFirstRow = false;
+          // Re-initialize starting balance for first active date row
+          runningRegBeg = selectedAccountId === 'all'
+            ? budget.accounts.reduce((sum, a) => sum + (parseFloat(a.startingBalance) || 0), 0)
+            : (parseFloat(selectedAccount?.startingBalance) || 0);
+          runningExtraBeg = selectedAccountId === 'all'
+            ? budget.accounts.reduce((sum, a) => sum + (parseFloat(a.extraStartingBalance) || 0), 0)
+            : (parseFloat(selectedAccount?.extraStartingBalance) || 0);
+        }
+
         const dayOfWeekName = DAYS_OF_WEEK[dateObj.getDay()];
         const isPayday = people.some(p => isPersonDepositDay(p, year, month, day));
         const isToday = todayObj.getFullYear() === year && todayObj.getMonth() === month && todayObj.getDate() === day;
@@ -362,7 +413,8 @@ function DailySpreadsheetMatrix() {
     accountBills,
     people,
     getDailyMatrixCell,
-    todayObj
+    todayObj,
+    startDateObj
   ]);
 
   // Group matrix rows by month so each month gets its own tbody with a sticky month banner
@@ -498,7 +550,7 @@ function DailySpreadsheetMatrix() {
       <div className="bg-slate-950 border-b border-slate-800 px-3 py-1.5 h-10 flex items-center justify-between gap-2 shadow-md shrink-0 whitespace-nowrap text-xs z-30">
         <div className="flex items-center gap-1.5 flex-shrink-0">
           <Wallet className="w-3.5 h-3.5 text-emerald-400" />
-          <h3 className="text-[11px] font-black text-slate-100 uppercase tracking-wider hidden sm:inline">Daily Register Matrix</h3>
+          <h3 className="text-[11px] font-black text-slate-100 uppercase tracking-wider hidden sm:inline">Daily Transactions Register</h3>
         </div>
 
         {/* Integrated KPI Metrics Pill Bar */}
@@ -648,12 +700,13 @@ function DailySpreadsheetMatrix() {
               {/* Beg Balances Banner */}
               <th colSpan={showExtraColumns ? 2 : 1} className="p-1 text-center border-r-2 border-blue-600 bg-blue-950 text-blue-100 font-black shadow-sm sticky top-0 z-40">Beg Balances</th>
               <th colSpan={people.length * (showExtraColumns ? 2 : 1)} className="p-1 text-center border-r border-slate-800 bg-emerald-950 text-emerald-300 sticky top-0 z-40">Credits (Deposits)</th>
-              <th colSpan={accountBills.length + 1} className="p-1 text-center border-r border-slate-800 bg-rose-950 text-rose-300 sticky top-0 z-40">Bills &amp; Deductions</th>
-              <th colSpan={showExtraColumns ? 3 : 2} className="p-1 text-center border-r border-slate-800 bg-purple-950 text-purple-300 sticky top-0 z-40">Ending Balances</th>
-              <th rowSpan={2} className="p-1 min-w-[90px] bg-slate-950 text-slate-300 font-bold sticky top-0 z-40 align-middle text-left border-b-2 border-blue-500">
-                <div className="flex flex-col items-start leading-tight text-[10px]">
-                  <span>Other</span>
-                  <span>Desc</span>
+              <th colSpan={accountBills.length + 2} className="p-1 text-center border-r border-slate-800 bg-rose-950 text-rose-300 sticky top-0 z-40">Bills &amp; Deductions</th>
+              <th colSpan={showExtraColumns ? 2 : 1} className="p-1 text-center border-r border-slate-800 bg-purple-950 text-purple-300 sticky top-0 z-40">Ending Balances</th>
+              {/* Sticky Right Column: Total End Spanning Both Rows */}
+              <th rowSpan={2} className="p-1 min-w-[85px] w-[85px] max-w-[85px] bg-slate-950 text-blue-300 font-black sticky right-0 top-0 z-50 align-middle text-right border-b-2 border-blue-500 border-l border-slate-700 shadow-[-4px_0_8px_rgba(0,0,0,0.5)]">
+                <div className="flex flex-col items-end leading-tight text-[9px]">
+                  <span>Total</span>
+                  <span>End</span>
                 </div>
               </th>
             </tr>
@@ -710,9 +763,15 @@ function DailySpreadsheetMatrix() {
                   </div>
                 </th>
               ))}
-              <th className="p-1 text-right min-w-[55px] text-rose-300 bg-rose-950 border-r border-slate-800 align-middle sticky top-[24px] z-40 border-b-2 border-blue-500">
+              <th className="p-1 text-right min-w-[55px] text-rose-300 bg-rose-950 align-middle sticky top-[24px] z-40 border-b-2 border-blue-500">
                 <div className="flex flex-col items-end leading-tight text-[9px]">
                   <span>Other</span>
+                </div>
+              </th>
+              <th className="p-1 text-left min-w-[90px] text-rose-300 bg-rose-950 border-r border-slate-800 align-middle sticky top-[24px] z-40 border-b-2 border-blue-500">
+                <div className="flex flex-col items-start leading-tight text-[9px]">
+                  <span>Other</span>
+                  <span>Desc</span>
                 </div>
               </th>
 
@@ -724,19 +783,13 @@ function DailySpreadsheetMatrix() {
                 </div>
               </th>
               {showExtraColumns && (
-                <th className="p-1 text-right min-w-[65px] text-slate-200 bg-purple-950 align-middle sticky top-[24px] z-40 border-b-2 border-blue-500">
+                <th className="p-1 text-right min-w-[65px] text-slate-200 bg-purple-950 border-r border-slate-800 align-middle sticky top-[24px] z-40 border-b-2 border-blue-500">
                   <div className="flex flex-col items-end leading-tight text-[9px]">
                     <span>Extra</span>
                     <span>Ending</span>
                   </div>
                 </th>
               )}
-              <th className="p-1 text-right min-w-[65px] text-blue-300 font-extrabold bg-purple-950 border-r border-slate-800 align-middle sticky top-[24px] z-40 border-b-2 border-blue-500">
-                <div className="flex flex-col items-end leading-tight text-[9px]">
-                  <span>Total</span>
-                  <span>End</span>
-                </div>
-              </th>
             </tr>
           </thead>
 
@@ -898,7 +951,7 @@ function DailySpreadsheetMatrix() {
 
                       {/* Other Expense Column */}
                       <td
-                        className={`p-1 text-right border-r border-slate-800/80 min-w-[55px] transition-colors relative ${
+                        className={`p-1 text-right min-w-[55px] transition-colors relative ${
                           dropTarget?.rowKey === row.rowKey && dropTarget?.field === 'other_amount'
                             ? 'bg-rose-500/30 ring-2 ring-rose-400 ring-inset shadow-[0_0_10px_rgba(244,63,94,0.3)]'
                             : ''
@@ -919,21 +972,8 @@ function DailySpreadsheetMatrix() {
                         />
                       </td>
 
-                      {/* Regular Ending Balance */}
-                      <td className="p-1 text-right font-bold text-slate-200">{fmtMoney(row.regEnding)}</td>
-
-                      {/* Extra Ending Balance */}
-                      {showExtraColumns && (
-                        <td className="p-1 text-right text-slate-300">{fmtMoney(row.extraEnding)}</td>
-                      )}
-
-                      {/* Total End Balance */}
-                      <td className={`p-1 text-right font-extrabold border-r border-slate-800/80 ${row.isDeficit ? 'text-rose-400 animate-pulse' : 'text-blue-300'}`}>
-                        {fmtMoney(row.totalEnd)}
-                      </td>
-
                       {/* Other Description */}
-                      <td className="p-1">
+                      <td className="p-1 border-r border-slate-800/80">
                         <input
                           type="text"
                           placeholder="—"
@@ -941,6 +981,25 @@ function DailySpreadsheetMatrix() {
                           onChange={e => updateDailyMatrixCell(selectedAccountId, row.monthKey, row.day, 'other_desc', e.target.value)}
                           className="bg-transparent text-[10px] text-slate-300 hover:bg-slate-800/60 focus:bg-slate-800 px-1 py-0.5 rounded outline-none w-full"
                         />
+                      </td>
+
+                      {/* Regular Ending Balance */}
+                      <td className="p-1 text-right font-bold text-slate-200">{fmtMoney(row.regEnding)}</td>
+
+                      {/* Extra Ending Balance */}
+                      {showExtraColumns && (
+                        <td className="p-1 text-right text-slate-300 border-r border-slate-800/80">{fmtMoney(row.extraEnding)}</td>
+                      )}
+
+                      {/* Total End Balance (Sticky Right) */}
+                      <td className={`p-1 text-right font-extrabold sticky right-0 z-20 border-l border-slate-700 shadow-[-4px_0_8px_rgba(0,0,0,0.5)] ${
+                        row.isToday
+                          ? 'bg-amber-950 text-amber-100 border-y border-y-amber-400/80'
+                          : row.isDeficit
+                            ? 'bg-slate-900 text-rose-400 animate-pulse'
+                            : 'bg-slate-900 text-blue-300'
+                      }`}>
+                        {fmtMoney(row.totalEnd)}
                       </td>
                     </tr>
                 );
@@ -981,19 +1040,20 @@ function DailySpreadsheetMatrix() {
                   -{fmtMoney(columnTotals.bills[b.id])}
                 </td>
               ))}
-              <td className="p-1 text-right text-rose-300 font-mono bg-slate-900 border-r border-slate-800 min-w-[55px]">
+              <td className="p-1 text-right text-rose-300 font-mono bg-slate-900 min-w-[55px]">
                 -{fmtMoney(columnTotals.other)}
               </td>
+              <td className="p-1 bg-slate-900 border-r border-slate-800">&mdash;</td>
 
               {/* Ending Balances Subtotals */}
               <td className="p-1 text-right font-mono text-slate-200 bg-slate-900">&mdash;</td>
               {showExtraColumns && (
-                <td className="p-1 text-right font-mono text-slate-200 bg-slate-900">&mdash;</td>
+                <td className="p-1 text-right font-mono text-slate-200 bg-slate-900 border-r border-slate-800">&mdash;</td>
               )}
-              <td className="p-1 text-right font-mono text-blue-400 font-black bg-slate-900 border-r border-slate-800">
+              {/* Sticky Right Total End Footer */}
+              <td className="p-1 text-right font-mono text-blue-400 font-black bg-slate-900 border-l border-slate-700 sticky right-0 z-40 shadow-[-4px_0_8px_rgba(0,0,0,0.5)]">
                 {fmtMoney(finalEndingBalance)}
               </td>
-              <td className="p-1 bg-slate-900">&mdash;</td>
             </tr>
           </tfoot>
         </table>

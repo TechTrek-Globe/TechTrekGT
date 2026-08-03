@@ -6,6 +6,8 @@ import { useAuth } from './AuthContext';
 import { isPersonDepositDay, getPersonDepositAmountForAccount, getAccountSaveExtraPersonPortion, getNextBillDueDate, getBillDueMonths, isBillDueInMonth, formatBillDueMonths } from '../utils/paydayUtils';
 import { getApiUrl } from '../utils/api';
 
+import { getBudgetData, saveBudgetData, clearAndRestoreBudgetData, clearBudgetData } from '../utils/indexedDB';
+
 const BudgetContext = createContext();
 
 const STORAGE_KEY = 'personal_budget_app_data_v1';
@@ -17,43 +19,12 @@ export function BudgetProvider({ children }) {
     catch { return 'all'; }
   });
 
-  const [budget, setBudget] = useState(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed && typeof parsed === 'object') {
-          return {
-            ...initialBudgetData,
-            ...parsed,
-            dailyMatrix: (parsed.dailyMatrix && typeof parsed.dailyMatrix === 'object') ? parsed.dailyMatrix : {},
-            lineItems: Array.isArray(parsed.lineItems) ? parsed.lineItems : [],
-            accounts: Array.isArray(parsed.accounts) ? parsed.accounts : [],
-            people: Array.isArray(parsed.people) ? parsed.people : [],
-            bills: Array.isArray(parsed.bills) ? parsed.bills : [],
-            loans: Array.isArray(parsed.loans) ? parsed.loans : [],
-            dashboardWidgets: Array.isArray(parsed.dashboardWidgets)
-              ? (() => {
-                  const existingIds = new Set(parsed.dashboardWidgets.map(w => w.id));
-                  const missing = DEFAULT_DASHBOARD_WIDGETS.filter(w => !existingIds.has(w.id));
-                  return [...parsed.dashboardWidgets, ...missing];
-                })()
-              : DEFAULT_DASHBOARD_WIDGETS,
-            theme: parsed.theme || 'dark',
-            hideDashboardHeader: Boolean(parsed.hideDashboardHeader)
-          };
-        }
-      }
-    } catch (e) {
-      console.error('Failed to load budget from localStorage:', e);
-    }
-    return initialBudgetData;
-  });
+  const [budget, setBudget] = useState(initialBudgetData);
+  const [isDbLoaded, setIsDbLoaded] = useState(false);
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState('accounts'); // 'accounts' | 'people' | 'bills' | 'splits' | 'data'
   const [activeView, setActiveView] = useState('dashboard');
-  const isInitialCloudFetch = useRef(true);
 
   useEffect(() => {
     try { localStorage.removeItem('trekledger_active_view'); }
@@ -65,130 +36,120 @@ export function BudgetProvider({ children }) {
     catch { /* ignore */ }
   }, [selectedPersonId]);
 
-  // Fetch Cloud Budget when user logs in
+  // Load from IndexedDB on startup (with legacy localStorage migration)
   useEffect(() => {
-    async function fetchCloudBudget() {
-      if (!isAuthenticated) return;
+    async function initLocalStorageOrIndexedDB() {
       try {
-        const res = await fetch(getApiUrl('/api/budget'), {
-          credentials: 'include'
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.success && data.budget) {
-            const b = data.budget;
-            isInitialCloudFetch.current = true;
-            setBudget(prev => {
-              const cloudBills = Array.isArray(b.bills) ? b.bills : [];
-              const cloudAccounts = Array.isArray(b.accounts) ? b.accounts : [];
-              const cloudPeople = Array.isArray(b.people) ? b.people : [];
-
-              // Crucial Safety Guard: Never overwrite non-empty local state with empty cloud state
-              const mergedBills = (cloudBills.length === 0 && prev.bills && prev.bills.length > 0)
-                ? prev.bills : cloudBills;
-              const mergedAccounts = (cloudAccounts.length === 0 && prev.accounts && prev.accounts.length > 0)
-                ? prev.accounts : cloudAccounts;
-              const mergedPeople = (cloudPeople.length === 0 && prev.people && prev.people.length > 0)
-                ? prev.people : cloudPeople;
-
-              return {
+        const stored = await getBudgetData();
+        if (stored && typeof stored === 'object') {
+          setBudget({
+            ...initialBudgetData,
+            ...stored,
+            dailyMatrix: (stored.dailyMatrix && typeof stored.dailyMatrix === 'object') ? stored.dailyMatrix : {},
+            lineItems: Array.isArray(stored.lineItems) ? stored.lineItems : [],
+            accounts: Array.isArray(stored.accounts) ? stored.accounts : [],
+            people: Array.isArray(stored.people) ? stored.people : [],
+            bills: Array.isArray(stored.bills) ? stored.bills : [],
+            loans: Array.isArray(stored.loans) ? stored.loans : [],
+            dashboardWidgets: Array.isArray(stored.dashboardWidgets)
+              ? (() => {
+                  const existingIds = new Set(stored.dashboardWidgets.map(w => w.id));
+                  const missing = DEFAULT_DASHBOARD_WIDGETS.filter(w => !existingIds.has(w.id));
+                  return [...stored.dashboardWidgets, ...missing];
+                })()
+              : DEFAULT_DASHBOARD_WIDGETS,
+            theme: stored.theme || 'dark',
+            hideDashboardHeader: Boolean(stored.hideDashboardHeader)
+          });
+        } else {
+          // Check for legacy localStorage data to migrate
+          const legacy = localStorage.getItem(STORAGE_KEY);
+          if (legacy) {
+            const parsed = JSON.parse(legacy);
+            if (parsed && typeof parsed === 'object') {
+              const migrated = {
                 ...initialBudgetData,
-                ...b,
-                dailyMatrix: (b.dailyMatrix && typeof b.dailyMatrix === 'object') ? b.dailyMatrix : (prev.dailyMatrix || {}),
-                lineItems: Array.isArray(b.lineItems) && b.lineItems.length > 0 ? b.lineItems : (prev.lineItems || []),
-                accounts: mergedAccounts,
-                people: mergedPeople,
-                bills: mergedBills,
-                loans: Array.isArray(b.loans) && b.loans.length > 0 ? b.loans : (prev.loans || []),
-                dashboardWidgets: (Array.isArray(b.dashboardWidgets) && b.dashboardWidgets.length > 0)
-                  ? b.dashboardWidgets
-                  : (prev.dashboardWidgets || DEFAULT_DASHBOARD_WIDGETS),
-                theme: b.theme || prev.theme || 'dark',
-                hideDashboardHeader: b.hideDashboardHeader !== undefined ? Boolean(b.hideDashboardHeader) : Boolean(prev.hideDashboardHeader)
+                ...parsed,
+                dailyMatrix: (parsed.dailyMatrix && typeof parsed.dailyMatrix === 'object') ? parsed.dailyMatrix : {},
+                lineItems: Array.isArray(parsed.lineItems) ? parsed.lineItems : [],
+                accounts: Array.isArray(parsed.accounts) ? parsed.accounts : [],
+                people: Array.isArray(parsed.people) ? parsed.people : [],
+                bills: Array.isArray(parsed.bills) ? parsed.bills : [],
+                loans: Array.isArray(parsed.loans) ? parsed.loans : [],
+                dashboardWidgets: Array.isArray(parsed.dashboardWidgets)
+                  ? parsed.dashboardWidgets
+                  : DEFAULT_DASHBOARD_WIDGETS,
+                theme: parsed.theme || 'dark',
+                hideDashboardHeader: Boolean(parsed.hideDashboardHeader)
               };
-            });
+              setBudget(migrated);
+              await saveBudgetData(migrated);
+              localStorage.removeItem(STORAGE_KEY);
+            }
           }
         }
       } catch (err) {
-        console.error('Failed to fetch budget from Cloudflare D1:', err);
+        console.error('Failed to load budget from IndexedDB:', err);
+      } finally {
+        setIsDbLoaded(true);
       }
     }
-    fetchCloudBudget();
-  }, [isAuthenticated]);
 
-  // Persist to localStorage and preserve automated backup whenever budget state changes
+    initLocalStorageOrIndexedDB();
+  }, []);
+
+  // Silently save to IndexedDB whenever budget state changes
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(budget));
-      if (Array.isArray(budget.bills) && budget.bills.length > 0) {
-        localStorage.setItem('personal_budget_backup_last_valid', JSON.stringify(budget));
-      }
-    } catch (e) {
-      console.error('Failed to save budget to localStorage:', e);
-    }
-  }, [budget]);
+    if (!isDbLoaded) return;
+    saveBudgetData(budget).catch(err => {
+      console.error('Failed to save budget to IndexedDB:', err);
+    });
+  }, [budget, isDbLoaded]);
 
-  // Restore helper from last valid local backup
-  const restoreLastBackup = () => {
+  // Export complete JSON backup helper
+  const exportBackupJson = () => {
     try {
-      const backup = localStorage.getItem('personal_budget_backup_last_valid');
-      if (backup) {
-        const parsed = JSON.parse(backup);
-        if (parsed && typeof parsed === 'object') {
-          const hasBills = Array.isArray(parsed.bills) && parsed.bills.length > 0;
-          const hasAccounts = Array.isArray(parsed.accounts) && parsed.accounts.length > 0;
-          if (hasBills || hasAccounts) {
-            setBudget(prev => ({
-              ...initialBudgetData,
-              ...parsed,
-              bills: hasBills ? parsed.bills : (prev.bills || []),
-              accounts: hasAccounts ? parsed.accounts : (prev.accounts || []),
-              people: Array.isArray(parsed.people) && parsed.people.length > 0 ? parsed.people : (prev.people || [])
-            }));
-            return true;
-          }
-        }
-      }
-    } catch (e) {
-      console.error('Failed to restore from backup:', e);
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(budget, null, 2));
+      const downloadAnchor = document.createElement('a');
+      const dateStr = new Date().toISOString().split('T')[0];
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `techtrek_backup_${dateStr}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      return true;
+    } catch (err) {
+      console.error('Failed to export JSON backup:', err);
+      return false;
     }
-    return false;
   };
 
-  // Auto-recover bills from backup if state bills are empty
-  useEffect(() => {
-    if (!budget.bills || budget.bills.length === 0) {
-      restoreLastBackup();
-    }
-  }, [budget.bills]);
-
-  // Sync to Cloudflare D1 database when budget updates (debounced)
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    
-    // Skip initial trigger right after loading cloud data
-    if (isInitialCloudFetch.current) {
-      isInitialCloudFetch.current = false;
-      return;
+  // Restore budget state from imported JSON backup
+  const restoreFromBackup = async (parsedData) => {
+    if (!parsedData || typeof parsedData !== 'object') {
+      throw new Error('Invalid backup file format.');
     }
 
-    const timer = setTimeout(async () => {
-      try {
-        await fetch(getApiUrl('/api/budget'), {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          credentials: 'include',
-          body: JSON.stringify({ budget })
-        });
-      } catch (err) {
-        console.error('Failed to sync budget to Cloudflare D1:', err);
-      }
-    }, 1000);
+    const merged = {
+      ...initialBudgetData,
+      ...parsedData,
+      dailyMatrix: (parsedData.dailyMatrix && typeof parsedData.dailyMatrix === 'object') ? parsedData.dailyMatrix : {},
+      lineItems: Array.isArray(parsedData.lineItems) ? parsedData.lineItems : [],
+      accounts: Array.isArray(parsedData.accounts) ? parsedData.accounts : [],
+      people: Array.isArray(parsedData.people) ? parsedData.people : [],
+      bills: Array.isArray(parsedData.bills) ? parsedData.bills : [],
+      loans: Array.isArray(parsedData.loans) ? parsedData.loans : [],
+      dashboardWidgets: Array.isArray(parsedData.dashboardWidgets) && parsedData.dashboardWidgets.length > 0
+        ? parsedData.dashboardWidgets
+        : DEFAULT_DASHBOARD_WIDGETS,
+      theme: parsedData.theme || 'dark',
+      hideDashboardHeader: Boolean(parsedData.hideDashboardHeader)
+    };
 
-    return () => clearTimeout(timer);
-  }, [budget, isAuthenticated]);
+    await clearAndRestoreBudgetData(merged);
+    setBudget(merged);
+    return true;
+  };
 
   // Account Operations
   const addAccount = (accountData) => {
@@ -758,6 +719,25 @@ export function BudgetProvider({ children }) {
     }
   }, [theme]);
 
+  const resetToDefaults = async () => {
+    setBudget(initialBudgetData);
+    await saveBudgetData(initialBudgetData);
+  };
+
+  const clearAllData = async () => {
+    const emptyState = {
+      ...initialBudgetData,
+      accounts: [],
+      people: [],
+      bills: [],
+      loans: [],
+      lineItems: [],
+      dailyMatrix: {}
+    };
+    await clearBudgetData();
+    setBudget(emptyState);
+  };
+
   return (
     <BudgetContext.Provider
       value={{
@@ -801,9 +781,8 @@ export function BudgetProvider({ children }) {
         deleteLoan,
         resetToDefaults,
         clearAllData,
-        restoreLastBackup,
-        loadDemoPreset,
-        importParsedSpreadsheet,
+        exportBackupJson,
+        restoreFromBackup,
         // line-item operations
         upsertLineItem,
         getLineItem,

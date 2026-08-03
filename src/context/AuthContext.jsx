@@ -8,43 +8,11 @@ const AuthContext = createContext(null);
  * @param {{ children: React.ReactNode }} props
  */
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [householdId, setHouseholdId] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser] = useState({ id: 'local-user', name: 'Local User', email: 'local@device' });
+  const [isAuthenticated, setIsAuthenticated] = useState(true);
+  const [householdId, setHouseholdId] = useState('local-household');
+  const [isLoading, setIsLoading] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-
-  // Validate session on mount via HttpOnly cookie
-  useEffect(() => {
-    async function verifyCurrentSession() {
-      try {
-        const res = await fetch(getApiUrl('/api/auth/me'), {
-          credentials: 'include'
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setUser(data.user);
-          setHouseholdId(data.householdId);
-          setIsAuthenticated(true);
-        } else {
-          setUser(null);
-          setHouseholdId(null);
-          setIsAuthenticated(false);
-          setIsAuthModalOpen(true);
-        }
-      } catch (err) {
-        console.error('Failed to verify authentication session:', err);
-        setUser(null);
-        setHouseholdId(null);
-        setIsAuthenticated(false);
-        setIsAuthModalOpen(true);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    verifyCurrentSession();
-  }, []);
 
   // Inactivity timeout handler
   useEffect(() => {

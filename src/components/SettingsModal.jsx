@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useBudget } from '../context/BudgetContext';
 import { 
   X, 
@@ -61,12 +61,13 @@ export function SettingsModal() {
     updateBillSplits,
     resetToDefaults,
     clearAllData,
-    loadDemoPreset,
-    importBudgetJson,
-    importParsedSpreadsheet
+    exportBackupJson,
+    restoreFromBackup
   } = useBudget();
 
   // Local form state for new item creation
+  const fileInputRef = useRef(null);
+  const [backupStatus, setBackupStatus] = useState(null);
   const [isAddAccountModalOpen, setIsAddAccountModalOpen] = useState(false);
   const [isAddPersonModalOpen, setIsAddPersonModalOpen] = useState(false);
   const [isAddBillModalOpen, setIsAddBillModalOpen] = useState(false);
@@ -272,13 +273,38 @@ export function SettingsModal() {
     }
   };
 
+  const handleExportDataClick = () => {
+    setBackupStatus(null);
+    const ok = exportBackupJson();
+    if (ok) {
+      setBackupStatus({ type: 'success', message: 'Exported JSON backup file successfully!' });
+    } else {
+      setBackupStatus({ type: 'error', message: 'Failed to generate JSON export backup file.' });
+    }
+  };
+
+  const handleLoadBackupFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setBackupStatus(null);
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      await restoreFromBackup(parsed);
+      setBackupStatus({ type: 'success', message: `Successfully restored backup from ${file.name}! UI state updated.` });
+    } catch (err) {
+      setBackupStatus({ type: 'error', message: `Restore failed: ${err.message}` });
+    } finally {
+      e.target.value = '';
+    }
+  };
+
   if (!isSettingsOpen) return null;
 
   const SETUP_TABS = ['accounts', 'people', 'splits', 'bills'];
-  const DATA_TABS  = ['import', 'export', 'reset'];
   const activeSection =
     SETUP_TABS.includes(settingsTab) ? 'setup' :
-    DATA_TABS.includes(settingsTab)  ? 'data'  :
     settingsTab;
 
   const knownAccountIds = new Set(budget.accounts.map(a => a.id));
@@ -290,7 +316,7 @@ export function SettingsModal() {
   const sidebarNav = [
     { id: 'setup',     label: 'Setup',     icon: Users,          desc: 'Accounts, Earners & Bills', badge: budget.accounts.length + budget.people.length + budget.bills.filter(b => !b.isArchived).length },
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, desc: 'Widgets & Theme',          badge: null },
-    { id: 'data',      label: 'Data',      icon: Archive,        desc: 'Import, Export & Reset',    badge: null },
+    { id: 'data',      label: 'Data',      icon: Archive,        desc: 'Backup, Restore & Security',badge: null },
     { id: 'security',  label: 'Security',  icon: ShieldCheck,    desc: 'Profile & Password',        badge: null },
   ];
 
@@ -302,8 +328,6 @@ export function SettingsModal() {
   const handleSidebarNav = (sectionId) => {
     if (sectionId === 'setup') {
       setSettingsTab(SETUP_TABS.includes(settingsTab) ? settingsTab : setupSubTab);
-    } else if (sectionId === 'data') {
-      setSettingsTab('import');
     } else {
       setSettingsTab(sectionId);
     }
@@ -2176,393 +2200,158 @@ export function SettingsModal() {
             </div>
           )}
 
-          {/* TAB 5: IMPORT */}
+          {/* TAB 5: LOCAL-FIRST DATA MANAGEMENT */}
           {activeSection === 'data' && (
-            <div className="space-y-6">
+            <div className="space-y-6 max-w-3xl mx-auto">
               
-              {/* Excel (.xlsx / .csv) Spreadsheet Importer Card */}
-              <div className="p-5 rounded-xl glass-card border border-emerald-800/60 bg-emerald-950/10 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold text-emerald-300 flex items-center gap-2">
-                    <FileSpreadsheet className="w-5 h-5 text-emerald-400" />
-                    Import Excel (.xlsx) or CSV Spreadsheet
-                  </h3>
-                  <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950 px-2.5 py-1 rounded-full border border-emerald-800">
-                    100% Client-Side Local Parser
-                  </span>
+              {/* Local-First Architecture & Security Origin Sandbox Banner */}
+              <div className="p-5 rounded-2xl bg-gradient-to-r from-blue-950/40 via-indigo-950/30 to-purple-950/40 border border-blue-800/50 shadow-xl space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/30">
+                      <ShieldCheck className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-slate-100">100% Local-First Architecture</h3>
+                      <p className="text-xs text-slate-400">Strict Browser Origin Sandboxing &amp; Zero Cloud Footprint</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-mono px-2.5 py-1 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800 font-semibold flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      IndexedDB Engine Active
+                    </span>
+                  </div>
                 </div>
                 <p className="text-xs text-slate-300 leading-relaxed">
-                  Select or drag &amp; drop your budget spreadsheet (e.g. <code>Personal Budget.xlsx</code> or custom CSV). The parser automatically extracts Accounts, Income/Contributors, Bills, and Loan schedules directly in your browser.
+                  All financial data (accounts, earners, bills, transactions, loan schedules) is saved entirely within your browser&apos;s native IndexedDB database. Data remains isolated on your device and is never transmitted to external cloud servers.
                 </p>
+              </div>
 
-                {/* Dropzone File Input */}
-                <div className="relative border-2 border-dashed border-emerald-600/50 hover:border-emerald-400 rounded-xl p-6 text-center transition-colors bg-slate-900/60">
+              {/* Database Record Metrics */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 text-center">
+                  <div className="text-xl font-mono font-bold text-blue-400">{budget.accounts?.length || 0}</div>
+                  <div className="text-[11px] text-slate-400 font-medium mt-0.5">Bank Accounts</div>
+                </div>
+                <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 text-center">
+                  <div className="text-xl font-mono font-bold text-purple-400">{budget.people?.length || 0}</div>
+                  <div className="text-[11px] text-slate-400 font-medium mt-0.5">Household Earners</div>
+                </div>
+                <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 text-center">
+                  <div className="text-xl font-mono font-bold text-emerald-400">{budget.bills?.length || 0}</div>
+                  <div className="text-[11px] text-slate-400 font-medium mt-0.5">Recurring Bills</div>
+                </div>
+                <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 text-center">
+                  <div className="text-xl font-mono font-bold text-amber-400">{budget.lineItems?.length || 0}</div>
+                  <div className="text-[11px] text-slate-400 font-medium mt-0.5">Ledger Entries</div>
+                </div>
+              </div>
+
+              {/* Status Feedback Banner */}
+              {backupStatus && (
+                <div className={`p-4 rounded-xl text-xs flex items-center justify-between ${
+                  backupStatus.type === 'success'
+                    ? 'bg-emerald-950/80 border border-emerald-800 text-emerald-300'
+                    : 'bg-rose-950/80 border border-rose-800 text-rose-300'
+                }`}>
+                  <div className="flex items-center gap-2.5">
+                    {backupStatus.type === 'success' ? (
+                      <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                    ) : (
+                      <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0" />
+                    )}
+                    <span className="font-medium">{backupStatus.message}</span>
+                  </div>
+                  <button
+                    onClick={() => setBackupStatus(null)}
+                    className="text-slate-400 hover:text-slate-200 text-xs cursor-pointer ml-4 font-bold"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              )}
+
+              {/* Backup &amp; Restore Action Panel */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                
+                {/* Export Data Card */}
+                <div className="p-5 rounded-2xl glass-card border border-blue-800/60 bg-blue-950/10 flex flex-col justify-between space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2.5">
+                      <span className="p-2 rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/30">
+                        <Download className="w-5 h-5" />
+                      </span>
+                      <h4 className="text-sm font-bold text-slate-100">Export Data (Download Backup)</h4>
+                    </div>
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      Pull current application state from IndexedDB and download a comprehensive JSON backup snapshot file to store on your local device.
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={handleExportDataClick}
+                    className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Export Data (.json)</span>
+                  </button>
+                </div>
+
+                {/* Load Backup Card */}
+                <div className="p-5 rounded-2xl glass-card border border-emerald-800/60 bg-emerald-950/10 flex flex-col justify-between space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2.5">
+                      <span className="p-2 rounded-xl bg-emerald-600/20 text-emerald-400 border border-emerald-500/30">
+                        <Upload className="w-5 h-5" />
+                      </span>
+                      <h4 className="text-sm font-bold text-slate-100">Load Backup (Restore)</h4>
+                    </div>
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      Upload a previously exported JSON backup file. This clears current IndexedDB state, loads the backup data, and refreshes the application UI immediately.
+                    </p>
+                  </div>
+
                   <input
                     type="file"
-                    accept=".xlsx, .xls, .csv"
-                    onChange={handleFileUpload}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                    ref={fileInputRef}
+                    onChange={handleLoadBackupFile}
+                    accept=".json"
+                    className="hidden"
                   />
-                  <div className="flex flex-col items-center justify-center space-y-2">
-                    <Upload className="w-8 h-8 text-emerald-400 animate-bounce" />
-                    <div className="text-xs font-bold text-slate-200">
-                      {spreadsheetFileName ? (
-                        <span className="text-emerald-400 font-mono">Selected: {spreadsheetFileName}</span>
-                      ) : (
-                        <span>Click to choose or drop <strong>.xlsx / .csv</strong> file here</span>
-                      )}
-                    </div>
-                    <span className="text-[10px] text-slate-400">Supports multi-tab workbooks &amp; standard register formats</span>
-                  </div>
-                </div>
 
-                {/* Live Granular Item Selection Checklist */}
-                {spreadsheetPreview && (
-                  <div className="p-4 rounded-xl bg-slate-900 border border-slate-700 space-y-4 animate-fade-in">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
-                      <div>
-                        <h4 className="text-xs font-bold text-slate-100 flex items-center gap-2">
-                          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                          Select Items to Import from {spreadsheetFileName}
-                        </h4>
-                        <p className="text-[11px] text-slate-400">
-                          Uncheck any items you do not wish to import into your budget.
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2 text-xs">
-                        <label className="text-slate-400 font-medium">Mode:</label>
-                        <select
-                          value={spreadsheetMode}
-                          onChange={e => setSpreadsheetMode(e.target.value)}
-                          className="bg-slate-800 text-slate-100 border border-slate-700 rounded-lg px-2.5 py-1 font-bold text-xs focus:outline-none focus:border-emerald-500"
-                        >
-                          <option value="replace">Replace Current Budget</option>
-                          <option value="merge">Merge with Existing</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    {/* Category Selection Summary Tabs */}
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
-                      <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center justify-between">
-                        <span className="text-slate-400 text-[11px] font-medium">Accounts Selected</span>
-                        <span className="font-bold text-blue-400">{selectedImportAccounts.size} / {spreadsheetPreview.accounts.length}</span>
-                      </div>
-                      <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center justify-between">
-                        <span className="text-slate-400 text-[11px] font-medium">Earners Selected</span>
-                        <span className="font-bold text-purple-400">{selectedImportPeople.size} / {spreadsheetPreview.people.length}</span>
-                      </div>
-                      <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center justify-between col-span-2 sm:col-span-1">
-                        <span className="text-slate-400 text-[11px] font-medium">Bills Selected</span>
-                        <span className="font-bold text-emerald-400">{selectedImportBills.size} / {spreadsheetPreview.bills.length}</span>
-                      </div>
-                    </div>
-
-                    {/* SECTION 1: ACCOUNTS CHECKLIST */}
-                    {spreadsheetPreview.accounts.length > 0 && (
-                      <div className="space-y-2 border border-slate-800 rounded-xl p-3 bg-slate-950/40">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-blue-300">
-                            Bank Accounts ({selectedImportAccounts.size} of {spreadsheetPreview.accounts.length})
-                          </span>
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => toggleAllAccounts(true)}
-                              className="text-[10px] text-blue-400 hover:underline cursor-pointer font-medium"
-                            >
-                              Select All
-                            </button>
-                            <span className="text-slate-600 text-[10px]">|</span>
-                            <button
-                              type="button"
-                              onClick={() => toggleAllAccounts(false)}
-                              className="text-[10px] text-slate-400 hover:underline cursor-pointer font-medium"
-                            >
-                              Deselect All
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="max-h-36 overflow-y-auto space-y-1 pr-1">
-                          {spreadsheetPreview.accounts.map(acc => {
-                            const isChecked = selectedImportAccounts.has(acc.id);
-                            return (
-                              <label
-                                key={acc.id}
-                                className={`flex items-center justify-between p-2 rounded-lg text-xs cursor-pointer border transition-all ${
-                                  isChecked
-                                    ? 'bg-blue-950/40 border-blue-800/60 text-slate-200'
-                                    : 'bg-slate-900/60 border-slate-800 text-slate-500 opacity-60'
-                                }`}
-                              >
-                                <div className="flex items-center gap-2.5">
-                                  <input
-                                    type="checkbox"
-                                    checked={isChecked}
-                                    onChange={() => toggleAccountSelection(acc.id)}
-                                    className="rounded border-slate-700 bg-slate-900 text-blue-500 focus:ring-0 cursor-pointer"
-                                  />
-                                  <span className="font-semibold">{acc.name}</span>
-                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 capitalize text-slate-400">{acc.type}</span>
-                                </div>
-                                <span className="font-mono text-xs font-bold text-blue-300">${acc.startingBalance.toFixed(2)}</span>
-                              </label>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* SECTION 2: EARNERS / PEOPLE CHECKLIST */}
-                    {spreadsheetPreview.people.length > 0 && (
-                      <div className="space-y-2 border border-slate-800 rounded-xl p-3 bg-slate-950/40">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-purple-300">
-                            Household Earners ({selectedImportPeople.size} of {spreadsheetPreview.people.length})
-                          </span>
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => toggleAllPeople(true)}
-                              className="text-[10px] text-purple-400 hover:underline cursor-pointer font-medium"
-                            >
-                              Select All
-                            </button>
-                            <span className="text-slate-600 text-[10px]">|</span>
-                            <button
-                              type="button"
-                              onClick={() => toggleAllPeople(false)}
-                              className="text-[10px] text-slate-400 hover:underline cursor-pointer font-medium"
-                            >
-                              Deselect All
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="max-h-36 overflow-y-auto space-y-1 pr-1">
-                          {spreadsheetPreview.people.map(person => {
-                            const isChecked = selectedImportPeople.has(person.id);
-                            return (
-                              <label
-                                key={person.id}
-                                className={`flex items-center justify-between p-2 rounded-lg text-xs cursor-pointer border transition-all ${
-                                  isChecked
-                                    ? 'bg-purple-950/40 border-purple-800/60 text-slate-200'
-                                    : 'bg-slate-900/60 border-slate-800 text-slate-500 opacity-60'
-                                }`}
-                              >
-                                <div className="flex items-center gap-2.5">
-                                  <input
-                                    type="checkbox"
-                                    checked={isChecked}
-                                    onChange={() => togglePersonSelection(person.id)}
-                                    className="rounded border-slate-700 bg-slate-900 text-purple-500 focus:ring-0 cursor-pointer"
-                                  />
-                                  <span className="font-semibold">{person.name}</span>
-                                </div>
-                                <span className="text-[10px] px-2 py-0.5 rounded bg-purple-950 text-purple-300 border border-purple-800">{person.role}</span>
-                              </label>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* SECTION 3: RECURRING BILLS CHECKLIST */}
-                    {spreadsheetPreview.bills.length > 0 && (
-                      <div className="space-y-2 border border-slate-800 rounded-xl p-3 bg-slate-950/40">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-emerald-300">
-                            Recurring Bills ({selectedImportBills.size} of {spreadsheetPreview.bills.length})
-                          </span>
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => toggleAllBills(true)}
-                              className="text-[10px] text-emerald-400 hover:underline cursor-pointer font-medium"
-                            >
-                              Select All
-                            </button>
-                            <span className="text-slate-600 text-[10px]">|</span>
-                            <button
-                              type="button"
-                              onClick={() => toggleAllBills(false)}
-                              className="text-[10px] text-slate-400 hover:underline cursor-pointer font-medium"
-                            >
-                              Deselect All
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="max-h-48 overflow-y-auto space-y-1 pr-1">
-                          {spreadsheetPreview.bills.map(bill => {
-                            const isChecked = selectedImportBills.has(bill.id);
-                            const acc = spreadsheetPreview.accounts.find(a => a.id === bill.accountId);
-                            return (
-                              <label
-                                key={bill.id}
-                                className={`flex items-center justify-between p-2 rounded-lg text-xs cursor-pointer border transition-all ${
-                                  isChecked
-                                    ? 'bg-emerald-950/30 border-emerald-800/60 text-slate-200'
-                                    : 'bg-slate-900/60 border-slate-800 text-slate-500 opacity-60'
-                                }`}
-                              >
-                                <div className="flex items-center gap-2.5 min-w-0">
-                                  <input
-                                    type="checkbox"
-                                    checked={isChecked}
-                                    onChange={() => toggleBillSelection(bill.id)}
-                                    className="rounded border-slate-700 bg-slate-900 text-emerald-500 focus:ring-0 cursor-pointer shrink-0"
-                                  />
-                                  <span className="font-semibold truncate">{bill.name}</span>
-                                  {acc && (
-                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 truncate shrink-0 max-w-[120px]">
-                                      {acc.name}
-                                    </span>
-                                  )}
-                                </div>
-                                <span className="font-mono text-xs font-bold text-emerald-300 shrink-0 font-mono">${bill.amount.toFixed(2)}</span>
-                              </label>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Action Bar */}
-                    <div className="flex items-center justify-between pt-2 border-t border-slate-800">
-                      <button
-                        type="button"
-                        onClick={() => setSpreadsheetPreview(null)}
-                        className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-medium cursor-pointer"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleApplySpreadsheet}
-                        disabled={selectedImportAccounts.size === 0 && selectedImportPeople.size === 0 && selectedImportBills.size === 0}
-                        className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <CheckCircle2 className="w-4 h-4" />
-                        <span>Import Selected Items ({selectedImportAccounts.size + selectedImportPeople.size + selectedImportBills.size})</span>
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* JSON Import Card */}
-              <div className="p-4 rounded-xl glass-card border border-slate-800 space-y-4">
-                <h3 className="text-sm font-semibold text-slate-200">Import Custom JSON Budget Configuration</h3>
-                <textarea
-                  rows={4}
-                  placeholder="Paste JSON budget configuration here..."
-                  value={jsonInput}
-                  onChange={e => setJsonInput(e.target.value)}
-                  className="w-full p-3 bg-slate-900 border border-slate-700 rounded-lg text-xs font-mono text-slate-200 focus:outline-none focus:border-blue-500"
-                />
-                <div className="flex items-center justify-between">
                   <button
-                    onClick={handleImportJson}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
                   >
-                    Load JSON Configuration
-                  </button>
-                  {jsonStatus && (
-                    <span className={`text-xs ${jsonStatus.type === 'success' ? 'text-emerald-400' : 'text-rose-400'}`}>
-                      {jsonStatus.message}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Clear Budget Card */}
-              <div className="p-4 rounded-xl border border-amber-800/40 bg-amber-950/20 space-y-3">
-                <h3 className="text-sm font-semibold text-amber-300 flex items-center gap-2">
-                  <RotateCcw className="w-4 h-4" /> Reset Budget Data to Cleared Defaults
-                </h3>
-                <p className="text-xs text-amber-200/80">
-                  Clears all accounts, members, bills, loans, and register entries to a clean slate.
-                </p>
-                <button
-                  onClick={() => {
-                    if (window.confirm('Are you sure you want to clear all budget data?')) {
-                      resetToDefaults();
-                      setJsonStatus({ type: 'success', message: 'Cleared all budget data.' });
-                    }
-                  }}
-                  className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-sm font-medium transition-colors"
-                >
-                  Clear All Budget Data
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* DATA: EXPORT */}
-          {activeSection === 'data' && (
-            <div className="space-y-4 mt-4 pt-4 border-t border-slate-800">
-              
-              {/* Export to Excel Workbook Card */}
-              <div className="p-5 rounded-xl glass-card border border-blue-800/60 bg-blue-950/10 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold text-blue-300 flex items-center gap-2">
-                    <FileSpreadsheet className="w-5 h-5 text-blue-400" />
-                    Export Active Budget to Excel (.xlsx) Workbook
-                  </h3>
-                  <span className="text-[10px] font-mono text-blue-400 bg-blue-950 px-2.5 py-1 rounded-full border border-blue-800">
-                    Multi-Tab Excel Format
-                  </span>
-                </div>
-                <p className="text-xs text-slate-300 leading-relaxed">
-                  Downloads a structured Excel workbook with dedicated sheets for Accounts, People &amp; Income, Bills, and Loans. Compatible with Microsoft Excel, Google Sheets, and Apple Numbers.
-                </p>
-
-                <div className="flex items-center justify-between pt-2">
-                  <div className="text-xs text-slate-400 font-mono">
-                    Includes {budget.accounts.length} accounts, {budget.bills.length} bills, {budget.people.length} earners
-                  </div>
-                  <button
-                    onClick={handleExportExcel}
-                    className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2 cursor-pointer"
-                  >
-                    <Download className="w-4 h-4" />
-                    <span>Download Excel Workbook (.xlsx)</span>
+                    <Upload className="w-4 h-4" />
+                    <span>Load Backup (.json)</span>
                   </button>
                 </div>
+
               </div>
 
-              {/* Export to JSON Backup Card */}
-              <div className="p-5 rounded-xl glass-card border border-purple-800/60 bg-purple-950/10 space-y-4">
+              {/* Reset Data Section */}
+              <div className="p-4 rounded-xl border border-rose-900/40 bg-rose-950/10 space-y-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold text-purple-300 flex items-center gap-2">
-                    <FileCode className="w-5 h-5 text-purple-400" />
-                    Download Complete JSON Backup File
-                  </h3>
-                  <span className="text-[10px] font-mono text-purple-400 bg-purple-950 px-2.5 py-1 rounded-full border border-purple-800">
-                    Full Snapshot Backup
-                  </span>
-                </div>
-                <p className="text-xs text-slate-300 leading-relaxed">
-                  Generates a full JSON backup file containing all configuration settings, line item registers, custom splits, and loan schedules. Perfect for restoring or transferring to another device.
-                </p>
-
-                <div className="flex items-center justify-between pt-2">
-                  {jsonStatus && (
-                    <span className={`text-xs ${jsonStatus.type === 'success' ? 'text-emerald-400' : 'text-rose-400'}`}>
-                      {jsonStatus.message}
-                    </span>
-                  )}
+                  <h4 className="text-xs font-bold text-rose-400 flex items-center gap-2">
+                    <RotateCcw className="w-4 h-4" /> Clear Local Database
+                  </h4>
                   <button
-                    onClick={handleExportJson}
-                    className="px-5 py-2.5 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2 cursor-pointer ml-auto"
+                    onClick={async () => {
+                      if (window.confirm('Are you sure you want to purge all local budget data? This action cannot be undone unless you have a JSON backup.')) {
+                        await clearAllData();
+                        setBackupStatus({ type: 'success', message: 'All local IndexedDB budget data has been cleared.' });
+                      }
+                    }}
+                    className="px-3.5 py-1.5 bg-rose-950/80 hover:bg-rose-900 text-rose-300 border border-rose-800 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
                   >
-                    <Download className="w-4 h-4" />
-                    <span>Download JSON Backup File</span>
+                    Purge Local Data
                   </button>
                 </div>
+                <p className="text-[11px] text-slate-400">
+                  Purges all accounts, earners, bills, and ledger transactions from your local IndexedDB storage.
+                </p>
               </div>
 
             </div>

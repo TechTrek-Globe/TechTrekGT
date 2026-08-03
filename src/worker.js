@@ -6,7 +6,6 @@ import { onRequestPost as forgotPasswordHandler } from '../functions/api/auth/fo
 import { onRequestPost as resetPasswordHandler } from '../functions/api/auth/reset-password.js';
 import { onRequestPost as securityQuestionHandler } from '../functions/api/auth/security-question.js';
 import { onRequestPost as updateProfileHandler } from '../functions/api/auth/update-profile.js';
-import { onRequestGet as getBudgetHandler, onRequestPost as postBudgetHandler } from '../functions/api/budget.js';
 
 /**
  * @param {Response} response
@@ -115,10 +114,6 @@ export default {
         response = await meHandler(context);
       } else if (apiPath === '/api/auth/logout' && request.method === 'POST') {
         response = await logoutHandler(context);
-      } else if (apiPath === '/api/budget') {
-        if (request.method === 'GET') response = await getBudgetHandler(context);
-        else if (request.method === 'POST') response = await postBudgetHandler(context);
-        else response = new Response('Method not allowed', { status: 405 });
       } else if (apiPath.startsWith('/api/')) {
         // If URL starts with /api/ but didn't match any route above
         response = new Response(JSON.stringify({ error: 'Endpoint not found' }), {

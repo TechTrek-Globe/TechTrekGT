@@ -45,18 +45,18 @@ export function LandingPage({ onNavigate }) {
     },
     {
       icon: ShieldCheck,
-      title: 'Edge-Encrypted Security',
-      description: 'PBKDF2 password hashing, secure JWT sessions, and Cloudflare D1 distributed edge database.'
+      title: 'Local-First Security',
+      description: 'Native browser origin sandboxing, zero cloud footprint, and local IndexedDB database persistence.'
     }
   ];
 
   const ecosystemCards = [
     {
-      title: 'TechTrek Cloud',
-      category: 'Infrastructure',
-      badge: 'Operational',
+      title: 'Local IndexedDB Engine',
+      category: 'Persistence',
+      badge: 'Active',
       badgeColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-      description: 'Global serverless edge infrastructure running on Cloudflare Workers and D1 database network.'
+      description: 'Native asynchronous IndexedDB database engine for 100% offline client-side storage.'
     },
     {
       title: 'TechTrek Analytics',
@@ -68,9 +68,9 @@ export function LandingPage({ onNavigate }) {
     {
       title: 'TechTrek Security Gateway',
       category: 'Protection',
-      badge: 'Hardened',
+      badge: 'Protected',
       badgeColor: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
-      description: 'Zero-trust perimeter controls, strict CSP enforcement, and cryptographic session management.'
+      description: 'Strict origin sandboxing ensuring all financial records remain exclusively on client device.'
     }
   ];
 
@@ -177,7 +177,7 @@ export function LandingPage({ onNavigate }) {
                     </div>
                     <div className="flex items-center space-x-2 text-xs text-slate-300">
                       <CheckCircle2 className="w-4 h-4 text-blue-400 shrink-0" />
-                      <span>Cloudflare D1 Multi-User Sync</span>
+                      <span>Local-First JSON Backup &amp; Restore</span>
                     </div>
                   </div>
 

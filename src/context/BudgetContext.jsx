@@ -373,22 +373,25 @@ export function BudgetProvider({ children }) {
     setBudget(fakeDemoBudgetData);
   };
 
-  // Reset to default spreadsheet data
-  const resetToDefaults = () => {
+  // Reset to default budget data
+  const resetToDefaults = async () => {
     setBudget(initialBudgetData);
+    await saveBudgetData(initialBudgetData);
   };
 
   // Clear all data (100% clean slate)
-  const clearAllData = () => {
-    setBudget(prev => ({
-      ...prev,
+  const clearAllData = async () => {
+    const emptyState = {
+      ...initialBudgetData,
       accounts: [],
       people: [],
       bills: [],
       lineItems: [],
       loans: [],
       dailyMatrix: {}
-    }));
+    };
+    await clearBudgetData();
+    setBudget(emptyState);
   };
 
   // Import Parsed Spreadsheet Data (replace or merge)
@@ -718,25 +721,6 @@ export function BudgetProvider({ children }) {
       }
     }
   }, [theme]);
-
-  const resetToDefaults = async () => {
-    setBudget(initialBudgetData);
-    await saveBudgetData(initialBudgetData);
-  };
-
-  const clearAllData = async () => {
-    const emptyState = {
-      ...initialBudgetData,
-      accounts: [],
-      people: [],
-      bills: [],
-      loans: [],
-      lineItems: [],
-      dailyMatrix: {}
-    };
-    await clearBudgetData();
-    setBudget(emptyState);
-  };
 
   return (
     <BudgetContext.Provider

@@ -35,15 +35,22 @@ function addSecurityHeaders(response, isLocalhost = false) {
   newHeaders.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
 
   // CORS headers for production domain
-  const allowedOrigins = ['https://techtrek-budget.pages.dev'];
-  const origin = response.headers.get('Origin'); // Request isn't available here easily, so we might not be able to echo back origin dynamically unless passed.
-  // Actually, we can just set it generically or use a wildcard for local/dev, but since it's a SPA served from same origin, CORS isn't strictly needed unless fetching from another domain.
-  // However, it's good practice to set it.
-  newHeaders.set('Access-Control-Allow-Origin', 'https://techtrek-budget.pages.dev');
+  const allowedOrigins = [
+    'https://techtrekgt.com',
+    'https://techtrek-budget.pages.dev',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000'
+  ];
+  const origin = response.headers.get('Origin');
+  if (origin && allowedOrigins.includes(origin)) {
+    newHeaders.set('Access-Control-Allow-Origin', origin);
+  } else {
+    newHeaders.set('Access-Control-Allow-Origin', 'https://techtrekgt.com');
+  }
   newHeaders.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   newHeaders.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  newHeaders.set('Access-Control-Allow-Credentials', 'true');
   newHeaders.set('Access-Control-Max-Age', '86400');
-
 
   const contentType = newHeaders.get('content-type') || '';
   if (contentType.includes('text/html')) {
@@ -76,35 +83,58 @@ export default {
       return Response.redirect(url.toString(), 301);
     }
 
+    // Handle OPTIONS preflight
+    if (request.method === 'OPTIONS') {
+      return addSecurityHeaders(new Response(null, { status: 204 }), isLocalhost);
+    }
+
     let response;
     try {
+      // Normalize subpath /finance or /finance/ for API routing
+      let apiPath = url.pathname;
+      if (apiPath.startsWith('/finance/api/')) {
+        apiPath = apiPath.slice('/finance'.length);
+      } else if (apiPath === '/finance/api') {
+        apiPath = '/api';
+      }
+
       // API Route Routing
-      if (url.pathname === '/api/auth/register' && request.method === 'POST') {
+      if (apiPath === '/api/auth/register' && request.method === 'POST') {
         response = await registerHandler(context);
-      } else if (url.pathname === '/api/auth/login' && request.method === 'POST') {
+      } else if (apiPath === '/api/auth/login' && request.method === 'POST') {
         response = await loginHandler(context);
-      } else if (url.pathname === '/api/auth/forgot-password' && request.method === 'POST') {
+      } else if (apiPath === '/api/auth/forgot-password' && request.method === 'POST') {
         response = await forgotPasswordHandler(context);
-      } else if (url.pathname === '/api/auth/reset-password' && request.method === 'POST') {
+      } else if (apiPath === '/api/auth/reset-password' && request.method === 'POST') {
         response = await resetPasswordHandler(context);
-      } else if (url.pathname === '/api/auth/security-question' && request.method === 'POST') {
+      } else if (apiPath === '/api/auth/security-question' && request.method === 'POST') {
         response = await securityQuestionHandler(context);
-      } else if (url.pathname === '/api/auth/update-profile' && request.method === 'POST') {
+      } else if (apiPath === '/api/auth/update-profile' && request.method === 'POST') {
         response = await updateProfileHandler(context);
-      } else if (url.pathname === '/api/auth/me' && request.method === 'GET') {
+      } else if (apiPath === '/api/auth/me' && request.method === 'GET') {
         response = await meHandler(context);
-      } else if (url.pathname === '/api/auth/logout' && request.method === 'POST') {
+      } else if (apiPath === '/api/auth/logout' && request.method === 'POST') {
         response = await logoutHandler(context);
-      } else if (url.pathname === '/api/budget') {
+      } else if (apiPath === '/api/budget') {
         if (request.method === 'GET') response = await getBudgetHandler(context);
         else if (request.method === 'POST') response = await postBudgetHandler(context);
         else response = new Response('Method not allowed', { status: 405 });
-      } else if (url.pathname.startsWith('/api/')) {
+      } else if (apiPath.startsWith('/api/')) {
         // If URL starts with /api/ but didn't match any route above
         response = new Response(JSON.stringify({ error: 'Endpoint not found' }), {
           status: 404,
           headers: { 'Content-Type': 'application/json' }
         });
+      } else if (url.pathname.startsWith('/finance/assets/')) {
+        // Rewrite asset requests under /finance/assets/ to /assets/
+        const assetUrl = new URL(request.url);
+        assetUrl.pathname = assetUrl.pathname.slice('/finance'.length);
+        response = await env.ASSETS.fetch(new Request(assetUrl.toString(), request));
+      } else if (url.pathname === '/finance' || url.pathname.startsWith('/finance/')) {
+        // SPA entry fallback for /finance subpath
+        const spaUrl = new URL(request.url);
+        spaUrl.pathname = '/';
+        response = await env.ASSETS.fetch(new Request(spaUrl.toString(), request));
       } else {
         // Fallback to static SPA assets
         response = await env.ASSETS.fetch(request);

@@ -251,13 +251,14 @@ async function onRequestPost$7(context) {
       });
     }
     const token = await createToken({ userId, email: cleanEmail, householdId, name: name.trim() }, env.JWT_SECRET);
+    const maxAge = body.rememberMe ? 30 * 24 * 3600 : 24 * 3600;
     const cookieOptions = [
       `auth_token=${token}`,
       "HttpOnly",
       "Secure",
-      "SameSite=Strict",
+      "SameSite=Lax",
       "Path=/",
-      `Max-Age=${body.rememberMe ? 5 * 24 * 3600 : 0}`
+      `Max-Age=${maxAge}`
     ].join("; ");
     return new Response(JSON.stringify({
       success: true,
@@ -333,13 +334,14 @@ async function onRequestPost$6(context) {
       });
     }
     const token = await createToken({ userId: user.id, email: user.email, householdId, name: user.name }, env.JWT_SECRET);
+    const maxAge = body.rememberMe ? 30 * 24 * 3600 : 24 * 3600;
     const cookieOptions = [
       `auth_token=${token}`,
       "HttpOnly",
       "Secure",
-      "SameSite=Strict",
+      "SameSite=Lax",
       "Path=/",
-      `Max-Age=${body.rememberMe ? 5 * 24 * 3600 : 0}`
+      `Max-Age=${maxAge}`
     ].join("; ");
     return new Response(JSON.stringify({
       success: true,
@@ -1229,10 +1231,21 @@ function addSecurityHeaders(response, isLocalhost = false) {
   newHeaders.set("X-XSS-Protection", "0");
   newHeaders.set("Referrer-Policy", "strict-origin-when-cross-origin");
   newHeaders.set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()");
-  response.headers.get("Origin");
-  newHeaders.set("Access-Control-Allow-Origin", "https://techtrek-budget.pages.dev");
+  const allowedOrigins = [
+    "https://techtrekgt.com",
+    "https://techtrek-budget.pages.dev",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000"
+  ];
+  const origin = response.headers.get("Origin");
+  if (origin && allowedOrigins.includes(origin)) {
+    newHeaders.set("Access-Control-Allow-Origin", origin);
+  } else {
+    newHeaders.set("Access-Control-Allow-Origin", "https://techtrekgt.com");
+  }
   newHeaders.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   newHeaders.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  newHeaders.set("Access-Control-Allow-Credentials", "true");
   newHeaders.set("Access-Control-Max-Age", "86400");
   const contentType = newHeaders.get("content-type") || "";
   if (contentType.includes("text/html")) {
@@ -1260,33 +1273,50 @@ const worker = {
       url.protocol = "https:";
       return Response.redirect(url.toString(), 301);
     }
+    if (request.method === "OPTIONS") {
+      return addSecurityHeaders(new Response(null, { status: 204 }), isLocalhost);
+    }
     let response;
     try {
-      if (url.pathname === "/api/auth/register" && request.method === "POST") {
+      let apiPath = url.pathname;
+      if (apiPath.startsWith("/finance/api/")) {
+        apiPath = apiPath.slice("/finance".length);
+      } else if (apiPath === "/finance/api") {
+        apiPath = "/api";
+      }
+      if (apiPath === "/api/auth/register" && request.method === "POST") {
         response = await onRequestPost$7(context);
-      } else if (url.pathname === "/api/auth/login" && request.method === "POST") {
+      } else if (apiPath === "/api/auth/login" && request.method === "POST") {
         response = await onRequestPost$6(context);
-      } else if (url.pathname === "/api/auth/forgot-password" && request.method === "POST") {
+      } else if (apiPath === "/api/auth/forgot-password" && request.method === "POST") {
         response = await onRequestPost$4(context);
-      } else if (url.pathname === "/api/auth/reset-password" && request.method === "POST") {
+      } else if (apiPath === "/api/auth/reset-password" && request.method === "POST") {
         response = await onRequestPost$3(context);
-      } else if (url.pathname === "/api/auth/security-question" && request.method === "POST") {
+      } else if (apiPath === "/api/auth/security-question" && request.method === "POST") {
         response = await onRequestPost$2(context);
-      } else if (url.pathname === "/api/auth/update-profile" && request.method === "POST") {
+      } else if (apiPath === "/api/auth/update-profile" && request.method === "POST") {
         response = await onRequestPost$1(context);
-      } else if (url.pathname === "/api/auth/me" && request.method === "GET") {
+      } else if (apiPath === "/api/auth/me" && request.method === "GET") {
         response = await onRequestGet$1(context);
-      } else if (url.pathname === "/api/auth/logout" && request.method === "POST") {
+      } else if (apiPath === "/api/auth/logout" && request.method === "POST") {
         response = await onRequestPost$5(context);
-      } else if (url.pathname === "/api/budget") {
+      } else if (apiPath === "/api/budget") {
         if (request.method === "GET") response = await onRequestGet(context);
         else if (request.method === "POST") response = await onRequestPost(context);
         else response = new Response("Method not allowed", { status: 405 });
-      } else if (url.pathname.startsWith("/api/")) {
+      } else if (apiPath.startsWith("/api/")) {
         response = new Response(JSON.stringify({ error: "Endpoint not found" }), {
           status: 404,
           headers: { "Content-Type": "application/json" }
         });
+      } else if (url.pathname.startsWith("/finance/assets/")) {
+        const assetUrl = new URL(request.url);
+        assetUrl.pathname = assetUrl.pathname.slice("/finance".length);
+        response = await env.ASSETS.fetch(new Request(assetUrl.toString(), request));
+      } else if (url.pathname === "/finance" || url.pathname.startsWith("/finance/")) {
+        const spaUrl = new URL(request.url);
+        spaUrl.pathname = "/";
+        response = await env.ASSETS.fetch(new Request(spaUrl.toString(), request));
       } else {
         response = await env.ASSETS.fetch(request);
       }

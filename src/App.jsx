@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { AuthProvider } from './context/AuthContext';
 import { BudgetProvider, useBudget } from './context/BudgetContext';
 import { AppLayout } from './components/AppLayout';
@@ -7,6 +7,7 @@ import { DashboardView } from './components/DashboardView';
 import { MainBudgetView } from './components/MainBudgetView';
 import { LedgerView } from './components/LedgerView';
 import { AmortizationView } from './components/AmortizationView';
+import { LandingPage } from './components/LandingPage';
 import AuthModal from './components/AuthModal';
 
 class ErrorBoundary extends React.Component {
@@ -91,16 +92,45 @@ function MainContent() {
   );
 }
 
+function getRouteFromPathname(pathname) {
+  const path = (pathname || (typeof window !== 'undefined' ? window.location.pathname : '')).toLowerCase();
+  if (path === '/finance' || path.startsWith('/finance/')) {
+    return 'finance';
+  }
+  return 'landing';
+}
+
 export default function App() {
+  const [route, setRoute] = useState(getRouteFromPathname);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setRoute(getRouteFromPathname(window.location.pathname));
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const navigateTo = (path) => {
+    if (typeof window !== 'undefined') {
+      window.history.pushState({}, '', path);
+      setRoute(getRouteFromPathname(path));
+    }
+  };
+
   return (
     <ErrorBoundary>
-      <AuthProvider>
-        <BudgetProvider>
-          <AppLayout>
-            <MainContent />
-          </AppLayout>
-        </BudgetProvider>
-      </AuthProvider>
+      {route === 'landing' ? (
+        <LandingPage onNavigate={navigateTo} />
+      ) : (
+        <AuthProvider>
+          <BudgetProvider>
+            <AppLayout onNavigateHome={() => navigateTo('/')}>
+              <MainContent />
+            </AppLayout>
+          </BudgetProvider>
+        </AuthProvider>
+      )}
     </ErrorBoundary>
   );
 }

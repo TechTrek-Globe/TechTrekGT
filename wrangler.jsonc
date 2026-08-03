@@ -2,13 +2,23 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "techtrek-budget",
   "main": "src/worker.js",
-  "compatibility_date": "2026-07-31",
+  "compatibility_date": "2026-08-01",
   "observability": {
     "enabled": true
   },
   "assets": {
     "not_found_handling": "single-page-application"
   },
+  "routes": [
+    {
+      "pattern": "techtrekgt.com/finance",
+      "zone_name": "techtrekgt.com"
+    },
+    {
+      "pattern": "techtrekgt.com/finance/*",
+      "zone_name": "techtrekgt.com"
+    }
+  ],
   "compatibility_flags": [
     "nodejs_compat"
   ],

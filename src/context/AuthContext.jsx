@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { getApiUrl } from '../utils/api';
 
 /** @type {React.Context<any>} */
 const AuthContext = createContext(null);
@@ -17,7 +18,9 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     async function verifyCurrentSession() {
       try {
-        const res = await fetch('/api/auth/me');
+        const res = await fetch(getApiUrl('/api/auth/me'), {
+          credentials: 'include'
+        });
         if (res.ok) {
           const data = await res.json();
           setUser(data.user);
@@ -87,9 +90,10 @@ export function AuthProvider({ children }) {
    * @param {boolean} rememberMe
    */
   const login = async (email, password, rememberMe = false) => {
-    const res = await fetch('/api/auth/login', {
+    const res = await fetch(getApiUrl('/api/auth/login'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ email, password, rememberMe })
     });
 
@@ -114,9 +118,10 @@ export function AuthProvider({ children }) {
    * @param {boolean} rememberMe
    */
   const register = async (name, email, password, securityQuestion, securityAnswer, rememberMe = false) => {
-    const res = await fetch('/api/auth/register', {
+    const res = await fetch(getApiUrl('/api/auth/register'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ name, email, password, securityQuestion, securityAnswer, rememberMe })
     });
 
@@ -133,9 +138,10 @@ export function AuthProvider({ children }) {
   };
 
   const getSecurityQuestion = async (email) => {
-    const res = await fetch('/api/auth/security-question', {
+    const res = await fetch(getApiUrl('/api/auth/security-question'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ email })
     });
 
@@ -147,9 +153,10 @@ export function AuthProvider({ children }) {
   };
 
   const forgotPassword = async (email, securityAnswer) => {
-    const res = await fetch('/api/auth/forgot-password', {
+    const res = await fetch(getApiUrl('/api/auth/forgot-password'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ email, securityAnswer })
     });
 
@@ -161,9 +168,10 @@ export function AuthProvider({ children }) {
   };
 
   const resetPassword = async (email, token, newPassword) => {
-    const res = await fetch('/api/auth/reset-password', {
+    const res = await fetch(getApiUrl('/api/auth/reset-password'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ email, token, newPassword })
     });
 
@@ -175,9 +183,10 @@ export function AuthProvider({ children }) {
   };
 
   const updateProfile = async (profileData) => {
-    const res = await fetch('/api/auth/update-profile', {
+    const res = await fetch(getApiUrl('/api/auth/update-profile'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify(profileData)
     });
 
@@ -197,7 +206,7 @@ export function AuthProvider({ children }) {
     setUser(null);
     setHouseholdId(null);
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      await fetch(getApiUrl('/api/auth/logout'), { method: 'POST', credentials: 'include' });
     } catch (e) {
       // ignore
     }

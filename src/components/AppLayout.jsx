@@ -14,7 +14,8 @@ import {
   Menu,
   X,
   Sun,
-  Moon
+  Moon,
+  Globe
 } from 'lucide-react';
 
 const NAV_ITEMS = [
@@ -27,7 +28,7 @@ const NAV_ITEMS = [
 
 const SIDEBAR_KEY = 'trekledger_sidebar_collapsed';
 
-export function AppLayout({ children }) {
+export function AppLayout({ children, onNavigateHome }) {
   const {
     budget,
     theme,
@@ -211,6 +212,28 @@ export function AppLayout({ children }) {
           >
             <Menu className="w-5 h-5" />
           </button>
+
+          {/* Platform Portal Home Link */}
+          <a
+            href="/"
+            onClick={(e) => {
+              if (onNavigateHome) {
+                e.preventDefault();
+                onNavigateHome();
+              }
+            }}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all ${
+              isLight
+                ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
+                : 'bg-slate-900/80 hover:bg-slate-800 text-slate-300 border-slate-800 hover:text-white'
+            }`}
+            title="Return to TechTrekGT Portal"
+          >
+            <Globe className="w-3.5 h-3.5 text-blue-400" />
+            <span className="font-semibold text-slate-200">TechTrekGT</span>
+            <span className="text-slate-500">/</span>
+            <span className="text-blue-400 font-semibold">Finance</span>
+          </a>
 
 
           {/* Spacer */}

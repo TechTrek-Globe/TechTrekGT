@@ -4,6 +4,7 @@ import { initialBudgetData, DEFAULT_DASHBOARD_WIDGETS } from '../initialData';
 import { fakeDemoBudgetData } from '../demoPresetData';
 import { useAuth } from './AuthContext';
 import { isPersonDepositDay, getPersonDepositAmountForAccount, getAccountSaveExtraPersonPortion, getNextBillDueDate, getBillDueMonths, isBillDueInMonth, formatBillDueMonths } from '../utils/paydayUtils';
+import { getApiUrl } from '../utils/api';
 
 const BudgetContext = createContext();
 
@@ -69,7 +70,7 @@ export function BudgetProvider({ children }) {
     async function fetchCloudBudget() {
       if (!isAuthenticated) return;
       try {
-        const res = await fetch('/api/budget', {
+        const res = await fetch(getApiUrl('/api/budget'), {
           credentials: 'include'
         });
         if (res.ok) {
@@ -173,7 +174,7 @@ export function BudgetProvider({ children }) {
 
     const timer = setTimeout(async () => {
       try {
-        await fetch('/api/budget', {
+        await fetch(getApiUrl('/api/budget'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'

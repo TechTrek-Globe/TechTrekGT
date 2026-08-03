@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react';
 import { cloudflare } from "@cloudflare/vite-plugin";
 
 export default defineConfig({
-  base: '/finance/',
+  base: '/',
   plugins: [react(), cloudflare()],
   server: {
     port: 3000,

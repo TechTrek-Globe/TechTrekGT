@@ -1216,11 +1216,11 @@ function addSecurityHeaders(response, isLocalhost = false) {
     newHeaders.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
     newHeaders.set("Content-Security-Policy", [
       "default-src 'self'",
-      "style-src 'self' 'unsafe-inline'",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "script-src 'self'",
-      "connect-src 'self'",
+      "connect-src 'self' https://techtrekgt.com",
       "img-src 'self' data: blob:",
-      "font-src 'self' data:",
+      "font-src 'self' data: https://fonts.gstatic.com",
       "frame-ancestors 'none'",
       "form-action 'self'",
       "base-uri 'self'"
@@ -1312,13 +1312,25 @@ const worker = {
       } else if (url.pathname.startsWith("/finance/assets/")) {
         const assetUrl = new URL(request.url);
         assetUrl.pathname = assetUrl.pathname.slice("/finance".length);
-        response = await env.ASSETS.fetch(new Request(assetUrl.toString(), request));
+        if (env?.ASSETS?.fetch) {
+          response = await env.ASSETS.fetch(new Request(assetUrl.toString(), request));
+        } else {
+          response = await fetch(new Request(assetUrl.toString(), request));
+        }
       } else if (url.pathname === "/finance" || url.pathname.startsWith("/finance/")) {
         const spaUrl = new URL(request.url);
         spaUrl.pathname = "/";
-        response = await env.ASSETS.fetch(new Request(spaUrl.toString(), request));
+        if (env?.ASSETS?.fetch) {
+          response = await env.ASSETS.fetch(new Request(spaUrl.toString(), request));
+        } else {
+          response = await fetch(new Request(spaUrl.toString(), request));
+        }
       } else {
-        response = await env.ASSETS.fetch(request);
+        if (env?.ASSETS?.fetch) {
+          response = await env.ASSETS.fetch(request);
+        } else {
+          response = await fetch(request);
+        }
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err || "Server error");

@@ -13,6 +13,7 @@ export const DEFAULT_DASHBOARD_WIDGETS = [
 
 export const initialBudgetData = {
   lineItems: [],
+  transactions: [],
   accounts: [],
   people: [],
   bills: [],

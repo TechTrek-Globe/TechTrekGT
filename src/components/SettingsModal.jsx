@@ -39,6 +39,7 @@ import { NoYearCalendarPicker } from './NoYearCalendarPicker';
 import { useAuth } from '../context/AuthContext';
 import { PRESET_SECURITY_QUESTIONS } from './AuthModal';
 import { getApiUrl } from '../utils/api';
+import { SpreadsheetImporter } from './SpreadsheetImporter';
 
 export function SettingsModal() {
   const { 
@@ -181,107 +182,8 @@ export function SettingsModal() {
   const [confirmResetDefaults, setConfirmResetDefaults] = useState(false);
   const [confirmLoadDemo, setConfirmLoadDemo] = useState(false);
 
-  // Granular import selection state
-  const [selectedImportAccounts, setSelectedImportAccounts] = useState(new Set());
-  const [selectedImportPeople, setSelectedImportPeople] = useState(new Set());
-  const [selectedImportBills, setSelectedImportBills] = useState(new Set());
-  const [selectedImportLoans, setSelectedImportLoans] = useState(new Set());
-
-  const handleFileUpload = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setSpreadsheetFileName(file.name);
-    const reader = new FileReader();
-
-    reader.onload = (evt) => {
-      const arrayBuffer = evt.target.result;
-      const res = parseSpreadsheet(arrayBuffer, file.name);
-      if (res.success && res.budget) {
-        setSpreadsheetPreview(res.budget);
-        setSelectedImportAccounts(new Set(res.budget.accounts.map(a => a.id)));
-        setSelectedImportPeople(new Set(res.budget.people.map(p => p.id)));
-        setSelectedImportBills(new Set(res.budget.bills.map(b => b.id)));
-        setSelectedImportLoans(new Set(res.budget.loans.map(l => l.id)));
-        setJsonStatus({ type: 'success', message: `Parsed ${file.name} successfully! Select items to import below.` });
-      } else {
-        setJsonStatus({ type: 'error', message: res.error });
-      }
-    };
-
-    reader.readAsArrayBuffer(file);
-  };
-
-  const handleApplySpreadsheet = () => {
-    if (!spreadsheetPreview) return;
-
-    const filteredBudget = {
-      accounts: spreadsheetPreview.accounts.filter(a => selectedImportAccounts.has(a.id)),
-      people: spreadsheetPreview.people.filter(p => selectedImportPeople.has(p.id)),
-      bills: spreadsheetPreview.bills.filter(b => selectedImportBills.has(b.id)),
-      loans: spreadsheetPreview.loans.filter(l => selectedImportLoans.has(l.id))
-    };
-
-    const res = importParsedSpreadsheet(filteredBudget, spreadsheetMode);
-    if (res.success) {
-      setJsonStatus({
-        type: 'success',
-        message: `Successfully imported ${filteredBudget.accounts.length} accounts, ${filteredBudget.people.length} earners, and ${filteredBudget.bills.length} bills!`
-      });
-      setSpreadsheetPreview(null);
-      setSpreadsheetFileName('');
-    } else {
-      setJsonStatus({ type: 'error', message: res.error });
-    }
-  };
-
-  const toggleAccountSelection = (id) => {
-    setSelectedImportAccounts(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  };
-
-  const toggleAllAccounts = (selectAll) => {
-    if (selectAll && spreadsheetPreview) {
-      setSelectedImportAccounts(new Set(spreadsheetPreview.accounts.map(a => a.id)));
-    } else {
-      setSelectedImportAccounts(new Set());
-    }
-  };
-
-  const toggleBillSelection = (id) => {
-    setSelectedImportBills(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  };
-
-  const toggleAllBills = (selectAll) => {
-    if (selectAll && spreadsheetPreview) {
-      setSelectedImportBills(new Set(spreadsheetPreview.bills.map(b => b.id)));
-    } else {
-      setSelectedImportBills(new Set());
-    }
-  };
-
-  const togglePersonSelection = (id) => {
-    setSelectedImportPeople(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  };
-
-  const toggleAllPeople = (selectAll) => {
-    if (selectAll && spreadsheetPreview) {
-      setSelectedImportPeople(new Set(spreadsheetPreview.people.map(p => p.id)));
-    } else {
-      setSelectedImportPeople(new Set());
-    }
-  };
+  const handleFileUpload = () => {}; // replaced by SpreadsheetImporter
+  const handleApplySpreadsheet = () => {}; // replaced by SpreadsheetImporter
 
   const handleExportExcel = () => {
     try {
@@ -2342,6 +2244,9 @@ export function SettingsModal() {
                   <div className="text-[11px] text-slate-400 font-medium mt-0.5">Ledger Entries</div>
                 </div>
               </div>
+
+              {/* Smart Spreadsheet Importer */}
+              <SpreadsheetImporter />
 
               {/* Status Feedback Banner */}
               {backupStatus && (

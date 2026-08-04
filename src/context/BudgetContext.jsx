@@ -47,6 +47,7 @@ export function BudgetProvider({ children }) {
             ...stored,
             dailyMatrix: (stored.dailyMatrix && typeof stored.dailyMatrix === 'object') ? stored.dailyMatrix : {},
             lineItems: Array.isArray(stored.lineItems) ? stored.lineItems : [],
+            transactions: Array.isArray(stored.transactions) ? stored.transactions : [],
             accounts: Array.isArray(stored.accounts) ? stored.accounts : [],
             people: Array.isArray(stored.people) ? stored.people : [],
             bills: Array.isArray(stored.bills) ? stored.bills : [],
@@ -461,7 +462,49 @@ export function BudgetProvider({ children }) {
     setBudget(emptyState);
   };
 
-  // Import Parsed Spreadsheet Data (replace or merge)
+  // Selective per-namespace spreadsheet import with per-namespace strategy
+  const importSpreadsheetSelective = ({ namespaces, strategies, data }) => {
+    if (!namespaces || !data) return { success: false, error: 'Invalid payload.' };
+
+    setBudget(prev => {
+      const next = { ...prev };
+
+      if (namespaces.people && Array.isArray(data.people)) {
+        if (strategies.people === 'override') {
+          next.people = data.people;
+        } else {
+          const existingNames = new Set(prev.people.map(p => p.name.toLowerCase()));
+          next.people = [...prev.people, ...data.people.filter(p => !existingNames.has(p.name.toLowerCase()))];
+        }
+      }
+
+      if (namespaces.bills && Array.isArray(data.bills)) {
+        if (strategies.bills === 'override') {
+          next.bills = data.bills;
+        } else {
+          const existingNames = new Set(prev.bills.map(b => b.name.toLowerCase()));
+          next.bills = [...prev.bills, ...data.bills.filter(b => !existingNames.has(b.name.toLowerCase()))];
+        }
+      }
+
+      if (namespaces.transactions && Array.isArray(data.transactions)) {
+        const existing = Array.isArray(prev.transactions) ? prev.transactions : [];
+        if (strategies.transactions === 'override') {
+          next.transactions = data.transactions;
+        } else {
+          const key = t => `${t.date}|${(t.description || '').toLowerCase()}|${t.amount}`;
+          const existingKeys = new Set(existing.map(key));
+          next.transactions = [...existing, ...data.transactions.filter(t => !existingKeys.has(key(t)))];
+        }
+      }
+
+      return next;
+    });
+
+    return { success: true };
+  };
+
+  // Import Parsed Spreadsheet Data (replace or merge) - legacy path
   const importParsedSpreadsheet = (parsedData, mode = 'replace') => {
     if (!parsedData || !parsedData.accounts) return { success: false, error: 'Invalid parsed data.' };
 
@@ -832,6 +875,7 @@ export function BudgetProvider({ children }) {
         deleteLoan,
         resetToDefaults,
         clearAllData,
+        importSpreadsheetSelective,
         exportBackupJson,
         restoreFromBackup,
         pushCloudBackup,

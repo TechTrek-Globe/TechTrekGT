@@ -115,3 +115,9 @@ CREATE TABLE IF NOT EXISTS household_settings (
   hide_dashboard_header INTEGER NOT NULL DEFAULT 0,
   FOREIGN KEY (household_id) REFERENCES households(id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS user_backups (
+  id TEXT PRIMARY KEY DEFAULT 'default_vault',
+  data TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);

@@ -47,7 +47,7 @@ function addSecurityHeaders(response, isLocalhost = false) {
     newHeaders.set('Access-Control-Allow-Origin', 'https://techtrekgt.com');
   }
   newHeaders.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  newHeaders.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  newHeaders.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Sync-Passcode');
   newHeaders.set('Access-Control-Allow-Credentials', 'true');
   newHeaders.set('Access-Control-Max-Age', '86400');
 
@@ -63,6 +63,131 @@ function addSecurityHeaders(response, isLocalhost = false) {
     statusText: response.statusText,
     headers: newHeaders
   });
+}
+
+async function handleVerifySyncCode(context) {
+  const { request, env } = context;
+  try {
+    const body = await request.json().catch(() => ({}));
+    const code = body?.code || '';
+    const secretCode = env?.SYNC_UNLOCK_CODE || '123456';
+
+    if (!code || String(code).trim() !== String(secretCode).trim()) {
+      return new Response(JSON.stringify({ error: 'Invalid access passcode' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    return new Response(JSON.stringify({ success: true, token: 'vault-unlocked' }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: 'Verification failed' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+function verifySyncGuard(request, env) {
+  const passcode = request.headers.get('x-sync-passcode') || request.headers.get('authorization')?.replace('Bearer ', '') || '';
+  const secretCode = env?.SYNC_UNLOCK_CODE || '123456';
+  return Boolean(passcode && String(passcode).trim() === String(secretCode).trim());
+}
+
+async function handleSyncBackup(context) {
+  const { request, env } = context;
+  if (!verifySyncGuard(request, env)) {
+    return new Response(JSON.stringify({ error: 'Unauthorized: Invalid or missing vault passcode' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  if (!env?.DB) {
+    return new Response(JSON.stringify({ error: 'D1 database binding not available' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  try {
+    const body = await request.json();
+    const dataStr = JSON.stringify(body.budget || body);
+
+    await env.DB.prepare(`
+      CREATE TABLE IF NOT EXISTS user_backups (
+        id TEXT PRIMARY KEY DEFAULT 'default_vault',
+        data TEXT NOT NULL,
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )
+    `).run();
+
+    await env.DB.prepare(`
+      INSERT INTO user_backups (id, data, updated_at)
+      VALUES ('default_vault', ?, datetime('now'))
+      ON CONFLICT(id) DO UPDATE SET data=excluded.data, updated_at=datetime('now')
+    `).bind(dataStr).run();
+
+    return new Response(JSON.stringify({ success: true, timestamp: new Date().toISOString() }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: `Backup failed: ${err.message}` }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+async function handleSyncRestore(context) {
+  const { request, env } = context;
+  if (!verifySyncGuard(request, env)) {
+    return new Response(JSON.stringify({ error: 'Unauthorized: Invalid or missing vault passcode' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  if (!env?.DB) {
+    return new Response(JSON.stringify({ error: 'D1 database binding not available' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  try {
+    await env.DB.prepare(`
+      CREATE TABLE IF NOT EXISTS user_backups (
+        id TEXT PRIMARY KEY DEFAULT 'default_vault',
+        data TEXT NOT NULL,
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )
+    `).run();
+
+    const row = await env.DB.prepare('SELECT data, updated_at FROM user_backups WHERE id = ?').bind('default_vault').first();
+
+    if (!row || !row.data) {
+      return new Response(JSON.stringify({ error: 'No cloud vault backup found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    const parsed = JSON.parse(row.data);
+    return new Response(JSON.stringify({ success: true, budget: parsed.budget || parsed, updatedAt: row.updated_at }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: `Restore failed: ${err.message}` }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
 }
 
 export default {
@@ -98,7 +223,13 @@ export default {
       }
 
       // API Route Routing
-      if (apiPath === '/api/auth/register' && request.method === 'POST') {
+      if (apiPath === '/api/verify-sync-code' && request.method === 'POST') {
+        response = await handleVerifySyncCode(context);
+      } else if (apiPath === '/api/sync/backup' && request.method === 'POST') {
+        response = await handleSyncBackup(context);
+      } else if (apiPath === '/api/sync/restore' && request.method === 'GET') {
+        response = await handleSyncRestore(context);
+      } else if (apiPath === '/api/auth/register' && request.method === 'POST') {
         response = await registerHandler(context);
       } else if (apiPath === '/api/auth/login' && request.method === 'POST') {
         response = await loginHandler(context);

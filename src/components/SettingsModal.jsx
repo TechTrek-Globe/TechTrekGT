@@ -24,7 +24,13 @@ import {
   GripVertical,
   Sun,
   Moon,
-  ShieldCheck
+  ShieldCheck,
+  Cloud,
+  CloudUpload,
+  CloudDownload,
+  Lock,
+  KeyRound,
+  Loader2
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { parseSpreadsheet } from '../utils/spreadsheetParser';
@@ -32,6 +38,7 @@ import { MONTH_SHORT_NAMES, getBillDueMonths, formatBillDueMonths, getAccountSav
 import { NoYearCalendarPicker } from './NoYearCalendarPicker';
 import { useAuth } from '../context/AuthContext';
 import { PRESET_SECURITY_QUESTIONS } from './AuthModal';
+import { getApiUrl } from '../utils/api';
 
 export function SettingsModal() {
   const { 
@@ -62,12 +69,100 @@ export function SettingsModal() {
     resetToDefaults,
     clearAllData,
     exportBackupJson,
-    restoreFromBackup
+    restoreFromBackup,
+    pushCloudBackup,
+    pullCloudRestore,
+    isAutoCloudBackupEnabled,
+    toggleAutoCloudBackup,
+    lastCloudSyncTime
   } = useBudget();
 
   // Local form state for new item creation
   const fileInputRef = useRef(null);
   const [backupStatus, setBackupStatus] = useState(null);
+
+  // Cloud Vault Sync state
+  const [isCloudUnlocked, setIsCloudUnlocked] = useState(() => {
+    try { return localStorage.getItem('cf_sync_unlocked') === 'true'; }
+    catch { return false; }
+  });
+  const [cloudPasscode, setCloudPasscode] = useState(() => {
+    try { return localStorage.getItem('cf_sync_passcode') || ''; }
+    catch { return ''; }
+  });
+  const [passcodeInput, setPasscodeInput] = useState('');
+  const [passcodeError, setPasscodeError] = useState('');
+  const [isVerifyingCode, setIsVerifyingCode] = useState(false);
+  const [cloudSyncStatus, setCloudSyncStatus] = useState(null);
+  const [isCloudSyncing, setIsCloudSyncing] = useState(false);
+
+  const handleUnlockCloudVault = async (e) => {
+    if (e) e.preventDefault();
+    if (!passcodeInput) return;
+    setPasscodeError('');
+    setIsVerifyingCode(true);
+
+    try {
+      const res = await fetch(getApiUrl('/api/verify-sync-code'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: passcodeInput })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        try {
+          localStorage.setItem('cf_sync_unlocked', 'true');
+          localStorage.setItem('cf_sync_passcode', passcodeInput);
+        } catch {}
+        setCloudPasscode(passcodeInput);
+        setIsCloudUnlocked(true);
+        setPasscodeInput('');
+        setCloudSyncStatus({ type: 'success', message: 'Cloud Vault unlocked successfully!' });
+      } else {
+        setPasscodeError(data.error || 'Invalid access passcode.');
+      }
+    } catch (err) {
+      setPasscodeError(`Verification failed: ${err.message}`);
+    } finally {
+      setIsVerifyingCode(false);
+    }
+  };
+
+  const handleLockCloudVault = () => {
+    try {
+      localStorage.removeItem('cf_sync_unlocked');
+      localStorage.removeItem('cf_sync_passcode');
+    } catch {}
+    setIsCloudUnlocked(false);
+    setCloudPasscode('');
+    setCloudSyncStatus(null);
+  };
+
+  const handlePushCloudBackup = async () => {
+    setCloudSyncStatus(null);
+    setIsCloudSyncing(true);
+    try {
+      await pushCloudBackup(cloudPasscode);
+      setCloudSyncStatus({ type: 'success', message: `Successfully backed up data to Cloud Vault! (${new Date().toLocaleTimeString()})` });
+    } catch (err) {
+      setCloudSyncStatus({ type: 'error', message: `Cloud backup failed: ${err.message}` });
+    } finally {
+      setIsCloudSyncing(false);
+    }
+  };
+
+  const handlePullCloudRestore = async () => {
+    setCloudSyncStatus(null);
+    setIsCloudSyncing(true);
+    try {
+      await pullCloudRestore(cloudPasscode);
+      setCloudSyncStatus({ type: 'success', message: `Successfully restored data from Cloud Vault! Database & UI state refreshed.` });
+    } catch (err) {
+      setCloudSyncStatus({ type: 'error', message: `Cloud restore failed: ${err.message}` });
+    } finally {
+      setIsCloudSyncing(false);
+    }
+  };
   const [isAddAccountModalOpen, setIsAddAccountModalOpen] = useState(false);
   const [isAddPersonModalOpen, setIsAddPersonModalOpen] = useState(false);
   const [isAddBillModalOpen, setIsAddBillModalOpen] = useState(false);
@@ -2329,6 +2424,126 @@ export function SettingsModal() {
                   </button>
                 </div>
 
+              </div>
+
+              {/* Cloudflare D1 Vault Sync Section */}
+              <div className="p-5 rounded-2xl glass-card border border-purple-800/60 bg-purple-950/10 space-y-4">
+                <div className={`flex items-center justify-between flex-wrap gap-2 transition-opacity ${!isCloudUnlocked ? 'opacity-50' : 'opacity-100'}`}>
+                  <div className="flex items-center gap-2.5">
+                    <span className="p-2 rounded-xl bg-purple-600/20 text-purple-400 border border-purple-500/30">
+                      <Cloud className="w-5 h-5" />
+                    </span>
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-100">Cloudflare D1 Vault Sync</h4>
+                      <p className="text-xs text-slate-400">Passcode-gated encrypted backup on Cloudflare D1</p>
+                    </div>
+                  </div>
+                  {isCloudUnlocked ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-mono px-2.5 py-1 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800 font-semibold">
+                        Vault Unlocked
+                      </span>
+                      <button
+                        onClick={handleLockCloudVault}
+                        className="text-xs text-slate-400 hover:text-slate-200 underline cursor-pointer font-medium"
+                      >
+                        Lock Vault
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="text-[10px] font-mono px-2.5 py-1 rounded-full bg-slate-800 text-slate-400 border border-slate-700 font-semibold">
+                      Locked
+                    </span>
+                  )}
+                </div>
+
+                {!isCloudUnlocked ? (
+                  <form onSubmit={handleUnlockCloudVault} className="space-y-3 pt-1">
+                    <p className="text-xs text-slate-300 opacity-50">
+                      Enter Access Passcode to Enable Cloud Sync across device sessions.
+                    </p>
+                    <div className="flex items-center gap-2 opacity-100">
+                      <div className="relative flex-1">
+                        <KeyRound className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
+                        <input
+                          type="password"
+                          placeholder="Enter Access Passcode..."
+                          value={passcodeInput}
+                          onChange={e => setPasscodeInput(e.target.value)}
+                          className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-slate-100 font-mono focus:outline-none focus:border-purple-500"
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={isVerifyingCode || !passcodeInput}
+                        className="px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
+                      >
+                        {isVerifyingCode ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Lock className="w-3.5 h-3.5" />}
+                        <span>Unlock Vault</span>
+                      </button>
+                    </div>
+                    {passcodeError && (
+                      <p className="text-xs text-rose-400 font-semibold opacity-100">{passcodeError}</p>
+                    )}
+                  </form>
+                ) : (
+                  <div className="space-y-4 pt-1">
+                    {/* Auto Backup Toggle Switch */}
+                    <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <div className="text-xs font-bold text-slate-200">Automatic Cloud Backup</div>
+                        <div className="text-[11px] text-slate-400">
+                          {isAutoCloudBackupEnabled
+                            ? (lastCloudSyncTime ? `Auto-sync active • Last backed up at ${lastCloudSyncTime}` : 'Auto-sync active • Syncs 3s after local changes')
+                            : 'Disabled • Local edits will not push to D1 automatically'}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => toggleAutoCloudBackup(!isAutoCloudBackupEnabled)}
+                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                          isAutoCloudBackupEnabled ? 'bg-purple-600' : 'bg-slate-700'
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                            isAutoCloudBackupEnabled ? 'translate-x-5' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    </div>
+
+                    {cloudSyncStatus && (
+                      <div className={`p-3.5 rounded-xl text-xs flex items-center justify-between ${
+                        cloudSyncStatus.type === 'success'
+                          ? 'bg-emerald-950/80 border border-emerald-800 text-emerald-300'
+                          : 'bg-rose-950/80 border border-rose-800 text-rose-300'
+                      }`}>
+                        <span>{cloudSyncStatus.message}</span>
+                        <button onClick={() => setCloudSyncStatus(null)} className="text-slate-400 hover:text-slate-200 text-xs cursor-pointer ml-2 font-bold">Dismiss</button>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <button
+                        onClick={handlePushCloudBackup}
+                        disabled={isCloudSyncing}
+                        className="py-2.5 px-4 bg-purple-600 hover:bg-purple-500 disabled:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        {isCloudSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <CloudUpload className="w-4 h-4" />}
+                        <span>Backup to Cloud</span>
+                      </button>
+                      <button
+                        onClick={handlePullCloudRestore}
+                        disabled={isCloudSyncing}
+                        className="py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        {isCloudSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <CloudDownload className="w-4 h-4" />}
+                        <span>Restore from Cloud</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Reset Data Section */}

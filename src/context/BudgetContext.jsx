@@ -151,6 +151,73 @@ export function BudgetProvider({ children }) {
     return true;
   };
 
+  // Cloud Vault Push Backup
+  const pushCloudBackup = async (passcode) => {
+    const res = await fetch(getApiUrl('/api/sync/backup'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Sync-Passcode': passcode
+      },
+      body: JSON.stringify({ budget })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'Failed to backup data to Cloud Vault.');
+    }
+    return data;
+  };
+
+  // Cloud Vault Pull Restore
+  const pullCloudRestore = async (passcode) => {
+    const res = await fetch(getApiUrl('/api/sync/restore'), {
+      method: 'GET',
+      headers: {
+        'X-Sync-Passcode': passcode
+      }
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success || !data.budget) {
+      throw new Error(data.error || 'Failed to restore data from Cloud Vault.');
+    }
+    await restoreFromBackup(data.budget);
+    return data;
+  };
+
+  // Auto Cloud Backup State & Control
+  const [isAutoCloudBackupEnabled, setIsAutoCloudBackupEnabled] = useState(() => {
+    try { return localStorage.getItem('cf_auto_backup_enabled') === 'true'; }
+    catch { return false; }
+  });
+  const [lastCloudSyncTime, setLastCloudSyncTime] = useState(null);
+
+  const toggleAutoCloudBackup = (enableBool) => {
+    const val = Boolean(enableBool);
+    try { localStorage.setItem('cf_auto_backup_enabled', String(val)); }
+    catch {}
+    setIsAutoCloudBackupEnabled(val);
+  };
+
+  // Debounced Auto Cloud Backup effect
+  useEffect(() => {
+    if (!isDbLoaded || !isAutoCloudBackupEnabled) return;
+
+    const isUnlocked = localStorage.getItem('cf_sync_unlocked') === 'true';
+    const passcode = localStorage.getItem('cf_sync_passcode');
+    if (!isUnlocked || !passcode) return;
+
+    const timer = setTimeout(async () => {
+      try {
+        await pushCloudBackup(passcode);
+        setLastCloudSyncTime(new Date().toLocaleTimeString());
+      } catch (err) {
+        console.error('Auto cloud backup failed:', err);
+      }
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, [budget, isDbLoaded, isAutoCloudBackupEnabled]);
+
   // Account Operations
   const addAccount = (accountData) => {
     const newAcc = {
@@ -767,6 +834,11 @@ export function BudgetProvider({ children }) {
         clearAllData,
         exportBackupJson,
         restoreFromBackup,
+        pushCloudBackup,
+        pullCloudRestore,
+        isAutoCloudBackupEnabled,
+        toggleAutoCloudBackup,
+        lastCloudSyncTime,
         // line-item operations
         upsertLineItem,
         getLineItem,

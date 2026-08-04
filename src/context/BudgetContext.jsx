@@ -726,7 +726,7 @@ export function BudgetProvider({ children }) {
 
   const getBillMonthlyCost = (bill) => {
     if (!bill) return 0;
-    const amt = parseFloat(bill.amount) || 0;
+    const amt = Math.abs(parseFloat(bill.amount) || 0);
     if (bill.period === 'Semi-Annual') return amt / 6;
     if (bill.period === 'Annual') return amt / 12;
     if (bill.period === 'Quarterly') return amt / 3;

@@ -178,7 +178,7 @@ export function parseSpreadsheet(fileData, fileName = '') {
           ) {
             // Found a valid bill row
             const billName = col0;
-            const amount = cleanNum(row[3] || row[2] || row[4], 0);
+            const amount = Math.abs(cleanNum(row[3] || row[2] || row[4], 0));
             const periodStr = rowText.includes('semi-annual') ? 'Semi-Annual' : rowText.includes('annual') ? 'Annual' : rowText.includes('weekly') ? 'Weekly' : 'Monthly';
 
             // Find due day or date if present
@@ -228,12 +228,50 @@ export function parseSpreadsheet(fileData, fileName = '') {
           const dateColIdx = headers.findIndex(h => String(h || '').toLowerCase().includes('date'));
           const otherDescIdx = headers.findIndex(h => String(h || '').toLowerCase().includes('other desc') || String(h || '').toLowerCase().includes('other expl'));
 
+          const balanceRegex = /\b(beg|beginning|end|ending|balance|subtotal|total)\b/i;
+
           // Map sheet to target account
           let sheetAccName = 'USAA Bills Checking - 7071';
           if (lowerSheet.includes('mortgage')) sheetAccName = 'USAA Mortgage Checking - 3223';
           else if (lowerSheet.includes('hoa') || lowerSheet.includes('sav')) sheetAccName = 'USAA HOA Savings - 9575';
 
           const targetAccountId = getOrCreateAccount(sheetAccName);
+
+          // Extract exact current balance for today's date (e.g. $3,019.84 for Mortgage)
+          const totalBalColIdx = headers.findIndex(h =>
+            h.toLowerCase().includes('total end') ||
+            h.toLowerCase().includes('total ending') ||
+            h.toLowerCase().includes('total beg') ||
+            h.toLowerCase().includes('total balance')
+          );
+
+          const todayISO = new Date().toISOString().split('T')[0];
+          let todayBal = null;
+
+          for (let i = headerRowIdx + 1; i < rows.length; i++) {
+            const r = rows[i];
+            if (!r || !r[dateColIdx]) continue;
+            let dateStr = String(r[dateColIdx]);
+            if (typeof r[dateColIdx] === 'number') {
+              const d = XLSX.SSF.parse_date_code(r[dateColIdx]);
+              if (d) {
+                const m = String(d.m).padStart(2, '0');
+                const day = String(d.d).padStart(2, '0');
+                dateStr = `${d.y}-${m}-${day}`;
+              }
+            }
+
+            if (dateStr <= todayISO) {
+              const balCell = totalBalColIdx >= 0 ? r[totalBalColIdx] : r[1];
+              const numBal = typeof balCell === 'number' ? balCell : parseFloat(String(balCell || '').replace(/[^0-9.-]+/g, ''));
+              if (!isNaN(numBal)) todayBal = numBal;
+            }
+          }
+
+          if (todayBal !== null) {
+            const accObj = Array.from(accountsMap.values()).find(a => a.id === targetAccountId);
+            if (accObj) accObj.startingBalance = todayBal;
+          }
 
           for (let i = headerRowIdx + 1; i < rows.length; i++) {
             const r = rows[i];
@@ -254,29 +292,53 @@ export function parseSpreadsheet(fileData, fileName = '') {
 
             headers.forEach((h, colIdx) => {
               if (!h || colIdx === dateColIdx || colIdx === otherDescIdx) return;
-              const lowerH = h.toLowerCase();
-              if (lowerH.includes('balance') || lowerH.includes('ending') || lowerH.includes('beg ')) return;
+              if (balanceRegex.test(h)) return; // Skip balance columns!
 
               const val = r[colIdx];
               const num = typeof val === 'number' ? val : parseFloat(String(val || '').replace(/[^0-9.-]+/g, ''));
 
               if (!isNaN(num) && num !== 0) {
+                const lowerH = h.toLowerCase();
                 const otherDesc = (otherDescIdx >= 0 && r[otherDescIdx]) ? String(r[otherDescIdx]).trim() : '';
                 const desc = lowerH.includes('other') && otherDesc ? `${h} (${otherDesc})` : h;
 
+                // Match to existing bill if debit
+                let billId = null;
+                const matchedBill = billsList.find(b => {
+                  const bName = b.name.toLowerCase();
+                  return bName.includes(lowerH) || lowerH.includes(bName) ||
+                    (lowerH.includes('cell') && bName.includes('cell')) ||
+                    (lowerH.includes('gym') && bName.includes('gym')) ||
+                    (lowerH.includes('insurance') && bName.includes('insurance')) ||
+                    (lowerH.includes('hoa') && bName.includes('hoa')) ||
+                    (lowerH.includes('mortgage') && bName.includes('mortgage')) ||
+                    (lowerH.includes('water') && bName.includes('water')) ||
+                    (lowerH.includes('power') && bName.includes('power')) ||
+                    (lowerH.includes('gas') && bName.includes('gas')) ||
+                    (lowerH.includes('comcast') && bName.includes('comcast')) ||
+                    (lowerH.includes('youtube') && bName.includes('youtube'));
+                });
+
+                if (matchedBill) billId = matchedBill.id;
+
+                const isCredit = lowerH.includes('credit') || lowerH.includes('deposit') || lowerH.includes('income');
+                const txnAmount = isCredit ? Math.abs(num) : -Math.abs(num);
+
                 // Infer category
                 let category = 'Uncategorized';
-                if (lowerH.includes('credit') || num > 0) category = 'Income / Transfer';
+                if (isCredit) category = 'Income / Transfer';
                 else if (lowerH.includes('power') || lowerH.includes('gas') || lowerH.includes('water') || lowerH.includes('comcast') || lowerH.includes('utility')) category = 'Utilities';
                 else if (lowerH.includes('mortgage') || lowerH.includes('hoa') || lowerH.includes('rent')) category = 'Housing';
-                else if (lowerH.includes('gym') || lowerH.includes('phone') || lowerH.includes('youtube')) category = 'Subscriptions';
+                else if (lowerH.includes('gym') || lowerH.includes('phone') || lowerH.includes('youtube') || lowerH.includes('cell')) category = 'Subscriptions';
+                else if (lowerH.includes('insurance')) category = 'Insurance';
 
                 lineItemsList.push({
                   id: `txn-${Date.now()}-${lineItemsList.length}`,
                   date: dateStr,
                   description: desc,
-                  amount: num,
+                  amount: txnAmount,
                   accountId: targetAccountId,
+                  billId,
                   category,
                   notes: `Imported from ${sheetName}`
                 });

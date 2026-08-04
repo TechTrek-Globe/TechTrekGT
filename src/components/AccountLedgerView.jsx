@@ -54,7 +54,7 @@ export function AccountLedgerView() {
       // Check bill payment deductions on this day
       relevantBills.forEach(bill => {
         if (parseInt(bill.dueDay) === dayOfMonth && isBillDueInMonth(bill, date.getMonth(), true)) {
-          const cost = parseFloat(bill.amount) || 0;
+          const cost = Math.abs(parseFloat(bill.amount) || 0);
           dailyDeductions += cost;
           transactions.push({
             title: bill.name,

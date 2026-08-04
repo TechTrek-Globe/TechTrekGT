@@ -198,8 +198,9 @@ export function applyBillMapping(rows, columnMap, defaultAccountId = '') {
     });
 
     const name = (mapped.name || '').trim();
-    const amount = parseFloat(String(mapped.amount || '').replace(/[^0-9.-]+/g, ''));
-    if (!name || isNaN(amount)) { skipped++; return; }
+    const parsedAmt = parseFloat(String(mapped.amount || '').replace(/[^0-9.-]+/g, ''));
+    if (!name || isNaN(parsedAmt)) { skipped++; return; }
+    const amount = Math.abs(parsedAmt);
 
     const rawPeriod = mapped.period || 'Monthly';
     const validPeriods = ['Monthly', 'Quarterly', 'Semi-Annual', 'Annual', 'Weekly'];

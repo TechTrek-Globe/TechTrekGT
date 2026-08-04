@@ -231,7 +231,9 @@ export function BudgetProvider({ children }) {
       saveExtraMonthly: parseFloat(accountData.saveExtraMonthly) || 0,
       enableExtraSavings: accountData.enableExtraSavings ?? true,
       color: accountData.color || 'blue',
-      notes: accountData.notes || ''
+      notes: accountData.notes || '',
+      ledgerMode: 'manual',     // Rule B default: project forward from startingBalance
+      importedLedgerRows: {}    // Empty until an import populates it
     };
     setBudget(prev => ({
       ...prev,
@@ -503,6 +505,19 @@ export function BudgetProvider({ children }) {
 
             if (match) {
               accountIdMap.set(incomingAcc.id, match.id);
+              // Rule A: preserve import-mode fields onto the matched existing account
+              if (incomingAcc.ledgerMode === 'import') {
+                const idx = next.accounts.findIndex(a => a.id === match.id);
+                if (idx >= 0) {
+                  next.accounts[idx] = {
+                    ...next.accounts[idx],
+                    ledgerMode: 'import',
+                    importedLedgerRows: incomingAcc.importedLedgerRows || {},
+                    startingBalance: incomingAcc.startingBalance ?? next.accounts[idx].startingBalance,
+                    balanceAsOfDate: incomingAcc.balanceAsOfDate ?? next.accounts[idx].balanceAsOfDate
+                  };
+                }
+              }
             } else {
               newAccountsToAdd.push(incomingAcc);
               accountIdMap.set(incomingAcc.id, incomingAcc.id);

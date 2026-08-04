@@ -285,6 +285,14 @@ function DailySpreadsheetMatrix() {
     const rows = [];
     if (monthList.length === 0) return rows;
 
+    // Rule A: single-account import mode only - 'all' view always projects
+    const isImportMode = selectedAccountId !== 'all'
+      && selectedAccount?.ledgerMode === 'import';
+
+    const importedRows = isImportMode
+      ? (selectedAccount?.importedLedgerRows || {})
+      : {};
+
     let runningRegBeg = selectedAccountId === 'all'
       ? budget.accounts.reduce((sum, a) => sum + (parseFloat(a.startingBalance) || 0), 0)
       : (parseFloat(selectedAccount?.startingBalance) || 0);
@@ -320,6 +328,45 @@ function DailySpreadsheetMatrix() {
         const dayOfWeekName = DAYS_OF_WEEK[dateObj.getDay()];
         const isPayday = people.some(p => isPersonDepositDay(p, year, month, day));
         const isToday = todayObj.getFullYear() === year && todayObj.getMonth() === month && todayObj.getDate() === day;
+
+        // --- Rule A: Import Mode lock ---
+        // If this ISO date exists in the imported map, use it verbatim as historical fact.
+        const isoDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        if (isImportMode && importedRows[isoDate] !== undefined) {
+          const lockedEndBal = importedRows[isoDate];
+          rows.push({
+            rowKey: `${monthKey}-${day}`,
+            day,
+            month,
+            year,
+            monthKey,
+            isFirstDayOfMonth: day === 1,
+            monthLabel: `${MONTHS[month]} ${year}`,
+            dateFormatted: `${month + 1}/${day}/${year}`,
+            dayOfWeekName,
+            isPayday,
+            isToday,
+            regBeg: runningRegBeg,
+            extraBeg: runningExtraBeg,
+            personCredits: {},
+            personExtraCredits: {},
+            totalRegCredits: 0,
+            totalExtraCredits: 0,
+            billValues: {},
+            otherAmt: 0,
+            otherDesc: '',
+            regEnding: lockedEndBal,
+            extraEnding: runningExtraBeg,
+            totalEnd: lockedEndBal + runningExtraBeg,
+            isDeficit: lockedEndBal + runningExtraBeg < 0,
+            isHistoricalLock: true
+          });
+          // Carry the locked balance forward as the next day's opening
+          runningRegBeg = lockedEndBal;
+          continue;
+        }
+
+        // --- Rule B: Manual / Forward Projection Mode ---
 
         // 1. Credits (Deposits)
         const personCredits = {};
@@ -395,7 +442,8 @@ function DailySpreadsheetMatrix() {
           regEnding,
           extraEnding,
           totalEnd,
-          isDeficit: totalEnd < 0
+          isDeficit: totalEnd < 0,
+          isHistoricalLock: false
         });
 
         // Carry forward to next day
@@ -823,11 +871,13 @@ function DailySpreadsheetMatrix() {
                     className={`transition-colors ${
                       row.isToday
                         ? 'bg-amber-950/70 border-l-4 border-l-amber-400 border-r-2 border-r-amber-400 border-y border-y-amber-400/80 ring-1 ring-amber-400/50 shadow-[0_0_15px_rgba(251,191,36,0.35)] font-extrabold text-amber-100 z-10'
-                        : row.isDeficit
-                          ? 'bg-rose-950/30 hover:bg-slate-800/40'
-                          : row.isPayday
-                            ? 'bg-emerald-950/25 border-l-2 border-l-emerald-500 hover:bg-slate-800/40'
-                            : 'hover:bg-slate-800/40'
+                        : row.isHistoricalLock
+                          ? 'bg-indigo-950/20 border-l-2 border-l-indigo-500/60 opacity-70 hover:opacity-90 hover:bg-indigo-950/30'
+                          : row.isDeficit
+                            ? 'bg-rose-950/30 hover:bg-slate-800/40'
+                            : row.isPayday
+                              ? 'bg-emerald-950/25 border-l-2 border-l-emerald-500 hover:bg-slate-800/40'
+                              : 'hover:bg-slate-800/40'
                     }`}
                   >
                       {/* Date (Frozen Left & Today Highlight) */}

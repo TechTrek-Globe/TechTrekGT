@@ -237,7 +237,7 @@ export function parseSpreadsheet(fileData, fileName = '') {
 
           const targetAccountId = getOrCreateAccount(sheetAccName);
 
-          // Extract exact current balance for today's date (e.g. $3,019.84 for Mortgage)
+          // Build a full per-date balance map (Rule A: historical truth)
           const totalBalColIdx = headers.findIndex(h =>
             h.toLowerCase().includes('total end') ||
             h.toLowerCase().includes('total ending') ||
@@ -245,8 +245,10 @@ export function parseSpreadsheet(fileData, fileName = '') {
             h.toLowerCase().includes('total balance')
           );
 
-          const todayISO = new Date().toISOString().split('T')[0];
-          let todayBal = null;
+          // importedLedgerRows: { 'YYYY-MM-DD': endingBalance }
+          const importedLedgerRows = {};
+          let firstRowDate = null;
+          let firstRowBal = null;
 
           for (let i = headerRowIdx + 1; i < rows.length; i++) {
             const r = rows[i];
@@ -261,16 +263,29 @@ export function parseSpreadsheet(fileData, fileName = '') {
               }
             }
 
-            if (dateStr <= todayISO) {
-              const balCell = totalBalColIdx >= 0 ? r[totalBalColIdx] : r[1];
-              const numBal = typeof balCell === 'number' ? balCell : parseFloat(String(balCell || '').replace(/[^0-9.-]+/g, ''));
-              if (!isNaN(numBal)) todayBal = numBal;
+            if (totalBalColIdx < 0) continue;
+            const balCell = r[totalBalColIdx];
+            const numBal = typeof balCell === 'number'
+              ? balCell
+              : parseFloat(String(balCell || '').replace(/[^0-9.-]+/g, ''));
+
+            if (!isNaN(numBal)) {
+              importedLedgerRows[dateStr] = numBal;
+              // Track the earliest date as the anchor for startingBalance
+              if (firstRowDate === null || dateStr < firstRowDate) {
+                firstRowDate = dateStr;
+                firstRowBal = numBal;
+              }
             }
           }
 
-          if (todayBal !== null) {
-            const accObj = Array.from(accountsMap.values()).find(a => a.id === targetAccountId);
-            if (accObj) accObj.startingBalance = todayBal;
+          // Attach the historical map and stamp ledgerMode on the account
+          const accObj = Array.from(accountsMap.values()).find(a => a.id === targetAccountId);
+          if (accObj && Object.keys(importedLedgerRows).length > 0) {
+            accObj.startingBalance = firstRowBal ?? accObj.startingBalance;
+            accObj.balanceAsOfDate = firstRowDate ?? accObj.balanceAsOfDate;
+            accObj.importedLedgerRows = importedLedgerRows;
+            accObj.ledgerMode = 'import';
           }
 
           for (let i = headerRowIdx + 1; i < rows.length; i++) {

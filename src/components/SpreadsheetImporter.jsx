@@ -102,15 +102,21 @@ export function SpreadsheetImporter() {
   const [nsCollapsed, setNsCollapsed] = useState({ people: false, bills: false, transactions: false });
 
   // Parsed data ready for commit
-  const [parsedPayload, setParsedPayload] = useState(null); // { people, bills, transactions }
+  const [parsedPayload, setParsedPayload] = useState(null); // { people, accounts, bills, loans, transactions }
   // Full preview modal state
-  const [fullPreviewNs, setFullPreviewNs] = useState(null); // null | 'people' | 'bills' | 'transactions'
+  const [fullPreviewNs, setFullPreviewNs] = useState(null); // null | 'people' | 'accounts' | 'bills' | 'transactions' | 'loans'
 
   // --- Resolve helpers ---
   const resolveAccountName = (accountId) => {
     if (!accountId) return '-';
-    const acc = budget.accounts.find(a => a.id === accountId);
-    return acc ? acc.name : accountId;
+    // Check parsed payload accounts first
+    const payloadAcc = parsedPayload?.accounts?.find(a => a.id === accountId);
+    // Next check budget context accounts
+    const budgetAcc = budget.accounts?.find(a => a.id === accountId);
+    const acc = payloadAcc || budgetAcc;
+
+    if (acc) return acc.name;
+    return accountId;
   };
 
   const renderSplitsText = (splits) => {
@@ -170,11 +176,19 @@ export function SpreadsheetImporter() {
 
         const payload = {
           people: result.budget.people || [],
+          accounts: result.budget.accounts || [],
           bills: result.budget.bills || [],
-          transactions: [],
+          loans: result.budget.loans || [],
+          transactions: result.budget.transactions || result.budget.lineItems || [],
         };
         setParsedPayload(payload);
-        setNsEnabled({ people: payload.people.length > 0, bills: payload.bills.length > 0, transactions: false });
+        setNsEnabled({
+          people: payload.people.length > 0,
+          accounts: payload.accounts.length > 0,
+          bills: payload.bills.length > 0,
+          loans: payload.loans.length > 0,
+          transactions: payload.transactions.length > 0,
+        });
         setStage(STAGE.SELECTING);
       } else {
         // Generic CSV - parse flat and run auto-match for transactions first
@@ -191,8 +205,8 @@ export function SpreadsheetImporter() {
         if (confidence >= 1.0) {
           // All required fields matched - skip mapper, go straight to selecting
           const { records } = applyTransactionMapping(rows, mapping);
-          setParsedPayload({ people: [], bills: [], transactions: records });
-          setNsEnabled({ people: false, bills: false, transactions: records.length > 0 });
+          setParsedPayload({ people: [], accounts: [], bills: [], loans: [], transactions: records });
+          setNsEnabled({ people: false, accounts: false, bills: false, loans: false, transactions: records.length > 0 });
           setStage(STAGE.SELECTING);
         } else {
           // Needs manual column mapping
@@ -227,14 +241,14 @@ export function SpreadsheetImporter() {
     setFlatRows([]);
     setColumnMap({});
     setParsedPayload(null);
-    setNsEnabled({ people: true, bills: true, transactions: false });
-    setNsStrategy({ people: 'merge', bills: 'merge', transactions: 'merge' });
+    setNsEnabled({ people: true, accounts: true, bills: true, transactions: false, loans: true });
+    setNsStrategy({ people: 'merge', accounts: 'merge', bills: 'merge', transactions: 'merge', loans: 'merge' });
   };
 
   // --- Column mapper confirm ---
   const handleMappingConfirm = () => {
     try {
-      let payload = { people: [], bills: [], transactions: [] };
+      let payload = { people: [], accounts: [], bills: [], loans: [], transactions: [] };
 
       if (mappingSchema === 'transactions') {
         const { records } = applyTransactionMapping(flatRows, columnMap);
@@ -292,8 +306,10 @@ export function SpreadsheetImporter() {
     if (result.success) {
       const parts = [];
       if (nsEnabled.people && parsedPayload.people?.length) parts.push(`${parsedPayload.people.length} earners`);
+      if (nsEnabled.accounts && parsedPayload.accounts?.length) parts.push(`${parsedPayload.accounts.length} accounts`);
       if (nsEnabled.bills && parsedPayload.bills?.length) parts.push(`${parsedPayload.bills.length} bills`);
       if (nsEnabled.transactions && parsedPayload.transactions?.length) parts.push(`${parsedPayload.transactions.length} transactions`);
+      if (nsEnabled.loans && parsedPayload.loans?.length) parts.push(`${parsedPayload.loans.length} loans`);
       setResultMsg(`Import complete: ${parts.join(', ')} committed to IndexedDB.`);
       setStage(STAGE.DONE);
     } else {
@@ -315,6 +331,15 @@ export function SpreadsheetImporter() {
       description: 'Household members and income earner profiles.',
     },
     {
+      key: 'accounts',
+      label: 'Financial Accounts',
+      icon: CreditCard,
+      color: 'indigo',
+      records: parsedPayload?.accounts || [],
+      previewCols: ['name', 'type', 'startingBalance'],
+      description: 'Checking, savings, credit, and mortgage funding accounts.',
+    },
+    {
       key: 'bills',
       label: 'Bills',
       icon: Receipt,
@@ -332,6 +357,15 @@ export function SpreadsheetImporter() {
       previewCols: ['date', 'description', 'amount', 'accountId', 'category'],
       description: 'Bank CSV transaction rows (date, description, amount, account).',
     },
+    {
+      key: 'loans',
+      label: 'Loan Amortization Schedules',
+      icon: FileSpreadsheet,
+      color: 'amber',
+      records: parsedPayload?.loans || [],
+      previewCols: ['description', 'principal', 'annualInterestRate', 'termMonths'],
+      description: 'Mortgages and structured loan amortization schedules.',
+    },
   ];
 
   const colorMap = {
@@ -340,6 +374,12 @@ export function SpreadsheetImporter() {
       check: 'bg-purple-600 border-purple-600',
       header: 'text-purple-300',
       icon: 'bg-purple-600/20 text-purple-400',
+    },
+    indigo: {
+      badge: 'bg-indigo-950 text-indigo-300 border-indigo-800',
+      check: 'bg-indigo-600 border-indigo-600',
+      header: 'text-indigo-300',
+      icon: 'bg-indigo-600/20 text-indigo-400',
     },
     blue: {
       badge: 'bg-blue-950 text-blue-300 border-blue-800',
@@ -352,6 +392,12 @@ export function SpreadsheetImporter() {
       check: 'bg-emerald-600 border-emerald-600',
       header: 'text-emerald-300',
       icon: 'bg-emerald-600/20 text-emerald-400',
+    },
+    amber: {
+      badge: 'bg-amber-950 text-amber-300 border-amber-800',
+      check: 'bg-amber-600 border-amber-600',
+      header: 'text-amber-300',
+      icon: 'bg-amber-600/20 text-amber-400',
     },
   };
 
@@ -368,7 +414,7 @@ export function SpreadsheetImporter() {
           </span>
           <div>
             <h4 className="text-sm font-bold text-slate-100">Smart Spreadsheet Importer</h4>
-            <p className="text-xs text-slate-400">Import from Emory Parc XLSX or any bank CSV</p>
+            <p className="text-xs text-slate-400">Import from XLSX, Google Sheets, or any bank CSV</p>
           </div>
         </div>
         {stage !== STAGE.IDLE && stage !== STAGE.PARSING && (
@@ -417,7 +463,7 @@ export function SpreadsheetImporter() {
           </div>
           <div className="text-center">
             <p className="text-sm font-semibold text-slate-200">Drop your file here, or click to browse</p>
-            <p className="text-xs text-slate-500 mt-1">Accepts <span className="font-mono text-slate-400">.csv</span> or <span className="font-mono text-slate-400">.xlsx</span></p>
+            <p className="text-xs text-slate-500 mt-1">Accepts <span className="font-mono text-slate-400">.csv</span>, <span className="font-mono text-slate-400">.xlsx</span>, or exported Google Sheets</p>
           </div>
 
         </div>
@@ -439,7 +485,7 @@ export function SpreadsheetImporter() {
           <div className="flex items-center gap-2 p-3 rounded-xl bg-amber-950/40 border border-amber-800/60">
             <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
             <div className="min-w-0">
-              <p className="text-xs font-semibold text-amber-200">Generic CSV Detected - Column Mapping Required</p>
+              <p className="text-xs font-semibold text-amber-200">Flat CSV / Sheet Detected - Column Mapping Required</p>
               <p className="text-[11px] text-amber-400/80 truncate">{fileName}</p>
             </div>
           </div>
@@ -524,7 +570,7 @@ export function SpreadsheetImporter() {
             <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
             <div className="min-w-0 flex-1">
               <p className="text-xs font-semibold text-emerald-200">
-                {fileType === 'emory_parc' ? 'Emory Parc Template Detected' : 'Generic CSV Parsed'} - Select Data to Import
+                {fileType === 'emory_parc' ? 'Multi-Sheet Workbook / Template Detected' : 'Spreadsheet / CSV Parsed'} - Select Data to Import
               </p>
               <p className="text-[11px] text-emerald-400/80 truncate">{fileName}</p>
             </div>

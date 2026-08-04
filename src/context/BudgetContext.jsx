@@ -469,6 +469,7 @@ export function BudgetProvider({ children }) {
     setBudget(prev => {
       const next = { ...prev };
 
+      // 1. Process People
       if (namespaces.people && Array.isArray(data.people)) {
         if (strategies.people === 'override') {
           next.people = data.people;
@@ -478,23 +479,109 @@ export function BudgetProvider({ children }) {
         }
       }
 
-      if (namespaces.bills && Array.isArray(data.bills)) {
-        if (strategies.bills === 'override') {
-          next.bills = data.bills;
+      // 2. Process Accounts & Build ID Translation Map
+      const accountIdMap = new Map(); // srcAccountId -> destAccountId
+
+      if (namespaces.accounts && Array.isArray(data.accounts)) {
+        if (strategies.accounts === 'override') {
+          next.accounts = data.accounts;
+          data.accounts.forEach(a => accountIdMap.set(a.id, a.id));
         } else {
-          const existingNames = new Set(prev.bills.map(b => b.name.toLowerCase()));
-          next.bills = [...prev.bills, ...data.bills.filter(b => !existingNames.has(b.name.toLowerCase()))];
+          const existingAccounts = [...(prev.accounts || [])];
+          const newAccountsToAdd = [];
+
+          data.accounts.forEach(incomingAcc => {
+            const normName = incomingAcc.name.toLowerCase().trim();
+            const match = existingAccounts.find(a =>
+              a.name.toLowerCase().trim() === normName ||
+              a.name.toLowerCase().includes(normName) ||
+              normName.includes(a.name.toLowerCase().trim()) ||
+              (normName.includes('bills') && a.name.toLowerCase().includes('bills')) ||
+              (normName.includes('mortgage') && a.name.toLowerCase().includes('mortgage')) ||
+              (normName.includes('hoa') && a.name.toLowerCase().includes('hoa'))
+            );
+
+            if (match) {
+              accountIdMap.set(incomingAcc.id, match.id);
+            } else {
+              newAccountsToAdd.push(incomingAcc);
+              accountIdMap.set(incomingAcc.id, incomingAcc.id);
+            }
+          });
+
+          next.accounts = [...existingAccounts, ...newAccountsToAdd];
+        }
+      } else {
+        const existingAccounts = [...(prev.accounts || [])];
+        if (Array.isArray(data.accounts)) {
+          data.accounts.forEach(incomingAcc => {
+            const normName = incomingAcc.name.toLowerCase().trim();
+            const match = existingAccounts.find(a =>
+              a.name.toLowerCase().trim() === normName ||
+              a.name.toLowerCase().includes(normName) ||
+              normName.includes(a.name.toLowerCase().trim()) ||
+              (normName.includes('bills') && a.name.toLowerCase().includes('bills')) ||
+              (normName.includes('mortgage') && a.name.toLowerCase().includes('mortgage')) ||
+              (normName.includes('hoa') && a.name.toLowerCase().includes('hoa'))
+            );
+            if (match) accountIdMap.set(incomingAcc.id, match.id);
+          });
         }
       }
 
+      // Helper to map an incoming accountId to an active account in next.accounts
+      const resolveTargetAccountId = (srcAccountId) => {
+        if (!srcAccountId) return (next.accounts?.[0]?.id || 'acc-bills');
+        if (accountIdMap.has(srcAccountId)) return accountIdMap.get(srcAccountId);
+
+        if (next.accounts && next.accounts.length > 0) {
+          const directMatch = next.accounts.find(a => a.id === srcAccountId);
+          if (directMatch) return directMatch.id;
+          return next.accounts[0].id;
+        }
+
+        return srcAccountId;
+      };
+
+      // 3. Process Bills (with automatic Account ID remapping!)
+      if (namespaces.bills && Array.isArray(data.bills)) {
+        const remappedBills = data.bills.map(b => ({
+          ...b,
+          accountId: resolveTargetAccountId(b.accountId)
+        }));
+
+        if (strategies.bills === 'override') {
+          next.bills = remappedBills;
+        } else {
+          const existingNames = new Set((prev.bills || []).map(b => b.name.toLowerCase().trim()));
+          next.bills = [...(prev.bills || []), ...remappedBills.filter(b => !existingNames.has(b.name.toLowerCase().trim()))];
+        }
+      }
+
+      // 4. Process Loans
+      if (namespaces.loans && Array.isArray(data.loans)) {
+        if (strategies.loans === 'override') {
+          next.loans = data.loans;
+        } else {
+          const existingDescs = new Set((prev.loans || []).map(l => (l.description || '').toLowerCase()));
+          next.loans = [...(prev.loans || []), ...data.loans.filter(l => !existingDescs.has((l.description || '').toLowerCase()))];
+        }
+      }
+
+      // 5. Process Transactions (with automatic Account ID remapping!)
       if (namespaces.transactions && Array.isArray(data.transactions)) {
+        const remappedTxns = data.transactions.map(t => ({
+          ...t,
+          accountId: resolveTargetAccountId(t.accountId)
+        }));
+
         const existing = Array.isArray(prev.transactions) ? prev.transactions : [];
         if (strategies.transactions === 'override') {
-          next.transactions = data.transactions;
+          next.transactions = remappedTxns;
         } else {
           const key = t => `${t.date}|${(t.description || '').toLowerCase()}|${t.amount}`;
           const existingKeys = new Set(existing.map(key));
-          next.transactions = [...existing, ...data.transactions.filter(t => !existingKeys.has(key(t)))];
+          next.transactions = [...existing, ...remappedTxns.filter(t => !existingKeys.has(key(t)))];
         }
       }
 

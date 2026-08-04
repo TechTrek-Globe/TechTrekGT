@@ -67,13 +67,20 @@ export function parseSpreadsheet(fileData, fileName = '') {
 
       // Check existing accounts
       for (const [key, acc] of accountsMap.entries()) {
-        if (key.includes(norm) || norm.includes(key)) {
+        if (
+          key.includes(norm) || norm.includes(key) ||
+          (norm.includes('bills') && key.includes('bills')) ||
+          (norm.includes('mortgage') && key.includes('mortgage')) ||
+          (norm.includes('hoa') && key.includes('hoa'))
+        ) {
           if (balance > 0 && acc.startingBalance === 0) acc.startingBalance = balance;
           return acc.id;
         }
       }
 
-      const id = `acc-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+      const slug = norm.replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      const id = `acc-${slug || 'default'}`;
+
       let color = 'blue';
       if (norm.includes('mortgage')) color = 'indigo';
       if (norm.includes('hoa') || norm.includes('sav')) color = 'emerald';
@@ -213,6 +220,72 @@ export function parseSpreadsheet(fileData, fileName = '') {
         }
       }
 
+      // --- SECTION D: Scan Checking & Savings Daily Matrix Sheets for Transactions ---
+      if (lowerSheet.includes('checking') || lowerSheet.includes('savings') || lowerSheet.includes('ledger') || lowerSheet.includes('matrix')) {
+        const headerRowIdx = rows.findIndex(r => r && r.some(c => c && String(c).toLowerCase().includes('date')));
+        if (headerRowIdx >= 0) {
+          const headers = (rows[headerRowIdx] || []).map(h => String(h || '').trim());
+          const dateColIdx = headers.findIndex(h => String(h || '').toLowerCase().includes('date'));
+          const otherDescIdx = headers.findIndex(h => String(h || '').toLowerCase().includes('other desc') || String(h || '').toLowerCase().includes('other expl'));
+
+          // Map sheet to target account
+          let sheetAccName = 'USAA Bills Checking - 7071';
+          if (lowerSheet.includes('mortgage')) sheetAccName = 'USAA Mortgage Checking - 3223';
+          else if (lowerSheet.includes('hoa') || lowerSheet.includes('sav')) sheetAccName = 'USAA HOA Savings - 9575';
+
+          const targetAccountId = getOrCreateAccount(sheetAccName);
+
+          for (let i = headerRowIdx + 1; i < rows.length; i++) {
+            const r = rows[i];
+            if (!r || r.length === 0) continue;
+
+            const rawDate = r[dateColIdx];
+            if (!rawDate) continue;
+
+            let dateStr = String(rawDate);
+            if (typeof rawDate === 'number') {
+              const d = XLSX.SSF.parse_date_code(rawDate);
+              if (d) {
+                const m = String(d.m).padStart(2, '0');
+                const day = String(d.d).padStart(2, '0');
+                dateStr = `${d.y}-${m}-${day}`;
+              }
+            }
+
+            headers.forEach((h, colIdx) => {
+              if (!h || colIdx === dateColIdx || colIdx === otherDescIdx) return;
+              const lowerH = h.toLowerCase();
+              if (lowerH.includes('balance') || lowerH.includes('ending') || lowerH.includes('beg ')) return;
+
+              const val = r[colIdx];
+              const num = typeof val === 'number' ? val : parseFloat(String(val || '').replace(/[^0-9.-]+/g, ''));
+
+              if (!isNaN(num) && num !== 0) {
+                const otherDesc = (otherDescIdx >= 0 && r[otherDescIdx]) ? String(r[otherDescIdx]).trim() : '';
+                const desc = lowerH.includes('other') && otherDesc ? `${h} (${otherDesc})` : h;
+
+                // Infer category
+                let category = 'Uncategorized';
+                if (lowerH.includes('credit') || num > 0) category = 'Income / Transfer';
+                else if (lowerH.includes('power') || lowerH.includes('gas') || lowerH.includes('water') || lowerH.includes('comcast') || lowerH.includes('utility')) category = 'Utilities';
+                else if (lowerH.includes('mortgage') || lowerH.includes('hoa') || lowerH.includes('rent')) category = 'Housing';
+                else if (lowerH.includes('gym') || lowerH.includes('phone') || lowerH.includes('youtube')) category = 'Subscriptions';
+
+                lineItemsList.push({
+                  id: `txn-${Date.now()}-${lineItemsList.length}`,
+                  date: dateStr,
+                  description: desc,
+                  amount: num,
+                  accountId: targetAccountId,
+                  category,
+                  notes: `Imported from ${sheetName}`
+                });
+              }
+            });
+          }
+        }
+      }
+
       // --- SECTION B: Scan Structured "Accounts" Sheet ---
       if (lowerSheet.includes('account') && !lowerSheet.includes('budget')) {
         const headerRow = rows[0]?.map(c => cleanText(c).toLowerCase()) || [];
@@ -290,6 +363,7 @@ export function parseSpreadsheet(fileData, fileName = '') {
         people,
         bills: billsList,
         lineItems: lineItemsList,
+        transactions: lineItemsList,
         loans: loansList
       }
     };

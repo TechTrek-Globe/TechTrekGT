@@ -31,8 +31,15 @@ const NAV_ITEMS = [
 
 const SIDEBAR_KEY = 'trekledger_sidebar_collapsed';
 
-const SidebarContent = ({ collapsed, activeView, cashOnHand, netIncome, netFlow, setActiveView, setIsSettingsOpen, onClose, isLight = false }) => {
+const SidebarContent = ({ collapsed, activeView, cashOnHand, netIncome, netFlow, setActiveView, onNavigateView, setIsSettingsOpen, onClose, isLight = false }) => {
   const logoSrc = isLight ? headerLogoLight : headerLogoDark;
+  const handleViewClick = (viewId) => {
+    if (onNavigateView) {
+      onNavigateView(viewId);
+    } else {
+      setActiveView(viewId);
+    }
+  };
   return (
     <div className="flex flex-col h-full">
       {/* Logo */}
@@ -66,9 +73,7 @@ const SidebarContent = ({ collapsed, activeView, cashOnHand, netIncome, netFlow,
         return (
           <button
             key={item.id}
-            onClick={() => {
-              setActiveView(item.id);
-            }}
+            onClick={() => handleViewClick(item.id)}
             title={collapsed ? item.label : undefined}
             aria-label={item.label}
             className={`sidebar-nav-item w-full text-left ${isActive ? 'active' : 'text-slate-400'} ${collapsed ? 'justify-center px-2' : ''}`}
@@ -113,7 +118,7 @@ const SidebarContent = ({ collapsed, activeView, cashOnHand, netIncome, netFlow,
   );
 };
 
-export function AppLayout({ children, onNavigateHome }) {
+export function AppLayout({ children, onNavigateHome, onNavigateView }) {
   const {
     budget,
     isDbLoaded,
@@ -168,6 +173,7 @@ export function AppLayout({ children, onNavigateHome }) {
           netFlow={netFlow}
           isLight={isLight}
           setActiveView={setActiveView}
+          onNavigateView={onNavigateView}
           setIsSettingsOpen={setIsSettingsOpen}
         />
 
@@ -209,7 +215,9 @@ export function AppLayout({ children, onNavigateHome }) {
               cashOnHand={cashOnHand}
               netIncome={netIncome}
               netFlow={netFlow}
+              isLight={isLight}
               setActiveView={setActiveView}
+              onNavigateView={onNavigateView}
               setIsSettingsOpen={setIsSettingsOpen}
               onClose={() => setMobileOpen(false)}
             />
@@ -293,7 +301,13 @@ export function AppLayout({ children, onNavigateHome }) {
           </button>
 
           <button
-            onClick={() => setActiveView('settings')}
+            onClick={() => {
+              if (onNavigateView) {
+                onNavigateView('settings');
+              } else {
+                setActiveView('settings');
+              }
+            }}
             aria-label="Open settings view"
             className={`flex items-center gap-2 px-4 py-1.5 rounded-xl text-xs font-semibold shadow-lg transition-all hover:-translate-y-0.5 active:translate-y-0 ${
               activeView === 'settings'

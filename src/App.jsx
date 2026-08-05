@@ -82,7 +82,7 @@ class ErrorBoundary extends React.Component {
 }
 
 function getViewFromPathname(pathname) {
-  const path = (pathname || (typeof window !== 'undefined' ? window.location.pathname : '')).toLowerCase().replace(/\/$/, '');
+  const path = (pathname || '').toLowerCase().replace(/\/$/, '');
   if (path === '/finance/ledger') return 'ledger';
   if (path === '/finance/main-budget' || path === '/finance/bills') return 'main_budget';
   if (path === '/finance/amortization') return 'amortization';
@@ -90,38 +90,42 @@ function getViewFromPathname(pathname) {
   return 'dashboard';
 }
 
-function MainContent({ onNavigateHome, onNavigate }) {
+function MainContent({ pathname, navigateTo, onNavigateHome }) {
   const { activeView, setActiveView, isSettingsOpen } = useBudget();
   const { isAuthenticated } = useAuth();
-  const currentPath = (typeof window !== 'undefined' ? window.location.pathname : '').toLowerCase().replace(/\/$/, '');
 
-  // Synchronize view state with URL pathname
+  // Synchronize view state with reactive pathname
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    if (currentPath === '/finance' || currentPath === '/finance/login' || currentPath === '') {
-      if (onNavigate) onNavigate('/finance/dashboard');
-    } else {
-      const view = getViewFromPathname(currentPath);
-      if (view && view !== activeView) {
-        setActiveView(view);
-      }
+    const normalized = (pathname || '').toLowerCase().replace(/\/$/, '');
+    if (normalized === '/finance' || normalized === '/finance/login' || normalized === '') {
+      navigateTo('/finance/dashboard');
+      return;
     }
-  }, [currentPath, isAuthenticated, activeView, setActiveView, onNavigate]);
+
+    const targetView = getViewFromPathname(normalized);
+    if (targetView && targetView !== activeView) {
+      setActiveView(targetView);
+    }
+  }, [pathname, isAuthenticated]);
 
   if (!isAuthenticated) {
     return (
       <AuthPage
         onNavigateHome={onNavigateHome}
-        onAuthSuccess={() => {
-          if (onNavigate) onNavigate('/finance/dashboard');
-        }}
+        onAuthSuccess={() => navigateTo('/finance/dashboard')}
       />
     );
   }
 
+  const handleNavigateView = (viewId) => {
+    setActiveView(viewId);
+    navigateTo(`/finance/${viewId}`);
+  };
+
   return (
-    <AppLayout onNavigateHome={onNavigateHome}>
+    <AppLayout onNavigateHome={onNavigateHome} onNavigateView={handleNavigateView}>
       {activeView === 'dashboard'   && <DashboardView />}
       {activeView === 'main_budget' && <MainBudgetView />}
       {activeView === 'ledger'      && <LedgerView />}
@@ -134,7 +138,7 @@ function MainContent({ onNavigateHome, onNavigate }) {
 }
 
 function getRouteFromPathname(pathname) {
-  const path = (pathname || (typeof window !== 'undefined' ? window.location.pathname : '')).toLowerCase().replace(/\/$/, '');
+  const path = (pathname || '').toLowerCase().replace(/\/$/, '');
   if (path === '/finance' || path.startsWith('/finance/')) {
     return 'finance';
   }
@@ -142,11 +146,23 @@ function getRouteFromPathname(pathname) {
 }
 
 export default function App() {
-  const [route, setRoute] = useState(getRouteFromPathname);
+  const [pathname, setPathname] = useState(() => (typeof window !== 'undefined' ? window.location.pathname : '/'));
+  const route = getRouteFromPathname(pathname);
+
+  // On page reload / initial mount, reset finance sub-routes back to main finance page
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const initialPath = window.location.pathname.toLowerCase().replace(/\/$/, '');
+      if (initialPath.startsWith('/finance')) {
+        window.history.replaceState({}, '', '/finance/dashboard');
+        setPathname('/finance/dashboard');
+      }
+    }
+  }, []);
 
   useEffect(() => {
     const handlePopState = () => {
-      setRoute(getRouteFromPathname(window.location.pathname));
+      setPathname(window.location.pathname);
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
@@ -154,8 +170,10 @@ export default function App() {
 
   const navigateTo = (path) => {
     if (typeof window !== 'undefined') {
-      window.history.pushState({}, '', path);
-      setRoute(getRouteFromPathname(path));
+      if (window.location.pathname !== path) {
+        window.history.pushState({}, '', path);
+      }
+      setPathname(path);
     }
   };
 
@@ -167,7 +185,7 @@ export default function App() {
         <AuthProvider>
           <BudgetMetadataProvider>
             <LedgerDataProvider>
-              <MainContent onNavigateHome={() => navigateTo('/')} onNavigate={navigateTo} />
+              <MainContent pathname={pathname} navigateTo={navigateTo} onNavigateHome={() => navigateTo('/')} />
             </LedgerDataProvider>
           </BudgetMetadataProvider>
         </AuthProvider>

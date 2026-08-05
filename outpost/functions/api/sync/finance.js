@@ -8,7 +8,7 @@ import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
 export async function onRequestGet(context) {
   const { request, env } = context;
   return withAuth(async () => {
-    const user = await requireAuth(request, env);
+    const { userId } = await requireAuth(request, env);
     if (!env.DB) return err('Database binding unavailable', 500);
 
     // 1. Calculate user's total realized net profit from sales
@@ -20,7 +20,7 @@ export async function onRequestGet(context) {
         COALESCE(SUM(net_proceeds), 0) AS total_net_proceeds
       FROM auction_sales
       WHERE user_id = ?
-    `).bind(user.id).first();
+    `).bind(userId).first();
 
     // 2. Calculate active capital tied up in inventory
     const inventorySummary = await env.DB.prepare(`
@@ -29,7 +29,7 @@ export async function onRequestGet(context) {
         COALESCE(SUM(true_total_cost), 0) AS capital_tied_up
       FROM auction_items
       WHERE user_id = ? AND status IN ('Available', 'Listed')
-    `).bind(user.id).first();
+    `).bind(userId).first();
 
     // 3. Find user's households and accounts in TechTrek Finance
     let households = [];
@@ -40,7 +40,7 @@ export async function onRequestGet(context) {
         FROM households h
         JOIN household_members hm ON hm.household_id = h.id
         WHERE hm.user_id = ?
-      `).bind(user.id).all();
+      `).bind(userId).all();
       households = hhRows.results || [];
 
       if (households.length > 0) {
@@ -74,7 +74,7 @@ export async function onRequestGet(context) {
 export async function onRequestPost(context) {
   const { request, env } = context;
   return withAuth(async () => {
-    const user = await requireAuth(request, env);
+    const { userId } = await requireAuth(request, env);
     if (!env.DB) return err('Database binding unavailable', 500);
 
     const body = await request.json().catch(() => ({}));
@@ -87,7 +87,7 @@ export async function onRequestPost(context) {
         COALESCE(SUM(net_proceeds), 0) AS total_net_proceeds
       FROM auction_sales
       WHERE user_id = ?
-    `).bind(user.id).first();
+    `).bind(userId).first();
 
     const netProfit = Number(salesSummary?.total_realized_profit || 0);
 
@@ -99,7 +99,7 @@ export async function onRequestPost(context) {
       if (!hhId) {
         const member = await env.DB.prepare(`
           SELECT household_id FROM household_members WHERE user_id = ? LIMIT 1
-        `).bind(user.id).first();
+        `).bind(userId).first();
         hhId = member?.household_id;
       }
 

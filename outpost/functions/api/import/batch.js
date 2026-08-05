@@ -10,7 +10,7 @@ import { computeSaleMetrics, computePricingFloors } from '../../utils/auction.js
 export async function onRequestPost(context) {
   const { request, env } = context;
   return withAuth(async () => {
-    const user = await requireAuth(request, env);
+    const { userId } = await requireAuth(request, env);
     if (!env.DB) return err('Database binding unavailable', 500);
 
     const body = await request.json().catch(() => ({}));
@@ -21,10 +21,10 @@ export async function onRequestPost(context) {
 
     if (strategy === 'replace') {
       statements.push(
-        env.DB.prepare('DELETE FROM auction_sales WHERE user_id = ?').bind(user.id),
-        env.DB.prepare('DELETE FROM auction_comps WHERE user_id = ?').bind(user.id),
-        env.DB.prepare('DELETE FROM auction_items WHERE user_id = ?').bind(user.id),
-        env.DB.prepare('DELETE FROM auction_invoices WHERE user_id = ?').bind(user.id)
+        env.DB.prepare('DELETE FROM auction_sales WHERE user_id = ?').bind(userId),
+        env.DB.prepare('DELETE FROM auction_comps WHERE user_id = ?').bind(userId),
+        env.DB.prepare('DELETE FROM auction_items WHERE user_id = ?').bind(userId),
+        env.DB.prepare('DELETE FROM auction_invoices WHERE user_id = ?').bind(userId)
       );
     }
 
@@ -50,7 +50,7 @@ export async function onRequestPost(context) {
             date_acquired = excluded.date_acquired
         `).bind(
           invId,
-          user.id,
+          userId,
           ref,
           inv.description || null,
           Number(inv.base_total) || 0,
@@ -79,7 +79,7 @@ export async function onRequestPost(context) {
           env.DB.prepare(`
             INSERT INTO auction_invoices (id, user_id, invoice_ref, description, base_total, discount, shipping, tax, date_acquired)
             VALUES (?, ?, ?, 'Imported batch', ?, 0, 0, 0, ?)
-          `).bind(invId, user.id, ref, Number(itm.unit_price) || 0, itm.date_acquired || null)
+          `).bind(invId, userId, ref, Number(itm.unit_price) || 0, itm.date_acquired || null)
         );
       }
 
@@ -92,6 +92,7 @@ export async function onRequestPost(context) {
       const flatFee = Number(itm.platform_flat_fee) || 0.40;
       const estShip = Number(itm.est_shipping_cost) || 6.50;
       const boostPct = Number(itm.boost_pct) || 0;
+      const targetMargin = Number(itm.target_margin_pct) || 0.30;
       const floors = computePricingFloors({
         true_total_cost: trueCost,
         est_shipping_cost: estShip,
@@ -136,7 +137,7 @@ export async function onRequestPost(context) {
             updated_at = datetime('now')
         `).bind(
           itemId,
-          user.id,
+          userId,
           invId,
           itm.item_name,
           itm.category || 'Memorabilia',
@@ -224,7 +225,7 @@ export async function onRequestPost(context) {
             roi_pct = excluded.roi_pct
         `).bind(
           saleId,
-          user.id,
+          userId,
           itemId,
           sale.sale_date || new Date().toISOString().split('T')[0],
           sale.platform || 'eBay',
@@ -251,7 +252,7 @@ export async function onRequestPost(context) {
           UPDATE auction_items
           SET status = 'Sold', date_sold = ?, actual_sell_price = ?, updated_at = datetime('now')
           WHERE id = ? AND user_id = ?
-        `).bind(sale.sale_date || new Date().toISOString().split('T')[0], gross, itemId, user.id)
+        `).bind(sale.sale_date || new Date().toISOString().split('T')[0], gross, itemId, userId)
       );
     }
 
@@ -285,7 +286,7 @@ export async function onRequestPost(context) {
         `).bind(
           compId,
           itemId,
-          user.id,
+          userId,
           c1,
           c2,
           c3,

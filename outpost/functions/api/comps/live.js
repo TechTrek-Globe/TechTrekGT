@@ -27,7 +27,7 @@ export async function onRequestGet(context) {
 export async function onRequestPost(context) {
   const { request, env } = context;
   return withAuth(async () => {
-    const user = await requireAuth(request, env);
+    const { userId } = await requireAuth(request, env);
     const body = await request.json().catch(() => ({}));
     const query = (body.query || '').trim();
     const itemId = body.itemId || null;
@@ -57,7 +57,7 @@ export async function onRequestPost(context) {
       `).bind(
         compId,
         itemId,
-        user.id,
+        userId,
         results.comp_1 || null,
         results.comp_2 || null,
         results.comp_3 || null,

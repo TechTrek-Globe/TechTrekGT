@@ -2,9 +2,12 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   Settings, Shield, Download, RefreshCw, Plus, Edit2, Trash2,
   CheckCircle2, AlertCircle, Loader2, Save, FileText, Database, User, ShieldCheck,
-  FileSpreadsheet, Upload
+  FileSpreadsheet, Upload, ArrowRightLeft, Sparkles, Boxes, Calculator
 } from 'lucide-react';
 import { SpreadsheetImporterModal } from './SpreadsheetImporterModal';
+import { FinanceSyncModal } from './FinanceSyncModal';
+import { SuppliesTrackerModal } from './SuppliesTrackerModal';
+import { TaxReportModal } from './TaxReportModal';
 import { useAuth } from '../context/AuthContext';
 import {
   getPlatforms, createPlatform, updatePlatform, deletePlatform, resetPlatforms,
@@ -19,9 +22,11 @@ export function SettingsView() {
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
-  // Platform edit state
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({ name: '', fee_pct: '', flat_fee: '', notes: '', is_default: false });
+  const [financeSyncOpen, setFinanceSyncOpen] = useState(false);
+  const [suppliesOpen, setSuppliesOpen] = useState(false);
+  const [taxReportOpen, setTaxReportOpen] = useState(false);
 
   // Add platform modal state
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -566,7 +571,7 @@ export function SettingsView() {
                   <h3 className="text-xs font-bold text-white">Spreadsheet Data Importer & Excel Migration</h3>
                 </div>
                 <p className="text-[11px] text-slate-400 mt-1">
-                  Upload your Prestine Auction Tracker workbook (.xlsx, .xls, .csv) to batch-import or replace your inventory, purchase batches, and sales log.
+                  Upload your Pristine Auction Tracker workbook (.xlsx, .xls, .csv) to batch-import or replace your inventory, purchase batches, and sales log.
                 </p>
               </div>
               <button
@@ -575,6 +580,72 @@ export function SettingsView() {
               >
                 <Upload className="w-3.5 h-3.5" />
                 <span>Launch Spreadsheet Importer</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Supplies & Packaging Tracker */}
+          <div className="glass-card-light rounded-xl p-4 border border-blue-500/30 bg-blue-500/5 flex flex-col justify-between space-y-3 md:col-span-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Boxes className="w-4 h-4 text-blue-400" />
+                  <h3 className="text-xs font-bold text-white">Packaging & Supplies Overhead Tracker</h3>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Track recurring supply expenses (bubble mailers, PSA graded sleeves, top-loaders, thermal labels) and deduct them against gross profits.
+                </p>
+              </div>
+              <button
+                onClick={() => setSuppliesOpen(true)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-950 bg-gradient-to-r from-blue-400 to-indigo-400 hover:from-blue-300 hover:to-indigo-300 transition-all flex items-center gap-2 flex-shrink-0 shadow-lg shadow-blue-500/20"
+              >
+                <Boxes className="w-3.5 h-3.5" />
+                <span>Open Supplies Center</span>
+              </button>
+            </div>
+          </div>
+
+          {/* IRS Schedule C & Tax Valuation Report */}
+          <div className="glass-card-light rounded-xl p-4 border border-amber-500/30 bg-amber-500/5 flex flex-col justify-between space-y-3 md:col-span-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Calculator className="w-4 h-4 text-amber-400" />
+                  <h3 className="text-xs font-bold text-white">Year-End IRS Schedule C & Inventory Valuation</h3>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Generate CPA-ready Schedule C tax reports with gross receipts, cost of goods sold (COGS), platform fees, shipping costs, and ending inventory valuation.
+                </p>
+              </div>
+              <button
+                onClick={() => setTaxReportOpen(true)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-950 bg-gradient-to-r from-amber-400 to-emerald-400 hover:from-amber-300 hover:to-emerald-300 transition-all flex items-center gap-2 flex-shrink-0 shadow-lg shadow-amber-500/20"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                <span>Generate Tax Report</span>
+              </button>
+            </div>
+          </div>
+
+          {/* TechTrek Finance Cross-Portal Sync */}
+          <div className="glass-card-light rounded-xl p-4 border border-emerald-500/30 bg-emerald-500/5 flex flex-col justify-between space-y-3 md:col-span-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <ArrowRightLeft className="w-4 h-4 text-emerald-400" />
+                  <h3 className="text-xs font-bold text-white">TechTrek Finance Household Sync</h3>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Connect your cumulative realized auction profits directly to your TechTrek Finance household budget accounts in Cloudflare D1.
+                </p>
+              </div>
+              <button
+                onClick={() => setFinanceSyncOpen(true)}
+                className="px-4 py-2 rounded-xl text-xs font-black text-slate-950 bg-gradient-to-r from-amber-400 to-emerald-400 hover:from-amber-300 hover:to-emerald-300 transition-all flex items-center gap-2 flex-shrink-0 shadow-lg shadow-emerald-500/20"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Launch Finance Sync</span>
               </button>
             </div>
           </div>
@@ -711,6 +782,24 @@ export function SettingsView() {
         isOpen={importerOpen}
         onClose={() => setImporterOpen(false)}
         onImportSuccess={() => showSuccess('Spreadsheet data successfully imported into your account!')}
+      />
+
+      {/* TechTrek Finance Sync Modal */}
+      <FinanceSyncModal
+        isOpen={financeSyncOpen}
+        onClose={() => setFinanceSyncOpen(false)}
+      />
+
+      {/* Supplies & Packaging Modal */}
+      <SuppliesTrackerModal
+        isOpen={suppliesOpen}
+        onClose={() => setSuppliesOpen(false)}
+      />
+
+      {/* Year-End Tax & Schedule C Report Modal */}
+      <TaxReportModal
+        isOpen={taxReportOpen}
+        onClose={() => setTaxReportOpen(false)}
       />
     </div>
   );

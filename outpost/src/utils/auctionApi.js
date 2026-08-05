@@ -136,5 +136,47 @@ export const deleteComp = (id) =>
 export const getDashboard = () =>
   apiFetch('/api/dashboard');
 
+// --- Live eBay Comps Auto-Fetch ---
+export const fetchLiveComps = (query, itemId = null) =>
+  apiFetch('/api/comps/live', {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ query, itemId })
+  });
 
+// --- TechTrek Finance Cross-Portal Sync ---
+export const getFinanceSyncMetrics = () =>
+  apiFetch('/api/sync/finance');
+
+export const syncToFinance = (options = {}) =>
+  apiFetch('/api/sync/finance', {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify(options)
+  });
+
+// --- Supplies & Packaging Expense Tracker ---
+export const getSupplies = () =>
+  apiFetch('/api/supplies');
+
+export const createSupply = (body) =>
+  apiFetch('/api/supplies', {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify(body)
+  });
+
+export const updateSupply = (id, body) =>
+  apiFetch(`/api/supplies/${id}`, {
+    method: 'PUT',
+    headers: JSON_HEADERS,
+    body: JSON.stringify(body)
+  });
+
+export const deleteSupply = (id) =>
+  apiFetch(`/api/supplies/${id}`, { method: 'DELETE' });
+
+// --- Year-End Tax & Schedule C Reports ---
+export const getTaxReport = (year = '') =>
+  apiFetch(`/api/reports/tax${year ? `?year=${encodeURIComponent(year)}` : ''}`);
 

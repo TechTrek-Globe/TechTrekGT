@@ -2,11 +2,16 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   DollarSign, TrendingUp, Package, Gavel, Clock, BarChart2,
   RefreshCw, Loader2, AlertCircle, ArrowUpRight, Plus, CheckCircle2,
-  ShieldCheck, ShoppingBag, Layers, Award, Tag
+  ShieldCheck, ShoppingBag, Layers, Award, Tag, ArrowRightLeft, Calculator,
+  Boxes, FileSpreadsheet
 } from 'lucide-react';
 import { getDashboard, getPlatforms } from '../utils/auctionApi';
 import { AddInvoiceModal } from './AddInvoiceModal';
 import { LogSaleModal } from './LogSaleModal';
+import { FinanceSyncModal } from './FinanceSyncModal';
+import { CardShowCalculatorModal } from './CardShowCalculatorModal';
+import { SuppliesTrackerModal } from './SuppliesTrackerModal';
+import { TaxReportModal } from './TaxReportModal';
 import { fmtCurrency, fmtPct } from '../utils/formulaPreview';
 
 export function DashboardView({ onNavigate }) {
@@ -18,6 +23,10 @@ export function DashboardView({ onNavigate }) {
   // Quick action modals
   const [addInvoiceOpen, setAddInvoiceOpen] = useState(false);
   const [logSaleOpen, setLogSaleOpen] = useState(false);
+  const [financeSyncOpen, setFinanceSyncOpen] = useState(false);
+  const [cardShowOpen, setCardShowOpen] = useState(false);
+  const [suppliesOpen, setSuppliesOpen] = useState(false);
+  const [taxReportOpen, setTaxReportOpen] = useState(false);
 
   const fetchDashboard = useCallback(async () => {
     setLoading(true);
@@ -95,16 +104,48 @@ export function DashboardView({ onNavigate }) {
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
           <button
+            id="quick-card-show-btn"
+            onClick={() => setCardShowOpen(true)}
+            className="px-3 py-2 rounded-xl text-xs font-semibold text-amber-300 bg-amber-950/60 hover:bg-amber-900/60 border border-amber-500/40 hover:border-amber-500/60 transition-all flex items-center gap-1.5"
+            title="Open Mobile Card Show Calculator"
+          >
+            <Calculator className="w-3.5 h-3.5" /> Show Calc
+          </button>
+          <button
+            id="quick-supplies-btn"
+            onClick={() => setSuppliesOpen(true)}
+            className="px-3 py-2 rounded-xl text-xs font-semibold text-blue-300 bg-blue-950/60 hover:bg-blue-900/60 border border-blue-500/40 hover:border-blue-500/60 transition-all flex items-center gap-1.5"
+            title="Open Packaging & Supplies Expense Tracker"
+          >
+            <Boxes className="w-3.5 h-3.5" /> Supplies
+          </button>
+          <button
+            id="quick-tax-btn"
+            onClick={() => setTaxReportOpen(true)}
+            className="px-3 py-2 rounded-xl text-xs font-semibold text-amber-300 bg-amber-950/60 hover:bg-amber-900/60 border border-amber-500/40 hover:border-amber-500/60 transition-all flex items-center gap-1.5"
+            title="View IRS Schedule C & Tax Valuation Report"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5" /> Taxes
+          </button>
+          <button
+            id="quick-finance-sync-btn"
+            onClick={() => setFinanceSyncOpen(true)}
+            className="px-3 py-2 rounded-xl text-xs font-semibold text-emerald-300 bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-500/40 hover:border-emerald-500/60 transition-all flex items-center gap-1.5"
+            title="Sync realized net profits with TechTrek Finance"
+          >
+            <ArrowRightLeft className="w-3.5 h-3.5" /> Sync
+          </button>
+          <button
             id="quick-add-invoice-btn"
             onClick={() => setAddInvoiceOpen(true)}
-            className="btn-primary w-auto px-4 py-2 text-xs flex items-center gap-1.5"
+            className="btn-primary w-auto px-3.5 py-2 text-xs flex items-center gap-1.5"
           >
             <Plus className="w-3.5 h-3.5" /> Add Invoice
           </button>
           <button
             id="quick-log-sale-btn"
             onClick={() => setLogSaleOpen(true)}
-            className="px-4 py-2 rounded-xl text-xs font-semibold text-emerald-300 bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-500/40 hover:border-emerald-500/60 transition-all flex items-center gap-1.5"
+            className="px-4 py-2 rounded-xl text-xs font-semibold text-blue-300 bg-blue-950/60 hover:bg-blue-900/60 border border-blue-500/40 hover:border-blue-500/60 transition-all flex items-center gap-1.5"
           >
             <DollarSign className="w-3.5 h-3.5" /> Log Sale
           </button>
@@ -501,26 +542,36 @@ export function DashboardView({ onNavigate }) {
         </div>
       </div>
 
-      {/* Quick Add Invoice Modal */}
+      {/* Modals */}
       <AddInvoiceModal
-        open={addInvoiceOpen}
-        platforms={platforms}
+        isOpen={addInvoiceOpen}
         onClose={() => setAddInvoiceOpen(false)}
-        onCreated={() => {
-          setAddInvoiceOpen(false);
+        onCreated={fetchDashboard}
+      />
+      <LogSaleModal
+        isOpen={logSaleOpen}
+        onClose={() => setLogSaleOpen(false)}
+        onCreated={fetchDashboard}
+      />
+      <FinanceSyncModal
+        isOpen={financeSyncOpen}
+        onClose={() => {
+          setFinanceSyncOpen(false);
           fetchDashboard();
         }}
       />
-
-      {/* Quick Log Sale Modal */}
-      <LogSaleModal
-        open={logSaleOpen}
-        platforms={platforms}
-        onClose={() => setLogSaleOpen(false)}
-        onSaved={() => {
-          setLogSaleOpen(false);
-          fetchDashboard();
-        }}
+      <CardShowCalculatorModal
+        isOpen={cardShowOpen}
+        onClose={() => setCardShowOpen(false)}
+        onItemAdded={fetchDashboard}
+      />
+      <SuppliesTrackerModal
+        isOpen={suppliesOpen}
+        onClose={() => setSuppliesOpen(false)}
+      />
+      <TaxReportModal
+        isOpen={taxReportOpen}
+        onClose={() => setTaxReportOpen(false)}
       />
     </div>
   );

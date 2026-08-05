@@ -8,9 +8,11 @@ import { getItems, updateItem, deleteItem, getInvoices } from '../utils/auctionA
 import { AddInvoiceModal } from './AddInvoiceModal';
 import { LogSaleModal } from './LogSaleModal';
 import { SpreadsheetImporterModal } from './SpreadsheetImporterModal';
+import { ListingCopyModal } from './ListingCopyModal';
 import { fmtCurrency, fmtPct } from '../utils/formulaPreview';
 import { getApiUrl } from '../utils/api';
-import { FileSpreadsheet } from 'lucide-react';
+import { FileSpreadsheet, ShieldCheck, Copy } from 'lucide-react';
+import { getCertVerificationUrl, getAuthenticatorMeta } from '../utils/certLookup';
 
 const STATUS_META = {
   'Available':     { color: 'text-emerald-400', bg: 'bg-emerald-500/10',  border: 'border-emerald-500/20' },
@@ -143,6 +145,7 @@ export function InventoryView() {
   const [modalOpen, setModalOpen] = useState(false);
   const [importerOpen, setImporterOpen] = useState(false);
   const [saleModalOpen, setSaleModalOpen] = useState(false);
+  const [copyModalItem, setCopyModalItem] = useState(null);
   const [itemToSell, setItemToSell] = useState(null);
   const [search,    setSearch]    = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -352,8 +355,35 @@ export function InventoryView() {
                   {/* Category */}
                   <td className="px-4 py-3 text-slate-400 whitespace-nowrap">{item.category || '--'}</td>
 
-                  {/* Auth */}
-                  <td className="px-4 py-3 text-slate-400 whitespace-nowrap">{item.authenticator || '--'}</td>
+                  {/* Auth & Cert Verification */}
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    {item.authenticator ? (
+                      <div>
+                        {getCertVerificationUrl(item.authenticator, item.cert_number) ? (
+                          <a
+                            href={getCertVerificationUrl(item.authenticator, item.cert_number)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-300 border border-blue-500/30 hover:bg-blue-500/20 hover:text-blue-200 transition-colors"
+                            title={`Verify with ${item.authenticator} Official Database`}
+                          >
+                            <ShieldCheck className="w-3 h-3 text-blue-400" />
+                            <span>{item.authenticator}</span>
+                            {item.cert_number && <span className="font-mono text-slate-400">#{item.cert_number}</span>}
+                            <ExternalLink className="w-2.5 h-2.5 opacity-60 ml-0.5" />
+                          </a>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-800 text-slate-300 border border-slate-700">
+                            <ShieldCheck className="w-3 h-3 text-slate-400" />
+                            <span>{item.authenticator}</span>
+                            {item.cert_number && <span className="font-mono text-slate-400">#{item.cert_number}</span>}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-slate-600 text-xs">--</span>
+                    )}
+                  </td>
 
                   {/* True Cost */}
                   <td className="px-4 py-3 whitespace-nowrap">
@@ -403,6 +433,13 @@ export function InventoryView() {
                   {/* Actions */}
                   <td className="px-4 py-3 whitespace-nowrap">
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={() => setCopyModalItem(item)}
+                        title="Generate multi-channel listing copy (eBay/Whatnot/Mercari)"
+                        className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 hover:text-amber-400 hover:bg-amber-900/20 transition-all"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                      </button>
                       {item.status !== 'Sold' && (
                         <button
                           id={`sell-item-${item.id}`}
@@ -475,6 +512,11 @@ export function InventoryView() {
         item={itemToSell}
         onClose={() => { setSaleModalOpen(false); setItemToSell(null); }}
         onCreated={() => fetchItems(pagination.page)}
+      />
+      <ListingCopyModal
+        isOpen={!!copyModalItem}
+        item={copyModalItem}
+        onClose={() => setCopyModalItem(null)}
       />
     </div>
   );

@@ -138,3 +138,23 @@ CREATE TABLE IF NOT EXISTS auction_platforms (
   is_default  INTEGER NOT NULL DEFAULT 0,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
+
+-- ============================================================
+-- AUCTION SUPPLIES (packaging, mailers, slabs, overhead)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS auction_supplies (
+  id            TEXT PRIMARY KEY,
+  user_id       TEXT NOT NULL,
+  name          TEXT NOT NULL,
+  category      TEXT NOT NULL DEFAULT 'Packaging',
+  purchase_date TEXT NOT NULL,
+  cost          REAL NOT NULL DEFAULT 0.0,
+  quantity      INTEGER NOT NULL DEFAULT 1,
+  unit_cost     REAL NOT NULL DEFAULT 0.0,
+  notes         TEXT,
+  created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_auction_supplies_user ON auction_supplies(user_id);
+

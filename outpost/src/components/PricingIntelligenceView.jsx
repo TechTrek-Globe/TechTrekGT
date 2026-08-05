@@ -2,10 +2,12 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   TrendingUp, Search, ExternalLink, Save, CheckCircle2,
   AlertCircle, Loader2, RefreshCw, BarChart2, ShieldCheck,
-  DollarSign, ArrowUpRight, Filter, Sparkles, SlidersHorizontal
+  DollarSign, ArrowUpRight, Filter, Sparkles, SlidersHorizontal, Zap, Copy
 } from 'lucide-react';
-import { getComps, saveComp, updateItem } from '../utils/auctionApi';
+import { getComps, saveComp, updateItem, fetchLiveComps } from '../utils/auctionApi';
 import { fmtCurrency, fmtPct } from '../utils/formulaPreview';
+import { getCertVerificationUrl } from '../utils/certLookup';
+import { ListingCopyModal } from './ListingCopyModal';
 
 export function PricingIntelligenceView() {
   const [comps, setComps] = useState([]);
@@ -14,7 +16,8 @@ export function PricingIntelligenceView() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('active'); // 'active' | 'all'
   const [categoryFilter, setCategoryFilter] = useState('All');
-
+  const [copyModalItem, setCopyModalItem] = useState(null);
+  
   // Local draft state for quick inputs: { [itemId]: { comp_1, comp_2, comp_3, rec_price, saving, applied } }
   const [drafts, setDrafts] = useState({});
 
@@ -106,6 +109,57 @@ export function PricingIntelligenceView() {
       setDrafts(prev => ({
         ...prev,
         [item.item_id]: { ...draft, saving: false }
+      }));
+    }
+  };
+
+  const handleAutoFetchLiveComps = async (item) => {
+    const draft = drafts[item.item_id] || {};
+    setDrafts(prev => ({
+      ...prev,
+      [item.item_id]: { ...draft, fetchingLive: true }
+    }));
+
+    try {
+      const query = item.item_name || `${item.athlete_person || ''} ${item.category || ''} ${item.authenticator || ''}`.trim();
+      const res = await fetchLiveComps(query, item.item_id);
+
+      if (res && res.success) {
+        setDrafts(prev => {
+          const cur = prev[item.item_id] || {};
+          const c1 = res.comp_1 !== null && res.comp_1 !== undefined ? res.comp_1 : cur.comp_1;
+          const c2 = res.comp_2 !== null && res.comp_2 !== undefined ? res.comp_2 : cur.comp_2;
+          const c3 = res.comp_3 !== null && res.comp_3 !== undefined ? res.comp_3 : cur.comp_3;
+          const recPrice = res.live_avg || res.median || cur.recommended_list_price;
+
+          return {
+            ...prev,
+            [item.item_id]: {
+              ...cur,
+              comp_1: c1,
+              comp_2: c2,
+              comp_3: c3,
+              recommended_list_price: recPrice,
+              fetchingLive: false,
+              applied: false
+            }
+          };
+        });
+
+        if (res.ebay_search_url) {
+          setComps(prev => prev.map(c => c.item_id === item.item_id ? { ...c, ebay_search_url: res.ebay_search_url } : c));
+        }
+      } else {
+        setDrafts(prev => ({
+          ...prev,
+          [item.item_id]: { ...draft, fetchingLive: false }
+        }));
+      }
+    } catch (err) {
+      alert(`Auto-fetch error: ${err.message}`);
+      setDrafts(prev => ({
+        ...prev,
+        [item.item_id]: { ...draft, fetchingLive: false }
       }));
     }
   };
@@ -282,10 +336,24 @@ export function PricingIntelligenceView() {
                         {item.category || 'General'}
                       </span>
                       {item.authenticator && (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-500/10 text-blue-300 border border-blue-500/20 flex items-center gap-1">
-                          <ShieldCheck className="w-3 h-3" />
-                          {item.authenticator} {item.cert_number ? `#${item.cert_number}` : ''}
-                        </span>
+                        getCertVerificationUrl(item.authenticator, item.cert_number) ? (
+                          <a
+                            href={getCertVerificationUrl(item.authenticator, item.cert_number)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-500/10 text-blue-300 border border-blue-500/20 hover:bg-blue-500/20 hover:text-blue-200 transition-colors flex items-center gap-1"
+                            title={`Verify with ${item.authenticator} Database`}
+                          >
+                            <ShieldCheck className="w-3 h-3 text-blue-400" />
+                            {item.authenticator} {item.cert_number ? `#${item.cert_number}` : ''}
+                            <ExternalLink className="w-2.5 h-2.5 opacity-60 ml-0.5" />
+                          </a>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-500/10 text-blue-300 border border-blue-500/20 flex items-center gap-1">
+                            <ShieldCheck className="w-3 h-3 text-blue-400" />
+                            {item.authenticator} {item.cert_number ? `#${item.cert_number}` : ''}
+                          </span>
+                        )
                       )}
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${item.status === 'Sold' ? 'bg-purple-500/10 text-purple-400' : item.status === 'Listed' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-800 text-slate-300'}`}>
                         {item.status}
@@ -319,20 +387,54 @@ export function PricingIntelligenceView() {
 
                 {/* Comps Inputs & Calculations */}
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
-                  {/* eBay Lookup Trigger */}
-                  <div className="lg:col-span-3">
-                    <a
-                      href={item.ebay_search_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold text-blue-300 bg-blue-950/40 hover:bg-blue-900/50 border border-blue-500/30 hover:border-blue-500/50 transition-all shadow-sm"
+                  {/* eBay Lookup & Live Auto-Fetch */}
+                  <div className="lg:col-span-3 space-y-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleAutoFetchLiveComps(item)}
+                      disabled={draft.fetchingLive}
+                      className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-amber-300 bg-amber-950/40 hover:bg-amber-900/50 border border-amber-500/40 hover:border-amber-500/60 transition-all shadow-sm disabled:opacity-50"
+                      title="Automatically fetch real completed eBay sales and populate comps"
                     >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                      View eBay Sold Comps ↗
-                    </a>
-                    <p className="text-[10px] text-slate-500 text-center mt-1">
-                      Direct search for completed sales
-                    </p>
+                      {draft.fetchingLive ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" />
+                          <span>Scanning eBay...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Zap className="w-3.5 h-3.5 text-amber-400" />
+                          <span>Auto-Fetch Sold Comps</span>
+                        </>
+                      )}
+                    </button>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <a
+                        href={item.ebay_search_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[10px] font-medium text-blue-300/80 hover:text-blue-200 bg-blue-950/20 hover:bg-blue-900/30 border border-blue-500/20 transition-all truncate"
+                      >
+                        <ExternalLink className="w-2.5 h-2.5" />
+                        <span>eBay Comps ↗</span>
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => setCopyModalItem({
+                          item_name: item.item_name,
+                          athlete_person: item.athlete_person,
+                          category: item.category,
+                          authenticator: item.authenticator,
+                          cert_number: item.cert_number,
+                          current_list_price: item.current_list_price || item.recommended_list_price
+                        })}
+                        className="flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold text-amber-300/90 hover:text-amber-200 bg-amber-950/20 hover:bg-amber-900/30 border border-amber-500/20 transition-all"
+                        title="Generate formatted multi-channel listing copy"
+                      >
+                        <Copy className="w-2.5 h-2.5" />
+                        <span>Listing Copy</span>
+                      </button>
+                    </div>
                   </div>
 
                   {/* 3 Comp Inputs */}
@@ -440,6 +542,13 @@ export function PricingIntelligenceView() {
           })}
         </div>
       )}
+
+      {/* Multi-Channel Listing Copy Modal */}
+      <ListingCopyModal
+        isOpen={!!copyModalItem}
+        item={copyModalItem}
+        onClose={() => setCopyModalItem(null)}
+      />
     </div>
   );
 }

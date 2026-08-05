@@ -16,8 +16,13 @@ import { onRequestGet as platformsListHandler, onRequestPost as platformsCreateH
 import { onRequestPut as platformPutHandler, onRequestDelete as platformDeleteHandler } from '../functions/api/platforms/[id].js';
 import { onRequestGet as compsListHandler, onRequestPost as compsCreateHandler } from '../functions/api/comps/index.js';
 import { onRequestGet as compGetHandler, onRequestPut as compPutHandler, onRequestDelete as compDeleteHandler } from '../functions/api/comps/[id].js';
+import { onRequestGet as compsLiveGetHandler, onRequestPost as compsLivePostHandler } from '../functions/api/comps/live.js';
 import { onRequestGet as dashboardHandler } from '../functions/api/dashboard.js';
 import { onRequestPost as batchImportHandler } from '../functions/api/import/batch.js';
+import { onRequestGet as syncFinanceGetHandler, onRequestPost as syncFinancePostHandler } from '../functions/api/sync/finance.js';
+import { onRequestGet as suppliesListHandler, onRequestPost as suppliesCreateHandler } from '../functions/api/supplies/index.js';
+import { onRequestPut as supplyPutHandler, onRequestDelete as supplyDeleteHandler } from '../functions/api/supplies/[id].js';
+import { onRequestGet as taxReportGetHandler } from '../functions/api/reports/tax.js';
 
 function addSecurityHeaders(response, isLocalhost = false) {
   const newHeaders = new Headers(response.headers);
@@ -158,6 +163,10 @@ export default {
       } else if (/^\/api\/platforms\/[^/]+$/.test(apiPath) && request.method === 'DELETE') {
         response = await platformDeleteHandler(context);
       // --- Comps / Pricing Intelligence ---
+      } else if (apiPath === '/api/comps/live' && request.method === 'GET') {
+        response = await compsLiveGetHandler(context);
+      } else if (apiPath === '/api/comps/live' && request.method === 'POST') {
+        response = await compsLivePostHandler(context);
       } else if (apiPath === '/api/comps' && request.method === 'GET') {
         response = await compsListHandler(context);
       } else if (apiPath === '/api/comps' && request.method === 'POST') {
@@ -174,6 +183,25 @@ export default {
       // --- Batch Import ---
       } else if (apiPath === '/api/import/batch' && request.method === 'POST') {
         response = await batchImportHandler(context);
+      // --- TechTrek Finance Sync ---
+      } else if (apiPath === '/api/sync/finance' && request.method === 'GET') {
+        response = await syncFinanceGetHandler(context);
+      } else if (apiPath === '/api/sync/finance' && request.method === 'POST') {
+        response = await syncFinancePostHandler(context);
+      // --- Supplies Expense Tracker ---
+      } else if (apiPath === '/api/supplies' && request.method === 'GET') {
+        response = await suppliesListHandler(context);
+      } else if (apiPath === '/api/supplies' && request.method === 'POST') {
+        response = await suppliesCreateHandler(context);
+      } else if (apiPath.match(/^\/api\/supplies\/[^/]+$/) && request.method === 'PUT') {
+        const id = apiPath.split('/')[3];
+        response = await supplyPutHandler({ ...context, params: { id } });
+      } else if (apiPath.match(/^\/api\/supplies\/[^/]+$/) && request.method === 'DELETE') {
+        const id = apiPath.split('/')[3];
+        response = await supplyDeleteHandler({ ...context, params: { id } });
+      // --- Year-End Tax & Schedule C Reports ---
+      } else if (apiPath === '/api/reports/tax' && request.method === 'GET') {
+        response = await taxReportGetHandler(context);
       } else if (apiPath.startsWith('/api/')) {
         response = new Response(JSON.stringify({ error: 'Endpoint not found' }), {
           status: 404,

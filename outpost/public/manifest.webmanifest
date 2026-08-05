@@ -1,0 +1,18 @@
+{
+  "name": "TechTrek Outpost",
+  "short_name": "Outpost",
+  "description": "Memorabilia auction inventory management, pricing intelligence, and card show live calculator.",
+  "start_url": "/outpost/",
+  "scope": "/outpost/",
+  "display": "standalone",
+  "background_color": "#020617",
+  "theme_color": "#f59e0b",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230f172a'/><text y='.75em' x='50%' text-anchor='middle' font-size='70'>🔨</text></svg>",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

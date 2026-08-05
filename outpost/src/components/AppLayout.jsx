@@ -1,6 +1,14 @@
-import React from 'react';
-import { Gavel, LayoutDashboard, Package, ShoppingCart, BarChart2, Settings, LogOut, ChevronRight } from 'lucide-react';
+import React, { useState } from 'react';
+import {
+  Gavel, LayoutDashboard, Package, ShoppingCart, BarChart2,
+  Settings, LogOut, ChevronRight, Calculator, ArrowRightLeft,
+  Sparkles, Boxes, FileSpreadsheet
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { FinanceSyncModal } from './FinanceSyncModal';
+import { CardShowCalculatorModal } from './CardShowCalculatorModal';
+import { SuppliesTrackerModal } from './SuppliesTrackerModal';
+import { TaxReportModal } from './TaxReportModal';
 
 const NAV_ITEMS = [
   { id: 'dashboard',   label: 'Dashboard',            icon: LayoutDashboard },
@@ -15,6 +23,10 @@ const NAV_ITEMS = [
  */
 export function AppLayout({ activeView, onNavigate, children }) {
   const { user, logout } = useAuth();
+  const [calcOpen, setCalcOpen] = useState(false);
+  const [financeSyncOpen, setFinanceSyncOpen] = useState(false);
+  const [suppliesOpen, setSuppliesOpen] = useState(false);
+  const [taxReportOpen, setTaxReportOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-slate-950 flex font-sans">
@@ -55,6 +67,52 @@ export function AppLayout({ activeView, onNavigate, children }) {
               </button>
             );
           })}
+
+          {/* Quick Action Tools */}
+          <div className="pt-4 pb-1">
+            <p className="px-3 text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">Live Tools</p>
+            <div className="space-y-1">
+              <button
+                type="button"
+                id="sidebar-card-show-btn"
+                onClick={() => setCalcOpen(true)}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 transition-all text-left group"
+              >
+                <Calculator className="w-4 h-4 text-amber-400" />
+                <span>Card Show Calc</span>
+              </button>
+
+              <button
+                type="button"
+                id="sidebar-finance-sync-btn"
+                onClick={() => setFinanceSyncOpen(true)}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 transition-all text-left group"
+              >
+                <ArrowRightLeft className="w-4 h-4 text-emerald-400" />
+                <span>Finance Sync</span>
+              </button>
+
+              <button
+                type="button"
+                id="sidebar-supplies-btn"
+                onClick={() => setSuppliesOpen(true)}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-blue-300 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 transition-all text-left group"
+              >
+                <Boxes className="w-4 h-4 text-blue-400" />
+                <span>Supplies Tracker</span>
+              </button>
+
+              <button
+                type="button"
+                id="sidebar-tax-report-btn"
+                onClick={() => setTaxReportOpen(true)}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 transition-all text-left group"
+              >
+                <FileSpreadsheet className="w-4 h-4 text-amber-400" />
+                <span>Tax / Schedule C</span>
+              </button>
+            </div>
+          </div>
         </nav>
 
         {/* Back to Finance Portal Link */}
@@ -97,15 +155,34 @@ export function AppLayout({ activeView, onNavigate, children }) {
 
         {/* Mobile top bar */}
         <header className="lg:hidden flex items-center justify-between px-4 py-3 bg-slate-900/80 border-b border-slate-800/60 backdrop-blur-md">
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center">
               <Gavel className="w-4 h-4 text-slate-950" />
             </div>
             <span className="font-black text-white text-sm">TechTrek Outpost</span>
           </div>
-          <button id="mobile-logout-btn" onClick={logout} className="text-slate-500 hover:text-red-400 transition-colors">
-            <LogOut className="w-4 h-4" />
-          </button>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCalcOpen(true)}
+              className="p-1.5 rounded-lg bg-amber-500/15 text-amber-400 border border-amber-500/30 text-xs font-bold flex items-center gap-1"
+            >
+              <Calculator className="w-3.5 h-3.5" />
+              <span>Show Calc</span>
+            </button>
+
+            <button
+              onClick={() => setFinanceSyncOpen(true)}
+              className="p-1.5 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-xs font-bold flex items-center gap-1"
+            >
+              <ArrowRightLeft className="w-3.5 h-3.5" />
+              <span>Sync</span>
+            </button>
+
+            <button id="mobile-logout-btn" onClick={logout} className="text-slate-500 hover:text-red-400 transition-colors p-1">
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
         </header>
 
         {/* Mobile nav */}
@@ -132,6 +209,25 @@ export function AppLayout({ activeView, onNavigate, children }) {
           {children}
         </main>
       </div>
+
+      {/* Global Modals */}
+      <FinanceSyncModal
+        isOpen={financeSyncOpen}
+        onClose={() => setFinanceSyncOpen(false)}
+      />
+      <CardShowCalculatorModal
+        isOpen={calcOpen}
+        onClose={() => setCalcOpen(false)}
+      />
+      <SuppliesTrackerModal
+        isOpen={suppliesOpen}
+        onClose={() => setSuppliesOpen(false)}
+      />
+      <TaxReportModal
+        isOpen={taxReportOpen}
+        onClose={() => setTaxReportOpen(false)}
+      />
     </div>
   );
 }
+

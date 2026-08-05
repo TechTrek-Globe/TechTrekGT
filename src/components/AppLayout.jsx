@@ -23,7 +23,7 @@ const NAV_ITEMS = [
   { id: 'ledger',      label: 'Transactions',         icon: TrendingUp,      color: 'text-emerald-400' },
   { id: 'main_budget', label: 'Bills & Allocations',   icon: ReceiptText,     color: 'text-violet-400' },
   { id: 'amortization',label: 'Loan Amortization',     icon: Calculator,      color: 'text-rose-400' },
-  { id: 'settings',    label: 'Setup Accounts, People, Bills, Splits', icon: Settings, color: 'text-amber-400', isSettings: true },
+  { id: 'settings',    label: 'Setup Accounts, People, Bills, Splits', icon: Settings, color: 'text-amber-400' },
 ];
 
 const SIDEBAR_KEY = 'trekledger_sidebar_collapsed';
@@ -59,16 +59,12 @@ const SidebarContent = ({ collapsed, activeView, cashOnHand, netIncome, netFlow,
       )}
       {NAV_ITEMS.map((item) => {
         const Icon = item.icon;
-        const isActive = item.isSettings ? false : activeView === item.id;
+        const isActive = activeView === item.id;
         return (
           <button
             key={item.id}
             onClick={() => {
-              if (item.isSettings) {
-                setIsSettingsOpen(true);
-              } else {
-                setActiveView(item.id);
-              }
+              setActiveView(item.id);
             }}
             title={collapsed ? item.label : undefined}
             aria-label={item.label}
@@ -280,12 +276,16 @@ export function AppLayout({ children, onNavigateHome }) {
           </button>
 
           <button
-            onClick={() => setIsSettingsOpen(true)}
-            aria-label="Open settings modal"
-            className="flex items-center gap-2 px-4 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-semibold shadow-lg shadow-blue-600/20 transition-all hover:-translate-y-0.5 active:translate-y-0"
+            onClick={() => setActiveView('settings')}
+            aria-label="Open settings view"
+            className={`flex items-center gap-2 px-4 py-1.5 rounded-xl text-xs font-semibold shadow-lg transition-all hover:-translate-y-0.5 active:translate-y-0 ${
+              activeView === 'settings'
+                ? 'bg-blue-600 text-white ring-2 ring-blue-400/50 shadow-blue-600/30'
+                : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-blue-600/20'
+            }`}
           >
-            <Settings className="w-3.5 h-3.5 animate-spin-slow" />
-            <span>Settings</span>
+            <Settings className="w-3.5 h-3.5" />
+            <span>Settings &amp; Setup</span>
           </button>
         </header>
 

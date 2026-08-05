@@ -3,6 +3,7 @@ import { AuthProvider } from './context/AuthContext';
 import { BudgetProvider, useBudget } from './context/BudgetContext';
 import { AppLayout } from './components/AppLayout';
 import { SettingsModal } from './components/SettingsModal';
+import { SettingsView } from './components/SettingsView';
 import { DashboardView } from './components/DashboardView';
 import { MainBudgetView } from './components/MainBudgetView';
 import { LedgerView } from './components/LedgerView';
@@ -86,6 +87,7 @@ function MainContent() {
       {activeView === 'main_budget' && <MainBudgetView />}
       {activeView === 'ledger'      && <LedgerView />}
       {activeView === 'amortization'&& <AmortizationView />}
+      {activeView === 'settings'    && <SettingsView />}
       {isSettingsOpen && <SettingsModal />}
       <AuthModal />
     </>

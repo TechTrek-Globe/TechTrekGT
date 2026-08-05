@@ -732,14 +732,14 @@ export function DashboardView() {
           {/* Header Action Controls */}
           <div className="flex items-center gap-2">
             <button
-              onClick={() => { setSettingsTab('dashboard'); setIsSettingsOpen(true); }}
+              onClick={() => { setSettingsTab('dashboard'); setActiveView('settings'); }}
               className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-[11px] font-semibold shadow shadow-blue-900/30 transition-colors flex items-center gap-1.5"
             >
               <SlidersHorizontal className="w-3.5 h-3.5" />
               Customize Layout
             </button>
             <button
-              onClick={() => { setSettingsTab('bills'); setIsSettingsOpen(true); }}
+              onClick={() => { setSettingsTab('bills'); setActiveView('settings'); }}
               className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold border transition-colors ${
                 isLight ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300' : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
               }`}

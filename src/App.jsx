@@ -94,11 +94,20 @@ function MainContent({ pathname, navigateTo, onNavigateHome }) {
   const { activeView, setActiveView, isSettingsOpen } = useBudget();
   const { isAuthenticated } = useAuth();
 
-  // Synchronize view state with reactive pathname
+  // Synchronize view state and URL pathname based on auth state
   useEffect(() => {
-    if (!isAuthenticated) return;
-
     const normalized = (pathname || '').toLowerCase().replace(/\/$/, '');
+
+    if (!isAuthenticated) {
+      if (normalized.startsWith('/finance') && normalized !== '/finance') {
+        if (typeof window !== 'undefined') {
+          window.history.replaceState({}, '', '/finance');
+        }
+        navigateTo('/finance');
+      }
+      return;
+    }
+
     if (normalized === '/finance' || normalized === '/finance/login' || normalized === '') {
       navigateTo('/finance/dashboard');
       return;
@@ -148,17 +157,6 @@ function getRouteFromPathname(pathname) {
 export default function App() {
   const [pathname, setPathname] = useState(() => (typeof window !== 'undefined' ? window.location.pathname : '/'));
   const route = getRouteFromPathname(pathname);
-
-  // On page reload / initial mount, reset finance sub-routes back to main finance page
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const initialPath = window.location.pathname.toLowerCase().replace(/\/$/, '');
-      if (initialPath.startsWith('/finance')) {
-        window.history.replaceState({}, '', '/finance/dashboard');
-        setPathname('/finance/dashboard');
-      }
-    }
-  }, []);
 
   useEffect(() => {
     const handlePopState = () => {

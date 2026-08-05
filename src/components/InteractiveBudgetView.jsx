@@ -68,7 +68,7 @@ function ActualCell({ bill, projected, actual, isEditing, editValue, onEdit, onC
     >
       <span className={`font-mono text-xs ${isOverridden ? 'text-emerald-300 font-bold' : 'text-slate-400'}`}>
         ${actual.toFixed(2)}
-        {isOverridden && <span className="ml-1 text-[9px] text-blue-400 font-normal">(actual)</span>}
+        {isOverridden && <span className="ml-1 text-xs text-blue-400 font-normal">(actual)</span>}
       </span>
       <Pencil className="w-2.5 h-2.5 text-slate-600 group-hover/cell:text-emerald-400 transition-colors opacity-0 group-hover/cell:opacity-100 absolute -left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
     </button>
@@ -229,7 +229,7 @@ export function InteractiveBudgetView() {
                   Actual end: <span className={`font-mono ${actualEndBal < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>{fmtMoney(actualEndBal)}</span>
                 </span>
                 {overBudget && (
-                  <span className="text-[9px] px-2 py-0.5 rounded-full bg-rose-950 text-rose-300 border border-rose-800 font-semibold">Over</span>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-rose-950 text-rose-300 border border-rose-800 font-semibold">Over</span>
                 )}
               </div>
             </button>

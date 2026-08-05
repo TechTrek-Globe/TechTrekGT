@@ -182,7 +182,19 @@ export function AppLayout({ children, onNavigateHome }) {
       {/* Mobile Overlay Drawer */}
       {mobileOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex">
-          <div className="absolute inset-0 bg-black/60" onClick={() => setMobileOpen(false)} />
+          <div
+            className="absolute inset-0 bg-black/60 cursor-pointer"
+            onClick={() => setMobileOpen(false)}
+            role="button"
+            tabIndex={0}
+            aria-label="Close navigation menu"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setMobileOpen(false);
+              }
+            }}
+          />
           <aside className={`relative w-64 h-full border-r flex flex-col animate-slide-in-left ${
             isLight ? 'bg-white border-slate-200 text-slate-900' : 'bg-slate-950 border-slate-800/60 text-slate-100'
           }`}>

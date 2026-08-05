@@ -444,6 +444,15 @@ export function SpreadsheetImporter() {
           onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
           onDragLeave={() => setIsDragging(false)}
           onDrop={handleDrop}
+          role="button"
+          tabIndex={0}
+          aria-label="Upload CSV or Excel file"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              fileInputRef.current?.click();
+            }
+          }}
           className={`relative flex flex-col items-center justify-center gap-3 p-8 rounded-2xl border-2 border-dashed transition-all cursor-pointer ${
             isDragging
               ? 'border-indigo-400 bg-indigo-950/40 scale-[1.01]'

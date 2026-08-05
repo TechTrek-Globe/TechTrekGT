@@ -172,16 +172,81 @@ export function SettingsModal() {
   const [newPersonForm, setNewPersonForm] = useState({ name: '', role: 'Member', payFrequency: 'bi-weekly', grossPerPay: 0, netPerPay: 0, payDay1: 15, payDay2: 'last', payOffsetDays: 0 });
   const [newBillForm, setNewBillForm] = useState({ name: '', amount: 0, period: 'Monthly', accountId: budget.accounts[0]?.id || '', dueDay: 1, dueMonths: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], paymentSource: 'Auto Pay', notes: '' });
 
-  // Escape key handler to close settings modal
+  const settingsModalRef = useRef(null);
+  const addAccountModalRef = useRef(null);
+  const addPersonModalRef = useRef(null);
+  const addBillModalRef = useRef(null);
+
+  // Focus trap helper for modal keydown events
+  const trapFocus = (e, modalElement) => {
+    if (!modalElement) return;
+    const focusableElements = modalElement.querySelectorAll(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    const focusable = Array.from(focusableElements).filter(
+      el => !el.hasAttribute('disabled') && el.getAttribute('tabindex') !== '-1'
+    );
+    if (focusable.length === 0) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+
+    if (e.key === 'Tab') {
+      if (e.shiftKey) {
+        if (document.activeElement === first || !modalElement.contains(document.activeElement)) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (document.activeElement === last || !modalElement.contains(document.activeElement)) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    }
+  };
+
+  // Keyboard navigation & Focus trapping across main modal & sub-modals
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === 'Escape') {
-        setIsSettingsOpen(false);
+      if (isAddAccountModalOpen) {
+        if (e.key === 'Escape') {
+          setIsAddAccountModalOpen(false);
+          return;
+        }
+        trapFocus(e, addAccountModalRef.current);
+        return;
+      }
+
+      if (isAddPersonModalOpen) {
+        if (e.key === 'Escape') {
+          setIsAddPersonModalOpen(false);
+          return;
+        }
+        trapFocus(e, addPersonModalRef.current);
+        return;
+      }
+
+      if (isAddBillModalOpen) {
+        if (e.key === 'Escape') {
+          setIsAddBillModalOpen(false);
+          return;
+        }
+        trapFocus(e, addBillModalRef.current);
+        return;
+      }
+
+      if (isSettingsOpen) {
+        if (e.key === 'Escape') {
+          setIsSettingsOpen(false);
+          return;
+        }
+        trapFocus(e, settingsModalRef.current);
       }
     };
+
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [setIsSettingsOpen]);
+  }, [isSettingsOpen, isAddAccountModalOpen, isAddPersonModalOpen, isAddBillModalOpen, setIsSettingsOpen]);
 
   // Keep newBillForm accountId synced if current account list changes
   useEffect(() => {
@@ -382,6 +447,7 @@ export function SettingsModal() {
 
   return (
     <div
+      ref={settingsModalRef}
       role="dialog"
       aria-modal="true"
       aria-labelledby="settings-modal-title"
@@ -721,9 +787,15 @@ export function SettingsModal() {
               {/* Pop-up Modal: Add New Account */}
               {isAddAccountModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in overflow-y-auto">
-                  <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto my-auto">
+                  <div
+                    ref={addAccountModalRef}
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="add-account-modal-title"
+                    className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto my-auto"
+                  >
                     <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                      <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
+                      <h3 id="add-account-modal-title" className="text-base font-bold text-slate-100 flex items-center gap-2">
                         <div className="w-8 h-8 rounded-lg bg-blue-600/20 flex items-center justify-center text-blue-400">
                           <Plus className="w-4 h-4" />
                         </div>
@@ -1136,7 +1208,7 @@ export function SettingsModal() {
                                             <span className="text-emerald-400 font-mono font-bold text-xs block">
                                               ${paycheckPortion.toFixed(2)}
                                             </span>
-                                            <span className="text-[9px] text-slate-500 font-sans uppercase">
+                                            <span className="text-xs text-slate-500 font-sans uppercase">
                                               / {p.payFrequency === 'bi-weekly' ? 'check' : p.payFrequency === 'weekly' ? 'wk' : 'check'}
                                             </span>
                                           </div>
@@ -1182,9 +1254,15 @@ export function SettingsModal() {
               {/* Pop-up Modal: Add New Person */}
               {isAddPersonModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in overflow-y-auto">
-                  <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto my-auto">
+                  <div
+                    ref={addPersonModalRef}
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="add-person-modal-title"
+                    className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto my-auto"
+                  >
                     <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                      <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
+                      <h3 id="add-person-modal-title" className="text-base font-bold text-slate-100 flex items-center gap-2">
                         <div className="w-8 h-8 rounded-lg bg-purple-600/20 flex items-center justify-center text-purple-400">
                           <Plus className="w-4 h-4" />
                         </div>
@@ -1760,9 +1838,15 @@ export function SettingsModal() {
               {/* Pop-up Modal: Add New Bill */}
               {isAddBillModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in overflow-y-auto">
-                  <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto my-auto">
+                  <div
+                    ref={addBillModalRef}
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="add-bill-modal-title"
+                    className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto my-auto"
+                  >
                     <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                      <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
+                      <h3 id="add-bill-modal-title" className="text-base font-bold text-slate-100 flex items-center gap-2">
                         <div className="w-8 h-8 rounded-lg bg-emerald-600/20 flex items-center justify-center text-emerald-400">
                           <Plus className="w-4 h-4" />
                         </div>

@@ -41,17 +41,21 @@ import { CSS } from '@dnd-kit/utilities';
 const ACCOUNT_COLORS = ['#3b82f6', '#a855f7', '#10b981', '#f59e0b', '#ec4899', '#06b6d4'];
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-// Radial health gauge (SVG-based)
-function HealthGauge({ score }) {
+// Radial health gauge (SVG-based, memoized to prevent animation thrashing)
+const HealthGauge = React.memo(function HealthGauge({ score }) {
   const radius = 38;
   const circumference = 2 * Math.PI * radius;
-  const dashOffset = circumference - (score / 100) * circumference;
-  const color = score >= 70 ? '#10b981' : score >= 40 ? '#f59e0b' : '#f43f5e';
-  const label = score >= 70 ? 'Healthy' : score >= 40 ? 'Fair' : 'At Risk';
+  const dashOffset = useMemo(() => circumference - (score / 100) * circumference, [score, circumference]);
+  const color = useMemo(() => (score >= 70 ? '#10b981' : score >= 40 ? '#f59e0b' : '#f43f5e'), [score]);
+  const label = useMemo(() => (score >= 70 ? 'Healthy' : score >= 40 ? 'Fair' : 'At Risk'), [score]);
 
   return (
-    <div className="flex flex-col items-center justify-center gap-1">
-      <svg width="90" height="90" viewBox="0 0 100 100" className="-rotate-90">
+    <div
+      className="flex flex-col items-center justify-center gap-1"
+      role="img"
+      aria-label={`Budget health score: ${score} out of 100 (${label})`}
+    >
+      <svg width="90" height="90" viewBox="0 0 100 100" className="-rotate-90" aria-hidden="true">
         <circle cx="50" cy="50" r={radius} fill="none" stroke="#1e293b" strokeWidth="8" />
         <circle
           cx="50" cy="50" r={radius}
@@ -66,11 +70,11 @@ function HealthGauge({ score }) {
       </svg>
       <div className="text-center -mt-14">
         <span className="text-xl font-black font-mono" style={{ color }}>{score}</span>
-        <p className="text-[9px] font-semibold" style={{ color }}>{label}</p>
+        <p className="text-xs font-semibold" style={{ color }}>{label}</p>
       </div>
     </div>
   );
-}
+});
 
 // Draggable Sortable Dashboard Widget Item
 function SortableDashboardWidget({
@@ -145,36 +149,39 @@ function SortableDashboardWidget({
             <button
               type="button"
               onClick={() => handlePresetWidth(widget.id, 'third')}
-              className={`px-1.5 py-0.5 text-[9px] font-bold rounded ${
+              className={`px-1.5 py-0.5 text-xs font-bold rounded ${
                 currentWidth === 'third' && !customSize.customWidth
                   ? 'bg-blue-600 text-white'
                   : isLight ? 'text-slate-600 hover:text-slate-900' : 'text-slate-400 hover:text-slate-200'
               }`}
               title="Make Box Small (1/3 Width Side Card)"
+              aria-label="Set widget width to 1/3 small"
             >
               1/3
             </button>
             <button
               type="button"
               onClick={() => handlePresetWidth(widget.id, 'half')}
-              className={`px-1.5 py-0.5 text-[9px] font-bold rounded ${
+              className={`px-1.5 py-0.5 text-xs font-bold rounded ${
                 currentWidth === 'half' && !customSize.customWidth
                   ? 'bg-blue-600 text-white'
                   : isLight ? 'text-slate-600 hover:text-slate-900' : 'text-slate-400 hover:text-slate-200'
               }`}
               title="Make Box Medium (1/2 Width)"
+              aria-label="Set widget width to 1/2 medium"
             >
               1/2
             </button>
             <button
               type="button"
               onClick={() => handlePresetWidth(widget.id, 'full')}
-              className={`px-1.5 py-0.5 text-[9px] font-bold rounded ${
+              className={`px-1.5 py-0.5 text-xs font-bold rounded ${
                 currentWidth === 'full' && !customSize.customWidth
                   ? 'bg-blue-600 text-white'
                   : isLight ? 'text-slate-600 hover:text-slate-900' : 'text-slate-400 hover:text-slate-200'
               }`}
               title="Make Box Full Width"
+              aria-label="Set widget width to full width"
             >
               Full
             </button>
@@ -507,11 +514,12 @@ export function DashboardView() {
                   key={acc.id}
                   className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-2.5 hover:border-slate-700 transition-all"
                   style={{ borderLeftColor: accentColor, borderLeftWidth: '4px' }}
+                  aria-label={`Account summary for ${acc.name}`}
                 >
                   <div className="flex items-start justify-between">
                     <div>
                       <h4 className="text-xs font-bold text-slate-200">{acc.name}</h4>
-                      <span className="text-[10px] text-slate-500 capitalize">{acc.type}</span>
+                      <span className="text-xs text-slate-500 capitalize">{acc.type}</span>
                     </div>
                     <div className="text-right">
                       <InlineEdit
@@ -520,7 +528,7 @@ export function DashboardView() {
                         onCommit={v => updateAccount(acc.id, { startingBalance: v })}
                         className="text-xs font-black text-slate-100 font-mono justify-end"
                       />
-                      <span className="text-[9px] text-slate-500 block mt-0.5">Current Balance</span>
+                      <span className="text-xs text-slate-500 block mt-0.5">Current Balance</span>
                     </div>
                   </div>
 
@@ -529,7 +537,7 @@ export function DashboardView() {
                     <div className="text-right">
                       <span className="text-rose-400 font-bold">{fmtMoney(actualCost)}</span>
                       {hasActualOverride && (
-                        <span className="text-[9px] text-slate-500 block font-sans">Proj: {fmtMoney(monthlyCost)}</span>
+                        <span className="text-xs text-slate-500 block font-sans">Proj: {fmtMoney(monthlyCost)}</span>
                       )}
                     </div>
                   </div>
@@ -553,11 +561,11 @@ export function DashboardView() {
               <div key={bill.id} className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80 flex items-center justify-between gap-2 text-xs">
                 <div className="min-w-0">
                   <h4 className="font-bold text-slate-200 truncate text-[11px]">{bill.name}</h4>
-                  <p className="text-[10px] text-slate-400">{bill.dueDateFormatted}</p>
+                  <p className="text-xs text-slate-400">{bill.dueDateFormatted}</p>
                 </div>
                 <div className="text-right flex-shrink-0">
                   <span className="font-bold text-rose-400 font-mono text-[11px] block">{fmtMoney(bill.monthlyCost)}</span>
-                  <span className={`inline-block text-[8px] px-1.5 py-0.2 rounded font-bold mt-0.5 ${
+                  <span className={`inline-block text-xs px-1.5 py-0.2 rounded font-bold mt-0.5 ${
                     bill.daysUntilDue <= 3
                       ? 'bg-rose-950 text-rose-300 border border-rose-800'
                       : 'bg-amber-950 text-amber-300 border border-amber-800'
@@ -587,11 +595,12 @@ export function DashboardView() {
                 <p className="text-xs text-slate-500 text-center py-10">No expense data</p>
               )}
             </div>
-            <div className="grid grid-cols-2 gap-1.5 pt-2 border-t border-slate-800 text-[11px]">
+            <div className="grid grid-cols-2 gap-1.5 pt-2 border-t border-slate-800 text-[11px]" aria-label="Expenses by account legend">
               {accountChartData.map((d, i) => (
                 <div key={i} className="flex items-center justify-between p-1.5 bg-slate-900/60 rounded-lg">
                   <div className="flex items-center gap-1.5 truncate">
-                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: d.color }} />
+                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: d.color }} aria-hidden="true" />
+                    <span className="sr-only">Indicator color for {d.name}: </span>
                     <span className="text-slate-300 font-medium truncate">{d.name}</span>
                   </div>
                   <span className="font-mono text-slate-200 font-bold">{fmtMoney(d.value)}</span>
@@ -684,7 +693,7 @@ export function DashboardView() {
                   <div key={p.id} className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2.5 text-xs">
                     <div className="flex items-center justify-between">
                       <h4 className="font-bold text-slate-200">{p.name}</h4>
-                      <span className="text-[9px] px-2 py-0.5 rounded-full bg-purple-950 text-purple-300 border border-purple-800 font-semibold capitalize">
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-purple-950 text-purple-300 border border-purple-800 font-semibold capitalize">
                         {p.payFrequency}
                       </span>
                     </div>
@@ -730,9 +739,9 @@ export function DashboardView() {
                                 <span className="font-sans text-slate-400 truncate max-w-[140px]">{acc.name}:</span>
                                 <div className="text-right">
                                   <span className="font-bold text-emerald-400">{fmtMoney(depositAmt)}</span>
-                                  {isRemaining && <span className="text-[9px] text-emerald-300/80 font-normal ml-1">(Remaining)</span>}
+                                  {isRemaining && <span className="text-xs text-emerald-300/80 font-normal ml-1">(Remaining)</span>}
                                   {p.payFrequency !== 'monthly' && (
-                                    <span className="text-[9px] text-slate-400 font-normal ml-1.5">({fmtMoney(monthlyAccDeposit)}/mo)</span>
+                                    <span className="text-xs text-slate-400 font-normal ml-1.5">({fmtMoney(monthlyAccDeposit)}/mo)</span>
                                   )}
                                 </div>
                               </div>
@@ -887,7 +896,7 @@ export function DashboardView() {
                     <span className="font-sans font-bold text-purple-300 text-[12px]">{group.label}</span>
                     <span className="font-bold text-emerald-400 text-[12px]">
                       {fmtMoney(group.totalMonthlyCost)}
-                      <span className="text-[9px] text-slate-400 font-normal font-sans ml-1">/ mo ({itemsCountText})</span>
+                      <span className="text-xs text-slate-400 font-normal font-sans ml-1">/ mo ({itemsCountText})</span>
                     </span>
                   </div>
 
@@ -908,7 +917,7 @@ export function DashboardView() {
                           <span className="font-sans text-slate-400 font-medium">{pName}:</span>
                           <span className="font-bold text-slate-200">
                             {fmtMoney(portionAmt)}
-                            <span className="text-[9px] text-slate-400 font-normal ml-1">/mo</span>
+                            <span className="text-xs text-slate-400 font-normal ml-1">/mo</span>
                             {isNonMonthly && (
                               <span className="text-[9px] text-blue-300 font-normal ml-1.5">
                                 ({fmtMoney(perPaycheckAmt)}/pay)

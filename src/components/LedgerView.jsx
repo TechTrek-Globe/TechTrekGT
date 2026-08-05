@@ -852,7 +852,7 @@ function DailySpreadsheetMatrix() {
           {/* Header Row 1 & 2: Sticky Tier 2 */}
           <thead>
             {/* Header Row 1: Category Banners & Spanning Headers */}
-            <tr className="bg-slate-950 text-slate-300 uppercase font-extrabold text-[9px] tracking-wider h-6">
+            <tr className="bg-slate-950 text-slate-300 uppercase font-extrabold text-xs tracking-wider h-6">
               {/* Date & Day (Frozen Left Spanning Both Rows) */}
               <th rowSpan={2} className="p-1 min-w-[90px] w-[90px] max-w-[90px] bg-slate-950 text-slate-200 font-bold sticky left-0 top-0 z-50 align-middle text-center border-b-2 border-blue-500 shadow-[2px_0_5px_rgba(0,0,0,0.5)]">
                 Date
@@ -868,7 +868,7 @@ function DailySpreadsheetMatrix() {
               <th colSpan={showExtraColumns ? 2 : 1} className="p-1 text-center border-r border-slate-800 bg-purple-950 text-purple-300 sticky top-0 z-40">Ending Balances</th>
               {/* Sticky Right Column: Total End Spanning Both Rows */}
               <th rowSpan={2} className="p-1 min-w-[85px] w-[85px] max-w-[85px] bg-slate-950 text-blue-300 font-black sticky right-0 top-0 z-50 align-middle text-right border-b-2 border-blue-500 border-l border-slate-700 shadow-[-4px_0_8px_rgba(0,0,0,0.5)]">
-                <div className="flex flex-col items-end leading-tight text-[9px]">
+                <div className="flex flex-col items-end leading-tight text-xs">
                   <span>Total</span>
                   <span>End</span>
                 </div>
@@ -876,17 +876,17 @@ function DailySpreadsheetMatrix() {
             </tr>
 
             {/* Header Row 2: Individual Columns (Stacked titles) */}
-            <tr className="bg-slate-950 text-slate-300 font-bold text-[9px] h-11">
+            <tr className="bg-slate-950 text-slate-300 font-bold text-xs h-11">
               {/* Beg Balances */}
               <th className="p-1 text-right min-w-[65px] bg-blue-950 text-blue-200 font-extrabold border-r border-blue-900/60 align-middle sticky top-[24px] z-40 border-b-2 border-blue-500">
-                <div className="flex flex-col items-end leading-tight text-[9px]">
+                <div className="flex flex-col items-end leading-tight text-xs">
                   <span>Beg</span>
                   <span>Bal</span>
                 </div>
               </th>
               {showExtraColumns && (
                 <th className="p-1 text-right min-w-[65px] border-r-2 border-blue-600 bg-blue-950 text-blue-200 font-extrabold align-middle sticky top-[24px] z-40 border-b-2 border-blue-500">
-                  <div className="flex flex-col items-end leading-tight text-[9px]">
+                  <div className="flex flex-col items-end leading-tight text-xs">
                     <span>Extra</span>
                     <span>Beg</span>
                   </div>
@@ -896,7 +896,7 @@ function DailySpreadsheetMatrix() {
               {/* Credits */}
               {people.map(p => (
                 <th key={`hdr-cred-${p.id}`} className="p-1 text-right min-w-[60px] text-emerald-400 bg-emerald-950 align-middle sticky top-[24px] z-40 border-b-2 border-blue-500">
-                  <div className="flex flex-col items-end leading-tight text-[9px]">
+                  <div className="flex flex-col items-end leading-tight text-xs">
                     <span>{p.name.split(' ')[0]}</span>
                     <span>Credit</span>
                   </div>
@@ -904,7 +904,7 @@ function DailySpreadsheetMatrix() {
               ))}
               {showExtraColumns && people.map(p => (
                 <th key={`hdr-ext-cred-${p.id}`} className="p-1 text-right min-w-[60px] text-emerald-300 bg-emerald-950 border-r border-slate-800 align-middle sticky top-[24px] z-40 border-b-2 border-blue-500">
-                  <div className="flex flex-col items-end leading-tight text-[9px]">
+                  <div className="flex flex-col items-end leading-tight text-xs">
                     <span>{p.name.split(' ')[0]}</span>
                     <span>Extra</span>
                   </div>
@@ -922,18 +922,18 @@ function DailySpreadsheetMatrix() {
                   >
                     <Archive className="w-2.5 h-2.5" />
                   </button>
-                  <div className="flex flex-col items-end leading-tight text-right text-[9px] w-full" title={b.name}>
+                  <div className="flex flex-col items-end leading-tight text-right text-xs w-full" title={b.name}>
                     <span className="block truncate max-w-[85px] font-bold">{b.name}</span>
                   </div>
                 </th>
               ))}
               <th className="p-1 text-right min-w-[55px] text-rose-300 bg-rose-950 align-middle sticky top-[24px] z-40 border-b-2 border-blue-500">
-                <div className="flex flex-col items-end leading-tight text-[9px]">
+                <div className="flex flex-col items-end leading-tight text-xs">
                   <span>Other</span>
                 </div>
               </th>
               <th className="p-1 text-left min-w-[90px] text-rose-300 bg-rose-950 border-r border-slate-800 align-middle sticky top-[24px] z-40 border-b-2 border-blue-500">
-                <div className="flex flex-col items-start leading-tight text-[9px]">
+                <div className="flex flex-col items-start leading-tight text-xs">
                   <span>Other</span>
                   <span>Desc</span>
                 </div>
@@ -941,14 +941,14 @@ function DailySpreadsheetMatrix() {
 
               {/* Ending Balances */}
               <th className="p-1 text-right min-w-[65px] text-slate-200 bg-purple-950 align-middle sticky top-[24px] z-40 border-b-2 border-blue-500">
-                <div className="flex flex-col items-end leading-tight text-[9px]">
+                <div className="flex flex-col items-end leading-tight text-xs">
                   <span>Reg</span>
                   <span>Ending</span>
                 </div>
               </th>
               {showExtraColumns && (
                 <th className="p-1 text-right min-w-[65px] text-slate-200 bg-purple-950 border-r border-slate-800 align-middle sticky top-[24px] z-40 border-b-2 border-blue-500">
-                  <div className="flex flex-col items-end leading-tight text-[9px]">
+                  <div className="flex flex-col items-end leading-tight text-xs">
                     <span>Extra</span>
                     <span>Ending</span>
                   </div>
@@ -1003,7 +1003,7 @@ function DailySpreadsheetMatrix() {
                         <div className="flex items-center justify-between gap-1">
                           <span>{row.dateFormatted}</span>
                           {row.isToday && (
-                            <span className="px-1 py-0.2 rounded bg-amber-400 text-slate-950 text-[8px] font-black uppercase tracking-wider animate-pulse flex-shrink-0">
+                            <span className="px-1 py-0.2 rounded bg-amber-400 text-slate-950 text-xs font-black uppercase tracking-wider animate-pulse flex-shrink-0">
                               NOW
                             </span>
                           )}
@@ -1014,7 +1014,7 @@ function DailySpreadsheetMatrix() {
                       <td className={`p-1 whitespace-nowrap min-w-[48px] w-[48px] max-w-[48px] border-r border-slate-700 sticky left-[90px] z-20 shadow-[4px_0_8px_rgba(0,0,0,0.5)] ${
                         row.isToday ? 'bg-amber-950 text-amber-300 border-y border-y-amber-400/80' : 'bg-slate-900 text-slate-300'
                       }`}>
-                        <span className={`px-1 py-0.5 rounded text-[9px] ${
+                        <span className={`px-1 py-0.5 rounded text-xs ${
                           row.isToday
                             ? 'bg-amber-400 text-slate-950 font-black shadow-md'
                             : row.isPayday

@@ -230,7 +230,7 @@ export function AccountTransferSummary() {
                       <button
                         type="button"
                         onClick={() => togglePersonMode(p.id, mode)}
-                        className="text-[9px] font-mono text-emerald-400 hover:text-emerald-200 underline transition-colors"
+                        className="text-xs font-mono text-emerald-400 hover:text-emerald-200 underline transition-colors"
                         title="Click to toggle between Monthly and Per-Paycheck target"
                       >
                         ({labelText})

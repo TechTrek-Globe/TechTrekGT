@@ -1,7 +1,8 @@
 import React from 'react';
 import { useBudget } from '../context/BudgetContext';
 import { useAuth } from '../context/AuthContext';
-import headerLogo from '../assets/header-logo.png';
+import headerLogoDark from '../assets/header-logo-dark.png';
+import headerLogoLight from '../assets/header-logo-light.png';
 import { 
   LayoutDashboard, 
   ReceiptText, 
@@ -30,10 +31,13 @@ export function Navbar() {
     getTotalMonthlyNetIncome,
     getTotalMonthlyExpenses,
     getTotalCashOnHand,
-    resetToDefaults
+    resetToDefaults,
+    theme
   } = useBudget();
 
   const { user, setIsAuthModalOpen, logout } = useAuth();
+
+  const logoSrc = theme === 'light' ? headerLogoLight : headerLogoDark;
 
   const netIncome = getTotalMonthlyNetIncome();
   const expenses = getTotalMonthlyExpenses();
@@ -66,7 +70,7 @@ export function Navbar() {
           
           {/* Logo & Branding */}
           <div className="flex items-center">
-            <img src={headerLogo} alt="TechTrek Finance Logo" className="h-12 w-auto max-w-[220px] object-contain drop-shadow-md" />
+            <img src={logoSrc} alt="TechTrek Finance Logo" className="h-12 w-auto max-w-[220px] object-contain drop-shadow-md" />
           </div>
 
           {/* Person View Selector & Auth Actions */}

@@ -18,7 +18,8 @@ import {
   Globe
 } from 'lucide-react';
 
-import headerLogo from '../assets/header-logo.png';
+import headerLogoDark from '../assets/header-logo-dark.png';
+import headerLogoLight from '../assets/header-logo-light.png';
 
 const NAV_ITEMS = [
   { id: 'dashboard',   label: 'Dashboard',            icon: LayoutDashboard, color: 'text-blue-400' },
@@ -30,25 +31,27 @@ const NAV_ITEMS = [
 
 const SIDEBAR_KEY = 'trekledger_sidebar_collapsed';
 
-const SidebarContent = ({ collapsed, activeView, cashOnHand, netIncome, netFlow, setActiveView, setIsSettingsOpen, onClose }) => (
-  <div className="flex flex-col h-full">
-    {/* Logo */}
-    <div className={`flex items-center border-b border-slate-800/60 ${collapsed ? 'justify-center px-3 py-3' : 'p-0'}`}>
-      {collapsed ? (
-        <div className="w-10 h-10 overflow-hidden flex items-center justify-center rounded-xl" title="TechTrek Finance">
-          <img src={headerLogo} alt="TechTrek Finance" className="h-12 w-12 object-cover object-left" style={{ mixBlendMode: 'multiply' }} />
-        </div>
-      ) : (
-        <div className="animate-fade-in flex items-center w-full overflow-hidden">
-          <img src={headerLogo} alt="TechTrek Finance Logo" className="w-full h-auto object-cover" style={{ mixBlendMode: 'multiply' }} />
-        </div>
-      )}
-      {onClose && (
-        <button onClick={onClose} aria-label="Close navigation menu" className="absolute top-3 right-3 p-1 text-slate-400 hover:text-slate-200 rounded-lg">
-          <X className="w-4 h-4" />
-        </button>
-      )}
-    </div>
+const SidebarContent = ({ collapsed, activeView, cashOnHand, netIncome, netFlow, setActiveView, setIsSettingsOpen, onClose, isLight = false }) => {
+  const logoSrc = isLight ? headerLogoLight : headerLogoDark;
+  return (
+    <div className="flex flex-col h-full">
+      {/* Logo */}
+      <div className={`flex items-center border-b border-slate-800/60 ${collapsed ? 'justify-center p-2' : 'p-1'}`}>
+        {collapsed ? (
+          <div className="w-10 h-10 overflow-hidden flex items-center justify-center rounded-xl" title="TechTrek Finance">
+            <img src={logoSrc} alt="TechTrek Finance" className="h-12 w-12 object-cover object-left" />
+          </div>
+        ) : (
+          <div className="animate-fade-in flex items-center w-full overflow-hidden">
+            <img src={logoSrc} alt="TechTrek Finance Logo" className="w-full h-auto object-contain filter drop-shadow-md" />
+          </div>
+        )}
+        {onClose && (
+          <button onClick={onClose} aria-label="Close navigation menu" className="absolute top-3 right-3 p-1 text-slate-400 hover:text-slate-200 rounded-lg">
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
 
     {/* Nav Items */}
     <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto sidebar-scroll">
@@ -107,7 +110,8 @@ const SidebarContent = ({ collapsed, activeView, cashOnHand, netIncome, netFlow,
       </div>
     )}
   </div>
-);
+  );
+};
 
 export function AppLayout({ children, onNavigateHome }) {
   const {
@@ -162,6 +166,7 @@ export function AppLayout({ children, onNavigateHome }) {
           cashOnHand={cashOnHand}
           netIncome={netIncome}
           netFlow={netFlow}
+          isLight={isLight}
           setActiveView={setActiveView}
           setIsSettingsOpen={setIsSettingsOpen}
         />

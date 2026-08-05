@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { AuthProvider } from './context/AuthContext';
-import { BudgetProvider, useBudget } from './context/BudgetContext';
+import { BudgetMetadataProvider } from './context/BudgetMetadataContext';
+import { LedgerDataProvider } from './context/LedgerDataContext';
+import { useBudget } from './context/BudgetContext';
 import { AppLayout } from './components/AppLayout';
 import { SettingsModal } from './components/SettingsModal';
 import { SettingsView } from './components/SettingsView';
@@ -126,11 +128,13 @@ export default function App() {
         <LandingPage onNavigate={navigateTo} />
       ) : (
         <AuthProvider>
-          <BudgetProvider>
-            <AppLayout onNavigateHome={() => navigateTo('/')}>
-              <MainContent />
-            </AppLayout>
-          </BudgetProvider>
+          <BudgetMetadataProvider>
+            <LedgerDataProvider>
+              <AppLayout onNavigateHome={() => navigateTo('/')}>
+                <MainContent />
+              </AppLayout>
+            </LedgerDataProvider>
+          </BudgetMetadataProvider>
         </AuthProvider>
       )}
     </ErrorBoundary>

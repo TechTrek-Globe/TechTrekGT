@@ -884,29 +884,16 @@ export function SettingsView() {
           {/* SETUP: BILLS & SPLITS */}
           {(settingsTab === 'bills' || settingsTab === 'splits') && (
             <div className="space-y-6">
-              {/* Bills Header Bar */}
-              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setBillsSubView('list')}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                      billsSubView === 'list' ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-900 text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    <Receipt className="w-3.5 h-3.5" />
-                    Bill List
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setBillsSubView('splits')}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                      billsSubView === 'splits' ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-900 text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    <PieChart className="w-3.5 h-3.5" />
-                    Split % Matrix
-                  </button>
+              {/* Bills Header & Info Bar */}
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                    <Receipt className="w-4 h-4 text-emerald-400" />
+                    Unified Bills & Earner Splits Manager
+                  </h3>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Manage recurring bills, due dates, assigned accounts, and responsible earner splits in one place.
+                  </p>
                 </div>
                 <button
                   type="button"
@@ -918,254 +905,185 @@ export function SettingsView() {
                 </button>
               </div>
 
-              {/* Bills List Sub-View */}
-              {billsSubView === 'list' && (
-                <div className="space-y-6">
-                  {displayAccounts.map(account => {
-                    const accountBills = budget.bills.filter(b => 
-                      (account.id === 'unassigned' ? !knownAccountIds.has(b.accountId) : b.accountId === account.id) && 
-                      (billFilterTab === 'archived' ? b.isArchived : !b.isArchived)
-                    );
-                    const accountTotal = accountBills.reduce((sum, b) => {
-                      const amt = b.amount || 0;
-                      return sum + (b.period === 'Annual' ? amt / 12 : b.period === 'Semi-Annual' ? amt / 6 : amt);
-                    }, 0);
+              {/* Unified Bills Manager Table Grouped by Account */}
+              <div className="space-y-6">
+                {displayAccounts.map(account => {
+                  const accountBills = budget.bills.filter(b => 
+                    (account.id === 'unassigned' ? !knownAccountIds.has(b.accountId) : b.accountId === account.id) && 
+                    (billFilterTab === 'archived' ? b.isArchived : !b.isArchived)
+                  );
+                  const accountTotal = accountBills.reduce((sum, b) => {
+                    const amt = b.amount || 0;
+                    return sum + (b.period === 'Annual' ? amt / 12 : b.period === 'Semi-Annual' ? amt / 6 : amt);
+                  }, 0);
 
-                    return (
-                      <div key={account.id} className="rounded-xl border border-slate-800 glass-card overflow-hidden">
-                        <div className="bg-slate-900/95 px-4 py-2.5 border-b border-slate-800 flex items-center justify-between">
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-                            <h4 className="text-xs font-bold text-slate-200">{account.name}</h4>
-                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 capitalize">{account.type}</span>
-                          </div>
-                          <span className="text-xs text-slate-400">
-                            Subtotal: <span className="font-bold text-rose-400 font-mono">${accountTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/mo</span>
-                          </span>
+                  return (
+                    <div key={account.id} className="rounded-xl border border-slate-800 glass-card overflow-hidden">
+                      <div className="bg-slate-900/95 px-4 py-2.5 border-b border-slate-800 flex items-center justify-between">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+                          <h4 className="text-xs font-bold text-slate-200">{account.name}</h4>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 capitalize">{account.type}</span>
+                          <span className="text-[10px] text-slate-500">({accountBills.length} bill{accountBills.length !== 1 ? 's' : ''})</span>
                         </div>
+                        <span className="text-xs text-slate-400">
+                          Account Subtotal: <span className="font-bold text-rose-400 font-mono">${accountTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/mo</span>
+                        </span>
+                      </div>
 
-                        <div className="overflow-x-auto matrix-scrollbar">
-                          <table className="w-full text-left text-[11px] text-slate-300 table-fixed">
-                            <thead className="bg-slate-900 text-slate-400 uppercase font-medium text-[9px] border-b border-slate-800">
+                      <div className="overflow-x-auto matrix-scrollbar">
+                        <table className="w-full text-left text-[11px] text-slate-300">
+                          <thead className="bg-slate-900 text-slate-400 uppercase font-medium text-[9px] border-b border-slate-800">
+                            <tr>
+                              <th className="px-2 py-2 w-[22%]">Bill Name</th>
+                              <th className="px-2 py-2 w-[11%]">Amount ($)</th>
+                              <th className="px-2 py-2 w-[12%]">Frequency</th>
+                              <th className="px-2 py-2 w-[10%]">Due Day</th>
+                              <th className="px-2 py-2 w-[18%]">Assigned Account</th>
+                              <th className="px-2 py-2 w-[22%]">Responsible / Split</th>
+                              <th className="px-2 py-2 w-[5%] text-right">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-800 bg-slate-950/40">
+                            {accountBills.length === 0 ? (
                               <tr>
-                                <th className="px-2 py-1.5 w-[35%] sm:w-[38%]">Bill Name</th>
-                                <th className="px-1 py-1.5 w-[12%] sm:w-[10%]">Amount</th>
-                                <th className="px-1 py-1.5 w-[14%] sm:w-[12%]">Period</th>
-                                <th className="px-1 py-1.5 w-[24%] sm:w-[25%]">Assigned Account</th>
-                                <th className="px-1 py-1.5 w-[10%] sm:w-[10%]">Due Day</th>
-                                <th className="px-2 py-1.5 w-[5%] text-right">Actions</th>
+                                <td colSpan={7} className="p-4 text-center text-slate-500 italic text-xs">
+                                  No bills assigned to this account
+                                </td>
                               </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-800 bg-slate-950/40">
-                              {accountBills.length === 0 ? (
-                                <tr>
-                                  <td colSpan={6} className="p-3 text-center text-slate-500 italic text-xs">
-                                    No bills assigned to this account
+                            ) : (
+                              accountBills.map(bill => (
+                                <tr key={bill.id} className="hover:bg-slate-900/60 transition-colors">
+                                  <td className="px-2 py-1.5 font-semibold text-slate-200">
+                                    <input
+                                      type="text"
+                                      value={bill.name}
+                                      onChange={e => updateBill(bill.id, { name: e.target.value })}
+                                      className="bg-transparent border-b border-transparent hover:border-slate-700 focus:border-emerald-500 focus:outline-none w-full truncate text-xs"
+                                    />
                                   </td>
-                                </tr>
-                              ) : (
-                                accountBills.map(bill => (
-                                  <tr key={bill.id} className="hover:bg-slate-900/60 transition-colors">
-                                    <td className="px-2 py-1 font-semibold text-slate-200">
-                                      <input
-                                        type="text"
-                                        value={bill.name}
-                                        onChange={e => updateBill(bill.id, { name: e.target.value })}
-                                        className="bg-transparent border-b border-transparent hover:border-slate-700 focus:border-emerald-500 focus:outline-none w-full min-w-[60px] truncate"
-                                      />
-                                    </td>
-                                    <td className="px-1 py-1 font-mono">
+                                  <td className="px-2 py-1.5 font-mono">
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      value={bill.amount}
+                                      onChange={e => updateBill(bill.id, { amount: parseFloat(e.target.value) || 0 })}
+                                      className="w-16 bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-slate-200 font-mono text-xs focus:border-emerald-500 focus:outline-none"
+                                    />
+                                  </td>
+                                  <td className="px-2 py-1.5">
+                                    <select
+                                      value={bill.period || 'Monthly'}
+                                      onChange={e => updateBill(bill.id, { period: e.target.value })}
+                                      className="w-full bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-slate-200 text-[11px] truncate focus:border-emerald-500 focus:outline-none"
+                                    >
+                                      <option value="Monthly">Monthly</option>
+                                      <option value="Quarterly">Quarterly</option>
+                                      <option value="Semi-Annual">Semi-Annual</option>
+                                      <option value="Annual">Annual</option>
+                                    </select>
+                                  </td>
+                                  <td className="px-2 py-1.5 font-mono text-xs">
+                                    <div className="flex items-center gap-1">
+                                      <span className="text-slate-400 text-[10px]">Day</span>
                                       <input
                                         type="number"
-                                        step="0.01"
-                                        value={bill.amount}
-                                        onChange={e => updateBill(bill.id, { amount: parseFloat(e.target.value) || 0 })}
-                                        className="w-14 sm:w-16 bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-slate-200 font-mono text-[10px]"
+                                        min="1"
+                                        max="31"
+                                        value={bill.dueDay || 1}
+                                        onChange={e => updateBill(bill.id, { dueDay: parseInt(e.target.value, 10) || 1 })}
+                                        className="w-10 bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-slate-200 text-center font-mono text-[11px] focus:border-emerald-500 focus:outline-none"
                                       />
-                                    </td>
-                                    <td className="px-1 py-1">
-                                      <select
-                                        value={bill.period}
-                                        onChange={e => updateBill(bill.id, { period: e.target.value })}
-                                        className="w-16 sm:w-20 bg-slate-900 border border-slate-700 rounded px-0.5 py-0.5 text-slate-200 text-[10px] truncate"
-                                      >
-                                        <option value="Monthly">Monthly</option>
-                                        <option value="Quarterly">Quarterly</option>
-                                        <option value="Semi-Annual">Semi-Annual</option>
-                                        <option value="Annual">Annual</option>
-                                      </select>
-                                    </td>
-                                    <td className="px-1 py-1">
-                                      <select
-                                        value={bill.accountId}
-                                        onChange={e => updateBill(bill.id, { accountId: e.target.value })}
-                                        className="w-full max-w-[110px] sm:max-w-[150px] bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-slate-200 text-[10px] truncate"
-                                      >
-                                        {budget.accounts.map(acc => (
-                                          <option key={acc.id} value={acc.id}>{acc.name}</option>
-                                        ))}
-                                      </select>
-                                    </td>
-                                    <td className="px-1 py-1 font-mono text-[10px] whitespace-nowrap">
-                                      Day {bill.dueDay}
-                                    </td>
-                                    <td className="px-2 py-1.5 text-right">
-                                      <button
-                                        type="button"
-                                        onClick={() => deleteBill(bill.id)}
-                                        className="p-1 text-slate-500 hover:text-rose-400 rounded transition-colors"
-                                      >
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                      </button>
-                                    </td>
-                                  </tr>
-                                ))
-                              )}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* SPLIT MATRIX VIEW */}
-              {billsSubView === 'splits' && (
-                <div className="space-y-6">
-                  <div className="p-4 rounded-xl bg-blue-950/40 border border-blue-800/60 text-xs text-blue-200 flex items-center justify-between">
-                    <div>
-                      <span className="font-semibold">Dynamic Household Bill Split Engine:</span> Define what percentage of each bill is split between members.
-                    </div>
-                  </div>
-
-                  {/* Bills Split Matrix Grouped by Assigned Account */}
-                  <div className="space-y-6">
-                    {displayAccounts.map(account => {
-                      const accountBills = budget.bills.filter(b => 
-                        account.id === 'unassigned' ? !knownAccountIds.has(b.accountId) : b.accountId === account.id
-                      );
-                      const accountTotal = accountBills.reduce((sum, b) => {
-                        const amt = b.amount || 0;
-                        return sum + (b.period === 'Annual' ? amt / 12 : b.period === 'Semi-Annual' ? amt / 6 : amt);
-                      }, 0);
-
-                      return (
-                        <div key={account.id} className="rounded-xl border border-slate-800 glass-card overflow-hidden">
-                          {/* Account Sticky Header Bar */}
-                          <div className="sticky top-0 z-20 bg-slate-900/95 backdrop-blur-md px-4 py-2.5 border-b border-slate-800 flex items-center justify-between">
-                            <div className="flex items-center gap-2.5">
-                              <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-                              <h4 className="text-xs font-bold text-slate-200">{account.name}</h4>
-                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 capitalize">{account.type}</span>
-                            </div>
-                            <span className="text-xs text-slate-400">
-                              Subtotal: <span className="font-bold text-rose-400 font-mono">${accountTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/mo</span>
-                            </span>
-                          </div>
-
-                          {/* Account Splits Table */}
-                          <div className="overflow-x-auto matrix-scrollbar">
-                            <table className="w-full text-left text-xs text-slate-300 min-w-[700px]">
-                              <thead className="bg-slate-900 text-slate-400 uppercase font-medium text-[10px] border-b border-slate-800">
-                                <tr>
-                                  <th className="p-3">Bill Name</th>
-                                  <th className="p-3">Monthly Cost</th>
-                                  {budget.people.map(p => (
-                                    <th key={p.id} className="p-3 text-center">{p.name} Split (%)</th>
-                                  ))}
-                                  <th className="p-3 text-center">Status</th>
-                                  <th className="p-3 text-right">Quick Presets</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-slate-800 bg-slate-950/40">
-                                {accountBills.length === 0 ? (
-                                  <tr>
-                                    <td colSpan={4 + budget.people.length} className="p-3 text-center text-slate-500 italic">
-                                      No bills assigned to this account
-                                    </td>
-                                  </tr>
-                                ) : (
-                                  accountBills.map(bill => {
-                                    const totalPct = budget.people.reduce((sum, p) => sum + (parseFloat(bill.splits?.[p.id]) || 0), 0);
-                                    const isValid = Math.abs(totalPct - 100) < 0.1;
-
-                                    return (
-                                      <tr key={bill.id} className="hover:bg-slate-900/60 transition-colors">
-                                        <td className="p-3 font-semibold text-slate-200">{bill.name}</td>
-                                        <td className="p-3 font-mono">${(bill.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                                        {budget.people.map(p => (
-                                          <td key={p.id} className="p-3 text-center">
-                                            <div className="inline-flex items-center gap-1">
+                                    </div>
+                                  </td>
+                                  <td className="px-2 py-1.5">
+                                    <select
+                                      value={bill.accountId}
+                                      onChange={e => updateBill(bill.id, { accountId: e.target.value })}
+                                      className="w-full bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-slate-200 text-[11px] truncate focus:border-emerald-500 focus:outline-none"
+                                    >
+                                      {budget.accounts.map(acc => (
+                                        <option key={acc.id} value={acc.id}>{acc.name}</option>
+                                      ))}
+                                    </select>
+                                  </td>
+                                  <td className="px-2 py-1.5">
+                                    <div className="flex flex-col gap-1">
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        {budget.people.map(p => {
+                                          const val = bill.splits?.[p.id] ?? (100 / (budget.people.length || 1));
+                                          return (
+                                            <div key={p.id} className="inline-flex items-center gap-1 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800 text-[10px]">
+                                              <span className="text-slate-400 font-medium truncate max-w-[45px]">{p.name.split(' ')[0]}:</span>
                                               <input
                                                 type="number"
                                                 min="0"
                                                 max="100"
-                                                value={bill.splits?.[p.id] ?? 0}
+                                                value={val}
                                                 onChange={e => {
-                                                  const val = parseFloat(e.target.value) || 0;
-                                                  const newSplits = { ...bill.splits, [p.id]: val };
+                                                  const num = parseFloat(e.target.value) || 0;
+                                                  const newSplits = { ...bill.splits, [p.id]: num };
                                                   updateBillSplits(bill.id, newSplits);
                                                 }}
-                                                className="w-16 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-100 font-semibold text-center font-mono"
+                                                className="w-9 bg-transparent text-center font-mono font-bold text-slate-200 focus:outline-none focus:bg-slate-800 rounded"
                                               />
                                               <span className="text-slate-500">%</span>
                                             </div>
-                                          </td>
-                                        ))}
-                                        <td className="p-3 text-center">
-                                          {isValid ? (
-                                            <span className="inline-flex items-center text-emerald-400 gap-1 font-medium">
-                                              <CheckCircle2 className="w-4 h-4" /> 100%
-                                            </span>
-                                          ) : (
-                                            <span className="inline-flex items-center text-amber-400 gap-1 font-medium" title={`Total is ${totalPct.toLocaleString('en-US')}%`}>
-                                              <AlertTriangle className="w-4 h-4" /> {totalPct.toLocaleString('en-US')}%
-                                            </span>
-                                          )}
-                                        </td>
-                                        <td className="p-3 text-right">
-                                          <div className="flex justify-end gap-1">
+                                          );
+                                        })}
+                                      </div>
+                                      {budget.people.length > 1 && (
+                                        <div className="flex items-center gap-1 text-[9px]">
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              const splits = {};
+                                              const count = budget.people.length || 1;
+                                              budget.people.forEach(p => splits[p.id] = 100 / count);
+                                              updateBillSplits(bill.id, splits);
+                                            }}
+                                            className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded cursor-pointer"
+                                          >
+                                            Equal
+                                          </button>
+                                          {budget.people.map(p => (
                                             <button
+                                              key={p.id}
                                               type="button"
                                               onClick={() => {
                                                 const splits = {};
-                                                const count = budget.people.length || 1;
-                                                budget.people.forEach(p => splits[p.id] = 100 / count);
+                                                budget.people.forEach(person => splits[person.id] = person.id === p.id ? 100 : 0);
                                                 updateBillSplits(bill.id, splits);
                                               }}
-                                              className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[10px]"
+                                              className="px-1.5 py-0.5 bg-blue-900/40 hover:bg-blue-800/70 text-blue-300 rounded cursor-pointer truncate max-w-[65px]"
                                             >
-                                              Equal
+                                              100% {p.name.split(' ')[0]}
                                             </button>
-                                            {budget.people[0] && (
-                                              <button
-                                                type="button"
-                                                onClick={() => {
-                                                  const splits = {};
-                                                  budget.people.forEach(p => splits[p.id] = p.id === budget.people[0].id ? 100 : 0);
-                                                  updateBillSplits(bill.id, splits);
-                                                }}
-                                                className="px-2 py-1 bg-blue-900/60 hover:bg-blue-800/80 text-blue-300 rounded text-[10px]"
-                                              >
-                                                100% {budget.people[0].name.split(' ')[0]}
-                                              </button>
-                                            )}
-                                          </div>
-                                        </td>
-                                      </tr>
-                                    );
-                                  })
-                                )}
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="px-2 py-1.5 text-right">
+                                    <button
+                                      type="button"
+                                      onClick={() => deleteBill(bill.id)}
+                                      className="p-1 text-slate-500 hover:text-rose-400 rounded transition-colors cursor-pointer"
+                                      title="Delete Bill"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
 

@@ -33,18 +33,18 @@ const SIDEBAR_KEY = 'trekledger_sidebar_collapsed';
 const SidebarContent = ({ collapsed, activeView, cashOnHand, netIncome, netFlow, setActiveView, setIsSettingsOpen, onClose }) => (
   <div className="flex flex-col h-full">
     {/* Logo */}
-    <div className={`flex items-center px-4 py-3.5 border-b border-slate-800/60 ${collapsed ? 'justify-center' : 'justify-between'}`}>
+    <div className={`flex items-center border-b border-slate-800/60 ${collapsed ? 'justify-center px-3 py-3' : 'p-0'}`}>
       {collapsed ? (
-        <div className="w-10 h-10 overflow-hidden flex items-center justify-center rounded-xl bg-slate-900 border border-slate-800" title="TechTrek Finance">
-          <img src={headerLogo} alt="TechTrek Finance" className="h-10 w-10 object-cover object-left scale-150 -translate-x-1" />
+        <div className="w-10 h-10 overflow-hidden flex items-center justify-center rounded-xl" title="TechTrek Finance">
+          <img src={headerLogo} alt="TechTrek Finance" className="h-12 w-12 object-cover object-left" style={{ mixBlendMode: 'multiply' }} />
         </div>
       ) : (
-        <div className="animate-fade-in flex items-center overflow-hidden">
-          <img src={headerLogo} alt="TechTrek Finance Logo" className="h-12 w-auto max-w-[210px] object-contain drop-shadow-md" />
+        <div className="animate-fade-in flex items-center w-full overflow-hidden">
+          <img src={headerLogo} alt="TechTrek Finance Logo" className="w-full h-auto object-cover" style={{ mixBlendMode: 'multiply' }} />
         </div>
       )}
       {onClose && (
-        <button onClick={onClose} aria-label="Close navigation menu" className="ml-auto p-1 text-slate-400 hover:text-slate-200 rounded-lg">
+        <button onClick={onClose} aria-label="Close navigation menu" className="absolute top-3 right-3 p-1 text-slate-400 hover:text-slate-200 rounded-lg">
           <X className="w-4 h-4" />
         </button>
       )}

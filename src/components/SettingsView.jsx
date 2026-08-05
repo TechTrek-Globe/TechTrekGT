@@ -138,15 +138,16 @@ export function SettingsView() {
   };
 
   const handlePushCloudBackup = async () => {
-    setCloudSyncStatus(null);
-    setIsCloudSyncing(true);
+    setCloudSyncStatus({ type: 'info', message: 'Saving changes locally & syncing with Cloud Vault in background...' });
     try {
-      await pushCloudBackup(cloudPasscode);
-      setCloudSyncStatus({ type: 'success', message: `Successfully backed up data to Cloud Vault! (${new Date().toLocaleTimeString()})` });
+      const res = await pushCloudBackup(cloudPasscode);
+      if (res && res.success) {
+        setCloudSyncStatus({ type: 'success', message: `Successfully backed up data to Cloud Vault! (${new Date().toLocaleTimeString()})` });
+      } else {
+        setCloudSyncStatus({ type: 'warning', message: `Saved locally. ${res?.error || 'Cloud sync queued for background retry.'}` });
+      }
     } catch (err) {
-      setCloudSyncStatus({ type: 'error', message: `Cloud backup failed: ${err.message}` });
-    } finally {
-      setIsCloudSyncing(false);
+      setCloudSyncStatus({ type: 'error', message: `Cloud backup error: ${err.message}` });
     }
   };
 

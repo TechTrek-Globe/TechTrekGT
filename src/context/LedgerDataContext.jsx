@@ -3,7 +3,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { initialBudgetData } from '../initialData';
 import { fakeDemoBudgetData } from '../demoPresetData';
 import { useBudgetMetadata } from './BudgetMetadataContext';
-import { getApiUrl } from '../utils/api';
+import { getApiUrl, pushCloudBackupOptimistic, flushPendingCloudSync } from '../utils/api';
 import { saveBudgetData, clearAndRestoreBudgetData, clearBudgetData } from '../utils/indexedDB';
 
 const LedgerDataContext = createContext();
@@ -57,21 +57,13 @@ export function LedgerDataProvider({ children }) {
     return () => clearTimeout(timer);
   }, [metadataState, dailyMatrix, lineItems, transactions, isDbLoaded]);
 
-  // Cloud Vault Push Backup
+  // Cloud Vault Push Backup (Optimistic + Fallback Queue)
   const pushCloudBackup = async (passcode) => {
-    const res = await fetch(getApiUrl('/api/sync/backup'), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Sync-Passcode': passcode
-      },
-      body: JSON.stringify({ budget })
-    });
-    const data = await res.json();
-    if (!res.ok || !data.success) {
-      throw new Error(data.error || 'Failed to backup data to Cloud Vault.');
+    const result = await pushCloudBackupOptimistic(passcode, budget);
+    if (result.success) {
+      setLastCloudSyncTime(new Date().toLocaleTimeString());
     }
-    return data;
+    return result;
   };
 
   // Restore budget state from imported JSON backup
@@ -141,6 +133,21 @@ export function LedgerDataProvider({ children }) {
   // Financial data checksum key to prevent UI-only updates (theme, widgets) from triggering cloud backups
   const financialDataChecksum = `${(metadataState.accounts || []).length}_${(metadataState.bills || []).length}_${(metadataState.people || []).length}_${(metadataState.loans || []).length}_${(lineItems || []).length}_${Object.keys(dailyMatrix || {}).length}`;
 
+  // Silent background retry effect for pending sync queue on app load or network recovery
+  useEffect(() => {
+    const handleOnlineRetry = async () => {
+      const flushed = await flushPendingCloudSync();
+      if (flushed) {
+        setLastCloudSyncTime(new Date().toLocaleTimeString());
+      }
+    };
+
+    handleOnlineRetry();
+
+    window.addEventListener('online', handleOnlineRetry);
+    return () => window.removeEventListener('online', handleOnlineRetry);
+  }, []);
+
   // Debounced Auto Cloud Backup effect
   useEffect(() => {
     if (!isDbLoaded || !isAutoCloudBackupEnabled) return;
@@ -152,7 +159,6 @@ export function LedgerDataProvider({ children }) {
     const timer = setTimeout(async () => {
       try {
         await pushCloudBackup(passcode);
-        setLastCloudSyncTime(new Date().toLocaleTimeString());
       } catch (err) {
         console.error('Auto cloud backup failed:', err);
       }

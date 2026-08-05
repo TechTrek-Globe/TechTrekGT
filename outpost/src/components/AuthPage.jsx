@@ -179,14 +179,8 @@ export function AuthPage({ onAuthSuccess }) {
 
         <div className="relative z-10">
           {/* Logo */}
-          <div className="flex items-center gap-3 mb-16">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shadow-lg shadow-amber-500/30">
-              <Gavel className="w-5 h-5 text-slate-950" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-amber-500/80 tracking-widest uppercase">TechTrek</p>
-              <p className="text-sm font-bold text-slate-100 -mt-0.5">Outpost</p>
-            </div>
+          <div className="mb-12">
+            <img src={outpostLogo} alt="TechTrek Outpost Logo" className="h-16 w-auto max-w-[280px] object-contain drop-shadow-xl" />
           </div>
 
           <h1 className="text-4xl font-black text-white leading-tight mb-4">
@@ -233,11 +227,8 @@ export function AuthPage({ onAuthSuccess }) {
         <div className="w-full max-w-md">
 
           {/* Mobile logo */}
-          <div className="flex lg:hidden items-center gap-2.5 mb-8 justify-center">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center">
-              <Gavel className="w-4 h-4 text-slate-950" />
-            </div>
-            <p className="font-black text-white text-lg">TechTrek Outpost</p>
+          <div className="flex lg:hidden items-center mb-8 justify-center">
+            <img src={outpostLogo} alt="TechTrek Outpost Logo" className="h-10 w-auto max-w-[200px] object-contain drop-shadow-md" />
           </div>
 
           <div className="glass-card rounded-2xl p-8 glow-amber-sm">

@@ -183,7 +183,7 @@ export function AuthPage({ onAuthSuccess }) {
             </div>
             <div>
               <p className="text-xs font-semibold text-amber-500/80 tracking-widest uppercase">TechTrek</p>
-              <p className="text-sm font-bold text-slate-100 -mt-0.5">Auction Tracker</p>
+              <p className="text-sm font-bold text-slate-100 -mt-0.5">Outpost</p>
             </div>
           </div>
 
@@ -235,7 +235,7 @@ export function AuthPage({ onAuthSuccess }) {
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center">
               <Gavel className="w-4 h-4 text-slate-950" />
             </div>
-            <p className="font-black text-white text-lg">Auction Tracker</p>
+            <p className="font-black text-white text-lg">TechTrek Outpost</p>
           </div>
 
           <div className="glass-card rounded-2xl p-8 glow-amber-sm">
@@ -245,7 +245,7 @@ export function AuthPage({ onAuthSuccess }) {
               <>
                 <div className="mb-7">
                   <h2 className="text-xl font-black text-white">Welcome back</h2>
-                  <p className="text-slate-400 text-sm mt-1">Sign in to your auction tracker</p>
+                  <p className="text-slate-400 text-sm mt-1">Sign in to TechTrek Outpost</p>
                 </div>
                 {error && (
                   <div className="mb-4 p-3 rounded-xl bg-red-950/40 border border-red-800/40 text-red-400 text-xs">

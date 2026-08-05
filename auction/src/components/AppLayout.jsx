@@ -28,7 +28,7 @@ export function AppLayout({ activeView, onNavigate, children }) {
           </div>
           <div className="min-w-0">
             <p className="text-[10px] font-semibold text-amber-500/70 tracking-widest uppercase">TechTrek</p>
-            <p className="text-sm font-bold text-slate-100 -mt-0.5 truncate">Auction Tracker</p>
+            <p className="text-sm font-bold text-slate-100 -mt-0.5 truncate">Outpost</p>
           </div>
         </div>
 
@@ -90,7 +90,7 @@ export function AppLayout({ activeView, onNavigate, children }) {
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center">
               <Gavel className="w-4 h-4 text-slate-950" />
             </div>
-            <span className="font-black text-white text-sm">Auction Tracker</span>
+            <span className="font-black text-white text-sm">TechTrek Outpost</span>
           </div>
           <button id="mobile-logout-btn" onClick={logout} className="text-slate-500 hover:text-red-400 transition-colors">
             <LogOut className="w-4 h-4" />

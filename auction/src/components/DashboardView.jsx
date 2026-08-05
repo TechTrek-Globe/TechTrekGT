@@ -81,7 +81,7 @@ export function DashboardView({ onNavigate }) {
             Executive Portfolio Dashboard
           </h1>
           <p className="text-xs text-slate-400 mt-0.5">
-            Pristine Auction Tracker & Financial Intelligence
+            TechTrek Outpost & Financial Intelligence
           </p>
         </div>
 

@@ -849,44 +849,43 @@ function DailySpreadsheetMatrix() {
         className="flex-1 min-h-0 overflow-auto matrix-scrollbar relative"
       >
         <table className="w-full text-left text-[10px] border-separate border-spacing-0">
-          {/* Header Row 1 & 2: Sticky Tier 2 */}
+          {/* Header Row 1 & 2: Sticky Matrix Header */}
           <thead>
             {/* Header Row 1: Category Banners & Spanning Headers */}
-            <tr className="bg-slate-950 text-slate-300 uppercase font-extrabold text-xs tracking-wider h-6">
-              {/* Date & Day (Frozen Left Spanning Both Rows) */}
-              <th rowSpan={2} className="p-1 min-w-[90px] w-[90px] max-w-[90px] bg-slate-950 text-slate-200 font-bold sticky left-0 top-0 z-50 align-middle text-center border-b-2 border-blue-500 shadow-[2px_0_5px_rgba(0,0,0,0.5)]">
-                Date
-              </th>
-              <th rowSpan={2} className="p-1 min-w-[48px] w-[48px] max-w-[48px] bg-slate-950 text-slate-200 font-bold border-r border-slate-700 sticky left-[90px] top-0 z-50 align-middle text-center border-b-2 border-blue-500 shadow-[4px_0_8px_rgba(0,0,0,0.5)]">
-                Day
-              </th>
+            <tr className="bg-slate-950 text-slate-300 uppercase font-extrabold text-xs tracking-wider h-7">
+              {/* Date & Day Banner Container */}
+              <th colSpan={2} className="p-0 h-7 bg-slate-950 border-r border-slate-700 sticky left-0 top-0 z-50 shadow-[2px_0_5px_rgba(0,0,0,0.5)]"></th>
 
               {/* Beg Balances Banner */}
-              <th colSpan={showExtraColumns ? 2 : 1} className="p-1 text-center border-r-2 border-blue-600 bg-blue-950 text-blue-100 font-black shadow-sm sticky top-0 z-40">Beg Balances</th>
-              <th colSpan={people.length * (showExtraColumns ? 2 : 1)} className="p-1 text-center border-r border-slate-800 bg-emerald-950 text-emerald-300 sticky top-0 z-40">Credits (Deposits)</th>
-              <th colSpan={accountBills.length + 2} className="p-1 text-center border-r border-slate-800 bg-rose-950 text-rose-300 sticky top-0 z-40">Bills &amp; Deductions</th>
-              <th colSpan={showExtraColumns ? 2 : 1} className="p-1 text-center border-r border-slate-800 bg-purple-950 text-purple-300 sticky top-0 z-40">Ending Balances</th>
-              {/* Sticky Right Column: Total End Spanning Both Rows */}
-              <th rowSpan={2} className="p-1 min-w-[85px] w-[85px] max-w-[85px] bg-slate-950 text-blue-300 font-black sticky right-0 top-0 z-50 align-middle text-right border-b-2 border-blue-500 border-l border-slate-700 shadow-[-4px_0_8px_rgba(0,0,0,0.5)]">
-                <div className="flex flex-col items-end leading-tight text-xs">
-                  <span>Total</span>
-                  <span>End</span>
-                </div>
-              </th>
+              <th colSpan={showExtraColumns ? 2 : 1} className="p-1 h-7 text-center border-r-2 border-blue-600 bg-blue-950 text-blue-100 font-black shadow-sm sticky top-0 z-40 align-middle">Beg Balances</th>
+              <th colSpan={people.length * (showExtraColumns ? 2 : 1)} className="p-1 h-7 text-center border-r border-slate-800 bg-emerald-950 text-emerald-300 font-black sticky top-0 z-40 align-middle">Credits (Deposits)</th>
+              <th colSpan={accountBills.length + 2} className="p-1 h-7 text-center border-r border-slate-800 bg-rose-950 text-rose-300 font-black sticky top-0 z-40 align-middle">Bills &amp; Deductions</th>
+              <th colSpan={showExtraColumns ? 2 : 1} className="p-1 h-7 text-center border-r border-slate-800 bg-purple-950 text-purple-300 font-black sticky top-0 z-40 align-middle">Ending Balances</th>
+              
+              {/* Total End Banner Container */}
+              <th colSpan={1} className="p-0 h-7 min-w-[85px] w-[85px] max-w-[85px] bg-slate-950 border-l border-slate-700 sticky right-0 top-0 z-50 shadow-[-4px_0_8px_rgba(0,0,0,0.5)]"></th>
             </tr>
 
             {/* Header Row 2: Individual Columns (Stacked titles) */}
-            <tr className="bg-slate-950 text-slate-300 font-bold text-xs h-11">
+            <tr className="bg-slate-950 text-slate-300 font-bold text-xs h-10">
+              {/* Date & Day Subheaders */}
+              <th className="p-1 h-10 min-w-[90px] w-[90px] max-w-[90px] bg-slate-950 text-slate-200 font-bold text-center align-middle sticky left-0 top-[28px] z-50 border-b-2 border-blue-500 shadow-[2px_0_5px_rgba(0,0,0,0.5)]">
+                <div className="flex items-center justify-center h-full">Date</div>
+              </th>
+              <th className="p-1 h-10 min-w-[48px] w-[48px] max-w-[48px] bg-slate-950 text-slate-200 font-bold text-center align-middle border-r border-slate-700 sticky left-[90px] top-[28px] z-50 border-b-2 border-blue-500 shadow-[4px_0_8px_rgba(0,0,0,0.5)]">
+                <div className="flex items-center justify-center h-full">Day</div>
+              </th>
+
               {/* Beg Balances */}
-              <th className="p-1 text-right min-w-[65px] bg-blue-950 text-blue-200 font-extrabold border-r border-blue-900/60 align-middle sticky top-[24px] z-40 border-b-2 border-blue-500">
-                <div className="flex flex-col items-end leading-tight text-xs">
+              <th className="p-1 h-10 text-right min-w-[65px] bg-blue-950 text-blue-200 font-extrabold border-r border-blue-900/60 align-middle sticky top-[28px] z-40 border-b-2 border-blue-500">
+                <div className="flex flex-col items-end justify-center leading-tight text-xs h-full">
                   <span>Beg</span>
                   <span>Bal</span>
                 </div>
               </th>
               {showExtraColumns && (
-                <th className="p-1 text-right min-w-[65px] border-r-2 border-blue-600 bg-blue-950 text-blue-200 font-extrabold align-middle sticky top-[24px] z-40 border-b-2 border-blue-500">
-                  <div className="flex flex-col items-end leading-tight text-xs">
+                <th className="p-1 h-10 text-right min-w-[65px] border-r-2 border-blue-600 bg-blue-950 text-blue-200 font-extrabold align-middle sticky top-[28px] z-40 border-b-2 border-blue-500">
+                  <div className="flex flex-col items-end justify-center leading-tight text-xs h-full">
                     <span>Extra</span>
                     <span>Beg</span>
                   </div>
@@ -895,16 +894,16 @@ function DailySpreadsheetMatrix() {
 
               {/* Credits */}
               {people.map(p => (
-                <th key={`hdr-cred-${p.id}`} className="p-1 text-right min-w-[60px] text-emerald-400 bg-emerald-950 align-middle sticky top-[24px] z-40 border-b-2 border-blue-500">
-                  <div className="flex flex-col items-end leading-tight text-xs">
+                <th key={`hdr-cred-${p.id}`} className="p-1 h-10 text-right min-w-[60px] text-emerald-400 bg-emerald-950 align-middle sticky top-[28px] z-40 border-b-2 border-blue-500">
+                  <div className="flex flex-col items-end justify-center leading-tight text-xs h-full">
                     <span>{p.name.split(' ')[0]}</span>
                     <span>Credit</span>
                   </div>
                 </th>
               ))}
               {showExtraColumns && people.map(p => (
-                <th key={`hdr-ext-cred-${p.id}`} className="p-1 text-right min-w-[60px] text-emerald-300 bg-emerald-950 border-r border-slate-800 align-middle sticky top-[24px] z-40 border-b-2 border-blue-500">
-                  <div className="flex flex-col items-end leading-tight text-xs">
+                <th key={`hdr-ext-cred-${p.id}`} className="p-1 h-10 text-right min-w-[60px] text-emerald-300 bg-emerald-950 border-r border-slate-800 align-middle sticky top-[28px] z-40 border-b-2 border-blue-500">
+                  <div className="flex flex-col items-end justify-center leading-tight text-xs h-full">
                     <span>{p.name.split(' ')[0]}</span>
                     <span>Extra</span>
                   </div>
@@ -913,47 +912,55 @@ function DailySpreadsheetMatrix() {
 
               {/* Bill Columns */}
               {accountBills.map(b => (
-                <th key={`hdr-bill-${b.id}`} className="p-1 text-right min-w-[70px] text-rose-300 bg-rose-950 group align-middle sticky top-[24px] z-40 border-b-2 border-blue-500 relative" title={b.name}>
+                <th key={`hdr-bill-${b.id}`} className="p-1 h-10 text-right min-w-[70px] text-rose-300 bg-rose-950 group align-middle sticky top-[28px] z-40 border-b-2 border-blue-500 relative" title={b.name}>
                   <button
                     type="button"
                     onClick={() => archiveBill(b.id)}
-                    className="opacity-0 group-hover:opacity-100 hover:scale-110 p-0.5 text-slate-400 hover:text-amber-400 transition-all rounded mb-0.5 absolute top-0.5 left-0.5 z-10"
+                    className="opacity-0 group-hover:opacity-100 hover:scale-110 p-0.5 text-slate-400 hover:text-amber-400 transition-all rounded absolute top-0.5 left-0.5 z-10"
                     title={`Archive bill "${b.name}"`}
                   >
                     <Archive className="w-2.5 h-2.5" />
                   </button>
-                  <div className="flex flex-col items-end leading-tight text-right text-xs w-full" title={b.name}>
+                  <div className="flex flex-col items-end justify-center leading-tight text-right text-xs w-full h-full" title={b.name}>
                     <span className="block truncate max-w-[85px] font-bold">{b.name}</span>
                   </div>
                 </th>
               ))}
-              <th className="p-1 text-right min-w-[55px] text-rose-300 bg-rose-950 align-middle sticky top-[24px] z-40 border-b-2 border-blue-500">
-                <div className="flex flex-col items-end leading-tight text-xs">
+              <th className="p-1 h-10 text-right min-w-[55px] text-rose-300 bg-rose-950 align-middle sticky top-[28px] z-40 border-b-2 border-blue-500">
+                <div className="flex flex-col items-end justify-center leading-tight text-xs h-full">
                   <span>Other</span>
                 </div>
               </th>
-              <th className="p-1 text-left min-w-[90px] text-rose-300 bg-rose-950 border-r border-slate-800 align-middle sticky top-[24px] z-40 border-b-2 border-blue-500">
-                <div className="flex flex-col items-start leading-tight text-xs">
+              <th className="p-1 h-10 text-left min-w-[90px] text-rose-300 bg-rose-950 border-r border-slate-800 align-middle sticky top-[28px] z-40 border-b-2 border-blue-500">
+                <div className="flex flex-col items-start justify-center leading-tight text-xs h-full">
                   <span>Other</span>
                   <span>Desc</span>
                 </div>
               </th>
 
               {/* Ending Balances */}
-              <th className="p-1 text-right min-w-[65px] text-slate-200 bg-purple-950 align-middle sticky top-[24px] z-40 border-b-2 border-blue-500">
-                <div className="flex flex-col items-end leading-tight text-xs">
+              <th className="p-1 h-10 text-right min-w-[65px] text-slate-200 bg-purple-950 align-middle sticky top-[28px] z-40 border-b-2 border-blue-500">
+                <div className="flex flex-col items-end justify-center leading-tight text-xs h-full">
                   <span>Reg</span>
                   <span>Ending</span>
                 </div>
               </th>
               {showExtraColumns && (
-                <th className="p-1 text-right min-w-[65px] text-slate-200 bg-purple-950 border-r border-slate-800 align-middle sticky top-[24px] z-40 border-b-2 border-blue-500">
-                  <div className="flex flex-col items-end leading-tight text-xs">
+                <th className="p-1 h-10 text-right min-w-[65px] text-slate-200 bg-purple-950 border-r border-slate-800 align-middle sticky top-[28px] z-40 border-b-2 border-blue-500">
+                  <div className="flex flex-col items-end justify-center leading-tight text-xs h-full">
                     <span>Extra</span>
                     <span>Ending</span>
                   </div>
                 </th>
               )}
+
+              {/* Total End Subheader */}
+              <th className="p-1 h-10 min-w-[85px] w-[85px] max-w-[85px] bg-slate-950 text-blue-300 font-black sticky right-0 top-[28px] z-50 align-middle text-right border-b-2 border-blue-500 border-l border-slate-700 shadow-[-4px_0_8px_rgba(0,0,0,0.5)]">
+                <div className="flex flex-col items-end justify-center leading-tight text-xs h-full">
+                  <span>Total</span>
+                  <span>End</span>
+                </div>
+              </th>
             </tr>
           </thead>
 

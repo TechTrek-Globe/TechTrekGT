@@ -1,0 +1,4 @@
+# Copy from e:\TechTrek Finance\.dev.vars and set same JWT_SECRET value
+# so the shared auth cookie works across both Finance and Auction apps.
+JWT_SECRET=your_jwt_secret_here
+SYNC_UNLOCK_CODE=your_sync_code_here

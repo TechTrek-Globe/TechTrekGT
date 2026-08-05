@@ -1,0 +1,138 @@
+import { onRequestPost as registerHandler }      from '../functions/api/auth/register.js';
+import { onRequestPost as loginHandler }         from '../functions/api/auth/login.js';
+import { onRequestGet  as meHandler }            from '../functions/api/auth/me.js';
+import { onRequestPost as logoutHandler }        from '../functions/api/auth/logout.js';
+import { onRequestPost as forgotPasswordHandler } from '../functions/api/auth/forgot-password.js';
+import { onRequestPost as resetPasswordHandler }  from '../functions/api/auth/reset-password.js';
+import { onRequestPost as securityQuestionHandler } from '../functions/api/auth/security-question.js';
+import { onRequestPost as updateProfileHandler }  from '../functions/api/auth/update-profile.js';
+
+function addSecurityHeaders(response, isLocalhost = false) {
+  const newHeaders = new Headers(response.headers);
+  if (!isLocalhost) {
+    newHeaders.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    newHeaders.set('Content-Security-Policy', [
+      "default-src 'self'",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "script-src 'self'",
+      "connect-src 'self' https://techtrekgt.com",
+      "img-src 'self' data: blob:",
+      "font-src 'self' data: https://fonts.gstatic.com",
+      "frame-ancestors 'none'",
+      "form-action 'self'",
+      "base-uri 'self'"
+    ].join('; '));
+  }
+  newHeaders.set('X-Content-Type-Options', 'nosniff');
+  newHeaders.set('X-Frame-Options', 'DENY');
+  newHeaders.set('X-XSS-Protection', '0');
+  newHeaders.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  newHeaders.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
+
+  const allowedOrigins = [
+    'https://techtrekgt.com',
+    'https://techtrek-auction.pages.dev',
+    'http://localhost:3001',
+    'http://127.0.0.1:3001'
+  ];
+  const origin = response.headers.get('Origin');
+  if (origin && allowedOrigins.includes(origin)) {
+    newHeaders.set('Access-Control-Allow-Origin', origin);
+  } else {
+    newHeaders.set('Access-Control-Allow-Origin', 'https://techtrekgt.com');
+  }
+  newHeaders.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  newHeaders.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  newHeaders.set('Access-Control-Allow-Credentials', 'true');
+  newHeaders.set('Access-Control-Max-Age', '86400');
+
+  const contentType = newHeaders.get('content-type') || '';
+  if (contentType.includes('text/html')) {
+    newHeaders.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    newHeaders.set('Pragma', 'no-cache');
+    newHeaders.set('Expires', '0');
+  }
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: newHeaders
+  });
+}
+
+export default {
+  async fetch(request, env, ctx) {
+    const url = new URL(request.url);
+    const context = { request, env, ctx };
+
+    const isLocalhost = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+    if (!isLocalhost && (url.protocol === 'http:' || request.headers.get('x-forwarded-proto') === 'http')) {
+      url.protocol = 'https:';
+      return Response.redirect(url.toString(), 301);
+    }
+
+    if (request.method === 'OPTIONS') {
+      return addSecurityHeaders(new Response(null, { status: 204 }), isLocalhost);
+    }
+
+    let response;
+    try {
+      // Normalize /auction/api/* -> /api/*
+      let apiPath = url.pathname;
+      if (apiPath.startsWith('/auction/api/')) {
+        apiPath = apiPath.slice('/auction'.length);
+      } else if (apiPath === '/auction/api') {
+        apiPath = '/api';
+      }
+
+      if (apiPath === '/api/auth/register' && request.method === 'POST') {
+        response = await registerHandler(context);
+      } else if (apiPath === '/api/auth/login' && request.method === 'POST') {
+        response = await loginHandler(context);
+      } else if (apiPath === '/api/auth/forgot-password' && request.method === 'POST') {
+        response = await forgotPasswordHandler(context);
+      } else if (apiPath === '/api/auth/reset-password' && request.method === 'POST') {
+        response = await resetPasswordHandler(context);
+      } else if (apiPath === '/api/auth/security-question' && request.method === 'POST') {
+        response = await securityQuestionHandler(context);
+      } else if (apiPath === '/api/auth/update-profile' && request.method === 'POST') {
+        response = await updateProfileHandler(context);
+      } else if (apiPath === '/api/auth/me' && request.method === 'GET') {
+        response = await meHandler(context);
+      } else if (apiPath === '/api/auth/logout' && request.method === 'POST') {
+        response = await logoutHandler(context);
+      } else if (apiPath.startsWith('/api/')) {
+        response = new Response(JSON.stringify({ error: 'Endpoint not found' }), {
+          status: 404,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      } else if (url.pathname.startsWith('/auction/assets/')) {
+        // Rewrite asset requests: /auction/assets/ -> /assets/
+        const assetUrl = new URL(request.url);
+        assetUrl.pathname = assetUrl.pathname.slice('/auction'.length);
+        response = env?.ASSETS?.fetch
+          ? await env.ASSETS.fetch(new Request(assetUrl.toString(), request))
+          : await fetch(new Request(assetUrl.toString(), request));
+      } else if (url.pathname === '/auction' || url.pathname.startsWith('/auction/')) {
+        // SPA fallback - serve index.html for all /auction/* routes
+        const spaUrl = new URL(request.url);
+        spaUrl.pathname = '/';
+        response = env?.ASSETS?.fetch
+          ? await env.ASSETS.fetch(new Request(spaUrl.toString(), request))
+          : await fetch(new Request(spaUrl.toString(), request));
+      } else {
+        response = env?.ASSETS?.fetch
+          ? await env.ASSETS.fetch(request)
+          : await fetch(request);
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err || 'Server error');
+      response = new Response(JSON.stringify({ error: errorMessage }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    return addSecurityHeaders(response, isLocalhost);
+  }
+};

@@ -764,23 +764,29 @@ export function SettingsModal() {
 
           {/* SETUP: ACCOUNTS & EARNERS */}
           {(settingsTab === 'accounts' || settingsTab === 'people') && (
-            <div className="space-y-6">
-              {/* Header & Add Account Button */}
-              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
-                    <CreditCard className="w-4 h-4 text-blue-400" />
-                    Active Household Accounts ({budget.accounts.length})
-                  </h3>
-                  <p className="text-xs text-slate-400">Configure checking, savings, and credit card accounts</p>
+            <div className="space-y-8">
+              {/* Accounts Header & Action Bar */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center">
+                      <CreditCard className="w-4 h-4" />
+                    </div>
+                    <h3 className="text-base font-semibold text-slate-100 tracking-tight">
+                      Active Household Accounts ({budget.accounts.length})
+                    </h3>
+                  </div>
+                  <p className="text-xs text-slate-400 pl-10">
+                    Set up starting balances, initial dates, and extra savings goals.
+                  </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setIsAddAccountModalOpen(true)}
-                  className="flex items-center gap-2 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-md shadow-blue-600/20 transition-all cursor-pointer"
+                  className="self-start sm:self-center flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-sm hover:shadow transition-all cursor-pointer"
                 >
-                  <Plus className="w-4 h-4" />
-                  Add Account
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add Account</span>
                 </button>
               </div>
 
@@ -927,327 +933,148 @@ export function SettingsModal() {
                 </div>
               )}
 
-              {/* Accounts List */}
-              <div className="space-y-3">
-                <h3 className="text-sm font-semibold text-slate-300">Active Accounts ({budget.accounts.length})</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {budget.accounts.map(acc => (
-                    <div key={acc.id} className="p-4 rounded-xl glass-card border border-slate-800 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <CreditCard className="w-5 h-5 text-blue-400" />
-                          <input
-                            type="text"
-                            value={acc.name}
-                            onChange={e => updateAccount(acc.id, { name: e.target.value })}
-                            className="bg-transparent border-b border-transparent hover:border-slate-600 focus:border-blue-500 font-semibold text-slate-100 text-sm focus:outline-none px-1"
-                          />
+              {/* Accounts Soft Cards List */}
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+                {budget.accounts.map(acc => (
+                  <div 
+                    key={acc.id} 
+                    className="p-5 sm:p-6 rounded-2xl bg-slate-900/40 hover:bg-slate-900/60 border border-slate-800/80 hover:border-slate-700/80 shadow-lg shadow-black/20 backdrop-blur-xl transition-all duration-300 space-y-5"
+                  >
+                    {/* Header: Icon, Editable Title & Delete */}
+                    <div className="flex items-center justify-between gap-3 pb-1 border-b border-slate-800/40">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
+                          <CreditCard className="w-4 h-4" />
                         </div>
-                        <button
-                          onClick={() => deleteAccount(acc.id)}
-                          className="p-1 text-slate-500 hover:text-rose-400 rounded transition-colors"
-                          title="Delete Account"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-
-                      <div className="grid grid-cols-3 gap-2 text-xs">
-                        <div>
-                          <label className="text-slate-500 block font-medium">Account Type</label>
-                          <select
-                            value={acc.type}
-                            onChange={e => updateAccount(acc.id, { type: e.target.value })}
-                            className="mt-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-slate-200 w-full focus:outline-none focus:border-blue-500"
-                          >
-                            <option value="checking">Checking</option>
-                            <option value="savings">Savings</option>
-                            <option value="credit">Credit Card</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="text-slate-500 block font-medium">Starting Balance ($)</label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={acc.startingBalance}
-                            onChange={e => updateAccount(acc.id, { startingBalance: parseFloat(e.target.value) || 0 })}
-                            className="mt-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-slate-100 font-mono w-full focus:outline-none focus:border-blue-500"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-amber-300 font-semibold block">Start Date / Day</label>
-                          <input
-                            type="date"
-                            value={acc.balanceAsOfDate || new Date().toISOString().split('T')[0]}
-                            onChange={e => updateAccount(acc.id, { balanceAsOfDate: e.target.value })}
-                            className="mt-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-amber-200 font-mono w-full focus:outline-none focus:border-blue-500"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 pt-1 border-t border-slate-800/80">
                         <input
-                          type="checkbox"
-                          id={`chk-extra-${acc.id}`}
-                          checked={acc.enableExtraSavings !== false}
-                          onChange={e => updateAccount(acc.id, { enableExtraSavings: e.target.checked })}
-                          className="rounded bg-slate-900 border-slate-700 text-indigo-500 focus:ring-0 cursor-pointer"
+                          type="text"
+                          value={acc.name}
+                          onChange={e => updateAccount(acc.id, { name: e.target.value })}
+                          className="w-full bg-transparent font-bold text-slate-100 text-sm sm:text-base focus:bg-slate-950/80 focus:outline-none focus:ring-1 focus:ring-blue-500/40 rounded-lg px-2 py-1 transition-all truncate"
+                          placeholder="Account Name"
                         />
-                        <label htmlFor={`chk-extra-${acc.id}`} className="text-xs text-slate-400 cursor-pointer">
-                          Track Extra Savings Bucket
-                        </label>
                       </div>
-
-                      {acc.enableExtraSavings !== false && (
-                        <div className="space-y-3 p-3 bg-slate-950/40 border border-slate-800 rounded-lg">
-                          <div className="grid grid-cols-2 gap-3 text-xs">
-                            <div>
-                              <label className="text-indigo-300 font-medium block">Save Extra Target ($/mo)</label>
-                              <input
-                                type="number"
-                                step="10"
-                                value={acc.saveExtraMonthly || 0}
-                                onChange={e => updateAccount(acc.id, { saveExtraMonthly: parseFloat(e.target.value) || 0 })}
-                                className="mt-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-emerald-400 font-mono font-bold w-full focus:outline-none focus:border-blue-500"
-                              />
-                            </div>
-                            <div>
-                              <label className="text-slate-400 block font-medium">Extra Current Balance ($)</label>
-                              <input
-                                type="number"
-                                step="0.01"
-                                value={acc.extraStartingBalance || 0}
-                                onChange={e => updateAccount(acc.id, { extraStartingBalance: parseFloat(e.target.value) || 0 })}
-                                className="mt-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-slate-200 font-mono w-full focus:outline-none focus:border-blue-500"
-                              />
-                            </div>
-                          </div>
-
-                          {/* Save Extra Earner Split Breakdown & % / $ Validation */}
-                          {acc.saveExtraMonthly > 0 && (budget.people || []).length > 0 && (() => {
-                            const people = budget.people || [];
-                            const splitType = acc.saveExtraSplitType || 'percentage'; // 'percentage' | 'amount'
-                            const isMultiPerson = people.length > 1;
-
-                            // Compute current split values
-                            const currentSplits = acc.saveExtraSplits || {};
-                            
-                            // Calculate total split allocated
-                            let totalAllocated = 0;
-                            people.forEach(p => {
-                              if (currentSplits[p.id] !== undefined) {
-                                totalAllocated += parseFloat(currentSplits[p.id]) || 0;
-                              } else {
-                                if (splitType === 'percentage') {
-                                  totalAllocated += 100 / people.length;
-                                } else {
-                                  totalAllocated += acc.saveExtraMonthly / people.length;
-                                }
-                              }
-                            });
-
-                            const isValid = splitType === 'percentage'
-                              ? Math.abs(totalAllocated - 100) < 0.1
-                              : Math.abs(totalAllocated - acc.saveExtraMonthly) < 0.05;
-
-                            return (
-                              <div className="pt-2.5 border-t border-slate-800/80 space-y-2">
-                                {/* Header & Mode Switcher */}
-                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-[11px]">
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="font-semibold text-indigo-300">Earner Extra Savings Split:</span>
-                                    {isValid ? (
-                                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-800">
-                                        <CheckCircle2 className="w-3 h-3 text-emerald-400" /> {splitType === 'percentage' ? '100% Valid' : `$${totalAllocated.toFixed(2)} Valid`}
-                                      </span>
-                                    ) : (
-                                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-400 bg-rose-950/80 px-2 py-0.5 rounded border border-rose-800 animate-pulse">
-                                        <AlertTriangle className="w-3 h-3 text-rose-400" />
-                                        {splitType === 'percentage' ? `${totalAllocated.toFixed(1)}% (Must equal 100%)` : `$${totalAllocated.toFixed(2)} (Must equal $${acc.saveExtraMonthly.toFixed(2)})`}
-                                      </span>
-                                    )}
-                                  </div>
-
-                                  {/* % vs $ Toggle */}
-                                  {isMultiPerson && (
-                                    <div className="flex items-center gap-1 bg-slate-900 p-0.5 rounded-lg border border-slate-800">
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          const newSplits = {};
-                                          people.forEach(p => {
-                                            newSplits[p.id] = Math.round((100 / people.length) * 10) / 10;
-                                          });
-                                          updateAccount(acc.id, { saveExtraSplitType: 'percentage', saveExtraSplits: newSplits });
-                                        }}
-                                        className={`px-2 py-0.5 text-[10px] font-bold rounded transition-all ${
-                                          splitType === 'percentage'
-                                            ? 'bg-blue-600 text-white shadow-sm'
-                                            : 'text-slate-400 hover:text-slate-200'
-                                        }`}
-                                      >
-                                        % Percentage
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          const newSplits = {};
-                                          people.forEach(p => {
-                                            newSplits[p.id] = Math.round((acc.saveExtraMonthly / people.length) * 100) / 100;
-                                          });
-                                          updateAccount(acc.id, { saveExtraSplitType: 'amount', saveExtraSplits: newSplits });
-                                        }}
-                                        className={`px-2 py-0.5 text-[10px] font-bold rounded transition-all ${
-                                          splitType === 'amount'
-                                            ? 'bg-blue-600 text-white shadow-sm'
-                                            : 'text-slate-400 hover:text-slate-200'
-                                        }`}
-                                      >
-                                        $ Amount
-                                      </button>
-                                    </div>
-                                  )}
-                                </div>
-
-                                {/* Quick Presets for Multi-Person */}
-                                {isMultiPerson && (
-                                  <div className="flex items-center justify-end gap-1.5 text-[10px]">
-                                    <span className="text-slate-500">Presets:</span>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const newSplits = {};
-                                        people.forEach(p => {
-                                          newSplits[p.id] = splitType === 'percentage'
-                                            ? Math.round((100 / people.length) * 10) / 10
-                                            : Math.round((acc.saveExtraMonthly / people.length) * 100) / 100;
-                                        });
-                                        updateAccount(acc.id, { saveExtraSplits: newSplits });
-                                      }}
-                                      className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-300 hover:text-white transition-colors"
-                                    >
-                                      Equal Split
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const totalNet = people.reduce((sum, p) => {
-                                          const net = parseFloat(p.netPerPay) || 0;
-                                          const freq = p.payFrequency || 'bi-weekly';
-                                          const mNet = freq === 'bi-weekly' ? (net * 26) / 12 : freq === 'weekly' ? (net * 52) / 12 : net * 2;
-                                          return sum + mNet;
-                                        }, 0);
-
-                                        const newSplits = {};
-                                        people.forEach(p => {
-                                          const net = parseFloat(p.netPerPay) || 0;
-                                          const freq = p.payFrequency || 'bi-weekly';
-                                          const mNet = freq === 'bi-weekly' ? (net * 26) / 12 : freq === 'weekly' ? (net * 52) / 12 : net * 2;
-                                          const ratio = totalNet > 0 ? mNet / totalNet : 1 / people.length;
-
-                                          newSplits[p.id] = splitType === 'percentage'
-                                            ? Math.round(ratio * 1000) / 10
-                                            : Math.round((acc.saveExtraMonthly * ratio) * 100) / 100;
-                                        });
-                                        updateAccount(acc.id, { saveExtraSplits: newSplits });
-                                      }}
-                                      className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-300 hover:text-white transition-colors"
-                                    >
-                                      Income Ratio
-                                    </button>
-                                  </div>
-                                )}
-
-                                {/* Per-Earner Editable Input Fields */}
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                  {people.map(p => {
-                                    const monthlyPortion = getAccountSaveExtraPersonPortion(acc, p, budget);
-                                    const paycheckPortion = (p.payFrequency === 'bi-weekly' || p.payFrequency === 'semi-monthly')
-                                      ? monthlyPortion / 2
-                                      : p.payFrequency === 'weekly'
-                                        ? (monthlyPortion * 12) / 52
-                                        : monthlyPortion;
-
-                                    const defaultVal = splitType === 'percentage'
-                                      ? Math.round((100 / people.length) * 10) / 10
-                                      : Math.round((acc.saveExtraMonthly / people.length) * 100) / 100;
-
-                                    const currentVal = currentSplits[p.id] !== undefined ? currentSplits[p.id] : defaultVal;
-
-                                    return (
-                                      <div key={p.id} className="p-2 rounded bg-slate-900 border border-slate-800 flex items-center justify-between gap-2">
-                                        <div className="flex-1 min-w-0">
-                                          <span className="text-xs font-bold text-slate-200 block truncate">{p.name}</span>
-                                          <span className="text-[10px] text-indigo-300 font-mono font-semibold">
-                                            ${monthlyPortion.toFixed(2)}/mo
-                                          </span>
-                                        </div>
-
-                                        {/* Editable Input for % or $ */}
-                                        {isMultiPerson ? (
-                                          <div className="flex items-center gap-1">
-                                            {splitType === 'amount' && <span className="text-xs text-slate-400 font-mono">$</span>}
-                                            <input
-                                              type="number"
-                                              step={splitType === 'percentage' ? '1' : '5'}
-                                              min="0"
-                                              max={splitType === 'percentage' ? '100' : acc.saveExtraMonthly}
-                                              value={currentVal}
-                                              onChange={e => {
-                                                const val = parseFloat(e.target.value) || 0;
-                                                const updated = { ...currentSplits, [p.id]: val };
-                                                updateAccount(acc.id, { saveExtraSplits: updated });
-                                              }}
-                                              className="w-16 bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-xs font-bold font-mono text-emerald-400 text-center focus:outline-none focus:border-blue-500"
-                                            />
-                                            {splitType === 'percentage' && <span className="text-xs text-slate-400">%</span>}
-                                          </div>
-                                        ) : (
-                                          <div className="text-right">
-                                            <span className="text-emerald-400 font-mono font-bold text-xs block">
-                                              ${paycheckPortion.toFixed(2)}
-                                            </span>
-                                            <span className="text-xs text-slate-500 font-sans uppercase">
-                                              / {p.payFrequency === 'bi-weekly' ? 'check' : p.payFrequency === 'weekly' ? 'wk' : 'check'}
-                                            </span>
-                                          </div>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            );
-                          })()}
-                        </div>
-                      )}
+                      <button
+                        onClick={() => deleteAccount(acc.id)}
+                        className="p-2 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-xl transition-all shrink-0 cursor-pointer"
+                        title="Delete Account"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
-                  ))}
-                </div>
+
+                    {/* Account Controls Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                      <div>
+                        <label className="text-[11px] font-semibold text-slate-400 block mb-1.5">Account Type</label>
+                        <select
+                          value={acc.type}
+                          onChange={e => updateAccount(acc.id, { type: e.target.value })}
+                          className="w-full bg-slate-950 border border-slate-800/80 rounded-xl px-2.5 py-2 text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/80 transition-all cursor-pointer [color-scheme:dark]"
+                        >
+                          <option value="checking">Checking</option>
+                          <option value="savings">Savings</option>
+                          <option value="credit">Credit Card</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-semibold text-slate-400 block mb-1.5">Starting Balance ($)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={acc.startingBalance}
+                          onChange={e => updateAccount(acc.id, { startingBalance: parseFloat(e.target.value) || 0 })}
+                          className="w-full bg-slate-950 border border-slate-800/80 rounded-xl px-2.5 py-2 text-slate-100 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/80 transition-all"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-semibold text-amber-400/90 block mb-1.5">Start Date / Day</label>
+                        <input
+                          type="date"
+                          value={acc.balanceAsOfDate || new Date().toISOString().split('T')[0]}
+                          onChange={e => updateAccount(acc.id, { balanceAsOfDate: e.target.value })}
+                          className="w-full bg-slate-950 border border-slate-800/80 rounded-xl px-2.5 py-2 text-amber-200 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/80 transition-all [color-scheme:dark]"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Extra Savings Toggle Switch */}
+                    <div className="pt-2 flex items-center gap-3">
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={acc.enableExtraSavings !== false}
+                        onClick={() => updateAccount(acc.id, { enableExtraSavings: acc.enableExtraSavings === false })}
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${acc.enableExtraSavings !== false ? 'bg-blue-600' : 'bg-slate-700'}`}
+                        id={`chk-extra-modal-${acc.id}`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${acc.enableExtraSavings !== false ? 'translate-x-4' : 'translate-x-0'}`}
+                        />
+                      </button>
+                      <label htmlFor={`chk-extra-modal-${acc.id}`} className="text-xs text-slate-300 font-medium cursor-pointer select-none">
+                        Track Extra Savings Bucket
+                      </label>
+                    </div>
+
+                    {/* Extra Savings Sub-Card */}
+                    {acc.enableExtraSavings !== false && (
+                      <div className="p-4 bg-slate-950/60 border border-slate-800/60 rounded-xl space-y-3">
+                        <div className="grid grid-cols-2 gap-3 text-xs">
+                          <div>
+                            <label className="text-[11px] font-semibold text-indigo-300 block mb-1.5">Save Extra Target ($/mo)</label>
+                            <input
+                              type="number"
+                              step="10"
+                              value={acc.saveExtraMonthly || 0}
+                              onChange={e => updateAccount(acc.id, { saveExtraMonthly: parseFloat(e.target.value) || 0 })}
+                              className="w-full bg-slate-950 border border-slate-800/80 rounded-xl px-3 py-2 text-emerald-400 font-mono font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/80 transition-all"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[11px] font-semibold text-slate-400 block mb-1.5">Extra Current Balance ($)</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={acc.extraStartingBalance || 0}
+                              onChange={e => updateAccount(acc.id, { extraStartingBalance: parseFloat(e.target.value) || 0 })}
+                              className="w-full bg-slate-950 border border-slate-800/80 rounded-xl px-3 py-2 text-slate-200 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/80 transition-all"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           )}
 
           {/* SETUP: EARNERS (stacked below Accounts in Accounts & Earners view) */}
           {(settingsTab === 'accounts' || settingsTab === 'people') && (
-            <div className="space-y-6 mt-8 pt-6 border-t border-slate-700">
-              {/* Header & Add Member Button */}
-              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
-                    <Users className="w-4 h-4 text-purple-400" />
-                    Household Members & Earners ({budget.people.length})
-                  </h3>
-                  <p className="text-xs text-slate-400">Configure household members, pay frequencies, and income</p>
+            <div className="space-y-6 pt-6">
+              {/* Earners Header & Action Bar */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center">
+                      <Users className="w-4 h-4" />
+                    </div>
+                    <h3 className="text-base font-semibold text-slate-100 tracking-tight">
+                      Household Members &amp; Earners ({budget.people.length})
+                    </h3>
+                  </div>
+                  <p className="text-xs text-slate-400 pl-10">
+                    Configure earners, pay frequencies, and net/gross income schedules.
+                  </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setIsAddPersonModalOpen(true)}
-                  className="flex items-center gap-2 px-3.5 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-semibold shadow-md shadow-purple-600/20 transition-all cursor-pointer"
+                  className="self-start sm:self-center flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-semibold shadow-sm hover:shadow transition-all cursor-pointer"
                 >
-                  <Plus className="w-4 h-4" />
-                  Add Member
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add Member</span>
                 </button>
               </div>
 
@@ -1542,41 +1369,48 @@ export function SettingsModal() {
                   const totalAllocated = Object.values(person.accountAllocations || {}).reduce((/** @type {number} */ sum, /** @type {any} */ val) => sum + (parseFloat(val) || 0), 0);
 
                   return (
-                    <div key={person.id} className="p-4 rounded-xl glass-card border border-slate-800 space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <Users className="w-5 h-5 text-purple-400" />
+                    <div 
+                      key={person.id} 
+                      className="p-5 sm:p-6 rounded-2xl bg-slate-900/40 hover:bg-slate-900/60 border border-slate-800/80 hover:border-slate-700/80 shadow-lg shadow-black/20 backdrop-blur-xl transition-all duration-300 space-y-5"
+                    >
+                      <div className="flex items-center justify-between gap-3 pb-1 border-b border-slate-800/40">
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <div className="w-9 h-9 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center shrink-0">
+                            <Users className="w-4 h-4" />
+                          </div>
                           <input
                             type="text"
                             value={person.name}
                             onChange={e => updatePerson(person.id, { name: e.target.value })}
-                            className="bg-transparent border-b border-transparent hover:border-slate-600 focus:border-purple-500 font-semibold text-slate-100 text-sm focus:outline-none px-1"
+                            className="w-full bg-transparent font-bold text-slate-100 text-sm sm:text-base focus:bg-slate-950/80 focus:outline-none focus:ring-1 focus:ring-purple-500/40 rounded-lg px-2 py-1 transition-all truncate"
+                            placeholder="Member Name"
                           />
-                          <span className="text-xs px-2 py-0.5 rounded bg-purple-950 text-purple-300 border border-purple-800">
+                          <span className="text-[10px] font-semibold px-2.5 py-1 rounded-full bg-purple-500/10 text-purple-300 border border-purple-500/20 shrink-0">
                             {person.payFrequency}
                           </span>
                           {person.payOffsetDays ? (
-                            <span className="text-[10px] px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800 font-mono">
-                              {person.payOffsetDays}d Early Deposit
+                            <span className="text-[10px] px-2 py-0.5 rounded bg-amber-950/80 text-amber-300 border border-amber-800 font-mono shrink-0">
+                              {person.payOffsetDays}d Early
                             </span>
                           ) : null}
                         </div>
                         <button
                           onClick={() => deletePerson(person.id)}
-                          className="p-1 text-slate-500 hover:text-rose-400 rounded transition-colors"
+                          className="p-2 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-xl transition-all shrink-0 cursor-pointer"
+                          title="Delete Member"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
 
                       <div className="space-y-3">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 text-xs">
                           <div>
-                            <label className="text-slate-500 font-medium">Pay Frequency</label>
+                            <label className="text-[11px] font-semibold text-slate-400 block mb-1.5">Pay Frequency</label>
                             <select
                               value={person.payFrequency}
                               onChange={e => updatePerson(person.id, { payFrequency: e.target.value })}
-                              className="mt-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-slate-200 w-full focus:outline-none focus:border-purple-500"
+                              className="w-full bg-slate-950 border border-slate-800/80 rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500/80 transition-all cursor-pointer [color-scheme:dark]"
                             >
                               <option value="bi-weekly">Bi-weekly (26/yr)</option>
                               <option value="semi-monthly">Semi-Monthly (24/yr)</option>
@@ -1585,23 +1419,23 @@ export function SettingsModal() {
                             </select>
                           </div>
                           <div>
-                            <label className="text-slate-500 font-medium">Gross Per Pay ($)</label>
+                            <label className="text-[11px] font-medium text-slate-400 block mb-1.5">Gross Per Pay ($)</label>
                             <input
                               type="number"
                               step="0.01"
                               value={person.grossPerPay}
                               onChange={e => updatePerson(person.id, { grossPerPay: parseFloat(e.target.value) || 0 })}
-                              className="mt-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-slate-200 font-mono w-full focus:outline-none focus:border-purple-500"
+                              className="w-full bg-slate-950/80 border border-slate-800/80 rounded-xl px-3 py-2 text-slate-200 font-mono focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500/80 transition-all"
                             />
                           </div>
                           <div>
-                            <label className="text-slate-500 font-medium">Net Per Pay ($)</label>
+                            <label className="text-[11px] font-medium text-slate-400 block mb-1.5">Net Per Pay ($)</label>
                             <input
                               type="number"
                               step="0.01"
                               value={person.netPerPay}
                               onChange={e => updatePerson(person.id, { netPerPay: parseFloat(e.target.value) || 0 })}
-                              className="mt-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-emerald-400 font-bold font-mono w-full focus:outline-none focus:border-purple-500"
+                              className="w-full bg-slate-950/80 border border-slate-800/80 rounded-xl px-3 py-2 text-emerald-400 font-bold font-mono focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500/80 transition-all"
                             />
                           </div>
                         </div>

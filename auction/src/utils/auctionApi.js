@@ -82,3 +82,8 @@ export const deleteSale = (id) =>
 export const getPlatforms = () =>
   apiFetch('/api/platforms');
 
+// --- Dashboard ---
+export const getDashboard = () =>
+  apiFetch('/api/dashboard');
+
+

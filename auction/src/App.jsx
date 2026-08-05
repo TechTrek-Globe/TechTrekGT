@@ -53,7 +53,7 @@ function MainContent({ pathname, navigateTo }) {
 
   return (
     <AppLayout activeView={activeView} onNavigate={handleNavigate}>
-      {activeView === 'dashboard' && <DashboardView />}
+      {activeView === 'dashboard' && <DashboardView onNavigate={handleNavigate} />}
       {activeView === 'inventory' && <InventoryView />}
       {activeView === 'sales' && <SalesLogView />}
       {activeView === 'pricing' && (

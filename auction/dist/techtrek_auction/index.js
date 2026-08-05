@@ -363,7 +363,7 @@ async function onRequestPost$7(context) {
     });
   }
 }
-async function onRequestGet$7(context) {
+async function onRequestGet$8(context) {
   const { request, env } = context;
   try {
     const token = getTokenFromRequest(request);
@@ -893,7 +893,7 @@ function daysBetween(fromDate, toDate) {
   const ms = new Date(toDate).getTime() - new Date(fromDate).getTime();
   return Math.floor(ms / (1e3 * 60 * 60 * 24));
 }
-async function onRequestGet$6(context) {
+async function onRequestGet$7(context) {
   const { request, env } = context;
   return withAuth(async () => {
     const payload = await requireAuth(request, env);
@@ -1048,7 +1048,7 @@ function getInvoiceId(url) {
   const parts = url.pathname.split("/");
   return parts[parts.length - 1] || null;
 }
-async function onRequestGet$5(context) {
+async function onRequestGet$6(context) {
   const { request, env } = context;
   return withAuth(async () => {
     const payload = await requireAuth(request, env);
@@ -1149,7 +1149,7 @@ async function onRequestDelete$2(context) {
     return ok({ success: true });
   });
 }
-async function onRequestGet$4(context) {
+async function onRequestGet$5(context) {
   const { request, env } = context;
   return withAuth(async () => {
     const payload = await requireAuth(request, env);
@@ -1208,7 +1208,7 @@ function getItemId(url) {
   const parts = url.pathname.split("/");
   return parts[parts.length - 1] || null;
 }
-async function onRequestGet$3(context) {
+async function onRequestGet$4(context) {
   const { request, env } = context;
   return withAuth(async () => {
     const payload = await requireAuth(request, env);
@@ -1346,7 +1346,7 @@ async function onRequestDelete$1(context) {
     return ok({ success: true });
   });
 }
-async function onRequestGet$2(context) {
+async function onRequestGet$3(context) {
   const { request, env } = context;
   return withAuth(async () => {
     const payload = await requireAuth(request, env);
@@ -1550,7 +1550,7 @@ function getSaleId(url) {
   const parts = url.pathname.split("/");
   return parts[parts.length - 1] || null;
 }
-async function onRequestGet$1(context) {
+async function onRequestGet$2(context) {
   const { request, env } = context;
   return withAuth(async () => {
     const payload = await requireAuth(request, env);
@@ -1697,7 +1697,7 @@ async function onRequestDelete(context) {
     return ok({ success: true, message: "Sale deleted and item status reverted" });
   });
 }
-async function onRequestGet(context) {
+async function onRequestGet$1(context) {
   const { request, env } = context;
   return withAuth(async () => {
     const payload = await requireAuth(request, env);
@@ -1706,6 +1706,158 @@ async function onRequestGet(context) {
       "SELECT * FROM auction_platforms WHERE user_id = ? ORDER BY is_default DESC, name ASC"
     ).bind(payload.userId).all();
     return ok({ platforms: rows.results || [] });
+  });
+}
+async function onRequestGet(context) {
+  return withAuth(async () => {
+    const { request, env } = context;
+    const { userId } = await requireAuth(request, env);
+    const db = env.DB;
+    const invStats = await db.prepare(`
+      SELECT
+        COUNT(*) as total_items,
+        SUM(CASE WHEN status = 'Available' THEN 1 ELSE 0 END) as available_items,
+        SUM(CASE WHEN status = 'Listed' THEN 1 ELSE 0 END) as listed_items,
+        SUM(CASE WHEN status = 'Sold' THEN 1 ELSE 0 END) as sold_items,
+        SUM(CASE WHEN status = 'Returned' THEN 1 ELSE 0 END) as returned_items,
+        SUM(CASE WHEN status IN ('Available', 'Listed') THEN true_total_cost ELSE 0 END) as capital_tied_up,
+        SUM(CASE WHEN status = 'Listed' THEN COALESCE(list_price, 0) ELSE 0 END) as listed_potential_revenue,
+        SUM(CASE WHEN status != 'Returned' THEN true_total_cost ELSE 0 END) as total_capital_invested
+      FROM auction_items
+      WHERE user_id = ?
+    `).bind(userId).first();
+    const salesStats = await db.prepare(`
+      SELECT
+        COUNT(*) as total_sales,
+        COALESCE(SUM(gross_sale_price), 0) as total_gross_sales,
+        COALESCE(SUM(net_proceeds), 0) as total_net_proceeds,
+        COALESCE(SUM(platform_fees_amt), 0) as total_platform_fees,
+        COALESCE(SUM(actual_shipping_cost), 0) as total_shipping_costs,
+        COALESCE(SUM(net_profit), 0) as total_net_profit,
+        COALESCE(AVG(days_to_sell), 0) as avg_days_to_sell
+      FROM auction_sales
+      WHERE user_id = ?
+    `).bind(userId).first();
+    const soldCostRow = await db.prepare(`
+      SELECT COALESCE(SUM(i.true_total_cost), 0) as total_sold_cost
+      FROM auction_sales s
+      JOIN auction_items i ON s.item_id = i.id
+      WHERE s.user_id = ?
+    `).bind(userId).first();
+    const totalSoldCost = soldCostRow?.total_sold_cost || 0;
+    const totalNetProfit = salesStats?.total_net_profit || 0;
+    const blendedRoi = totalSoldCost > 0 ? totalNetProfit / totalSoldCost : 0;
+    const categoryStats = await db.prepare(`
+      SELECT
+        category,
+        COUNT(*) as item_count,
+        SUM(CASE WHEN status IN ('Available', 'Listed') THEN true_total_cost ELSE 0 END) as capital_tied_up,
+        SUM(CASE WHEN status = 'Sold' THEN 1 ELSE 0 END) as sold_count
+      FROM auction_items
+      WHERE user_id = ? AND status != 'Returned'
+      GROUP BY category
+      ORDER BY capital_tied_up DESC, item_count DESC
+    `).bind(userId).all();
+    const authenticatorStats = await db.prepare(`
+      SELECT
+        COALESCE(NULLIF(authenticator, ''), 'Uncertified / Raw') as authenticator,
+        COUNT(*) as count,
+        SUM(CASE WHEN status IN ('Available', 'Listed') THEN true_total_cost ELSE 0 END) as capital_tied_up
+      FROM auction_items
+      WHERE user_id = ? AND status != 'Returned'
+      GROUP BY authenticator
+      ORDER BY count DESC
+    `).bind(userId).all();
+    const platformSalesStats = await db.prepare(`
+      SELECT
+        platform,
+        COUNT(*) as sales_count,
+        COALESCE(SUM(gross_sale_price), 0) as gross_volume,
+        COALESCE(SUM(net_profit), 0) as net_profit,
+        COALESCE(SUM(platform_fees_amt), 0) as total_fees
+      FROM auction_sales
+      WHERE user_id = ?
+      GROUP BY platform
+      ORDER BY sales_count DESC
+    `).bind(userId).all();
+    const monthlyTrend = await db.prepare(`
+      SELECT
+        strftime('%Y-%m', sale_date) as month,
+        COUNT(*) as sales_count,
+        COALESCE(SUM(gross_sale_price), 0) as gross_volume,
+        COALESCE(SUM(net_profit), 0) as net_profit
+      FROM auction_sales
+      WHERE user_id = ?
+      GROUP BY strftime('%Y-%m', sale_date)
+      ORDER BY month ASC
+      LIMIT 12
+    `).bind(userId).all();
+    const recentSales = await db.prepare(`
+      SELECT
+        s.id,
+        s.sale_date,
+        s.platform,
+        s.gross_sale_price,
+        s.net_profit,
+        s.roi_pct,
+        s.days_to_sell,
+        i.item_name,
+        i.category,
+        i.athlete_person
+      FROM auction_sales s
+      JOIN auction_items i ON s.item_id = i.id
+      WHERE s.user_id = ?
+      ORDER BY s.sale_date DESC, s.created_at DESC
+      LIMIT 5
+    `).bind(userId).all();
+    const recentAcquisitions = await db.prepare(`
+      SELECT
+        i.id,
+        i.item_name,
+        i.category,
+        i.athlete_person,
+        i.status,
+        i.unit_price,
+        i.true_total_cost,
+        i.min_sell_price,
+        i.suggested_list_price,
+        i.created_at,
+        inv.invoice_ref
+      FROM auction_items i
+      LEFT JOIN auction_invoices inv ON i.invoice_id = inv.id
+      WHERE i.user_id = ?
+      ORDER BY i.created_at DESC
+      LIMIT 5
+    `).bind(userId).all();
+    return ok({
+      inventory: {
+        total_items: invStats?.total_items || 0,
+        available_items: invStats?.available_items || 0,
+        listed_items: invStats?.listed_items || 0,
+        sold_items: invStats?.sold_items || 0,
+        returned_items: invStats?.returned_items || 0,
+        capital_tied_up: invStats?.capital_tied_up || 0,
+        listed_potential_revenue: invStats?.listed_potential_revenue || 0,
+        total_capital_invested: invStats?.total_capital_invested || 0
+      },
+      sales: {
+        total_sales: salesStats?.total_sales || 0,
+        total_gross_sales: salesStats?.total_gross_sales || 0,
+        total_net_proceeds: salesStats?.total_net_proceeds || 0,
+        total_platform_fees: salesStats?.total_platform_fees || 0,
+        total_shipping_costs: salesStats?.total_shipping_costs || 0,
+        total_net_profit: totalNetProfit,
+        total_sold_cost: totalSoldCost,
+        blended_roi: blendedRoi,
+        avg_days_to_sell: Math.round((salesStats?.avg_days_to_sell || 0) * 10) / 10
+      },
+      categories: categoryStats?.results || [],
+      authenticators: authenticatorStats?.results || [],
+      platforms: platformSalesStats?.results || [],
+      monthly_trend: monthlyTrend?.results || [],
+      recent_sales: recentSales?.results || [],
+      recent_acquisitions: recentAcquisitions?.results || []
+    });
   });
 }
 function addSecurityHeaders(response, isLocalhost = false) {
@@ -1790,38 +1942,40 @@ const worker = {
       } else if (apiPath === "/api/auth/update-profile" && request.method === "POST") {
         response = await onRequestPost$2(context);
       } else if (apiPath === "/api/auth/me" && request.method === "GET") {
-        response = await onRequestGet$7(context);
+        response = await onRequestGet$8(context);
       } else if (apiPath === "/api/auth/logout" && request.method === "POST") {
         response = await onRequestPost$6(context);
       } else if (apiPath === "/api/invoices" && request.method === "GET") {
-        response = await onRequestGet$6(context);
+        response = await onRequestGet$7(context);
       } else if (apiPath === "/api/invoices" && request.method === "POST") {
         response = await onRequestPost$1(context);
       } else if (/^\/api\/invoices\/[^/]+$/.test(apiPath) && request.method === "GET") {
-        response = await onRequestGet$5(context);
+        response = await onRequestGet$6(context);
       } else if (/^\/api\/invoices\/[^/]+$/.test(apiPath) && request.method === "PUT") {
         response = await onRequestPut$2(context);
       } else if (/^\/api\/invoices\/[^/]+$/.test(apiPath) && request.method === "DELETE") {
         response = await onRequestDelete$2(context);
       } else if (apiPath === "/api/items" && request.method === "GET") {
-        response = await onRequestGet$4(context);
+        response = await onRequestGet$5(context);
       } else if (/^\/api\/items\/[^/]+$/.test(apiPath) && request.method === "GET") {
-        response = await onRequestGet$3(context);
+        response = await onRequestGet$4(context);
       } else if (/^\/api\/items\/[^/]+$/.test(apiPath) && request.method === "PUT") {
         response = await onRequestPut$1(context);
       } else if (/^\/api\/items\/[^/]+$/.test(apiPath) && request.method === "DELETE") {
         response = await onRequestDelete$1(context);
       } else if (apiPath === "/api/sales" && request.method === "GET") {
-        response = await onRequestGet$2(context);
+        response = await onRequestGet$3(context);
       } else if (apiPath === "/api/sales" && request.method === "POST") {
         response = await onRequestPost(context);
       } else if (/^\/api\/sales\/[^/]+$/.test(apiPath) && request.method === "GET") {
-        response = await onRequestGet$1(context);
+        response = await onRequestGet$2(context);
       } else if (/^\/api\/sales\/[^/]+$/.test(apiPath) && request.method === "PUT") {
         response = await onRequestPut(context);
       } else if (/^\/api\/sales\/[^/]+$/.test(apiPath) && request.method === "DELETE") {
         response = await onRequestDelete(context);
       } else if (apiPath === "/api/platforms" && request.method === "GET") {
+        response = await onRequestGet$1(context);
+      } else if (apiPath === "/api/dashboard" && request.method === "GET") {
         response = await onRequestGet(context);
       } else if (apiPath.startsWith("/api/")) {
         response = new Response(JSON.stringify({ error: "Endpoint not found" }), {

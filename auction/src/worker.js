@@ -13,6 +13,7 @@ import { onRequestGet as itemGetHandler, onRequestPut as itemPutHandler, onReque
 import { onRequestGet as salesListHandler, onRequestPost as salesCreateHandler } from '../functions/api/sales/index.js';
 import { onRequestGet as saleGetHandler, onRequestPut as salePutHandler, onRequestDelete as saleDeleteHandler } from '../functions/api/sales/[id].js';
 import { onRequestGet as platformsListHandler } from '../functions/api/platforms/index.js';
+import { onRequestGet as dashboardHandler } from '../functions/api/dashboard.js';
 
 function addSecurityHeaders(response, isLocalhost = false) {
   const newHeaders = new Headers(response.headers);
@@ -142,6 +143,9 @@ export default {
       // --- Platforms ---
       } else if (apiPath === '/api/platforms' && request.method === 'GET') {
         response = await platformsListHandler(context);
+      // --- Dashboard ---
+      } else if (apiPath === '/api/dashboard' && request.method === 'GET') {
+        response = await dashboardHandler(context);
       } else if (apiPath.startsWith('/api/')) {
         response = new Response(JSON.stringify({ error: 'Endpoint not found' }), {
           status: 404,

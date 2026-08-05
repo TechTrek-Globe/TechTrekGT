@@ -295,52 +295,6 @@ function DailySpreadsheetMatrix() {
     updateDailyMatrixCell(selectedAccountId, monthKey, day, field, val);
   }, [updateDailyMatrixCell, selectedAccountId]);
 
-  const handleDragOver = useCallback((e, row, field) => {
-    if (!draggedCell || draggedCell.field !== field) return;
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-  }, [draggedCell]);
-
-  const handleDragEnter = useCallback((e, row, field) => {
-    if (!draggedCell || draggedCell.field !== field) return;
-    e.preventDefault();
-    setDropTarget(prev => (prev?.rowKey === row.rowKey && prev?.field === field ? prev : { rowKey: row.rowKey, field }));
-  }, [draggedCell]);
-
-  const handleDragLeave = useCallback((e, row, field) => {
-    setDropTarget(prev => (prev?.rowKey === row.rowKey && prev?.field === field ? null : prev));
-  }, []);
-
-  const handleDrop = useCallback((e, targetRow, field) => {
-    e.preventDefault();
-    setDropTarget(null);
-    let payload = draggedCell;
-    if (!payload) {
-      try {
-        const raw = e.dataTransfer.getData('text/plain');
-        if (raw) payload = JSON.parse(raw);
-      } catch {
-        // ignore
-      }
-    }
-    if (!payload || payload.field !== field) return;
-    if (payload.sourceMonthKey === targetRow.monthKey && payload.sourceDay === targetRow.day) {
-      setDraggedCell(null);
-      return;
-    }
-
-    moveDailyMatrixCell(
-      selectedAccountId,
-      payload.sourceMonthKey,
-      payload.sourceDay,
-      targetRow.monthKey,
-      targetRow.day,
-      field,
-      payload.value,
-      payload.extraData
-    );
-    setDraggedCell(null);
-  }, [draggedCell, moveDailyMatrixCell, selectedAccountId]);
 
   const monthKey = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`;
   const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();

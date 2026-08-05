@@ -14,6 +14,7 @@ export const PRESET_SECURITY_QUESTIONS = [
 export default function AuthModal() {
   const { 
     user, 
+    isAuthenticated,
     isAuthModalOpen, 
     setIsAuthModalOpen, 
     login, 
@@ -28,7 +29,20 @@ export default function AuthModal() {
   
   // Form fields
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const [rememberMe, setRememberMe] = useState(() => {
+    try {
+      return Boolean(localStorage.getItem('techtrek_saved_email'));
+    } catch (e) {
+      return false;
+    }
+  });
+  const [email, setEmail] = useState(() => {
+    try {
+      return localStorage.getItem('techtrek_saved_email') || '';
+    } catch (e) {
+      return '';
+    }
+  });
   const [password, setPassword] = useState('');
   const [securityQuestion, setSecurityQuestion] = useState(PRESET_SECURITY_QUESTIONS[0]);
   const [securityAnswer, setSecurityAnswer] = useState('');
@@ -40,7 +54,6 @@ export default function AuthModal() {
   // Reset password state
   const [resetToken, setResetToken] = useState('');
   const [newPassword, setNewPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(false);
   
   const [error, setError] = useState('');
   const [infoMessage, setInfoMessage] = useState('');
@@ -96,8 +109,18 @@ export default function AuthModal() {
           return;
         }
         await register(name, email, password, securityQuestion, securityAnswer, rememberMe);
+        if (rememberMe && email) {
+          try { localStorage.setItem('techtrek_saved_email', email); } catch (e) {}
+        } else {
+          try { localStorage.removeItem('techtrek_saved_email'); } catch (e) {}
+        }
       } else if (mode === 'signin') {
         await login(email, password, rememberMe);
+        if (rememberMe && email) {
+          try { localStorage.setItem('techtrek_saved_email', email); } catch (e) {}
+        } else {
+          try { localStorage.removeItem('techtrek_saved_email'); } catch (e) {}
+        }
       } else if (mode === 'forgot') {
         if (forgotStep === 1) {
           await handleFetchQuestion();
@@ -159,16 +182,15 @@ export default function AuthModal() {
               </p>
             </div>
           </div>
-          <button
-            onClick={() => {
-              if (user) {
-                setIsAuthModalOpen(false);
-              }
-            }}
-            className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          {isAuthenticated && user && (
+            <button
+              type="button"
+              onClick={() => setIsAuthModalOpen(false)}
+              className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
         </div>
 
         {/* Form Body */}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { BudgetMetadataProvider } from './context/BudgetMetadataContext';
 import { LedgerDataProvider } from './context/LedgerDataContext';
 import { useBudget } from './context/BudgetContext';
@@ -12,6 +12,7 @@ import { LedgerView } from './components/LedgerView';
 import { AmortizationView } from './components/AmortizationView';
 import { LandingPage } from './components/LandingPage';
 import AuthModal from './components/AuthModal';
+import { Lock } from 'lucide-react';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -82,6 +83,24 @@ class ErrorBoundary extends React.Component {
 
 function MainContent() {
   const { activeView, isSettingsOpen } = useBudget();
+  const { isAuthenticated } = useAuth();
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-[70vh] flex flex-col items-center justify-center p-8 text-center">
+        <div className="max-w-md w-full p-8 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-2xl backdrop-blur-xl text-center space-y-4">
+          <div className="w-12 h-12 rounded-2xl bg-slate-800/90 border border-slate-700/80 mx-auto flex items-center justify-center text-emerald-400 shadow-inner">
+            <Lock className="w-6 h-6" />
+          </div>
+          <h2 className="text-xl font-bold text-slate-100">Authentication Required</h2>
+          <p className="text-xs text-slate-400">
+            Please sign in with your TechTrek account credentials to access your personal dashboard and ledger.
+          </p>
+        </div>
+        <AuthModal />
+      </div>
+    );
+  }
 
   return (
     <>

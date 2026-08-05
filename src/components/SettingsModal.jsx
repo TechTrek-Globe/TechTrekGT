@@ -1870,7 +1870,7 @@ export function SettingsModal() {
                       </div>
 
                       {/* Account Bills Table */}
-                      <div className="overflow-x-auto">
+                      <div className="overflow-x-auto matrix-scrollbar">
                         <table className="w-full text-left text-xs text-slate-300">
                           <thead className="bg-slate-900 text-slate-400 uppercase font-medium text-[10px] border-b border-slate-800">
                             <tr>
@@ -2037,7 +2037,7 @@ export function SettingsModal() {
                       </div>
 
                       {/* Account Splits Table */}
-                      <div className="overflow-x-auto">
+                      <div className="overflow-x-auto matrix-scrollbar">
                         <table className="w-full text-left text-xs text-slate-300 min-w-[700px]">
                           <thead className="bg-slate-900 text-slate-400 uppercase font-medium text-[10px] border-b border-slate-800">
                             <tr>

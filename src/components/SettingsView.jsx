@@ -299,91 +299,87 @@ export function SettingsView() {
         </div>
       </div>
 
-      {/* Main View Layout: Left Vertical Nav Column + Content Panel */}
-      <div className="flex flex-col lg:flex-row gap-6 min-h-[650px] items-start">
+      {/* Main View Layout: Horizontal Nav + Content Panel */}
+      <div className="flex flex-col gap-6 min-h-[650px]">
 
-        {/* Left Section Navigation (Vertical Bar) */}
-        <aside className="w-full lg:w-64 flex-shrink-0 bg-slate-900/40 backdrop-blur-xl border border-slate-800/80 rounded-2xl p-4 flex flex-col justify-between space-y-6 shadow-xl lg:sticky lg:top-6">
-          <div className="space-y-3">
-            <div className="flex items-center justify-between px-2 pb-1 border-b border-slate-800/60">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                Configuration Sections
-              </p>
-              <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+        {/* Top Section Navigation (Horizontal Bar) */}
+        <aside className="w-full bg-slate-900/40 backdrop-blur-xl border border-slate-800/80 rounded-2xl p-1.5 sm:p-2 flex flex-col gap-1.5 shadow-xl">
+          <div className="flex items-center justify-between px-2 pt-1 pb-1">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+              Configuration Sections
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse block" />
+            </p>
+            <div className="text-[10px] text-slate-500 flex items-center gap-1.5">
+              <span>Auto-saves to local storage</span>
+              <CheckCircle2 className="w-3 h-3 text-emerald-500/70" />
             </div>
-
-            <nav className="space-y-1.5" aria-label="Settings configuration sections">
-              {sidebarNav.map(section => {
-                const Icon = section.icon;
-                const isActive = activeSection === section.id;
-                return (
-                  <div key={section.id} className="space-y-1">
-                    <button
-                      onClick={() => handleSidebarNav(section.id)}
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all cursor-pointer text-left group ${
-                        isActive
-                          ? 'bg-blue-600/15 text-blue-300 border border-blue-500/30 shadow-sm shadow-blue-500/10 font-bold'
-                          : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/50 border border-transparent'
-                      }`}
-                    >
-                      <span className={`p-2 rounded-xl flex-shrink-0 transition-all ${
-                        isActive ? 'bg-blue-600/25 text-blue-400 border border-blue-500/20' : 'bg-slate-950/60 border border-slate-800/80 text-slate-400 group-hover:text-slate-200'
-                      }`}>
-                        <Icon className="w-4 h-4" />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <div className={`text-xs truncate ${isActive ? 'text-blue-100' : 'text-slate-200 font-medium'}`}>
-                          {section.label}
-                        </div>
-                        <div className="text-[10px] text-slate-400 truncate leading-tight mt-0.5">{section.desc}</div>
-                      </div>
-                      {section.badge !== null && section.badge > 0 && (
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold flex-shrink-0 ${
-                          isActive ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' : 'bg-slate-950 text-slate-400 border border-slate-800'
-                        }`}>
-                          {section.badge}
-                        </span>
-                      )}
-                    </button>
-
-                    {/* Setup Vertical Sub-Items (Accounts vs Bills) */}
-                    {section.id === 'setup' && isActive && (
-                      <div className="ml-5 pl-3 border-l-2 border-blue-500/40 my-1 space-y-1">
-                        {setupSubNavItems.map(sub => {
-                          const SubIcon = sub.icon;
-                          const isSubActive = settingsTab === sub.id;
-                          return (
-                            <button
-                              key={sub.id}
-                              onClick={() => { setSettingsTab(sub.id); setSetupSubTab(sub.id); }}
-                              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs transition-all cursor-pointer text-left ${
-                                isSubActive
-                                  ? 'bg-blue-600/20 text-blue-200 font-bold border border-blue-500/30'
-                                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border border-transparent'
-                              }`}
-                            >
-                              <SubIcon className={`w-3.5 h-3.5 flex-shrink-0 ${isSubActive ? 'text-blue-400' : 'text-slate-400'}`} />
-                              <span className="truncate">{sub.label}</span>
-                              {sub.count !== null && (
-                                <span className={`ml-auto text-[10px] font-mono font-semibold px-1.5 py-0.2 rounded ${isSubActive ? 'text-blue-300 bg-blue-950/60' : 'text-slate-500'}`}>
-                                  {sub.count}
-                                </span>
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
+          </div>
+          
+          <div className="flex items-stretch gap-1.5 overflow-x-auto pb-1 scrollbar-hide px-1">
+            {sidebarNav.map(section => {
+              const Icon = section.icon;
+              const isActive = activeSection === section.id;
+              return (
+                <button
+                  key={section.id}
+                  onClick={() => handleSidebarNav(section.id)}
+                  className={`flex-1 min-w-[140px] flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all cursor-pointer text-left group ${
+                    isActive
+                      ? 'bg-blue-600/15 text-blue-300 border border-blue-500/30 shadow-sm shadow-blue-500/10 font-bold'
+                      : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/50 border border-transparent'
+                  }`}
+                >
+                  <span className={`p-2 rounded-xl flex-shrink-0 transition-all ${
+                    isActive ? 'bg-blue-600/25 text-blue-400 border border-blue-500/20' : 'bg-slate-950/60 border border-slate-800/80 text-slate-400 group-hover:text-slate-200'
+                  }`}>
+                    <Icon className="w-4 h-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className={`text-xs truncate ${isActive ? 'text-blue-100' : 'text-slate-200 font-medium'}`}>
+                      {section.label}
+                    </div>
+                    <div className="text-[9px] text-slate-400 truncate leading-tight mt-0.5">{section.desc}</div>
                   </div>
+                  {section.badge !== null && section.badge > 0 && (
+                    <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-mono font-bold flex-shrink-0 ${
+                      isActive ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' : 'bg-slate-950 text-slate-400 border border-slate-800'
+                    }`}>
+                      {section.badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Setup Sub-Items (Accounts vs Bills) */}
+          {activeSection === 'setup' && (
+            <div className="flex items-center gap-2 pt-1.5 px-2 pb-0.5 border-t border-slate-800/60 overflow-x-auto">
+              {setupSubNavItems.map(sub => {
+                const SubIcon = sub.icon;
+                const isSubActive = settingsTab === sub.id;
+                return (
+                  <button
+                    key={sub.id}
+                    onClick={() => { setSettingsTab(sub.id); setSetupSubTab(sub.id); }}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer ${
+                      isSubActive
+                        ? 'bg-blue-600/20 text-blue-200 font-bold border border-blue-500/30'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border border-transparent'
+                    }`}
+                  >
+                    <SubIcon className={`w-3.5 h-3.5 flex-shrink-0 ${isSubActive ? 'text-blue-400' : 'text-slate-400'}`} />
+                    <span className="whitespace-nowrap">{sub.label}</span>
+                    {sub.count !== null && (
+                      <span className={`ml-1.5 text-[9px] font-mono font-semibold px-1.5 py-0.5 rounded ${isSubActive ? 'text-blue-300 bg-blue-950/60' : 'text-slate-500'}`}>
+                        {sub.count}
+                      </span>
+                    )}
+                  </button>
                 );
               })}
-            </nav>
-          </div>
-
-          <div className="pt-4 border-t border-slate-800/80 px-2 text-[11px] text-slate-400 flex items-center justify-between">
-            <span>Auto-saves to local storage</span>
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-          </div>
+            </div>
+          )}
         </aside>
 
         {/* Content Panel Area */}
@@ -868,50 +864,50 @@ export function SettingsView() {
                           </span>
                         </div>
 
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-left text-xs text-slate-300">
-                            <thead className="bg-slate-900 text-slate-400 uppercase font-medium text-[10px] border-b border-slate-800">
+                        <div className="overflow-x-auto matrix-scrollbar">
+                          <table className="w-full text-left text-[11px] text-slate-300 table-fixed">
+                            <thead className="bg-slate-900 text-slate-400 uppercase font-medium text-[9px] border-b border-slate-800">
                               <tr>
-                                <th className="p-3">Bill Name</th>
-                                <th className="p-3">Amount</th>
-                                <th className="p-3">Period</th>
-                                <th className="p-3">Assigned Account</th>
-                                <th className="p-3">Due Day</th>
-                                <th className="p-3 text-right">Actions</th>
+                                <th className="px-2 py-1.5 w-[35%] sm:w-[38%]">Bill Name</th>
+                                <th className="px-1 py-1.5 w-[12%] sm:w-[10%]">Amount</th>
+                                <th className="px-1 py-1.5 w-[14%] sm:w-[12%]">Period</th>
+                                <th className="px-1 py-1.5 w-[24%] sm:w-[25%]">Assigned Account</th>
+                                <th className="px-1 py-1.5 w-[10%] sm:w-[10%]">Due Day</th>
+                                <th className="px-2 py-1.5 w-[5%] text-right">Actions</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-800 bg-slate-950/40">
                               {accountBills.length === 0 ? (
                                 <tr>
-                                  <td colSpan={6} className="p-3 text-center text-slate-500 italic">
+                                  <td colSpan={6} className="p-3 text-center text-slate-500 italic text-xs">
                                     No bills assigned to this account
                                   </td>
                                 </tr>
                               ) : (
                                 accountBills.map(bill => (
                                   <tr key={bill.id} className="hover:bg-slate-900/60 transition-colors">
-                                    <td className="p-3 font-semibold text-slate-200">
+                                    <td className="px-2 py-1 font-semibold text-slate-200">
                                       <input
                                         type="text"
                                         value={bill.name}
                                         onChange={e => updateBill(bill.id, { name: e.target.value })}
-                                        className="bg-transparent border-b border-transparent hover:border-slate-700 focus:border-emerald-500 focus:outline-none"
+                                        className="bg-transparent border-b border-transparent hover:border-slate-700 focus:border-emerald-500 focus:outline-none w-full min-w-[60px] truncate"
                                       />
                                     </td>
-                                    <td className="p-3 font-mono">
+                                    <td className="px-1 py-1 font-mono">
                                       <input
                                         type="number"
                                         step="0.01"
                                         value={bill.amount}
                                         onChange={e => updateBill(bill.id, { amount: parseFloat(e.target.value) || 0 })}
-                                        className="w-24 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-200 font-mono"
+                                        className="w-14 sm:w-16 bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-slate-200 font-mono text-[10px]"
                                       />
                                     </td>
-                                    <td className="p-3">
+                                    <td className="px-1 py-1">
                                       <select
                                         value={bill.period}
                                         onChange={e => updateBill(bill.id, { period: e.target.value })}
-                                        className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-200"
+                                        className="w-16 sm:w-20 bg-slate-900 border border-slate-700 rounded px-0.5 py-0.5 text-slate-200 text-[10px] truncate"
                                       >
                                         <option value="Monthly">Monthly</option>
                                         <option value="Quarterly">Quarterly</option>
@@ -919,27 +915,27 @@ export function SettingsView() {
                                         <option value="Annual">Annual</option>
                                       </select>
                                     </td>
-                                    <td className="p-3">
+                                    <td className="px-1 py-1">
                                       <select
                                         value={bill.accountId}
                                         onChange={e => updateBill(bill.id, { accountId: e.target.value })}
-                                        className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-200 text-xs"
+                                        className="w-full max-w-[110px] sm:max-w-[150px] bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-slate-200 text-[10px] truncate"
                                       >
                                         {budget.accounts.map(acc => (
                                           <option key={acc.id} value={acc.id}>{acc.name}</option>
                                         ))}
                                       </select>
                                     </td>
-                                    <td className="p-3 font-mono">
+                                    <td className="px-1 py-1 font-mono text-[10px] whitespace-nowrap">
                                       Day {bill.dueDay}
                                     </td>
-                                    <td className="p-3 text-right">
+                                    <td className="px-2 py-1.5 text-right">
                                       <button
                                         type="button"
                                         onClick={() => deleteBill(bill.id)}
                                         className="p-1 text-slate-500 hover:text-rose-400 rounded transition-colors"
                                       >
-                                        <Trash2 className="w-4 h-4" />
+                                        <Trash2 className="w-3.5 h-3.5" />
                                       </button>
                                     </td>
                                   </tr>

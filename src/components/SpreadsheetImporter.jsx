@@ -655,7 +655,7 @@ export function SpreadsheetImporter() {
 
                 {/* Preview table */}
                 {!collapsed && count > 0 && (
-                  <div className="border-t border-slate-800/60 overflow-x-auto max-h-64 overflow-y-auto">
+                  <div className="border-t border-slate-800/60 overflow-x-auto matrix-scrollbar max-h-64 overflow-y-auto">
                     <table className="w-full text-[10px] text-slate-400" style={{ minWidth: '520px' }}>
                       <thead className="bg-slate-900/80 sticky top-0 z-10">
                         <tr>
@@ -788,7 +788,7 @@ export function SpreadsheetImporter() {
               </div>
 
               {/* Scrollable table */}
-              <div className="overflow-auto flex-1">
+              <div className="overflow-auto matrix-scrollbar flex-1">
                 <table className="text-[11px] text-slate-300 border-collapse" style={{ minWidth: `${cols.length * 140}px` }}>
                   <thead className="sticky top-0 z-10 bg-slate-950">
                     <tr>

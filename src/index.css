@@ -119,6 +119,10 @@
 .sidebar-scroll::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 2px; }
 
 /* Custom High-Contrast Matrix Scrollbar */
+.matrix-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #6366f1 #090d16;
+}
 .matrix-scrollbar::-webkit-scrollbar {
   height: 14px;
   width: 10px;
@@ -137,6 +141,18 @@
 .matrix-scrollbar::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(90deg, #60a5fa 0%, #818cf8 50%, #a78bfa 100%);
 }
+
+html.light .matrix-scrollbar {
+  scrollbar-color: #6366f1 #f1f5f9;
+}
+html.light .matrix-scrollbar::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+}
+html.light .matrix-scrollbar::-webkit-scrollbar-thumb {
+  border: 2px solid #ffffff;
+}
+
 
 /* LIGHT MODE STYLES & OVERRIDES */
 html.light, body.light {

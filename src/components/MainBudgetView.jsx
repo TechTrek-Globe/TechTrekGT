@@ -65,7 +65,7 @@ export function MainBudgetView() {
               </span>
             </div>
 
-            <div className="overflow-x-auto rounded-2xl border border-slate-800 glass-panel">
+            <div className="overflow-x-auto matrix-scrollbar rounded-2xl border border-slate-800 glass-panel">
               <table className="w-full text-left text-xs text-slate-300">
                 <thead className="bg-slate-900/90 text-slate-500 uppercase font-semibold text-[10px] border-b border-slate-800">
                   <tr>

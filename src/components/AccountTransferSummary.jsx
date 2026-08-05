@@ -210,7 +210,7 @@ export function AccountTransferSummary() {
       </div>
 
       {/* Table */}
-      <div className={`overflow-x-auto rounded-xl border shadow-lg ${isLight ? 'border-slate-200' : 'border-slate-800/80'}`}>
+      <div className={`overflow-x-auto matrix-scrollbar rounded-xl border shadow-lg ${isLight ? 'border-slate-200' : 'border-slate-800/80'}`}>
         <table className="w-full text-left text-xs border-collapse">
           {/* Header Row: High-Contrast Green Header Bar */}
           <thead className={`${isLight ? 'bg-emerald-800 text-white' : 'bg-emerald-950/90 text-emerald-100'} font-extrabold text-[11px] border-b ${isLight ? 'border-emerald-700' : 'border-emerald-800/60'}`}>

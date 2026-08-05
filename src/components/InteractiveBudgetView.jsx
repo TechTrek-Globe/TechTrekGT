@@ -236,7 +236,7 @@ export function InteractiveBudgetView() {
 
             {/* Bills Table */}
             {!isCollapsed && (
-              <div className="overflow-x-auto border border-t-0 border-slate-800 rounded-b-2xl glass-panel">
+              <div className="overflow-x-auto matrix-scrollbar border border-t-0 border-slate-800 rounded-b-2xl glass-panel">
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-900/90 text-slate-500 uppercase font-semibold text-[10px] border-b border-slate-800">
                     <tr>

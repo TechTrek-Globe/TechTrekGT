@@ -118,7 +118,7 @@ export function AccountLedgerView() {
       </div>
 
       {/* Ledger Table */}
-      <div className="overflow-x-auto rounded-2xl border border-slate-800 glass-panel">
+      <div className="overflow-x-auto matrix-scrollbar rounded-2xl border border-slate-800 glass-panel">
         <table className="w-full text-left text-xs text-slate-300">
           <thead className="bg-slate-900/90 text-slate-400 uppercase font-medium border-b border-slate-800">
             <tr>

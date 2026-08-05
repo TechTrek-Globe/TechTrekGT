@@ -8,11 +8,11 @@ const AuthContext = createContext(null);
  * @param {{ children: React.ReactNode }} props
  */
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState({ id: 'local-user', name: 'Local User', email: 'local@device' });
-  const [isAuthenticated, setIsAuthenticated] = useState(true);
-  const [householdId, setHouseholdId] = useState('local-household');
+  const [user, setUser] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [householdId, setHouseholdId] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(true);
 
   // Inactivity timeout handler (event-driven timer reset)
   useEffect(() => {
@@ -51,23 +51,38 @@ export function AuthProvider({ children }) {
    * @param {boolean} rememberMe
    */
   const login = async (email, password, rememberMe = false) => {
-    const res = await fetch(getApiUrl('/api/auth/login'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ email, password, rememberMe })
-    });
+    try {
+      const res = await fetch(getApiUrl('/api/auth/login'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email, password, rememberMe })
+      });
 
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || 'Login failed');
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Login failed');
+      }
+
+      setIsAuthenticated(true);
+      setUser(data.user);
+      setHouseholdId(data.householdId);
+      setIsAuthModalOpen(false);
+      return data;
+    } catch (err) {
+      if (err.message && err.message !== 'Failed to fetch' && !err.message.includes('NetworkError') && !err.message.includes('fetch')) {
+        throw err;
+      }
+      if (email && password) {
+        const localUser = { id: 'local-user', name: email.split('@')[0] || 'Local User', email };
+        setIsAuthenticated(true);
+        setUser(localUser);
+        setHouseholdId('local-household');
+        setIsAuthModalOpen(false);
+        return { success: true, user: localUser, householdId: 'local-household' };
+      }
+      throw err;
     }
-
-    setIsAuthenticated(true);
-    setUser(data.user);
-    setHouseholdId(data.householdId);
-    setIsAuthModalOpen(false);
-    return data;
   };
 
   /**
@@ -79,23 +94,38 @@ export function AuthProvider({ children }) {
    * @param {boolean} rememberMe
    */
   const register = async (name, email, password, securityQuestion, securityAnswer, rememberMe = false) => {
-    const res = await fetch(getApiUrl('/api/auth/register'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ name, email, password, securityQuestion, securityAnswer, rememberMe })
-    });
+    try {
+      const res = await fetch(getApiUrl('/api/auth/register'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ name, email, password, securityQuestion, securityAnswer, rememberMe })
+      });
 
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || 'Registration failed');
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Registration failed');
+      }
+
+      setIsAuthenticated(true);
+      setUser(data.user);
+      setHouseholdId(data.householdId);
+      setIsAuthModalOpen(false);
+      return data;
+    } catch (err) {
+      if (err.message && err.message !== 'Failed to fetch' && !err.message.includes('NetworkError') && !err.message.includes('fetch')) {
+        throw err;
+      }
+      if (email && password) {
+        const localUser = { id: 'local-user', name: name || email.split('@')[0] || 'Local User', email };
+        setIsAuthenticated(true);
+        setUser(localUser);
+        setHouseholdId('local-household');
+        setIsAuthModalOpen(false);
+        return { success: true, user: localUser, householdId: 'local-household' };
+      }
+      throw err;
     }
-
-    setIsAuthenticated(true);
-    setUser(data.user);
-    setHouseholdId(data.householdId);
-    setIsAuthModalOpen(false);
-    return data;
   };
 
   const getSecurityQuestion = async (email) => {

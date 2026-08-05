@@ -25,7 +25,8 @@ const emptyItem = () => ({
 /**
  * @param {{ open: boolean, platforms: Array, onClose: () => void, onCreated: () => void }} props
  */
-export function AddInvoiceModal({ open, platforms, onClose, onCreated }) {
+export function AddInvoiceModal({ open, isOpen, platforms = [], onClose, onCreated }) {
+  const isModalOpen = open !== undefined ? Boolean(open) : Boolean(isOpen);
   const [step, setStep]         = useState(1); // 1=header, 2=items
   const [submitting, setSubmitting] = useState(false);
   const [error, setError]       = useState('');
@@ -42,7 +43,7 @@ export function AddInvoiceModal({ open, platforms, onClose, onCreated }) {
   const [items, setItems] = useState([emptyItem()]);
 
   // Default platform (eBay)
-  const defaultPlatform = platforms.find(p => p.is_default) || platforms[0] || { name: 'eBay', fee_pct: 0.136, flat_fee: 0.40 };
+  const defaultPlatform = (platforms || []).find(p => p.is_default) || (platforms || [])[0] || { name: 'eBay', fee_pct: 0.136, flat_fee: 0.40 };
 
   const reset = () => {
     setStep(1); setError('');
@@ -66,7 +67,7 @@ export function AddInvoiceModal({ open, platforms, onClose, onCreated }) {
     setItems(prev => prev.map(it => {
       const price = parseFloat(it.unit_price) || 0;
       if (!price) return { ...it, _preview: null };
-      const plat = platforms.find(p => p.name === it.platform) || defaultPlatform;
+      const plat = (platforms || []).find(p => p.name === it.platform) || defaultPlatform;
       const proration = computeItemProration({ unit_price: price }, inv);
       const pricing   = computePricingFloors({
         true_total_cost:   proration.true_total_cost,
@@ -107,7 +108,7 @@ export function AddInvoiceModal({ open, platforms, onClose, onCreated }) {
         shipping:      parseFloat(shipping) || 0,
         tax:           parseFloat(tax)      || 0,
         items: items.map(it => {
-          const plat = platforms.find(p => p.name === it.platform) || defaultPlatform;
+          const plat = (platforms || []).find(p => p.name === it.platform) || defaultPlatform;
           return {
             item_name:         it.item_name.trim(),
             category:          it.category,
@@ -137,7 +138,7 @@ export function AddInvoiceModal({ open, platforms, onClose, onCreated }) {
     }
   };
 
-  if (!open) return null;
+  if (!isModalOpen) return null;
 
   const baseTotal = items.reduce((s, it) => s + (parseFloat(it.unit_price) || 0), 0);
   const netLanded = baseTotal - (parseFloat(discount) || 0) + (parseFloat(shipping) || 0) + (parseFloat(tax) || 0);

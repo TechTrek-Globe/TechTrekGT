@@ -16,7 +16,10 @@ import { computeSaleMetrics, daysBetween, fmtCurrency, fmtPct } from '../utils/f
  *   onSaved: () => void
  * }} props
  */
-export function LogSaleModal({ open, saleToEdit, preselectedItem, platforms, onClose, onSaved }) {
+export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, platforms = [], onClose, onSaved, onCreated }) {
+  const isModalOpen = open !== undefined ? Boolean(open) : Boolean(isOpen);
+  const targetItem = preselectedItem || item;
+  const handleSaved = onSaved || onCreated || (() => {});
   const isEdit = Boolean(saleToEdit);
 
   const [availableItems, setAvailableItems] = useState([]);
@@ -40,12 +43,12 @@ export function LogSaleModal({ open, saleToEdit, preselectedItem, platforms, onC
 
   // Default platform fallback
   const defaultPlatform = useMemo(() => {
-    return platforms.find(p => p.is_default) || platforms[0] || { name: 'eBay', fee_pct: 0.136, flat_fee: 0.40 };
+    return (platforms || []).find(p => p.is_default) || (platforms || [])[0] || { name: 'eBay', fee_pct: 0.136, flat_fee: 0.40 };
   }, [platforms]);
 
   // Load available items if creating a new sale without a pre-selected item
   useEffect(() => {
-    if (!open) return;
+    if (!isModalOpen) return;
 
     if (isEdit && saleToEdit) {
       setSelectedItem({
@@ -95,7 +98,7 @@ export function LogSaleModal({ open, saleToEdit, preselectedItem, platforms, onC
 
   const applyItemPlatformDefaults = (item, platName) => {
     setPlatform(platName);
-    const plat = platforms.find(p => p.name === platName) || defaultPlatform;
+    const plat = (platforms || []).find(p => p.name === platName) || defaultPlatform;
     if (plat) {
       setPlatformFeePct((plat.fee_pct * 100).toString());
       setPlatformFlatFee(plat.flat_fee.toString());
@@ -107,7 +110,7 @@ export function LogSaleModal({ open, saleToEdit, preselectedItem, platforms, onC
 
   const handlePlatformChange = (newPlat) => {
     setPlatform(newPlat);
-    const plat = platforms.find(p => p.name === newPlat);
+    const plat = (platforms || []).find(p => p.name === newPlat);
     if (plat) {
       setPlatformFeePct((plat.fee_pct * 100).toString());
       setPlatformFlatFee(plat.flat_fee.toString());
@@ -194,7 +197,7 @@ export function LogSaleModal({ open, saleToEdit, preselectedItem, platforms, onC
         await createSale(payload);
       }
 
-      onSaved();
+      handleSaved();
       onClose();
     } catch (err) {
       setError(err.message || 'Failed to save sale.');
@@ -203,7 +206,7 @@ export function LogSaleModal({ open, saleToEdit, preselectedItem, platforms, onC
     }
   };
 
-  if (!open) return null;
+  if (!isModalOpen) return null;
 
   const filteredItems = availableItems.filter(it => {
     if (!itemSearch) return true;

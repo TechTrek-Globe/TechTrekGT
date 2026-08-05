@@ -545,11 +545,13 @@ export function DashboardView({ onNavigate }) {
       {/* Modals */}
       <AddInvoiceModal
         isOpen={addInvoiceOpen}
+        platforms={platforms}
         onClose={() => setAddInvoiceOpen(false)}
         onCreated={fetchDashboard}
       />
       <LogSaleModal
         isOpen={logSaleOpen}
+        platforms={platforms}
         onClose={() => setLogSaleOpen(false)}
         onCreated={fetchDashboard}
       />

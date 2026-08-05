@@ -499,6 +499,7 @@ export function InventoryView() {
       {/* Modals */}
       <AddInvoiceModal
         isOpen={modalOpen}
+        platforms={platforms}
         onClose={() => setModalOpen(false)}
         onCreated={() => fetchItems(1)}
       />
@@ -510,6 +511,7 @@ export function InventoryView() {
       <LogSaleModal
         isOpen={saleModalOpen}
         item={itemToSell}
+        platforms={platforms}
         onClose={() => { setSaleModalOpen(false); setItemToSell(null); }}
         onCreated={() => fetchItems(pagination.page)}
       />

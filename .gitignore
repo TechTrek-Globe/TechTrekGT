@@ -1,5 +1,4 @@
 # wrangler files
-# wrangler files
 
 .dev.vars*
 !.dev.vars.example

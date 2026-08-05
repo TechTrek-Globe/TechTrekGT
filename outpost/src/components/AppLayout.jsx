@@ -57,6 +57,17 @@ export function AppLayout({ activeView, onNavigate, children }) {
           })}
         </nav>
 
+        {/* Back to Finance Portal Link */}
+        <div className="px-3 py-2 border-t border-slate-800/40">
+          <a
+            href="https://techtrekgt.com"
+            className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-amber-400 hover:bg-slate-800/40 transition-colors group"
+          >
+            <span>TechTrek Finance</span>
+            <span className="text-[10px] text-slate-600 group-hover:text-amber-400">↗</span>
+          </a>
+        </div>
+
         {/* User strip */}
         <div className="p-3 border-t border-slate-800/60">
           <div className="flex items-center gap-2.5 px-2 py-2 rounded-xl hover:bg-slate-800/60 transition-colors group">

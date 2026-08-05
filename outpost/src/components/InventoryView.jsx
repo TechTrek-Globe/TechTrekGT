@@ -7,8 +7,10 @@ import {
 import { getItems, updateItem, deleteItem, getInvoices } from '../utils/auctionApi';
 import { AddInvoiceModal } from './AddInvoiceModal';
 import { LogSaleModal } from './LogSaleModal';
+import { SpreadsheetImporterModal } from './SpreadsheetImporterModal';
 import { fmtCurrency, fmtPct } from '../utils/formulaPreview';
 import { getApiUrl } from '../utils/api';
+import { FileSpreadsheet } from 'lucide-react';
 
 const STATUS_META = {
   'Available':     { color: 'text-emerald-400', bg: 'bg-emerald-500/10',  border: 'border-emerald-500/20' },
@@ -139,6 +141,7 @@ export function InventoryView() {
   const [error,     setError]     = useState('');
   const [platforms, setPlatforms] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
+  const [importerOpen, setImporterOpen] = useState(false);
   const [saleModalOpen, setSaleModalOpen] = useState(false);
   const [itemToSell, setItemToSell] = useState(null);
   const [search,    setSearch]    = useState('');
@@ -208,13 +211,23 @@ export function InventoryView() {
             {pagination.total} item{pagination.total !== 1 ? 's' : ''} · {fmtCurrency(items.reduce((s, it) => s + (it.true_total_cost || 0), 0))} total landed cost
           </p>
         </div>
-        <button
-          id="add-invoice-btn"
-          onClick={() => setModalOpen(true)}
-          className="btn-primary w-auto px-5 py-2.5 text-sm flex-shrink-0"
-        >
-          <Plus className="w-4 h-4" /> Add Invoice
-        </button>
+        <div className="flex items-center gap-2.5 flex-shrink-0">
+          <button
+            id="import-excel-btn"
+            onClick={() => setImporterOpen(true)}
+            className="btn-secondary w-auto px-4 py-2.5 text-sm flex items-center gap-2"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-amber-400" />
+            <span>Import Spreadsheet</span>
+          </button>
+          <button
+            id="add-invoice-btn"
+            onClick={() => setModalOpen(true)}
+            className="btn-primary w-auto px-5 py-2.5 text-sm"
+          >
+            <Plus className="w-4 h-4" /> Add Invoice
+          </button>
+        </div>
       </div>
 
       {/* Status pills */}
@@ -446,26 +459,22 @@ export function InventoryView() {
         )}
       </div>
 
-      {/* Add Invoice Modal */}
+      {/* Modals */}
       <AddInvoiceModal
-        open={modalOpen}
-        platforms={platforms}
+        isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
-        onCreated={() => { setModalOpen(false); fetchItems(1); }}
+        onCreated={() => fetchItems(1)}
       />
-
-      {/* Quick Log Sale Modal */}
+      <SpreadsheetImporterModal
+        isOpen={importerOpen}
+        onClose={() => setImporterOpen(false)}
+        onImportSuccess={() => fetchItems(1)}
+      />
       <LogSaleModal
-        open={saleModalOpen}
-        preselectedItem={itemToSell}
-        platforms={platforms}
-        onClose={() => {
-          setSaleModalOpen(false);
-          setItemToSell(null);
-        }}
-        onSaved={() => {
-          fetchItems(pagination.page);
-        }}
+        isOpen={saleModalOpen}
+        item={itemToSell}
+        onClose={() => { setSaleModalOpen(false); setItemToSell(null); }}
+        onCreated={() => fetchItems(pagination.page)}
       />
     </div>
   );

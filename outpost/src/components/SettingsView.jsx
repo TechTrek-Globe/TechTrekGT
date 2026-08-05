@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Settings, Shield, Download, RefreshCw, Plus, Edit2, Trash2,
-  CheckCircle2, AlertCircle, Loader2, Save, FileText, Database, User, ShieldCheck
+  CheckCircle2, AlertCircle, Loader2, Save, FileText, Database, User, ShieldCheck,
+  FileSpreadsheet, Upload
 } from 'lucide-react';
+import { SpreadsheetImporterModal } from './SpreadsheetImporterModal';
 import { useAuth } from '../context/AuthContext';
 import {
   getPlatforms, createPlatform, updatePlatform, deletePlatform, resetPlatforms,
@@ -23,7 +25,8 @@ export function SettingsView() {
 
   // Add platform modal state
   const [addModalOpen, setAddModalOpen] = useState(false);
-  const [newPlatform, setNewPlatform] = useState({ name: '', fee_pct: '0.10', flat_fee: '0.30', notes: '', is_default: false });
+  const [importerOpen, setImporterOpen] = useState(false);
+  const [addForm, setAddForm] = useState({ name: '', fee_pct: '', flat_fee: '', notes: '', is_default: false });
 
   // Export state
   const [exporting, setExporting] = useState(false);
@@ -553,6 +556,28 @@ export function SettingsView() {
               Full Backup (.JSON)
             </button>
           </div>
+
+          {/* Import Spreadsheet (.xlsx / .csv) */}
+          <div className="glass-card-light rounded-xl p-4 border border-amber-500/30 bg-amber-500/5 flex flex-col justify-between space-y-3 md:col-span-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <FileSpreadsheet className="w-4 h-4 text-amber-400" />
+                  <h3 className="text-xs font-bold text-white">Spreadsheet Data Importer & Excel Migration</h3>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Upload your Prestine Auction Tracker workbook (.xlsx, .xls, .csv) to batch-import or replace your inventory, purchase batches, and sales log.
+                </p>
+              </div>
+              <button
+                onClick={() => setImporterOpen(true)}
+                className="btn-primary w-auto px-4 py-2 text-xs flex items-center gap-2 flex-shrink-0"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                <span>Launch Spreadsheet Importer</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -680,6 +705,13 @@ export function SettingsView() {
           </div>
         </div>
       )}
+
+      {/* Spreadsheet Importer Modal */}
+      <SpreadsheetImporterModal
+        isOpen={importerOpen}
+        onClose={() => setImporterOpen(false)}
+        onImportSuccess={() => showSuccess('Spreadsheet data successfully imported into your account!')}
+      />
     </div>
   );
 }

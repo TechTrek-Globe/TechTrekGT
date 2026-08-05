@@ -17,6 +17,7 @@ import { onRequestPut as platformPutHandler, onRequestDelete as platformDeleteHa
 import { onRequestGet as compsListHandler, onRequestPost as compsCreateHandler } from '../functions/api/comps/index.js';
 import { onRequestGet as compGetHandler, onRequestPut as compPutHandler, onRequestDelete as compDeleteHandler } from '../functions/api/comps/[id].js';
 import { onRequestGet as dashboardHandler } from '../functions/api/dashboard.js';
+import { onRequestPost as batchImportHandler } from '../functions/api/import/batch.js';
 
 function addSecurityHeaders(response, isLocalhost = false) {
   const newHeaders = new Headers(response.headers);
@@ -170,6 +171,9 @@ export default {
       // --- Dashboard ---
       } else if (apiPath === '/api/dashboard' && request.method === 'GET') {
         response = await dashboardHandler(context);
+      // --- Batch Import ---
+      } else if (apiPath === '/api/import/batch' && request.method === 'POST') {
+        response = await batchImportHandler(context);
       } else if (apiPath.startsWith('/api/')) {
         response = new Response(JSON.stringify({ error: 'Endpoint not found' }), {
           status: 404,

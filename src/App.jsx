@@ -78,7 +78,7 @@ class ErrorBoundary extends React.Component {
 }
 
 function MainContent() {
-  const { activeView } = useBudget();
+  const { activeView, isSettingsOpen } = useBudget();
 
   return (
     <>
@@ -86,7 +86,7 @@ function MainContent() {
       {activeView === 'main_budget' && <MainBudgetView />}
       {activeView === 'ledger'      && <LedgerView />}
       {activeView === 'amortization'&& <AmortizationView />}
-      <SettingsModal />
+      {isSettingsOpen && <SettingsModal />}
       <AuthModal />
     </>
   );

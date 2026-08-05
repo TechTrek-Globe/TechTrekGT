@@ -21,6 +21,7 @@ export function BudgetProvider({ children }) {
 
   const [budget, setBudget] = useState(initialBudgetData);
   const [isDbLoaded, setIsDbLoaded] = useState(false);
+  const [saveError, setSaveError] = useState(null);
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState('accounts'); // 'accounts' | 'people' | 'bills' | 'splits' | 'data'
@@ -99,12 +100,18 @@ export function BudgetProvider({ children }) {
     initLocalStorageOrIndexedDB();
   }, []);
 
-  // Silently save to IndexedDB whenever budget state changes
+  // Silently save to IndexedDB whenever budget state changes (debounced 500ms)
   useEffect(() => {
     if (!isDbLoaded) return;
-    saveBudgetData(budget).catch(err => {
-      console.error('Failed to save budget to IndexedDB:', err);
-    });
+    const timer = setTimeout(() => {
+      saveBudgetData(budget)
+        .then(() => setSaveError(null))
+        .catch(err => {
+          console.error('Failed to save budget to IndexedDB:', err);
+          setSaveError('Local storage save failed. Browser storage quota may be exceeded.');
+        });
+    }, 500);
+    return () => clearTimeout(timer);
   }, [budget, isDbLoaded]);
 
   // Export complete JSON backup helper
@@ -199,6 +206,9 @@ export function BudgetProvider({ children }) {
     setIsAutoCloudBackupEnabled(val);
   };
 
+  // Financial data checksum key to prevent UI-only updates (theme, widgets) from triggering cloud backups
+  const financialDataChecksum = `${(budget.accounts || []).length}_${(budget.bills || []).length}_${(budget.people || []).length}_${(budget.loans || []).length}_${(budget.lineItems || []).length}_${Object.keys(budget.dailyMatrix || {}).length}`;
+
   // Debounced Auto Cloud Backup effect
   useEffect(() => {
     if (!isDbLoaded || !isAutoCloudBackupEnabled) return;
@@ -217,7 +227,7 @@ export function BudgetProvider({ children }) {
     }, 3000);
 
     return () => clearTimeout(timer);
-  }, [budget, isDbLoaded, isAutoCloudBackupEnabled]);
+  }, [financialDataChecksum, isDbLoaded, isAutoCloudBackupEnabled]);
 
   // Account Operations
   const addAccount = (accountData) => {
@@ -938,6 +948,8 @@ export function BudgetProvider({ children }) {
     <BudgetContext.Provider
       value={{
         budget,
+        isDbLoaded,
+        saveError,
         theme,
         setTheme,
         hideDashboardHeader: Boolean(budget?.hideDashboardHeader),

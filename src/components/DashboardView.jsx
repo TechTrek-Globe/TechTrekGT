@@ -97,12 +97,12 @@ export function DashboardView() {
   const today    = new Date();
   const monthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
 
-  const netIncome     = getTotalMonthlyNetIncome();
-  const totalExpenses  = getTotalMonthlyExpenses();
-  const netCashFlow   = netIncome - totalExpenses;
-  const savingsRate   = netIncome > 0 ? ((netCashFlow / netIncome) * 100) : 0;
-  const cashOnHand    = getTotalCashOnHand();
-  const upcomingBills = getUpcomingBills(5);
+  const netIncome     = useMemo(() => getTotalMonthlyNetIncome(), [budget?.people]);
+  const totalExpenses  = useMemo(() => getTotalMonthlyExpenses(), [budget?.bills]);
+  const netCashFlow   = useMemo(() => netIncome - totalExpenses, [netIncome, totalExpenses]);
+  const savingsRate   = useMemo(() => netIncome > 0 ? ((netCashFlow / netIncome) * 100) : 0, [netIncome, netCashFlow]);
+  const cashOnHand    = useMemo(() => getTotalCashOnHand(), [budget?.accounts]);
+  const upcomingBills = useMemo(() => getUpcomingBills(5), [budget?.bills, getUpcomingBills]);
 
   // Budget health score (0-100)
   const healthScore = useMemo(() => {
@@ -120,20 +120,26 @@ export function DashboardView() {
       if ((acc.startingBalance || 0) - expenses < 0) score -= 10;
     });
     return Math.max(0, Math.min(100, Math.round(score)));
-  }, [budget, netIncome, totalExpenses, savingsRate]);
+  }, [budget?.accounts, getAccountMonthlyExpenses, netIncome, totalExpenses, savingsRate]);
 
-  // Chart data
-  const accountChartData = (budget?.accounts || []).map((acc, i) => ({
-    name: (acc.name || '').split('-')[0].trim(),
-    value: parseFloat(getAccountMonthlyExpenses(acc.id).toFixed(2)),
-    color: ACCOUNT_COLORS[i % ACCOUNT_COLORS.length]
-  })).filter(d => d.value > 0);
+  // Chart data (memoized)
+  const accountChartData = useMemo(() =>
+    (budget?.accounts || []).map((acc, i) => ({
+      name: (acc.name || '').split('-')[0].trim(),
+      value: parseFloat(getAccountMonthlyExpenses(acc.id).toFixed(2)),
+      color: ACCOUNT_COLORS[i % ACCOUNT_COLORS.length]
+    })).filter(d => d.value > 0),
+    [budget?.accounts, budget?.bills, getAccountMonthlyExpenses]
+  );
 
-  const projActualData = (budget?.accounts || []).map((acc, i) => ({
-    name: (acc.name || '').split('-')[0].trim(),
-    projected: parseFloat(getAccountMonthlyExpenses(acc.id).toFixed(2)),
-    actual: parseFloat(getAccountActualExpenses(acc.id, monthKey).toFixed(2)),
-  })).filter(d => d.projected > 0);
+  const projActualData = useMemo(() =>
+    (budget?.accounts || []).map((acc, i) => ({
+      name: (acc.name || '').split('-')[0].trim(),
+      projected: parseFloat(getAccountMonthlyExpenses(acc.id).toFixed(2)),
+      actual: parseFloat(getAccountActualExpenses(acc.id, monthKey).toFixed(2)),
+    })).filter(d => d.projected > 0),
+    [budget?.accounts, budget?.bills, budget?.lineItems, monthKey, getAccountMonthlyExpenses, getAccountActualExpenses]
+  );
 
   const getWidthClass = (w) => {
     switch (w) {

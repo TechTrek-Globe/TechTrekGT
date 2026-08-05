@@ -14,40 +14,33 @@ export function AuthProvider({ children }) {
   const [isLoading, setIsLoading] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
-  // Inactivity timeout handler
+  // Inactivity timeout handler (event-driven timer reset)
   useEffect(() => {
     if (!isAuthenticated) return;
 
     const INACTIVITY_TIMEOUT = 15 * 60 * 1000; // 15 minutes
-    
-    const interval = setInterval(() => {
-      const lastActivity = sessionStorage.getItem('personal_budget_last_activity');
-      if (lastActivity) {
-        const timeElapsed = Date.now() - parseInt(lastActivity, 10);
-        if (timeElapsed > INACTIVITY_TIMEOUT) {
-          logout();
-          setIsAuthModalOpen(true);
-        }
-      } else {
-        sessionStorage.setItem('personal_budget_last_activity', Date.now().toString());
-      }
-    }, 10000);
+    let timer;
 
-    const updateActivity = () => {
+    const resetTimer = () => {
+      clearTimeout(timer);
       sessionStorage.setItem('personal_budget_last_activity', Date.now().toString());
+      timer = setTimeout(() => {
+        logout();
+        setIsAuthModalOpen(true);
+      }, INACTIVITY_TIMEOUT);
     };
 
     const activityEvents = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
     activityEvents.forEach(event => {
-      window.addEventListener(event, updateActivity);
+      window.addEventListener(event, resetTimer, { passive: true });
     });
 
-    updateActivity();
+    resetTimer();
 
     return () => {
-      clearInterval(interval);
+      clearTimeout(timer);
       activityEvents.forEach(event => {
-        window.removeEventListener(event, updateActivity);
+        window.removeEventListener(event, resetTimer);
       });
     };
   }, [isAuthenticated]);

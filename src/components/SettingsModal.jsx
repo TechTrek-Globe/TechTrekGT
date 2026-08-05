@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useBudget } from '../context/BudgetContext';
 import { 
   X, 
@@ -170,6 +170,24 @@ export function SettingsModal() {
   const [newAccForm, setNewAccForm] = useState({ name: '', type: 'checking', startingBalance: 0, balanceAsOfDate: new Date().toISOString().split('T')[0], saveExtraMonthly: 0, extraStartingBalance: 0, enableExtraSavings: true, color: 'blue', notes: '' });
   const [newPersonForm, setNewPersonForm] = useState({ name: '', role: 'Member', payFrequency: 'bi-weekly', grossPerPay: 0, netPerPay: 0, payDay1: 15, payDay2: 'last', payOffsetDays: 0 });
   const [newBillForm, setNewBillForm] = useState({ name: '', amount: 0, period: 'Monthly', accountId: budget.accounts[0]?.id || '', dueDay: 1, dueMonths: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], paymentSource: 'Auto Pay', notes: '' });
+
+  // Escape key handler to close settings modal
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setIsSettingsOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [setIsSettingsOpen]);
+
+  // Keep newBillForm accountId synced if current account list changes
+  useEffect(() => {
+    if (!newBillForm.accountId && budget.accounts.length > 0) {
+      setNewBillForm(prev => ({ ...prev, accountId: budget.accounts[0].id }));
+    }
+  }, [budget.accounts, newBillForm.accountId]);
   const [billFilterTab, setBillFilterTab] = useState('active'); // 'active' | 'archived'
   const [setupSubTab, setSetupSubTab] = useState('accounts'); // 'accounts' | 'bills'
   const [billsSubView, setBillsSubView] = useState('list'); // 'list' | 'splits'
@@ -362,7 +380,12 @@ export function SettingsModal() {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950 flex flex-col animate-fade-in w-screen h-screen overflow-hidden text-slate-100">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="settings-modal-title"
+      className="fixed inset-0 z-50 bg-slate-950 flex flex-col animate-fade-in w-screen h-screen overflow-hidden text-slate-100"
+    >
       <div className="bg-slate-900 w-full h-full flex flex-col overflow-hidden">
 
         {/* Slim Top Bar */}
@@ -371,10 +394,11 @@ export function SettingsModal() {
             <span className="p-1.5 rounded-lg bg-blue-600/20 text-blue-400">
               <Receipt className="w-4 h-4" />
             </span>
-            <span className="font-bold text-sm text-slate-100">Settings &amp; Setup</span>
+            <span id="settings-modal-title" className="font-bold text-sm text-slate-100">Settings &amp; Setup</span>
           </div>
           <button
             onClick={() => setIsSettingsOpen(false)}
+            aria-label="Close settings modal"
             className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
             title="Close Settings (Esc)"
           >

@@ -117,6 +117,7 @@ export function InlineEdit({
           max={max}
           value={draft}
           autoFocus
+          aria-label="Edit value"
           onChange={e => setDraft(e.target.value)}
           onKeyDown={onKeyDown}
           onBlur={commit}
@@ -125,6 +126,7 @@ export function InlineEdit({
         {suffix && <span className="text-slate-500 text-xs">{suffix}</span>}
         <button
           onMouseDown={e => { e.preventDefault(); commit(); }}
+          aria-label="Save changes"
           className="p-0.5 text-emerald-400 hover:text-emerald-300 transition-colors"
           title="Commit (Enter)"
         >
@@ -132,6 +134,7 @@ export function InlineEdit({
         </button>
         <button
           onMouseDown={e => { e.preventDefault(); cancel(); }}
+          aria-label="Cancel editing"
           className="p-0.5 text-slate-400 hover:text-rose-400 transition-colors"
           title="Cancel (Esc)"
         >
@@ -144,6 +147,7 @@ export function InlineEdit({
   return (
     <button
       onClick={open}
+      aria-label={`Edit value, current value is ${formatted}`}
       className={`group/ie flex items-center justify-end w-full hover:opacity-90 transition-opacity relative ${className}`}
       title="Click to edit"
     >

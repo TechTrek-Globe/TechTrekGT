@@ -486,30 +486,37 @@ function DailySpreadsheetMatrix() {
   }, [matrixData]);
 
   const containerRef = useRef(null);
+  const scrollRafRef = useRef(null);
 
-  // Sync toolbar Month & Year selector to currently visible row as user scrolls
-  const handleScroll = () => {
-    if (!containerRef.current || isProgrammaticScrollRef.current) return;
+  // Sync toolbar Month & Year selector to currently visible row as user scrolls (throttled with rAF)
+  const handleScroll = useCallback(() => {
+    if (isProgrammaticScrollRef.current) return;
+    if (scrollRafRef.current) return;
 
-    const containerBounds = containerRef.current.getBoundingClientRect();
-    const sampleY = containerBounds.top + 80;
-    const rowEls = containerRef.current.querySelectorAll('tr[data-month]');
+    scrollRafRef.current = requestAnimationFrame(() => {
+      scrollRafRef.current = null;
+      if (!containerRef.current) return;
 
-    for (let el of rowEls) {
-      const rect = el.getBoundingClientRect();
-      if (rect.top <= sampleY && rect.bottom >= sampleY) {
-        const m = parseInt(el.getAttribute('data-month'));
-        const y = parseInt(el.getAttribute('data-year'));
-        if (!isNaN(m) && !isNaN(y) && (m !== selectedMonth || y !== selectedYear)) {
-          isProgrammaticScrollRef.current = true;
-          setSelectedMonth(m);
-          setSelectedYear(y);
-          setTimeout(() => { isProgrammaticScrollRef.current = false; }, 100);
+      const containerBounds = containerRef.current.getBoundingClientRect();
+      const sampleY = containerBounds.top + 80;
+      const rowEls = containerRef.current.querySelectorAll('tr[data-month]');
+
+      for (let el of rowEls) {
+        const rect = el.getBoundingClientRect();
+        if (rect.top <= sampleY && rect.bottom >= sampleY) {
+          const m = parseInt(el.getAttribute('data-month'));
+          const y = parseInt(el.getAttribute('data-year'));
+          if (!isNaN(m) && !isNaN(y) && (m !== selectedMonth || y !== selectedYear)) {
+            isProgrammaticScrollRef.current = true;
+            setSelectedMonth(m);
+            setSelectedYear(y);
+            setTimeout(() => { isProgrammaticScrollRef.current = false; }, 100);
+          }
+          break;
         }
-        break;
       }
-    }
-  };
+    });
+  }, [selectedMonth, selectedYear]);
 
   // Scroll to selected month when user picks a new month from the dropdown
   const handleMonthSelect = (m) => {

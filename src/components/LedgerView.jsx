@@ -22,6 +22,18 @@ import { InlineEdit } from './InlineEdit';
 import { fmtMoney, fmtNum } from '../utils/formatters';
 import { isBillDueInMonth } from '../utils/paydayUtils';
 
+import {
+  DndContext,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  useDraggable,
+  useDroppable,
+  DragOverlay
+} from '@dnd-kit/core';
+import { CSS } from '@dnd-kit/utilities';
+
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'
@@ -37,7 +49,7 @@ function fmtGrid(val) {
   return fmtMoney(val);
 }
 
-// Inline cell editor for matrix cells with Drag & Drop capability
+// Inline cell editor for matrix cells with @dnd-kit Draggable capability
 const MatrixCell = React.memo(function MatrixCell({
   value,
   onCommit,
@@ -49,11 +61,9 @@ const MatrixCell = React.memo(function MatrixCell({
   isTotal = false,
   isNegative = false,
   draggable = false,
-  onDragStart,
-  onDragEnd,
-  isDragging = false,
   dragLabel = '',
-  otherDesc = ''
+  otherDesc = '',
+  selectedAccountId
 }) {
   const isZero = !value || value === 0;
 
@@ -61,18 +71,40 @@ const MatrixCell = React.memo(function MatrixCell({
     if (onCommit) onCommit(monthKey, day, field, val);
   }, [onCommit, monthKey, day, field]);
 
-  const dragStartHandler = useCallback((e) => {
-    if (onDragStart) {
-      const extraData = field === 'other_amount' ? { otherDesc } : {};
-      onDragStart(e, monthKey, day, field, value, extraData, dragLabel);
-    }
-  }, [onDragStart, monthKey, day, field, value, otherDesc, dragLabel]);
+  const cellId = `${monthKey}-${day}-${field}`;
+  const extraData = field === 'other_amount' ? { otherDesc } : {};
+  const payload = useMemo(() => ({
+    accountId: selectedAccountId,
+    sourceMonthKey: monthKey,
+    sourceDay: day,
+    field,
+    value,
+    extraData,
+    label: dragLabel
+  }), [selectedAccountId, monthKey, day, field, value, otherDesc, dragLabel]);
+
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    isDragging
+  } = useDraggable({
+    id: cellId,
+    data: payload,
+    disabled: !draggable
+  });
+
+  const style = transform ? {
+    transform: CSS.Translate.toString(transform)
+  } : undefined;
 
   return (
     <div
-      draggable={draggable}
-      onDragStart={draggable ? dragStartHandler : undefined}
-      onDragEnd={draggable ? onDragEnd : undefined}
+      ref={setNodeRef}
+      style={style}
+      {...(draggable ? attributes : {})}
+      {...(draggable ? listeners : {})}
       className={`group/matrix relative flex items-center justify-end w-full ${
         draggable ? 'cursor-grab active:cursor-grabbing select-none' : ''
       } ${isDragging ? 'opacity-30 scale-90' : ''}`}
@@ -103,6 +135,48 @@ const MatrixCell = React.memo(function MatrixCell({
         className="justify-end w-full"
       />
     </div>
+  );
+});
+
+// Droppable Table Cell TD Wrapper for Matrix
+const DroppableCellTd = React.memo(function DroppableCellTd({
+  row,
+  field,
+  children,
+  className,
+  activeCellData,
+  isBillField = false
+}) {
+  const dropId = `drop-${row.monthKey}-${row.day}-${field}`;
+
+  const dropPayload = useMemo(() => ({
+    rowKey: row.rowKey,
+    monthKey: row.monthKey,
+    day: row.day,
+    field
+  }), [row.rowKey, row.monthKey, row.day, field]);
+
+  const isDisabled = !activeCellData || activeCellData.field !== field;
+
+  const { isOver, setNodeRef } = useDroppable({
+    id: dropId,
+    data: dropPayload,
+    disabled: isDisabled
+  });
+
+  const activeHighlight = isOver && activeCellData?.field === field
+    ? isBillField
+      ? 'bg-rose-500/30 ring-2 ring-rose-400 ring-inset shadow-[0_0_10px_rgba(244,63,94,0.3)]'
+      : 'bg-emerald-500/30 ring-2 ring-emerald-400 ring-inset shadow-[0_0_10px_rgba(16,185,129,0.3)]'
+    : '';
+
+  return (
+    <td
+      ref={setNodeRef}
+      className={`${className} ${activeHighlight}`}
+    >
+      {children}
+    </td>
   );
 });
 
@@ -175,32 +249,46 @@ function DailySpreadsheetMatrix() {
   const [monthsBack, setMonthsBack] = useState(3);
   const [monthsForward, setMonthsForward] = useState(6);
 
-  // Drag and drop state for per-day matrix values
-  const [draggedCell, setDraggedCell] = useState(null);
-  const [dropTarget, setDropTarget] = useState(null);
+  // Drag and drop state for per-day matrix values via @dnd-kit
+  const [activeCellData, setActiveCellData] = useState(null);
 
-  const handleDragStart = useCallback((e, monthKey, day, field, value, extraData = {}, label = '') => {
-    const payload = {
-      accountId: selectedAccountId,
-      sourceMonthKey: monthKey,
-      sourceDay: day,
-      field,
-      value,
-      extraData,
-      label
-    };
-    setDraggedCell(payload);
-    e.dataTransfer.effectAllowed = 'move';
-    try {
-      e.dataTransfer.setData('text/plain', JSON.stringify(payload));
-    } catch {
-      // ignore
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 4
+      }
+    }),
+    useSensor(KeyboardSensor)
+  );
+
+  const handleDragStart = useCallback((event) => {
+    setActiveCellData(event.active.data.current);
+  }, []);
+
+  const handleDragEnd = useCallback((event) => {
+    const { active, over } = event;
+    const activeData = active?.data?.current;
+    const overData = over?.data?.current;
+
+    if (activeData && overData && overData.field === activeData.field) {
+      if (activeData.sourceMonthKey !== overData.monthKey || activeData.sourceDay !== overData.day) {
+        moveDailyMatrixCell(
+          activeData.accountId || selectedAccountId,
+          activeData.sourceMonthKey,
+          activeData.sourceDay,
+          overData.monthKey,
+          overData.day,
+          activeData.field,
+          activeData.value,
+          activeData.extraData
+        );
+      }
     }
-  }, [selectedAccountId]);
+    setActiveCellData(null);
+  }, [moveDailyMatrixCell, selectedAccountId]);
 
-  const handleDragEnd = useCallback(() => {
-    setDraggedCell(null);
-    setDropTarget(null);
+  const handleDragCancel = useCallback(() => {
+    setActiveCellData(null);
   }, []);
 
   const handleCellCommit = useCallback((monthKey, day, field, val) => {
@@ -660,7 +748,13 @@ function DailySpreadsheetMatrix() {
     : (selectedAccount?.enableExtraSavings !== false);
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col overflow-hidden rounded-2xl border border-slate-800 glass-panel shadow-2xl">
+    <DndContext
+      sensors={sensors}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
+    >
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden rounded-2xl border border-slate-800 glass-panel shadow-2xl">
 
       {/* Compact Fixed Toolbar Header - Tier 1 (Outside Table Scroll Viewport) */}
       <div className="bg-slate-950 border-b border-slate-800 px-3 py-1.5 h-10 flex items-center justify-between gap-2 shadow-md shrink-0 whitespace-nowrap text-xs z-30">
@@ -991,17 +1085,12 @@ function DailySpreadsheetMatrix() {
 
                       {/* Earner Credits */}
                       {people.map(p => (
-                        <td
+                        <DroppableCellTd
                           key={`cred-${row.rowKey}-${p.id}`}
-                          className={`p-1 text-right min-w-[60px] transition-colors relative ${
-                            dropTarget?.rowKey === row.rowKey && dropTarget?.field === `credit_${p.id}`
-                              ? 'bg-emerald-500/30 ring-2 ring-emerald-400 ring-inset shadow-[0_0_10px_rgba(16,185,129,0.3)]'
-                              : ''
-                          }`}
-                          onDragOver={e => handleDragOver(e, row, `credit_${p.id}`)}
-                          onDragEnter={e => handleDragEnter(e, row, `credit_${p.id}`)}
-                          onDragLeave={e => handleDragLeave(e, row, `credit_${p.id}`)}
-                          onDrop={e => handleDrop(e, row, `credit_${p.id}`)}
+                          row={row}
+                          field={`credit_${p.id}`}
+                          className="p-1 text-right min-w-[60px] transition-colors relative"
+                          activeCellData={activeCellData}
                         >
                           <MatrixCell
                             value={row.personCredits[p.id]}
@@ -1011,27 +1100,20 @@ function DailySpreadsheetMatrix() {
                             field={`credit_${p.id}`}
                             onCommit={handleCellCommit}
                             draggable={Boolean(row.personCredits[p.id] && row.personCredits[p.id] > 0)}
-                            onDragStart={handleDragStart}
-                            onDragEnd={handleDragEnd}
                             dragLabel={`${p.name.split(' ')[0]} Credit`}
-                            isDragging={draggedCell?.sourceMonthKey === row.monthKey && draggedCell?.sourceDay === row.day && draggedCell?.field === `credit_${p.id}`}
+                            selectedAccountId={selectedAccountId}
                           />
-                        </td>
+                        </DroppableCellTd>
                       ))}
 
                       {/* Earner Extra Credits */}
                       {showExtraColumns && people.map(p => (
-                        <td
+                        <DroppableCellTd
                           key={`ext-cred-${row.rowKey}-${p.id}`}
-                          className={`p-1 text-right border-r border-slate-800/80 min-w-[60px] transition-colors relative ${
-                            dropTarget?.rowKey === row.rowKey && dropTarget?.field === `extra_credit_${p.id}`
-                              ? 'bg-emerald-500/30 ring-2 ring-emerald-400 ring-inset shadow-[0_0_10px_rgba(16,185,129,0.3)]'
-                              : ''
-                          }`}
-                          onDragOver={e => handleDragOver(e, row, `extra_credit_${p.id}`)}
-                          onDragEnter={e => handleDragEnter(e, row, `extra_credit_${p.id}`)}
-                          onDragLeave={e => handleDragLeave(e, row, `extra_credit_${p.id}`)}
-                          onDrop={e => handleDrop(e, row, `extra_credit_${p.id}`)}
+                          row={row}
+                          field={`extra_credit_${p.id}`}
+                          className="p-1 text-right border-r border-slate-800/80 min-w-[60px] transition-colors relative"
+                          activeCellData={activeCellData}
                         >
                           <MatrixCell
                             value={row.personExtraCredits[p.id]}
@@ -1041,27 +1123,21 @@ function DailySpreadsheetMatrix() {
                             field={`extra_credit_${p.id}`}
                             onCommit={handleCellCommit}
                             draggable={Boolean(row.personExtraCredits[p.id] && row.personExtraCredits[p.id] > 0)}
-                            onDragStart={handleDragStart}
-                            onDragEnd={handleDragEnd}
                             dragLabel={`${p.name.split(' ')[0]} Extra`}
-                            isDragging={draggedCell?.sourceMonthKey === row.monthKey && draggedCell?.sourceDay === row.day && draggedCell?.field === `extra_credit_${p.id}`}
+                            selectedAccountId={selectedAccountId}
                           />
-                        </td>
+                        </DroppableCellTd>
                       ))}
 
                       {/* Individual Bill Columns */}
                       {accountBills.map(b => (
-                        <td
+                        <DroppableCellTd
                           key={`bill-${row.rowKey}-${b.id}`}
-                          className={`p-1 text-right min-w-[70px] transition-colors relative ${
-                            dropTarget?.rowKey === row.rowKey && dropTarget?.field === `bill_${b.id}`
-                              ? 'bg-rose-500/30 ring-2 ring-rose-400 ring-inset shadow-[0_0_10px_rgba(244,63,94,0.3)]'
-                              : ''
-                          }`}
-                          onDragOver={e => handleDragOver(e, row, `bill_${b.id}`)}
-                          onDragEnter={e => handleDragEnter(e, row, `bill_${b.id}`)}
-                          onDragLeave={e => handleDragLeave(e, row, `bill_${b.id}`)}
-                          onDrop={e => handleDrop(e, row, `bill_${b.id}`)}
+                          row={row}
+                          field={`bill_${b.id}`}
+                          className="p-1 text-right min-w-[70px] transition-colors relative"
+                          activeCellData={activeCellData}
+                          isBillField
                         >
                           <MatrixCell
                             value={row.billValues[b.id]}
@@ -1071,25 +1147,19 @@ function DailySpreadsheetMatrix() {
                             field={`bill_${b.id}`}
                             onCommit={handleCellCommit}
                             draggable={Boolean(row.billValues[b.id] && row.billValues[b.id] > 0)}
-                            onDragStart={handleDragStart}
-                            onDragEnd={handleDragEnd}
                             dragLabel={b.name}
-                            isDragging={draggedCell?.sourceMonthKey === row.monthKey && draggedCell?.sourceDay === row.day && draggedCell?.field === `bill_${b.id}`}
+                            selectedAccountId={selectedAccountId}
                           />
-                        </td>
+                        </DroppableCellTd>
                       ))}
 
                       {/* Other Expense Column */}
-                      <td
-                        className={`p-1 text-right min-w-[55px] transition-colors relative ${
-                          dropTarget?.rowKey === row.rowKey && dropTarget?.field === 'other_amount'
-                            ? 'bg-rose-500/30 ring-2 ring-rose-400 ring-inset shadow-[0_0_10px_rgba(244,63,94,0.3)]'
-                            : ''
-                        }`}
-                        onDragOver={e => handleDragOver(e, row, 'other_amount')}
-                        onDragEnter={e => handleDragEnter(e, row, 'other_amount')}
-                        onDragLeave={e => handleDragLeave(e, row, 'other_amount')}
-                        onDrop={e => handleDrop(e, row, 'other_amount')}
+                      <DroppableCellTd
+                        row={row}
+                        field="other_amount"
+                        className="p-1 text-right min-w-[55px] transition-colors relative"
+                        activeCellData={activeCellData}
+                        isBillField
                       >
                         <MatrixCell
                           value={row.otherAmt}
@@ -1099,13 +1169,11 @@ function DailySpreadsheetMatrix() {
                           field="other_amount"
                           onCommit={handleCellCommit}
                           draggable={Boolean(row.otherAmt && row.otherAmt > 0)}
-                          onDragStart={handleDragStart}
-                          onDragEnd={handleDragEnd}
                           dragLabel={row.otherDesc ? `Other (${row.otherDesc})` : 'Other Expense'}
                           otherDesc={row.otherDesc}
-                          isDragging={draggedCell?.sourceMonthKey === row.monthKey && draggedCell?.sourceDay === row.day && draggedCell?.field === 'other_amount'}
+                          selectedAccountId={selectedAccountId}
                         />
-                      </td>
+                      </DroppableCellTd>
 
                       {/* Other Description */}
                       <td className="p-1 border-r border-slate-800/80">
@@ -1196,14 +1264,17 @@ function DailySpreadsheetMatrix() {
         </table>
       </div>
 
-      {/* Floating Drag Indicator Pill */}
-      {draggedCell && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 border border-blue-500/80 text-blue-100 px-4 py-2 rounded-full shadow-2xl backdrop-blur flex items-center gap-2 text-xs font-medium pointer-events-none animate-bounce">
-          <Sparkles className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
-          <span>Moving <strong>{draggedCell.label} ({fmtMoney(draggedCell.value)})</strong>: drop onto any date line to move</span>
-        </div>
-      )}
+      {/* Floating Drag Overlay */}
+      <DragOverlay>
+        {activeCellData ? (
+          <div className="bg-slate-900/95 border border-blue-500 text-blue-100 px-3 py-1.5 rounded-full shadow-2xl backdrop-blur flex items-center gap-2 text-xs font-mono font-bold pointer-events-none scale-105 ring-2 ring-blue-500/80 z-50">
+            <Sparkles className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 animate-spin" />
+            <span>{activeCellData.label} ({fmtMoney(activeCellData.value)})</span>
+          </div>
+        ) : null}
+      </DragOverlay>
     </div>
+    </DndContext>
   );
 }
 

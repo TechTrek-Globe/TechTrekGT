@@ -3,6 +3,8 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { AuthPage } from './components/AuthPage';
 import { AppLayout } from './components/AppLayout';
 import { DashboardView } from './components/DashboardView';
+import { InventoryView } from './components/InventoryView';
+import { SalesLogView } from './components/SalesLogView';
 
 const VIEWS = ['dashboard', 'inventory', 'sales', 'pricing', 'settings'];
 
@@ -52,16 +54,8 @@ function MainContent({ pathname, navigateTo }) {
   return (
     <AppLayout activeView={activeView} onNavigate={handleNavigate}>
       {activeView === 'dashboard' && <DashboardView />}
-      {activeView === 'inventory' && (
-        <div className="flex items-center justify-center h-64 text-slate-500 text-sm">
-          Inventory module — Phase 2
-        </div>
-      )}
-      {activeView === 'sales' && (
-        <div className="flex items-center justify-center h-64 text-slate-500 text-sm">
-          Sales Log module — Phase 3
-        </div>
-      )}
+      {activeView === 'inventory' && <InventoryView />}
+      {activeView === 'sales' && <SalesLogView />}
       {activeView === 'pricing' && (
         <div className="flex items-center justify-center h-64 text-slate-500 text-sm">
           Pricing Intelligence — Phase 5

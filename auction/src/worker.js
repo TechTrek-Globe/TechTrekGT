@@ -6,6 +6,13 @@ import { onRequestPost as forgotPasswordHandler } from '../functions/api/auth/fo
 import { onRequestPost as resetPasswordHandler }  from '../functions/api/auth/reset-password.js';
 import { onRequestPost as securityQuestionHandler } from '../functions/api/auth/security-question.js';
 import { onRequestPost as updateProfileHandler }  from '../functions/api/auth/update-profile.js';
+import { onRequestGet as invoicesListHandler, onRequestPost as invoicesCreateHandler } from '../functions/api/invoices/index.js';
+import { onRequestGet as invoiceGetHandler, onRequestPut as invoicePutHandler, onRequestDelete as invoiceDeleteHandler } from '../functions/api/invoices/[id].js';
+import { onRequestGet as itemsListHandler } from '../functions/api/items/index.js';
+import { onRequestGet as itemGetHandler, onRequestPut as itemPutHandler, onRequestDelete as itemDeleteHandler } from '../functions/api/items/[id].js';
+import { onRequestGet as salesListHandler, onRequestPost as salesCreateHandler } from '../functions/api/sales/index.js';
+import { onRequestGet as saleGetHandler, onRequestPut as salePutHandler, onRequestDelete as saleDeleteHandler } from '../functions/api/sales/[id].js';
+import { onRequestGet as platformsListHandler } from '../functions/api/platforms/index.js';
 
 function addSecurityHeaders(response, isLocalhost = false) {
   const newHeaders = new Headers(response.headers);
@@ -101,6 +108,40 @@ export default {
         response = await meHandler(context);
       } else if (apiPath === '/api/auth/logout' && request.method === 'POST') {
         response = await logoutHandler(context);
+      // --- Invoices ---
+      } else if (apiPath === '/api/invoices' && request.method === 'GET') {
+        response = await invoicesListHandler(context);
+      } else if (apiPath === '/api/invoices' && request.method === 'POST') {
+        response = await invoicesCreateHandler(context);
+      } else if (/^\/api\/invoices\/[^/]+$/.test(apiPath) && request.method === 'GET') {
+        response = await invoiceGetHandler(context);
+      } else if (/^\/api\/invoices\/[^/]+$/.test(apiPath) && request.method === 'PUT') {
+        response = await invoicePutHandler(context);
+      } else if (/^\/api\/invoices\/[^/]+$/.test(apiPath) && request.method === 'DELETE') {
+        response = await invoiceDeleteHandler(context);
+      // --- Items ---
+      } else if (apiPath === '/api/items' && request.method === 'GET') {
+        response = await itemsListHandler(context);
+      } else if (/^\/api\/items\/[^/]+$/.test(apiPath) && request.method === 'GET') {
+        response = await itemGetHandler(context);
+      } else if (/^\/api\/items\/[^/]+$/.test(apiPath) && request.method === 'PUT') {
+        response = await itemPutHandler(context);
+      } else if (/^\/api\/items\/[^/]+$/.test(apiPath) && request.method === 'DELETE') {
+        response = await itemDeleteHandler(context);
+      // --- Sales ---
+      } else if (apiPath === '/api/sales' && request.method === 'GET') {
+        response = await salesListHandler(context);
+      } else if (apiPath === '/api/sales' && request.method === 'POST') {
+        response = await salesCreateHandler(context);
+      } else if (/^\/api\/sales\/[^/]+$/.test(apiPath) && request.method === 'GET') {
+        response = await saleGetHandler(context);
+      } else if (/^\/api\/sales\/[^/]+$/.test(apiPath) && request.method === 'PUT') {
+        response = await salePutHandler(context);
+      } else if (/^\/api\/sales\/[^/]+$/.test(apiPath) && request.method === 'DELETE') {
+        response = await saleDeleteHandler(context);
+      // --- Platforms ---
+      } else if (apiPath === '/api/platforms' && request.method === 'GET') {
+        response = await platformsListHandler(context);
       } else if (apiPath.startsWith('/api/')) {
         response = new Response(JSON.stringify({ error: 'Endpoint not found' }), {
           status: 404,

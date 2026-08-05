@@ -111,7 +111,7 @@ async function verifyToken(token, secret) {
       return null;
     }
     return payload;
-  } catch (err) {
+  } catch (err2) {
     return null;
   }
 }
@@ -141,8 +141,8 @@ async function checkRateLimit(kv, key, maxRequests, windowSeconds) {
     }
     await kv.put(windowKey, String(current + 1), { expirationTtl: windowSeconds * 2 });
     return { allowed: true };
-  } catch (err) {
-    console.error("[rateLimit] failed to check KV:", err);
+  } catch (err2) {
+    console.error("[rateLimit] failed to check KV:", err2);
     return { allowed: true };
   }
 }
@@ -171,7 +171,7 @@ async function ensureUserSchema(db) {
   } catch (e) {
   }
 }
-async function onRequestPost$6(context) {
+async function onRequestPost$8(context) {
   const { request, env } = context;
   const ip = request.headers.get("CF-Connecting-IP") || "unknown";
   const rlKey = `register:${ip}`;
@@ -274,15 +274,15 @@ async function onRequestPost$6(context) {
         "Set-Cookie": cookieOptions
       }
     });
-  } catch (err) {
-    console.error("[auction register] handler error:", err);
+  } catch (err2) {
+    console.error("[auction register] handler error:", err2);
     return new Response(JSON.stringify({ error: "An internal error occurred. Please try again." }), {
       status: 500,
       headers: { "Content-Type": "application/json" }
     });
   }
 }
-async function onRequestPost$5(context) {
+async function onRequestPost$7(context) {
   const { request, env } = context;
   const ip = request.headers.get("CF-Connecting-IP") || "unknown";
   const rlKey = `login:${ip}`;
@@ -355,15 +355,15 @@ async function onRequestPost$5(context) {
         "Set-Cookie": cookieOptions
       }
     });
-  } catch (err) {
-    console.error("[auction login] handler error:", err);
+  } catch (err2) {
+    console.error("[auction login] handler error:", err2);
     return new Response(JSON.stringify({ error: "An internal error occurred. Please try again." }), {
       status: 500,
       headers: { "Content-Type": "application/json" }
     });
   }
 }
-async function onRequestGet(context) {
+async function onRequestGet$7(context) {
   const { request, env } = context;
   try {
     const token = getTokenFromRequest(request);
@@ -405,15 +405,15 @@ async function onRequestGet(context) {
       status: 200,
       headers: { "Content-Type": "application/json" }
     });
-  } catch (err) {
-    console.error("[auction me] handler error:", err);
+  } catch (err2) {
+    console.error("[auction me] handler error:", err2);
     return new Response(JSON.stringify({ error: "An internal error occurred." }), {
       status: 500,
       headers: { "Content-Type": "application/json" }
     });
   }
 }
-async function onRequestPost$4() {
+async function onRequestPost$6() {
   const cookieOptions = [
     "auth_token=",
     "HttpOnly",
@@ -447,7 +447,7 @@ async function ensureResetTable(db) {
   } catch (e) {
   }
 }
-async function onRequestPost$3(context) {
+async function onRequestPost$5(context) {
   const { request, env } = context;
   const ip = request.headers.get("CF-Connecting-IP") || "unknown";
   const rlKey = `forgot:${ip}`;
@@ -526,15 +526,15 @@ async function onRequestPost$3(context) {
       status: 200,
       headers: { "Content-Type": "application/json" }
     });
-  } catch (err) {
-    console.error("[auction forgot-password] error:", err);
+  } catch (err2) {
+    console.error("[auction forgot-password] error:", err2);
     return new Response(JSON.stringify({ error: "An internal error occurred. Please try again." }), {
       status: 500,
       headers: { "Content-Type": "application/json" }
     });
   }
 }
-async function onRequestPost$2(context) {
+async function onRequestPost$4(context) {
   const { request, env } = context;
   const ip = request.headers.get("CF-Connecting-IP") || "unknown";
   const rlKey = `reset:${ip}`;
@@ -613,15 +613,15 @@ async function onRequestPost$2(context) {
       status: 200,
       headers: { "Content-Type": "application/json" }
     });
-  } catch (err) {
-    console.error("[auction reset-password] error:", err);
+  } catch (err2) {
+    console.error("[auction reset-password] error:", err2);
     return new Response(JSON.stringify({ error: "An internal error occurred. Please try again." }), {
       status: 500,
       headers: { "Content-Type": "application/json" }
     });
   }
 }
-async function onRequestPost$1(context) {
+async function onRequestPost$3(context) {
   const { request, env } = context;
   const ip = request.headers.get("CF-Connecting-IP") || "unknown";
   const rlKey = `sec-q:${ip}`;
@@ -666,15 +666,15 @@ async function onRequestPost$1(context) {
       status: 200,
       headers: { "Content-Type": "application/json" }
     });
-  } catch (err) {
-    console.error("[auction security-question] error:", err);
+  } catch (err2) {
+    console.error("[auction security-question] error:", err2);
     return new Response(JSON.stringify({ error: "An internal error occurred." }), {
       status: 500,
       headers: { "Content-Type": "application/json" }
     });
   }
 }
-async function onRequestPost(context) {
+async function onRequestPost$2(context) {
   const { request, env } = context;
   try {
     const token = getTokenFromRequest(request);
@@ -805,13 +805,908 @@ async function onRequestPost(context) {
         "Set-Cookie": cookieOptions
       }
     });
-  } catch (err) {
-    console.error("[auction update-profile] error:", err);
+  } catch (err2) {
+    console.error("[auction update-profile] error:", err2);
     return new Response(JSON.stringify({ error: "An internal error occurred." }), {
       status: 500,
       headers: { "Content-Type": "application/json" }
     });
   }
+}
+async function requireAuth(request, env) {
+  if (!env.JWT_SECRET) {
+    throw new Response(JSON.stringify({ error: "Server misconfiguration: missing JWT_SECRET" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" }
+    });
+  }
+  const token = getTokenFromRequest(request);
+  if (!token) {
+    throw new Response(JSON.stringify({ error: "Unauthorized: missing token" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" }
+    });
+  }
+  const payload = await verifyToken(token, env.JWT_SECRET);
+  if (!payload || !payload.userId) {
+    throw new Response(JSON.stringify({ error: "Unauthorized: invalid or expired token" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" }
+    });
+  }
+  return payload;
+}
+async function withAuth(fn) {
+  try {
+    return await fn();
+  } catch (err2) {
+    if (err2 instanceof Response) return err2;
+    console.error("[withAuth] unexpected error:", err2);
+    return new Response(JSON.stringify({ error: "An internal error occurred." }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" }
+    });
+  }
+}
+function ok(data, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { "Content-Type": "application/json" }
+  });
+}
+function err(message, status = 400) {
+  return new Response(JSON.stringify({ error: message }), {
+    status,
+    headers: { "Content-Type": "application/json" }
+  });
+}
+function computeItemProration(item, invoice) {
+  const base = invoice.base_total;
+  const weight = base > 0 ? item.unit_price / base : 0;
+  const prorated_discount = weight * invoice.discount;
+  const prorated_shipping = weight * invoice.shipping;
+  const prorated_tax = weight * invoice.tax;
+  const true_total_cost = item.unit_price - prorated_discount + prorated_shipping + prorated_tax;
+  return {
+    proration_weight: weight,
+    prorated_discount,
+    prorated_shipping,
+    prorated_tax,
+    true_total_cost
+  };
+}
+function computeSaleMetrics(sale) {
+  const platform_fees_amt = sale.gross_sale_price * sale.platform_fee_pct + sale.platform_flat_fee;
+  const net_proceeds = sale.gross_sale_price + sale.buyer_shipping_paid - sale.actual_shipping_cost - platform_fees_amt - sale.payment_processing_amt - sale.promoted_listing_fee;
+  const net_profit = net_proceeds - sale.true_total_cost;
+  const roi_pct = sale.true_total_cost > 0 ? net_profit / sale.true_total_cost : 0;
+  return { platform_fees_amt, net_proceeds, net_profit, roi_pct };
+}
+function computePricingFloors(item) {
+  const divisor = 1 - item.platform_fee_pct - item.boost_pct;
+  const min_sell_price = divisor > 0 ? (item.true_total_cost + item.est_shipping_cost + item.platform_flat_fee) / divisor : 0;
+  const suggested_list_price = min_sell_price * (1 + item.target_margin_pct);
+  return { min_sell_price, suggested_list_price };
+}
+function daysBetween(fromDate, toDate) {
+  if (!fromDate || !toDate) return null;
+  const ms = new Date(toDate).getTime() - new Date(fromDate).getTime();
+  return Math.floor(ms / (1e3 * 60 * 60 * 24));
+}
+async function onRequestGet$6(context) {
+  const { request, env } = context;
+  return withAuth(async () => {
+    const payload = await requireAuth(request, env);
+    if (!env.DB) return err("Database not available", 500);
+    const rows = await env.DB.prepare(`
+      SELECT
+        i.id, i.invoice_ref, i.description, i.base_total,
+        i.discount, i.shipping, i.tax, i.date_acquired, i.created_at,
+        COUNT(it.id) AS item_count,
+        SUM(it.true_total_cost) AS total_landed_cost
+      FROM auction_invoices i
+      LEFT JOIN auction_items it ON it.invoice_id = i.id
+      WHERE i.user_id = ?
+      GROUP BY i.id
+      ORDER BY i.created_at DESC
+    `).bind(payload.userId).all();
+    return ok({ invoices: rows.results || [] });
+  });
+}
+async function onRequestPost$1(context) {
+  const { request, env } = context;
+  return withAuth(async () => {
+    const payload = await requireAuth(request, env);
+    if (!env.DB) return err("Database not available", 500);
+    const body = await request.json();
+    const { invoice_ref, description, discount, shipping, tax, date_acquired, items } = body;
+    if (!invoice_ref) return err("invoice_ref is required");
+    if (!Array.isArray(items) || items.length === 0) return err("At least one item is required");
+    for (const it of items) {
+      if (!it.item_name || !it.item_name.trim()) return err("Each item must have a name");
+      if (typeof it.unit_price !== "number" || it.unit_price <= 0) return err(`Item "${it.item_name}" must have a positive unit_price`);
+    }
+    const base_total = items.reduce((sum, it) => sum + (it.unit_price || 0), 0);
+    const invDiscount = discount || 0;
+    const invShipping = shipping || 0;
+    const invTax = tax || 0;
+    const invoiceId = `inv-${crypto.randomUUID()}`;
+    const invoicePayload = {
+      base_total,
+      discount: invDiscount,
+      shipping: invShipping,
+      tax: invTax
+    };
+    await env.DB.prepare(`
+      INSERT INTO auction_invoices (id, user_id, invoice_ref, description, base_total, discount, shipping, tax, date_acquired)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      invoiceId,
+      payload.userId,
+      invoice_ref.trim(),
+      description || null,
+      base_total,
+      invDiscount,
+      invShipping,
+      invTax,
+      date_acquired || null
+    ).run();
+    const insertedItems = [];
+    for (const it of items) {
+      const itemId = `item-${crypto.randomUUID()}`;
+      const proration = computeItemProration({ unit_price: it.unit_price }, invoicePayload);
+      let feePct = it.platform_fee_pct || 0;
+      let flatFee = it.platform_flat_fee || 0;
+      if (it.platform && !it.platform_fee_pct) {
+        const plat = await env.DB.prepare(
+          "SELECT fee_pct, flat_fee FROM auction_platforms WHERE user_id = ? AND name = ?"
+        ).bind(payload.userId, it.platform).first();
+        if (plat) {
+          feePct = plat.fee_pct;
+          flatFee = plat.flat_fee;
+        }
+      }
+      const boostPct = it.boost_pct || 0;
+      const estShipping = it.est_shipping_cost || 0;
+      const targetMarginPct = it.target_margin_pct || 0;
+      const pricing = computePricingFloors({
+        true_total_cost: proration.true_total_cost,
+        est_shipping_cost: estShipping,
+        platform_flat_fee: flatFee,
+        platform_fee_pct: feePct,
+        boost_pct: boostPct,
+        target_margin_pct: targetMarginPct
+      });
+      await env.DB.prepare(`
+        INSERT INTO auction_items (
+          id, user_id, invoice_id, item_name, category, sport_genre, athlete_person,
+          authenticator, cert_number, unit_price, item_base_total,
+          proration_weight, prorated_discount, prorated_shipping, prorated_tax, true_total_cost,
+          status, platform, platform_fee_pct, platform_flat_fee,
+          est_shipping_cost, boost_pct, min_sell_price, suggested_list_price,
+          current_list_price, target_margin_pct,
+          date_acquired, date_listed, notes, best_listing_window
+        ) VALUES (
+          ?,?,?,?,?,?,?,
+          ?,?,?,?,
+          ?,?,?,?,?,
+          ?,?,?,?,
+          ?,?,?,?,
+          ?,?,
+          ?,?,?,?
+        )
+      `).bind(
+        itemId,
+        payload.userId,
+        invoiceId,
+        it.item_name.trim(),
+        it.category || null,
+        it.sport_genre || null,
+        it.athlete_person || null,
+        it.authenticator || null,
+        it.cert_number || null,
+        it.unit_price,
+        it.unit_price,
+        proration.proration_weight,
+        proration.prorated_discount,
+        proration.prorated_shipping,
+        proration.prorated_tax,
+        proration.true_total_cost,
+        it.status || "Available",
+        it.platform || null,
+        feePct,
+        flatFee,
+        estShipping,
+        boostPct,
+        pricing.min_sell_price,
+        pricing.suggested_list_price,
+        it.current_list_price || null,
+        targetMarginPct,
+        date_acquired || null,
+        it.date_listed || null,
+        it.notes || null,
+        it.best_listing_window || null
+      ).run();
+      insertedItems.push({
+        id: itemId,
+        item_name: it.item_name.trim(),
+        unit_price: it.unit_price,
+        ...proration,
+        min_sell_price: pricing.min_sell_price,
+        suggested_list_price: pricing.suggested_list_price,
+        status: it.status || "Available"
+      });
+    }
+    return ok({
+      success: true,
+      invoice: { id: invoiceId, invoice_ref, base_total, discount: invDiscount, shipping: invShipping, tax: invTax },
+      items: insertedItems
+    }, 201);
+  });
+}
+function getInvoiceId(url) {
+  const parts = url.pathname.split("/");
+  return parts[parts.length - 1] || null;
+}
+async function onRequestGet$5(context) {
+  const { request, env } = context;
+  return withAuth(async () => {
+    const payload = await requireAuth(request, env);
+    if (!env.DB) return err("Database not available", 500);
+    const id = getInvoiceId(new URL(request.url));
+    if (!id) return err("Invoice ID required", 400);
+    const invoice = await env.DB.prepare(
+      "SELECT * FROM auction_invoices WHERE id = ? AND user_id = ?"
+    ).bind(id, payload.userId).first();
+    if (!invoice) return err("Invoice not found", 404);
+    const items = await env.DB.prepare(
+      "SELECT * FROM auction_items WHERE invoice_id = ? AND user_id = ? ORDER BY created_at ASC"
+    ).bind(id, payload.userId).all();
+    return ok({ invoice, items: items.results || [] });
+  });
+}
+async function onRequestPut$2(context) {
+  const { request, env } = context;
+  return withAuth(async () => {
+    const payload = await requireAuth(request, env);
+    if (!env.DB) return err("Database not available", 500);
+    const url = new URL(request.url);
+    const id = getInvoiceId(url);
+    if (!id) return err("Invoice ID required", 400);
+    const invoice = await env.DB.prepare(
+      "SELECT * FROM auction_invoices WHERE id = ? AND user_id = ?"
+    ).bind(id, payload.userId).first();
+    if (!invoice) return err("Invoice not found", 404);
+    const body = await request.json();
+    const { invoice_ref, description, discount, shipping, tax, date_acquired } = body;
+    const newDiscount = discount ?? invoice.discount;
+    const newShipping = shipping ?? invoice.shipping;
+    const newTax = tax ?? invoice.tax;
+    const newRef = invoice_ref ?? invoice.invoice_ref;
+    const newDesc = description ?? invoice.description;
+    const newDateAcq = date_acquired ?? invoice.date_acquired;
+    await env.DB.prepare(`
+      UPDATE auction_invoices
+      SET invoice_ref = ?, description = ?, discount = ?, shipping = ?, tax = ?, date_acquired = ?
+      WHERE id = ? AND user_id = ?
+    `).bind(newRef, newDesc, newDiscount, newShipping, newTax, newDateAcq, id, payload.userId).run();
+    const existing = await env.DB.prepare(
+      "SELECT * FROM auction_items WHERE invoice_id = ? AND user_id = ?"
+    ).bind(id, payload.userId).all();
+    const updatedInvoice = { ...invoice, discount: newDiscount, shipping: newShipping, tax: newTax };
+    for (const item of existing.results || []) {
+      const proration = computeItemProration({ unit_price: item.unit_price }, updatedInvoice);
+      const pricing = computePricingFloors({
+        true_total_cost: proration.true_total_cost,
+        est_shipping_cost: item.est_shipping_cost || 0,
+        platform_flat_fee: item.platform_flat_fee || 0,
+        platform_fee_pct: item.platform_fee_pct || 0,
+        boost_pct: item.boost_pct || 0,
+        target_margin_pct: item.target_margin_pct || 0
+      });
+      await env.DB.prepare(`
+        UPDATE auction_items
+        SET proration_weight = ?, prorated_discount = ?, prorated_shipping = ?,
+            prorated_tax = ?, true_total_cost = ?,
+            min_sell_price = ?, suggested_list_price = ?, updated_at = datetime('now')
+        WHERE id = ? AND user_id = ?
+      `).bind(
+        proration.proration_weight,
+        proration.prorated_discount,
+        proration.prorated_shipping,
+        proration.prorated_tax,
+        proration.true_total_cost,
+        pricing.min_sell_price,
+        pricing.suggested_list_price,
+        item.id,
+        payload.userId
+      ).run();
+    }
+    return ok({ success: true, message: `Invoice updated and ${existing.results?.length || 0} items re-prorated.` });
+  });
+}
+async function onRequestDelete$2(context) {
+  const { request, env } = context;
+  return withAuth(async () => {
+    const payload = await requireAuth(request, env);
+    if (!env.DB) return err("Database not available", 500);
+    const id = getInvoiceId(new URL(request.url));
+    if (!id) return err("Invoice ID required", 400);
+    const invoice = await env.DB.prepare(
+      "SELECT id FROM auction_invoices WHERE id = ? AND user_id = ?"
+    ).bind(id, payload.userId).first();
+    if (!invoice) return err("Invoice not found", 404);
+    const soldCheck = await env.DB.prepare(`
+      SELECT COUNT(*) AS cnt FROM auction_sales s
+      JOIN auction_items i ON i.id = s.item_id
+      WHERE i.invoice_id = ? AND s.user_id = ?
+    `).bind(id, payload.userId).first();
+    if (soldCheck && soldCheck.cnt > 0) {
+      return err("Cannot delete an invoice that has recorded sales. Archive items instead.", 409);
+    }
+    await env.DB.prepare("DELETE FROM auction_items WHERE invoice_id = ? AND user_id = ?").bind(id, payload.userId).run();
+    await env.DB.prepare("DELETE FROM auction_invoices WHERE id = ? AND user_id = ?").bind(id, payload.userId).run();
+    return ok({ success: true });
+  });
+}
+async function onRequestGet$4(context) {
+  const { request, env } = context;
+  return withAuth(async () => {
+    const payload = await requireAuth(request, env);
+    if (!env.DB) return err("Database not available", 500);
+    const url = new URL(request.url);
+    const status = url.searchParams.get("status") || "";
+    const invoice_id = url.searchParams.get("invoice_id") || "";
+    const q = url.searchParams.get("q") || "";
+    const page = Math.max(1, parseInt(url.searchParams.get("page") || "1"));
+    const limit = Math.min(200, Math.max(1, parseInt(url.searchParams.get("limit") || "50")));
+    const offset = (page - 1) * limit;
+    const conditions = ["i.user_id = ?"];
+    const bindings = [payload.userId];
+    if (status) {
+      conditions.push("i.status = ?");
+      bindings.push(status);
+    }
+    if (invoice_id) {
+      conditions.push("i.invoice_id = ?");
+      bindings.push(invoice_id);
+    }
+    if (q) {
+      conditions.push("(i.item_name LIKE ? OR i.athlete_person LIKE ? OR i.category LIKE ?)");
+      const like = `%${q}%`;
+      bindings.push(like, like, like);
+    }
+    const whereClause = conditions.join(" AND ");
+    const countRow = await env.DB.prepare(
+      `SELECT COUNT(*) AS total FROM auction_items i WHERE ${whereClause}`
+    ).bind(...bindings).first();
+    const rows = await env.DB.prepare(`
+      SELECT
+        i.*,
+        inv.invoice_ref,
+        inv.discount AS inv_discount,
+        inv.shipping AS inv_shipping,
+        inv.tax      AS inv_tax
+      FROM auction_items i
+      LEFT JOIN auction_invoices inv ON inv.id = i.invoice_id
+      WHERE ${whereClause}
+      ORDER BY i.created_at DESC
+      LIMIT ? OFFSET ?
+    `).bind(...bindings, limit, offset).all();
+    return ok({
+      items: rows.results || [],
+      pagination: {
+        total: countRow?.total || 0,
+        page,
+        limit,
+        pages: Math.ceil((countRow?.total || 0) / limit)
+      }
+    });
+  });
+}
+function getItemId(url) {
+  const parts = url.pathname.split("/");
+  return parts[parts.length - 1] || null;
+}
+async function onRequestGet$3(context) {
+  const { request, env } = context;
+  return withAuth(async () => {
+    const payload = await requireAuth(request, env);
+    if (!env.DB) return err("Database not available", 500);
+    const id = getItemId(new URL(request.url));
+    if (!id) return err("Item ID required", 400);
+    const item = await env.DB.prepare(
+      "SELECT * FROM auction_items WHERE id = ? AND user_id = ?"
+    ).bind(id, payload.userId).first();
+    if (!item) return err("Item not found", 404);
+    return ok({ item });
+  });
+}
+async function onRequestPut$1(context) {
+  const { request, env } = context;
+  return withAuth(async () => {
+    const payload = await requireAuth(request, env);
+    if (!env.DB) return err("Database not available", 500);
+    const id = getItemId(new URL(request.url));
+    if (!id) return err("Item ID required", 400);
+    const item = await env.DB.prepare(
+      "SELECT * FROM auction_items WHERE id = ? AND user_id = ?"
+    ).bind(id, payload.userId).first();
+    if (!item) return err("Item not found", 404);
+    const body = await request.json();
+    const updated = {
+      item_name: body.item_name ?? item.item_name,
+      category: body.category ?? item.category,
+      sport_genre: body.sport_genre ?? item.sport_genre,
+      athlete_person: body.athlete_person ?? item.athlete_person,
+      authenticator: body.authenticator ?? item.authenticator,
+      cert_number: body.cert_number ?? item.cert_number,
+      status: body.status ?? item.status,
+      platform: body.platform ?? item.platform,
+      platform_fee_pct: body.platform_fee_pct ?? item.platform_fee_pct,
+      platform_flat_fee: body.platform_flat_fee ?? item.platform_flat_fee,
+      est_shipping_cost: body.est_shipping_cost ?? item.est_shipping_cost,
+      boost_pct: body.boost_pct ?? item.boost_pct,
+      target_margin_pct: body.target_margin_pct ?? item.target_margin_pct,
+      current_list_price: body.current_list_price ?? item.current_list_price,
+      actual_sell_price: body.actual_sell_price ?? item.actual_sell_price,
+      date_listed: body.date_listed ?? item.date_listed,
+      date_sold: body.date_sold ?? item.date_sold,
+      notes: body.notes ?? item.notes,
+      best_listing_window: body.best_listing_window ?? item.best_listing_window
+    };
+    if (body.platform && body.platform !== item.platform && !body.platform_fee_pct) {
+      const plat = await env.DB.prepare(
+        "SELECT fee_pct, flat_fee FROM auction_platforms WHERE user_id = ? AND name = ?"
+      ).bind(payload.userId, body.platform).first();
+      if (plat) {
+        updated.platform_fee_pct = plat.fee_pct;
+        updated.platform_flat_fee = plat.flat_fee;
+      }
+    }
+    const pricing = computePricingFloors({
+      true_total_cost: item.true_total_cost,
+      est_shipping_cost: updated.est_shipping_cost,
+      platform_flat_fee: updated.platform_flat_fee,
+      platform_fee_pct: updated.platform_fee_pct,
+      boost_pct: updated.boost_pct,
+      target_margin_pct: updated.target_margin_pct
+    });
+    let days_on_market = item.days_on_market;
+    if (updated.status === "Sold" && updated.date_listed && updated.date_sold) {
+      const from = new Date(updated.date_listed).getTime();
+      const to = new Date(updated.date_sold).getTime();
+      days_on_market = Math.floor((to - from) / (1e3 * 60 * 60 * 24));
+    }
+    await env.DB.prepare(`
+      UPDATE auction_items SET
+        item_name = ?, category = ?, sport_genre = ?, athlete_person = ?,
+        authenticator = ?, cert_number = ?,
+        status = ?, platform = ?, platform_fee_pct = ?, platform_flat_fee = ?,
+        est_shipping_cost = ?, boost_pct = ?, target_margin_pct = ?,
+        min_sell_price = ?, suggested_list_price = ?,
+        current_list_price = ?, actual_sell_price = ?,
+        date_listed = ?, date_sold = ?, days_on_market = ?,
+        notes = ?, best_listing_window = ?,
+        updated_at = datetime('now')
+      WHERE id = ? AND user_id = ?
+    `).bind(
+      updated.item_name,
+      updated.category,
+      updated.sport_genre,
+      updated.athlete_person,
+      updated.authenticator,
+      updated.cert_number,
+      updated.status,
+      updated.platform,
+      updated.platform_fee_pct,
+      updated.platform_flat_fee,
+      updated.est_shipping_cost,
+      updated.boost_pct,
+      updated.target_margin_pct,
+      pricing.min_sell_price,
+      pricing.suggested_list_price,
+      updated.current_list_price,
+      updated.actual_sell_price,
+      updated.date_listed,
+      updated.date_sold,
+      days_on_market,
+      updated.notes,
+      updated.best_listing_window,
+      id,
+      payload.userId
+    ).run();
+    return ok({
+      success: true,
+      min_sell_price: pricing.min_sell_price,
+      suggested_list_price: pricing.suggested_list_price,
+      days_on_market
+    });
+  });
+}
+async function onRequestDelete$1(context) {
+  const { request, env } = context;
+  return withAuth(async () => {
+    const payload = await requireAuth(request, env);
+    if (!env.DB) return err("Database not available", 500);
+    const id = getItemId(new URL(request.url));
+    if (!id) return err("Item ID required", 400);
+    const item = await env.DB.prepare(
+      "SELECT id FROM auction_items WHERE id = ? AND user_id = ?"
+    ).bind(id, payload.userId).first();
+    if (!item) return err("Item not found", 404);
+    const saleCheck = await env.DB.prepare(
+      "SELECT COUNT(*) AS cnt FROM auction_sales WHERE item_id = ? AND user_id = ?"
+    ).bind(id, payload.userId).first();
+    if (saleCheck && saleCheck.cnt > 0) {
+      return err('Cannot delete an item that has recorded sales. Set status to "Returned" instead.', 409);
+    }
+    await env.DB.prepare("DELETE FROM auction_comps WHERE item_id = ?").bind(id).run();
+    await env.DB.prepare("DELETE FROM auction_items WHERE id = ? AND user_id = ?").bind(id, payload.userId).run();
+    return ok({ success: true });
+  });
+}
+async function onRequestGet$2(context) {
+  const { request, env } = context;
+  return withAuth(async () => {
+    const payload = await requireAuth(request, env);
+    if (!env.DB) return err("Database not available", 500);
+    const url = new URL(request.url);
+    const platform = url.searchParams.get("platform") || "";
+    const q = url.searchParams.get("q") || "";
+    const page = Math.max(1, parseInt(url.searchParams.get("page") || "1"));
+    const limit = Math.min(200, Math.max(1, parseInt(url.searchParams.get("limit") || "50")));
+    const offset = (page - 1) * limit;
+    const conditions = ["s.user_id = ?"];
+    const bindings = [payload.userId];
+    if (platform) {
+      conditions.push("s.platform = ?");
+      bindings.push(platform);
+    }
+    if (q) {
+      conditions.push("(i.item_name LIKE ? OR i.athlete_person LIKE ? OR s.buyer_handle LIKE ?)");
+      const like = `%${q}%`;
+      bindings.push(like, like, like);
+    }
+    const whereClause = conditions.join(" AND ");
+    const aggRow = await env.DB.prepare(`
+      SELECT
+        COUNT(s.id) AS total_count,
+        COALESCE(SUM(s.gross_sale_price), 0) AS total_gross,
+        COALESCE(SUM(s.net_proceeds), 0) AS total_net_proceeds,
+        COALESCE(SUM(s.true_total_cost), 0) AS total_cost,
+        COALESCE(SUM(s.net_profit), 0) AS total_net_profit,
+        COALESCE(AVG(s.days_to_sell), 0) AS avg_days_to_sell
+      FROM auction_sales s
+      JOIN auction_items i ON i.id = s.item_id
+      WHERE ${whereClause}
+    `).bind(...bindings).first();
+    const count = aggRow?.total_count || 0;
+    const totalCost = aggRow?.total_cost || 0;
+    const totalProfit = aggRow?.total_net_profit || 0;
+    const blendedRoi = totalCost > 0 ? totalProfit / totalCost : 0;
+    const rows = await env.DB.prepare(`
+      SELECT
+        s.*,
+        i.item_name,
+        i.category,
+        i.athlete_person,
+        i.authenticator,
+        i.cert_number,
+        i.date_acquired,
+        i.date_listed,
+        inv.invoice_ref
+      FROM auction_sales s
+      JOIN auction_items i ON i.id = s.item_id
+      LEFT JOIN auction_invoices inv ON inv.id = i.invoice_id
+      WHERE ${whereClause}
+      ORDER BY s.sale_date DESC, s.created_at DESC
+      LIMIT ? OFFSET ?
+    `).bind(...bindings, limit, offset).all();
+    return ok({
+      sales: rows.results || [],
+      summary: {
+        total_count: count,
+        total_gross: aggRow?.total_gross || 0,
+        total_net_proceeds: aggRow?.total_net_proceeds || 0,
+        total_cost: totalCost,
+        total_net_profit: totalProfit,
+        blended_roi: blendedRoi,
+        avg_days_to_sell: Math.round(aggRow?.avg_days_to_sell || 0)
+      },
+      pagination: {
+        total: count,
+        page,
+        limit,
+        pages: Math.ceil(count / limit)
+      }
+    });
+  });
+}
+async function onRequestPost(context) {
+  const { request, env } = context;
+  return withAuth(async () => {
+    const payload = await requireAuth(request, env);
+    if (!env.DB) return err("Database not available", 500);
+    const body = await request.json();
+    const {
+      item_id,
+      sale_date,
+      platform,
+      buyer_handle,
+      gross_sale_price,
+      buyer_shipping_paid,
+      actual_shipping_cost,
+      platform_fee_pct,
+      platform_flat_fee,
+      payment_processing_amt,
+      promoted_listing_fee
+    } = body;
+    if (!item_id) return err("item_id is required");
+    if (!sale_date) return err("sale_date is required");
+    if (!platform) return err("platform is required");
+    if (typeof gross_sale_price !== "number" || gross_sale_price < 0) {
+      return err("Valid gross_sale_price is required");
+    }
+    const item = await env.DB.prepare(
+      "SELECT * FROM auction_items WHERE id = ? AND user_id = ?"
+    ).bind(item_id, payload.userId).first();
+    if (!item) return err("Item not found", 404);
+    let feePct = platform_fee_pct;
+    let flatFee = platform_flat_fee;
+    if (feePct == null || flatFee == null) {
+      const plat = await env.DB.prepare(
+        "SELECT fee_pct, flat_fee FROM auction_platforms WHERE user_id = ? AND name = ?"
+      ).bind(payload.userId, platform).first();
+      feePct = feePct ?? (plat?.fee_pct || 0);
+      flatFee = flatFee ?? (plat?.flat_fee || 0);
+    }
+    const bShippingPaid = buyer_shipping_paid || 0;
+    const aShippingCost = actual_shipping_cost || 0;
+    const pProcessingAmt = payment_processing_amt || 0;
+    const pListingFee = promoted_listing_fee || 0;
+    const metrics = computeSaleMetrics({
+      gross_sale_price,
+      buyer_shipping_paid: bShippingPaid,
+      actual_shipping_cost: aShippingCost,
+      platform_fee_pct: feePct,
+      platform_flat_fee: flatFee,
+      payment_processing_amt: pProcessingAmt,
+      promoted_listing_fee: pListingFee,
+      true_total_cost: item.true_total_cost
+    });
+    const startDate = item.date_listed || item.date_acquired;
+    const daysToSell = daysBetween(startDate, sale_date) ?? 0;
+    const saleId = `sale-${crypto.randomUUID()}`;
+    await env.DB.prepare(`
+      INSERT INTO auction_sales (
+        id, user_id, item_id, sale_date, platform, buyer_handle,
+        gross_sale_price, buyer_shipping_paid, actual_shipping_cost,
+        platform_fee_pct, platform_flat_fee, platform_fees_amt,
+        payment_processing_amt, promoted_listing_fee,
+        net_proceeds, true_total_cost, net_profit, roi_pct,
+        days_to_sell
+      ) VALUES (
+        ?, ?, ?, ?, ?, ?,
+        ?, ?, ?,
+        ?, ?, ?,
+        ?, ?,
+        ?, ?, ?, ?,
+        ?
+      )
+    `).bind(
+      saleId,
+      payload.userId,
+      item_id,
+      sale_date,
+      platform,
+      buyer_handle || null,
+      gross_sale_price,
+      bShippingPaid,
+      aShippingCost,
+      feePct,
+      flatFee,
+      metrics.platform_fees_amt,
+      pProcessingAmt,
+      pListingFee,
+      metrics.net_proceeds,
+      item.true_total_cost,
+      metrics.net_profit,
+      metrics.roi_pct,
+      daysToSell >= 0 ? daysToSell : 0
+    ).run();
+    await env.DB.prepare(`
+      UPDATE auction_items SET
+        status = 'Sold',
+        actual_sell_price = ?,
+        date_sold = ?,
+        days_on_market = ?,
+        updated_at = datetime('now')
+      WHERE id = ? AND user_id = ?
+    `).bind(
+      gross_sale_price,
+      sale_date,
+      daysToSell >= 0 ? daysToSell : 0,
+      item_id,
+      payload.userId
+    ).run();
+    return ok({
+      success: true,
+      sale: {
+        id: saleId,
+        item_id,
+        sale_date,
+        platform,
+        gross_sale_price,
+        net_profit: metrics.net_profit,
+        roi_pct: metrics.roi_pct,
+        net_proceeds: metrics.net_proceeds,
+        days_to_sell: daysToSell >= 0 ? daysToSell : 0
+      }
+    }, 201);
+  });
+}
+function getSaleId(url) {
+  const parts = url.pathname.split("/");
+  return parts[parts.length - 1] || null;
+}
+async function onRequestGet$1(context) {
+  const { request, env } = context;
+  return withAuth(async () => {
+    const payload = await requireAuth(request, env);
+    if (!env.DB) return err("Database not available", 500);
+    const id = getSaleId(new URL(request.url));
+    if (!id) return err("Sale ID required", 400);
+    const sale = await env.DB.prepare(`
+      SELECT
+        s.*,
+        i.item_name,
+        i.category,
+        i.athlete_person,
+        i.authenticator,
+        i.cert_number,
+        i.date_acquired,
+        i.date_listed,
+        inv.invoice_ref
+      FROM auction_sales s
+      JOIN auction_items i ON i.id = s.item_id
+      LEFT JOIN auction_invoices inv ON inv.id = i.invoice_id
+      WHERE s.id = ? AND s.user_id = ?
+    `).bind(id, payload.userId).first();
+    if (!sale) return err("Sale not found", 404);
+    return ok({ sale });
+  });
+}
+async function onRequestPut(context) {
+  const { request, env } = context;
+  return withAuth(async () => {
+    const payload = await requireAuth(request, env);
+    if (!env.DB) return err("Database not available", 500);
+    const id = getSaleId(new URL(request.url));
+    if (!id) return err("Sale ID required", 400);
+    const existing = await env.DB.prepare(
+      "SELECT * FROM auction_sales WHERE id = ? AND user_id = ?"
+    ).bind(id, payload.userId).first();
+    if (!existing) return err("Sale not found", 404);
+    const item = await env.DB.prepare(
+      "SELECT * FROM auction_items WHERE id = ? AND user_id = ?"
+    ).bind(existing.item_id, payload.userId).first();
+    if (!item) return err("Associated item not found", 404);
+    const body = await request.json();
+    const sale_date = body.sale_date ?? existing.sale_date;
+    const platform = body.platform ?? existing.platform;
+    const buyer_handle = body.buyer_handle !== void 0 ? body.buyer_handle : existing.buyer_handle;
+    const gross_sale_price = typeof body.gross_sale_price === "number" ? body.gross_sale_price : existing.gross_sale_price;
+    const buyer_shipping_paid = typeof body.buyer_shipping_paid === "number" ? body.buyer_shipping_paid : existing.buyer_shipping_paid;
+    const actual_shipping_cost = typeof body.actual_shipping_cost === "number" ? body.actual_shipping_cost : existing.actual_shipping_cost;
+    const platform_fee_pct = typeof body.platform_fee_pct === "number" ? body.platform_fee_pct : existing.platform_fee_pct;
+    const platform_flat_fee = typeof body.platform_flat_fee === "number" ? body.platform_flat_fee : existing.platform_flat_fee;
+    const payment_processing_amt = typeof body.payment_processing_amt === "number" ? body.payment_processing_amt : existing.payment_processing_amt;
+    const promoted_listing_fee = typeof body.promoted_listing_fee === "number" ? body.promoted_listing_fee : existing.promoted_listing_fee;
+    const metrics = computeSaleMetrics({
+      gross_sale_price,
+      buyer_shipping_paid,
+      actual_shipping_cost,
+      platform_fee_pct,
+      platform_flat_fee,
+      payment_processing_amt,
+      promoted_listing_fee,
+      true_total_cost: item.true_total_cost
+    });
+    const startDate = item.date_listed || item.date_acquired;
+    const daysToSell = daysBetween(startDate, sale_date) ?? existing.days_to_sell;
+    await env.DB.prepare(`
+      UPDATE auction_sales SET
+        sale_date = ?,
+        platform = ?,
+        buyer_handle = ?,
+        gross_sale_price = ?,
+        buyer_shipping_paid = ?,
+        actual_shipping_cost = ?,
+        platform_fee_pct = ?,
+        platform_flat_fee = ?,
+        platform_fees_amt = ?,
+        payment_processing_amt = ?,
+        promoted_listing_fee = ?,
+        net_proceeds = ?,
+        true_total_cost = ?,
+        net_profit = ?,
+        roi_pct = ?,
+        days_to_sell = ?
+      WHERE id = ? AND user_id = ?
+    `).bind(
+      sale_date,
+      platform,
+      buyer_handle || null,
+      gross_sale_price,
+      buyer_shipping_paid,
+      actual_shipping_cost,
+      platform_fee_pct,
+      platform_flat_fee,
+      metrics.platform_fees_amt,
+      payment_processing_amt,
+      promoted_listing_fee,
+      metrics.net_proceeds,
+      item.true_total_cost,
+      metrics.net_profit,
+      metrics.roi_pct,
+      daysToSell >= 0 ? daysToSell : 0,
+      id,
+      payload.userId
+    ).run();
+    await env.DB.prepare(`
+      UPDATE auction_items SET
+        actual_sell_price = ?,
+        date_sold = ?,
+        days_on_market = ?,
+        updated_at = datetime('now')
+      WHERE id = ? AND user_id = ?
+    `).bind(
+      gross_sale_price,
+      sale_date,
+      daysToSell >= 0 ? daysToSell : 0,
+      existing.item_id,
+      payload.userId
+    ).run();
+    return ok({ success: true, message: "Sale updated successfully" });
+  });
+}
+async function onRequestDelete(context) {
+  const { request, env } = context;
+  return withAuth(async () => {
+    const payload = await requireAuth(request, env);
+    if (!env.DB) return err("Database not available", 500);
+    const id = getSaleId(new URL(request.url));
+    if (!id) return err("Sale ID required", 400);
+    const existing = await env.DB.prepare(
+      "SELECT id, item_id FROM auction_sales WHERE id = ? AND user_id = ?"
+    ).bind(id, payload.userId).first();
+    if (!existing) return err("Sale not found", 404);
+    await env.DB.prepare(
+      "DELETE FROM auction_sales WHERE id = ? AND user_id = ?"
+    ).bind(id, payload.userId).run();
+    await env.DB.prepare(`
+      UPDATE auction_items SET
+        status = CASE WHEN date_listed IS NOT NULL AND date_listed != '' THEN 'Listed' ELSE 'Available' END,
+        actual_sell_price = NULL,
+        date_sold = NULL,
+        days_on_market = NULL,
+        updated_at = datetime('now')
+      WHERE id = ? AND user_id = ?
+    `).bind(existing.item_id, payload.userId).run();
+    return ok({ success: true, message: "Sale deleted and item status reverted" });
+  });
+}
+async function onRequestGet(context) {
+  const { request, env } = context;
+  return withAuth(async () => {
+    const payload = await requireAuth(request, env);
+    if (!env.DB) return err("Database not available", 500);
+    const rows = await env.DB.prepare(
+      "SELECT * FROM auction_platforms WHERE user_id = ? ORDER BY is_default DESC, name ASC"
+    ).bind(payload.userId).all();
+    return ok({ platforms: rows.results || [] });
+  });
 }
 function addSecurityHeaders(response, isLocalhost = false) {
   const newHeaders = new Headers(response.headers);
@@ -883,21 +1778,51 @@ const worker = {
         apiPath = "/api";
       }
       if (apiPath === "/api/auth/register" && request.method === "POST") {
-        response = await onRequestPost$6(context);
+        response = await onRequestPost$8(context);
       } else if (apiPath === "/api/auth/login" && request.method === "POST") {
-        response = await onRequestPost$5(context);
+        response = await onRequestPost$7(context);
       } else if (apiPath === "/api/auth/forgot-password" && request.method === "POST") {
-        response = await onRequestPost$3(context);
+        response = await onRequestPost$5(context);
       } else if (apiPath === "/api/auth/reset-password" && request.method === "POST") {
-        response = await onRequestPost$2(context);
-      } else if (apiPath === "/api/auth/security-question" && request.method === "POST") {
-        response = await onRequestPost$1(context);
-      } else if (apiPath === "/api/auth/update-profile" && request.method === "POST") {
-        response = await onRequestPost(context);
-      } else if (apiPath === "/api/auth/me" && request.method === "GET") {
-        response = await onRequestGet(context);
-      } else if (apiPath === "/api/auth/logout" && request.method === "POST") {
         response = await onRequestPost$4(context);
+      } else if (apiPath === "/api/auth/security-question" && request.method === "POST") {
+        response = await onRequestPost$3(context);
+      } else if (apiPath === "/api/auth/update-profile" && request.method === "POST") {
+        response = await onRequestPost$2(context);
+      } else if (apiPath === "/api/auth/me" && request.method === "GET") {
+        response = await onRequestGet$7(context);
+      } else if (apiPath === "/api/auth/logout" && request.method === "POST") {
+        response = await onRequestPost$6(context);
+      } else if (apiPath === "/api/invoices" && request.method === "GET") {
+        response = await onRequestGet$6(context);
+      } else if (apiPath === "/api/invoices" && request.method === "POST") {
+        response = await onRequestPost$1(context);
+      } else if (/^\/api\/invoices\/[^/]+$/.test(apiPath) && request.method === "GET") {
+        response = await onRequestGet$5(context);
+      } else if (/^\/api\/invoices\/[^/]+$/.test(apiPath) && request.method === "PUT") {
+        response = await onRequestPut$2(context);
+      } else if (/^\/api\/invoices\/[^/]+$/.test(apiPath) && request.method === "DELETE") {
+        response = await onRequestDelete$2(context);
+      } else if (apiPath === "/api/items" && request.method === "GET") {
+        response = await onRequestGet$4(context);
+      } else if (/^\/api\/items\/[^/]+$/.test(apiPath) && request.method === "GET") {
+        response = await onRequestGet$3(context);
+      } else if (/^\/api\/items\/[^/]+$/.test(apiPath) && request.method === "PUT") {
+        response = await onRequestPut$1(context);
+      } else if (/^\/api\/items\/[^/]+$/.test(apiPath) && request.method === "DELETE") {
+        response = await onRequestDelete$1(context);
+      } else if (apiPath === "/api/sales" && request.method === "GET") {
+        response = await onRequestGet$2(context);
+      } else if (apiPath === "/api/sales" && request.method === "POST") {
+        response = await onRequestPost(context);
+      } else if (/^\/api\/sales\/[^/]+$/.test(apiPath) && request.method === "GET") {
+        response = await onRequestGet$1(context);
+      } else if (/^\/api\/sales\/[^/]+$/.test(apiPath) && request.method === "PUT") {
+        response = await onRequestPut(context);
+      } else if (/^\/api\/sales\/[^/]+$/.test(apiPath) && request.method === "DELETE") {
+        response = await onRequestDelete(context);
+      } else if (apiPath === "/api/platforms" && request.method === "GET") {
+        response = await onRequestGet(context);
       } else if (apiPath.startsWith("/api/")) {
         response = new Response(JSON.stringify({ error: "Endpoint not found" }), {
           status: 404,
@@ -914,8 +1839,8 @@ const worker = {
       } else {
         response = env?.ASSETS?.fetch ? await env.ASSETS.fetch(request) : await fetch(request);
       }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : String(err || "Server error");
+    } catch (err2) {
+      const errorMessage = err2 instanceof Error ? err2.message : String(err2 || "Server error");
       response = new Response(JSON.stringify({ error: errorMessage }), {
         status: 500,
         headers: { "Content-Type": "application/json" }

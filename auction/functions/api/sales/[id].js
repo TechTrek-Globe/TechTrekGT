@@ -1,0 +1,187 @@
+import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
+import { computeSaleMetrics, daysBetween } from '../../utils/auction.js';
+
+// ============================================================
+// GET    /api/sales/:id - retrieve single sale with item info
+// PUT    /api/sales/:id - update sale metrics and sync item
+// DELETE /api/sales/:id - remove sale and revert item status
+// ============================================================
+
+function getSaleId(url) {
+  const parts = url.pathname.split('/');
+  return parts[parts.length - 1] || null;
+}
+
+export async function onRequestGet(context) {
+  const { request, env } = context;
+  return withAuth(async () => {
+    const payload = await requireAuth(request, env);
+    if (!env.DB) return err('Database not available', 500);
+
+    const id = getSaleId(new URL(request.url));
+    if (!id) return err('Sale ID required', 400);
+
+    const sale = await env.DB.prepare(`
+      SELECT
+        s.*,
+        i.item_name,
+        i.category,
+        i.athlete_person,
+        i.authenticator,
+        i.cert_number,
+        i.date_acquired,
+        i.date_listed,
+        inv.invoice_ref
+      FROM auction_sales s
+      JOIN auction_items i ON i.id = s.item_id
+      LEFT JOIN auction_invoices inv ON inv.id = i.invoice_id
+      WHERE s.id = ? AND s.user_id = ?
+    `).bind(id, payload.userId).first();
+
+    if (!sale) return err('Sale not found', 404);
+    return ok({ sale });
+  });
+}
+
+export async function onRequestPut(context) {
+  const { request, env } = context;
+  return withAuth(async () => {
+    const payload = await requireAuth(request, env);
+    if (!env.DB) return err('Database not available', 500);
+
+    const id = getSaleId(new URL(request.url));
+    if (!id) return err('Sale ID required', 400);
+
+    const existing = await env.DB.prepare(
+      'SELECT * FROM auction_sales WHERE id = ? AND user_id = ?'
+    ).bind(id, payload.userId).first();
+
+    if (!existing) return err('Sale not found', 404);
+
+    const item = await env.DB.prepare(
+      'SELECT * FROM auction_items WHERE id = ? AND user_id = ?'
+    ).bind(existing.item_id, payload.userId).first();
+
+    if (!item) return err('Associated item not found', 404);
+
+    const body = await request.json();
+
+    const sale_date = body.sale_date ?? existing.sale_date;
+    const platform = body.platform ?? existing.platform;
+    const buyer_handle = body.buyer_handle !== undefined ? body.buyer_handle : existing.buyer_handle;
+    const gross_sale_price = typeof body.gross_sale_price === 'number' ? body.gross_sale_price : existing.gross_sale_price;
+    const buyer_shipping_paid = typeof body.buyer_shipping_paid === 'number' ? body.buyer_shipping_paid : existing.buyer_shipping_paid;
+    const actual_shipping_cost = typeof body.actual_shipping_cost === 'number' ? body.actual_shipping_cost : existing.actual_shipping_cost;
+    const platform_fee_pct = typeof body.platform_fee_pct === 'number' ? body.platform_fee_pct : existing.platform_fee_pct;
+    const platform_flat_fee = typeof body.platform_flat_fee === 'number' ? body.platform_flat_fee : existing.platform_flat_fee;
+    const payment_processing_amt = typeof body.payment_processing_amt === 'number' ? body.payment_processing_amt : existing.payment_processing_amt;
+    const promoted_listing_fee = typeof body.promoted_listing_fee === 'number' ? body.promoted_listing_fee : existing.promoted_listing_fee;
+
+    const metrics = computeSaleMetrics({
+      gross_sale_price,
+      buyer_shipping_paid,
+      actual_shipping_cost,
+      platform_fee_pct,
+      platform_flat_fee,
+      payment_processing_amt,
+      promoted_listing_fee,
+      true_total_cost: item.true_total_cost
+    });
+
+    const startDate = item.date_listed || item.date_acquired;
+    const daysToSell = daysBetween(startDate, sale_date) ?? existing.days_to_sell;
+
+    await env.DB.prepare(`
+      UPDATE auction_sales SET
+        sale_date = ?,
+        platform = ?,
+        buyer_handle = ?,
+        gross_sale_price = ?,
+        buyer_shipping_paid = ?,
+        actual_shipping_cost = ?,
+        platform_fee_pct = ?,
+        platform_flat_fee = ?,
+        platform_fees_amt = ?,
+        payment_processing_amt = ?,
+        promoted_listing_fee = ?,
+        net_proceeds = ?,
+        true_total_cost = ?,
+        net_profit = ?,
+        roi_pct = ?,
+        days_to_sell = ?
+      WHERE id = ? AND user_id = ?
+    `).bind(
+      sale_date,
+      platform,
+      buyer_handle || null,
+      gross_sale_price,
+      buyer_shipping_paid,
+      actual_shipping_cost,
+      platform_fee_pct,
+      platform_flat_fee,
+      metrics.platform_fees_amt,
+      payment_processing_amt,
+      promoted_listing_fee,
+      metrics.net_proceeds,
+      item.true_total_cost,
+      metrics.net_profit,
+      metrics.roi_pct,
+      daysToSell >= 0 ? daysToSell : 0,
+      id,
+      payload.userId
+    ).run();
+
+    // Update item actual_sell_price & date_sold
+    await env.DB.prepare(`
+      UPDATE auction_items SET
+        actual_sell_price = ?,
+        date_sold = ?,
+        days_on_market = ?,
+        updated_at = datetime('now')
+      WHERE id = ? AND user_id = ?
+    `).bind(
+      gross_sale_price,
+      sale_date,
+      daysToSell >= 0 ? daysToSell : 0,
+      existing.item_id,
+      payload.userId
+    ).run();
+
+    return ok({ success: true, message: 'Sale updated successfully' });
+  });
+}
+
+export async function onRequestDelete(context) {
+  const { request, env } = context;
+  return withAuth(async () => {
+    const payload = await requireAuth(request, env);
+    if (!env.DB) return err('Database not available', 500);
+
+    const id = getSaleId(new URL(request.url));
+    if (!id) return err('Sale ID required', 400);
+
+    const existing = await env.DB.prepare(
+      'SELECT id, item_id FROM auction_sales WHERE id = ? AND user_id = ?'
+    ).bind(id, payload.userId).first();
+
+    if (!existing) return err('Sale not found', 404);
+
+    // Delete sale
+    await env.DB.prepare(
+      'DELETE FROM auction_sales WHERE id = ? AND user_id = ?'
+    ).bind(id, payload.userId).run();
+
+    // Revert item back to Listed or Available
+    await env.DB.prepare(`
+      UPDATE auction_items SET
+        status = CASE WHEN date_listed IS NOT NULL AND date_listed != '' THEN 'Listed' ELSE 'Available' END,
+        actual_sell_price = NULL,
+        date_sold = NULL,
+        days_on_market = NULL,
+        updated_at = datetime('now')
+      WHERE id = ? AND user_id = ?
+    `).bind(existing.item_id, payload.userId).run();
+
+    return ok({ success: true, message: 'Sale deleted and item status reverted' });
+  });
+}

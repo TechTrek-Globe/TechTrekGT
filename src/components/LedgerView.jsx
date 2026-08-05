@@ -41,6 +41,9 @@ function fmtGrid(val) {
 const MatrixCell = React.memo(function MatrixCell({
   value,
   onCommit,
+  monthKey,
+  day,
+  field,
   isCredit = false,
   isBill = false,
   isTotal = false,
@@ -48,15 +51,28 @@ const MatrixCell = React.memo(function MatrixCell({
   draggable = false,
   onDragStart,
   onDragEnd,
-  isDragging = false
+  isDragging = false,
+  dragLabel = '',
+  otherDesc = ''
 }) {
   const isZero = !value || value === 0;
+
+  const commitHandler = useCallback((val) => {
+    if (onCommit) onCommit(monthKey, day, field, val);
+  }, [onCommit, monthKey, day, field]);
+
+  const dragStartHandler = useCallback((e) => {
+    if (onDragStart) {
+      const extraData = field === 'other_amount' ? { otherDesc } : {};
+      onDragStart(e, monthKey, day, field, value, extraData, dragLabel);
+    }
+  }, [onDragStart, monthKey, day, field, value, otherDesc, dragLabel]);
 
   return (
     <div
       draggable={draggable}
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
+      onDragStart={draggable ? dragStartHandler : undefined}
+      onDragEnd={draggable ? onDragEnd : undefined}
       className={`group/matrix relative flex items-center justify-end w-full ${
         draggable ? 'cursor-grab active:cursor-grabbing select-none' : ''
       } ${isDragging ? 'opacity-30 scale-90' : ''}`}
@@ -68,7 +84,7 @@ const MatrixCell = React.memo(function MatrixCell({
       <InlineEdit
         value={value || 0}
         type="currency"
-        onCommit={onCommit}
+        onCommit={commitHandler}
         displayFn={() => (
           <span
             className={`font-mono text-[10px] ${
@@ -87,6 +103,47 @@ const MatrixCell = React.memo(function MatrixCell({
         className="justify-end w-full"
       />
     </div>
+  );
+});
+
+// Fully isolated text input for descriptions to prevent global renders on keystrokes
+const IsolatedTextInput = React.memo(function IsolatedTextInput({ 
+  value, 
+  monthKey, 
+  day, 
+  field, 
+  onCommit, 
+  placeholder, 
+  className 
+}) {
+  const [draft, setDraft] = useState(value || '');
+
+  useEffect(() => {
+    setDraft(value || '');
+  }, [value]);
+
+  const handleBlur = () => {
+    if (draft !== value && onCommit) {
+      onCommit(monthKey, day, field, draft);
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.target.blur();
+    }
+  };
+
+  return (
+    <input
+      type="text"
+      placeholder={placeholder}
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={handleBlur}
+      onKeyDown={handleKeyDown}
+      className={className}
+    />
   );
 });
 
@@ -122,11 +179,11 @@ function DailySpreadsheetMatrix() {
   const [draggedCell, setDraggedCell] = useState(null);
   const [dropTarget, setDropTarget] = useState(null);
 
-  const handleDragStart = useCallback((e, row, field, value, extraData = {}, label = '') => {
+  const handleDragStart = useCallback((e, monthKey, day, field, value, extraData = {}, label = '') => {
     const payload = {
       accountId: selectedAccountId,
-      sourceMonthKey: row.monthKey,
-      sourceDay: row.day,
+      sourceMonthKey: monthKey,
+      sourceDay: day,
       field,
       value,
       extraData,
@@ -145,6 +202,10 @@ function DailySpreadsheetMatrix() {
     setDraggedCell(null);
     setDropTarget(null);
   }, []);
+
+  const handleCellCommit = useCallback((monthKey, day, field, val) => {
+    updateDailyMatrixCell(selectedAccountId, monthKey, day, field, val);
+  }, [updateDailyMatrixCell, selectedAccountId]);
 
   const handleDragOver = useCallback((e, row, field) => {
     if (!draggedCell || draggedCell.field !== field) return;
@@ -945,10 +1006,14 @@ function DailySpreadsheetMatrix() {
                           <MatrixCell
                             value={row.personCredits[p.id]}
                             isCredit
-                            onCommit={val => updateDailyMatrixCell(selectedAccountId, row.monthKey, row.day, `credit_${p.id}`, val)}
+                            monthKey={row.monthKey}
+                            day={row.day}
+                            field={`credit_${p.id}`}
+                            onCommit={handleCellCommit}
                             draggable={Boolean(row.personCredits[p.id] && row.personCredits[p.id] > 0)}
-                            onDragStart={e => handleDragStart(e, row, `credit_${p.id}`, row.personCredits[p.id], {}, `${p.name.split(' ')[0]} Credit`)}
+                            onDragStart={handleDragStart}
                             onDragEnd={handleDragEnd}
+                            dragLabel={`${p.name.split(' ')[0]} Credit`}
                             isDragging={draggedCell?.sourceMonthKey === row.monthKey && draggedCell?.sourceDay === row.day && draggedCell?.field === `credit_${p.id}`}
                           />
                         </td>
@@ -971,10 +1036,14 @@ function DailySpreadsheetMatrix() {
                           <MatrixCell
                             value={row.personExtraCredits[p.id]}
                             isCredit
-                            onCommit={val => updateDailyMatrixCell(selectedAccountId, row.monthKey, row.day, `extra_credit_${p.id}`, val)}
+                            monthKey={row.monthKey}
+                            day={row.day}
+                            field={`extra_credit_${p.id}`}
+                            onCommit={handleCellCommit}
                             draggable={Boolean(row.personExtraCredits[p.id] && row.personExtraCredits[p.id] > 0)}
-                            onDragStart={e => handleDragStart(e, row, `extra_credit_${p.id}`, row.personExtraCredits[p.id], {}, `${p.name.split(' ')[0]} Extra`)}
+                            onDragStart={handleDragStart}
                             onDragEnd={handleDragEnd}
+                            dragLabel={`${p.name.split(' ')[0]} Extra`}
                             isDragging={draggedCell?.sourceMonthKey === row.monthKey && draggedCell?.sourceDay === row.day && draggedCell?.field === `extra_credit_${p.id}`}
                           />
                         </td>
@@ -997,10 +1066,14 @@ function DailySpreadsheetMatrix() {
                           <MatrixCell
                             value={row.billValues[b.id]}
                             isBill
-                            onCommit={val => updateDailyMatrixCell(selectedAccountId, row.monthKey, row.day, `bill_${b.id}`, val)}
+                            monthKey={row.monthKey}
+                            day={row.day}
+                            field={`bill_${b.id}`}
+                            onCommit={handleCellCommit}
                             draggable={Boolean(row.billValues[b.id] && row.billValues[b.id] > 0)}
-                            onDragStart={e => handleDragStart(e, row, `bill_${b.id}`, row.billValues[b.id], {}, b.name)}
+                            onDragStart={handleDragStart}
                             onDragEnd={handleDragEnd}
+                            dragLabel={b.name}
                             isDragging={draggedCell?.sourceMonthKey === row.monthKey && draggedCell?.sourceDay === row.day && draggedCell?.field === `bill_${b.id}`}
                           />
                         </td>
@@ -1021,21 +1094,28 @@ function DailySpreadsheetMatrix() {
                         <MatrixCell
                           value={row.otherAmt}
                           isBill
-                          onCommit={val => updateDailyMatrixCell(selectedAccountId, row.monthKey, row.day, 'other_amount', val)}
+                          monthKey={row.monthKey}
+                          day={row.day}
+                          field="other_amount"
+                          onCommit={handleCellCommit}
                           draggable={Boolean(row.otherAmt && row.otherAmt > 0)}
-                          onDragStart={e => handleDragStart(e, row, 'other_amount', row.otherAmt, { otherDesc: row.otherDesc }, row.otherDesc ? `Other (${row.otherDesc})` : 'Other Expense')}
+                          onDragStart={handleDragStart}
                           onDragEnd={handleDragEnd}
+                          dragLabel={row.otherDesc ? `Other (${row.otherDesc})` : 'Other Expense'}
+                          otherDesc={row.otherDesc}
                           isDragging={draggedCell?.sourceMonthKey === row.monthKey && draggedCell?.sourceDay === row.day && draggedCell?.field === 'other_amount'}
                         />
                       </td>
 
                       {/* Other Description */}
                       <td className="p-1 border-r border-slate-800/80">
-                        <input
-                          type="text"
-                          placeholder="—"
+                        <IsolatedTextInput
                           value={row.otherDesc}
-                          onChange={e => updateDailyMatrixCell(selectedAccountId, row.monthKey, row.day, 'other_desc', e.target.value)}
+                          monthKey={row.monthKey}
+                          day={row.day}
+                          field="other_desc"
+                          onCommit={handleCellCommit}
+                          placeholder="—"
                           className="bg-transparent text-[10px] text-slate-300 hover:bg-slate-800/60 focus:bg-slate-800 px-1 py-0.5 rounded outline-none w-full"
                         />
                       </td>

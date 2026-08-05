@@ -10,6 +10,8 @@ import { CardShowCalculatorModal } from './CardShowCalculatorModal';
 import { SuppliesTrackerModal } from './SuppliesTrackerModal';
 import { TaxReportModal } from './TaxReportModal';
 
+import outpostLogo from '../assets/outpost-logo.png';
+
 const NAV_ITEMS = [
   { id: 'dashboard',   label: 'Dashboard',            icon: LayoutDashboard },
   { id: 'inventory',   label: 'Inventory',             icon: Package },
@@ -34,14 +36,8 @@ export function AppLayout({ activeView, onNavigate, children }) {
       {/* --- Sidebar --- */}
       <aside className="hidden lg:flex flex-col w-60 bg-slate-900/60 border-r border-slate-800/60 backdrop-blur-md flex-shrink-0">
         {/* Logo */}
-        <div className="flex items-center gap-3 px-5 py-5 border-b border-slate-800/60">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shadow-md shadow-amber-500/20 flex-shrink-0">
-            <Gavel className="w-4.5 h-4.5 text-slate-950" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-[10px] font-semibold text-amber-500/70 tracking-widest uppercase">TechTrek</p>
-            <p className="text-sm font-bold text-slate-100 -mt-0.5 truncate">Outpost</p>
-          </div>
+        <div className="flex items-center justify-center px-4 py-4 border-b border-slate-800/60">
+          <img src={outpostLogo} alt="TechTrek Outpost Logo" className="w-full h-auto max-h-12 object-contain filter drop-shadow-md" />
         </div>
 
         {/* Nav */}
@@ -156,10 +152,7 @@ export function AppLayout({ activeView, onNavigate, children }) {
         {/* Mobile top bar */}
         <header className="lg:hidden flex items-center justify-between px-4 py-3 bg-slate-900/80 border-b border-slate-800/60 backdrop-blur-md">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center">
-              <Gavel className="w-4 h-4 text-slate-950" />
-            </div>
-            <span className="font-black text-white text-sm">TechTrek Outpost</span>
+            <img src={outpostLogo} alt="TechTrek Outpost" className="h-8 w-auto max-w-[160px] object-contain filter drop-shadow-md" />
           </div>
 
           <div className="flex items-center gap-2">

@@ -995,6 +995,13 @@ const worker = {
       url.protocol = "https:";
       return Response.redirect(url.toString(), 301);
     }
+    if (/^\/(outpost|auction)($|\/|\?)/i.test(url.pathname)) {
+      if (!url.pathname.startsWith("/outpost")) {
+        const outpostUrl = new URL(request.url);
+        outpostUrl.pathname = outpostUrl.pathname.replace(/^\/(outpost|auction)/i, "/outpost");
+        return Response.redirect(outpostUrl.toString(), 301);
+      }
+    }
     if (request.method === "OPTIONS") {
       return addSecurityHeaders(new Response(null, { status: 204 }), isLocalhost);
     }

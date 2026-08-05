@@ -88,6 +88,15 @@ export default {
       return Response.redirect(url.toString(), 301);
     }
 
+    // Redirect non-canonical case (/Outpost, /OUTPOST, /auction) to lowercase /outpost
+    if (/^\/(outpost|auction)($|\/|\?)/i.test(url.pathname)) {
+      if (!url.pathname.startsWith('/outpost')) {
+        const canonicalUrl = new URL(request.url);
+        canonicalUrl.pathname = canonicalUrl.pathname.replace(/^\/(outpost|auction)/i, '/outpost');
+        return Response.redirect(canonicalUrl.toString(), 301);
+      }
+    }
+
     if (request.method === 'OPTIONS') {
       return addSecurityHeaders(new Response(null, { status: 204 }), isLocalhost);
     }

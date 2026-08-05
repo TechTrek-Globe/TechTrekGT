@@ -19,6 +19,22 @@
     {
       "pattern": "techtrekgt.com/outpost/*",
       "zone_name": "techtrekgt.com"
+    },
+    {
+      "pattern": "techtrekgt.com/Outpost",
+      "zone_name": "techtrekgt.com"
+    },
+    {
+      "pattern": "techtrekgt.com/Outpost/*",
+      "zone_name": "techtrekgt.com"
+    },
+    {
+      "pattern": "techtrekgt.com/OUTPOST",
+      "zone_name": "techtrekgt.com"
+    },
+    {
+      "pattern": "techtrekgt.com/OUTPOST/*",
+      "zone_name": "techtrekgt.com"
     }
   ],
   "compatibility_flags": [

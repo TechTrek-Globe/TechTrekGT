@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "npm run build && wrangler dev",
     "deploy": "npm run build && wrangler deploy",
-    "db:migrate": "wrangler d1 execute personal-budget-db --file=./auction-schema.sql",
+    "db:migrate": "wrangler d1 execute personal-budget-db --remote --file=./auction-schema.sql",
     "db:migrate:local": "wrangler d1 execute personal-budget-db --local --file=./auction-schema.sql"
   },
   "dependencies": {

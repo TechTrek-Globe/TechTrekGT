@@ -196,6 +196,9 @@ export function AuthProvider({ children }) {
     setIsAuthenticated(false);
     setUser(null);
     setHouseholdId(null);
+    if (typeof window !== 'undefined') {
+      window.history.pushState({}, '', '/finance');
+    }
     try {
       await fetch(getApiUrl('/api/auth/logout'), { method: 'POST', credentials: 'include' });
     } catch (e) {

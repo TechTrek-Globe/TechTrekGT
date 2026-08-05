@@ -155,6 +155,12 @@ export function Navbar() {
                     setIsSettingsOpen(true);
                   } else {
                     setActiveView(item.id);
+                    if (typeof window !== 'undefined') {
+                      const targetPath = `/finance/${item.id}`;
+                      if (window.location.pathname !== targetPath) {
+                        window.history.pushState({}, '', targetPath);
+                      }
+                    }
                   }
                 }}
                 className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${

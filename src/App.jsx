@@ -11,8 +11,8 @@ import { MainBudgetView } from './components/MainBudgetView';
 import { LedgerView } from './components/LedgerView';
 import { AmortizationView } from './components/AmortizationView';
 import { LandingPage } from './components/LandingPage';
+import { AuthPage } from './components/AuthPage';
 import AuthModal from './components/AuthModal';
-import { Lock } from 'lucide-react';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -81,29 +81,47 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-function MainContent() {
-  const { activeView, isSettingsOpen } = useBudget();
+function getViewFromPathname(pathname) {
+  const path = (pathname || (typeof window !== 'undefined' ? window.location.pathname : '')).toLowerCase().replace(/\/$/, '');
+  if (path === '/finance/ledger') return 'ledger';
+  if (path === '/finance/main-budget' || path === '/finance/bills') return 'main_budget';
+  if (path === '/finance/amortization') return 'amortization';
+  if (path === '/finance/settings') return 'settings';
+  return 'dashboard';
+}
+
+function MainContent({ onNavigateHome, onNavigate }) {
+  const { activeView, setActiveView, isSettingsOpen } = useBudget();
   const { isAuthenticated } = useAuth();
+  const currentPath = (typeof window !== 'undefined' ? window.location.pathname : '').toLowerCase().replace(/\/$/, '');
+
+  // Synchronize view state with URL pathname
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    if (currentPath === '/finance' || currentPath === '/finance/login' || currentPath === '') {
+      if (onNavigate) onNavigate('/finance/dashboard');
+    } else {
+      const view = getViewFromPathname(currentPath);
+      if (view && view !== activeView) {
+        setActiveView(view);
+      }
+    }
+  }, [currentPath, isAuthenticated, activeView, setActiveView, onNavigate]);
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-[70vh] flex flex-col items-center justify-center p-8 text-center">
-        <div className="max-w-md w-full p-8 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-2xl backdrop-blur-xl text-center space-y-4">
-          <div className="w-12 h-12 rounded-2xl bg-slate-800/90 border border-slate-700/80 mx-auto flex items-center justify-center text-emerald-400 shadow-inner">
-            <Lock className="w-6 h-6" />
-          </div>
-          <h2 className="text-xl font-bold text-slate-100">Authentication Required</h2>
-          <p className="text-xs text-slate-400">
-            Please sign in with your TechTrek account credentials to access your personal dashboard and ledger.
-          </p>
-        </div>
-        <AuthModal />
-      </div>
+      <AuthPage
+        onNavigateHome={onNavigateHome}
+        onAuthSuccess={() => {
+          if (onNavigate) onNavigate('/finance/dashboard');
+        }}
+      />
     );
   }
 
   return (
-    <>
+    <AppLayout onNavigateHome={onNavigateHome}>
       {activeView === 'dashboard'   && <DashboardView />}
       {activeView === 'main_budget' && <MainBudgetView />}
       {activeView === 'ledger'      && <LedgerView />}
@@ -111,12 +129,12 @@ function MainContent() {
       {activeView === 'settings'    && <SettingsView />}
       {isSettingsOpen && <SettingsModal />}
       <AuthModal />
-    </>
+    </AppLayout>
   );
 }
 
 function getRouteFromPathname(pathname) {
-  const path = (pathname || (typeof window !== 'undefined' ? window.location.pathname : '')).toLowerCase();
+  const path = (pathname || (typeof window !== 'undefined' ? window.location.pathname : '')).toLowerCase().replace(/\/$/, '');
   if (path === '/finance' || path.startsWith('/finance/')) {
     return 'finance';
   }
@@ -149,9 +167,7 @@ export default function App() {
         <AuthProvider>
           <BudgetMetadataProvider>
             <LedgerDataProvider>
-              <AppLayout onNavigateHome={() => navigateTo('/')}>
-                <MainContent />
-              </AppLayout>
+              <MainContent onNavigateHome={() => navigateTo('/')} onNavigate={navigateTo} />
             </LedgerDataProvider>
           </BudgetMetadataProvider>
         </AuthProvider>
@@ -159,3 +175,4 @@ export default function App() {
     </ErrorBoundary>
   );
 }
+

@@ -171,6 +171,84 @@ export function SettingsView() {
   const [newPersonForm, setNewPersonForm] = useState({ name: '', role: 'Member', payFrequency: 'bi-weekly', grossPerPay: 0, netPerPay: 0, payDay1: 15, payDay2: 'last', payOffsetDays: 0 });
   const [newBillForm, setNewBillForm] = useState({ name: '', amount: 0, period: 'Monthly', accountId: budget.accounts[0]?.id || '', dueDay: 1, dueMonths: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], paymentSource: 'Auto Pay', notes: '' });
 
+  const addAccountModalRef = useRef(null);
+  const addPersonModalRef = useRef(null);
+  const addBillModalRef = useRef(null);
+
+  const trapFocus = (e, modalElement) => {
+    if (!modalElement) return;
+    const focusableElements = modalElement.querySelectorAll(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    const focusable = Array.from(focusableElements).filter(
+      el => !el.hasAttribute('disabled') && el.getAttribute('tabindex') !== '-1'
+    );
+    if (focusable.length === 0) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+
+    if (e.key === 'Tab') {
+      if (e.shiftKey) {
+        if (document.activeElement === first || !modalElement.contains(document.activeElement)) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (document.activeElement === last || !modalElement.contains(document.activeElement)) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    }
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (isAddAccountModalOpen) {
+        if (e.key === 'Escape') setIsAddAccountModalOpen(false);
+        else trapFocus(e, addAccountModalRef.current);
+        return;
+      }
+      if (isAddPersonModalOpen) {
+        if (e.key === 'Escape') setIsAddPersonModalOpen(false);
+        else trapFocus(e, addPersonModalRef.current);
+        return;
+      }
+      if (isAddBillModalOpen) {
+        if (e.key === 'Escape') setIsAddBillModalOpen(false);
+        else trapFocus(e, addBillModalRef.current);
+        return;
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isAddAccountModalOpen, isAddPersonModalOpen, isAddBillModalOpen]);
+
+  const handleAddAccount = (e) => {
+    e.preventDefault();
+    if (!newAccForm.name) return;
+    addAccount(newAccForm);
+    setNewAccForm({ name: '', type: 'checking', startingBalance: 0, balanceAsOfDate: new Date().toISOString().split('T')[0], saveExtraMonthly: 0, extraStartingBalance: 0, enableExtraSavings: true, color: 'blue', notes: '' });
+    setIsAddAccountModalOpen(false);
+  };
+
+  const handleAddPerson = (e) => {
+    e.preventDefault();
+    if (!newPersonForm.name) return;
+    addPerson(newPersonForm);
+    setNewPersonForm({ name: '', role: 'Member', payFrequency: 'bi-weekly', grossPerPay: 0, netPerPay: 0, payDay1: 15, payDay2: 'last', payOffsetDays: 0 });
+    setIsAddPersonModalOpen(false);
+  };
+
+  const handleAddBill = (e) => {
+    e.preventDefault();
+    if (!newBillForm.name) return;
+    addBill(newBillForm);
+    setNewBillForm({ name: '', amount: 0, period: 'Monthly', accountId: budget.accounts[0]?.id || '', dueDay: 1, dueMonths: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], paymentSource: 'Auto Pay', notes: '' });
+    setIsAddBillModalOpen(false);
+  };
+
+
   // Keep newBillForm accountId synced if current account list changes
   useEffect(() => {
     if (!newBillForm.accountId && budget.accounts.length > 0) {
@@ -1055,6 +1133,606 @@ export function SettingsView() {
               </form>
             </div>
           )}
+
+
+              {/* Pop-up Modal: Add New Account */}
+              {isAddAccountModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in overflow-y-auto">
+                  <div
+                    ref={addAccountModalRef}
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="add-account-modal-title"
+                    className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto my-auto"
+                  >
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                      <h3 id="add-account-modal-title" className="text-base font-bold text-slate-100 flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-blue-600/20 flex items-center justify-center text-blue-400">
+                          <Plus className="w-4 h-4" />
+                        </div>
+                        Add New Account
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => setIsAddAccountModalOpen(false)}
+                        className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <form onSubmit={(e) => {
+                      e.preventDefault();
+                      if (!newAccForm.name) return;
+                      addAccount(newAccForm);
+                      setNewAccForm({ name: '', type: 'checking', startingBalance: 0, balanceAsOfDate: new Date().toISOString().split('T')[0], saveExtraMonthly: 0, extraStartingBalance: 0, enableExtraSavings: true, color: 'blue', notes: '' });
+                      setIsAddAccountModalOpen(false);
+                    }} className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1">Account Name *</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. USAA Bills Checking - 7071"
+                          value={newAccForm.name}
+                          onChange={e => setNewAccForm({ ...newAccForm, name: e.target.value })}
+                          className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-blue-500"
+                          autoFocus
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-slate-300 mb-1">Account Type</label>
+                          <select
+                            value={newAccForm.type}
+                            onChange={e => setNewAccForm({ ...newAccForm, type: e.target.value })}
+                            className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-blue-500"
+                          >
+                            <option value="checking">Checking Account</option>
+                            <option value="savings">Savings Account</option>
+                            <option value="credit">Credit Card Account</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-slate-300 mb-1">Starting Balance ($)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            placeholder="0.00"
+                            value={newAccForm.startingBalance}
+                            onChange={e => setNewAccForm({ ...newAccForm, startingBalance: parseFloat(e.target.value) || 0 })}
+                            className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-100 font-mono focus:outline-none focus:border-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-amber-300 mb-1">Start Date / Day</label>
+                          <input
+                            type="date"
+                            value={newAccForm.balanceAsOfDate || new Date().toISOString().split('T')[0]}
+                            onChange={e => setNewAccForm({ ...newAccForm, balanceAsOfDate: e.target.value })}
+                            className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-amber-200 font-mono focus:outline-none focus:border-blue-500"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-800 space-y-3">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id="chk-new-extra"
+                            checked={newAccForm.enableExtraSavings !== false}
+                            onChange={e => setNewAccForm({ ...newAccForm, enableExtraSavings: e.target.checked })}
+                            className="rounded bg-slate-950 border-slate-700 text-indigo-500 focus:ring-0 cursor-pointer"
+                          />
+                          <label htmlFor="chk-new-extra" className="text-xs font-medium text-slate-300 cursor-pointer">
+                            Track Extra Savings Bucket
+                          </label>
+                        </div>
+
+                        {newAccForm.enableExtraSavings !== false && (
+                          <div className="grid grid-cols-2 gap-3 p-3 bg-slate-950/60 border border-slate-800 rounded-xl">
+                            <div>
+                              <label className="block text-xs font-medium text-indigo-300 mb-1">Save Extra Target ($/mo)</label>
+                              <input
+                                type="number"
+                                step="10"
+                                placeholder="0"
+                                value={newAccForm.saveExtraMonthly || 0}
+                                onChange={e => setNewAccForm({ ...newAccForm, saveExtraMonthly: parseFloat(e.target.value) || 0 })}
+                                className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-emerald-400 font-mono font-bold focus:outline-none focus:border-blue-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-slate-400 mb-1">Extra Current Balance ($)</label>
+                              <input
+                                type="number"
+                                step="0.01"
+                                placeholder="0.00"
+                                value={newAccForm.extraStartingBalance || 0}
+                                onChange={e => setNewAccForm({ ...newAccForm, extraStartingBalance: parseFloat(e.target.value) || 0 })}
+                                className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-200 font-mono focus:outline-none focus:border-blue-500"
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+                        <button
+                          type="button"
+                          onClick={() => setIsAddAccountModalOpen(false)}
+                          className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          className="px-5 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/20 transition-all cursor-pointer"
+                        >
+                          Create Account
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
+              {/* Pop-up Modal: Add New Person */}
+              {isAddPersonModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in overflow-y-auto">
+                  <div
+                    ref={addPersonModalRef}
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="add-person-modal-title"
+                    className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto my-auto"
+                  >
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                      <h3 id="add-person-modal-title" className="text-base font-bold text-slate-100 flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-purple-600/20 flex items-center justify-center text-purple-400">
+                          <Plus className="w-4 h-4" />
+                        </div>
+                        Add Household Member
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => setIsAddPersonModalOpen(false)}
+                        className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <form onSubmit={(e) => {
+                      e.preventDefault();
+                      if (!newPersonForm.name) return;
+                      addPerson(newPersonForm);
+                      setNewPersonForm({ name: '', role: 'Member', payFrequency: 'bi-weekly', grossPerPay: 0, netPerPay: 0, payDay1: 15, payDay2: 'last', payOffsetDays: 0 });
+                      setIsAddPersonModalOpen(false);
+                    }} className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1">Member Name *</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Jon Kemp"
+                          value={newPersonForm.name}
+                          onChange={e => setNewPersonForm({ ...newPersonForm, name: e.target.value })}
+                          className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-purple-500"
+                          autoFocus
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-slate-300 mb-1">Pay Schedule</label>
+                          <select
+                            value={newPersonForm.payFrequency}
+                            onChange={e => setNewPersonForm({ ...newPersonForm, payFrequency: e.target.value })}
+                            className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-purple-500"
+                          >
+                            <option value="bi-weekly">Bi-weekly (26/yr)</option>
+                            <option value="semi-monthly">Semi-Monthly (24/yr)</option>
+                            <option value="monthly">Monthly (12/yr)</option>
+                            <option value="weekly">Weekly (52/yr)</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-slate-300 mb-1">Role / Title</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Primary Earner"
+                            value={newPersonForm.role || ''}
+                            onChange={e => setNewPersonForm({ ...newPersonForm, role: e.target.value })}
+                            className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-purple-500"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Pay Dates Customization & Presets */}
+                      {(() => {
+                        const isMulti = newPersonForm.payFrequency === 'bi-weekly' || newPersonForm.payFrequency === 'semi-monthly';
+                        return (
+                          <div className="p-3 bg-slate-950/60 border border-slate-800 rounded-xl space-y-2">
+                            <div className="flex items-center justify-between">
+                              <label className="block text-xs font-semibold text-purple-300">Payment Dates / Schedule</label>
+                              {isMulti && (
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => setNewPersonForm({ ...newPersonForm, payDay1: '1st', payDay2: '15th' })}
+                                    className="px-2 py-0.5 text-[10px] rounded bg-purple-950/80 hover:bg-purple-900 text-purple-300 border border-purple-800 transition-colors"
+                                  >
+                                    1st & 15th
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setNewPersonForm({ ...newPersonForm, payDay1: '15th', payDay2: 'End of Month' })}
+                                    className="px-2 py-0.5 text-[10px] rounded bg-purple-950/80 hover:bg-purple-900 text-purple-300 border border-purple-800 transition-colors"
+                                  >
+                                    15th & End
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setNewPersonForm({ ...newPersonForm, payDay1: 'Every 2 Wks', payDay2: 'Fridays' })}
+                                    className="px-2 py-0.5 text-[10px] rounded bg-purple-950/80 hover:bg-purple-900 text-purple-300 border border-purple-800 transition-colors"
+                                  >
+                                    Bi-Weekly
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                            <div className={`grid gap-3 ${isMulti ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                              <div>
+                                <label className="block text-[10px] text-slate-400 mb-1">
+                                  {isMulti ? 'Pay Date 1 (e.g. 1st / 1)' : 'Pay Date (e.g. 1st / 15th)'}
+                                </label>
+                                <input
+                                  type="text"
+                                  placeholder="e.g. 1st or 1"
+                                  value={newPersonForm.payDay1 || ''}
+                                  onChange={e => setNewPersonForm({ ...newPersonForm, payDay1: e.target.value })}
+                                  className="w-full px-3 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:border-purple-500 font-mono"
+                                />
+                              </div>
+                              {isMulti && (
+                                <div>
+                                  <label className="block text-[10px] text-slate-400 mb-1">Pay Date 2 (e.g. 15th / 15)</label>
+                                  <input
+                                    type="text"
+                                    placeholder="e.g. 15th or 15"
+                                    value={newPersonForm.payDay2 || ''}
+                                    onChange={e => setNewPersonForm({ ...newPersonForm, payDay2: e.target.value })}
+                                    className="w-full px-3 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:border-purple-500 font-mono"
+                                  />
+                                </div>
+                              )}
+                              <div>
+                                <label className="block text-[10px] text-amber-300 font-semibold mb-1">Early Pay Deposit Offset</label>
+                                <select
+                                  value={newPersonForm.payOffsetDays ?? 0}
+                                  onChange={e => setNewPersonForm({ ...newPersonForm, payOffsetDays: parseInt(e.target.value) || 0 })}
+                                  className="w-full px-3 py-1.5 text-xs bg-slate-900 border border-amber-500/40 rounded-lg text-amber-200 focus:outline-none focus:border-purple-500 font-mono"
+                                >
+                                  <option value={0}>Exact Payday (0 Days)</option>
+                                  <option value={-1}>1 Day Early (-1 Day)</option>
+                                  <option value={-2}>2 Days Early (-2 Days e.g. USAA)</option>
+                                  <option value={-3}>3 Days Early (-3 Days)</option>
+                                </select>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {/* Per-Account Direct Deposit Allocations (if multiple accounts exist) */}
+                      {budget.accounts.length > 1 && (
+                        <div className="p-3 bg-slate-950/60 border border-slate-800 rounded-xl space-y-2">
+                          <div className="flex items-center justify-between">
+                            <label className="block text-xs font-semibold text-purple-300">Direct Deposit Allocations (Per Paycheck)</label>
+                            {(() => {
+                              const allocs = newPersonForm.accountAllocations || {};
+                              const totalAllocated = Object.values(allocs).reduce((/** @type {number} */ sum, /** @type {any} */ val) => sum + (val === 'remaining' ? 0 : (parseFloat(val) || 0)), 0);
+                              const hasRemaining = Object.values(allocs).includes('remaining');
+                              const netPay = parseFloat(newPersonForm.netPerPay) || 0;
+                              const remVal = Math.max(0, netPay - totalAllocated);
+                              const isBalanced = (hasRemaining && totalAllocated <= netPay) || (Math.abs(totalAllocated - netPay) < 0.01 && netPay > 0);
+                              return (
+                                <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
+                                  isBalanced
+                                    ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                                    : 'bg-amber-950 text-amber-300 border border-amber-800'
+                                }`}>
+                                  Allocated: ${totalAllocated.toLocaleString('en-US', { minimumFractionDigits: 2 })} {hasRemaining ? `+ Remaining ($${remVal.toLocaleString('en-US', { minimumFractionDigits: 2 })})` : `/ $${netPay.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+                                </span>
+                              );
+                            })()}
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            {budget.accounts.map(acc => {
+                              const rawVal = newPersonForm.accountAllocations?.[acc.id];
+                              const isRemaining = rawVal === 'remaining';
+                              const val = isRemaining ? '' : (rawVal ?? '');
+                              return (
+                                <div key={acc.id} className={`flex items-center justify-between p-2 rounded-lg text-xs transition-colors ${
+                                  isRemaining ? 'bg-emerald-950/40 border border-emerald-800/60' : 'bg-slate-900/80 border border-slate-800'
+                                }`}>
+                                  <span className="text-slate-300 font-medium truncate max-w-[110px]">{acc.name}</span>
+                                  <div className="flex items-center gap-1.5">
+                                    {!isRemaining ? (
+                                      <>
+                                        <span className="text-slate-500 font-mono">$</span>
+                                        <input
+                                          type="number"
+                                          step="0.01"
+                                          placeholder="0.00"
+                                          value={val}
+                                          onChange={e => {
+                                            const amount = parseFloat(e.target.value) || 0;
+                                            setNewPersonForm({
+                                              ...newPersonForm,
+                                              accountAllocations: { ...(newPersonForm.accountAllocations || {}), [acc.id]: amount }
+                                            });
+                                          }}
+                                          className="w-20 px-2 py-1 bg-slate-950 border border-slate-700 rounded text-right text-slate-100 font-mono focus:outline-none focus:border-purple-500"
+                                        />
+                                      </>
+                                    ) : (
+                                      <span className="text-[10px] font-mono font-semibold text-emerald-400 px-1.5 py-0.5 bg-emerald-950 border border-emerald-800 rounded">
+                                        Remaining
+                                      </span>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const currentAlloc = { ...(newPersonForm.accountAllocations || {}) };
+                                        if (isRemaining) {
+                                          delete currentAlloc[acc.id];
+                                        } else {
+                                          Object.keys(currentAlloc).forEach(k => {
+                                            if (currentAlloc[k] === 'remaining') delete currentAlloc[k];
+                                          });
+                                          currentAlloc[acc.id] = 'remaining';
+                                        }
+                                        setNewPersonForm({
+                                          ...newPersonForm,
+                                          accountAllocations: currentAlloc
+                                        });
+                                      }}
+                                      className={`px-2 py-1 text-[10px] font-semibold rounded transition-colors ${
+                                        isRemaining
+                                          ? 'bg-emerald-500 text-slate-950 hover:bg-emerald-400'
+                                          : 'bg-slate-800 text-slate-300 hover:bg-purple-950 hover:text-purple-300 border border-slate-700'
+                                      }`}
+                                      title="Toggle Remaining (allocates all unallocated paycheck income to this account)"
+                                    >
+                                      {isRemaining ? 'Remaining ✓' : 'Set Remaining'}
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-800">
+                        <div>
+                          <label className="block text-xs font-medium text-slate-300 mb-1">Gross Per Paycheck ($)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            placeholder="3000.00"
+                            value={newPersonForm.grossPerPay || 0}
+                            onChange={e => setNewPersonForm({ ...newPersonForm, grossPerPay: parseFloat(e.target.value) || 0 })}
+                            className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-100 font-mono focus:outline-none focus:border-purple-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-slate-300 mb-1">Net Per Paycheck ($)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            placeholder="2200.00"
+                            value={newPersonForm.netPerPay || 0}
+                            onChange={e => setNewPersonForm({ ...newPersonForm, netPerPay: parseFloat(e.target.value) || 0 })}
+                            className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-emerald-400 font-mono font-bold focus:outline-none focus:border-purple-500"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+                        <button
+                          type="button"
+                          onClick={() => setIsAddPersonModalOpen(false)}
+                          className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          className="px-5 py-2 rounded-xl text-xs font-semibold bg-purple-600 hover:bg-purple-500 text-white shadow-md shadow-purple-600/20 transition-all cursor-pointer"
+                        >
+                          Add Member
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
+              {/* Pop-up Modal: Add New Bill */}
+              {isAddBillModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in overflow-y-auto">
+                  <div
+                    ref={addBillModalRef}
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="add-bill-modal-title"
+                    className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto my-auto"
+                  >
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                      <h3 id="add-bill-modal-title" className="text-base font-bold text-slate-100 flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-emerald-600/20 flex items-center justify-center text-emerald-400">
+                          <Plus className="w-4 h-4" />
+                        </div>
+                        Add New Bill & Assign to Account
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => setIsAddBillModalOpen(false)}
+                        className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <form onSubmit={(e) => {
+                      e.preventDefault();
+                      if (!newBillForm.name) return;
+                      addBill(newBillForm);
+                      setNewBillForm({ name: '', amount: 0, period: 'Monthly', accountId: budget.accounts[0]?.id || '', dueDay: 1, paymentSource: 'Auto Pay', notes: '' });
+                      setIsAddBillModalOpen(false);
+                    }} className="space-y-4 pb-12">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1">Bill Name *</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Comcast Cable / Electric Utility"
+                          value={newBillForm.name}
+                          onChange={e => setNewBillForm({ ...newBillForm, name: e.target.value })}
+                          className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-emerald-500"
+                          autoFocus
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-slate-300 mb-1">Amount ($)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            placeholder="100.00"
+                            value={newBillForm.amount}
+                            onChange={e => setNewBillForm({ ...newBillForm, amount: parseFloat(e.target.value) || 0 })}
+                            className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-100 font-mono focus:outline-none focus:border-emerald-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-slate-300 mb-1">Billing Period</label>
+                          <select
+                            value={newBillForm.period}
+                            onChange={e => {
+                              const p = e.target.value;
+                              let defaultM = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+                              if (p === 'Annual') defaultM = [1];
+                              else if (p === 'Semi-Annual') defaultM = [1, 7];
+                              else if (p === 'Quarterly') defaultM = [1, 4, 7, 10];
+                              setNewBillForm({ ...newBillForm, period: p, dueMonths: defaultM });
+                            }}
+                            className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-emerald-500"
+                          >
+                            <option value="Monthly">Monthly</option>
+                            <option value="Quarterly">Quarterly</option>
+                            <option value="Semi-Annual">Semi-Annual</option>
+                            <option value="Annual">Annual</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {newBillForm.period !== 'Monthly' && (
+                        <div className="pt-2 border-t border-slate-800">
+                          <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                            Due Month(s) <span className="text-emerald-400 font-normal">({newBillForm.period})</span>
+                          </label>
+                          <div className="grid grid-cols-6 gap-1.5">
+                            {MONTH_SHORT_NAMES.map((mName, idx) => {
+                              const mNum = idx + 1;
+                              const isSelected = (newBillForm.dueMonths || []).includes(mNum);
+                              return (
+                                <button
+                                  key={mNum}
+                                  type="button"
+                                  onClick={() => {
+                                    const current = newBillForm.dueMonths || [];
+                                    let updated;
+                                    if (current.includes(mNum)) {
+                                      if (current.length === 1) return;
+                                      updated = current.filter(m => m !== mNum);
+                                    } else {
+                                      updated = [...current, mNum].sort((a, b) => a - b);
+                                    }
+                                    setNewBillForm({ ...newBillForm, dueMonths: updated });
+                                  }}
+                                  className={`px-2 py-1 rounded text-xs font-semibold text-center transition-all cursor-pointer ${
+                                    isSelected
+                                      ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
+                                      : 'bg-slate-900 text-slate-400 hover:bg-slate-800 hover:text-slate-200 border border-slate-800'
+                                  }`}
+                                >
+                                  {mName}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-800">
+                        <div>
+                          <label className="block text-xs font-medium text-slate-300 mb-1">Assigned Account</label>
+                          <select
+                            value={newBillForm.accountId}
+                            onChange={e => setNewBillForm({ ...newBillForm, accountId: e.target.value })}
+                            className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-emerald-500"
+                          >
+                            {budget.accounts.map(acc => (
+                              <option key={acc.id} value={acc.id}>{acc.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-slate-300 mb-1">Due Date & Months</label>
+                          <NoYearCalendarPicker
+                            dueDay={newBillForm.dueDay}
+                            dueMonths={newBillForm.dueMonths}
+                            period={newBillForm.period}
+                            onChange={({ dueDay, dueMonths }) => setNewBillForm({ ...newBillForm, dueDay, dueMonths })}
+                            className="w-full justify-between px-3 py-2 bg-slate-950 rounded-xl"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1">Payment Notes / Method</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Auto Pay / Credit Card"
+                          value={newBillForm.paymentSource || ''}
+                          onChange={e => setNewBillForm({ ...newBillForm, paymentSource: e.target.value, paymentNotes: e.target.value })}
+                          className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+                        <button
+                          type="button"
+                          onClick={() => setIsAddBillModalOpen(false)}
+                          className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          className="px-5 py-2 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
+                        >
+                          Add Bill
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
 
         </div>
       </div>

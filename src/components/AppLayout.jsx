@@ -18,6 +18,8 @@ import {
   Globe
 } from 'lucide-react';
 
+import headerLogo from '../assets/header-logo.png';
+
 const NAV_ITEMS = [
   { id: 'dashboard',   label: 'Dashboard',            icon: LayoutDashboard, color: 'text-blue-400' },
   { id: 'ledger',      label: 'Transactions',         icon: TrendingUp,      color: 'text-emerald-400' },
@@ -31,16 +33,14 @@ const SIDEBAR_KEY = 'trekledger_sidebar_collapsed';
 const SidebarContent = ({ collapsed, activeView, cashOnHand, netIncome, netFlow, setActiveView, setIsSettingsOpen, onClose }) => (
   <div className="flex flex-col h-full">
     {/* Logo */}
-    <div className={`flex items-center gap-3 px-4 py-5 border-b border-slate-800/60 ${collapsed ? 'justify-center' : ''}`}>
-      <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-500 to-purple-600 p-0.5 shadow-lg shadow-blue-500/25 flex-shrink-0">
-        <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
-          <DollarSign className="w-4 h-4 text-blue-400" />
+    <div className={`flex items-center px-4 py-3.5 border-b border-slate-800/60 ${collapsed ? 'justify-center' : 'justify-between'}`}>
+      {collapsed ? (
+        <div className="w-10 h-10 overflow-hidden flex items-center justify-center rounded-xl bg-slate-900 border border-slate-800" title="TechTrek Finance">
+          <img src={headerLogo} alt="TechTrek Finance" className="h-10 w-10 object-cover object-left scale-150 -translate-x-1" />
         </div>
-      </div>
-      {!collapsed && (
-        <div className="animate-fade-in overflow-hidden">
-          <h1 className="text-base font-black gradient-text leading-none">TechTrek Finance</h1>
-          <p className="text-[10px] text-slate-500 mt-0.5 leading-none">Personal Finance OS</p>
+      ) : (
+        <div className="animate-fade-in flex items-center overflow-hidden">
+          <img src={headerLogo} alt="TechTrek Finance Logo" className="h-12 w-auto max-w-[210px] object-contain drop-shadow-md" />
         </div>
       )}
       {onClose && (
@@ -146,7 +146,7 @@ export function AppLayout({ children, onNavigateHome }) {
   const isLight = theme === 'light';
 
   return (
-    <div className={`min-h-screen font-sans selection:bg-blue-500 selection:text-white flex transition-colors duration-200 ${
+    <div className={`h-screen overflow-hidden font-sans selection:bg-blue-500 selection:text-white flex transition-colors duration-200 ${
       isLight ? 'bg-slate-100 text-slate-900 light' : 'bg-slate-950 text-slate-100 dark'
     }`}>
 
@@ -302,7 +302,7 @@ export function AppLayout({ children, onNavigateHome }) {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 px-4 sm:px-6 lg:px-8 py-6">
+        <main className="flex-1 min-h-0 flex flex-col overflow-y-auto px-4 sm:px-6 lg:px-8 py-6">
           {!isDbLoaded ? (
             <div className="flex flex-col items-center justify-center h-64 gap-3 text-slate-400">
               <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />

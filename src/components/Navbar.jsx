@@ -1,6 +1,7 @@
 import React from 'react';
 import { useBudget } from '../context/BudgetContext';
 import { useAuth } from '../context/AuthContext';
+import headerLogo from '../assets/header-logo.png';
 import { 
   LayoutDashboard, 
   ReceiptText, 
@@ -64,16 +65,8 @@ export function Navbar() {
         <div className="flex items-center justify-between h-16">
           
           {/* Logo & Branding */}
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-500 to-purple-600 p-0.5 shadow-lg shadow-blue-500/20">
-              <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
-                <DollarSign className="w-5 h-5 text-blue-400" />
-              </div>
-            </div>
-            <div>
-              <h1 className="text-lg font-bold gradient-text">TechTrek Finance</h1>
-              <p className="text-xs text-slate-400">Personal Cash Flow & Split Engine</p>
-            </div>
+          <div className="flex items-center">
+            <img src={headerLogo} alt="TechTrek Finance Logo" className="h-12 w-auto max-w-[220px] object-contain drop-shadow-md" />
           </div>
 
           {/* Person View Selector & Auth Actions */}

@@ -1237,7 +1237,7 @@ function DailySpreadsheetMatrix() {
 // ==========================================
 export function LedgerView() {
   return (
-    <div className="h-[calc(100vh-125px)] flex flex-col overflow-hidden">
+    <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
       <DailySpreadsheetMatrix />
     </div>
   );

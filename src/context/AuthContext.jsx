@@ -206,6 +206,7 @@ export function AuthProvider({ children }) {
   return (
     <AuthContext.Provider value={{
       user,
+      isAuthenticated,
       token: isAuthenticated ? 'cookie-active' : null, // alias for backwards compatibility with BudgetContext
       householdId,
       isLoading,

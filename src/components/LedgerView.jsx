@@ -652,6 +652,25 @@ function DailySpreadsheetMatrix() {
     }
   }, []);
 
+  // Controlled fine-grained mouse wheel scrolling (scrolls 1 day row ~32px per notch)
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleWheelStep = (e) => {
+      if (Math.abs(e.deltaY) >= 40 && Math.abs(e.deltaX) < Math.abs(e.deltaY)) {
+        e.preventDefault();
+        const direction = Math.sign(e.deltaY);
+        container.scrollBy({ top: direction * 32, behavior: 'auto' });
+      }
+    };
+
+    container.addEventListener('wheel', handleWheelStep, { passive: false });
+    return () => {
+      container.removeEventListener('wheel', handleWheelStep);
+    };
+  }, []);
+
   // Column totals for selected month
   const columnTotals = useMemo(() => {
     const totals = {
@@ -863,7 +882,7 @@ function DailySpreadsheetMatrix() {
               <th colSpan={showExtraColumns ? 2 : 1} className="p-1 h-7 text-center border-r border-slate-800 bg-purple-950 text-purple-300 font-black sticky top-0 z-40 align-middle">Ending Balances</th>
               
               {/* Total End Banner Container */}
-              <th colSpan={1} className="p-0 h-7 min-w-[85px] w-[85px] max-w-[85px] bg-slate-950 border-l border-slate-700 sticky right-0 top-0 z-50 shadow-[-4px_0_8px_rgba(0,0,0,0.5)]"></th>
+              <th colSpan={1} className="p-0 h-7 min-w-[72px] w-[72px] max-w-[72px] bg-slate-950 border-l border-slate-700 sticky right-0 top-0 z-50 shadow-[-4px_0_8px_rgba(0,0,0,0.5)]"></th>
             </tr>
 
             {/* Header Row 2: Individual Columns (Stacked titles) */}
@@ -955,7 +974,7 @@ function DailySpreadsheetMatrix() {
               )}
 
               {/* Total End Subheader */}
-              <th className="p-1 h-10 min-w-[85px] w-[85px] max-w-[85px] bg-slate-950 text-blue-300 font-black sticky right-0 top-[28px] z-50 align-middle text-right border-b-2 border-blue-500 border-l border-slate-700 shadow-[-4px_0_8px_rgba(0,0,0,0.5)]">
+              <th className="p-1 h-10 min-w-[72px] w-[72px] max-w-[72px] bg-slate-950 text-blue-300 font-black sticky right-0 top-[28px] z-50 align-middle text-right border-b-2 border-blue-500 border-l border-slate-700 shadow-[-4px_0_8px_rgba(0,0,0,0.5)]">
                 <div className="flex flex-col items-end justify-center leading-tight text-xs h-full">
                   <span>Total</span>
                   <span>End</span>
@@ -973,7 +992,7 @@ function DailySpreadsheetMatrix() {
                   colSpan={100}
                   className="py-1 px-3 bg-blue-950 text-blue-200 border-b border-blue-700/80 sticky left-0 top-[68px] z-30 shadow-sm"
                 >
-                  <div className="sticky left-3 inline-flex items-center gap-2 font-mono uppercase tracking-widest text-[11px] font-black z-30">
+                  <div className="sticky left-[146px] inline-flex items-center gap-2 font-mono uppercase tracking-widest text-[11px] font-black z-30">
                     <Calendar className="w-3.5 h-3.5 text-blue-400" />
                     <span>{group.monthLabel}</span>
                   </div>
@@ -991,7 +1010,7 @@ function DailySpreadsheetMatrix() {
                     data-month={row.month}
                     data-year={row.year}
                     data-rowkey={row.rowKey}
-                    className={`transition-colors ${
+                    className={`snap-start transition-colors ${
                       row.isToday
                         ? 'bg-amber-950/70 border-l-4 border-l-amber-400 border-r-2 border-r-amber-400 border-y border-y-amber-400/80 ring-1 ring-amber-400/50 shadow-[0_0_15px_rgba(251,191,36,0.35)] font-extrabold text-amber-100 z-10'
                         : row.isHistoricalLock
@@ -1158,7 +1177,7 @@ function DailySpreadsheetMatrix() {
                       )}
 
                       {/* Total End Balance (Sticky Right) */}
-                      <td className={`p-1 text-right font-extrabold sticky right-0 z-20 border-l border-slate-700 shadow-[-4px_0_8px_rgba(0,0,0,0.5)] ${
+                      <td className={`p-1 min-w-[72px] w-[72px] max-w-[72px] text-right font-extrabold sticky right-0 z-20 border-l border-slate-700 shadow-[-4px_0_8px_rgba(0,0,0,0.5)] ${
                         row.isToday
                           ? 'bg-amber-950 text-amber-100 border-y border-y-amber-400/80'
                           : row.isDeficit

@@ -167,89 +167,120 @@ export function AuthPage({ onAuthSuccess }) {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-950 bg-grid-pattern flex font-sans">
+    <div className="min-h-screen bg-slate-950 bg-grid-pattern flex items-center justify-center p-4 sm:p-6 lg:p-12 font-sans relative overflow-hidden">
+      
+      {/* Background ambient glow spheres */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute -top-40 -left-40 w-[500px] h-[500px] bg-amber-500/10 rounded-full blur-[120px]" />
+        <div className="absolute -bottom-40 -right-40 w-[500px] h-[500px] bg-amber-600/10 rounded-full blur-[120px]" />
+      </div>
 
-      {/* --- Left: Branding Panel --- */}
-      <div className="hidden lg:flex flex-col justify-between w-[42%] p-12 relative overflow-hidden">
-        {/* Ambient glow */}
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute -top-32 -left-32 w-96 h-96 bg-amber-500/8 rounded-full blur-3xl" />
-          <div className="absolute bottom-0 right-0 w-64 h-64 bg-amber-600/6 rounded-full blur-2xl" />
-        </div>
+      <div className="w-full max-w-6xl flex flex-col lg:flex-row items-center justify-center gap-8 lg:gap-12 relative z-10">
 
-        <div className="relative z-10">
-          {/* Logo */}
-          <div className="mb-8">
-            <img src={outpostLogo} alt="TechTrek Outpost Logo" className="w-full max-w-[280px] h-auto object-contain drop-shadow-2xl" />
+        {/* --- Left: Hero Branding Showcase (Desktop) --- */}
+        <div className="hidden lg:flex flex-col items-center text-center lg:items-start lg:text-left w-full lg:w-1/2 max-w-lg">
+          
+          {/* Logo Showcase Card */}
+          <div className="glass-card rounded-3xl p-6 border border-amber-500/20 shadow-2xl glow-amber-sm w-full transition-all duration-300 hover:border-amber-500/40">
+            <img 
+              src={outpostLogo} 
+              alt="TechTrek Outpost Emblem" 
+              className="w-full h-auto max-h-[300px] object-contain drop-shadow-2xl mx-auto" 
+            />
           </div>
 
-          <h1 className="text-4xl font-black text-white leading-tight mb-4">
-            Your Auction Inventory,{' '}
-            <span className="text-gradient-amber">Perfected.</span>
-          </h1>
-          <p className="text-slate-400 text-sm leading-relaxed mb-12">
-            Replace your spreadsheet with a live dashboard. Track signed memorabilia from invoice to sale with automated proration, platform fee lookup, and ROI intelligence.
-          </p>
+          <div className="mt-8">
+            <h1 className="text-3xl font-black text-white tracking-tight leading-tight">
+              Auction Inventory &{' '}
+              <span className="text-gradient-amber">Profit Intelligence</span>
+            </h1>
+            <p className="text-slate-400 text-sm leading-relaxed mt-3">
+              Track memorabilia from invoice to sale with automated proration, fee calculations, and real-time ROI tracking.
+            </p>
+          </div>
 
-          {/* Features */}
-          <div className="space-y-5">
+          {/* Feature Highlights Grid */}
+          <div className="grid grid-cols-3 gap-3 w-full mt-6">
             {features.map(({ icon: Icon, label, desc }) => (
-              <div key={label} className="flex items-start gap-4">
-                <div className="w-9 h-9 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <div key={label} className="glass-card rounded-2xl p-3.5 border border-slate-800/80 flex flex-col items-center text-center group hover:border-amber-500/30 transition-all duration-200">
+                <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
                   <Icon className="w-4 h-4 text-amber-400" />
                 </div>
-                <div>
-                  <p className="text-sm font-semibold text-slate-200">{label}</p>
-                  <p className="text-xs text-slate-500 mt-0.5">{desc}</p>
-                </div>
+                <p className="text-xs font-bold text-slate-200 line-clamp-1">{label}</p>
+                <p className="text-[10px] text-slate-500 mt-0.5 line-clamp-1">{desc}</p>
               </div>
             ))}
           </div>
+
+          {/* Trust Stat Strip */}
+          <div className="flex items-center justify-between w-full mt-6 px-4 py-3 rounded-2xl bg-slate-900/40 border border-slate-800/60 text-xs text-slate-400">
+            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" /> Live Dashboard</span>
+            <span className="text-slate-600">•</span>
+            <span>12 Platforms Tracked</span>
+            <span className="text-slate-600">•</span>
+            <span>100% Fee Accuracy</span>
+          </div>
         </div>
 
-        {/* Bottom stat strip */}
-        <div className="relative z-10 grid grid-cols-3 gap-3">
-          {[
-            { val: '12', label: 'Platforms Tracked' },
-            { val: '100%', label: 'Fee Accuracy' },
-            { val: 'Live', label: 'ROI Dashboard' },
-          ].map(({ val, label }) => (
-            <div key={label} className="glass-card rounded-xl p-3 text-center">
-              <p className="text-lg font-black text-amber-400">{val}</p>
-              <p className="text-[10px] text-slate-500 mt-0.5">{label}</p>
+        {/* --- Right: Form Container --- */}
+        <div className="w-full lg:w-1/2 max-w-md">
+
+          {/* Mobile Logo Presentation */}
+          <div className="flex lg:hidden flex-col items-center mb-6 text-center">
+            <div className="glass-card rounded-2xl p-4 border border-amber-500/20 shadow-xl max-w-[220px] mb-3">
+              <img src={outpostLogo} alt="TechTrek Outpost Logo" className="w-full h-auto object-contain drop-shadow-md" />
             </div>
-          ))}
-        </div>
-      </div>
-
-      {/* --- Right: Auth Form Panel --- */}
-      <div className="flex-1 flex items-center justify-center p-6">
-        <div className="w-full max-w-md">
-
-          {/* Mobile logo */}
-          <div className="flex lg:hidden items-center mb-8 justify-center">
-            <img src={outpostLogo} alt="TechTrek Outpost Logo" className="w-48 h-auto max-w-[220px] object-contain drop-shadow-md" />
+            <p className="text-xs text-amber-400 font-semibold tracking-wide uppercase">Auction Inventory & ROI System</p>
           </div>
 
-          <div className="glass-card rounded-2xl p-8 glow-amber-sm">
+          {/* Main Auth Glass Card */}
+          <div className="glass-card rounded-3xl p-7 sm:p-8 glow-amber-sm shadow-2xl border border-slate-800/80">
 
-            {/* --- Sign In --- */}
+            {/* Mode Switcher Tabs (Sign In / Register) */}
+            {(mode === 'signin' || mode === 'register') && (
+              <div className="flex bg-slate-900/90 p-1 rounded-xl border border-slate-800 mb-6">
+                <button
+                  type="button"
+                  onClick={() => switchMode('signin')}
+                  className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all duration-200 ${
+                    mode === 'signin'
+                      ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Sign In
+                </button>
+                <button
+                  type="button"
+                  onClick={() => switchMode('register')}
+                  className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all duration-200 ${
+                    mode === 'register'
+                      ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Create Account
+                </button>
+              </div>
+            )}
+
+            {/* --- Sign In Mode --- */}
             {mode === 'signin' && (
               <>
-                <div className="mb-7">
-                  <h2 className="text-xl font-black text-white">Welcome back</h2>
-                  <p className="text-slate-400 text-sm mt-1">Sign in to TechTrek Outpost</p>
+                <div className="mb-6">
+                  <h2 className="text-xl font-black text-white tracking-tight">Welcome back</h2>
+                  <p className="text-slate-400 text-xs mt-1">Sign in to access your Outpost dashboard</p>
                 </div>
                 {error && (
-                  <div className="mb-4 p-3 rounded-xl bg-red-950/40 border border-red-800/40 text-red-400 text-xs">
+                  <div className="mb-5 p-3.5 rounded-xl bg-red-950/50 border border-red-800/50 text-red-400 text-xs font-medium leading-relaxed">
                     {error}
                   </div>
                 )}
                 <form onSubmit={handleSignIn} className="space-y-4" id="signin-form">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1.5">Email address</label>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1.5">Email address</label>
                     <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                      <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                       <input
                         id="signin-email"
                         type="email"
@@ -262,9 +293,9 @@ export function AuthPage({ onAuthSuccess }) {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1.5">Password</label>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1.5">Password</label>
                     <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                      <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                       <input
                         id="signin-password"
                         type="password"
@@ -291,70 +322,61 @@ export function AuthPage({ onAuthSuccess }) {
                     </button>
                   </div>
                   <button id="signin-submit" type="submit" className="btn-primary mt-2" disabled={isSubmitting}>
-                    {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <><span>Sign in</span><ArrowRight className="w-4 h-4" /></>}
+                    {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <><span>Sign In to Outpost</span><ArrowRight className="w-4 h-4" /></>}
                   </button>
                 </form>
-                <p className="text-center text-xs text-slate-500 mt-6">
-                  No account?{' '}
-                  <button className="text-amber-400 hover:text-amber-300 font-semibold transition-colors" onClick={() => switchMode('register')}>
-                    Create one
-                  </button>
-                </p>
               </>
             )}
 
-            {/* --- Register --- */}
+            {/* --- Register Mode --- */}
             {mode === 'register' && (
               <>
-                <div className="mb-7">
-                  <button className="btn-ghost mb-4" onClick={() => switchMode('signin')}>
-                    <ChevronLeft className="w-3.5 h-3.5" /> Back to sign in
-                  </button>
-                  <h2 className="text-xl font-black text-white">Create account</h2>
-                  <p className="text-slate-400 text-sm mt-1">Set up your TechTrek Outpost account</p>
+                <div className="mb-6">
+                  <h2 className="text-xl font-black text-white tracking-tight">Create account</h2>
+                  <p className="text-slate-400 text-xs mt-1">Set up your TechTrek Outpost account</p>
                 </div>
                 {error && (
-                  <div className="mb-4 p-3 rounded-xl bg-red-950/40 border border-red-800/40 text-red-400 text-xs">
+                  <div className="mb-5 p-3.5 rounded-xl bg-red-950/50 border border-red-800/50 text-red-400 text-xs font-medium leading-relaxed">
                     {error}
                   </div>
                 )}
                 <form onSubmit={handleRegister} className="space-y-4" id="register-form">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1.5">Full name</label>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1.5">Full name</label>
                     <div className="relative">
-                      <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                      <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                       <input id="reg-name" type="text" autoComplete="name" className="input-field pl-10" placeholder="Prestine Owner" value={name} onChange={e => setName(e.target.value)} />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1.5">Email address</label>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1.5">Email address</label>
                     <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                      <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                       <input id="reg-email" type="email" autoComplete="email" className="input-field pl-10" placeholder="you@example.com" value={email} onChange={e => setEmail(e.target.value)} />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1.5">Password</label>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1.5">Password</label>
                     <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                      <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                       <input id="reg-password" type="password" autoComplete="new-password" className="input-field pl-10" placeholder="Min 8 chars, 1 uppercase, 1 number" value={password} onChange={e => setPassword(e.target.value)} />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1.5">Security question</label>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1.5">Security question</label>
                     <div className="relative">
-                      <HelpCircle className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                      <HelpCircle className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                       <select id="reg-security-question" className="input-field pl-10 appearance-none" value={securityQuestion} onChange={e => setSecurityQuestion(e.target.value)}>
                         {PRESET_SECURITY_QUESTIONS.map(q => <option key={q} value={q}>{q}</option>)}
                       </select>
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1.5">Security answer</label>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1.5">Security answer</label>
                     <input id="reg-security-answer" type="text" autoComplete="off" className="input-field" placeholder="Your answer (case-insensitive)" value={securityAnswer} onChange={e => setSecurityAnswer(e.target.value)} />
                   </div>
                   <button id="reg-submit" type="submit" className="btn-primary mt-2" disabled={isSubmitting}>
-                    {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <><span>Create account</span><ArrowRight className="w-4 h-4" /></>}
+                    {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <><span>Create Outpost Account</span><ArrowRight className="w-4 h-4" /></>}
                   </button>
                 </form>
               </>
@@ -363,26 +385,26 @@ export function AuthPage({ onAuthSuccess }) {
             {/* --- Forgot Password --- */}
             {mode === 'forgot' && (
               <>
-                <div className="mb-7">
-                  <button className="btn-ghost mb-4" onClick={() => switchMode('signin')}>
-                    <ChevronLeft className="w-3.5 h-3.5" /> Back to sign in
+                <div className="mb-6">
+                  <button className="btn-ghost mb-3" onClick={() => switchMode('signin')}>
+                    <ChevronLeft className="w-3.5 h-3.5" /> Back to Sign In
                   </button>
-                  <h2 className="text-xl font-black text-white">Reset password</h2>
-                  <p className="text-slate-400 text-sm mt-1">
+                  <h2 className="text-xl font-black text-white tracking-tight">Reset password</h2>
+                  <p className="text-slate-400 text-xs mt-1">
                     {forgotStep === 1 && "Enter your email to look up your security question."}
-                    {forgotStep === 2 && "Answer your security question to verify your identity."}
+                    {forgotStep === 2 && "Answer your security question to verify identity."}
                     {forgotStep === 3 && "Enter your reset code and new password."}
                   </p>
                 </div>
-                {error && <div className="mb-4 p-3 rounded-xl bg-red-950/40 border border-red-800/40 text-red-400 text-xs">{error}</div>}
-                {infoMessage && <div className="mb-4 p-3 rounded-xl bg-emerald-950/40 border border-emerald-800/40 text-emerald-400 text-xs">{infoMessage}</div>}
+                {error && <div className="mb-4 p-3.5 rounded-xl bg-red-950/50 border border-red-800/50 text-red-400 text-xs font-medium">{error}</div>}
+                {infoMessage && <div className="mb-4 p-3.5 rounded-xl bg-emerald-950/50 border border-emerald-800/50 text-emerald-300 text-xs font-medium">{infoMessage}</div>}
 
                 {forgotStep === 1 && (
                   <form onSubmit={handleForgotStep1} className="space-y-4" id="forgot-step1-form">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-400 mb-1.5">Email address</label>
+                      <label className="block text-xs font-semibold text-slate-300 mb-1.5">Email address</label>
                       <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                        <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                         <input id="forgot-email" type="email" className="input-field pl-10" placeholder="you@example.com" value={email} onChange={e => setEmail(e.target.value)} />
                       </div>
                     </div>
@@ -394,11 +416,11 @@ export function AuthPage({ onAuthSuccess }) {
 
                 {forgotStep === 2 && (
                   <form onSubmit={handleForgotStep2} className="space-y-4" id="forgot-step2-form">
-                    <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs font-medium">
+                    <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs font-medium">
                       <HelpCircle className="w-3.5 h-3.5 inline mr-1.5 mb-0.5" />{loadedQuestion}
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-400 mb-1.5">Your answer</label>
+                      <label className="block text-xs font-semibold text-slate-300 mb-1.5">Your answer</label>
                       <input id="forgot-security-answer" type="text" autoComplete="off" className="input-field" placeholder="Case-insensitive" value={securityAnswer} onChange={e => setSecurityAnswer(e.target.value)} />
                     </div>
                     <button id="forgot-verify-submit" type="submit" className="btn-primary" disabled={isSubmitting}>
@@ -410,16 +432,16 @@ export function AuthPage({ onAuthSuccess }) {
                 {forgotStep === 3 && (
                   <form onSubmit={handleResetPassword} className="space-y-4" id="reset-password-form">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-400 mb-1.5">Reset code</label>
+                      <label className="block text-xs font-semibold text-slate-300 mb-1.5">Reset code</label>
                       <div className="relative">
-                        <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                        <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                         <input id="reset-token" type="text" className="input-field pl-10" placeholder="6-digit code" value={resetToken} onChange={e => setResetToken(e.target.value)} />
                       </div>
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-400 mb-1.5">New password</label>
+                      <label className="block text-xs font-semibold text-slate-300 mb-1.5">New password</label>
                       <div className="relative">
-                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                        <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                         <input id="reset-new-password" type="password" autoComplete="new-password" className="input-field pl-10" placeholder="Min 8 chars, 1 uppercase, 1 number" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
                       </div>
                     </div>
@@ -432,11 +454,12 @@ export function AuthPage({ onAuthSuccess }) {
             )}
           </div>
 
-          {/* Footer */}
-          <p className="text-center text-xs text-slate-600 mt-6">
-            &copy; {new Date().getFullYear()} TechTrek · Secure · All data encrypted at rest
+          {/* Secure Footer */}
+          <p className="text-center text-xs text-slate-500 mt-6 font-medium">
+            &copy; {new Date().getFullYear()} TechTrek Outpost · Encrypted & Secure
           </p>
         </div>
+
       </div>
     </div>
   );

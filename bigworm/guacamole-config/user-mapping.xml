@@ -16,7 +16,7 @@
 <user-mapping>
   <authorize
     username="JonKempATO"
-    password="81b4b3429e11fa9effc6e78737630e79"
+    password="[PASSWORD]"
     encoding="md5">
 
     <!-- Home Laptop VNC Connection (TightVNC Server) -->

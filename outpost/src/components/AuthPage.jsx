@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import outpostLogo from '../assets/outpost-logo.png';
-import outpostHeaderBanner from '../assets/outpost-header-banner.png';
+import outpostHeaderBanner from '../assets/outpost-ai-cropped.png';
 import {
   Gavel,
   Lock,
@@ -181,11 +181,11 @@ export function AuthPage({ onAuthSuccess }) {
     <div className="min-h-screen bg-slate-950 bg-grid-pattern flex flex-col items-center justify-between font-sans relative overflow-hidden">
 
       {/* --- Full-width Top Bar Header --- */}
-      <header className="w-full bg-black border-b border-amber-500/30 shadow-2xl glow-amber-sm relative z-20 overflow-hidden">
+      <header className="w-full bg-black shadow-2xl relative z-20 flex justify-center items-center overflow-hidden" style={{ height: '280px', borderBottom: '1px solid rgba(180,130,20,0.3)' }}>
         <img 
           src={outpostHeaderBanner} 
           alt="TechTrek Outpost Top Bar" 
-          className="w-full h-auto max-h-[160px] sm:max-h-[220px] md:max-h-[260px] object-cover object-center block drop-shadow-2xl" 
+          style={{ height: '100%', width: 'auto', maxWidth: '100%', objectFit: 'contain', display: 'block' }} 
         />
       </header>
 

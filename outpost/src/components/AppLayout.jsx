@@ -11,8 +11,7 @@ import { SuppliesTrackerModal } from './SuppliesTrackerModal';
 import { TaxReportModal } from './TaxReportModal';
 
 import outpostLogo from '../assets/outpost-logo.png';
-import outpostHeaderBanner from '../assets/outpost-header-banner.png';
-import globetrotterPortrait from '../assets/globetrotter-portrait.png';
+import outpostHeaderBanner from '../assets/outpost-ai-cropped.png';
 
 const NAV_ITEMS = [
   { id: 'dashboard',   label: 'Dashboard',            icon: LayoutDashboard },
@@ -36,31 +35,12 @@ export function AppLayout({ activeView, onNavigate, children }) {
     <div className="min-h-screen bg-slate-950 flex flex-col font-sans">
 
       {/* --- Full-Width Top Header Banner --- */}
-      <header style={{ width: '100%', flexShrink: 0, overflow: 'hidden', height: '90px', lineHeight: 0, position: 'relative', borderBottom: '1px solid rgba(180,130,20,0.3)' }}>
-        {/* Wide panoramic base banner */}
+      <header style={{ width: '100%', flexShrink: 0, overflow: 'hidden', height: '280px', display: 'flex', justifyContent: 'center', alignItems: 'center', borderBottom: '1px solid rgba(180,130,20,0.3)', backgroundColor: '#000' }}>
         <img
           src={outpostHeaderBanner}
           alt="TechTrek Outpost - Buy Sell Track Profit"
-          style={{ width: '100%', height: '90px', objectFit: 'cover', objectPosition: 'center center', display: 'block' }}
+          style={{ height: '100%', width: 'auto', maxWidth: '100%', objectFit: 'contain', display: 'block' }}
         />
-        {/* Globetrotter portrait overlay - left side */}
-        <div style={{
-          position: 'absolute', top: '50%', left: '16px',
-          transform: 'translateY(-50%)',
-          width: '68px', height: '68px',
-          borderRadius: '50%',
-          background: 'linear-gradient(135deg, #C9A227, #8B6914)',
-          padding: '2px',
-          boxShadow: '0 0 14px rgba(201,162,39,0.6), 0 2px 8px rgba(0,0,0,0.8)',
-        }}>
-          <div style={{ width: '100%', height: '100%', borderRadius: '50%', overflow: 'hidden', background: '#050507' }}>
-            <img
-              src={globetrotterPortrait}
-              alt="TreckTrek Globetrotter"
-              style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 15%', display: 'block' }}
-            />
-          </div>
-        </div>
       </header>
 
       {/* --- Sidebar + Content row --- */}

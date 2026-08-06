@@ -1,0 +1,10 @@
+# Required env vars - set via `wrangler secret put <KEY>`
+JWT_SECRET=your-shared-jwt-secret-same-as-finance-and-outpost
+
+# Guacamole tunnel URL - the internal Cloudflare Tunnel hostname pointing to localhost:8080
+# Example: https://guac-internal.techtrekgt.com
+GUACAMOLE_INTERNAL_URL=https://guac-internal.techtrekgt.com
+
+# Guacamole web UI credentials (must match guacamole-config/user-mapping.xml)
+GUAC_USERNAME=bigworm_admin
+GUAC_PASSWORD=your-strong-guacamole-password-here

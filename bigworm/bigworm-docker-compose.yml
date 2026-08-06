@@ -1,0 +1,40 @@
+# BigWorm - Guacamole Remote Desktop Stack
+# Run from: e:\TechTrekGT\bigworm\
+# Command:  docker compose -f bigworm-docker-compose.yml up -d
+
+services:
+
+  # guacd: native protocol daemon (handles RDP, VNC, SSH connections)
+  guacd:
+    image: guacamole/guacd:1.5.5
+    container_name: bigworm-guacd
+    restart: unless-stopped
+    networks:
+      - guacnet
+
+  # guacamole: web UI + REST API (serves on port 8080)
+  guacamole:
+    image: guacamole/guacamole:1.5.5
+    container_name: bigworm-guacamole
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"      # Bound to localhost ONLY - not exposed externally
+    environment:
+      GUACD_HOSTNAME: guacd
+      GUACD_PORT:     4822
+      # File-based auth (simplest for personal use)
+      GUACAMOLE_HOME:  /etc/guacamole
+    volumes:
+      - ./guacamole-config:/etc/guacamole:ro
+    depends_on:
+      - guacd
+    networks:
+      - guacnet
+
+networks:
+  guacnet:
+    driver: bridge
+
+# NOTE: Port 8080 is bound to 127.0.0.1 (localhost only).
+# The cloudflared tunnel daemon exposes it to Cloudflare's network.
+# No port is exposed directly to your home router or the internet.

@@ -1,0 +1,46 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "techtrek-bigworm",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-08-01",
+  "observability": {
+    "enabled": true
+  },
+  "assets": {
+    "directory": "./dist/client",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application"
+  },
+  "routes": [
+    {
+      "pattern": "bigworm.techtrekgt.com",
+      "zone_name": "techtrekgt.com"
+    },
+    {
+      "pattern": "bigworm.techtrekgt.com/*",
+      "zone_name": "techtrekgt.com"
+    }
+  ],
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  // Shared D1 database - same users as Finance and Outpost
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "personal-budget-db",
+      "database_id": "10f220d4-1c10-49e9-b63e-5d4cb08d599f"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "RATE_LIMIT_KV",
+      "id": "7c5c9f9c8c1641e090e8a6677077048a"
+    }
+  ]
+  // Env vars (set via `wrangler secret put`):
+  //   JWT_SECRET          - same value as Finance/Outpost for SSO
+  //   GUACAMOLE_INTERNAL_URL - e.g. https://guac-internal.techtrekgt.com
+  //   GUAC_USERNAME       - Guacamole web UI username (from user-mapping.xml)
+  //   GUAC_PASSWORD       - Guacamole web UI password (from user-mapping.xml)
+}

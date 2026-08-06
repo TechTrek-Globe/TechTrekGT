@@ -1,0 +1,141 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body, #root { height: 100%; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background-color: #020817;
+    color: #e2e8f0;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+@layer utilities {
+  /* Cyber grid pattern */
+  .bg-grid-cyber {
+    background-image:
+      linear-gradient(rgba(6, 182, 212, 0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(6, 182, 212, 0.04) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+
+  /* Scanline overlay effect */
+  .scanlines::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0, 0, 0, 0.06) 2px,
+      rgba(0, 0, 0, 0.06) 4px
+    );
+    pointer-events: none;
+  }
+
+  /* Text gradient - cyan/teal */
+  .text-gradient-cyber {
+    background: linear-gradient(135deg, #22d3ee 0%, #06b6d4 50%, #0ea5e9 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Glass card */
+  .glass-card {
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+
+  /* Cyan glow */
+  .glow-cyan {
+    box-shadow:
+      0 0 0 1px rgba(6, 182, 212, 0.15),
+      0 0 40px rgba(6, 182, 212, 0.08),
+      0 20px 60px rgba(0, 0, 0, 0.5);
+  }
+
+  .glow-cyan-sm {
+    box-shadow:
+      0 0 0 1px rgba(6, 182, 212, 0.10),
+      0 0 20px rgba(6, 182, 212, 0.06);
+  }
+}
+
+@layer components {
+  /* Input fields */
+  .input-field {
+    @apply w-full px-3.5 py-2.5 bg-slate-900/80 border border-slate-700/60 rounded-xl text-sm text-slate-100 placeholder-slate-600;
+    @apply focus:outline-none focus:border-cyan-500/60 focus:ring-1 focus:ring-cyan-500/30 transition-all duration-200;
+    @apply font-mono;
+  }
+
+  /* Primary button */
+  .btn-primary {
+    @apply w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm;
+    @apply bg-gradient-to-r from-cyan-500 to-cyan-600 text-slate-950;
+    @apply hover:from-cyan-400 hover:to-cyan-500 hover:shadow-lg hover:shadow-cyan-500/25;
+    @apply focus:outline-none focus:ring-2 focus:ring-cyan-500/40;
+    @apply active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply transition-all duration-200;
+  }
+
+  /* Ghost button */
+  .btn-ghost {
+    @apply inline-flex items-center gap-1.5 text-xs font-medium text-slate-400;
+    @apply hover:text-cyan-400 transition-colors duration-200;
+  }
+
+  /* Status badge */
+  .status-dot-live {
+    @apply w-2 h-2 rounded-full bg-emerald-400;
+    animation: pulse-dot 2s infinite;
+  }
+
+  .status-dot-connecting {
+    @apply w-2 h-2 rounded-full bg-yellow-400;
+    animation: pulse-dot 1s infinite;
+  }
+
+  .status-dot-error {
+    @apply w-2 h-2 rounded-full bg-red-400;
+  }
+}
+
+/* Animations */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.5; transform: scale(0.8); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.4s ease-out forwards;
+}
+
+/* Guacamole canvas - fill container, no scrollbars */
+#guac-display {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  cursor: none;
+  user-select: none;
+}
+
+#guac-display canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain;
+}

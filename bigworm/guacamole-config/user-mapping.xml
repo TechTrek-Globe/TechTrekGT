@@ -1,0 +1,37 @@
+<!--
+  Guacamole File-Based Authentication
+  Path: e:\TechTrekGT\bigworm\guacamole-config\user-mapping.xml
+
+  SECURITY NOTE:
+  - This file contains credentials in plaintext.
+  - It is mounted READ-ONLY into the Docker container.
+  - Access is already gated by the BigWorm JWT in the Cloudflare Worker.
+  - Set restrictive file permissions: only your Windows user should read this.
+
+  Steps to generate the MD5 password hash for Guacamole:
+    PowerShell: [System.BitConverter]::ToString((New-Object System.Security.Cryptography.MD5CryptoServiceProvider).ComputeHash([System.Text.Encoding]::UTF8.GetBytes("YOUR_PASSWORD"))).Replace("-","").ToLower()
+  
+  Replace the username, password hash, and Windows credentials below.
+-->
+<user-mapping>
+  <authorize
+    username="JonKempATO"
+    password="81b4b3429e11fa9effc6e78737630e79"
+    encoding="md5">
+
+    <!-- Home Laptop VNC Connection (TightVNC Server) -->
+    <!-- Install TightVNC Server: https://www.tightvnc.com/download.php -->
+    <!-- During install, set password to first 8 chars of your Guac password -->
+    <connection name="Home Laptop - Remote Desktop">
+      <protocol>vnc</protocol>
+      <!-- TightVNC runs locally on your laptop - never exposed externally -->
+      <param name="hostname">127.0.0.1</param>
+      <param name="port">5900</param>
+      <!-- Must match the password set in TightVNC (8-char VNC limit) -->
+      <param name="password">Gesmr3gh%*</param>
+      <!-- Display settings -->
+      <param name="color-depth">24</param>
+    </connection>
+
+  </authorize>
+</user-mapping>

@@ -21,7 +21,7 @@ export async function onRequestGet(context) {
         SUM(CASE WHEN status = 'Sold' THEN 1 ELSE 0 END) as sold_items,
         SUM(CASE WHEN status = 'Returned' THEN 1 ELSE 0 END) as returned_items,
         SUM(CASE WHEN status IN ('Available', 'Listed') THEN true_total_cost ELSE 0 END) as capital_tied_up,
-        SUM(CASE WHEN status = 'Listed' THEN COALESCE(list_price, 0) ELSE 0 END) as listed_potential_revenue,
+        SUM(CASE WHEN status = 'Listed' THEN COALESCE(current_list_price, 0) ELSE 0 END) as listed_potential_revenue,
         SUM(CASE WHEN status != 'Returned' THEN true_total_cost ELSE 0 END) as total_capital_invested
       FROM auction_items
       WHERE user_id = ?

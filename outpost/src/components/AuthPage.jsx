@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import outpostLogo from '../assets/outpost-logo.png';
+import outpostHeaderBanner from '../assets/outpost-header-banner.png';
 import {
   Gavel,
   Lock,
@@ -14,7 +15,11 @@ import {
   ChevronLeft,
   Trophy,
   TrendingUp,
-  Package
+  Package,
+  ShieldCheck,
+  Zap,
+  BarChart3,
+  Sparkles
 } from 'lucide-react';
 
 export const PRESET_SECURITY_QUESTIONS = [
@@ -166,75 +171,92 @@ export function AuthPage({ onAuthSuccess }) {
     { icon: Trophy, label: 'Pricing Intelligence', desc: 'eBay comps and suggested list prices' },
   ];
 
+  const stats = [
+    { value: '12+', label: 'Platforms Tracked' },
+    { value: '100%', label: 'Fee Accuracy' },
+    { value: '24/7', label: 'Live Dashboard' },
+  ];
+
   return (
-    <div className="min-h-screen bg-slate-950 bg-grid-pattern flex items-center justify-center p-4 sm:p-6 lg:p-12 font-sans relative overflow-hidden">
-      
+    <div className="min-h-screen bg-slate-950 bg-grid-pattern flex flex-col items-center justify-between font-sans relative overflow-hidden">
+
+      {/* --- Full-width Top Bar Header --- */}
+      <header className="w-full bg-black border-b border-amber-500/30 shadow-2xl glow-amber-sm relative z-20 overflow-hidden">
+        <img 
+          src={outpostHeaderBanner} 
+          alt="TechTrek Outpost Top Bar" 
+          className="w-full h-auto max-h-[160px] sm:max-h-[220px] md:max-h-[260px] object-cover object-center block drop-shadow-2xl" 
+        />
+      </header>
+
       {/* Background ambient glow spheres */}
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute -top-40 -left-40 w-[500px] h-[500px] bg-amber-500/10 rounded-full blur-[120px]" />
-        <div className="absolute -bottom-40 -right-40 w-[500px] h-[500px] bg-amber-600/10 rounded-full blur-[120px]" />
+        <div className="absolute -top-40 -left-40 w-[600px] h-[600px] bg-amber-500/10 rounded-full blur-[140px]" />
+        <div className="absolute -bottom-40 -right-40 w-[600px] h-[600px] bg-amber-600/10 rounded-full blur-[140px]" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-amber-400/5 rounded-full blur-[100px]" />
       </div>
 
-      <div className="w-full max-w-6xl flex flex-col lg:flex-row items-center justify-center gap-8 lg:gap-12 relative z-10">
+      <div className="w-full max-w-7xl relative z-10 flex-1 flex flex-col lg:flex-row items-center justify-center gap-10 lg:gap-16 p-4 sm:p-6 lg:p-12">
 
         {/* --- Left: Hero Branding Showcase (Desktop) --- */}
-        <div className="hidden lg:flex flex-col items-center text-center lg:items-start lg:text-left w-full lg:w-1/2 max-w-lg">
-          
-          {/* Logo Showcase Card */}
-          <div className="glass-card rounded-3xl p-6 border border-amber-500/20 shadow-2xl glow-amber-sm w-full transition-all duration-300 hover:border-amber-500/40">
-            <img 
-              src={outpostLogo} 
-              alt="TechTrek Outpost Emblem" 
-              className="w-full h-auto max-h-[300px] object-contain drop-shadow-2xl mx-auto" 
-            />
+        <div className="hidden lg:flex flex-col items-center text-center lg:items-start lg:text-left w-full lg:w-[52%] max-w-xl">
+
+          {/* Badge pill */}
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/25 text-amber-300 text-xs font-semibold tracking-wide mb-6">
+            <Sparkles className="w-3.5 h-3.5" />
+            TechTrek Suite · Auction Intelligence
           </div>
 
-          <div className="mt-8">
-            <h1 className="text-3xl font-black text-white tracking-tight leading-tight">
+          <div>
+            <h1 className="text-4xl xl:text-5xl font-black text-white tracking-tight leading-[1.1]">
               Auction Inventory &{' '}
               <span className="text-gradient-amber">Profit Intelligence</span>
             </h1>
-            <p className="text-slate-400 text-sm leading-relaxed mt-3">
+            <p className="text-slate-400 text-base leading-relaxed mt-4 max-w-md">
               Track memorabilia from invoice to sale with automated proration, fee calculations, and real-time ROI tracking.
             </p>
           </div>
 
           {/* Feature Highlights Grid */}
-          <div className="grid grid-cols-3 gap-3 w-full mt-6">
+          <div className="grid grid-cols-3 gap-3 w-full mt-8">
             {features.map(({ icon: Icon, label, desc }) => (
-              <div key={label} className="glass-card rounded-2xl p-3.5 border border-slate-800/80 flex flex-col items-center text-center group hover:border-amber-500/30 transition-all duration-200">
-                <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                  <Icon className="w-4 h-4 text-amber-400" />
+              <div key={label} className="glass-card rounded-2xl p-4 border border-slate-800/80 flex flex-col items-center text-center group hover:border-amber-500/30 hover:bg-slate-900/60 hover:-translate-y-0.5 transition-all duration-200">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/20 to-amber-700/10 border border-amber-500/25 flex items-center justify-center mb-2.5 group-hover:scale-110 group-hover:from-amber-500/30 transition-all duration-200">
+                  <Icon className="w-5 h-5 text-amber-400" />
                 </div>
                 <p className="text-xs font-bold text-slate-200 line-clamp-1">{label}</p>
-                <p className="text-[10px] text-slate-500 mt-0.5 line-clamp-1">{desc}</p>
+                <p className="text-[10px] text-slate-500 mt-1 line-clamp-2 leading-relaxed">{desc}</p>
               </div>
             ))}
           </div>
 
-          {/* Trust Stat Strip */}
-          <div className="flex items-center justify-between w-full mt-6 px-4 py-3 rounded-2xl bg-slate-900/40 border border-slate-800/60 text-xs text-slate-400">
-            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" /> Live Dashboard</span>
-            <span className="text-slate-600">•</span>
-            <span>12 Platforms Tracked</span>
-            <span className="text-slate-600">•</span>
-            <span>100% Fee Accuracy</span>
+          {/* Stats Strip */}
+          <div className="grid grid-cols-3 gap-3 w-full mt-6">
+            {stats.map(({ value, label }) => (
+              <div key={label} className="flex flex-col items-center py-3 rounded-2xl bg-slate-900/40 border border-slate-800/60">
+                <span className="text-lg font-black text-gradient-amber">{value}</span>
+                <span className="text-[10px] text-slate-500 mt-0.5 font-medium">{label}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Trust indicators */}
+          <div className="flex items-center gap-4 w-full mt-6 px-4 py-3 rounded-2xl bg-slate-900/40 border border-slate-800/60 text-xs text-slate-400">
+            <span className="flex items-center gap-1.5"><ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Encrypted</span>
+            <span className="text-slate-700">•</span>
+            <span className="flex items-center gap-1.5"><Zap className="w-3.5 h-3.5 text-amber-400" /> Real-time Sync</span>
+            <span className="text-slate-700">•</span>
+            <span className="flex items-center gap-1.5"><BarChart3 className="w-3.5 h-3.5 text-blue-400" /> ROI Analytics</span>
           </div>
         </div>
 
         {/* --- Right: Form Container --- */}
-        <div className="w-full lg:w-1/2 max-w-md">
-
-          {/* Mobile Logo Presentation */}
-          <div className="flex lg:hidden flex-col items-center mb-6 text-center">
-            <div className="glass-card rounded-2xl p-4 border border-amber-500/20 shadow-xl max-w-[220px] mb-3">
-              <img src={outpostLogo} alt="TechTrek Outpost Logo" className="w-full h-auto object-contain drop-shadow-md" />
-            </div>
-            <p className="text-xs text-amber-400 font-semibold tracking-wide uppercase">Auction Inventory & ROI System</p>
-          </div>
+        <div className="w-full lg:w-[480px] max-w-md">
 
           {/* Main Auth Glass Card */}
-          <div className="glass-card rounded-3xl p-7 sm:p-8 glow-amber-sm shadow-2xl border border-slate-800/80">
+          <div className="glass-card rounded-3xl p-7 sm:p-8 glow-amber-sm shadow-2xl border border-slate-800/80 relative overflow-hidden">
+            {/* Inner top highlight */}
+            <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-amber-500/30 to-transparent" />
 
             {/* Mode Switcher Tabs (Sign In / Register) */}
             {(mode === 'signin' || mode === 'register') && (
@@ -244,7 +266,7 @@ export function AuthPage({ onAuthSuccess }) {
                   onClick={() => switchMode('signin')}
                   className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all duration-200 ${
                     mode === 'signin'
-                      ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                      ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-md shadow-amber-500/20'
                       : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
@@ -255,7 +277,7 @@ export function AuthPage({ onAuthSuccess }) {
                   onClick={() => switchMode('register')}
                   className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all duration-200 ${
                     mode === 'register'
-                      ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                      ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-md shadow-amber-500/20'
                       : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
@@ -268,8 +290,8 @@ export function AuthPage({ onAuthSuccess }) {
             {mode === 'signin' && (
               <>
                 <div className="mb-6">
-                  <h2 className="text-xl font-black text-white tracking-tight">Welcome back</h2>
-                  <p className="text-slate-400 text-xs mt-1">Sign in to access your Outpost dashboard</p>
+                  <h2 className="text-2xl font-black text-white tracking-tight">Welcome back</h2>
+                  <p className="text-slate-400 text-sm mt-1.5">Sign in to access your Outpost dashboard</p>
                 </div>
                 {error && (
                   <div className="mb-5 p-3.5 rounded-xl bg-red-950/50 border border-red-800/50 text-red-400 text-xs font-medium leading-relaxed">
@@ -332,8 +354,8 @@ export function AuthPage({ onAuthSuccess }) {
             {mode === 'register' && (
               <>
                 <div className="mb-6">
-                  <h2 className="text-xl font-black text-white tracking-tight">Create account</h2>
-                  <p className="text-slate-400 text-xs mt-1">Set up your TechTrek Outpost account</p>
+                  <h2 className="text-2xl font-black text-white tracking-tight">Create account</h2>
+                  <p className="text-slate-400 text-sm mt-1.5">Set up your TechTrek Outpost account</p>
                 </div>
                 {error && (
                   <div className="mb-5 p-3.5 rounded-xl bg-red-950/50 border border-red-800/50 text-red-400 text-xs font-medium leading-relaxed">
@@ -389,8 +411,8 @@ export function AuthPage({ onAuthSuccess }) {
                   <button className="btn-ghost mb-3" onClick={() => switchMode('signin')}>
                     <ChevronLeft className="w-3.5 h-3.5" /> Back to Sign In
                   </button>
-                  <h2 className="text-xl font-black text-white tracking-tight">Reset password</h2>
-                  <p className="text-slate-400 text-xs mt-1">
+                  <h2 className="text-2xl font-black text-white tracking-tight">Reset password</h2>
+                  <p className="text-slate-400 text-sm mt-1.5">
                     {forgotStep === 1 && "Enter your email to look up your security question."}
                     {forgotStep === 2 && "Answer your security question to verify identity."}
                     {forgotStep === 3 && "Enter your reset code and new password."}

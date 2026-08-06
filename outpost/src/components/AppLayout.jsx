@@ -11,6 +11,7 @@ import { SuppliesTrackerModal } from './SuppliesTrackerModal';
 import { TaxReportModal } from './TaxReportModal';
 
 import outpostLogo from '../assets/outpost-logo.png';
+import outpostHeaderBanner from '../assets/outpost-header-banner.png';
 
 const NAV_ITEMS = [
   { id: 'dashboard',   label: 'Dashboard',            icon: LayoutDashboard },
@@ -31,7 +32,25 @@ export function AppLayout({ activeView, onNavigate, children }) {
   const [taxReportOpen, setTaxReportOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-slate-950 flex font-sans">
+    <div className="min-h-screen bg-slate-950 flex flex-col font-sans">
+
+      {/* --- Full-Width Top Header Banner --- */}
+      <header style={{ width: '100%', flexShrink: 0, overflow: 'hidden', height: '90px', lineHeight: 0, borderBottom: '1px solid rgba(180,130,20,0.25)' }}>
+        <img
+          src={outpostHeaderBanner}
+          alt="TechTrek Outpost - Buy Sell Track Profit"
+          style={{
+            width: '100%',
+            height: '90px',
+            objectFit: 'cover',
+            objectPosition: 'center 28%',
+            display: 'block',
+          }}
+        />
+      </header>
+
+      {/* --- Sidebar + Content row --- */}
+      <div className="flex flex-1 min-h-0">
 
       {/* --- Sidebar --- */}
       <aside className="hidden lg:flex flex-col w-60 bg-slate-900/60 border-r border-slate-800/60 backdrop-blur-md flex-shrink-0">
@@ -201,6 +220,8 @@ export function AppLayout({ activeView, onNavigate, children }) {
         <main className="flex-1 overflow-y-auto p-4 lg:p-6 bg-grid-pattern">
           {children}
         </main>
+      </div>
+      {/* End Sidebar + Content row */}
       </div>
 
       {/* Global Modals */}

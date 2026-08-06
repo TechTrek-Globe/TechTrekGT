@@ -1,5 +1,69 @@
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
+import pdfWorkerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url';
 import { parseCleanNumber, formatExcelDate, extractMetadataFromTitle } from './spreadsheetParser.js';
 import { computePricingFloors } from './formulaPreview.js';
+
+// Configure PDF.js worker in browser environments
+if (typeof window !== 'undefined' && pdfWorkerUrl) {
+  try {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
+  } catch {
+    // Ignore worker assignment if already set
+  }
+}
+
+/**
+ * Extract structured text lines from a PDF binary ArrayBuffer using PDF.js
+ * Groups tokens by Y-coordinate to reconstruct exact lines and table layouts.
+ *
+ * @param {ArrayBuffer} buffer
+ * @returns {Promise<string>}
+ */
+export async function extractTextFromPdfBuffer(buffer) {
+  const loadingTask = pdfjsLib.getDocument({
+    data: new Uint8Array(buffer),
+    useSystemFonts: true,
+    disableFontFace: true,
+    isEvalSupported: false
+  });
+
+  const pdf = await loadingTask.promise;
+  const allLines = [];
+
+  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+    const page = await pdf.getPage(pageNum);
+    const textContent = await page.getTextContent();
+
+    // Group items by vertical position (Y coordinate)
+    const linesByY = new Map();
+    for (const item of textContent.items) {
+      if (!item.str || item.str.trim() === '') continue;
+      // Round Y to 3pt grid to group text on the same line
+      const y = Math.round((item.transform?.[5] || 0) / 3) * 3;
+      if (!linesByY.has(y)) {
+        linesByY.set(y, []);
+      }
+      linesByY.get(y).push({
+        x: item.transform?.[4] || 0,
+        text: item.str
+      });
+    }
+
+    // Sort lines from top to bottom (descending Y)
+    const sortedY = Array.from(linesByY.keys()).sort((a, b) => b - a);
+    for (const y of sortedY) {
+      const itemsOnLine = linesByY.get(y);
+      // Sort tokens from left to right (ascending X)
+      itemsOnLine.sort((a, b) => a.x - b.x);
+      const lineText = itemsOnLine.map(it => it.text.trim()).filter(Boolean).join(' ');
+      if (lineText) {
+        allLines.push(lineText);
+      }
+    }
+  }
+
+  return allLines.join('\n');
+}
 
 /**
  * Robust Pristine Auction PDF Text Parser.
@@ -12,11 +76,11 @@ import { computePricingFloors } from './formulaPreview.js';
  *
  * @param {string} rawText - Extracted text content from the PDF invoice
  * @param {string} [fallbackDate] - Optional fallback acquired date
- * @returns {{ invoice: any, items: any[], summary: any }}
+ * @returns {{ invoices: any[], items: any[], sales: any[], comps: any[], summary: any }}
  */
 export function parsePristineAuctionInvoiceText(rawText, fallbackDate = null) {
-  if (!rawText || typeof rawText !== 'string') {
-    throw new Error('No readable text provided for PDF parsing.');
+  if (!rawText || typeof rawText !== 'string' || !rawText.trim()) {
+    throw new Error('No readable text found in PDF document.');
   }
 
   const lines = rawText
@@ -29,8 +93,8 @@ export function parsePristineAuctionInvoiceText(rawText, fallbackDate = null) {
   let dateAcquired = fallbackDate || null;
 
   for (const line of lines) {
-    // Invoice # matching: "Invoice #: 4809173", "Invoice # 4809173", "Invoice: 4809173"
-    const invMatch = line.match(/(?:invoice\s*(?:#|number|ref|id)?[:\s]+)([A-Za-z0-9-]+)/i);
+    // Invoice # matching: "Invoice #: 4809173", "Invoice # 4809173", "Invoice: 4809173", "Invoice 4809173"
+    const invMatch = line.match(/(?:invoice\s*(?:#|number|ref|id|no)?[:\s]+)([A-Za-z0-9-]+)/i);
     if (invMatch && !invoiceRef) {
       invoiceRef = invMatch[1].trim();
     }
@@ -38,16 +102,28 @@ export function parsePristineAuctionInvoiceText(rawText, fallbackDate = null) {
     // Date matching: "Invoice Date: 06/24/2026", "Date: 2026-06-24", "June 24, 2026"
     const dateMatch = line.match(/(?:invoice\s*date|date\s*acquired|date)[:\s]+([A-Za-z0-9/,\s-]+)/i);
     if (dateMatch && !dateAcquired) {
-      dateAcquired = formatExcelDate(dateMatch[1].trim());
+      const parsedDate = formatExcelDate(dateMatch[1].trim());
+      if (parsedDate) dateAcquired = parsedDate;
     }
   }
 
-  // If invoiceRef was not found in specific regex, look for standalone 7-digit invoice numbers
+  // If invoiceRef was not found in specific regex, look for standalone 6-8 digit invoice numbers
   if (!invoiceRef) {
-    for (const line of lines.slice(0, 15)) {
+    for (const line of lines.slice(0, 20)) {
       const standaloneMatch = line.match(/\b(48\d{5}|49\d{5}|50\d{5}|\d{7})\b/);
       if (standaloneMatch) {
         invoiceRef = standaloneMatch[1];
+        break;
+      }
+    }
+  }
+
+  // Date fallback scan
+  if (!dateAcquired) {
+    for (const line of lines.slice(0, 20)) {
+      const dateScanMatch = line.match(/\b(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\b/);
+      if (dateScanMatch) {
+        dateAcquired = formatExcelDate(dateScanMatch[1]);
         break;
       }
     }
@@ -61,9 +137,9 @@ export function parsePristineAuctionInvoiceText(rawText, fallbackDate = null) {
     dateAcquired = new Date().toISOString().split('T')[0];
   }
 
-  // 2. State-machine to parse "AUCTIONS WON" and "ADJUSTMENTS"
+  // 2. State-machine & line scanning to parse "AUCTIONS WON" and "ADJUSTMENTS"
   const rawWonItems = [];
-  let adjustments = {
+  const adjustments = {
     discount: 0,
     shipping: 0,
     tax: 0,
@@ -71,96 +147,146 @@ export function parsePristineAuctionInvoiceText(rawText, fallbackDate = null) {
     total: 0
   };
 
-  let section = 'HEADER'; // 'HEADER' | 'AUCTIONS_WON' | 'ADJUSTMENTS' | 'SUMMARY'
+  let inAuctionsWonSection = false;
+  let inAdjustmentsSection = false;
+
+  const SUMMARY_KEYWORDS = /subtotal|total\s*due|amount\s*paid|grand\s*total|invoice\s*total|balance/i;
+  const ADJUSTMENT_KEYWORDS = /shipping|freight|handling|s&h|sales\s*tax|tax|discount|promo|credit|coupon|buyer'?s?\s*premium|bp/i;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+    const lower = line.toLowerCase();
 
-    // Section transition detection
-    if (/auctions\s*won/i.test(line)) {
-      section = 'AUCTIONS_WON';
+    // Section transitions
+    if (/auctions\s*won|won\s*items|items\s*won|items\s*purchased|winning\s*bids/i.test(line)) {
+      inAuctionsWonSection = true;
+      inAdjustmentsSection = false;
       continue;
     }
 
-    if (/adjustments|invoice\s*breakdown|charges\s*&\s*credits/i.test(line)) {
-      section = 'ADJUSTMENTS';
+    if (/adjustments|invoice\s*breakdown|charges\s*&\s*credits|payment\s*summary|order\s*summary/i.test(line)) {
+      inAdjustmentsSection = true;
+      inAuctionsWonSection = false;
       continue;
     }
 
-    if (/^(invoice\s*total|total\s*due|amount\s*paid|grand\s*total)/i.test(line)) {
-      section = 'SUMMARY';
+    if (SUMMARY_KEYWORDS.test(line) && !inAuctionsWonSection) {
+      inAdjustmentsSection = true;
     }
 
     // --- AUCTIONS WON PARSING ---
-    if (section === 'AUCTIONS_WON') {
-      // Skip header row if encountered
-      if (/lot\s*#|item\s*#|final\s*price|winning\s*bid/i.test(line) && /title|description/i.test(line)) {
+    if (inAuctionsWonSection) {
+      // Check if we hit the adjustments or totals section
+      if (ADJUSTMENT_KEYWORDS.test(line) && /\$?[0-9,]+\.\d{2}/.test(line)) {
+        inAuctionsWonSection = false;
+        inAdjustmentsSection = true;
+      } else if (SUMMARY_KEYWORDS.test(line) && /\$?[0-9,]+\.\d{2}/.test(line)) {
+        inAuctionsWonSection = false;
+        inAdjustmentsSection = true;
+      }
+    }
+
+    if (inAuctionsWonSection) {
+      // Skip header labels row
+      if ((/lot\s*#|item\s*#|final\s*price|winning\s*bid/i.test(line)) && (/title|description/i.test(line))) {
         continue;
       }
 
-      // Check if line contains a price at the end: e.g. "... $17.01" or "... 17.01"
-      // Pristine format: [Lot #] [Item #] [Title Description] [Final Price]
-      const rowRegex = /^([A-Za-z0-9-]+)\s+(\d+)\s+(.+?)\s+\$?([0-9,]+\.\d{2})$/;
-      const match = line.match(rowRegex);
-
-      if (match) {
-        const lotNum = match[1].trim();
-        const itemNum = match[2].trim();
-        const title = match[3].trim();
-        const finalPrice = parseCleanNumber(match[4], 0);
-
+      // Format 1: [Lot #] [Item #] [Title] [Final Price] e.g. "4809173-1 8192031 Shawn Kemp Signed Card $17.01"
+      const fullMatch = line.match(/^([A-Za-z0-9-]+)\s+(\d{4,10})\s+(.+?)\s+\$?([0-9,]+\.\d{2})$/);
+      if (fullMatch) {
         rawWonItems.push({
-          lotNum,
-          itemNum,
-          title,
-          finalPrice
+          lotNum: fullMatch[1].trim(),
+          itemNum: fullMatch[2].trim(),
+          title: fullMatch[3].trim(),
+          finalPrice: parseCleanNumber(fullMatch[4], 0)
         });
-      } else {
-        // Fallback for multi-line titles or tab-separated lines
-        const priceAtEndMatch = line.match(/\$?([0-9,]+\.\d{2})\s*$/);
-        if (priceAtEndMatch && !/subtotal|total|tax|shipping|discount|balance/i.test(line)) {
-          const finalPrice = parseCleanNumber(priceAtEndMatch[1], 0);
-          const remainder = line.substring(0, priceAtEndMatch.index).trim();
+        continue;
+      }
 
-          // Try to extract leading Lot # and Item #
-          const idPrefixMatch = remainder.match(/^([A-Za-z0-9-]+)\s+(\d+)\s+(.+)$/);
-          if (idPrefixMatch) {
-            rawWonItems.push({
-              lotNum: idPrefixMatch[1].trim(),
-              itemNum: idPrefixMatch[2].trim(),
-              title: idPrefixMatch[3].trim(),
-              finalPrice
-            });
-          } else if (remainder.length > 5) {
-            // General title with price
-            rawWonItems.push({
-              lotNum: '',
-              itemNum: '',
-              title: remainder,
-              finalPrice
-            });
-          }
+      // Format 2: [Item # or Lot #] [Title] [Final Price] e.g. "8192031 Shawn Kemp Signed Card $17.01"
+      const idTitleMatch = line.match(/^([A-Za-z0-9-]+)\s+(.+?)\s+\$?([0-9,]+\.\d{2})$/);
+      if (idTitleMatch && !SUMMARY_KEYWORDS.test(line) && !ADJUSTMENT_KEYWORDS.test(line)) {
+        const firstToken = idTitleMatch[1].trim();
+        const titleText = idTitleMatch[2].trim();
+        const price = parseCleanNumber(idTitleMatch[3], 0);
+
+        if (titleText.length >= 3 && price > 0) {
+          rawWonItems.push({
+            lotNum: /^\d+-\d+$/.test(firstToken) ? firstToken : '',
+            itemNum: /^\d{5,10}$/.test(firstToken) ? firstToken : '',
+            title: titleText,
+            finalPrice: price
+          });
+          continue;
+        }
+      }
+
+      // Format 3: Title ending with price
+      const priceEndMatch = line.match(/^(.+?)\s+\$?([0-9,]+\.\d{2})$/);
+      if (priceEndMatch && !SUMMARY_KEYWORDS.test(line) && !ADJUSTMENT_KEYWORDS.test(line)) {
+        const titleText = priceEndMatch[1].trim();
+        const price = parseCleanNumber(priceEndMatch[2], 0);
+        if (titleText.length >= 5 && price > 0) {
+          rawWonItems.push({
+            lotNum: '',
+            itemNum: '',
+            title: titleText,
+            finalPrice: price
+          });
         }
       }
     }
 
-    // --- ADJUSTMENTS PARSING ---
-    if (section === 'ADJUSTMENTS' || section === 'SUMMARY') {
-      const lower = line.toLowerCase();
+    // --- ADJUSTMENTS & SUMMARY PARSING ---
+    if (inAdjustmentsSection || ADJUSTMENT_KEYWORDS.test(line) || SUMMARY_KEYWORDS.test(line)) {
       const amountMatch = line.match(/\(?\$?([0-9,]+\.\d{2})\)?/);
-      const val = amountMatch ? parseCleanNumber(amountMatch[0], 0) : 0;
-
-      if (val !== 0) {
-        if (/shipping|freight|delivery|handling/i.test(lower)) {
-          adjustments.shipping += Math.abs(val);
-        } else if (/sales\s*tax|tax/i.test(lower)) {
-          adjustments.tax += Math.abs(val);
-        } else if (/discount|promo|credit|coupon|voucher/i.test(lower)) {
-          adjustments.discount += Math.abs(val);
+      if (amountMatch) {
+        const val = parseCleanNumber(amountMatch[0], 0);
+        if (/shipping|freight|delivery|handling|s&h/i.test(lower)) {
+          adjustments.shipping = Math.abs(val);
+        } else if (/sales\s*tax|tax/i.test(lower) && !/tax\s*id|exempt/i.test(lower)) {
+          adjustments.tax = Math.abs(val);
+        } else if (/discount|promo|credit|coupon|voucher|rebate/i.test(lower)) {
+          adjustments.discount = Math.abs(val);
         } else if (/buyer'?s?\s*premium|bp/i.test(lower)) {
-          adjustments.buyersPremium += Math.abs(val);
+          adjustments.buyersPremium = Math.abs(val);
         } else if (/total|amount\s*paid|grand\s*total/i.test(lower)) {
           adjustments.total = Math.abs(val);
+        }
+      }
+    }
+  }
+
+  // Fallback scan across all lines if no section header was encountered
+  if (rawWonItems.length === 0) {
+    for (const line of lines) {
+      if (SUMMARY_KEYWORDS.test(line) || ADJUSTMENT_KEYWORDS.test(line)) continue;
+      if (/invoice|page\s*\d|customer|billing|shipping\s*to|date|thank\s*you/i.test(line)) continue;
+
+      const fullMatch = line.match(/^([A-Za-z0-9-]+)\s+(\d{4,10})\s+(.+?)\s+\$?([0-9,]+\.\d{2})$/);
+      if (fullMatch) {
+        rawWonItems.push({
+          lotNum: fullMatch[1].trim(),
+          itemNum: fullMatch[2].trim(),
+          title: fullMatch[3].trim(),
+          finalPrice: parseCleanNumber(fullMatch[4], 0)
+        });
+        continue;
+      }
+
+      const idTitleMatch = line.match(/^([A-Za-z0-9-]+)\s+([A-Za-z].+?)\s+\$?([0-9,]+\.\d{2})$/);
+      if (idTitleMatch) {
+        const firstToken = idTitleMatch[1].trim();
+        const titleText = idTitleMatch[2].trim();
+        const price = parseCleanNumber(idTitleMatch[3], 0);
+        if (titleText.length >= 4 && price > 0) {
+          rawWonItems.push({
+            lotNum: /^\d+-\d+$/.test(firstToken) ? firstToken : '',
+            itemNum: /^\d{5,10}$/.test(firstToken) ? firstToken : '',
+            title: titleText,
+            finalPrice: price
+          });
         }
       }
     }
@@ -170,7 +296,7 @@ export function parsePristineAuctionInvoiceText(rawText, fallbackDate = null) {
     throw new Error('No items could be extracted from "AUCTIONS WON" section in PDF text.');
   }
 
-  // 3. Build Invoices & Items Structure
+  // 3. Build Invoices & Items Structure with full proration
   const baseTotal = rawWonItems.reduce((sum, it) => sum + it.finalPrice, 0);
 
   const invoice = {
@@ -184,7 +310,7 @@ export function parsePristineAuctionInvoiceText(rawText, fallbackDate = null) {
     item_count: rawWonItems.length
   };
 
-  const items = rawWonItems.map((won, idx) => {
+  const items = rawWonItems.map((won) => {
     const inferred = extractMetadataFromTitle(won.title);
     const unitPrice = won.finalPrice;
 
@@ -261,58 +387,14 @@ export function parsePristineAuctionInvoiceText(rawText, fallbackDate = null) {
 }
 
 /**
- * Parses raw ArrayBuffer of a PDF in the browser or Cloudflare Worker environment.
+ * Parses raw ArrayBuffer of a PDF in the browser or Worker environment.
  * Extracts text stream and passes through the Pristine Auction Parser.
  *
  * @param {ArrayBuffer} buffer
  * @returns {Promise<{ invoices: any[], items: any[], sales: any[], comps: any[], summary: any }>}
  */
 export async function parsePristineAuctionPdf(buffer) {
-  // 1. If running in a browser environment with pdfjs-dist available
-  if (typeof window !== 'undefined' && window.pdfjsLib) {
-    const loadingTask = window.pdfjsLib.getDocument({ data: new Uint8Array(buffer) });
-    const pdf = await loadingTask.promise;
-    let fullText = '';
-
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
-      const textContent = await page.getTextContent();
-      const pageText = textContent.items.map(item => item.str).join(' ');
-      fullText += pageText + '\n';
-    }
-
-    return parsePristineAuctionInvoiceText(fullText);
-  }
-
-  // 2. Fast fallback for pure binary PDF text streams: extract text streams from PDF raw bytes
-  const bytes = new Uint8Array(buffer);
-  const textDecoder = new TextDecoder('latin1');
-  const rawString = textDecoder.decode(bytes);
-
-  // Extract text within stream chunks or standard PDF text objects (BT ... ET)
-  const textChunks = [];
-  const btRegex = /BT[\s\S]*?ET/g;
-  let btMatch;
-
-  while ((btMatch = btRegex.exec(rawString)) !== null) {
-    const block = btMatch[0];
-    // Extract strings in parentheses e.g. (Shawn Kemp Signed...) Tj
-    const tjRegex = /\(([^)]+)\)\s*(?:Tj|'|")/g;
-    let tjMatch;
-    const lineParts = [];
-    while ((tjMatch = tjRegex.exec(block)) !== null) {
-      lineParts.push(tjMatch[1]);
-    }
-    if (lineParts.length > 0) {
-      textChunks.push(lineParts.join(' '));
-    }
-  }
-
-  if (textChunks.length > 0) {
-    return parsePristineAuctionInvoiceText(textChunks.join('\n'));
-  }
-
-  // If no PDF streams were decoded, try clean UTF-8 text fallback
-  const fallbackStr = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
-  return parsePristineAuctionInvoiceText(fallbackStr);
+  const extractedText = await extractTextFromPdfBuffer(buffer);
+  return parsePristineAuctionInvoiceText(extractedText);
 }
+

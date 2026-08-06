@@ -1,9 +1,10 @@
 import React, { useState, useRef } from 'react';
 import {
-  Upload, FileSpreadsheet, CheckCircle2, AlertCircle,
+  Upload, FileSpreadsheet, FileText, CheckCircle2, AlertCircle,
   X, Loader2, ArrowRight, Database, RefreshCw, Layers, Check
 } from 'lucide-react';
 import { parseAuctionWorkbook } from '../utils/spreadsheetParser';
+import { parsePristineAuctionPdf } from '../utils/pdfInvoiceParser';
 import { getApiUrl } from '../utils/api';
 
 /**
@@ -40,13 +41,17 @@ export function SpreadsheetImporterModal({ isOpen, onClose, onImportSuccess }) {
     setIsProcessing(true);
     try {
       const buffer = await fileObj.arrayBuffer();
-      const result = parseAuctionWorkbook(buffer);
-      if (result.items.length === 0) {
-        throw new Error('No valid inventory items found in spreadsheet. Check sheet names and column headers.');
+      const isPdf = fileObj.name.toLowerCase().endsWith('.pdf');
+      const result = isPdf
+        ? await parsePristineAuctionPdf(buffer)
+        : parseAuctionWorkbook(buffer);
+
+      if (!result || !result.items || result.items.length === 0) {
+        throw new Error('No valid inventory items found in file. Check sheet structure or PDF content.');
       }
       setParsedData(result);
     } catch (err) {
-      setError(err.message || 'Failed to parse spreadsheet file.');
+      setError(err.message || 'Failed to parse file.');
       setParsedData(null);
     } finally {
       setIsProcessing(false);
@@ -104,8 +109,8 @@ export function SpreadsheetImporterModal({ isOpen, onClose, onImportSuccess }) {
               <FileSpreadsheet className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-white">Spreadsheet Data Importer</h2>
-              <p className="text-xs text-slate-400">Migrate Excel workbook (`.xlsx`, `.xls`, `.csv`) into Outpost</p>
+              <h2 className="text-base font-bold text-white">Workbook & PDF Invoice Importer</h2>
+              <p className="text-xs text-slate-400">Import Excel workbooks (`.xlsx`, `.xls`, `.csv`) or Pristine Auction PDF invoices</p>
             </div>
           </div>
           <button
@@ -133,7 +138,7 @@ export function SpreadsheetImporterModal({ isOpen, onClose, onImportSuccess }) {
               </div>
               <div>
                 <h3 className="text-lg font-bold text-white">Migration Completed Successfully!</h3>
-                <p className="text-xs text-slate-400 mt-1">Your spreadsheet records are now live in your database.</p>
+                <p className="text-xs text-slate-400 mt-1">Your imported records are now live in your database.</p>
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-lg mx-auto pt-2">
@@ -176,7 +181,7 @@ export function SpreadsheetImporterModal({ isOpen, onClose, onImportSuccess }) {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".xlsx, .xls, .csv"
+                  accept=".xlsx, .xls, .csv, .pdf"
                   onChange={handleFileChange}
                   className="hidden"
                 />
@@ -184,18 +189,18 @@ export function SpreadsheetImporterModal({ isOpen, onClose, onImportSuccess }) {
                   {isProcessing ? <Loader2 className="w-6 h-6 animate-spin" /> : <Upload className="w-6 h-6" />}
                 </div>
                 <p className="text-sm font-semibold text-slate-200">
-                  {isProcessing ? 'Parsing spreadsheet...' : 'Choose or drop your Prestine Auction Tracker workbook'}
+                  {isProcessing ? 'Parsing file...' : 'Choose or drop your Pristine Tracker workbook or PDF invoice'}
                 </p>
-                <p className="text-xs text-slate-500 mt-1">Supports .xlsx, .xls, or .csv formats</p>
+                <p className="text-xs text-slate-500 mt-1">Supports .xlsx, .xls, .csv, or .pdf (Pristine Invoices)</p>
               </div>
 
               <div className="p-4 bg-slate-950/60 border border-slate-800 rounded-xl space-y-2">
                 <div className="flex items-center gap-2 text-xs font-semibold text-slate-300">
                   <Layers className="w-4 h-4 text-amber-400" />
-                  <span>Automatic Sheet & Column Recognition</span>
+                  <span>Automatic Sheet & Format Recognition</span>
                 </div>
                 <p className="text-xs text-slate-400 leading-relaxed">
-                  Automatically extracts purchase invoices, proration weights, true total costs, listing statuses, completed sales records, and manual pricing comps directly from your Excel sheets.
+                  Automatically parses purchase invoices, auctions won, adjustments, proration weights, true landed costs, and pricing floors from Excel workbooks or Pristine Auction PDF invoices.
                 </p>
               </div>
             </div>

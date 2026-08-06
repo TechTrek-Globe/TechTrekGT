@@ -1,0 +1,18 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "techtrek-landing",
+  "compatibility_date": "2026-08-01",
+  "assets": {
+    "directory": "./"
+  },
+  "routes": [
+    {
+      "pattern": "techtrekgt.com",
+      "zone_name": "techtrekgt.com"
+    },
+    {
+      "pattern": "techtrekgt.com/*",
+      "zone_name": "techtrekgt.com"
+    }
+  ]
+}

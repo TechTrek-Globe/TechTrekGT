@@ -13,11 +13,11 @@
   },
   "routes": [
     {
-      "pattern": "techtrekgt.com",
+      "pattern": "techtrekgt.com/finance",
       "zone_name": "techtrekgt.com"
     },
     {
-      "pattern": "techtrekgt.com/*",
+      "pattern": "techtrekgt.com/finance/*",
       "zone_name": "techtrekgt.com"
     }
   ],

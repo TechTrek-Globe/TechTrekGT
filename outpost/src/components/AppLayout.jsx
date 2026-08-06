@@ -36,8 +36,8 @@ export function AppLayout({ activeView, onNavigate, children }) {
       {/* --- Sidebar --- */}
       <aside className="hidden lg:flex flex-col w-60 bg-slate-900/60 border-r border-slate-800/60 backdrop-blur-md flex-shrink-0">
         {/* Logo */}
-        <div className="flex items-center justify-center border-b border-slate-800/60">
-          <img src={outpostLogo} alt="TechTrek Outpost Logo" className="w-full h-auto object-cover filter drop-shadow-md" />
+        <div className="flex items-center justify-center p-3 border-b border-slate-800/60">
+          <img src={outpostLogo} alt="TechTrek Outpost Logo" className="w-full h-auto object-contain filter drop-shadow-md" />
         </div>
 
         {/* Nav */}

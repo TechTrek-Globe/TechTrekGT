@@ -179,8 +179,8 @@ export function AuthPage({ onAuthSuccess }) {
 
         <div className="relative z-10">
           {/* Logo */}
-          <div className="mb-12">
-            <img src={outpostLogo} alt="TechTrek Outpost Logo" className="h-16 w-auto max-w-[280px] object-contain drop-shadow-xl" />
+          <div className="mb-8">
+            <img src={outpostLogo} alt="TechTrek Outpost Logo" className="w-full max-w-[280px] h-auto object-contain drop-shadow-2xl" />
           </div>
 
           <h1 className="text-4xl font-black text-white leading-tight mb-4">
@@ -228,7 +228,7 @@ export function AuthPage({ onAuthSuccess }) {
 
           {/* Mobile logo */}
           <div className="flex lg:hidden items-center mb-8 justify-center">
-            <img src={outpostLogo} alt="TechTrek Outpost Logo" className="h-10 w-auto max-w-[200px] object-contain drop-shadow-md" />
+            <img src={outpostLogo} alt="TechTrek Outpost Logo" className="w-48 h-auto max-w-[220px] object-contain drop-shadow-md" />
           </div>
 
           <div className="glass-card rounded-2xl p-8 glow-amber-sm">

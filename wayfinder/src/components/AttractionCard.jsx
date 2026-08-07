@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { MapPin, Navigation, Compass, Plus, Check, CalendarX, Landmark, ExternalLink, ExternalLinkIcon } from 'lucide-react';
+import { MapPin, Navigation, Compass, Plus, Check, CalendarX, Landmark } from 'lucide-react';
+import { cityImages, marketImages } from '../utils/cityImages';
 
 /**
  * Extracts a concise vital stats list for the quick stats row.
@@ -89,6 +90,23 @@ function getQuickStats(sight, cityName = 'Kraków') {
   return stats;
 }
 
+function getSightFallbackImage(sight, cityName = 'Kraków') {
+  const name = (sight.name || '').toLowerCase();
+  if (name.includes('mariacki') || name.includes('cloth hall') || name.includes('sukiennice') || name.includes('wawel')) {
+    return marketImages['rynek-glowny'] || cityImages.krakow;
+  }
+  if (name.includes('kazimierz') || name.includes('schindler') || name.includes('jewish')) {
+    return marketImages['kazimierz-wolnica'] || cityImages.krakow;
+  }
+  if (name.includes('planty') || name.includes('barbican') || name.includes('podgór')) {
+    return marketImages['podgorze'] || cityImages.krakow;
+  }
+  if (name.includes('wieliczka') || name.includes('salt') || name.includes('maly')) {
+    return marketImages['maly-rynek'] || cityImages.krakow;
+  }
+  return cityImages[cityName.toLowerCase()] || cityImages.krakow;
+}
+
 export function AttractionCard({ sight, cityName = 'Kraków', onAddToItinerary }) {
   const [isSaved, setIsSaved] = useState(false);
   const [imgError, setImgError] = useState(false);
@@ -107,24 +125,20 @@ export function AttractionCard({ sight, cityName = 'Kraków', onAddToItinerary }
     }
   };
 
+  const currentImgSrc = (!imgError && sight.imageUrl) ? sight.imageUrl : getSightFallbackImage(sight, cityName);
+
   return (
     <article className="glass-panel rounded-3xl border border-white/10 hover:border-amber-500/40 transition-all duration-300 overflow-hidden flex flex-col h-full bg-wf-navy-mid/80 shadow-xl group">
       {/* 1. Static Image (Top): Fixed 200px height with #2d3748 fallback */}
       <div className="relative w-full h-[200px] bg-[#2d3748] overflow-hidden shrink-0">
-        {!imgError && sight.imageUrl ? (
-          <img
-            src={sight.imageUrl}
-            alt={sight.name}
-            onError={() => setImgError(true)}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-            loading="lazy"
-          />
-        ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-slate-800 to-slate-900 text-amber-400/80 p-4 text-center">
-            <Landmark className="w-12 h-12 mb-2 stroke-1 text-amber-400/60" />
-            <span className="text-xs font-semibold text-slate-300 tracking-wide">{sight.name}</span>
-          </div>
-        )}
+        <img
+          src={currentImgSrc}
+          alt={sight.name}
+          referrerPolicy="no-referrer"
+          onError={() => setImgError(true)}
+          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          loading="lazy"
+        />
 
         {/* Gradient Scrim for Contrast */}
         <div className="absolute inset-0 bg-gradient-to-t from-wf-navy-mid/95 via-transparent to-black/30 pointer-events-none" />

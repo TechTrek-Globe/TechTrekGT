@@ -12,6 +12,7 @@ import { handleItinerary }  from '../functions/api/wayfinder/itinerary.js';
 import { handleDocuments }  from '../functions/api/wayfinder/documents.js';
 import { handleImportJobs } from '../functions/api/wayfinder/import-jobs.js';
 import { handleBudget }     from '../functions/api/wayfinder/budget.js';
+import { handleExchangeRate } from '../functions/api/wayfinder/exchange-rate.js';
 
 const ALLOWED_ORIGINS = [
   'https://techtrekgt.com',
@@ -92,6 +93,10 @@ export default {
 
     // --- Protected wayfinder API routes ---
     if (path.startsWith('/api/wayfinder/')) {
+      if (path === '/api/wayfinder/exchange-rate' && method === 'GET') {
+        return handleExchangeRate({ request, env, ctx }, url, method);
+      }
+
       const auth = await requireAuth(request, env);
       if (!auth.ok) return auth.error;
 

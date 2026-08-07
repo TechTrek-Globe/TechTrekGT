@@ -487,13 +487,28 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                   <p className="text-xs sm:text-sm text-wf-cream leading-relaxed">{city.practical.currency}</p>
                   
                   {/* Live Exchange Rate Callout Box */}
-                  <div className="p-3 rounded-xl bg-slate-950/80 border border-amber-500/20 space-y-1.5 text-xs">
-                    <div className="flex items-center justify-between text-amber-300 font-bold">
+                  <div className="p-3 rounded-xl bg-slate-950/80 border border-amber-500/20 space-y-2 text-xs">
+                    <div className="flex items-center justify-between text-amber-300 font-bold border-b border-white/10 pb-1.5">
                       <span>1 USD ≈ {exchangeRates.usdToPln} PLN</span>
                       <span>1 EUR ≈ {exchangeRates.eurToPln} PLN</span>
                     </div>
-                    <div className="text-[11px] text-slate-400 flex items-center justify-between pt-1 border-t border-white/5">
-                      <span>💡 20 PLN Mug Deposit ≈ ${(20 / exchangeRates.usdToPln).toFixed(2)} USD / €{(20 / exchangeRates.eurToPln).toFixed(2)} EUR</span>
+                    <div className="space-y-1 text-[11px] text-slate-300 font-medium">
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">🚄 Airport SKA1 Train:</span>
+                        <span className="font-bold text-amber-200">17 PLN (~${(17 / exchangeRates.usdToPln).toFixed(2)} USD)</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">🚃 24-hr Tram Pass:</span>
+                        <span className="font-bold text-amber-200">17 PLN (~${(17 / exchangeRates.usdToPln).toFixed(2)} USD)</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">🎫 72-hr Tram Pass:</span>
+                        <span className="font-bold text-amber-200">50 PLN (~${(50 / exchangeRates.usdToPln).toFixed(2)} USD)</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">☕ Mug Deposit (Kaucja):</span>
+                        <span className="font-bold text-amber-200">20-30 PLN (~${(20 / exchangeRates.usdToPln).toFixed(2)}–${(30 / exchangeRates.usdToPln).toFixed(2)} USD)</span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -716,22 +731,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
             );
           })()}
 
-          {/* Authentic Culinary Highlights & Pronunciation Guide */}
-          <CulinaryHighlightsSection highlights={city.culinaryHighlights} />
 
-          {/* Market Food Strategy Box */}
-          <div className="glass-panel border-wf-amber/30 p-8 rounded-3xl bg-wf-amber/5">
-            <h3 className="text-2xl font-bold text-white mb-4 flex items-center space-x-3">
-              <Info className="w-6 h-6 text-wf-amber" />
-              <span>Market Culinary Strategy</span>
-            </h3>
-            <p className="text-wf-cream leading-relaxed text-sm sm:text-base mb-4">
-              {city.marketStrategy}
-            </p>
-            <div className="p-4 rounded-2xl bg-wf-navy-mid/80 border border-amber-400/20 text-xs text-amber-200">
-              💡 Pro Tip: Order <strong>Grzaniec Galicyjski</strong> (mulled wine served in festive earthenware mugs) and <strong>Oscypek</strong> with warm cranberry jam at the wooden market stalls!
-            </div>
-          </div>
         </div>
       )}
 

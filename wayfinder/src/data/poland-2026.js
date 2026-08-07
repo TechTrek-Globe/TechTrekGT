@@ -4,6 +4,50 @@ export const polandJourney = {
   tagline: 'Winter Markets, Historic Cities, and Scenic Rails',
   description: 'A curated winter expedition traversing Poland from south to north. Experience the medieval grandeur of Kraków, the fairytale bridges of Wrocław, the vibrant squares of Poznań, a daytime stop in gingerbread-famed Toruń, and a coastal finale in the Hanseatic city of Gdańsk.',
   dates: 'December 2026', // Public dates only
+  culinaryHighlights: [
+    {
+      name: 'Grzaniec Galicyjski',
+      phonetic: 'GZH-ah-nyets gah-li-TSYEV-skee',
+      english: 'Galician Mulled Wine',
+      description: 'Rich mulled red wine spiced with cloves, cinnamon bark, orange zest, and dark honey, served steaming hot from massive oak barrels.',
+      tip: 'Ask for a splash of Wiśniówka (cherry liqueur) for an extra warm kick.'
+    },
+    {
+      name: 'Oscypek z żurawiną',
+      phonetic: 'oh-STSYE-pek z zhoo-rah-VEE-noh',
+      english: 'Grilled Highlander Cheese w/ Cranberry',
+      description: 'Spindle-shaped smoked sheep\'s milk cheese from the Podhale mountain region, grilled over charcoal coals until soft and topped with hot sweet-tart cranberry preserves.',
+      tip: 'Look for authentic PDO Highlander cheeses stamped with traditional wooden mold patterns.'
+    },
+    {
+      name: 'Pierogi Smażone',
+      phonetic: 'pyeh-ROH-gee smah-ZHOH-neh',
+      english: 'Crispy Pan-Fried Dumplings',
+      description: 'Hand-rolled dumplings pan-fried in butter until crispy. Fillings include classic Ruskie (potato & cheese), braised pork, or wild mushroom & sauerkraut.',
+      tip: 'Order a mixed platter (porcja mieszana) to sample all savory varieties.'
+    },
+    {
+      name: 'Kiełbasa Krakowska z Grilla',
+      phonetic: 'kyeow-BAH-sah krah-KOV-skah z GREEL-lah',
+      english: 'Grilled Kraków Sausage',
+      description: 'Thick, garlic and black pepper seasoned pork sausage roasted over open wood flames, served with crusty sourdough bread and sharp Polish mustard (musztarda).',
+      tip: 'Crispy skin paired with spicy mustard makes this the ultimate winter street food.'
+    },
+    {
+      name: 'Barszcz z Uszkami',
+      phonetic: 'barshch z oosh-KAH-mee',
+      english: 'Beetroot Borscht w/ Mushroom Dumplings',
+      description: 'Clear ruby-red fermented beet broth served steaming hot in sipping cups with tiny mushroom-stuffed tortellini-like dumplings.',
+      tip: 'The perfect comforting handheld soup while strolling illuminated market stalls.'
+    },
+    {
+      name: 'Miód Pitny',
+      phonetic: 'myood PEET-ny',
+      english: 'Hot Spiced Mead',
+      description: 'Traditional Polish honey wine fermented with aromatic spices and served hot. Grades like Trójniak and Dwójniak offer rich, floral honey sweetness.',
+      tip: 'Visit the Mały Rynek craft corner for small-batch artisanal mead tastings.'
+    }
+  ],
   
   route: [
     {
@@ -16,14 +60,14 @@ export const polandJourney = {
       dates: 'Nov 28, 2026 - Jan 1, 2027',
       openingHours: 'Open 10am-8pm. Early close on Dec 24 (~2pm).',
       hours: 'Open 10am-8pm. Early close on Dec 24 (~2pm).',
-      kaucja: '20-30 PLN',
+      kaucja: '20-30 PLN (~$5.35–$8.00 USD)',
       foodTargets: ['Morskie Oko', 'Pod Wawelem', 'Czarna Kaczka', 'Plac Nowy Zapiekanki'],
       hotels: ['Hotel Stary', 'Hotel Copernicus', 'Sheraton Grand Kraków', 'PURO Kraków Stare Miasto'],
       quickReference: {
         dates: 'Nov 28, 2026 - Jan 1, 2027',
         daylight: 'Sunrise ~7:30 AM | Sunset ~3:30 PM (~8 hrs daylight)',
         peakHours: '5:30 PM - 8:00 PM (Dusk illuminations & caroling)',
-        kaucja: '20-30 PLN (Ceramic Mug Deposit, Cash Only)'
+        kaucja: '20-30 PLN (~$5.35–$8.00 USD) (Ceramic Mug Deposit, Cash Only)'
       },
       holidayClosures: {
         title: 'Critical Holiday Operating Hours (Dec 24 - 25)',
@@ -33,9 +77,9 @@ export const polandJourney = {
       },
       kaucjaCallout: {
         title: 'Kaucja (Ceramic Mug Deposit)',
-        deposit: '20-30 PLN per mug',
-        cashWarning: 'CASH MANDATORY: Card payments are accepted for food and drinks, but vendors strictly require exact CASH in PLN for mug deposits.',
-        details: 'Pay 20-30 PLN cash per ceramic mug when ordering Grzaniec Galicyjski or hot spiced mead. Return your mug to any drink chalet for a full cash refund, or keep it as an authentic souvenir!'
+        deposit: '20-30 PLN (~$5.35–$8.00 USD) per mug',
+        cashWarning: 'CASH MANDATORY: Card payments are accepted for food and drinks, but vendors strictly require exact CASH in PLN (~$5.35–$8.00 USD) for mug deposits.',
+        details: 'Pay 20-30 PLN (~$5.35–$8.00 USD) cash per ceramic mug when ordering Grzaniec Galicyjski or hot spiced mead. Return your mug to any drink chalet for a full cash refund in PLN, or keep it as an authentic souvenir!'
       },
       culinaryHighlights: [
         {
@@ -83,14 +127,14 @@ export const polandJourney = {
       ],
       history: 'Kraków was the royal capital of Poland for over 500 years until 1596. Miraculously preserved during WWII, its entire Old Town (Stare Miasto) is a UNESCO World Heritage site boasting Europe\'s largest medieval market square (Rynek Główny), the legendary Wawel Royal Castle, and the historic Jewish Quarter of Kazimierz. Its Christmas Market tradition dates back centuries as a vibrant gathering place for craftsmen across Central Europe.',
       transit: {
-        airport: 'Direct SKA1 train from Kraków Airport (KRK) to Kraków Główny central station runs every 30 mins (17-min journey, ~17 PLN ticket).',
-        cityTransit: 'Trams & buses managed by ZTP Kraków. Use 24-hr (~17 PLN) or 72-hr (~50 PLN) passes. Trams 1, 3, 8, 13, and 24 connect Old Town directly with Kazimierz.',
+        airport: 'Direct SKA1 train from Kraków Airport (KRK) to Kraków Główny central station runs every 30 mins (17-min journey, ~17 PLN (~$4.50 USD) ticket).',
+        cityTransit: 'Trams & buses managed by ZTP Kraków. Use 24-hr (~17 PLN (~$4.50 USD)) or 72-hr (~50 PLN (~$13.35 USD)) passes. Trams 1, 3, 8, 13, and 24 connect Old Town directly with Kazimierz.',
         station: 'Kraków Główny train station is directly attached to Galeria Krakowska and is a flat 5-minute walk to the Barbican and Planty Park entry to Old Town.'
       },
       practical: {
         weather: 'December in Kraków averages -2°C to 4°C (28°F–39°F) with brisk evening winds off the Vistula. Thermal base layers, fleece-lined waterproof boots for wet cobblestones, a windproof coat, gloves, and a beanie are recommended for evening strolls.',
-        currency: 'Poland uses the Polish Złoty (PLN). Contactless card payment (Apple/Google Pay) is accepted at ~90% of stalls, but keep 20–50 PLN cash for mug deposits and small craft vendors. Always select "Pay in PLN" on card readers to avoid 5-10% DCC markups.',
-        restrooms: 'Underground public WC is located beneath Sukiennice (Cloth Hall) on Main Square, and at Galeria Krakowska central station (2–4 PLN fee, contactless card accepted).'
+        currency: 'Poland uses the Polish Złoty (PLN). Contactless card payment (Apple/Google Pay) is accepted at ~90% of stalls, but keep 20–50 PLN (~$5.35–$13.35 USD) cash for mug deposits and small craft vendors. Always select "Pay in PLN" on card readers to avoid 5-10% DCC markups.',
+        restrooms: 'Underground public WC is located beneath Sukiennice (Cloth Hall) on Main Square, and at Galeria Krakowska central station (2–4 PLN (~$0.50–$1.05 USD) fee, contactless card accepted).'
       },
       markets: [
         {
@@ -102,7 +146,7 @@ export const polandJourney = {
           mustTry: ['Oscypek with warm cranberry jam', 'Sizzling Pierogi', 'Grzaniec Galicyjski mulled wine', 'Krakowska Sausage'],
           souvenirs: ['Hand-blown glass ornaments (Bombki)', 'Baltic Amber jewelry', 'Carved wooden kitchenware & boxes', 'Wool slippers'],
           unescoTradition: 'UNESCO Intangible Cultural Heritage: Szopki Krakowskie (Christmas Cribs). The annual competition takes place on the first Thursday of December (Dec 3, 2026) at the Mickiewicz monument, followed by an exhibition at Krzysztofory Palace.',
-          tips: 'Peak crowds are 5:30 PM - 8:00 PM. Hot drink mugs require a 30 PLN cash deposit (refundable upon returning the mug). Stage caroling occurs daily around 5:00 PM / 6:00 PM. Dec 24 hours: 10:00 AM - 2:00 PM.',
+          tips: 'Peak crowds are 5:30 PM - 8:00 PM. Hot drink mugs require a 30 PLN (~$8.00 USD) cash deposit (refundable upon returning the mug). Stage caroling occurs daily around 5:00 PM / 6:00 PM. Dec 24 hours: 10:00 AM - 2:00 PM.',
           specialty: 'Hand-carved wooden trinkets, Baltic amber, hand-blown glass ornaments (Bombki), and piping hot Grzaniec Galicyjski.',
           details: 'The crown jewel of Polish Christmas markets! Over 100 wooden chalets surround the Renaissance Cloth Hall (Sukiennice) under the illuminated towers of St. Mary\'s Basilica. Feast on grilled Oscypek smoked cheese with cranberry jam, sizzling pierogi, and roasted kielbasa while carols echo across the square.'
         },
@@ -216,7 +260,7 @@ export const polandJourney = {
       dates: 'Nov 21, 2026 - Jan 7, 2027',
       openingHours: 'Open 10am-9pm. Closed Dec 24/25. Opens 1pm on Dec 26.',
       hours: 'Open 10am-9pm. Closed Dec 24/25. Opens 1pm on Dec 26.',
-      kaucja: '30 PLN',
+      kaucja: '30 PLN (~$8.00 USD)',
       foodTargets: ['Konspira', 'Karczma Lwowska', 'Pod Fredrą'],
       hotels: ['The Bridge Wrocław MGallery', 'Hotel Monopol', 'AC Hotel by Marriott Wrocław'],
       imageDetails: {
@@ -235,7 +279,7 @@ export const polandJourney = {
       dates: 'Nov 21, 2026 - Jan 6, 2027 (Plac Wolności)',
       openingHours: 'Open 11am-9pm. Open on Christmas Day.',
       hours: 'Open 11am-9pm. Open on Christmas Day.',
-      kaucja: '30 PLN',
+      kaucja: '30 PLN (~$8.00 USD)',
       foodTargets: ['Brovaria', 'Bamberka', 'Wiejskie Jadło'],
       hotels: ['PURO Poznań Stare Miasto', 'City Park Hotel & Residence', 'Sheraton Poznań Hotel'],
       imageDetails: {
@@ -254,7 +298,7 @@ export const polandJourney = {
       dates: 'Nov 21, 2026 - Dec 21, 2026',
       openingHours: 'Mon-Thu 12pm-9pm, Fri 12pm-10pm, Sat 10am-10pm, Sun 10am-9pm.',
       hours: 'Mon-Thu 12pm-9pm, Fri 12pm-10pm, Sat 10am-10pm, Sun 10am-9pm.',
-      kaucja: '30 PLN',
+      kaucja: '30 PLN (~$8.00 USD)',
       foodTargets: [],
       hotels: [],
       imageDetails: {
@@ -273,7 +317,7 @@ export const polandJourney = {
       dates: 'Nov 20, 2026 - Dec 23, 2026',
       openingHours: 'Open Sun-Thu 12pm-8pm, Fri-Sat 12pm-9pm. Closed Dec 24/25.',
       hours: 'Open Sun-Thu 12pm-8pm, Fri-Sat 12pm-9pm. Closed Dec 24/25.',
-      kaucja: '30 PLN',
+      kaucja: '30 PLN (~$8.00 USD)',
       foodTargets: ['Pierogarnia Mandu', 'Kubicki', 'Gdański Bowke'],
       hotels: ['Hilton Gdańsk', 'Hotel Podewils', 'Radisson Hotel & Suites Gdańsk'],
       imageDetails: {
@@ -294,7 +338,7 @@ export const polandJourney = {
   marketStrategy: 'Treat the Christmas markets as evening anchors rather than all-day activities. The best rhythm is sightseeing in daylight, a warm break in the late afternoon, then markets from roughly 5 PM to 7 PM when the lights are on and dinner snacks are easy.',
 
   practicalTools: {
-    currency: 'Use PLN divided by 4 as a fast USD estimate. Keep 50 to 100 PLN in small notes for market snacks, facilities, and small vendors.',
+    currency: 'Use PLN divided by 3.75 for exact USD conversion. Keep 50 to 100 PLN (~$13.35 to $26.70 USD) in small notes for market snacks, facilities, and small vendors.',
     phrases: 'Cześć (Hello), Dzień dobry (Good morning), Dziękuję (Thank you), Proszę (Please/Here you go), Ile to kosztuje? (How much is this?), Czy można kartą? (Can I pay by card?), Poproszę grzańca (Mulled wine, please), Poproszę piwo (Beer, please), Na zdrowie (Cheers).',
     packing: 'Waterproof boots, thermal layers, winter parka, hat, scarf, gloves, merino socks, compact daypack, power bank, Type C/E adapters, printed rail and flight documents.',
     emergency: 'Store passport copies, insurance, reservations, train tickets, airline check-in details, hotel addresses, and payment backup offline. Use Jakdojade for transit and Uber or Bolt for quick point-to-point rides.'

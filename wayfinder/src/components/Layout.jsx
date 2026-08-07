@@ -38,12 +38,12 @@ export function Layout({ children }) {
 
   return (
     <div className="min-h-screen flex flex-col font-sans bg-slate-950">
-      {/* --- Full-Width Top Header Banner (Like Outpost) --- */}
-      <header style={{ width: '100%', flexShrink: 0, overflow: 'hidden', height: '182px', display: 'flex', justifyContent: 'center', alignItems: 'center', borderBottom: '1px solid rgba(180,130,20,0.3)', backgroundColor: '#000', position: 'relative', zIndex: 60 }}>
+      {/* --- Full-Width Top Header Banner (Matching Outpost) --- */}
+      <header style={{ width: '100%', flexShrink: 0, overflow: 'hidden', height: '180px', display: 'flex', justifyContent: 'center', alignItems: 'center', borderBottom: '1px solid rgba(180,130,20,0.3)', backgroundColor: '#000', position: 'relative', zIndex: 60 }}>
         <img
           src={wayfinderHeaderBanner}
           alt="TechTrek Wayfinder - Plan • Explore • Navigate • Discover"
-          style={{ height: '100%', width: '100%', objectFit: 'contain', objectPosition: 'center', display: 'block' }}
+          style={{ height: '100%', width: '100%', objectFit: 'cover', objectPosition: 'center', display: 'block' }}
         />
       </header>
 

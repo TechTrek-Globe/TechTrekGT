@@ -18,6 +18,40 @@ function getViewFromPathname(pathname) {
   return 'dashboard';
 }
 
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error("ErrorBoundary caught error:", error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-6 max-w-xl mx-auto my-8 glass-card rounded-2xl border border-red-500/30 text-slate-200">
+          <div className="flex items-center gap-3 text-red-400 font-bold text-lg mb-2">
+            <span>Component Rendering Error</span>
+          </div>
+          <p className="text-xs font-mono text-red-300 bg-red-950/60 p-3 rounded-lg mb-4 overflow-x-auto">
+            {this.state.error?.toString() || 'Unknown error occurred'}
+          </p>
+          <button
+            onClick={() => { this.setState({ hasError: false }); window.location.reload(); }}
+            className="btn-primary py-2 px-4 text-xs"
+          >
+            Reload Page
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 function MainContent({ pathname, navigateTo }) {
   const { isAuthenticated } = useAuth();
   const [activeView, setActiveView] = useState(() => getViewFromPathname(pathname));
@@ -55,11 +89,13 @@ function MainContent({ pathname, navigateTo }) {
 
   return (
     <AppLayout activeView={activeView} onNavigate={handleNavigate}>
-      {activeView === 'dashboard' && <DashboardView onNavigate={handleNavigate} />}
-      {activeView === 'inventory' && <InventoryView />}
-      {activeView === 'sales' && <SalesLogView />}
-      {activeView === 'pricing' && <PricingIntelligenceView />}
-      {activeView === 'settings' && <SettingsView />}
+      <ErrorBoundary key={activeView}>
+        {activeView === 'dashboard' && <DashboardView onNavigate={handleNavigate} />}
+        {activeView === 'inventory' && <InventoryView />}
+        {activeView === 'sales' && <SalesLogView />}
+        {activeView === 'pricing' && <PricingIntelligenceView />}
+        {activeView === 'settings' && <SettingsView />}
+      </ErrorBoundary>
     </AppLayout>
   );
 }

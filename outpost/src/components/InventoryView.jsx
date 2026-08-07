@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   Plus, Search, Filter, RefreshCw, Loader2, AlertCircle,
   Package, Pencil, Trash2, Check, X, ChevronDown, ExternalLink,
@@ -219,7 +219,13 @@ export function InventoryView() {
     return () => window.removeEventListener('outpost-settings-updated', handleSettingsUpdate);
   }, []);
 
-  const { columnVisibility, columnWidths } = userSettings;
+  const { columnVisibility = {}, columnWidths = {} } = userSettings || {};
+
+  const platformOptions = useMemo(() => {
+    const custom = Array.isArray(platforms) ? platforms.map(p => (typeof p === 'string' ? p : (p?.name || ''))).filter(Boolean) : [];
+    const defaults = ['eBay', 'Pristine Auction', 'Mercari', 'Whatnot', 'Private Sale', 'Other'];
+    return Array.from(new Set([...custom, ...defaults]));
+  }, [platforms]);
 
   // Column Resizing Handler
   const handleResizeStart = (colKey, e) => {
@@ -597,7 +603,7 @@ export function InventoryView() {
                         value={item.platform}
                         itemId={item.id}
                         field="platform"
-                        options={platforms.map(p => p.name).concat(['eBay', 'Pristine Auction', 'Mercari', 'Whatnot', 'Private Sale', 'Other'])}
+                        options={platformOptions}
                         onUpdated={handleItemUpdated}
                       />
                     </td>

@@ -32,6 +32,7 @@ export function GuacamoleView() {
 
   const [connState, setConnState] = useState(STATE.IDLE);
   const [errorMsg,  setErrorMsg]  = useState('');
+  const [iframeUrl, setIframeUrl] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const controlsTimerRef = useRef(null);
@@ -54,6 +55,7 @@ export function GuacamoleView() {
   }, [resetControlsTimer]);
 
   const disconnect = useCallback(() => {
+    setIframeUrl('');
     if (clientRef.current) {
       try { clientRef.current.disconnect(); } catch (e) { /* ignore */ }
       clientRef.current = null;
@@ -95,21 +97,15 @@ export function GuacamoleView() {
 
     setConnState(STATE.CONNECTING);
 
-    // Step 2: Build Guacamole Chained Tunnel (WebSocket + HTTP fallback) through Worker proxy
-    const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${wsProtocol}//${location.host}/tunnel/websocket-tunnel`;
-    const httpUrl = `/tunnel/tunnel`;
-
-    const wsTunnel = new Guacamole.WebSocketTunnel(wsUrl);
-    const httpTunnel = new Guacamole.HTTPTunnel(httpUrl);
-    const tunnel = new Guacamole.ChainedTunnel(wsTunnel, httpTunnel);
-    const client = new Guacamole.Client(tunnel);
-    clientRef.current = client;
-
-    // Mount the display canvas
-    const displayEl = client.getDisplay().getElement();
-    displayRef.current.innerHTML = '';
-    displayRef.current.appendChild(displayEl);
+    try {
+      const idBase64 = btoa(`${connectionId}\0c\0default`);
+      const fullUrl = `/tunnel/#/client/${encodeURIComponent(idBase64)}?token=${encodeURIComponent(guacToken)}`;
+      setIframeUrl(fullUrl);
+      setConnState(STATE.CONNECTED);
+    } catch (err) {
+      setConnState(STATE.ERROR);
+      setErrorMsg('Failed to open remote desktop interface.');
+    }
 
     // Scale display to fit container
     const fitDisplay = () => {
@@ -277,12 +273,21 @@ export function GuacamoleView() {
       {/* Main content */}
       <div className="flex-1 relative bg-black overflow-hidden">
 
-        {/* Guacamole display canvas container */}
-        <div
-          id="guac-display"
-          ref={displayRef}
-          className={`absolute inset-0 ${connState === STATE.CONNECTED ? 'block' : 'hidden'}`}
-        />
+        {/* Guacamole display container / iframe */}
+        {iframeUrl ? (
+          <iframe
+            src={iframeUrl}
+            className="w-full h-full border-0"
+            title="Guacamole Remote Desktop"
+            allow="fullscreen; clipboard-read; clipboard-write"
+          />
+        ) : (
+          <div
+            id="guac-display"
+            ref={displayRef}
+            className={`absolute inset-0 ${connState === STATE.CONNECTED || connState === STATE.CONNECTING ? 'block' : 'hidden'}`}
+          />
+        )}
 
         {/* Overlay states */}
         {connState !== STATE.CONNECTED && (

@@ -42,7 +42,7 @@ export default {
     }
 
     // --- Guacamole tunnel proxy (JWT required) ---
-    if (path.startsWith('/tunnel/')) {
+    if (path.startsWith('/tunnel')) {
       return handleTunnelProxy(request, env, url, path);
     }
 

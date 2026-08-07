@@ -191,27 +191,82 @@ export const polandJourney = {
         {
           name: 'Wawel Royal Castle & Cathedral',
           category: 'Royal Heritage',
-          description: 'The ancient seat of Polish kings overlooking the Vistula River. Explore the Italian Renaissance courtyard, royal state rooms, and the dragon\'s den statue that breathes real fire.'
+          description: 'The ancient seat of Polish kings overlooking the Vistula River. Explore the Italian Renaissance courtyard, royal state rooms, and the dragon\'s den statue that breathes real fire.',
+          imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1d/Wawel_Castle_in_Krak%C3%B3w.jpg/800px-Wawel_Castle_in_Krak%C3%B3w.jpg',
+          howToGetThere: 'Walk south through Old Town or take Trams 1, 3, 8 to Wawel stop.',
+          pricing: 'Cathedral free; State Rooms ~35 PLN (~$9)',
+          openTimes: '9:30 AM - 5:00 PM (winter hours)',
+          daysClosed: 'Mondays (most exhibitions closed)'
         },
         {
           name: 'St. Mary\'s Basilica (Kościół Mariacki)',
           category: 'Architecture & Tradition',
-          description: 'Iconic twin-towered gothic basilica on Rynek Główny. Step inside to marvel at the 15th-century carved wooden Veit Stoss altarpiece, and listen for the hourly trumpet call (Hejnał Mariacki).'
+          description: 'Iconic twin-towered gothic basilica on Rynek Główny. Step inside to marvel at the 15th-century carved wooden Veit Stoss altarpiece, and listen for the hourly trumpet call (Hejnał Mariacki).',
+          imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/64/Ko%C5%9Bci%C3%B3%C5%82_Mariacki_w_Krakowie_%281%29.jpg/800px-Ko%C5%9Bci%C3%B3%C5%82_Mariacki_w_Krakowie_%281%29.jpg',
+          howToGetThere: 'Located directly on the Main Market Square (Rynek Główny).',
+          pricing: '15 PLN (~$4) for tourist entry (front half of church)',
+          openTimes: '11:30 AM - 6:00 PM (Mon-Sat), 2:00 PM - 6:00 PM (Sun)',
+          daysClosed: 'During mass'
         },
         {
           name: 'Cloth Hall (Sukiennice) & Rynek Underground',
           category: 'Museums & Shopping',
-          description: 'A 14th-century merchant hub selling amber and carved wood; underneath it lies a state-of-the-art medieval archaeological museum buried 4 meters under the square.'
+          description: 'A 14th-century merchant hub selling amber and carved wood; underneath it lies a state-of-the-art medieval archaeological museum buried 4 meters under the square.',
+          imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Krakow_sukiennice.jpg/800px-Krakow_sukiennice.jpg',
+          howToGetThere: 'Center of Main Market Square.',
+          pricing: 'Cloth Hall free; Underground Museum ~32 PLN (~$8.50)',
+          openTimes: '10:00 AM - 8:00 PM',
+          daysClosed: 'Underground closed second Monday of month'
         },
         {
           name: 'Kazimierz (Historic Jewish Quarter)',
           category: 'Culture & Nightlife',
-          description: 'Atmospheric cobblestone streets packed with historic synagogues, art galleries, cozy cellar bars, and the famous Plac Nowy Zapiekanki food plaza.'
+          description: 'Atmospheric cobblestone streets packed with historic synagogues, art galleries, cozy cellar bars, and the famous Plac Nowy Zapiekanki food plaza.',
+          imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3d/Szeroka_street%2C_Kazimierz%2C_Krak%C3%B3w.jpg/800px-Szeroka_street%2C_Kazimierz%2C_Krak%C3%B3w.jpg',
+          howToGetThere: 'Trams 1, 3, 8 to Plac Wolnica or 15-min walk south of Old Town.',
+          pricing: 'Free to explore; Synagogue entries ~10-15 PLN',
+          openTimes: '24/7 (Synagogues usually 10:00 AM - 4:00 PM)',
+          daysClosed: 'Synagogues closed on Saturdays (Shabbat) and Jewish holidays'
         },
         {
           name: 'Planty Park & Barbican Fortress',
           category: 'Scenic Walk',
-          description: 'A 4-kilometer ring of parkland surrounding Old Town where medieval walls once stood, leading to the formidable 15th-century round Barbican defense tower.'
+          description: 'A 4-kilometer ring of parkland surrounding Old Town where medieval walls once stood, leading to the formidable 15th-century round Barbican defense tower.',
+          imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/87/Planty_krakowskie_3.jpg/800px-Planty_krakowskie_3.jpg',
+          howToGetThere: 'Surrounds the entire Old Town; Barbican is at the north end.',
+          pricing: 'Park free; Barbican entry ~16 PLN',
+          openTimes: 'Park 24/7; Barbican 10:00 AM - 5:00 PM (season dependent)',
+          daysClosed: 'Barbican often closed in deep winter (Dec-Mar)'
+        },
+        {
+          name: 'Auschwitz-Birkenau Memorial and Museum',
+          category: 'History & Memorial',
+          description: 'The former German Nazi concentration and extermination camp. A sobering and essential historical site requiring advance booking and respectful observance.',
+          imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/ef/Auschwitz_Birkenau_main_gate.jpg/800px-Auschwitz_Birkenau_main_gate.jpg',
+          howToGetThere: 'Bus from MDA Bus Station (approx 1.5 hrs) to Oświęcim, or guided tour.',
+          pricing: 'Free without guide; ~100 PLN (~$27) for guided tour (highly recommended)',
+          openTimes: '8:00 AM - 3:00 PM (winter), up to 7:00 PM (summer)',
+          daysClosed: 'Dec 25, Jan 1, Easter Sunday'
+        },
+        {
+          name: 'Wieliczka Salt Mine',
+          category: 'UNESCO Underground',
+          description: 'A massive 13th-century subterranean salt mine featuring stunning underground lakes, chapels carved entirely of salt, and intricate statues.',
+          imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/Wieliczka_St_Kingas_Chapel_1.jpg/800px-Wieliczka_St_Kingas_Chapel_1.jpg',
+          howToGetThere: 'SKA1 Train from Kraków Główny to Wieliczka Rynek-Kopalnia (approx 20 mins).',
+          pricing: '122 PLN (~$32) for foreign language guided tour',
+          openTimes: '8:30 AM - 5:00 PM',
+          daysClosed: 'Dec 24-25, Jan 1, Easter Sunday'
+        },
+        {
+          name: 'Oskar Schindler\'s Enamel Factory',
+          category: 'WWII History',
+          description: 'An interactive and deeply moving museum housed in Schindler\'s former factory, detailing life in Kraków under Nazi occupation during WWII.',
+          imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f7/Krak%C3%B3w_fabryka_Schindlera_1.jpg/800px-Krak%C3%B3w_fabryka_Schindlera_1.jpg',
+          howToGetThere: 'Tram 3 or 24 to Plac Bohaterów Getta, then a 10-min walk to Zabłocie district.',
+          pricing: '32 PLN (~$8.50)',
+          openTimes: '10:00 AM - 6:00 PM (Mondays 10:00 AM - 2:00 PM)',
+          daysClosed: 'First Tuesday of every month'
         }
       ],
       restaurants: [

@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { Compass, Map, User, LogOut, ShieldCheck, ChevronRight, Menu, X, Coins, ArrowLeftRight } from 'lucide-react';
 import { CurrencyConverterModal } from './CurrencyConverterModal';
 import { useExchangeRate } from '../hooks/useExchangeRate';
-import wayfinderHeaderBanner from '../assets/wayfinder-header-banner.png';
+import wayfinderHeaderBanner from '../assets/wayfinder-header-banner-new.png';
 
 export function Layout({ children }) {
   const { user, isAuthenticated, setIsAuthModalOpen, logout } = useAuth();
@@ -38,12 +38,12 @@ export function Layout({ children }) {
 
   return (
     <div className="min-h-screen flex flex-col font-sans bg-slate-950">
-      {/* --- Full-Width Top Header Banner (Matching Outpost) --- */}
-      <header style={{ width: '100%', flexShrink: 0, overflow: 'hidden', height: '180px', display: 'flex', justifyContent: 'center', alignItems: 'center', borderBottom: '1px solid rgba(180,130,20,0.3)', backgroundColor: '#000', position: 'relative', zIndex: 60 }}>
+      {/* --- Full-Width Top Header Banner --- */}
+      <header className="w-full flex-shrink-0 bg-black relative z-[60] border-b border-[#b48214]/30 flex justify-center items-center pt-3 pb-1 px-4 overflow-visible">
         <img
           src={wayfinderHeaderBanner}
           alt="TechTrek Wayfinder - Plan • Explore • Navigate • Discover"
-          style={{ height: '100%', width: '100%', objectFit: 'cover', objectPosition: 'center', display: 'block' }}
+          className="h-40 sm:h-52 md:h-60 w-auto max-w-full object-contain block relative -mb-5 sm:-mb-7 md:-mb-8 z-[60] drop-shadow-2xl translate-x-10 sm:translate-x-16"
         />
       </header>
 
@@ -53,36 +53,23 @@ export function Layout({ children }) {
         <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-wf-evergreen/10 rounded-full blur-[100px] mix-blend-screen transform -translate-x-1/3 translate-y-1/3" />
       </div>
 
-      <header className="sticky top-0 z-50 glass-panel border-b border-white/5">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center space-x-8">
-            <a href="/wayfinder" onClick={(e) => pushRoute(e, '/wayfinder')} className="flex items-center space-x-2.5 group">
-              <div className="p-2 rounded-xl bg-gradient-to-br from-wf-blue to-wf-navy-mid border border-wf-blue-lt/30 shadow-lg group-hover:shadow-wf-blue/20 transition-all">
-                <Compass className="w-5 h-5 text-wf-cream" />
+      <header className="sticky top-0 z-40 glass-panel border-b border-white/5">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <a href="/wayfinder" onClick={(e) => pushRoute(e, '/wayfinder')} className="flex items-center space-x-2 group">
+              <div className="p-1.5 rounded-xl bg-gradient-to-br from-wf-blue to-wf-navy-mid border border-wf-blue-lt/30 shadow-lg group-hover:shadow-wf-blue/20 transition-all">
+                <Compass className="w-4 h-4 text-wf-cream" />
               </div>
               <div>
-                <div className="text-lg font-black tracking-tight text-white flex items-center space-x-1">
+                <div className="text-base font-black tracking-tight text-white flex items-center space-x-1">
                   <span>TechTrek</span>
                   <span className="gradient-amber">Wayfinder</span>
                 </div>
-                <div className="text-[9px] font-semibold text-wf-muted uppercase tracking-widest -mt-1">
+                <div className="text-[8px] font-semibold text-wf-muted uppercase tracking-widest -mt-1">
                   Travel Operations
                 </div>
               </div>
             </a>
-
-            <nav className="hidden md:flex items-center space-x-1 border-l border-white/10 pl-8">
-              {navLinks.map((link) => (
-                <a
-                  key={link.href}
-                  href={link.href}
-                  onClick={(e) => pushRoute(e, link.href)}
-                  className="px-3 py-1.5 rounded-lg text-sm font-medium text-wf-text hover:text-white hover:bg-white/5 transition-colors"
-                >
-                  {link.label}
-                </a>
-              ))}
-            </nav>
           </div>
 
           <div className="hidden md:flex items-center space-x-4">

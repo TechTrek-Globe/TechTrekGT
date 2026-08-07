@@ -3,6 +3,7 @@ import { MapPin, Utensils, Bed, ArrowLeft, Bus, Train, ShoppingBag, Sparkles, La
 import { polandJourney } from '../data/poland-2026';
 import { cityImages, marketImages } from '../utils/cityImages';
 import { useExchangeRate } from '../hooks/useExchangeRate';
+import { AttractionCard } from './AttractionCard';
 
 function QuickReferenceBar({ city }) {
   const quick = city.quickReference || {
@@ -738,26 +739,20 @@ export function CityPage({ cityId, subPage = 'overview' }) {
       {/* 3. MUST-SEE ATTRACTIONS SUB-PAGE */}
       {subPage === 'attractions' && city.mustSee && (
         <div className="space-y-6 animate-fade-in">
-          <h2 className="text-3xl font-black text-white flex items-center space-x-3">
-            <Sparkles className="w-7 h-7 text-amber-400" />
-            <span>Must-See Attractions in {city.name}</span>
-          </h2>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <h2 className="text-3xl font-black text-white flex items-center space-x-3">
+              <Sparkles className="w-7 h-7 text-amber-400" />
+              <span>Must-See Attractions in {city.name}</span>
+            </h2>
+            <span className="text-xs text-wf-muted font-medium">Curated Golden Component template</span>
+          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div 
+            className="grid gap-6 items-stretch"
+            style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}
+          >
             {city.mustSee.map((sight, idx) => (
-              <div key={idx} className="glass-panel p-6 rounded-3xl border border-white/10 hover:border-amber-500/40 transition-colors flex flex-col justify-between group">
-                <div>
-                  <span className="text-[10px] font-black uppercase tracking-widest text-amber-400 px-2.5 py-1 rounded-full bg-amber-400/10 border border-amber-400/20 inline-block mb-3">
-                    {sight.category}
-                  </span>
-                  <h3 className="text-xl font-bold text-white mb-2 group-hover:text-amber-300 transition-colors">
-                    {sight.name}
-                  </h3>
-                  <p className="text-sm text-wf-muted leading-relaxed">
-                    {sight.description}
-                  </p>
-                </div>
-              </div>
+              <AttractionCard key={idx} sight={sight} cityName={city.name} />
             ))}
           </div>
         </div>

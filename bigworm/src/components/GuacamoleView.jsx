@@ -95,12 +95,14 @@ export function GuacamoleView() {
 
     setConnState(STATE.CONNECTING);
 
-    // Step 2: Build Guacamole WebSocket tunnel through the Worker proxy
-    // /tunnel/websocket-tunnel -> Worker -> Cloudflare Tunnel -> localhost:8080/guacamole/websocket-tunnel
-    const wsProtocol = location.protocol === 'https:' ? 'wss' : 'ws';
-    const tunnelUrl  = `${wsProtocol}://${location.host}/tunnel/websocket-tunnel`;
+    // Step 2: Build Guacamole Chained Tunnel (WebSocket + HTTP fallback) through Worker proxy
+    const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${wsProtocol}//${location.host}/tunnel/websocket-tunnel`;
+    const httpUrl = `/tunnel/tunnel`;
 
-    const tunnel = new Guacamole.WebSocketTunnel(tunnelUrl);
+    const wsTunnel = new Guacamole.WebSocketTunnel(wsUrl);
+    const httpTunnel = new Guacamole.HTTPTunnel(httpUrl);
+    const tunnel = new Guacamole.ChainedTunnel(wsTunnel, httpTunnel);
     const client = new Guacamole.Client(tunnel);
     clientRef.current = client;
 

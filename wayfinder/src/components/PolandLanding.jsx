@@ -1,7 +1,8 @@
 import React from 'react';
-import { Compass, Map, Calendar, Train, Utensils, Bed, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { Compass, Map, Calendar, Train, Utensils, Bed, ArrowRight, CheckCircle2, MapPin, Plane } from 'lucide-react';
 import { polandJourney } from '../data/poland-2026';
 import { cityImages } from '../utils/cityImages';
+import polandMapRouteClean from '../assets/poland-map-route-clean.png';
 
 export function PolandLanding() {
   const pushRoute = (e, path) => {
@@ -11,48 +12,151 @@ export function PolandLanding() {
   };
 
   return (
-    <div className="w-full pb-20">
-      {/* Hero Section */}
-      <div className="relative pt-24 pb-16 px-4 sm:px-6 lg:px-8 overflow-hidden">
-        <div className="absolute inset-0 z-0">
-          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5"></div>
-          <div className="absolute inset-0 bg-gradient-to-b from-wf-navy via-wf-navy to-wf-navy-mid/80"></div>
-          <div className="absolute top-1/4 right-0 w-96 h-96 bg-wf-amber/10 rounded-full blur-[100px]" />
-          <div className="absolute bottom-0 left-1/4 w-96 h-96 bg-wf-blue-lt/10 rounded-full blur-[100px]" />
-        </div>
+    <div className="w-full pb-20 space-y-8">
+      {/* Sleek Compact Hero & 3D Poland Route Map Card */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+        <div className="glass-panel p-4 sm:p-6 rounded-3xl border border-amber-500/30 bg-wf-navy-mid/95 shadow-2xl flex flex-col lg:flex-row items-stretch gap-6">
+          {/* Left Text & Actions Column */}
+          <div className="w-full lg:w-5/12 flex flex-col justify-between space-y-4">
+            <div className="space-y-3">
+              <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-bold uppercase tracking-wider">
+                <Compass className="w-3.5 h-3.5" />
+                <span>{polandJourney.dates}</span>
+              </div>
 
-        <div className="relative z-10 max-w-5xl mx-auto space-y-6">
-          <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-wf-amber/10 border border-wf-amber/30 text-wf-amber text-xs font-medium uppercase tracking-wider">
-            <Compass className="w-3.5 h-3.5" />
-            <span>{polandJourney.dates}</span>
+              <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-white leading-snug">
+                {polandJourney.title}
+              </h1>
+
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                {polandJourney.description}
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2.5 pt-2">
+              <a
+                href="/wayfinder/poland-christmas-2026/route"
+                onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026/route')}
+                className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center space-x-1.5 transition-all shadow-md shadow-amber-500/20"
+              >
+                <Map className="w-4 h-4" />
+                <span>View Full Route</span>
+              </a>
+              <a
+                href="/wayfinder/poland-christmas-2026/private"
+                onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026/private')}
+                className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-xs flex items-center space-x-1.5 transition-colors"
+              >
+                <Calendar className="w-4 h-4" />
+                <span>Private Itinerary</span>
+              </a>
+            </div>
           </div>
-          
-          <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-white leading-tight">
-            {polandJourney.title.split(':')[0]}: <br />
-            <span className="gradient-amber">{polandJourney.title.split(':')[1]}</span>
-          </h1>
-          
-          <p className="text-lg sm:text-xl text-wf-muted max-w-3xl leading-relaxed">
-            {polandJourney.description}
-          </p>
 
-          <div className="flex flex-wrap gap-4 pt-4">
-            <a
-              href="/wayfinder/poland-christmas-2026/route"
-              onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026/route')}
-              className="px-6 py-3 rounded-xl bg-wf-blue hover:bg-wf-blue-lt text-white font-medium flex items-center space-x-2 transition-colors hover-lift"
-            >
-              <Map className="w-5 h-5" />
-              <span>View Route Map</span>
-            </a>
-            <a
-              href="/wayfinder/poland-christmas-2026/private"
-              onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026/private')}
-              className="px-6 py-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-medium flex items-center space-x-2 transition-colors"
-            >
-              <Calendar className="w-5 h-5" />
-              <span>Access Private Itinerary</span>
-            </a>
+          {/* Right Compact 3D Route Map Panel (100% Precise City, Track & Flight Paths) */}
+          <div className="w-full lg:w-7/12 h-64 sm:h-80 rounded-2xl overflow-hidden relative bg-slate-950 border border-amber-500/30 shadow-inner group shrink-0">
+            {/* Pristine 3D Map Background */}
+            <img 
+              src={polandMapRouteClean} 
+              alt="3D Poland Route Map" 
+              className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-1000 group-hover:scale-105" 
+            />
+
+            {/* Glowing Golden Rail Track & Flight Path Vectors */}
+            <svg className="absolute inset-0 w-full h-full pointer-events-none z-10" viewBox="0 0 100 100" preserveAspectRatio="none">
+              {/* Train Rail Track: Kraków -> Wrocław -> Poznań -> Toruń -> Gdańsk */}
+              <path 
+                d="M 58 78 Q 45 70 36 60 T 30 44 T 48 34 T 45 18" 
+                fill="none" 
+                stroke="#f59e0b" 
+                strokeWidth="2.5" 
+                strokeDasharray="2 1"
+                className="opacity-90 drop-shadow-[0_0_8px_rgba(245,158,11,0.9)]"
+              />
+              <path 
+                d="M 58 78 Q 45 70 36 60 T 30 44 T 48 34 T 45 18" 
+                fill="none" 
+                stroke="#fef3c7" 
+                strokeWidth="1" 
+                className="opacity-60"
+              />
+
+              {/* Incoming Flight Path: Air Arrival into Kraków */}
+              <path 
+                d="M 82 92 Q 70 86 58 78" 
+                fill="none" 
+                stroke="#38bdf8" 
+                strokeWidth="1.8" 
+                strokeDasharray="1.5 1.5"
+                className="opacity-85 drop-shadow-[0_0_6px_rgba(56,189,248,0.8)]"
+              />
+
+              {/* Outgoing Flight Path: Air Departure out of Gdańsk */}
+              <path 
+                d="M 45 18 Q 32 12 20 6" 
+                fill="none" 
+                stroke="#38bdf8" 
+                strokeWidth="1.8" 
+                strokeDasharray="1.5 1.5"
+                className="opacity-85 drop-shadow-[0_0_6px_rgba(56,189,248,0.8)]"
+              />
+            </svg>
+
+            {/* Incoming Flight Badge to Kraków (KRK) */}
+            <div className="absolute top-[88%] left-[80%] z-20 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
+              <div className="px-2 py-0.5 rounded-full bg-slate-950/90 border border-sky-400 text-sky-300 text-[9px] font-black tracking-wider uppercase flex items-center space-x-1 shadow-lg shadow-sky-950/80 backdrop-blur-md animate-pulse">
+                <Plane className="w-3 h-3 text-sky-300 rotate-45" />
+                <span>FLY IN: KRK</span>
+              </div>
+            </div>
+
+            {/* Outgoing Flight Badge from Gdańsk (GDN) */}
+            <div className="absolute top-[8%] left-[20%] z-20 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
+              <div className="px-2 py-0.5 rounded-full bg-slate-950/90 border border-sky-400 text-sky-300 text-[9px] font-black tracking-wider uppercase flex items-center space-x-1 shadow-lg shadow-sky-950/80 backdrop-blur-md animate-pulse">
+                <Plane className="w-3 h-3 text-sky-300 -rotate-45" />
+                <span>FLY OUT: GDN</span>
+              </div>
+            </div>
+
+            {/* Interactive City Micro Nodes */}
+            <div className="absolute inset-0 z-20 pointer-events-auto">
+              {polandJourney.route.map((item) => {
+                const itemUrl = `/wayfinder/poland-christmas-2026/cities/${item.id}`;
+
+                // Coordinates matching glowing SVG rail track points exactly
+                const positions = {
+                  krakow: 'top-[78%] left-[58%]',
+                  wroclaw: 'top-[60%] left-[36%]',
+                  poznan: 'top-[44%] left-[30%]',
+                  torun: 'top-[34%] left-[48%]',
+                  gdansk: 'top-[18%] left-[45%]'
+                };
+
+                return (
+                  <a
+                    key={item.id}
+                    href={itemUrl}
+                    onClick={(e) => pushRoute(e, itemUrl)}
+                    className={`absolute flex flex-col items-center group/node cursor-pointer -translate-x-1/2 -translate-y-1/2 transition-transform hover:scale-110 ${positions[item.id] || 'top-1/2 left-1/2'}`}
+                    title={`View ${item.name}`}
+                  >
+                    {/* Micro-Avatar Circle */}
+                    <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full overflow-hidden border-2 border-amber-400 bg-slate-950 shadow-xl shadow-amber-500/60 relative flex items-center justify-center transition-all group-hover/node:border-amber-300 group-hover/node:ring-4 group-hover/node:ring-amber-500/40">
+                      <img 
+                        src={cityImages[item.id]} 
+                        alt={item.name} 
+                        className="w-full h-full object-cover" 
+                      />
+                    </div>
+
+                    {/* City Label Badge */}
+                    <div className="mt-0.5 px-2 py-0.5 rounded-full bg-slate-950/95 border border-amber-400/80 text-white font-black text-[9px] sm:text-[10px] tracking-tight shadow-lg backdrop-blur-md group-hover/node:bg-amber-500 group-hover/node:text-slate-950 transition-colors">
+                      {item.name}
+                    </div>
+                  </a>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>

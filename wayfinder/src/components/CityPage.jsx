@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { MapPin, Utensils, Bed, ArrowLeft, Bus, Train, ShoppingBag, Sparkles, Landmark, Compass, DollarSign, Info, Map, Clock, Navigation, Gift, Lightbulb } from 'lucide-react';
+import { MapPin, Utensils, Bed, ArrowLeft, Bus, Train, ShoppingBag, Sparkles, Landmark, Compass, DollarSign, Info, Map, Clock, Navigation, Gift, Lightbulb, Video, ExternalLink, Thermometer, CreditCard, Award } from 'lucide-react';
 import { polandJourney } from '../data/poland-2026';
-import { cityImages, marketImages, polandMapBg } from '../utils/cityImages';
+import { cityImages, marketImages } from '../utils/cityImages';
 
 export function CityPage({ cityId, subPage = 'overview' }) {
   const [activeMarketTab, setActiveMarketTab] = useState(0);
@@ -33,175 +33,173 @@ export function CityPage({ cityId, subPage = 'overview' }) {
     : "https://www.openstreetmap.org/export/embed.html?bbox=16.9000%2C51.1000%2C17.1000%2C51.1300&amp;layer=mapnik";
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-8">
-      {/* Top Header Section with Poland Map Route Overlay (Mockup Design) */}
-      <div className="relative rounded-3xl overflow-hidden glass-panel border border-amber-500/30 p-6 sm:p-8 bg-wf-navy/90 shadow-2xl space-y-6">
-        {/* Poland Map Background Image Overlay */}
-        <div className="absolute inset-0 z-0 pointer-events-none opacity-40 mix-blend-screen">
-          <img 
-            src={polandMapBg} 
-            alt="Poland Route Map" 
-            className="w-full h-full object-cover object-center scale-105" 
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-wf-navy via-wf-navy/60 to-transparent"></div>
-          <div className="absolute inset-0 bg-gradient-to-t from-wf-navy via-transparent to-wf-navy/80"></div>
-        </div>
-
-        {/* Header Content */}
-        <div className="relative z-10 flex flex-col md:flex-row items-start justify-between gap-6">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+      {/* Navigation Header with Horizontal Trail Track Chart (07:48 Version) */}
+      <div className="space-y-4">
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
           {/* Back Button */}
           <a 
             href="/wayfinder/poland-christmas-2026" 
             onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026')} 
-            className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-full bg-amber-500/10 hover:bg-amber-500 text-amber-300 hover:text-slate-950 font-bold text-sm border border-amber-500/40 hover:border-amber-400 transition-all duration-300 shadow-lg shadow-amber-900/30 hover:shadow-amber-500/30 hover:scale-105 group shrink-0"
+            className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-full bg-amber-500/10 hover:bg-amber-500 text-amber-300 hover:text-slate-950 font-bold text-sm border border-amber-500/40 hover:border-amber-400 transition-all duration-300 shadow-lg shadow-amber-900/30 hover:shadow-amber-500/30 hover:scale-105 shrink-0 group self-start lg:self-auto"
           >
             <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
-            <span>Back to Poland Overview</span>
+            <span>Back to Poland Journey Overview</span>
           </a>
 
-          {/* Interactive Geographic Route Map Nodes */}
-          <div className="w-full md:w-auto flex-1 max-w-xl h-44 sm:h-48 relative border border-amber-500/20 rounded-2xl bg-wf-navy-mid/70 backdrop-blur-md p-3 overflow-hidden shadow-inner">
-            {/* Background S-Curve Rail Track SVG */}
-            <svg className="absolute inset-0 w-full h-full pointer-events-none z-0" viewBox="0 0 500 180">
-              <path 
-                d="M 260 30 Q 280 60 270 70 T 200 95 T 230 135 T 325 145" 
-                fill="none" 
-                stroke="url(#trackGradient)" 
-                strokeWidth="4" 
-                strokeDasharray="6 3"
-              />
-              <path 
-                d="M 260 30 Q 280 60 270 70 T 200 95 T 230 135 T 325 145" 
-                fill="none" 
-                stroke="#f59e0b" 
-                strokeWidth="1.5" 
-                opacity="0.6"
-              />
-              <defs>
-                <linearGradient id="trackGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.4" />
-                  <stop offset="50%" stopColor="#fbbf24" stopOpacity="1" />
-                  <stop offset="100%" stopColor="#f59e0b" stopOpacity="0.8" />
-                </linearGradient>
-              </defs>
-            </svg>
+          {/* Prominent Wide Horizontal Trail Track Chart */}
+          <div className="flex-1 glass-panel px-5 py-3 rounded-full border-2 border-amber-500/40 bg-wf-navy-mid/95 backdrop-blur-xl shadow-2xl flex items-center justify-between min-w-0 overflow-x-auto no-scrollbar">
+            <div className="flex items-center justify-between w-full min-w-[540px] relative px-4 py-2">
+              {/* Thick Visible Railroad Track Line */}
+              <div className="absolute top-[22px] left-8 right-8 h-2.5 bg-slate-950 border-y-2 border-amber-400 rounded-full z-0 flex items-center justify-around overflow-hidden shadow-inner">
+                {/* Railroad ties pattern */}
+                <div className="w-full h-full bg-[linear-gradient(90deg,transparent_50%,rgba(245,158,11,0.6)_50%)] bg-[length:12px_100%] opacity-90"></div>
+              </div>
 
-            {/* Glowing Golden Express Train on Track */}
-            <div className="absolute top-[125px] left-[270px] z-10 animate-pulse flex items-center space-x-1 bg-amber-400 text-slate-950 px-2 py-0.5 rounded-full shadow-lg shadow-amber-500/60 border border-amber-200">
-              <Train className="w-3.5 h-3.5 fill-current" />
-              <span className="text-[9px] font-black tracking-widest uppercase">EXPRESS</span>
-            </div>
+              {polandJourney.route.map((item, idx) => {
+                const isCurrent = item.id === cityId;
+                const itemUrl = `/wayfinder/poland-christmas-2026/cities/${item.id}`;
+                const isLast = idx === polandJourney.route.length - 1;
 
-            {/* City Pin Nodes */}
-            {polandJourney.route.map((item) => {
-              const isCurrent = item.id === cityId;
-              const itemUrl = `/wayfinder/poland-christmas-2026/cities/${item.id}`;
+                return (
+                  <React.Fragment key={item.id}>
+                    {/* City Avatar Node */}
+                    <a
+                      href={itemUrl}
+                      onClick={(e) => pushRoute(e, itemUrl)}
+                      className="relative z-10 flex flex-col items-center group cursor-pointer shrink-0"
+                      title={`${item.name} (${item.nights > 0 ? `${item.nights} Nights` : 'Day Stop'})`}
+                    >
+                      <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-full overflow-hidden border-2 transition-all duration-300 relative flex items-center justify-center bg-slate-900 ${
+                        isCurrent 
+                          ? 'border-amber-400 ring-4 ring-amber-500/40 scale-110 shadow-xl shadow-amber-500/50' 
+                          : 'border-white/40 hover:border-amber-300 hover:scale-105'
+                      }`}>
+                        <img 
+                          src={cityImages[item.id]} 
+                          alt={item.name} 
+                          className="w-full h-full object-cover" 
+                        />
+                        {isCurrent && (
+                          <div className="absolute inset-0 bg-amber-500/25 ring-2 ring-amber-400 ring-inset"></div>
+                        )}
+                      </div>
 
-              // Map position coordinates
-              const positions = {
-                gdansk: 'top-[12px] left-[50%]',
-                torun: 'top-[52px] left-[52%]',
-                poznan: 'top-[75px] left-[35%]',
-                wroclaw: 'top-[115px] left-[42%]',
-                krakow: 'top-[125px] left-[62%]'
-              };
+                      <span className={`text-xs font-black mt-1.5 tracking-tight ${
+                        isCurrent ? 'text-amber-300 drop-shadow-md scale-105 font-black' : 'text-wf-cream group-hover:text-white'
+                      }`}>
+                        {item.name}
+                      </span>
+                    </a>
 
-              return (
-                <a
-                  key={item.id}
-                  href={itemUrl}
-                  onClick={(e) => pushRoute(e, itemUrl)}
-                  className={`absolute z-20 flex flex-col items-center group cursor-pointer -translate-x-1/2 -translate-y-1/2 ${positions[item.id] || 'top-1/2 left-1/2'}`}
-                >
-                  <div className={`rounded-full overflow-hidden border-2 transition-all duration-300 relative flex items-center justify-center bg-slate-950 ${
-                    isCurrent 
-                      ? 'w-10 h-10 border-amber-400 ring-4 ring-amber-500/40 scale-110 shadow-xl shadow-amber-500/60' 
-                      : 'w-7 h-7 border-white/40 hover:border-amber-300 hover:scale-110'
-                  }`}>
-                    <img 
-                      src={cityImages[item.id]} 
-                      alt={item.name} 
-                      className="w-full h-full object-cover" 
-                    />
-                    {isCurrent && (
-                      <div className="absolute inset-0 bg-amber-500/20 ring-2 ring-amber-400 ring-inset"></div>
+                    {/* Crisp Vector Train Badge Riding ON the Track */}
+                    {!isLast && (
+                      <div className="relative z-10 flex items-center justify-center shrink-0 -mt-5">
+                        <div className="bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 px-2.5 py-1 rounded-full border border-amber-300 shadow-lg shadow-amber-500/40 flex items-center space-x-1.5 transform hover:scale-110 transition-all font-black">
+                          <Train className="w-4 h-4 text-slate-950 stroke-[2.5]" />
+                          <span className="text-[10px] font-black tracking-wider uppercase text-slate-950">TRAIN</span>
+                        </div>
+                      </div>
                     )}
-                  </div>
-                  <span className={`text-[10px] sm:text-xs font-bold mt-0.5 tracking-tight ${
-                    isCurrent ? 'text-amber-300 font-black drop-shadow-md' : 'text-wf-cream group-hover:text-white'
-                  }`}>
-                    {item.name}
-                  </span>
-                </a>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Main City Title Row */}
-        <div className="relative z-10 flex flex-wrap items-center justify-between gap-4 pt-2 border-t border-white/10">
-          <h1 className="text-4xl sm:text-5xl font-black text-white flex items-center space-x-3 tracking-tight">
-            <MapPin className="w-9 h-9 text-amber-400" />
-            <span>{city.name}</span>
-          </h1>
-          <div className="flex items-center space-x-3">
-            <div className="px-4 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-sm font-semibold">
-              🎄 Christmas Market Destination
-            </div>
-            <div className="px-4 py-1.5 rounded-full bg-wf-navy-mid border border-white/10 text-wf-cream text-sm font-medium">
-              {city.nights > 0 ? `${city.nights} Nights` : 'Day Stop'}
+                  </React.Fragment>
+                );
+              })}
             </div>
           </div>
         </div>
       </div>
 
-      {/* HIGHLIGHTS Banner Card (Mockup Design) */}
-      <div className="w-full h-72 sm:h-96 rounded-3xl overflow-hidden relative bg-wf-navy-mid border border-amber-500/30 shadow-2xl shadow-amber-900/20 group">
-        <img 
-          src={cityImages[city.id]} 
-          alt={city.name} 
-          className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105 opacity-90"
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-wf-navy/95 via-wf-navy/70 to-transparent"></div>
+      {/* 2-Column Split Hero Section: Left (High-level details & text), Right (Main Picture) */}
+      <div className="glass-panel p-4 sm:p-6 rounded-3xl border border-amber-500/30 bg-wf-navy-mid/95 shadow-2xl flex flex-col lg:flex-row items-stretch gap-6">
+        {/* Left Column: High-Level Details & Text */}
+        <div className="w-full lg:w-5/12 flex flex-col justify-between space-y-4">
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-bold uppercase tracking-wider flex items-center space-x-1">
+                <span>🎄</span>
+                <span>Christmas Market Destination</span>
+              </span>
+              <span className="px-3 py-1 rounded-full bg-slate-800/80 border border-white/10 text-wf-cream text-xs font-medium">
+                {city.nights > 0 ? `${city.nights} Nights` : 'Day Stop'}
+              </span>
+            </div>
 
-        {/* Highlights Text Content */}
-        <div className="absolute inset-y-0 left-0 w-full md:w-3/4 p-6 sm:p-10 flex flex-col justify-center space-y-3 z-10">
-          <span className="text-xs sm:text-sm font-black uppercase tracking-widest text-amber-400">
-            HIGHLIGHTS
-          </span>
-          <p className="text-xl sm:text-3xl font-bold text-white leading-snug drop-shadow-md">
-            Discover Central Europe’s largest historic start: explore <strong className="text-amber-300">Rynek Główny</strong>, Wawel Royal Castle, and a beautiful Christmas market.
-          </p>
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white flex items-center space-x-3 tracking-tight">
+              <MapPin className="w-8 h-8 sm:w-10 sm:h-10 text-amber-400 shrink-0" />
+              <span>{city.name}</span>
+            </h1>
+
+            <div className="space-y-1.5 pt-1">
+              <div className="text-amber-300 text-xs font-bold uppercase tracking-widest">Trip Focus</div>
+              <p className="text-xs sm:text-sm text-slate-200 leading-relaxed font-medium">
+                {city.focus}
+              </p>
+            </div>
+
+            {city.imageDetails?.location && (
+              <div className="text-xs text-amber-400/90 font-semibold flex items-center space-x-1.5 pt-1">
+                <MapPin className="w-3.5 h-3.5" />
+                <span>{city.imageDetails.location}</span>
+              </div>
+            )}
+          </div>
+
+          {city.imageDetails?.landmark && (
+            <div className="pt-3 border-t border-white/10 text-xs text-slate-300 flex items-center space-x-2">
+              <span className="font-bold text-amber-300">Key Landmark:</span>
+              <span className="truncate">{city.imageDetails.landmark}</span>
+            </div>
+          )}
         </div>
 
-        {/* Detailed Hover Overlay */}
-        <div className="absolute inset-0 bg-wf-navy/95 p-6 sm:p-10 flex flex-col justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 backdrop-blur-md z-20">
-          <div className="text-xs sm:text-sm font-bold uppercase tracking-wider text-amber-400 mb-1 flex items-center space-x-2">
-            <MapPin className="w-4 h-4" />
-            <span>{city.imageDetails?.location}</span>
+        {/* Right Column: Main Picture with Hover Overlay */}
+        <div className="w-full lg:w-7/12 h-64 sm:h-80 rounded-2xl overflow-hidden relative bg-slate-950 border border-amber-500/30 shadow-inner group shrink-0">
+          <img 
+            src={cityImages[city.id]} 
+            alt={city.name} 
+            className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105 opacity-90"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-wf-navy via-wf-navy/30 to-transparent"></div>
+
+          {/* Detailed Hover Overlay */}
+          <div className="absolute inset-0 bg-wf-navy/95 p-6 sm:p-8 flex flex-col justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 backdrop-blur-md z-20">
+            <div className="text-xs sm:text-sm font-bold uppercase tracking-wider text-amber-400 mb-1 flex items-center space-x-2">
+              <MapPin className="w-4 h-4" />
+              <span>{city.imageDetails?.location}</span>
+            </div>
+            <div className="text-xl sm:text-2xl font-black text-white mb-2">
+              🏛️ {city.imageDetails?.landmark}
+            </div>
+            <p className="text-xs sm:text-sm text-amber-100/90 leading-relaxed">
+              {city.imageDetails?.description}
+            </p>
           </div>
-          <div className="text-2xl sm:text-3xl font-black text-white mb-3">
-            🏛️ {city.imageDetails?.landmark}
+
+          <div className="absolute bottom-4 left-4 right-4 group-hover:opacity-0 transition-opacity duration-300">
+            <div className="bg-slate-950/80 backdrop-blur-md px-3.5 py-2 rounded-xl border border-white/10 shadow-lg flex items-center justify-between">
+              <span className="text-xs text-amber-300 font-bold flex items-center space-x-1.5 truncate">
+                <span>🏛️</span>
+                <span className="truncate">{city.imageDetails?.landmark}</span>
+              </span>
+              <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold shrink-0 ml-2">Hover for details</span>
+            </div>
           </div>
-          <p className="text-sm sm:text-base text-amber-100/90 leading-relaxed max-w-4xl">
-            {city.imageDetails?.description}
-          </p>
         </div>
       </div>
 
       {/* Top Sub-Header Toolbar (Opens Dedicated Sub-Pages) */}
-      <div className="sticky top-4 z-40">
-        <div className="glass-panel p-2 rounded-2xl border border-amber-500/30 bg-wf-navy/95 backdrop-blur-xl shadow-2xl flex items-center justify-start overflow-x-auto no-scrollbar gap-1.5 sm:gap-2">
+      <div className="sticky top-[68px] z-40">
+        <div className="p-1.5 rounded-xl border border-amber-500/20 !bg-slate-950/90 backdrop-blur-xl shadow-md flex items-center justify-start overflow-x-auto no-scrollbar gap-1 sm:gap-1.5">
           <a
             href={baseUrl}
             onClick={(e) => pushRoute(e, baseUrl)}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap flex items-center space-x-1.5 ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center space-x-1.5 ${
               subPage === 'overview'
-                ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                ? 'bg-amber-500 text-slate-950 shadow-sm font-bold'
                 : 'text-wf-cream hover:text-white hover:bg-white/10'
             }`}
           >
-            <Landmark className="w-4 h-4" />
+            <Landmark className="w-3.5 h-3.5" />
             <span>Overview & History</span>
           </a>
 
@@ -209,13 +207,13 @@ export function CityPage({ cityId, subPage = 'overview' }) {
             <a
               href={`${baseUrl}/markets`}
               onClick={(e) => pushRoute(e, `${baseUrl}/markets`)}
-              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap flex items-center space-x-1.5 ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center space-x-1.5 ${
                 subPage === 'markets'
-                  ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                  ? 'bg-amber-500 text-slate-950 shadow-sm font-bold'
                   : 'text-amber-300 hover:text-amber-100 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30'
               }`}
             >
-              <ShoppingBag className="w-4 h-4" />
+              <ShoppingBag className="w-3.5 h-3.5" />
               <span>Christmas Markets</span>
             </a>
           )}
@@ -224,13 +222,13 @@ export function CityPage({ cityId, subPage = 'overview' }) {
             <a
               href={`${baseUrl}/attractions`}
               onClick={(e) => pushRoute(e, `${baseUrl}/attractions`)}
-              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap flex items-center space-x-1.5 ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center space-x-1.5 ${
                 subPage === 'attractions'
-                  ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                  ? 'bg-amber-500 text-slate-950 shadow-sm font-bold'
                   : 'text-wf-cream hover:text-white hover:bg-white/10'
               }`}
             >
-              <Sparkles className="w-4 h-4" />
+              <Sparkles className="w-3.5 h-3.5" />
               <span>Must-See Sights</span>
             </a>
           )}
@@ -239,13 +237,13 @@ export function CityPage({ cityId, subPage = 'overview' }) {
             <a
               href={`${baseUrl}/restaurants`}
               onClick={(e) => pushRoute(e, `${baseUrl}/restaurants`)}
-              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap flex items-center space-x-1.5 ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center space-x-1.5 ${
                 subPage === 'restaurants'
-                  ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                  ? 'bg-amber-500 text-slate-950 shadow-sm font-bold'
                   : 'text-wf-cream hover:text-white hover:bg-white/10'
               }`}
             >
-              <Utensils className="w-4 h-4" />
+              <Utensils className="w-3.5 h-3.5" />
               <span>Top Restaurants</span>
             </a>
           )}
@@ -253,13 +251,13 @@ export function CityPage({ cityId, subPage = 'overview' }) {
           <a
             href={`${baseUrl}/hotels`}
             onClick={(e) => pushRoute(e, `${baseUrl}/hotels`)}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap flex items-center space-x-1.5 ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center space-x-1.5 ${
               subPage === 'hotels'
-                ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                ? 'bg-amber-500 text-slate-950 shadow-sm font-bold'
                 : 'text-wf-cream hover:text-white hover:bg-white/10'
             }`}
           >
-            <Bed className="w-4 h-4" />
+            <Bed className="w-3.5 h-3.5" />
             <span>Base & Hotels</span>
           </a>
         </div>
@@ -344,13 +342,48 @@ export function CityPage({ cityId, subPage = 'overview' }) {
               </div>
             </div>
           </section>
+
+          {/* Practical Visitor Guide (Weather, Currency, Restrooms) */}
+          {city.practical && (
+            <section className="space-y-4 pt-4 border-t border-white/10">
+              <h3 className="text-2xl font-bold text-white flex items-center space-x-3">
+                <Info className="w-6 h-6 text-amber-400" />
+                <span>Practical Visitor Guide ({city.name})</span>
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="glass-panel p-5 rounded-2xl border border-sky-500/30 bg-sky-500/5 space-y-2">
+                  <div className="flex items-center space-x-2 text-sky-400 font-bold text-sm">
+                    <Thermometer className="w-5 h-5" />
+                    <span>December Weather & Gear</span>
+                  </div>
+                  <p className="text-xs sm:text-sm text-wf-cream leading-relaxed">{city.practical.weather}</p>
+                </div>
+
+                <div className="glass-panel p-5 rounded-2xl border border-amber-500/30 bg-amber-500/5 space-y-2">
+                  <div className="flex items-center space-x-2 text-amber-400 font-bold text-sm">
+                    <CreditCard className="w-5 h-5" />
+                    <span>Currency & Payment Rules</span>
+                  </div>
+                  <p className="text-xs sm:text-sm text-wf-cream leading-relaxed">{city.practical.currency}</p>
+                </div>
+
+                <div className="glass-panel p-5 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 space-y-2">
+                  <div className="flex items-center space-x-2 text-emerald-400 font-bold text-sm">
+                    <Navigation className="w-5 h-5" />
+                    <span>Public Restrooms (WC)</span>
+                  </div>
+                  <p className="text-xs sm:text-sm text-wf-cream leading-relaxed">{city.practical.restrooms}</p>
+                </div>
+              </div>
+            </section>
+          )}
         </div>
       )}
 
       {/* 2. CHRISTMAS MARKETS SUB-PAGE */}
       {subPage === 'markets' && city.markets && (
         <div className="space-y-6 animate-fade-in">
-          <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <div className="text-xs font-bold uppercase tracking-wider text-amber-400 mb-1 flex items-center space-x-1">
                 <Sparkles className="w-4 h-4" />
@@ -358,21 +391,53 @@ export function CityPage({ cityId, subPage = 'overview' }) {
               </div>
               <h2 className="text-3xl font-black text-white">Christmas Markets in {city.name}</h2>
             </div>
+
+            {/* Compact Embedded 4K Walking Tour Mini-Player (Krakow) */}
+            {city.id === 'krakow' && (
+              <div className="w-44 sm:w-48 md:w-52 shrink-0 rounded-xl overflow-hidden border border-amber-500/30 bg-slate-950 shadow-lg shadow-amber-950/30 group">
+                <div className="relative w-full aspect-video">
+                  <iframe
+                    src="https://www.youtube-nocookie.com/embed/DUFYxovB_80"
+                    title="4K Krakow Christmas Market Walking Tour"
+                    className="absolute inset-0 w-full h-full border-0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    loading="lazy"
+                  ></iframe>
+                </div>
+                <div className="px-2.5 py-1 bg-wf-navy-mid/95 border-t border-white/10 flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-amber-300 uppercase tracking-wider flex items-center space-x-1">
+                    <Video className="w-3 h-3 text-red-400" />
+                    <span>4K Walking Tour</span>
+                  </span>
+                  <a
+                    href="https://www.youtube.com/watch?v=DUFYxovB_80"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[10px] text-slate-400 hover:text-white flex items-center space-x-1 transition-colors"
+                    title="Open on YouTube"
+                  >
+                    <span>YouTube</span>
+                    <ExternalLink className="w-2.5 h-2.5" />
+                  </a>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Sub-Tabs for individual markets */}
-          <div className="flex flex-wrap gap-2 border-b border-white/10 pb-2">
+          {/* Sticky Sub-Tabs for individual markets */}
+          <div className="sticky top-[114px] z-30 p-1.5 rounded-xl border border-emerald-500/50 !bg-[#0f2d1e]/95 backdrop-blur-xl shadow-xl shadow-black/60 flex items-center justify-start overflow-x-auto no-scrollbar gap-1.5">
             {city.markets.map((market, idx) => (
               <button
                 key={market.id}
                 onClick={() => setActiveMarketTab(idx)}
-                className={`px-5 py-3 rounded-2xl font-bold text-sm transition-all duration-300 flex items-center space-x-2 ${
+                className={`px-3 py-1 rounded-lg font-bold text-xs transition-all duration-300 flex items-center space-x-1.5 whitespace-nowrap ${
                   activeMarketTab === idx
-                    ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20 scale-105'
-                    : 'bg-wf-navy-mid/80 text-wf-muted hover:text-white hover:bg-wf-navy-mid'
+                    ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 scale-102'
+                    : 'text-emerald-100/90 hover:text-white hover:bg-emerald-800/40'
                 }`}
               >
-                <ShoppingBag className="w-4 h-4" />
+                <ShoppingBag className="w-3.5 h-3.5" />
                 <span>{market.name}</span>
               </button>
             ))}
@@ -476,6 +541,17 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                       </div>
                     )}
                   </div>
+
+                  {/* UNESCO Cultural Tradition Callout */}
+                  {currentMarket.unescoTradition && (
+                    <div className="p-4.5 rounded-2xl bg-amber-500/15 border border-amber-400/40 flex items-start space-x-3 shadow-lg shadow-amber-950/20">
+                      <Award className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="text-amber-400 text-xs font-bold uppercase tracking-wider block mb-0.5">🏆 UNESCO Heritage Tradition</span>
+                        <p className="text-xs sm:text-sm text-amber-100 font-medium leading-relaxed">{currentMarket.unescoTradition}</p>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Insider Tips Callout */}
                   {currentMarket.tips && (

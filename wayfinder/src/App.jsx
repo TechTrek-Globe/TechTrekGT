@@ -12,20 +12,25 @@ import { PrivateHub } from './components/PrivateHub';
 
 // Simple client-side router
 function App() {
-  const [currentPath, setCurrentPath] = useState(window.location.pathname);
+  const [currentPath, setCurrentPath] = useState(window.location.pathname + window.location.search);
 
   useEffect(() => {
-    const handlePopState = () => setCurrentPath(window.location.pathname);
+    const handlePopState = () => setCurrentPath(window.location.pathname + window.location.search);
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
+  // Scroll restoration: scroll to top on every route change
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [currentPath]);
+
   const renderRoute = () => {
     // Route matching with normalized path
-    const path = currentPath.toLowerCase();
-    const normalizedPath = (path === '/' || path === '' || path === '/index.html') 
+    const pathOnly = currentPath.split('?')[0].toLowerCase();
+    const normalizedPath = (pathOnly === '/' || pathOnly === '' || pathOnly === '/index.html') 
       ? '/wayfinder' 
-      : (path.startsWith('/wayfinder') ? path : `/wayfinder${path.startsWith('/') ? path : '/' + path}`);
+      : (pathOnly.startsWith('/wayfinder') ? pathOnly : `/wayfinder${pathOnly.startsWith('/') ? pathOnly : '/' + pathOnly}`);
 
     // Wayfinder Root Landing
     if (normalizedPath === '/wayfinder' || normalizedPath === '/wayfinder/') {

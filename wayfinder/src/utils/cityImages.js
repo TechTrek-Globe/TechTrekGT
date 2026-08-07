@@ -8,7 +8,6 @@ import krakowRynekGlownyImg from '../assets/krakow-rynek-glowny.png';
 import krakowMalyRynekImg from '../assets/krakow-maly-rynek.png';
 import krakowPlacWolnicaImg from '../assets/krakow-plac-wolnica.png';
 import krakowRynekPodgorskiImg from '../assets/krakow-rynek-podgorski.png';
-import polandMapBgImg from '../assets/poland-map-bg.png';
 
 export const cityImages = {
   krakow: krakowImg,
@@ -17,8 +16,6 @@ export const cityImages = {
   torun: torunImg,
   gdansk: gdanskImg,
 };
-
-export const polandMapBg = polandMapBgImg;
 
 export const marketImages = {
   'rynek-glowny': krakowRynekGlownyImg,

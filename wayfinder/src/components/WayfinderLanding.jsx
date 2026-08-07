@@ -1,6 +1,7 @@
 import React from 'react';
 import { Compass, Map, ArrowRight } from 'lucide-react';
 import polandMarketImg from '../assets/poland-market.png';
+import wayfinderHeaderBanner from '../assets/wayfinder-header-banner.png';
 
 export function WayfinderLanding() {
   const pushRoute = (e, path) => {
@@ -10,8 +11,18 @@ export function WayfinderLanding() {
   };
 
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center py-20 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto text-center space-y-8 animate-slide-up">
+    <div className="w-full h-full flex flex-col items-center pb-20">
+      {/* Top Banner Header Section */}
+      <header className="w-full bg-black border-b border-amber-500/30 overflow-hidden flex justify-center items-center py-2 md:py-4 shadow-2xl relative mb-12">
+        <div className="absolute inset-0 bg-gradient-to-r from-amber-500/5 via-transparent to-amber-500/5 pointer-events-none" />
+        <img
+          src={wayfinderHeaderBanner}
+          alt="TechTrek Wayfinder - Plan • Explore • Navigate • Discover"
+          className="h-auto max-h-[280px] w-auto max-w-full object-contain drop-shadow-[0_10px_25px_rgba(0,0,0,0.8)] display-block"
+        />
+      </header>
+
+      <div className="max-w-4xl mx-auto text-center space-y-8 animate-slide-up px-4 sm:px-6 lg:px-8">
         
         <div className="inline-flex items-center space-x-2 px-4 py-2 rounded-full bg-wf-blue/10 border border-wf-blue/30 text-wf-blue-lt text-sm font-medium">
           <Compass className="w-4 h-4" />

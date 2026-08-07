@@ -12,6 +12,8 @@ export function useExchangeRate() {
         const isFresh = Date.now() - (parsed.timestamp || 0) < CACHE_TTL_MS;
         return {
           usdToPln: parsed.usdToPln || 3.73,
+          usdToEur: parsed.usdToEur || 0.92,
+          usdToGbp: parsed.usdToGbp || 0.78,
           eurToPln: parsed.eurToPln || 4.30,
           gbpToPln: parsed.gbpToPln || 4.95,
           loading: false,
@@ -26,6 +28,8 @@ export function useExchangeRate() {
     }
     return {
       usdToPln: 3.73,
+      usdToEur: 0.92,
+      usdToGbp: 0.78,
       eurToPln: 4.30,
       gbpToPln: 4.95,
       loading: true,
@@ -36,6 +40,37 @@ export function useExchangeRate() {
     };
   });
 
+  // Detect active destination country from window route
+  const getActiveCurrencyInfo = () => {
+    const path = (window.location.pathname || '').toLowerCase();
+    if (path.includes('uk') || path.includes('london')) {
+      return {
+        country: 'United Kingdom',
+        code: 'GBP',
+        symbol: '£',
+        rate: rates.usdToGbp || 0.78,
+        presets: [5, 10, 20, 50, 100],
+      };
+    }
+    if (path.includes('euro') || path.includes('france') || path.includes('germany')) {
+      return {
+        country: 'Eurozone',
+        code: 'EUR',
+        symbol: '€',
+        rate: rates.usdToEur || 0.92,
+        presets: [5, 10, 20, 50, 100],
+      };
+    }
+    // Default country context for current TechTrek Poland trip
+    return {
+      country: 'Poland',
+      code: 'PLN',
+      symbol: 'zł',
+      rate: rates.usdToPln || 3.73,
+      presets: [10, 25, 50, 100, 200],
+    };
+  };
+
   const fetchRates = async (force = false) => {
     try {
       if (!force) {
@@ -45,6 +80,8 @@ export function useExchangeRate() {
           if (Date.now() - (parsed.timestamp || 0) < CACHE_TTL_MS) {
             setRates({
               usdToPln: parsed.usdToPln,
+              usdToEur: parsed.usdToEur || 0.92,
+              usdToGbp: parsed.usdToGbp || 0.78,
               eurToPln: parsed.eurToPln,
               gbpToPln: parsed.gbpToPln,
               loading: false,
@@ -65,13 +102,17 @@ export function useExchangeRate() {
 
       if (data && data.rates && data.rates.PLN) {
         const pln = data.rates.PLN;
-        const eur = data.rates.EUR ? pln / data.rates.EUR : 4.30;
-        const gbp = data.rates.GBP ? pln / data.rates.GBP : 4.95;
+        const eurRate = data.rates.EUR || 0.92;
+        const gbpRate = data.rates.GBP || 0.78;
+        const eur = pln / eurRate;
+        const gbp = pln / gbpRate;
         const formattedTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         const now = Date.now();
 
         const newRates = {
           usdToPln: parseFloat(pln.toFixed(2)),
+          usdToEur: parseFloat(eurRate.toFixed(2)),
+          usdToGbp: parseFloat(gbpRate.toFixed(2)),
           eurToPln: parseFloat(eur.toFixed(2)),
           gbpToPln: parseFloat(gbp.toFixed(2)),
           loading: false,
@@ -107,6 +148,7 @@ export function useExchangeRate() {
 
   return {
     ...rates,
+    activeCurrency: getActiveCurrencyInfo(),
     refreshRates: () => fetchRates(true),
   };
 }

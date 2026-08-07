@@ -8,7 +8,19 @@ export function Layout({ children }) {
   const { user, isAuthenticated, setIsAuthModalOpen, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isConverterOpen, setIsConverterOpen] = useState(false);
-  const { usdToPln } = useExchangeRate();
+  const [currentPath, setCurrentPath] = useState(() => window.location.pathname);
+  const { activeCurrency } = useExchangeRate();
+  const { symbol = 'zł', rate = 3.73 } = activeCurrency || {};
+
+  React.useEffect(() => {
+    const handlePopState = () => setCurrentPath(window.location.pathname);
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const pathOnly = (currentPath || '').split('?')[0].toLowerCase();
+  const isMainLanding = pathOnly === '/' || pathOnly === '' || pathOnly === '/wayfinder' || pathOnly === '/wayfinder/' || pathOnly === '/index.html';
+  const showCurrencyConverter = !isMainLanding;
 
   const navLinks = [
     { label: 'Destinations', href: '/wayfinder' },
@@ -18,6 +30,7 @@ export function Layout({ children }) {
   const pushRoute = (e, path) => {
     e.preventDefault();
     window.history.pushState({}, '', path);
+    setCurrentPath(path);
     window.dispatchEvent(new PopStateEvent('popstate'));
     setMobileMenuOpen(false);
   };
@@ -63,18 +76,20 @@ export function Layout({ children }) {
           </div>
 
           <div className="hidden md:flex items-center space-x-4">
-            {/* Quick Currency Converter Trigger (Desktop) */}
-            <button
-              onClick={() => setIsConverterOpen(true)}
-              className="flex items-center space-x-2 px-3 py-1.5 rounded-xl bg-wf-amber/10 border border-wf-amber/30 text-wf-amber text-sm font-bold hover:bg-wf-amber/20 transition-all shadow-sm active:scale-95 group"
-              title="Open PLN to USD Currency Converter"
-            >
-              <Coins className="w-4 h-4 text-wf-amber group-hover:rotate-12 transition-transform" />
-              <span>PLN to USD Currency Converter</span>
-              <span className="text-xs bg-wf-amber/20 px-1.5 py-0.5 rounded-md font-semibold text-wf-cream">
-                zł {usdToPln ? usdToPln.toFixed(2) : '3.73'}
-              </span>
-            </button>
+            {/* Quick Currency Converter Trigger (Desktop) - Only show when trip is selected */}
+            {showCurrencyConverter && (
+              <button
+                onClick={() => setIsConverterOpen(!isConverterOpen)}
+                className="flex items-center space-x-2 px-3 py-1.5 rounded-xl bg-wf-amber/10 border border-wf-amber/30 text-wf-amber text-sm font-bold hover:bg-wf-amber/20 transition-all shadow-sm active:scale-95 group"
+                title="Open Currency Converter"
+              >
+                <Coins className="w-4 h-4 text-wf-amber group-hover:rotate-12 transition-transform" />
+                <span>Currency Converter</span>
+                <span className="text-xs bg-wf-amber/20 px-1.5 py-0.5 rounded-md font-semibold text-wf-cream">
+                  {symbol} {rate.toFixed(2)}
+                </span>
+              </button>
+            )}
 
             {isAuthenticated ? (
               <div className="flex items-center space-x-3">
@@ -108,14 +123,16 @@ export function Layout({ children }) {
 
           {/* Mobile top bar items: Currency button + Mobile menu button */}
           <div className="md:hidden flex items-center space-x-2">
-            <button
-              onClick={() => setIsConverterOpen(true)}
-              className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl bg-wf-amber/10 border border-wf-amber/30 text-wf-amber text-xs font-bold active:scale-95"
-              title="Open PLN to USD Currency Converter"
-            >
-              <Coins className="w-4 h-4 text-wf-amber" />
-              <span>Currency Converter</span>
-            </button>
+            {showCurrencyConverter && (
+              <button
+                onClick={() => setIsConverterOpen(!isConverterOpen)}
+                className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl bg-wf-amber/10 border border-wf-amber/30 text-wf-amber text-xs font-bold active:scale-95"
+                title="Open Currency Converter"
+              >
+                <Coins className="w-4 h-4 text-wf-amber" />
+                <span>Currency Converter</span>
+              </button>
+            )}
 
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -140,18 +157,20 @@ export function Layout({ children }) {
               </a>
             ))}
 
-            <button
-              onClick={() => { setIsConverterOpen(true); setMobileMenuOpen(false); }}
-              className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-base font-medium text-wf-amber hover:bg-white/5 text-left"
-            >
-              <span className="flex items-center space-x-2">
-                <Coins className="w-5 h-5" />
-                <span>PLN to USD Currency Converter</span>
-              </span>
-              <span className="text-xs bg-wf-amber/20 px-2 py-0.5 rounded-full font-bold">
-                zł {usdToPln ? usdToPln.toFixed(2) : '3.73'}
-              </span>
-            </button>
+            {showCurrencyConverter && (
+              <button
+                onClick={() => { setIsConverterOpen(true); setMobileMenuOpen(false); }}
+                className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-base font-medium text-wf-amber hover:bg-white/5 text-left"
+              >
+                <span className="flex items-center space-x-2">
+                  <Coins className="w-5 h-5" />
+                  <span>Currency Converter</span>
+                </span>
+                <span className="text-xs bg-wf-amber/20 px-2 py-0.5 rounded-full font-bold">
+                  {symbol} {rate.toFixed(2)}
+                </span>
+              </button>
+            )}
 
             <div className="h-px bg-white/10 my-2" />
             {isAuthenticated ? (

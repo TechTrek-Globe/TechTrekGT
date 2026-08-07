@@ -1,0 +1,165 @@
+import React, { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
+import { Compass, Map, User, LogOut, ShieldCheck, ChevronRight, Menu, X } from 'lucide-react';
+
+export function Layout({ children }) {
+  const { user, isAuthenticated, setIsAuthModalOpen, logout } = useAuth();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const navLinks = [
+    { label: 'Destinations', href: '/wayfinder' },
+    { label: 'Poland 2026', href: '/wayfinder/poland-christmas-2026' },
+  ];
+
+  const pushRoute = (e, path) => {
+    e.preventDefault();
+    window.history.pushState({}, '', path);
+    window.dispatchEvent(new PopStateEvent('popstate'));
+    setMobileMenuOpen(false);
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col font-sans">
+      {/* Background glow effects */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+        <div className="absolute top-0 right-0 w-[800px] h-[600px] bg-wf-blue/10 rounded-full blur-[120px] mix-blend-screen transform translate-x-1/3 -translate-y-1/3" />
+        <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-wf-evergreen/10 rounded-full blur-[100px] mix-blend-screen transform -translate-x-1/3 translate-y-1/3" />
+      </div>
+
+      <header className="sticky top-0 z-50 glass-panel border-b border-white/5">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          <div className="flex items-center space-x-8">
+            <a href="/wayfinder" onClick={(e) => pushRoute(e, '/wayfinder')} className="flex items-center space-x-2.5 group">
+              <div className="p-2 rounded-xl bg-gradient-to-br from-wf-blue to-wf-navy-mid border border-wf-blue-lt/30 shadow-lg group-hover:shadow-wf-blue/20 transition-all">
+                <Compass className="w-5 h-5 text-wf-cream" />
+              </div>
+              <div>
+                <div className="text-lg font-black tracking-tight text-white flex items-center space-x-1">
+                  <span>TechTrek</span>
+                  <span className="gradient-amber">Wayfinder</span>
+                </div>
+                <div className="text-[9px] font-semibold text-wf-muted uppercase tracking-widest -mt-1">
+                  Travel Operations
+                </div>
+              </div>
+            </a>
+
+            <nav className="hidden md:flex items-center space-x-1 border-l border-white/10 pl-8">
+              {navLinks.map((link) => (
+                <a
+                  key={link.href}
+                  href={link.href}
+                  onClick={(e) => pushRoute(e, link.href)}
+                  className="px-3 py-1.5 rounded-lg text-sm font-medium text-wf-text hover:text-white hover:bg-white/5 transition-colors"
+                >
+                  {link.label}
+                </a>
+              ))}
+            </nav>
+          </div>
+
+          <div className="hidden md:flex items-center space-x-4">
+            {isAuthenticated ? (
+              <div className="flex items-center space-x-3">
+                <a
+                  href="/wayfinder/poland-christmas-2026/private"
+                  onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026/private')}
+                  className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-wf-navy border border-wf-blue/30 text-wf-blue-lt text-sm font-medium hover:bg-wf-navy-lt transition-colors"
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>Private Hub</span>
+                </a>
+                <div className="h-6 w-px bg-white/10 mx-1" />
+                <button
+                  onClick={logout}
+                  className="flex items-center space-x-1.5 px-3 py-1.5 text-sm font-medium text-wf-muted hover:text-white transition-colors"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Sign Out</span>
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setIsAuthModalOpen(true)}
+                className="flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-sm font-medium transition-colors"
+              >
+                <User className="w-4 h-4 text-wf-blue-lt" />
+                <span>Sign In</span>
+              </button>
+            )}
+          </div>
+
+          {/* Mobile menu button */}
+          <div className="md:hidden flex items-center">
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="p-2 rounded-lg text-wf-muted hover:text-white hover:bg-white/5"
+            >
+              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile menu */}
+        {mobileMenuOpen && (
+          <div className="md:hidden glass-panel border-t border-white/5 py-2 px-4 space-y-1">
+            {navLinks.map((link) => (
+              <a
+                key={link.href}
+                href={link.href}
+                onClick={(e) => pushRoute(e, link.href)}
+                className="block px-3 py-2 rounded-lg text-base font-medium text-wf-text hover:text-white hover:bg-white/5"
+              >
+                {link.label}
+              </a>
+            ))}
+            <div className="h-px bg-white/10 my-2" />
+            {isAuthenticated ? (
+              <>
+                <a
+                  href="/wayfinder/poland-christmas-2026/private"
+                  onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026/private')}
+                  className="flex items-center space-x-2 px-3 py-2 rounded-lg text-base font-medium text-wf-blue-lt hover:bg-white/5"
+                >
+                  <ShieldCheck className="w-5 h-5" />
+                  <span>Private Hub</span>
+                </a>
+                <button
+                  onClick={logout}
+                  className="w-full flex items-center space-x-2 px-3 py-2 rounded-lg text-base font-medium text-wf-muted hover:text-white hover:bg-white/5 text-left"
+                >
+                  <LogOut className="w-5 h-5" />
+                  <span>Sign Out</span>
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => { setIsAuthModalOpen(true); setMobileMenuOpen(false); }}
+                className="w-full flex items-center space-x-2 px-3 py-2 rounded-lg text-base font-medium text-white hover:bg-white/5 text-left"
+              >
+                <User className="w-5 h-5 text-wf-blue-lt" />
+                <span>Sign In</span>
+              </button>
+            )}
+          </div>
+        )}
+      </header>
+
+      <main className="flex-1 relative z-10 w-full flex flex-col">
+        {children}
+      </main>
+
+      <footer className="border-t border-white/5 py-8 bg-wf-navy/80 backdrop-blur-md relative z-10 mt-auto">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center space-x-2">
+            <Compass className="w-5 h-5 text-wf-blue-lt" />
+            <span className="text-sm font-semibold text-white tracking-wide">TechTrek Wayfinder</span>
+          </div>
+          <div className="text-xs text-wf-muted">
+            &copy; {new Date().getFullYear()} TechTrekGT. Smart routes. Memorable places.
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+}

@@ -1,0 +1,8 @@
+# Environment variables for local development
+# Copy to .dev.vars (never commit .dev.vars to source control)
+
+# Same JWT secret as Finance / Outpost / Bigworm for SSO
+JWT_SECRET=your-jwt-secret-here
+
+# Optional: KV namespace for rate limiting (create with wrangler kv:namespace create RATE_LIMIT_KV)
+# RATE_LIMIT_KV will be auto-bound via wrangler.jsonc once configured

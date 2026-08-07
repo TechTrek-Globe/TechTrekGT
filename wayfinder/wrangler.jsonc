@@ -1,0 +1,51 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "techtrek-wayfinder",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-08-01",
+  "observability": {
+    "enabled": true
+  },
+  "assets": {
+    "directory": "./dist/client",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application"
+  },
+  "routes": [
+    {
+      "pattern": "techtrekgt.com/wayfinder",
+      "zone_name": "techtrekgt.com"
+    },
+    {
+      "pattern": "techtrekgt.com/wayfinder/*",
+      "zone_name": "techtrekgt.com"
+    }
+  ],
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  // Shared D1 database - same users as Finance, Outpost, Bigworm
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "personal-budget-db",
+      "database_id": "10f220d4-1c10-49e9-b63e-5d4cb08d599f"
+    }
+  ],
+  "kv_namespaces": [
+    // Add after running: npx wrangler kv:namespace create RATE_LIMIT_KV
+    // {
+    //   "binding": "RATE_LIMIT_KV",
+    //   "id": "<YOUR_KV_NAMESPACE_ID>"
+    // }
+  ]
+  // R2 bucket (required for document storage - not yet configured):
+  // "r2_buckets": [
+  //   {
+  //     "binding": "WAYFINDER_BUCKET",
+  //     "bucket_name": "techtrek-wayfinder-docs"
+  //   }
+  // ]
+  // Secrets (set via `wrangler secret put`):
+  //   JWT_SECRET  - same value as Finance/Outpost/Bigworm for SSO
+}

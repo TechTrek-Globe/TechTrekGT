@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { Compass, Map, User, LogOut, ShieldCheck, ChevronRight, Menu, X, Coins, ArrowLeftRight } from 'lucide-react';
 import { CurrencyConverterModal } from './CurrencyConverterModal';
 import { useExchangeRate } from '../hooks/useExchangeRate';
+import wayfinderHeaderBanner from '../assets/wayfinder-header-banner.png';
 
 export function Layout({ children }) {
   const { user, isAuthenticated, setIsAuthModalOpen, logout } = useAuth();
@@ -36,7 +37,16 @@ export function Layout({ children }) {
   };
 
   return (
-    <div className="min-h-screen flex flex-col font-sans">
+    <div className="min-h-screen flex flex-col font-sans bg-slate-950">
+      {/* --- Full-Width Top Header Banner (Like Outpost) --- */}
+      <header style={{ width: '100%', flexShrink: 0, overflow: 'hidden', height: '182px', display: 'flex', justifyContent: 'center', alignItems: 'center', borderBottom: '1px solid rgba(180,130,20,0.3)', backgroundColor: '#000', position: 'relative', zIndex: 60 }}>
+        <img
+          src={wayfinderHeaderBanner}
+          alt="TechTrek Wayfinder - Plan • Explore • Navigate • Discover"
+          style={{ height: '100%', width: '100%', objectFit: 'contain', objectPosition: 'center', display: 'block' }}
+        />
+      </header>
+
       {/* Background glow effects */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
         <div className="absolute top-0 right-0 w-[800px] h-[600px] bg-wf-blue/10 rounded-full blur-[120px] mix-blend-screen transform translate-x-1/3 -translate-y-1/3" />

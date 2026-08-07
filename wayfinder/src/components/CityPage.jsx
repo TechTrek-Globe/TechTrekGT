@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { MapPin, Utensils, Bed, ArrowLeft, Bus, Train, ShoppingBag, Sparkles, Landmark, Compass, DollarSign, Info, Map, Clock, Navigation, Gift, Lightbulb, Video, ExternalLink, Thermometer, CreditCard, Award } from 'lucide-react';
+import { MapPin, Utensils, Bed, ArrowLeft, Bus, Train, ShoppingBag, Sparkles, Landmark, Compass, DollarSign, Info, Map, Clock, Navigation, Gift, Lightbulb, Video, ExternalLink, Thermometer, CreditCard, Award, RefreshCw } from 'lucide-react';
 import { polandJourney } from '../data/poland-2026';
 import { cityImages, marketImages } from '../utils/cityImages';
+import { useExchangeRate } from '../hooks/useExchangeRate';
 
 export function CityPage({ cityId, subPage = 'overview' }) {
   const [activeMarketTab, setActiveMarketTab] = useState(0);
+  const exchangeRates = useExchangeRate();
 
   const pushRoute = (e, path) => {
     e.preventDefault();
@@ -359,12 +361,29 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                   <p className="text-xs sm:text-sm text-wf-cream leading-relaxed">{city.practical.weather}</p>
                 </div>
 
-                <div className="glass-panel p-5 rounded-2xl border border-amber-500/30 bg-amber-500/5 space-y-2">
-                  <div className="flex items-center space-x-2 text-amber-400 font-bold text-sm">
-                    <CreditCard className="w-5 h-5" />
-                    <span>Currency & Payment Rules</span>
+                <div className="glass-panel p-5 rounded-2xl border border-amber-500/30 bg-amber-500/5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2 text-amber-400 font-bold text-sm">
+                      <CreditCard className="w-5 h-5" />
+                      <span>Currency & Payment Rules</span>
+                    </div>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center space-x-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                      <span>Live Exchange Rates</span>
+                    </span>
                   </div>
                   <p className="text-xs sm:text-sm text-wf-cream leading-relaxed">{city.practical.currency}</p>
+                  
+                  {/* Live Exchange Rate Callout Box */}
+                  <div className="p-3 rounded-xl bg-slate-950/80 border border-amber-500/20 space-y-1.5 text-xs">
+                    <div className="flex items-center justify-between text-amber-300 font-bold">
+                      <span>1 USD ≈ {exchangeRates.usdToPln} PLN</span>
+                      <span>1 EUR ≈ {exchangeRates.eurToPln} PLN</span>
+                    </div>
+                    <div className="text-[11px] text-slate-400 flex items-center justify-between pt-1 border-t border-white/5">
+                      <span>💡 20 PLN Mug Deposit ≈ ${(20 / exchangeRates.usdToPln).toFixed(2)} USD / €{(20 / exchangeRates.eurToPln).toFixed(2)} EUR</span>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="glass-panel p-5 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 space-y-2">

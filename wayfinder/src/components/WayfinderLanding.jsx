@@ -13,12 +13,11 @@ export function WayfinderLanding() {
   return (
     <div className="w-full h-full flex flex-col items-center pb-20">
       {/* Top Banner Header Section */}
-      <header className="w-full bg-black border-b border-amber-500/30 overflow-hidden flex justify-center items-center py-2 md:py-4 shadow-2xl relative mb-12">
-        <div className="absolute inset-0 bg-gradient-to-r from-amber-500/5 via-transparent to-amber-500/5 pointer-events-none" />
+      <header style={{ width: '100%', flexShrink: 0, overflow: 'hidden', height: '280px', display: 'flex', justifyContent: 'center', alignItems: 'center', borderBottom: '1px solid rgba(180,130,20,0.3)', backgroundColor: '#000', marginBottom: '3rem' }}>
         <img
           src={wayfinderHeaderBanner}
           alt="TechTrek Wayfinder - Plan • Explore • Navigate • Discover"
-          className="h-auto max-h-[280px] w-auto max-w-full object-contain drop-shadow-[0_10px_25px_rgba(0,0,0,0.8)] display-block"
+          style={{ height: '100%', width: 'auto', maxWidth: '100%', objectFit: 'contain', display: 'block' }}
         />
       </header>
 

@@ -13,8 +13,74 @@ export const polandJourney = {
       base: 'Old Town or Kazimierz',
       focus: 'Biggest historic start: Rynek Główny, Wawel, cafés, market atmosphere, and optional deeper history day.',
       marketStrategy: 'First Christmas market pass. Keep dinner simple with pierogi, grilled oscypek, or mulled wine snacks.',
+      dates: 'Nov 28, 2026 - Jan 1, 2027',
+      openingHours: 'Open 10am-8pm. Early close on Dec 24 (~2pm).',
+      hours: 'Open 10am-8pm. Early close on Dec 24 (~2pm).',
+      kaucja: '20-30 PLN',
       foodTargets: ['Morskie Oko', 'Pod Wawelem', 'Czarna Kaczka', 'Plac Nowy Zapiekanki'],
       hotels: ['Hotel Stary', 'Hotel Copernicus', 'Sheraton Grand Kraków', 'PURO Kraków Stare Miasto'],
+      quickReference: {
+        dates: 'Nov 28, 2026 - Jan 1, 2027',
+        daylight: 'Sunrise ~7:30 AM | Sunset ~3:30 PM (~8 hrs daylight)',
+        peakHours: '5:30 PM - 8:00 PM (Dusk illuminations & caroling)',
+        kaucja: '20-30 PLN (Ceramic Mug Deposit, Cash Only)'
+      },
+      holidayClosures: {
+        title: 'Critical Holiday Operating Hours (Dec 24 - 25)',
+        dec24: 'Dec 24 (Wigilia): Market closes early at ~2:00 PM. Stalls shut down early so vendors can return home for traditional Wigilia family dinner. Finish all market visits before 1:30 PM!',
+        dec25: 'Dec 25 (Christmas Day): Restricted hours (~1:00 PM - 8:00 PM). Select hot food stalls open; artisan and gift chalets remain closed.',
+        dec26: 'Dec 26 (St. Stephen\'s Day): Normal full market operations resume (10:00 AM - 8:00 PM).'
+      },
+      kaucjaCallout: {
+        title: 'Kaucja (Ceramic Mug Deposit)',
+        deposit: '20-30 PLN per mug',
+        cashWarning: 'CASH MANDATORY: Card payments are accepted for food and drinks, but vendors strictly require exact CASH in PLN for mug deposits.',
+        details: 'Pay 20-30 PLN cash per ceramic mug when ordering Grzaniec Galicyjski or hot spiced mead. Return your mug to any drink chalet for a full cash refund, or keep it as an authentic souvenir!'
+      },
+      culinaryHighlights: [
+        {
+          name: 'Grzaniec Galicyjski',
+          phonetic: 'GZH-ah-nyets gah-li-TSYEV-skee',
+          english: 'Galician Mulled Wine',
+          description: 'Rich mulled red wine spiced with cloves, cinnamon bark, orange zest, and dark honey, served steaming hot from massive oak barrels.',
+          tip: 'Ask for a splash of Wiśniówka (cherry liqueur) for an extra warm kick.'
+        },
+        {
+          name: 'Oscypek z żurawiną',
+          phonetic: 'oh-STSYE-pek z zhoo-rah-VEE-noh',
+          english: 'Grilled Highlander Cheese w/ Cranberry',
+          description: 'Spindle-shaped smoked sheep\'s milk cheese from the Podhale mountain region, grilled over charcoal coals until soft and topped with hot sweet-tart cranberry preserves.',
+          tip: 'Look for authentic PDO Highlander cheeses stamped with traditional wooden mold patterns.'
+        },
+        {
+          name: 'Pierogi Smażone',
+          phonetic: 'pyeh-ROH-gee smah-ZHOH-neh',
+          english: 'Crispy Pan-Fried Dumplings',
+          description: 'Hand-rolled dumplings pan-fried in butter until crispy. Fillings include classic Ruskie (potato & cheese), braised pork, or wild mushroom & sauerkraut.',
+          tip: 'Order a mixed platter (porcja mieszana) to sample all savory varieties.'
+        },
+        {
+          name: 'Kiełbasa Krakowska z Grilla',
+          phonetic: 'kyeow-BAH-sah krah-KOV-skah z GREEL-lah',
+          english: 'Grilled Kraków Sausage',
+          description: 'Thick, garlic and black pepper seasoned pork sausage roasted over open wood flames, served with crusty sourdough bread and sharp Polish mustard (musztarda).',
+          tip: 'Crispy skin paired with spicy mustard makes this the ultimate winter street food.'
+        },
+        {
+          name: 'Barszcz z Uszkami',
+          phonetic: 'barshch z oosh-KAH-mee',
+          english: 'Beetroot Borscht w/ Mushroom Dumplings',
+          description: 'Clear ruby-red fermented beet broth served steaming hot in sipping cups with tiny mushroom-stuffed tortellini-like dumplings.',
+          tip: 'The perfect comforting handheld soup while strolling illuminated market stalls.'
+        },
+        {
+          name: 'Miód Pitny',
+          phonetic: 'myood PEET-ny',
+          english: 'Hot Spiced Mead',
+          description: 'Traditional Polish honey wine fermented with aromatic spices and served hot. Grades like Trójniak and Dwójniak offer rich, floral honey sweetness.',
+          tip: 'Visit the Mały Rynek craft corner for small-batch artisanal mead tastings.'
+        }
+      ],
       history: 'Kraków was the royal capital of Poland for over 500 years until 1596. Miraculously preserved during WWII, its entire Old Town (Stare Miasto) is a UNESCO World Heritage site boasting Europe\'s largest medieval market square (Rynek Główny), the legendary Wawel Royal Castle, and the historic Jewish Quarter of Kazimierz. Its Christmas Market tradition dates back centuries as a vibrant gathering place for craftsmen across Central Europe.',
       transit: {
         airport: 'Direct SKA1 train from Kraków Airport (KRK) to Kraków Główny central station runs every 30 mins (17-min journey, ~17 PLN ticket).',
@@ -31,12 +97,12 @@ export const polandJourney = {
           id: 'rynek-glowny',
           name: 'Rynek Główny Main Market',
           location: 'Grand Main Square (Old Town)',
-          hours: 'Late Nov – Dec 26 | Daily 10:00 AM – 10:00 PM',
+          hours: 'Nov 28, 2026 – Jan 1, 2027 | Open 10am-8pm. Early close on Dec 24 (~2pm).',
           address: 'Rynek Główny 1, 31-042 Kraków (Tram: Teatr Bagatela or Dworzec Główny)',
           mustTry: ['Oscypek with warm cranberry jam', 'Sizzling Pierogi', 'Grzaniec Galicyjski mulled wine', 'Krakowska Sausage'],
           souvenirs: ['Hand-blown glass ornaments (Bombki)', 'Baltic Amber jewelry', 'Carved wooden kitchenware & boxes', 'Wool slippers'],
           unescoTradition: 'UNESCO Intangible Cultural Heritage: Szopki Krakowskie (Christmas Cribs). The annual competition takes place on the first Thursday of December (Dec 3, 2026) at the Mickiewicz monument, followed by an exhibition at Krzysztofory Palace.',
-          tips: 'Peak crowds are 5:30 PM - 8:00 PM. Hot drink mugs require a 20 PLN cash deposit (refundable upon returning the mug). Stage caroling occurs daily around 5:00 PM / 6:00 PM. Dec 24 hours: 10:00 AM - 3:00 PM; Dec 25-26: 12:00 PM - 9:00 PM.',
+          tips: 'Peak crowds are 5:30 PM - 8:00 PM. Hot drink mugs require a 30 PLN cash deposit (refundable upon returning the mug). Stage caroling occurs daily around 5:00 PM / 6:00 PM. Dec 24 hours: 10:00 AM - 2:00 PM.',
           specialty: 'Hand-carved wooden trinkets, Baltic amber, hand-blown glass ornaments (Bombki), and piping hot Grzaniec Galicyjski.',
           details: 'The crown jewel of Polish Christmas markets! Over 100 wooden chalets surround the Renaissance Cloth Hall (Sukiennice) under the illuminated towers of St. Mary\'s Basilica. Feast on grilled Oscypek smoked cheese with cranberry jam, sizzling pierogi, and roasted kielbasa while carols echo across the square.'
         },
@@ -147,6 +213,10 @@ export const polandJourney = {
       base: 'Market Square or Cathedral Island',
       focus: 'Most fairytale-like stop: colorful square, bridges, dwarfs, Ostrów Tumski, and strong evening lights.',
       marketStrategy: 'First Wrocław Christmas Market evening, ideally 5 PM to 7 PM.',
+      dates: 'Nov 21, 2026 - Jan 7, 2027',
+      openingHours: 'Open 10am-9pm. Closed Dec 24/25. Opens 1pm on Dec 26.',
+      hours: 'Open 10am-9pm. Closed Dec 24/25. Opens 1pm on Dec 26.',
+      kaucja: '30 PLN',
       foodTargets: ['Konspira', 'Karczma Lwowska', 'Pod Fredrą'],
       hotels: ['The Bridge Wrocław MGallery', 'Hotel Monopol', 'AC Hotel by Marriott Wrocław'],
       imageDetails: {
@@ -162,6 +232,10 @@ export const polandJourney = {
       base: 'Old Town / Stare Miasto',
       focus: 'Efficient midpoint: compact historic core, Cathedral Island, markets, cafés, and easy rail positioning.',
       marketStrategy: 'First Poznań market evening. Seasonal displays, possible ice-sculpture or market events.',
+      dates: 'Nov 21, 2026 - Jan 6, 2027 (Plac Wolności)',
+      openingHours: 'Open 11am-9pm. Open on Christmas Day.',
+      hours: 'Open 11am-9pm. Open on Christmas Day.',
+      kaucja: '30 PLN',
       foodTargets: ['Brovaria', 'Bamberka', 'Wiejskie Jadło'],
       hotels: ['PURO Poznań Stare Miasto', 'City Park Hotel & Residence', 'Sheraton Poznań Hotel'],
       imageDetails: {
@@ -177,6 +251,10 @@ export const polandJourney = {
       base: 'Day Stop Only',
       focus: 'Low-hassle medieval break: lockers, gingerbread, UNESCO core, lunch, and onward train to Gdańsk.',
       marketStrategy: 'Walk the medieval core, try gingerbread, photograph the red-brick streets, and have one sit-down lunch.',
+      dates: 'Nov 21, 2026 - Dec 21, 2026',
+      openingHours: 'Mon-Thu 12pm-9pm, Fri 12pm-10pm, Sat 10am-10pm, Sun 10am-9pm.',
+      hours: 'Mon-Thu 12pm-9pm, Fri 12pm-10pm, Sat 10am-10pm, Sun 10am-9pm.',
+      kaucja: '30 PLN',
       foodTargets: [],
       hotels: [],
       imageDetails: {
@@ -192,6 +270,10 @@ export const polandJourney = {
       base: 'Old Town, Waterfront, or Granary Island',
       focus: 'Coastal finale: Motława waterfront, amber, Hanseatic streets, and final Christmas market night.',
       marketStrategy: 'Final Christmas market at Targ Węglowy, then pack and stage luggage for the airport transfer.',
+      dates: 'Nov 20, 2026 - Dec 23, 2026',
+      openingHours: 'Open Sun-Thu 12pm-8pm, Fri-Sat 12pm-9pm. Closed Dec 24/25.',
+      hours: 'Open Sun-Thu 12pm-8pm, Fri-Sat 12pm-9pm. Closed Dec 24/25.',
+      kaucja: '30 PLN',
       foodTargets: ['Pierogarnia Mandu', 'Kubicki', 'Gdański Bowke'],
       hotels: ['Hilton Gdańsk', 'Hotel Podewils', 'Radisson Hotel & Suites Gdańsk'],
       imageDetails: {

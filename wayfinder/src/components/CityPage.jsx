@@ -1,8 +1,120 @@
 import React, { useState } from 'react';
-import { MapPin, Utensils, Bed, ArrowLeft, Bus, Train, ShoppingBag, Sparkles, Landmark, Compass, DollarSign, Info, Map, Clock, Navigation, Gift, Lightbulb, Video, ExternalLink, Thermometer, CreditCard, Award, RefreshCw } from 'lucide-react';
+import { MapPin, Utensils, Bed, ArrowLeft, Bus, Train, ShoppingBag, Sparkles, Landmark, Compass, DollarSign, Info, Map, Clock, Navigation, Gift, Lightbulb, Video, ExternalLink, Thermometer, CreditCard, Award, RefreshCw, AlertTriangle, CalendarX, Coins, Coffee, Sun, Volume2 } from 'lucide-react';
 import { polandJourney } from '../data/poland-2026';
 import { cityImages, marketImages } from '../utils/cityImages';
 import { useExchangeRate } from '../hooks/useExchangeRate';
+
+function QuickReferenceBar({ city }) {
+  const quick = city.quickReference || {
+    dates: city.dates,
+    daylight: 'Sunrise ~7:30 AM | Sunset ~3:30 PM (~8 hrs daylight)',
+    peakHours: '5:30 PM - 8:00 PM (Dusk illuminations & caroling)',
+    kaucja: `${city.kaucja} deposit per mug`
+  };
+
+  const kaucjaDeposit = typeof city.kaucjaCallout === 'object' ? city.kaucjaCallout.deposit : (city.kaucja || '20-30 PLN');
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="p-3.5 sm:p-4 rounded-xl bg-slate-900/90 border border-amber-500/30 space-y-1.5 shadow-md flex flex-col justify-between">
+        <div className="flex items-center space-x-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
+          <Clock className="w-4 h-4 shrink-0" />
+          <span>Market Dates</span>
+        </div>
+        <p className="text-xs sm:text-sm text-white font-bold leading-snug">
+          {quick.dates}
+        </p>
+      </div>
+
+      <div className="p-3.5 sm:p-4 rounded-xl bg-slate-900/90 border border-sky-500/30 space-y-1.5 shadow-md flex flex-col justify-between">
+        <div className="flex items-center space-x-2 text-sky-400 font-bold text-xs uppercase tracking-wider">
+          <Sun className="w-4 h-4 shrink-0" />
+          <span>Daylight & Sunset</span>
+        </div>
+        <p className="text-xs sm:text-sm text-slate-200 leading-snug font-medium">
+          {quick.daylight}
+        </p>
+      </div>
+
+      <div className="p-3.5 sm:p-4 rounded-xl bg-slate-900/90 border border-purple-500/30 space-y-1.5 shadow-md flex flex-col justify-between">
+        <div className="flex items-center space-x-2 text-purple-300 font-bold text-xs uppercase tracking-wider">
+          <Sparkles className="w-4 h-4 shrink-0" />
+          <span>Peak Atmosphere</span>
+        </div>
+        <p className="text-xs sm:text-sm text-slate-200 leading-snug font-medium">
+          {quick.peakHours}
+        </p>
+      </div>
+
+      <div className="p-3.5 sm:p-4 rounded-xl bg-slate-900/90 border border-amber-400/50 space-y-1.5 shadow-md flex flex-col justify-between">
+        <div className="flex items-center space-x-2 text-amber-300 font-bold text-xs uppercase tracking-wider">
+          <Coffee className="w-4 h-4 shrink-0 text-amber-400" />
+          <span>Mug Deposit (Kaucja)</span>
+        </div>
+        <p className="text-xs sm:text-sm text-amber-100/90 leading-snug font-medium">
+          {kaucjaDeposit} deposit per mug. <strong className="text-amber-300">EXACT CASH REQUIRED</strong> for deposit.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function CulinaryHighlightsSection({ highlights }) {
+  if (!highlights || highlights.length === 0) return null;
+
+  return (
+    <section className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div>
+          <div className="text-xs font-bold uppercase tracking-wider text-amber-400 mb-1 flex items-center space-x-1">
+            <Utensils className="w-4 h-4" />
+            <span>Authentic Market Flavors</span>
+          </div>
+          <h2 className="text-2xl sm:text-3xl font-black text-white">Culinary Highlights & Pronunciation Guide</h2>
+        </div>
+        <span className="text-xs text-slate-400 font-medium">Phonetics included for easy ordering</span>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {highlights.map((item, idx) => (
+          <div key={idx} className="glass-panel p-6 rounded-3xl border border-amber-500/20 hover:border-amber-500/50 bg-wf-navy-mid/90 transition-all flex flex-col justify-between group shadow-lg">
+            <div className="space-y-3">
+              <div className="flex items-start justify-between gap-2">
+                <h3 className="text-lg font-black text-white group-hover:text-amber-300 transition-colors leading-snug">
+                  {item.name}
+                </h3>
+                <span className="px-2 py-1 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 font-mono text-[10px] font-bold shrink-0 flex items-center space-x-1">
+                  <Volume2 className="w-3 h-3 text-amber-400" />
+                  <span>Pronunciation</span>
+                </span>
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-slate-950/80 border border-white/5 font-mono text-xs text-amber-300 tracking-wide flex items-center space-x-2">
+                <span className="text-slate-500 select-none">🗣️</span>
+                <span className="font-semibold">{item.phonetic}</span>
+              </div>
+
+              <div className="text-xs font-bold text-amber-400/90 uppercase tracking-wider">
+                {item.english}
+              </div>
+
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-medium">
+                {item.description}
+              </p>
+            </div>
+
+            {item.tip && (
+              <div className="mt-4 pt-3 border-t border-white/10 text-xs text-emerald-300 flex items-start space-x-2">
+                <span className="shrink-0 mt-0.5">💡</span>
+                <span className="leading-snug">{item.tip}</span>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
 
 export function CityPage({ cityId, subPage = 'overview' }) {
   const [activeMarketTab, setActiveMarketTab] = useState(0);
@@ -190,8 +302,8 @@ export function CityPage({ cityId, subPage = 'overview' }) {
       </div>
 
       {/* Top Sub-Header Toolbar (Opens Dedicated Sub-Pages) */}
-      <div className="sticky top-[68px] z-40">
-        <div className="p-1.5 rounded-xl border border-amber-500/20 !bg-slate-950/90 backdrop-blur-xl shadow-md flex items-center justify-start overflow-x-auto no-scrollbar gap-1 sm:gap-1.5">
+      <div className="sticky top-16 z-40 py-1 bg-slate-950/95 backdrop-blur-xl -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 border-b border-amber-500/20">
+        <div className="p-1.5 rounded-xl border border-amber-500/20 !bg-slate-900/90 shadow-md flex items-center justify-start overflow-x-auto no-scrollbar gap-1 sm:gap-1.5">
           <a
             href={baseUrl}
             onClick={(e) => pushRoute(e, baseUrl)}
@@ -402,6 +514,9 @@ export function CityPage({ cityId, subPage = 'overview' }) {
       {/* 2. CHRISTMAS MARKETS SUB-PAGE */}
       {subPage === 'markets' && city.markets && (
         <div className="space-y-6 animate-fade-in">
+          {/* Quick Reference Stats Bar */}
+          <QuickReferenceBar city={city} />
+
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <div className="text-xs font-bold uppercase tracking-wider text-amber-400 mb-1 flex items-center space-x-1">
@@ -445,21 +560,35 @@ export function CityPage({ cityId, subPage = 'overview' }) {
           </div>
 
           {/* Sticky Sub-Tabs for individual markets */}
-          <div className="sticky top-[114px] z-30 p-1.5 rounded-xl border border-emerald-500/50 !bg-[#0f2d1e]/95 backdrop-blur-xl shadow-xl shadow-black/60 flex items-center justify-start overflow-x-auto no-scrollbar gap-1.5">
-            {city.markets.map((market, idx) => (
-              <button
-                key={market.id}
-                onClick={() => setActiveMarketTab(idx)}
-                className={`px-3 py-1 rounded-lg font-bold text-xs transition-all duration-300 flex items-center space-x-1.5 whitespace-nowrap ${
-                  activeMarketTab === idx
-                    ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 scale-102'
-                    : 'text-emerald-100/90 hover:text-white hover:bg-emerald-800/40'
-                }`}
-              >
-                <ShoppingBag className="w-3.5 h-3.5" />
-                <span>{market.name}</span>
-              </button>
-            ))}
+          <div className="sticky top-[112px] z-30 py-2 bg-slate-950/95 backdrop-blur-xl -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 border-b-2 border-emerald-500/30 shadow-2xl">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+              {/* Distinct Section Label */}
+              <div className="flex items-center space-x-2 shrink-0 text-amber-400 font-black text-xs uppercase tracking-wider px-1">
+                <ShoppingBag className="w-4 h-4 text-emerald-400" />
+                <span>Explore Markets:</span>
+              </div>
+
+              {/* Separate, Prominent Pill Buttons */}
+              <div className="flex items-center justify-start overflow-x-auto no-scrollbar gap-2.5 sm:gap-3 py-1 flex-1 min-w-0">
+                {city.markets.map((market, idx) => {
+                  const isActive = activeMarketTab === idx;
+                  return (
+                    <button
+                      key={market.id}
+                      onClick={() => setActiveMarketTab(idx)}
+                      className={`px-4 py-2 rounded-xl font-extrabold text-xs sm:text-sm transition-all duration-300 flex items-center space-x-2 whitespace-nowrap shrink-0 border ${
+                        isActive
+                          ? 'bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 border-amber-300 shadow-lg shadow-amber-500/30 scale-102 ring-2 ring-amber-400/40'
+                          : 'bg-emerald-950/80 hover:bg-emerald-900/90 text-emerald-100 border-emerald-500/50 hover:border-amber-400/60 shadow-md'
+                      }`}
+                    >
+                      <span className="text-base">{isActive ? '🎄' : '⛺'}</span>
+                      <span>{market.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
 
           {/* Active Market Details Card */}
@@ -586,6 +715,9 @@ export function CityPage({ cityId, subPage = 'overview' }) {
               </div>
             );
           })()}
+
+          {/* Authentic Culinary Highlights & Pronunciation Guide */}
+          <CulinaryHighlightsSection highlights={city.culinaryHighlights} />
 
           {/* Market Food Strategy Box */}
           <div className="glass-panel border-wf-amber/30 p-8 rounded-3xl bg-wf-amber/5">

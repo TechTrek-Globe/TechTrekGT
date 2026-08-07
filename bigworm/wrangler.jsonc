@@ -14,11 +14,7 @@
   "routes": [
     {
       "pattern": "bigworm.techtrekgt.com",
-      "zone_name": "techtrekgt.com"
-    },
-    {
-      "pattern": "bigworm.techtrekgt.com/*",
-      "zone_name": "techtrekgt.com"
+      "custom_domain": true
     }
   ],
   "compatibility_flags": [

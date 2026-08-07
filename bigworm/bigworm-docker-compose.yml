@@ -8,7 +8,9 @@ services:
   guacd:
     image: guacamole/guacd:1.5.5
     container_name: bigworm-guacd
-    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "TechTrek:host-gateway"
     networks:
       - guacnet
 

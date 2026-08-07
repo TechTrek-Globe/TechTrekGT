@@ -77,19 +77,24 @@ export function PolandLanding() {
           
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             {polandJourney.route.map((city, idx) => (
-              <div key={city.id} className="glass-panel p-5 rounded-2xl relative hover-lift cursor-pointer" onClick={(e) => pushRoute(e, `/wayfinder/poland-christmas-2026/cities/${city.id}`)}>
+              <div key={city.id} className="glass-panel rounded-2xl relative hover-lift cursor-pointer overflow-hidden border border-white/5 hover:border-amber-500/40 transition-colors" onClick={(e) => pushRoute(e, `/wayfinder/poland-christmas-2026/cities/${city.id}`)}>
                 {idx < polandJourney.route.length - 1 && (
-                  <div className="hidden md:block absolute top-1/2 -right-4 w-4 h-px bg-white/20" />
+                  <div className="hidden md:block absolute top-1/2 -right-4 w-4 h-px bg-white/20 z-10" />
                 )}
-                <div className="text-wf-blue-lt text-xs font-bold uppercase tracking-widest mb-1">
-                  Stop 0{idx + 1}
+                <div className="h-32 w-full bg-cover bg-center relative group" style={{ backgroundImage: `url('/${city.id}.png')` }}>
+                  <div className="absolute inset-0 bg-gradient-to-t from-wf-navy via-wf-navy/60 to-transparent transition-opacity duration-300"></div>
                 </div>
-                <h3 className="text-xl font-bold text-white mb-2">{city.name}</h3>
-                <p className="text-sm text-wf-muted mb-4">
-                  {city.nights > 0 ? `${city.nights} nights` : 'Day Stop'}
-                </p>
-                <div className="text-xs text-wf-cream/70 line-clamp-3">
-                  {city.focus}
+                <div className="p-5 -mt-10 relative z-10">
+                  <div className="text-amber-300 text-[10px] font-black uppercase tracking-widest mb-1 drop-shadow-md">
+                    Stop 0{idx + 1}
+                  </div>
+                  <h3 className="text-xl font-bold text-white mb-1 drop-shadow-md">{city.name}</h3>
+                  <p className="text-xs text-amber-100/80 mb-3 font-medium">
+                    {city.nights > 0 ? `${city.nights} nights` : 'Day Stop'}
+                  </p>
+                  <div className="text-xs text-wf-cream/80 line-clamp-3 leading-relaxed">
+                    {city.focus}
+                  </div>
                 </div>
               </div>
             ))}

@@ -28,13 +28,18 @@ export function MarketsPage() {
 
       <div className="space-y-4">
         {polandJourney.route.filter(c => c.nights > 0).map((city, idx) => (
-          <div key={city.id} className="glass-panel p-6 rounded-2xl flex items-start space-x-4">
-            <div className="w-8 h-8 rounded-full bg-wf-navy-mid border border-white/10 flex items-center justify-center shrink-0 mt-1 text-wf-blue-lt font-bold text-sm">
-              {idx + 1}
-            </div>
-            <div>
-              <h3 className="text-lg font-bold text-white">{city.name} Market Rhythm</h3>
-              <p className="text-wf-muted mt-2">{city.marketStrategy}</p>
+          <div key={city.id} className="glass-panel p-6 rounded-2xl flex flex-col sm:flex-row sm:items-start space-y-4 sm:space-y-0 sm:space-x-6 relative overflow-hidden group hover:border-amber-500/30 transition-colors border border-white/5">
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-amber-900/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
+            <div 
+              className="w-full sm:w-24 sm:h-24 h-32 rounded-xl bg-cover bg-center shrink-0 shadow-md border border-white/10"
+              style={{ backgroundImage: `url('/${city.id}.png')` }}
+            ></div>
+            <div className="flex-1 relative z-10">
+              <div className="flex items-center space-x-2 mb-1">
+                <span className="text-amber-400 font-black text-xs uppercase tracking-wider">Stop 0{idx + 1}</span>
+              </div>
+              <h3 className="text-xl font-bold text-white mb-2">{city.name} Market Rhythm</h3>
+              <p className="text-wf-muted leading-relaxed">{city.marketStrategy}</p>
             </div>
           </div>
         ))}

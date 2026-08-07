@@ -43,7 +43,7 @@ export function CityPage({ cityId }) {
       <div className="w-full h-64 md:h-80 rounded-3xl overflow-hidden relative mb-12 bg-wf-navy-mid border border-amber-500/20 shadow-lg shadow-amber-900/20">
         <div 
           className="absolute inset-0 bg-cover bg-center transition-transform duration-1000 hover:scale-105 opacity-90"
-          style={{ backgroundImage: `url('/${city.id}.png')` }}
+          style={{ backgroundImage: `url('/wayfinder/${city.id}.png')` }}
         ></div>
         <div className="absolute inset-0 bg-gradient-to-t from-wf-navy via-wf-navy/40 to-transparent"></div>
         <div className="absolute bottom-6 left-6 right-6">

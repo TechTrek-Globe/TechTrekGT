@@ -36,7 +36,7 @@ export function WayfinderLanding() {
             <div className="absolute inset-0 bg-gradient-to-br from-wf-blue/20 via-amber-900/20 to-wf-navy opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
             <div className="relative h-48 rounded-2xl overflow-hidden mb-4 bg-wf-navy-mid border border-amber-500/20 group-hover:border-amber-500/50 transition-colors duration-500">
               {/* Festive Poland Christmas Market Background */}
-              <div className="absolute inset-0 bg-[url('/poland-market.png')] bg-cover bg-center opacity-70 group-hover:scale-105 group-hover:opacity-90 transition-all duration-700"></div>
+              <div className="absolute inset-0 bg-[url('/wayfinder/poland-market.png')] bg-cover bg-center opacity-70 group-hover:scale-105 group-hover:opacity-90 transition-all duration-700"></div>
               <div className="absolute inset-0 bg-gradient-to-t from-wf-navy-mid via-wf-navy-mid/60 to-transparent"></div>
               <div className="absolute bottom-4 left-4 right-4">
                 <div className="flex items-center space-x-2 text-amber-200/80 text-xs font-semibold uppercase tracking-wider mb-1">

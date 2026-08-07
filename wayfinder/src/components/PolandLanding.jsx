@@ -81,7 +81,7 @@ export function PolandLanding() {
                 {idx < polandJourney.route.length - 1 && (
                   <div className="hidden md:block absolute top-1/2 -right-4 w-4 h-px bg-white/20 z-10" />
                 )}
-                <div className="h-32 w-full bg-cover bg-center relative group" style={{ backgroundImage: `url('/${city.id}.png')` }}>
+                <div className="h-32 w-full bg-cover bg-center relative group" style={{ backgroundImage: `url('/wayfinder/${city.id}.png')` }}>
                   <div className="absolute inset-0 bg-gradient-to-t from-wf-navy via-wf-navy/60 to-transparent transition-opacity duration-300"></div>
                 </div>
                 <div className="p-5 -mt-10 relative z-10">

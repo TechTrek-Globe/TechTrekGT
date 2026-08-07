@@ -26,7 +26,7 @@ export function StaysAndFoodPage() {
           <div key={city.id} className="relative rounded-3xl overflow-hidden border border-white/5">
             <div 
               className="absolute inset-0 bg-cover bg-center opacity-20"
-              style={{ backgroundImage: `url('/${city.id}.png')` }}
+              style={{ backgroundImage: `url('/wayfinder/${city.id}.png')` }}
             ></div>
             <div className="absolute inset-0 bg-gradient-to-r from-wf-navy via-wf-navy/90 to-wf-navy/80"></div>
             

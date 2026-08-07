@@ -32,7 +32,7 @@ export function MarketsPage() {
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-amber-900/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
             <div 
               className="w-full sm:w-24 sm:h-24 h-32 rounded-xl bg-cover bg-center shrink-0 shadow-md border border-white/10"
-              style={{ backgroundImage: `url('/${city.id}.png')` }}
+              style={{ backgroundImage: `url('/wayfinder/${city.id}.png')` }}
             ></div>
             <div className="flex-1 relative z-10">
               <div className="flex items-center space-x-2 mb-1">

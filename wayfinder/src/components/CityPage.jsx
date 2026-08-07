@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { MapPin, Utensils, Bed, ArrowLeft, Bus, Train, ShoppingBag, Sparkles, Landmark, Compass, DollarSign, Info, Map, Clock, Navigation, Gift, Lightbulb } from 'lucide-react';
 import { polandJourney } from '../data/poland-2026';
-import { cityImages, marketImages } from '../utils/cityImages';
+import { cityImages, marketImages, polandMapBg } from '../utils/cityImages';
 
 export function CityPage({ cityId, subPage = 'overview' }) {
   const [activeMarketTab, setActiveMarketTab] = useState(0);
@@ -32,82 +32,114 @@ export function CityPage({ cityId, subPage = 'overview' }) {
     ? "https://www.openstreetmap.org/export/embed.html?bbox=19.9200%2C50.0450%2C19.9650%2C50.0700&amp;layer=mapnik&amp;marker=50.0614%2C19.9366"
     : "https://www.openstreetmap.org/export/embed.html?bbox=16.9000%2C51.1000%2C17.1000%2C51.1300&amp;layer=mapnik";
 
-  const cityIndex = polandJourney.route.findIndex(c => c.id === cityId);
-
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      {/* Navigation Header with Compact Trail Track Chart */}
-      <div className="space-y-4">
-        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-8">
+      {/* Top Header Section with Poland Map Route Overlay (Mockup Design) */}
+      <div className="relative rounded-3xl overflow-hidden glass-panel border border-amber-500/30 p-6 sm:p-8 bg-wf-navy/90 shadow-2xl space-y-6">
+        {/* Poland Map Background Image Overlay */}
+        <div className="absolute inset-0 z-0 pointer-events-none opacity-40 mix-blend-screen">
+          <img 
+            src={polandMapBg} 
+            alt="Poland Route Map" 
+            className="w-full h-full object-cover object-center scale-105" 
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-wf-navy via-wf-navy/60 to-transparent"></div>
+          <div className="absolute inset-0 bg-gradient-to-t from-wf-navy via-transparent to-wf-navy/80"></div>
+        </div>
+
+        {/* Header Content */}
+        <div className="relative z-10 flex flex-col md:flex-row items-start justify-between gap-6">
           {/* Back Button */}
           <a 
             href="/wayfinder/poland-christmas-2026" 
             onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026')} 
-            className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-full bg-amber-500/10 hover:bg-amber-500 text-amber-300 hover:text-slate-950 font-bold text-sm border border-amber-500/40 hover:border-amber-400 transition-all duration-300 shadow-lg shadow-amber-900/30 hover:shadow-amber-500/30 hover:scale-105 shrink-0 group self-start lg:self-auto"
+            className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-full bg-amber-500/10 hover:bg-amber-500 text-amber-300 hover:text-slate-950 font-bold text-sm border border-amber-500/40 hover:border-amber-400 transition-all duration-300 shadow-lg shadow-amber-900/30 hover:shadow-amber-500/30 hover:scale-105 group shrink-0"
           >
             <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
-            <span>Back to Poland Journey Overview</span>
+            <span>Back to Poland Overview</span>
           </a>
 
-          {/* Compact Wide Trail Track Chart */}
-          <div className="flex-1 glass-panel px-4 py-2 rounded-full border border-amber-500/30 bg-wf-navy-mid/90 backdrop-blur-xl shadow-xl flex items-center justify-between min-w-0 overflow-x-auto no-scrollbar">
-            <div className="flex items-center justify-between w-full min-w-[480px] relative px-3 py-1">
-              {/* Background Dotted Track Line */}
-              <div className="absolute top-4 left-6 right-6 h-0.5 border-b-2 border-dashed border-amber-400/40 z-0"></div>
+          {/* Interactive Geographic Route Map Nodes */}
+          <div className="w-full md:w-auto flex-1 max-w-xl h-44 sm:h-48 relative border border-amber-500/20 rounded-2xl bg-wf-navy-mid/70 backdrop-blur-md p-3 overflow-hidden shadow-inner">
+            {/* Background S-Curve Rail Track SVG */}
+            <svg className="absolute inset-0 w-full h-full pointer-events-none z-0" viewBox="0 0 500 180">
+              <path 
+                d="M 260 30 Q 280 60 270 70 T 200 95 T 230 135 T 325 145" 
+                fill="none" 
+                stroke="url(#trackGradient)" 
+                strokeWidth="4" 
+                strokeDasharray="6 3"
+              />
+              <path 
+                d="M 260 30 Q 280 60 270 70 T 200 95 T 230 135 T 325 145" 
+                fill="none" 
+                stroke="#f59e0b" 
+                strokeWidth="1.5" 
+                opacity="0.6"
+              />
+              <defs>
+                <linearGradient id="trackGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.4" />
+                  <stop offset="50%" stopColor="#fbbf24" stopOpacity="1" />
+                  <stop offset="100%" stopColor="#f59e0b" stopOpacity="0.8" />
+                </linearGradient>
+              </defs>
+            </svg>
 
-              {polandJourney.route.map((item, idx) => {
-                const isCurrent = item.id === cityId;
-                const itemUrl = `/wayfinder/poland-christmas-2026/cities/${item.id}`;
-                const isLast = idx === polandJourney.route.length - 1;
-
-                return (
-                  <React.Fragment key={item.id}>
-                    {/* City Avatar Node */}
-                    <a
-                      href={itemUrl}
-                      onClick={(e) => pushRoute(e, itemUrl)}
-                      className="relative z-10 flex flex-col items-center group cursor-pointer shrink-0"
-                      title={`${item.name} (${item.nights > 0 ? `${item.nights} Nights` : 'Day Stop'})`}
-                    >
-                      <div className={`w-8 h-8 rounded-full overflow-hidden border-2 transition-all duration-300 relative flex items-center justify-center ${
-                        isCurrent 
-                          ? 'border-amber-400 ring-4 ring-amber-500/30 scale-110 shadow-md shadow-amber-500/40' 
-                          : 'border-white/30 hover:border-amber-300 hover:scale-105'
-                      }`}>
-                        <img 
-                          src={cityImages[item.id]} 
-                          alt={item.name} 
-                          className="w-full h-full object-cover" 
-                        />
-                        {isCurrent && (
-                          <div className="absolute inset-0 bg-amber-500/20"></div>
-                        )}
-                      </div>
-
-                      <span className={`text-[11px] font-bold mt-1 tracking-tight ${
-                        isCurrent ? 'text-amber-300 drop-shadow font-black' : 'text-wf-cream group-hover:text-white'
-                      }`}>
-                        {item.name}
-                      </span>
-                    </a>
-
-                    {/* Train / Transport Icon between stops */}
-                    {!isLast && (
-                      <div className="relative z-10 flex items-center justify-center shrink-0 px-0.5 -mt-3">
-                        <span className="text-xs filter drop-shadow opacity-90 hover:scale-125 transition-transform" title="Train / Express Route">
-                          {idx === 3 ? '🚆' : '🚆'}
-                        </span>
-                      </div>
-                    )}
-                  </React.Fragment>
-                );
-              })}
+            {/* Glowing Golden Express Train on Track */}
+            <div className="absolute top-[125px] left-[270px] z-10 animate-pulse flex items-center space-x-1 bg-amber-400 text-slate-950 px-2 py-0.5 rounded-full shadow-lg shadow-amber-500/60 border border-amber-200">
+              <Train className="w-3.5 h-3.5 fill-current" />
+              <span className="text-[9px] font-black tracking-widest uppercase">EXPRESS</span>
             </div>
+
+            {/* City Pin Nodes */}
+            {polandJourney.route.map((item) => {
+              const isCurrent = item.id === cityId;
+              const itemUrl = `/wayfinder/poland-christmas-2026/cities/${item.id}`;
+
+              // Map position coordinates
+              const positions = {
+                gdansk: 'top-[12px] left-[50%]',
+                torun: 'top-[52px] left-[52%]',
+                poznan: 'top-[75px] left-[35%]',
+                wroclaw: 'top-[115px] left-[42%]',
+                krakow: 'top-[125px] left-[62%]'
+              };
+
+              return (
+                <a
+                  key={item.id}
+                  href={itemUrl}
+                  onClick={(e) => pushRoute(e, itemUrl)}
+                  className={`absolute z-20 flex flex-col items-center group cursor-pointer -translate-x-1/2 -translate-y-1/2 ${positions[item.id] || 'top-1/2 left-1/2'}`}
+                >
+                  <div className={`rounded-full overflow-hidden border-2 transition-all duration-300 relative flex items-center justify-center bg-slate-950 ${
+                    isCurrent 
+                      ? 'w-10 h-10 border-amber-400 ring-4 ring-amber-500/40 scale-110 shadow-xl shadow-amber-500/60' 
+                      : 'w-7 h-7 border-white/40 hover:border-amber-300 hover:scale-110'
+                  }`}>
+                    <img 
+                      src={cityImages[item.id]} 
+                      alt={item.name} 
+                      className="w-full h-full object-cover" 
+                    />
+                    {isCurrent && (
+                      <div className="absolute inset-0 bg-amber-500/20 ring-2 ring-amber-400 ring-inset"></div>
+                    )}
+                  </div>
+                  <span className={`text-[10px] sm:text-xs font-bold mt-0.5 tracking-tight ${
+                    isCurrent ? 'text-amber-300 font-black drop-shadow-md' : 'text-wf-cream group-hover:text-white'
+                  }`}>
+                    {item.name}
+                  </span>
+                </a>
+              );
+            })}
           </div>
         </div>
 
-        {/* City Title Header */}
-        <div className="flex flex-wrap items-center justify-between gap-4 pt-1">
+        {/* Main City Title Row */}
+        <div className="relative z-10 flex flex-wrap items-center justify-between gap-4 pt-2 border-t border-white/10">
           <h1 className="text-4xl sm:text-5xl font-black text-white flex items-center space-x-3 tracking-tight">
             <MapPin className="w-9 h-9 text-amber-400" />
             <span>{city.name}</span>
@@ -123,14 +155,24 @@ export function CityPage({ cityId, subPage = 'overview' }) {
         </div>
       </div>
 
-      {/* Hero Image Header with Detailed Hover Overlay (Always at top of sub-pages) */}
-      <div className="w-full h-64 sm:h-80 rounded-3xl overflow-hidden relative bg-wf-navy-mid border border-amber-500/30 shadow-2xl shadow-amber-900/20 group">
+      {/* HIGHLIGHTS Banner Card (Mockup Design) */}
+      <div className="w-full h-72 sm:h-96 rounded-3xl overflow-hidden relative bg-wf-navy-mid border border-amber-500/30 shadow-2xl shadow-amber-900/20 group">
         <img 
           src={cityImages[city.id]} 
           alt={city.name} 
           className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105 opacity-90"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-wf-navy via-wf-navy/30 to-transparent"></div>
+        <div className="absolute inset-0 bg-gradient-to-r from-wf-navy/95 via-wf-navy/70 to-transparent"></div>
+
+        {/* Highlights Text Content */}
+        <div className="absolute inset-y-0 left-0 w-full md:w-3/4 p-6 sm:p-10 flex flex-col justify-center space-y-3 z-10">
+          <span className="text-xs sm:text-sm font-black uppercase tracking-widest text-amber-400">
+            HIGHLIGHTS
+          </span>
+          <p className="text-xl sm:text-3xl font-bold text-white leading-snug drop-shadow-md">
+            Discover Central Europe’s largest historic start: explore <strong className="text-amber-300">Rynek Główny</strong>, Wawel Royal Castle, and a beautiful Christmas market.
+          </p>
+        </div>
 
         {/* Detailed Hover Overlay */}
         <div className="absolute inset-0 bg-wf-navy/95 p-6 sm:p-10 flex flex-col justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 backdrop-blur-md z-20">
@@ -144,13 +186,6 @@ export function CityPage({ cityId, subPage = 'overview' }) {
           <p className="text-sm sm:text-base text-amber-100/90 leading-relaxed max-w-4xl">
             {city.imageDetails?.description}
           </p>
-        </div>
-
-        <div className="absolute bottom-6 left-6 right-6 group-hover:opacity-0 transition-opacity duration-300">
-          <p className="text-amber-300 text-xs font-bold uppercase tracking-widest mb-1">Trip Focus</p>
-          <div className="text-xl sm:text-3xl font-black text-white max-w-3xl leading-snug drop-shadow-lg">
-            {city.focus}
-          </div>
         </div>
       </div>
 

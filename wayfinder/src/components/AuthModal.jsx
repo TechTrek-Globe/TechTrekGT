@@ -152,15 +152,14 @@ export function AuthModal() {
               </p>
             </div>
           </div>
-          {isAuthenticated && user && (
-            <button
-              type="button"
-              onClick={() => setIsAuthModalOpen(false)}
-              className="p-1.5 text-wf-muted hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => setIsAuthModalOpen(false)}
+            className="p-1.5 text-wf-muted hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+            title="Close modal"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
         {/* Form Body */}

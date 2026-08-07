@@ -35,6 +35,12 @@
   --vine-glow:      rgba(16, 185, 129, 0.35);
   --vine-border:    rgba(16, 185, 129, 0.3);
 
+  /* Wayfinder - cyan sky blue */
+  --wayfinder-500:    #0284c7;
+  --wayfinder-400:    #38bdf8;
+  --wayfinder-glow:   rgba(56, 189, 248, 0.35);
+  --wayfinder-border: rgba(56, 189, 248, 0.3);
+
   /* Neutrals */
   --text-primary:   #f1f5f9;
   --text-secondary: #94a3b8;
@@ -240,9 +246,9 @@ body {
 /* ---------- CARDS GRID ---------- */
 .cards-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1.75rem;
-  max-width: 1200px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.5rem;
+  max-width: 1400px;
   margin: 0 auto;
   padding: 1rem 2rem 0;
 }
@@ -315,6 +321,14 @@ body {
   box-shadow: 0 20px 60px rgba(16, 185, 129, 0.18), 0 1px 0 rgba(255,255,255,0.05) inset;
 }
 
+.card--wayfinder {
+  --card-mouse-color: rgba(56, 189, 248, 0.12);
+}
+.card--wayfinder:hover {
+  border-color: var(--wayfinder-border);
+  box-shadow: 0 20px 60px rgba(56, 189, 248, 0.18), 0 1px 0 rgba(255,255,255,0.05) inset;
+}
+
 /* Card link - fills entire card */
 .card-link {
   display: flex;
@@ -373,6 +387,9 @@ body {
 .card-glow--vinescout {
   background: radial-gradient(ellipse at 50% 80%, rgba(16, 185, 129, 0.2) 0%, transparent 65%);
 }
+.card-glow--wayfinder {
+  background: radial-gradient(ellipse at 50% 80%, rgba(56, 189, 248, 0.2) 0%, transparent 65%);
+}
 
 /* ---------- CARD BODY ---------- */
 .card-body {
@@ -408,6 +425,11 @@ body {
   background: rgba(16, 185, 129, 0.15);
   color: var(--vine-400);
   border: 1px solid rgba(16, 185, 129, 0.25);
+}
+.card-tag--wayfinder {
+  background: rgba(56, 189, 248, 0.15);
+  color: var(--wayfinder-400);
+  border: 1px solid rgba(56, 189, 248, 0.25);
 }
 
 .card-title {
@@ -506,6 +528,18 @@ body {
 .site-card:hover .cta-btn--vinescout {
   transform: translateX(3px);
   box-shadow: 0 6px 28px rgba(16,185,129,0.45);
+}
+
+.cta-btn--wayfinder {
+  background: linear-gradient(135deg, rgba(56,189,248,0.85) 0%, rgba(2,132,199,0.95) 100%);
+  color: #fff;
+  box-shadow: 0 4px 20px rgba(56,189,248,0.3);
+  border: 1px solid rgba(56,189,248,0.4);
+}
+.cta-btn--wayfinder:hover,
+.site-card:hover .cta-btn--wayfinder {
+  transform: translateX(3px);
+  box-shadow: 0 6px 28px rgba(56,189,248,0.45);
 }
 
 .cta-btn svg {
@@ -608,23 +642,17 @@ body {
 .site-card:nth-child(1) { animation-delay: 0.1s; }
 .site-card:nth-child(2) { animation-delay: 0.22s; }
 .site-card:nth-child(3) { animation-delay: 0.34s; }
+.site-card:nth-child(4) { animation-delay: 0.46s; }
 
 /* ---------- RESPONSIVE ---------- */
 
-/* Tablet: 2 columns */
-@media (max-width: 1024px) {
+/* Desktop / Laptop: 2x2 Grid under 1100px */
+@media (max-width: 1100px) {
   .cards-grid {
     grid-template-columns: repeat(2, 1fr);
     max-width: 780px;
     gap: 1.5rem;
     padding: 1rem 1.5rem 0;
-  }
-
-  .site-card:nth-child(3) {
-    grid-column: 1 / -1;
-    max-width: 480px;
-    justify-self: center;
-    width: 100%;
   }
 }
 
@@ -644,12 +672,6 @@ body {
     max-width: 480px;
     padding: 1rem 1rem 0;
     gap: 1.25rem;
-  }
-
-  .site-card:nth-child(3) {
-    grid-column: auto;
-    justify-self: auto;
-    max-width: none;
   }
 
   .section-intro {

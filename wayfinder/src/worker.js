@@ -39,7 +39,7 @@ function addSecurityHeaders(response, isLocal = false) {
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "script-src 'self'",
       "connect-src 'self' https://techtrekgt.com",
-      "img-src 'self' data: blob: https://fonts.gstatic.com",
+      "img-src 'self' data: blob: https://fonts.gstatic.com https://www.transparenttextures.com",
       "font-src 'self' data: https://fonts.gstatic.com",
       "frame-ancestors 'none'",
       "form-action 'self'",
@@ -110,7 +110,17 @@ export default {
     }
 
     // --- Serve SPA assets ---
-    const assetResp = await env.ASSETS.fetch(request);
+    let assetReq = request;
+    if (path.startsWith('/wayfinder/assets/')) {
+      const assetUrl = new URL(request.url);
+      assetUrl.pathname = assetUrl.pathname.slice('/wayfinder'.length);
+      assetReq = new Request(assetUrl.toString(), request);
+    } else if (path === '/wayfinder' || path.startsWith('/wayfinder/')) {
+      const spaUrl = new URL(request.url);
+      spaUrl.pathname = '/';
+      assetReq = new Request(spaUrl.toString(), request);
+    }
+    const assetResp = await env.ASSETS.fetch(assetReq);
     return addSecurityHeaders(assetResp, isLocal);
   },
 };

@@ -21,50 +21,53 @@ function App() {
   }, []);
 
   const renderRoute = () => {
-    // Route matching
+    // Route matching with normalized path
     const path = currentPath.toLowerCase();
+    const normalizedPath = (path === '/' || path === '' || path === '/index.html') 
+      ? '/wayfinder' 
+      : (path.startsWith('/wayfinder') ? path : `/wayfinder${path.startsWith('/') ? path : '/' + path}`);
 
     // Wayfinder Root Landing
-    if (path === '/wayfinder' || path === '/wayfinder/') {
+    if (normalizedPath === '/wayfinder' || normalizedPath === '/wayfinder/') {
       return <WayfinderLanding />;
     }
 
-    if (path === '/wayfinder/poland-christmas-2026' || path === '/wayfinder/poland-christmas-2026/') {
+    if (normalizedPath === '/wayfinder/poland-christmas-2026' || normalizedPath === '/wayfinder/poland-christmas-2026/') {
       return <PolandLanding />;
     }
 
-    if (path === '/wayfinder/poland-christmas-2026/route' || path === '/wayfinder/poland-christmas-2026/rail') {
+    if (normalizedPath === '/wayfinder/poland-christmas-2026/route' || normalizedPath === '/wayfinder/poland-christmas-2026/rail') {
       return <RouteVisualization />;
     }
 
-    if (path === '/wayfinder/poland-christmas-2026/markets') {
+    if (normalizedPath === '/wayfinder/poland-christmas-2026/markets') {
       return <MarketsPage />;
     }
 
-    if (path === '/wayfinder/poland-christmas-2026/stays-and-food') {
+    if (normalizedPath === '/wayfinder/poland-christmas-2026/stays-and-food') {
       return <StaysAndFoodPage />;
     }
 
-    if (path === '/wayfinder/poland-christmas-2026/practical') {
+    if (normalizedPath === '/wayfinder/poland-christmas-2026/practical') {
       return <PracticalPage />;
     }
 
-    if (path.startsWith('/wayfinder/poland-christmas-2026/cities/')) {
-      const cityId = path.split('/').pop();
+    if (normalizedPath.startsWith('/wayfinder/poland-christmas-2026/cities/')) {
+      const cityId = normalizedPath.split('/').pop();
       return <CityPage cityId={cityId} />;
     }
 
-    if (path.startsWith('/wayfinder/poland-christmas-2026/private')) {
-      return <PrivateHub currentPath={path} />;
+    if (normalizedPath.startsWith('/wayfinder/poland-christmas-2026/private')) {
+      return <PrivateHub currentPath={normalizedPath} />;
     }
 
     // Other Poland 2026 routes will go here once built
-    if (path.startsWith('/wayfinder/poland-christmas-2026')) {
+    if (normalizedPath.startsWith('/wayfinder/poland-christmas-2026')) {
       return (
         <div className="flex-1 flex items-center justify-center text-wf-muted p-8">
           <div className="text-center">
             <h2 className="text-2xl font-bold text-white mb-2">Poland 2026 Route</h2>
-            <p>Component under construction: {path}</p>
+            <p>Component under construction: {normalizedPath}</p>
           </div>
         </div>
       );

@@ -49,8 +49,8 @@ export function AppLayout({ activeView, onNavigate, children }) {
       {/* --- Sidebar --- */}
       <aside className="hidden lg:flex flex-col w-60 bg-slate-900/60 border-r border-slate-800/60 backdrop-blur-md flex-shrink-0">
         {/* Logo */}
-        <div className="flex items-center justify-center p-3 border-b border-slate-800/60">
-          <img src={outpostLogo} alt="TechTrek Outpost Logo" className="w-full h-auto object-contain filter drop-shadow-md" />
+        <div className="flex items-center justify-center px-2 py-3.5 border-b border-slate-800/60 overflow-visible">
+          <img src={outpostLogo} alt="TechTrek Outpost Logo" className="w-full h-auto max-w-[210px] object-contain filter drop-shadow-md" />
         </div>
 
         {/* Nav */}
@@ -165,7 +165,7 @@ export function AppLayout({ activeView, onNavigate, children }) {
         {/* Mobile top bar */}
         <header className="lg:hidden flex items-center justify-between px-4 py-3 bg-slate-900/80 border-b border-slate-800/60 backdrop-blur-md">
           <div className="flex items-center gap-2">
-            <img src={outpostLogo} alt="TechTrek Outpost" className="h-8 w-auto max-w-[160px] object-contain filter drop-shadow-md" />
+            <img src={outpostLogo} alt="TechTrek Outpost" className="h-8 w-auto max-w-[220px] object-contain filter drop-shadow-md" />
           </div>
 
           <div className="flex items-center gap-2">
@@ -211,7 +211,7 @@ export function AppLayout({ activeView, onNavigate, children }) {
         </nav>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto p-4 lg:p-6 bg-grid-pattern">
+        <main className="flex-1 flex flex-col min-h-0 overflow-hidden p-3 lg:p-4 bg-grid-pattern">
           {children}
         </main>
       </div>

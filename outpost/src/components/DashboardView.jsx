@@ -81,7 +81,7 @@ export function DashboardView({ onNavigate }) {
   const maxMonthlyGross = Math.max(...monthlyTrend.map(m => m.gross_volume || 0), 100);
 
   return (
-    <div className="space-y-6">
+    <div className="w-full flex-1 min-h-0 overflow-y-auto space-y-6 pb-8 pr-1">
       {/* Top Header & Quick Actions */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>

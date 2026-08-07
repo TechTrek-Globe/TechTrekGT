@@ -272,10 +272,10 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
             ) : (
               <div className="space-y-2">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 z-10 pointer-events-none" />
                   <input
                     type="text"
-                    className="input-field pl-9 text-xs"
+                    className="input-field !pl-10 text-xs"
                     placeholder="Search inventory items..."
                     value={itemSearch}
                     onChange={e => setItemSearch(e.target.value)}

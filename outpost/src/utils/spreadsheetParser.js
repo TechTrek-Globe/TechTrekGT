@@ -51,6 +51,25 @@ export function parseCleanNumber(val, defaultVal = 0) {
 }
 
 /**
+ * Clean item title by separating prepended Item #s, Lot #s, or standalone 5-10 digit numbers
+ * Preserves 4-digit years (e.g. 1996, 2024).
+ * @param {string} title
+ * @returns {string}
+ */
+export function cleanItemName(title) {
+  if (!title || typeof title !== 'string') return '';
+  let cleaned = title.trim();
+
+  // Strip leading Item # or Lot # prefixes e.g. "Item #3931984", "Lot #1234", "3931984 - ", "#3931984"
+  cleaned = cleaned.replace(/^(?:item\s*#?|lot\s*#?|#)\s*\d{4,12}(?:\s*[-–—:]\s*|\s+)?/i, '');
+  // Strip standalone leading 5-10 digit numbers followed by hyphen or space e.g. "3931984 - Shawn Kemp" or "3931984 Shawn Kemp"
+  cleaned = cleaned.replace(/^\d{5,10}\s*[-–—:]\s*/, '');
+  cleaned = cleaned.replace(/^\d{5,10}\s+(?=[A-Za-z])/, '');
+
+  return cleaned.trim() || title.trim();
+}
+
+/**
  * Normalize string key for flexible header matching
  * @param {string} str
  * @returns {string}
@@ -344,7 +363,7 @@ export function parseAuctionWorkbook(buffer) {
       const item = {
         id: `item-${crypto.randomUUID()}`,
         invoice_ref: invoiceRef,
-        item_name: itemName,
+        item_name: cleanItemName(itemName),
         category: String(rawCategory || inferred.category || 'Memorabilia').trim(),
         sport_genre: String(rawSport || inferred.sport_genre || '').trim(),
         athlete_person: String(rawAthlete || inferred.athlete_person || '').trim(),

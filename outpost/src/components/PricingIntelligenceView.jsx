@@ -187,7 +187,7 @@ export function PricingIntelligenceView() {
   const coveragePct = totalItems > 0 ? (itemsWithComps / totalItems) * 100 : 0;
 
   return (
-    <div className="space-y-6">
+    <div className="flex-1 flex flex-col min-h-0 space-y-5">
       {/* Top Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
@@ -257,13 +257,13 @@ export function PricingIntelligenceView() {
       <div className="glass-card rounded-xl p-3 border border-slate-800 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 flex-1 min-w-[240px]">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 z-10 pointer-events-none" />
             <input
               type="text"
               placeholder="Search by player, item title, or cert #..."
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="input-field pl-9 py-1.5 text-xs"
+              className="input-field !pl-10 py-1.5 text-xs"
             />
           </div>
         </div>
@@ -311,7 +311,7 @@ export function PricingIntelligenceView() {
           <p className="text-xs text-slate-600 mt-1">Try clearing your search query or switching filters</p>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="flex-1 min-h-0 overflow-y-auto space-y-4 pr-1">
           {filteredComps.map(item => {
             const draft = drafts[item.item_id] || {
               comp_1: '', comp_2: '', comp_3: '',

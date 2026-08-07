@@ -96,17 +96,14 @@ export function SalesLogView() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex items-start justify-between gap-4">
+    <div className="flex-1 flex flex-col min-h-0 space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-4 flex-shrink-0">
         <div>
           <h1 className="text-2xl font-black text-white flex items-center gap-2">
             <TrendingUp className="w-6 h-6 text-amber-400" />
             Sales Log & Realized Profit
           </h1>
-          <p className="text-sm text-slate-400 mt-0.5">
-            Track closed sales, net proceeds after platform deductions, and realized ROI.
-          </p>
         </div>
         <button
           id="btn-log-sale"
@@ -118,35 +115,35 @@ export function SalesLogView() {
       </div>
 
       {/* KPI Cards Summary Strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 flex-shrink-0">
         <div className="glass-card rounded-xl p-4 border border-slate-800">
           <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Total Net Profit</p>
           <p className={`text-xl font-black mt-1 ${summary.total_net_profit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
             {fmtCurrency(summary.total_net_profit)}
           </p>
-          <p className="text-[10px] text-slate-500 mt-0.5">Realized gain</p>
+          <p className="text-[10px] text-slate-500 mt-0.5">After cost & fees</p>
         </div>
 
         <div className="glass-card rounded-xl p-4 border border-slate-800">
-          <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Blended ROI</p>
-          <p className={`text-xl font-black mt-1 ${summary.blended_roi >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-            {fmtPct(summary.blended_roi)}
-          </p>
-          <p className="text-[10px] text-slate-500 mt-0.5">Gain / Cost ratio</p>
-        </div>
-
-        <div className="glass-card rounded-xl p-4 border border-slate-800">
-          <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Gross Sales</p>
-          <p className="text-xl font-black text-slate-100 mt-1">
-            {fmtCurrency(summary.total_gross)}
-          </p>
-          <p className="text-[10px] text-slate-500 mt-0.5">Proceeds: {fmtCurrency(summary.total_net_proceeds)}</p>
-        </div>
-
-        <div className="glass-card rounded-xl p-4 border border-slate-800">
-          <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Total Sold Items</p>
+          <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Gross Sales Volume</p>
           <p className="text-xl font-black text-amber-400 mt-1">
-            {summary.total_count}
+            {fmtCurrency(summary.total_gross_volume)}
+          </p>
+          <p className="text-[10px] text-slate-500 mt-0.5">Total buyer payment</p>
+        </div>
+
+        <div className="glass-card rounded-xl p-4 border border-slate-800">
+          <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Net Proceeds</p>
+          <p className="text-xl font-black text-white mt-1">
+            {fmtCurrency(summary.total_net_proceeds)}
+          </p>
+          <p className="text-[10px] text-slate-500 mt-0.5">Bank deposit total</p>
+        </div>
+
+        <div className="glass-card rounded-xl p-4 border border-slate-800">
+          <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Overall ROI</p>
+          <p className="text-xl font-black text-emerald-400 mt-1">
+            {fmtPct(summary.overall_roi_pct)}
           </p>
           <p className="text-[10px] text-slate-500 mt-0.5">Completed orders</p>
         </div>
@@ -161,14 +158,14 @@ export function SalesLogView() {
       </div>
 
       {/* Search and Filters Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 flex-shrink-0">
         <div className="flex items-center gap-3 flex-1 min-w-[240px] max-w-md">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 z-10 pointer-events-none" />
             <input
               id="sales-search-input"
               type="text"
-              className="input-field pl-10 text-xs"
+              className="input-field !pl-10 text-xs"
               placeholder="Search items, athlete, buyer..."
               value={search}
               onChange={e => setSearch(e.target.value)}
@@ -213,11 +210,11 @@ export function SalesLogView() {
       )}
 
       {/* Sales Data Table */}
-      <div className="glass-card rounded-2xl overflow-hidden border border-slate-800">
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="border-b border-slate-800/60 bg-slate-950/50">
+      <div className="w-full glass-card rounded-xl overflow-hidden border border-slate-800 shadow-2xl flex-1 flex flex-col min-h-0">
+        <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0 relative">
+          <table className="w-full text-xs border-collapse">
+            <thead className="sticky top-0 z-30 bg-slate-900 shadow-md">
+              <tr className="border-b border-slate-800/80 bg-slate-900/95 backdrop-blur-md">
                 {[
                   'Sale Date',
                   'Item & Details',
@@ -230,8 +227,13 @@ export function SalesLogView() {
                   'ROI %',
                   'Days',
                   'Actions'
-                ].map(h => (
-                  <th key={h} className="px-4 py-3 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">
+                ].map((h, idx) => (
+                  <th
+                    key={h}
+                    className={`px-4 py-3 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap sticky top-0 bg-slate-900 border-b border-slate-700/80 shadow-md ${
+                      idx === 1 ? 'sticky left-0 z-40 border-r border-slate-700/80' : 'z-30'
+                    }`}
+                  >
                     {h}
                   </th>
                 ))}

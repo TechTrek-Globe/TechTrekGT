@@ -1,6 +1,6 @@
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 import pdfWorkerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url';
-import { parseCleanNumber, formatExcelDate, extractMetadataFromTitle } from './spreadsheetParser.js';
+import { parseCleanNumber, formatExcelDate, extractMetadataFromTitle, cleanItemName } from './spreadsheetParser.js';
 import { computePricingFloors } from './formulaPreview.js';
 
 // Configure PDF.js worker in browser environments
@@ -333,17 +333,16 @@ export function parsePristineAuctionInvoiceText(rawText, fallbackDate = null) {
 
     const notesParts = [];
     if (won.lotNum) notesParts.push(`Lot #${won.lotNum}`);
-    if (won.itemNum) notesParts.push(`Item #${won.itemNum}`);
 
     return {
       id: `item-${crypto.randomUUID()}`,
       invoice_ref: invoiceRef,
-      item_name: won.title,
+      item_name: cleanItemName(won.title),
       category: inferred.category || 'Memorabilia',
       sport_genre: inferred.sport_genre || '',
       athlete_person: inferred.athlete_person || '',
       authenticator: inferred.authenticator || '',
-      cert_number: inferred.cert_number || (won.itemNum ? String(won.itemNum) : ''),
+      cert_number: inferred.cert_number || '',
       unit_price: unitPrice,
       item_base_total: unitPrice,
       proration_weight: weight,

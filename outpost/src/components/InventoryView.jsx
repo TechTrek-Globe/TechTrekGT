@@ -13,6 +13,8 @@ import { fmtCurrency, fmtPct } from '../utils/formulaPreview';
 import { getApiUrl } from '../utils/api';
 import { FileSpreadsheet, ShieldCheck, Copy } from 'lucide-react';
 import { getCertVerificationUrl, getAuthenticatorMeta } from '../utils/certLookup';
+import { DEFAULT_COLUMNS, DEFAULT_CATEGORIES, getStoredUserSettings, saveUserSettings } from '../utils/userSettings';
+import { cleanItemName } from '../utils/spreadsheetParser';
 
 const STATUS_META = {
   'Available':     { color: 'text-emerald-400', bg: 'bg-emerald-500/10',  border: 'border-emerald-500/20' },
@@ -72,7 +74,7 @@ function InlineStatusSelect({ itemId, current, onUpdated }) {
   );
 }
 
-function InlineEditCell({ value, itemId, field, type = 'text', prefix, suffix, onUpdated }) {
+function InlineEditCell({ value, itemId, field, type = 'text', prefix, suffix, className = '', onUpdated }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
   const [saving, setSaving] = useState(false);
@@ -92,7 +94,7 @@ function InlineEditCell({ value, itemId, field, type = 'text', prefix, suffix, o
     setSaving(true);
     try {
       await updateItem(itemId, { [field]: parsed });
-      onUpdated(itemId, { [field]: parsed });
+      if (onUpdated) onUpdated(itemId, { [field]: parsed });
     } catch (e) {
       console.error(e);
     } finally {
@@ -103,34 +105,88 @@ function InlineEditCell({ value, itemId, field, type = 'text', prefix, suffix, o
 
   if (editing) {
     return (
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 w-full">
         {prefix && <span className="text-slate-500 text-xs">{prefix}</span>}
         <input
           ref={inputRef}
           type={type}
-          className="w-24 bg-slate-800 border border-amber-500/40 rounded-md px-2 py-1 text-xs text-slate-100 outline-none focus:border-amber-500"
+          step={type === 'number' ? '0.01' : undefined}
+          className="w-full min-w-[70px] bg-slate-800 border border-amber-500/60 rounded px-2 py-0.5 text-xs text-slate-100 outline-none focus:border-amber-500"
           value={draft}
           onChange={e => setDraft(e.target.value)}
+          onBlur={save}
           onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') cancel(); }}
           autoFocus
         />
-        {saving
-          ? <Loader2 className="w-3 h-3 animate-spin text-amber-400 flex-shrink-0" />
-          : <>
-            <button onClick={save} className="w-5 h-5 flex items-center justify-center rounded text-emerald-400 hover:bg-emerald-900/30 transition-colors"><Check className="w-3 h-3" /></button>
-            <button onClick={cancel} className="w-5 h-5 flex items-center justify-center rounded text-slate-500 hover:text-slate-300 transition-colors"><X className="w-3 h-3" /></button>
-          </>}
+        {saving && <Loader2 className="w-3 h-3 animate-spin text-amber-400 flex-shrink-0" />}
       </div>
     );
   }
 
-  const display = value != null ? `${prefix || ''}${type === 'number' ? Number(value).toFixed(2) : value}${suffix || ''}` : '--';
+  const display = value != null && value !== '' ? `${prefix || ''}${type === 'number' ? Number(value).toFixed(2) : value}${suffix || ''}` : '--';
 
   return (
-    <button onClick={startEdit} className="group flex items-center gap-1 text-left hover:text-amber-300 transition-colors">
-      <span className={value != null ? 'text-slate-200' : 'text-slate-600'}>{display}</span>
-      <Pencil className="w-3 h-3 text-slate-700 group-hover:text-amber-400/60 transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100" />
-    </button>
+    <div
+      onClick={startEdit}
+      className={`group cursor-pointer flex items-center justify-between gap-1 hover:bg-slate-800/60 rounded px-1 -mx-1 py-0.5 transition-colors ${className}`}
+      title="Click to edit cell"
+    >
+      <span className={value != null && value !== '' ? 'text-slate-200' : 'text-slate-600'}>{display}</span>
+      <Pencil className="w-2.5 h-2.5 text-slate-500 group-hover:text-amber-400 transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0" />
+    </div>
+  );
+}
+
+function InlineSelectCell({ value, itemId, field, options = [], onUpdated }) {
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const choose = async (val) => {
+    if (val === value) { setEditing(false); return; }
+    setSaving(true);
+    try {
+      await updateItem(itemId, { [field]: val });
+      if (onUpdated) onUpdated(itemId, { [field]: val });
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSaving(false);
+      setEditing(false);
+    }
+  };
+
+  if (editing) {
+    const safeOptions = Array.isArray(options) ? options : [];
+    return (
+      <div className="flex items-center gap-1 w-full">
+        <select
+          autoFocus
+          className="w-full bg-slate-800 border border-amber-500/60 rounded px-2 py-0.5 text-xs text-slate-100 outline-none focus:border-amber-500"
+          value={value || ''}
+          onChange={e => choose(e.target.value)}
+          onBlur={() => setEditing(false)}
+        >
+          <option value="">-- None --</option>
+          {safeOptions.map(opt => {
+            const val = typeof opt === 'object' ? opt.value : opt;
+            const lbl = typeof opt === 'object' ? opt.label : opt;
+            return <option key={val} value={val}>{lbl}</option>;
+          })}
+        </select>
+        {saving && <Loader2 className="w-3 h-3 animate-spin text-amber-400 flex-shrink-0" />}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      onClick={() => setEditing(true)}
+      className="group cursor-pointer flex items-center justify-between gap-1 hover:bg-slate-800/60 rounded px-1 -mx-1 py-0.5 transition-colors"
+      title="Click to edit cell"
+    >
+      <span className={value ? 'text-slate-200' : 'text-slate-600'}>{value || '--'}</span>
+      <Pencil className="w-2.5 h-2.5 text-slate-500 group-hover:text-amber-400 transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0" />
+    </div>
   );
 }
 
@@ -151,6 +207,46 @@ export function InventoryView() {
   const [statusFilter, setStatusFilter] = useState('');
   const [pagination, setPagination] = useState({ total: 0, page: 1, pages: 1 });
   const [deleting,  setDeleting]  = useState(null);
+
+  // Settings: Column Visibility & Column Widths
+  const [userSettings, setUserSettings] = useState(getStoredUserSettings);
+
+  useEffect(() => {
+    const handleSettingsUpdate = (e) => {
+      if (e.detail) setUserSettings(e.detail);
+    };
+    window.addEventListener('outpost-settings-updated', handleSettingsUpdate);
+    return () => window.removeEventListener('outpost-settings-updated', handleSettingsUpdate);
+  }, []);
+
+  const { columnVisibility, columnWidths } = userSettings;
+
+  // Column Resizing Handler
+  const handleResizeStart = (colKey, e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX;
+    const startWidth = columnWidths[colKey] || 120;
+    const colDef = DEFAULT_COLUMNS.find(c => c.key === colKey) || { minWidth: 80 };
+
+    const handleMouseMove = (moveEvent) => {
+      const delta = moveEvent.clientX - startX;
+      const newWidth = Math.max(colDef.minWidth, startWidth + delta);
+      setUserSettings(prev => ({
+        ...prev,
+        columnWidths: { ...prev.columnWidths, [colKey]: newWidth }
+      }));
+    };
+
+    const handleMouseUp = () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      saveUserSettings({ columnWidths: userSettings.columnWidths });
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
 
   const fetchItems = useCallback(async (page = 1) => {
     setLoading(true); setError('');
@@ -204,10 +300,12 @@ export function InventoryView() {
     return acc;
   }, {});
 
+  const visibleColumns = DEFAULT_COLUMNS.filter(col => columnVisibility[col.key] !== false);
+
   return (
-    <div className="space-y-5">
+    <div className="flex-1 flex flex-col min-h-0 space-y-5">
       {/* Page header */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex items-start justify-between gap-4 flex-shrink-0">
         <div>
           <h1 className="text-2xl font-black text-white">Inventory</h1>
           <p className="text-sm text-slate-400 mt-0.5">
@@ -234,7 +332,7 @@ export function InventoryView() {
       </div>
 
       {/* Status pills */}
-      <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex items-center gap-2 flex-wrap flex-shrink-0">
         <button
           onClick={() => setStatusFilter('')}
           className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border ${!statusFilter ? 'bg-amber-500/15 text-amber-400 border-amber-500/20' : 'text-slate-500 border-slate-800 hover:text-slate-300'}`}
@@ -257,13 +355,13 @@ export function InventoryView() {
       </div>
 
       {/* Search + refresh */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-shrink-0">
         <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 z-10 pointer-events-none" />
           <input
             id="inventory-search"
             type="text"
-            className="input-field pl-10 text-sm"
+            className="input-field !pl-10 text-sm"
             placeholder="Search items, athletes..."
             value={search}
             onChange={e => setSearch(e.target.value)}
@@ -280,40 +378,43 @@ export function InventoryView() {
 
       {/* Error */}
       {error && (
-        <div className="p-4 rounded-xl bg-red-950/40 border border-red-800/40 text-red-400 text-sm flex gap-2">
+        <div className="p-4 rounded-xl bg-red-950/40 border border-red-800/40 text-red-400 text-sm flex gap-2 flex-shrink-0">
           <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />{error}
         </div>
       )}
 
-      {/* Table */}
-      <div className="glass-card rounded-2xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="border-b border-slate-800/60 bg-slate-950/40">
-                {[
-                  'Item',
-                  'Status',
-                  'Category',
-                  'Authenticator',
-                  'True Cost',
-                  'Min Sell',
-                  'Suggested List',
-                  'Current List',
-                  'Platform',
-                  'Invoice',
-                  ''
-                ].map(h => (
-                  <th key={h} className="px-4 py-3 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">
-                    {h}
-                  </th>
-                ))}
+      {/* Table with Full Width & Vertical Extension, Sticky Header, Horizontal Scroll, Resizable Columns */}
+      <div className="w-full glass-card rounded-xl overflow-hidden border border-slate-800/80 shadow-2xl flex-1 flex flex-col min-h-0">
+        <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0 relative">
+          <table className="w-full text-xs border-collapse">
+            <thead className="sticky top-0 z-30 bg-slate-900 shadow-md">
+              <tr className="border-b border-slate-800/80 bg-slate-900/95 backdrop-blur-md">
+                {visibleColumns.map(col => {
+                  const width = columnWidths[col.key] || col.defaultWidth;
+                  const isItemName = col.key === 'item_name';
+                  return (
+                    <th
+                      key={col.key}
+                      style={{ width: `${width}px`, minWidth: `${col.minWidth}px`, maxWidth: `${width}px` }}
+                      className={`px-4 py-3 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide whitespace-nowrap relative select-none group/th sticky top-0 bg-slate-900 border-b border-slate-700/80 shadow-md ${
+                        isItemName ? 'left-0 z-40 border-r border-slate-700/80 shadow-r' : 'z-30'
+                      }`}
+                    >
+                      <span>{col.label}</span>
+                      <div
+                        onMouseDown={(e) => handleResizeStart(col.key, e)}
+                        className="absolute right-0 top-0 bottom-0 w-2 cursor-col-resize hover:bg-amber-500/40 group-hover/th:bg-slate-700/60 transition-colors z-30"
+                        title="Drag to resize column"
+                      />
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody>
               {loading && items.length === 0 && (
                 <tr>
-                  <td colSpan={11} className="py-16 text-center text-slate-500">
+                  <td colSpan={visibleColumns.length} className="py-16 text-center text-slate-500">
                     <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2 text-amber-400" />
                     <p className="text-sm">Loading inventory...</p>
                   </td>
@@ -321,7 +422,7 @@ export function InventoryView() {
               )}
               {!loading && items.length === 0 && (
                 <tr>
-                  <td colSpan={11} className="py-16 text-center">
+                  <td colSpan={visibleColumns.length} className="py-16 text-center">
                     <Package className="w-8 h-8 text-slate-700 mx-auto mb-3" />
                     <p className="text-slate-400 font-semibold text-sm">No items yet</p>
                     <p className="text-slate-600 text-xs mt-1">Click "Add Invoice" to import your first batch of memorabilia.</p>
@@ -333,137 +434,229 @@ export function InventoryView() {
                   key={item.id}
                   className={`border-b border-slate-800/30 hover:bg-slate-800/20 transition-colors group ${i % 2 === 0 ? 'bg-transparent' : 'bg-slate-950/20'}`}
                 >
-                  {/* Item Name */}
-                  <td className="px-4 py-3 max-w-[220px]">
-                    <p className="text-slate-200 font-medium text-xs leading-snug line-clamp-2" title={item.item_name}>
-                      {item.item_name}
-                    </p>
-                    {item.athlete_person && (
-                      <p className="text-slate-500 text-[10px] mt-0.5">{item.athlete_person}</p>
-                    )}
-                  </td>
+                  {/* Item Name (Locked Column 1) */}
+                  {columnVisibility.item_name !== false && (
+                    <td
+                      style={{ width: `${columnWidths.item_name || 220}px` }}
+                      className={`px-4 py-3 sticky left-0 z-10 border-r border-slate-800/80 shadow-r transition-colors ${
+                        i % 2 === 0 ? 'bg-slate-950' : 'bg-slate-900'
+                      } group-hover:bg-slate-900`}
+                    >
+                      <InlineEditCell
+                        value={cleanItemName(item.item_name)}
+                        itemId={item.id}
+                        field="item_name"
+                        onUpdated={handleItemUpdated}
+                      />
+                      {item.athlete_person && !item.item_name?.toLowerCase().includes(item.athlete_person.toLowerCase()) && (
+                        <p className="text-slate-500 text-[10px] mt-0.5 pointer-events-none">{item.athlete_person}</p>
+                      )}
+                    </td>
+                  )}
 
-                  {/* Status - inline dropdown */}
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <InlineStatusSelect
-                      itemId={item.id}
-                      current={item.status}
-                      onUpdated={handleItemUpdated}
-                    />
-                  </td>
+                  {/* Status */}
+                  {columnVisibility.status !== false && (
+                    <td
+                      style={{ width: `${columnWidths.status || 130}px` }}
+                      className="px-4 py-3 whitespace-nowrap"
+                    >
+                      <InlineStatusSelect
+                        itemId={item.id}
+                        current={item.status}
+                        onUpdated={handleItemUpdated}
+                      />
+                    </td>
+                  )}
 
                   {/* Category */}
-                  <td className="px-4 py-3 text-slate-400 whitespace-nowrap">{item.category || '--'}</td>
+                  {columnVisibility.category !== false && (
+                    <td
+                      style={{ width: `${columnWidths.category || 120}px` }}
+                      className="px-4 py-3 text-slate-400 whitespace-nowrap"
+                    >
+                      <InlineSelectCell
+                        value={item.category}
+                        itemId={item.id}
+                        field="category"
+                        options={DEFAULT_CATEGORIES}
+                        onUpdated={handleItemUpdated}
+                      />
+                    </td>
+                  )}
 
-                  {/* Auth & Cert Verification */}
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    {item.authenticator ? (
-                      <div>
-                        {getCertVerificationUrl(item.authenticator, item.cert_number) ? (
-                          <a
-                            href={getCertVerificationUrl(item.authenticator, item.cert_number)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-300 border border-blue-500/30 hover:bg-blue-500/20 hover:text-blue-200 transition-colors"
-                            title={`Verify with ${item.authenticator} Official Database`}
-                          >
-                            <ShieldCheck className="w-3 h-3 text-blue-400" />
-                            <span>{item.authenticator}</span>
-                            {item.cert_number && <span className="font-mono text-slate-400">#{item.cert_number}</span>}
-                            <ExternalLink className="w-2.5 h-2.5 opacity-60 ml-0.5" />
-                          </a>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-800 text-slate-300 border border-slate-700">
-                            <ShieldCheck className="w-3 h-3 text-slate-400" />
-                            <span>{item.authenticator}</span>
-                            {item.cert_number && <span className="font-mono text-slate-400">#{item.cert_number}</span>}
-                          </span>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="text-slate-600 text-xs">--</span>
-                    )}
-                  </td>
+                  {/* Authenticator Company */}
+                  {columnVisibility.authenticator !== false && (
+                    <td
+                      style={{ width: `${columnWidths.authenticator || 130}px` }}
+                      className="px-4 py-3 whitespace-nowrap"
+                    >
+                      <InlineSelectCell
+                        value={item.authenticator ? item.authenticator.replace(/#.*$/, '').trim() : ''}
+                        itemId={item.id}
+                        field="authenticator"
+                        options={['Beckett', 'JSA', 'PSA', 'ACOA', 'Upper Deck', 'Fanatics', 'Tristar', 'Steiner', 'Schwartz', 'Other']}
+                        onUpdated={handleItemUpdated}
+                      />
+                    </td>
+                  )}
+
+                  {/* Cert / Authenticator # */}
+                  {columnVisibility.cert_number !== false && (
+                    <td
+                      style={{ width: `${columnWidths.cert_number || 120}px` }}
+                      className="px-4 py-3 whitespace-nowrap"
+                    >
+                      <InlineEditCell
+                        value={item.cert_number}
+                        itemId={item.id}
+                        field="cert_number"
+                        onUpdated={handleItemUpdated}
+                      />
+                    </td>
+                  )}
 
                   {/* True Cost */}
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <span className="text-slate-200 font-semibold">{fmtCurrency(item.true_total_cost)}</span>
-                    <div className="text-[10px] text-slate-600 mt-0.5 space-x-1">
-                      <span title="Discount">-{fmtCurrency(item.prorated_discount)}</span>
-                      <span title="Shipping">+{fmtCurrency(item.prorated_shipping)}</span>
-                      <span title="Tax">+{fmtCurrency(item.prorated_tax)}</span>
-                    </div>
-                  </td>
+                  {columnVisibility.true_total_cost !== false && (
+                    <td
+                      style={{ width: `${columnWidths.true_total_cost || 120}px` }}
+                      className="px-4 py-3 whitespace-nowrap"
+                    >
+                      <InlineEditCell
+                        value={item.true_total_cost}
+                        itemId={item.id}
+                        field="true_total_cost"
+                        type="number"
+                        prefix="$"
+                        className="font-semibold"
+                        onUpdated={handleItemUpdated}
+                      />
+                    </td>
+                  )}
 
                   {/* Min Sell */}
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <span className="text-emerald-400 font-semibold">{fmtCurrency(item.min_sell_price)}</span>
-                  </td>
+                  {columnVisibility.min_sell_price !== false && (
+                    <td
+                      style={{ width: `${columnWidths.min_sell_price || 110}px` }}
+                      className="px-4 py-3 whitespace-nowrap"
+                    >
+                      <InlineEditCell
+                        value={item.min_sell_price}
+                        itemId={item.id}
+                        field="min_sell_price"
+                        type="number"
+                        prefix="$"
+                        className="text-emerald-400 font-semibold"
+                        onUpdated={handleItemUpdated}
+                      />
+                    </td>
+                  )}
 
                   {/* Suggested List */}
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <span className="text-blue-400 font-semibold">{fmtCurrency(item.suggested_list_price)}</span>
-                  </td>
+                  {columnVisibility.suggested_list_price !== false && (
+                    <td
+                      style={{ width: `${columnWidths.suggested_list_price || 130}px` }}
+                      className="px-4 py-3 whitespace-nowrap"
+                    >
+                      <InlineEditCell
+                        value={item.suggested_list_price}
+                        itemId={item.id}
+                        field="suggested_list_price"
+                        type="number"
+                        prefix="$"
+                        className="text-blue-400 font-semibold"
+                        onUpdated={handleItemUpdated}
+                      />
+                    </td>
+                  )}
 
-                  {/* Current List - inline editable */}
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <InlineEditCell
-                      value={item.current_list_price}
-                      itemId={item.id}
-                      field="current_list_price"
-                      type="number"
-                      prefix="$"
-                      onUpdated={handleItemUpdated}
-                    />
-                  </td>
+                  {/* Current List */}
+                  {columnVisibility.current_list_price !== false && (
+                    <td
+                      style={{ width: `${columnWidths.current_list_price || 130}px` }}
+                      className="px-4 py-3 whitespace-nowrap"
+                    >
+                      <InlineEditCell
+                        value={item.current_list_price}
+                        itemId={item.id}
+                        field="current_list_price"
+                        type="number"
+                        prefix="$"
+                        className="text-amber-300 font-semibold"
+                        onUpdated={handleItemUpdated}
+                      />
+                    </td>
+                  )}
 
                   {/* Platform */}
-                  <td className="px-4 py-3 text-slate-400 whitespace-nowrap">
-                    <div>{item.platform || '--'}</div>
-                    {item.platform_fee_pct > 0 && (
-                      <div className="text-[10px] text-slate-600">{fmtPct(item.platform_fee_pct)} fee</div>
-                    )}
-                  </td>
+                  {columnVisibility.platform !== false && (
+                    <td
+                      style={{ width: `${columnWidths.platform || 120}px` }}
+                      className="px-4 py-3 text-slate-400 whitespace-nowrap"
+                    >
+                      <InlineSelectCell
+                        value={item.platform}
+                        itemId={item.id}
+                        field="platform"
+                        options={platforms.map(p => p.name).concat(['eBay', 'Pristine Auction', 'Mercari', 'Whatnot', 'Private Sale', 'Other'])}
+                        onUpdated={handleItemUpdated}
+                      />
+                    </td>
+                  )}
 
                   {/* Invoice Ref */}
-                  <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
-                    {item.invoice_ref || '--'}
-                  </td>
+                  {columnVisibility.invoice_ref !== false && (
+                    <td
+                      style={{ width: `${columnWidths.invoice_ref || 110}px` }}
+                      className="px-4 py-3 text-slate-500 whitespace-nowrap"
+                    >
+                      <InlineEditCell
+                        value={item.invoice_ref}
+                        itemId={item.id}
+                        field="invoice_ref"
+                        onUpdated={handleItemUpdated}
+                      />
+                    </td>
+                  )}
 
                   {/* Actions */}
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={() => setCopyModalItem(item)}
-                        title="Generate multi-channel listing copy (eBay/Whatnot/Mercari)"
-                        className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 hover:text-amber-400 hover:bg-amber-900/20 transition-all"
-                      >
-                        <Copy className="w-3.5 h-3.5" />
-                      </button>
-                      {item.status !== 'Sold' && (
+                  {columnVisibility.actions !== false && (
+                    <td
+                      style={{ width: `${columnWidths.actions || 100}px` }}
+                      className="px-4 py-3 whitespace-nowrap"
+                    >
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
-                          id={`sell-item-${item.id}`}
-                          onClick={() => {
-                            setItemToSell(item);
-                            setSaleModalOpen(true);
-                          }}
-                          title="Record sale for this item"
-                          className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 hover:text-emerald-400 hover:bg-emerald-900/20 transition-all"
+                          onClick={() => setCopyModalItem(item)}
+                          title="Generate multi-channel listing copy (eBay/Whatnot/Mercari)"
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 hover:text-amber-400 hover:bg-amber-900/20 transition-all"
                         >
-                          <DollarSign className="w-3.5 h-3.5" />
+                          <Copy className="w-3.5 h-3.5" />
                         </button>
-                      )}
-                      <button
-                        id={`delete-item-${item.id}`}
-                        onClick={() => handleDelete(item.id)}
-                        disabled={deleting === item.id || item.status === 'Sold'}
-                        title={item.status === 'Sold' ? 'Cannot delete a sold item' : 'Delete item'}
-                        className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-600 hover:text-red-400 hover:bg-red-900/20 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-                      >
-                        {deleting === item.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                      </button>
-                    </div>
-                  </td>
+                        {item.status !== 'Sold' && (
+                          <button
+                            id={`sell-item-${item.id}`}
+                            onClick={() => {
+                              setItemToSell(item);
+                              setSaleModalOpen(true);
+                            }}
+                            title="Record sale for this item"
+                            className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 hover:text-emerald-400 hover:bg-emerald-900/20 transition-all"
+                          >
+                            <DollarSign className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        <button
+                          id={`delete-item-${item.id}`}
+                          onClick={() => handleDelete(item.id)}
+                          disabled={deleting === item.id || item.status === 'Sold'}
+                          title={item.status === 'Sold' ? 'Cannot delete a sold item' : 'Delete item'}
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-600 hover:text-red-400 hover:bg-red-900/20 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                        >
+                          {deleting === item.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

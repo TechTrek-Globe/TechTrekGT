@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   Settings, Shield, Download, RefreshCw, Plus, Edit2, Trash2,
   CheckCircle2, AlertCircle, Loader2, Save, FileText, Database, User, ShieldCheck,
-  FileSpreadsheet, Upload, ArrowRightLeft, Sparkles, Boxes, Calculator
+  FileSpreadsheet, Upload, ArrowRightLeft, Sparkles, Boxes, Calculator, LayoutGrid, ArrowUp, ArrowDown, Eye, EyeOff
 } from 'lucide-react';
 import { SpreadsheetImporterModal } from './SpreadsheetImporterModal';
 import { FinanceSyncModal } from './FinanceSyncModal';
@@ -14,6 +14,7 @@ import {
   getItems, getSales, getInvoices, getComps
 } from '../utils/auctionApi';
 import { fmtCurrency, fmtPct } from '../utils/formulaPreview';
+import { DEFAULT_COLUMNS, DEFAULT_CATEGORIES, getStoredUserSettings, saveUserSettings } from '../utils/userSettings';
 
 export function SettingsView() {
   const { user } = useAuth();
@@ -33,8 +34,34 @@ export function SettingsView() {
   const [importerOpen, setImporterOpen] = useState(false);
   const [addForm, setAddForm] = useState({ name: '', fee_pct: '', flat_fee: '', notes: '', is_default: false });
 
+  // User Preferences (Column Visibility & Category Ordering)
+  const [userSettings, setUserSettingsState] = useState(getStoredUserSettings);
+
   // Export state
   const [exporting, setExporting] = useState(false);
+
+  const toggleColumnVisibility = (colKey) => {
+    const updated = {
+      ...userSettings.columnVisibility,
+      [colKey]: !userSettings.columnVisibility[colKey]
+    };
+    const newSettings = saveUserSettings({ ...userSettings, columnVisibility: updated });
+    setUserSettingsState(newSettings);
+    showSuccess(`Updated visibility for column '${colKey}'`);
+  };
+
+  const moveCategory = (index, direction) => {
+    const categories = [...userSettings.categoryOrder];
+    const targetIdx = index + direction;
+    if (targetIdx < 0 || targetIdx >= categories.length) return;
+    const temp = categories[index];
+    categories[index] = categories[targetIdx];
+    categories[targetIdx] = temp;
+
+    const newSettings = saveUserSettings({ ...userSettings, categoryOrder: categories });
+    setUserSettingsState(newSettings);
+    showSuccess('Updated category ordering.');
+  };
 
   const fetchPlatformsList = useCallback(async () => {
     setLoading(true);
@@ -276,7 +303,7 @@ export function SettingsView() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8 pb-12">
+    <div className="w-full flex-1 min-h-0 overflow-y-auto space-y-8 pb-12 pr-1">
       {/* Top Header */}
       <div>
         <h1 className="text-2xl font-black text-white flex items-center gap-2">
@@ -647,6 +674,90 @@ export function SettingsView() {
                 <Sparkles className="w-3.5 h-3.5" />
                 <span>Launch Finance Sync</span>
               </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Section 2.5: Inventory View Columns & Category Customization */}
+      <div className="glass-card rounded-2xl p-6 border border-slate-800 space-y-6">
+        <div className="border-b border-slate-800/60 pb-4">
+          <h2 className="text-base font-bold text-slate-100 flex items-center gap-2">
+            <LayoutGrid className="w-4 h-4 text-amber-400" />
+            Inventory Table Customization & Category Ordering
+          </h2>
+          <p className="text-xs text-slate-400 mt-0.5">
+            Configure column visibility for all inventory views and re-order product categories
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Column Visibility Toggles */}
+          <div className="space-y-3">
+            <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wide flex items-center gap-1.5">
+              <Eye className="w-3.5 h-3.5 text-amber-400" />
+              Column Visibility (Applies dynamically across all views)
+            </h3>
+            <div className="grid grid-cols-2 gap-2 bg-slate-900/60 p-3 rounded-xl border border-slate-800">
+              {DEFAULT_COLUMNS.map(col => {
+                const isVisible = userSettings.columnVisibility[col.key] !== false;
+                return (
+                  <label
+                    key={col.key}
+                    className={`flex items-center justify-between p-2 rounded-lg text-xs cursor-pointer border transition-all ${
+                      isVisible
+                        ? 'bg-amber-500/10 text-amber-300 border-amber-500/30 font-semibold'
+                        : 'bg-slate-950/40 text-slate-500 border-slate-800'
+                    }`}
+                  >
+                    <span>{col.label}</span>
+                    <input
+                      type="checkbox"
+                      checked={isVisible}
+                      onChange={() => toggleColumnVisibility(col.key)}
+                      className="rounded border-slate-700 bg-slate-900 text-amber-500 focus:ring-amber-500/30"
+                    />
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Category Ordering */}
+          <div className="space-y-3">
+            <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wide flex items-center gap-1.5">
+              <LayoutGrid className="w-3.5 h-3.5 text-amber-400" />
+              Custom Category Order
+            </h3>
+            <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-800 space-y-1.5 max-h-72 overflow-y-auto">
+              {userSettings.categoryOrder.map((cat, idx) => (
+                <div
+                  key={cat}
+                  className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-slate-950/60 border border-slate-800/80 text-xs text-slate-200"
+                >
+                  <span className="font-medium">{idx + 1}. {cat}</span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      disabled={idx === 0}
+                      onClick={() => moveCategory(idx, -1)}
+                      className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-amber-400 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-400"
+                      title="Move Up"
+                    >
+                      <ArrowUp className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={idx === userSettings.categoryOrder.length - 1}
+                      onClick={() => moveCategory(idx, 1)}
+                      className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-amber-400 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-400"
+                      title="Move Down"
+                    >
+                      <ArrowDown className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>

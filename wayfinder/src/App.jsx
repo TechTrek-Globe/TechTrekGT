@@ -53,8 +53,11 @@ function App() {
     }
 
     if (normalizedPath.startsWith('/wayfinder/poland-christmas-2026/cities/')) {
-      const cityId = normalizedPath.split('/').pop();
-      return <CityPage cityId={cityId} />;
+      const pathSuffix = normalizedPath.replace(/\/wayfinder\/poland-christmas-2026\/cities\/?/, '');
+      const parts = pathSuffix.split('/');
+      const cityId = parts[0];
+      const subPage = parts[1] || 'overview';
+      return <CityPage cityId={cityId} subPage={subPage} />;
     }
 
     if (normalizedPath.startsWith('/wayfinder/poland-christmas-2026/private')) {

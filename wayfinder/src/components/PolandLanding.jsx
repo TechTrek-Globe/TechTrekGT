@@ -1,6 +1,7 @@
 import React from 'react';
 import { Compass, Map, Calendar, Train, Utensils, Bed, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { polandJourney } from '../data/poland-2026';
+import { cityImages } from '../utils/cityImages';
 
 export function PolandLanding() {
   const pushRoute = (e, path) => {
@@ -77,22 +78,41 @@ export function PolandLanding() {
           
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             {polandJourney.route.map((city, idx) => (
-              <div key={city.id} className="glass-panel rounded-2xl relative hover-lift cursor-pointer overflow-hidden border border-white/5 hover:border-amber-500/40 transition-colors" onClick={(e) => pushRoute(e, `/wayfinder/poland-christmas-2026/cities/${city.id}`)}>
+              <div key={city.id} className="glass-panel rounded-2xl relative hover-lift cursor-pointer overflow-hidden border border-white/5 hover:border-amber-500/40 transition-colors group" onClick={(e) => pushRoute(e, `/wayfinder/poland-christmas-2026/cities/${city.id}`)}>
                 {idx < polandJourney.route.length - 1 && (
                   <div className="hidden md:block absolute top-1/2 -right-4 w-4 h-px bg-white/20 z-10" />
                 )}
-                <div className="h-32 w-full bg-cover bg-center relative group" style={{ backgroundImage: `url('/wayfinder/${city.id}.png')` }}>
-                  <div className="absolute inset-0 bg-gradient-to-t from-wf-navy via-wf-navy/60 to-transparent transition-opacity duration-300"></div>
+                <div className="h-36 w-full relative overflow-hidden">
+                  <img 
+                    src={cityImages[city.id]} 
+                    alt={city.name} 
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-wf-navy via-wf-navy/50 to-transparent"></div>
+                  
+                  {/* Detailed Hover Overlay */}
+                  <div className="absolute inset-0 bg-wf-navy/95 p-3 flex flex-col justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 backdrop-blur-sm z-20">
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-amber-400 mb-0.5">
+                      📍 {city.imageDetails?.location}
+                    </div>
+                    <div className="text-xs font-bold text-white mb-1 line-clamp-1">
+                      🏛️ {city.imageDetails?.landmark}
+                    </div>
+                    <p className="text-[11px] text-amber-100/90 leading-tight line-clamp-4">
+                      {city.imageDetails?.description}
+                    </p>
+                  </div>
                 </div>
-                <div className="p-5 -mt-10 relative z-10">
+
+                <div className="p-4 relative z-10">
                   <div className="text-amber-300 text-[10px] font-black uppercase tracking-widest mb-1 drop-shadow-md">
                     Stop 0{idx + 1}
                   </div>
                   <h3 className="text-xl font-bold text-white mb-1 drop-shadow-md">{city.name}</h3>
-                  <p className="text-xs text-amber-100/80 mb-3 font-medium">
+                  <p className="text-xs text-amber-100/80 mb-2 font-medium">
                     {city.nights > 0 ? `${city.nights} nights` : 'Day Stop'}
                   </p>
-                  <div className="text-xs text-wf-cream/80 line-clamp-3 leading-relaxed">
+                  <div className="text-xs text-wf-cream/80 line-clamp-2 leading-relaxed">
                     {city.focus}
                   </div>
                 </div>

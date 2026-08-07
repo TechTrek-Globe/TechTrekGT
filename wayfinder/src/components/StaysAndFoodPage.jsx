@@ -1,6 +1,7 @@
 import React from 'react';
 import { ArrowLeft, Bed, Utensils } from 'lucide-react';
 import { polandJourney } from '../data/poland-2026';
+import { cityImages } from '../utils/cityImages';
 
 export function StaysAndFoodPage() {
   const pushRoute = (e, path) => {
@@ -24,10 +25,11 @@ export function StaysAndFoodPage() {
       <div className="space-y-12">
         {polandJourney.route.filter(c => c.nights > 0).map((city) => (
           <div key={city.id} className="relative rounded-3xl overflow-hidden border border-white/5">
-            <div 
-              className="absolute inset-0 bg-cover bg-center opacity-20"
-              style={{ backgroundImage: `url('/wayfinder/${city.id}.png')` }}
-            ></div>
+            <img 
+              src={cityImages[city.id]} 
+              alt={city.name} 
+              className="absolute inset-0 w-full h-full object-cover opacity-20" 
+            />
             <div className="absolute inset-0 bg-gradient-to-r from-wf-navy via-wf-navy/90 to-wf-navy/80"></div>
             
             <div className="relative p-6 sm:p-8 grid grid-cols-1 md:grid-cols-2 gap-6">

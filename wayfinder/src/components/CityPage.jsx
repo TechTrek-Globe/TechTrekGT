@@ -119,6 +119,7 @@ function CulinaryHighlightsSection({ highlights }) {
 
 export function CityPage({ cityId, subPage = 'overview' }) {
   const [activeMarketTab, setActiveMarketTab] = useState(0);
+  const [activeEpochTab, setActiveEpochTab] = useState('all');
   const exchangeRates = useExchangeRate();
 
   const pushRoute = (e, path) => {
@@ -142,15 +143,17 @@ export function CityPage({ cityId, subPage = 'overview' }) {
 
   const baseUrl = `/wayfinder/poland-christmas-2026/cities/${cityId}`;
 
-  const activeSubPage = ['attractions', 'sights', 'must-see', 'must-see-sights'].includes(subPage)
-    ? 'attractions'
-    : (['restaurants', 'food', 'dining', 'top-restaurants'].includes(subPage)
-      ? 'restaurants'
-      : (['markets', 'market', 'christmas-markets'].includes(subPage)
-        ? 'markets'
-        : (['hotels', 'stays', 'base'].includes(subPage)
-          ? 'hotels'
-          : 'overview')));
+  const activeSubPage = ['history', 'timeline', 'history-timeline', 'chronological'].includes(subPage)
+    ? 'history'
+    : (['attractions', 'sights', 'must-see', 'must-see-sights'].includes(subPage)
+      ? 'attractions'
+      : (['restaurants', 'food', 'dining', 'top-restaurants'].includes(subPage)
+        ? 'restaurants'
+        : (['markets', 'market', 'christmas-markets'].includes(subPage)
+          ? 'markets'
+          : (['hotels', 'stays', 'base'].includes(subPage)
+            ? 'hotels'
+            : 'overview'))));
 
   // OpenStreetMap embed bbox for Kraków or generic fallback
   const mapUrl = cityId === 'krakow'
@@ -337,8 +340,23 @@ export function CityPage({ cityId, subPage = 'overview' }) {
             }`}
           >
             <Landmark className="w-3.5 h-3.5" />
-            <span>Overview & History</span>
+            <span>Overview</span>
           </a>
+
+          {city.historyEpochs && city.historyEpochs.length > 0 && (
+            <a
+              href={`${baseUrl}/history`}
+              onClick={(e) => pushRoute(e, `${baseUrl}/history`)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center space-x-1.5 ${
+                activeSubPage === 'history'
+                  ? 'bg-amber-500 text-slate-950 shadow-sm font-bold'
+                  : 'text-amber-300 hover:text-amber-100 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30'
+              }`}
+            >
+              <BookOpen className="w-3.5 h-3.5" />
+              <span>Chronological Journey Through Time</span>
+            </a>
+          )}
 
           {city.markets && city.markets.length > 0 && (
             <a
@@ -402,127 +420,79 @@ export function CityPage({ cityId, subPage = 'overview' }) {
 
       {/* RENDER DEDICATED SUB-PAGE CONTENT */}
 
-      {/* 1. OVERVIEW & HISTORY SUB-PAGE (Main Page) */}
+      {/* 1. OVERVIEW SUB-PAGE (Main Page) */}
       {activeSubPage === 'overview' && (
         <div className="space-y-10 animate-fade-in">
           {city.history && (
-            <section className="space-y-6">
-              <div className="glass-panel p-6 sm:p-10 rounded-3xl border border-amber-500/30 bg-wf-navy-mid/90 relative overflow-hidden shadow-2xl">
-                <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-amber-500/10 via-amber-500/5 to-transparent rounded-full blur-3xl pointer-events-none"></div>
-                
-                <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-                  <h2 className="text-2xl sm:text-3xl font-black text-white flex items-center space-x-3 tracking-tight">
-                    <Landmark className="w-7 h-7 sm:w-8 sm:h-8 text-amber-400" />
-                    <span>History & Heritage of {city.name}</span>
-                  </h2>
-                  <span className="px-3.5 py-1 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 text-xs font-black uppercase tracking-wider flex items-center space-x-1.5 shadow-sm">
-                    <Crown className="w-3.5 h-3.5" />
-                    <span>Royal Capital & UNESCO Inscription</span>
-                  </span>
-                </div>
-
-                {/* Historical Stats Grid */}
-                {city.historyStats && (
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-                    {city.historyStats.map((stat, idx) => (
-                      <div key={idx} className="p-3 sm:p-4 rounded-2xl bg-slate-900/80 border border-white/10 hover:border-amber-500/40 transition-colors">
-                        <div className="text-[11px] font-bold uppercase tracking-wider text-amber-400/80 mb-1 flex items-center space-x-1.5">
-                          {stat.icon === 'Crown' && <Crown className="w-3.5 h-3.5" />}
-                          {stat.icon === 'Award' && <Award className="w-3.5 h-3.5" />}
-                          {stat.icon === 'MapPin' && <MapPin className="w-3.5 h-3.5" />}
-                          {stat.icon === 'Landmark' && <Landmark className="w-3.5 h-3.5" />}
-                          <span>{stat.label}</span>
-                        </div>
-                        <div className="text-xs sm:text-sm font-black text-white leading-tight">
-                          {stat.value}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Primary Overview Narrative */}
-                <p className="text-wf-cream text-sm sm:text-base md:text-lg leading-relaxed font-medium">
-                  {city.history}
-                </p>
+            <section className="glass-panel p-6 sm:p-10 rounded-3xl border border-amber-500/30 bg-wf-navy-mid/90 relative overflow-hidden shadow-2xl space-y-6">
+              <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-amber-500/10 via-amber-500/5 to-transparent rounded-full blur-3xl pointer-events-none"></div>
+              
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-2xl sm:text-3xl font-black text-white flex items-center space-x-3 tracking-tight">
+                  <Landmark className="w-7 h-7 sm:w-8 sm:h-8 text-amber-400" />
+                  <span>Overview & Heritage of {city.name}</span>
+                </h2>
+                <span className="px-3.5 py-1 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 text-xs font-black uppercase tracking-wider flex items-center space-x-1.5 shadow-sm">
+                  <Crown className="w-3.5 h-3.5" />
+                  <span>Royal Capital & UNESCO Inscription</span>
+                </span>
               </div>
 
-              {/* Chronological Historical Epochs */}
-              {city.historyEpochs && (
-                <div className="space-y-4 pt-2">
-                  <div className="flex items-center space-x-2 text-amber-400 font-bold text-sm uppercase tracking-wider">
-                    <BookOpen className="w-5 h-5" />
-                    <span>Chronological Journey Through Time</span>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-4">
-                    {city.historyEpochs.map((epoch, idx) => (
-                      <div 
-                        key={idx} 
-                        className="glass-panel p-5 sm:p-7 rounded-2xl border border-white/10 hover:border-amber-500/40 bg-wf-navy/80 backdrop-blur-md transition-all group"
-                      >
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2.5">
-                          <div className="flex items-center space-x-3">
-                            <span className="w-7 h-7 rounded-full bg-amber-400/20 text-amber-300 font-black text-xs flex items-center justify-center border border-amber-400/40 shrink-0">
-                              {idx + 1}
-                            </span>
-                            <h3 className="text-base sm:text-lg font-black text-white group-hover:text-amber-300 transition-colors">
-                              {epoch.title}
-                            </h3>
-                          </div>
-                          <span className="inline-block px-3 py-1 rounded-full bg-slate-900/90 border border-amber-500/30 text-amber-400 text-xs font-black self-start sm:self-auto shrink-0">
-                            {epoch.era}
-                          </span>
-                        </div>
-
-                        {epoch.subtitle && (
-                          <div className="text-xs sm:text-sm font-semibold text-amber-200/90 mb-2 pl-10">
-                            {epoch.subtitle}
-                          </div>
-                        )}
-
-                        <p className="text-xs sm:text-sm text-slate-200 leading-relaxed pl-10">
-                          {epoch.description}
-                        </p>
+              {/* Historical Stats Grid */}
+              {city.historyStats && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {city.historyStats.map((stat, idx) => (
+                    <div key={idx} className="p-3 sm:p-4 rounded-2xl bg-slate-900/80 border border-white/10 hover:border-amber-500/40 transition-colors">
+                      <div className="text-[11px] font-bold uppercase tracking-wider text-amber-400/80 mb-1 flex items-center space-x-1.5">
+                        {stat.icon === 'Crown' && <Crown className="w-3.5 h-3.5" />}
+                        {stat.icon === 'Award' && <Award className="w-3.5 h-3.5" />}
+                        {stat.icon === 'MapPin' && <MapPin className="w-3.5 h-3.5" />}
+                        {stat.icon === 'Landmark' && <Landmark className="w-3.5 h-3.5" />}
+                        <span>{stat.label}</span>
                       </div>
-                    ))}
-                  </div>
+                      <div className="text-xs sm:text-sm font-black text-white leading-tight">
+                        {stat.value}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
 
-              {/* Legends & Intangible Cultural Traditions */}
-              {city.historyLegends && (
-                <div className="space-y-4 pt-2">
-                  <div className="flex items-center space-x-2 text-amber-400 font-bold text-sm uppercase tracking-wider">
-                    <Sparkles className="w-5 h-5" />
-                    <span>Living Folklore & Cultural Traditions</span>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {city.historyLegends.map((legend, idx) => (
-                      <div 
-                        key={idx} 
-                        className="glass-panel p-5 sm:p-6 rounded-2xl border border-amber-500/20 hover:border-amber-400/50 bg-wf-navy/90 flex flex-col justify-between transition-all"
-                      >
-                        <div>
-                          <div className="text-2xl mb-2.5">{legend.icon}</div>
-                          <h4 className="text-sm sm:text-base font-black text-white mb-2 leading-snug">
-                            {legend.title}
-                          </h4>
-                          <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-medium">
-                            {legend.description}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {/* Primary Overview Narrative */}
+              <p className="text-wf-cream text-sm sm:text-base md:text-lg leading-relaxed font-medium">
+                {city.history}
+              </p>
             </section>
           )}
 
-          {/* Quick-Jump Highlights: Must-See Sights & Top Dining */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Quick-Jump Highlights Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {city.historyEpochs && city.historyEpochs.length > 0 && (
+              <div className="glass-panel p-6 sm:p-7 rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-wf-navy-mid to-slate-950 shadow-xl flex flex-col justify-between group hover:border-amber-400/50 transition-all">
+                <div className="space-y-2 mb-4">
+                  <div className="flex items-center space-x-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
+                    <BookOpen className="w-4 h-4" />
+                    <span>{city.historyEpochs.length} Historical Epochs</span>
+                  </div>
+                  <h3 className="text-xl sm:text-2xl font-black text-white group-hover:text-amber-300 transition-colors">
+                    Chronological Journey Through Time
+                  </h3>
+                  <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-medium">
+                    Explore Kraków's thousand-year timeline from Slavic dragon legends to the Royal Golden Age, WWII occupation, and UNESCO inscription.
+                  </p>
+                </div>
+                <a
+                  href={`${baseUrl}/history`}
+                  onClick={(e) => pushRoute(e, `${baseUrl}/history`)}
+                  className="inline-flex items-center justify-center space-x-2 px-5 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm transition-all transform hover:scale-[1.02] shadow-lg shadow-amber-500/20 cursor-pointer self-start"
+                >
+                  <BookOpen className="w-4 h-4" />
+                  <span>View Timeline Tab</span>
+                  <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                </a>
+              </div>
+            )}
+
             {city.mustSee && city.mustSee.length > 0 && (
               <div className="glass-panel p-6 sm:p-7 rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-wf-navy-mid to-slate-950 shadow-xl flex flex-col justify-between group hover:border-amber-400/50 transition-all">
                 <div className="space-y-2 mb-4">
@@ -531,10 +501,10 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                     <span>{city.mustSee.length} Iconic Landmarks</span>
                   </div>
                   <h3 className="text-xl sm:text-2xl font-black text-white group-hover:text-amber-300 transition-colors">
-                    Must-See Attractions in {city.name}
+                    Must-See Attractions
                   </h3>
                   <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-medium">
-                    Explore curated landmarks including {city.mustSee.slice(0, 3).map(s => s.title || s.name).join(', ')} with costs, hours, and navigation advice.
+                    Curated landmarks including Wawel Castle, St. Mary's Basilica, Cloth Hall, Schindler's Factory, and Wieliczka Salt Mine.
                   </p>
                 </div>
                 <a
@@ -543,7 +513,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                   className="inline-flex items-center justify-center space-x-2 px-5 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm transition-all transform hover:scale-[1.02] shadow-lg shadow-amber-500/20 cursor-pointer self-start"
                 >
                   <Sparkles className="w-4 h-4" />
-                  <span>View All Must-See Sights</span>
+                  <span>View All Sights</span>
                   <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
                 </a>
               </div>
@@ -554,13 +524,13 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                 <div className="space-y-2 mb-4">
                   <div className="flex items-center space-x-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
                     <Utensils className="w-4 h-4" />
-                    <span>{city.restaurants.length} Curated Culinary Stops</span>
+                    <span>{city.restaurants.length} Culinary Destinations</span>
                   </div>
                   <h3 className="text-xl sm:text-2xl font-black text-white group-hover:text-amber-300 transition-colors">
-                    Top Restaurants & Dining in {city.name}
+                    Top Restaurants & Dining
                   </h3>
                   <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-medium">
-                    Authentic Polish dining from historic milk bars (Bar Mleczny) to fine dining, pierogi specialists, and cozy winter eateries.
+                    Authentic Polish dining from Podhale highlander taverns to royal game, pierogarnias, and street food.
                   </p>
                 </div>
                 <a
@@ -569,7 +539,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                   className="inline-flex items-center justify-center space-x-2 px-5 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm transition-all transform hover:scale-[1.02] shadow-lg shadow-amber-500/20 cursor-pointer self-start"
                 >
                   <Utensils className="w-4 h-4" />
-                  <span>View Top Restaurants & Dining</span>
+                  <span>View Restaurants</span>
                   <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
                 </a>
               </div>
@@ -703,6 +673,156 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                 </div>
               </div>
             </section>
+          )}
+        </div>
+      )}
+
+      {/* 2. CHRONOLOGICAL HISTORY SUB-PAGE */}
+      {activeSubPage === 'history' && city.history && (
+        <div className="space-y-8 animate-fade-in">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <h2 className="text-3xl font-black text-white flex items-center space-x-3">
+              <BookOpen className="w-7 h-7 text-amber-400" />
+              <span>Chronological History & Heritage of {city.name}</span>
+            </h2>
+            <span className="px-3.5 py-1 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 text-xs font-black uppercase tracking-wider">
+              1,000+ Years Living Timeline
+            </span>
+          </div>
+
+          <div className="glass-panel p-6 sm:p-10 rounded-3xl border border-amber-500/30 bg-wf-navy-mid/90 relative overflow-hidden shadow-2xl space-y-6">
+            <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-amber-500/10 via-amber-500/5 to-transparent rounded-full blur-3xl pointer-events-none"></div>
+
+            {/* Historical Stats Grid */}
+            {city.historyStats && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {city.historyStats.map((stat, idx) => (
+                  <div key={idx} className="p-3 sm:p-4 rounded-2xl bg-slate-900/80 border border-white/10 hover:border-amber-500/40 transition-colors">
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-amber-400/80 mb-1 flex items-center space-x-1.5">
+                      {stat.icon === 'Crown' && <Crown className="w-3.5 h-3.5" />}
+                      {stat.icon === 'Award' && <Award className="w-3.5 h-3.5" />}
+                      {stat.icon === 'MapPin' && <MapPin className="w-3.5 h-3.5" />}
+                      {stat.icon === 'Landmark' && <Landmark className="w-3.5 h-3.5" />}
+                      <span>{stat.label}</span>
+                    </div>
+                    <div className="text-xs sm:text-sm font-black text-white leading-tight">
+                      {stat.value}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Narrative Overview */}
+            <p className="text-wf-cream text-sm sm:text-base md:text-lg leading-relaxed font-medium">
+              {city.history}
+            </p>
+          </div>
+
+          {/* Chronological Historical Epochs Timeline */}
+          {city.historyEpochs && (
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
+                <div className="flex items-center space-x-2 text-amber-400 font-bold text-sm uppercase tracking-wider">
+                  <BookOpen className="w-5 h-5" />
+                  <span>Chronological Journey Through Time</span>
+                </div>
+
+                {/* Filterable Era Tabs */}
+                <div className="flex items-center space-x-1.5 overflow-x-auto no-scrollbar py-1">
+                  <button
+                    onClick={() => setActiveEpochTab('all')}
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-black transition-all cursor-pointer ${
+                      activeEpochTab === 'all'
+                        ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/30'
+                        : 'bg-slate-900/90 text-slate-300 hover:text-white border border-white/10 hover:border-amber-400/40'
+                    }`}
+                  >
+                    All Historical Eras ({city.historyEpochs.length})
+                  </button>
+                  {city.historyEpochs.map((epoch, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => setActiveEpochTab(idx)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                        activeEpochTab === idx
+                          ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/30'
+                          : 'bg-slate-900/90 text-slate-300 hover:text-white border border-white/10 hover:border-amber-400/40'
+                      }`}
+                    >
+                      {epoch.era}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4">
+                {city.historyEpochs
+                  .filter((_, idx) => activeEpochTab === 'all' || activeEpochTab === idx)
+                  .map((epoch) => {
+                    const originalIdx = city.historyEpochs.indexOf(epoch);
+                    return (
+                      <div 
+                        key={originalIdx} 
+                        className="glass-panel p-6 sm:p-8 rounded-3xl border border-amber-500/30 hover:border-amber-400 bg-wf-navy/90 backdrop-blur-md transition-all group"
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                          <div className="flex items-center space-x-3">
+                            <span className="w-8 h-8 rounded-full bg-amber-400/20 text-amber-300 font-black text-sm flex items-center justify-center border border-amber-400/40 shrink-0">
+                              {originalIdx + 1}
+                            </span>
+                            <h3 className="text-lg sm:text-xl font-black text-white group-hover:text-amber-300 transition-colors">
+                              {epoch.title}
+                            </h3>
+                          </div>
+                          <span className="inline-block px-3 py-1 rounded-full bg-slate-900/90 border border-amber-500/40 text-amber-400 text-xs font-black self-start sm:self-auto shrink-0">
+                            {epoch.era}
+                          </span>
+                        </div>
+
+                        {epoch.subtitle && (
+                          <div className="text-xs sm:text-sm font-semibold text-amber-200/90 mb-2 pl-11">
+                            {epoch.subtitle}
+                          </div>
+                        )}
+
+                        <p className="text-xs sm:text-sm text-slate-200 leading-relaxed pl-11">
+                          {epoch.description}
+                        </p>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
+
+          {/* Living Folklore & Cultural Traditions */}
+          {city.historyLegends && (
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2 text-amber-400 font-bold text-sm uppercase tracking-wider">
+                <Sparkles className="w-5 h-5" />
+                <span>Living Folklore & Cultural Traditions</span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {city.historyLegends.map((legend, idx) => (
+                  <div 
+                    key={idx} 
+                    className="glass-panel p-5 sm:p-6 rounded-2xl border border-amber-500/20 hover:border-amber-400/50 bg-wf-navy/90 flex flex-col justify-between transition-all"
+                  >
+                    <div>
+                      <div className="text-2xl mb-2.5">{legend.icon}</div>
+                      <h4 className="text-sm sm:text-base font-black text-white mb-2 leading-snug">
+                        {legend.title}
+                      </h4>
+                      <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-medium">
+                        {legend.description}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </div>
       )}

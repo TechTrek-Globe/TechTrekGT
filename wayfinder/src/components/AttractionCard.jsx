@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { MapPin, Navigation, Compass, Plus, Check, CalendarX, Landmark } from 'lucide-react';
-import { cityImages, marketImages } from '../utils/cityImages';
+import { cityImages, marketImages, getAttractionImage } from '../utils/cityImages';
 
 /**
  * Extracts a concise vital stats list for the quick stats row.
@@ -125,7 +125,7 @@ export function AttractionCard({ sight, cityName = 'Kraków', onAddToItinerary }
     }
   };
 
-  const currentImgSrc = (!imgError && sight.imageUrl) ? sight.imageUrl : getSightFallbackImage(sight, cityName);
+  const currentImgSrc = getAttractionImage(sight.imageUrl || sight.imageSrc, sight.name || sight.title, cityName);
 
   return (
     <article className="glass-panel rounded-3xl border border-white/10 hover:border-amber-500/40 transition-all duration-300 overflow-hidden flex flex-col h-full bg-wf-navy-mid/80 shadow-xl group">

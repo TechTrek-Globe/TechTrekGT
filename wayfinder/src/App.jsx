@@ -74,7 +74,7 @@ function App() {
         subPage = 'attractions';
       } else if (['markets', 'market', 'christmas-markets'].includes(rawSub)) {
         subPage = 'markets';
-      } else if (['restaurants', 'food', 'dining', 'top-restaurants'].includes(rawSub)) {
+      } else if (['restaurants', 'food', 'dining', 'top-restaurants', 'food-drink', 'drinks', 'bars', 'pubs', 'breweries'].includes(rawSub)) {
         subPage = 'restaurants';
       } else if (['hotels', 'stays', 'base'].includes(rawSub)) {
         subPage = 'hotels';

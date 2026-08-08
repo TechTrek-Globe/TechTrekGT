@@ -939,7 +939,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
 
       {/* 2. CHRONOLOGICAL HISTORY SUB-PAGE */}
       {activeSubPage === 'history' && city.history && (
-        <div ref={subPageSectionRef} id="chronological-history-section" className="space-y-8 animate-fade-in scroll-mt-32">
+        <div id="chronological-history-section" className="space-y-8 animate-fade-in scroll-mt-32">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <h2 className="text-3xl font-black text-white flex items-center space-x-3">
               <BookOpen className="w-7 h-7 text-amber-400" />
@@ -1089,7 +1089,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
 
       {/* 2. CHRISTMAS MARKETS SUB-PAGE */}
       {activeSubPage === 'markets' && city.markets && (
-        <div ref={subPageSectionRef} id="markets-section" className="space-y-6 animate-fade-in scroll-mt-32">
+        <div id="markets-section" className="space-y-6 animate-fade-in scroll-mt-32">
           {/* Quick Reference Stats Bar */}
           <QuickReferenceBar city={city} />
 
@@ -1566,7 +1566,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
 
       {/* 3. MUST-SEE ATTRACTIONS SUB-PAGE */}
       {activeSubPage === 'attractions' && city.mustSee && (
-        <div ref={subPageSectionRef} id="attractions-section" className="space-y-6 animate-fade-in scroll-mt-32">
+        <div id="attractions-section" className="space-y-6 animate-fade-in scroll-mt-32">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <h2 className="text-3xl font-black text-white flex items-center space-x-3">
               <Sparkles className="w-7 h-7 text-amber-400" />
@@ -1601,7 +1601,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
 
       {/* 4. FOOD & DRINK SUB-PAGE */}
       {activeSubPage === 'restaurants' && (city.krakowRestaurantsDetailed || city.krakowDrinksDetailed || city.restaurants) && (
-        <div ref={subPageSectionRef} id="restaurants-section" className="space-y-8 animate-fade-in scroll-mt-32">
+        <div id="restaurants-section" className="space-y-8 animate-fade-in scroll-mt-32">
           {/* Header Banner */}
           <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-amber-500/30 bg-wf-navy-mid/95 relative overflow-hidden shadow-2xl space-y-6">
             <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-amber-500/15 via-purple-500/10 to-transparent rounded-full blur-3xl pointer-events-none" />
@@ -1860,7 +1860,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
 
       {/* 5. BASE & HOTELS SUB-PAGE */}
       {activeSubPage === 'hotels' && (
-        <div ref={subPageSectionRef} id="hotels-section" className="space-y-8 animate-fade-in scroll-mt-32">
+        <div id="hotels-section" className="space-y-8 animate-fade-in scroll-mt-32">
           {/* Header Banner */}
           <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-amber-500/30 bg-wf-navy-mid/95 relative overflow-hidden shadow-2xl space-y-6">
             <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-amber-500/15 via-emerald-500/10 to-transparent rounded-full blur-3xl pointer-events-none" />
@@ -2182,7 +2182,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
 
       {/* 6. LGBTQ+ GUIDE SUB-PAGE */}
       {activeSubPage === 'lgbtq' && city.lgbtq && (
-        <div ref={subPageSectionRef} id="lgbtq-section" className="space-y-10 animate-fade-in scroll-mt-32">
+        <div id="lgbtq-section" className="space-y-10 animate-fade-in scroll-mt-32">
           {/* Header Banner */}
           <div className="glass-panel p-6 sm:p-10 rounded-3xl border border-purple-500/30 bg-wf-navy-mid/95 relative overflow-hidden shadow-2xl space-y-6">
             <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-purple-500/20 via-pink-500/10 to-transparent rounded-full blur-3xl pointer-events-none"></div>

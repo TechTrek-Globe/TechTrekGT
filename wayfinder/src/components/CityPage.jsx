@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MapPin, Utensils, Bed, ArrowLeft, ArrowRight, Bus, Train, ShoppingBag, Sparkles, Landmark, Compass, DollarSign, Info, Map, Clock, Navigation, Gift, Lightbulb, Video, ExternalLink, Thermometer, CreditCard, Award, RefreshCw, AlertTriangle, CalendarX, Coins, Coffee, Sun, Volume2, Crown, BookOpen, Scroll, Flame, ShieldCheck, Heart, Users, Phone, Star, CheckCircle2, Lock } from 'lucide-react';
+import { MapPin, Utensils, Bed, ArrowLeft, ArrowRight, Bus, Train, ShoppingBag, Sparkles, Landmark, Compass, DollarSign, Info, Map, Clock, Navigation, Gift, Lightbulb, Video, ExternalLink, Thermometer, CreditCard, Award, RefreshCw, AlertTriangle, CalendarX, Coins, Coffee, Sun, Volume2, Crown, BookOpen, Scroll, Flame, ShieldCheck, Heart, Users, Phone, Star, CheckCircle2, Lock, Wine, GlassWater } from 'lucide-react';
 import { polandJourney } from '../data/poland-2026';
 import { cityImages, marketImages, attractionImages } from '../utils/cityImages';
 import { useExchangeRate } from '../hooks/useExchangeRate';
@@ -122,6 +122,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
   const [activeMarketTab, setActiveMarketTab] = useState(0);
   const [activeEpochTab, setActiveEpochTab] = useState('all');
   const [hotelTierFilter, setHotelTierFilter] = useState('all');
+  const [restaurantCategoryFilter, setRestaurantCategoryFilter] = useState('all');
   const { isAuthenticated, setIsAuthModalOpen } = useAuth();
   const exchangeRates = useExchangeRate();
   const subPageSectionRef = useRef(null);
@@ -166,7 +167,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
     ? 'history'
     : (['attractions', 'sights', 'must-see', 'must-see-sights'].includes(subPage)
       ? 'attractions'
-      : (['restaurants', 'food', 'dining', 'top-restaurants'].includes(subPage)
+      : (['restaurants', 'food', 'dining', 'top-restaurants', 'food-drink', 'drinks', 'bars', 'pubs', 'breweries'].includes(subPage)
         ? 'restaurants'
         : (['markets', 'market', 'christmas-markets'].includes(subPage)
           ? 'markets'
@@ -349,7 +350,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
               }`}
             >
               <Utensils className="w-3.5 h-3.5" />
-              <span>Top Restaurants</span>
+              <span>Food & Drink</span>
             </a>
           )}
 
@@ -644,13 +645,13 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                 <div className="space-y-2 mb-4">
                   <div className="flex items-center space-x-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
                     <Utensils className="w-4 h-4" />
-                    <span>{city.restaurants.length} Culinary Destinations</span>
+                    <span>Food & Drink Destinations</span>
                   </div>
                   <h3 className="text-xl sm:text-2xl font-black text-white group-hover:text-amber-300 transition-colors">
-                    Top Restaurants & Dining
+                    Food & Drink Guide
                   </h3>
                   <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-medium">
-                    Authentic Polish dining, regional delicacies, pierogarnias, and comforting winter culinary destinations in {city.name}.
+                    Handpicked dining destinations, craft breweries, historic vodka houses, steakhouses, and local tavern fares in {city.name}.
                   </p>
                 </div>
                 <a
@@ -659,7 +660,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                   className="inline-flex items-center justify-center space-x-2 px-5 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm transition-all transform hover:scale-[1.02] shadow-lg shadow-amber-500/20 cursor-pointer self-start"
                 >
                   <Utensils className="w-4 h-4" />
-                  <span>View Restaurants</span>
+                  <span>View Food & Drink</span>
                   <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
                 </a>
               </div>
@@ -1191,41 +1192,362 @@ export function CityPage({ cityId, subPage = 'overview' }) {
         </div>
       )}
 
-      {/* 4. TOP RESTAURANTS SUB-PAGE */}
-      {activeSubPage === 'restaurants' && city.restaurants && (
-        <div ref={subPageSectionRef} id="restaurants-section" className="space-y-6 animate-fade-in scroll-mt-32">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <h2 className="text-3xl font-black text-white flex items-center space-x-3">
-              <Utensils className="w-7 h-7 text-amber-400" />
-              <span>Top Restaurants & Dining</span>
-            </h2>
-            <span className="text-xs text-wf-muted font-medium">Curated local recommendations</span>
+      {/* 4. FOOD & DRINK SUB-PAGE */}
+      {activeSubPage === 'restaurants' && (city.krakowRestaurantsDetailed || city.krakowDrinksDetailed || city.restaurants) && (
+        <div ref={subPageSectionRef} id="restaurants-section" className="space-y-8 animate-fade-in scroll-mt-32">
+          {/* Header Banner */}
+          <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-amber-500/30 bg-wf-navy-mid/95 relative overflow-hidden shadow-2xl space-y-6">
+            <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-amber-500/15 via-purple-500/10 to-transparent rounded-full blur-3xl pointer-events-none" />
+
+            <div className="relative z-10 space-y-2 max-w-3xl">
+              <div className="inline-flex items-center space-x-2 px-3.5 py-1 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 text-xs font-black uppercase tracking-wider shadow-sm">
+                <Utensils className="w-4 h-4" />
+                <Wine className="w-4 h-4 text-purple-300" />
+                <span>Food, Drink & Nightlife Guide</span>
+              </div>
+              <h2 className="text-3xl sm:text-4xl font-black text-white leading-tight">
+                Top Food & Drink Destinations in {city.name}
+              </h2>
+              <p className="text-sm sm:text-base text-slate-300 font-medium leading-relaxed">
+                Handpicked culinary dining, underground craft breweries, historic Polish vodka houses, bohemian cellar bars, steakhouses, and budget milk bars in Kraków.
+              </p>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {city.restaurants.map((rest, idx) => (
-              <div key={idx} className="glass-panel p-7 rounded-3xl border border-white/10 hover:border-amber-500/30 transition-all flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-xl font-bold text-white">{rest.name}</h3>
-                    <span className="px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 font-black text-xs">
-                      {rest.price}
-                    </span>
-                  </div>
-                  <div className="text-xs font-semibold text-amber-400 mb-3">{rest.cuisine}</div>
+          {/* Sticky Category Filter Toolbar (Stays in view while scrolling) */}
+          {(city.krakowRestaurantsDetailed || city.krakowDrinksDetailed) && (
+            <div className="sticky top-[104px] z-30 py-3 px-4 sm:px-6 rounded-2xl bg-slate-950/95 backdrop-blur-xl border border-amber-500/30 shadow-2xl transition-all">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setRestaurantCategoryFilter('all')}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                      restaurantCategoryFilter === 'all'
+                        ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                        : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10'
+                    }`}
+                  >
+                    All Food & Drink (35)
+                  </button>
 
-                  <div className="p-3.5 rounded-2xl bg-wf-navy-mid/90 border border-white/5 mb-3">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-wf-muted block mb-1">🍽️ Signature Dishes</span>
-                    <p className="text-sm font-medium text-wf-cream">{rest.signature}</p>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setRestaurantCategoryFilter('coffee-breakfast')}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 cursor-pointer ${
+                      restaurantCategoryFilter === 'coffee-breakfast'
+                        ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20'
+                        : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                    }`}
+                  >
+                    <Coffee className="w-3.5 h-3.5" />
+                    <span>Coffee & Breakfast (5)</span>
+                  </button>
 
-                  <p className="text-xs text-wf-muted leading-relaxed">
-                    💡 <span className="font-medium text-wf-cream">Vibe & Notes:</span> {rest.notes}
-                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setRestaurantCategoryFilter('drink-all')}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 cursor-pointer ${
+                      restaurantCategoryFilter === 'drink-all'
+                        ? 'bg-purple-500 text-white shadow-md shadow-purple-500/20'
+                        : 'bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                    }`}
+                  >
+                    <Wine className="w-3.5 h-3.5" />
+                    <span>All Drinks & Bars (15)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setRestaurantCategoryFilter('pub-bars')}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 cursor-pointer ${
+                      restaurantCategoryFilter === 'pub-bars'
+                        ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                        : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                    }`}
+                  >
+                    <GlassWater className="w-3.5 h-3.5" />
+                    <span>Beer Halls, Pubs & Cellars (11)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setRestaurantCategoryFilter('vodka-house')}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 cursor-pointer ${
+                      restaurantCategoryFilter === 'vodka-house'
+                        ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20'
+                        : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                    }`}
+                  >
+                    <Crown className="w-3.5 h-3.5" />
+                    <span>Vodka Houses (2)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setRestaurantCategoryFilter('brewery')}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 cursor-pointer ${
+                      restaurantCategoryFilter === 'brewery'
+                        ? 'bg-amber-600 text-white shadow-md shadow-amber-600/20'
+                        : 'bg-amber-600/10 hover:bg-amber-600/20 text-amber-300 border border-amber-600/30'
+                    }`}
+                  >
+                    <GlassWater className="w-3.5 h-3.5" />
+                    <span>Breweries (2)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setRestaurantCategoryFilter('must-haves')}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 cursor-pointer ${
+                      restaurantCategoryFilter === 'must-haves'
+                        ? 'bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                        : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10'
+                    }`}
+                  >
+                    <Utensils className="w-3.5 h-3.5" />
+                    <span>Must-Have Dining (3)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setRestaurantCategoryFilter('local')}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 cursor-pointer ${
+                      restaurantCategoryFilter === 'local'
+                        ? 'bg-pink-500 text-white shadow-md shadow-pink-500/20'
+                        : 'bg-pink-500/10 hover:bg-pink-500/20 text-pink-300 border border-pink-500/30'
+                    }`}
+                  >
+                    <span>Local Fares (3)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setRestaurantCategoryFilter('expensive')}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 cursor-pointer ${
+                      restaurantCategoryFilter === 'expensive'
+                        ? 'bg-purple-600 text-white shadow-md shadow-purple-500/20'
+                        : 'bg-purple-600/10 hover:bg-purple-600/20 text-purple-300 border border-purple-600/30'
+                    }`}
+                  >
+                    <Award className="w-3.5 h-3.5" />
+                    <span>Fine Dining (3)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setRestaurantCategoryFilter('steak')}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 cursor-pointer ${
+                      restaurantCategoryFilter === 'steak'
+                        ? 'bg-rose-600 text-white shadow-md shadow-rose-500/20'
+                        : 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                    }`}
+                  >
+                    <Flame className="w-3.5 h-3.5" />
+                    <span>Steakhouses (3)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setRestaurantCategoryFilter('cheap')}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 cursor-pointer ${
+                      restaurantCategoryFilter === 'cheap'
+                        ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/20'
+                        : 'bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-300 border border-emerald-600/30'
+                    }`}
+                  >
+                    <Coins className="w-3.5 h-3.5" />
+                    <span>Cheap Eats (3)</span>
+                  </button>
                 </div>
               </div>
-            ))}
-          </div>
+            </div>
+          )}
+
+          {/* Cards Grid */}
+          {(city.krakowRestaurantsDetailed || city.krakowDrinksDetailed || city.krakowCafesDetailed) ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[
+                ...(city.krakowRestaurantsDetailed || []),
+                ...(city.krakowDrinksDetailed || []),
+                ...(city.krakowCafesDetailed || [])
+              ]
+                .filter((item) => {
+                  if (restaurantCategoryFilter === 'all') return true;
+                  if (restaurantCategoryFilter === 'drink-all') return ['vodka-house', 'brewery', 'historic-bar', 'pub', 'watering-hole', 'beer-hall'].includes(item.category);
+                  if (restaurantCategoryFilter === 'food-all') return ['must-haves', 'local', 'expensive', 'steak', 'cheap'].includes(item.category);
+                  if (restaurantCategoryFilter === 'vodka-house') return item.category === 'vodka-house';
+                  if (restaurantCategoryFilter === 'brewery') return item.category === 'brewery';
+                  if (restaurantCategoryFilter === 'pub-bars') return ['historic-bar', 'pub', 'watering-hole', 'beer-hall'].includes(item.category);
+                  if (restaurantCategoryFilter === 'coffee-breakfast') return item.category === 'coffee-breakfast';
+                  return item.category === restaurantCategoryFilter;
+                })
+                .map((item) => {
+                  const isCafe = item.category === 'coffee-breakfast';
+                  const isDrink = ['vodka-house', 'brewery', 'historic-bar', 'pub', 'watering-hole', 'beer-hall'].includes(item.category);
+                  const isMustHave = item.category === 'must-haves';
+                  const isLocal = item.category === 'local';
+                  const isExpensive = item.category === 'expensive';
+                  const isSteak = item.category === 'steak';
+                  const isCheap = item.category === 'cheap';
+                  const isVodka = item.category === 'vodka-house';
+                  const isBrewery = item.category === 'brewery';
+
+                  const badgeStyle = isCafe
+                    ? 'bg-amber-400 text-slate-950 border-amber-300 font-black'
+                    : isVodka
+                    ? 'bg-amber-400 text-slate-950 border-amber-300 font-black'
+                    : isBrewery
+                    ? 'bg-amber-600/30 text-amber-300 border-amber-500/40'
+                    : isDrink
+                    ? 'bg-purple-500/20 text-purple-300 border-purple-400/40'
+                    : isMustHave
+                    ? 'bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 border-amber-300'
+                    : isExpensive
+                    ? 'bg-purple-500/20 text-purple-300 border-purple-400/40'
+                    : isSteak
+                    ? 'bg-rose-500/20 text-rose-300 border-rose-400/40'
+                    : isCheap
+                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400/40'
+                    : 'bg-pink-500/20 text-pink-300 border-pink-400/40';
+
+                  const borderStyle = isCafe
+                    ? 'border-amber-500/30 hover:border-amber-400/60'
+                    : (isVodka || isBrewery || isDrink)
+                    ? 'border-purple-500/30 hover:border-purple-400/60'
+                    : isMustHave
+                    ? 'border-amber-500/30 hover:border-amber-400/60'
+                    : isExpensive
+                    ? 'border-purple-500/30 hover:border-purple-400/60'
+                    : isSteak
+                    ? 'border-rose-500/30 hover:border-rose-400/60'
+                    : isCheap
+                    ? 'border-emerald-500/30 hover:border-emerald-400/60'
+                    : 'border-pink-500/30 hover:border-pink-400/60';
+
+                  const mapSearchQuery = encodeURIComponent(`${item.name}, Kraków, Poland`);
+                  const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${mapSearchQuery}`;
+                  const mapSearchUrl = `https://www.google.com/maps/search/?api=1&query=${mapSearchQuery}`;
+
+                  return (
+                    <article
+                      key={item.id}
+                      className={`glass-panel rounded-3xl border ${borderStyle} bg-wf-navy-mid/90 overflow-hidden shadow-xl transition-all duration-300 flex flex-col justify-between group`}
+                    >
+                      <div>
+                        {/* Image Header */}
+                        <div className="relative w-full h-44 bg-slate-950 overflow-hidden shrink-0">
+                          <img
+                            src={item.imageSrc}
+                            alt={item.name}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                            loading="lazy"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-wf-navy-mid via-transparent to-black/40 pointer-events-none" />
+
+                          {/* Floating Category Pill */}
+                          <div className="absolute top-3.5 left-3.5 z-10 flex items-center space-x-2 max-w-[70%]">
+                            <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border backdrop-blur-md shadow-md truncate ${badgeStyle}`}>
+                              {item.categoryLabel}
+                            </span>
+                          </div>
+
+                          {/* Price Tier Badge */}
+                          <div className="absolute top-3.5 right-3.5 z-10 bg-slate-950/80 backdrop-blur-md px-3 py-1 rounded-full border border-amber-400/30 text-amber-300 text-xs font-black shadow-md">
+                            {item.priceTier}
+                          </div>
+                        </div>
+
+                        {/* Card Body */}
+                        <div className="p-5 sm:p-6 space-y-4">
+                          <div className="space-y-1">
+                            <h3 className="text-xl font-black text-white group-hover:text-amber-300 transition-colors leading-tight">
+                              {item.name}
+                            </h3>
+                            <div className="flex items-center space-x-1.5 text-xs text-slate-400 font-semibold">
+                              <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                              <span>{item.address}</span>
+                            </div>
+                          </div>
+
+                          {/* Price & Type Bar */}
+                          <div className="p-2.5 rounded-xl bg-slate-950/80 border border-white/5 flex items-center justify-between text-xs">
+                            <span className="font-bold text-amber-300 text-[11px] uppercase tracking-wider">{item.cuisine || item.drinkType}</span>
+                            <span className="text-slate-400 font-mono text-[11px] font-semibold">{item.priceEstimatePln}</span>
+                          </div>
+
+                          <p className="text-xs text-slate-300 leading-relaxed font-medium">
+                            {item.description}
+                          </p>
+
+                          {/* Signature Dishes / Drink / Coffee Box */}
+                          <div className={`p-3 rounded-2xl border text-xs space-y-1 ${
+                            isDrink
+                              ? 'bg-purple-500/10 border-purple-500/20 text-purple-200'
+                              : 'bg-amber-500/10 border-amber-500/20 text-amber-200'
+                          }`}>
+                            <span className={`text-[10px] font-extrabold uppercase tracking-wider block ${
+                              isDrink ? 'text-purple-300' : 'text-amber-300'
+                            }`}>
+                              {isCafe ? '☕ Signature Coffee & Morning Fares:' : (isDrink ? '🍷 Signature Drink & Flight:' : '🍽️ Signature Dishes & Fares:')}
+                            </span>
+                            <p className="font-semibold text-slate-200 leading-snug">{item.signature}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Footer Actions */}
+                      <div className="bg-slate-950/80 border-t border-white/10 p-3.5 sm:p-4 flex items-center justify-between gap-2 shrink-0">
+                        <a
+                          href={directionsUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 py-2 px-2.5 rounded-xl bg-white/5 hover:bg-amber-500/20 text-slate-300 hover:text-amber-300 border border-white/10 hover:border-amber-500/40 text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn"
+                        >
+                          <Navigation className="w-3.5 h-3.5 text-sky-400 group-hover/btn:text-amber-300" />
+                          <span>Directions</span>
+                        </a>
+
+                        <a
+                          href={mapSearchUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 py-2 px-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:border-amber-500/50 text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn"
+                        >
+                          <Compass className="w-3.5 h-3.5 text-amber-400 group-hover/btn:text-amber-300" />
+                          <span>View Map</span>
+                        </a>
+                      </div>
+                    </article>
+                  );
+                })}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {city.restaurants.map((rest, idx) => (
+                <div key={idx} className="glass-panel p-7 rounded-3xl border border-white/10 hover:border-amber-500/30 transition-all flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-xl font-bold text-white">{rest.name}</h3>
+                      <span className="px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 font-black text-xs">
+                        {rest.price}
+                      </span>
+                    </div>
+                    <div className="text-xs font-semibold text-amber-400 mb-3">{rest.cuisine}</div>
+
+                    <div className="p-3.5 rounded-2xl bg-wf-navy-mid/90 border border-white/5 mb-3">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-wf-muted block mb-1">🍽️ Signature Dishes</span>
+                      <p className="text-sm font-medium text-wf-cream">{rest.signature}</p>
+                    </div>
+
+                    <p className="text-xs text-wf-muted leading-relaxed">
+                      💡 <span className="font-medium text-wf-cream">Vibe & Notes:</span> {rest.notes}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -1291,15 +1613,17 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                 )}
               </div>
             </div>
+          </div>
 
-            {/* Tier Filter Tabs (Luxury, Mid-Range, Cost-Effective) */}
-            {city.krakowHotelsDetailed && (
-              <div className="pt-4 border-t border-white/10 flex flex-wrap items-center justify-between gap-3">
+          {/* Sticky Tier Filter Bar (Stays in view while scrolling hotels) */}
+          {city.krakowHotelsDetailed && (
+            <div className="sticky top-[104px] z-30 py-3 px-4 sm:px-6 rounded-2xl bg-slate-950/95 backdrop-blur-xl border border-amber-500/30 shadow-2xl transition-all">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
                     onClick={() => setHotelTierFilter('all')}
-                    className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${
+                    className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
                       hotelTierFilter === 'all'
                         ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
                         : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10'
@@ -1310,7 +1634,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                   <button
                     type="button"
                     onClick={() => setHotelTierFilter('luxury')}
-                    className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 ${
+                    className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 cursor-pointer ${
                       hotelTierFilter === 'luxury'
                         ? 'bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
                         : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30'
@@ -1322,7 +1646,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                   <button
                     type="button"
                     onClick={() => setHotelTierFilter('mid')}
-                    className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 ${
+                    className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 cursor-pointer ${
                       hotelTierFilter === 'mid'
                         ? 'bg-purple-500 text-white shadow-md shadow-purple-500/20'
                         : 'bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30'
@@ -1334,7 +1658,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                   <button
                     type="button"
                     onClick={() => setHotelTierFilter('budget')}
-                    className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 ${
+                    className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 cursor-pointer ${
                       hotelTierFilter === 'budget'
                         ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
                         : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
@@ -1349,8 +1673,8 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                   <span>Proximity metrics included for all top markets</span>
                 </div>
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Detailed Hotel Cards Grid */}
           {city.krakowHotelsDetailed ? (

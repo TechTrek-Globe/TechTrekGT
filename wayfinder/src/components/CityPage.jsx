@@ -653,7 +653,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
       )}
 
       {/* 2. CHRISTMAS MARKETS SUB-PAGE */}
-      {subPage === 'markets' && city.markets && (
+      {activeSubPage === 'markets' && city.markets && (
         <div className="space-y-6 animate-fade-in">
           {/* Quick Reference Stats Bar */}
           <QuickReferenceBar city={city} />
@@ -862,7 +862,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
       )}
 
       {/* 3. MUST-SEE ATTRACTIONS SUB-PAGE */}
-      {subPage === 'attractions' && city.mustSee && (
+      {activeSubPage === 'attractions' && city.mustSee && (
         <div className="space-y-6 animate-fade-in">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <h2 className="text-3xl font-black text-white flex items-center space-x-3">

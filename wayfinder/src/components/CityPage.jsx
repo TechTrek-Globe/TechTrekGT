@@ -328,8 +328,8 @@ export function CityPage({ cityId, subPage = 'overview' }) {
       </div>
 
       {/* Top Sub-Header Toolbar (Opens Dedicated Sub-Pages) */}
-      <div className="sticky top-16 z-40 py-1 bg-slate-950/95 backdrop-blur-xl -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 border-b border-amber-500/20">
-        <div className="p-1.5 rounded-xl border border-amber-500/20 !bg-slate-900/90 shadow-md flex items-center justify-start overflow-x-auto no-scrollbar gap-1 sm:gap-1.5">
+      <div className="sticky top-14 z-40 py-2 bg-slate-950/95 backdrop-blur-xl border-b border-amber-500/20 w-full">
+        <div className="p-1.5 rounded-xl border border-amber-500/20 !bg-slate-900/90 shadow-md flex flex-wrap items-center gap-1.5 sm:gap-2">
           <a
             href={baseUrl}
             onClick={(e) => pushRoute(e, baseUrl)}
@@ -354,7 +354,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
               }`}
             >
               <BookOpen className="w-3.5 h-3.5" />
-              <span>Chronological Journey Through Time</span>
+              <span>History & Timeline</span>
             </a>
           )}
 

@@ -37,13 +37,13 @@ export function Layout({ children }) {
   };
 
   return (
-    <div className="min-h-screen flex flex-col font-sans bg-slate-950">
+    <div className="min-h-screen flex flex-col font-sans bg-slate-950 w-full max-w-full overflow-x-hidden">
       {/* --- Full-Width Top Header Banner --- */}
-      <header className="w-full flex-shrink-0 bg-black relative z-[60] border-b border-[#b48214]/30 flex justify-center items-center pt-3 pb-1 px-4 overflow-visible">
+      <header className="w-full flex-shrink-0 bg-black relative z-[60] border-b border-[#b48214]/30 flex justify-center items-center pt-3 pb-1 px-4 overflow-hidden">
         <img
           src={wayfinderHeaderBanner}
           alt="TechTrek Wayfinder - Plan • Explore • Navigate • Discover"
-          className="h-40 sm:h-52 md:h-60 w-auto max-w-full object-contain block relative -mb-5 sm:-mb-7 md:-mb-8 z-[60] drop-shadow-2xl translate-x-10 sm:translate-x-16"
+          className="h-40 sm:h-52 md:h-60 w-auto max-w-full object-contain block relative -mb-5 sm:-mb-7 md:-mb-8 z-[60] drop-shadow-2xl translate-x-0"
         />
       </header>
 
@@ -53,8 +53,8 @@ export function Layout({ children }) {
         <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-wf-evergreen/10 rounded-full blur-[100px] mix-blend-screen transform -translate-x-1/3 translate-y-1/3" />
       </div>
 
-      <header className="sticky top-0 z-40 glass-panel border-b border-white/5">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
+      <header className="sticky top-0 z-40 glass-panel border-b border-white/5 w-full max-w-full overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between min-w-0">
           <div className="flex items-center space-x-4">
             <a href="/wayfinder" onClick={(e) => pushRoute(e, '/wayfinder')} className="flex items-center space-x-2 group">
               <div className="p-1.5 rounded-xl bg-gradient-to-br from-wf-blue to-wf-navy-mid border border-wf-blue-lt/30 shadow-lg group-hover:shadow-wf-blue/20 transition-all">

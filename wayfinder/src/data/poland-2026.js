@@ -579,7 +579,69 @@ export const polandJourney = {
         location: 'Rynek & Plac Solny Market Squares',
         landmark: 'Gothic Old Town Hall & Fairy-tale Windmills',
         description: "Ranked among Europe's most magical markets. Surrounded by colorful merchant houses, a 3-story wooden Christmas pyramid, fragrant spiced wine stalls, and hidden festive Wrocław Dwarfs (Krasnale)."
-      }
+      },
+      history: 'Known as the "Venice of Poland" and the "City of a Hundred Bridges", Wrocław is an architectural marvel spread across 12 islands connected by over 100 bridges on the Oder River. With more than a thousand years of shifting Polish, Bohemian, Austrian (Habsburg), Prussian, and German heritage, Wrocław presents a breathtaking blend of Gothic brick churches, Flemish Baroque townhouses, and vibrant modern cultural energy. Recognized as a 2016 European Capital of Culture, its historic core around Ostrów Tumski and Rynek represents one of Central Europe\'s most resilient and captivating cities.',
+      historyStats: [
+        { label: 'Founded', value: '10th Century (Chartered 1242)', icon: 'Landmark' },
+        { label: 'Cultural Eras', value: '5 Nations (PL, CZ, AT, PR, DE)', icon: 'Award' },
+        { label: 'Bridges & Islands', value: '12 Islands & 100+ Bridges', icon: 'MapPin' },
+        { label: 'European Culture', value: 'Capital of Culture 2016', icon: 'Crown' }
+      ],
+      historyEpochs: [
+        {
+          era: '10th - 13th Century',
+          title: 'Medieval Piast Stronghold & Cathedral Island',
+          subtitle: 'Slavic foundations on Ostrów Tumski and the early bishopric',
+          description: 'Established on fortified islands in the Oder River by the Polish Piast dynasty, Duke Bolesław the Brave founded the Bishopric of Wrocław in the year 1000. Ostrów Tumski (Cathedral Island) quickly became the spiritual and political center of Silesia, surviving the 1241 Mongol invasion before rebuilding on a grand Magdeburg grid.'
+        },
+        {
+          era: '1335 - 1526',
+          title: 'Bohemian Crown & Hanseatic Trade Prosperity',
+          subtitle: 'Flourishing commerce under King John of Bohemia and Charles IV',
+          description: 'In 1335, Silesia came under the rule of the Kingdom of Bohemia. Wrocław prospered immensely as a prominent Hanseatic League trading post connecting the Baltic to Central Europe. The magnificent Gothic Old Town Hall (Ratusz) with its astronomical clock and ornate interior halls was completed during this merchant boom.'
+        },
+        {
+          era: '1526 - 1741',
+          title: 'Habsburg Baroque & The University of Wrocław',
+          subtitle: 'Austrian imperial rule, Leopoldina Hall, and Catholic counter-reformation',
+          description: 'Following the death of King Louis II of Hungary and Bohemia, Wrocław fell under Austrian Habsburg rule. Counter-Reformation Jesuit architects transformed the city skyline, culminating in the founding of the University of Wrocław in 1702 and the breathtaking Baroque Aula Leopoldina with its gold-leaf ceiling frescoes.'
+        },
+        {
+          era: '1741 - 1918',
+          title: 'Prussian Industrial Expansion (Breslau)',
+          subtitle: 'Silesian Wars, industrialization, and Max Berg\'s Centennial Hall',
+          description: 'Conquered by King Frederick the Great of Prussia in 1741, the city (Breslau) expanded into a major German industrial powerhouse and railway junction. In 1913, architect Max Berg completed Centennial Hall (Hala Stulecia) - an engineering triumph of reinforced concrete and a UNESCO World Heritage landmark.'
+        },
+        {
+          era: '1945',
+          title: 'Siege of Festung Breslau & Polish Post-War Rebirth',
+          subtitle: 'Three-month wartime siege and monumental architectural restoration',
+          description: 'Designated a fanatical fortress (Festung Breslau) during WWII, the city endured a brutal three-month siege in early 1945 that destroyed 70% of its buildings. Following post-war border shifts, Polish scholars, architects, and families from Lwów and eastern Poland resettled Wrocław, meticulously rebuilding the historic Old Town brick by brick.'
+        },
+        {
+          era: '1980s - Present',
+          title: 'Orange Alternative Dwarfs & European Capital of Culture',
+          subtitle: 'Peaceful anti-communist dwarf satire and modern renaissance',
+          description: 'In the 1980s, Waldemar Fydrych\'s Orange Alternative movement staged whimsical, surrealist protests using painted dwarfs to mock communist absurdity. Today, hundreds of bronze Krasnale (dwarfs) inhabit the cobblestones, celebrating Wrocław as a symbol of wit, resilience, and open European culture.'
+        }
+      ],
+      historyLegends: [
+        {
+          icon: '🧙‍♂️',
+          title: 'The Wrocław Dwarfs (Krasnale)',
+          description: 'Originating as satirical protest symbols of the Orange Alternative against communist censorship in the 1980s, over 400 charming bronze dwarf statues now populate the city streets, each with its own trade and humorous personality.'
+        },
+        {
+          icon: '🥟',
+          title: 'The Dumpling Gate (Brama Kluskowa)',
+          description: 'Medieval legend tells of a heartbroken peasant who received a magical pot of endless Silesian dumplings from his late wife\'s spirit with one rule: leave the last dumpling. He greedily reached for the last piece, and it flew atop the gate turning to stone forever.'
+        },
+        {
+          icon: '🏮',
+          title: 'The Lamp Lighter of Ostrów Tumski',
+          description: 'Every evening at dusk, a traditional cloaked lamp lighter walks the cobblestones of Cathedral Island to hand-light over 100 historic gas lamps, maintaining a centuries-old unbroken Silesian tradition.'
+        }
+      ]
     },
     {
       id: 'poznan',
@@ -598,7 +660,69 @@ export const polandJourney = {
         location: 'Stare Miasto & Plac Wolności',
         landmark: 'Renaissance Town Hall & Betlejem Poznańskie',
         description: "Home to the famous International Ice Sculpture Festival. Features a giant illuminated ferris wheel, wooden craft stalls, and warm bakery stands serving official St. Martin's Croissants (Rogale Świętomarcińskie)."
-      }
+      },
+      history: 'Poznań is celebrated as the cradle of the Polish state and the birthplace of the nation. It was on Ostrów Tumski (Cathedral Island) in 966 that Duke Mieszko I was baptized, uniting Slavic tribes under Christianity and establishing Poland. Poznań grew into a major mercantile crossroads, renowned for its Italian Renaissance Town Hall with its famous head-butting mechanical goats, the victorious Greater Poland Uprising of 1918, and the cherished tradition of St. Martin\'s croissants.',
+      historyStats: [
+        { label: 'Nation Birthplace', value: '966 AD (Baptism of Poland)', icon: 'Landmark' },
+        { label: 'Royal Tombs', value: '1st Polish Kings (Mieszko I)', icon: 'Crown' },
+        { label: 'Old Market Square', value: 'Chartered 1253 (Stary Rynek)', icon: 'MapPin' },
+        { label: 'Victorious Uprising', value: '1918-1919 (Greater Poland)', icon: 'Award' }
+      ],
+      historyEpochs: [
+        {
+          era: '966 - 1038',
+          title: 'The Cradle of the Polish Nation',
+          subtitle: 'Ostrów Tumski, Duke Mieszko I, and Poland\'s first cathedral',
+          description: 'On Cathedral Island in Poznań, Duke Mieszko I built his fortified palace and accepted Christian baptism in 966, founding the Polish state. Poland\'s first cathedral (St. Peter and Paul) was erected here in 968, housing the Golden Chapel tombs of Mieszko I and Poland\'s first crowned king, Bolesław the Brave.'
+        },
+        {
+          era: '1253 - 1550',
+          title: 'Medieval Trade Hub & Renaissance Splendor',
+          subtitle: 'Magdeburg Law charter and Giovanni Battista di Quadro\'s Town Hall',
+          description: 'In 1253, Duke Przemysł I relocated the city center across the Warta River to the present-day Stary Rynek. Following a destructive fire in 1536, Italian master architect Giovanni Battista di Quadro rebuilt the Town Hall into one of Northern Europe\'s finest Renaissance civic masterpieces, incorporating the famous mechanical clock goats.'
+        },
+        {
+          era: '1550 - 1793',
+          title: 'The Golden Age of Merchant Guilds & Academia',
+          subtitle: 'Lubrański Academy, Baroque parish churches, and European trade crossroads',
+          description: 'Poznań flourished as a vital hub of international commerce along routes connecting Nuremberg, Wrocław, Toruń, and Baltic ports. Bishop Jan Lubrański established the Lubrański Academy in 1518, while Jesuit masters crafted the magnificent pink-and-gold Baroque Fara Church (St. Stanislaus Parish Basilica).'
+        },
+        {
+          era: '1793 - 1918',
+          title: 'Prussian Partition & The Citadel Fortress',
+          subtitle: 'Festung Posen fortification, economic resistance, and organic work movement',
+          description: 'Annexed by Prussia during the Partitions of Poland, Poznań was turned into a garrison fortress city (Festung Posen) centered on the massive Winiary Fort (Citadel). Local Polish patriots pioneered the "Organic Work" philosophy, founding the Bazar Hotel, Cegielski manufacturing plants, and agricultural cooperatives to maintain Polish economic autonomy.'
+        },
+        {
+          era: '1918 - 1919',
+          title: 'The Victorious Greater Poland Uprising',
+          subtitle: 'Ignacy Jan Paderewski\'s rallying speech and triumphant reunification',
+          description: 'On December 26, 1918, world-renowned pianist and statesman Ignacy Jan Paderewski arrived at Poznań Główny station, giving an electrifying speech at the Bazar Hotel. The following day, the Greater Poland Uprising erupted - one of the very few completely victorious Polish military uprisings in history, freeing the region and reuniting it with the Second Polish Republic.'
+        },
+        {
+          era: 'Post-WWII - Present',
+          title: 'Poznań June 1956 & Modern Commercial Crossroads',
+          subtitle: 'Historic workers\' strike for "Bread and Freedom" and international commerce',
+          description: 'On June 28, 1956, over 100,000 workers took to the streets demanding "Bread and Freedom", sparking Poland\'s first major revolt against communist dictatorship. Commemorated by the towering Monument of the Poznań Crosses, modern Poznań has evolved into Poland\'s leading international trade fair hub and a dynamic cultural capital.'
+        }
+      ],
+      historyLegends: [
+        {
+          icon: '🐐',
+          title: 'The Poznań Town Hall Goats (Koziołki)',
+          description: 'Legend says a clumsy young chef named Pietrek accidentally burned the roast deer intended for the Voivode\'s banquet. In panic, he stole two billy goats from a meadow to cook, but they escaped up the Town Hall tower and started head-butting, delighting the guests so much they were spared forever.'
+        },
+        {
+          icon: '🥐',
+          title: 'St. Martin\'s Horseshoe Croissant (Rogale)',
+          description: 'In 1891, inspired by priest Jan Lewicki\'s sermon about St. Martin\'s generosity, baker Józef Melzer baked horseshoe-shaped pastries filled with white poppy seeds, almonds, and honey to distribute free to the city\'s poor, creating Poznań\'s proudest culinary tradition.'
+        },
+        {
+          icon: '👑',
+          title: 'Lech, Czech, and Rus at Poznań',
+          description: 'Slavic folklore tells that three founding brothers - Lech, Czech, and Rus - had been separated for years during their travels across Europe. When they unexpectedly met again by the Warta River, they joyfully cried out "Poznać!" ("To recognize!"), and built a stronghold on that very spot.'
+        }
+      ]
     },
     {
       id: 'torun',
@@ -617,7 +741,69 @@ export const polandJourney = {
         location: 'Rynek Staromiejski (Old Town Square)',
         landmark: 'UNESCO Medieval Gothic Town Hall & Copernicus Monument',
         description: 'Set within a preserved 13th-century red-brick medieval core. Famous for rich ginger aromas, traditional hand-painted wooden trinkets, and centuries-old Toruń gingerbread (pierniki) baked from secret spice recipes.'
-      }
+      },
+      history: 'Toruń is one of Poland’s oldest and most intact medieval cities, founded in 1233 by the Teutonic Knights along the Vistula River. Inscribed on the UNESCO World Heritage List in 1997, its magnificent red-brick Gothic Old Town survived World War II without a single bomb falling on its historic core. Toruń is world-renowned as the birthplace of astronomer Nicolaus Copernicus - who "stopped the Sun and moved the Earth" - and as Europe\'s ancient gingerbread capital, baking Toruńskie Pierniki for over 700 years.',
+      historyStats: [
+        { label: 'Founded', value: '1233 (Teutonic Order Charter)', icon: 'Landmark' },
+        { label: 'UNESCO Heritage', value: '1997 (Intact Brick Gothic)', icon: 'Award' },
+        { label: 'Pierniki Tradition', value: '700+ Years (Since 1380)', icon: 'Crown' },
+        { label: 'Copernicus Birth', value: 'Feb 19, 1473', icon: 'MapPin' }
+      ],
+      historyEpochs: [
+        {
+          era: '1233 - 1454',
+          title: 'Teutonic Knights & Hanseatic River Port',
+          subtitle: 'Teutonic castle fortress and Baltic grain trade wealth',
+          description: 'Founded by the Teutonic Order in 1233, Toruń quickly joined the Hanseatic League and grew into a wealthy river trading hub. Grand Gothic monuments rose across the city, including the monumental Town Hall on Rynek Staromiejski, St. John\'s Cathedral, and the fortified city walls with the iconic Leaning Tower (Krzywa Wieża).'
+        },
+        {
+          era: '1454 - 1466',
+          title: 'The Thirteen Years\' War & Return to Poland',
+          subtitle: 'Burghers demolish the Teutonic castle and pledge loyalty to the Polish Crown',
+          description: 'Frustrated by heavy Teutonic taxes, Toruń burghers rebelled in 1454, besieging and completely demolishing the Teutonic Castle. They pledged loyalty to Polish King Casimir IV Jagiellon, sparking the Thirteen Years\' War that ended with the 1466 Second Peace of Toruń, returning Royal Prussia to the Polish realm with extensive autonomous privileges.'
+        },
+        {
+          era: '1473',
+          title: 'The Birth of Nicolaus Copernicus',
+          subtitle: 'The Renaissance astronomer who revolutionized human understanding of the universe',
+          description: 'On February 19, 1473, Mikołaj Kopernik (Nicolaus Copernicus) was born in a Gothic townhouse on St. Anne Street. Educated at Kraków and in Italy, his groundbreaking treatise De revolutionibus orbium coelestium placed the Sun at the center of the solar system, launching the modern scientific revolution.'
+        },
+        {
+          era: '16th - 18th Century',
+          title: 'Golden Age of Patrician Palaces & Pierniki',
+          subtitle: 'Renaissance art, gingerbread guilds, and the House Under the Star',
+          description: 'Toruń patrician families built exquisite Renaissance townhouses like the House Under the Star (Kamienica Pod Gwiazdą). The Toruń gingerbread baking guild established secret spice recipes blending Asian ginger, cinnamon, nutmeg, and regional Vistula honey, earning royal acclaim across European courts.'
+        },
+        {
+          era: '1793 - 1920',
+          title: 'Prussian Rule & The Fortress of Toruń',
+          subtitle: 'Ring of artillery forts and cultural preservation under partition',
+          description: 'Following the Second Partition of Poland in 1793, Toruń became a key border stronghold of Prussia (Festung Thorn). A formidable ring of over 200 artillery forts and defensive works was constructed, protecting the medieval core while industrial railways linked the city to Berlin, Warsaw, and Danzig.'
+        },
+        {
+          era: '1945 - Present',
+          title: 'Miraculous Preservation & UNESCO Recognition',
+          subtitle: 'Undamaged architectural treasure and academic center',
+          description: 'Spared from destructive street battles during WWII, Toruń emerged as one of Poland\'s purest preserved medieval cities. In 1945, displaced Polish professors from Stefan Batory University in Wilno (Vilnius) founded Nicolaus Copernicus University (UMK), cementing Toruń as a premier academic and cultural destination.'
+        }
+      ],
+      historyLegends: [
+        {
+          icon: '🎻',
+          title: 'The Toruń Raftsman (Flisak) & The Frog Plague',
+          description: 'When Toruń was overrun by an overwhelming plague of frogs, the mayor offered gold and his daughter\'s hand in marriage to whoever could rid the town of them. A humble raftsman named Iwo played his violin so enchantingly that all the frogs followed his melody out through Chełmno Gate into the Vistula marshlands.'
+        },
+        {
+          icon: '🏰',
+          title: 'The Leaning Tower of Toruń (Krzywa Wieża)',
+          description: 'Built in the 14th century, this 15-meter tower leans 1.4 meters off-center. Medieval legend says a Teutonic knight built it as penance for falling in love with a local woman. Visitors are challenged to stand with their heels and back against the wall without falling over - proving they possess a pure and honest heart.'
+        },
+        {
+          icon: '🍪',
+          title: 'The Legend of Katarzynka Gingerbread',
+          description: 'When a medieval baker fell ill before the Polish King\'s visit, his clever daughter Katarzyna baked spiced honey cookies using six overlapping circles of dough. The King was so impressed by the unique shape and delicious flavor that he declared them Poland\'s official gingerbread, named "Katarzynki" in her honor.'
+        }
+      ]
     },
     {
       id: 'gdansk',
@@ -636,7 +822,69 @@ export const polandJourney = {
         location: 'Targ Węglowy (Coal Market) & Motława Waterfront',
         landmark: 'Historic Motława Crane & Amber Sky',
         description: 'Award-winning coastal market with Hanseatic flair. Highlights include the Talking Moose Lucek, an authentic 19th-century Venetian Carousel, local Baltic amber artisan stalls, and hot spiced mead.'
-      }
+      },
+      history: 'Gdańsk is the thousand-year-old Hanseatic "Pearl of the Baltic" and Poland’s maritime gateway to the world. Renowned for its Dutch Mannerist merchant facades along the Royal Way (Droga Królewska), the colossal red-brick St. Mary\'s Basilica, and the 15th-century wooden harbor Crane (Żuraw) on the Motława River, Gdańsk has always stood as a fortress of liberty. It was here at Westerplatte that World War II began in 1939, and here in the Gdańsk Shipyard that Lech Wałęsa\'s Solidarność movement ignited the peaceful dismantling of European communism in 1980.',
+      historyStats: [
+        { label: 'First Mentioned', value: '997 AD (St. Adalbert)', icon: 'Landmark' },
+        { label: 'Hanseatic Trade', value: '14th-17th C. (Golden Age)', icon: 'Award' },
+        { label: 'Amber Capital', value: '70%+ World Amber Crafting', icon: 'MapPin' },
+        { label: 'Solidarity Birth', value: 'August 1980 (Solidarność)', icon: 'Crown' }
+      ],
+      historyEpochs: [
+        {
+          era: '997 - 1308',
+          title: 'Slavic Stronghold & Early Baltic Port',
+          subtitle: 'Mission of St. Adalbert and Piast royal maritime outpost',
+          description: 'Gdańsk was first documented in 997 AD during St. Adalbert\'s Christian mission supported by Polish Duke Bolesław the Brave. Strategically situated at the mouth of the Vistula River where Polish grain and timber met Baltic sea routes, Gdańsk grew into a thriving Slavic port town under the Dukes of Pomerelia.'
+        },
+        {
+          era: '1308 - 1454',
+          title: 'Teutonic Knights & Hanseatic Maritime Boom',
+          subtitle: 'The Great Mill, St. Mary\'s Basilica, and the Motława River Crane',
+          description: 'In 1308, the Teutonic Order seized Gdańsk. Despite harsh Teutonic rule, the city joined the Hanseatic League and became one of Europe\'s most powerful maritime commercial powers. Teutonic engineers constructed the Great Mill (Wielki Młyn) and the legendary wooden harbor Crane (Żuraw) to load Polish grain onto European cargo caravels.'
+        },
+        {
+          era: '1454 - 1793',
+          title: 'The Polish Golden Age & Europe\'s Granary',
+          subtitle: 'The Royal Way, Neptune\'s Fountain, and Dutch Mannerist architecture',
+          description: 'During the Thirteen Years\' War, Gdańsk citizens allied with Polish King Casimir IV, receiving the grand Privileges of Casimir that granted the city vast autonomy, coinage rights, and control over Polish foreign trade. Wealthy merchant patricians transformed Długi Targ into a showcase of Dutch Mannerism, building Artus Court and Neptune\'s Fountain.'
+        },
+        {
+          era: '1920 - 1939',
+          title: 'The Free City of Danzig (Wolne Miasto Gdańsk)',
+          subtitle: 'League of Nations autonomous mandate and geopolitical tension',
+          description: 'Under the Treaty of Versailles following WWI, Gdańsk was established as a semi-autonomous city-state (Free City of Danzig) under League of Nations supervision, with Poland retaining customs, rail, and postal rights. Rising nationalistic tensions led to historic friction over the Polish Post Office and the Westerplatte military depot.'
+        },
+        {
+          era: '1939 - 1945',
+          title: 'Westerplatte & The Outbreak of World War II',
+          subtitle: 'First shots of WWII on Sept 1, 1939, and wartime devastation',
+          description: 'At 4:45 AM on September 1, 1939, the German battleship Schleswig-Holstein fired the opening shots of World War II at the Polish military outpost on Westerplatte peninsula. A tiny garrison of fewer than 200 Polish soldiers heroically held out for seven days against overwhelming Nazi forces before surrender. In early 1945, heavy fighting left 90% of Gdańsk\'s historic center in ruins.'
+        },
+        {
+          era: '1980 - Present',
+          title: 'The Solidarność Revolution & Maritime Renaissance',
+          subtitle: 'Lenin Shipyard strikes, Lech Wałęsa, and the fall of the Iron Curtain',
+          description: 'In August 1980, electrician Lech Wałęsa led the historic strike at the Lenin Shipyard, resulting in the signing of the Gdańsk Agreement and the creation of Solidarność - the first independent trade union in the Soviet Bloc. This 10-million-strong movement ignited the peaceful collapse of communist regimes across Eastern Europe in 1989.'
+        }
+      ],
+      historyLegends: [
+        {
+          icon: '🔱',
+          title: 'Neptune\'s Fountain & Goldwasser Liqueur',
+          description: 'According to Gdańsk lore, citizens and merchants would toss gold and silver coins into Neptune\'s fountain for luck. Annoyed by the cluttered basin, the bronze sea god struck his heavy trident against the water, shattering the coins into millions of tiny golden flakes that gave birth to Danziger Goldwasser herbal liqueur.'
+        },
+        {
+          icon: '🪟',
+          title: 'The Lady in the Window (Panienka z Okienka)',
+          description: 'Based on Deotyma\'s 19th-century novel, the legend tells of beautiful young Hedwig who looked out from the top garret window of Artus Court onto Długi Targ. A mechanical figure of the "Lady in the Window" still appears daily at 1:00 PM from the top window of the New Court House.'
+        },
+        {
+          icon: '⛪',
+          title: 'The Clockmaker of St. Mary\'s Basilica',
+          description: 'In 1464, master craftsman Hans Düringer built the monumental 14-meter astronomical clock inside St. Mary\'s. Legend says the city council, fearing he might build an even more magnificent clock for a rival city, blinded the master. In retribution, Düringer climbed the clock one final time and smashed its delicate gear mechanism before falling to his death.'
+        }
+      ]
     }
   ],
 

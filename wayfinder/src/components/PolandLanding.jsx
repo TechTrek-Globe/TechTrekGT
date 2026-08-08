@@ -7,13 +7,11 @@ import polandMapRouteClean from '../assets/poland-map-route-clean.png';
 export function PolandLanding() {
   const pushRoute = (e, path) => {
     if (e) e.preventDefault();
-    if (path.includes('/cities/')) {
-      window.scrollTo({ top: 156, behavior: 'instant' });
-    } else if (path.includes('scroll=journey-sequence') || path.includes('#journey-sequence')) {
+    if (path.includes('scroll=journey-sequence') || path.includes('#journey-sequence')) {
       const el = document.getElementById('journey-sequence');
       const targetY = el ? Math.max(0, el.getBoundingClientRect().top + window.pageYOffset - 80) : 440;
       window.scrollTo({ top: targetY, behavior: 'instant' });
-    } else {
+    } else if (!path.includes('/cities/')) {
       window.scrollTo({ top: 0, behavior: 'instant' });
     }
     window.history.pushState({}, '', path);

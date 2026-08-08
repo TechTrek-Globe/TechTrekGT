@@ -1743,52 +1743,62 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                             </div>
 
                             <div className="grid grid-cols-1 gap-1.5 text-xs font-medium">
-                              <div className="p-2 rounded-xl bg-white/5 border border-white/5 flex items-center justify-between gap-2">
-                                <span className="text-slate-300 text-[11px] font-bold truncate">🎄 Main Market (Rynek Główny)</span>
-                                <span className="text-amber-300 font-mono text-[11px] font-bold shrink-0">
-                                  {hotel.proximity.rynekMarket.distance} ({hotel.proximity.rynekMarket.time})
-                                </span>
-                              </div>
-                              <div className="p-2 rounded-xl bg-white/5 border border-white/5 flex items-center justify-between gap-2">
-                                <span className="text-slate-300 text-[11px] font-bold truncate">🎁 Mały Rynek Market</span>
-                                <span className="text-amber-300 font-mono text-[11px] font-bold shrink-0">
-                                  {hotel.proximity.malyRynekMarket.distance} ({hotel.proximity.malyRynekMarket.time})
-                                </span>
-                              </div>
-                              <div className="p-2 rounded-xl bg-white/5 border border-white/5 flex items-center justify-between gap-2">
-                                <span className="text-slate-300 text-[11px] font-bold truncate">🕯️ Kazimierz Markets</span>
-                                <span className="text-amber-300 font-mono text-[11px] font-bold shrink-0">
-                                  {hotel.proximity.kazimierzMarket.distance} ({hotel.proximity.kazimierzMarket.time})
-                                </span>
-                              </div>
+                              {hotel.proximity?.rynekMarket && (
+                                <div className="p-2 rounded-xl bg-white/5 border border-white/5 flex items-center justify-between gap-2">
+                                  <span className="text-slate-300 text-[11px] font-bold truncate">🎄 Main Market (Rynek Główny)</span>
+                                  <span className="text-amber-300 font-mono text-[11px] font-bold shrink-0">
+                                    {hotel.proximity.rynekMarket.distance} ({hotel.proximity.rynekMarket.time})
+                                  </span>
+                                </div>
+                              )}
+                              {hotel.proximity?.malyRynekMarket && (
+                                <div className="p-2 rounded-xl bg-white/5 border border-white/5 flex items-center justify-between gap-2">
+                                  <span className="text-slate-300 text-[11px] font-bold truncate">🎁 Mały Rynek Market</span>
+                                  <span className="text-amber-300 font-mono text-[11px] font-bold shrink-0">
+                                    {hotel.proximity.malyRynekMarket.distance} ({hotel.proximity.malyRynekMarket.time})
+                                  </span>
+                                </div>
+                              )}
+                              {hotel.proximity?.kazimierzMarket && (
+                                <div className="p-2 rounded-xl bg-white/5 border border-white/5 flex items-center justify-between gap-2">
+                                  <span className="text-slate-300 text-[11px] font-bold truncate">🕯️ Kazimierz Markets</span>
+                                  <span className="text-amber-300 font-mono text-[11px] font-bold shrink-0">
+                                    {hotel.proximity.kazimierzMarket.distance} ({hotel.proximity.kazimierzMarket.time})
+                                  </span>
+                                </div>
+                              )}
                             </div>
                           </div>
 
                           {/* Proximity to Top Attractions */}
-                          <div className="pt-2 border-t border-white/10 space-y-2">
-                            <div className="text-xs font-black text-sky-400 uppercase tracking-wider flex items-center space-x-1.5">
-                              <Landmark className="w-3.5 h-3.5" />
-                              <span>Top Landmark Distances</span>
-                            </div>
+                          {hotel.proximity?.attractions && hotel.proximity.attractions.length > 0 && (
+                            <div className="pt-2 border-t border-white/10 space-y-2">
+                              <div className="text-xs font-black text-sky-400 uppercase tracking-wider flex items-center space-x-1.5">
+                                <Landmark className="w-3.5 h-3.5" />
+                                <span>Top Landmark Distances</span>
+                              </div>
 
-                            <div className="grid grid-cols-2 gap-1.5 text-[11px]">
-                              {hotel.proximity.attractions.map((att, aIdx) => (
-                                <div key={aIdx} className="p-1.5 rounded-lg bg-slate-950/60 border border-white/5 text-slate-300 flex flex-col justify-between">
-                                  <span className="font-semibold truncate text-slate-200">{att.name}</span>
-                                  <span className="text-sky-300 font-mono text-[10px] font-bold">{att.distance} ({att.time})</span>
-                                </div>
-                              ))}
+                              <div className="grid grid-cols-2 gap-1.5 text-[11px]">
+                                {hotel.proximity.attractions.map((att, aIdx) => (
+                                  <div key={aIdx} className="p-1.5 rounded-lg bg-slate-950/60 border border-white/5 text-slate-300 flex flex-col justify-between">
+                                    <span className="font-semibold truncate text-slate-200">{att.name}</span>
+                                    <span className="text-sky-300 font-mono text-[10px] font-bold">{att.distance} ({att.time})</span>
+                                  </div>
+                                ))}
+                              </div>
                             </div>
-                          </div>
+                          )}
 
                           {/* Amenities Tags */}
-                          <div className="flex flex-wrap gap-1.5 pt-1">
-                            {hotel.amenities.map((am, amIdx) => (
-                              <span key={amIdx} className="px-2 py-0.5 rounded-md bg-slate-900 border border-white/10 text-[10px] font-bold text-slate-300">
-                                • {am}
-                              </span>
-                            ))}
-                          </div>
+                          {hotel.amenities && hotel.amenities.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 pt-1">
+                              {hotel.amenities.map((am, amIdx) => (
+                                <span key={amIdx} className="px-2 py-0.5 rounded-md bg-slate-900 border border-white/10 text-[10px] font-bold text-slate-300">
+                                  • {am}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </div>
 

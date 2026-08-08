@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { MapPin, Utensils, Bed, ArrowLeft, ArrowRight, Bus, Train, ShoppingBag, Sparkles, Landmark, Compass, DollarSign, Info, Map, Clock, Navigation, Gift, Lightbulb, Video, ExternalLink, Thermometer, CreditCard, Award, RefreshCw, AlertTriangle, CalendarX, Coins, Coffee, Sun, Volume2, Crown, BookOpen, Scroll, Flame, ShieldCheck, Heart, Users, Phone, Star, CheckCircle2, Lock, Wine, GlassWater } from 'lucide-react';
+import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
+import { MapPin, Utensils, Bed, ArrowLeft, ArrowRight, Bus, Train, ShoppingBag, Sparkles, Landmark, Compass, DollarSign, Info, Map, Clock, Navigation, Gift, Lightbulb, Video, ExternalLink, Thermometer, CreditCard, Award, RefreshCw, AlertTriangle, CalendarX, Coins, Coffee, Sun, Volume2, Crown, BookOpen, Scroll, Flame, ShieldCheck, Heart, Users, Phone, Star, CheckCircle2, Lock, Wine, GlassWater, ChevronDown } from 'lucide-react';
 import { polandJourney } from '../data/poland-2026';
 import { cityImages, marketImages, attractionImages } from '../utils/cityImages';
 import { useExchangeRate } from '../hooks/useExchangeRate';
@@ -115,6 +115,159 @@ function CulinaryHighlightsSection({ highlights }) {
         ))}
       </div>
     </section>
+  );
+}
+
+const FILTER_CATEGORIES = [
+  { id: 'all', label: 'All Food & Drink (35)', Icon: null, activeClass: 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20', inactiveClass: 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10' },
+  { id: 'coffee-breakfast', label: 'Coffee & Breakfast (5)', Icon: Coffee, activeClass: 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20', inactiveClass: 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30' },
+  { id: 'drink-all', label: 'All Drinks & Bars (15)', Icon: Wine, activeClass: 'bg-purple-500 text-white shadow-md shadow-purple-500/20', inactiveClass: 'bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30' },
+  { id: 'pub-bars', label: 'Beer Halls, Pubs & Cellars (11)', Icon: GlassWater, activeClass: 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20', inactiveClass: 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30' },
+  { id: 'vodka-house', label: 'Vodka Houses (2)', Icon: Crown, activeClass: 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20', inactiveClass: 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30' },
+  { id: 'brewery', label: 'Breweries (2)', Icon: GlassWater, activeClass: 'bg-amber-600 text-white shadow-md shadow-amber-600/20', inactiveClass: 'bg-amber-600/10 hover:bg-amber-600/20 text-amber-300 border border-amber-600/30' },
+  { id: 'must-haves', label: 'Must-Have Dining (3)', Icon: Utensils, activeClass: 'bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 shadow-md shadow-amber-500/20', inactiveClass: 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10' },
+  { id: 'local', label: 'Local Fares (3)', Icon: null, activeClass: 'bg-pink-500 text-white shadow-md shadow-pink-500/20', inactiveClass: 'bg-pink-500/10 hover:bg-pink-500/20 text-pink-300 border border-pink-500/30' },
+  { id: 'expensive', label: 'Fine Dining (3)', Icon: Award, activeClass: 'bg-purple-600 text-white shadow-md shadow-purple-500/20', inactiveClass: 'bg-purple-600/10 hover:bg-purple-600/20 text-purple-300 border border-purple-600/30' },
+  { id: 'steak', label: 'Steakhouses (3)', Icon: Flame, activeClass: 'bg-rose-600 text-white shadow-md shadow-rose-500/20', inactiveClass: 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30' },
+  { id: 'cheap', label: 'Cheap Eats (3)', Icon: Coins, activeClass: 'bg-emerald-600 text-white shadow-md shadow-emerald-500/20', inactiveClass: 'bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-300 border border-emerald-600/30' }
+];
+
+function PriorityPlusFilters({ activeFilter, onFilterChange }) {
+  const containerRef = useRef(null);
+  const dropdownRef = useRef(null);
+  const [visibleCount, setVisibleCount] = useState(FILTER_CATEGORIES.length);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [itemWidths, setItemWidths] = useState([]);
+  
+  useLayoutEffect(() => {
+    if (!containerRef.current) return;
+    const items = Array.from(containerRef.current.children);
+    // Measure all initial elements
+    const widths = items.map(el => el.offsetWidth);
+    setItemWidths(widths);
+  }, []);
+
+  useEffect(() => {
+    if (!containerRef.current || itemWidths.length === 0) return;
+    
+    const container = containerRef.current;
+    
+    const observer = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        const containerWidth = entry.contentRect.width;
+        let currentWidth = 0;
+        let count = 0;
+        const gap = 8; // space-x-2 is 0.5rem = 8px
+        const moreButtonWidth = 96; 
+        
+        for (let i = 0; i < FILTER_CATEGORIES.length; i++) {
+          const itemWidth = itemWidths[i] || 0;
+          
+          if (i === FILTER_CATEGORIES.length - 1) {
+             if (currentWidth + itemWidth <= containerWidth) {
+                 count++;
+             }
+             break;
+          }
+
+          if (currentWidth + itemWidth + gap + moreButtonWidth <= containerWidth) {
+            currentWidth += itemWidth + gap;
+            count++;
+          } else {
+            break;
+          }
+        }
+        setVisibleCount(count);
+      }
+    });
+    
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [itemWidths]);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsDropdownOpen(false);
+      }
+    }
+    if (isDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isDropdownOpen]);
+
+  const visibleItems = FILTER_CATEGORIES.slice(0, visibleCount);
+  const dropdownItems = FILTER_CATEGORIES.slice(visibleCount);
+  const isMeasuring = itemWidths.length === 0;
+
+  return (
+    <div className="relative flex items-center w-full" ref={dropdownRef}>
+      <div 
+        ref={containerRef} 
+        className={`flex items-center space-x-2 w-full ${isMeasuring ? 'opacity-0' : 'overflow-hidden'}`}
+      >
+        {(isMeasuring ? FILTER_CATEGORIES : visibleItems).map((cat) => {
+          const Icon = cat.Icon;
+          const isActive = activeFilter === cat.id;
+          return (
+            <button
+              key={cat.id}
+              type="button"
+              onClick={() => onFilterChange(cat.id)}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 whitespace-nowrap shrink-0 cursor-pointer ${
+                isActive ? cat.activeClass : cat.inactiveClass
+              }`}
+            >
+              {Icon && <Icon className="w-3.5 h-3.5" />}
+              <span>{cat.label}</span>
+            </button>
+          );
+        })}
+
+        {!isMeasuring && dropdownItems.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 whitespace-nowrap shrink-0 cursor-pointer ${
+              isDropdownOpen || dropdownItems.some(item => item.id === activeFilter)
+                ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/10'
+            }`}
+          >
+            <span>+{dropdownItems.length} More</span>
+            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+          </button>
+        )}
+      </div>
+
+      {isDropdownOpen && dropdownItems.length > 0 && (
+        <div className="absolute top-full right-0 mt-2 z-50 w-64 bg-slate-950/95 backdrop-blur-xl border border-amber-500/30 rounded-2xl shadow-2xl p-2 animate-fade-in origin-top-right">
+          <div className="flex flex-col space-y-1">
+            {dropdownItems.map((cat) => {
+              const Icon = cat.Icon;
+              const isActive = activeFilter === cat.id;
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => {
+                    onFilterChange(cat.id);
+                    setIsDropdownOpen(false);
+                  }}
+                  className={`w-full text-left px-3 py-2 rounded-xl text-xs font-black transition-all flex items-center space-x-2 cursor-pointer ${
+                    isActive ? cat.activeClass : cat.inactiveClass
+                  }`}
+                >
+                  {Icon && <Icon className="w-4 h-4 shrink-0" />}
+                  <span className="truncate">{cat.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1216,151 +1369,11 @@ export function CityPage({ cityId, subPage = 'overview' }) {
 
           {/* Sticky Category Filter Toolbar (Stays in view while scrolling) */}
           {(city.krakowRestaurantsDetailed || city.krakowDrinksDetailed) && (
-            <div className="sticky top-[104px] z-30 py-3 px-4 sm:px-6 rounded-2xl bg-slate-950/95 backdrop-blur-xl border border-amber-500/30 shadow-2xl transition-all">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setRestaurantCategoryFilter('all')}
-                    className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                      restaurantCategoryFilter === 'all'
-                        ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
-                        : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10'
-                    }`}
-                  >
-                    All Food & Drink (35)
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setRestaurantCategoryFilter('coffee-breakfast')}
-                    className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 cursor-pointer ${
-                      restaurantCategoryFilter === 'coffee-breakfast'
-                        ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20'
-                        : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                    }`}
-                  >
-                    <Coffee className="w-3.5 h-3.5" />
-                    <span>Coffee & Breakfast (5)</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setRestaurantCategoryFilter('drink-all')}
-                    className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 cursor-pointer ${
-                      restaurantCategoryFilter === 'drink-all'
-                        ? 'bg-purple-500 text-white shadow-md shadow-purple-500/20'
-                        : 'bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30'
-                    }`}
-                  >
-                    <Wine className="w-3.5 h-3.5" />
-                    <span>All Drinks & Bars (15)</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setRestaurantCategoryFilter('pub-bars')}
-                    className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 cursor-pointer ${
-                      restaurantCategoryFilter === 'pub-bars'
-                        ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
-                        : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                    }`}
-                  >
-                    <GlassWater className="w-3.5 h-3.5" />
-                    <span>Beer Halls, Pubs & Cellars (11)</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setRestaurantCategoryFilter('vodka-house')}
-                    className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 cursor-pointer ${
-                      restaurantCategoryFilter === 'vodka-house'
-                        ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20'
-                        : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                    }`}
-                  >
-                    <Crown className="w-3.5 h-3.5" />
-                    <span>Vodka Houses (2)</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setRestaurantCategoryFilter('brewery')}
-                    className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 cursor-pointer ${
-                      restaurantCategoryFilter === 'brewery'
-                        ? 'bg-amber-600 text-white shadow-md shadow-amber-600/20'
-                        : 'bg-amber-600/10 hover:bg-amber-600/20 text-amber-300 border border-amber-600/30'
-                    }`}
-                  >
-                    <GlassWater className="w-3.5 h-3.5" />
-                    <span>Breweries (2)</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setRestaurantCategoryFilter('must-haves')}
-                    className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 cursor-pointer ${
-                      restaurantCategoryFilter === 'must-haves'
-                        ? 'bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
-                        : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10'
-                    }`}
-                  >
-                    <Utensils className="w-3.5 h-3.5" />
-                    <span>Must-Have Dining (3)</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setRestaurantCategoryFilter('local')}
-                    className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 cursor-pointer ${
-                      restaurantCategoryFilter === 'local'
-                        ? 'bg-pink-500 text-white shadow-md shadow-pink-500/20'
-                        : 'bg-pink-500/10 hover:bg-pink-500/20 text-pink-300 border border-pink-500/30'
-                    }`}
-                  >
-                    <span>Local Fares (3)</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setRestaurantCategoryFilter('expensive')}
-                    className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 cursor-pointer ${
-                      restaurantCategoryFilter === 'expensive'
-                        ? 'bg-purple-600 text-white shadow-md shadow-purple-500/20'
-                        : 'bg-purple-600/10 hover:bg-purple-600/20 text-purple-300 border border-purple-600/30'
-                    }`}
-                  >
-                    <Award className="w-3.5 h-3.5" />
-                    <span>Fine Dining (3)</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setRestaurantCategoryFilter('steak')}
-                    className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 cursor-pointer ${
-                      restaurantCategoryFilter === 'steak'
-                        ? 'bg-rose-600 text-white shadow-md shadow-rose-500/20'
-                        : 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30'
-                    }`}
-                  >
-                    <Flame className="w-3.5 h-3.5" />
-                    <span>Steakhouses (3)</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setRestaurantCategoryFilter('cheap')}
-                    className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 cursor-pointer ${
-                      restaurantCategoryFilter === 'cheap'
-                        ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/20'
-                        : 'bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-300 border border-emerald-600/30'
-                    }`}
-                  >
-                    <Coins className="w-3.5 h-3.5" />
-                    <span>Cheap Eats (3)</span>
-                  </button>
-                </div>
-              </div>
+            <div className="sticky top-[104px] z-30 py-2.5 px-3 sm:px-5 rounded-2xl bg-slate-950/95 backdrop-blur-xl border border-amber-500/30 shadow-2xl transition-all">
+              <PriorityPlusFilters 
+                activeFilter={restaurantCategoryFilter} 
+                onFilterChange={setRestaurantCategoryFilter} 
+              />
             </div>
           )}
 

@@ -2177,6 +2177,94 @@ export function CityPage({ cityId, subPage = 'overview' }) {
               )}
             </div>
           )}
+
+          {/* Unique Stays Section */}
+          {city.krakowUniqueStays && city.krakowUniqueStays.length > 0 && (
+            <div className="space-y-4">
+              <div className="glass-panel p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-purple-500/30 bg-wf-navy-mid/95 relative overflow-hidden shadow-lg">
+                <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-bl from-purple-500/15 via-pink-500/10 to-transparent rounded-full blur-2xl pointer-events-none" />
+                <div className="relative z-10 space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full bg-purple-500/20 border border-purple-400/40 text-purple-300 text-[10px] sm:text-xs font-bold uppercase tracking-wider shadow-sm">
+                      <Sparkles className="w-3.5 h-3.5 text-pink-400" />
+                      <span>Unique Stays</span>
+                    </div>
+                    <h2 className="text-lg sm:text-xl font-bold text-white leading-snug">
+                      Beyond the Ordinary in {city.name}
+                    </h2>
+                  </div>
+                  <p className="text-xs sm:text-sm text-slate-300 font-medium leading-tight">
+                    Unconventional, memorable, and one-of-a-kind accommodations - from UNESCO salt mines to communist-era icons and monastic retreats.
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                {city.krakowUniqueStays.map((stay) => (
+                  <article
+                    key={stay.id}
+                    className="glass-panel rounded-2xl border border-purple-500/20 hover:border-purple-400/50 bg-wf-navy-mid/90 overflow-hidden shadow-xl transition-all duration-300 flex flex-col justify-between group"
+                  >
+                    <div className="relative w-full h-44 bg-slate-950 overflow-hidden shrink-0">
+                      <img src={stay.imageSrc} alt={stay.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-wf-navy-mid via-transparent to-black/30 pointer-events-none" />
+                      <div className="absolute top-3 left-3 z-10">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border backdrop-blur-md shadow-md bg-purple-500/30 border-purple-400/50 text-purple-200">{stay.typeLabel}</span>
+                      </div>
+                      <div className="absolute top-3 right-3 z-10 bg-slate-950/80 backdrop-blur-md px-2.5 py-0.5 rounded-full border border-purple-500/30 text-purple-300 text-[10px] font-bold shadow-md">{stay.vibe}</div>
+                    </div>
+                    <div className="p-4 sm:p-5 space-y-3 flex-1">
+                      <div className="space-y-0.5">
+                        <h3 className="text-base font-black text-white group-hover:text-purple-300 transition-colors leading-tight">{stay.name}</h3>
+                        <div className="flex items-center space-x-1.5 text-xs text-slate-400 font-semibold">
+                          <MapPin className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                          <span>{stay.neighborhood}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/80 border border-purple-500/20">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Est. Price / Night</span>
+                        <div className="text-right">
+                          <span className="text-sm font-black text-white">{stay.priceRange}</span>
+                          <span className="text-[10px] text-slate-400 ml-1.5 font-semibold">({stay.priceUsd})</span>
+                        </div>
+                      </div>
+                      <p className="text-xs text-slate-300 leading-relaxed font-medium">{stay.description}</p>
+                      <div className="p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-xs font-semibold text-purple-200">
+                        <span className="mr-1">&#10024;</span><span className="font-bold text-purple-300">Why it is unique:</span> {stay.whyUnique}
+                      </div>
+                      {stay.bestFor && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {stay.bestFor.map((tag, i) => (
+                            <span key={i} className="px-2 py-0.5 rounded-md bg-slate-900 border border-purple-500/20 text-[10px] font-bold text-purple-300">{tag}</span>
+                          ))}
+                        </div>
+                      )}
+                      {stay.travelNote && (
+                        <div className="flex items-start space-x-1.5 text-[11px] text-slate-400 font-medium">
+                          <Navigation className="w-3 h-3 text-sky-400 shrink-0 mt-0.5" />
+                          <span>{stay.travelNote}</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="bg-slate-950/80 border-t border-white/10 p-3.5 flex items-center gap-2 shrink-0">
+                      <a href={stay.bookingUrl} target="_blank" rel="noopener noreferrer" className="flex-1 py-2 px-2.5 rounded-xl bg-purple-500/10 hover:bg-purple-500/25 text-purple-300 hover:text-purple-200 border border-purple-500/30 hover:border-purple-400/60 text-[11px] font-bold transition-all flex items-center justify-center space-x-1.5">
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        <span>Book / Explore</span>
+                      </a>
+                      <button
+                        onClick={() => toggleItinerary(stay.id)}
+                        className={`flex-1 py-2 px-2.5 rounded-xl text-[11px] font-bold transition-all flex items-center justify-center space-x-1.5 border ${savedItems.has(stay.id) ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30' : 'bg-white/5 hover:bg-emerald-500/20 text-slate-300 hover:text-emerald-300 border-white/10 hover:border-emerald-500/40'}`}
+                      >
+                        {savedItems.has(stay.id)
+                          ? <><CheckCircle2 className="w-3.5 h-3.5" /><span>Saved</span></>
+                          : <><Plus className="w-3.5 h-3.5 text-emerald-400" /><span>Itinerary</span></>
+                        }
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

@@ -163,10 +163,10 @@ export function CityPage({ cityId, subPage = 'overview' }) {
           </a>
 
           {/* Prominent Wide Horizontal Trail Track Chart */}
-          <div className="flex-1 glass-panel px-5 py-3 rounded-full border-2 border-amber-500/40 bg-wf-navy-mid/95 backdrop-blur-xl shadow-2xl flex items-center justify-between min-w-0 overflow-x-auto no-scrollbar">
-            <div className="flex items-center justify-between w-full min-w-[540px] relative px-4 py-2">
+          <div className="flex-1 glass-panel px-5 py-4 rounded-2xl border-2 border-amber-500/40 bg-wf-navy-mid/95 backdrop-blur-xl shadow-2xl flex items-center justify-between min-w-0 overflow-x-auto no-scrollbar">
+            <div className="flex items-center justify-between w-full min-w-[580px] relative px-4 py-3">
               {/* Thick Visible Railroad Track Line */}
-              <div className="absolute top-[22px] left-8 right-8 h-2.5 bg-slate-950 border-y-2 border-amber-400 rounded-full z-0 flex items-center justify-around overflow-hidden shadow-inner">
+              <div className="absolute top-[32px] left-8 right-8 h-2.5 bg-slate-950 border-y-2 border-amber-400 rounded-full z-0 flex items-center justify-around overflow-hidden shadow-inner">
                 {/* Railroad ties pattern */}
                 <div className="w-full h-full bg-[linear-gradient(90deg,transparent_50%,rgba(245,158,11,0.6)_50%)] bg-[length:12px_100%] opacity-90"></div>
               </div>
@@ -182,13 +182,23 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                     <a
                       href={itemUrl}
                       onClick={(e) => pushRoute(e, itemUrl)}
-                      className="relative z-10 flex flex-col items-center group cursor-pointer shrink-0"
+                      className={`relative z-10 flex flex-col items-center group cursor-pointer shrink-0 transition-transform ${
+                        isCurrent ? 'z-20' : 'opacity-70 hover:opacity-100'
+                      }`}
                       title={`${item.name} (${item.nights > 0 ? `${item.nights} Nights` : 'Day Stop'})`}
                     >
-                      <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-full overflow-hidden border-2 transition-all duration-300 relative flex items-center justify-center bg-slate-900 ${
+                      {/* Active City "YOU ARE HERE" Badge */}
+                      {isCurrent && (
+                        <span className="absolute -top-7 px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[9px] font-black uppercase tracking-widest border border-amber-200 shadow-lg shadow-amber-500/60 whitespace-nowrap z-30 flex items-center space-x-1 animate-pulse">
+                          <span>📍</span>
+                          <span>YOU ARE HERE</span>
+                        </span>
+                      )}
+
+                      <div className={`rounded-full overflow-hidden border-2 transition-all duration-300 relative flex items-center justify-center bg-slate-900 ${
                         isCurrent 
-                          ? 'border-amber-400 ring-4 ring-amber-500/40 scale-110 shadow-xl shadow-amber-500/50' 
-                          : 'border-white/40 hover:border-amber-300 hover:scale-105'
+                          ? 'w-14 h-14 sm:w-16 sm:h-16 border-amber-400 ring-4 ring-amber-400/70 shadow-[0_0_30px_rgba(245,158,11,0.85)] scale-110' 
+                          : 'w-9 h-9 sm:w-10 sm:h-10 border-white/30 hover:border-amber-300 hover:scale-110 grayscale-[30%] hover:grayscale-0'
                       }`}>
                         <img 
                           src={cityImages[item.id]} 
@@ -196,12 +206,14 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                           className="w-full h-full object-cover" 
                         />
                         {isCurrent && (
-                          <div className="absolute inset-0 bg-amber-500/25 ring-2 ring-amber-400 ring-inset"></div>
+                          <div className="absolute inset-0 bg-amber-400/20 ring-2 ring-amber-300 ring-inset"></div>
                         )}
                       </div>
 
-                      <span className={`text-xs font-black mt-1.5 tracking-tight ${
-                        isCurrent ? 'text-amber-300 drop-shadow-md scale-105 font-black' : 'text-wf-cream group-hover:text-white'
+                      <span className={`mt-1.5 tracking-tight ${
+                        isCurrent 
+                          ? 'text-amber-300 text-sm font-black drop-shadow-[0_2px_8px_rgba(245,158,11,0.7)] underline decoration-amber-400 decoration-2 underline-offset-4' 
+                          : 'text-slate-400 text-xs font-bold group-hover:text-white'
                       }`}>
                         {item.name}
                       </span>
@@ -209,10 +221,10 @@ export function CityPage({ cityId, subPage = 'overview' }) {
 
                     {/* Crisp Vector Train Badge Riding ON the Track */}
                     {!isLast && (
-                      <div className="relative z-10 flex items-center justify-center shrink-0 -mt-5">
-                        <div className="bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 px-2.5 py-1 rounded-full border border-amber-300 shadow-lg shadow-amber-500/40 flex items-center space-x-1.5 transform hover:scale-110 transition-all font-black">
-                          <Train className="w-4 h-4 text-slate-950 stroke-[2.5]" />
-                          <span className="text-[10px] font-black tracking-wider uppercase text-slate-950">TRAIN</span>
+                      <div className="relative z-10 flex items-center justify-center shrink-0">
+                        <div className="bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full border border-amber-300 shadow-md shadow-amber-500/30 flex items-center space-x-1 font-black transform hover:scale-105 transition-all">
+                          <Train className="w-3.5 h-3.5 text-slate-950 stroke-[2.5]" />
+                          <span className="text-[9px] sm:text-[10px] font-black tracking-wider uppercase text-slate-950">TRAIN</span>
                         </div>
                       </div>
                     )}

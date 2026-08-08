@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { MapPin, Navigation, Compass, Plus, Check, CalendarX } from 'lucide-react';
-import { cityImages, marketImages } from '../utils/cityImages';
+import { cityImages, marketImages, getAttractionImage } from '../utils/cityImages';
 
 /**
  * Extracts a concise vital stats list for the quick stats row.
@@ -168,7 +168,7 @@ export function MustSeeCard(props) {
     }
   };
 
-  const currentImgSrc = (!imgError && cardImage) ? cardImage : getFallbackImage(cardTitle, cityName);
+  const currentImgSrc = getAttractionImage(cardImage, cardTitle, cityName);
 
   return (
     <article className="glass-panel rounded-3xl border border-white/10 hover:border-amber-500/40 transition-all duration-300 overflow-hidden flex flex-col h-full bg-wf-navy-mid/80 shadow-xl group">

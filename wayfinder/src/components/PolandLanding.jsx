@@ -6,10 +6,31 @@ import polandMapRouteClean from '../assets/poland-map-route-clean.png';
 
 export function PolandLanding() {
   const pushRoute = (e, path) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
+    if (path.includes('/cities/')) {
+      window.scrollTo({ top: 156, behavior: 'instant' });
+    } else if (path.includes('scroll=journey-sequence') || path.includes('#journey-sequence')) {
+      const el = document.getElementById('journey-sequence');
+      const targetY = el ? Math.max(0, el.getBoundingClientRect().top + window.pageYOffset - 80) : 440;
+      window.scrollTo({ top: targetY, behavior: 'instant' });
+    } else {
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    }
     window.history.pushState({}, '', path);
     window.dispatchEvent(new PopStateEvent('popstate'));
   };
+
+  React.useLayoutEffect(() => {
+    const isScrollRequested = window.location.search.includes('scroll=journey-sequence') || window.location.hash === '#journey-sequence';
+    if (isScrollRequested) {
+      const el = document.getElementById('journey-sequence');
+      if (el) {
+        const yOffset = -80;
+        const y = el.getBoundingClientRect().top + window.pageYOffset + yOffset;
+        window.scrollTo({ top: Math.max(0, y), behavior: 'instant' });
+      }
+    }
+  }, []);
 
   return (
     <div className="w-full pb-20 space-y-8">
@@ -148,7 +169,6 @@ export function PolandLanding() {
                         className="w-full h-full object-cover" 
                       />
                     </div>
-
                     {/* City Label Badge */}
                     <div className="mt-0.5 px-2 py-0.5 rounded-full bg-slate-950/95 border border-amber-400/80 text-white font-black text-[9px] sm:text-[10px] tracking-tight shadow-lg backdrop-blur-md group-hover/node:bg-amber-500 group-hover/node:text-slate-950 transition-colors">
                       {item.name}
@@ -164,8 +184,8 @@ export function PolandLanding() {
       {/* Overview Grid */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8 space-y-16">
         
-        {/* Route Snapshot */}
-        <section>
+        {/* Route Snapshot / Journey Sequence */}
+        <section id="journey-sequence">
           <div className="flex items-center justify-between mb-8">
             <h2 className="text-2xl font-bold text-white flex items-center space-x-3">
               <Map className="w-6 h-6 text-wf-blue-lt" />

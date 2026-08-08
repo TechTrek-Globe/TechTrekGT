@@ -249,7 +249,16 @@ export function CityPage({ cityId, subPage = 'overview' }) {
   const subPageSectionRef = useRef(null);
 
   const pushRoute = (e, path) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
+    if (path.includes('/cities/')) {
+      window.scrollTo({ top: 156, behavior: 'instant' });
+    } else if (path.includes('scroll=journey-sequence') || path.includes('#journey-sequence')) {
+      const el = document.getElementById('journey-sequence');
+      const targetY = el ? Math.max(0, el.getBoundingClientRect().top + window.pageYOffset - 80) : 440;
+      window.scrollTo({ top: targetY, behavior: 'instant' });
+    } else {
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    }
     window.history.pushState({}, '', path);
     window.dispatchEvent(new PopStateEvent('popstate'));
   };
@@ -259,14 +268,24 @@ export function CityPage({ cityId, subPage = 'overview' }) {
       const yOffset = -120; // Accounts for sticky layout top bar (56px) + sticky sub-toolbar (~50px) + breathing space
       const element = subPageSectionRef.current;
       const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset;
-      window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
+      window.scrollTo({ top: Math.max(0, y), behavior: 'instant' });
+    }
+  };
+
+  const cityHeaderRef = useRef(null);
+
+  const scrollToCityHeader = () => {
+    if (cityHeaderRef.current) {
+      const yOffset = -60; // Offset for the sticky navbar
+      const y = cityHeaderRef.current.getBoundingClientRect().top + window.pageYOffset + yOffset;
+      window.scrollTo({ top: Math.max(0, y), behavior: 'instant' });
     }
   };
 
   const handleSubPageTabClick = (e, path) => {
     e.preventDefault();
     pushRoute(e, path);
-    window.scrollTo({ top: 0, behavior: 'instant' });
+    setTimeout(scrollToCityHeader, 30);
   };
 
   const city = polandJourney.route.find(c => c.id === cityId);
@@ -298,9 +317,13 @@ export function CityPage({ cityId, subPage = 'overview' }) {
               ? 'lgbtq'
               : 'overview')))));
 
-  useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'instant' });
-  }, [cityId, activeSubPage]);
+  React.useLayoutEffect(() => {
+    if (cityHeaderRef.current) {
+      const yOffset = -60; // Offset for the sticky navbar
+      const y = cityHeaderRef.current.getBoundingClientRect().top + window.pageYOffset + yOffset;
+      window.scrollTo({ top: Math.max(0, y), behavior: 'instant' });
+    }
+  }, [cityId]);
 
   // OpenStreetMap embed bbox for Kraków or generic fallback
   const mapUrl = cityId === 'krakow'
@@ -308,14 +331,14 @@ export function CityPage({ cityId, subPage = 'overview' }) {
     : "https://www.openstreetmap.org/export/embed.html?bbox=16.9000%2C51.1000%2C17.1000%2C51.1300&amp;layer=mapnik";
 
   return (
-    <div className="w-full max-w-6xl min-w-0 mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <div ref={cityHeaderRef} className="w-full max-w-6xl min-w-0 mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
       {/* Navigation Header with Horizontal Trail Track Chart (07:48 Version) */}
       <div className="space-y-4">
         <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
           {/* Back Button */}
           <a 
-            href="/wayfinder/poland-christmas-2026" 
-            onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026')} 
+            href="/wayfinder/poland-christmas-2026?scroll=journey-sequence" 
+            onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026?scroll=journey-sequence')} 
             className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-full bg-amber-500/10 hover:bg-amber-500 text-amber-300 hover:text-slate-950 font-bold text-sm border border-amber-500/40 hover:border-amber-400 transition-all duration-300 shadow-lg shadow-amber-900/30 hover:shadow-amber-500/30 hover:scale-105 shrink-0 group self-start lg:self-auto"
           >
             <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />

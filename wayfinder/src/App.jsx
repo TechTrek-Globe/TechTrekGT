@@ -31,9 +31,13 @@ function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // Scroll restoration: scroll to top on route change
+  // Scroll restoration: scroll to top on route change (unless city route or scroll target is present)
   useEffect(() => {
-    window.scrollTo(0, 0);
+    const isCityRoute = currentPath.includes('/cities/');
+    const isScrollTarget = currentPath.includes('scroll=') || currentPath.includes('#');
+    if (!isCityRoute && !isScrollTarget) {
+      window.scrollTo(0, 0);
+    }
   }, [currentPath]);
 
   const renderRoute = () => {

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { MapPin, Navigation, Compass, Plus, Check, CalendarX } from 'lucide-react';
+import { MapPin, Navigation, Compass, Plus, Check, CalendarX, ExternalLink } from 'lucide-react';
 import { cityImages, marketImages, getAttractionImage } from '../utils/cityImages';
 
 /**
@@ -264,7 +264,18 @@ export function MustSeeCard(props) {
       </div>
 
       {/* 4. Action Footer (Bottom): Darker background with flexbox evenly spaced buttons */}
-      <div className="bg-slate-950/80 border-t border-white/10 p-3.5 sm:p-4 flex items-center justify-between gap-2 shrink-0">
+      <div className="bg-slate-950/80 border-t border-white/10 p-3.5 sm:p-4 flex flex-wrap items-center justify-between gap-2 shrink-0">
+        <a
+          href={sight?.websiteUrl || sight?.url || `https://www.google.com/search?q=${searchQuery}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex-1 py-2 px-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:border-emerald-500/50 text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn"
+          title={`Visit ${cardTitle} website`}
+        >
+          <ExternalLink className="w-3.5 h-3.5 text-emerald-400 group-hover/btn:text-emerald-300 transition-colors shrink-0" />
+          <span className="truncate">Website</span>
+        </a>
+
         <a
           href={directionsUrl}
           target="_blank"

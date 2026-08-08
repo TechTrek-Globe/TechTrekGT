@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
-import { MapPin, Utensils, Bed, ArrowLeft, ArrowRight, Bus, Train, ShoppingBag, Sparkles, Landmark, Compass, DollarSign, Info, Map, Clock, Navigation, Gift, Lightbulb, Video, ExternalLink, Thermometer, CreditCard, Award, RefreshCw, AlertTriangle, CalendarX, Coins, Coffee, Sun, Volume2, Crown, BookOpen, Scroll, Flame, ShieldCheck, Heart, Users, Phone, Star, CheckCircle2, Lock, Wine, GlassWater, ChevronDown } from 'lucide-react';
+import { MapPin, Utensils, Bed, ArrowLeft, ArrowRight, Bus, Train, ShoppingBag, Sparkles, Landmark, Compass, DollarSign, Info, Map, Clock, Navigation, Gift, Lightbulb, Video, ExternalLink, Thermometer, CreditCard, Award, RefreshCw, AlertTriangle, CalendarX, Coins, Coffee, Sun, Volume2, Crown, BookOpen, Scroll, Flame, ShieldCheck, Heart, Users, Phone, Star, CheckCircle2, Lock, Wine, GlassWater, ChevronDown, Plus } from 'lucide-react';
 import { polandJourney } from '../data/poland-2026';
 import { cityImages, marketImages, attractionImages } from '../utils/cityImages';
 import { useExchangeRate } from '../hooks/useExchangeRate';
@@ -132,140 +132,84 @@ const FILTER_CATEGORIES = [
   { id: 'cheap', label: 'Cheap Eats (3)', Icon: Coins, activeClass: 'bg-emerald-600 text-white shadow-md shadow-emerald-500/20', inactiveClass: 'bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-300 border border-emerald-600/30' }
 ];
 
-function PriorityPlusFilters({ activeFilter, onFilterChange }) {
-  const containerRef = useRef(null);
-  const dropdownRef = useRef(null);
-  const [visibleCount, setVisibleCount] = useState(FILTER_CATEGORIES.length);
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [itemWidths, setItemWidths] = useState([]);
-  
-  useLayoutEffect(() => {
-    if (!containerRef.current) return;
-    const items = Array.from(containerRef.current.children);
-    // Measure all initial elements
-    const widths = items.map(el => el.offsetWidth);
-    setItemWidths(widths);
-  }, []);
+function DrillDownFilters({ activeFilter, onFilterChange }) {
+  const [activeTier, setActiveTier] = useState('main'); // 'main', 'eat', 'drink'
 
-  useEffect(() => {
-    if (!containerRef.current || itemWidths.length === 0) return;
-    
-    const container = containerRef.current;
-    
-    const observer = new ResizeObserver((entries) => {
-      for (let entry of entries) {
-        const containerWidth = entry.contentRect.width;
-        let currentWidth = 0;
-        let count = 0;
-        const gap = 8; // space-x-2 is 0.5rem = 8px
-        const moreButtonWidth = 96; 
-        
-        for (let i = 0; i < FILTER_CATEGORIES.length; i++) {
-          const itemWidth = itemWidths[i] || 0;
-          
-          if (i === FILTER_CATEGORIES.length - 1) {
-             if (currentWidth + itemWidth <= containerWidth) {
-                 count++;
-             }
-             break;
-          }
+  const eatIds = ['local', 'coffee-breakfast', 'must-haves', 'expensive', 'steak', 'cheap'];
+  const drinkIds = ['drink-all', 'pub-bars', 'vodka-house', 'brewery'];
 
-          if (currentWidth + itemWidth + gap + moreButtonWidth <= containerWidth) {
-            currentWidth += itemWidth + gap;
-            count++;
-          } else {
-            break;
-          }
-        }
-        setVisibleCount(count);
-      }
-    });
-    
-    observer.observe(container);
-    return () => observer.disconnect();
-  }, [itemWidths]);
+  const getItemsForTier = () => {
+    if (activeTier === 'eat') return FILTER_CATEGORIES.filter(c => eatIds.includes(c.id));
+    if (activeTier === 'drink') return FILTER_CATEGORIES.filter(c => drinkIds.includes(c.id));
+    return []; 
+  };
 
-  useEffect(() => {
-    function handleClickOutside(event) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setIsDropdownOpen(false);
-      }
-    }
-    if (isDropdownOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [isDropdownOpen]);
-
-  const visibleItems = FILTER_CATEGORIES.slice(0, visibleCount);
-  const dropdownItems = FILTER_CATEGORIES.slice(visibleCount);
-  const isMeasuring = itemWidths.length === 0;
+  const currentItems = getItemsForTier();
 
   return (
-    <div className="relative flex items-center w-full" ref={dropdownRef}>
-      <div 
-        ref={containerRef} 
-        className={`flex items-center space-x-2 w-full ${isMeasuring ? 'opacity-0' : 'overflow-hidden'}`}
-      >
-        {(isMeasuring ? FILTER_CATEGORIES : visibleItems).map((cat) => {
-          const Icon = cat.Icon;
-          const isActive = activeFilter === cat.id;
-          return (
-            <button
-              key={cat.id}
-              type="button"
-              onClick={() => onFilterChange(cat.id)}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 whitespace-nowrap shrink-0 cursor-pointer ${
-                isActive ? cat.activeClass : cat.inactiveClass
-              }`}
-            >
-              {Icon && <Icon className="w-3.5 h-3.5" />}
-              <span>{cat.label}</span>
-            </button>
-          );
-        })}
-
-        {!isMeasuring && dropdownItems.length > 0 && (
+    <div className="flex items-center space-x-2 w-full overflow-x-auto no-scrollbar whitespace-nowrap">
+      {activeTier === 'main' ? (
+        <>
           <button
             type="button"
-            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 whitespace-nowrap shrink-0 cursor-pointer ${
-              isDropdownOpen || dropdownItems.some(item => item.id === activeFilter)
+            onClick={() => onFilterChange('all')}
+            className={`px-4 py-2 rounded-xl text-xs font-black transition-all shrink-0 cursor-pointer ${
+              activeFilter === 'all'
                 ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
-                : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/10'
+                : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10'
             }`}
           >
-            <span>+{dropdownItems.length} More</span>
-            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+            All Food & Drink (35)
           </button>
-        )}
-      </div>
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTier('eat');
+              onFilterChange('local');
+            }}
+            className="px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 shrink-0 cursor-pointer bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30"
+          >
+            <Utensils className="w-3.5 h-3.5" />
+            <span>Eat</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTier('drink')}
+            className="px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 shrink-0 cursor-pointer bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30"
+          >
+            <Wine className="w-3.5 h-3.5" />
+            <span>Drink</span>
+          </button>
+        </>
+      ) : (
+        <>
+          <button
+            type="button"
+            onClick={() => setActiveTier('main')}
+            className="px-3.5 py-1.5 rounded-xl text-xs font-black transition-all shrink-0 cursor-pointer bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/10 flex items-center space-x-1.5"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Back</span>
+          </button>
 
-      {isDropdownOpen && dropdownItems.length > 0 && (
-        <div className="absolute top-full right-0 mt-2 z-50 w-64 bg-slate-950/95 backdrop-blur-xl border border-amber-500/30 rounded-2xl shadow-2xl p-2 animate-fade-in origin-top-right">
-          <div className="flex flex-col space-y-1">
-            {dropdownItems.map((cat) => {
-              const Icon = cat.Icon;
-              const isActive = activeFilter === cat.id;
-              return (
-                <button
-                  key={cat.id}
-                  type="button"
-                  onClick={() => {
-                    onFilterChange(cat.id);
-                    setIsDropdownOpen(false);
-                  }}
-                  className={`w-full text-left px-3 py-2 rounded-xl text-xs font-black transition-all flex items-center space-x-2 cursor-pointer ${
-                    isActive ? cat.activeClass : cat.inactiveClass
-                  }`}
-                >
-                  {Icon && <Icon className="w-4 h-4 shrink-0" />}
-                  <span className="truncate">{cat.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
+          {currentItems.map((cat) => {
+            const Icon = cat.Icon;
+            const isActive = activeFilter === cat.id;
+            return (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => onFilterChange(cat.id)}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 shrink-0 cursor-pointer ${
+                  isActive ? cat.activeClass : cat.inactiveClass
+                }`}
+              >
+                {Icon && <Icon className="w-3.5 h-3.5" />}
+                <span>{cat.label}</span>
+              </button>
+            );
+          })}
+        </>
       )}
     </div>
   );
@@ -276,6 +220,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
   const [activeEpochTab, setActiveEpochTab] = useState('all');
   const [hotelTierFilter, setHotelTierFilter] = useState('all');
   const [restaurantCategoryFilter, setRestaurantCategoryFilter] = useState('all');
+  const [savedItems, setSavedItems] = useState(new Set());
   const { isAuthenticated, setIsAuthModalOpen } = useAuth();
   const exchangeRates = useExchangeRate();
   const subPageSectionRef = useRef(null);
@@ -517,7 +462,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
             }`}
           >
             <Bed className="w-3.5 h-3.5" />
-            <span>Base & Hotels</span>
+            <span>Lodging</span>
           </a>
 
           {city.lgbtq && (
@@ -1370,7 +1315,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
           {/* Sticky Category Filter Toolbar (Stays in view while scrolling) */}
           {(city.krakowRestaurantsDetailed || city.krakowDrinksDetailed) && (
             <div className="sticky top-[104px] z-30 py-2.5 px-3 sm:px-5 rounded-2xl bg-slate-950/95 backdrop-blur-xl border border-amber-500/30 shadow-2xl transition-all">
-              <PriorityPlusFilters 
+              <DrillDownFilters 
                 activeFilter={restaurantCategoryFilter} 
                 onFilterChange={setRestaurantCategoryFilter} 
               />
@@ -1510,15 +1455,55 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                       </div>
 
                       {/* Footer Actions */}
-                      <div className="bg-slate-950/80 border-t border-white/10 p-3.5 sm:p-4 flex items-center justify-between gap-2 shrink-0">
+                      <div className="bg-slate-950/80 border-t border-white/10 p-3.5 sm:p-4 flex flex-wrap items-center justify-between gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setSavedItems(prev => {
+                              const newSet = new Set(prev);
+                              if (newSet.has(item.id)) newSet.delete(item.id);
+                              else newSet.add(item.id);
+                              return newSet;
+                            });
+                          }}
+                          className={`flex-1 py-2 px-2.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 border ${
+                            savedItems.has(item.id)
+                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
+                              : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30 hover:border-amber-500/50'
+                          }`}
+                        >
+                          {savedItems.has(item.id) ? (
+                            <>
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                              <span className="truncate">Saved</span>
+                            </>
+                          ) : (
+                            <>
+                              <Plus className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                              <span className="truncate">Itinerary</span>
+                            </>
+                          )}
+                        </button>
+
+                        <a
+                          href={item.websiteUrl || `https://www.google.com/search?q=${mapSearchQuery}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 py-2 px-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:border-emerald-500/50 text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5 text-emerald-400 group-hover/btn:text-emerald-300 shrink-0" />
+                          <span className="truncate">Visit Website</span>
+                        </a>
+
                         <a
                           href={directionsUrl}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="flex-1 py-2 px-2.5 rounded-xl bg-white/5 hover:bg-amber-500/20 text-slate-300 hover:text-amber-300 border border-white/10 hover:border-amber-500/40 text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn"
                         >
-                          <Navigation className="w-3.5 h-3.5 text-sky-400 group-hover/btn:text-amber-300" />
-                          <span>Directions</span>
+                          <Navigation className="w-3.5 h-3.5 text-sky-400 group-hover/btn:text-amber-300 shrink-0" />
+                          <span className="truncate">Directions</span>
                         </a>
 
                         <a
@@ -1527,8 +1512,8 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                           rel="noopener noreferrer"
                           className="flex-1 py-2 px-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:border-amber-500/50 text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn"
                         >
-                          <Compass className="w-3.5 h-3.5 text-amber-400 group-hover/btn:text-amber-300" />
-                          <span>View Map</span>
+                          <Compass className="w-3.5 h-3.5 text-amber-400 group-hover/btn:text-amber-300 shrink-0" />
+                          <span className="truncate">View Map</span>
                         </a>
                       </div>
                     </article>
@@ -1578,7 +1563,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                   <span>Curated Accommodations</span>
                 </div>
                 <h2 className="text-3xl sm:text-4xl font-black text-white leading-tight">
-                  Hotels & Recommended Base in {city.name}
+                  Recommended Lodging in {city.name}
                 </h2>
                 <p className="text-sm sm:text-base text-slate-300 font-medium leading-relaxed">
                   Strategic hotels selected for proximity to the Christmas Markets, walking distance to historic landmarks, and winter comfort.
@@ -1589,42 +1574,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                 </div>
               </div>
 
-              {/* Signed-In vs Guest Pricing Banner */}
-              <div className="w-full md:w-auto shrink-0">
-                {isAuthenticated ? (
-                  <div className="p-4 rounded-2xl bg-emerald-950/80 border border-emerald-500/40 text-emerald-200 text-xs space-y-1.5 shadow-xl max-w-sm">
-                    <div className="flex items-center space-x-2 text-emerald-300 font-black text-sm">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                      <span>Member Pricing Unlocked</span>
-                    </div>
-                    <p className="text-[11px] text-emerald-200/90 leading-snug">
-                      Date-specific rates active for peak Christmas Market dates (<span className="font-bold text-white">Nov 28 – Dec 1, 2026 • 3 Nights</span>).
-                    </p>
-                    <div className="pt-1 text-[10px] uppercase font-bold text-emerald-400 flex items-center space-x-1">
-                      <Coins className="w-3 h-3" />
-                      <span>Member Savings Applied</span>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="p-4 rounded-2xl bg-slate-950/90 border border-amber-500/30 text-amber-200 text-xs space-y-2 shadow-xl max-w-sm">
-                    <div className="flex items-center space-x-2 text-amber-300 font-bold text-sm">
-                      <Lock className="w-4 h-4 text-amber-400 shrink-0" />
-                      <span>Guest Mode: Public Rates</span>
-                    </div>
-                    <p className="text-[11px] text-slate-300 leading-snug">
-                      Showing average winter rates. Sign in to view date-locked member discounts for your exact 3-night stay.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => setIsAuthModalOpen(true)}
-                      className="w-full py-2 px-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-all shadow-md flex items-center justify-center space-x-1.5 active:scale-95 cursor-pointer"
-                    >
-                      <Crown className="w-3.5 h-3.5" />
-                      <span>Sign In for Member Pricing</span>
-                    </button>
-                  </div>
-                )}
-              </div>
+              {/* Signed-In vs Guest Pricing Banner Removed */}
             </div>
           </div>
 
@@ -1711,10 +1661,8 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                     ? 'border-purple-500/30 hover:border-purple-400/60'
                     : 'border-emerald-500/30 hover:border-emerald-400/60';
 
-                  const displayPrice = isAuthenticated ? hotel.memberPricePln : hotel.basePricePln;
-                  const displayUsd = isAuthenticated ? hotel.usdEstimateMember : hotel.usdEstimateBase;
-                  const totalStayPln = displayPrice * 3;
-                  const totalStayUsd = displayUsd * 3;
+                  const displayPrice = hotel.basePricePln;
+                  const displayUsd = hotel.usdEstimateBase;
 
                   const mapSearchQuery = encodeURIComponent(`${hotel.name}, Kraków, Poland`);
                   const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${mapSearchQuery}`;
@@ -1767,13 +1715,8 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                             <div className="flex items-center justify-between">
                               <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center space-x-1">
                                 <DollarSign className="w-3.5 h-3.5 text-amber-400" />
-                                <span>{isAuthenticated ? 'Member Rate / Night' : 'Live Average / Night'}</span>
+                                <span>Live Average / Night</span>
                               </div>
-                              {isAuthenticated && (
-                                <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 text-[10px] font-extrabold uppercase border border-emerald-500/40">
-                                  Member Price
-                                </span>
-                              )}
                             </div>
 
                             <div className="flex items-baseline justify-between">
@@ -1781,16 +1724,6 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                                 <span className="text-2xl font-black text-white">{displayPrice} PLN</span>
                                 <span className="text-xs text-slate-400 ml-1.5 font-semibold">(~${displayUsd} USD)</span>
                               </div>
-                              {isAuthenticated ? (
-                                <div className="text-right">
-                                  <div className="text-[10px] text-emerald-400 font-bold">3-Night Total:</div>
-                                  <div className="text-xs font-black text-emerald-300">{totalStayPln} PLN (~${totalStayUsd})</div>
-                                </div>
-                              ) : (
-                                <span className="text-[10px] font-bold text-amber-400 hover:underline cursor-pointer" onClick={() => setIsAuthModalOpen(true)}>
-                                  Sign in for discount
-                                </span>
-                              )}
                             </div>
                           </div>
 
@@ -1872,14 +1805,35 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                         </a>
 
                         <a
-                          href={mapSearchUrl}
+                          href={hotel.websiteUrl || mapSearchUrl}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="flex-1 py-2 px-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:border-amber-500/50 text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn"
                         >
-                          <Compass className="w-3.5 h-3.5 text-amber-400 group-hover/btn:text-amber-300" />
-                          <span>View Map</span>
+                          {hotel.websiteUrl ? <ExternalLink className="w-3.5 h-3.5" /> : <Compass className="w-3.5 h-3.5 text-amber-400 group-hover/btn:text-amber-300" />}
+                          <span>{hotel.websiteUrl ? 'Website' : 'View Map'}</span>
                         </a>
+
+                        <button
+                          onClick={() => toggleItinerary(hotel.id)}
+                          className={`flex-1 py-2 px-2.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 border ${
+                            savedItems.has(hotel.id)
+                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
+                              : 'bg-white/5 hover:bg-emerald-500/20 text-slate-300 hover:text-emerald-300 border-white/10 hover:border-emerald-500/40'
+                          }`}
+                        >
+                          {savedItems.has(hotel.id) ? (
+                            <>
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>Saved</span>
+                            </>
+                          ) : (
+                            <>
+                              <Plus className="w-3.5 h-3.5 text-emerald-400" />
+                              <span>Itinerary</span>
+                            </>
+                          )}
+                        </button>
                       </div>
                     </article>
                   );
@@ -1889,7 +1843,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
             <div className="glass-panel border-wf-evergreen/30 p-8 rounded-3xl bg-wf-evergreen/5">
               <h3 className="text-2xl font-bold text-white mb-4 flex items-center space-x-3">
                 <Bed className="w-6 h-6 text-wf-evergreen" />
-                <span>Recommended Base & Hotels in {city.name}</span>
+                <span>Recommended Lodging in {city.name}</span>
               </h3>
               <p className="text-wf-cream font-semibold text-lg mb-4">{city.base}</p>
               {city.hotels.length > 0 && (

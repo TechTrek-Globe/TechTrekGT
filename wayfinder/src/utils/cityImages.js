@@ -17,6 +17,9 @@ import krakowPlantyImg from '../assets/attractions/krakow/planty-park-barbican.j
 import krakowAuschwitzImg from '../assets/attractions/krakow/auschwitz-birkenau.jpg';
 import krakowWieliczkaImg from '../assets/attractions/krakow/wieliczka-salt-mine.jpg';
 import krakowSchindlerImg from '../assets/attractions/krakow/schindler-factory.jpg';
+import krakowThermalBathsImg from '../assets/attractions/krakow/thermal-baths.jpg';
+import krakowWalkingTourImg from '../assets/attractions/krakow/walking-tour.jpg';
+import krakowLgbtqKazimierzImg from '../assets/attractions/krakow/lgbtq-kazimierz.jpg';
 
 export const cityImages = {
   krakow: krakowImg,
@@ -42,6 +45,9 @@ export const attractionImages = {
   'auschwitz-birkenau.jpg': krakowAuschwitzImg,
   'wieliczka-salt-mine.jpg': krakowWieliczkaImg,
   'schindler-factory.jpg': krakowSchindlerImg,
+  'thermal-baths.jpg': krakowThermalBathsImg,
+  'walking-tour.jpg': krakowWalkingTourImg,
+  'lgbtq-kazimierz.jpg': krakowLgbtqKazimierzImg,
 };
 
 export function getAttractionImage(cardImage = '', cardTitle = '', cityName = 'Kraków') {
@@ -53,6 +59,8 @@ export function getAttractionImage(cardImage = '', cardTitle = '', cityName = 'K
   }
 
   const name = (cardTitle || '').toLowerCase();
+  if (name.includes('walk') || name.includes('tour') || name.includes('guided')) return attractionImages['walking-tour.jpg'];
+  if (name.includes('thermal') || name.includes('termy') || name.includes('bath') || name.includes('chochoł')) return attractionImages['thermal-baths.jpg'];
   if (name.includes('wawel')) return attractionImages['wawel-castle.jpg'];
   if (name.includes('mariacki') || name.includes('mary')) return attractionImages['st-marys-basilica.jpg'];
   if (name.includes('cloth hall') || name.includes('sukiennice')) return attractionImages['cloth-hall.jpg'];

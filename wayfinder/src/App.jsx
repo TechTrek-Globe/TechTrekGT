@@ -73,6 +73,8 @@ function App() {
         subPage = 'restaurants';
       } else if (['hotels', 'stays', 'base'].includes(rawSub)) {
         subPage = 'hotels';
+      } else if (['lgbtq', 'gay', 'queer', 'lgbt', 'lgbtq-guide'].includes(rawSub)) {
+        subPage = 'lgbtq';
       }
       return <CityPage key={`${cityId}-${subPage}`} cityId={cityId} subPage={subPage} />;
     }

@@ -193,6 +193,30 @@ export function AttractionCard({ sight, cityName = 'Kraków', onAddToItinerary }
               </div>
             )}
           </div>
+
+          {/* GetYourGuide & Viator Walking Tour Booking Action Bar */}
+          <div className="pt-2.5 border-t border-white/10 flex items-center justify-between gap-2">
+            <a
+              href={sight?.gygUrl || `https://www.getyourguide.com/s/?q=Krakow+${encodeURIComponent(sight.name)}+walking+tour`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 py-1.5 px-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/25 text-amber-300 hover:text-amber-200 border border-amber-500/30 text-[10px] sm:text-[11px] font-black transition-all flex items-center justify-center space-x-1 shadow-sm"
+              title={`Book ${sight.name} tour on GetYourGuide`}
+            >
+              <span>🎟️</span>
+              <span>GetYourGuide</span>
+            </a>
+            <a
+              href={sight?.viatorUrl || `https://www.viator.com/searchResults/all?text=Krakow+${encodeURIComponent(sight.name)}+walking+tour`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 py-1.5 px-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/25 text-emerald-300 hover:text-emerald-200 border border-emerald-500/30 text-[10px] sm:text-[11px] font-black transition-all flex items-center justify-center space-x-1 shadow-sm"
+              title={`Book ${sight.name} tour on Viator`}
+            >
+              <span>🗺️</span>
+              <span>Viator Tour</span>
+            </a>
+          </div>
         </div>
       </div>
 

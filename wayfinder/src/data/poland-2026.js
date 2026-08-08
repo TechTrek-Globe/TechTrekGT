@@ -253,8 +253,8 @@ export const polandJourney = {
           location: 'Wawel Hill',
           locationData: 'Wawel Hill',
           howToGetThere: 'Walk south through Old Town or take Trams 1, 3, 8 to Wawel stop.',
-          pricing: 'Cathedral free; State Rooms ~35 PLN (~$9)',
-          costData: 'Cathedral free; State Rooms ~35 PLN (~$9)',
+          pricing: 'Cathedral free; State Rooms ~35 PLN (~$9.20 USD)',
+          costData: 'Cathedral free; State Rooms ~35 PLN (~$9.20 USD)',
           openTimes: '9:30 AM - 5:00 PM (winter hours)',
           hoursData: '9:30 AM - 5:00 PM (winter hours)',
           daysClosed: 'Mondays (most exhibitions closed)'
@@ -269,8 +269,8 @@ export const polandJourney = {
           location: 'Old Town (Rynek)',
           locationData: 'Old Town (Rynek)',
           howToGetThere: 'Located directly on the Main Market Square (Rynek Główny).',
-          pricing: '15 PLN (~$4) for tourist entry (front half of church)',
-          costData: '15 PLN (~$4) for tourist entry (front half of church)',
+          pricing: '15 PLN (~$4.00 USD) for tourist entry (front half of church)',
+          costData: '15 PLN (~$4.00 USD) for tourist entry (front half of church)',
           openTimes: '11:30 AM - 6:00 PM (Mon-Sat), 2:00 PM - 6:00 PM (Sun)',
           hoursData: '11:30 AM - 6:00 PM (Mon-Sat), 2:00 PM - 6:00 PM (Sun)',
           daysClosed: 'During mass'
@@ -285,8 +285,8 @@ export const polandJourney = {
           location: 'Old Town (Rynek)',
           locationData: 'Old Town (Rynek)',
           howToGetThere: 'Center of Main Market Square.',
-          pricing: 'Cloth Hall free; Underground Museum ~32 PLN (~$8.50)',
-          costData: 'Cloth Hall free; Underground Museum ~32 PLN (~$8.50)',
+          pricing: 'Cloth Hall free; Underground Museum ~32 PLN (~$8.50 USD)',
+          costData: 'Cloth Hall free; Underground Museum ~32 PLN (~$8.50 USD)',
           openTimes: '10:00 AM - 8:00 PM',
           hoursData: '10:00 AM - 8:00 PM',
           daysClosed: 'Underground closed second Monday of month'
@@ -301,8 +301,8 @@ export const polandJourney = {
           location: 'Kazimierz',
           locationData: 'Kazimierz',
           howToGetThere: 'Trams 1, 3, 8 to Plac Wolnica or 15-min walk south of Old Town.',
-          pricing: 'Free to explore; Synagogue entries ~10-15 PLN',
-          costData: 'Free to explore; Synagogue entries ~10-15 PLN',
+          pricing: 'Free to explore; Synagogue entries ~10–15 PLN (~$2.60–$4.00 USD)',
+          costData: 'Free to explore; Synagogue entries ~10–15 PLN (~$2.60–$4.00 USD)',
           openTimes: '24/7 (Synagogues usually 10:00 AM - 4:00 PM)',
           hoursData: '24/7 (Synagogues usually 10:00 AM - 4:00 PM)',
           daysClosed: 'Synagogues closed on Saturdays (Shabbat) and Jewish holidays'
@@ -317,8 +317,8 @@ export const polandJourney = {
           location: 'Old Town (Planty)',
           locationData: 'Old Town (Planty)',
           howToGetThere: 'Surrounds the entire Old Town; Barbican is at the north end.',
-          pricing: 'Park free; Barbican entry ~16 PLN',
-          costData: 'Park free; Barbican entry ~16 PLN',
+          pricing: 'Park free; Barbican entry ~16 PLN (~$4.20 USD)',
+          costData: 'Park free; Barbican entry ~16 PLN (~$4.20 USD)',
           openTimes: 'Park 24/7; Barbican 10:00 AM - 5:00 PM (season dependent)',
           hoursData: 'Park 24/7; Barbican 10:00 AM - 5:00 PM (season dependent)',
           daysClosed: 'Barbican often closed in deep winter (Dec-Mar)'
@@ -333,8 +333,8 @@ export const polandJourney = {
           location: 'Oświęcim',
           locationData: 'Oświęcim',
           howToGetThere: 'Bus from MDA Bus Station (approx 1.5 hrs) to Oświęcim, or guided tour.',
-          pricing: 'Free without guide; ~100 PLN (~$27) for guided tour (highly recommended)',
-          costData: 'Free without guide; ~100 PLN (~$27) for guided tour (highly recommended)',
+          pricing: 'Free without guide; ~100 PLN (~$27.00 USD) for guided tour (highly recommended)',
+          costData: 'Free without guide; ~100 PLN (~$27.00 USD) for guided tour (highly recommended)',
           openTimes: '8:00 AM - 3:00 PM (winter), up to 7:00 PM (summer)',
           hoursData: '8:00 AM - 3:00 PM (winter), up to 7:00 PM (summer)',
           daysClosed: 'Dec 25, Jan 1, Easter Sunday'
@@ -349,8 +349,8 @@ export const polandJourney = {
           location: 'Wieliczka',
           locationData: 'Wieliczka',
           howToGetThere: 'SKA1 Train from Kraków Główny to Wieliczka Rynek-Kopalnia (approx 20 mins).',
-          pricing: '122 PLN (~$32) for foreign language guided tour',
-          costData: '122 PLN (~$32) for foreign language guided tour',
+          pricing: '122 PLN (~$32.00 USD) for foreign language guided tour',
+          costData: '122 PLN (~$32.00 USD) for foreign language guided tour',
           openTimes: '8:30 AM - 5:00 PM',
           hoursData: '8:30 AM - 5:00 PM',
           daysClosed: 'Dec 24-25, Jan 1, Easter Sunday'
@@ -365,11 +365,63 @@ export const polandJourney = {
           location: 'Zabłocie',
           locationData: 'Zabłocie',
           howToGetThere: 'Tram 3 or 24 to Plac Bohaterów Getta, then a 10-min walk to Zabłocie district.',
-          pricing: '32 PLN (~$8.50)',
-          costData: '32 PLN (~$8.50)',
+          pricing: '32 PLN (~$8.50 USD)',
+          costData: '32 PLN (~$8.50 USD)',
           openTimes: '10:00 AM - 6:00 PM (Mondays 10:00 AM - 2:00 PM)',
           hoursData: '10:00 AM - 6:00 PM (Mondays 10:00 AM - 2:00 PM)',
           daysClosed: 'First Tuesday of every month'
+        },
+        {
+          name: 'Chochołów Thermal Baths (Chochołowskie Termy)',
+          title: 'Chochołów Thermal Baths (Chochołowskie Termy)',
+          category: 'Wellness & Thermal Spa',
+          description: 'The largest thermal bath complex in Poland located in the Podhale mountain region near Kraków. Features steaming outdoor geothermal pools, whirlpools, saunas, and hydro-massages under falling winter snow with views of the Tatras mountains.',
+          imageUrl: '/images/krakow/thermal-baths.jpg',
+          imageSrc: '/images/krakow/thermal-baths.jpg',
+          location: 'Chochołów (Podhale)',
+          locationData: 'Chochołów (Podhale)',
+          howToGetThere: 'Direct shuttle bus from Kraków Główny bus station (approx 1.5 hrs) or private day tour.',
+          pricing: '89–119 PLN (~$23.00–$31.00 USD) for 3-hour / all-day bath pass',
+          costData: '89–119 PLN (~$23.00–$31.00 USD) for 3-hour / all-day bath pass',
+          openTimes: '9:00 AM - 10:00 PM (open daily)',
+          hoursData: '9:00 AM - 10:00 PM (open daily)',
+          daysClosed: 'Open 365 days a year (special holiday hours apply)'
+        },
+        {
+          name: 'Kraków Christmas Markets & Old Town Guided Walking Tour',
+          title: 'Kraków Christmas Markets & Old Town Guided Walking Tour',
+          category: 'Top Rated Guided Tour',
+          description: 'Top-rated guided walking tour through illuminated Old Town cobblestone streets. Sample hot spiced mead (miód pitny) & grilled oscypek, explore Rynek Główny market stalls, and discover royal legends.',
+          imageUrl: '/images/krakow/walking-tour.jpg',
+          imageSrc: '/images/krakow/walking-tour.jpg',
+          location: 'Old Town (Stare Miasto)',
+          locationData: 'Old Town (Stare Miasto)',
+          howToGetThere: 'Starts at St. Florian\'s Gate / Barbican (north end of Planty Park).',
+          pricing: '75–95 PLN (~$19.00–$25.00 USD) per person',
+          costData: '75–95 PLN (~$19.00–$25.00 USD) per person',
+          openTimes: 'Departs 10:00 AM, 2:00 PM, & 5:00 PM (2 hrs)',
+          hoursData: 'Departs 10:00 AM, 2:00 PM, & 5:00 PM (2 hrs)',
+          daysClosed: 'Runs daily through December',
+          gygUrl: 'https://www.getyourguide.com/s/?q=Krakow+Christmas+Market+walking+tour',
+          viatorUrl: 'https://www.viator.com/searchResults/all?text=Krakow+Christmas+Market+walking+tour'
+        },
+        {
+          name: 'Kazimierz Jewish Quarter & Schindler\'s Factory Walking Tour',
+          title: 'Kazimierz Jewish Quarter & Schindler\'s Factory Walking Tour',
+          category: 'History & Culture Tour',
+          description: 'Immersive guided walking tour through historic Kazimierz, ancient Szeroka Street synagogues, Ghetto Heroes Square, and skip-the-line entry to Schindler\'s Factory Museum.',
+          imageUrl: '/images/krakow/schindler-factory.jpg',
+          imageSrc: '/images/krakow/schindler-factory.jpg',
+          location: 'Kazimierz & Zabłocie',
+          locationData: 'Kazimierz & Zabłocie',
+          howToGetThere: 'Starts at Szeroka Street in Kazimierz (tram 3, 8, or 24).',
+          pricing: '95–125 PLN (~$25.00–$33.00 USD) incl. Museum Ticket',
+          costData: '95–125 PLN (~$25.00–$33.00 USD) incl. Museum Ticket',
+          openTimes: 'Departs 10:30 AM & 2:30 PM daily (3 hrs)',
+          hoursData: 'Departs 10:30 AM & 2:30 PM daily (3 hrs)',
+          daysClosed: 'Mondays (reduced museum hours apply)',
+          gygUrl: 'https://www.getyourguide.com/s/?q=Krakow+Kazimierz+Schindler+walking+tour',
+          viatorUrl: 'https://www.viator.com/searchResults/all?text=Krakow+Kazimierz+Schindler+walking+tour'
         }
       ],
       restaurants: [
@@ -402,6 +454,108 @@ export const polandJourney = {
           notes: 'Essential Krakow late-night snack served from the central rotunda in Kazimierz.'
         }
       ],
+      lgbtq: {
+        title: "LGBTQ+ Traveler's Guide to Kraków",
+        subtitle: "Kazimierz neighborhood hub, inclusive Christmas markets, iconic gay clubs, & welcoming spots",
+        overview: "Kraków is widely celebrated as Poland's cultural and artistic soul, with the bohemian district of Kazimierz acting as the beating heart of its progressive, inclusive, and vibrant LGBTQ+ scene. While Poland as a whole continues its journey toward full legal equality, Kraków is a safe, welcoming, and open destination for queer travelers. With long-running gay clubs, rainbow-friendly cellar bars, inclusive artisan Christmas markets, and a rich history of hosting Poland's oldest Equality March (Marsz Równości), LGBTQ+ visitors will find a warm community atmosphere.",
+        imageUrl: "/images/krakow/lgbtq-kazimierz.jpg",
+        areas: [
+          {
+            name: "Kazimierz (Historic Jewish Quarter)",
+            vibe: "Kraków's premier bohemian & queer district",
+            description: "Cobblestone streets packed with inclusive cellar pubs, vintage art galleries, and rainbow-welcoming cafes centered around Plac Wolnica and Józefa Street."
+          },
+          {
+            name: "Father Bernatek Footbridge (Kładka Ojca Bernatka)",
+            vibe: "Romantic river crossing & rainbow lights",
+            description: "Pedestrian bridge linking Kazimierz to Podgórze, featuring acrobat sculptures and colorful rainbow illuminations reflecting over the Vistula River."
+          },
+          {
+            name: "Sławkowska & Old Town Cellar Bars",
+            vibe: "Late-night Old Town cocktail enclave",
+            description: "Tucked away inside historic medieval brick vaults right off Rynek Główny, offering friendly international queer crowds."
+          }
+        ],
+        christmasMarkets: [
+          {
+            name: "Plac Wolnica Christmas Market (Kazimierz)",
+            type: "Neighborhood & Artisan Fair",
+            vibe: "Alternative, inclusive, & artisan-focused",
+            description: "Set in Kazimierz in front of St. Joseph's Church, this is Kraków's most LGBTQ+-welcoming neighborhood holiday market. Features local queer ceramic artists, indie craft stalls, vegan pierogi, artisanal spiced mead, and cozy community workshops.",
+            location: "Plac Wolnica, Kazimierz"
+          },
+          {
+            name: "Mały Rynek Craft & Indie Corner",
+            type: "Craft & Artisan Corner",
+            vibe: "Relaxed indie vibe right off the main square",
+            description: "A quieter, highly inclusive market plaza offering small-batch mead tastings, hand-poured soy candles, and warm bakery stands.",
+            location: "Mały Rynek (Behind St. Mary's)"
+          }
+        ],
+        barsAndClubs: [
+          {
+            name: "Ciemnia Club",
+            address: "ul. Koletek 6 (Kazimierz)",
+            type: "Iconic Gay Nightclub & Lounge",
+            description: "Kraków's longest-running and famous gay club. Features energetic DJ dance floors, themed drag performances, darkroom lounges, and an inclusive international crowd.",
+            vibe: "High-energy dance floors & drag shows (Open till late)"
+          },
+          {
+            name: "Piękny Pies (Beautiful Dog)",
+            address: "ul. Bożego Ciała 9 (Kazimierz)",
+            type: "Bohemian & Queer-Friendly Pub",
+            description: "Legendary nocturnal hangout beloved by local artists, writers, and the LGBTQ+ community. Known for eclectic music, late-night drinks, and zero-judgment atmosphere.",
+            vibe: "Bohemian pub & late-night community favorite"
+          },
+          {
+            name: "Lindo Bar",
+            address: "ul. Sławkowska 11 (Old Town)",
+            type: "Gay & Inclusive Cocktail Bar",
+            description: "Warm, cozy cocktail bar located right in Old Town. Friendly bartenders, rainbow decor, and great cocktails make it ideal for pre-club evening drinks.",
+            vibe: "Cozy cocktail lounge & social drinks"
+          }
+        ],
+        restaurants: [
+          {
+            name: "Alchemia",
+            address: "ul. Estery 5 (Plac Nowy, Kazimierz)",
+            type: "Bohemian Café & Candle-lit Dining",
+            description: "Iconic Kazimierz institution featuring antique candle-lit wooden tables, wardrobe doors leading to hidden rooms, and a notoriously welcoming queer-friendly vibe.",
+            signature: "Mulled wine, craft beers, hearty Polish pierogi & breakfasts"
+          },
+          {
+            name: "Zazie Bistro",
+            address: "ul. Józefa 15 (Kazimierz)",
+            type: "Inclusive French-Polish Bistro",
+            description: "Michelin Bib Gourmand rated bistro located on vibrant Józefa Street. Super welcoming to queer couples with intimate, romantic winter cellar seating.",
+            signature: "Coq au vin, French onion soup, beef bourguignon & natural wines"
+          },
+          {
+            name: "Youmiko Vegan Sushi & Hummus Amamelus",
+            address: "Kazimierz District",
+            type: "Plant-Based & Queer-Inclusive Eateries",
+            description: "Trendy, progressive Kazimierz eateries with 100% plant-based menus and strong LGBTQ+ community support.",
+            signature: "Artisanal vegan sushi omakase & warm pita platters"
+          }
+        ],
+        mustSee: [
+          {
+            name: "Father Bernatek Footbridge (Rainbow Illuminations)",
+            description: "Walk across the footbridge at dusk under falling snow to admire the romantic acrobat sculptures and vibrant rainbow night lights reflecting over the Vistula River.",
+            tip: "Great photo spot linking Kazimierz with Podgórze."
+          },
+          {
+            name: "Marsz Równości (Equality March) Heritage",
+            description: "Kraków has hosted Poland's Equality March since 2004, fostering a resilient, proud local activist community celebrated during annual Queer May festivals.",
+            tip: "Check local Kazimierz community boards for winter queer art pop-ups."
+          },
+          {
+            name: "Józefa Street Vintage & Art Galleries",
+            description: "Stroll along Józefa Street in Kazimierz to browse independent queer art galleries, handmade winter scarves, and vintage vinyl shops.",
+            tip: "Stop by Galeria LueLue for retro Kraków prints."
+          }
+        ]
+      },
       imageDetails: {
         location: "Rynek Główny (Main Market Square)",
         landmark: "Christmas Market at Rynek Główny & Sukiennice",

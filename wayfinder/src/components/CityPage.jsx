@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { MapPin, Utensils, Bed, ArrowLeft, ArrowRight, Bus, Train, ShoppingBag, Sparkles, Landmark, Compass, DollarSign, Info, Map, Clock, Navigation, Gift, Lightbulb, Video, ExternalLink, Thermometer, CreditCard, Award, RefreshCw, AlertTriangle, CalendarX, Coins, Coffee, Sun, Volume2, Crown, BookOpen, Scroll, Flame, ShieldCheck } from 'lucide-react';
+import { MapPin, Utensils, Bed, ArrowLeft, ArrowRight, Bus, Train, ShoppingBag, Sparkles, Landmark, Compass, DollarSign, Info, Map, Clock, Navigation, Gift, Lightbulb, Video, ExternalLink, Thermometer, CreditCard, Award, RefreshCw, AlertTriangle, CalendarX, Coins, Coffee, Sun, Volume2, Crown, BookOpen, Scroll, Flame, ShieldCheck, Heart } from 'lucide-react';
 import { polandJourney } from '../data/poland-2026';
 import { cityImages, marketImages } from '../utils/cityImages';
 import { useExchangeRate } from '../hooks/useExchangeRate';
@@ -415,6 +415,21 @@ export function CityPage({ cityId, subPage = 'overview' }) {
             <Bed className="w-3.5 h-3.5" />
             <span>Base & Hotels</span>
           </a>
+
+          {city.lgbtq && (
+            <a
+              href={`${baseUrl}/lgbtq`}
+              onClick={(e) => pushRoute(e, `${baseUrl}/lgbtq`)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center space-x-1.5 ${
+                activeSubPage === 'lgbtq'
+                  ? 'bg-purple-600 text-white shadow-sm font-bold ring-2 ring-purple-400/50'
+                  : 'text-purple-300 hover:text-purple-100 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30'
+              }`}
+            >
+              <Heart className="w-3.5 h-3.5 text-pink-400 fill-pink-400/30" />
+              <span>LGBTQ+ Guide</span>
+            </a>
+          )}
         </div>
       </div>
 
@@ -1129,6 +1144,191 @@ export function CityPage({ cityId, subPage = 'overview' }) {
               </ul>
             )}
           </div>
+        </div>
+      )}
+
+      {/* 6. LGBTQ+ GUIDE SUB-PAGE */}
+      {activeSubPage === 'lgbtq' && city.lgbtq && (
+        <div className="space-y-10 animate-fade-in">
+          {/* Header Banner */}
+          <div className="glass-panel p-6 sm:p-10 rounded-3xl border border-purple-500/30 bg-wf-navy-mid/95 relative overflow-hidden shadow-2xl space-y-6">
+            <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-purple-500/20 via-pink-500/10 to-transparent rounded-full blur-3xl pointer-events-none"></div>
+
+            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div className="space-y-3 max-w-2xl">
+                <div className="inline-flex items-center space-x-2 px-3.5 py-1 rounded-full bg-purple-500/20 border border-purple-400/40 text-purple-300 text-xs font-black uppercase tracking-wider shadow-sm">
+                  <Heart className="w-3.5 h-3.5 text-pink-400 fill-pink-400/40" />
+                  <span>LGBTQ+ Traveler's Guide</span>
+                </div>
+                <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
+                  {city.lgbtq.title}
+                </h2>
+                <p className="text-sm sm:text-base text-purple-200/90 font-medium leading-relaxed">
+                  {city.lgbtq.subtitle}
+                </p>
+              </div>
+
+              {city.lgbtq.imageUrl && (
+                <div className="w-full md:w-80 h-48 rounded-2xl overflow-hidden border border-white/10 shadow-xl shrink-0 relative group">
+                  <img
+                    src={city.lgbtq.imageUrl}
+                    alt="LGBTQ+ Kraków Kazimierz"
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent"></div>
+                  <div className="absolute bottom-2.5 left-3 text-[11px] font-bold text-white flex items-center space-x-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-pink-400" />
+                    <span>Father Bernatek Footbridge & Kazimierz</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Overview Box */}
+            <div className="p-5 rounded-2xl bg-slate-950/70 border border-white/10 space-y-2 relative z-10">
+              <h3 className="text-xs font-black uppercase tracking-wider text-purple-400 flex items-center space-x-1.5">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                <span>Atmosphere, Safety & Legal Context</span>
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-medium">
+                {city.lgbtq.overview}
+              </p>
+            </div>
+          </div>
+
+          {/* 1. Queer-Welcoming Christmas Markets */}
+          {city.lgbtq.christmasMarkets && city.lgbtq.christmasMarkets.length > 0 && (
+            <section className="space-y-4">
+              <div className="flex items-center space-x-2 text-pink-400 font-black text-xs uppercase tracking-wider">
+                <ShoppingBag className="w-4 h-4" />
+                <span>Inclusive Christmas Markets & Craft Fairs</span>
+              </div>
+              <h3 className="text-2xl font-black text-white">Queer-Welcoming Holiday Markets</h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {city.lgbtq.christmasMarkets.map((market, idx) => (
+                  <div key={idx} className="glass-panel p-6 rounded-3xl border border-pink-500/30 bg-wf-navy-mid/90 hover:border-pink-400/60 transition-all flex flex-col justify-between shadow-xl">
+                    <div className="space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <h4 className="text-xl font-black text-white">{market.name}</h4>
+                        <span className="px-2.5 py-1 rounded-full bg-pink-500/20 border border-pink-400/30 text-pink-300 text-[10px] font-black uppercase tracking-wider shrink-0">
+                          {market.type}
+                        </span>
+                      </div>
+                      <div className="text-xs font-semibold text-purple-300">✨ {market.vibe}</div>
+                      <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-medium">
+                        {market.description}
+                      </p>
+                    </div>
+                    <div className="pt-3 mt-4 border-t border-white/10 text-xs font-semibold text-amber-300 flex items-center space-x-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                      <span>{market.location}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* 2. Gay Clubs & Bars */}
+          {city.lgbtq.barsAndClubs && city.lgbtq.barsAndClubs.length > 0 && (
+            <section className="space-y-4">
+              <div className="flex items-center space-x-2 text-purple-400 font-black text-xs uppercase tracking-wider">
+                <Sparkles className="w-4 h-4" />
+                <span>Nightlife & Social Venues</span>
+              </div>
+              <h3 className="text-2xl font-black text-white">Gay Clubs & Queer-Friendly Bars</h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {city.lgbtq.barsAndClubs.map((venue, idx) => (
+                  <div key={idx} className="glass-panel p-6 rounded-3xl border border-purple-500/30 bg-wf-navy-mid/90 hover:border-purple-400/60 transition-all flex flex-col justify-between shadow-xl">
+                    <div className="space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <h4 className="text-lg font-black text-white">{venue.name}</h4>
+                        <span className="px-2 py-0.5 rounded-lg bg-purple-500/20 border border-purple-400/30 text-purple-300 text-[10px] font-bold shrink-0">
+                          {venue.type}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-300 leading-relaxed font-medium">
+                        {venue.description}
+                      </p>
+                      <div className="p-2 rounded-xl bg-purple-950/60 border border-purple-500/20 text-[11px] font-semibold text-purple-200">
+                        🔥 {venue.vibe}
+                      </div>
+                    </div>
+                    <div className="pt-3 mt-4 border-t border-white/10 text-xs font-medium text-slate-400 flex items-center space-x-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+                      <span>{venue.address}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* 3. Inclusive Dining */}
+          {city.lgbtq.restaurants && city.lgbtq.restaurants.length > 0 && (
+            <section className="space-y-4">
+              <div className="flex items-center space-x-2 text-amber-400 font-black text-xs uppercase tracking-wider">
+                <Utensils className="w-4 h-4" />
+                <span>Culinary & Café Culture</span>
+              </div>
+              <h3 className="text-2xl font-black text-white">LGBTQ+-Friendly Restaurants & Cafés</h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {city.lgbtq.restaurants.map((rest, idx) => (
+                  <div key={idx} className="glass-panel p-6 rounded-3xl border border-amber-500/30 bg-wf-navy-mid/90 hover:border-amber-400/60 transition-all flex flex-col justify-between shadow-xl">
+                    <div className="space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <h4 className="text-lg font-black text-white">{rest.name}</h4>
+                        <span className="px-2 py-0.5 rounded-lg bg-amber-500/20 border border-amber-400/30 text-amber-300 text-[10px] font-bold shrink-0">
+                          {rest.type}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-300 leading-relaxed font-medium">
+                        {rest.description}
+                      </p>
+                      <div className="p-2.5 rounded-xl bg-slate-950/80 border border-white/5 text-xs text-amber-200">
+                        🍽️ <span className="font-bold text-amber-300">Highlights:</span> {rest.signature}
+                      </div>
+                    </div>
+                    <div className="pt-3 mt-4 border-t border-white/10 text-xs font-medium text-slate-400 flex items-center space-x-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                      <span>{rest.address}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* 4. Must-See & Cultural Highlights */}
+          {city.lgbtq.mustSee && city.lgbtq.mustSee.length > 0 && (
+            <section className="space-y-4">
+              <div className="flex items-center space-x-2 text-sky-400 font-black text-xs uppercase tracking-wider">
+                <Landmark className="w-4 h-4" />
+                <span>Queer Culture & Landmarks</span>
+              </div>
+              <h3 className="text-2xl font-black text-white">Must-See LGBTQ+ Highlights</h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {city.lgbtq.mustSee.map((spot, idx) => (
+                  <div key={idx} className="glass-panel p-6 rounded-3xl border border-sky-500/30 bg-wf-navy-mid/90 space-y-3 shadow-xl">
+                    <h4 className="text-base font-black text-white flex items-center space-x-2">
+                      <span className="text-pink-400">♥</span>
+                      <span>{spot.name}</span>
+                    </h4>
+                    <p className="text-xs text-slate-300 leading-relaxed font-medium">
+                      {spot.description}
+                    </p>
+                    <div className="p-2 rounded-xl bg-sky-950/60 border border-sky-500/20 text-[11px] font-semibold text-sky-200">
+                      💡 <span className="text-sky-300 font-bold">Local Tip:</span> {spot.tip}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
         </div>
       )}
     </div>

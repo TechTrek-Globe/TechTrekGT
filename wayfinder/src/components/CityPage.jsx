@@ -192,7 +192,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                       }`}>
                         <img 
                           src={cityImages[item.id]} 
-                          alt={item.name} 
+                          alt={`${item.name} timeline node - ${item.id === 'krakow' ? "Rynek Główny & St. Mary's Basilica" : "Christmas Market"}`} 
                           className="w-full h-full object-cover" 
                         />
                         {isCurrent && (
@@ -271,7 +271,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
         <div className="w-full lg:w-7/12 h-64 sm:h-80 rounded-2xl overflow-hidden relative bg-slate-950 border border-amber-500/30 shadow-inner group shrink-0">
           <img 
             src={cityImages[city.id]} 
-            alt={city.name} 
+            alt={`${city.name} - ${city.id === 'krakow' ? "Rynek Główny & St. Mary's Basilica" : city.name}`} 
             className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105 opacity-90"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-wf-navy via-wf-navy/30 to-transparent"></div>
@@ -404,23 +404,6 @@ export function CityPage({ cityId, subPage = 'overview' }) {
             </h2>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* Interactive Map */}
-              <div className="lg:col-span-2 glass-panel p-4 rounded-3xl overflow-hidden border border-white/10 min-h-[340px] flex flex-col">
-                <div className="flex items-center justify-between mb-3 px-2">
-                  <span className="text-xs font-semibold text-wf-muted flex items-center space-x-1">
-                    <Compass className="w-4 h-4 text-wf-blue-lt" />
-                    <span>Interactive Navigation Map ({city.name})</span>
-                  </span>
-                  <span className="text-xs text-amber-400 font-medium">Use scroll to zoom</span>
-                </div>
-                <iframe 
-                  title={`${city.name} Map`}
-                  className="w-full h-80 sm:h-96 rounded-2xl border-0"
-                  src={mapUrl}
-                  loading="lazy"
-                ></iframe>
-              </div>
-
               {/* Transit Breakdown Cards */}
               <div className="lg:col-span-1 space-y-4 flex flex-col justify-between">
                 {city.transit ? (
@@ -454,6 +437,23 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                     <p className="text-sm text-wf-muted">Walkable historic center. Transit passes available via Jakdojade app.</p>
                   </div>
                 )}
+              </div>
+
+              {/* Interactive Map */}
+              <div className="lg:col-span-2 glass-panel p-4 rounded-3xl overflow-hidden border border-white/10 min-h-[340px] flex flex-col">
+                <div className="flex items-center justify-between mb-3 px-2">
+                  <span className="text-xs font-semibold text-wf-muted flex items-center space-x-1">
+                    <Compass className="w-4 h-4 text-wf-blue-lt" />
+                    <span>Interactive Navigation Map ({city.name})</span>
+                  </span>
+                  <span className="text-xs text-amber-400 font-medium">Use scroll to zoom</span>
+                </div>
+                <iframe 
+                  title={`${city.name} Map`}
+                  className="w-full h-80 sm:h-96 rounded-2xl border-0"
+                  src={mapUrl}
+                  loading="lazy"
+                ></iframe>
               </div>
             </div>
           </section>

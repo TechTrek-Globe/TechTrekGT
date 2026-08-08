@@ -348,9 +348,9 @@ export const polandJourney = {
         }
       ],
       imageDetails: {
-        location: 'Wawel Hill & Vistula River',
-        landmark: 'Wawel Royal Castle & Wawel Cathedral',
-        description: 'The ancient seat of Polish kings perched above the snow-dusted Vistula River. Illuminates with warm golden floodlights at dusk, showcasing 1,000 years of royal Polish heritage, gothic cathedral spires, and winter magic.'
+        location: "Rynek Główny (Grand Main Square)",
+        landmark: "St. Mary's Basilica & Cloth Hall (Sukiennice)",
+        description: "Europe's largest medieval market square dressed in festive winter illuminations, framed by the twin Gothic towers of St. Mary's Basilica and the historic Cloth Hall."
       }
     },
     {

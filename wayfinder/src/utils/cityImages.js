@@ -1,4 +1,4 @@
-import krakowImg from '../assets/krakow.png';
+import krakowImg from '../assets/krakow-rynek-glowny.png';
 import wroclawImg from '../assets/wroclaw.png';
 import poznanImg from '../assets/poznan.png';
 import torunImg from '../assets/torun.png';

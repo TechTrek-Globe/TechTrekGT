@@ -274,6 +274,112 @@ export function CityPage({ cityId, subPage = 'overview' }) {
         </div>
       </div>
 
+      {/* Top Sub-Header Toolbar (Opens Dedicated Sub-Pages & Stays Sticky at Top) */}
+      <div className="sticky top-14 z-40 py-2.5 bg-slate-950/95 backdrop-blur-xl border-y border-amber-500/30 w-full shadow-xl">
+        <div className="p-1.5 rounded-xl border border-amber-500/20 !bg-slate-900/90 shadow-md flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar">
+          <a
+            href={baseUrl}
+            onClick={(e) => pushRoute(e, baseUrl)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center space-x-1.5 shrink-0 ${
+              activeSubPage === 'overview'
+                ? 'bg-amber-500 text-slate-950 shadow-sm font-bold'
+                : 'text-wf-cream hover:text-white hover:bg-white/10'
+            }`}
+          >
+            <Landmark className="w-3.5 h-3.5" />
+            <span>Overview</span>
+          </a>
+
+          {city.historyEpochs && city.historyEpochs.length > 0 && (
+            <a
+              href={`${baseUrl}/history`}
+              onClick={(e) => handleSubPageTabClick(e, `${baseUrl}/history`)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center space-x-1.5 shrink-0 ${
+                activeSubPage === 'history'
+                  ? 'bg-amber-500 text-slate-950 shadow-sm font-bold'
+                  : 'text-amber-300 hover:text-amber-100 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30'
+              }`}
+            >
+              <BookOpen className="w-3.5 h-3.5" />
+              <span>History & Timeline</span>
+            </a>
+          )}
+
+          {city.markets && city.markets.length > 0 && (
+            <a
+              href={`${baseUrl}/markets`}
+              onClick={(e) => handleSubPageTabClick(e, `${baseUrl}/markets`)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center space-x-1.5 shrink-0 ${
+                activeSubPage === 'markets'
+                  ? 'bg-amber-500 text-slate-950 shadow-sm font-bold'
+                  : 'text-amber-300 hover:text-amber-100 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30'
+              }`}
+            >
+              <ShoppingBag className="w-3.5 h-3.5" />
+              <span>Christmas Markets</span>
+            </a>
+          )}
+
+          {city.mustSee && city.mustSee.length > 0 && (
+            <a
+              href={`${baseUrl}/attractions`}
+              onClick={(e) => handleSubPageTabClick(e, `${baseUrl}/attractions`)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center space-x-1.5 shrink-0 ${
+                activeSubPage === 'attractions'
+                  ? 'bg-amber-500 text-slate-950 shadow-sm font-bold'
+                  : 'text-wf-cream hover:text-white hover:bg-white/10'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Must-See Sights</span>
+            </a>
+          )}
+
+          {city.restaurants && city.restaurants.length > 0 && (
+            <a
+              href={`${baseUrl}/restaurants`}
+              onClick={(e) => handleSubPageTabClick(e, `${baseUrl}/restaurants`)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center space-x-1.5 shrink-0 ${
+                activeSubPage === 'restaurants'
+                  ? 'bg-amber-500 text-slate-950 shadow-sm font-bold'
+                  : 'text-wf-cream hover:text-white hover:bg-white/10'
+              }`}
+            >
+              <Utensils className="w-3.5 h-3.5" />
+              <span>Top Restaurants</span>
+            </a>
+          )}
+
+          <a
+            href={`${baseUrl}/hotels`}
+            onClick={(e) => handleSubPageTabClick(e, `${baseUrl}/hotels`)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center space-x-1.5 shrink-0 ${
+              activeSubPage === 'hotels'
+                ? 'bg-amber-500 text-slate-950 shadow-sm font-bold'
+                : 'text-wf-cream hover:text-white hover:bg-white/10'
+            }`}
+          >
+            <Bed className="w-3.5 h-3.5" />
+            <span>Base & Hotels</span>
+          </a>
+
+          {city.lgbtq && (
+            <a
+              href={`${baseUrl}/lgbtq`}
+              onClick={(e) => handleSubPageTabClick(e, `${baseUrl}/lgbtq`)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center space-x-1.5 shrink-0 ${
+                activeSubPage === 'lgbtq'
+                  ? 'bg-purple-600 text-white shadow-sm font-bold ring-2 ring-purple-400/50'
+                  : 'text-purple-300 hover:text-purple-100 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30'
+              }`}
+            >
+              <Heart className="w-3.5 h-3.5 text-pink-400 fill-pink-400/30" />
+              <span>LGBTQ+ Guide</span>
+            </a>
+          )}
+        </div>
+      </div>
+
       {/* 2-Column Split Hero Section: Left (High-level details & text), Right (Main Picture) */}
       {activeSubPage === 'lgbtq' && city.lgbtq ? (
         <div className="glass-panel p-4 sm:p-6 rounded-3xl border border-purple-500/30 bg-wf-navy-mid/95 shadow-2xl flex flex-col lg:flex-row items-stretch gap-6">
@@ -427,111 +533,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
         </div>
       )}
 
-      {/* Top Sub-Header Toolbar (Opens Dedicated Sub-Pages) */}
-      <div className="sticky top-14 z-40 py-2 bg-slate-950/95 backdrop-blur-xl border-b border-amber-500/20 w-full">
-        <div className="p-1.5 rounded-xl border border-amber-500/20 !bg-slate-900/90 shadow-md flex flex-wrap items-center gap-1.5 sm:gap-2">
-          <a
-            href={baseUrl}
-            onClick={(e) => pushRoute(e, baseUrl)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center space-x-1.5 ${
-              activeSubPage === 'overview'
-                ? 'bg-amber-500 text-slate-950 shadow-sm font-bold'
-                : 'text-wf-cream hover:text-white hover:bg-white/10'
-            }`}
-          >
-            <Landmark className="w-3.5 h-3.5" />
-            <span>Overview</span>
-          </a>
 
-          {city.historyEpochs && city.historyEpochs.length > 0 && (
-            <a
-              href={`${baseUrl}/history`}
-              onClick={(e) => handleSubPageTabClick(e, `${baseUrl}/history`)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center space-x-1.5 ${
-                activeSubPage === 'history'
-                  ? 'bg-amber-500 text-slate-950 shadow-sm font-bold'
-                  : 'text-amber-300 hover:text-amber-100 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30'
-              }`}
-            >
-              <BookOpen className="w-3.5 h-3.5" />
-              <span>History & Timeline</span>
-            </a>
-          )}
-
-          {city.markets && city.markets.length > 0 && (
-            <a
-              href={`${baseUrl}/markets`}
-              onClick={(e) => handleSubPageTabClick(e, `${baseUrl}/markets`)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center space-x-1.5 ${
-                activeSubPage === 'markets'
-                  ? 'bg-amber-500 text-slate-950 shadow-sm font-bold'
-                  : 'text-amber-300 hover:text-amber-100 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30'
-              }`}
-            >
-              <ShoppingBag className="w-3.5 h-3.5" />
-              <span>Christmas Markets</span>
-            </a>
-          )}
-
-          {city.mustSee && city.mustSee.length > 0 && (
-            <a
-              href={`${baseUrl}/attractions`}
-              onClick={(e) => handleSubPageTabClick(e, `${baseUrl}/attractions`)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center space-x-1.5 ${
-                activeSubPage === 'attractions'
-                  ? 'bg-amber-500 text-slate-950 shadow-sm font-bold'
-                  : 'text-wf-cream hover:text-white hover:bg-white/10'
-              }`}
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Must-See Sights</span>
-            </a>
-          )}
-
-          {city.restaurants && city.restaurants.length > 0 && (
-            <a
-              href={`${baseUrl}/restaurants`}
-              onClick={(e) => handleSubPageTabClick(e, `${baseUrl}/restaurants`)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center space-x-1.5 ${
-                activeSubPage === 'restaurants'
-                  ? 'bg-amber-500 text-slate-950 shadow-sm font-bold'
-                  : 'text-wf-cream hover:text-white hover:bg-white/10'
-              }`}
-            >
-              <Utensils className="w-3.5 h-3.5" />
-              <span>Top Restaurants</span>
-            </a>
-          )}
-
-          <a
-            href={`${baseUrl}/hotels`}
-            onClick={(e) => handleSubPageTabClick(e, `${baseUrl}/hotels`)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center space-x-1.5 ${
-              activeSubPage === 'hotels'
-                ? 'bg-amber-500 text-slate-950 shadow-sm font-bold'
-                : 'text-wf-cream hover:text-white hover:bg-white/10'
-            }`}
-          >
-            <Bed className="w-3.5 h-3.5" />
-            <span>Base & Hotels</span>
-          </a>
-
-          {city.lgbtq && (
-            <a
-              href={`${baseUrl}/lgbtq`}
-              onClick={(e) => handleSubPageTabClick(e, `${baseUrl}/lgbtq`)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center space-x-1.5 ${
-                activeSubPage === 'lgbtq'
-                  ? 'bg-purple-600 text-white shadow-sm font-bold ring-2 ring-purple-400/50'
-                  : 'text-purple-300 hover:text-purple-100 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30'
-              }`}
-            >
-              <Heart className="w-3.5 h-3.5 text-pink-400 fill-pink-400/30" />
-              <span>LGBTQ+ Guide</span>
-            </a>
-          )}
-        </div>
-      </div>
 
       {/* RENDER DEDICATED SUB-PAGE CONTENT */}
 

@@ -63,11 +63,18 @@
   background: #2d6a9f;
 }
 
-html, body, #root {
+html {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  overflow-x: visible;
+}
+
+body, #root {
   margin: 0;
   padding: 0;
   max-width: 100vw;
-  overflow-x: hidden;
+  overflow-x: clip;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }

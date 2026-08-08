@@ -10,24 +10,23 @@ export function WayfinderLanding() {
   };
 
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center py-20 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto text-center space-y-8 animate-slide-up">
+    <div className="w-full flex-1 flex flex-col items-center justify-start py-4 sm:py-6 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-3xl mx-auto text-center space-y-2.5 animate-slide-up">
         
-        <div className="inline-flex items-center space-x-2 px-4 py-2 rounded-full bg-wf-blue/10 border border-wf-blue/30 text-wf-blue-lt text-sm font-medium">
-          <Compass className="w-4 h-4" />
+        <div className="inline-flex items-center space-x-2 px-2.5 py-0.5 rounded-full bg-wf-blue/10 border border-wf-blue/30 text-wf-blue-lt text-[11px] sm:text-xs font-medium">
+          <Compass className="w-3 h-3" />
           <span>Curated Travel Experiences</span>
         </div>
 
-        <h1 className="text-4xl sm:text-5xl lg:text-7xl font-black tracking-tight text-white leading-tight">
-          Smart routes. <br className="hidden sm:block" />
-          <span className="gradient-amber">Memorable places.</span>
+        <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight text-white leading-tight">
+          Smart routes. <span className="gradient-amber">Memorable places.</span>
         </h1>
 
-        <p className="text-lg sm:text-xl text-wf-muted max-w-2xl mx-auto leading-relaxed">
+        <p className="text-xs sm:text-sm text-wf-muted max-w-md mx-auto leading-normal">
           Every detail within reach. Explore curated public destination guides, or sign in to access your private itinerary and document hub.
         </p>
 
-        <div className="pt-12 grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
+        <div className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-5 max-w-3xl mx-auto">
           {/* Poland 2026 Card */}
           <a
             href="/wayfinder/poland-christmas-2026"

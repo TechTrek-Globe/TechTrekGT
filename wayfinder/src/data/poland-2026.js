@@ -63,6 +63,269 @@ export const polandJourney = {
       kaucja: '20-30 PLN (~$5.35–$8.00 USD)',
       foodTargets: ['Morskie Oko', 'Pod Wawelem', 'Czarna Kaczka', 'Plac Nowy Zapiekanki'],
       hotels: ['Hotel Stary', 'Hotel Copernicus', 'Sheraton Grand Kraków', 'PURO Kraków Stare Miasto'],
+      krakowHotelsDetailed: [
+        {
+          id: 'hotel-stary',
+          name: 'Hotel Stary',
+          tier: 'luxury',
+          tierLabel: '5-Star Luxury Palace',
+          address: 'ul. Szczepańska 5 (Old Town)',
+          neighborhood: 'Stare Miasto (Old Town)',
+          stars: 5,
+          imageSrc: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80',
+          basePricePln: 1150,
+          memberPricePln: 1020,
+          currency: 'PLN',
+          usdEstimateBase: 295,
+          usdEstimateMember: 260,
+          description: 'Award-winning 14th-century merchant palace turned 5-star hotel. Features a breathtaking glass-roofed summer rooftop terrace overlooking Rynek Główny and an underground medieval brick-vaulted spa & pool.',
+          signatureFeature: 'Rooftop terrace overlooking Rynek Główny & Gothic cellar pool',
+          amenities: ['Cellar Swimming Pool', 'Rooftop Lounge', 'Michelin-Guide Dining', 'Spa & Sauna', 'Valet Parking'],
+          proximity: {
+            rynekMarket: { name: 'Main Market Square (Rynek Główny)', distance: '100m', time: '1 min walk' },
+            malyRynekMarket: { name: 'Mały Rynek Christmas Market', distance: '350m', time: '4 min walk' },
+            kazimierzMarket: { name: 'Kazimierz (Plac Wolnica / Nowy)', distance: '1.4 km', time: '18 min walk / 6 min tram' },
+            attractions: [
+              { name: 'Cloth Hall (Sukiennice)', distance: '120m', time: '1 min walk' },
+              { name: 'St. Mary\'s Basilica', distance: '250m', time: '3 min walk' },
+              { name: 'Wawel Royal Castle', distance: '950m', time: '12 min walk' },
+              { name: 'Schindler\'s Factory', distance: '2.8 km', time: '10 min taxi' }
+            ]
+          }
+        },
+        {
+          id: 'hotel-copernicus',
+          name: 'Hotel Copernicus',
+          tier: 'luxury',
+          tierLabel: '5-Star Renaissance Heritage',
+          address: 'ul. Kanonicza 16 (Old Town)',
+          neighborhood: 'Stare Miasto (Kanonicza Street)',
+          stars: 5,
+          imageSrc: 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=800&q=80',
+          basePricePln: 1250,
+          memberPricePln: 1100,
+          currency: 'PLN',
+          usdEstimateBase: 320,
+          usdEstimateMember: 282,
+          description: 'Historic Relais & Châteaux residence on Kraków\'s oldest street. Named after Nicolaus Copernicus who stayed here; features preserved 14th-century wooden beams, Renaissance frescoes, and a fireside library lounge.',
+          signatureFeature: 'Preserved 14th-century frescoes & fireside Renaissance courtyard',
+          amenities: ['Underground Vaulted Pool', 'Fine Dining Restaurant', 'Rooftop Panorama Bar', 'Concierge Service'],
+          proximity: {
+            rynekMarket: { name: 'Main Market Square (Rynek Główny)', distance: '450m', time: '5 min walk' },
+            malyRynekMarket: { name: 'Mały Rynek Christmas Market', distance: '500m', time: '6 min walk' },
+            kazimierzMarket: { name: 'Kazimierz (Plac Wolnica / Nowy)', distance: '900m', time: '11 min walk' },
+            attractions: [
+              { name: 'Wawel Royal Castle', distance: '200m', time: '2 min walk' },
+              { name: 'St. Mary\'s Basilica', distance: '500m', time: '6 min walk' },
+              { name: 'Cloth Hall (Sukiennice)', distance: '450m', time: '5 min walk' },
+              { name: 'Planty Park', distance: '100m', time: '1 min walk' }
+            ]
+          }
+        },
+        {
+          id: 'sheraton-grand-krakow',
+          name: 'Sheraton Grand Kraków',
+          tier: 'luxury',
+          tierLabel: '5-Star Riverside Grand Hotel',
+          address: 'ul. Powadle 7 (Vistula Riverfront)',
+          neighborhood: 'Wawel Slope & Vistula River',
+          stars: 5,
+          imageSrc: 'https://images.unsplash.com/photo-1571896349842-33c89424de2d?auto=format&fit=crop&w=800&q=80',
+          basePricePln: 920,
+          memberPricePln: 810,
+          currency: 'PLN',
+          usdEstimateBase: 235,
+          usdEstimateMember: 207,
+          description: 'Refined 5-star luxury positioned right at the foot of Wawel Castle on the Vistula River bank. Boasts a massive glass-domed atrium lobby, Roof Top Terrace bar, and indoor heated pool.',
+          signatureFeature: 'Direct river views & Wawel Castle panorama lounge',
+          amenities: ['Glass-Domed Atrium', 'Indoor Swimming Pool', 'Fitness Center', 'Roof Top Bar', 'Riverfront Dining'],
+          proximity: {
+            rynekMarket: { name: 'Main Market Square (Rynek Główny)', distance: '800m', time: '10 min walk' },
+            malyRynekMarket: { name: 'Mały Rynek Christmas Market', distance: '900m', time: '11 min walk' },
+            kazimierzMarket: { name: 'Kazimierz (Plac Wolnica / Nowy)', distance: '1.0 km', time: '13 min walk' },
+            attractions: [
+              { name: 'Wawel Royal Castle', distance: '150m', time: '2 min walk' },
+              { name: 'Vistula River Boulevards', distance: '30m', time: '1 min walk' },
+              { name: 'Cloth Hall (Sukiennice)', distance: '800m', time: '10 min walk' },
+              { name: 'Schindler\'s Factory', distance: '2.2 km', time: '7 min taxi' }
+            ]
+          }
+        },
+        {
+          id: 'puro-krakow-stare-miasto',
+          name: 'PURO Kraków Stare Miasto',
+          tier: 'mid',
+          tierLabel: 'Modern Boutique Design',
+          address: 'ul. Ogrodowa 10 (Near Barbican)',
+          neighborhood: 'Stare Miasto North / Main Station',
+          stars: 4,
+          imageSrc: 'https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=800&q=80',
+          basePricePln: 480,
+          memberPricePln: 425,
+          currency: 'PLN',
+          usdEstimateBase: 123,
+          usdEstimateMember: 109,
+          description: 'Ultra-contemporary Scandinavian design hotel right across from the historic Barbican. Features tablet-controlled smart rooms, complimentary specialty drip coffee lounge, and free city bikes.',
+          signatureFeature: 'Contemporary art collection & complimentary artisan coffee',
+          amenities: ['Free Specialty Coffee', 'Smart Room Control', 'Free Bike Rentals', 'Design Lounge & Bar', 'Pet Friendly'],
+          proximity: {
+            rynekMarket: { name: 'Main Market Square (Rynek Główny)', distance: '650m', time: '8 min walk' },
+            malyRynekMarket: { name: 'Mały Rynek Christmas Market', distance: '700m', time: '9 min walk' },
+            kazimierzMarket: { name: 'Kazimierz (Plac Wolnica / Nowy)', distance: '2.1 km', time: '10 min tram' },
+            attractions: [
+              { name: 'Barbican & St. Florian\'s Gate', distance: '250m', time: '3 min walk' },
+              { name: 'St. Mary\'s Basilica', distance: '700m', time: '9 min walk' },
+              { name: 'Main Railway Station (Kraków Główny)', distance: '300m', time: '4 min walk' },
+              { name: 'Wawel Royal Castle', distance: '1.6 km', time: '20 min walk' }
+            ]
+          }
+        },
+        {
+          id: 'hotel-indigo-krakow',
+          name: 'Hotel Indigo Kraków Old Town',
+          tier: 'mid',
+          tierLabel: 'Artisanal Heritage Boutique',
+          address: 'ul. św. Filipa 18 (Kleparz)',
+          neighborhood: 'Stary Kleparz & Old Town Gate',
+          stars: 4,
+          imageSrc: 'https://images.unsplash.com/photo-1566665797739-1674de7a421a?auto=format&fit=crop&w=800&q=80',
+          basePricePln: 550,
+          memberPricePln: 485,
+          currency: 'PLN',
+          usdEstimateBase: 141,
+          usdEstimateMember: 124,
+          description: 'Sophisticated IHG boutique hotel set inside a restored 18th-century residential palace. Individually styled rooms inspired by Polish art icons Wyspiański, Matejko, and Nowakowski.',
+          signatureFeature: 'Polish art history interiors & Filipa 18 gourmet restaurant',
+          amenities: ['Boutique Bar', 'Fitness Center & Sauna', 'Art Gallery Corridors', 'Gourmet Breakfast'],
+          proximity: {
+            rynekMarket: { name: 'Main Market Square (Rynek Główny)', distance: '750m', time: '9 min walk' },
+            malyRynekMarket: { name: 'Mały Rynek Christmas Market', distance: '800m', time: '10 min walk' },
+            kazimierzMarket: { name: 'Kazimierz (Plac Wolnica / Nowy)', distance: '2.2 km', time: '12 min tram' },
+            attractions: [
+              { name: 'Stary Kleparz Artisanal Food Market', distance: '50m', time: '1 min walk' },
+              { name: 'Barbican', distance: '350m', time: '4 min walk' },
+              { name: 'Cloth Hall (Sukiennice)', distance: '800m', time: '10 min walk' },
+              { name: 'Wawel Royal Castle', distance: '1.7 km', time: '21 min walk' }
+            ]
+          }
+        },
+        {
+          id: 'metropolitan-boutique-hotel',
+          name: 'Metropolitan Boutique Hotel',
+          tier: 'mid',
+          tierLabel: 'Old Town / Kazimierz Gateway',
+          address: 'ul. Berka Joselewicza 19 (Kazimierz Border)',
+          neighborhood: 'Old Town & Kazimierz Junction',
+          stars: 4,
+          imageSrc: 'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?auto=format&fit=crop&w=800&q=80',
+          basePricePln: 510,
+          memberPricePln: 450,
+          currency: 'PLN',
+          usdEstimateBase: 130,
+          usdEstimateMember: 115,
+          description: 'Elegantly restored 19th-century residence perfectly situated right between the medieval Old Town and the trendy bohemian quarter of Kazimierz.',
+          signatureFeature: 'Quiet internal courtyard garden & Fabryka Thonett bistro',
+          amenities: ['Quiet Courtyard', 'Bistro & Cocktail Lounge', 'Fitness Room', 'Airport Shuttle', 'Concierge'],
+          proximity: {
+            rynekMarket: { name: 'Main Market Square (Rynek Główny)', distance: '900m', time: '11 min walk' },
+            malyRynekMarket: { name: 'Mały Rynek Christmas Market', distance: '850m', time: '10 min walk' },
+            kazimierzMarket: { name: 'Kazimierz (Plac Nowy)', distance: '400m', time: '5 min walk' },
+            attractions: [
+              { name: 'Wawel Royal Castle', distance: '850m', time: '10 min walk' },
+              { name: 'Old Synagogue Kazimierz', distance: '350m', time: '4 min walk' },
+              { name: 'Cloth Hall (Sukiennice)', distance: '950m', time: '12 min walk' },
+              { name: 'Father Bernatek Footbridge', distance: '900m', time: '11 min walk' }
+            ]
+          }
+        },
+        {
+          id: 'ibis-krakow-stare-miasto',
+          name: 'Ibis Kraków Stare Miasto',
+          tier: 'budget',
+          tierLabel: 'Cost-Effective Modern Comfort',
+          address: 'ul. Pawia 15 (Main Station)',
+          neighborhood: 'Stare Miasto North',
+          stars: 3,
+          imageSrc: 'https://images.unsplash.com/photo-1568495248636-6432b97bd949?auto=format&fit=crop&w=800&q=80',
+          basePricePln: 260,
+          memberPricePln: 230,
+          currency: 'PLN',
+          usdEstimateBase: 66,
+          usdEstimateMember: 58,
+          description: 'Dependable, ultra-clean budget hotel located right next to Kraków Główny train station and Galeria Krakowska, with comfortable Sweet Bed mattresses and hot breakfast buffet.',
+          signatureFeature: 'Direct express airport train access & Sweet Bed comfort',
+          amenities: ['24/7 Reception', 'Express Check-In', 'Hot Breakfast Buffet', 'High-Speed WiFi', 'On-Site Bar'],
+          proximity: {
+            rynekMarket: { name: 'Main Market Square (Rynek Główny)', distance: '900m', time: '11 min walk' },
+            malyRynekMarket: { name: 'Mały Rynek Christmas Market', distance: '850m', time: '10 min walk' },
+            kazimierzMarket: { name: 'Kazimierz (Plac Wolnica / Nowy)', distance: '2.3 km', time: '10 min tram' },
+            attractions: [
+              { name: 'Barbican & Florian\'s Gate', distance: '450m', time: '5 min walk' },
+              { name: 'St. Mary\'s Basilica', distance: '900m', time: '11 min walk' },
+              { name: 'Main Train Station (Airport Direct)', distance: '150m', time: '2 min walk' },
+              { name: 'Wawel Royal Castle', distance: '1.8 km', time: '22 min walk' }
+            ]
+          }
+        },
+        {
+          id: 'boutique-aparthotel-kazimierz',
+          name: 'Boutique Aparthotel Kazimierz',
+          tier: 'budget',
+          tierLabel: 'Cost-Effective Kazimierz Studio',
+          address: 'ul. Miodowa 16 (Kazimierz)',
+          neighborhood: 'Kazimierz Jewish Quarter',
+          stars: 3,
+          imageSrc: 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=800&q=80',
+          basePricePln: 280,
+          memberPricePln: 245,
+          currency: 'PLN',
+          usdEstimateBase: 71,
+          usdEstimateMember: 62,
+          description: 'Charming self-catering studio apartments set in an authentic 19th-century Kazimierz townhouse. Steps away from bohemian vintage shops, pierogarnias, and queer-friendly bakery spots.',
+          signatureFeature: 'Kitchenette in room & authentic bohemian neighborhood location',
+          amenities: ['In-Room Kitchenette', 'Self Check-In Keypad', 'Fast WiFi', 'Coffee Maker', 'Luggage Storage'],
+          proximity: {
+            rynekMarket: { name: 'Main Market Square (Rynek Główny)', distance: '1.2 km', time: '15 min walk / 6 min tram' },
+            malyRynekMarket: { name: 'Mały Rynek Christmas Market', distance: '1.1 km', time: '14 min walk' },
+            kazimierzMarket: { name: 'Kazimierz (Plac Nowy)', distance: '200m', time: '2 min walk' },
+            attractions: [
+              { name: 'Remuh Synagogue & Old Jewish Cemetery', distance: '150m', time: '2 min walk' },
+              { name: 'Wawel Royal Castle', distance: '900m', time: '11 min walk' },
+              { name: 'Schindler\'s Factory', distance: '1.4 km', time: '17 min walk' },
+              { name: 'Massolit Books & Café', distance: '1.2 km', time: '15 min walk' }
+            ]
+          }
+        },
+        {
+          id: 'greg-tom-beer-house',
+          name: 'Greg & Tom Beer House Hostel / Privates',
+          tier: 'budget',
+          tierLabel: 'Historic Old Town Budget & Pods',
+          address: 'ul. Floriańska 43 (Old Town)',
+          neighborhood: 'Stare Miasto (Royal Route)',
+          stars: 2,
+          imageSrc: 'https://images.unsplash.com/photo-1555854877-bab0e564b8d5?auto=format&fit=crop&w=800&q=80',
+          basePricePln: 190,
+          memberPricePln: 165,
+          currency: 'PLN',
+          usdEstimateBase: 48,
+          usdEstimateMember: 42,
+          description: 'Top-rated, legendary historic townhouse offering cozy en-suite private rooms and privacy-curtained luxury dorm pods right on famous Floriańska street. Includes free cooked hot breakfast.',
+          signatureFeature: 'Free cooked hot breakfast & prime Royal Route location',
+          amenities: ['Free Hot Breakfast', 'Private En-Suite Rooms', '24/7 Security', 'Social Lounge', 'Luggage Locker'],
+          proximity: {
+            rynekMarket: { name: 'Main Market Square (Rynek Główny)', distance: '300m', time: '4 min walk' },
+            malyRynekMarket: { name: 'Mały Rynek Christmas Market', distance: '300m', time: '4 min walk' },
+            kazimierzMarket: { name: 'Kazimierz (Plac Wolnica / Nowy)', distance: '1.6 km', time: '20 min walk' },
+            attractions: [
+              { name: 'St. Florian\'s Gate', distance: '100m', time: '1 min walk' },
+              { name: 'St. Mary\'s Basilica', distance: '300m', time: '4 min walk' },
+              { name: 'Cloth Hall (Sukiennice)', distance: '350m', time: '4 min walk' },
+              { name: 'Wawel Royal Castle', distance: '1.2 km', time: '15 min walk' }
+            ]
+          }
+        }
+      ],
       quickReference: {
         dates: 'Nov 28, 2026 - Jan 1, 2027',
         daylight: 'Sunrise ~7:30 AM | Sunset ~3:30 PM (~8 hrs daylight)',

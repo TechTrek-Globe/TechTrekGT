@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MapPin, Utensils, Bed, ArrowLeft, ArrowRight, Bus, Train, ShoppingBag, Sparkles, Landmark, Compass, DollarSign, Info, Map, Clock, Navigation, Gift, Lightbulb, Video, ExternalLink, Thermometer, CreditCard, Award, RefreshCw, AlertTriangle, CalendarX, Coins, Coffee, Sun, Volume2, Crown, BookOpen, Scroll, Flame, ShieldCheck, Heart, Users, Phone } from 'lucide-react';
+import { MapPin, Utensils, Bed, ArrowLeft, ArrowRight, Bus, Train, ShoppingBag, Sparkles, Landmark, Compass, DollarSign, Info, Map, Clock, Navigation, Gift, Lightbulb, Video, ExternalLink, Thermometer, CreditCard, Award, RefreshCw, AlertTriangle, CalendarX, Coins, Coffee, Sun, Volume2, Crown, BookOpen, Scroll, Flame, ShieldCheck, Heart, Users, Phone, Star, CheckCircle2, Lock } from 'lucide-react';
 import { polandJourney } from '../data/poland-2026';
 import { cityImages, marketImages, attractionImages } from '../utils/cityImages';
 import { useExchangeRate } from '../hooks/useExchangeRate';
 import { MustSeeCard } from './MustSeeCard';
+import { useAuth } from '../context/AuthContext';
 
 function QuickReferenceBar({ city }) {
   const quick = city.quickReference || {
@@ -120,6 +121,8 @@ function CulinaryHighlightsSection({ highlights }) {
 export function CityPage({ cityId, subPage = 'overview' }) {
   const [activeMarketTab, setActiveMarketTab] = useState(0);
   const [activeEpochTab, setActiveEpochTab] = useState('all');
+  const [hotelTierFilter, setHotelTierFilter] = useState('all');
+  const { isAuthenticated, setIsAuthModalOpen } = useAuth();
   const exchangeRates = useExchangeRate();
   const subPageSectionRef = useRef(null);
 
@@ -1228,24 +1231,342 @@ export function CityPage({ cityId, subPage = 'overview' }) {
 
       {/* 5. BASE & HOTELS SUB-PAGE */}
       {activeSubPage === 'hotels' && (
-        <div ref={subPageSectionRef} id="hotels-section" className="space-y-6 animate-fade-in scroll-mt-32">
-          <div className="glass-panel border-wf-evergreen/30 p-8 rounded-3xl bg-wf-evergreen/5">
-            <h3 className="text-2xl font-bold text-white mb-4 flex items-center space-x-3">
-              <Bed className="w-6 h-6 text-wf-evergreen" />
-              <span>Recommended Base & Hotels in {city.name}</span>
-            </h3>
-            <p className="text-wf-cream font-semibold text-lg mb-4">{city.base}</p>
-            {city.hotels.length > 0 && (
-              <ul className="space-y-3">
-                {city.hotels.map((hotel, idx) => (
-                  <li key={idx} className="text-sm text-wf-cream flex items-start space-x-2">
-                    <span className="text-wf-evergreen font-bold">•</span>
-                    <span>{hotel}</span>
-                  </li>
-                ))}
-              </ul>
+        <div ref={subPageSectionRef} id="hotels-section" className="space-y-8 animate-fade-in scroll-mt-32">
+          {/* Header Banner */}
+          <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-amber-500/30 bg-wf-navy-mid/95 relative overflow-hidden shadow-2xl space-y-6">
+            <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-amber-500/15 via-emerald-500/10 to-transparent rounded-full blur-3xl pointer-events-none" />
+
+            <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+              <div className="space-y-2 max-w-2xl">
+                <div className="inline-flex items-center space-x-2 px-3.5 py-1 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 text-xs font-black uppercase tracking-wider shadow-sm">
+                  <Bed className="w-4 h-4" />
+                  <span>Curated Accommodations</span>
+                </div>
+                <h2 className="text-3xl sm:text-4xl font-black text-white leading-tight">
+                  Hotels & Recommended Base in {city.name}
+                </h2>
+                <p className="text-sm sm:text-base text-slate-300 font-medium leading-relaxed">
+                  Strategic hotels selected for proximity to the Christmas Markets, walking distance to historic landmarks, and winter comfort.
+                </p>
+                <div className="pt-1 flex items-center space-x-2 text-xs font-bold text-emerald-300">
+                  <MapPin className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>Recommended Base Area: <span className="text-white underline decoration-emerald-400/50 underline-offset-4">{city.base}</span></span>
+                </div>
+              </div>
+
+              {/* Signed-In vs Guest Pricing Banner */}
+              <div className="w-full md:w-auto shrink-0">
+                {isAuthenticated ? (
+                  <div className="p-4 rounded-2xl bg-emerald-950/80 border border-emerald-500/40 text-emerald-200 text-xs space-y-1.5 shadow-xl max-w-sm">
+                    <div className="flex items-center space-x-2 text-emerald-300 font-black text-sm">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <span>Member Pricing Unlocked</span>
+                    </div>
+                    <p className="text-[11px] text-emerald-200/90 leading-snug">
+                      Date-specific rates active for peak Christmas Market dates (<span className="font-bold text-white">Nov 28 – Dec 1, 2026 • 3 Nights</span>).
+                    </p>
+                    <div className="pt-1 text-[10px] uppercase font-bold text-emerald-400 flex items-center space-x-1">
+                      <Coins className="w-3 h-3" />
+                      <span>Member Savings Applied</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-4 rounded-2xl bg-slate-950/90 border border-amber-500/30 text-amber-200 text-xs space-y-2 shadow-xl max-w-sm">
+                    <div className="flex items-center space-x-2 text-amber-300 font-bold text-sm">
+                      <Lock className="w-4 h-4 text-amber-400 shrink-0" />
+                      <span>Guest Mode: Public Rates</span>
+                    </div>
+                    <p className="text-[11px] text-slate-300 leading-snug">
+                      Showing average winter rates. Sign in to view date-locked member discounts for your exact 3-night stay.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setIsAuthModalOpen(true)}
+                      className="w-full py-2 px-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-all shadow-md flex items-center justify-center space-x-1.5 active:scale-95 cursor-pointer"
+                    >
+                      <Crown className="w-3.5 h-3.5" />
+                      <span>Sign In for Member Pricing</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Tier Filter Tabs (Luxury, Mid-Range, Cost-Effective) */}
+            {city.krakowHotelsDetailed && (
+              <div className="pt-4 border-t border-white/10 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setHotelTierFilter('all')}
+                    className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${
+                      hotelTierFilter === 'all'
+                        ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                        : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10'
+                    }`}
+                  >
+                    All Options (9)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setHotelTierFilter('luxury')}
+                    className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 ${
+                      hotelTierFilter === 'luxury'
+                        ? 'bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                        : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                    }`}
+                  >
+                    <Crown className="w-3.5 h-3.5" />
+                    <span>Luxury (3)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setHotelTierFilter('mid')}
+                    className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 ${
+                      hotelTierFilter === 'mid'
+                        ? 'bg-purple-500 text-white shadow-md shadow-purple-500/20'
+                        : 'bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                    }`}
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Mid-Range (3)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setHotelTierFilter('budget')}
+                    className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 ${
+                      hotelTierFilter === 'budget'
+                        ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
+                        : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                    }`}
+                  >
+                    <Coins className="w-3.5 h-3.5" />
+                    <span>Cost-Effective (3)</span>
+                  </button>
+                </div>
+                <div className="text-xs font-bold text-slate-400 flex items-center space-x-1">
+                  <Compass className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Proximity metrics included for all top markets</span>
+                </div>
+              </div>
             )}
           </div>
+
+          {/* Detailed Hotel Cards Grid */}
+          {city.krakowHotelsDetailed ? (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {city.krakowHotelsDetailed
+                .filter((h) => hotelTierFilter === 'all' || h.tier === hotelTierFilter)
+                .map((hotel) => {
+                  const isLuxury = hotel.tier === 'luxury';
+                  const isMid = hotel.tier === 'mid';
+                  const isBudget = hotel.tier === 'budget';
+
+                  const badgeStyle = isLuxury
+                    ? 'bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 border-amber-300'
+                    : isMid
+                    ? 'bg-purple-500/20 text-purple-300 border-purple-400/40'
+                    : 'bg-emerald-500/20 text-emerald-300 border-emerald-400/40';
+
+                  const borderStyle = isLuxury
+                    ? 'border-amber-500/30 hover:border-amber-400/60'
+                    : isMid
+                    ? 'border-purple-500/30 hover:border-purple-400/60'
+                    : 'border-emerald-500/30 hover:border-emerald-400/60';
+
+                  const displayPrice = isAuthenticated ? hotel.memberPricePln : hotel.basePricePln;
+                  const displayUsd = isAuthenticated ? hotel.usdEstimateMember : hotel.usdEstimateBase;
+                  const totalStayPln = displayPrice * 3;
+                  const totalStayUsd = displayUsd * 3;
+
+                  const mapSearchQuery = encodeURIComponent(`${hotel.name}, Kraków, Poland`);
+                  const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${mapSearchQuery}`;
+                  const mapSearchUrl = `https://www.google.com/maps/search/?api=1&query=${mapSearchQuery}`;
+
+                  return (
+                    <article
+                      key={hotel.id}
+                      className={`glass-panel rounded-3xl border ${borderStyle} bg-wf-navy-mid/90 overflow-hidden shadow-xl transition-all duration-300 flex flex-col justify-between group`}
+                    >
+                      <div>
+                        {/* Hotel Header Image */}
+                        <div className="relative w-full h-48 bg-slate-950 overflow-hidden shrink-0">
+                          <img
+                            src={hotel.imageSrc}
+                            alt={hotel.name}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                            loading="lazy"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-wf-navy-mid via-transparent to-black/40 pointer-events-none" />
+
+                          {/* Floating Category Pill */}
+                          <div className="absolute top-3.5 left-3.5 z-10 flex items-center space-x-2">
+                            <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border backdrop-blur-md shadow-md ${badgeStyle}`}>
+                              {hotel.tierLabel}
+                            </span>
+                          </div>
+
+                          {/* Star Rating */}
+                          <div className="absolute top-3.5 right-3.5 z-10 bg-slate-950/80 backdrop-blur-md px-2.5 py-0.5 rounded-full border border-white/10 flex items-center space-x-1 text-amber-300 text-xs font-bold shadow-md">
+                            <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                            <span>{hotel.stars}-Star</span>
+                          </div>
+                        </div>
+
+                        {/* Hotel Body Details */}
+                        <div className="p-5 sm:p-6 space-y-4">
+                          <div className="space-y-1">
+                            <h3 className="text-xl font-black text-white group-hover:text-amber-300 transition-colors leading-tight">
+                              {hotel.name}
+                            </h3>
+                            <div className="flex items-center space-x-1.5 text-xs text-slate-400 font-semibold">
+                              <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                              <span>{hotel.neighborhood}</span>
+                            </div>
+                          </div>
+
+                          {/* Live Average Pricing Box */}
+                          <div className="p-3.5 rounded-2xl bg-slate-950/90 border border-white/10 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center space-x-1">
+                                <DollarSign className="w-3.5 h-3.5 text-amber-400" />
+                                <span>{isAuthenticated ? 'Member Rate / Night' : 'Live Average / Night'}</span>
+                              </div>
+                              {isAuthenticated && (
+                                <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 text-[10px] font-extrabold uppercase border border-emerald-500/40">
+                                  Member Price
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex items-baseline justify-between">
+                              <div>
+                                <span className="text-2xl font-black text-white">{displayPrice} PLN</span>
+                                <span className="text-xs text-slate-400 ml-1.5 font-semibold">(~${displayUsd} USD)</span>
+                              </div>
+                              {isAuthenticated ? (
+                                <div className="text-right">
+                                  <div className="text-[10px] text-emerald-400 font-bold">3-Night Total:</div>
+                                  <div className="text-xs font-black text-emerald-300">{totalStayPln} PLN (~${totalStayUsd})</div>
+                                </div>
+                              ) : (
+                                <span className="text-[10px] font-bold text-amber-400 hover:underline cursor-pointer" onClick={() => setIsAuthModalOpen(true)}>
+                                  Sign in for discount
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <p className="text-xs text-slate-300 leading-relaxed font-medium">
+                            {hotel.description}
+                          </p>
+
+                          <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs font-semibold text-amber-200">
+                            ✨ <span className="font-bold text-amber-300">Highlight:</span> {hotel.signatureFeature}
+                          </div>
+
+                          {/* Proximity Breakdown to Top Christmas Markets */}
+                          <div className="pt-2 border-t border-white/10 space-y-2">
+                            <div className="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center space-x-1.5">
+                              <Compass className="w-3.5 h-3.5" />
+                              <span>Distance to Top Christmas Markets</span>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-1.5 text-xs font-medium">
+                              <div className="p-2 rounded-xl bg-white/5 border border-white/5 flex items-center justify-between gap-2">
+                                <span className="text-slate-300 text-[11px] font-bold truncate">🎄 Main Market (Rynek Główny)</span>
+                                <span className="text-amber-300 font-mono text-[11px] font-bold shrink-0">
+                                  {hotel.proximity.rynekMarket.distance} ({hotel.proximity.rynekMarket.time})
+                                </span>
+                              </div>
+                              <div className="p-2 rounded-xl bg-white/5 border border-white/5 flex items-center justify-between gap-2">
+                                <span className="text-slate-300 text-[11px] font-bold truncate">🎁 Mały Rynek Market</span>
+                                <span className="text-amber-300 font-mono text-[11px] font-bold shrink-0">
+                                  {hotel.proximity.malyRynekMarket.distance} ({hotel.proximity.malyRynekMarket.time})
+                                </span>
+                              </div>
+                              <div className="p-2 rounded-xl bg-white/5 border border-white/5 flex items-center justify-between gap-2">
+                                <span className="text-slate-300 text-[11px] font-bold truncate">🕯️ Kazimierz Markets</span>
+                                <span className="text-amber-300 font-mono text-[11px] font-bold shrink-0">
+                                  {hotel.proximity.kazimierzMarket.distance} ({hotel.proximity.kazimierzMarket.time})
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Proximity to Top Attractions */}
+                          <div className="pt-2 border-t border-white/10 space-y-2">
+                            <div className="text-xs font-black text-sky-400 uppercase tracking-wider flex items-center space-x-1.5">
+                              <Landmark className="w-3.5 h-3.5" />
+                              <span>Top Landmark Distances</span>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-1.5 text-[11px]">
+                              {hotel.proximity.attractions.map((att, aIdx) => (
+                                <div key={aIdx} className="p-1.5 rounded-lg bg-slate-950/60 border border-white/5 text-slate-300 flex flex-col justify-between">
+                                  <span className="font-semibold truncate text-slate-200">{att.name}</span>
+                                  <span className="text-sky-300 font-mono text-[10px] font-bold">{att.distance} ({att.time})</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Amenities Tags */}
+                          <div className="flex flex-wrap gap-1.5 pt-1">
+                            {hotel.amenities.map((am, amIdx) => (
+                              <span key={amIdx} className="px-2 py-0.5 rounded-md bg-slate-900 border border-white/10 text-[10px] font-bold text-slate-300">
+                                • {am}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Card Action Footer */}
+                      <div className="bg-slate-950/80 border-t border-white/10 p-3.5 sm:p-4 flex items-center justify-between gap-2 shrink-0">
+                        <a
+                          href={directionsUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 py-2 px-2.5 rounded-xl bg-white/5 hover:bg-amber-500/20 text-slate-300 hover:text-amber-300 border border-white/10 hover:border-amber-500/40 text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn"
+                        >
+                          <Navigation className="w-3.5 h-3.5 text-sky-400 group-hover/btn:text-amber-300" />
+                          <span>Directions</span>
+                        </a>
+
+                        <a
+                          href={mapSearchUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 py-2 px-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:border-amber-500/50 text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn"
+                        >
+                          <Compass className="w-3.5 h-3.5 text-amber-400 group-hover/btn:text-amber-300" />
+                          <span>View Map</span>
+                        </a>
+                      </div>
+                    </article>
+                  );
+                })}
+            </div>
+          ) : (
+            <div className="glass-panel border-wf-evergreen/30 p-8 rounded-3xl bg-wf-evergreen/5">
+              <h3 className="text-2xl font-bold text-white mb-4 flex items-center space-x-3">
+                <Bed className="w-6 h-6 text-wf-evergreen" />
+                <span>Recommended Base & Hotels in {city.name}</span>
+              </h3>
+              <p className="text-wf-cream font-semibold text-lg mb-4">{city.base}</p>
+              {city.hotels.length > 0 && (
+                <ul className="space-y-3">
+                  {city.hotels.map((hotel, idx) => (
+                    <li key={idx} className="text-sm text-wf-cream flex items-start space-x-2">
+                      <span className="text-wf-evergreen font-bold">•</span>
+                      <span>{hotel}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
         </div>
       )}
 

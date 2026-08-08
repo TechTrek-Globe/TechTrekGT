@@ -23,12 +23,12 @@ function CulinaryHighlightsSection({ highlights }) {
         {highlights.map((item, idx) => (
           <div key={idx} className="glass-panel p-6 rounded-3xl border border-amber-500/20 hover:border-amber-500/50 bg-wf-navy-mid/90 transition-all flex flex-col justify-between group shadow-lg">
             <div className="space-y-3">
-              <div className="flex items-start justify-between gap-2">
+              <div className="flex flex-wrap items-start justify-between gap-2">
                 <h3 className="text-lg font-black text-white group-hover:text-amber-300 transition-colors leading-snug">
                   {item.name}
                 </h3>
-                <span className="px-2 py-1 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 font-mono text-[10px] font-bold shrink-0 flex items-center space-x-1">
-                  <Volume2 className="w-3 h-3 text-amber-400" />
+                <span className="px-2 py-1 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 font-mono text-[10px] font-bold flex items-center space-x-1 max-w-full">
+                  <Volume2 className="w-3 h-3 text-amber-400 shrink-0" />
                   <span>Pronunciation</span>
                 </span>
               </div>

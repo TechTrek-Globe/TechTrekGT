@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { MapPin, Utensils, Bed, ArrowLeft, ArrowRight, Bus, Train, ShoppingBag, Sparkles, Landmark, Compass, DollarSign, Info, Map, Clock, Navigation, Gift, Lightbulb, Video, ExternalLink, Thermometer, CreditCard, Award, RefreshCw, AlertTriangle, CalendarX, Coins, Coffee, Sun, Volume2, Crown, BookOpen, Scroll, Flame, ShieldCheck, Heart } from 'lucide-react';
 import { polandJourney } from '../data/poland-2026';
 import { cityImages, marketImages } from '../utils/cityImages';
@@ -121,11 +121,27 @@ export function CityPage({ cityId, subPage = 'overview' }) {
   const [activeMarketTab, setActiveMarketTab] = useState(0);
   const [activeEpochTab, setActiveEpochTab] = useState('all');
   const exchangeRates = useExchangeRate();
+  const subPageSectionRef = useRef(null);
 
   const pushRoute = (e, path) => {
     e.preventDefault();
     window.history.pushState({}, '', path);
     window.dispatchEvent(new PopStateEvent('popstate'));
+  };
+
+  const scrollToSubPageArea = () => {
+    if (subPageSectionRef.current) {
+      const yOffset = -120; // Accounts for sticky layout top bar (56px) + sticky sub-toolbar (~50px) + breathing space
+      const element = subPageSectionRef.current;
+      const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset;
+      window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
+    }
+  };
+
+  const handleSubPageTabClick = (e, path) => {
+    e.preventDefault();
+    pushRoute(e, path);
+    setTimeout(scrollToSubPageArea, 30);
   };
 
   const city = polandJourney.route.find(c => c.id === cityId);
@@ -154,6 +170,13 @@ export function CityPage({ cityId, subPage = 'overview' }) {
           : (['hotels', 'stays', 'base'].includes(subPage)
             ? 'hotels'
             : 'overview'))));
+
+  useEffect(() => {
+    if (activeSubPage && activeSubPage !== 'overview') {
+      const scrollTimer = setTimeout(scrollToSubPageArea, 60);
+      return () => clearTimeout(scrollTimer);
+    }
+  }, [activeSubPage, cityId]);
 
   // OpenStreetMap embed bbox for Kraków or generic fallback
   const mapUrl = cityId === 'krakow'

@@ -3,7 +3,7 @@ import { MapPin, Utensils, Bed, ArrowLeft, Bus, Train, ShoppingBag, Sparkles, La
 import { polandJourney } from '../data/poland-2026';
 import { cityImages, marketImages } from '../utils/cityImages';
 import { useExchangeRate } from '../hooks/useExchangeRate';
-import { AttractionCard } from './AttractionCard';
+import { MustSeeCard } from './MustSeeCard';
 
 function QuickReferenceBar({ city }) {
   const quick = city.quickReference || {
@@ -752,7 +752,20 @@ export function CityPage({ cityId, subPage = 'overview' }) {
             style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}
           >
             {city.mustSee.map((sight, idx) => (
-              <AttractionCard key={idx} sight={sight} cityName={city.name} />
+              <MustSeeCard
+                key={idx}
+                imageSrc={sight.imageSrc || sight.imageUrl}
+                title={sight.title || sight.name}
+                category={sight.category}
+                description={sight.description}
+                locationData={sight.locationData || sight.location}
+                costData={sight.costData || sight.pricing}
+                hoursData={sight.hoursData || sight.openTimes}
+                howToGetThere={sight.howToGetThere}
+                daysClosed={sight.daysClosed}
+                cityName={city.name}
+                sight={sight}
+              />
             ))}
           </div>
         </div>

@@ -59,6 +59,7 @@ function App() {
 
     if (normalizedPath.startsWith('/wayfinder/poland-christmas-2026/cities/')) {
       const pathSuffix = normalizedPath.replace(/\/wayfinder\/poland-christmas-2026\/cities\/?/, '');
+      const parts = pathSuffix.split('/');
       const cityId = parts[0];
       const rawSub = (parts[1] || 'overview').toLowerCase();
       let subPage = 'overview';
@@ -66,12 +67,12 @@ function App() {
         subPage = 'attractions';
       } else if (['markets', 'market', 'christmas-markets'].includes(rawSub)) {
         subPage = 'markets';
-      } else if (['restaurants', 'food', 'dining'].includes(rawSub)) {
+      } else if (['restaurants', 'food', 'dining', 'top-restaurants'].includes(rawSub)) {
         subPage = 'restaurants';
       } else if (['hotels', 'stays', 'base'].includes(rawSub)) {
         subPage = 'hotels';
       }
-      return <CityPage cityId={cityId} subPage={subPage} />;
+      return <CityPage key={`${cityId}-${subPage}`} cityId={cityId} subPage={subPage} />;
     }
 
     if (normalizedPath.startsWith('/wayfinder/poland-christmas-2026/private')) {

@@ -142,6 +142,16 @@ export function CityPage({ cityId, subPage = 'overview' }) {
 
   const baseUrl = `/wayfinder/poland-christmas-2026/cities/${cityId}`;
 
+  const activeSubPage = ['attractions', 'sights', 'must-see', 'must-see-sights'].includes(subPage)
+    ? 'attractions'
+    : (['restaurants', 'food', 'dining', 'top-restaurants'].includes(subPage)
+      ? 'restaurants'
+      : (['markets', 'market', 'christmas-markets'].includes(subPage)
+        ? 'markets'
+        : (['hotels', 'stays', 'base'].includes(subPage)
+          ? 'hotels'
+          : 'overview')));
+
   // OpenStreetMap embed bbox for Kraków or generic fallback
   const mapUrl = cityId === 'krakow'
     ? "https://www.openstreetmap.org/export/embed.html?bbox=19.9200%2C50.0450%2C19.9650%2C50.0700&amp;layer=mapnik&amp;marker=50.0614%2C19.9366"
@@ -321,7 +331,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
             href={baseUrl}
             onClick={(e) => pushRoute(e, baseUrl)}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center space-x-1.5 ${
-              subPage === 'overview'
+              activeSubPage === 'overview'
                 ? 'bg-amber-500 text-slate-950 shadow-sm font-bold'
                 : 'text-wf-cream hover:text-white hover:bg-white/10'
             }`}
@@ -335,7 +345,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
               href={`${baseUrl}/markets`}
               onClick={(e) => pushRoute(e, `${baseUrl}/markets`)}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center space-x-1.5 ${
-                subPage === 'markets'
+                activeSubPage === 'markets'
                   ? 'bg-amber-500 text-slate-950 shadow-sm font-bold'
                   : 'text-amber-300 hover:text-amber-100 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30'
               }`}
@@ -350,7 +360,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
               href={`${baseUrl}/attractions`}
               onClick={(e) => pushRoute(e, `${baseUrl}/attractions`)}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center space-x-1.5 ${
-                subPage === 'attractions'
+                activeSubPage === 'attractions'
                   ? 'bg-amber-500 text-slate-950 shadow-sm font-bold'
                   : 'text-wf-cream hover:text-white hover:bg-white/10'
               }`}
@@ -365,7 +375,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
               href={`${baseUrl}/restaurants`}
               onClick={(e) => pushRoute(e, `${baseUrl}/restaurants`)}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center space-x-1.5 ${
-                subPage === 'restaurants'
+                activeSubPage === 'restaurants'
                   ? 'bg-amber-500 text-slate-950 shadow-sm font-bold'
                   : 'text-wf-cream hover:text-white hover:bg-white/10'
               }`}
@@ -379,7 +389,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
             href={`${baseUrl}/hotels`}
             onClick={(e) => pushRoute(e, `${baseUrl}/hotels`)}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center space-x-1.5 ${
-              subPage === 'hotels'
+              activeSubPage === 'hotels'
                 ? 'bg-amber-500 text-slate-950 shadow-sm font-bold'
                 : 'text-wf-cream hover:text-white hover:bg-white/10'
             }`}
@@ -393,7 +403,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
       {/* RENDER DEDICATED SUB-PAGE CONTENT */}
 
       {/* 1. OVERVIEW & HISTORY SUB-PAGE (Main Page) */}
-      {subPage === 'overview' && (
+      {activeSubPage === 'overview' && (
         <div className="space-y-10 animate-fade-in">
           {city.history && (
             <section className="space-y-6">

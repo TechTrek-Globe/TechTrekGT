@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { MapPin, Utensils, Bed, ArrowLeft, Bus, Train, ShoppingBag, Sparkles, Landmark, Compass, DollarSign, Info, Map, Clock, Navigation, Gift, Lightbulb, Video, ExternalLink, Thermometer, CreditCard, Award, RefreshCw, AlertTriangle, CalendarX, Coins, Coffee, Sun, Volume2 } from 'lucide-react';
+import { MapPin, Utensils, Bed, ArrowLeft, ArrowRight, Bus, Train, ShoppingBag, Sparkles, Landmark, Compass, DollarSign, Info, Map, Clock, Navigation, Gift, Lightbulb, Video, ExternalLink, Thermometer, CreditCard, Award, RefreshCw, AlertTriangle, CalendarX, Coins, Coffee, Sun, Volume2, Crown, BookOpen, Scroll, Flame, ShieldCheck } from 'lucide-react';
 import { polandJourney } from '../data/poland-2026';
 import { cityImages, marketImages } from '../utils/cityImages';
 import { useExchangeRate } from '../hooks/useExchangeRate';
@@ -396,15 +396,118 @@ export function CityPage({ cityId, subPage = 'overview' }) {
       {subPage === 'overview' && (
         <div className="space-y-10 animate-fade-in">
           {city.history && (
-            <section className="glass-panel p-8 sm:p-10 rounded-3xl border border-amber-500/20 relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-80 h-80 bg-amber-500/5 rounded-full blur-3xl pointer-events-none"></div>
-              <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4 flex items-center space-x-3">
-                <Landmark className="w-7 h-7 text-amber-400" />
-                <span>History of the City</span>
-              </h2>
-              <p className="text-wf-cream text-base sm:text-lg leading-relaxed max-w-4xl">
-                {city.history}
-              </p>
+            <section className="space-y-6">
+              <div className="glass-panel p-6 sm:p-10 rounded-3xl border border-amber-500/30 bg-wf-navy-mid/90 relative overflow-hidden shadow-2xl">
+                <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-amber-500/10 via-amber-500/5 to-transparent rounded-full blur-3xl pointer-events-none"></div>
+                
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+                  <h2 className="text-2xl sm:text-3xl font-black text-white flex items-center space-x-3 tracking-tight">
+                    <Landmark className="w-7 h-7 sm:w-8 sm:h-8 text-amber-400" />
+                    <span>History & Heritage of {city.name}</span>
+                  </h2>
+                  <span className="px-3.5 py-1 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 text-xs font-black uppercase tracking-wider flex items-center space-x-1.5 shadow-sm">
+                    <Crown className="w-3.5 h-3.5" />
+                    <span>Royal Capital & UNESCO Inscription</span>
+                  </span>
+                </div>
+
+                {/* Historical Stats Grid */}
+                {city.historyStats && (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                    {city.historyStats.map((stat, idx) => (
+                      <div key={idx} className="p-3 sm:p-4 rounded-2xl bg-slate-900/80 border border-white/10 hover:border-amber-500/40 transition-colors">
+                        <div className="text-[11px] font-bold uppercase tracking-wider text-amber-400/80 mb-1 flex items-center space-x-1.5">
+                          {stat.icon === 'Crown' && <Crown className="w-3.5 h-3.5" />}
+                          {stat.icon === 'Award' && <Award className="w-3.5 h-3.5" />}
+                          {stat.icon === 'MapPin' && <MapPin className="w-3.5 h-3.5" />}
+                          {stat.icon === 'Landmark' && <Landmark className="w-3.5 h-3.5" />}
+                          <span>{stat.label}</span>
+                        </div>
+                        <div className="text-xs sm:text-sm font-black text-white leading-tight">
+                          {stat.value}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Primary Overview Narrative */}
+                <p className="text-wf-cream text-sm sm:text-base md:text-lg leading-relaxed font-medium">
+                  {city.history}
+                </p>
+              </div>
+
+              {/* Chronological Historical Epochs */}
+              {city.historyEpochs && (
+                <div className="space-y-4 pt-2">
+                  <div className="flex items-center space-x-2 text-amber-400 font-bold text-sm uppercase tracking-wider">
+                    <BookOpen className="w-5 h-5" />
+                    <span>Chronological Journey Through Time</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4">
+                    {city.historyEpochs.map((epoch, idx) => (
+                      <div 
+                        key={idx} 
+                        className="glass-panel p-5 sm:p-7 rounded-2xl border border-white/10 hover:border-amber-500/40 bg-wf-navy/80 backdrop-blur-md transition-all group"
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2.5">
+                          <div className="flex items-center space-x-3">
+                            <span className="w-7 h-7 rounded-full bg-amber-400/20 text-amber-300 font-black text-xs flex items-center justify-center border border-amber-400/40 shrink-0">
+                              {idx + 1}
+                            </span>
+                            <h3 className="text-base sm:text-lg font-black text-white group-hover:text-amber-300 transition-colors">
+                              {epoch.title}
+                            </h3>
+                          </div>
+                          <span className="inline-block px-3 py-1 rounded-full bg-slate-900/90 border border-amber-500/30 text-amber-400 text-xs font-black self-start sm:self-auto shrink-0">
+                            {epoch.era}
+                          </span>
+                        </div>
+
+                        {epoch.subtitle && (
+                          <div className="text-xs sm:text-sm font-semibold text-amber-200/90 mb-2 pl-10">
+                            {epoch.subtitle}
+                          </div>
+                        )}
+
+                        <p className="text-xs sm:text-sm text-slate-200 leading-relaxed pl-10">
+                          {epoch.description}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Legends & Intangible Cultural Traditions */}
+              {city.historyLegends && (
+                <div className="space-y-4 pt-2">
+                  <div className="flex items-center space-x-2 text-amber-400 font-bold text-sm uppercase tracking-wider">
+                    <Sparkles className="w-5 h-5" />
+                    <span>Living Folklore & Cultural Traditions</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {city.historyLegends.map((legend, idx) => (
+                      <div 
+                        key={idx} 
+                        className="glass-panel p-5 sm:p-6 rounded-2xl border border-amber-500/20 hover:border-amber-400/50 bg-wf-navy/90 flex flex-col justify-between transition-all"
+                      >
+                        <div>
+                          <div className="text-2xl mb-2.5">{legend.icon}</div>
+                          <h4 className="text-sm sm:text-base font-black text-white mb-2 leading-snug">
+                            {legend.title}
+                          </h4>
+                          <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-medium">
+                            {legend.description}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </section>
           )}
 

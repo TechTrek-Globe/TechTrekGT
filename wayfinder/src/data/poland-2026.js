@@ -125,7 +125,62 @@ export const polandJourney = {
           tip: 'Visit the Mały Rynek craft corner for small-batch artisanal mead tastings.'
         }
       ],
-      history: 'Kraków was the royal capital of Poland for over 500 years until 1596. Miraculously preserved during WWII, its entire Old Town (Stare Miasto) is a UNESCO World Heritage site boasting Europe\'s largest medieval market square (Rynek Główny), the legendary Wawel Royal Castle, and the historic Jewish Quarter of Kazimierz. Its Christmas Market tradition dates back centuries as a vibrant gathering place for craftsmen across Central Europe.',
+      history: 'Kraków was the royal capital of Poland for over 500 years (1038–1596) and stands as the nation’s cultural soul. Miraculously preserved through the devastation of WWII, its entire Old Town (Stare Miasto) was among the first 12 sites ever inscribed on the UNESCO World Heritage List in 1978. From the mythical dragon caves of Wawel Hill to Europe’s largest medieval market square (Rynek Główny), the historic Jewish Quarter of Kazimierz, and the university where Copernicus studied, Kraków offers an unbroken living bridge across a thousand years of Central European history.',
+      historyStats: [
+        { label: 'Founded', value: '7th Century (Chartered 1257)', icon: 'Landmark' },
+        { label: 'Royal Capital', value: '558 Years (1038–1596)', icon: 'Crown' },
+        { label: 'UNESCO Heritage', value: '1978 (First 12 Worldwide)', icon: 'Award' },
+        { label: 'Market Square', value: '40,000 m² (Europe’s Largest)', icon: 'MapPin' }
+      ],
+      historyEpochs: [
+        {
+          era: '7th – 10th Century',
+          title: 'Mythical Origins & The Wawel Dragon',
+          subtitle: 'The legend of Prince Krakus and Slavic tribal stronghold',
+          description: 'According to Slavic chronicle lore, the city was founded on limestone Wawel Hill by Prince Krakus after the cunning shoemaker Skuba defeated Smok Wawelski (the fire-breathing Wawel dragon) using a sulfur-stuffed sheep. Emerging as a fortified trade settlement along the historic Amber and Silk routes, Kraków quickly became the dominant hub of Lesser Poland (Małopolska).'
+        },
+        {
+          era: '1038 – 1596',
+          title: 'The Royal Golden Age & Jagiellonian Renaissance',
+          subtitle: 'Five centuries as Poland’s imperial capital and academic beacon',
+          description: 'In 1038, King Casimir I made Kraków Poland’s royal capital. Following devastating 13th-century Tatar sieges, the city was rebuilt in 1257 on a grand geometric grid around Rynek Główny. King Casimir III the Great founded Jagiellonian University in 1364—the second-oldest university in Central Europe, where Nicolaus Copernicus studied. Italian Renaissance architects transformed Wawel Castle into one of Europe’s most breathtaking royal courts before King Sigismund III moved the royal court to Warsaw in 1596.'
+        },
+        {
+          era: '1335 – 1939',
+          title: 'Kazimierz & Jewish Golden Age',
+          subtitle: 'Center of European Jewish scholarship and culture',
+          description: 'Founded as a separate royal town in 1335, Kazimierz became a flourishing sanctuary of Jewish commerce, theology, and philosophy under royal protection. Renowned as the home of Rabbi Moses Isserles (the Remuh), Kazimierz evolved into one of the world’s preeminent centers of Ashkenazi Jewish culture, boasting seven historic synagogues, bustling market squares, and a vibrant community that thrived for over six centuries.'
+        },
+        {
+          era: '1939 – 1945',
+          title: 'WWII & The Miraculous Architectural Survival',
+          subtitle: 'Occupied capital, the Podgórze Ghetto, and Oskar Schindler',
+          description: 'During WWII, the Nazi regime designated Kraków as the headquarters of the General Government under Hans Frank, who occupied Wawel Castle. Because the occupiers intended Kraków to serve as an administrative showcase, the historic city was spared the wholesale physical demolition that obliterated Warsaw. Across the river in Podgórze, the Jewish community was forced into a walled ghetto, where Oskar Schindler famously saved over 1,200 Jewish workers at his enamel factory (Emalia).'
+        },
+        {
+          era: '1978 – Present',
+          title: 'UNESCO World Heritage & Papal Legacy',
+          subtitle: 'First global heritage list and intellectual renaissance',
+          description: 'In 1978, UNESCO inscribed Kraków’s Historic Centre on its inaugural World Heritage List—one of the first 12 cultural monuments in the world. That same year, Kraków’s Archbishop Cardinal Karol Wojtyła was elected Pope John Paul II, providing moral momentum for Poland’s Solidarity movement and the eventual peaceful collapse of the Iron Curtain. Today, Kraków stands as Central Europe’s crown jewel of preserved architecture, arts, and winter festivities.'
+        }
+      ],
+      historyLegends: [
+        {
+          title: 'The Hejnał Mariacki (St. Mary’s Bugle Call)',
+          icon: '🎺',
+          description: 'Every single hour, day and night, a live firefighter bugler sounds a five-note melody from the highest tower of St. Mary’s Basilica in all four cardinal directions. The anthem abruptly stops mid-note to honor the legendary 13th-century trumpeter who was struck in the throat by a Mongol archer’s arrow while warning the city of an impending siege.'
+        },
+        {
+          title: 'The Wawel Dragon (Smok Wawelski)',
+          icon: '🐉',
+          description: 'Deep within the limestone caves beneath Wawel Castle (Smocza Jama) once lurked the fearsome Wawel Dragon. Today, a famous bronze dragon statue stands guard at the riverbank at the foot of Wawel Hill, breathing real bursts of fire every few minutes to the delight of visitors and locals.'
+        },
+        {
+          title: 'Szopki Krakowskie (UNESCO Nativity Masterpieces)',
+          icon: '✨',
+          description: 'Kraków’s 19th-century folk tradition of building intricate, jewel-toned, multi-towered miniature nativity palaces made of colored tin foil and wood. Recognized as UNESCO Intangible Cultural Heritage, these astonishing creations incorporate miniature models of St. Mary’s towers, Sukiennice, and Wawel spires and are exhibited around the Main Square each December.'
+        }
+      ],
       transit: {
         airport: 'Direct SKA1 train from Kraków Airport (KRK) to Kraków Główny central station runs every 30 mins (17-min journey, ~17 PLN (~$4.50 USD) ticket).',
         cityTransit: 'Trams & buses managed by ZTP Kraków. Use 24-hr (~17 PLN (~$4.50 USD)) or 72-hr (~50 PLN (~$13.35 USD)) passes. Trams 1, 3, 8, 13, and 24 connect Old Town directly with Kazimierz.',
@@ -348,9 +403,9 @@ export const polandJourney = {
         }
       ],
       imageDetails: {
-        location: "Rynek Główny (Grand Main Square)",
-        landmark: "St. Mary's Basilica & Cloth Hall (Sukiennice)",
-        description: "Europe's largest medieval market square dressed in festive winter illuminations, framed by the twin Gothic towers of St. Mary's Basilica and the historic Cloth Hall."
+        location: "Rynek Główny (Main Market Square)",
+        landmark: "St. Mary's Basilica (Kościół Mariacki)",
+        description: "The iconic twin Gothic towers of St. Mary's Basilica rising above Krakow's historic main square, crowned with its famous golden spire."
       }
     },
     {

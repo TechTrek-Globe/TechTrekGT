@@ -144,7 +144,7 @@ export function PolandLanding() {
                     <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full overflow-hidden border-2 border-amber-400 bg-slate-950 shadow-xl shadow-amber-500/60 relative flex items-center justify-center transition-all group-hover/node:border-amber-300 group-hover/node:ring-4 group-hover/node:ring-amber-500/40">
                       <img 
                         src={cityImages[item.id]} 
-                        alt={`${item.name} timeline node - ${item.id === 'krakow' ? "Rynek Główny & St. Mary's Basilica" : "Christmas Market"}`} 
+                        alt={`${item.name} timeline node - ${item.id === 'krakow' ? "Rynek Główny Christmas Market" : "Christmas Market"}`} 
                         className="w-full h-full object-cover" 
                       />
                     </div>

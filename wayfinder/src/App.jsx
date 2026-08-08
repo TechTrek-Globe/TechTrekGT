@@ -63,7 +63,9 @@ function App() {
       const cityId = parts[0];
       const rawSub = (parts[1] || 'overview').toLowerCase();
       let subPage = 'overview';
-      if (['attractions', 'sights', 'must-see', 'must-see-sights'].includes(rawSub)) {
+      if (['history', 'timeline', 'history-timeline', 'chronological'].includes(rawSub)) {
+        subPage = 'history';
+      } else if (['attractions', 'sights', 'must-see', 'must-see-sights'].includes(rawSub)) {
         subPage = 'attractions';
       } else if (['markets', 'market', 'christmas-markets'].includes(rawSub)) {
         subPage = 'markets';

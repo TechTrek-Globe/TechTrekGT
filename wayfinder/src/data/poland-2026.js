@@ -404,8 +404,8 @@ export const polandJourney = {
       ],
       imageDetails: {
         location: "Rynek Główny (Main Market Square)",
-        landmark: "St. Mary's Basilica (Kościół Mariacki)",
-        description: "The iconic twin Gothic towers of St. Mary's Basilica rising above Krakow's historic main square, crowned with its famous golden spire."
+        landmark: "Christmas Market at Rynek Główny & Sukiennice",
+        description: "Europe's largest medieval market square dressed in festive winter illuminations, wooden artisan stalls, and warm glowing festive lights in historic Kraków."
       }
     },
     {

@@ -212,7 +212,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                       }`}>
                         <img 
                           src={cityImages[item.id]} 
-                          alt={`${item.name} timeline node - ${item.id === 'krakow' ? "Rynek Główny & St. Mary's Basilica" : "Christmas Market"}`} 
+                          alt={`${item.name} timeline node - ${item.id === 'krakow' ? "Rynek Główny Christmas Market" : "Christmas Market"}`} 
                           className="w-full h-full object-cover" 
                         />
                         {isCurrent && (
@@ -293,7 +293,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
         <div className="w-full lg:w-7/12 h-64 sm:h-80 rounded-2xl overflow-hidden relative bg-slate-950 border border-amber-500/30 shadow-inner group shrink-0">
           <img 
             src={cityImages[city.id]} 
-            alt={`${city.name} - ${city.id === 'krakow' ? "Rynek Główny & St. Mary's Basilica" : city.name}`} 
+            alt={`${city.name} - ${city.id === 'krakow' ? "Rynek Główny Christmas Market" : city.name}`} 
             className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105 opacity-90"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-wf-navy via-wf-navy/30 to-transparent"></div>
@@ -520,6 +520,61 @@ export function CityPage({ cityId, subPage = 'overview' }) {
               )}
             </section>
           )}
+
+          {/* Quick-Jump Highlights: Must-See Sights & Top Dining */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {city.mustSee && city.mustSee.length > 0 && (
+              <div className="glass-panel p-6 sm:p-7 rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-wf-navy-mid to-slate-950 shadow-xl flex flex-col justify-between group hover:border-amber-400/50 transition-all">
+                <div className="space-y-2 mb-4">
+                  <div className="flex items-center space-x-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
+                    <Sparkles className="w-4 h-4" />
+                    <span>{city.mustSee.length} Iconic Landmarks</span>
+                  </div>
+                  <h3 className="text-xl sm:text-2xl font-black text-white group-hover:text-amber-300 transition-colors">
+                    Must-See Attractions in {city.name}
+                  </h3>
+                  <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-medium">
+                    Explore curated landmarks including {city.mustSee.slice(0, 3).map(s => s.title || s.name).join(', ')} with costs, hours, and navigation advice.
+                  </p>
+                </div>
+                <a
+                  href={`${baseUrl}/attractions`}
+                  onClick={(e) => pushRoute(e, `${baseUrl}/attractions`)}
+                  className="inline-flex items-center justify-center space-x-2 px-5 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm transition-all transform hover:scale-[1.02] shadow-lg shadow-amber-500/20 cursor-pointer self-start"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span>View All Must-See Sights</span>
+                  <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                </a>
+              </div>
+            )}
+
+            {city.restaurants && city.restaurants.length > 0 && (
+              <div className="glass-panel p-6 sm:p-7 rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-wf-navy-mid to-slate-950 shadow-xl flex flex-col justify-between group hover:border-amber-400/50 transition-all">
+                <div className="space-y-2 mb-4">
+                  <div className="flex items-center space-x-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
+                    <Utensils className="w-4 h-4" />
+                    <span>{city.restaurants.length} Curated Culinary Stops</span>
+                  </div>
+                  <h3 className="text-xl sm:text-2xl font-black text-white group-hover:text-amber-300 transition-colors">
+                    Top Restaurants & Dining in {city.name}
+                  </h3>
+                  <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-medium">
+                    Authentic Polish dining from historic milk bars (Bar Mleczny) to fine dining, pierogi specialists, and cozy winter eateries.
+                  </p>
+                </div>
+                <a
+                  href={`${baseUrl}/restaurants`}
+                  onClick={(e) => pushRoute(e, `${baseUrl}/restaurants`)}
+                  className="inline-flex items-center justify-center space-x-2 px-5 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm transition-all transform hover:scale-[1.02] shadow-lg shadow-amber-500/20 cursor-pointer self-start"
+                >
+                  <Utensils className="w-4 h-4" />
+                  <span>View Top Restaurants & Dining</span>
+                  <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                </a>
+              </div>
+            )}
+          </div>
 
           {/* Transit & Interactive City Map */}
           <section className="space-y-6">
@@ -897,7 +952,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
       )}
 
       {/* 4. TOP RESTAURANTS SUB-PAGE */}
-      {subPage === 'restaurants' && city.restaurants && (
+      {activeSubPage === 'restaurants' && city.restaurants && (
         <div className="space-y-6 animate-fade-in">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <h2 className="text-3xl font-black text-white flex items-center space-x-3">
@@ -935,7 +990,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
       )}
 
       {/* 5. BASE & HOTELS SUB-PAGE */}
-      {subPage === 'hotels' && (
+      {activeSubPage === 'hotels' && (
         <div className="space-y-6 animate-fade-in">
           <div className="glass-panel border-wf-evergreen/30 p-8 rounded-3xl bg-wf-evergreen/5">
             <h3 className="text-2xl font-bold text-white mb-4 flex items-center space-x-3">

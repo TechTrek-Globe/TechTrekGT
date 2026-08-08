@@ -696,7 +696,105 @@ export const polandJourney = {
           title: 'The Lamp Lighter of Ostrów Tumski',
           description: 'Every evening at dusk, a traditional cloaked lamp lighter walks the cobblestones of Cathedral Island to hand-light over 100 historic gas lamps, maintaining a centuries-old unbroken Silesian tradition.'
         }
-      ]
+      ],
+      lgbtq: {
+        title: "LGBTQ+ Traveler's Guide to Wrocław",
+        subtitle: "District of Four Denominations, HAH Wrocław club, progressive cafés, and Lower Silesian pride",
+        overview: "Wrocław is celebrated as one of Poland's most open, progressive, and cosmopolitan university cities. The heart of Wrocław's queer and alternative culture is nestled within the District of Four Denominations (Dzielnica Czterech Wyznań) and the Nadodrze arts quarter. With the high-energy multi-room HAH Wrocław dance club, welcoming bohemian courtyard bars along Ruska street, and the annual Wrocław Equality March (Marsz Równości Wrocław), LGBTQ+ travelers will find a relaxed, warm, and friendly atmosphere.",
+        primaryArea: "District of Four Denominations (Dzielnica Czterech Wyznań)",
+        landmark: "Neon Side Gallery & Ruska 46 Courtyard",
+        landmarkDescription: "A vibrant illuminated retro neon art courtyard on Ruska street serving as Wrocław's progressive cultural and queer nightlife hub.",
+        imageUrl: "/images/wroclaw.png",
+        safetyAndLegal: {
+          legalContext: "Decriminalized nationwide since 1932. Wrocław's City Hall has consistently championed European diversity and anti-discrimination initiatives across Lower Silesia.",
+          safetyRating: "Very Safe & Progressive",
+          pdaAdvice: "Public Displays of Affection: High comfort in the Market Square, District of Four Denominations, and university districts.",
+          helplines: [
+            { name: "Kultura Równości", contact: "Organizers of Wrocław Equality March & Queer Community Center" },
+            { name: "Stowarzyszenie Różowa Szybka", contact: "Lower Silesian LGBTQ+ cultural advocacy" }
+          ]
+        },
+        neighborhoods: [
+          {
+            name: "District of Four Denominations (Dzielnica Czterech Wyznań)",
+            vibe: "Tolerant, historic & vibrant nightlife district",
+            description: "An enclave symbolizing mutual respect with synagogue, Catholic, Orthodox, and Lutheran churches side-by-side, home to Wrocław's top indie cafés and wine bars."
+          },
+          {
+            name: "Ruska 46 & Neon Side Gallery",
+            vibe: "Retro neon courtyard & arts hub",
+            description: "Lively courtyard filled with preserved vintage glowing neon signs, progressive art foundations, and queer-friendly dance clubs."
+          },
+          {
+            name: "Nadodrze Artisan Quarter",
+            vibe: "Artsy, bohemian & indie studios",
+            description: "North of the Oder River, Nadodrze is filled with artist workshops, specialty bakeries, and inclusive community galleries."
+          }
+        ],
+        barsAndClubs: [
+          {
+            name: "HAH Wrocław",
+            address: "ul. Piotra Skargi 18a",
+            type: "Premier Multi-Room LGBTQ+ Nightclub",
+            description: "Wrocław's largest and most famous gay club featuring multiple dance zones (Pop, House, Retro, Darkroom), weekly drag revues, and themed events.",
+            vibe: "High-energy weekend dance club & drag extravaganzas"
+          },
+          {
+            name: "Surowiec",
+            address: "ul. Ruska 46a (Neon Courtyard)",
+            type: "Queer-Friendly Cultural Bar & Dance Spot",
+            description: "Trendy industrial-chic bar under glowing neon signs hosting queer DJ sets, discussions, indie film screenings, and craft beer.",
+            vibe: "Eclectic arts space & vibrant neon courtyard drinks"
+          },
+          {
+            name: "Bułka z Masłem",
+            address: "ul. Pawła Włodkowica 8a",
+            type: "Secret Garden Cocktail Bar",
+            description: "Enchanting leafy garden bar in the Four Denominations district, known for welcoming vibes, cocktails, and delicious bites.",
+            vibe: "Cozy romantic garden atmosphere"
+          }
+        ],
+        cafesAndDining: [
+          {
+            name: "Café Borówka",
+            address: "ul. Świdnicka 38a",
+            type: "Cozy Specialty Coffee & Bakery",
+            description: "Welcoming indie café with specialty pour-overs, artisanal cakes, and an inclusive, warm neighborhood atmosphere.",
+            signature: "Artisanal drip coffees, cheesecake & vegan brownies"
+          },
+          {
+            name: "Pochlebna",
+            address: "ul. św. Antoniego 15",
+            type: "Artisan Organic Bakery & Natural Wines",
+            description: "Progressive sourdough bakery and bistro in the Four Denominations district famous for organic brunches and queer-welcoming staff.",
+            signature: "Sourdough tartines, organic breakfasts & biodynamic wines"
+          }
+        ],
+        communityAndCulture: [
+          {
+            name: "Marsz Równości Wrocław (Wrocław Pride)",
+            type: "Annual Equality March & Festival",
+            description: "Held annually every October, filling Wrocław's Rynek with thousands of participants, live music, and colorful equality floats.",
+            highlight: "Organized by Kultura Równości with a multi-week cultural program"
+          },
+          {
+            name: "Równe Miejsce (Equality Community Center)",
+            type: "LGBTQ+ Community Center & Library",
+            description: "Safe community space run by Kultura Równości hosting support groups, language exchanges, film clubs, and queer literature circles.",
+            highlight: "ul. Kniaziewicza 16 — weekly community events & library"
+          }
+        ],
+        winterExperiences: [
+          {
+            title: "Winter Glow in the Neon Side Gallery",
+            description: "Stroll through the glowing Ruska 46 courtyard under warm neon signs while sipping spiced mulled wine."
+          },
+          {
+            title: "Bridge Illuminations over the Oder",
+            description: "Take an evening winter walk across the Tumski and Sand bridges to enjoy the illuminated Gothic spires."
+          }
+        ]
+      }
     },
     {
       id: 'poznan',
@@ -777,7 +875,83 @@ export const polandJourney = {
           title: 'Lech, Czech, and Rus at Poznań',
           description: 'Slavic folklore tells that three founding brothers - Lech, Czech, and Rus - had been separated for years during their travels across Europe. When they unexpectedly met again by the Warta River, they joyfully cried out "Poznać!" ("To recognize!"), and built a stronghold on that very spot.'
         }
-      ]
+      ],
+      lgbtq: {
+        title: "LGBTQ+ Traveler's Guide to Poznań",
+        subtitle: "Poland's Rainbow Capital, Grupa Stonewall, Lokomotywa Club, and bohemian Jeżyce",
+        overview: "Poznań is widely recognized as Poland's most progressive, open-minded, and LGBTQ+-friendly city. Home to Grupa Stonewall—one of Central Europe's most active and impactful queer organizations—Poznań features queer-owned cafés (Kawiarnia Stonewall), LGBTQ+ health services, the legendary Lokomotywa nightclub, and Poland's most celebrated Poznań Pride Week. Queer travelers will find unmatched visibility, rainbow flags in storefronts, and a relaxed, welcoming metropolitan energy.",
+        primaryArea: "Jeżyce District & Stare Miasto (Old Town)",
+        landmark: "Kawiarnia Stonewall & Plac Wolności",
+        landmarkDescription: "Queer-owned community café and activist hub in Jeżyce, minutes from the lively Christmas market on Plac Wolności.",
+        imageUrl: "/images/poznan.png",
+        safetyAndLegal: {
+          legalContext: "Poznań has long been Poland's leader in municipal anti-discrimination policies, with official mayoral patronage for Pride marches since 2015.",
+          safetyRating: "Highest in Poland (Very Safe & Progressive)",
+          pdaAdvice: "Public Displays of Affection: Very comfortable throughout the city center, Jeżyce, and Old Town.",
+          helplines: [
+            { name: "Grupa Stonewall", contact: "Poland's flagship LGBTQ+ organization & community center" },
+            { name: "Kawiarnia Stonewall", contact: "ul. Za Bramką 1 / ul. Garbary — queer community café" }
+          ]
+        },
+        neighborhoods: [
+          {
+            name: "Jeżyce District",
+            vibe: "Hipster, culinary & progressive queer hub",
+            description: "Poznań's trendiest neighborhood, packed with Art Nouveau tenements, queer-welcoming vegan eateries, specialty coffee, and vintage stores."
+          },
+          {
+            name: "Stare Miasto & Plac Wolności",
+            vibe: "Historic market plaza & nightlife center",
+            description: "Surrounding the Old Market Square and Plac Wolności, home to historic cellar pubs, cocktail lounges, and seasonal festivals."
+          }
+        ],
+        barsAndClubs: [
+          {
+            name: "Lokomotywa Club",
+            address: "ul. Dworcowa 1 (Near Main Station)",
+            type: "Legendary Dedicated LGBTQ+ Nightclub",
+            description: "Poznań's iconic gay dance club with two dance floors, energetic DJ sets, drag shows, and friendly weekend crowds.",
+            vibe: "Classic gay dance floor, drag revues & weekend party vibes"
+          },
+          {
+            name: "Punto Punct Club",
+            address: "ul. Wielka 10",
+            type: "Alternative & Queer Social Lounge",
+            description: "Intimate downtown venue hosting queer dance parties, karaoke nights, and community gatherings.",
+            vibe: "Welcoming lounge & community parties"
+          }
+        ],
+        cafesAndDining: [
+          {
+            name: "Kawiarnia Stonewall",
+            address: "ul. Garbary 67 / ul. Wroniecka",
+            type: "100% Queer-Owned Community Café",
+            description: "Social enterprise café run by Grupa Stonewall where 100% of profits fund local LGBTQ+ mental health and community services.",
+            signature: "Specialty coffee, delicious cakes & rainbow souvenirs"
+          },
+          {
+            name: "Kraszkebab (Jeżyce)",
+            address: "ul. Kraszewskiego 9",
+            type: "Beloved Vegan Culinary Hotspot",
+            description: "Cult plant-based eatery in Jeżyce loved by the queer community for plant-based wraps, craft drinks, and friendly staff.",
+            signature: "Vegan seitan kebabs, fries & homemade sauces"
+          }
+        ],
+        communityAndCulture: [
+          {
+            name: "Poznań Pride Week & Marsz Równości",
+            type: "Poland's Flagship Pride Festival",
+            description: "A massive week-long festival featuring film screenings, panel debates, drag contests, and a Pride march supported by the city council.",
+            highlight: "Organized by Grupa Stonewall with nationwide participation"
+          }
+        ],
+        winterExperiences: [
+          {
+            title: "Coffee & Community at Kawiarnia Stonewall",
+            description: "Warm up after the Christmas market on Plac Wolności with specialty brew at Kawiarnia Stonewall."
+          }
+        ]
+      }
     },
     {
       id: 'torun',
@@ -939,7 +1113,76 @@ export const polandJourney = {
           title: 'The Clockmaker of St. Mary\'s Basilica',
           description: 'In 1464, master craftsman Hans Düringer built the monumental 14-meter astronomical clock inside St. Mary\'s. Legend says the city council, fearing he might build an even more magnificent clock for a rival city, blinded the master. In retribution, Düringer climbed the clock one final time and smashed its delicate gear mechanism before falling to his death.'
         }
-      ]
+      ],
+      lgbtq: {
+        title: "LGBTQ+ Traveler's Guide to Gdańsk & Tricity",
+        subtitle: "Baltic City of Freedom, Tolerado Association, Bunkier Club, and Stare Przedmieście",
+        overview: "As the historic birthplace of Solidarity, Gdańsk proudly embodies the spirit of freedom, tolerance, and open maritime culture. Gdańsk was the first Polish city to adopt a comprehensive Model of Equal Treatment (Model na rzecz Równego Traktowania). Driven by the influential regional advocacy group Tolerado, Gdańsk and the broader Tricity (Sopot, Gdynia) offer an open and progressive coastal haven with vibrant multi-level nightlife at Bunkier Club and welcoming amber-lit cellar taverns along Piwna and Mariacka streets.",
+        primaryArea: "Główne Miasto (Main Town) & Dolne Miasto",
+        landmark: "Bunkier Club & Motława Waterfront",
+        landmarkDescription: "A massive 6-story converted wartime air-raid bunker turned into an eclectic arts venue and inclusive multi-floor nightclub near the Old Town.",
+        imageUrl: "/images/gdansk.png",
+        safetyAndLegal: {
+          legalContext: "Gdańsk pioneered Poland's first municipal Equality Charter and celebrates official City Hall patronage for its Equality March (Trójmiejski Marsz Równości).",
+          safetyRating: "Very Safe & Cosmopolitan",
+          pdaAdvice: "Public Displays of Affection: Relaxed along the Długi Targ, Motława waterfront, and café districts.",
+          helplines: [
+            { name: "Tolerado Association", contact: "Flagship Tricity LGBTQ+ advocacy & community foundation" },
+            { name: "Trójmiejski Marsz Równości", contact: "Annual Tricity Pride March & cultural festival" }
+          ]
+        },
+        neighborhoods: [
+          {
+            name: "Główne Miasto (Main Town)",
+            vibe: "Historic Hanseatic merchant streets & cellar bars",
+            description: "Centered on Piwna, Długa, and Mariacka streets, offering cozy candlelit bars, amber boutiques, and welcoming cafés."
+          },
+          {
+            name: "Stocznia & 100cznia / Ulica Elektryków",
+            vibe: "Post-industrial creative shipyards",
+            description: "Creative shipping-container cultural zone by the historic Gdańsk Shipyards with street art, food trucks, and queer-friendly DJ sets."
+          }
+        ],
+        barsAndClubs: [
+          {
+            name: "Bunkier Club",
+            address: "ul. Olejarna 3",
+            type: "6-Floor Monumental Art & Dance Club",
+            description: "Epic multi-level club housed in a historic WWII bunker. Features art installations, prison-cell lounge booths, drag events, and welcoming queer-inclusive dance floors.",
+            vibe: "Industrial labyrinth, drag revues & eclectic dance floors"
+          },
+          {
+            name: "Red Light Pub",
+            address: "ul. Piwna 28",
+            type: "Artsy Queer-Welcoming Craft Beer Pub",
+            description: "Intimate, atmospheric pub on picturesque Piwna street serving curated Polish craft beers, ciders, and vinyl beats in a cozy red-lit haven.",
+            vibe: "Craft beers, red neon lights & bohemian chats"
+          }
+        ],
+        cafesAndDining: [
+          {
+            name: "Drukarnia Café",
+            address: "ul. Mariacka 36",
+            type: "Specialty Coffee on Amber Street",
+            description: "Stunning specialty coffee spot on historic cobblestone Mariacka street, welcoming travelers with third-wave brews and gourmet toasts.",
+            signature: "Pour-over coffees, artisan cheesecakes & warm winter tea"
+          }
+        ],
+        communityAndCulture: [
+          {
+            name: "Trójmiejski Marsz Równości (Tricity Pride)",
+            type: "Annual Baltic Equality March",
+            description: "One of Poland's largest pride marches, traversing Gdańsk's historic center with wide municipal support and seaside solidarity.",
+            highlight: "Organized annually by Stowarzyszenie Tolerado"
+          }
+        ],
+        winterExperiences: [
+          {
+            title: "Evening Glow on Mariacka & Motława Waterfront",
+            description: "Walk past gargoyle rainspouts and amber stalls along Mariacka street, then cross the footbridge to the illuminated granaries."
+          }
+        ]
+      }
     }
   ],
 

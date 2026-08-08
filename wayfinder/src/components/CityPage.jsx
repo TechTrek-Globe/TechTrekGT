@@ -221,6 +221,17 @@ export function CityPage({ cityId, subPage = 'overview' }) {
   const [hotelTierFilter, setHotelTierFilter] = useState('all');
   const [restaurantCategoryFilter, setRestaurantCategoryFilter] = useState('all');
   const [savedItems, setSavedItems] = useState(new Set());
+  const toggleItinerary = (id) => {
+    setSavedItems((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
   const { isAuthenticated, setIsAuthModalOpen } = useAuth();
   const exchangeRates = useExchangeRate();
   const subPageSectionRef = useRef(null);
@@ -1592,7 +1603,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                         : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10'
                     }`}
                   >
-                    All Options (9)
+                    All Options ({city.krakowHotelsDetailed.length})
                   </button>
                   <button
                     type="button"
@@ -1604,7 +1615,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                     }`}
                   >
                     <Crown className="w-3.5 h-3.5" />
-                    <span>Luxury (3)</span>
+                    <span>Luxury ({city.krakowHotelsDetailed.filter((h) => h.tier === 'luxury').length})</span>
                   </button>
                   <button
                     type="button"
@@ -1616,7 +1627,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                     }`}
                   >
                     <Sparkles className="w-3.5 h-3.5" />
-                    <span>Mid-Range (3)</span>
+                    <span>Mid-Range ({city.krakowHotelsDetailed.filter((h) => h.tier === 'mid').length})</span>
                   </button>
                   <button
                     type="button"
@@ -1628,7 +1639,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                     }`}
                   >
                     <Coins className="w-3.5 h-3.5" />
-                    <span>Cost-Effective (3)</span>
+                    <span>Cost-Effective ({city.krakowHotelsDetailed.filter((h) => h.tier === 'budget').length})</span>
                   </button>
                 </div>
                 <div className="text-xs font-bold text-slate-400 flex items-center space-x-1">

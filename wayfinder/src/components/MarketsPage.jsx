@@ -103,7 +103,15 @@ export function MarketsPage() {
                 <span className="text-amber-400 font-black text-xs uppercase tracking-wider">Stop 0{idx + 1}</span>
               </div>
               <h3 className="text-xl font-bold text-white mb-2">{city.name} Market Rhythm</h3>
-              <p className="text-wf-muted leading-relaxed">{city.marketStrategy}</p>
+              <p className="text-wf-muted leading-relaxed text-sm mb-3">{city.marketStrategy}</p>
+              <a
+                href={`/wayfinder/poland-christmas-2026/cities/${city.id}/markets`}
+                onClick={(e) => pushRoute(e, `/wayfinder/poland-christmas-2026/cities/${city.id}/markets`)}
+                className="inline-flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold transition-all group/btn"
+              >
+                <Compass className="w-3.5 h-3.5 text-amber-400 group-hover/btn:rotate-45 transition-transform" />
+                <span>Explore {city.name} Markets Guide</span>
+              </a>
             </div>
           </div>
         ))}

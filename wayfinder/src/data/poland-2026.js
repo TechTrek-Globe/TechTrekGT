@@ -813,9 +813,18 @@ export const polandJourney = {
         {
           id: 'rynek-glowny',
           name: 'Rynek Główny Main Market',
+          shortName: 'Rynek Główny',
           location: 'Grand Main Square (Old Town)',
           hours: 'Nov 28, 2026 – Jan 1, 2027 | Open 10am-8pm. Early close on Dec 24 (~2pm).',
           address: 'Rynek Główny 1, 31-042 Kraków (Tram: Teatr Bagatela or Dworzec Główny)',
+          vibe: 'Bustling, Grand & Iconic',
+          bestTime: '5:00 PM – 7:30 PM (Dusk illuminations & stage caroling)',
+          highlights: [
+            'Over 100 illuminated wooden chalets surrounding the Renaissance Cloth Hall',
+            'SZOPKI Krakowskie Christmas Crib Competition (First Thursday of Dec)',
+            'Stage caroling and live highlander folk performances daily',
+            'Hot drink mugs require a 30 PLN (~$8.00 USD) cash deposit'
+          ],
           mustTry: ['Oscypek with warm cranberry jam', 'Sizzling Pierogi', 'Grzaniec Galicyjski mulled wine', 'Krakowska Sausage'],
           souvenirs: ['Hand-blown glass ornaments (Bombki)', 'Baltic Amber jewelry', 'Carved wooden kitchenware & boxes', 'Wool slippers'],
           unescoTradition: 'UNESCO Intangible Cultural Heritage: Szopki Krakowskie (Christmas Cribs). The annual competition takes place on the first Thursday of December (Dec 3, 2026) at the Mickiewicz monument, followed by an exhibition at Krzysztofory Palace.',
@@ -826,9 +835,18 @@ export const polandJourney = {
         {
           id: 'maly-rynek',
           name: 'Mały Rynek Craft Corner',
+          shortName: 'Mały Rynek',
           location: 'Small Square (Behind St. Mary\'s)',
           hours: 'Late Nov – Dec 26 | Daily 11:00 AM – 9:00 PM',
           address: 'Mały Rynek, 31-041 Kraków (2-min walk from Main Square)',
+          vibe: 'Cozy, Artisanal & Intimate',
+          bestTime: '4:00 PM – 6:30 PM (Sip hot mead away from Main Square crowds)',
+          highlights: [
+            'Specialist regional honey producers & spiced mead (Miód Pitny)',
+            'Master woodcarvers and handmade wooden toys',
+            'Boutique hand-loomed wool scarves & slippers',
+            'Substantially shorter lines for hot food and drinks'
+          ],
           mustTry: ['Miód Pitny (Hot Spiced Mead)', 'Artisanal Ginger Cookies', 'Regional Honey Tides', 'Highlander Mountain Cheeses'],
           souvenirs: ['Small-batch honeys & beeswax candles', 'Hand-loomed wool scarves', 'Wooden toys', 'Artisan pottery'],
           tips: 'Much quieter and less crowded than the Main Square. Ideal spot to sip hot spiced mead without long lines and sample local organic honey jams.',
@@ -838,20 +856,37 @@ export const polandJourney = {
         {
           id: 'kazimierz-wolnica',
           name: 'Plac Wolnica Market',
+          shortName: 'Plac Wolnica',
           location: 'Kazimierz (Jewish Quarter)',
-          specialty: 'Vintage antiques, indie artisan crafts, craft beer stalls, and gourmet local street food.',
+          vibe: 'Bohemian, Vintage & Eclectic',
+          bestTime: '6:00 PM – 9:00 PM (Combine with Kazimierz nightlife & Zapiekanki)',
+          highlights: [
+            'Bohemian, vintage vinyl & antique collector chalets',
+            'Local craft mulled cider and winter craft beers on tap',
+            'Indie artisan ceramics & handmade jewelry',
+            'Proximity to Plac Nowy late-night Zapiekanki food plaza'
+          ],
           hours: 'Dec 1 – Dec 24 | Daily 12:00 PM – 9:00 PM',
           address: 'Plac Wolnica, 31-060 Kraków (Tram: Plac Wolnica - Trams 1, 6, 8, 10, 13)',
           mustTry: ['Plac Nowy Zapiekanki', 'Craft Mulled Cider', 'Gourmet Pierogi flavors', 'Local Winter Stouts'],
           souvenirs: ['Retro vintage vinyl & antiques', 'Handmade ceramic mugs', 'Eco-friendly beeswax wraps', 'Indie jewelry'],
           tips: 'Located in the historic Jewish Quarter. Combine a market visit with dinner at nearby historic Jewish quarter restaurants, craft stouts, and late-night Zapiekanki at Plac Nowy.',
+          specialty: 'Vintage antiques, indie artisan crafts, craft beer stalls, and gourmet local street food.',
           details: 'Set in the historic heart of Kazimierz, this market offers a bohemian, relaxed holiday atmosphere. Browse vintage vinyl, handmade ceramics, and indie art while sipping hot spiced cider or craft stouts.'
         },
         {
           id: 'podgorze',
           name: 'Rynek Podgórski Fair',
+          shortName: 'Rynek Podgórski',
           location: 'Podgórze District (Across Vistula)',
-          specialty: 'Family-friendly workshops, local bakery treats, caroling performances, and handcrafted wooden ornaments.',
+          vibe: 'Fairytale, Family-Friendly & Charming',
+          bestTime: '4:30 PM – 7:00 PM (Sunset backdrop against St. Joseph Church)',
+          highlights: [
+            'Breathtaking fairytale backdrop of neo-gothic St. Joseph\'s Church',
+            'Vintage 19th-century Victorian carousel for children',
+            'Neighborhood cookie & ornament crafting workshops',
+            'Authentic community choir performances'
+          ],
           hours: 'Dec 5 – Dec 22 | Fri - Sun 11:00 AM – 8:00 PM',
           address: 'Rynek Podgórski, 30-518 Kraków (Tram: Korona or Rynek Podgórski)',
           mustTry: ['Traditional Makowiec (Poppy seed cake)', 'Hot Spiced Apple Cider', 'Warm Pretzels', 'Grilled Highlander Skewers'],

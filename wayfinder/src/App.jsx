@@ -14,18 +14,26 @@ import { PrivateHub } from './components/PrivateHub';
 function App() {
   const [currentPath, setCurrentPath] = useState(window.location.pathname + window.location.search);
 
+  // Always reset to main overview page on browser refresh / initial load
+  useEffect(() => {
+    const mainOverviewPath = '/wayfinder/poland-christmas-2026';
+    const pathOnly = window.location.pathname.split('?')[0].toLowerCase();
+    if (pathOnly !== mainOverviewPath && pathOnly !== `${mainOverviewPath}/`) {
+      window.history.replaceState({}, '', mainOverviewPath);
+      setCurrentPath(mainOverviewPath);
+    }
+    window.scrollTo(0, 0);
+  }, []);
+
   useEffect(() => {
     const handlePopState = () => setCurrentPath(window.location.pathname + window.location.search);
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // Scroll restoration: scroll to top on major route change (unless navigating to a subpage section)
+  // Scroll restoration: scroll to top on route change
   useEffect(() => {
-    const isSubPage = /\/cities\/[^/]+\/(history|markets|attractions|restaurants|hotels|lgbtq|timeline|sights|food|stays)/i.test(currentPath);
-    if (!isSubPage) {
-      window.scrollTo(0, 0);
-    }
+    window.scrollTo(0, 0);
   }, [currentPath]);
 
   const renderRoute = () => {

@@ -220,7 +220,14 @@ export function CityPage({ cityId, subPage = 'overview' }) {
   const [activeEpochTab, setActiveEpochTab] = useState('all');
   const [hotelTierFilter, setHotelTierFilter] = useState('all');
   const [restaurantCategoryFilter, setRestaurantCategoryFilter] = useState('all');
-  const [savedItems, setSavedItems] = useState(new Set());
+  const [savedItems, setSavedItems] = useState(() => {
+    try {
+      const saved = localStorage.getItem('wayfinder_saved_items');
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
   const toggleItinerary = (id) => {
     setSavedItems((prev) => {
       const next = new Set(prev);
@@ -228,6 +235,11 @@ export function CityPage({ cityId, subPage = 'overview' }) {
         next.delete(id);
       } else {
         next.add(id);
+      }
+      try {
+        localStorage.setItem('wayfinder_saved_items', JSON.stringify([...next]));
+      } catch (err) {
+        console.error('Failed to save itinerary item:', err);
       }
       return next;
     });
@@ -254,7 +266,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
   const handleSubPageTabClick = (e, path) => {
     e.preventDefault();
     pushRoute(e, path);
-    setTimeout(scrollToSubPageArea, 30);
+    window.scrollTo({ top: 0, behavior: 'instant' });
   };
 
   const city = polandJourney.route.find(c => c.id === cityId);
@@ -287,11 +299,8 @@ export function CityPage({ cityId, subPage = 'overview' }) {
               : 'overview')))));
 
   useEffect(() => {
-    if (activeSubPage && activeSubPage !== 'overview') {
-      const scrollTimer = setTimeout(scrollToSubPageArea, 60);
-      return () => clearTimeout(scrollTimer);
-    }
-  }, [activeSubPage, cityId]);
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, [cityId, activeSubPage]);
 
   // OpenStreetMap embed bbox for Kraków or generic fallback
   const mapUrl = cityId === 'krakow'
@@ -299,7 +308,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
     : "https://www.openstreetmap.org/export/embed.html?bbox=16.9000%2C51.1000%2C17.1000%2C51.1300&amp;layer=mapnik";
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <div className="w-full max-w-6xl min-w-0 mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
       {/* Navigation Header with Horizontal Trail Track Chart (07:48 Version) */}
       <div className="space-y-4">
         <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
@@ -1106,30 +1115,45 @@ export function CityPage({ cityId, subPage = 'overview' }) {
           </div>
 
           {/* Sticky Sub-Tabs for individual markets */}
-          <div className="sticky top-[112px] z-30 py-2 bg-slate-950/95 backdrop-blur-xl -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 border-b-2 border-emerald-500/30 shadow-2xl">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+          <div className="sticky top-[118px] z-30 py-2 px-3 sm:px-4 rounded-2xl bg-slate-950/95 backdrop-blur-xl border border-emerald-500/30 shadow-2xl transition-all w-full">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               {/* Distinct Section Label */}
-              <div className="flex items-center space-x-2 shrink-0 text-amber-400 font-black text-xs uppercase tracking-wider px-1">
-                <ShoppingBag className="w-4 h-4 text-emerald-400" />
+              <div className="flex items-center space-x-1.5 shrink-0 text-amber-400 font-black text-[11px] sm:text-xs uppercase tracking-wider px-1">
+                <ShoppingBag className="w-3.5 h-3.5 text-emerald-400" />
                 <span>Explore Markets:</span>
               </div>
 
-              {/* Separate, Prominent Pill Buttons */}
-              <div className="flex items-center justify-start overflow-x-auto no-scrollbar gap-2.5 sm:gap-3 py-1 flex-1 min-w-0">
+              {/* Compact Responsive Pill Buttons */}
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                <button
+                  type="button"
+                  onClick={() => setActiveMarketTab('all')}
+                  className={`px-2.5 py-1 rounded-xl font-black text-[11px] sm:text-xs transition-all duration-200 flex items-center space-x-1 whitespace-nowrap shrink-0 border cursor-pointer ${
+                    activeMarketTab === 'all'
+                      ? 'bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 border-amber-300 shadow-md shadow-amber-500/30'
+                      : 'bg-white/5 hover:bg-white/10 text-slate-200 border-white/10'
+                  }`}
+                >
+                  <span>✨</span>
+                  <span>All ({city.markets.length})</span>
+                </button>
+
                 {city.markets.map((market, idx) => {
                   const isActive = activeMarketTab === idx;
+                  const label = market.shortName || market.name.replace(' Main Market', '').replace(' Craft Corner', '').replace(' Fair', '').replace(' Market', '');
                   return (
                     <button
                       key={market.id}
+                      type="button"
                       onClick={() => setActiveMarketTab(idx)}
-                      className={`px-4 py-2 rounded-xl font-extrabold text-xs sm:text-sm transition-all duration-300 flex items-center space-x-2 whitespace-nowrap shrink-0 border ${
+                      className={`px-2.5 py-1 rounded-xl font-bold text-[11px] sm:text-xs transition-all duration-200 flex items-center space-x-1 whitespace-nowrap shrink-0 border cursor-pointer ${
                         isActive
-                          ? 'bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 border-amber-300 shadow-lg shadow-amber-500/30 scale-102 ring-2 ring-amber-400/40'
-                          : 'bg-emerald-950/80 hover:bg-emerald-900/90 text-emerald-100 border-emerald-500/50 hover:border-amber-400/60 shadow-md'
+                          ? 'bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 border-amber-300 shadow-md shadow-amber-500/30 font-black'
+                          : 'bg-emerald-950/70 hover:bg-emerald-900/90 text-emerald-100 border-emerald-500/40 hover:border-amber-400/60 shadow-sm'
                       }`}
                     >
-                      <span className="text-base">{isActive ? '🎄' : '⛺'}</span>
-                      <span>{market.name}</span>
+                      <span>{isActive ? '🎄' : '⛺'}</span>
+                      <span>{label}</span>
                     </button>
                   );
                 })}
@@ -1137,27 +1161,204 @@ export function CityPage({ cityId, subPage = 'overview' }) {
             </div>
           </div>
 
-          {/* Active Market Details Card */}
-          {city.markets[activeMarketTab] && (() => {
+          {/* 1. All Markets Grid View (When 'all' is selected) */}
+          {activeMarketTab === 'all' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fade-in">
+              {city.markets.map((market) => {
+                const marketImg = marketImages[market.id];
+                const mapSearchQuery = encodeURIComponent(`${market.name}, ${market.address || market.location}, ${city.name}, Poland`);
+                const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${mapSearchQuery}`;
+                const mapSearchUrl = `https://www.google.com/maps/search/?api=1&query=${mapSearchQuery}`;
+                const isSaved = savedItems.has(market.id);
+
+                return (
+                  <article
+                    key={market.id}
+                    className="glass-panel rounded-3xl border border-amber-500/30 bg-wf-navy-mid/90 overflow-hidden shadow-xl flex flex-col justify-between group hover:border-amber-400/60 transition-all duration-300"
+                  >
+                    <div>
+                      {/* Image Header */}
+                      <div className="relative w-full h-52 bg-slate-950 overflow-hidden shrink-0">
+                        {marketImg ? (
+                          <img
+                            src={marketImg}
+                            alt={market.name}
+                            className="w-full h-full object-cover object-[center_85%] group-hover:scale-105 transition-transform duration-500"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-gradient-to-br from-slate-900 to-amber-950/40 flex items-center justify-center">
+                            <ShoppingBag className="w-12 h-12 text-amber-400/40" />
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-wf-navy-mid via-transparent to-black/40 pointer-events-none" />
+
+                        {/* Location & Vibe Badges */}
+                        <div className="absolute top-3.5 left-3.5 right-3.5 z-10 flex flex-wrap items-center justify-between gap-1.5">
+                          <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-slate-950/80 backdrop-blur-md border border-amber-400/30 text-amber-300 shadow-md truncate">
+                            📍 {market.location}
+                          </span>
+                          {market.vibe && (
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/20 backdrop-blur-md border border-emerald-400/40 text-emerald-300 shadow-md">
+                              ✨ {market.vibe}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Card Body */}
+                      <div className="p-5 sm:p-6 space-y-4">
+                        <div className="space-y-1">
+                          <h3 className="text-xl font-black text-white group-hover:text-amber-300 transition-colors leading-tight">
+                            {market.name}
+                          </h3>
+                          {market.address && (
+                            <div className="flex items-center space-x-1.5 text-xs text-slate-400 font-semibold">
+                              <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                              <span className="truncate">{market.address}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Operating Hours Bar */}
+                        {market.hours && (
+                          <div className="p-2.5 rounded-xl bg-slate-950/80 border border-white/5 flex items-center space-x-2 text-xs">
+                            <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                            <span className="text-slate-300 font-medium truncate">{market.hours}</span>
+                          </div>
+                        )}
+
+                        {/* Best Time to Visit callout */}
+                        {market.bestTime && (
+                          <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs flex items-center space-x-2">
+                            <Sparkles className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+                            <span className="text-amber-200 font-semibold leading-snug">Best Time: {market.bestTime}</span>
+                          </div>
+                        )}
+
+                        {/* Key Highlights List */}
+                        {market.highlights && market.highlights.length > 0 && (
+                          <div className="p-3 rounded-2xl bg-wf-navy-mid/90 border border-white/10 space-y-1.5">
+                            <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-300 block">
+                              ✦ Key Highlights & Features:
+                            </span>
+                            <ul className="space-y-1 text-xs text-slate-300">
+                              {market.highlights.slice(0, 3).map((item, idx) => (
+                                <li key={idx} className="flex items-start space-x-1.5">
+                                  <span className="text-amber-400 font-bold">•</span>
+                                  <span className="leading-snug">{item}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {/* Must-Try Quick Tags */}
+                        {market.mustTry && (
+                          <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs space-y-1.5">
+                            <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-300 block">
+                              🍢 Must-Try Fares:
+                            </span>
+                            <div className="flex flex-wrap gap-1.5">
+                              {market.mustTry.map((food, idx) => (
+                                <span key={idx} className="px-2 py-0.5 rounded-lg bg-amber-500/20 text-amber-200 text-[11px] font-semibold">
+                                  {food}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Action Footer */}
+                    <div className="bg-slate-950/80 border-t border-white/10 p-3.5 sm:p-4 flex items-center justify-between gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          toggleItinerary(market.id);
+                        }}
+                        className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-1.5 border cursor-pointer ${
+                          isSaved
+                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
+                            : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30 hover:border-amber-500/50'
+                        }`}
+                        title={isSaved ? 'Saved in Itinerary' : 'Add to Itinerary'}
+                      >
+                        {isSaved ? (
+                          <>
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                            <span className="truncate">Saved</span>
+                          </>
+                        ) : (
+                          <>
+                            <Plus className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                            <span className="truncate">Itinerary</span>
+                          </>
+                        )}
+                      </button>
+
+                      <a
+                        href={directionsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 py-2 px-2.5 rounded-xl bg-white/5 hover:bg-sky-500/20 text-slate-300 hover:text-sky-300 border border-white/10 hover:border-sky-500/40 text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn"
+                        title={`Get Directions to ${market.name}`}
+                      >
+                        <Navigation className="w-3.5 h-3.5 text-sky-400 group-hover/btn:text-sky-300 shrink-0" />
+                        <span className="truncate">Directions</span>
+                      </a>
+
+                      <a
+                        href={mapSearchUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 py-2 px-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:border-amber-500/50 text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn"
+                        title={`View ${market.name} on Map`}
+                      >
+                        <Compass className="w-3.5 h-3.5 text-amber-400 group-hover/btn:text-amber-300 shrink-0" />
+                        <span className="truncate">View Map</span>
+                      </a>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+
+          {/* 2. Active Market Deep-Dive Details Card (When individual index is selected) */}
+          {activeMarketTab !== 'all' && city.markets[activeMarketTab] && (() => {
             const currentMarket = city.markets[activeMarketTab];
             const marketImg = marketImages[currentMarket.id];
+            const mapSearchQuery = encodeURIComponent(`${currentMarket.name}, ${currentMarket.address || currentMarket.location}, ${city.name}, Poland`);
+            const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${mapSearchQuery}`;
+            const mapSearchUrl = `https://www.google.com/maps/search/?api=1&query=${mapSearchQuery}`;
+            const isSaved = savedItems.has(currentMarket.id);
 
             return (
-              <div className="glass-panel rounded-3xl border border-amber-500/30 overflow-hidden shadow-2xl bg-amber-500/5 space-y-6">
+              <div className="glass-panel rounded-3xl border border-amber-500/30 overflow-hidden shadow-2xl bg-amber-500/5 space-y-6 animate-fade-in">
                 {/* Market Specific Picture Header */}
                 {marketImg && (
                   <div className="w-full h-64 sm:h-80 relative overflow-hidden group">
                     <img 
                       src={marketImg} 
                       alt={currentMarket.name} 
-                      className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" 
+                      className="w-full h-full object-cover object-[center_85%] transition-transform duration-1000 group-hover:scale-105" 
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-wf-navy via-wf-navy/40 to-transparent"></div>
-                    <div className="absolute bottom-6 left-6 right-6">
-                      <span className="px-3 py-1 rounded-full bg-amber-400/20 border border-amber-400/40 text-amber-300 text-xs font-bold uppercase tracking-wider backdrop-blur-md">
-                        📍 {currentMarket.location}
-                      </span>
-                      <h3 className="text-3xl sm:text-4xl font-black text-white mt-2 drop-shadow-md">
+                    <div className="absolute bottom-6 left-6 right-6 flex flex-col items-start gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="px-3 py-1 rounded-full bg-amber-400/20 border border-amber-400/40 text-amber-300 text-xs font-bold uppercase tracking-wider backdrop-blur-md">
+                          📍 {currentMarket.location}
+                        </span>
+                        {currentMarket.vibe && (
+                          <span className="px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-xs font-bold uppercase tracking-wider backdrop-blur-md">
+                            ✨ {currentMarket.vibe}
+                          </span>
+                        )}
+                      </div>
+                      <h3 className="text-3xl sm:text-4xl font-black text-white drop-shadow-md">
                         {currentMarket.name}
                       </h3>
                     </div>
@@ -1166,7 +1367,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
 
                 <div className="p-6 sm:p-8 space-y-6">
                   {/* Hours & Address quick bar */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {currentMarket.hours && (
                       <div className="p-4 rounded-2xl bg-wf-navy-mid/90 border border-amber-500/20 flex items-start space-x-3">
                         <Clock className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
@@ -1186,6 +1387,16 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                         </div>
                       </div>
                     )}
+
+                    {currentMarket.bestTime && (
+                      <div className="p-4 rounded-2xl bg-wf-navy-mid/90 border border-emerald-500/20 flex items-start space-x-3">
+                        <Sparkles className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                        <div>
+                          <span className="text-emerald-400 text-xs font-bold uppercase tracking-wider block mb-0.5">Best Time to Visit</span>
+                          <span className="text-sm font-semibold text-white">{currentMarket.bestTime}</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Primary Specialty & Atmosphere */}
@@ -1198,6 +1409,24 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                       {currentMarket.details}
                     </p>
                   </div>
+
+                  {/* Comprehensive Highlights Breakdown */}
+                  {currentMarket.highlights && currentMarket.highlights.length > 0 && (
+                    <div className="p-5 rounded-2xl bg-amber-500/10 border border-amber-500/25 space-y-3">
+                      <span className="text-amber-300 text-xs font-extrabold uppercase tracking-wider block flex items-center space-x-2">
+                        <Compass className="w-4 h-4 text-amber-400" />
+                        <span>Key Market Highlights & Unique Experiences</span>
+                      </span>
+                      <ul className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs sm:text-sm text-slate-200">
+                        {currentMarket.highlights.map((h, i) => (
+                          <li key={i} className="flex items-start space-x-2 bg-slate-950/60 p-3 rounded-xl border border-white/5">
+                            <span className="text-amber-400 font-bold">✦</span>
+                            <span className="font-medium leading-snug">{h}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
 
                   {/* Must-Try & Souvenirs Grids */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1257,6 +1486,54 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                       </div>
                     </div>
                   )}
+                </div>
+
+                {/* Market Card Action Bar (Directions, Add to Itinerary, View Map) */}
+                <div className="bg-slate-950/90 border-t border-white/10 p-4 sm:p-6 flex flex-wrap items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={() => toggleItinerary(currentMarket.id)}
+                    className={`flex-1 min-w-[150px] py-3 px-4 rounded-2xl text-xs sm:text-sm font-black transition-all flex items-center justify-center space-x-2 border cursor-pointer ${
+                      isSaved
+                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30 shadow-lg shadow-emerald-950/30'
+                        : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30 hover:border-amber-500/50 shadow-lg'
+                    }`}
+                    title={isSaved ? 'Saved in Itinerary' : 'Add to Itinerary'}
+                  >
+                    {isSaved ? (
+                      <>
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <span>Saved in Itinerary</span>
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="w-4 h-4 text-amber-400 shrink-0" />
+                        <span>Add to Itinerary</span>
+                      </>
+                    )}
+                  </button>
+
+                  <a
+                    href={directionsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 min-w-[150px] py-3 px-4 rounded-2xl bg-white/5 hover:bg-sky-500/20 text-slate-200 hover:text-sky-300 border border-white/10 hover:border-sky-500/40 text-xs sm:text-sm font-black transition-all flex items-center justify-center space-x-2 group/btn shadow-lg"
+                    title={`Get Google Maps Directions to ${currentMarket.name}`}
+                  >
+                    <Navigation className="w-4 h-4 text-sky-400 group-hover/btn:text-sky-300 shrink-0" />
+                    <span>Directions</span>
+                  </a>
+
+                  <a
+                    href={mapSearchUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 min-w-[150px] py-3 px-4 rounded-2xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:border-amber-500/50 text-xs sm:text-sm font-black transition-all flex items-center justify-center space-x-2 group/btn shadow-lg"
+                    title={`View ${currentMarket.name} on Map`}
+                  >
+                    <Compass className="w-4 h-4 text-amber-400 group-hover/btn:text-amber-300 shrink-0" />
+                    <span>View Map</span>
+                  </a>
                 </div>
               </div>
             );
@@ -1325,7 +1602,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
 
           {/* Sticky Category Filter Toolbar (Stays in view while scrolling) */}
           {(city.krakowRestaurantsDetailed || city.krakowDrinksDetailed) && (
-            <div className="sticky top-[104px] z-30 py-2.5 px-3 sm:px-5 rounded-2xl bg-slate-950/95 backdrop-blur-xl border border-amber-500/30 shadow-2xl transition-all">
+            <div className="sticky top-[118px] z-30 py-2.5 px-3 sm:px-5 rounded-2xl bg-slate-950/95 backdrop-blur-xl border border-amber-500/30 shadow-2xl transition-all">
               <DrillDownFilters 
                 activeFilter={restaurantCategoryFilter} 
                 onFilterChange={setRestaurantCategoryFilter} 
@@ -1591,7 +1868,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
 
           {/* Sticky Tier Filter Bar (Stays in view while scrolling hotels) */}
           {city.krakowHotelsDetailed && (
-            <div className="sticky top-[104px] z-30 py-3 px-4 sm:px-6 rounded-2xl bg-slate-950/95 backdrop-blur-xl border border-amber-500/30 shadow-2xl transition-all">
+            <div className="sticky top-[118px] z-30 py-3 px-4 sm:px-6 rounded-2xl bg-slate-950/95 backdrop-blur-xl border border-amber-500/30 shadow-2xl transition-all">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <button

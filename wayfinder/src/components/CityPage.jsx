@@ -1601,21 +1601,23 @@ export function CityPage({ cityId, subPage = 'overview' }) {
 
       {/* 4. FOOD & DRINK SUB-PAGE */}
       {activeSubPage === 'restaurants' && (city.krakowRestaurantsDetailed || city.krakowDrinksDetailed || city.restaurants) && (
-        <div id="restaurants-section" className="space-y-8 animate-fade-in scroll-mt-32">
+        <div id="restaurants-section" className="space-y-4 animate-fade-in scroll-mt-32">
           {/* Header Banner */}
-          <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-amber-500/30 bg-wf-navy-mid/95 relative overflow-hidden shadow-2xl space-y-6">
-            <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-amber-500/15 via-purple-500/10 to-transparent rounded-full blur-3xl pointer-events-none" />
+          <div className="glass-panel p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-amber-500/30 bg-wf-navy-mid/95 relative overflow-hidden shadow-lg">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-amber-500/15 via-purple-500/10 to-transparent rounded-full blur-2xl pointer-events-none" />
 
-            <div className="relative z-10 space-y-2 max-w-3xl">
-              <div className="inline-flex items-center space-x-2 px-3.5 py-1 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 text-xs font-black uppercase tracking-wider shadow-sm">
-                <Utensils className="w-4 h-4" />
-                <Wine className="w-4 h-4 text-purple-300" />
-                <span>Food, Drink & Nightlife Guide</span>
+            <div className="relative z-10 space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 text-[10px] sm:text-xs font-bold uppercase tracking-wider shadow-sm">
+                  <Utensils className="w-3.5 h-3.5" />
+                  <Wine className="w-3.5 h-3.5 text-purple-300" />
+                  <span>Food, Drink & Nightlife Guide</span>
+                </div>
+                <h2 className="text-lg sm:text-xl font-bold text-white leading-snug">
+                  Top Food & Drink Destinations in {city.name}
+                </h2>
               </div>
-              <h2 className="text-3xl sm:text-4xl font-black text-white leading-tight">
-                Top Food & Drink Destinations in {city.name}
-              </h2>
-              <p className="text-sm sm:text-base text-slate-300 font-medium leading-relaxed">
+              <p className="text-xs sm:text-sm text-slate-300 font-medium leading-tight">
                 Handpicked culinary dining, underground craft breweries, historic Polish vodka houses, bohemian cellar bars, steakhouses, and budget milk bars in Kraków.
               </p>
             </div>
@@ -1860,30 +1862,28 @@ export function CityPage({ cityId, subPage = 'overview' }) {
 
       {/* 5. BASE & HOTELS SUB-PAGE */}
       {activeSubPage === 'hotels' && (
-        <div id="hotels-section" className="space-y-8 animate-fade-in scroll-mt-32">
+        <div id="hotels-section" className="space-y-4 animate-fade-in scroll-mt-32">
           {/* Header Banner */}
-          <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-amber-500/30 bg-wf-navy-mid/95 relative overflow-hidden shadow-2xl space-y-6">
-            <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-amber-500/15 via-emerald-500/10 to-transparent rounded-full blur-3xl pointer-events-none" />
+          <div className="glass-panel p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-amber-500/30 bg-wf-navy-mid/95 relative overflow-hidden shadow-lg">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-amber-500/15 via-emerald-500/10 to-transparent rounded-full blur-2xl pointer-events-none" />
 
-            <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-              <div className="space-y-2 max-w-2xl">
-                <div className="inline-flex items-center space-x-2 px-3.5 py-1 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 text-xs font-black uppercase tracking-wider shadow-sm">
-                  <Bed className="w-4 h-4" />
+            <div className="relative z-10 space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 text-[10px] sm:text-xs font-bold uppercase tracking-wider shadow-sm">
+                  <Bed className="w-3.5 h-3.5" />
                   <span>Curated Accommodations</span>
                 </div>
-                <h2 className="text-3xl sm:text-4xl font-black text-white leading-tight">
+                <h2 className="text-lg sm:text-xl font-bold text-white leading-snug">
                   Recommended Lodging in {city.name}
                 </h2>
-                <p className="text-sm sm:text-base text-slate-300 font-medium leading-relaxed">
-                  Strategic hotels selected for proximity to the Christmas Markets, walking distance to historic landmarks, and winter comfort.
-                </p>
-                <div className="pt-1 flex items-center space-x-2 text-xs font-bold text-emerald-300">
-                  <MapPin className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>Recommended Base Area: <span className="text-white underline decoration-emerald-400/50 underline-offset-4">{city.base}</span></span>
-                </div>
               </div>
-
-              {/* Signed-In vs Guest Pricing Banner Removed */}
+              <p className="text-xs sm:text-sm text-slate-300 font-medium leading-tight">
+                Strategic hotels selected for proximity to the Christmas Markets, walking distance to historic landmarks, and winter comfort.
+              </p>
+              <div className="pt-0.5 flex items-center space-x-1.5 text-[11px] sm:text-xs font-bold text-emerald-300">
+                <MapPin className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span>Recommended Base Area: <span className="text-white underline decoration-emerald-400/50 underline-offset-2">{city.base}</span></span>
+              </div>
             </div>
           </div>
 

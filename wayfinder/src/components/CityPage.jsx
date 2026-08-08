@@ -369,7 +369,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
           {city.historyEpochs && city.historyEpochs.length > 0 && (
             <a
               href={`${baseUrl}/history`}
-              onClick={(e) => pushRoute(e, `${baseUrl}/history`)}
+              onClick={(e) => handleSubPageTabClick(e, `${baseUrl}/history`)}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center space-x-1.5 ${
                 activeSubPage === 'history'
                   ? 'bg-amber-500 text-slate-950 shadow-sm font-bold'
@@ -384,7 +384,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
           {city.markets && city.markets.length > 0 && (
             <a
               href={`${baseUrl}/markets`}
-              onClick={(e) => pushRoute(e, `${baseUrl}/markets`)}
+              onClick={(e) => handleSubPageTabClick(e, `${baseUrl}/markets`)}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center space-x-1.5 ${
                 activeSubPage === 'markets'
                   ? 'bg-amber-500 text-slate-950 shadow-sm font-bold'
@@ -399,7 +399,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
           {city.mustSee && city.mustSee.length > 0 && (
             <a
               href={`${baseUrl}/attractions`}
-              onClick={(e) => pushRoute(e, `${baseUrl}/attractions`)}
+              onClick={(e) => handleSubPageTabClick(e, `${baseUrl}/attractions`)}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center space-x-1.5 ${
                 activeSubPage === 'attractions'
                   ? 'bg-amber-500 text-slate-950 shadow-sm font-bold'
@@ -414,7 +414,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
           {city.restaurants && city.restaurants.length > 0 && (
             <a
               href={`${baseUrl}/restaurants`}
-              onClick={(e) => pushRoute(e, `${baseUrl}/restaurants`)}
+              onClick={(e) => handleSubPageTabClick(e, `${baseUrl}/restaurants`)}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center space-x-1.5 ${
                 activeSubPage === 'restaurants'
                   ? 'bg-amber-500 text-slate-950 shadow-sm font-bold'
@@ -428,7 +428,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
 
           <a
             href={`${baseUrl}/hotels`}
-            onClick={(e) => pushRoute(e, `${baseUrl}/hotels`)}
+            onClick={(e) => handleSubPageTabClick(e, `${baseUrl}/hotels`)}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center space-x-1.5 ${
               activeSubPage === 'hotels'
                 ? 'bg-amber-500 text-slate-950 shadow-sm font-bold'
@@ -442,7 +442,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
           {city.lgbtq && (
             <a
               href={`${baseUrl}/lgbtq`}
-              onClick={(e) => pushRoute(e, `${baseUrl}/lgbtq`)}
+              onClick={(e) => handleSubPageTabClick(e, `${baseUrl}/lgbtq`)}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center space-x-1.5 ${
                 activeSubPage === 'lgbtq'
                   ? 'bg-purple-600 text-white shadow-sm font-bold ring-2 ring-purple-400/50'
@@ -516,12 +516,12 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                     Chronological Journey Through Time
                   </h3>
                   <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-medium">
-                    Explore Kraków's thousand-year timeline from Slavic dragon legends to the Royal Golden Age, WWII occupation, and UNESCO inscription.
+                    Explore {city.name}'s thousand-year timeline from ancient foundations to royal golden eras, wartime resilience, and UNESCO heritage.
                   </p>
                 </div>
                 <a
                   href={`${baseUrl}/history`}
-                  onClick={(e) => pushRoute(e, `${baseUrl}/history`)}
+                  onClick={(e) => handleSubPageTabClick(e, `${baseUrl}/history`)}
                   className="inline-flex items-center justify-center space-x-2 px-5 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm transition-all transform hover:scale-[1.02] shadow-lg shadow-amber-500/20 cursor-pointer self-start"
                 >
                   <BookOpen className="w-4 h-4" />
@@ -542,12 +542,12 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                     Must-See Attractions
                   </h3>
                   <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-medium">
-                    Curated landmarks including Wawel Castle, St. Mary's Basilica, Cloth Hall, Schindler's Factory, and Wieliczka Salt Mine.
+                    Curated iconic sights and architectural landmarks in {city.name} selected for winter exploration.
                   </p>
                 </div>
                 <a
                   href={`${baseUrl}/attractions`}
-                  onClick={(e) => pushRoute(e, `${baseUrl}/attractions`)}
+                  onClick={(e) => handleSubPageTabClick(e, `${baseUrl}/attractions`)}
                   className="inline-flex items-center justify-center space-x-2 px-5 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm transition-all transform hover:scale-[1.02] shadow-lg shadow-amber-500/20 cursor-pointer self-start"
                 >
                   <Sparkles className="w-4 h-4" />
@@ -568,12 +568,12 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                     Top Restaurants & Dining
                   </h3>
                   <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-medium">
-                    Authentic Polish dining from Podhale highlander taverns to royal game, pierogarnias, and street food.
+                    Authentic Polish dining, regional delicacies, pierogarnias, and comforting winter culinary destinations in {city.name}.
                   </p>
                 </div>
                 <a
                   href={`${baseUrl}/restaurants`}
-                  onClick={(e) => pushRoute(e, `${baseUrl}/restaurants`)}
+                  onClick={(e) => handleSubPageTabClick(e, `${baseUrl}/restaurants`)}
                   className="inline-flex items-center justify-center space-x-2 px-5 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm transition-all transform hover:scale-[1.02] shadow-lg shadow-amber-500/20 cursor-pointer self-start"
                 >
                   <Utensils className="w-4 h-4" />
@@ -717,7 +717,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
 
       {/* 2. CHRONOLOGICAL HISTORY SUB-PAGE */}
       {activeSubPage === 'history' && city.history && (
-        <div className="space-y-8 animate-fade-in">
+        <div ref={subPageSectionRef} id="chronological-history-section" className="space-y-8 animate-fade-in scroll-mt-32">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <h2 className="text-3xl font-black text-white flex items-center space-x-3">
               <BookOpen className="w-7 h-7 text-amber-400" />
@@ -867,7 +867,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
 
       {/* 2. CHRISTMAS MARKETS SUB-PAGE */}
       {activeSubPage === 'markets' && city.markets && (
-        <div className="space-y-6 animate-fade-in">
+        <div ref={subPageSectionRef} id="markets-section" className="space-y-6 animate-fade-in scroll-mt-32">
           {/* Quick Reference Stats Bar */}
           <QuickReferenceBar city={city} />
 
@@ -1076,7 +1076,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
 
       {/* 3. MUST-SEE ATTRACTIONS SUB-PAGE */}
       {activeSubPage === 'attractions' && city.mustSee && (
-        <div className="space-y-6 animate-fade-in">
+        <div ref={subPageSectionRef} id="attractions-section" className="space-y-6 animate-fade-in scroll-mt-32">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <h2 className="text-3xl font-black text-white flex items-center space-x-3">
               <Sparkles className="w-7 h-7 text-amber-400" />
@@ -1111,7 +1111,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
 
       {/* 4. TOP RESTAURANTS SUB-PAGE */}
       {activeSubPage === 'restaurants' && city.restaurants && (
-        <div className="space-y-6 animate-fade-in">
+        <div ref={subPageSectionRef} id="restaurants-section" className="space-y-6 animate-fade-in scroll-mt-32">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <h2 className="text-3xl font-black text-white flex items-center space-x-3">
               <Utensils className="w-7 h-7 text-amber-400" />
@@ -1149,7 +1149,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
 
       {/* 5. BASE & HOTELS SUB-PAGE */}
       {activeSubPage === 'hotels' && (
-        <div className="space-y-6 animate-fade-in">
+        <div ref={subPageSectionRef} id="hotels-section" className="space-y-6 animate-fade-in scroll-mt-32">
           <div className="glass-panel border-wf-evergreen/30 p-8 rounded-3xl bg-wf-evergreen/5">
             <h3 className="text-2xl font-bold text-white mb-4 flex items-center space-x-3">
               <Bed className="w-6 h-6 text-wf-evergreen" />
@@ -1172,7 +1172,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
 
       {/* 6. LGBTQ+ GUIDE SUB-PAGE */}
       {activeSubPage === 'lgbtq' && city.lgbtq && (
-        <div className="space-y-10 animate-fade-in">
+        <div ref={subPageSectionRef} id="lgbtq-section" className="space-y-10 animate-fade-in scroll-mt-32">
           {/* Header Banner */}
           <div className="glass-panel p-6 sm:p-10 rounded-3xl border border-purple-500/30 bg-wf-navy-mid/95 relative overflow-hidden shadow-2xl space-y-6">
             <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-purple-500/20 via-pink-500/10 to-transparent rounded-full blur-3xl pointer-events-none"></div>

@@ -20,9 +20,12 @@ function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // Scroll restoration: scroll to top on every route change
+  // Scroll restoration: scroll to top on major route change (unless navigating to a subpage section)
   useEffect(() => {
-    window.scrollTo(0, 0);
+    const isSubPage = /\/cities\/[^/]+\/(history|markets|attractions|restaurants|hotels|lgbtq|timeline|sights|food|stays)/i.test(currentPath);
+    if (!isSubPage) {
+      window.scrollTo(0, 0);
+    }
   }, [currentPath]);
 
   const renderRoute = () => {

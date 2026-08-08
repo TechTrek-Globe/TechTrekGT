@@ -206,11 +206,11 @@ export function PolandLanding() {
                 {idx < polandJourney.route.length - 1 && (
                   <div className="hidden md:block absolute top-1/2 -right-4 w-4 h-px bg-white/20 z-10" />
                 )}
-                <div className="h-36 w-full relative overflow-hidden">
+                <div className="h-48 sm:h-52 w-full relative overflow-hidden bg-slate-950">
                   <img 
                     src={cityImages[city.id]} 
                     alt={city.name} 
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
+                    className="w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-105" 
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-wf-navy via-wf-navy/50 to-transparent"></div>
                   

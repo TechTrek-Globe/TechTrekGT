@@ -265,10 +265,9 @@ export function CityPage({ cityId, subPage = 'overview' }) {
 
   const scrollToSubPageArea = () => {
     if (subPageSectionRef.current) {
-      const yOffset = -120; // Accounts for sticky layout top bar (56px) + sticky sub-toolbar (~50px) + breathing space
-      const element = subPageSectionRef.current;
-      const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset;
-      window.scrollTo({ top: Math.max(0, y), behavior: 'instant' });
+      const yOffset = -115; // Accounts for sticky navbar (56px) + sticky sub-toolbar (~48px) + breathing room
+      const y = subPageSectionRef.current.getBoundingClientRect().top + window.pageYOffset + yOffset;
+      window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
     }
   };
 
@@ -276,16 +275,22 @@ export function CityPage({ cityId, subPage = 'overview' }) {
 
   const scrollToCityHeader = () => {
     if (cityHeaderRef.current) {
-      const yOffset = -60; // Offset for the sticky navbar
+      const yOffset = -60; // Offset for sticky navbar
       const y = cityHeaderRef.current.getBoundingClientRect().top + window.pageYOffset + yOffset;
-      window.scrollTo({ top: Math.max(0, y), behavior: 'instant' });
+      window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
     }
   };
 
   const handleSubPageTabClick = (e, path) => {
-    e.preventDefault();
-    pushRoute(e, path);
-    setTimeout(scrollToCityHeader, 30);
+    if (e) e.preventDefault();
+    const isOverview = path === baseUrl || path === `${baseUrl}/` || path.endsWith(`/${cityId}`);
+    window.history.pushState({}, '', path);
+    window.dispatchEvent(new PopStateEvent('popstate'));
+    if (isOverview) {
+      setTimeout(scrollToCityHeader, 30);
+    } else {
+      setTimeout(scrollToSubPageArea, 30);
+    }
   };
 
   const city = polandJourney.route.find(c => c.id === cityId);
@@ -318,12 +323,14 @@ export function CityPage({ cityId, subPage = 'overview' }) {
               : 'overview')))));
 
   React.useLayoutEffect(() => {
-    if (cityHeaderRef.current) {
-      const yOffset = -60; // Offset for the sticky navbar
+    if (activeSubPage !== 'overview') {
+      setTimeout(scrollToSubPageArea, 50);
+    } else if (cityHeaderRef.current) {
+      const yOffset = -60;
       const y = cityHeaderRef.current.getBoundingClientRect().top + window.pageYOffset + yOffset;
       window.scrollTo({ top: Math.max(0, y), behavior: 'instant' });
     }
-  }, [cityId]);
+  }, [cityId, activeSubPage]);
 
   // OpenStreetMap embed bbox for Kraków or generic fallback
   const mapUrl = cityId === 'krakow'
@@ -424,7 +431,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
         <div className="p-1.5 rounded-xl border border-amber-500/20 !bg-slate-900/90 shadow-md flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar">
           <a
             href={baseUrl}
-            onClick={(e) => pushRoute(e, baseUrl)}
+            onClick={(e) => handleSubPageTabClick(e, baseUrl)}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center space-x-1.5 shrink-0 ${
               activeSubPage === 'overview'
                 ? 'bg-amber-500 text-slate-950 shadow-sm font-bold'
@@ -643,11 +650,11 @@ export function CityPage({ cityId, subPage = 'overview' }) {
           </div>
 
           {/* Right Column: Main Picture with Hover Overlay */}
-          <div className="w-full lg:w-7/12 h-64 sm:h-80 rounded-2xl overflow-hidden relative bg-slate-950 border border-amber-500/30 shadow-inner group shrink-0">
+          <div className="w-full lg:w-7/12 h-72 sm:h-96 rounded-2xl overflow-hidden relative bg-slate-950 border border-amber-500/30 shadow-inner group shrink-0">
             <img 
               src={cityImages[city.id]} 
               alt={`${city.name} - ${city.id === 'krakow' ? "Rynek Główny Christmas Market" : city.name}`} 
-              className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105 opacity-90"
+              className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-1000 group-hover:scale-105 opacity-90"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-wf-navy via-wf-navy/30 to-transparent"></div>
 
@@ -681,9 +688,9 @@ export function CityPage({ cityId, subPage = 'overview' }) {
 
 
       {/* RENDER DEDICATED SUB-PAGE CONTENT */}
-
-      {/* 1. OVERVIEW SUB-PAGE (Main Page) */}
-      {activeSubPage === 'overview' && (
+      <div ref={subPageSectionRef} className="space-y-8">
+        {/* 1. OVERVIEW SUB-PAGE (Main Page) */}
+        {activeSubPage === 'overview' && (
         <div className="space-y-10 animate-fade-in">
           {city.history && (
             <section className="glass-panel p-6 sm:p-10 rounded-3xl border border-amber-500/30 bg-wf-navy-mid/90 relative overflow-hidden shadow-2xl space-y-6">
@@ -1201,12 +1208,12 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                   >
                     <div>
                       {/* Image Header */}
-                      <div className="relative w-full h-52 bg-slate-950 overflow-hidden shrink-0">
+                      <div className="relative w-full h-64 sm:h-72 bg-slate-950 overflow-hidden shrink-0">
                         {marketImg ? (
                           <img
                             src={marketImg}
                             alt={market.name}
-                            className="w-full h-full object-cover object-[center_85%] group-hover:scale-105 transition-transform duration-500"
+                            className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
                             loading="lazy"
                           />
                         ) : (
@@ -1363,11 +1370,11 @@ export function CityPage({ cityId, subPage = 'overview' }) {
               <div className="glass-panel rounded-3xl border border-amber-500/30 overflow-hidden shadow-2xl bg-amber-500/5 space-y-6 animate-fade-in">
                 {/* Market Specific Picture Header */}
                 {marketImg && (
-                  <div className="w-full h-64 sm:h-80 relative overflow-hidden group">
+                  <div className="w-full h-72 sm:h-96 relative overflow-hidden group bg-slate-950">
                     <img 
                       src={marketImg} 
                       alt={currentMarket.name} 
-                      className="w-full h-full object-cover object-[center_85%] transition-transform duration-1000 group-hover:scale-105" 
+                      className="w-full h-full object-cover object-center transition-transform duration-1000 group-hover:scale-105" 
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-wf-navy via-wf-navy/40 to-transparent"></div>
                     <div className="absolute bottom-6 left-6 right-6 flex flex-col items-start gap-2">
@@ -2441,6 +2448,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
           )}
         </div>
       )}
+      </div>
     </div>
   );
 }

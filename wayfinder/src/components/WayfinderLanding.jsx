@@ -34,12 +34,12 @@ export function WayfinderLanding() {
             className="group block text-left relative overflow-hidden rounded-3xl glass-panel p-1 hover-lift"
           >
             <div className="absolute inset-0 bg-gradient-to-br from-wf-blue/20 via-amber-900/20 to-wf-navy opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-            <div className="relative h-48 rounded-2xl overflow-hidden mb-4 bg-wf-navy-mid border border-amber-500/20 group-hover:border-amber-500/50 transition-colors duration-500">
+            <div className="relative h-64 sm:h-72 rounded-2xl overflow-hidden mb-4 bg-wf-navy-mid border border-amber-500/20 group-hover:border-amber-500/50 transition-colors duration-500">
               {/* Festive Poland Christmas Market Background */}
               <img 
                 src={polandMarketImg} 
                 alt="Poland Christmas Market" 
-                className="absolute inset-0 w-full h-full object-cover opacity-75 group-hover:scale-105 transition-all duration-700" 
+                className="absolute inset-0 w-full h-full object-cover object-center opacity-85 group-hover:scale-105 transition-all duration-700" 
               />
               <div className="absolute inset-0 bg-gradient-to-t from-wf-navy-mid via-wf-navy-mid/60 to-transparent"></div>
               

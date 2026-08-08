@@ -14,16 +14,6 @@ import { PrivateHub } from './components/PrivateHub';
 function App() {
   const [currentPath, setCurrentPath] = useState(window.location.pathname + window.location.search);
 
-  // Always reset to main overview page on browser refresh / initial load
-  useEffect(() => {
-    const mainOverviewPath = '/wayfinder/poland-christmas-2026';
-    const pathOnly = window.location.pathname.split('?')[0].toLowerCase();
-    if (pathOnly !== mainOverviewPath && pathOnly !== `${mainOverviewPath}/`) {
-      window.history.replaceState({}, '', mainOverviewPath);
-      setCurrentPath(mainOverviewPath);
-    }
-    window.scrollTo(0, 0);
-  }, []);
 
   useEffect(() => {
     const handlePopState = () => setCurrentPath(window.location.pathname + window.location.search);

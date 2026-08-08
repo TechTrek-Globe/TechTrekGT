@@ -91,11 +91,11 @@ export function MarketsPage() {
         {polandJourney.route.filter(c => c.nights > 0).map((city, idx) => (
           <div key={city.id} className="glass-panel p-6 rounded-2xl flex flex-col sm:flex-row sm:items-start space-y-4 sm:space-y-0 sm:space-x-6 relative overflow-hidden group hover:border-amber-500/30 transition-colors border border-white/5">
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-amber-900/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
-            <div className="w-full sm:w-24 sm:h-24 h-32 rounded-xl overflow-hidden shrink-0 shadow-md border border-white/10 relative">
+            <div className="w-full sm:w-64 h-48 sm:h-40 rounded-xl overflow-hidden shrink-0 shadow-md border border-white/10 relative bg-slate-950">
               <img 
                 src={cityImages[city.id]} 
                 alt={city.name} 
-                className="w-full h-full object-cover" 
+                className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500" 
               />
             </div>
             <div className="flex-1 relative z-10">

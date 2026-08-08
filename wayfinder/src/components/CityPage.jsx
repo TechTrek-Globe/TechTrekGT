@@ -169,7 +169,9 @@ export function CityPage({ cityId, subPage = 'overview' }) {
           ? 'markets'
           : (['hotels', 'stays', 'base'].includes(subPage)
             ? 'hotels'
-            : 'overview'))));
+            : (['lgbtq', 'gay', 'queer', 'lgbt', 'lgbtq-guide'].includes(subPage)
+              ? 'lgbtq'
+              : 'overview')))));
 
   useEffect(() => {
     if (activeSubPage && activeSubPage !== 'overview') {

@@ -455,104 +455,159 @@ export const polandJourney = {
         }
       ],
       lgbtq: {
-        title: "LGBTQ+ Traveler's Guide to Kraków",
-        subtitle: "Kazimierz neighborhood hub, inclusive Christmas markets, iconic gay clubs, & welcoming spots",
-        overview: "Kraków is widely celebrated as Poland's cultural and artistic soul, with the bohemian district of Kazimierz acting as the beating heart of its progressive, inclusive, and vibrant LGBTQ+ scene. While Poland as a whole continues its journey toward full legal equality, Kraków is a safe, welcoming, and open destination for queer travelers. With long-running gay clubs, rainbow-friendly cellar bars, inclusive artisan Christmas markets, and a rich history of hosting Poland's oldest Equality March (Marsz Równości), LGBTQ+ visitors will find a warm community atmosphere.",
+        title: "LGBTQ+ Traveler's Guide to Kraków & Kazimierz",
+        subtitle: "Bohemian cellar bars, iconic gay nightlife, inclusive cafés, Equality March history, & queer traveler safety",
+        overview: "Kraków is celebrated as Poland's cultural and artistic soul, with the bohemian district of Kazimierz acting as the beating heart of its progressive, inclusive, and vibrant LGBTQ+ scene. While Poland as a whole continues its journey toward full legal equality, Kraków is an open, welcoming, and safe destination for queer travelers. With long-running gay clubs (Ciemnia, Lindo), rainbow-friendly cellar bars, independent bookstores (Massolit), and a rich 20+ year history of Poland's Equality March (Marsz Równości), LGBTQ+ visitors will find a warm, creative community atmosphere.",
+        primaryArea: "Kazimierz (Bohemian & Queer Quarter)",
+        landmark: "Father Bernatek Footbridge & Plac Wolnica",
+        landmarkDescription: "Historic pedestrian bridge linking Kazimierz to Podgórze with acrobatic sculptures and romantic rainbow nighttime illuminations over the Vistula River.",
         imageUrl: "/images/krakow/lgbtq-kazimierz.jpg",
-        areas: [
+        safetyAndLegal: {
+          legalContext: "Homosexuality has been legal in Poland since 1932 (with an equal age of consent of 15, one of Europe's earliest decriminalizations). In 2021, the Małopolska Regional Assembly and Kraków officially repealed controversial symbolic anti-LGBT declarations, ensuring a welcoming environment for all visitors.",
+          safetyRating: "Safe & Welcoming in Central Districts",
+          pdaAdvice: "Public Displays of Affection: Kazimierz and Old Town are progressive, relaxed, and safe for queer couples. Standard mild discretion is recommended in outer residential suburbs and late-night public transit.",
+          helplines: [
+            { name: "Stowarzyszenie Queerowy Maj", contact: "Organizers of Kraków Pride / Marsz Równości & Queer May arts" },
+            { name: "Fundacja Równość.org.pl", contact: "Regional southern Poland LGBTQ+ advocacy & support" },
+            { name: "Lambda Polska Helpline", contact: "+48 22 628 52 22 (National LGBTQ+ crisis & community support)" }
+          ]
+        },
+        neighborhoods: [
           {
             name: "Kazimierz (Historic Jewish Quarter)",
             vibe: "Kraków's premier bohemian & queer district",
-            description: "Cobblestone streets packed with inclusive cellar pubs, vintage art galleries, and rainbow-welcoming cafes centered around Plac Wolnica and Józefa Street."
+            description: "Centered around Plac Nowy, Józefa Street, and Plac Wolnica, Kazimierz is packed with rainbow-friendly cellar pubs, vintage art galleries, and candle-lit cafes with zero-judgment atmospheres."
           },
           {
             name: "Father Bernatek Footbridge (Kładka Ojca Bernatka)",
-            vibe: "Romantic river crossing & rainbow lights",
-            description: "Pedestrian bridge linking Kazimierz to Podgórze, featuring acrobat sculptures and colorful rainbow illuminations reflecting over the Vistula River."
+            vibe: "Romantic rainbow-illuminated river crossing",
+            description: "Pedestrian bridge spanning the Vistula River between Kazimierz and Podgórze, adorned with balancing acrobat sculptures and vibrant rainbow night lights reflecting on the water."
           },
           {
-            name: "Sławkowska & Old Town Cellar Bars",
-            vibe: "Late-night Old Town cocktail enclave",
-            description: "Tucked away inside historic medieval brick vaults right off Rynek Główny, offering friendly international queer crowds."
-          }
-        ],
-        christmasMarkets: [
-          {
-            name: "Plac Wolnica Christmas Market (Kazimierz)",
-            type: "Neighborhood & Artisan Fair",
-            vibe: "Alternative, inclusive, & artisan-focused",
-            description: "Set in Kazimierz in front of St. Joseph's Church, this is Kraków's most LGBTQ+-welcoming neighborhood holiday market. Features local queer ceramic artists, indie craft stalls, vegan pierogi, artisanal spiced mead, and cozy community workshops.",
-            location: "Plac Wolnica, Kazimierz"
-          },
-          {
-            name: "Mały Rynek Craft & Indie Corner",
-            type: "Craft & Artisan Corner",
-            vibe: "Relaxed indie vibe right off the main square",
-            description: "A quieter, highly inclusive market plaza offering small-batch mead tastings, hand-poured soy candles, and warm bakery stands.",
-            location: "Mały Rynek (Behind St. Mary's)"
+            name: "Old Town Cellars (Stare Miasto)",
+            vibe: "Medieval vaulted cocktail bars & late-night hubs",
+            description: "Historic brick-vaulted cellar venues tucked along Sławkowska, św. Krzyża, and Szewska streets hosting welcoming international crowds."
           }
         ],
         barsAndClubs: [
           {
             name: "Ciemnia Club",
-            address: "ul. Koletek 6 (Kazimierz)",
-            type: "Iconic Gay Nightclub & Lounge",
-            description: "Kraków's longest-running and famous gay club. Features energetic DJ dance floors, themed drag performances, darkroom lounges, and an inclusive international crowd.",
-            vibe: "High-energy dance floors & drag shows (Open till late)"
-          },
-          {
-            name: "Piękny Pies (Beautiful Dog)",
-            address: "ul. Bożego Ciała 9 (Kazimierz)",
-            type: "Bohemian & Queer-Friendly Pub",
-            description: "Legendary nocturnal hangout beloved by local artists, writers, and the LGBTQ+ community. Known for eclectic music, late-night drinks, and zero-judgment atmosphere.",
-            vibe: "Bohemian pub & late-night community favorite"
+            address: "ul. Koletek 6 (Between Kazimierz & Wawel)",
+            type: "Dedicated Gay Dance Club & Darkroom",
+            description: "Kraków's premier and longest-running gay club. Features energetic DJ dance floors, weekend drag revues, darkroom lounge areas, and a lively international crowd.",
+            vibe: "High-energy dance floors, drag shows, open till 5-6 AM"
           },
           {
             name: "Lindo Bar",
             address: "ul. Sławkowska 11 (Old Town)",
-            type: "Gay & Inclusive Cocktail Bar",
-            description: "Warm, cozy cocktail bar located right in Old Town. Friendly bartenders, rainbow decor, and great cocktails make it ideal for pre-club evening drinks.",
-            vibe: "Cozy cocktail lounge & social drinks"
+            type: "Gay Cocktail Lounge & Social Bar",
+            description: "Warm, stylish gay cocktail bar housed in historic Old Town cellar arches. Famous for rainbow-hued cocktails, friendly bartenders, and a convivial social vibe ideal for pre-club drinks.",
+            vibe: "Cozy cellar cocktail lounge & friendly mingling"
+          },
+          {
+            name: "Piękny Pies (Beautiful Dog)",
+            address: "ul. Bożego Ciała 9 (Kazimierz)",
+            type: "Bohemian Dive & Queer Artist Haunt",
+            description: "Legendary nocturnal hangout beloved by Kraków's queer artists, writers, and musicians. Famous for zero-judgment atmosphere, eclectic music, and late-night drinks.",
+            vibe: "Artsy bohemian dive & late-night community favorite"
+          },
+          {
+            name: "Hevre",
+            address: "ul. Meiselsa 18 (Kazimierz)",
+            type: "Bohemian Cultural Bar & Drag Brunches",
+            description: "A breathtaking 19th-century former prayer house turned high-ceilinged bohemian bar and cultural space. Regularly hosts queer arts events, drag brunches, and vibrant weekend DJ sets.",
+            vibe: "Majestic frescos, craft cocktails & queer arts events"
+          },
+          {
+            name: "Klub RE",
+            address: "ul. św. Krzyża 4 (Old Town)",
+            type: "Indie Cellar Bar & Arts Community",
+            description: "Classic indie student and queer-welcoming bar with a leafy courtyard and subterranean brick cellar hosting alternative gigs, acoustic sets, and cheap beers.",
+            vibe: "Relaxed alternative/indie cellar vibe"
+          },
+          {
+            name: "Klub Pozytywka",
+            address: "ul. Bożego Ciała 12 (Kazimierz)",
+            type: "Artsy Cocktail Bar & Queer Social Hub",
+            description: "Charming, eccentric Kazimierz venue with vintage decor, craft cocktails, board games, and an openly inclusive crowd.",
+            vibe: "Intimate, eccentric & warm social setting"
           }
         ],
-        restaurants: [
+        cafesAndDining: [
           {
-            name: "Alchemia",
-            address: "ul. Estery 5 (Plac Nowy, Kazimierz)",
-            type: "Bohemian Café & Candle-lit Dining",
-            description: "Iconic Kazimierz institution featuring antique candle-lit wooden tables, wardrobe doors leading to hidden rooms, and a notoriously welcoming queer-friendly vibe.",
-            signature: "Mulled wine, craft beers, hearty Polish pierogi & breakfasts"
+            name: "Massolit Books & Café",
+            address: "ul. Felicjanek 4 (Near Old Town & Planty)",
+            type: "Progressive Bookstore, Queer Literature & Café",
+            description: "Famous English-language bookstore and bakery with a dedicated section for LGBTQ+ literature, gender theory, and queer Polish history. Delicious homemade vegan pies and artisan coffee.",
+            signature: "LGBTQ+ book collections, vegan apple crumble & specialty drip coffee"
+          },
+          {
+            name: "Karma Coffee Roasters",
+            address: "ul. Krupnicza 12 & ul. św. Wawrzyńca 9 (Kazimierz)",
+            type: "Specialty Coffee Roastery & Queer-Friendly Staff",
+            description: "Kraków's premier specialty coffee house. Openly queer-friendly staff and clientele, plant-based bakery treats, and third-wave espresso in a sunlit minimalist space.",
+            signature: "Pour-over single origin coffees, sourdough toasts & vegan treats"
+          },
+          {
+            name: "Ranny Ptaszek (Early Bird)",
+            address: "ul. Augustiańska 5 (Kazimierz)",
+            type: "Pink-Tiled Queer-Welcoming Breakfast Bar",
+            description: "Cheery, bubblegum-pink breakfast bar run by a progressive mother-daughter duo. Extremely popular with local LGBTQ+ couples and foodies for wholesome, colorful morning meals.",
+            signature: "Sabich with baked eggplant, warm shakshuka & homemade pickles"
+          },
+          {
+            name: "Hummus Amamelus",
+            address: "ul. św. Sebastiana 16 (Kazimierz)",
+            type: "Vegetarian/Vegan Middle Eastern Sanctuary",
+            description: "Cozy, queer-inclusive dining space serving authentic velvety hummus platters, warm za'atar pita, and seasonal soups in a warm neighborhood setting.",
+            signature: "Silky warm hummus bowls, roasted beets, and homemade lemonade"
           },
           {
             name: "Zazie Bistro",
             address: "ul. Józefa 15 (Kazimierz)",
-            type: "Inclusive French-Polish Bistro",
-            description: "Michelin Bib Gourmand rated bistro located on vibrant Józefa Street. Super welcoming to queer couples with intimate, romantic winter cellar seating.",
-            signature: "Coq au vin, French onion soup, beef bourguignon & natural wines"
-          },
-          {
-            name: "Youmiko Vegan Sushi & Hummus Amamelus",
-            address: "Kazimierz District",
-            type: "Plant-Based & Queer-Inclusive Eateries",
-            description: "Trendy, progressive Kazimierz eateries with 100% plant-based menus and strong LGBTQ+ community support.",
-            signature: "Artisanal vegan sushi omakase & warm pita platters"
+            type: "Romantic Michelin Bib Gourmand French Bistro",
+            description: "Romantic, candle-lit cellar bistro on bustling Józefa street, praised for welcoming queer couples with superb French-Polish gastronomy and curated natural wines.",
+            signature: "Coq au vin, beef bourguignon, French onion soup & natural wines"
           }
         ],
-        mustSee: [
+        communityAndCulture: [
           {
-            name: "Father Bernatek Footbridge (Rainbow Illuminations)",
-            description: "Walk across the footbridge at dusk under falling snow to admire the romantic acrobat sculptures and vibrant rainbow night lights reflecting over the Vistula River.",
-            tip: "Great photo spot linking Kazimierz with Podgórze."
+            name: "Marsz Równości (Equality March Kraków)",
+            type: "Living Pride Heritage & Activism",
+            description: "Held annually every May since 2004, Kraków's Equality March is one of Poland's oldest and most resilient pride demonstrations, marching past Wawel Castle and through Rynek Główny.",
+            highlight: "Annual Queer May Arts Festival & community pop-up exhibitions"
           },
           {
-            name: "Marsz Równości (Equality March) Heritage",
-            description: "Kraków has hosted Poland's Equality March since 2004, fostering a resilient, proud local activist community celebrated during annual Queer May festivals.",
-            tip: "Check local Kazimierz community boards for winter queer art pop-ups."
+            name: "Spółdzielnia Ogniwo (Ogniwo Cooperative)",
+            type: "Queer Activist Social Center & Bookshop",
+            description: "Independent social cooperative and progressive bookshop in Podgórze hosting queer reading clubs, feminist discussions, film screenings, and activist solidarity gatherings.",
+            highlight: "ul. Smolki 11a — community library, vegan coffee & open meetings"
           },
           {
-            name: "Józefa Street Vintage & Art Galleries",
-            description: "Stroll along Józefa Street in Kazimierz to browse independent queer art galleries, handmade winter scarves, and vintage vinyl shops.",
-            tip: "Stop by Galeria LueLue for retro Kraków prints."
+            name: "MOCAK (Museum of Contemporary Art)",
+            type: "Queer Contemporary Art Exhibitions",
+            description: "World-class contemporary art museum in Zabłocie frequently featuring groundbreaking Polish LGBTQ+ artists exploring gender identity, post-communist expression, and human rights.",
+            highlight: "ul. Lipowa 4 — temporary exhibitions & progressive art bookstore"
+          },
+          {
+            name: "Sauna Kazimierz",
+            type: "Gay Men's Sauna & Relaxation Club",
+            description: "Long-running men's wellness and social venue located in Kazimierz on Dietla street, featuring dry Finnish sauna, steam baths, relaxation cabins, and a bar.",
+            highlight: "ul. Dietla 75 (Kazimierz) — open daily from late afternoon"
+          }
+        ],
+        winterExperiences: [
+          {
+            title: "Romantic Evening Walk: Father Bernatek Footbridge",
+            description: "Cross the illuminated footbridge at dusk under falling snow to see the acrobat sculptures and rainbow lights glowing against the winter river."
+          },
+          {
+            title: "Artisan Holiday Shopping on Józefa Street",
+            description: "Kazimierz's Józefa street is home to independent queer-welcoming jewelry designers, vintage fashion boutiques, and handmade Polish ceramics."
+          },
+          {
+            title: "Cozy Cellar Pub Crawl in Kazimierz",
+            description: "Escape the winter freeze by ducking into candle-lit brick basements like Alchemia and Piękny Pies for warm spiced Polish honey mead (Grzany Miód)."
           }
         ]
       },

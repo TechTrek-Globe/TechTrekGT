@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MapPin, Utensils, Bed, ArrowLeft, ArrowRight, Bus, Train, ShoppingBag, Sparkles, Landmark, Compass, DollarSign, Info, Map, Clock, Navigation, Gift, Lightbulb, Video, ExternalLink, Thermometer, CreditCard, Award, RefreshCw, AlertTriangle, CalendarX, Coins, Coffee, Sun, Volume2, Crown, BookOpen, Scroll, Flame, ShieldCheck, Heart } from 'lucide-react';
+import { MapPin, Utensils, Bed, ArrowLeft, ArrowRight, Bus, Train, ShoppingBag, Sparkles, Landmark, Compass, DollarSign, Info, Map, Clock, Navigation, Gift, Lightbulb, Video, ExternalLink, Thermometer, CreditCard, Award, RefreshCw, AlertTriangle, CalendarX, Coins, Coffee, Sun, Volume2, Crown, BookOpen, Scroll, Flame, ShieldCheck, Heart, Users, Phone } from 'lucide-react';
 import { polandJourney } from '../data/poland-2026';
-import { cityImages, marketImages } from '../utils/cityImages';
+import { cityImages, marketImages, attractionImages } from '../utils/cityImages';
 import { useExchangeRate } from '../hooks/useExchangeRate';
 import { MustSeeCard } from './MustSeeCard';
 
@@ -273,82 +273,157 @@ export function CityPage({ cityId, subPage = 'overview' }) {
       </div>
 
       {/* 2-Column Split Hero Section: Left (High-level details & text), Right (Main Picture) */}
-      <div className="glass-panel p-4 sm:p-6 rounded-3xl border border-amber-500/30 bg-wf-navy-mid/95 shadow-2xl flex flex-col lg:flex-row items-stretch gap-6">
-        {/* Left Column: High-Level Details & Text */}
-        <div className="w-full lg:w-5/12 flex flex-col justify-between space-y-4">
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-bold uppercase tracking-wider flex items-center space-x-1">
-                <span>🎄</span>
-                <span>Christmas Market Destination</span>
-              </span>
-              <span className="px-3 py-1 rounded-full bg-slate-800/80 border border-white/10 text-wf-cream text-xs font-medium">
-                {city.nights > 0 ? `${city.nights} Nights` : 'Day Stop'}
-              </span>
+      {activeSubPage === 'lgbtq' && city.lgbtq ? (
+        <div className="glass-panel p-4 sm:p-6 rounded-3xl border border-purple-500/30 bg-wf-navy-mid/95 shadow-2xl flex flex-col lg:flex-row items-stretch gap-6">
+          {/* Left Column: LGBTQ+ Specific Focus & Text */}
+          <div className="w-full lg:w-5/12 flex flex-col justify-between space-y-4">
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="px-3 py-1 rounded-full bg-purple-500/20 border border-purple-400/40 text-purple-300 text-xs font-black uppercase tracking-wider flex items-center space-x-1.5 shadow-sm">
+                  <Heart className="w-3.5 h-3.5 text-pink-400 fill-pink-400/40" />
+                  <span>LGBTQ+ Traveler's Guide</span>
+                </span>
+                <span className="px-3 py-1 rounded-full bg-slate-800/80 border border-white/10 text-wf-cream text-xs font-medium">
+                  {city.name} & Kazimierz
+                </span>
+              </div>
+
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white flex items-center space-x-3 tracking-tight">
+                <Heart className="w-8 h-8 sm:w-10 sm:h-10 text-pink-400 fill-pink-400/30 shrink-0" />
+                <span>LGBTQ+ {city.name}</span>
+              </h1>
+
+              <div className="space-y-1.5 pt-1">
+                <div className="text-purple-300 text-xs font-bold uppercase tracking-widest">Queer Atmosphere & Culture</div>
+                <p className="text-xs sm:text-sm text-slate-200 leading-relaxed font-medium">
+                  {city.lgbtq.subtitle}
+                </p>
+              </div>
+
+              <div className="text-xs text-pink-400/90 font-semibold flex items-center space-x-1.5 pt-1">
+                <MapPin className="w-3.5 h-3.5" />
+                <span>{city.lgbtq.primaryArea || "Kazimierz Bohemian & Queer Quarter"}</span>
+              </div>
             </div>
 
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white flex items-center space-x-3 tracking-tight">
-              <MapPin className="w-8 h-8 sm:w-10 sm:h-10 text-amber-400 shrink-0" />
-              <span>{city.name}</span>
-            </h1>
+            <div className="pt-3 border-t border-white/10 text-xs text-slate-300 flex items-center space-x-2">
+              <span className="font-bold text-purple-300">Key Hub:</span>
+              <span className="truncate">{city.lgbtq.landmark || "Father Bernatek Footbridge & Plac Wolnica"}</span>
+            </div>
+          </div>
 
-            <div className="space-y-1.5 pt-1">
-              <div className="text-amber-300 text-xs font-bold uppercase tracking-widest">Trip Focus</div>
-              <p className="text-xs sm:text-sm text-slate-200 leading-relaxed font-medium">
-                {city.focus}
+          {/* Right Column: LGBTQ+ Photo with Hover Overlay */}
+          <div className="w-full lg:w-7/12 h-64 sm:h-80 rounded-2xl overflow-hidden relative bg-slate-950 border border-purple-500/30 shadow-inner group shrink-0">
+            <img 
+              src={attractionImages['lgbtq-kazimierz.jpg'] || city.lgbtq.imageUrl || cityImages[city.id]} 
+              alt={`LGBTQ+ ${city.name} - ${city.lgbtq.landmark || "Father Bernatek Footbridge"}`} 
+              className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105 opacity-90"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-wf-navy via-wf-navy/30 to-transparent"></div>
+
+            {/* Detailed Hover Overlay */}
+            <div className="absolute inset-0 bg-wf-navy/95 p-6 sm:p-8 flex flex-col justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 backdrop-blur-md z-20">
+              <div className="text-xs sm:text-sm font-bold uppercase tracking-wider text-pink-400 mb-1 flex items-center space-x-2">
+                <MapPin className="w-4 h-4" />
+                <span>{city.lgbtq.primaryArea || "Kazimierz District"}</span>
+              </div>
+              <div className="text-xl sm:text-2xl font-black text-white mb-2">
+                🏳️‍🌈 {city.lgbtq.landmark || "Father Bernatek Footbridge"}
+              </div>
+              <p className="text-xs sm:text-sm text-purple-100/90 leading-relaxed">
+                {city.lgbtq.landmarkDescription || city.lgbtq.overview}
               </p>
             </div>
 
-            {city.imageDetails?.location && (
-              <div className="text-xs text-amber-400/90 font-semibold flex items-center space-x-1.5 pt-1">
-                <MapPin className="w-3.5 h-3.5" />
-                <span>{city.imageDetails.location}</span>
+            <div className="absolute bottom-4 left-4 right-4 group-hover:opacity-0 transition-opacity duration-300">
+              <div className="bg-slate-950/80 backdrop-blur-md px-3.5 py-2 rounded-xl border border-white/10 shadow-lg flex items-center justify-between">
+                <span className="text-xs text-purple-300 font-bold flex items-center space-x-1.5 truncate">
+                  <span>🏳️‍🌈</span>
+                  <span className="truncate">{city.lgbtq.landmark || "Father Bernatek Footbridge & Kazimierz"}</span>
+                </span>
+                <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold shrink-0 ml-2">Hover for details</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="glass-panel p-4 sm:p-6 rounded-3xl border border-amber-500/30 bg-wf-navy-mid/95 shadow-2xl flex flex-col lg:flex-row items-stretch gap-6">
+          {/* Left Column: High-Level Details & Text */}
+          <div className="w-full lg:w-5/12 flex flex-col justify-between space-y-4">
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-bold uppercase tracking-wider flex items-center space-x-1">
+                  <span>🎄</span>
+                  <span>Christmas Market Destination</span>
+                </span>
+                <span className="px-3 py-1 rounded-full bg-slate-800/80 border border-white/10 text-wf-cream text-xs font-medium">
+                  {city.nights > 0 ? `${city.nights} Nights` : 'Day Stop'}
+                </span>
+              </div>
+
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white flex items-center space-x-3 tracking-tight">
+                <MapPin className="w-8 h-8 sm:w-10 sm:h-10 text-amber-400 shrink-0" />
+                <span>{city.name}</span>
+              </h1>
+
+              <div className="space-y-1.5 pt-1">
+                <div className="text-amber-300 text-xs font-bold uppercase tracking-widest">Trip Focus</div>
+                <p className="text-xs sm:text-sm text-slate-200 leading-relaxed font-medium">
+                  {city.focus}
+                </p>
+              </div>
+
+              {city.imageDetails?.location && (
+                <div className="text-xs text-amber-400/90 font-semibold flex items-center space-x-1.5 pt-1">
+                  <MapPin className="w-3.5 h-3.5" />
+                  <span>{city.imageDetails.location}</span>
+                </div>
+              )}
+            </div>
+
+            {city.imageDetails?.landmark && (
+              <div className="pt-3 border-t border-white/10 text-xs text-slate-300 flex items-center space-x-2">
+                <span className="font-bold text-amber-300">Key Landmark:</span>
+                <span className="truncate">{city.imageDetails.landmark}</span>
               </div>
             )}
           </div>
 
-          {city.imageDetails?.landmark && (
-            <div className="pt-3 border-t border-white/10 text-xs text-slate-300 flex items-center space-x-2">
-              <span className="font-bold text-amber-300">Key Landmark:</span>
-              <span className="truncate">{city.imageDetails.landmark}</span>
-            </div>
-          )}
-        </div>
+          {/* Right Column: Main Picture with Hover Overlay */}
+          <div className="w-full lg:w-7/12 h-64 sm:h-80 rounded-2xl overflow-hidden relative bg-slate-950 border border-amber-500/30 shadow-inner group shrink-0">
+            <img 
+              src={cityImages[city.id]} 
+              alt={`${city.name} - ${city.id === 'krakow' ? "Rynek Główny Christmas Market" : city.name}`} 
+              className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105 opacity-90"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-wf-navy via-wf-navy/30 to-transparent"></div>
 
-        {/* Right Column: Main Picture with Hover Overlay */}
-        <div className="w-full lg:w-7/12 h-64 sm:h-80 rounded-2xl overflow-hidden relative bg-slate-950 border border-amber-500/30 shadow-inner group shrink-0">
-          <img 
-            src={cityImages[city.id]} 
-            alt={`${city.name} - ${city.id === 'krakow' ? "Rynek Główny Christmas Market" : city.name}`} 
-            className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105 opacity-90"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-wf-navy via-wf-navy/30 to-transparent"></div>
-
-          {/* Detailed Hover Overlay */}
-          <div className="absolute inset-0 bg-wf-navy/95 p-6 sm:p-8 flex flex-col justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 backdrop-blur-md z-20">
-            <div className="text-xs sm:text-sm font-bold uppercase tracking-wider text-amber-400 mb-1 flex items-center space-x-2">
-              <MapPin className="w-4 h-4" />
-              <span>{city.imageDetails?.location}</span>
+            {/* Detailed Hover Overlay */}
+            <div className="absolute inset-0 bg-wf-navy/95 p-6 sm:p-8 flex flex-col justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 backdrop-blur-md z-20">
+              <div className="text-xs sm:text-sm font-bold uppercase tracking-wider text-amber-400 mb-1 flex items-center space-x-2">
+                <MapPin className="w-4 h-4" />
+                <span>{city.imageDetails?.location}</span>
+              </div>
+              <div className="text-xl sm:text-2xl font-black text-white mb-2">
+                🏛️ {city.imageDetails?.landmark}
+              </div>
+              <p className="text-xs sm:text-sm text-amber-100/90 leading-relaxed">
+                {city.imageDetails?.description}
+              </p>
             </div>
-            <div className="text-xl sm:text-2xl font-black text-white mb-2">
-              🏛️ {city.imageDetails?.landmark}
-            </div>
-            <p className="text-xs sm:text-sm text-amber-100/90 leading-relaxed">
-              {city.imageDetails?.description}
-            </p>
-          </div>
 
-          <div className="absolute bottom-4 left-4 right-4 group-hover:opacity-0 transition-opacity duration-300">
-            <div className="bg-slate-950/80 backdrop-blur-md px-3.5 py-2 rounded-xl border border-white/10 shadow-lg flex items-center justify-between">
-              <span className="text-xs text-amber-300 font-bold flex items-center space-x-1.5 truncate">
-                <span>🏛️</span>
-                <span className="truncate">{city.imageDetails?.landmark}</span>
-              </span>
-              <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold shrink-0 ml-2">Hover for details</span>
+            <div className="absolute bottom-4 left-4 right-4 group-hover:opacity-0 transition-opacity duration-300">
+              <div className="bg-slate-950/80 backdrop-blur-md px-3.5 py-2 rounded-xl border border-white/10 shadow-lg flex items-center justify-between">
+                <span className="text-xs text-amber-300 font-bold flex items-center space-x-1.5 truncate">
+                  <span>🏛️</span>
+                  <span className="truncate">{city.imageDetails?.landmark}</span>
+                </span>
+                <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold shrink-0 ml-2">Hover for details</span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Top Sub-Header Toolbar (Opens Dedicated Sub-Pages) */}
       <div className="sticky top-14 z-40 py-2 bg-slate-950/95 backdrop-blur-xl border-b border-amber-500/20 w-full">
@@ -1191,61 +1266,98 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                 </p>
               </div>
 
-              {city.lgbtq.imageUrl && (
-                <div className="w-full md:w-80 h-48 rounded-2xl overflow-hidden border border-white/10 shadow-xl shrink-0 relative group">
+              {(attractionImages['lgbtq-kazimierz.jpg'] || city.lgbtq.imageUrl) && (
+                <div className="w-full md:w-80 h-48 rounded-2xl overflow-hidden border border-purple-500/30 shadow-xl shrink-0 relative group">
                   <img
-                    src={city.lgbtq.imageUrl}
-                    alt="LGBTQ+ Kraków Kazimierz"
+                    src={attractionImages['lgbtq-kazimierz.jpg'] || city.lgbtq.imageUrl}
+                    alt={`LGBTQ+ ${city.name} - ${city.lgbtq.landmark || "Father Bernatek Footbridge"}`}
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent"></div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/20 to-transparent"></div>
                   <div className="absolute bottom-2.5 left-3 text-[11px] font-bold text-white flex items-center space-x-1.5">
                     <MapPin className="w-3.5 h-3.5 text-pink-400" />
-                    <span>Father Bernatek Footbridge & Kazimierz</span>
+                    <span>{city.lgbtq.landmark || "Father Bernatek Footbridge & Kazimierz"}</span>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Overview Box */}
+            {/* Overview Narrative */}
             <div className="p-5 rounded-2xl bg-slate-950/70 border border-white/10 space-y-2 relative z-10">
               <h3 className="text-xs font-black uppercase tracking-wider text-purple-400 flex items-center space-x-1.5">
-                <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                <span>Atmosphere, Safety & Legal Context</span>
+                <Heart className="w-4 h-4 text-pink-400 fill-pink-400/40" />
+                <span>Culture, Atmosphere & Community</span>
               </h3>
               <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-medium">
                 {city.lgbtq.overview}
               </p>
             </div>
+
+            {/* Safety & Legal Context Card */}
+            {city.lgbtq.safetyAndLegal && (
+              <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-br from-slate-950/90 to-purple-950/40 border border-purple-500/30 space-y-4 relative z-10 shadow-lg">
+                <div className="flex items-center space-x-2 text-emerald-400 font-black text-xs uppercase tracking-wider">
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>Safety, Laws & Traveler Practicalities</span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                  <div className="p-3.5 rounded-xl bg-slate-900/80 border border-white/5 space-y-1.5">
+                    <div className="font-bold text-emerald-300 flex items-center space-x-1.5">
+                      <span>⚖️ Legal Equality & History</span>
+                    </div>
+                    <p className="text-slate-300 leading-relaxed">
+                      {city.lgbtq.safetyAndLegal.legalContext}
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-slate-900/80 border border-white/5 space-y-1.5">
+                    <div className="font-bold text-sky-300 flex items-center space-x-1.5">
+                      <span>🤝 Public Displays of Affection (PDA) & Safety</span>
+                    </div>
+                    <p className="text-slate-300 leading-relaxed">
+                      {city.lgbtq.safetyAndLegal.pdaAdvice}
+                    </p>
+                  </div>
+                </div>
+
+                {city.lgbtq.safetyAndLegal.helplines && (
+                  <div className="pt-3 border-t border-white/10 flex flex-wrap items-center gap-3">
+                    <span className="text-[11px] font-bold text-purple-300 uppercase tracking-wider flex items-center space-x-1">
+                      <Phone className="w-3.5 h-3.5" />
+                      <span>Community Resources:</span>
+                    </span>
+                    {city.lgbtq.safetyAndLegal.helplines.map((hl, hIdx) => (
+                      <div key={hIdx} className="px-3 py-1 rounded-lg bg-purple-900/40 border border-purple-500/30 text-[11px] text-slate-200">
+                        <span className="font-bold text-pink-300">{hl.name}:</span> <span className="text-slate-300">{hl.contact}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
-          {/* 1. Queer-Welcoming Christmas Markets */}
-          {city.lgbtq.christmasMarkets && city.lgbtq.christmasMarkets.length > 0 && (
+          {/* 1. Key Districts & Queer Geography */}
+          {city.lgbtq.neighborhoods && city.lgbtq.neighborhoods.length > 0 && (
             <section className="space-y-4">
               <div className="flex items-center space-x-2 text-pink-400 font-black text-xs uppercase tracking-wider">
-                <ShoppingBag className="w-4 h-4" />
-                <span>Inclusive Christmas Markets & Craft Fairs</span>
+                <Compass className="w-4 h-4" />
+                <span>Queer Districts & Enclaves</span>
               </div>
-              <h3 className="text-2xl font-black text-white">Queer-Welcoming Holiday Markets</h3>
+              <h3 className="text-2xl font-black text-white">Neighborhoods & Iconic Hubs</h3>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {city.lgbtq.christmasMarkets.map((market, idx) => (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {city.lgbtq.neighborhoods.map((area, idx) => (
                   <div key={idx} className="glass-panel p-6 rounded-3xl border border-pink-500/30 bg-wf-navy-mid/90 hover:border-pink-400/60 transition-all flex flex-col justify-between shadow-xl">
                     <div className="space-y-3">
                       <div className="flex items-start justify-between gap-2">
-                        <h4 className="text-xl font-black text-white">{market.name}</h4>
-                        <span className="px-2.5 py-1 rounded-full bg-pink-500/20 border border-pink-400/30 text-pink-300 text-[10px] font-black uppercase tracking-wider shrink-0">
-                          {market.type}
-                        </span>
+                        <h4 className="text-lg font-black text-white">{area.name}</h4>
                       </div>
-                      <div className="text-xs font-semibold text-purple-300">✨ {market.vibe}</div>
+                      <div className="text-xs font-semibold text-pink-300">✨ {area.vibe}</div>
                       <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-medium">
-                        {market.description}
+                        {area.description}
                       </p>
-                    </div>
-                    <div className="pt-3 mt-4 border-t border-white/10 text-xs font-semibold text-amber-300 flex items-center space-x-1.5">
-                      <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                      <span>{market.location}</span>
                     </div>
                   </div>
                 ))}
@@ -1289,17 +1401,17 @@ export function CityPage({ cityId, subPage = 'overview' }) {
             </section>
           )}
 
-          {/* 3. Inclusive Dining */}
-          {city.lgbtq.restaurants && city.lgbtq.restaurants.length > 0 && (
+          {/* 3. Inclusive Dining & Cafés */}
+          {city.lgbtq.cafesAndDining && city.lgbtq.cafesAndDining.length > 0 && (
             <section className="space-y-4">
               <div className="flex items-center space-x-2 text-amber-400 font-black text-xs uppercase tracking-wider">
                 <Utensils className="w-4 h-4" />
                 <span>Culinary & Café Culture</span>
               </div>
-              <h3 className="text-2xl font-black text-white">LGBTQ+-Friendly Restaurants & Cafés</h3>
+              <h3 className="text-2xl font-black text-white">LGBTQ+-Friendly Cafés, Bakeries & Dining</h3>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {city.lgbtq.restaurants.map((rest, idx) => (
+                {city.lgbtq.cafesAndDining.map((rest, idx) => (
                   <div key={idx} className="glass-panel p-6 rounded-3xl border border-amber-500/30 bg-wf-navy-mid/90 hover:border-amber-400/60 transition-all flex flex-col justify-between shadow-xl">
                     <div className="space-y-3">
                       <div className="flex items-start justify-between gap-2">
@@ -1312,7 +1424,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                         {rest.description}
                       </p>
                       <div className="p-2.5 rounded-xl bg-slate-950/80 border border-white/5 text-xs text-amber-200">
-                        🍽️ <span className="font-bold text-amber-300">Highlights:</span> {rest.signature}
+                        🍽️ <span className="font-bold text-amber-300">Signature:</span> {rest.signature}
                       </div>
                     </div>
                     <div className="pt-3 mt-4 border-t border-white/10 text-xs font-medium text-slate-400 flex items-center space-x-1.5">
@@ -1325,28 +1437,60 @@ export function CityPage({ cityId, subPage = 'overview' }) {
             </section>
           )}
 
-          {/* 4. Must-See & Cultural Highlights */}
-          {city.lgbtq.mustSee && city.lgbtq.mustSee.length > 0 && (
+          {/* 4. Living Culture, Activism & Wellness */}
+          {city.lgbtq.communityAndCulture && city.lgbtq.communityAndCulture.length > 0 && (
             <section className="space-y-4">
               <div className="flex items-center space-x-2 text-sky-400 font-black text-xs uppercase tracking-wider">
                 <Landmark className="w-4 h-4" />
-                <span>Queer Culture & Landmarks</span>
+                <span>Queer Culture, Activism & Community</span>
               </div>
-              <h3 className="text-2xl font-black text-white">Must-See LGBTQ+ Highlights</h3>
+              <h3 className="text-2xl font-black text-white">Community Spaces & Cultural Heritage</h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {city.lgbtq.communityAndCulture.map((spot, idx) => (
+                  <div key={idx} className="glass-panel p-6 rounded-3xl border border-sky-500/30 bg-wf-navy-mid/90 space-y-3 shadow-xl flex flex-col justify-between">
+                    <div className="space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <h4 className="text-lg font-black text-white flex items-center space-x-2">
+                          <span className="text-pink-400">♥</span>
+                          <span>{spot.name}</span>
+                        </h4>
+                        <span className="px-2 py-0.5 rounded-lg bg-sky-500/20 border border-sky-400/30 text-sky-300 text-[10px] font-bold shrink-0">
+                          {spot.type}
+                        </span>
+                      </div>
+                      <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-medium">
+                        {spot.description}
+                      </p>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-sky-950/60 border border-sky-500/20 text-xs font-semibold text-sky-200">
+                      💡 <span className="text-sky-300 font-bold">Highlight:</span> {spot.highlight}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* 5. Queer Winter & Holiday Experiences */}
+          {city.lgbtq.winterExperiences && city.lgbtq.winterExperiences.length > 0 && (
+            <section className="space-y-4">
+              <div className="flex items-center space-x-2 text-amber-300 font-black text-xs uppercase tracking-wider">
+                <Sparkles className="w-4 h-4" />
+                <span>Winter & Holiday Strolls</span>
+              </div>
+              <h3 className="text-2xl font-black text-white">Queer-Welcoming Winter Experiences</h3>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {city.lgbtq.mustSee.map((spot, idx) => (
-                  <div key={idx} className="glass-panel p-6 rounded-3xl border border-sky-500/30 bg-wf-navy-mid/90 space-y-3 shadow-xl">
+                {city.lgbtq.winterExperiences.map((item, idx) => (
+                  <div key={idx} className="glass-panel p-6 rounded-3xl border border-amber-500/30 bg-wf-navy-mid/90 space-y-3 shadow-xl">
                     <h4 className="text-base font-black text-white flex items-center space-x-2">
-                      <span className="text-pink-400">♥</span>
-                      <span>{spot.name}</span>
+                      <span className="text-amber-400">❄️</span>
+                      <span>{item.title}</span>
                     </h4>
                     <p className="text-xs text-slate-300 leading-relaxed font-medium">
-                      {spot.description}
+                      {item.description}
                     </p>
-                    <div className="p-2 rounded-xl bg-sky-950/60 border border-sky-500/20 text-[11px] font-semibold text-sky-200">
-                      💡 <span className="text-sky-300 font-bold">Local Tip:</span> {spot.tip}
-                    </div>
                   </div>
                 ))}
               </div>

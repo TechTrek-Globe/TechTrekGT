@@ -1,25 +1,25 @@
-import krakowImg from '../assets/krakow-rynek-glowny.png';
-import wroclawImg from '../assets/wroclaw.png';
-import poznanImg from '../assets/poznan.png';
-import torunImg from '../assets/torun.png';
-import gdanskImg from '../assets/gdansk.png';
+import krakowImg from '../assets/krakow/markets/krakow-rynek-glowny.png';
+import wroclawImg from '../assets/wroclaw/markets/wroclaw.png';
+import poznanImg from '../assets/poznan/markets/poznan.png';
+import torunImg from '../assets/torun/markets/torun.png';
+import gdanskImg from '../assets/gdansk/markets/gdansk.png';
 
-import krakowRynekGlownyImg from '../assets/krakow-rynek-glowny.png';
-import krakowMalyRynekImg from '../assets/krakow-maly-rynek.png';
-import krakowPlacWolnicaImg from '../assets/krakow-plac-wolnica.png';
-import krakowRynekPodgorskiImg from '../assets/krakow-rynek-podgorski.png';
+import krakowRynekGlownyImg from '../assets/krakow/markets/krakow-rynek-glowny.png';
+import krakowMalyRynekImg from '../assets/krakow/markets/krakow-maly-rynek.png';
+import krakowPlacWolnicaImg from '../assets/krakow/markets/krakow-plac-wolnica.png';
+import krakowRynekPodgorskiImg from '../assets/krakow/markets/krakow-rynek-podgorski.png';
 
-import krakowWawelImg from '../assets/attractions/krakow/wawel-castle.jpg';
-import krakowStMarysImg from '../assets/attractions/krakow/st-marys-basilica.jpg';
-import krakowClothHallImg from '../assets/attractions/krakow/cloth-hall.jpg';
-import krakowKazimierzImg from '../assets/attractions/krakow/kazimierz.jpg';
-import krakowPlantyImg from '../assets/attractions/krakow/planty-park-barbican.jpg';
-import krakowAuschwitzImg from '../assets/attractions/krakow/auschwitz-birkenau.jpg';
-import krakowWieliczkaImg from '../assets/attractions/krakow/wieliczka-salt-mine.jpg';
-import krakowSchindlerImg from '../assets/attractions/krakow/schindler-factory.jpg';
-import krakowThermalBathsImg from '../assets/attractions/krakow/thermal-baths.jpg';
-import krakowWalkingTourImg from '../assets/attractions/krakow/walking-tour.jpg';
-import krakowLgbtqKazimierzImg from '../assets/attractions/krakow/lgbtq-kazimierz.jpg';
+import krakowWawelImg from '../assets/krakow/attractions/wawel-castle.jpg';
+import krakowStMarysImg from '../assets/krakow/attractions/st-marys-basilica.jpg';
+import krakowClothHallImg from '../assets/krakow/attractions/cloth-hall.jpg';
+import krakowKazimierzImg from '../assets/krakow/attractions/kazimierz.jpg';
+import krakowPlantyImg from '../assets/krakow/attractions/planty-park-barbican.jpg';
+import krakowAuschwitzImg from '../assets/krakow/attractions/auschwitz-birkenau.jpg';
+import krakowWieliczkaImg from '../assets/krakow/attractions/wieliczka-salt-mine.jpg';
+import krakowSchindlerImg from '../assets/krakow/attractions/schindler-factory.jpg';
+import krakowThermalBathsImg from '../assets/krakow/attractions/thermal-baths.jpg';
+import krakowWalkingTourImg from '../assets/krakow/attractions/walking-tour.jpg';
+import krakowLgbtqKazimierzImg from '../assets/krakow/attractions/lgbtq-kazimierz.jpg';
 
 export const cityImages = {
   krakow: krakowImg,

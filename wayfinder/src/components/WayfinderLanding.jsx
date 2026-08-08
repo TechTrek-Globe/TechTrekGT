@@ -1,6 +1,6 @@
 import React from 'react';
 import { Compass, Map, ArrowRight } from 'lucide-react';
-import polandMarketImg from '../assets/poland-market.png';
+import polandMarketImg from '../assets/general/markets/poland-market.png';
 
 export function WayfinderLanding() {
   const pushRoute = (e, path) => {

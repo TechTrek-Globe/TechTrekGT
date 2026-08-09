@@ -1290,31 +1290,33 @@ export function CityPage({ cityId, subPage = 'overview' }) {
 
                     {/* Action Footer */}
                     <div className="bg-slate-950/80 border-t border-white/10 p-3.5 sm:p-4 flex items-center justify-between gap-2 shrink-0">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          toggleItinerary(market.id);
-                        }}
-                        className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-1.5 border cursor-pointer ${
-                          isSaved
-                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
-                            : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30 hover:border-amber-500/50'
-                        }`}
-                        title={isSaved ? 'Saved in Itinerary' : 'Add to Itinerary'}
-                      >
-                        {isSaved ? (
-                          <>
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                            <span className="truncate">Saved</span>
-                          </>
-                        ) : (
-                          <>
-                            <Plus className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                            <span className="truncate">Itinerary</span>
-                          </>
-                        )}
-                      </button>
+                      {isAuthenticated && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            toggleItinerary(market.id);
+                          }}
+                          className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-1.5 border cursor-pointer ${
+                            isSaved
+                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
+                              : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30 hover:border-amber-500/50'
+                          }`}
+                          title={isSaved ? 'Saved in Itinerary' : 'Add to Itinerary'}
+                        >
+                          {isSaved ? (
+                            <>
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                              <span className="truncate">Saved</span>
+                            </>
+                          ) : (
+                            <>
+                              <Plus className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                              <span className="truncate">Itinerary</span>
+                            </>
+                          )}
+                        </button>
+                      )}
 
                       <a
                         href={directionsUrl}
@@ -1509,28 +1511,30 @@ export function CityPage({ cityId, subPage = 'overview' }) {
 
                 {/* Market Card Action Bar (Directions, Add to Itinerary, View Map) */}
                 <div className="bg-slate-950/90 border-t border-white/10 p-4 sm:p-6 flex flex-wrap items-center justify-between gap-3">
-                  <button
-                    type="button"
-                    onClick={() => toggleItinerary(currentMarket.id)}
-                    className={`flex-1 min-w-[150px] py-3 px-4 rounded-2xl text-xs sm:text-sm font-black transition-all flex items-center justify-center space-x-2 border cursor-pointer ${
-                      isSaved
-                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30 shadow-lg shadow-emerald-950/30'
-                        : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30 hover:border-amber-500/50 shadow-lg'
-                    }`}
-                    title={isSaved ? 'Saved in Itinerary' : 'Add to Itinerary'}
-                  >
-                    {isSaved ? (
-                      <>
-                        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                        <span>Saved in Itinerary</span>
-                      </>
-                    ) : (
-                      <>
-                        <Plus className="w-4 h-4 text-amber-400 shrink-0" />
-                        <span>Add to Itinerary</span>
-                      </>
-                    )}
-                  </button>
+                  {isAuthenticated && (
+                    <button
+                      type="button"
+                      onClick={() => toggleItinerary(currentMarket.id)}
+                      className={`flex-1 min-w-[150px] py-3 px-4 rounded-2xl text-xs sm:text-sm font-black transition-all flex items-center justify-center space-x-2 border cursor-pointer ${
+                        isSaved
+                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30 shadow-lg shadow-emerald-950/30'
+                          : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30 hover:border-amber-500/50 shadow-lg'
+                      }`}
+                      title={isSaved ? 'Saved in Itinerary' : 'Add to Itinerary'}
+                    >
+                      {isSaved ? (
+                        <>
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                          <span>Saved in Itinerary</span>
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="w-4 h-4 text-amber-400 shrink-0" />
+                          <span>Add to Itinerary</span>
+                        </>
+                      )}
+                    </button>
+                  )}
 
                   <a
                     href={directionsUrl}
@@ -1765,35 +1769,37 @@ export function CityPage({ cityId, subPage = 'overview' }) {
 
                       {/* Footer Actions */}
                       <div className="bg-slate-950/80 border-t border-white/10 p-3.5 sm:p-4 flex flex-wrap items-center justify-between gap-2 shrink-0">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            setSavedItems(prev => {
-                              const newSet = new Set(prev);
-                              if (newSet.has(item.id)) newSet.delete(item.id);
-                              else newSet.add(item.id);
-                              return newSet;
-                            });
-                          }}
-                          className={`flex-1 py-2 px-2.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 border ${
-                            savedItems.has(item.id)
-                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
-                              : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30 hover:border-amber-500/50'
-                          }`}
-                        >
-                          {savedItems.has(item.id) ? (
-                            <>
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                              <span className="truncate">Saved</span>
-                            </>
-                          ) : (
-                            <>
-                              <Plus className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                              <span className="truncate">Itinerary</span>
-                            </>
-                          )}
-                        </button>
+                        {isAuthenticated && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setSavedItems(prev => {
+                                const newSet = new Set(prev);
+                                if (newSet.has(item.id)) newSet.delete(item.id);
+                                else newSet.add(item.id);
+                                return newSet;
+                              });
+                            }}
+                            className={`flex-1 py-2 px-2.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 border ${
+                              savedItems.has(item.id)
+                                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
+                                : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30 hover:border-amber-500/50'
+                            }`}
+                          >
+                            {savedItems.has(item.id) ? (
+                              <>
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                                <span className="truncate">Saved</span>
+                              </>
+                            ) : (
+                              <>
+                                <Plus className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                                <span className="truncate">Itinerary</span>
+                              </>
+                            )}
+                          </button>
+                        )}
 
                         <a
                           href={item.websiteUrl || `https://www.google.com/search?q=${mapSearchQuery}`}
@@ -2002,6 +2008,10 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                             alt={hotel.name}
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                             loading="lazy"
+                            onError={(e) => {
+                              e.currentTarget.onerror = null;
+                              e.currentTarget.src = cityImages[city.id] || cityImages.krakow;
+                            }}
                           />
                           <div className="absolute inset-0 bg-gradient-to-t from-wf-navy-mid via-transparent to-black/40 pointer-events-none" />
 
@@ -2145,26 +2155,28 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                           <span>{hotel.websiteUrl ? 'Website' : 'View Map'}</span>
                         </a>
 
-                        <button
-                          onClick={() => toggleItinerary(hotel.id)}
-                          className={`flex-1 py-2 px-2.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 border ${
-                            savedItems.has(hotel.id)
-                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
-                              : 'bg-white/5 hover:bg-emerald-500/20 text-slate-300 hover:text-emerald-300 border-white/10 hover:border-emerald-500/40'
-                          }`}
-                        >
-                          {savedItems.has(hotel.id) ? (
-                            <>
-                              <CheckCircle2 className="w-3.5 h-3.5" />
-                              <span>Saved</span>
-                            </>
-                          ) : (
-                            <>
-                              <Plus className="w-3.5 h-3.5 text-emerald-400" />
-                              <span>Itinerary</span>
-                            </>
-                          )}
-                        </button>
+                        {isAuthenticated && (
+                          <button
+                            onClick={() => toggleItinerary(hotel.id)}
+                            className={`flex-1 py-2 px-2.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 border ${
+                              savedItems.has(hotel.id)
+                                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
+                                : 'bg-white/5 hover:bg-emerald-500/20 text-slate-300 hover:text-emerald-300 border-white/10 hover:border-emerald-500/40'
+                            }`}
+                          >
+                            {savedItems.has(hotel.id) ? (
+                              <>
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                <span>Saved</span>
+                              </>
+                            ) : (
+                              <>
+                                <Plus className="w-3.5 h-3.5 text-emerald-400" />
+                                <span>Itinerary</span>
+                              </>
+                            )}
+                          </button>
+                        )}
                       </div>
                     </article>
                   );
@@ -2217,7 +2229,16 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                     className="glass-panel rounded-2xl border border-purple-500/20 hover:border-purple-400/50 bg-wf-navy-mid/90 overflow-hidden shadow-xl transition-all duration-300 flex flex-col justify-between group"
                   >
                     <div className="relative w-full h-44 bg-slate-950 overflow-hidden shrink-0">
-                      <img src={stay.imageSrc} alt={stay.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
+                      <img
+                        src={stay.imageSrc}
+                        alt={stay.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        loading="lazy"
+                        onError={(e) => {
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.src = cityImages[city.id] || cityImages.krakow;
+                        }}
+                      />
                       <div className="absolute inset-0 bg-gradient-to-t from-wf-navy-mid via-transparent to-black/30 pointer-events-none" />
                       <div className="absolute top-3 left-3 z-10">
                         <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border backdrop-blur-md shadow-md bg-purple-500/30 border-purple-400/50 text-purple-200">{stay.typeLabel}</span>
@@ -2262,15 +2283,17 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                         <ExternalLink className="w-3.5 h-3.5" />
                         <span>Book / Explore</span>
                       </a>
-                      <button
-                        onClick={() => toggleItinerary(stay.id)}
-                        className={`flex-1 py-2 px-2.5 rounded-xl text-[11px] font-bold transition-all flex items-center justify-center space-x-1.5 border ${savedItems.has(stay.id) ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30' : 'bg-white/5 hover:bg-emerald-500/20 text-slate-300 hover:text-emerald-300 border-white/10 hover:border-emerald-500/40'}`}
-                      >
-                        {savedItems.has(stay.id)
-                          ? <><CheckCircle2 className="w-3.5 h-3.5" /><span>Saved</span></>
-                          : <><Plus className="w-3.5 h-3.5 text-emerald-400" /><span>Itinerary</span></>
-                        }
-                      </button>
+                      {isAuthenticated && (
+                        <button
+                          onClick={() => toggleItinerary(stay.id)}
+                          className={`flex-1 py-2 px-2.5 rounded-xl text-[11px] font-bold transition-all flex items-center justify-center space-x-1.5 border ${savedItems.has(stay.id) ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30' : 'bg-white/5 hover:bg-emerald-500/20 text-slate-300 hover:text-emerald-300 border-white/10 hover:border-emerald-500/40'}`}
+                        >
+                          {savedItems.has(stay.id)
+                            ? <><CheckCircle2 className="w-3.5 h-3.5" /><span>Saved</span></>
+                            : <><Plus className="w-3.5 h-3.5 text-emerald-400" /><span>Itinerary</span></>
+                          }
+                        </button>
+                      )}
                     </div>
                   </article>
                 ))}
@@ -2490,30 +2513,32 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                     </div>
                     {/* Action Footer */}
                     <div className="bg-slate-950/80 border-t border-white/10 p-3.5 sm:p-4 grid grid-cols-2 gap-2 shrink-0">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          toggleItinerary(areaId);
-                        }}
-                        className={`py-2 px-2.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 border ${
-                          isSaved
-                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
-                            : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30 hover:border-amber-500/50'
-                        }`}
-                      >
-                        {isSaved ? (
-                          <>
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                            <span className="truncate">Saved</span>
-                          </>
-                        ) : (
-                          <>
-                            <Plus className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                            <span className="truncate">Itinerary</span>
-                          </>
-                        )}
-                      </button>
+                      {isAuthenticated && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            toggleItinerary(areaId);
+                          }}
+                          className={`py-2 px-2.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 border ${
+                            isSaved
+                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
+                              : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30 hover:border-amber-500/50'
+                          }`}
+                        >
+                          {isSaved ? (
+                            <>
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                              <span className="truncate">Saved</span>
+                            </>
+                          ) : (
+                            <>
+                              <Plus className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                              <span className="truncate">Itinerary</span>
+                            </>
+                          )}
+                        </button>
+                      )}
 
                       <a
                         href={area.websiteUrl || `https://www.google.com/search?q=${mapSearchQuery}`}
@@ -2573,30 +2598,32 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                     </div>
                     {/* Action Footer */}
                     <div className="bg-slate-950/80 border-t border-white/10 p-3.5 sm:p-4 grid grid-cols-2 gap-2 shrink-0">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          toggleItinerary(venueId);
-                        }}
-                        className={`py-2 px-2.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 border ${
-                          isSaved
-                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
-                            : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30 hover:border-amber-500/50'
-                        }`}
-                      >
-                        {isSaved ? (
-                          <>
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                            <span className="truncate">Saved</span>
-                          </>
-                        ) : (
-                          <>
-                            <Plus className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                            <span className="truncate">Itinerary</span>
-                          </>
-                        )}
-                      </button>
+                      {isAuthenticated && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            toggleItinerary(venueId);
+                          }}
+                          className={`py-2 px-2.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 border ${
+                            isSaved
+                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
+                              : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30 hover:border-amber-500/50'
+                          }`}
+                        >
+                          {isSaved ? (
+                            <>
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                              <span className="truncate">Saved</span>
+                            </>
+                          ) : (
+                            <>
+                              <Plus className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                              <span className="truncate">Itinerary</span>
+                            </>
+                          )}
+                        </button>
+                      )}
 
                       <a
                         href={venue.websiteUrl || `https://www.google.com/search?q=${mapSearchQuery}`}
@@ -2676,30 +2703,32 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                     </div>
                     {/* Action Footer */}
                     <div className="bg-slate-950/80 border-t border-white/10 p-3.5 sm:p-4 grid grid-cols-2 gap-2 shrink-0">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          toggleItinerary(restId);
-                        }}
-                        className={`py-2 px-2.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 border ${
-                          isSaved
-                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
-                            : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30 hover:border-amber-500/50'
-                        }`}
-                      >
-                        {isSaved ? (
-                          <>
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                            <span className="truncate">Saved</span>
-                          </>
-                        ) : (
-                          <>
-                            <Plus className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                            <span className="truncate">Itinerary</span>
-                          </>
-                        )}
-                      </button>
+                      {isAuthenticated && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            toggleItinerary(restId);
+                          }}
+                          className={`py-2 px-2.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 border ${
+                            isSaved
+                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
+                              : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30 hover:border-amber-500/50'
+                          }`}
+                        >
+                          {isSaved ? (
+                            <>
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                              <span className="truncate">Saved</span>
+                            </>
+                          ) : (
+                            <>
+                              <Plus className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                              <span className="truncate">Itinerary</span>
+                            </>
+                          )}
+                        </button>
+                      )}
 
                       <a
                         href={rest.websiteUrl || `https://www.google.com/search?q=${mapSearchQuery}`}
@@ -2776,30 +2805,32 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                     </div>
                     {/* Action Footer */}
                     <div className="bg-slate-950/80 border-t border-white/10 p-3.5 sm:p-4 grid grid-cols-2 gap-2 shrink-0">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          toggleItinerary(spotId);
-                        }}
-                        className={`py-2 px-2.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 border ${
-                          isSaved
-                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
-                            : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30 hover:border-amber-500/50'
-                        }`}
-                      >
-                        {isSaved ? (
-                          <>
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                            <span className="truncate">Saved</span>
-                          </>
-                        ) : (
-                          <>
-                            <Plus className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                            <span className="truncate">Itinerary</span>
-                          </>
-                        )}
-                      </button>
+                      {isAuthenticated && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            toggleItinerary(spotId);
+                          }}
+                          className={`py-2 px-2.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 border ${
+                            isSaved
+                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
+                              : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30 hover:border-amber-500/50'
+                          }`}
+                        >
+                          {isSaved ? (
+                            <>
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                              <span className="truncate">Saved</span>
+                            </>
+                          ) : (
+                            <>
+                              <Plus className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                              <span className="truncate">Itinerary</span>
+                            </>
+                          )}
+                        </button>
+                      )}
 
                       <a
                         href={spot.websiteUrl || `https://www.google.com/search?q=${mapSearchQuery}`}
@@ -2846,30 +2877,32 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                     </div>
                     {/* Action Footer */}
                     <div className="bg-slate-950/80 border-t border-white/10 p-3.5 sm:p-4 grid grid-cols-2 gap-2 shrink-0">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          toggleItinerary(itemId);
-                        }}
-                        className={`py-2 px-2.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 border ${
-                          isSaved
-                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
-                            : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30 hover:border-amber-500/50'
-                        }`}
-                      >
-                        {isSaved ? (
-                          <>
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                            <span className="truncate">Saved</span>
-                          </>
-                        ) : (
-                          <>
-                            <Plus className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                            <span className="truncate">Itinerary</span>
-                          </>
-                        )}
-                      </button>
+                      {isAuthenticated && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            toggleItinerary(itemId);
+                          }}
+                          className={`py-2 px-2.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 border ${
+                            isSaved
+                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
+                              : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30 hover:border-amber-500/50'
+                          }`}
+                        >
+                          {isSaved ? (
+                            <>
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                              <span className="truncate">Saved</span>
+                            </>
+                          ) : (
+                            <>
+                              <Plus className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                              <span className="truncate">Itinerary</span>
+                            </>
+                          )}
+                        </button>
+                      )}
 
                       <a
                         href={item.websiteUrl || `https://www.google.com/search?q=${mapSearchQuery}`}

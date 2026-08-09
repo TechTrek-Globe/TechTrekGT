@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { MapPin, Navigation, Compass, Plus, Check, CalendarX, Landmark } from 'lucide-react';
 import { cityImages, marketImages, getAttractionImage } from '../utils/cityImages';
+import { useAuth } from '../context/AuthContext';
 
 /**
  * Extracts a concise vital stats list for the quick stats row.
@@ -108,6 +109,7 @@ function getSightFallbackImage(sight, cityName = 'Kraków') {
 }
 
 export function AttractionCard({ sight, cityName = 'Kraków', onAddToItinerary }) {
+  const { isAuthenticated } = useAuth();
   const [isSaved, setIsSaved] = useState(false);
   const [imgError, setImgError] = useState(false);
 
@@ -244,28 +246,30 @@ export function AttractionCard({ sight, cityName = 'Kraków', onAddToItinerary }
           <span>View Map</span>
         </a>
 
-        <button
-          type="button"
-          onClick={handleToggleItinerary}
-          className={`flex-1 py-2 px-2.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 border ${
-            isSaved
-              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
-              : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30 hover:border-amber-500/50'
-          }`}
-          title={isSaved ? 'Remove from itinerary' : 'Add to itinerary'}
-        >
-          {isSaved ? (
-            <>
-              <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-              <span>Saved</span>
-            </>
-          ) : (
-            <>
-              <Plus className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-              <span>Itinerary</span>
-            </>
-          )}
-        </button>
+        {isAuthenticated && (
+          <button
+            type="button"
+            onClick={handleToggleItinerary}
+            className={`flex-1 py-2 px-2.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 border ${
+              isSaved
+                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
+                : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30 hover:border-amber-500/50'
+            }`}
+            title={isSaved ? 'Remove from itinerary' : 'Add to itinerary'}
+          >
+            {isSaved ? (
+              <>
+                <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span>Saved</span>
+              </>
+            ) : (
+              <>
+                <Plus className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <span>Itinerary</span>
+              </>
+            )}
+          </button>
+        )}
       </div>
     </article>
   );

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Compass, Map, User, LogOut, ShieldCheck, ChevronRight, Menu, X, Coins, ArrowLeftRight } from 'lucide-react';
+import { Compass, Map, User, LogOut, ShieldCheck, ChevronRight, Menu, X, Coins, ArrowLeftRight, Settings } from 'lucide-react';
 import { CurrencyConverterModal } from './CurrencyConverterModal';
+import { SettingsModal } from './SettingsModal';
 import { useExchangeRate } from '../hooks/useExchangeRate';
 import wayfinderHeaderBanner from '../assets/wayfinder-header-banner-new.png';
 
@@ -9,6 +10,7 @@ export function Layout({ children }) {
   const { user, isAuthenticated, setIsAuthModalOpen, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isConverterOpen, setIsConverterOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [currentPath, setCurrentPath] = useState(() => window.location.pathname);
   const { activeCurrency } = useExchangeRate();
   const { symbol = 'zł', rate = 3.73 } = activeCurrency || {};
@@ -37,9 +39,9 @@ export function Layout({ children }) {
   };
 
   return (
-    <div className="min-h-screen flex flex-col font-sans bg-slate-950 w-full max-w-full overflow-x-clip">
+    <div className="min-h-screen flex flex-col font-sans bg-slate-950 w-full max-w-full overflow-x-hidden">
       {/* --- Full-Width Top Header Banner --- */}
-      <header className="w-full flex-shrink-0 bg-black relative z-[60] border-b border-[#b48214]/30 flex justify-center items-center pt-3 pb-1 px-4 overflow-hidden">
+      <header className="w-full flex-shrink-0 bg-black relative z-[60] border-b border-[#b48214]/30 flex justify-center items-center pb-1 px-4 overflow-hidden safe-pt">
         <img
           src={wayfinderHeaderBanner}
           alt="TechTrek Wayfinder - Plan • Explore • Navigate • Discover"
@@ -101,6 +103,14 @@ export function Layout({ children }) {
                 </a>
                 <div className="h-6 w-px bg-white/10 mx-1" />
                 <button
+                  onClick={() => setIsSettingsOpen(true)}
+                  className="flex items-center space-x-1.5 px-3 py-1.5 text-sm font-medium text-wf-muted hover:text-white transition-colors"
+                  title="Settings"
+                >
+                  <Settings className="w-4 h-4" />
+                  <span>Settings</span>
+                </button>
+                <button
                   onClick={logout}
                   className="flex items-center space-x-1.5 px-3 py-1.5 text-sm font-medium text-wf-muted hover:text-white transition-colors"
                 >
@@ -109,13 +119,23 @@ export function Layout({ children }) {
                 </button>
               </div>
             ) : (
-              <button
-                onClick={() => setIsAuthModalOpen(true)}
-                className="flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-sm font-medium transition-colors"
-              >
-                <User className="w-4 h-4 text-wf-blue-lt" />
-                <span>Sign In</span>
-              </button>
+              <div className="flex items-center space-x-3">
+                <button
+                  onClick={() => setIsSettingsOpen(true)}
+                  className="flex items-center space-x-1.5 px-3 py-1.5 text-sm font-medium text-wf-muted hover:text-white transition-colors"
+                  title="Settings"
+                >
+                  <Settings className="w-4 h-4" />
+                  <span>Settings</span>
+                </button>
+                <button
+                  onClick={() => setIsAuthModalOpen(true)}
+                  className="flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-sm font-medium transition-colors"
+                >
+                  <User className="w-4 h-4 text-wf-blue-lt" />
+                  <span>Sign In</span>
+                </button>
+              </div>
             )}
           </div>
 
@@ -171,6 +191,14 @@ export function Layout({ children }) {
               </button>
             )}
 
+            <button
+              onClick={() => { setIsSettingsOpen(true); setMobileMenuOpen(false); }}
+              className="w-full flex items-center space-x-2 px-3 py-3 sm:py-2 rounded-lg text-base font-medium text-wf-text hover:text-white hover:bg-white/5 text-left min-h-[44px]"
+            >
+              <Settings className="w-5 h-5" />
+              <span>Settings</span>
+            </button>
+
             <div className="h-px bg-white/10 my-2" />
             {isAuthenticated ? (
               <>
@@ -213,7 +241,13 @@ export function Layout({ children }) {
         onClose={() => setIsConverterOpen(false)}
       />
 
-      <footer className="border-t border-white/5 py-8 bg-wf-navy/80 backdrop-blur-md relative z-10 mt-auto">
+      {/* Global Settings Modal */}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+      />
+
+      <footer className="border-t border-white/5 pt-8 bg-wf-navy/80 backdrop-blur-md relative z-10 mt-auto safe-pb">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center space-x-2">
             <Compass className="w-5 h-5 text-wf-blue-lt" />

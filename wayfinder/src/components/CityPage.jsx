@@ -147,7 +147,7 @@ function DrillDownFilters({ activeFilter, onFilterChange }) {
   const currentItems = getItemsForTier();
 
   return (
-    <div className="flex items-center space-x-2 w-full overflow-x-auto no-scrollbar whitespace-nowrap">
+    <div className="flex items-center space-x-2 w-full overflow-x-auto no-scrollbar no-overscroll-x whitespace-nowrap">
       {activeTier === 'main' ? (
         <>
           <button
@@ -384,7 +384,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
           </a>
 
           {/* Prominent Wide Horizontal Trail Track Chart */}
-          <div className="flex-1 glass-panel px-5 py-4 rounded-2xl border-2 border-amber-500/40 bg-wf-navy-mid/95 backdrop-blur-xl shadow-2xl flex items-center justify-between min-w-0 overflow-x-auto no-scrollbar">
+          <div className="flex-1 glass-panel px-5 py-4 rounded-2xl border-2 border-amber-500/40 bg-wf-navy-mid/95 backdrop-blur-xl shadow-2xl flex items-center justify-between min-w-0 overflow-x-auto no-scrollbar no-overscroll-x">
             <div className="flex items-center justify-between w-full min-w-[580px] relative px-4 py-3">
               {/* Thick Visible Railroad Track Line */}
               <div className="absolute top-[32px] left-8 right-8 h-2.5 bg-slate-950 border-y-2 border-amber-400 rounded-full z-0 flex items-center justify-around overflow-hidden shadow-inner">
@@ -461,7 +461,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
 
       {/* Top Sub-Header Toolbar (Opens Dedicated Sub-Pages & Stays Sticky at Top) */}
       <div className="sticky top-14 z-40 py-2.5 bg-slate-950/95 backdrop-blur-xl border-y border-amber-500/30 w-full shadow-xl">
-        <div className="p-1.5 rounded-xl border border-amber-500/20 !bg-slate-900/90 shadow-md flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar">
+        <div className="p-1.5 rounded-xl border border-amber-500/20 !bg-slate-900/90 shadow-md flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar no-overscroll-x">
           <a
             href={baseUrl}
             onClick={(e) => handleSubPageTabClick(e, baseUrl)}
@@ -985,7 +985,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                 </div>
 
                 {/* Filterable Era Tabs */}
-                <div className="flex items-center space-x-1.5 overflow-x-auto no-scrollbar py-1">
+                <div className="flex items-center space-x-1.5 overflow-x-auto no-scrollbar no-overscroll-x py-1">
                   <button
                     onClick={() => setActiveEpochTab('all')}
                     className={`px-3.5 py-1.5 rounded-full text-xs font-black transition-all cursor-pointer ${
@@ -2400,7 +2400,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
 
           {/* Sticky Category Filter Toolbar */}
           <div className="sticky top-[118px] z-30 py-3 px-4 sm:px-6 rounded-2xl bg-slate-950/95 backdrop-blur-xl border border-purple-500/30 shadow-2xl transition-all">
-            <div className="flex items-center space-x-2 overflow-x-auto no-scrollbar">
+            <div className="flex items-center space-x-2 overflow-x-auto no-scrollbar no-overscroll-x">
               <button
                 type="button"
                 onClick={() => setLgbtqCategoryFilter('all')}

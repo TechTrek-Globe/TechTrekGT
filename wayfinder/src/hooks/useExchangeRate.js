@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSettings } from '../context/SettingsContext';
 
 const STORAGE_KEY = 'wayfinder_pln_usd_rate';
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -40,33 +41,54 @@ export function useExchangeRate() {
     };
   });
 
+  const { settings } = useSettings();
+
   // Detect active destination country from window route
   const getActiveCurrencyInfo = () => {
     const path = (window.location.pathname || '').toLowerCase();
+    const baseCode = settings?.currency || 'USD';
+    const baseSymbol = baseCode === 'EUR' ? '€' : baseCode === 'GBP' ? '£' : '$';
+
     if (path.includes('uk') || path.includes('london')) {
+      let rate = rates.usdToGbp || 0.78;
+      if (baseCode === 'EUR') rate = (rates.usdToGbp || 0.78) / (rates.usdToEur || 0.92);
+      if (baseCode === 'GBP') rate = 1.0;
       return {
         country: 'United Kingdom',
         code: 'GBP',
         symbol: '£',
-        rate: rates.usdToGbp || 0.78,
+        baseCode,
+        baseSymbol,
+        rate,
         presets: [5, 10, 20, 50, 100],
       };
     }
     if (path.includes('euro') || path.includes('france') || path.includes('germany')) {
+      let rate = rates.usdToEur || 0.92;
+      if (baseCode === 'EUR') rate = 1.0;
+      if (baseCode === 'GBP') rate = (rates.usdToEur || 0.92) / (rates.usdToGbp || 0.78);
       return {
         country: 'Eurozone',
         code: 'EUR',
         symbol: '€',
-        rate: rates.usdToEur || 0.92,
+        baseCode,
+        baseSymbol,
+        rate,
         presets: [5, 10, 20, 50, 100],
       };
     }
     // Default country context for current TechTrek Poland trip
+    let rate = rates.usdToPln || 3.73;
+    if (baseCode === 'EUR') rate = rates.eurToPln || 4.30;
+    if (baseCode === 'GBP') rate = rates.gbpToPln || 4.95;
+
     return {
       country: 'Poland',
       code: 'PLN',
       symbol: 'zł',
-      rate: rates.usdToPln || 3.73,
+      baseCode,
+      baseSymbol,
+      rate,
       presets: [10, 25, 50, 100, 200],
     };
   };

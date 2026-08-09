@@ -1892,6 +1892,143 @@ export const polandJourney = {
       kaucja: '30 PLN (~$8.00 USD)',
       foodTargets: ['Konspira', 'Karczma Lwowska', 'Pod Fredrą'],
       hotels: ['The Bridge Wrocław MGallery', 'Hotel Monopol', 'AC Hotel by Marriott Wrocław'],
+wroclawHotelsDetailed: [
+        {
+          id: 'the-bridge-wroclaw',
+          name: 'The Bridge Wrocław MGallery',
+          tier: 'luxury',
+          tierLabel: '5-Star Modern Luxury',
+          address: 'Plac Katedralny 8 (Cathedral Island)',
+          neighborhood: 'Ostrów Tumski',
+          stars: 5,
+          websiteUrl: 'https://thebridgewroclaw.pl/en/',
+          imageSrc: '/wayfinder/Poland-2026/images/wroclaw/hotels/the-bridge.jpg',
+          basePricePln: 950,
+          memberPricePln: 850,
+          currency: 'PLN',
+          usdEstimateBase: 240,
+          usdEstimateMember: 215,
+          description: 'A striking modern addition to historic Cathedral Island. Features exceptional views of the river and gothic spires, luxurious wellness facilities, and easy walking access to the Market Square.',
+          signatureFeature: 'Rooftop views of Cathedral Island',
+          amenities: ['Wellness Center & Spa', 'River Views', 'Gourmet Restaurant', 'Rooftop Bar'],
+          proximity: {
+            rynekMarket: { name: 'Main Market Square', distance: '1.2 km', time: '15 min walk' },
+            attractions: [
+              { name: 'Wrocław Cathedral', distance: '100m', time: '1 min walk' },
+              { name: 'Tumski Bridge', distance: '300m', time: '4 min walk' }
+            ]
+          }
+        },
+        {
+          id: 'hotel-monopol-wroclaw',
+          name: 'Hotel Monopol Wrocław',
+          tier: 'luxury',
+          tierLabel: '5-Star Historic Elegance',
+          address: 'H. Modrzejewskiej 2 (Old Town)',
+          neighborhood: 'Stare Miasto',
+          stars: 5,
+          websiteUrl: 'https://monopolwroclaw.hotel.com.pl/en/',
+          imageSrc: '/wayfinder/Poland-2026/images/wroclaw/hotels/monopol.jpg',
+          basePricePln: 850,
+          memberPricePln: 760,
+          currency: 'PLN',
+          usdEstimateBase: 215,
+          usdEstimateMember: 195,
+          description: 'A legendary 19th-century Neo-Baroque hotel situated right next to the Opera House. Boasts magnificent architecture, an underground pool, and historic charm.',
+          signatureFeature: 'Neo-Baroque heritage & rooftop terraces',
+          amenities: ['Underground Spa Pool', 'Rooftop Terrace', 'Historic Architecture', 'Fine Dining'],
+          proximity: {
+            rynekMarket: { name: 'Main Market Square', distance: '500m', time: '6 min walk' },
+            attractions: [
+              { name: 'Wrocław Opera', distance: '50m', time: '1 min walk' }
+            ]
+          }
+        },
+        {
+          id: 'ac-hotel-wroclaw',
+          name: 'AC Hotel by Marriott Wrocław',
+          tier: 'mid',
+          tierLabel: 'Premium Modern Comfort',
+          address: 'Plac Wolności 10',
+          neighborhood: 'Stare Miasto',
+          stars: 4,
+          websiteUrl: 'https://www.marriott.com/en-us/hotels/wroaw-ac-hotel-wroclaw/overview/',
+          imageSrc: '/wayfinder/Poland-2026/images/wroclaw/hotels/ac-hotel.jpg',
+          basePricePln: 550,
+          memberPricePln: 490,
+          currency: 'PLN',
+          usdEstimateBase: 140,
+          usdEstimateMember: 125,
+          description: 'Housed in a beautifully restored historic building with modern interiors. Features an indoor pool, excellent breakfast, and a location steps away from the National Forum of Music.',
+          signatureFeature: 'Historic facade with sleek modern interiors',
+          amenities: ['Indoor Pool', 'Winery Bar', 'Fitness Center', 'European Breakfast'],
+          proximity: {
+            rynekMarket: { name: 'Main Market Square', distance: '600m', time: '8 min walk' },
+            attractions: [
+              { name: 'National Forum of Music', distance: '100m', time: '1 min walk' }
+            ]
+          }
+        }
+      ],
+      wroclawUniqueStays: [
+        {
+          id: 'wroclaw-water-tower',
+          name: 'The Water Tower Apartment',
+          neighborhood: 'Borek (South)',
+          bookingUrl: '#',
+          imageSrc: '/wayfinder/Poland-2026/images/wroclaw/hotels/water-tower.jpg',
+          description: 'Stay inside a historic renovated 19th-century water tower, offering panoramic 360-degree views over Wrocław and the distant Sudeten mountains.',
+          travelNote: 'A short tram ride from the historic center'
+        }
+      ],
+      wroclawRestaurantsDetailed: [
+        {
+          name: 'Konspira',
+          category: 'must-haves',
+          price: '$$',
+          description: 'Immersive restaurant themed around the Polish anti-communist resistance. Huge portions of traditional Polish food in a historic, secret-feeling atmosphere.',
+          mustTry: 'Solidarność Ribs or Giant Pierogi platter'
+        },
+        {
+          name: 'Karczma Lwowska',
+          category: 'local',
+          price: '$$',
+          description: 'Rustic wooden interiors located right on the Market Square, serving hearty eastern borderlands (Kresy) and traditional Polish cuisine.',
+          mustTry: 'Hunter’s Stew (Bigos) and Lwów-style Duck'
+        },
+        {
+          name: 'Pod Fredrą',
+          category: 'steak',
+          price: '$$$',
+          description: 'Located right next to the Town Hall, offering premium grilled meats, steaks, and Polish delicacies smoked in-house on an open hearth.',
+          mustTry: 'Smoked meats board and grilled steaks'
+        }
+      ],
+      wroclawDrinksDetailed: [
+        {
+          name: 'Spiż',
+          category: 'brewery',
+          price: '$$',
+          description: 'Wrocław’s oldest microbrewery located in the cellars of the New Town Hall. Experience fresh, unpasteurized beers served with traditional bread and smalec.',
+          mustTry: 'Spiż Honey Beer or Dark Lager'
+        },
+        {
+          name: 'Przedwojenna',
+          category: 'vodka-house',
+          price: '$',
+          description: '24/7 retro-style bistro capturing the pre-war vibe. Perfect for a quick shot of vodka and traditional Polish tapas like beef tartare or herring.',
+          mustTry: 'Chilled Vodka and Beef Tartare'
+        }
+      ],
+      wroclawCafesDetailed: [
+        {
+          name: 'Café Targowa',
+          category: 'coffee-breakfast',
+          price: '$',
+          description: 'Tiny, award-winning specialty coffee shop tucked inside the historic Hala Targowa (Market Hall). Perfect stop before exploring the market.',
+          mustTry: 'Flat White and freshly baked pastries'
+        }
+      ],
       imageDetails: {
         location: 'Rynek & Plac Solny Market Squares',
         landmark: 'Gothic Old Town Hall & Fairy-tale Windmills',

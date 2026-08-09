@@ -1603,7 +1603,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
       )}
 
       {/* 4. FOOD & DRINK SUB-PAGE */}
-      {activeSubPage === 'restaurants' && (city.krakowRestaurantsDetailed || city.krakowDrinksDetailed || city.restaurants) && (
+      {activeSubPage === 'restaurants' && (city[`${city.id}RestaurantsDetailed`] || city[`${city.id}DrinksDetailed`] || city.restaurants) && (
         <div id="restaurants-section" className="space-y-4 animate-fade-in scroll-mt-32">
           {/* Header Banner */}
           <div className="glass-panel p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-amber-500/30 bg-wf-navy-mid/95 relative overflow-hidden shadow-lg">
@@ -1627,7 +1627,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
           </div>
 
           {/* Sticky Category Filter Toolbar (Stays in view while scrolling) */}
-          {(city.krakowRestaurantsDetailed || city.krakowDrinksDetailed) && (
+          {(city[`${city.id}RestaurantsDetailed`] || city[`${city.id}DrinksDetailed`]) && (
             <div className="sticky top-[118px] z-30 py-2.5 px-3 sm:px-5 rounded-2xl bg-slate-950/95 backdrop-blur-xl border border-amber-500/30 shadow-2xl transition-all">
               <DrillDownFilters 
                 activeFilter={restaurantCategoryFilter} 
@@ -1637,12 +1637,12 @@ export function CityPage({ cityId, subPage = 'overview' }) {
           )}
 
           {/* Cards Grid */}
-          {(city.krakowRestaurantsDetailed || city.krakowDrinksDetailed || city.krakowCafesDetailed) ? (
+          {(city[`${city.id}RestaurantsDetailed`] || city[`${city.id}DrinksDetailed`] || city[`${city.id}CafesDetailed`]) ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {[
-                ...(city.krakowRestaurantsDetailed || []),
-                ...(city.krakowDrinksDetailed || []),
-                ...(city.krakowCafesDetailed || [])
+                ...(city[`${city.id}RestaurantsDetailed`] || []),
+                ...(city[`${city.id}DrinksDetailed`] || []),
+                ...(city[`${city.id}CafesDetailed`] || [])
               ]
                 .filter((item) => {
                   if (restaurantCategoryFilter === 'all') return true;
@@ -1893,7 +1893,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
           </div>
 
           {/* Sticky Tier Filter Bar (Stays in view while scrolling hotels) */}
-          {city.krakowHotelsDetailed && (
+          {city[`${city.id}HotelsDetailed`] && (
             <div className="sticky top-[118px] z-30 py-3 px-4 sm:px-6 rounded-2xl bg-slate-950/95 backdrop-blur-xl border border-amber-500/30 shadow-2xl transition-all">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex flex-wrap items-center gap-2">
@@ -1906,7 +1906,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                         : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10'
                     }`}
                   >
-                    All Options ({city.krakowHotelsDetailed.length + (city.krakowUniqueStays?.length || 0)})
+                    All Options ({city[`${city.id}HotelsDetailed`].length + (city[`${city.id}UniqueStays`]?.length || 0)})
                   </button>
                   <button
                     type="button"
@@ -1918,7 +1918,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                     }`}
                   >
                     <Crown className="w-3.5 h-3.5" />
-                    <span>Luxury ({city.krakowHotelsDetailed.filter((h) => h.tier === 'luxury').length})</span>
+                    <span>Luxury ({city[`${city.id}HotelsDetailed`].filter((h) => h.tier === 'luxury').length})</span>
                   </button>
                   <button
                     type="button"
@@ -1930,7 +1930,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                     }`}
                   >
                     <Sparkles className="w-3.5 h-3.5" />
-                    <span>Mid-Range ({city.krakowHotelsDetailed.filter((h) => h.tier === 'mid').length})</span>
+                    <span>Mid-Range ({city[`${city.id}HotelsDetailed`].filter((h) => h.tier === 'mid').length})</span>
                   </button>
                   <button
                     type="button"
@@ -1942,9 +1942,9 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                     }`}
                   >
                     <Coins className="w-3.5 h-3.5" />
-                    <span>Cost-Effective ({city.krakowHotelsDetailed.filter((h) => h.tier === 'budget').length})</span>
+                    <span>Cost-Effective ({city[`${city.id}HotelsDetailed`].filter((h) => h.tier === 'budget').length})</span>
                   </button>
-                  {city.krakowUniqueStays && city.krakowUniqueStays.length > 0 && (
+                  {city[`${city.id}UniqueStays`] && city[`${city.id}UniqueStays`].length > 0 && (
                     <button
                       type="button"
                       onClick={() => setHotelTierFilter('unique')}
@@ -1955,7 +1955,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                       }`}
                     >
                       <Sparkles className="w-3.5 h-3.5" />
-                      <span>UNIQUE STAYS ({city.krakowUniqueStays.length})</span>
+                      <span>UNIQUE STAYS ({city[`${city.id}UniqueStays`].length})</span>
                     </button>
                   )}
                 </div>
@@ -1968,9 +1968,9 @@ export function CityPage({ cityId, subPage = 'overview' }) {
           )}
 
           {/* Detailed Hotel Cards Grid */}
-          {city.krakowHotelsDetailed ? (
+          {city[`${city.id}HotelsDetailed`] ? (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {city.krakowHotelsDetailed
+              {city[`${city.id}HotelsDetailed`]
                 .filter((h) => hotelTierFilter === 'all' || h.tier === hotelTierFilter)
                 .map((hotel) => {
                   const isLuxury = hotel.tier === 'luxury';
@@ -2203,7 +2203,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
           )}
 
           {/* Unique Stays Section */}
-          {(hotelTierFilter === 'all' || hotelTierFilter === 'unique') && city.krakowUniqueStays && city.krakowUniqueStays.length > 0 && (
+          {(hotelTierFilter === 'all' || hotelTierFilter === 'unique') && city[`${city.id}UniqueStays`] && city[`${city.id}UniqueStays`].length > 0 && (
             <div className="space-y-4">
               <div className="glass-panel p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-purple-500/30 bg-wf-navy-mid/95 relative overflow-hidden shadow-lg">
                 <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-bl from-purple-500/15 via-pink-500/10 to-transparent rounded-full blur-2xl pointer-events-none" />
@@ -2223,7 +2223,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                {city.krakowUniqueStays.map((stay) => (
+                {city[`${city.id}UniqueStays`].map((stay) => (
                   <article
                     key={stay.id}
                     className="glass-panel rounded-2xl border border-purple-500/20 hover:border-purple-400/50 bg-wf-navy-mid/90 overflow-hidden shadow-xl transition-all duration-300 flex flex-col justify-between group"

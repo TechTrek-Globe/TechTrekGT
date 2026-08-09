@@ -27,7 +27,7 @@ import wroclawDwarfsImg from '../assets/wroclaw/attractions/wroclaw-dwarfs.jpg';
 import wroclawTumskiBridgeImg from '../assets/wroclaw/attractions/tumski-bridge.jpg';
 import wroclawCentennialHallImg from '../assets/wroclaw/attractions/centennial-hall.jpg';
 import wroclawPanoramaRaclawiceImg from '../assets/wroclaw/attractions/panorama-raclawice.jpg';
-import wroclawWalkingTourImg from '../assets/wroclaw/attractions/walking-tour.jpg';
+import wroclawWalkingTourImg from '../assets/wroclaw/attractions/wroclaw-walking-tour.jpg';
 
 import wroclawPlacSolnyImg from '../assets/wroclaw/markets/wroclaw-plac-solny.jpg';
 import wroclawSwidnickaImg from '../assets/wroclaw/markets/wroclaw-swidnicka.jpg';

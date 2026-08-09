@@ -12,8 +12,6 @@ TechTrekGT is a multi-application platform hosted on `techtrekgt.com`. The repos
 | `wayfinder/` | Poland Christmas 2026 travel guide | `techtrekgt.com/wayfinder/*` | React 19 + Vite + Cloudflare Workers |
 | `bigworm/` | Secure remote desktop portal (Guacamole) | `bigworm.techtrekgt.com` | React 19 + Vite + Cloudflare Workers |
 
-`_orphaned-archive/` contains abandoned files from earlier iterations (Navbar, TechTrekLogo, old README, InteractiveBudgetView) and is not referenced by any active project.
-
 ---
 
 ## 2. Tech Stack Overview
@@ -374,6 +372,31 @@ All apps (finance, outpost, wayfinder, bigworm) point at the same `personal-budg
 - **`nodejs_compat` compatibility flag** enables Node APIs inside workers (e.g., crypto, path).
 - **KV** is used for rate limiting in bigworm (`RATE_LIMIT_KV`); finance and outpost have commented-out KV placeholders.
 
+### 8.4 Scalability Constraints & Write-Lock Risks
+
+The decision to run all four apps against a single Cloudflare D1 (SQLite) instance introduces several production constraints that must be understood before scaling:
+
+| Constraint | Impact |
+|-----------|--------|
+| **Single-writer model** | D1 is a single-primary SQLite database. Only one write transaction can commit at a time across the entire database, regardless of which app issues it. Concurrent writes from finance, outpost, wayfinder, and bigworm serialize on the same write lock. |
+| **Cross-app write contention** | A heavy write burst in one app (e.g., outpost batch imports, finance ledger sync) can delay writes in every other app sharing the database. |
+| **Read amplification** | All reads from all apps hit the same D1 instance. Under sustained load, read latency can degrade for every app simultaneously. |
+| **No horizontal write scaling** | D1 does not support sharding or multiple primaries. Scaling writes requires migrating to a different storage model (e.g., per-app D1 instances, or a relational database with write replicas). |
+| **Schema coupling** | All apps share one schema namespace. A migration for one app (e.g., adding a column to `users`) affects all apps and must be coordinated. |
+| **Single point of failure** | A D1 outage or degradation impacts all four apps at once, not just one. |
+
+**Current mitigation (as implemented):**
+
+- The shared `users` table is the only true cross-app dependency; each app's domain tables are logically separate.
+- Finance uses IndexedDB as its primary local persistence, with D1 only for auth and cloud vault backup/restore, reducing its write pressure on the shared instance.
+- Bigworm's D1 usage is limited to auth; its operational state lives in Guacamole and KV.
+
+**Future roadmap (not yet implemented):**
+
+- Split domain data into per-app D1 databases, keeping only the shared `users`/auth tables in a single instance.
+- Introduce a queue or write-batching layer for high-volume imports (outpost batch import, finance ledger sync).
+- Evaluate Cloudflare D1's read replicas or migrate write-heavy workloads to a horizontally scalable store.
+
 ---
 
 ## 9. Deployment Topology
@@ -420,7 +443,106 @@ Set via `wrangler secret put`:
 
 ---
 
-## 10. Security Model
+## 10. CI/CD & Automation
+
+### 10.1 Current State: Manual Deployments
+
+**There is no CI/CD pipeline in this repository.** Deployments are performed manually by a developer running `npm run deploy` from each project directory. There is no `.github/` directory, no GitHub Actions workflows, no GitLab CI, and no Jenkins configuration anywhere in the workspace.
+
+The manual deployment flow for each React app is:
+
+```powershell
+cd <project>
+npm run build        # Vite build -> dist/client
+wrangler deploy      # Upload worker + assets to Cloudflare
+```
+
+The `landing/` app is deployed the same way via `wrangler deploy` (static assets only, no build step).
+
+### 10.2 Risks of Manual Deployments
+
+| Risk | Impact |
+|------|--------|
+| No automated build verification | A broken build can be deployed if the developer does not run `npm run build` locally first. |
+| No automated tests in the pipeline | Regressions are not caught before reaching production. |
+| No rollback automation | Reverting a bad deploy requires manual `wrangler rollback` or re-deploying a previous build. |
+| No environment promotion | There is no staging environment; all deploys target production directly. |
+| No deployment history | No audit trail of who deployed what and when, beyond Cloudflare's own logs. |
+
+### 10.3 Future Roadmap (Not Yet Implemented)
+
+- Add a GitHub Actions workflow per project (or a matrix workflow) that runs `npm ci`, `npm run build`, and any future test suite on every push and pull request.
+- Gate production deploys behind a successful build + test run, triggered on tags or manual approval.
+- Introduce a staging worker (e.g., `techtrek-budget-staging`) deployed from a `develop` branch.
+- Add `wrangler rollback` documentation and a rollback script for rapid incident response.
+
+---
+
+## 11. Testing Strategy
+
+### 11.1 Current State: No Automated Tests
+
+**There is no automated test infrastructure in this repository.** None of the five projects define a `test` script in their `package.json`, and none include any testing framework (no Vitest, Jest, Playwright, Cypress, Mocha, or Testing Library). No `.test.js`, `.test.jsx`, `.spec.js`, or `.spec.jsx` files exist anywhere in the workspace.
+
+| Project | Test Script | Testing Framework | Test Files |
+|---------|-------------|-------------------|------------|
+| `finance/` | None | None | None |
+| `outpost/` | None | None | None |
+| `wayfinder/` | None | None | None |
+| `bigworm/` | None | None | None |
+| `landing/` | None | None | None |
+
+### 11.2 Verification Today
+
+The only verification performed today is manual:
+
+- **Build verification**: `npm run build` must succeed before `wrangler deploy`.
+- **Manual QA**: developers manually exercise the UI and API endpoints in the browser and via `curl`.
+- **ErrorBoundary**: finance and outpost render a user-facing error panel on uncaught render errors, which surfaces issues during manual testing.
+
+### 11.3 Future Roadmap (Not Yet Implemented)
+
+- **Unit tests**: Add Vitest (natural fit with the Vite toolchain) for pure logic modules: `utils/formatters.js`, `utils/paydayUtils.js`, `utils/spreadsheetParser.js`, `utils/listingCopyGenerator.js`, and the auth utilities in `functions/utils/auth.js`.
+- **Component tests**: Add React Testing Library + jsdom for the smart view components and context providers.
+- **Integration tests**: Test the Cloudflare Worker request routing in `src/worker.js` using `wrangler dev` or Miniflare against a local D1 instance.
+- **E2E tests**: Add Playwright for critical user journeys (login, dashboard load, ledger entry, outpost invoice import).
+- **CI integration**: Wire the test suite into the CI/CD pipeline described in section 10.
+
+---
+
+## 12. Observability & Logging
+
+### 12.1 Current State
+
+Observability is minimal and relies on Cloudflare's built-in platform telemetry rather than custom instrumentation:
+
+| Capability | Status | Details |
+|-----------|--------|---------|
+| Worker request logs | Enabled | All workers set `"observability": { "enabled": true }` in `wrangler.jsonc`, which enables Cloudflare's Workers Logs (request/response, status codes, exceptions). |
+| D1 query logs | Partial | D1 queries appear in Cloudflare's Workers Logs when invoked from a worker, but there is no dedicated D1 dashboard or custom query logging. |
+| Error surfacing | Client-side only | `ErrorBoundary` components in finance and outpost display errors to the user; worker errors return JSON `{ error: message }` with a 500 status. |
+| Structured logging | Not implemented | No `console.log`/`console.error` instrumentation strategy, no log correlation IDs, no request tracing. |
+| Alerting | Not implemented | No automated alerts on worker failures, D1 errors, or elevated error rates. |
+| Metrics dashboards | Not implemented | No Grafana, Datadog, or Cloudflare Analytics custom dashboards configured. |
+
+### 12.2 How Failures Are Detected Today
+
+- **Worker exceptions**: Surface in Cloudflare's Workers Logs dashboard (per-worker, per-request).
+- **D1 errors**: Surface as 500 responses with JSON error bodies; visible in Workers Logs alongside the request.
+- **Client-side render errors**: Caught by `ErrorBoundary` and shown to the user, but not reported to any backend or logging service.
+- **Manual monitoring**: A developer must proactively open the Cloudflare dashboard to inspect logs; there is no push-based alerting.
+
+### 12.3 Future Roadmap (Not Yet Implemented)
+
+- Add structured logging to `src/worker.js` with a correlation ID per request (e.g., `X-Request-Id`) and consistent `console.log`/`console.error` payloads.
+- Add a `/api/health` endpoint per worker that checks D1 connectivity and returns status for uptime monitoring.
+- Configure Cloudflare Workers Logs push to a log sink (e.g., Workers Logpush to R2 or an external service) for retention and analysis.
+- Add alerting via Cloudflare's alerting rules or an external uptime monitor (e.g., UptimeRobot, Pingdom) on the `/api/health` endpoints.
+- Add client-side error reporting (e.g., a lightweight beacon to a worker endpoint) so `ErrorBoundary` failures are captured centrally.
+
+---
+
+## 13. Security Model
 
 | Control | Implementation |
 |---------|---------------|
@@ -436,7 +558,34 @@ Set via `wrangler secret put`:
 
 ---
 
-## 11. Development Workflow
+## 14. Development Workflow
+
+### 14.1 Local Environment Setup
+
+Each project reads local secrets from a `.dev.vars` file (git-ignored) that is loaded by Wrangler during `wrangler dev`. The `.dev.vars` file must never be committed to source control. Template files (`.dev.vars.example`) are committed for reference.
+
+**Setup steps per project:**
+
+1. Copy the committed template to a local `.dev.vars` file:
+   ```powershell
+   cd <project>
+   copy .dev.vars.example .dev.vars
+   ```
+2. Edit `.dev.vars` and set real values. The `JWT_SECRET` must match the value used by the other apps so the shared SSO cookie works across all of them during local development.
+3. Run `npm run dev` (or `wrangler dev` for the worker).
+
+**Local secrets by project:**
+
+| Project | `.dev.vars.example` | Required Keys |
+|---------|---------------------|---------------|
+| `finance/` | (uses local `.dev.vars`; no committed example) | `JWT_SECRET`, `SYNC_UNLOCK_CODE` |
+| `outpost/` | `.dev.vars.example` | `JWT_SECRET`, `SYNC_UNLOCK_CODE` |
+| `wayfinder/` | `.dev.vars.example` | `JWT_SECRET` |
+| `bigworm/` | `.dev.vars.example` | `JWT_SECRET`, `GUACAMOLE_INTERNAL_URL`, `GUAC_USERNAME`, `GUAC_PASSWORD` |
+
+> Note: `finance/` has a local `.dev.vars` but no committed `.dev.vars.example`. The `outpost/.dev.vars.example` explicitly instructs copying the `JWT_SECRET` from the finance `.dev.vars` so the shared auth cookie works across both apps.
+
+### 14.2 Standard Workflow
 
 1. **Local dev**: `npm run dev` in any project directory. Ports: finance `3000`, outpost `3001`, wayfinder `5174`, bigworm (Vite default `5173`).
 2. **Local database**: `wrangler d1 execute personal-budget-db --local` (or `npm run db:migrate:local` in outpost).
@@ -445,7 +594,7 @@ Set via `wrangler secret put`:
 
 ---
 
-## 12. Cross-Cutting Conventions
+## 15. Cross-Cutting Conventions
 
 - **No TypeScript**: all source is plain JavaScript (JSX) with occasional `// @ts-nocheck` directives.
 - **No CSS-in-JS**: no styled-components or inline `style` props in React components.

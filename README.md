@@ -47,5 +47,7 @@ npm run deploy
 TechTrekGT/
   finance/          - Budget OS (React + Vite + Cloudflare Worker + D1)
   outpost/          - Auction Tracker (React + Vite + Cloudflare Worker + D1)
-  _orphaned-archive/ - Legacy files pending review before permanent deletion
+  wayfinder/        - Poland Christmas 2026 travel guide (React + Vite + Cloudflare Worker + D1)
+  bigworm/          - Secure remote desktop portal (React + Vite + Cloudflare Worker + Guacamole)
+  landing/          - Platform hub (static HTML/CSS/JS)
 ```

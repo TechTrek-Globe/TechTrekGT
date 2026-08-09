@@ -4,6 +4,42 @@ import { polandJourney } from '../data/poland-2026';
 import { cityImages } from '../utils/cityImages';
 import polandMapRouteClean from '../assets/poland-map-route-clean.png';
 
+function CityRouteCard({ city, idx, totalCount, pushRoute }) {
+  return (
+    <div 
+      className="glass-panel rounded-2xl relative hover-lift cursor-pointer overflow-hidden border border-white/5 hover:border-amber-500/40 transition-colors group" 
+      onClick={(e) => pushRoute(e, `/wayfinder/poland-christmas-2026/cities/${city.id}`)}
+    >
+      {idx < totalCount - 1 && (
+        <div className="hidden md:block absolute top-1/2 -right-4 w-4 h-px bg-white/20 z-10" />
+      )}
+      <div className="h-48 sm:h-52 w-full relative overflow-hidden bg-slate-950">
+        <img 
+          src={cityImages[city.id]} 
+          alt={city.name} 
+          className="w-full h-full object-cover object-center" 
+          loading="lazy"
+          decoding="async"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-wf-navy via-wf-navy/50 to-transparent"></div>
+      </div>
+
+      <div className="p-4 relative z-10">
+        <div className="text-amber-300 text-[10px] font-black uppercase tracking-widest mb-1 drop-shadow-md">
+          Stop 0{idx + 1}
+        </div>
+        <h3 className="text-xl font-bold text-white mb-1 drop-shadow-md">{city.name}</h3>
+        <p className="text-xs text-amber-100/80 mb-2 font-medium">
+          {city.nights > 0 ? `${city.nights} nights` : 'Day Stop'}
+        </p>
+        <div className="text-xs text-wf-cream/80 line-clamp-2 leading-relaxed">
+          {city.focus}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function PolandLanding() {
   const pushRoute = (e, path) => {
     if (e) e.preventDefault();
@@ -179,14 +215,10 @@ export function PolandLanding() {
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Overview Grid */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8 space-y-16">
-        
-        {/* Route Snapshot / Journey Sequence */}
-        <section id="journey-sequence">
-          <div className="flex items-center justify-between mb-8">
+        {/* Journey Sequence Grid */}
+        <section id="journey-sequence" className="space-y-6">
+          <div className="flex items-center justify-between">
             <h2 className="text-2xl font-bold text-white flex items-center space-x-3">
               <Map className="w-6 h-6 text-wf-blue-lt" />
               <span>Journey Sequence</span>
@@ -202,47 +234,13 @@ export function PolandLanding() {
           
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             {polandJourney.route.map((city, idx) => (
-              <div key={city.id} className="glass-panel rounded-2xl relative hover-lift cursor-pointer overflow-hidden border border-white/5 hover:border-amber-500/40 transition-colors group" onClick={(e) => pushRoute(e, `/wayfinder/poland-christmas-2026/cities/${city.id}`)}>
-                {idx < polandJourney.route.length - 1 && (
-                  <div className="hidden md:block absolute top-1/2 -right-4 w-4 h-px bg-white/20 z-10" />
-                )}
-                <div className="h-48 sm:h-52 w-full relative overflow-hidden bg-slate-950">
-                  <img 
-                    src={cityImages[city.id]} 
-                    alt={city.name} 
-                    className="w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-105" 
-                    loading="lazy"
-                    decoding="async"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-wf-navy via-wf-navy/50 to-transparent"></div>
-                  
-                  {/* Detailed Hover Overlay */}
-                  <div className="absolute inset-0 bg-wf-navy/95 p-3 flex flex-col justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 backdrop-blur-sm z-20">
-                    <div className="text-[10px] font-bold uppercase tracking-wider text-amber-400 mb-0.5">
-                      📍 {city.imageDetails?.location}
-                    </div>
-                    <div className="text-xs font-bold text-white mb-1 line-clamp-1">
-                      🏛️ {city.imageDetails?.landmark}
-                    </div>
-                    <p className="text-[11px] text-amber-100/90 leading-tight line-clamp-4">
-                      {city.imageDetails?.description}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="p-4 relative z-10">
-                  <div className="text-amber-300 text-[10px] font-black uppercase tracking-widest mb-1 drop-shadow-md">
-                    Stop 0{idx + 1}
-                  </div>
-                  <h3 className="text-xl font-bold text-white mb-1 drop-shadow-md">{city.name}</h3>
-                  <p className="text-xs text-amber-100/80 mb-2 font-medium">
-                    {city.nights > 0 ? `${city.nights} nights` : 'Day Stop'}
-                  </p>
-                  <div className="text-xs text-wf-cream/80 line-clamp-2 leading-relaxed">
-                    {city.focus}
-                  </div>
-                </div>
-              </div>
+              <CityRouteCard
+                key={city.id}
+                city={city}
+                idx={idx}
+                totalCount={polandJourney.route.length}
+                pushRoute={pushRoute}
+              />
             ))}
           </div>
         </section>

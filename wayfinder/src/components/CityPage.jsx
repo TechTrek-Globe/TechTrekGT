@@ -215,6 +215,45 @@ function DrillDownFilters({ activeFilter, onFilterChange }) {
   );
 }
 
+function CityHeroImageCard({ 
+  imageSrc, 
+  alt, 
+  location, 
+  landmark, 
+  description, 
+  isLgbtq = false, 
+  heightClass = "h-72 sm:h-96" 
+}) {
+  const borderClass = isLgbtq ? "border-purple-500/30" : "border-amber-500/30";
+  const textAccClass = isLgbtq ? "text-purple-300" : "text-amber-300";
+  const icon = isLgbtq ? "🏳️‍🌈" : "🏛️";
+
+  return (
+    <div 
+      className={`w-full lg:w-7/12 ${heightClass} rounded-2xl overflow-hidden relative bg-slate-950 border ${borderClass} shadow-inner group shrink-0`}
+    >
+      <img 
+        src={imageSrc} 
+        alt={alt} 
+        className="absolute inset-0 w-full h-full object-cover object-center opacity-90"
+        fetchPriority="high"
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-wf-navy via-wf-navy/30 to-transparent"></div>
+
+      {landmark && (
+        <div className="absolute bottom-4 left-4 right-4">
+          <div className="bg-slate-950/80 backdrop-blur-md px-3.5 py-2 rounded-xl border border-white/10 shadow-lg flex items-center">
+            <span className={`text-xs ${textAccClass} font-bold flex items-center space-x-1.5 truncate`}>
+              <span>{icon}</span>
+              <span className="truncate">{landmark}</span>
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function CityPage({ cityId, subPage = 'overview' }) {
   const [activeMarketTab, setActiveMarketTab] = useState(0);
   const [activeEpochTab, setActiveEpochTab] = useState('all');
@@ -566,40 +605,16 @@ export function CityPage({ cityId, subPage = 'overview' }) {
             </div>
           </div>
 
-          {/* Right Column: LGBTQ+ Photo with Hover Overlay */}
-          <div className="w-full lg:w-7/12 h-64 sm:h-80 rounded-2xl overflow-hidden relative bg-slate-950 border border-purple-500/30 shadow-inner group shrink-0">
-            <img 
-              src={attractionImages['lgbtq-kazimierz.jpg'] || city.lgbtq.imageUrl || cityImages[city.id]} 
-              alt={`LGBTQ+ ${city.name} - ${city.lgbtq.landmark || "Father Bernatek Footbridge"}`} 
-              className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105 opacity-90"
-              fetchPriority="high"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-wf-navy via-wf-navy/30 to-transparent"></div>
-
-            {/* Detailed Hover Overlay */}
-            <div className="absolute inset-0 bg-wf-navy/95 p-6 sm:p-8 flex flex-col justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 backdrop-blur-md z-20">
-              <div className="text-xs sm:text-sm font-bold uppercase tracking-wider text-pink-400 mb-1 flex items-center space-x-2">
-                <MapPin className="w-4 h-4" />
-                <span>{city.lgbtq.primaryArea || "Kazimierz District"}</span>
-              </div>
-              <div className="text-xl sm:text-2xl font-black text-white mb-2">
-                🏳️‍🌈 {city.lgbtq.landmark || "Father Bernatek Footbridge"}
-              </div>
-              <p className="text-xs sm:text-sm text-purple-100/90 leading-relaxed">
-                {city.lgbtq.landmarkDescription || city.lgbtq.overview}
-              </p>
-            </div>
-
-            <div className="absolute bottom-4 left-4 right-4 group-hover:opacity-0 transition-opacity duration-300">
-              <div className="bg-slate-950/80 backdrop-blur-md px-3.5 py-2 rounded-xl border border-white/10 shadow-lg flex items-center justify-between">
-                <span className="text-xs text-purple-300 font-bold flex items-center space-x-1.5 truncate">
-                  <span>🏳️‍🌈</span>
-                  <span className="truncate">{city.lgbtq.landmark || "Father Bernatek Footbridge & Kazimierz"}</span>
-                </span>
-                <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold shrink-0 ml-2">Hover for details</span>
-              </div>
-            </div>
-          </div>
+          {/* Right Column: LGBTQ+ Photo */}
+          <CityHeroImageCard
+            imageSrc={attractionImages['lgbtq-kazimierz.jpg'] || city.lgbtq.imageUrl || cityImages[city.id]}
+            alt={`LGBTQ+ ${city.name} - ${city.lgbtq.landmark || "Father Bernatek Footbridge"}`}
+            location={city.lgbtq.primaryArea || "Kazimierz District"}
+            landmark={city.lgbtq.landmark || "Father Bernatek Footbridge & Kazimierz"}
+            description={city.lgbtq.landmarkDescription || city.lgbtq.overview}
+            isLgbtq={true}
+            heightClass="h-64 sm:h-80"
+          />
         </div>
       ) : (
         <div className="glass-panel p-4 sm:p-6 rounded-3xl border border-amber-500/30 bg-wf-navy-mid/95 shadow-2xl flex flex-col lg:flex-row items-stretch gap-6">
@@ -644,40 +659,16 @@ export function CityPage({ cityId, subPage = 'overview' }) {
             )}
           </div>
 
-          {/* Right Column: Main Picture with Hover Overlay */}
-          <div className="w-full lg:w-7/12 h-72 sm:h-96 rounded-2xl overflow-hidden relative bg-slate-950 border border-amber-500/30 shadow-inner group shrink-0">
-            <img 
-              src={cityImages[city.id]} 
-              alt={`${city.name} - ${city.id === 'krakow' ? "Rynek Główny Christmas Market" : city.name}`} 
-              className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-1000 group-hover:scale-105 opacity-90"
-              fetchPriority="high"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-wf-navy via-wf-navy/30 to-transparent"></div>
-
-            {/* Detailed Hover Overlay */}
-            <div className="absolute inset-0 bg-wf-navy/95 p-6 sm:p-8 flex flex-col justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 backdrop-blur-md z-20">
-              <div className="text-xs sm:text-sm font-bold uppercase tracking-wider text-amber-400 mb-1 flex items-center space-x-2">
-                <MapPin className="w-4 h-4" />
-                <span>{city.imageDetails?.location}</span>
-              </div>
-              <div className="text-xl sm:text-2xl font-black text-white mb-2">
-                🏛️ {city.imageDetails?.landmark}
-              </div>
-              <p className="text-xs sm:text-sm text-amber-100/90 leading-relaxed">
-                {city.imageDetails?.description}
-              </p>
-            </div>
-
-            <div className="absolute bottom-4 left-4 right-4 group-hover:opacity-0 transition-opacity duration-300">
-              <div className="bg-slate-950/80 backdrop-blur-md px-3.5 py-2 rounded-xl border border-white/10 shadow-lg flex items-center justify-between">
-                <span className="text-xs text-amber-300 font-bold flex items-center space-x-1.5 truncate">
-                  <span>🏛️</span>
-                  <span className="truncate">{city.imageDetails?.landmark}</span>
-                </span>
-                <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold shrink-0 ml-2">Hover for details</span>
-              </div>
-            </div>
-          </div>
+          {/* Right Column: Main Picture */}
+          <CityHeroImageCard
+            imageSrc={cityImages[city.id]}
+            alt={`${city.name} - ${city.id === 'krakow' ? "Rynek Główny Christmas Market" : city.name}`}
+            location={city.imageDetails?.location}
+            landmark={city.imageDetails?.landmark}
+            description={city.imageDetails?.description}
+            isLgbtq={false}
+            heightClass="h-72 sm:h-96"
+          />
         </div>
       )}
 

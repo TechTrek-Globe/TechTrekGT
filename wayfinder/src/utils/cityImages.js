@@ -21,6 +21,14 @@ import krakowThermalBathsImg from '../assets/krakow/attractions/thermal-baths.jp
 import krakowWalkingTourImg from '../assets/krakow/attractions/walking-tour.jpg';
 import krakowLgbtqKazimierzImg from '../assets/krakow/attractions/lgbtq-kazimierz.jpg';
 
+import wroclawMarketSquareImg from '../assets/wroclaw/attractions/wroclaw-market-square.jpg';
+import wroclawOstrowTumskiImg from '../assets/wroclaw/attractions/ostrow-tumski.jpg';
+import wroclawDwarfsImg from '../assets/wroclaw/attractions/wroclaw-dwarfs.jpg';
+import wroclawTumskiBridgeImg from '../assets/wroclaw/attractions/tumski-bridge.jpg';
+import wroclawCentennialHallImg from '../assets/wroclaw/attractions/centennial-hall.jpg';
+import wroclawPanoramaRaclawiceImg from '../assets/wroclaw/attractions/panorama-raclawice.jpg';
+import wroclawWalkingTourImg from '../assets/wroclaw/attractions/walking-tour.jpg';
+
 export const cityImages = {
   krakow: krakowImg,
   wroclaw: wroclawImg,
@@ -34,6 +42,7 @@ export const marketImages = {
   'maly-rynek': krakowMalyRynekImg,
   'kazimierz-wolnica': krakowPlacWolnicaImg,
   'podgorze': krakowRynekPodgorskiImg,
+  'wroclaw-rynek': wroclawImg,
 };
 
 export const attractionImages = {
@@ -48,6 +57,13 @@ export const attractionImages = {
   'thermal-baths.jpg': krakowThermalBathsImg,
   'walking-tour.jpg': krakowWalkingTourImg,
   'lgbtq-kazimierz.jpg': krakowLgbtqKazimierzImg,
+  'wroclaw-market-square.jpg': wroclawMarketSquareImg,
+  'ostrow-tumski.jpg': wroclawOstrowTumskiImg,
+  'wroclaw-dwarfs.jpg': wroclawDwarfsImg,
+  'tumski-bridge.jpg': wroclawTumskiBridgeImg,
+  'centennial-hall.jpg': wroclawCentennialHallImg,
+  'panorama-raclawice.jpg': wroclawPanoramaRaclawiceImg,
+  'wroclaw-walking-tour.jpg': wroclawWalkingTourImg
 };
 
 export function getAttractionImage(cardImage = '', cardTitle = '', cityName = 'Kraków') {
@@ -59,6 +75,19 @@ export function getAttractionImage(cardImage = '', cardTitle = '', cityName = 'K
   }
 
   const name = (cardTitle || '').toLowerCase();
+  const cName = (cityName || '').toLowerCase();
+
+  if (cName.includes('wrocław') || cName.includes('wroclaw')) {
+    if (name.includes('dwarf') || name.includes('krasnal')) return attractionImages['wroclaw-dwarfs.jpg'];
+    if (name.includes('tumski') && name.includes('bridge')) return attractionImages['tumski-bridge.jpg'];
+    if (name.includes('tumski') || name.includes('cathedral')) return attractionImages['ostrow-tumski.jpg'];
+    if (name.includes('centennial') || name.includes('stulecia')) return attractionImages['centennial-hall.jpg'];
+    if (name.includes('panorama') || name.includes('racławic')) return attractionImages['panorama-raclawice.jpg'];
+    if (name.includes('walk') || name.includes('tour')) return attractionImages['wroclaw-walking-tour.jpg'];
+    if (name.includes('ratusz') || name.includes('square')) return attractionImages['wroclaw-market-square.jpg'];
+    return cityImages.wroclaw;
+  }
+
   if (name.includes('walk') || name.includes('tour') || name.includes('guided')) return attractionImages['walking-tour.jpg'];
   if (name.includes('thermal') || name.includes('termy') || name.includes('bath') || name.includes('chochoł')) return attractionImages['thermal-baths.jpg'];
   if (name.includes('wawel')) return attractionImages['wawel-castle.jpg'];
@@ -70,5 +99,5 @@ export function getAttractionImage(cardImage = '', cardTitle = '', cityName = 'K
   if (name.includes('wieliczka') || name.includes('salt mine')) return attractionImages['wieliczka-salt-mine.jpg'];
   if (name.includes('schindler')) return attractionImages['schindler-factory.jpg'];
 
-  return cityImages[cityName.toLowerCase()] || cityImages.krakow;
+  return cityImages[cName] || cityImages.krakow;
 }

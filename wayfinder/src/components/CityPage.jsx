@@ -133,7 +133,7 @@ const FILTER_CATEGORIES = [
   { id: 'cheap', label: 'Cheap Eats (3)', Icon: Coins, activeClass: 'bg-emerald-600 text-white shadow-md shadow-emerald-500/20', inactiveClass: 'bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-300 border border-emerald-600/30' }
 ];
 
-function DrillDownFilters({ activeFilter, onFilterChange }) {
+function DrillDownFilters({ activeFilter, onFilterChange, items = [] }) {
   const [activeTier, setActiveTier] = useState('main'); // 'main', 'eat', 'drink'
 
   const eatIds = ['local', 'coffee-breakfast', 'must-haves', 'expensive', 'steak', 'cheap'];
@@ -160,7 +160,7 @@ function DrillDownFilters({ activeFilter, onFilterChange }) {
                 : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10'
             }`}
           >
-            All Food & Drink (35)
+            All Food & Drink ({items.length > 0 ? items.length : 'All'})
           </button>
           <button
             type="button"
@@ -364,10 +364,104 @@ export function CityPage({ cityId, subPage = 'overview' }) {
     }
   }, [cityId, activeSubPage]);
 
-  // OpenStreetMap embed bbox for Kraków or generic fallback
+  // Dynamic Page Title, Meta Description, Canonical URL, Open Graph & JSON-LD Structured Data
+  useEffect(() => {
+    if (!city) return;
+
+    const pageTitle = activeSubPage !== 'overview'
+      ? `${city.name} ${activeSubPage.charAt(0).toUpperCase() + activeSubPage.slice(1)} | Poland Christmas 2026`
+      : `${city.name} Travel Guide & Christmas Market 2026 | TechTrek Wayfinder`;
+
+    document.title = pageTitle;
+
+    const canonicalUrl = `https://techtrekgt.com/wayfinder/poland-christmas-2026/cities/${city.id}${activeSubPage !== 'overview' ? '/' + activeSubPage : ''}`;
+
+    // Meta description
+    let metaDesc = document.querySelector('meta[name="description"]');
+    if (!metaDesc) {
+      metaDesc = document.createElement('meta');
+      metaDesc.name = 'description';
+      document.head.appendChild(metaDesc);
+    }
+    metaDesc.content = `Explore ${city.name} during Christmas 2026. ${city.focus || city.description || ''} Complete guide with hotels, food, markets, and attractions.`;
+
+    // Canonical link
+    let canonicalLink = document.querySelector('link[rel="canonical"]');
+    if (!canonicalLink) {
+      canonicalLink = document.createElement('link');
+      canonicalLink.rel = 'canonical';
+      document.head.appendChild(canonicalLink);
+    }
+    canonicalLink.href = canonicalUrl;
+
+    // Open Graph Title
+    let ogTitle = document.querySelector('meta[property="og:title"]');
+    if (!ogTitle) {
+      ogTitle = document.createElement('meta');
+      ogTitle.setAttribute('property', 'og:title');
+      document.head.appendChild(ogTitle);
+    }
+    ogTitle.content = pageTitle;
+
+    // Open Graph Description
+    let ogDesc = document.querySelector('meta[property="og:description"]');
+    if (!ogDesc) {
+      ogDesc = document.createElement('meta');
+      ogDesc.setAttribute('property', 'og:description');
+      document.head.appendChild(ogDesc);
+    }
+    ogDesc.content = metaDesc.content;
+
+    // Open Graph URL
+    let ogUrl = document.querySelector('meta[property="og:url"]');
+    if (!ogUrl) {
+      ogUrl = document.createElement('meta');
+      ogUrl.setAttribute('property', 'og:url');
+      document.head.appendChild(ogUrl);
+    }
+    ogUrl.content = canonicalUrl;
+
+    // JSON-LD Structured Data
+    let jsonLdScript = document.getElementById('city-json-ld');
+    if (!jsonLdScript) {
+      jsonLdScript = document.createElement('script');
+      jsonLdScript.id = 'city-json-ld';
+      jsonLdScript.type = 'application/ld+json';
+      document.head.appendChild(jsonLdScript);
+    }
+    jsonLdScript.text = JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'TouristDestination',
+      'name': `${city.name} Christmas Market 2026`,
+      'description': city.focus,
+      'url': canonicalUrl,
+      'event': {
+        '@type': 'Event',
+        'name': `${city.name} Christmas Market 2026`,
+        'startDate': '2026-11-21',
+        'endDate': '2027-01-07',
+        'eventAttendanceMode': 'https://schema.org/OfflineEventAttendanceMode',
+        'eventStatus': 'https://schema.org/EventScheduled',
+        'location': {
+          '@type': 'Place',
+          'name': `${city.name} Main Market Square`,
+          'address': {
+            '@type': 'PostalAddress',
+            'addressLocality': city.name,
+            'addressCountry': 'PL'
+          }
+        }
+      }
+    });
+
+  }, [city, activeSubPage]);
+
+  // OpenStreetMap embed bbox for Kraków, Wrocław, or generic fallback
   const mapUrl = cityId === 'krakow'
     ? "https://www.openstreetmap.org/export/embed.html?bbox=19.9200%2C50.0450%2C19.9650%2C50.0700&amp;layer=mapnik&amp;marker=50.0614%2C19.9366"
-    : "https://www.openstreetmap.org/export/embed.html?bbox=16.9000%2C51.1000%2C17.1000%2C51.1300&amp;layer=mapnik";
+    : cityId === 'wroclaw'
+      ? "https://www.openstreetmap.org/export/embed.html?bbox=17.0150%2C51.1000%2C17.0500%2C51.1200&amp;layer=mapnik&amp;marker=51.1095%2C17.0318"
+      : "https://www.openstreetmap.org/export/embed.html?bbox=16.9000%2C51.1000%2C17.1000%2C51.1300&amp;layer=mapnik";
 
   return (
     <div ref={cityHeaderRef} className="w-full max-w-6xl min-w-0 mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -1099,37 +1193,41 @@ export function CityPage({ cityId, subPage = 'overview' }) {
               <h2 className="text-3xl font-black text-white">Christmas Markets in {city.name}</h2>
             </div>
 
-            {/* Compact Embedded 4K Walking Tour Mini-Player (Krakow) */}
-            {city.id === 'krakow' && (
-              <div className="w-44 sm:w-48 md:w-52 shrink-0 rounded-xl overflow-hidden border border-amber-500/30 bg-slate-950 shadow-lg shadow-amber-950/30 group">
-                <div className="relative w-full aspect-video">
-                  <iframe
-                    src="https://www.youtube-nocookie.com/embed/DUFYxovB_80"
-                    title="4K Krakow Christmas Market Walking Tour"
-                    className="absolute inset-0 w-full h-full border-0"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                    loading="lazy"
-                  ></iframe>
+            {/* Compact Embedded 4K Walking Tour Mini-Player */}
+            {(() => {
+              const videoId = city.id === 'krakow' ? 'DUFYxovB_80' : (city.id === 'wroclaw' ? 'lZfJ3H5kL50' : null);
+              if (!videoId) return null;
+              return (
+                <div className="w-44 sm:w-48 md:w-52 shrink-0 rounded-xl overflow-hidden border border-amber-500/30 bg-slate-950 shadow-lg shadow-amber-950/30 group">
+                  <div className="relative w-full aspect-video">
+                    <iframe
+                      src={`https://www.youtube-nocookie.com/embed/${videoId}`}
+                      title={`4K ${city.name} Christmas Market Walking Tour`}
+                      className="absolute inset-0 w-full h-full border-0"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                      loading="lazy"
+                    ></iframe>
+                  </div>
+                  <div className="px-2.5 py-1 bg-wf-navy-mid/95 border-t border-white/10 flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-amber-300 uppercase tracking-wider flex items-center space-x-1">
+                      <Video className="w-3 h-3 text-red-400" />
+                      <span>4K Walking Tour</span>
+                    </span>
+                    <a
+                      href={`https://www.youtube.com/watch?v=${videoId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] text-slate-400 hover:text-white flex items-center space-x-1 transition-colors"
+                      title="Open on YouTube"
+                    >
+                      <span>YouTube</span>
+                      <ExternalLink className="w-2.5 h-2.5" />
+                    </a>
+                  </div>
                 </div>
-                <div className="px-2.5 py-1 bg-wf-navy-mid/95 border-t border-white/10 flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-amber-300 uppercase tracking-wider flex items-center space-x-1">
-                    <Video className="w-3 h-3 text-red-400" />
-                    <span>4K Walking Tour</span>
-                  </span>
-                  <a
-                    href="https://www.youtube.com/watch?v=DUFYxovB_80"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[10px] text-slate-400 hover:text-white flex items-center space-x-1 transition-colors"
-                    title="Open on YouTube"
-                  >
-                    <span>YouTube</span>
-                    <ExternalLink className="w-2.5 h-2.5" />
-                  </a>
-                </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
 
           {/* Sticky Sub-Tabs for individual markets */}
@@ -1621,7 +1719,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                 </h2>
               </div>
               <p className="text-xs sm:text-sm text-slate-300 font-medium leading-tight">
-                Handpicked culinary dining, underground craft breweries, historic Polish vodka houses, bohemian cellar bars, steakhouses, and budget milk bars in Kraków.
+                Handpicked culinary dining, underground craft breweries, historic Polish vodka houses, bohemian cellar bars, steakhouses, and budget milk bars in {city.name}.
               </p>
             </div>
           </div>
@@ -1630,6 +1728,11 @@ export function CityPage({ cityId, subPage = 'overview' }) {
           {(city[`${city.id}RestaurantsDetailed`] || city[`${city.id}DrinksDetailed`]) && (
             <div className="sticky top-[118px] z-30 py-2.5 px-3 sm:px-5 rounded-2xl bg-slate-950/95 backdrop-blur-xl border border-amber-500/30 shadow-2xl transition-all">
               <DrillDownFilters 
+                items={[
+                  ...(city[`${city.id}RestaurantsDetailed`] || []),
+                  ...(city[`${city.id}DrinksDetailed`] || []),
+                  ...(city[`${city.id}CafesDetailed`] || [])
+                ]}
                 activeFilter={restaurantCategoryFilter} 
                 onFilterChange={setRestaurantCategoryFilter} 
               />

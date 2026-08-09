@@ -47,3 +47,9 @@
       - If any validation step fails, you MUST fix the issue before marking the task as complete. This may involve updating API configurations, generating missing images, sanitizing data, or removing problematic code.
    6. **Documentation:**
       - After successful validation, update the relevant documentation (e.g., Architecture.md) to reflect any changes made to API dependencies or data sources.
+
+## 6. Google Places API Rules
+* **API Keys:** The Google Places API key is stored in `.env` as `GOOGLE_PLACES_API_KEY`.
+* **Fetching Places:** Use the `places` library in the correct format (using `google` as the namespace) when calling the API.
+* **Place Creation:** When creating a new place in the database, the `google_place_id` field is the unique identifier returned by the API.
+* **Verification:** Verify that the Google Places API key is valid and has the necessary permissions to make requests before using the API.

@@ -1901,7 +1901,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                         : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10'
                     }`}
                   >
-                    All Options ({city.krakowHotelsDetailed.length})
+                    All Options ({city.krakowHotelsDetailed.length + (city.krakowUniqueStays?.length || 0)})
                   </button>
                   <button
                     type="button"
@@ -1939,6 +1939,20 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                     <Coins className="w-3.5 h-3.5" />
                     <span>Cost-Effective ({city.krakowHotelsDetailed.filter((h) => h.tier === 'budget').length})</span>
                   </button>
+                  {city.krakowUniqueStays && city.krakowUniqueStays.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setHotelTierFilter('unique')}
+                      className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 cursor-pointer ${
+                        hotelTierFilter === 'unique'
+                          ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md shadow-purple-500/20 border border-transparent'
+                          : 'bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                      }`}
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>UNIQUE STAYS ({city.krakowUniqueStays.length})</span>
+                    </button>
+                  )}
                 </div>
                 <div className="text-xs font-bold text-slate-400 flex items-center space-x-1">
                   <Compass className="w-3.5 h-3.5 text-amber-400" />
@@ -2179,7 +2193,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
           )}
 
           {/* Unique Stays Section */}
-          {city.krakowUniqueStays && city.krakowUniqueStays.length > 0 && (
+          {(hotelTierFilter === 'all' || hotelTierFilter === 'unique') && city.krakowUniqueStays && city.krakowUniqueStays.length > 0 && (
             <div className="space-y-4">
               <div className="glass-panel p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-purple-500/30 bg-wf-navy-mid/95 relative overflow-hidden shadow-lg">
                 <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-bl from-purple-500/15 via-pink-500/10 to-transparent rounded-full blur-2xl pointer-events-none" />

@@ -73,7 +73,7 @@ export const polandJourney = {
           neighborhood: 'Stare Miasto (Old Town)',
           stars: 5,
           websiteUrl: 'https://stary.hotel.com.pl/en/',
-          imageSrc: '/images/hotels/hotel-stary.jpg',
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/hotel-stary.jpg',
           basePricePln: 1150,
           memberPricePln: 1020,
           currency: 'PLN',
@@ -103,7 +103,7 @@ export const polandJourney = {
           neighborhood: 'Stare Miasto (Kanonicza Street)',
           stars: 5,
           websiteUrl: 'https://copernicus.hotel.com.pl/en/',
-          imageSrc: '/images/hotels/hotel-copernicus.jpg',
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/hotel-copernicus.jpg',
           basePricePln: 1250,
           memberPricePln: 1100,
           currency: 'PLN',
@@ -133,7 +133,7 @@ export const polandJourney = {
           neighborhood: 'Wawel Slope & Vistula River',
           stars: 5,
           websiteUrl: 'https://www.marriott.com/en-us/hotels/krksi-sheraton-grand-krakow/overview/',
-          imageSrc: '/images/hotels/sheraton-grand-krakow.jpg',
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/sheraton-grand-krakow.jpg',
           basePricePln: 920,
           memberPricePln: 810,
           currency: 'PLN',
@@ -163,7 +163,7 @@ export const polandJourney = {
           neighborhood: 'Stare Miasto North / Main Station',
           stars: 4,
           websiteUrl: 'https://purohotel.pl/en/krakow-stare-miasto',
-          imageSrc: '/images/hotels/puro-krakow-stare-miasto.jpg',
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/puro-krakow-stare-miasto.jpg',
           basePricePln: 480,
           memberPricePln: 425,
           currency: 'PLN',
@@ -193,7 +193,7 @@ export const polandJourney = {
           neighborhood: 'Stary Kleparz & Old Town Gate',
           stars: 4,
           websiteUrl: 'https://www.ihg.com/hotelindigo/hotels/us/en/krakow/krkin/hoteldetail',
-          imageSrc: '/images/hotels/hotel-indigo-krakow.jpg',
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/hotel-indigo-krakow.jpg',
           basePricePln: 550,
           memberPricePln: 485,
           currency: 'PLN',
@@ -223,7 +223,7 @@ export const polandJourney = {
           neighborhood: 'Old Town & Kazimierz Junction',
           stars: 4,
           websiteUrl: 'https://hotelmetropolitan.pl/en/',
-          imageSrc: '/images/hotels/metropolitan-boutique-hotel.jpg',
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/metropolitan-boutique-hotel.jpg',
           basePricePln: 510,
           memberPricePln: 450,
           currency: 'PLN',
@@ -253,7 +253,7 @@ export const polandJourney = {
           neighborhood: 'Stare Miasto North',
           stars: 3,
           websiteUrl: 'https://all.accor.com/hotel/7161/index.en.shtml',
-          imageSrc: '/images/hotels/ibis-krakow-stare-miasto.jpg',
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/ibis-krakow-stare-miasto.jpg',
           basePricePln: 260,
           memberPricePln: 230,
           currency: 'PLN',
@@ -283,7 +283,7 @@ export const polandJourney = {
           neighborhood: 'Kazimierz Jewish Quarter',
           stars: 3,
           websiteUrl: 'https://www.aparthoteldelta.pl/',
-          imageSrc: '/images/hotels/boutique-aparthotel-kazimierz.jpg',
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/boutique-aparthotel-kazimierz.jpg',
           basePricePln: 280,
           memberPricePln: 245,
           currency: 'PLN',
@@ -313,7 +313,7 @@ export const polandJourney = {
           neighborhood: 'Stare Miasto (Royal Route)',
           stars: 2,
           websiteUrl: 'https://gregtomhostel.com',
-          imageSrc: '/images/hotels/greg-tom-beer-house.jpg',
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/greg-tom-beer-house.jpg',
           basePricePln: 190,
           memberPricePln: 165,
           currency: 'PLN',
@@ -343,7 +343,7 @@ export const polandJourney = {
           neighborhood: 'Stare Miasto (Old Town)',
           stars: 5,
           websiteUrl: 'https://grand.pl/',
-          imageSrc: '/images/hotels/grand-hotel-krakow.jpg',
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/grand-hotel-krakow.jpg',
           basePricePln: 1100,
           memberPricePln: 950,
           currency: 'PLN',
@@ -366,7 +366,7 @@ export const polandJourney = {
           neighborhood: 'Stare Miasto (Old Town)',
           stars: 5,
           websiteUrl: 'https://www.marriott.com/en-us/hotels/krklc-h15-palace-a-luxury-collection-hotel-krakow/overview/',
-          imageSrc: '/images/hotels/h15-palace.jpg',
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/h15-palace.jpg',
           basePricePln: 1300,
           memberPricePln: 1150,
           currency: 'PLN',
@@ -389,7 +389,7 @@ export const polandJourney = {
           neighborhood: 'Stare Miasto (Royal Route)',
           stars: 5,
           websiteUrl: 'https://podroza.hotel.com.pl/en/',
-          imageSrc: '/images/hotels/hotel-pod-roza.jpg',
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/hotel-pod-roza.jpg',
           basePricePln: 1050,
           memberPricePln: 900,
           currency: 'PLN',
@@ -412,7 +412,7 @@ export const polandJourney = {
           neighborhood: 'Planty Park / Wawel',
           stars: 5,
           websiteUrl: 'https://bachledaluxuryhotel.pl/',
-          imageSrc: '/images/hotels/bachleda-luxury-hotel.jpg',
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/bachleda-luxury-hotel.jpg',
           basePricePln: 950,
           memberPricePln: 820,
           currency: 'PLN',
@@ -435,7 +435,7 @@ export const polandJourney = {
           neighborhood: 'Stare Miasto (Grodzka Street)',
           stars: 5,
           websiteUrl: 'https://balthazarhotel.com/',
-          imageSrc: '/images/hotels/balthazar-design-hotel.jpg',
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/balthazar-design-hotel.jpg',
           basePricePln: 1150,
           memberPricePln: 980,
           currency: 'PLN',
@@ -458,7 +458,7 @@ export const polandJourney = {
           neighborhood: 'Stare Miasto (Old Town)',
           stars: 4,
           websiteUrl: 'https://www.hotelunicus.pl/en/',
-          imageSrc: '/images/hotels/hotel-unicus.jpg',
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/hotel-unicus.jpg',
           basePricePln: 520,
           memberPricePln: 450,
           currency: 'PLN',
@@ -481,7 +481,7 @@ export const polandJourney = {
           neighborhood: 'Stare Miasto (Old Town)',
           stars: 4,
           websiteUrl: 'https://www.senacki.com/en/',
-          imageSrc: '/images/hotels/hotel-senacki.jpg',
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/hotel-senacki.jpg',
           basePricePln: 480,
           memberPricePln: 420,
           currency: 'PLN',
@@ -504,7 +504,7 @@ export const polandJourney = {
           neighborhood: 'Stare Miasto (Old Town)',
           stars: 4,
           websiteUrl: 'https://aparthotelstaremiasto.pl/en/',
-          imageSrc: '/images/hotels/aparthotel-stare-miasto.jpg',
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/aparthotel-stare-miasto.jpg',
           basePricePln: 460,
           memberPricePln: 390,
           currency: 'PLN',
@@ -527,7 +527,7 @@ export const polandJourney = {
           neighborhood: 'Planty Park / Wawel',
           stars: 4,
           websiteUrl: 'https://wawelqueen.pl/en/',
-          imageSrc: '/images/hotels/hotel-wawel-queen.jpg',
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/hotel-wawel-queen.jpg',
           basePricePln: 490,
           memberPricePln: 430,
           currency: 'PLN',
@@ -550,7 +550,7 @@ export const polandJourney = {
           neighborhood: 'Stare Miasto (Old Town)',
           stars: 4,
           websiteUrl: 'https://hotelfrancuski.pl/en/',
-          imageSrc: '/images/hotels/hotel-francuski.jpg',
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/hotel-francuski.jpg',
           basePricePln: 450,
           memberPricePln: 390,
           currency: 'PLN',
@@ -573,7 +573,7 @@ export const polandJourney = {
           neighborhood: 'Stare Miasto (Old Town)',
           stars: 3,
           websiteUrl: 'https://pollera.com.pl/en/',
-          imageSrc: '/images/hotels/hotel-pollera.jpg',
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/hotel-pollera.jpg',
           basePricePln: 290,
           memberPricePln: 250,
           currency: 'PLN',
@@ -596,7 +596,7 @@ export const polandJourney = {
           neighborhood: 'Stare Miasto (Old Town)',
           stars: 3,
           websiteUrl: 'https://hotelelektor.pl/en/',
-          imageSrc: '/images/hotels/hotel-elektor-premium.jpg',
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/hotel-elektor-premium.jpg',
           basePricePln: 310,
           memberPricePln: 270,
           currency: 'PLN',
@@ -619,7 +619,7 @@ export const polandJourney = {
           neighborhood: 'Stare Miasto (Old Town)',
           stars: 2,
           websiteUrl: 'https://draggo.house/',
-          imageSrc: '/images/hotels/draggo-house.jpg',
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/draggo-house.jpg',
           basePricePln: 120,
           memberPricePln: 100,
           currency: 'PLN',
@@ -642,7 +642,7 @@ export const polandJourney = {
           neighborhood: 'Stare Miasto (Main Square)',
           stars: 2,
           websiteUrl: 'http://www.rynek7.pl/en/',
-          imageSrc: '/images/hotels/hostel-rynek-7.jpg',
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/hostel-rynek-7.jpg',
           basePricePln: 110,
           memberPricePln: 95,
           currency: 'PLN',
@@ -665,7 +665,7 @@ export const polandJourney = {
           neighborhood: 'Stare Miasto (Planty North)',
           stars: 2,
           websiteUrl: 'https://bubblehostel.pl/',
-          imageSrc: '/images/hotels/bubble-hostel.jpg',
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/bubble-hostel.jpg',
           basePricePln: 100,
           memberPricePln: 85,
           currency: 'PLN',
@@ -691,7 +691,7 @@ export const polandJourney = {
           priceRange: '450-650 PLN/night',
           priceUsd: '$115-$165',
           bookingUrl: 'https://www.wieliczka-saltmine.com/',
-          imageSrc: '/images/hotels/unique-wieliczka-salt.jpg',
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/unique-wieliczka-salt.jpg',
           description: 'Sleep beneath 13 floors of crystalline salt chambers in Wieliczka, a UNESCO World Heritage site dating to the 13th century. The subterranean sanatorium offers overnight stays with proven therapeutic benefits for respiratory ailments.',
           whyUnique: 'One of the world\'s only underground wellness hotels - salt air therapy used for over 200 years',
           vibe: 'Mystical & Therapeutic',
@@ -708,7 +708,7 @@ export const polandJourney = {
           priceRange: '380-520 PLN/night',
           priceUsd: '$97-$133',
           bookingUrl: 'https://www.airbnb.com/s/Kazimierz--Krakow',
-          imageSrc: '/images/hotels/unique-jewish-quarter-loft.jpg',
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/unique-jewish-quarter-loft.jpg',
           description: 'Restored 19th-century Jewish tenement lofts in the heart of Kazimierz - the city\'s most atmospheric and bohemian district. Featured in Schindler\'s List filming locations, now buzzing with galleries, klezmer bars, and legendary brunch spots.',
           whyUnique: 'Wake up in a living piece of Polish-Jewish heritage - steps from synagogues, flea markets and the city\'s best nightlife',
           vibe: 'Bohemian & Historic',
@@ -725,7 +725,7 @@ export const polandJourney = {
           priceRange: '320-490 PLN/night',
           priceUsd: '$82-$125',
           bookingUrl: 'https://forumkrakow.eu/',
-          imageSrc: '/images/hotels/unique-communist-era-hotel.jpg',
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/unique-communist-era-hotel.jpg',
           description: 'An audacious brutalist relic from the 1980s, dramatically revived as a cultural hub. Dramatic river views, rooftop cinema, cult cocktail bar, and one of Krakow\'s most unexpected skyline panoramas directly opposite Wawel Castle.',
           whyUnique: 'Nowhere else in Europe can you sleep in a communist-era brutalist landmark with a Wawel Castle panorama from the rooftop bar',
           vibe: 'Edgy & Cultural',
@@ -742,7 +742,7 @@ export const polandJourney = {
           priceRange: '180-280 PLN/night',
           priceUsd: '$46-$72',
           bookingUrl: 'https://www.bielany.net/en/',
-          imageSrc: '/images/hotels/unique-monastery-guesthouse.jpg',
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/unique-monastery-guesthouse.jpg',
           description: 'A 17th-century hermitage perched on a forested hill above Krakow, offering guesthouse accommodation for male travelers seeking profound quiet, Gregorian chant at sunrise, and a total digital detox. One of the most unique experiences in Central Europe.',
           whyUnique: 'The only accommodation in Krakow where you are literally woken by 500-year-old Gregorian chanting and can hear nothing but forest silence',
           vibe: 'Spiritual & Serene',
@@ -759,7 +759,7 @@ export const polandJourney = {
           priceRange: '350-600 PLN/night',
           priceUsd: '$90-$153',
           bookingUrl: 'https://www.airbnb.com/s/Zakopane--Poland',
-          imageSrc: '/images/hotels/unique-tatra-villa.jpg',
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/unique-tatra-villa.jpg',
           description: 'Base yourself in a traditional Gorals wooden highland villa in Zakopane for a night or two - perfect for a mountain detour from Krakow. Thermal baths, Tatra peaks, cable car rides, and authentic oscypek cheese direct from shepherds.',
           whyUnique: 'Swap Krakow\'s cobblestones for Tatra peaks - traditional Goral wooden chalet architecture found nowhere else in Poland',
           vibe: 'Alpine & Adventurous',
@@ -1218,7 +1218,7 @@ export const polandJourney = {
           signature: 'Góralski Pierogi, Roasted Duck with Apples & Cranberries, Grilled Oscypek Cheese',
           description: 'Rustic wooden log cabin interior with live highlander folk musicians, crackling stone fireplaces, and rich mountain hospitality.',
           websiteUrl: 'https://www.morskieoko.krakow.pl',
-          imageSrc: '/images/hotels/morskie-oko.jpg'
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/morskie-oko.jpg'
         },
         {
           id: 'czarna-kaczka',
@@ -1233,7 +1233,7 @@ export const polandJourney = {
           signature: 'Roasted Half Duck with Red Cabbage & Plum Sauce, Wild Mushroom Soup in Bread Bowl',
           description: 'Romantic, candle-lit Old Town dining room praised for authentic centuries-old Royal Polish duck and game bird preparations.',
           websiteUrl: 'https://czarnakaczka.pl',
-          imageSrc: '/images/hotels/czarna-kaczka.jpg'
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/czarna-kaczka.jpg'
         },
         {
           id: 'stary-port',
@@ -1247,7 +1247,7 @@ export const polandJourney = {
           cuisine: 'Polish Maritime & Subterranean Comfort',
           signature: 'Hot Spiced Honey Mead, Creamy Garlic Soup in Loaf, Smoked Trout, Pierogi Platters',
           description: 'Uniquely themed subterranean sailor tavern carved inside a 19th-century cellar near Wawel with warm wooden booths and historic relics.',
-          imageSrc: '/images/hotels/stary-port.jpg'
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/stary-port.jpg'
         },
         {
           id: 'pierogarnia-glowna',
@@ -1261,7 +1261,7 @@ export const polandJourney = {
           cuisine: 'Handmade Traditional Polish Pierogi',
           signature: 'Ruskie Pierogi (Potato & Cottage Cheese), Wild Mushroom & Cabbage, Sweet Cherry Pierogi',
           description: 'Acclaimed, dedicated handmade pierogi spot where dumplings are rolled, stuffed, and boiled fresh right before your eyes.',
-          imageSrc: '/images/hotels/pierogarnia-glowna.jpg'
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/pierogarnia-glowna.jpg'
         },
         {
           id: 'restauracja-starka',
@@ -1275,7 +1275,7 @@ export const polandJourney = {
           cuisine: 'Bohemian Polish & Homemade Infused Vodkas',
           signature: 'Chili-Honey & Cranberry Infused Vodkas, Pork Tenderloin in Creamy Chanterelle Sauce',
           description: 'Warm, vibrant Kazimierz institution famous for artisanal house-infused vodkas and hearty Polish comfort classics.',
-          imageSrc: '/images/hotels/restauracja-starka.jpg'
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/restauracja-starka.jpg'
         },
         {
           id: 'pod-wawelem',
@@ -1290,7 +1290,7 @@ export const polandJourney = {
           signature: 'Giant Schnitzels, Grilled Meat Skewers (Szaszłyk), Crispy Pork Knuckle (Golonka), Draft Beers',
           description: 'Lively, festive beer hall at the foot of Wawel Castle with massive portions, brass band energy, and family-style wooden tables.',
           websiteUrl: 'https://www.podwawelem.eu',
-          imageSrc: '/images/hotels/pod-wawelem.jpg'
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/pod-wawelem.jpg'
         },
         {
           id: 'bottiglieria-1881',
@@ -1305,7 +1305,7 @@ export const polandJourney = {
           signature: 'Seasonal Małopolska Foraged Tasting Menu, Smoked Sturgeon, Artisanal Butter & Natural Wines',
           description: 'Poland\'s premier 2-Michelin-starred culinary temple in Kazimierz, transforming local Małopolska farm ingredients into modern art.',
           websiteUrl: 'https://1881.com.pl',
-          imageSrc: '/images/hotels/bottiglieria-1881.jpg'
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/bottiglieria-1881.jpg'
         },
         {
           id: 'fiorentina-ristorante',
@@ -1320,7 +1320,7 @@ export const polandJourney = {
           signature: 'Bistecca alla Fiorentina (Dry-Aged Chianina Beef), Truffle Tagliatelle, Wild Boar Carpaccio',
           description: 'Award-winning fine dining housed in a restored Gothic palace on the Royal Route with an romantic glass courtyard atrium.',
           websiteUrl: 'https://fiorentina.com.pl/',
-          imageSrc: '/images/hotels/fiorentina-ristorante.jpg'
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/fiorentina-ristorante.jpg'
         },
         {
           id: 'trzy-rybki',
@@ -1335,7 +1335,7 @@ export const polandJourney = {
           signature: 'Venison Loin with Juniper, Roasted Goose Breast, Crayfish Soup, Fine Wine Pairing',
           description: 'Elegantly soaring Renaissance vaulted hall inside 5-star Hotel Stary, offering inventive modern Polish gastronomy.',
           websiteUrl: 'https://stary.hotel.com.pl/en/trzy-rybki/',
-          imageSrc: '/images/hotels/trzy-rybki.jpg'
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/trzy-rybki.jpg'
         },
         {
           id: 'ed-red-steakhouse',
@@ -1349,7 +1349,7 @@ export const polandJourney = {
           cuisine: 'Dry-Aged Beef & Polish Red Cattle',
           signature: '30-90 Day Dry-Aged Polish Red Cattle Ribeye, Bone Marrow Toast, Beef Tartare',
           description: 'Pioneering Polish steakhouse dedicated to dry-aging heritage Polish Red cattle breeds over aromatic wood embers.',
-          imageSrc: '/images/hotels/ed-red-steakhouse.jpg'
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/ed-red-steakhouse.jpg'
         },
         {
           id: 'pampas-steakhouse',
@@ -1364,7 +1364,7 @@ export const polandJourney = {
           signature: 'Argentine Black Angus Bife de Lomo, Chimichurri Ribeye, Charcoal-Grilled Lamb Chops',
           description: 'Intimate, rustic stone cellar steakhouse specializing in prime South American charcoal-grilled cuts and Malbec pairings.',
           websiteUrl: 'https://pampas.pl/',
-          imageSrc: '/images/hotels/pampas-steakhouse.jpg'
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/pampas-steakhouse.jpg'
         },
         {
           id: 'muu-muu-steakhouse',
@@ -1379,7 +1379,7 @@ export const polandJourney = {
           signature: 'T-Bone Steak, Wagyu Skirt Steak, Charcoal Grilled Burgers, Potato Wedges with Truffle Dip',
           description: 'Cozy brick-walled steakhouse near Planty Park serving sizzling hot-stone steaks and craft draft beers.',
           websiteUrl: 'https://muumuu.pl/',
-          imageSrc: '/images/hotels/muu-muu-steakhouse.jpg'
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/muu-muu-steakhouse.jpg'
         },
         {
           id: 'bar-mleczny-pod-temida',
@@ -1393,7 +1393,7 @@ export const polandJourney = {
           cuisine: 'Authentic Post-Communist Polish Milk Bar',
           signature: 'Żurek Sour Rye Soup, Placki Ziemniaczane (Potato Pancakes), Pierogi Ruskie',
           description: 'Legendary subsidized Polish Milk Bar on Grodzka street serving dirt-cheap, piping-hot traditional home cooking.',
-          imageSrc: '/images/hotels/bar-mleczny-pod-temida.jpg'
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/bar-mleczny-pod-temida.jpg'
         },
         {
           id: 'plac-nowy-zapiekanki',
@@ -1407,7 +1407,7 @@ export const polandJourney = {
           cuisine: 'Iconic Polish Open-Face Baguette Street Food',
           signature: 'Toasted Zapiekanki with sautéed mushrooms, melted cheese, chives, fried onions & garlic sauce',
           description: 'Kraków\'s most famous late-night budget street food experience served steaming hot from the Kazimierz rotunda.',
-          imageSrc: '/images/hotels/plac-nowy-zapiekanki.jpg'
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/plac-nowy-zapiekanki.jpg'
         },
         {
           id: 'pierogarnia-u-vincenta',
@@ -1422,7 +1422,7 @@ export const polandJourney = {
           signature: 'Spinach & Feta Pierogi, Sweet Cottage Cheese Dumplings, Beetroot Barszcz',
           description: 'Whimsical, colorful budget pierogi spot in Kazimierz with Van Gogh-inspired wall murals and delicious low prices.',
           websiteUrl: 'https://uvincenta.pl/',
-          imageSrc: '/images/hotels/pierogarnia-u-vincenta.jpg'
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/pierogarnia-u-vincenta.jpg'
         }
       ],
       krakowDrinksDetailed: [
@@ -1439,7 +1439,7 @@ export const polandJourney = {
           signature: '6-Shot Tasting Flights (Hazelnut, Salted Caramel, Horseradish, Quince, Plum, Chili)',
           description: 'Intimate candlelit Old Town tasting room famous for artisanal Polish vodka flights served on custom wooden paddles.',
           websiteUrl: 'https://wodkabar.pl/',
-          imageSrc: '/images/hotels/wodka-cafe-bar.jpg'
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/wodka-cafe-bar.jpg'
         },
         {
           id: 'pijalnia-wodki',
@@ -1454,7 +1454,7 @@ export const polandJourney = {
           signature: 'Lufa i Zakąska (Shot of Cytrynówka Lemon Vodka with Tart Herring or Pickles)',
           description: 'Retro post-communist watering hole with vintage newsprint wallpaper, 8 PLN vodka shots, draft Tyskie, and classic tavern snacks.',
           websiteUrl: 'https://pijalnia.pl/',
-          imageSrc: '/images/hotels/pijalnia-wodki.jpg'
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/pijalnia-wodki.jpg'
         },
         {
           id: 'singer-bar',
@@ -1468,7 +1468,7 @@ export const polandJourney = {
           drinkType: 'Mulled Beer, Spiced Wine & Classic Cocktails',
           signature: 'Grzane Piwo (Warm Spiced Beer with Honey & Cloves), Espresso Cocktails',
           description: 'Legendary Kazimierz watering hole where vintage 19th-century Singer sewing machines serve as tables amidst flickering candlelight and tango music.',
-          imageSrc: '/images/hotels/singer-bar.jpg'
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/singer-bar.jpg'
         },
         {
           id: 'ck-browar',
@@ -1483,7 +1483,7 @@ export const polandJourney = {
           signature: 'Unfiltered CK Lager, CK Dunkel, CK Weizen served in 3.5L & 5L Table Towers',
           description: 'Underground brick-vaulted microbrewery brewing unpasteurized Austrian & German style beers right on site since 1996.',
           websiteUrl: 'https://ckbrowar.pl/',
-          imageSrc: '/images/hotels/ck-browar.jpg'
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/ck-browar.jpg'
         },
         {
           id: 'multi-qlti-tap-bar',
@@ -1497,7 +1497,7 @@ export const polandJourney = {
           drinkType: 'Polish Indie Craft Draft Taps',
           signature: '20 Rotating Polish & European Craft Taps (Pinta, AleBrowar, Stu Mostów, IPA & Porters)',
           description: 'Lively second-floor craft beer sanctuary overlooking Szewska street with 20 rotating draft taps, tasting flights, and balcony views.',
-          imageSrc: '/images/hotels/multi-qlti-tap-bar.jpg'
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/multi-qlti-tap-bar.jpg'
         },
         {
           id: 'house-of-beer',
@@ -1511,7 +1511,7 @@ export const polandJourney = {
           drinkType: 'Polish Microbrews & Import Specialty Ales',
           signature: 'Smoked Grodziskie Wheat Ale, Polish Baltic Porters, Trappist Abbey Ales',
           description: 'Cozy brick pub with over 200 bottled beers and 15 craft taps from top Polish indie microbreweries.',
-          imageSrc: '/images/hotels/house-of-beer.jpg'
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/house-of-beer.jpg'
         },
         {
           id: 'alchemia',
@@ -1526,7 +1526,7 @@ export const polandJourney = {
           signature: 'Absinthe Drips, Dark Beer Cocktails, Polish Craft Lagers',
           description: 'The undisputed beating heart of Kazimierz nightlife. Dark, candlelit rooms filled with antique taxidermy, potion bottles, and basement jazz concerts.',
           websiteUrl: 'https://alchemia.com.pl/',
-          imageSrc: '/images/hotels/alchemia.jpg'
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/alchemia.jpg'
         },
         {
           id: 'nowa-prowincja',
@@ -1540,7 +1540,7 @@ export const polandJourney = {
           drinkType: 'Hot Spiced Wine & Rum Chocolate Mugs',
           signature: 'Grzaniec Galicyjski (Hot Spiced Mulled Wine), Thick Hot Chocolate with Dark Rum',
           description: 'Iconic Kraków bohemian cellar frequented by Polish poets and artists; famous for steaming mugs of thick hot chocolate and spiced wine.',
-          imageSrc: '/images/hotels/nowa-prowincja.jpg'
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/nowa-prowincja.jpg'
         },
         {
           id: 'piwnica-pod-baranami',
@@ -1555,7 +1555,7 @@ export const polandJourney = {
           signature: 'Polish Regional Ciders, Honey Beers, Classic Old Fashioned',
           description: 'Famed historic cellar beneath Main Market Square, birth site of Poland\'s most famous literary cabaret with stone arches and outdoor summer terrace.',
           websiteUrl: 'https://piwnicapodbaranami.pl/',
-          imageSrc: '/images/hotels/piwnica-pod-baranami.jpg'
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/piwnica-pod-baranami.jpg'
         },
         {
           id: 'bierhalle-krakow',
@@ -1570,7 +1570,7 @@ export const polandJourney = {
           signature: 'Freshly Brewed Weizen & Dunkel on Tap, Bavarian Pretzels, Giant Pork Knuckle',
           description: 'Vibrant traditional beer hall right on Mały Rynek with giant copper brewing kettles, long wooden feast tables, and dirndl-clad servers.',
           websiteUrl: 'https://bierhalle.pl/',
-          imageSrc: '/images/hotels/bierhalle-krakow.jpg'
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/bierhalle-krakow.jpg'
         },
         {
           id: 'stara-zajezdnia',
@@ -1585,7 +1585,7 @@ export const polandJourney = {
           signature: 'Stara Zajezdnia Unfiltered Lager, Honey Beer, 1-Liter Stein Mugs, Charcoal Sausages',
           description: 'Enormous, breathtaking 1913 brick tram depot hall converted into Poland\'s largest microbrewery beer hall with a 1500m² hall floor and massive timber beams.',
           websiteUrl: 'https://starazajezdniakrakow.pl/',
-          imageSrc: '/images/hotels/stara-zajezdnia.jpg'
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/stara-zajezdnia.jpg'
         },
         {
           id: 'cechowa-guild-cellar',
@@ -1599,7 +1599,7 @@ export const polandJourney = {
           drinkType: 'Polish Regional Beers & Spiced Honey Meads',
           signature: 'Fresh Unpasteurized Draft Lager, Polish Mead (Miód Pitny), Smoked Sheep Cheese',
           description: 'Centuries-old stone cellar tavern beneath Jagiellońska street featuring heraldic shields, arched gothic brick vaults, and heavy oak benches.',
-          imageSrc: '/images/hotels/cechowa-guild-cellar.jpg'
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/cechowa-guild-cellar.jpg'
         },
         {
           id: 'u-szwejka',
@@ -1613,7 +1613,7 @@ export const polandJourney = {
           drinkType: 'Draft Pilsner Urquell, Budvar & Polish Lagers',
           signature: '1-Liter Pilsner Steins, Crispy Duck, Goulash in Bread Bowl, Brass Tap Towers',
           description: 'Festive Central European beer hall named after the famous fictional soldier Švejk, serving ice-cold liter steins and hearty tavern feasts.',
-          imageSrc: '/images/hotels/u-szwejka.jpg'
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/u-szwejka.jpg'
         },
         {
           id: 'bropub-brokreacja',
@@ -1627,7 +1627,7 @@ export const polandJourney = {
           drinkType: 'Award-Winning Polish Craft IPA, Stouts & Sours',
           signature: '18 Tap Lines of BroKreacja Craft Brews, Wood-Fired Pizza, Nitro Baltic Porters',
           description: 'Underground Gothic stone cellar taproom operated by award-winning Polish craft brewery BroKreacja, serving bold IPAs and Nitro stouts.',
-          imageSrc: '/images/hotels/bropub-brokreacja.jpg'
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/bropub-brokreacja.jpg'
         },
         {
           id: 'taverna-krowa',
@@ -1641,7 +1641,7 @@ export const polandJourney = {
           drinkType: 'Draft Craft Lager, Cider & Honey Beers',
           signature: 'Draft Amber Lager, Spiced Mulled Cider, Craft Cider Pint Towers',
           description: 'Lively underground cellar bar hidden off Sławkowska street with rustic wooden tables, draft ciders, and unbeatable wallet-friendly prices.',
-          imageSrc: '/images/hotels/taverna-krowa.jpg'
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/taverna-krowa.jpg'
         }
       ],
       krakowCafesDetailed: [
@@ -1657,7 +1657,7 @@ export const polandJourney = {
           cuisine: 'Fairytale Polish Breakfast & Espresso',
           signature: 'French Toast with Baked Winter Berries, Polish Farmer Breakfast, Shakshuka, Hand-Crafted Cappuccinos',
           description: 'Whimsical, candlelit fairytale café nestled on a cobblestone corner near Main Square, famous for lavish Polish breakfasts, vintage puppets, and cozy velvet armchairs.',
-          imageSrc: '/images/hotels/camelot-cafe.jpg'
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/camelot-cafe.jpg'
         },
         {
           id: 'wesola-cafe',
@@ -1671,7 +1671,7 @@ export const polandJourney = {
           cuisine: 'Third Wave Specialty Coffee & Artisan Brunch',
           signature: 'Single-Origin Chemex Pour-Overs, Avocado Toast with Poached Eggs, Brioche French Toast',
           description: 'Famous specialty coffee shrine with the iconic neon sign "Kawa dobro powraca" (Coffee, goodness returns), serving Third Wave pour-overs and hearty artisanal brunch.',
-          imageSrc: '/images/hotels/wesola-cafe.jpg'
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/wesola-cafe.jpg'
         },
         {
           id: 'massolit-books-cafe',
@@ -1685,7 +1685,7 @@ export const polandJourney = {
           cuisine: 'Artisan Bakery & Specialty Filter Coffee',
           signature: 'Freshly Baked New York Style Bagels, Homemade Pecan Pie, Chemex Single-Origin Brews',
           description: 'Charming English-language bookstore and quiet café filled with floor-to-ceiling wooden bookshelves, vintage lamps, authentic NYC bagels, and slice-of-heaven pie.',
-          imageSrc: '/images/hotels/massolit-books-cafe.jpg'
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/massolit-books-cafe.jpg'
         },
         {
           id: 'poranki-kazimierz',
@@ -1699,7 +1699,7 @@ export const polandJourney = {
           cuisine: 'Scandinavian-Style Breakfast & Sourdough Bakery',
           signature: 'Sourdough Breakfast Platters, Cardamom Buns, Dutch Baby Pancakes, Oat Flat Whites',
           description: 'Sunlit Scandinavian-style Kazimierz breakfast sanctuary on Plac Wolnica, dedicated entirely to warm morning sourdough, specialty espresso, and cardamom pastries.',
-          imageSrc: '/images/hotels/poranki-kazimierz.jpg'
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/poranki-kazimierz.jpg'
         },
         {
           id: 'cafe-charlotte',
@@ -1713,7 +1713,7 @@ export const polandJourney = {
           cuisine: 'French Bakery & Artisanal Preserves',
           signature: 'French Breakfast Basket (Fresh Croissants & Baguettes served with Jars of House Salted Caramel & White Chocolate)',
           description: 'Bustling Parisian-style bakery overlooking Plac Szczepański with giant communal wooden tables, freshly baked sourdough loaves, and unlimited artisanal jam jars.',
-          imageSrc: '/images/hotels/cafe-charlotte.jpg'
+          imageSrc: '/wayfinder/Poland-2026/images/krakow/hotels/cafe-charlotte.jpg'
         }
       ],
       lgbtq: {

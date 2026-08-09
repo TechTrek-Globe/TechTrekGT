@@ -1,14 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { Layout } from './components/Layout';
 import { AuthModal } from './components/AuthModal';
-import { WayfinderLanding } from './components/WayfinderLanding';
-import { PolandLanding } from './components/PolandLanding';
-import { CityPage } from './components/CityPage';
-import { RouteVisualization } from './components/RouteVisualization';
-import { MarketsPage } from './components/MarketsPage';
-import { StaysAndFoodPage } from './components/StaysAndFoodPage';
-import { PracticalPage } from './components/PracticalPage';
-import { PrivateHub } from './components/PrivateHub';
+const WayfinderLanding = React.lazy(() => import('./components/WayfinderLanding').then(m => ({ default: m.WayfinderLanding })));
+const PolandLanding = React.lazy(() => import('./components/PolandLanding').then(m => ({ default: m.PolandLanding })));
+const CityPage = React.lazy(() => import('./components/CityPage').then(m => ({ default: m.CityPage })));
+const RouteVisualization = React.lazy(() => import('./components/RouteVisualization').then(m => ({ default: m.RouteVisualization })));
+const MarketsPage = React.lazy(() => import('./components/MarketsPage').then(m => ({ default: m.MarketsPage })));
+const StaysAndFoodPage = React.lazy(() => import('./components/StaysAndFoodPage').then(m => ({ default: m.StaysAndFoodPage })));
+const PracticalPage = React.lazy(() => import('./components/PracticalPage').then(m => ({ default: m.PracticalPage })));
+const PrivateHub = React.lazy(() => import('./components/PrivateHub').then(m => ({ default: m.PrivateHub })));
 
 // Simple client-side router
 function App() {
@@ -113,7 +113,15 @@ function App() {
 
   return (
     <Layout>
-      {renderRoute()}
+      <Suspense fallback={
+        <div className="flex-1 flex items-center justify-center p-8 min-h-[50vh]">
+          <div className="text-center animate-pulse">
+            <h2 className="text-xl font-semibold text-wf-muted">Loading route...</h2>
+          </div>
+        </div>
+      }>
+        {renderRoute()}
+      </Suspense>
       <AuthModal />
     </Layout>
   );

@@ -44,13 +44,14 @@ export function Layout({ children }) {
           src={wayfinderHeaderBanner}
           alt="TechTrek Wayfinder - Plan • Explore • Navigate • Discover"
           className="h-40 sm:h-52 md:h-60 w-auto max-w-full object-contain block relative -mb-5 sm:-mb-7 md:-mb-8 z-[60] drop-shadow-2xl translate-x-0"
+          fetchPriority="high"
         />
       </header>
 
-      {/* Background glow effects */}
+      {/* Background glow effects - Radial gradients instead of CSS blur() for massive iOS performance boost */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-        <div className="absolute top-0 right-0 w-[800px] h-[600px] bg-wf-blue/10 rounded-full blur-[120px] mix-blend-screen transform translate-x-1/3 -translate-y-1/3" />
-        <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-wf-evergreen/10 rounded-full blur-[100px] mix-blend-screen transform -translate-x-1/3 translate-y-1/3" />
+        <div className="absolute top-0 right-0 w-[800px] h-[600px] bg-[radial-gradient(circle_at_center,rgba(45,106,159,0.15)_0%,transparent_70%)] mix-blend-screen transform translate-x-1/3 -translate-y-1/3" />
+        <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-[radial-gradient(circle_at_center,rgba(30,92,58,0.15)_0%,transparent_70%)] mix-blend-screen transform -translate-x-1/3 translate-y-1/3" />
       </div>
 
       <header className="sticky top-0 z-40 glass-panel border-b border-white/5 w-full max-w-full overflow-hidden">
@@ -133,7 +134,8 @@ export function Layout({ children }) {
 
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 rounded-lg text-wf-muted hover:text-white hover:bg-white/5"
+              className="p-2 rounded-lg text-wf-muted hover:text-white hover:bg-white/5 min-h-[44px] min-w-[44px] flex items-center justify-center"
+              aria-label="Toggle Mobile Menu"
             >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
@@ -148,7 +150,7 @@ export function Layout({ children }) {
                 key={link.href}
                 href={link.href}
                 onClick={(e) => pushRoute(e, link.href)}
-                className="block px-3 py-2 rounded-lg text-base font-medium text-wf-text hover:text-white hover:bg-white/5"
+                className="block px-3 py-3 sm:py-2 rounded-lg text-base font-medium text-wf-text hover:text-white hover:bg-white/5 min-h-[44px] flex items-center"
               >
                 {link.label}
               </a>
@@ -157,7 +159,7 @@ export function Layout({ children }) {
             {showCurrencyConverter && (
               <button
                 onClick={() => { setIsConverterOpen(true); setMobileMenuOpen(false); }}
-                className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-base font-medium text-wf-amber hover:bg-white/5 text-left"
+                className="w-full flex items-center justify-between px-3 py-3 sm:py-2 rounded-lg text-base font-medium text-wf-amber hover:bg-white/5 text-left min-h-[44px]"
               >
                 <span className="flex items-center space-x-2">
                   <Coins className="w-5 h-5" />
@@ -175,14 +177,14 @@ export function Layout({ children }) {
                 <a
                   href="/wayfinder/poland-christmas-2026/private"
                   onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026/private')}
-                  className="flex items-center space-x-2 px-3 py-2 rounded-lg text-base font-medium text-wf-blue-lt hover:bg-white/5"
+                  className="flex items-center space-x-2 px-3 py-3 sm:py-2 rounded-lg text-base font-medium text-wf-blue-lt hover:bg-white/5 min-h-[44px]"
                 >
                   <ShieldCheck className="w-5 h-5" />
                   <span>Private Hub</span>
                 </a>
                 <button
                   onClick={logout}
-                  className="w-full flex items-center space-x-2 px-3 py-2 rounded-lg text-base font-medium text-wf-muted hover:text-white hover:bg-white/5 text-left"
+                  className="w-full flex items-center space-x-2 px-3 py-3 sm:py-2 rounded-lg text-base font-medium text-wf-muted hover:text-white hover:bg-white/5 text-left min-h-[44px]"
                 >
                   <LogOut className="w-5 h-5" />
                   <span>Sign Out</span>
@@ -191,7 +193,7 @@ export function Layout({ children }) {
             ) : (
               <button
                 onClick={() => { setIsAuthModalOpen(true); setMobileMenuOpen(false); }}
-                className="w-full flex items-center space-x-2 px-3 py-2 rounded-lg text-base font-medium text-white hover:bg-white/5 text-left"
+                className="w-full flex items-center space-x-2 px-3 py-3 sm:py-2 rounded-lg text-base font-medium text-white hover:bg-white/5 text-left min-h-[44px]"
               >
                 <User className="w-5 h-5 text-wf-blue-lt" />
                 <span>Sign In</span>

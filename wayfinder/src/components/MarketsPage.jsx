@@ -96,6 +96,8 @@ export function MarketsPage() {
                 src={cityImages[city.id]} 
                 alt={city.name} 
                 className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500" 
+                loading="lazy"
+                decoding="async"
               />
             </div>
             <div className="flex-1 relative z-10">
@@ -107,7 +109,7 @@ export function MarketsPage() {
               <a
                 href={`/wayfinder/poland-christmas-2026/cities/${city.id}/markets`}
                 onClick={(e) => pushRoute(e, `/wayfinder/poland-christmas-2026/cities/${city.id}/markets`)}
-                className="inline-flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold transition-all group/btn"
+                className="inline-flex items-center space-x-1.5 px-3.5 py-3 sm:py-1.5 min-h-[44px] sm:min-h-0 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold transition-all group/btn"
               >
                 <Compass className="w-3.5 h-3.5 text-amber-400 group-hover/btn:rotate-45 transition-transform" />
                 <span>Explore {city.name} Markets Guide</span>

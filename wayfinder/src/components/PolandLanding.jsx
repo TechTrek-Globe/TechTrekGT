@@ -56,7 +56,7 @@ export function PolandLanding() {
               <a
                 href="/wayfinder/poland-christmas-2026/route"
                 onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026/route')}
-                className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center space-x-1.5 transition-all shadow-md shadow-amber-500/20"
+                className="px-4 py-3 sm:py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center space-x-1.5 transition-all shadow-md shadow-amber-500/20 min-h-[44px] sm:min-h-0"
               >
                 <Map className="w-4 h-4" />
                 <span>View Full Route</span>
@@ -64,7 +64,7 @@ export function PolandLanding() {
               <a
                 href="/wayfinder/poland-christmas-2026/private"
                 onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026/private')}
-                className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-xs flex items-center space-x-1.5 transition-colors"
+                className="px-4 py-3 sm:py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-xs flex items-center space-x-1.5 transition-colors min-h-[44px] sm:min-h-0"
               >
                 <Calendar className="w-4 h-4" />
                 <span>Private Itinerary</span>
@@ -74,11 +74,11 @@ export function PolandLanding() {
 
           {/* Right Compact 3D Route Map Panel (100% Precise City, Track & Flight Paths) */}
           <div className="w-full lg:w-7/12 h-64 sm:h-80 rounded-2xl overflow-hidden relative bg-slate-950 border border-amber-500/30 shadow-inner group shrink-0">
-            {/* Pristine 3D Map Background */}
             <img 
               src={polandMapRouteClean} 
               alt="3D Poland Route Map" 
               className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-1000 group-hover:scale-105" 
+              fetchPriority="high"
             />
 
             {/* Glowing Golden Rail Track & Flight Path Vectors */}
@@ -165,6 +165,8 @@ export function PolandLanding() {
                         src={cityImages[item.id]} 
                         alt={`${item.name} timeline node - ${item.id === 'krakow' ? "Rynek Główny Christmas Market" : "Christmas Market"}`} 
                         className="w-full h-full object-cover" 
+                        loading="lazy"
+                        decoding="async"
                       />
                     </div>
                     {/* City Label Badge */}
@@ -209,6 +211,8 @@ export function PolandLanding() {
                     src={cityImages[city.id]} 
                     alt={city.name} 
                     className="w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-105" 
+                    loading="lazy"
+                    decoding="async"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-wf-navy via-wf-navy/50 to-transparent"></div>
                   

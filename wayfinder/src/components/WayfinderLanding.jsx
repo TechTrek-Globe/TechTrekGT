@@ -40,6 +40,7 @@ export function WayfinderLanding() {
                 src={polandMarketImg} 
                 alt="Poland Christmas Market" 
                 className="absolute inset-0 w-full h-full object-cover object-center opacity-85 group-hover:scale-105 transition-all duration-700" 
+                fetchPriority="high"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-wf-navy-mid via-wf-navy-mid/60 to-transparent"></div>
               

@@ -29,6 +29,8 @@ export function StaysAndFoodPage() {
               src={cityImages[city.id]} 
               alt={city.name} 
               className="absolute inset-0 w-full h-full object-cover opacity-20" 
+              loading="lazy"
+              decoding="async"
             />
             <div className="absolute inset-0 bg-gradient-to-r from-wf-navy via-wf-navy/90 to-wf-navy/80"></div>
             

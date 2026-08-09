@@ -15,7 +15,6 @@ import krakowClothHallImg from '../assets/krakow/attractions/cloth-hall.jpg';
 import krakowKazimierzImg from '../assets/krakow/attractions/kazimierz.jpg';
 import krakowPlantyImg from '../assets/krakow/attractions/planty-park-barbican.jpg';
 import krakowAuschwitzImg from '../assets/krakow/attractions/auschwitz-birkenau.jpg';
-import krakowWieliczkaImg from '../assets/krakow/attractions/wieliczka-salt-mine.jpg';
 import krakowSchindlerImg from '../assets/krakow/attractions/schindler-factory.jpg';
 import krakowThermalBathsImg from '../assets/krakow/attractions/thermal-baths.jpg';
 import krakowWalkingTourImg from '../assets/krakow/attractions/walking-tour.jpg';
@@ -27,6 +26,7 @@ import wroclawDwarfsImg from '../assets/wroclaw/attractions/wroclaw-dwarfs.jpg';
 import wroclawTumskiBridgeImg from '../assets/wroclaw/attractions/tumski-bridge.jpg';
 import wroclawCentennialHallImg from '../assets/wroclaw/attractions/centennial-hall.jpg';
 import wroclawPanoramaRaclawiceImg from '../assets/wroclaw/attractions/panorama-raclawice.jpg';
+import wroclawWalkingTourImg from '../assets/wroclaw/attractions/wroclaw-walking-tour.jpg';
 
 import wroclawPlacSolnyImg from '../assets/wroclaw/markets/wroclaw-plac-solny.jpg';
 import wroclawSwidnickaImg from '../assets/wroclaw/markets/wroclaw-swidnicka.jpg';
@@ -66,7 +66,8 @@ export const attractionImages = {
   'wroclaw-dwarfs.jpg': wroclawDwarfsImg,
   'tumski-bridge.jpg': wroclawTumskiBridgeImg,
   'centennial-hall.jpg': wroclawCentennialHallImg,
-  'panorama-raclawice.jpg': wroclawPanoramaRaclawiceImg
+  'panorama-raclawice.jpg': wroclawPanoramaRaclawiceImg,
+  'wroclaw-walking-tour.jpg': wroclawWalkingTourImg
 };
 
 export function getAttractionImage(cardImage = '', cardTitle = '', cityName = 'Kraków') {
@@ -86,7 +87,7 @@ export function getAttractionImage(cardImage = '', cardTitle = '', cityName = 'K
     if (name.includes('tumski') || name.includes('cathedral')) return attractionImages['ostrow-tumski.jpg'];
     if (name.includes('centennial') || name.includes('stulecia')) return attractionImages['centennial-hall.jpg'];
     if (name.includes('panorama') || name.includes('racławic')) return attractionImages['panorama-raclawice.jpg'];
-    if (name.includes('walk') || name.includes('tour')) return cityImages.wroclaw;
+    if (name.includes('walk') || name.includes('tour')) return attractionImages['wroclaw-walking-tour.jpg'];
     if (name.includes('ratusz') || name.includes('square')) return attractionImages['wroclaw-market-square.jpg'];
     return cityImages.wroclaw;
   }

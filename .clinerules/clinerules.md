@@ -27,3 +27,23 @@
 * **Strict Image Hierarchy:** All images for the Wayfinder application MUST be stored locally following this exact path convention: `public/Poland-2026/images/[city_name]/[category]/`. Valid categories are limited to `hotels`, `food`, `markets`, and `attractions` (e.g., `public/Poland-2026/images/krakow/markets/`).
 * **Asset Verification & Download:** When adding, generating, or modifying a place (hotel, attraction, restaurant, etc.), you must verify that a local image exists in the correct directory. If missing or currently referencing an external URL, write and execute a utility script to download the image and save it to the strict hierarchical folder. Never leave external image URLs in the data source.
 * **Global Image Migration Mandate:** If you detect any images stored in legacy or root directories (e.g., `public/images/hotels/`), you must autonomously move the files to their correct city/category folders using Node.js file system commands. Immediately following the move, you must update the corresponding data files (JSON/JS) and React components to wire the images to their new local paths.
+* **Critical:** Validate Data Integrity & External Dependencies for "Things to Do" Functionality
+   Before activating the "Things to Do" feature, you MUST perform the following validation steps to prevent production errors:
+   1. **External API Dependency Verification:**
+      - Examine the source code for the "Things to Do" (places/events) feature. 
+      - Identify and list ALL external APIs (e.g., Google Places, ticket providers) that the feature depends on.
+      - For each API, verify that the necessary API keys, credentials, and usage quotas are correctly configured in the current environment (e.g., .dev.vars).
+      - If the feature relies on local static data (JSON files) for places/events, verify that the data files exist and contain complete entries (name, location, image URLs, description, dates).
+   2. **Image URL Validation:**
+      - Audit all image URLs used in the "Things to Do" feature (including generated or updated images).
+      - Confirm that every image URL points to a valid, accessible resource.
+      - Migrate any external or broken image URLs to local assets following the directory structure specified in Rule 5.1.
+   3. **Data Sanitization & Completeness:**
+      - For user-generated or imported content, verify that all required fields are populated (e.g., venue, date/time, location, pricing).
+      - Remove or replace incomplete entries that may cause rendering errors or poor user experience.
+   4. **Production Safety Check:**
+      - Ensure that no debugging or placeholder code remains that could cause runtime failures (e.g., API calls without error handling, hardcoded test data).
+   5. **Action Mandate:**
+      - If any validation step fails, you MUST fix the issue before marking the task as complete. This may involve updating API configurations, generating missing images, sanitizing data, or removing problematic code.
+   6. **Documentation:**
+      - After successful validation, update the relevant documentation (e.g., Architecture.md) to reflect any changes made to API dependencies or data sources.

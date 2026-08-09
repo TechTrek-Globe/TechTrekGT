@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { MapPin, Navigation, Compass, Plus, Check, CalendarX, ExternalLink } from 'lucide-react';
 import { cityImages, marketImages, getAttractionImage } from '../utils/cityImages';
 import { useAuth } from '../context/AuthContext';
+import { FormatText } from './Formatters';
 
 /**
  * Extracts a concise vital stats list for the quick stats row.
@@ -214,7 +215,7 @@ export function MustSeeCard(props) {
             {quickStats.map((stat, idx) => (
               <React.Fragment key={idx}>
                 <span className="inline-flex items-center space-x-1 whitespace-nowrap">
-                  <span>{stat}</span>
+                  <span><FormatText text={stat} /></span>
                 </span>
                 {idx < quickStats.length - 1 && (
                   <span className="text-slate-600 font-bold select-none">•</span>

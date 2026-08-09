@@ -57,13 +57,19 @@ export function FormatText({ text }) {
     formatted = formatted.replace(/-2°C to 4°C \((28°F[–-]39°F)\)/g, '$1');
   }
 
-  // 2. Process Mixed Currencies e.g., "25-35 PLN (~$6.70-$9.40)" or "20-30 PLN (~$5.35–$8.00 USD)"
+  // 2. Process Mixed Currencies e.g., "25-35 PLN (~$6.70-$9.40)", "15 PLN", "450-650 PLN/night"
   const { baseSymbol, rate } = activeCurrency || {};
   if (rate) {
-    formatted = formatted.replace(/(\d+)-(\d+)\s*PLN\s*\([^)]+\)/g, (match, minPln, maxPln) => {
+    formatted = formatted.replace(/(?:~)?(\d+)(?:\s*-\s*(\d+))?\s*PLN(?:(\/night|\s*per person))?(?:\s*\([^)]+\))?/gi, (match, minPln, maxPln, suffix) => {
       const minBase = Math.round(parseInt(minPln, 10) / rate);
-      const maxBase = Math.round(parseInt(maxPln, 10) / rate);
-      return `${minPln}-${maxPln} PLN (~${baseSymbol}${minBase}-${baseSymbol}${maxBase})`;
+      const safeSuffix = suffix || '';
+      
+      if (maxPln) {
+        const maxBase = Math.round(parseInt(maxPln, 10) / rate);
+        return `${minPln}-${maxPln} PLN (~${baseSymbol}${minBase}-${baseSymbol}${maxBase})${safeSuffix}`;
+      } else {
+        return `${minPln} PLN (~${baseSymbol}${minBase})${safeSuffix}`;
+      }
     });
   }
 

@@ -5,6 +5,7 @@ import { cityImages, marketImages, attractionImages } from '../utils/cityImages'
 import { useExchangeRate } from '../hooks/useExchangeRate';
 import { MustSeeCard } from './MustSeeCard';
 import { useAuth } from '../context/AuthContext';
+import { FormatDistance, FormatCurrency, FormatText } from './Formatters';
 
 function QuickReferenceBar({ city }) {
   const quick = city.quickReference || {
@@ -54,7 +55,7 @@ function QuickReferenceBar({ city }) {
           <span>Mug Deposit (Kaucja)</span>
         </div>
         <p className="text-xs sm:text-sm text-amber-100/90 leading-snug font-medium">
-          {kaucjaDeposit} deposit per mug. <strong className="text-amber-300">EXACT CASH REQUIRED</strong> for deposit.
+          <FormatText text={kaucjaDeposit} /> deposit per mug. <strong className="text-amber-300">EXACT CASH REQUIRED</strong> for deposit.
         </p>
       </div>
     </div>
@@ -819,7 +820,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                         <Train className="w-5 h-5" />
                         <span>Airport Transfer</span>
                       </div>
-                      <p className="text-xs sm:text-sm text-wf-cream leading-relaxed">{city.transit.airport}</p>
+                      <p className="text-xs sm:text-sm text-wf-cream leading-relaxed"><FormatText text={city.transit.airport} /></p>
                     </div>
 
                     <div className="glass-panel p-5 rounded-2xl border border-amber-500/30 bg-amber-500/5">
@@ -877,7 +878,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                     <Thermometer className="w-5 h-5" />
                     <span>December Weather & Gear</span>
                   </div>
-                  <p className="text-xs sm:text-sm text-wf-cream leading-relaxed">{city.practical.weather}</p>
+                  <p className="text-xs sm:text-sm text-wf-cream leading-relaxed"><FormatText text={city.practical.weather} /></p>
                 </div>
 
                 <div className="glass-panel p-5 rounded-2xl border border-amber-500/30 bg-amber-500/5 space-y-3">
@@ -891,7 +892,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                       <span>Live Exchange Rates</span>
                     </span>
                   </div>
-                  <p className="text-xs sm:text-sm text-wf-cream leading-relaxed">{city.practical.currency}</p>
+                  <p className="text-xs sm:text-sm text-wf-cream leading-relaxed"><FormatText text={city.practical.currency} /></p>
                   
                   {/* Live Exchange Rate Callout Box */}
                   <div className="p-3 rounded-xl bg-slate-950/80 border border-amber-500/20 space-y-2 text-xs">
@@ -902,19 +903,19 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                     <div className="space-y-1 text-[11px] text-slate-300 font-medium">
                       <div className="flex justify-between">
                         <span className="text-slate-400">🚄 Airport SKA1 Train:</span>
-                        <span className="font-bold text-amber-200">17 PLN (~${(17 / exchangeRates.usdToPln).toFixed(2)} USD)</span>
+                        <span className="font-bold text-amber-200">17 PLN (~<FormatCurrency pln={17} />)</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-slate-400">🚃 24-hr Tram Pass:</span>
-                        <span className="font-bold text-amber-200">17 PLN (~${(17 / exchangeRates.usdToPln).toFixed(2)} USD)</span>
+                        <span className="font-bold text-amber-200">17 PLN (~<FormatCurrency pln={17} />)</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-slate-400">🎫 72-hr Tram Pass:</span>
-                        <span className="font-bold text-amber-200">50 PLN (~${(50 / exchangeRates.usdToPln).toFixed(2)} USD)</span>
+                        <span className="font-bold text-amber-200">50 PLN (~<FormatCurrency pln={50} />)</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-slate-400">☕ Mug Deposit (Kaucja):</span>
-                        <span className="font-bold text-amber-200">20-30 PLN (~${(20 / exchangeRates.usdToPln).toFixed(2)}–${(30 / exchangeRates.usdToPln).toFixed(2)} USD)</span>
+                        <span className="font-bold text-amber-200">20-30 PLN (~<FormatCurrency pln={20} />–<FormatCurrency pln={30} />)</span>
                       </div>
                     </div>
                   </div>
@@ -925,7 +926,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                     <Navigation className="w-5 h-5" />
                     <span>Public Restrooms (WC)</span>
                   </div>
-                  <p className="text-xs sm:text-sm text-wf-cream leading-relaxed">{city.practical.restrooms}</p>
+                  <p className="text-xs sm:text-sm text-wf-cream leading-relaxed"><FormatText text={city.practical.restrooms} /></p>
                 </div>
               </div>
             </section>
@@ -1989,7 +1990,6 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                     : 'border-emerald-500/30 hover:border-emerald-400/60';
 
                   const displayPrice = hotel.basePricePln;
-                  const displayUsd = hotel.usdEstimateBase;
 
                   const mapSearchQuery = encodeURIComponent(`${hotel.name}, Kraków, Poland`);
                   const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${mapSearchQuery}`;
@@ -2049,12 +2049,9 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                                 <span>Live Average / Night</span>
                               </div>
                             </div>
-
-                            <div className="flex items-baseline justify-between">
-                              <div>
-                                <span className="text-2xl font-black text-white">{displayPrice} PLN</span>
-                                <span className="text-xs text-slate-400 ml-1.5 font-semibold">(~${displayUsd} USD)</span>
-                              </div>
+                            <div className="flex items-baseline">
+                              <span className="text-2xl font-black text-white">{displayPrice} PLN</span>
+                              <span className="text-xs text-slate-400 ml-1.5 font-semibold">(~<FormatCurrency pln={displayPrice} />)</span>
                             </div>
                           </div>
 
@@ -2074,29 +2071,32 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                             </div>
 
                             <div className="grid grid-cols-1 gap-1.5 text-xs font-medium">
-                              {hotel.proximity?.rynekMarket && (
-                                <div className="p-2 rounded-xl bg-white/5 border border-white/5 flex items-center justify-between gap-2">
-                                  <span className="text-slate-300 text-[11px] font-bold truncate">🎄 Main Market (Rynek Główny)</span>
-                                  <span className="text-amber-300 font-mono text-[11px] font-bold shrink-0">
-                                    {hotel.proximity.rynekMarket.distance} ({hotel.proximity.rynekMarket.time})
-                                  </span>
-                                </div>
+                              {hotel.proximity.rynekMarket && (
+                                <div className="flex items-start space-x-2">
+                                    <MapPin className="w-3.5 h-3.5 text-amber-500 mt-0.5 shrink-0" />
+                                    <span className="text-amber-200 font-semibold">{hotel.proximity.rynekMarket.name}</span>
+                                    <span className="text-slate-400 ml-auto whitespace-nowrap font-mono text-[11px] bg-slate-900/50 px-2 py-0.5 rounded border border-white/5 font-semibold">
+                                      <FormatDistance val={hotel.proximity.rynekMarket.distance} /> ({hotel.proximity.rynekMarket.time})
+                                    </span>
+                                  </div>
                               )}
-                              {hotel.proximity?.malyRynekMarket && (
-                                <div className="p-2 rounded-xl bg-white/5 border border-white/5 flex items-center justify-between gap-2">
-                                  <span className="text-slate-300 text-[11px] font-bold truncate">🎁 Mały Rynek Market</span>
-                                  <span className="text-amber-300 font-mono text-[11px] font-bold shrink-0">
-                                    {hotel.proximity.malyRynekMarket.distance} ({hotel.proximity.malyRynekMarket.time})
-                                  </span>
-                                </div>
+                              {hotel.proximity.malyRynekMarket && (
+                                <div className="flex items-start space-x-2">
+                                    <MapPin className="w-3.5 h-3.5 text-amber-500/70 mt-0.5 shrink-0" />
+                                    <span className="text-amber-100/70">{hotel.proximity.malyRynekMarket.name}</span>
+                                    <span className="text-slate-500 ml-auto whitespace-nowrap font-mono text-[11px]">
+                                      <FormatDistance val={hotel.proximity.malyRynekMarket.distance} /> ({hotel.proximity.malyRynekMarket.time})
+                                    </span>
+                                  </div>
                               )}
-                              {hotel.proximity?.kazimierzMarket && (
-                                <div className="p-2 rounded-xl bg-white/5 border border-white/5 flex items-center justify-between gap-2">
-                                  <span className="text-slate-300 text-[11px] font-bold truncate">🕯️ Kazimierz Markets</span>
-                                  <span className="text-amber-300 font-mono text-[11px] font-bold shrink-0">
-                                    {hotel.proximity.kazimierzMarket.distance} ({hotel.proximity.kazimierzMarket.time})
-                                  </span>
-                                </div>
+                              {hotel.proximity.kazimierzMarket && (
+                                <div className="flex items-start space-x-2">
+                                    <MapPin className="w-3.5 h-3.5 text-amber-500/70 mt-0.5 shrink-0" />
+                                    <span className="text-amber-100/70">{hotel.proximity.kazimierzMarket.name}</span>
+                                    <span className="text-slate-500 ml-auto whitespace-nowrap font-mono text-[11px]">
+                                      <FormatDistance val={hotel.proximity.kazimierzMarket.distance} /> ({hotel.proximity.kazimierzMarket.time})
+                                    </span>
+                                  </div>
                               )}
                             </div>
                           </div>
@@ -2109,11 +2109,11 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                                 <span>Top Landmark Distances</span>
                               </div>
 
-                              <div className="grid grid-cols-2 gap-1.5 text-[11px]">
+                              <div className="grid grid-cols-1 gap-1.5 text-[11px]">
                                 {hotel.proximity.attractions.map((att, aIdx) => (
-                                  <div key={aIdx} className="p-1.5 rounded-lg bg-slate-950/60 border border-white/5 text-slate-300 flex flex-col justify-between">
-                                    <span className="font-semibold truncate text-slate-200">{att.name}</span>
-                                    <span className="text-sky-300 font-mono text-[10px] font-bold">{att.distance} ({att.time})</span>
+                                  <div key={aIdx} className="flex items-center justify-between text-xs py-1 border-b border-white/5 last:border-0">
+                                    <span className="text-slate-300 truncate pr-2">{att.name}</span>
+                                    <span className="text-sky-300 font-mono text-[10px] font-bold"><FormatDistance val={att.distance} /> ({att.time})</span>
                                   </div>
                                 ))}
                               </div>

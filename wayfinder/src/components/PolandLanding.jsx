@@ -263,11 +263,7 @@ export function PolandLanding() {
                 <div className="flex-1 font-medium text-white group-hover:text-wf-amber transition-colors">Rail Connections</div>
                 <ArrowRight className="w-4 h-4 text-wf-muted group-hover:text-wf-amber transition-colors" />
               </a>
-              <a href="/wayfinder/poland-christmas-2026/stays-and-food" onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026/stays-and-food')} className="flex items-center space-x-3 p-4 rounded-xl bg-wf-navy-mid border border-white/5 hover:border-wf-evergreen/50 transition-colors group">
-                <div className="p-2 rounded-lg bg-wf-evergreen/20 text-wf-evergreen"><Bed className="w-5 h-5" /></div>
-                <div className="flex-1 font-medium text-white group-hover:text-wf-evergreen transition-colors">Neighborhoods & Food</div>
-                <ArrowRight className="w-4 h-4 text-wf-muted group-hover:text-wf-evergreen transition-colors" />
-              </a>
+
             </div>
           </div>
           

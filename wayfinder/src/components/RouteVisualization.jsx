@@ -32,7 +32,7 @@ export function RouteVisualization() {
               <div className="absolute top-12 bottom-12 left-1/2 -ml-1 w-2 bg-wf-navy-lt rounded-full" />
               <div className="absolute top-12 bottom-12 left-1/2 -ml-1 w-2 bg-gradient-to-t from-wf-blue via-wf-blue-lt to-wf-evergreen rounded-full opacity-50" />
               
-              {[...polandJourney.route].reverse().map((city, idx) => {
+              {polandJourney.route.map((city, idx) => {
                 const isGdansk = city.id === 'gdansk';
                 const isKrakow = city.id === 'krakow';
                 return (

@@ -487,6 +487,7 @@ body {
   padding: 0.65rem 1.3rem;
   border-radius: 10px;
   cursor: pointer;
+  min-height: 44px;
   transition:
     transform 0.2s var(--ease-spring),
     box-shadow 0.25s ease,
@@ -610,6 +611,9 @@ body {
   font-weight: 500;
   color: var(--text-secondary);
   text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
   transition: color 0.2s ease;
 }
 

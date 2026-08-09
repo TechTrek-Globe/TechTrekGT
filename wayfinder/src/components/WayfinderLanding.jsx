@@ -44,20 +44,7 @@ export function WayfinderLanding() {
               />
               <div className="absolute inset-0 bg-gradient-to-t from-wf-navy-mid via-wf-navy-mid/60 to-transparent"></div>
               
-              {/* Detailed Hover Overlay */}
-              <div className="absolute inset-0 bg-wf-navy/95 p-4 flex flex-col justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 backdrop-blur-sm z-20">
-                <div className="text-xs font-bold uppercase tracking-wider text-amber-400 mb-1">
-                  📍 Rynek Główny (Grand Main Square), Kraków
-                </div>
-                <div className="text-sm font-bold text-white mb-2">
-                  🏛️ St. Mary's Basilica & Renaissance Cloth Hall (Sukiennice)
-                </div>
-                <p className="text-xs text-amber-100/90 leading-relaxed">
-                  Europe's premier medieval Christmas Market featuring 100+ wooden stalls, hand-carved trinkets, Baltic amber jewelry, traditional oscypek smoked cheese, and piping hot grzaniec galicyjski.
-                </p>
-              </div>
-
-              <div className="absolute bottom-4 left-4 right-4 z-10 group-hover:opacity-0 transition-opacity duration-300">
+              <div className="absolute bottom-4 left-4 right-4 z-10 transition-opacity duration-300">
                 <div className="flex items-center space-x-2 text-amber-200/80 text-xs font-semibold uppercase tracking-wider mb-1">
                   <Map className="w-3 h-3" />
                   <span>Europe</span>

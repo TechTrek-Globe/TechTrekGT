@@ -1966,6 +1966,68 @@ export const polandJourney = {
         tip: 'Pair with pickled cucumber (ogórek kiszony) for an authentic market snack.'
       }
     ],
+    history: "Wrocław is one of the oldest and most storied cities in Poland, with roots stretching back over 1,000 years. Founded at a strategic crossing on the Oder River, it has been known successively as Vratislavia, Breslau, and Wrocław. The city's identity was forged by the Piast dynasty, flourished under Bohemian and Habsburg rule, and became a brilliant center of German-Jewish culture before enduring the devastating Siege of Breslau in 1945. After WWII, the city was repopulated by Polish settlers expelled from Lwów and the eastern kresy, transforming Wrocław into a vibrant melting pot that today thrives as one of Poland's most dynamic cultural capitals and a 2016 European Capital of Culture.",
+      historyStats: [
+        { label: 'Founded', value: '10th Century (Trade Settlement)', icon: 'Landmark' },
+        { label: 'Bridges', value: 'Over 100 (Paris of the East)', icon: 'MapPin' },
+        { label: 'UNESCO Heritage', value: '2006 (Centennial Hall)', icon: 'Award' },
+        { label: 'Dwarfs', value: '600+ Bronze Krasnale', icon: 'Crown' }
+      ],
+      historyEpochs: [
+        {
+          era: '10th – 13th Century',
+          title: 'Piast Foundation on the Oder',
+          subtitle: 'From Slavic trading outpost to Silesian capital',
+          description: "First chronicled in 985 by Ibrahim ibn Yaqub as a prosperous trade settlement, Wrocław grew around Ostrów Tumski (Cathedral Island). In 1000, Emperor Otto III established a bishopric here, cementing its religious importance. After Mongol raids devastated the city in 1241, it was rebuilt on a grand grid plan around today's Rynek, one of the largest medieval market squares in Europe."
+        },
+        {
+          era: '1335 – 1526',
+          title: 'The Kingdom of Bohemia & Merchant Golden Age',
+          subtitle: 'A crossroads of Central European commerce and Gothic splendor',
+          description: 'Wrocław passed to the Kingdom of Bohemia in 1335, becoming a major Hanseatic and overland trade hub. The magnificent Gothic Ratusz (Old Town Hall) - one of the finest secular medieval buildings in Central Europe - was completed in this era, alongside the city\'s soaring churches. Merchants from Flanders, Italy, and the Baltic met in the vast Rynek to trade cloth, grain, and silver.'
+        },
+        {
+          era: '1526 – 1741',
+          title: 'Habsburg Rule & Religious Pluralism',
+          subtitle: 'A multiconfessional city of Catholics, Lutherans, and Jews',
+          description: 'After 1526, Wrocław fell under Habsburg sovereignty. The city became a remarkable religious melting pot: Catholic, Lutheran, and Jewish communities coexisted with relative tolerance. The White Stork Synagogue (1792), still standing in the Four Denominations District, testifies to this rich pluralism. Baroque churches and palaces reshaped the skyline alongside the Gothic core.'
+        },
+        {
+          era: '1741 – 1918',
+          title: 'Prussian Era & the Golden Age of Breslau',
+          subtitle: 'Industrial powerhouse and center of German-Jewish culture',
+          description: 'Following the Silesian Wars, Wrocław (then Breslau) became a vibrant Prussian city. The 19th century brought explosive industrial growth, an outstanding university and opera, and a flourishing German-Jewish community that produced philosophers, philanthropists, and architects. The century culminated in 1913 with the revolutionary Centennial Hall (Hala Stulecia), Max Berg\'s pioneering reinforced-concrete dome, now a UNESCO World Heritage site.'
+        },
+        {
+          era: '1939 – 1989',
+          title: 'Twilight, Destruction & Rebirth',
+          subtitle: 'Festung Breslau, expulsion, and postwar Polish resurrection',
+          description: 'Declared a fortress city (Festung Breslau) by the Nazis, the city endured a brutal three-month siege at the end of WWII that devastated up to 70% of its buildings. Post-1945, the German population was expelled and replaced by Polish settlers from the East. The Communist era saw slow reconstruction, while student protests and the Orange Alternative movement - known for its absurdist dwarf graffiti protests - kept Wrocław\'s rebellious spirit alive.'
+        },
+        {
+          era: '1989 – Present',
+          title: 'The Dwarf City & European Cultural Capital',
+          subtitle: 'From Solidarity transition to a beloved modern European metropolis',
+          description: 'After 1989, Wrocław underwent astonishing transformation and rebirth. The first bronze dwarf (Krasnal) appeared on Świdnicka in 2001, spawning a beloved citywide scavenger hunt now spanning 600+ statues. In 2006, Centennial Hall was inscribed on UNESCO\'s World Heritage List, and in 2016 Wrocław served as a European Capital of Culture, welcoming millions to festivals, light shows, and its reimagined Oder waterfront.'
+        }
+      ],
+      historyLegends: [
+        {
+          title: 'The Wrocław Dwarfs (Krasnale)',
+          icon: '🧌',
+          description: 'Born from the absurdist Orange Alternative protests of the 1980s, when activists painted graffiti dwarfs over slogans police had painted over. Today over 600 tiny bronze dwarfs hide across the city - a playful tribute to civil disobedience that has become Wrocław\'s most beloved scavenger hunt.'
+        },
+        {
+          title: 'The Gas Lantern Lighter (Lampnik)',
+          icon: '🏮',
+          description: 'Every evening at dusk, a costumed lantern keeper with a long pole torch walks Ostrów Tumski lighting 103 real gas street lamps by hand - a surviving tradition practiced since the 19th century despite the city\'s fully modernized grid.'
+        },
+        {
+          title: 'The Love Bridge & Cathedral Island',
+          icon: '🔒',
+          description: 'Tumski Bridge connecting the mainland to Cathedral Island is covered with thousands of padlocks placed by lovers. Legend holds that couples who lock a padlock and throw the key into the Oder will stay together forever. At night, gaslight reflects off the river for one of Poland\'s most romantic winter scenes.'
+        }
+      ],
     transit: {
       airport: 'Wrocław Copernicus Airport (WRO) is located 12 km west of the center. Take Express Bus 106 to Wrocław Główny central station (~35 mins, 4.60 PLN (~$1.20 USD)) or Uber/Bolt (~45-60 PLN (~$12-16 USD)).',
       cityTransit: 'Trams & buses are operated by MPK Wrocław. Single tickets cost 4.60 PLN (~$1.20 USD); 24-hr passes cost 15 PLN (~$4.00 USD). Purchase directly on board using contactless card tap on the yellow validators or via the Jakdojade app. Trams 6, 7, and 17 connect Wrocław Główny directly with Rynek and Ostrów Tumski.',
@@ -2515,20 +2577,96 @@ export const polandJourney = {
       }
     ],
     lgbtq: {
-      title: 'Wrocław Queer & Cultural Scene',
-      description: "Wrocław is one of Poland's most progressive and welcoming cities, featuring vibrant rainbow-friendly cultural centers around the Four Denominations District.",
-      spots: [
+      title: "LGBTQ+ Traveler's Guide to Wrocław",
+      subtitle: "The Four Denominations District, Ruska 46 neon courtyards, Rainbow Coalition heritage, and open Silesian nightlife",
+      overview: "Wrocław is one of Poland's most progressive, open, and welcoming cities. Boasting the famous Four Denominations District (Czterech Wyznań) where Catholic, Orthodox, Lutheran, and Jewish communities converge, Wrocław offers travelers an extraordinary interfaith atmosphere and an active, visible queer scene. The iconic Ruska 46 neon courtyard hosts alternative cultural spaces, while Poland's largest LGBTQ+ rights organizations - the Campaign Against Homophobia (KPH) - are headquartered here. Queer travelers will find rainbow-welcoming bars, vibrant nightlife, and progressive festivals like Wrocław Pride.",
+      primaryArea: "Four Denominations District & Ruska Street",
+      landmark: "Ruska 46 Courtyard & Surowiec Club",
+      landmarkDescription: "The alternative neon courtyard on Ruska Street surrounded by queer-friendly art spaces, club Surowiec, and retro cocktail lounges.",
+      imageUrl: "/wayfinder/Poland-2026/images/wroclaw/markets/wroclaw.png",
+      safetyAndLegal: {
+        legalContext: "Wrocław has long housed the headquarters of Poland's Campaign Against Homophobia (KPH). The city council officially supports Wrocław Pride and has welcomed the city's queer community with official mayoral patronage.",
+        safetyRating: "Safe & Welcoming in Central Districts",
+        pdaAdvice: "Public Displays of Affection: Comfortable across Rynek, the Four Denominations District, and Ruska Street. Mild discretion is advised in outer suburbs and late-night public transit.",
+        helplines: [
+          { name: "Campaign Against Homophobia (KPH) Wrocław", contact: "Poland's largest LGBTQ+ advocacy organization" },
+          { name: "Wrocław Pride (Parada Równości)", contact: "Annual Pride March & cultural festival" },
+          { name: "Lambda Polska Helpline", contact: "+48 22 628 52 22 (National LGBTQ+ crisis & community support)" }
+        ]
+      },
+      neighborhoods: [
         {
-          name: 'Surowiec',
-          category: 'Cultural Club & Bar',
-          address: 'ul. Ruska 46A',
-          description: 'Alternative art space, cocktail bar, and queer-friendly dance floor in the Ruska 46 neon courtyard.'
+          name: "Four Denominations District (Czterech Wyznań)",
+          vibe: "Interfaith harmony & rainbow oasis",
+          description: "A unique square where the Evangelical-Augsburg Church of Divine Providence, Orthodox Church of St. Cyril and Methodius, White Stork Synagogue, and St. Anthony Catholic church all converge. Hugely popular with progressive crowds and home to Wrocław's queer social spaces."
         },
         {
-          name: 'Bezsenność',
-          category: 'Retro Cocktail Lounge',
-          address: 'ul. Ruska 51',
-          description: 'Vintage speakeasy lounge attracting a diverse, open-minded crowd in the heart of the nightlife quarter.'
+          name: "Ruska Street & Neon Courtyards",
+          vibe: "Alternative art, neon & nightlife",
+          description: "The Ruska 46 neon courtyard anchors Wrocław's alternative scene with art galleries, vinyl bars, nightclubs, and inclusive social venues."
+        }
+      ],
+      barsAndClubs: [
+        {
+          name: "Surowiec",
+          address: "ul. Ruska 46A",
+          type: "Cultural Club & Queer Dance Venue",
+          description: "Alternative art space, cocktail bar, and queer-friendly dance floor set within the dramatic industrial-chic Ruska 46 neon courtyard.",
+          vibe: "Post-industrial neon courtyard dancing till dawn"
+        },
+        {
+          name: "Bezsenność",
+          address: "ul. Ruska 51",
+          type: "Retro Speakeasy Lounge",
+          description: "Vintage speakeasy lounge attracting a diverse, open-minded crowd in the heart of the nightlife quarter.",
+          vibe: "Retro cocktails, vinyl jazz & open-minded mingling"
+        },
+        {
+          name: "Przedwojenna Bistro & Bar",
+          address: "ul. św. Mikołaja 1",
+          type: "24/7 Pre-War Vodka Bistro",
+          description: "24/7 retro bistro beloved by Wrocław's late-night queer crowd, famous for chilled Polish vodkas, beef tartare, and nostalgic Art Deco decor.",
+          vibe: "Prewar glamour, vodka flights & all-night vibes"
+        }
+      ],
+      cafesAndDining: [
+        {
+          name: "Café Targowa",
+          address: "ul. Piaskowa 17 (Hala Targowa Stand 30)",
+          type: "World-Champion Specialty Coffee",
+          description: "Run by World Aeropress Champion Filip Śwojak inside the historic 1908 Market Hall. A welcoming, professional space popular with all communities.",
+          signature: "Aeropress single-origin brews, flat whites & cinnamon buns"
+        },
+        {
+          name: "Konspira",
+          address: "Plac Solny 6/7",
+          type: "Anti-Communist Themed Restaurant",
+          description: "Immersive 1980s Solidarity-themed restaurant beloved by progressive crowds for its playful subversive history and hearty Polish fare.",
+          signature: "Solidarność ribs, giant pierogi platters & bigos"
+        }
+      ],
+      communityAndCulture: [
+        {
+          name: "Wrocław Pride (Parada Równości)",
+          type: "Annual Equality March",
+          description: "Wrocław's annual pride march, one of Poland's largest, celebrates queer visibility with municipal support and draws tens of thousands of participants.",
+          highlight: "Held each June, routes from Rynek to the National Forum of Music"
+        },
+        {
+          name: "Campaign Against Homophobia (KPH) HQ",
+          type: "Poland's Leading LGBTQ+ Organization",
+          description: "Oldest and largest Polish LGBTQ+ rights advocacy organization, headquartered in Wrocław, offering legal aid, community events, and national campaigns.",
+          highlight: "Organizers of Poland's National Equality March"
+        }
+      ],
+      winterExperiences: [
+        {
+          title: "Christmas Market & Neon Courtyard Stroll",
+          description: "After the Rynek Christmas market, wander to the Ruska 46 neon courtyard for hot spiced mead (grzany miód) and inclusive DJ sets."
+        },
+        {
+          title: "Gas Lantern Lighter Walk on Ostrów Tumski",
+          description: "Join the romantic dusk lantern-lighting ceremony across Cathedral Island, one of Poland's most atmospheric winter rituals."
         }
       ]
     }

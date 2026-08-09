@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { MapPin, Utensils, Bed, ArrowLeft, ArrowRight, Bus, Train, ShoppingBag, Sparkles, Landmark, Compass, DollarSign, Info, Map, Clock, Navigation, Gift, Lightbulb, Video, ExternalLink, Thermometer, CreditCard, Award, RefreshCw, AlertTriangle, CalendarX, Coins, Coffee, Sun, Volume2, Crown, BookOpen, Scroll, Flame, ShieldCheck, Heart, Users, Phone, Star, CheckCircle2, Lock, Wine, GlassWater, ChevronDown, Plus } from 'lucide-react';
 import { polandJourney } from '../data/poland-2026';
-import { cityImages, marketImages, attractionImages } from '../utils/cityImages';
+import { cityImages, marketImages, attractionImages, getAttractionImage } from '../utils/cityImages';
 import { useExchangeRate } from '../hooks/useExchangeRate';
 import { MustSeeCard } from './MustSeeCard';
 import { useAuth } from '../context/AuthContext';
@@ -422,6 +422,25 @@ export function CityPage({ cityId, subPage = 'overview' }) {
     ogUrl.content = canonicalUrl;
 
     // JSON-LD Structured Data
+    // Parse display date string (e.g. "Nov 21, 2026 - Jan 7, 2027") into ISO 8601 start/end
+    const parseDateRange = (dateRange) => {
+      if (!dateRange) return { start: '2026-11-21', end: '2027-01-07' };
+      const parts = dateRange.split('-').map(s => s.trim());
+      if (parts.length < 2) return { start: '2026-11-21', end: '2027-01-07' };
+      const toIso = (raw) => {
+        const m = String(raw).match(/([A-Za-z]{3})[a-z]*\.?\s+(\d{1,2}),?\s+(\d{4})/);
+        if (!m) return null;
+        const months = { Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06', Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12' };
+        const mm = months[m[1]];
+        if (!mm) return null;
+        return `${m[3]}-${mm}-${String(m[2]).padStart(2, '0')}`;
+      };
+      const start = toIso(parts[0]);
+      const end = toIso(parts[1]);
+      return { start: start || '2026-11-21', end: end || '2027-01-07' };
+    };
+    const { start: jsonLdStart, end: jsonLdEnd } = parseDateRange(city.dates);
+
     let jsonLdScript = document.getElementById('city-json-ld');
     if (!jsonLdScript) {
       jsonLdScript = document.createElement('script');
@@ -438,8 +457,8 @@ export function CityPage({ cityId, subPage = 'overview' }) {
       'event': {
         '@type': 'Event',
         'name': `${city.name} Christmas Market 2026`,
-        'startDate': '2026-11-21',
-        'endDate': '2027-01-07',
+        'startDate': jsonLdStart,
+        'endDate': jsonLdEnd,
         'eventAttendanceMode': 'https://schema.org/OfflineEventAttendanceMode',
         'eventStatus': 'https://schema.org/EventScheduled',
         'location': {
@@ -672,7 +691,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                   <span>LGBTQ+ Traveler's Guide</span>
                 </span>
                 <span className="px-3 py-1 rounded-full bg-slate-800/80 border border-white/10 text-wf-cream text-xs font-medium">
-                  {city.name} & Kazimierz
+                  {city.lgbtq.primaryArea?.split('(')[0]?.trim() || city.name}
                 </span>
               </div>
 
@@ -690,22 +709,22 @@ export function CityPage({ cityId, subPage = 'overview' }) {
 
               <div className="text-xs text-pink-400/90 font-semibold flex items-center space-x-1.5 pt-1">
                 <MapPin className="w-3.5 h-3.5" />
-                <span>{city.lgbtq.primaryArea || "Kazimierz Bohemian & Queer Quarter"}</span>
+                <span>{city.lgbtq.primaryArea || city.name}</span>
               </div>
             </div>
 
             <div className="pt-3 border-t border-white/10 text-xs text-slate-300 flex items-center space-x-2">
               <span className="font-bold text-purple-300">Key Hub:</span>
-              <span className="truncate">{city.lgbtq.landmark || "Father Bernatek Footbridge & Plac Wolnica"}</span>
+              <span className="truncate">{city.lgbtq.landmark || city.name}</span>
             </div>
           </div>
 
           {/* Right Column: LGBTQ+ Photo */}
           <CityHeroImageCard
-            imageSrc={attractionImages['lgbtq-kazimierz.jpg'] || city.lgbtq.imageUrl || cityImages[city.id]}
-            alt={`LGBTQ+ ${city.name} - ${city.lgbtq.landmark || "Father Bernatek Footbridge"}`}
-            location={city.lgbtq.primaryArea || "Kazimierz District"}
-            landmark={city.lgbtq.landmark || "Father Bernatek Footbridge & Kazimierz"}
+            imageSrc={city.lgbtq.imageUrl ? getAttractionImage(city.lgbtq.imageUrl) : cityImages[city.id]}
+            alt={`LGBTQ+ ${city.name} - ${city.lgbtq.landmark || city.name}`}
+            location={city.lgbtq.primaryArea || city.name}
+            landmark={city.lgbtq.landmark || city.name}
             description={city.lgbtq.landmarkDescription || city.lgbtq.overview}
             isLgbtq={true}
             heightClass="h-64 sm:h-80"
@@ -1800,7 +1819,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                     ? 'border-emerald-500/30 hover:border-emerald-400/60'
                     : 'border-pink-500/30 hover:border-pink-400/60';
 
-                  const mapSearchQuery = encodeURIComponent(`${item.name}, Kraków, Poland`);
+                  const mapSearchQuery = encodeURIComponent(`${item.name}, ${city.name}, Poland`);
                   const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${mapSearchQuery}`;
                   const mapSearchUrl = `https://www.google.com/maps/search/?api=1&query=${mapSearchQuery}`;
 
@@ -2094,7 +2113,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
 
                   const displayPrice = hotel.basePricePln;
 
-                  const mapSearchQuery = encodeURIComponent(`${hotel.name}, Kraków, Poland`);
+                  const mapSearchQuery = encodeURIComponent(`${hotel.name}, ${city.name}, Poland`);
                   const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${mapSearchQuery}`;
                   const mapSearchUrl = `https://www.google.com/maps/search/?api=1&query=${mapSearchQuery}`;
 
@@ -2427,11 +2446,11 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                 </p>
               </div>
 
-              {(attractionImages['lgbtq-kazimierz.jpg'] || city.lgbtq.imageUrl) && (
+              {city.lgbtq.imageUrl && (
                 <div className="w-full md:w-80 h-48 rounded-2xl overflow-hidden border border-purple-500/30 shadow-xl shrink-0 relative group">
                   <img
-                    src={attractionImages['lgbtq-kazimierz.jpg'] || city.lgbtq.imageUrl}
-                    alt={`LGBTQ+ ${city.name} - ${city.lgbtq.landmark || "Father Bernatek Footbridge"}`}
+                    src={getAttractionImage(city.lgbtq.imageUrl)}
+                    alt={`LGBTQ+ ${city.name} - ${city.lgbtq.landmark || city.name}`}
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                     loading="lazy"
                     decoding="async"
@@ -2439,7 +2458,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/20 to-transparent"></div>
                   <div className="absolute bottom-2.5 left-3 text-[11px] font-bold text-white flex items-center space-x-1.5">
                     <MapPin className="w-3.5 h-3.5 text-pink-400" />
-                    <span>{city.lgbtq.landmark || "Father Bernatek Footbridge & Kazimierz"}</span>
+                    <span>{city.lgbtq.landmark || city.name}</span>
                   </div>
                 </div>
               )}

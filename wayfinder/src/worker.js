@@ -116,14 +116,11 @@ export default {
 
     // --- Serve SPA assets ---
     let assetReq = request;
-    if (path.startsWith('/wayfinder/assets/')) {
+    if (path === '/wayfinder' || path.startsWith('/wayfinder/')) {
       const assetUrl = new URL(request.url);
-      assetUrl.pathname = assetUrl.pathname.slice('/wayfinder'.length);
+      const subPath = path.slice('/wayfinder'.length);
+      assetUrl.pathname = subPath === '' ? '/' : subPath;
       assetReq = new Request(assetUrl.toString(), request);
-    } else if (path === '/wayfinder' || path.startsWith('/wayfinder/')) {
-      const spaUrl = new URL(request.url);
-      spaUrl.pathname = '/';
-      assetReq = new Request(spaUrl.toString(), request);
     }
     const assetResp = await env.ASSETS.fetch(assetReq);
     return addSecurityHeaders(assetResp, isLocal);

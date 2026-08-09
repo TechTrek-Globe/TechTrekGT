@@ -1900,9 +1900,12 @@ export const polandJourney = {
     hotels: [
       'The Bridge Wrocław MGallery',
       'Hotel Monopol Wrocław',
+      'DoubleTree by Hilton Wrocław',
       'AC Hotel by Marriott Wrocław',
       'Radisson Blu Hotel Wrocław',
+      'Mercure Wrocław Centrum',
       'PURO Wrocław Stare Miasto',
+      'ibis Styles Wrocław Centrum',
       'B&B Hotel Wrocław Centrum'
     ],
     quickReference: {
@@ -2350,6 +2353,84 @@ export const polandJourney = {
         }
       },
       {
+        id: 'mercure-wroclaw-centrum',
+        name: 'Mercure Wrocław Centrum',
+        tier: 'mid',
+        tierLabel: 'Premium Central Comfort',
+        address: 'ul. Sienkiewicza 22 (Near Plac Grunwaldzki)',
+        neighborhood: 'Plac Grunwaldzki / University District',
+        stars: 4,
+        websiteUrl: 'https://all.accor.com/hotel/5339/index.en.shtml',
+        imageSrc: '/wayfinder/Poland-2026/images/wroclaw/hotels/mercure.jpg',
+        basePricePln: 420,
+        memberPricePln: 370,
+        currency: 'PLN',
+        usdEstimateBase: 105,
+        usdEstimateMember: 93,
+        description: 'Well-regarded international 4-star hotel positioned between the Old Town and the Oder University district. Features a rooftop gym, Scandinavian breakfast, and easy tram access to the Rynek.',
+        signatureFeature: 'Rooftop fitness & proximity to the Oder waterpark',
+        amenities: ['Rooftop Fitness Center', 'Scandinavian Breakfast', 'Meeting Facilities', 'Indoor Pool'],
+        proximity: {
+          rynekMarket: { name: 'Main Market Square', distance: '1.6 km', time: '6 min tram' },
+          attractions: [
+            { name: 'Ostrów Tumski (Cathedral Island)', distance: '1.1 km', time: '14 min walk' },
+            { name: 'Mat. Building Wrocław University', distance: '800m', time: '10 min walk' }
+          ]
+        }
+      },
+      {
+        id: 'doubletree-by-hilton-wroclaw',
+        name: 'DoubleTree by Hilton Wrocław',
+        tier: 'mid',
+        tierLabel: 'Skyline Comfort & River Views',
+        address: 'ul. Podwale 84 (Old Town South)',
+        neighborhood: 'Stare Miasto (Podwale)',
+        stars: 4,
+        websiteUrl: 'https://www.hilton.com/en/hotels/wrocdi-doubletree-wroclaw/',
+        imageSrc: '/wayfinder/Poland-2026/images/wroclaw/hotels/doubletree.jpg',
+        basePricePln: 520,
+        memberPricePln: 460,
+        currency: 'PLN',
+        usdEstimateBase: 130,
+        usdEstimateMember: 115,
+        description: 'Modern Hilton towers with expansive skyline and Oder River views. Features signature warm DoubleTree cookies at check-in, an indoor pool, and easy walk-in access to the Rynek.',
+        signatureFeature: 'City skyline & Oder river panorama rooms',
+        amenities: ['Indoor Pool', 'Skyline Restaurant', 'Fitness Center', 'Signature Cookies'],
+        proximity: {
+          rynekMarket: { name: 'Main Market Square', distance: '800m', time: '10 min walk' },
+          attractions: [
+            { name: 'National Forum of Music', distance: '650m', time: '8 min walk' },
+            { name: 'Opera Wrocławska', distance: '500m', time: '6 min walk' }
+          ]
+        }
+      },
+      {
+        id: 'ibis-styles-wroclaw-centrum',
+        name: 'ibis Styles Wrocław Centrum',
+        tier: 'budget',
+        tierLabel: 'Stylish Budget Comfort',
+        address: 'ul. Kłodnicka 14 (Near Main Station)',
+        neighborhood: 'Wrocław Śródmieście (Main Station)',
+        stars: 3,
+        websiteUrl: 'https://all.accor.com/hotel/8133/index.en.shtml',
+        imageSrc: '/wayfinder/Poland-2026/images/wroclaw/hotels/ibis-styles.jpg',
+        basePricePln: 260,
+        memberPricePln: 230,
+        currency: 'PLN',
+        usdEstimateBase: 65,
+        usdEstimateMember: 58,
+        description: 'Bright, design-led 3-star hotel by the Accor group with bold colors, free WiFi, and a warm continental breakfast. Direct tram connections to the Rynek from nearby Wrocław Główny.',
+        signatureFeature: 'Whimsical interior design at an unbeatable price',
+        amenities: ['Free WiFi', 'Buffet Breakfast', '24/7 Front Desk', 'Air Conditioning'],
+        proximity: {
+          rynekMarket: { name: 'Main Market Square', distance: '1.1 km', time: '5 min tram' },
+          attractions: [
+            { name: 'Wrocław Główny Station', distance: '600m', time: '7 min walk' },
+            { name: 'Galeria Wroclavia', distance: '700m', time: '8 min walk' }
+          ]
+        }
+      },
+      {
         id: 'hostel-mleczarnia',
         name: 'Hostel Mleczarnia',
         tier: 'budget',
@@ -2408,21 +2489,21 @@ export const polandJourney = {
         travelNote: '12 min walk across Tumski Bridge to Market Square'
       },
       {
-        id: 'houseboat-odra',
-        name: 'Floating Odra River Houseboat Suite',
-        type: 'Riverfront Stay',
-        typeLabel: 'Luxury Floating Residence',
-        neighborhood: 'Oder River Promenade',
-        priceRange: '500-750 PLN/night',
-        priceUsd: '$125-$190',
-        bookingUrl: 'https://visitwroclaw.eu/en/',
-        imageSrc: '/wayfinder/Poland-2026/images/wroclaw/hotels/houseboat-odra.jpg',
-        description: 'Modern eco-friendly floating home moored on the Oder River with floor-to-ceiling glass windows facing illuminated gothic spires.',
-        whyUnique: 'Fall asleep to gentle water reflections and wake up to swans on the Oder River.',
-        vibe: 'Modern Water-Front Luxury',
-        bestFor: ['Romantic getaways', 'Nature & urban mix lovers'],
-        highlights: ['Private river deck', 'Floor-to-ceiling river views', 'Heated floors & fireplace'],
-        travelNote: '5 min walk to Main Market Square'
+        id: 'hotel-korona-wroclaw',
+        name: 'Hotel Korona Wrocław',
+        type: 'Green Parkside Retreat',
+        typeLabel: 'Near Centennial Hall & Szczytnicki Park',
+        neighborhood: 'Szczytnicki Park (Near Hala Stulecia)',
+        priceRange: '175-240 PLN/night',
+        priceUsd: '$44-$60',
+        bookingUrl: 'https://www.hotelkorona.pl/en/',
+        imageSrc: '/wayfinder/Poland-2026/images/wroclaw/hotels/korona-hotel.jpg',
+        description: 'Quiet, green 3-star hotel set in a garden near the UNESCO-listed Centennial Hall and Szczytnicki Park. Offers comfortable rooms, a breakfast garden, and easy tram access to the Rynek.',
+        whyUnique: 'Wake up surrounded by parkland and mature trees, with the iconic Centennial Hall dome visible nearby.',
+        vibe: 'Green & Relaxed',
+        bestFor: ['Tram commuters to Rynek', 'Nature lovers', 'Budget-conscious travelers'],
+        highlights: ['Szczytnicki Park access', 'Centennial Hall close by', 'Garden breakfast terrace', 'Quiet green setting'],
+        travelNote: 'Tram 2, 4, or 10 from Hala Stulecia stop to Rynek (~15 mins)'
       }
     ],
     wroclawRestaurantsDetailed: [
@@ -2439,7 +2520,7 @@ export const polandJourney = {
         signature: 'Solidarność Ribs, Giant Pierogi Platter, Bigos in Bread Bowl',
         description: 'Immersive restaurant themed around the 1980s Polish anti-communist Solidarity movement. Hidden passageways behind secret bookcases, vintage radio broadcasts, and hearty traditional Polish cooking.',
         websiteUrl: 'https://restauracjakonspira.pl/',
-        imageSrc: '/wayfinder/Poland-2026/images/wroclaw/hotels/konspira.jpg'
+        imageSrc: '/wayfinder/Poland-2026/images/wroclaw/food/konspira.jpg'
       },
       {
         id: 'karczma-lwowska',
@@ -2454,7 +2535,7 @@ export const polandJourney = {
         signature: "Hunter's Stew (Bigos), Lwów-Style Roast Duck with Apples, Wild Mushroom Soup",
         description: 'Rustic wooden timbered tavern located directly on Market Square, serving hearty pre-war Lwów borderlands recipes since 1999.',
         websiteUrl: 'https://lwowska.com.pl/',
-        imageSrc: '/wayfinder/Poland-2026/images/wroclaw/hotels/karczma-lwowska.jpg'
+        imageSrc: '/wayfinder/Poland-2026/images/wroclaw/food/karczma-lwowska.jpg'
       },
       {
         id: 'pod-fredra',
@@ -2469,7 +2550,7 @@ export const polandJourney = {
         signature: 'Wood-Fired Seasoned Pork Knuckle (Golonka), Dry-Aged Ribeye Steak, House Smoked Sausages',
         description: 'Located right next to the Town Hall, featuring open hearth fires where prime Polish meats and game are roasted over seasoned beechwood and oak coals.',
         websiteUrl: 'https://podfredra.pl/',
-        imageSrc: '/wayfinder/Poland-2026/images/wroclaw/hotels/pod-fredra.jpg'
+        imageSrc: '/wayfinder/Poland-2026/images/wroclaw/food/pod-fredra.jpg'
       },
       {
         id: 'pierogarnia-stary-mlyn',
@@ -2484,7 +2565,7 @@ export const polandJourney = {
         signature: 'Opiekane (Crispy Baked Pierogi), Ruskie with Crispy Onions, Sweet Cottage Cheese Dumplings',
         description: 'Famous pierogi bakery where dumplings are rolled by hand and either boiled or baked in clay ovens until golden and bubbling.',
         websiteUrl: 'https://www.pierogarnie.com/',
-        imageSrc: '/wayfinder/Poland-2026/images/wroclaw/hotels/pierogarnia-stary-mlyn.jpg'
+        imageSrc: '/wayfinder/Poland-2026/images/wroclaw/food/pierogarnia-stary-mlyn.jpg'
       },
       {
         id: 'piwnica-swidnicka',
@@ -2499,7 +2580,7 @@ export const polandJourney = {
         signature: 'Royal Roast Wild Boar, Silesian Heaven (Śląskie Niebo), White Wine Steamed Mussels',
         description: 'Operating continuously in the brick vaults beneath Wrocław Town Hall since 1273. Fryderyk Chopin, Goethe, and Polish kings dined here over 700 years of history.',
         websiteUrl: 'https://piwnicaswidnicka.pl/',
-        imageSrc: '/wayfinder/Poland-2026/images/wroclaw/hotels/piwnica-swidnicka.jpg'
+        imageSrc: '/wayfinder/Poland-2026/images/wroclaw/food/piwnica-swidnicka.jpg'
       }
     ],
     wroclawDrinksDetailed: [
@@ -2516,7 +2597,7 @@ export const polandJourney = {
         signature: 'Spiż Honey Lager, Miodowe Dark Beer, Fresh Sourdough Bread with Lardo (Smalec)',
         description: 'Wrocław’s pioneer microbrewery located in the gothic cellars of Ratusz. Every craft beer comes with a complimentary thick slice of fresh sourdough bread topped with seasoned smalec.',
         websiteUrl: 'https://spiz.pl/',
-        imageSrc: '/wayfinder/Poland-2026/images/wroclaw/hotels/spiz.jpg'
+        imageSrc: '/wayfinder/Poland-2026/images/wroclaw/food/spiz.jpg'
       },
       {
         id: 'przedwojenna',
@@ -2531,7 +2612,7 @@ export const polandJourney = {
         signature: 'Soplica Hazelnut Vodka Shots, Beef Tartare (Tatar), Herring in Oil (Śledź)',
         description: '24/7 pre-war retro bistro with nostalgic decor, serving flat-rate chilled Polish vodkas and classic drinking bites like beef tartare and Gzik cheese.',
         websiteUrl: 'https://przedwojenna.pl/',
-        imageSrc: '/wayfinder/Poland-2026/images/wroclaw/hotels/przedwojenna.jpg'
+        imageSrc: '/wayfinder/Poland-2026/images/wroclaw/food/przedwojenna.jpg'
       },
       {
         id: 'alegrano',
@@ -2546,7 +2627,7 @@ export const polandJourney = {
         signature: '16 Rotating Polish Craft Taps, Hazy IPAs, Imperial Baltic Stouts',
         description: 'Vibrant craft beer haven showcasing independent microbreweries from across Poland in an atmospheric brick cellar setting.',
         websiteUrl: 'https://alegrano.pl/',
-        imageSrc: '/wayfinder/Poland-2026/images/wroclaw/hotels/alegrano.jpg'
+        imageSrc: '/wayfinder/Poland-2026/images/wroclaw/food/alegrano.jpg'
       }
     ],
     wroclawCafesDetailed: [
@@ -2563,7 +2644,7 @@ export const polandJourney = {
         signature: 'Aeropress Single-Origin Brew, Flat White, Freshly Baked Cinnamon Buns',
         description: 'Run by World Aeropress Champion Filip Śwojak inside the historic 1908 brick Market Hall. Renowned for serving the finest specialty coffee in Silesia.',
         websiteUrl: 'https://cafetargowa.pl/',
-        imageSrc: '/wayfinder/Poland-2026/images/wroclaw/hotels/cafe-targowa.jpg'
+        imageSrc: '/wayfinder/Poland-2026/images/wroclaw/food/cafe-targowa.jpg'
       },
       {
         id: 'gniazdo',
@@ -2578,7 +2659,7 @@ export const polandJourney = {
         signature: 'Avocado & Poached Eggs on Sourdough, Espresso Tonic, Matcha Latte, Homemade Tartlets',
         description: 'Stylish, light-filled coffee house on Świdnicka street serving gourmet morning breakfasts, avocado toasts, and single-origin pour-overs.',
         websiteUrl: 'https://gniazdo.cafe/',
-        imageSrc: '/wayfinder/Poland-2026/images/wroclaw/hotels/gniazdo.jpg'
+        imageSrc: '/wayfinder/Poland-2026/images/wroclaw/food/gniazdo.jpg'
       }
     ],
     lgbtq: {

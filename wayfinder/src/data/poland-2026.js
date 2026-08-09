@@ -1883,6 +1883,7 @@ export const polandJourney = {
     id: 'wroclaw',
     name: 'Wrocław',
     nights: 2,
+    historyBadge: 'City of Dwarfs & European Capital of Culture',
     base: 'Market Square or Cathedral Island',
     focus: 'Most fairytale-like stop: colorful square, bridges, dwarfs, Ostrów Tumski, and strong evening lights.',
     marketStrategy: 'First Wrocław Christmas Market evening, ideally 5 PM to 7 PM.',
@@ -2053,8 +2054,13 @@ export const polandJourney = {
         location: 'Rynek (Main Market Square)',
         dates: 'Nov 21, 2026 - Jan 7, 2027',
         hours: '10:00 AM - 9:00 PM daily (Early close Dec 24, Closed Dec 25)',
+        bestTime: '5:00 PM - 7:00 PM for peak illuminations',
+        specialty: 'Silesian crafts & three-story wooden windmill bar',
+        details: 'The heart of Wrocław\'s winter magic. Over 150 stalls radiate from the historic Ratusz, featuring whimsical animatronic displays for children and traditional Polish culinary delights.',
         description: "One of Europe's most enchanting Christmas markets surrounding the massive Gothic Ratusz. Features a fairytale forest, a 3-story rotating wooden pyramid, glowing windmills, and over 150 wooden chalets.",
         highlights: ['3-Story Wooden Pyramid & Windmill', 'Fairytale Forest (Bajkowy Las)', 'Krasnal Prezentuś (Gift Dwarf)', 'Hot Spiced Mulled Wine in Shoe Mugs'],
+        mustTry: ['Grzaniec Wrocławski (Mulled Wine)', 'Oscypek (Grilled Cheese)', 'Bigos (Hunter\'s Stew)'],
+        souvenirs: ['Hand-painted Baubles', 'Wooden Toys', 'Silesian Ceramics'],
         imageSrc: '/wayfinder/Poland-2026/images/wroclaw/markets/wroclaw.png'
       },
       {
@@ -2063,8 +2069,13 @@ export const polandJourney = {
         location: 'Plac Solny (Salt Square)',
         dates: 'Nov 21, 2026 - Jan 7, 2027',
         hours: '10:00 AM - 9:00 PM daily',
+        bestTime: '8:00 PM for quieter browsing',
+        specialty: 'Artisan woodcarvings, amber, and late-night flowers',
+        details: 'Tucked right next to the main square, this auxiliary market focuses on high-quality handmade gifts, regional Polish honeys, and intricate Baltic amber jewelry.',
         description: 'Adjacent to Rynek, Plac Solny transforms into a magical artisan craft village featuring woodcarvers, hand-blown glass ornaments, hot mead tastings, and the historic 24/7 flower market stalls.',
         highlights: ['Artisan Woodcarvings & Glass Ornaments', 'Hot Spiced Mead & Honey Wine', 'Historic 24/7 Flower Market', 'Cozy Fire Pit Lounge'],
+        mustTry: ['Grzany Miód (Hot Mead)', 'Roasted Chestnuts', 'Silesian Pretzels'],
+        souvenirs: ['Baltic Amber Jewelry', 'Beeswax Candles', 'Hand-blown Glass'],
         imageSrc: '/wayfinder/Poland-2026/images/wroclaw/markets/wroclaw-plac-solny.jpg'
       },
       {
@@ -2073,8 +2084,13 @@ export const polandJourney = {
         location: 'ul. Świdnicka & ul. Oławska',
         dates: 'Nov 21, 2026 - Jan 7, 2027',
         hours: '10:00 AM - 9:00 PM daily',
+        bestTime: 'Mid-afternoon for street performers',
+        specialty: 'Street food, gingerbread, and winter accessories',
+        details: 'These decorated pedestrian arteries leading to the Rynek are lined with festive light arches, offering a constant stream of hot street food, roasted nuts, and warm winter clothing stalls.',
         description: 'The pedestrian avenues radiating from Market Square are lined with festive arches, street food vendors selling grilled sausages, Silesian gingerbread, and handmade wool gifts.',
         highlights: ['Illuminated Festive Light Arches', 'Fresh Silesian Gingerbread (Pierniczki)', 'Handcrafted Woolen Mittens & Scarves', 'Street Musicians & Carolers'],
+        mustTry: ['Pierniczki (Gingerbread)', 'Kiełbasa z Grilla', 'Roasted Almonds'],
+        souvenirs: ['Woolen Mittens', 'Sheepskin Slippers', 'Festive Scarves'],
         imageSrc: '/wayfinder/Poland-2026/images/wroclaw/markets/wroclaw-swidnicka.jpg'
       }
     ],

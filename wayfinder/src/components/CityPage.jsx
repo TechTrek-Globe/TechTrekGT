@@ -721,7 +721,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
 
           {/* Right Column: LGBTQ+ Photo */}
           <CityHeroImageCard
-            imageSrc={city.lgbtq.imageUrl ? getAttractionImage(city.lgbtq.imageUrl) : cityImages[city.id]}
+            imageSrc={city.lgbtq.imageUrl ? getAttractionImage(city.lgbtq.imageUrl, '', city.id) : cityImages[city.id]}
             alt={`LGBTQ+ ${city.name} - ${city.lgbtq.landmark || city.name}`}
             location={city.lgbtq.primaryArea || city.name}
             landmark={city.lgbtq.landmark || city.name}
@@ -804,7 +804,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
                 </h2>
                 <span className="px-3.5 py-1 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 text-xs font-black uppercase tracking-wider flex items-center space-x-1.5 shadow-sm">
                   <Crown className="w-3.5 h-3.5" />
-                  <span>Royal Capital & UNESCO Inscription</span>
+                  <span>{city.historyBadge || 'Historic Heritage City'}</span>
                 </span>
               </div>
 

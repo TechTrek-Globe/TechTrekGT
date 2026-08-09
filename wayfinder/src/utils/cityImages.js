@@ -15,6 +15,7 @@ import krakowClothHallImg from '../assets/krakow/attractions/cloth-hall.jpg';
 import krakowKazimierzImg from '../assets/krakow/attractions/kazimierz.jpg';
 import krakowPlantyImg from '../assets/krakow/attractions/planty-park-barbican.jpg';
 import krakowAuschwitzImg from '../assets/krakow/attractions/auschwitz-birkenau.jpg';
+import krakowWieliczkaImg from '../assets/krakow/attractions/wieliczka-salt-mine.jpg';
 import krakowSchindlerImg from '../assets/krakow/attractions/schindler-factory.jpg';
 import krakowThermalBathsImg from '../assets/krakow/attractions/thermal-baths.jpg';
 import krakowWalkingTourImg from '../assets/krakow/attractions/walking-tour.jpg';

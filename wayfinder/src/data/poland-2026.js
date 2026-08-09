@@ -1966,6 +1966,11 @@ export const polandJourney = {
         tip: 'Pair with pickled cucumber (ogórek kiszony) for an authentic market snack.'
       }
     ],
+    imageDetails: {
+      location: "Rynek (Main Market Square)",
+      landmark: "Wrocław Market Square during Christmas",
+      description: "A magical fairytale setting featuring the illuminated Gothic Old Town Hall, over 150 wooden artisan chalets, and the whimsical three-story wooden windmill."
+    },
     history: "Wrocław is one of the oldest and most storied cities in Poland, with roots stretching back over 1,000 years. Founded at a strategic crossing on the Oder River, it has been known successively as Vratislavia, Breslau, and Wrocław. The city's identity was forged by the Piast dynasty, flourished under Bohemian and Habsburg rule, and became a brilliant center of German-Jewish culture before enduring the devastating Siege of Breslau in 1945. After WWII, the city was repopulated by Polish settlers expelled from Lwów and the eastern kresy, transforming Wrocław into a vibrant melting pot that today thrives as one of Poland's most dynamic cultural capitals and a 2016 European Capital of Culture.",
       historyStats: [
         { label: 'Founded', value: '10th Century (Trade Settlement)', icon: 'Landmark' },
@@ -2386,16 +2391,16 @@ export const polandJourney = {
         travelNote: '10 min tram ride (Tram 2 or 7) from Main Market Square'
       },
       {
-        id: 'monastery-guesthouse',
-        name: 'Dom Sample Monastery Guesthouse - Cathedral Island',
+        id: 'hotel-jana-pawla-ii',
+        name: 'Hotel im. Jana Pawła II',
         type: 'Sacred Peace Stay',
         typeLabel: 'Cathedral Island Quiet Retreat',
         neighborhood: 'Ostrów Tumski',
         priceRange: '280-380 PLN/night',
         priceUsd: '$70-$95',
-        bookingUrl: 'https://visitwroclaw.eu/en/place/ostrow-tumski-wroclaw',
+        bookingUrl: 'https://hotel-jp2.pl/en/',
         imageSrc: '/wayfinder/Poland-2026/images/wroclaw/hotels/monastery-guesthouse.jpg',
-        description: 'Peaceful guesthouse set in a tranquil historic cobblestone courtyard on Cathedral Island, steps away from the gas lantern bridge.',
+        description: 'Peaceful hotel set in a tranquil historic cobblestone environment on Cathedral Island, steps away from the Botanical Garden and the gas lantern bridge.',
         whyUnique: 'Experience the quiet evening enchantment of Cathedral Island after day visitors leave.',
         vibe: 'Serene & Historic',
         bestFor: ['Peace seekers', 'Solo travelers', 'History buffs'],

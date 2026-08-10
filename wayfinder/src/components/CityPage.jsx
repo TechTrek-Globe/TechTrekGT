@@ -121,15 +121,15 @@ function CulinaryHighlightsSection({ highlights }) {
 
 const RAW_FILTER_CATEGORIES = [
   { id: 'food-all', title: 'All Dining', Icon: Utensils, activeClass: 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 ring-1 ring-amber-400', inactiveClass: 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30' },
-  { id: 'must-haves', title: 'Must-Have Dining', Icon: Utensils, activeClass: 'bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 shadow-md shadow-amber-500/20', inactiveClass: 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10' },
+  { id: 'must-haves', title: 'Must-Haves', Icon: Utensils, activeClass: 'bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 shadow-md shadow-amber-500/20', inactiveClass: 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10' },
   { id: 'local', title: 'Local Fares', Icon: Utensils, activeClass: 'bg-pink-500 text-white shadow-md shadow-pink-500/20', inactiveClass: 'bg-pink-500/10 hover:bg-pink-500/20 text-pink-300 border border-pink-500/30' },
   { id: 'steak', title: 'Steakhouses', Icon: Flame, activeClass: 'bg-rose-600 text-white shadow-md shadow-rose-500/20', inactiveClass: 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30' },
   { id: 'cheap', title: 'Cheap Eats', Icon: Coins, activeClass: 'bg-emerald-600 text-white shadow-md shadow-emerald-500/20', inactiveClass: 'bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-300 border border-emerald-600/30' },
   { id: 'expensive', title: 'Fine Dining', Icon: Award, activeClass: 'bg-purple-600 text-white shadow-md shadow-purple-500/20', inactiveClass: 'bg-purple-600/10 hover:bg-purple-600/20 text-purple-300 border border-purple-600/30' },
   { id: 'coffee-breakfast', title: 'Coffee & Breakfast', Icon: Coffee, activeClass: 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20', inactiveClass: 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30' },
 
-  { id: 'drink-all', title: 'All Drinks & Bars', Icon: Wine, activeClass: 'bg-purple-500 text-white shadow-md shadow-purple-500/20 ring-1 ring-purple-400', inactiveClass: 'bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30' },
-  { id: 'pub-bars', title: 'Beer Halls & Pubs', Icon: GlassWater, activeClass: 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20', inactiveClass: 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30' },
+  { id: 'drink-all', title: 'All Drinks', Icon: Wine, activeClass: 'bg-purple-500 text-white shadow-md shadow-purple-500/20 ring-1 ring-purple-400', inactiveClass: 'bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30' },
+  { id: 'pub-bars', title: 'Pubs & Bars', Icon: GlassWater, activeClass: 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20', inactiveClass: 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30' },
   { id: 'vodka-house', title: 'Vodka Houses', Icon: Crown, activeClass: 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20', inactiveClass: 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30' },
   { id: 'brewery', title: 'Breweries', Icon: GlassWater, activeClass: 'bg-amber-600 text-white shadow-md shadow-amber-600/20', inactiveClass: 'bg-amber-600/10 hover:bg-amber-600/20 text-amber-300 border border-amber-600/30' }
 ];
@@ -160,13 +160,13 @@ function DrillDownFilters({ activeFilter, onFilterChange, items = [] }) {
   const totalDrink = getCount('drink-all');
 
   return (
-    <div className="flex items-center space-x-2 w-full overflow-x-auto no-scrollbar no-overscroll-x whitespace-nowrap py-0.5">
+    <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 w-full py-0.5">
       {activeTier === 'main' ? (
         <>
           <button
             type="button"
             onClick={() => onFilterChange('all')}
-            className={`px-4 py-2 rounded-xl text-xs font-black transition-all shrink-0 cursor-pointer min-h-[40px] ${
+            className={`px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-black transition-all shrink-0 cursor-pointer min-h-[36px] ${
               activeFilter === 'all'
                 ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 ring-1 ring-amber-400'
                 : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10'
@@ -180,7 +180,7 @@ function DrillDownFilters({ activeFilter, onFilterChange, items = [] }) {
               setActiveTier('eat');
               onFilterChange('food-all');
             }}
-            className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center space-x-2 shrink-0 cursor-pointer min-h-[40px] ${
+            className={`px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-black transition-all flex items-center space-x-2 shrink-0 cursor-pointer min-h-[36px] ${
               isEatCategory(activeFilter)
                 ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 ring-1 ring-amber-400'
                 : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30'
@@ -195,7 +195,7 @@ function DrillDownFilters({ activeFilter, onFilterChange, items = [] }) {
               setActiveTier('drink');
               onFilterChange('drink-all');
             }}
-            className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center space-x-2 shrink-0 cursor-pointer min-h-[40px] ${
+            className={`px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-black transition-all flex items-center space-x-2 shrink-0 cursor-pointer min-h-[36px] ${
               isDrinkCategory(activeFilter)
                 ? 'bg-purple-500 text-white shadow-md shadow-purple-500/20 ring-1 ring-purple-400'
                 : 'bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30'
@@ -213,7 +213,7 @@ function DrillDownFilters({ activeFilter, onFilterChange, items = [] }) {
               setActiveTier('main');
               onFilterChange('all');
             }}
-            className="px-3.5 py-2 rounded-xl text-xs font-black transition-all shrink-0 cursor-pointer bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/10 flex items-center space-x-1.5 min-h-[40px]"
+            className="px-3 py-1.5 rounded-xl text-xs font-black transition-all shrink-0 cursor-pointer bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/10 flex items-center space-x-1.5 min-h-[36px]"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             <span>Back</span>
@@ -230,7 +230,7 @@ function DrillDownFilters({ activeFilter, onFilterChange, items = [] }) {
                 key={catId}
                 type="button"
                 onClick={() => onFilterChange(catId)}
-                className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 shrink-0 cursor-pointer min-h-[40px] ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 shrink-0 cursor-pointer min-h-[36px] ${
                   isActive ? catDef.activeClass : catDef.inactiveClass
                 }`}
               >

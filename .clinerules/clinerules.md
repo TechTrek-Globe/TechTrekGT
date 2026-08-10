@@ -1,7 +1,3 @@
----
-trigger: always_on
----
-
 # TechTrekGT Workspace Rules
 
 ## 0. MANDATORY PRE-FLIGHT AUDIT (READ BEFORE CODING)
@@ -10,25 +6,59 @@ BEFORE writing, editing, or generating any code, data, or components:
 2. **Inspect Asset Tree:** You MUST inspect the workspace asset folder (`public/` or `src/assets/`) to see which image files actually exist on disk before referencing any local file path.
 3. **Locate Data Files:** Determine whether city/travel data lives in centralized files (e.g., `wayfinder/src/data/poland-2026.js`) or inside component files, and update the data at its source.
 
+---
+
 ## 1. Architecture & Navigation (Multi-App)
-* **No Root Manifest:** The repository contains five standalone apps. You MUST `cd` into the specific project directory before executing any npm, Vite, or Wrangler commands.
+* **No Root Manifest:** The repository contains five standalone apps (`landing/`, `finance/`, `outpost/`, `wayfinder/`, `bigworm/`). You MUST `cd` into the specific project directory before executing any npm, Vite, or Wrangler commands.
 * **Pure JavaScript (No TypeScript):** The project uses pure JS/JSX (`React 19`, `Vite 6`, `Tailwind 3.4`). NEVER attempt to run `tsc`, enforce type-checking, or generate `.ts`/`.tsx` files.
-* **Custom SPA Routing (CRITICAL):** There is NO React Router. The apps use a hand-rolled client-side router (`window.history.pushState` / `MapsTo`). Do NOT import, install, or use `react-router-dom`.
-* **State Management:** Use React Context and standard hooks exclusively. Do not introduce Redux, Zustand, or other state libraries.
+* **Custom SPA Routing:** There is NO React Router. The apps use a hand-rolled client-side router (`window.history.pushState`). Do not import, install, or attempt to configure `react-router-dom`.
+* **State Management:** Use React Context and standard hooks (`useState`, `useReducer`) exclusively. Do not introduce Redux, Zustand, or other state libraries.
 
-## 2. Content, Asset & Image Integrity Rules
-* **No Invented Local Paths:** NEVER generate local image paths unless you have confirmed that the file physically exists on disk.
-* **Image Fallbacks:** If local assets do not exist, use high-quality external Unsplash URLs. Images MUST match the domain context (e.g., European winter, Polish architecture). **NEVER use tropical, beach, or warm-climate images.**
-* **Zero Hallucination & Cross-Contamination:** - Fact-check all hotel names, attractions, and Christmas market details for the target city.
-  - NEVER copy data from one city (e.g., Wroclaw) into another (e.g., Poznan) without completely overhauling the data to match reality.
+---
 
-## 3. Backend, Database & Cloudflare Workers
-* **Worker Routing:** API logic lives in `src/worker.js` and `functions/api/`.
-* **Shared D1 Database:** All apps share a single D1 database (`personal-budget-db`). Write SQL migrations directly into the specific project's schema file. 
-* **Authentication:** Sessions rely exclusively on HttpOnly cookies. Never store tokens in `localStorage` or `sessionStorage`.
+## 2. Backend, Database & Cloudflare Workers
+* **Worker Routing:** API and request logic lives in each app's `src/worker.js` (Cloudflare Workers ESM format) and `functions/api/` (Pages-Functions style endpoints).
+* **Shared D1 Database:** All apps share a single Cloudflare D1 SQLite database (`personal-budget-db`). Write SQL migrations directly into the specific project's schema file. Be mindful of single-writer SQLite limits when designing data imports.
+* **Authentication:** All React apps share a single SSO JWT secret. Sessions rely exclusively on HttpOnly cookies (`credentials: 'include'`). Never store auth tokens in `localStorage`.
+* **Local Secrets:** Use `.dev.vars` for local environment variables during `wrangler dev`. Never commit `.dev.vars` to version control.
 
-## 4. Production Readiness & Validation Mandate
-1. **Routing Verification:** Verify that every link and CTA button uses the custom SPA router.
-2. **Asset Validation:** Verify that every `src` URL loads a real image that fits the context.
-3. **Data Completeness:** Ensure no placeholder text (e.g., "Lorem Ipsum") remains.
-4. **Action Mandate:** If any step fails, you MUST fix the issue before marking the task as complete.
+---
+
+## 3. Mandatory Build & Deploy Loop
+* **Automated Build Trigger:** Immediately upon completing source code modifications, `cd` into the target app directory and execute the production build (`npm run build`) using PowerShell.
+* **Zero-Error Mandate:** If the build fails (due to linting, unresolved imports, or bundle misconfigurations), the task is not complete. Surgically fix the regression and rebuild.
+* **Deployment Execution:** Upon a successful zero-error build, immediately deploy the application using `npm run deploy` (which triggers `wrangler deploy`).
+* **Verification:** Confirm the deployment completes successfully. Log the deployment status or Cloudflare Worker URL in your final task summary.
+
+---
+
+## 4. Architectural Integrity & Documentation Sync
+* **Always Read First:** Before proposing or executing any structural changes (new directories, state providers, database tables, or routing paths), you MUST read the `ARCHITECTURE.md` file in the workspace root to ensure your approach aligns with the established system design.
+* **Mandatory Sync:** If your code modifications alter the tech stack, routing strategy, database schema, CI/CD pipeline, or deployment topology, you MUST automatically update the `ARCHITECTURE.md` file to accurately reflect the new state of the project before marking the task as complete.
+* **No Silent Drift:** Never leave the architecture document outdated. If a feature changes how the system works, document it immediately.
+
+---
+
+## 5. Wayfinder Asset Management & Directory Standardization
+* **Strict Image Hierarchy:** All images for the Wayfinder application MUST be stored locally following this exact path convention: `public/Poland-2026/images/[city_name]/[category]/`. Valid categories are limited to `hotels`, `food`, `markets`, and `attractions`.
+* **Asset Sourcing via Foursquare API:** When adding or modifying a POI, verify that a local image exists. If missing, write and execute a Node.js utility script that uses the Foursquare Places API (specifically the `/photos` endpoint) to autonomously download a high-quality venue photo and save it to the strict hierarchical folder. Never leave external image URLs in the data source.
+* **Global Image Migration Mandate:** If you detect any images stored in legacy or root directories (e.g., `public/images/hotels/`), autonomously move the files to their correct city/category folders using Node.js file system commands, then update all data files and React components to reference the new paths.
+* **Critical: Validate Data Integrity for "Things to Do" Functionality**
+   Before activating the "Things to Do" feature, you MUST:
+   1. **Image URL Validation:** Audit all image URLs to confirm they point to valid, local resources within the strict directory structure.
+   2. **Data Sanitization & Completeness:** Verify that all required fields are populated (venue, date/time, location). Remove or replace incomplete entries.
+   3. **Production Safety Check:** Ensure no debugging, placeholder code, or dead external image links remain.
+   4. **Action Mandate:** If validation fails, fix the issue before marking the task complete.
+
+---
+
+## 6. External API Integration Rules (Foursquare & Geoapify)
+* **Foursquare Places API (Primary Photos & Venue Details):**
+  - **API Keys:** The Foursquare API key is stored as `FOURSQUARE_API_KEY` in `.dev.vars`.
+  - **Fetching Data:** Pass the key via the `Authorization` header when querying `https://api.foursquare.com/v3/places/search` (for venue data) or `https://api.foursquare.com/v3/places/{fsq_id}/photos` (for images).
+* **Geoapify API (Primary POI Generation & Geocoding):**
+  - **API Keys:** Access the Geoapify API key via `GEOAPIFY_API_KEY` in `.dev.vars`.
+  - **Zero Hallucination POI Generation:** Whenever populating hotels, attractions, or Christmas market locations for a city (e.g., Wrocław, Poznań, Kraków):
+    1. Use Geoapify Places API (`https://api.geoapify.com/v2/places`) or Geocoding API to query real venues for the target city.
+    2. Categories to query: `accommodation.hotel`, `tourism.sights`, `catering.restaurant`, `leisure`.
+    3. Save the fetched venue names, addresses, star ratings, and coordinates directly into the central data file (`wayfinder/src/data/poland-2026.js`).

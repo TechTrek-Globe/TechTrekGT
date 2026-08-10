@@ -7,6 +7,10 @@ import { verifyToken, getTokenFromRequest } from '../functions/utils/auth.js';
 import { onRequestPost as loginHandler }  from '../functions/api/auth/login.js';
 import { onRequestPost as logoutHandler } from '../functions/api/auth/logout.js';
 import { onRequestGet  as meHandler }     from '../functions/api/auth/me.js';
+import { onRequestPost as registerHandler } from '../functions/api/auth/register.js';
+import { onRequestPost as forgotPasswordHandler } from '../functions/api/auth/forgot-password.js';
+import { onRequestPost as resetPasswordHandler } from '../functions/api/auth/reset-password.js';
+import { onRequestPost as securityQuestionHandler } from '../functions/api/auth/security-question.js';
 import { handleJourneys }   from '../functions/api/wayfinder/journeys.js';
 import { handleItinerary }  from '../functions/api/wayfinder/itinerary.js';
 import { handleDocuments }  from '../functions/api/wayfinder/documents.js';
@@ -86,14 +90,26 @@ export default {
       return new Response(null, { status: 204, headers: corsHeaders(origin) });
     }
 
+    // Normalize subpath /wayfinder or /wayfinder/ for API routing
+    let apiPath = path;
+    if (apiPath.startsWith('/wayfinder/api/')) {
+      apiPath = apiPath.slice('/wayfinder'.length);
+    } else if (apiPath === '/wayfinder/api') {
+      apiPath = '/api';
+    }
+
     // --- Public auth routes ---
-    if (path === '/api/auth/login'  && method === 'POST') return loginHandler({ request, env, ctx });
-    if (path === '/api/auth/logout' && method === 'POST') return logoutHandler({ request, env, ctx });
-    if (path === '/api/auth/me'     && method === 'GET')  return meHandler({ request, env, ctx });
+    if (apiPath === '/api/auth/login'  && method === 'POST') return loginHandler({ request, env, ctx });
+    if (apiPath === '/api/auth/logout' && method === 'POST') return logoutHandler({ request, env, ctx });
+    if (apiPath === '/api/auth/me'     && method === 'GET')  return meHandler({ request, env, ctx });
+    if (apiPath === '/api/auth/register' && method === 'POST') return registerHandler({ request, env, ctx });
+    if (apiPath === '/api/auth/forgot-password' && method === 'POST') return forgotPasswordHandler({ request, env, ctx });
+    if (apiPath === '/api/auth/reset-password' && method === 'POST') return resetPasswordHandler({ request, env, ctx });
+    if (apiPath === '/api/auth/security-question' && method === 'POST') return securityQuestionHandler({ request, env, ctx });
 
     // --- Protected wayfinder API routes ---
-    if (path.startsWith('/api/wayfinder/')) {
-      if (path === '/api/wayfinder/exchange-rate' && method === 'GET') {
+    if (apiPath.startsWith('/api/wayfinder/')) {
+      if (apiPath === '/api/wayfinder/exchange-rate' && method === 'GET') {
         return handleExchangeRate({ request, env, ctx }, url, method);
       }
 
@@ -102,11 +118,11 @@ export default {
 
       const context = { request, env, ctx, user: auth.payload };
 
-      if (path.startsWith('/api/wayfinder/journeys'))    return handleJourneys(context, url, method);
-      if (path.startsWith('/api/wayfinder/itinerary'))   return handleItinerary(context, url, method);
-      if (path.startsWith('/api/wayfinder/documents'))   return handleDocuments(context, url, method);
-      if (path.startsWith('/api/wayfinder/import-jobs')) return handleImportJobs(context, url, method);
-      if (path.startsWith('/api/wayfinder/budget'))      return handleBudget(context, url, method);
+      if (apiPath.startsWith('/api/wayfinder/journeys'))    return handleJourneys(context, url, method);
+      if (apiPath.startsWith('/api/wayfinder/itinerary'))   return handleItinerary(context, url, method);
+      if (apiPath.startsWith('/api/wayfinder/documents'))   return handleDocuments(context, url, method);
+      if (apiPath.startsWith('/api/wayfinder/import-jobs')) return handleImportJobs(context, url, method);
+      if (apiPath.startsWith('/api/wayfinder/budget'))      return handleBudget(context, url, method);
 
       return new Response(JSON.stringify({ error: 'Not found' }), {
         status: 404,

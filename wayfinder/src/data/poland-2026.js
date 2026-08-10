@@ -2594,7 +2594,7 @@ export const polandJourney = {
         cuisine: 'Traditional Polish & Lwów Borderlands',
         signature: "Hunter's Stew (Bigos), Lwów-Style Roast Duck with Apples, Wild Mushroom Soup",
         description: 'Rustic wooden timbered tavern located directly on Market Square, serving hearty pre-war Lwów borderlands recipes since 1999.',
-        websiteUrl: 'https://lwowska.com.pl/',
+        websiteUrl: 'https://www.lwowska.com.pl/',
         imageSrc: '/wayfinder/Poland-2026/images/wroclaw/food/karczma-lwowska.jpg'
       },
       {
@@ -2611,7 +2611,7 @@ export const polandJourney = {
         cuisine: 'Oak Wood Flame Grills & Prime Polish Steaks',
         signature: 'Wood-Fired Seasoned Pork Knuckle (Golonka), Dry-Aged Ribeye Steak, House Smoked Sausages',
         description: 'Located right next to the Town Hall, featuring open hearth fires where prime Polish meats and game are roasted over seasoned beechwood and oak coals.',
-        websiteUrl: 'https://podfredra.pl/',
+        websiteUrl: 'https://www.podfredra.pl/',
         imageSrc: '/wayfinder/Poland-2026/images/wroclaw/food/pod-fredra.jpg'
       },
       {
@@ -2628,7 +2628,7 @@ export const polandJourney = {
         cuisine: 'Baked & Boiled Traditional Pierogi',
         signature: 'Opiekane (Crispy Baked Pierogi), Ruskie with Crispy Onions, Sweet Cottage Cheese Dumplings',
         description: 'Famous pierogi bakery where dumplings are rolled by hand and either boiled or baked in clay ovens until golden and bubbling.',
-        websiteUrl: 'https://www.pierogarnie.com/',
+        websiteUrl: 'https://www.pierogarnie.com/restauracje/stary-mlyn-wroclaw/',
         imageSrc: '/wayfinder/Poland-2026/images/wroclaw/food/pierogarnia-stary-mlyn.jpg'
       },
       {
@@ -2664,7 +2664,7 @@ export const polandJourney = {
         drinkType: 'Unfiltered Craft Beer & Lardo Bread',
         signature: 'Spiż Honey Lager, Miodowe Dark Beer, Fresh Sourdough Bread with Lardo (Smalec)',
         description: 'Wrocław’s pioneer microbrewery located in the gothic cellars of Ratusz. Every craft beer comes with a complimentary thick slice of fresh sourdough bread topped with seasoned smalec.',
-        websiteUrl: 'https://spiz.pl/',
+        websiteUrl: 'https://www.browar.wroc.pl/',
         imageSrc: '/wayfinder/Poland-2026/images/wroclaw/food/spiz.jpg'
       },
       {
@@ -2717,7 +2717,7 @@ export const polandJourney = {
         cuisine: 'Aeropress World Champion Coffee & Pastries',
         signature: 'Aeropress Single-Origin Brew, Flat White, Freshly Baked Cinnamon Buns',
         description: 'Run by World Aeropress Champion Filip Śwojak inside the historic 1908 brick Market Hall. Renowned for serving the finest specialty coffee in Silesia.',
-        websiteUrl: 'https://cafetargowa.pl/',
+        websiteUrl: 'http://cafetargowa.pl',
         imageSrc: '/wayfinder/Poland-2026/images/wroclaw/food/cafe-targowa.jpg'
       },
       {
@@ -2777,7 +2777,7 @@ export const polandJourney = {
           type: "Cultural Club & Queer Dance Venue",
           description: "Alternative art space, cocktail bar, and queer-friendly dance floor set within the dramatic industrial-chic Ruska 46 neon courtyard.",
           vibe: "Post-industrial neon courtyard dancing till dawn",
-          imageSrc: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?q=80&w=2574&auto=format&fit=crop"
+          imageSrc: "/wayfinder/Poland-2026/images/wroclaw/api-fetched/surowiec.jpg"
         },
         {
           name: "Bezsenność",

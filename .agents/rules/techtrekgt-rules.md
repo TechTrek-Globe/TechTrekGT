@@ -36,3 +36,11 @@ BEFORE writing, editing, or generating any code, data, or components:
 2. **Asset Validation:** Verify that every `src` URL loads a real image that fits the context.
 3. **Data Completeness:** Ensure no placeholder text (e.g., "Lorem Ipsum") remains.
 4. **Action Mandate:** If any step fails, you MUST fix the issue before marking the task as complete.
+
+## 5. Geoapify API Data Fetching Rules
+* **API Key Location:** Access the API key via `process.env.GEOAPIFY_API_KEY` or `.env`.
+* **Zero Hallucination POI Generation:** Whenever populating hotels, attractions, or Christmas market locations for a city (e.g., Wrocław, Poznań, Kraków):
+  1. Use Geoapify Places API (`https://api.geoapify.com/v2/places`) or Geocoding API to query real venues for the target city.
+  2. Categories to query: `accommodation.hotel`, `tourism.sights`, `catering.restaurant`, `leisure`.
+  3. Save the fetched venue names, addresses, star ratings, and coordinates directly into the central data file (`wayfinder/src/data/poland-2026.js`).
+* **Image Fallbacks:** If Geoapify does not return a direct image URL, use high-quality Unsplash URLs matching European winter/architecture. Never invent fake local image paths.

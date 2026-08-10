@@ -7,14 +7,43 @@ function computeManualAvg(comp1, comp2, comp3) {
   return Math.round((sum / vals.length) * 100) / 100;
 }
 
-function buildEbaySearchUrl(itemName, athlete, authenticator, certNumber) {
-  const terms = [];
-  if (athlete) terms.push(athlete);
-  if (itemName) terms.push(itemName);
-  if (authenticator) terms.push(authenticator);
-  if (certNumber) terms.push(certNumber);
-  const q = terms.join(' ').replace(/[^\w\s-]/g, '').trim();
-  return `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(q)}&LH_Sold=1&LH_Complete=1`;
+export function cleanEbaySearchQuery(itemName, athlete, authenticator) {
+  let text = String(itemName || '').trim();
+
+  // Strip leading Item #, Lot #, or standalone 5-12 digit numbers
+  text = text.replace(/^(?:item\s*#?|lot\s*#?|#)\s*\d{4,12}(?:\s*[-–—:]\s*|\s+)?/gi, '');
+  text = text.replace(/^\d{5,12}\s*[-–—:]\s*/g, '');
+  text = text.replace(/^\d{5,12}\s+/g, '');
+
+  // Strip standalone non-year 5-12 digit numbers anywhere in text (e.g. internal lot IDs like "5261 894")
+  text = text.replace(/\b(?!(?:19|20)\d{2})\d{5,12}\b/g, '');
+  text = text.replace(/\s+/g, ' ').trim();
+
+  // If athlete provided and not in text, prepend athlete
+  if (athlete && athlete.trim()) {
+    const cleanAthlete = athlete.replace(/^\d{5,12}\s+/, '').trim();
+    if (cleanAthlete && !text.toLowerCase().includes(cleanAthlete.toLowerCase())) {
+      text = `${cleanAthlete} ${text}`;
+    }
+  }
+
+  // If authenticator provided and not in text, append authenticator
+  if (authenticator && authenticator.trim() && authenticator.toLowerCase() !== 'other') {
+    const cleanAuth = authenticator.replace(/#.*$/, '').trim();
+    if (cleanAuth && !text.toLowerCase().includes(cleanAuth.toLowerCase())) {
+      text = `${text} ${cleanAuth}`;
+    }
+  }
+
+  // Clean special characters except word characters, spaces, and hyphens
+  text = text.replace(/[^\w\s-]/g, '').replace(/\s+/g, ' ').trim();
+
+  return text;
+}
+
+function buildEbaySearchUrl(itemName, athlete, authenticator) {
+  const query = cleanEbaySearchQuery(itemName, athlete, authenticator);
+  return `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(query)}&LH_Sold=1&LH_Complete=1`;
 }
 
 /**
@@ -77,10 +106,12 @@ export async function onRequestGet(context) {
 
     const rows = await env.DB.prepare(query).bind(...bindings).all();
     const results = (rows.results || []).map(row => {
-      // Auto build search URL if none saved yet
-      const searchUrl = row.ebay_search_url || buildEbaySearchUrl(row.item_name, row.athlete_person, row.authenticator, row.cert_number);
+      const cleanName = cleanEbaySearchQuery(row.item_name);
+      // Always compute clean search URL
+      const searchUrl = buildEbaySearchUrl(row.item_name, row.athlete_person, row.authenticator);
       return {
         ...row,
+        item_name: cleanName,
         ebay_search_url: searchUrl
       };
     });
@@ -122,7 +153,7 @@ export async function onRequestPost(context) {
       ? Number(recommended_list_price)
       : (manualAvg || item.suggested_list_price);
 
-    const searchUrl = ebay_search_url || buildEbaySearchUrl(item.item_name, item.athlete_person, item.authenticator, item.cert_number);
+    const searchUrl = ebay_search_url || buildEbaySearchUrl(item.item_name, item.athlete_person, item.authenticator);
 
     // Check if comp row already exists
     const existingComp = await env.DB.prepare(

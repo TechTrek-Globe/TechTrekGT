@@ -8,18 +8,36 @@ import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
  * calculates the statistical average/median comps, and returns structured data.
  */
 
+function cleanEbaySearchQuery(queryText) {
+  let text = String(queryText || '').trim();
+
+  // Strip leading Item #, Lot #, or standalone 5-12 digit numbers
+  text = text.replace(/^(?:item\s*#?|lot\s*#?|#)\s*\d{4,12}(?:\s*[-–—:]\s*|\s+)?/gi, '');
+  text = text.replace(/^\d{5,12}\s*[-–—:]\s*/g, '');
+  text = text.replace(/^\d{5,12}\s+/g, '');
+
+  // Strip standalone non-year 5-12 digit numbers anywhere in text (e.g. internal lot IDs like "5261 894")
+  text = text.replace(/\b(?!(?:19|20)\d{2})\d{5,12}\b/g, '');
+  text = text.replace(/\s+/g, ' ').trim();
+
+  // Clean special characters except word characters, spaces, and hyphens
+  text = text.replace(/[^\w\s-]/g, '').replace(/\s+/g, ' ').trim();
+
+  return text;
+}
+
 export async function onRequestGet(context) {
   const { request, env } = context;
   return withAuth(async () => {
     await requireAuth(request, env);
 
     const url = new URL(request.url);
-    const query = url.searchParams.get('query') || '';
-    if (!query.trim()) {
+    const rawQuery = url.searchParams.get('query') || '';
+    if (!rawQuery.trim()) {
       return err('Search query parameter is required', 400);
     }
 
-    const results = await fetchEbaySoldComps(query.trim());
+    const results = await fetchEbaySoldComps(rawQuery.trim());
     return ok(results);
   });
 }
@@ -29,8 +47,30 @@ export async function onRequestPost(context) {
   return withAuth(async () => {
     const { userId } = await requireAuth(request, env);
     const body = await request.json().catch(() => ({}));
-    const query = (body.query || '').trim();
+    let query = (body.query || '').trim();
     const itemId = body.itemId || null;
+
+    // If itemId provided, pull item_name, athlete_person, authenticator to build ultra-clean query
+    if (itemId && env.DB) {
+      const itemRow = await env.DB.prepare(
+        'SELECT item_name, athlete_person, authenticator FROM auction_items WHERE id = ? AND user_id = ?'
+      ).bind(itemId, userId).first();
+
+      if (itemRow) {
+        let nameText = cleanEbaySearchQuery(itemRow.item_name);
+        if (itemRow.athlete_person && !nameText.toLowerCase().includes(itemRow.athlete_person.toLowerCase())) {
+          const cleanAthlete = cleanEbaySearchQuery(itemRow.athlete_person);
+          if (cleanAthlete) nameText = `${cleanAthlete} ${nameText}`;
+        }
+        if (itemRow.authenticator && itemRow.authenticator.toLowerCase() !== 'other' && !nameText.toLowerCase().includes(itemRow.authenticator.toLowerCase())) {
+          const cleanAuth = itemRow.authenticator.replace(/#.*$/, '').trim();
+          if (cleanAuth) nameText = `${nameText} ${cleanAuth}`;
+        }
+        query = cleanEbaySearchQuery(nameText);
+      }
+    }
+
+    query = cleanEbaySearchQuery(query);
 
     if (!query) {
       return err('Search query is required', 400);
@@ -74,9 +114,10 @@ export async function onRequestPost(context) {
 
 /**
  * Fetches completed/sold listings from eBay and parses pricing data
- * @param {string} query
+ * @param {string} rawQuery
  */
-async function fetchEbaySoldComps(query) {
+async function fetchEbaySoldComps(rawQuery) {
+  const query = cleanEbaySearchQuery(rawQuery);
   const ebaySearchUrl = `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(query)}&LH_Complete=1&LH_Sold=1&_sop=13&_ipg=25`;
 
   try {

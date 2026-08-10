@@ -14,11 +14,11 @@ export function computeItemProration(item, invoice) {
 }
 
 export function computePricingFloors(item) {
-  const divisor = 1 - item.platform_fee_pct - item.boost_pct;
+  const divisor = 1 - (item.platform_fee_pct || 0) - (item.boost_pct || 0);
   const min_sell_price = divisor > 0
-    ? (item.true_total_cost + item.est_shipping_cost + item.platform_flat_fee) / divisor
+    ? Math.round(((item.true_total_cost + (item.est_shipping_cost || 0) + (item.platform_flat_fee || 0)) / divisor) * 100) / 100
     : 0;
-  const suggested_list_price = min_sell_price * (1 + item.target_margin_pct);
+  const suggested_list_price = Math.round((min_sell_price * (1 + (item.target_margin_pct || 0))) * 100) / 100;
   return { min_sell_price, suggested_list_price };
 }
 

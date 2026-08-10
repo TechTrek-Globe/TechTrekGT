@@ -603,7 +603,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
       </div>
 
       {/* Top Sub-Header Toolbar (Opens Dedicated Sub-Pages & Stays Sticky at Top) */}
-      <div className="sticky top-14 z-40 py-2.5 bg-slate-950/95 backdrop-blur-xl border-y border-amber-500/30 w-full shadow-xl">
+      <div className="sticky top-14 z-30 py-2.5 bg-slate-950/95 backdrop-blur-xl border-y border-amber-500/30 w-full shadow-xl">
         <div className="p-1.5 rounded-xl border border-amber-500/20 !bg-slate-900/90 shadow-md flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar no-overscroll-x">
           <a
             href={baseUrl}

@@ -39,7 +39,7 @@ export function Layout({ children }) {
   };
 
   return (
-    <div className="min-h-screen flex flex-col font-sans bg-slate-950 w-full max-w-full overflow-x-hidden">
+    <div className="min-h-screen flex flex-col font-sans bg-slate-950 w-full max-w-full">
       {/* --- Full-Width Top Header Banner --- */}
       <header className="w-full flex-shrink-0 bg-black relative z-[60] border-b border-[#b48214]/30 flex justify-center items-center pb-1 px-4 overflow-hidden safe-pt">
         <img
@@ -56,7 +56,7 @@ export function Layout({ children }) {
         <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-[radial-gradient(circle_at_center,rgba(30,92,58,0.15)_0%,transparent_70%)] mix-blend-screen transform -translate-x-1/3 translate-y-1/3" />
       </div>
 
-      <header className="sticky top-0 z-40 glass-panel border-b border-white/5 w-full max-w-full overflow-hidden">
+      <header className="sticky top-0 z-40 glass-panel border-b border-white/5 w-full max-w-full">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between min-w-0">
           <div className="flex items-center space-x-4">
             <a href="/wayfinder" onClick={(e) => pushRoute(e, '/wayfinder')} className="flex items-center space-x-2 group">

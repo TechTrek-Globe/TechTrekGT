@@ -14,7 +14,7 @@ import {
   getItems, getSales, getInvoices, getComps
 } from '../utils/auctionApi';
 import { fmtCurrency, fmtPct } from '../utils/formulaPreview';
-import { DEFAULT_COLUMNS, DEFAULT_CATEGORIES, getStoredUserSettings, saveUserSettings } from '../utils/userSettings';
+import { DEFAULT_COLUMNS, DEFAULT_CATEGORIES, getStoredUserSettings, saveUserSettings, resetColumnWidths } from '../utils/userSettings';
 
 export function SettingsView() {
   const { user } = useAuth();
@@ -36,6 +36,7 @@ export function SettingsView() {
 
   // User Preferences (Column Visibility & Category Ordering)
   const [userSettings, setUserSettingsState] = useState(getStoredUserSettings);
+  const [newCategoryInput, setNewCategoryInput] = useState('');
 
   // Export state
   const [exporting, setExporting] = useState(false);
@@ -50,6 +51,12 @@ export function SettingsView() {
     showSuccess(`Updated visibility for column '${colKey}'`);
   };
 
+  const handleResetColumnWidths = () => {
+    const updated = resetColumnWidths();
+    setUserSettingsState(updated);
+    showSuccess('Reset column widths to factory defaults.');
+  };
+
   const moveCategory = (index, direction) => {
     const categories = [...userSettings.categoryOrder];
     const targetIdx = index + direction;
@@ -61,6 +68,32 @@ export function SettingsView() {
     const newSettings = saveUserSettings({ ...userSettings, categoryOrder: categories });
     setUserSettingsState(newSettings);
     showSuccess('Updated category ordering.');
+  };
+
+  const handleAddCategory = () => {
+    const name = newCategoryInput.trim();
+    if (!name) return;
+    if (userSettings.categoryOrder.includes(name)) {
+      alert(`Category '${name}' already exists.`);
+      return;
+    }
+    const categories = [...userSettings.categoryOrder, name];
+    const newSettings = saveUserSettings({ ...userSettings, categoryOrder: categories });
+    setUserSettingsState(newSettings);
+    setNewCategoryInput('');
+    showSuccess(`Added new category '${name}'.`);
+  };
+
+  const handleDeleteCategory = (cat) => {
+    if (userSettings.categoryOrder.length <= 1) {
+      alert('Must keep at least one category.');
+      return;
+    }
+    if (!window.confirm(`Remove category '${cat}' from list?`)) return;
+    const categories = userSettings.categoryOrder.filter(c => c !== cat);
+    const newSettings = saveUserSettings({ ...userSettings, categoryOrder: categories });
+    setUserSettingsState(newSettings);
+    showSuccess(`Removed category '${cat}'.`);
   };
 
   const fetchPlatformsList = useCallback(async () => {
@@ -692,12 +725,22 @@ export function SettingsView() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Column Visibility Toggles */}
+          {/* Column Visibility & Width Toggles */}
           <div className="space-y-3">
-            <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wide flex items-center gap-1.5">
-              <Eye className="w-3.5 h-3.5 text-amber-400" />
-              Column Visibility (Applies dynamically across all views)
-            </h3>
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wide flex items-center gap-1.5">
+                <Eye className="w-3.5 h-3.5 text-amber-400" />
+                Column Visibility & Width Defaults
+              </h3>
+              <button
+                type="button"
+                onClick={handleResetColumnWidths}
+                className="px-2.5 py-1 rounded-lg text-[10px] font-semibold text-slate-400 bg-slate-800 hover:bg-slate-700 hover:text-slate-200 border border-slate-700 transition-all flex items-center gap-1"
+                title="Reset column widths to factory defaults"
+              >
+                <RefreshCw className="w-3 h-3" /> Reset Column Widths
+              </button>
+            </div>
             <div className="grid grid-cols-2 gap-2 bg-slate-900/60 p-3 rounded-xl border border-slate-800">
               {DEFAULT_COLUMNS.map(col => {
                 const isVisible = userSettings.columnVisibility[col.key] !== false;
@@ -723,12 +766,32 @@ export function SettingsView() {
             </div>
           </div>
 
-          {/* Category Ordering */}
+          {/* Category Ordering & Management */}
           <div className="space-y-3">
             <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wide flex items-center gap-1.5">
               <LayoutGrid className="w-3.5 h-3.5 text-amber-400" />
-              Custom Category Order
+              Custom Category Order & Management
             </h3>
+
+            {/* Add custom category input */}
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={newCategoryInput}
+                onChange={e => setNewCategoryInput(e.target.value)}
+                placeholder="Add custom category..."
+                className="input-field py-1.5 px-3 text-xs flex-1"
+                onKeyDown={e => { if (e.key === 'Enter') handleAddCategory(); }}
+              />
+              <button
+                type="button"
+                onClick={handleAddCategory}
+                className="btn-primary w-auto px-3 py-1.5 text-xs flex items-center gap-1 flex-shrink-0"
+              >
+                <Plus className="w-3.5 h-3.5" /> Add
+              </button>
+            </div>
+
             <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-800 space-y-1.5 max-h-72 overflow-y-auto">
               {userSettings.categoryOrder.map((cat, idx) => (
                 <div
@@ -754,6 +817,14 @@ export function SettingsView() {
                       title="Move Down"
                     >
                       <ArrowDown className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteCategory(cat)}
+                      className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-red-400 ml-1"
+                      title="Remove Category"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>

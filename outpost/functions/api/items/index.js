@@ -1,4 +1,5 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
+import { cleanItemName, cleanAthleteName } from '../../utils/auction.js';
 
 // ============================================================
 // GET /api/items  - list all items for authenticated user
@@ -56,8 +57,14 @@ export async function onRequestGet(context) {
       LIMIT ? OFFSET ?
     `).bind(...bindings, limit, offset).all();
 
+    const cleanedItems = (rows.results || []).map(row => ({
+      ...row,
+      item_name: cleanItemName(row.item_name),
+      athlete_person: cleanAthleteName(row.athlete_person)
+    }));
+
     return ok({
-      items: rows.results || [],
+      items: cleanedItems,
       pagination: {
         total: countRow?.total || 0,
         page,

@@ -8,6 +8,51 @@ import { getComps, saveComp, updateItem, fetchLiveComps } from '../utils/auction
 import { fmtCurrency, fmtPct } from '../utils/formulaPreview';
 import { getCertVerificationUrl } from '../utils/certLookup';
 import { ListingCopyModal } from './ListingCopyModal';
+import { cleanItemName, cleanAthleteName, cleanItemDescription } from '../utils/spreadsheetParser';
+
+function cleanEbaySearchQuery(itemName, athlete, authenticator) {
+  let text = String(itemName || '').trim();
+
+  // Strip leading Item #, Lot #, or standalone 5-12 digit numbers
+  text = text.replace(/^(?:item\s*#?|lot\s*#?|#)\s*\d{4,12}(?:\s*[-–—:]\s*|\s+)?/gi, '');
+  text = text.replace(/^\d{5,12}\s*[-–—:]\s*/g, '');
+  text = text.replace(/^\d{5,12}\s+/g, '');
+
+  // Strip standalone non-year 5-12 digit numbers anywhere in text (e.g. internal lot IDs like "5261 894")
+  text = text.replace(/\b(?!(?:19|20)\d{2})\d{5,12}\b/g, '');
+  text = text.replace(/\s+/g, ' ').trim();
+
+  // If athlete provided and not in text, prepend athlete
+  if (athlete && athlete.trim()) {
+    const cleanAthlete = athlete.replace(/^\d{5,12}\s+/, '').trim();
+    if (cleanAthlete && !text.toLowerCase().includes(cleanAthlete.toLowerCase())) {
+      text = `${cleanAthlete} ${text}`;
+    }
+  }
+
+  // If authenticator provided and not in text, append authenticator
+  if (authenticator && authenticator.trim() && authenticator.toLowerCase() !== 'other') {
+    const cleanAuth = authenticator.replace(/#.*$/, '').trim();
+    if (cleanAuth && !text.toLowerCase().includes(cleanAuth.toLowerCase())) {
+      text = `${text} ${cleanAuth}`;
+    }
+  }
+
+  // Clean special characters except word characters, spaces, and hyphens
+  text = text.replace(/[^\w\s-]/g, '').replace(/\s+/g, ' ').trim();
+
+  return text;
+}
+
+function buildEbaySearchUrl(itemName, athlete, authenticator) {
+  const query = cleanEbaySearchQuery(itemName, athlete, authenticator);
+  return `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(query)}&LH_Sold=1&LH_Complete=1`;
+}
+
+function roundPrice(val) {
+  if (val === null || val === undefined || val === '' || isNaN(Number(val))) return '';
+  return Math.round(Number(val) * 100) / 100;
+}
 
 export function PricingIntelligenceView() {
   const [comps, setComps] = useState([]);
@@ -32,11 +77,12 @@ export function PricingIntelligenceView() {
       // Populate draft inputs
       const initialDrafts = {};
       itemsList.forEach(item => {
+        const rawRec = item.recommended_list_price || item.current_list_price || item.suggested_list_price || '';
         initialDrafts[item.item_id] = {
-          comp_1: item.comp_1 !== null && item.comp_1 !== undefined ? item.comp_1 : '',
-          comp_2: item.comp_2 !== null && item.comp_2 !== undefined ? item.comp_2 : '',
-          comp_3: item.comp_3 !== null && item.comp_3 !== undefined ? item.comp_3 : '',
-          recommended_list_price: item.recommended_list_price || item.current_list_price || item.suggested_list_price || '',
+          comp_1: item.comp_1 !== null && item.comp_1 !== undefined ? roundPrice(item.comp_1) : '',
+          comp_2: item.comp_2 !== null && item.comp_2 !== undefined ? roundPrice(item.comp_2) : '',
+          comp_3: item.comp_3 !== null && item.comp_3 !== undefined ? roundPrice(item.comp_3) : '',
+          recommended_list_price: roundPrice(rawRec),
           saving: false,
           applied: false
         };
@@ -121,15 +167,15 @@ export function PricingIntelligenceView() {
     }));
 
     try {
-      const query = item.item_name || `${item.athlete_person || ''} ${item.category || ''} ${item.authenticator || ''}`.trim();
+      const query = cleanEbaySearchQuery(item.item_name, item.athlete_person, item.authenticator);
       const res = await fetchLiveComps(query, item.item_id);
 
       if (res && res.success) {
         setDrafts(prev => {
           const cur = prev[item.item_id] || {};
-          const c1 = res.comp_1 !== null && res.comp_1 !== undefined ? res.comp_1 : cur.comp_1;
-          const c2 = res.comp_2 !== null && res.comp_2 !== undefined ? res.comp_2 : cur.comp_2;
-          const c3 = res.comp_3 !== null && res.comp_3 !== undefined ? res.comp_3 : cur.comp_3;
+          const c1 = res.comp_1 !== null && res.comp_1 !== undefined ? roundPrice(res.comp_1) : cur.comp_1;
+          const c2 = res.comp_2 !== null && res.comp_2 !== undefined ? roundPrice(res.comp_2) : cur.comp_2;
+          const c3 = res.comp_3 !== null && res.comp_3 !== undefined ? roundPrice(res.comp_3) : cur.comp_3;
           const recPrice = res.live_avg || res.median || cur.recommended_list_price;
 
           return {
@@ -139,7 +185,7 @@ export function PricingIntelligenceView() {
               comp_1: c1,
               comp_2: c2,
               comp_3: c3,
-              recommended_list_price: recPrice,
+              recommended_list_price: roundPrice(recPrice),
               fetchingLive: false,
               applied: false
             }
@@ -359,9 +405,9 @@ export function PricingIntelligenceView() {
                         {item.status}
                       </span>
                     </div>
-                    <h3 className="text-base font-black text-slate-100 mt-1 truncate">{item.item_name}</h3>
+                    <h3 className="text-base font-black text-slate-100 mt-1 truncate">{cleanItemDescription(item.item_name, item.athlete_person, item.authenticator)}</h3>
                     <p className="text-xs text-slate-400 mt-0.5">
-                      {item.athlete_person ? <span>Player: <strong className="text-slate-300">{item.athlete_person}</strong> · </span> : ''}
+                      {item.athlete_person ? <span>Player: <strong className="text-slate-300">{cleanAthleteName(item.athlete_person)}</strong> · </span> : ''}
                       Invoice Ref: <span className="font-mono text-slate-300">{item.invoice_ref || 'N/A'}</span>
                     </p>
                   </div>
@@ -410,7 +456,7 @@ export function PricingIntelligenceView() {
                     </button>
                     <div className="grid grid-cols-2 gap-1.5">
                       <a
-                        href={item.ebay_search_url}
+                        href={buildEbaySearchUrl(item.item_name, item.athlete_person, item.authenticator)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[10px] font-medium text-blue-300/80 hover:text-blue-200 bg-blue-950/20 hover:bg-blue-900/30 border border-blue-500/20 transition-all truncate"

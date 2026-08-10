@@ -96,12 +96,12 @@ export function computeSaleMetrics(sale) {
  * @returns {{ min_sell_price: number, suggested_list_price: number }}
  */
 export function computePricingFloors(item) {
-  const divisor = 1 - item.platform_fee_pct - item.boost_pct;
+  const divisor = 1 - (item.platform_fee_pct || 0) - (item.boost_pct || 0);
   const min_sell_price = divisor > 0
-    ? (item.true_total_cost + item.est_shipping_cost + item.platform_flat_fee) / divisor
+    ? Math.round(((item.true_total_cost + (item.est_shipping_cost || 0) + (item.platform_flat_fee || 0)) / divisor) * 100) / 100
     : 0;
 
-  const suggested_list_price = min_sell_price * (1 + item.target_margin_pct);
+  const suggested_list_price = Math.round((min_sell_price * (1 + (item.target_margin_pct || 0))) * 100) / 100;
 
   return { min_sell_price, suggested_list_price };
 }
@@ -143,4 +143,66 @@ export function daysBetween(fromDate, toDate) {
   if (!fromDate || !toDate) return null;
   const ms = new Date(toDate).getTime() - new Date(fromDate).getTime();
   return Math.floor(ms / (1000 * 60 * 60 * 24));
+}
+
+export function cleanItemName(title) {
+  if (!title || typeof title !== 'string') return '';
+  let cleaned = title.trim();
+
+  // 1. Strip trailing dollar prices, fee numbers, e.g. "$52.61 $8.94", "$10.50 $1.79", "$18.00 $3.06", "$52.61"
+  cleaned = cleaned.replace(/(?:\s*\$?\d+(?:,\d{3})*(?:\.\d{2})?){1,4}\s*$/gi, '');
+
+  // 2. Strip trailing orphaned prepositions/connectors left behind e.g. "Box of", "Jersey for", "-"
+  cleaned = cleaned.replace(/\s+(?:of|for|at|with|and|[-–—:])\s*$/gi, '');
+
+  // 3. Strip leading Item # or Lot # prefixes e.g. "Item #3931984", "Lot #1234", "3931984 - ", "#3931984"
+  cleaned = cleaned.replace(/^(?:item\s*#?|lot\s*#?|#)\s*\d{4,12}(?:\s*[-–—:]\s*|\s+)?/gi, '');
+  cleaned = cleaned.replace(/^\d{5,12}\s*[-–—:]\s*/g, '');
+  cleaned = cleaned.replace(/^\d{5,12}\s+(?=[A-Za-z])/g, '');
+
+  // 4. Strip standalone non-year 5-12 digit numbers trailing at the end (unless 4-digit year like 1996, 2024)
+  cleaned = cleaned.replace(/\s+\b(?!(?:19|20)\d{2})\d{5,12}\b\s*$/g, '');
+
+  return cleaned.replace(/\s+/g, ' ').trim() || title.trim();
+}
+
+export function cleanAthleteName(athlete) {
+  if (!athlete || typeof athlete !== 'string') return '';
+  let cleaned = athlete.trim();
+
+  // Strip leading Item #, Lot #, or standalone 4-12 digit numbers (e.g. "3931984 Raul Rosas Jr." -> "Raul Rosas Jr.")
+  cleaned = cleaned.replace(/^(?:item\s*#?|lot\s*#?|#)\s*\d{4,12}(?:\s*[-–—:]\s*|\s+)?/gi, '');
+  cleaned = cleaned.replace(/^\d{5,12}\s*[-–—:]\s*/g, '');
+  cleaned = cleaned.replace(/^\d{5,12}\s+/g, '');
+
+  return cleaned.trim() || athlete.trim();
+}
+
+export function cleanItemDescription(itemName, athletePerson, authenticator) {
+  if (!itemName || typeof itemName !== 'string') return '';
+  let desc = cleanItemName(itemName);
+
+  if (athletePerson && athletePerson.trim()) {
+    const cleanAthlete = cleanAthleteName(athletePerson);
+    if (cleanAthlete) {
+      const athleteRegex = new RegExp(cleanAthlete.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '\\.?\\s*', 'gi');
+      desc = desc.replace(athleteRegex, '');
+    }
+  }
+
+  if (authenticator && authenticator.trim()) {
+    const cleanAuth = authenticator.replace(/#.*$/, '').trim();
+    if (cleanAuth) {
+      const authRegex = new RegExp('(?:\\(?\\b' + cleanAuth.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '\\b\\)?|\\bCOA\\b)', 'gi');
+      desc = desc.replace(authRegex, '');
+    }
+  }
+
+  desc = desc.replace(/\b\((?:JSA|Beckett|BAS|BGS|PSA|ACOA|SGC|CGC|Fanatics|Upper Deck|UDA|Tristar|Steiner|Schwartz)\)/gi, '');
+  desc = desc.replace(/\b(?:COA|LOA)\b/gi, '');
+
+  desc = desc.replace(/^[\s\-–—:]+/g, '');
+  desc = desc.replace(/[\s\-–—:]+$/g, '');
+
+  return desc.replace(/\s+/g, ' ').trim() || cleanItemName(itemName);
 }

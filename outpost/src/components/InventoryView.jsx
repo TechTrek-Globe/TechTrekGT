@@ -9,12 +9,13 @@ import { AddInvoiceModal } from './AddInvoiceModal';
 import { LogSaleModal } from './LogSaleModal';
 import { SpreadsheetImporterModal } from './SpreadsheetImporterModal';
 import { ListingCopyModal } from './ListingCopyModal';
+import { EditItemModal } from './EditItemModal';
 import { fmtCurrency, fmtPct } from '../utils/formulaPreview';
 import { getApiUrl } from '../utils/api';
 import { FileSpreadsheet, ShieldCheck, Copy } from 'lucide-react';
 import { getCertVerificationUrl, getAuthenticatorMeta } from '../utils/certLookup';
 import { DEFAULT_COLUMNS, DEFAULT_CATEGORIES, getStoredUserSettings, saveUserSettings } from '../utils/userSettings';
-import { cleanItemName } from '../utils/spreadsheetParser';
+import { cleanItemName, cleanAthleteName, cleanItemDescription } from '../utils/spreadsheetParser';
 
 const STATUS_META = {
   'Available':     { color: 'text-emerald-400', bg: 'bg-emerald-500/10',  border: 'border-emerald-500/20' },
@@ -202,6 +203,7 @@ export function InventoryView() {
   const [importerOpen, setImporterOpen] = useState(false);
   const [saleModalOpen, setSaleModalOpen] = useState(false);
   const [copyModalItem, setCopyModalItem] = useState(null);
+  const [editModalItem, setEditModalItem] = useState(null);
   const [itemToSell, setItemToSell] = useState(null);
   const [search,    setSearch]    = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -227,29 +229,44 @@ export function InventoryView() {
     return Array.from(new Set([...custom, ...defaults]));
   }, [platforms]);
 
+  const categoryOptions = useMemo(() => {
+    const configured = userSettings?.categoryOrder || DEFAULT_CATEGORIES;
+    const itemCats = items.map(it => it.category).filter(Boolean);
+    return Array.from(new Set([...configured, ...itemCats]));
+  }, [userSettings?.categoryOrder, items]);
+
   // Column Resizing Handler
   const handleResizeStart = (colKey, e) => {
     e.preventDefault();
     e.stopPropagation();
     const startX = e.clientX;
-    const startWidth = columnWidths[colKey] || 120;
-    const colDef = DEFAULT_COLUMNS.find(c => c.key === colKey) || { minWidth: 80 };
+    const colDef = DEFAULT_COLUMNS.find(c => c.key === colKey) || { minWidth: 80, defaultWidth: 120 };
+    const startWidth = columnWidths[colKey] || colDef.defaultWidth;
+    let latestWidth = startWidth;
 
     const handleMouseMove = (moveEvent) => {
       const delta = moveEvent.clientX - startX;
-      const newWidth = Math.max(colDef.minWidth, startWidth + delta);
+      latestWidth = Math.max(colDef.minWidth, startWidth + delta);
       setUserSettings(prev => ({
         ...prev,
-        columnWidths: { ...prev.columnWidths, [colKey]: newWidth }
+        columnWidths: { ...prev.columnWidths, [colKey]: latestWidth }
       }));
     };
 
     const handleMouseUp = () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
-      saveUserSettings({ columnWidths: userSettings.columnWidths });
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      setUserSettings(prev => {
+        const finalWidths = { ...prev.columnWidths, [colKey]: latestWidth };
+        saveUserSettings({ ...prev, columnWidths: finalWidths });
+        return { ...prev, columnWidths: finalWidths };
+      });
     };
 
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
   };
@@ -309,7 +326,7 @@ export function InventoryView() {
   const visibleColumns = DEFAULT_COLUMNS.filter(col => columnVisibility[col.key] !== false);
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 space-y-5">
+    <div className="flex-1 flex flex-col min-h-0 h-full overflow-hidden space-y-3">
       {/* Page header */}
       <div className="flex items-start justify-between gap-4 flex-shrink-0">
         <div>
@@ -392,7 +409,7 @@ export function InventoryView() {
       {/* Table with Full Width & Vertical Extension, Sticky Header, Horizontal Scroll, Resizable Columns */}
       <div className="w-full glass-card rounded-xl overflow-hidden border border-slate-800/80 shadow-2xl flex-1 flex flex-col min-h-0">
         <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0 relative">
-          <table className="w-full text-xs border-collapse">
+          <table className="w-full text-xs border-collapse" style={{ tableLayout: 'fixed' }}>
             <thead className="sticky top-0 z-30 bg-slate-900 shadow-md">
               <tr className="border-b border-slate-800/80 bg-slate-900/95 backdrop-blur-md">
                 {visibleColumns.map(col => {
@@ -443,19 +460,27 @@ export function InventoryView() {
                   {/* Item Name (Locked Column 1) */}
                   {columnVisibility.item_name !== false && (
                     <td
-                      style={{ width: `${columnWidths.item_name || 220}px` }}
-                      className={`px-4 py-3 sticky left-0 z-10 border-r border-slate-800/80 shadow-r transition-colors ${
+                      style={{
+                        width: `${columnWidths.item_name || 220}px`,
+                        minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'item_name')?.minWidth || 150}px`,
+                        maxWidth: `${columnWidths.item_name || 220}px`
+                      }}
+                      className={`px-4 py-3 sticky left-0 z-10 border-r border-slate-800/80 shadow-r transition-colors overflow-hidden ${
                         i % 2 === 0 ? 'bg-slate-950' : 'bg-slate-900'
                       } group-hover:bg-slate-900`}
                     >
-                      <InlineEditCell
-                        value={cleanItemName(item.item_name)}
-                        itemId={item.id}
-                        field="item_name"
-                        onUpdated={handleItemUpdated}
-                      />
+                      <div
+                        onClick={() => setEditModalItem(item)}
+                        className="group/name cursor-pointer flex items-center justify-between gap-1.5 hover:bg-slate-800/60 rounded px-1 -mx-1 py-0.5 transition-colors"
+                        title="Click to view & edit full item details"
+                      >
+                        <span className="text-slate-200 font-medium group-hover/name:text-amber-400 group-hover/name:underline transition-colors truncate">
+                          {cleanItemDescription(item.item_name, item.athlete_person, item.authenticator)}
+                        </span>
+                        <Pencil className="w-2.5 h-2.5 text-slate-500 group-hover/name:text-amber-400 transition-colors opacity-0 group-hover/name:opacity-100 flex-shrink-0" />
+                      </div>
                       {item.athlete_person && !item.item_name?.toLowerCase().includes(item.athlete_person.toLowerCase()) && (
-                        <p className="text-slate-500 text-[10px] mt-0.5 pointer-events-none">{item.athlete_person}</p>
+                        <p className="text-slate-500 text-[10px] mt-0.5 pointer-events-none truncate">{cleanAthleteName(item.athlete_person)}</p>
                       )}
                     </td>
                   )}
@@ -463,8 +488,12 @@ export function InventoryView() {
                   {/* Status */}
                   {columnVisibility.status !== false && (
                     <td
-                      style={{ width: `${columnWidths.status || 130}px` }}
-                      className="px-4 py-3 whitespace-nowrap"
+                      style={{
+                        width: `${columnWidths.status || 130}px`,
+                        minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'status')?.minWidth || 100}px`,
+                        maxWidth: `${columnWidths.status || 130}px`
+                      }}
+                      className="px-4 py-3 whitespace-nowrap overflow-hidden"
                     >
                       <InlineStatusSelect
                         itemId={item.id}
@@ -477,14 +506,18 @@ export function InventoryView() {
                   {/* Category */}
                   {columnVisibility.category !== false && (
                     <td
-                      style={{ width: `${columnWidths.category || 120}px` }}
-                      className="px-4 py-3 text-slate-400 whitespace-nowrap"
+                      style={{
+                        width: `${columnWidths.category || 120}px`,
+                        minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'category')?.minWidth || 100}px`,
+                        maxWidth: `${columnWidths.category || 120}px`
+                      }}
+                      className="px-4 py-3 text-slate-400 whitespace-nowrap overflow-hidden"
                     >
                       <InlineSelectCell
                         value={item.category}
                         itemId={item.id}
                         field="category"
-                        options={DEFAULT_CATEGORIES}
+                        options={categoryOptions}
                         onUpdated={handleItemUpdated}
                       />
                     </td>
@@ -493,8 +526,12 @@ export function InventoryView() {
                   {/* Authenticator Company */}
                   {columnVisibility.authenticator !== false && (
                     <td
-                      style={{ width: `${columnWidths.authenticator || 130}px` }}
-                      className="px-4 py-3 whitespace-nowrap"
+                      style={{
+                        width: `${columnWidths.authenticator || 130}px`,
+                        minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'authenticator')?.minWidth || 110}px`,
+                        maxWidth: `${columnWidths.authenticator || 130}px`
+                      }}
+                      className="px-4 py-3 whitespace-nowrap overflow-hidden"
                     >
                       <InlineSelectCell
                         value={item.authenticator ? item.authenticator.replace(/#.*$/, '').trim() : ''}
@@ -509,8 +546,12 @@ export function InventoryView() {
                   {/* Cert / Authenticator # */}
                   {columnVisibility.cert_number !== false && (
                     <td
-                      style={{ width: `${columnWidths.cert_number || 120}px` }}
-                      className="px-4 py-3 whitespace-nowrap"
+                      style={{
+                        width: `${columnWidths.cert_number || 120}px`,
+                        minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'cert_number')?.minWidth || 100}px`,
+                        maxWidth: `${columnWidths.cert_number || 120}px`
+                      }}
+                      className="px-4 py-3 whitespace-nowrap overflow-hidden"
                     >
                       <InlineEditCell
                         value={item.cert_number}
@@ -524,8 +565,12 @@ export function InventoryView() {
                   {/* True Cost */}
                   {columnVisibility.true_total_cost !== false && (
                     <td
-                      style={{ width: `${columnWidths.true_total_cost || 120}px` }}
-                      className="px-4 py-3 whitespace-nowrap"
+                      style={{
+                        width: `${columnWidths.true_total_cost || 120}px`,
+                        minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'true_total_cost')?.minWidth || 100}px`,
+                        maxWidth: `${columnWidths.true_total_cost || 120}px`
+                      }}
+                      className="px-4 py-3 whitespace-nowrap overflow-hidden"
                     >
                       <InlineEditCell
                         value={item.true_total_cost}
@@ -542,8 +587,12 @@ export function InventoryView() {
                   {/* Min Sell */}
                   {columnVisibility.min_sell_price !== false && (
                     <td
-                      style={{ width: `${columnWidths.min_sell_price || 110}px` }}
-                      className="px-4 py-3 whitespace-nowrap"
+                      style={{
+                        width: `${columnWidths.min_sell_price || 110}px`,
+                        minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'min_sell_price')?.minWidth || 90}px`,
+                        maxWidth: `${columnWidths.min_sell_price || 110}px`
+                      }}
+                      className="px-4 py-3 whitespace-nowrap overflow-hidden"
                     >
                       <InlineEditCell
                         value={item.min_sell_price}
@@ -560,8 +609,12 @@ export function InventoryView() {
                   {/* Suggested List */}
                   {columnVisibility.suggested_list_price !== false && (
                     <td
-                      style={{ width: `${columnWidths.suggested_list_price || 130}px` }}
-                      className="px-4 py-3 whitespace-nowrap"
+                      style={{
+                        width: `${columnWidths.suggested_list_price || 130}px`,
+                        minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'suggested_list_price')?.minWidth || 110}px`,
+                        maxWidth: `${columnWidths.suggested_list_price || 130}px`
+                      }}
+                      className="px-4 py-3 whitespace-nowrap overflow-hidden"
                     >
                       <InlineEditCell
                         value={item.suggested_list_price}
@@ -578,8 +631,12 @@ export function InventoryView() {
                   {/* Current List */}
                   {columnVisibility.current_list_price !== false && (
                     <td
-                      style={{ width: `${columnWidths.current_list_price || 130}px` }}
-                      className="px-4 py-3 whitespace-nowrap"
+                      style={{
+                        width: `${columnWidths.current_list_price || 130}px`,
+                        minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'current_list_price')?.minWidth || 110}px`,
+                        maxWidth: `${columnWidths.current_list_price || 130}px`
+                      }}
+                      className="px-4 py-3 whitespace-nowrap overflow-hidden"
                     >
                       <InlineEditCell
                         value={item.current_list_price}
@@ -596,8 +653,12 @@ export function InventoryView() {
                   {/* Platform */}
                   {columnVisibility.platform !== false && (
                     <td
-                      style={{ width: `${columnWidths.platform || 120}px` }}
-                      className="px-4 py-3 text-slate-400 whitespace-nowrap"
+                      style={{
+                        width: `${columnWidths.platform || 120}px`,
+                        minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'platform')?.minWidth || 100}px`,
+                        maxWidth: `${columnWidths.platform || 120}px`
+                      }}
+                      className="px-4 py-3 text-slate-400 whitespace-nowrap overflow-hidden"
                     >
                       <InlineSelectCell
                         value={item.platform}
@@ -612,8 +673,12 @@ export function InventoryView() {
                   {/* Invoice Ref */}
                   {columnVisibility.invoice_ref !== false && (
                     <td
-                      style={{ width: `${columnWidths.invoice_ref || 110}px` }}
-                      className="px-4 py-3 text-slate-500 whitespace-nowrap"
+                      style={{
+                        width: `${columnWidths.invoice_ref || 110}px`,
+                        minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'invoice_ref')?.minWidth || 90}px`,
+                        maxWidth: `${columnWidths.invoice_ref || 110}px`
+                      }}
+                      className="px-4 py-3 text-slate-500 whitespace-nowrap overflow-hidden"
                     >
                       <InlineEditCell
                         value={item.invoice_ref}
@@ -627,8 +692,12 @@ export function InventoryView() {
                   {/* Actions */}
                   {columnVisibility.actions !== false && (
                     <td
-                      style={{ width: `${columnWidths.actions || 100}px` }}
-                      className="px-4 py-3 whitespace-nowrap"
+                      style={{
+                        width: `${columnWidths.actions || 100}px`,
+                        minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'actions')?.minWidth || 80}px`,
+                        maxWidth: `${columnWidths.actions || 100}px`
+                      }}
+                      className="px-4 py-3 whitespace-nowrap overflow-hidden"
                     >
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
@@ -718,6 +787,14 @@ export function InventoryView() {
         isOpen={!!copyModalItem}
         item={copyModalItem}
         onClose={() => setCopyModalItem(null)}
+      />
+      <EditItemModal
+        isOpen={!!editModalItem}
+        item={editModalItem}
+        categoryOptions={categoryOptions}
+        platformOptions={platformOptions}
+        onClose={() => setEditModalItem(null)}
+        onUpdated={(id, patch) => handleItemUpdated(id, patch)}
       />
     </div>
   );

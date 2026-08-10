@@ -50,23 +50,25 @@ export function parseCleanNumber(val, defaultVal = 0) {
   return isNaN(num) ? defaultVal : (isNegative ? -num : num);
 }
 
-/**
- * Clean item title by separating prepended Item #s, Lot #s, or standalone 5-10 digit numbers
- * Preserves 4-digit years (e.g. 1996, 2024).
- * @param {string} title
- * @returns {string}
- */
 export function cleanItemName(title) {
   if (!title || typeof title !== 'string') return '';
   let cleaned = title.trim();
 
-  // Strip leading Item # or Lot # prefixes e.g. "Item #3931984", "Lot #1234", "3931984 - ", "#3931984"
-  cleaned = cleaned.replace(/^(?:item\s*#?|lot\s*#?|#)\s*\d{4,12}(?:\s*[-–—:]\s*|\s+)?/i, '');
-  // Strip standalone leading 5-10 digit numbers followed by hyphen or space e.g. "3931984 - Shawn Kemp" or "3931984 Shawn Kemp"
-  cleaned = cleaned.replace(/^\d{5,10}\s*[-–—:]\s*/, '');
-  cleaned = cleaned.replace(/^\d{5,10}\s+(?=[A-Za-z])/, '');
+  // 1. Strip trailing dollar prices, fee numbers, e.g. "$52.61 $8.94", "$10.50 $1.79", "$18.00 $3.06", "$52.61"
+  cleaned = cleaned.replace(/(?:\s*\$?\d+(?:,\d{3})*(?:\.\d{2})?){1,4}\s*$/gi, '');
 
-  return cleaned.trim() || title.trim();
+  // 2. Strip trailing orphaned prepositions/connectors left behind e.g. "Box of", "Jersey for", "-"
+  cleaned = cleaned.replace(/\s+(?:of|for|at|with|and|[-–—:])\s*$/gi, '');
+
+  // 3. Strip leading Item # or Lot # prefixes e.g. "Item #3931984", "Lot #1234", "3931984 - ", "#3931984"
+  cleaned = cleaned.replace(/^(?:item\s*#?|lot\s*#?|#)\s*\d{4,12}(?:\s*[-–—:]\s*|\s+)?/gi, '');
+  cleaned = cleaned.replace(/^\d{5,12}\s*[-–—:]\s*/g, '');
+  cleaned = cleaned.replace(/^\d{5,12}\s+(?=[A-Za-z])/g, '');
+
+  // 4. Strip standalone non-year 5-12 digit numbers trailing at the end (unless 4-digit year like 1996, 2024)
+  cleaned = cleaned.replace(/\s+\b(?!(?:19|20)\d{2})\d{5,12}\b\s*$/g, '');
+
+  return cleaned.replace(/\s+/g, ' ').trim() || title.trim();
 }
 
 /**
@@ -152,15 +154,65 @@ export function getRowValue(row, headerMap, aliases) {
   return undefined;
 }
 
+export function cleanAthleteName(athlete) {
+  if (!athlete || typeof athlete !== 'string') return '';
+  let cleaned = athlete.trim();
+
+  // Strip leading Item #, Lot #, or standalone 4-12 digit numbers (e.g. "3931984 Raul Rosas Jr." -> "Raul Rosas Jr.")
+  cleaned = cleaned.replace(/^(?:item\s*#?|lot\s*#?|#)\s*\d{4,12}(?:\s*[-–—:]\s*|\s+)?/gi, '');
+  cleaned = cleaned.replace(/^\d{5,12}\s*[-–—:]\s*/g, '');
+  cleaned = cleaned.replace(/^\d{5,12}\s+/g, '');
+
+  return cleaned.trim() || athlete.trim();
+}
+
 /**
- * Intelligent metadata extractor from memorabilia item title
+ * Strips Athlete/Signer Name and Authenticator badges from Item Title/Description
+ * e.g. "Raul Rosas Jr. Signed Venum Trunks (PSA)" + Athlete "Raul Rosas Jr." + Auth "PSA" -> "Signed Venum Trunks"
+ */
+export function cleanItemDescription(itemName, athletePerson, authenticator) {
+  if (!itemName || typeof itemName !== 'string') return '';
+  let desc = cleanItemName(itemName);
+
+  // 1. Remove athlete/person name from description if present
+  if (athletePerson && athletePerson.trim()) {
+    const cleanAthlete = cleanAthleteName(athletePerson);
+    if (cleanAthlete) {
+      const athleteRegex = new RegExp(cleanAthlete.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '\\.?\\s*', 'gi');
+      desc = desc.replace(athleteRegex, '');
+    }
+  }
+
+  // 2. Remove authenticator company names/badges e.g. (PSA), PSA, (Beckett), Beckett, JSA, (JSA), ACOA, COA, etc.
+  if (authenticator && authenticator.trim()) {
+    const cleanAuth = authenticator.replace(/#.*$/, '').trim();
+    if (cleanAuth) {
+      const authRegex = new RegExp('(?:\\(?\\b' + cleanAuth.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '\\b\\)?|\\bCOA\\b)', 'gi');
+      desc = desc.replace(authRegex, '');
+    }
+  }
+
+  // Strip common generic authenticator/COA terms e.g. (PSA), (Beckett), (JSA), COA
+  desc = desc.replace(/\b\((?:JSA|Beckett|BAS|BGS|PSA|ACOA|SGC|CGC|Fanatics|Upper Deck|UDA|Tristar|Steiner|Schwartz)\)/gi, '');
+  desc = desc.replace(/\b(?:COA|LOA)\b/gi, '');
+
+  // Strip leading/trailing hyphens, colons, or orphaned punctuation
+  desc = desc.replace(/^[\s\-–—:]+/g, '');
+  desc = desc.replace(/[\s\-–—:]+$/g, '');
+
+  return desc.replace(/\s+/g, ' ').trim() || cleanItemName(itemName);
+}
+
+/**
+ * Extract metadata (authenticator, category, sport_genre, athlete_person, cert_number) from item title.
  * @param {string} title
  * @returns {{ authenticator?: string, category?: string, sport_genre?: string, athlete_person?: string, cert_number?: string }}
  */
 export function extractMetadataFromTitle(title) {
   const result = {};
   if (!title) return result;
-  const t = String(title).trim();
+  const cleanT = cleanItemName(title);
+  const t = cleanT || String(title).trim();
 
   // 1. Authenticator extraction (e.g., (JSA), (Beckett), PSA, ACOA, SGC, etc.)
   const authMatch = t.match(/\b\((JSA|Beckett|BAS|BGS|PSA|ACOA|SGC|CGC|Fanatics|Upper Deck|UDA|Tristar|Steiner|Schwartz)\)|\b(JSA|Beckett|PSA|ACOA|SGC|CGC|Fanatics|Upper Deck|Tristar|Steiner)\b/i);
@@ -198,7 +250,7 @@ export function extractMetadataFromTitle(title) {
   // 4. Athlete / Person extraction (e.g. "Shawn Kemp Signed ...", "Mark Henn Signed ...")
   const personMatch = t.match(/^([^—–\(\)"]+?)\s+(?:Signed|Autographed|Auto'd|Inscribed|Signed & Inscribed)\b/i);
   if (personMatch) {
-    const rawPerson = personMatch[1].trim();
+    const rawPerson = cleanAthleteName(personMatch[1]);
     if (rawPerson.length > 1 && rawPerson.length < 50 && !/^(official|authentic|vintage|rare|lot of)/i.test(rawPerson)) {
       result.athlete_person = rawPerson;
     }

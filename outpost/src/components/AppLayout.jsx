@@ -32,29 +32,21 @@ export function AppLayout({ activeView, onNavigate, children }) {
   const [taxReportOpen, setTaxReportOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col font-sans">
-
-      {/* --- Full-Width Top Header Banner --- */}
-      <header style={{ width: '100%', flexShrink: 0, overflow: 'hidden', height: '280px', display: 'flex', justifyContent: 'center', alignItems: 'center', borderBottom: '1px solid rgba(180,130,20,0.3)', backgroundColor: '#000' }}>
-        <img
-          src={outpostHeaderBanner}
-          alt="TechTrek Outpost - Buy Sell Track Profit"
-          style={{ height: '100%', width: 'auto', maxWidth: '100%', objectFit: 'contain', display: 'block' }}
-        />
-      </header>
-
-      {/* --- Sidebar + Content row --- */}
-      <div className="flex flex-1 min-h-0">
+    <div className="h-screen max-h-screen bg-slate-950 flex font-sans overflow-hidden">
 
       {/* --- Sidebar --- */}
-      <aside className="hidden lg:flex flex-col w-60 bg-slate-900/60 border-r border-slate-800/60 backdrop-blur-md flex-shrink-0">
-        {/* Logo */}
-        <div className="flex items-center justify-center px-2 py-3.5 border-b border-slate-800/60 overflow-visible">
-          <img src={outpostLogo} alt="TechTrek Outpost Logo" className="w-full h-auto max-w-[210px] object-contain filter drop-shadow-md" />
+      <aside className="hidden lg:flex flex-col w-60 bg-slate-900/60 border-r border-slate-800/60 backdrop-blur-md flex-shrink-0 min-h-0 overflow-y-auto">
+        {/* Top Logo Header - 95% Width */}
+        <div className="flex items-center justify-center px-2 py-3.5 border-b border-slate-800/60 flex-shrink-0 bg-slate-950/40">
+          <img
+            src={outpostLogo}
+            alt="TechTrek Outpost Logo"
+            className="w-[95%] max-w-[220px] h-auto object-contain filter drop-shadow-md"
+          />
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+        <nav className="px-3 py-3 space-y-0.5">
           {NAV_ITEMS.map(({ id, label, icon: Icon }) => {
             const isActive = activeView === id;
             return (
@@ -214,8 +206,6 @@ export function AppLayout({ activeView, onNavigate, children }) {
         <main className="flex-1 flex flex-col min-h-0 overflow-hidden p-3 lg:p-4 bg-grid-pattern">
           {children}
         </main>
-      </div>
-      {/* End Sidebar + Content row */}
       </div>
 
       {/* Global Modals */}

@@ -5,7 +5,7 @@
  */
 
 export const DEFAULT_COLUMNS = [
-  { key: 'item_name',            label: 'Item',            defaultVisible: true, minWidth: 150, defaultWidth: 220 },
+  { key: 'item_name',            label: 'Item Description', defaultVisible: true, minWidth: 150, defaultWidth: 220 },
   { key: 'status',               label: 'Status',          defaultVisible: true, minWidth: 100, defaultWidth: 130 },
   { key: 'category',             label: 'Category',        defaultVisible: true, minWidth: 100, defaultWidth: 120 },
   { key: 'authenticator',        label: 'Authenticator',   defaultVisible: true, minWidth: 110, defaultWidth: 130 },
@@ -91,3 +91,11 @@ export function saveUserSettings(settings) {
     return settings;
   }
 }
+
+export function resetColumnWidths() {
+  const current = getStoredUserSettings();
+  const resetWidths = getDefaultWidths();
+  return saveUserSettings({ ...current, columnWidths: resetWidths });
+}
+
+

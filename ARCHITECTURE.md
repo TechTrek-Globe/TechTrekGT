@@ -4,13 +4,15 @@
 
 TechTrekGT is a multi-application platform hosted on `techtrekgt.com`. The repository is a collection of five self-contained projects, each deployed independently as a Cloudflare Worker, sharing a common D1 SQLite database and a single sign-on (SSO) JWT secret. There is no root-level workspace manifest; each project manages its own dependencies, build, and deployment.
 
+**`landing/` is the primary domain root.** It serves `techtrekgt.com` directly as a static Cloudflare Worker. All other apps are independently deployed Workers mounted at sub-paths or sub-domains and are linked from the landing hub.
+
 | Project | Purpose | Route | Stack |
 |---------|---------|-------|-------|
-| `landing/` | Platform hub / marketing page | `techtrekgt.com` | Static HTML/CSS/JS |
+| `landing/` | **Primary domain root** - platform hub / marketing page | `techtrekgt.com` *(Main Site)* | Static HTML/CSS/JS |
 | `finance/` | Personal budget tracker | `techtrekgt.com/finance/*` | React 19 + Vite + Cloudflare Workers |
 | `outpost/` | Resale / auction operations tracker | `techtrekgt.com/outpost/*` | React 19 + Vite + Cloudflare Workers |
 | `wayfinder/` | Poland Christmas 2026 travel guide | `techtrekgt.com/wayfinder/*` | React 19 + Vite + Cloudflare Workers |
-| `bigworm/` | Secure remote desktop portal (Guacamole) | `bigworm.techtrekgt.com` | React 19 + Vite + Cloudflare Workers |
+| `bigworm/` | Secure remote desktop portal (Guacamole) | `bigworm.techtrekgt.com` *(sub-domain)* | React 19 + Vite + Cloudflare Workers |
 
 ---
 
@@ -587,9 +589,18 @@ Each project reads local secrets from a `.dev.vars` file (git-ignored) that is l
 
 ### 14.2 Standard Workflow
 
-1. **Local dev**: `npm run dev` in any project directory. Ports: finance `3000`, outpost `3001`, wayfinder `5174`, bigworm (Vite default `5173`).
+1. **Local dev**: Run from each project directory. Dev ports as defined in `vite.config.js` (or `wrangler dev` for landing):
+
+   | App | Command | Local URL |
+   |-----|---------|----------|
+   | `landing/` | `wrangler dev` | `http://localhost:8787` |
+   | `finance/` | `npm run dev` | `http://localhost:3000` |
+   | `outpost/` | `npm run dev` | `http://localhost:3001` |
+   | `wayfinder/` | `npm run dev` | `http://localhost:5174` |
+   | `bigworm/` | `npm run dev` | `http://localhost:5173` |
+
 2. **Local database**: `wrangler d1 execute personal-budget-db --local` (or `npm run db:migrate:local` in outpost).
-3. **Production deploy**: `npm run deploy` (build + wrangler deploy).
+3. **Production deploy**: `npm run deploy` (build + wrangler deploy). Landing uses `wrangler deploy` directly.
 4. **Database migration**: `npm run db:migrate` in outpost; other apps use `wrangler d1 execute --file=./schema.sql`.
 
 ---

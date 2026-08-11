@@ -21,6 +21,7 @@ import { onRequestGet as dashboardHandler } from '../functions/api/dashboard.js'
 import { onRequestPost as batchImportHandler } from '../functions/api/import/batch.js';
 import { onRequestPost as amazonImportHandler } from '../functions/api/import/amazon.js';
 import { onRequestGet as amazonTokenGetHandler, onRequestPost as amazonTokenPostHandler } from '../functions/api/import/amazon-token.js';
+import { onRequestPost as amazonFetchHandler } from '../functions/api/import/amazon-fetch.js';
 import { onRequestGet as syncFinanceGetHandler, onRequestPost as syncFinancePostHandler } from '../functions/api/sync/finance.js';
 import { onRequestGet as suppliesListHandler, onRequestPost as suppliesCreateHandler } from '../functions/api/supplies/index.js';
 import { onRequestPut as supplyPutHandler, onRequestDelete as supplyDeleteHandler } from '../functions/api/supplies/[id].js';
@@ -201,6 +202,8 @@ export default {
         response = await amazonTokenGetHandler(context);
       } else if (apiPath === '/api/import/amazon-token' && request.method === 'POST') {
         response = await amazonTokenPostHandler(context);
+      } else if (apiPath === '/api/import/amazon-fetch' && request.method === 'POST') {
+        response = await amazonFetchHandler(context);
       // --- TechTrek Finance Sync ---
       } else if (apiPath === '/api/sync/finance' && request.method === 'GET') {
         response = await syncFinanceGetHandler(context);

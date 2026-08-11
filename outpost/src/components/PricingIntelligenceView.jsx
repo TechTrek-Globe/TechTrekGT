@@ -62,6 +62,7 @@ export function PricingIntelligenceView() {
   const [statusFilter, setStatusFilter] = useState('active'); // 'active' | 'all'
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [copyModalItem, setCopyModalItem] = useState(null);
+  const [queryEditModal, setQueryEditModal] = useState(null); // { item, query }
   
   // Local draft state for quick inputs: { [itemId]: { comp_1, comp_2, comp_3, rec_price, saving, applied } }
   const [drafts, setDrafts] = useState({});
@@ -159,53 +160,64 @@ export function PricingIntelligenceView() {
     }
   };
 
-  const handleAutoFetchLiveComps = async (item) => {
+  // Step 1: generate the cleaned query and open the edit popup
+  const handlePrepareSearch = (item) => {
+    const query = cleanEbaySearchQuery(item.item_name, item.athlete_person, item.authenticator);
+    setQueryEditModal({ item, query });
+    setDrafts(prev => ({ ...prev, [item.item_id]: { ...(prev[item.item_id] || {}), fetchMsg: null } }));
+  };
+
+  // Step 2: user confirmed (possibly edited) query - fire the actual API
+  const handleConfirmSearch = async (item, query) => {
     const draft = drafts[item.item_id] || {};
     setDrafts(prev => ({
       ...prev,
-      [item.item_id]: { ...draft, fetchingLive: true }
+      [item.item_id]: { ...draft, fetchingLive: true, fetchQueryDraft: null, fetchMsg: null }
     }));
 
     try {
-      const query = cleanEbaySearchQuery(item.item_name, item.athlete_person, item.authenticator);
       const res = await fetchLiveComps(query, item.item_id);
 
-      if (res && res.success) {
+      if (res && res.success && res.count > 0) {
         setDrafts(prev => {
           const cur = prev[item.item_id] || {};
           const c1 = res.comp_1 !== null && res.comp_1 !== undefined ? roundPrice(res.comp_1) : cur.comp_1;
           const c2 = res.comp_2 !== null && res.comp_2 !== undefined ? roundPrice(res.comp_2) : cur.comp_2;
           const c3 = res.comp_3 !== null && res.comp_3 !== undefined ? roundPrice(res.comp_3) : cur.comp_3;
           const recPrice = res.live_avg || res.median || cur.recommended_list_price;
-
           return {
             ...prev,
             [item.item_id]: {
               ...cur,
-              comp_1: c1,
-              comp_2: c2,
-              comp_3: c3,
+              comp_1: c1, comp_2: c2, comp_3: c3,
               recommended_list_price: roundPrice(recPrice),
               fetchingLive: false,
+              fetchMsg: { type: 'success', text: `Found ${res.count} sold comps on eBay! Avg: $${res.live_avg}` },
               applied: false
             }
           };
         });
-
         if (res.ebay_search_url) {
           setComps(prev => prev.map(c => c.item_id === item.item_id ? { ...c, ebay_search_url: res.ebay_search_url } : c));
         }
       } else {
         setDrafts(prev => ({
           ...prev,
-          [item.item_id]: { ...draft, fetchingLive: false }
+          [item.item_id]: {
+            ...(prev[item.item_id] || {}),
+            fetchingLive: false,
+            fetchMsg: { type: 'info', text: 'No comps found for that query. Try editing the search term or click eBay Comps ↗.' }
+          }
         }));
       }
     } catch (err) {
-      alert(`Auto-fetch error: ${err.message}`);
       setDrafts(prev => ({
         ...prev,
-        [item.item_id]: { ...draft, fetchingLive: false }
+        [item.item_id]: {
+          ...(prev[item.item_id] || {}),
+          fetchingLive: false,
+          fetchMsg: { type: 'error', text: err.message || 'Auto-fetch error. Click eBay Comps ↗ to view sold listings.' }
+        }
       }));
     }
   };
@@ -435,25 +447,27 @@ export function PricingIntelligenceView() {
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
                   {/* eBay Lookup & Live Auto-Fetch */}
                   <div className="lg:col-span-3 space-y-1.5">
-                    <button
-                      type="button"
-                      onClick={() => handleAutoFetchLiveComps(item)}
-                      disabled={draft.fetchingLive}
-                      className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-amber-300 bg-amber-950/40 hover:bg-amber-900/50 border border-amber-500/40 hover:border-amber-500/60 transition-all shadow-sm disabled:opacity-50"
-                      title="Automatically fetch real completed eBay sales and populate comps"
-                    >
-                      {draft.fetchingLive ? (
-                        <>
-                          <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" />
-                          <span>Scanning eBay...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Zap className="w-3.5 h-3.5 text-amber-400" />
-                          <span>Auto-Fetch Sold Comps</span>
-                        </>
-                      )}
-                    </button>
+                    {/* Auto-fetch button */}
+                    {!draft.fetchingLive && (
+                      <button
+                        type="button"
+                        onClick={() => handlePrepareSearch(item)}
+                        className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-amber-300 bg-amber-950/40 hover:bg-amber-900/50 border border-amber-500/40 hover:border-amber-500/60 transition-all shadow-sm"
+                        title="Preview and edit the search query before sending to eBay"
+                      >
+                        <Zap className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Auto-Fetch Sold Comps</span>
+                      </button>
+                    )}
+
+                    {/* Scanning state */}
+                    {draft.fetchingLive && (
+                      <div className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-amber-300 bg-amber-950/40 border border-amber-500/40">
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" />
+                        <span>Scanning eBay...</span>
+                      </div>
+                    )}
+
                     <div className="grid grid-cols-2 gap-1.5">
                       <a
                         href={buildEbaySearchUrl(item.item_name, item.athlete_person, item.authenticator)}
@@ -481,6 +495,18 @@ export function PricingIntelligenceView() {
                         <span>Listing Copy</span>
                       </button>
                     </div>
+                    {draft.fetchMsg && (
+                      <div className={`p-2 rounded-lg text-[10px] leading-tight flex items-start gap-1 ${
+                        draft.fetchMsg.type === 'success'
+                          ? 'bg-emerald-950/60 border border-emerald-500/40 text-emerald-300'
+                          : draft.fetchMsg.type === 'error'
+                            ? 'bg-red-950/60 border border-red-500/40 text-red-300'
+                            : 'bg-amber-950/60 border border-amber-500/40 text-amber-300'
+                      }`}>
+                        <AlertCircle className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                        <span>{draft.fetchMsg.text}</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* 3 Comp Inputs */}
@@ -586,6 +612,68 @@ export function PricingIntelligenceView() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* eBay Query Edit Popup */}
+      {queryEditModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}
+          onClick={() => setQueryEditModal(null)}
+        >
+          <div
+            className="w-full max-w-lg bg-slate-900 border border-amber-500/30 rounded-2xl shadow-2xl p-6 space-y-4"
+            onClick={e => e.stopPropagation()}
+          >
+            <div>
+              <h3 className="text-base font-bold text-white">Edit eBay Search Query</h3>
+              <p className="text-xs text-slate-400 mt-1">
+                Trim or refine the query below before sending. Include the model name for better comp accuracy.
+              </p>
+            </div>
+
+            <div className="text-[10px] text-slate-500 font-medium uppercase tracking-wide">Item</div>
+            <p className="text-sm text-slate-300 leading-snug -mt-2 line-clamp-2">{queryEditModal.item.item_name}</p>
+
+            <div>
+              <label className="block text-[10px] font-semibold text-amber-400 uppercase tracking-wide mb-1.5">Search Query</label>
+              <textarea
+                autoFocus
+                rows={3}
+                value={queryEditModal.query}
+                onChange={e => setQueryEditModal(prev => ({ ...prev, query: e.target.value }))}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                    handleConfirmSearch(queryEditModal.item, queryEditModal.query);
+                    setQueryEditModal(null);
+                  }
+                  if (e.key === 'Escape') setQueryEditModal(null);
+                }}
+                className="w-full bg-slate-800 border border-slate-600 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500/60 resize-none leading-relaxed"
+                placeholder="e.g. Kawasaki Mule UTV Windshield"
+              />
+              <p className="text-[10px] text-slate-500 mt-1">Tip: Ctrl+Enter to search. Shorter focused queries work best on eBay.</p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => { handleConfirmSearch(queryEditModal.item, queryEditModal.query); setQueryEditModal(null); }}
+                disabled={!queryEditModal.query?.trim()}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition-all disabled:opacity-50"
+              >
+                <Search className="w-4 h-4" /> Search eBay for Sold Comps
+              </button>
+              <button
+                type="button"
+                onClick={() => setQueryEditModal(null)}
+                className="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-400 bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-all"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  X, ShoppingCart, Link, Hash, DollarSign, Tag, Loader2, AlertCircle, CheckCircle2
+  X, ShoppingCart, Link, Hash, DollarSign, Tag, Loader2, AlertCircle, CheckCircle2, Search, ExternalLink, PackageCheck
 } from 'lucide-react';
 import { createInvoice } from '../utils/auctionApi';
 
@@ -11,35 +11,50 @@ const CATEGORIES = [
 ];
 
 /**
- * Extracts an ASIN from an Amazon URL or raw ASIN string.
- * Handles /dp/ASIN, /gp/product/ASIN, or bare 10-char ASIN.
+ * Extracts Order ID or ASIN from an input string or Amazon URL.
  */
-function extractAsin(input) {
-  if (!input) return '';
+function parseAmazonInput(input) {
+  if (!input) return { asin: '', orderId: '' };
   const trimmed = input.trim();
 
-  // Match /dp/ASIN or /gp/product/ASIN
-  const match = trimmed.match(/\/(?:dp|gp\/product)\/([A-Z0-9]{10})/i);
-  if (match) return match[1].toUpperCase();
+  // Extract Order ID (e.g. 111-2212343-5265805)
+  const orderMatch = trimmed.match(/\b(\d{3}-\d{7}-\d{7})\b/);
+  const orderId = orderMatch ? orderMatch[1] : '';
 
-  // Bare ASIN: 10 alphanumeric chars
-  if (/^[A-Z0-9]{10}$/i.test(trimmed)) return trimmed.toUpperCase();
+  // Extract ASIN (10 alphanumeric chars)
+  let asin = '';
+  const asinMatch = trimmed.match(/\/(?:dp|gp\/product|asin)\/([A-Z0-9]{10})/i)
+    || trimmed.match(/[?&]pd_rd_i=([A-Z0-9]{10})/i)
+    || trimmed.match(/[?&]asin=([A-Z0-9]{10})/i);
 
-  return '';
+  if (asinMatch) {
+    asin = asinMatch[1].toUpperCase();
+  } else if (/^[A-Z0-9]{10}$/i.test(trimmed)) {
+    asin = trimmed.toUpperCase();
+  }
+
+  return { asin, orderId };
 }
 
-function buildAmazonUrl(asin) {
-  return asin ? `https://www.amazon.com/dp/${asin}` : '';
+function buildAmazonUrl(asin, orderId) {
+  if (orderId) return `https://www.amazon.com/gp/your-account/order-details?orderID=${orderId}`;
+  if (asin) return `https://www.amazon.com/dp/${asin}`;
+  return '';
 }
 
 export function AmazonItemModal({ isOpen, platforms = [], onClose, onCreated }) {
   const [asinInput, setAsinInput]     = useState('');
   const [asin, setAsin]               = useState('');
+  const [orderId, setOrderId]         = useState('');
   const [itemName, setItemName]       = useState('');
   const [category, setCategory]       = useState('Electronics');
   const [unitPrice, setUnitPrice]     = useState('');
   const [notes, setNotes]             = useState('');
+  const [imageUrl, setImageUrl]       = useState('');
+  
+  const [fetching, setFetching]       = useState(false);
   const [submitting, setSubmitting]   = useState(false);
+  const [fetchMsg, setFetchMsg]       = useState('');
   const [error, setError]             = useState('');
   const [success, setSuccess]         = useState(false);
 
@@ -47,37 +62,101 @@ export function AmazonItemModal({ isOpen, platforms = [], onClose, onCreated }) 
     || (platforms || [])[0]
     || { name: 'eBay', fee_pct: 0.136, flat_fee: 0.40 };
 
-  // Auto-extract ASIN whenever asinInput changes
+  // Parse ASIN & Order ID whenever input changes
   useEffect(() => {
-    const extracted = extractAsin(asinInput);
-    setAsin(extracted);
+    const { asin: parsedAsin, orderId: parsedOrderId } = parseAmazonInput(asinInput);
+    setAsin(parsedAsin);
+    setOrderId(parsedOrderId);
   }, [asinInput]);
 
   const reset = () => {
-    setAsinInput(''); setAsin(''); setItemName('');
-    setCategory('Electronics'); setUnitPrice('');
-    setNotes(''); setError(''); setSuccess(false);
+    setAsinInput(''); setAsin(''); setOrderId(''); setItemName('');
+    setCategory('Electronics'); setUnitPrice(''); setNotes(''); setImageUrl('');
+    setFetching(false); setError(''); setFetchMsg(''); setSuccess(false);
   };
 
   const handleClose = () => { reset(); onClose(); };
+
+  const nameInputRef = React.useRef(null);
+
+  // Search / Fetch Info from backend endpoint
+  const handleFetchInfo = async () => {
+    if (!asinInput.trim()) {
+      setError('Please paste an Amazon URL, Order URL, ASIN, or Order ID first.');
+      return;
+    }
+
+    setError('');
+    setFetching(true);
+    setFetchMsg('Fetching product metadata...');
+
+    try {
+      const res = await fetch('/outpost/api/import/amazon-fetch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ input: asinInput.trim() })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to fetch Amazon details');
+
+      if (data.asin && !asin) setAsin(data.asin);
+      if (data.orderId && !orderId) setOrderId(data.orderId);
+
+      if (data.title) setItemName(data.title);
+      if (data.price) setUnitPrice(String(data.price));
+      if (data.image) setImageUrl(data.image);
+
+      if (data.title) {
+        setFetchMsg('Product title & info populated from Amazon!');
+      } else if (data.orderId) {
+        setFetchMsg(`Order #${data.orderId} linked! (Order pages require Amazon login, so enter Product Name below).`);
+        setTimeout(() => nameInputRef.current?.focus(), 100);
+      } else if (data.asin) {
+        setFetchMsg(`ASIN ${data.asin} linked! Enter item name below or paste product link.`);
+        setTimeout(() => nameInputRef.current?.focus(), 100);
+      } else {
+        setFetchMsg('Parsed URL. Please enter product details below.');
+        setTimeout(() => nameInputRef.current?.focus(), 100);
+      }
+    } catch (err) {
+      console.error(err);
+      setError(err.message || 'Could not auto-fetch metadata. Please enter title manually.');
+      setTimeout(() => nameInputRef.current?.focus(), 100);
+    } finally {
+      setFetching(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
-    if (!asin) { setError('Enter a valid Amazon URL or 10-character ASIN.'); return; }
+    if (!asin && !orderId) {
+      setError('Enter a valid Amazon URL, Order ID, or ASIN.');
+      return;
+    }
     if (!itemName.trim()) { setError('Product name is required.'); return; }
     const price = parseFloat(unitPrice);
-    if (!price || price <= 0) { setError('Enter a valid purchase price greater than $0.'); return; }
+    if (isNaN(price) || price < 0) { setError('Enter a valid purchase price (enter 0.00 for Vine $0 ETV items).'); return; }
 
     setSubmitting(true);
     try {
       const today = new Date().toISOString().split('T')[0];
-      const invoiceRef = `AMAZON-${asin}-${today}`;
+      const invoiceRef = orderId
+        ? `AMAZON-ORDER-${orderId}`
+        : `AMAZON-${asin}-${today}`;
+
+      const noteParts = [];
+      if (orderId) noteParts.push(`Order ID: ${orderId}`);
+      if (asin) noteParts.push(`ASIN: ${asin}`);
+      if (imageUrl) noteParts.push(`Image: ${imageUrl}`);
+      if (notes.trim()) noteParts.push(notes.trim());
 
       await createInvoice({
         invoice_ref: invoiceRef,
-        description: `Amazon import - ASIN ${asin}`,
+        description: orderId ? `Amazon Order ${orderId}` : `Amazon import - ASIN ${asin}`,
         date_acquired: today,
         discount: 0,
         shipping: 0,
@@ -96,9 +175,7 @@ export function AmazonItemModal({ isOpen, platforms = [], onClose, onCreated }) 
           boost_pct: 0,
           target_margin_pct: 0.20,
           status: 'Available',
-          notes: notes.trim()
-            ? `ASIN: ${asin} | ${notes.trim()}`
-            : `ASIN: ${asin} | Imported from Amazon`,
+          notes: noteParts.join(' | ') || 'Imported from Amazon',
           best_listing_window: ''
         }]
       });
@@ -117,17 +194,17 @@ export function AmazonItemModal({ isOpen, platforms = [], onClose, onCreated }) 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-lg glass-card rounded-2xl border border-slate-700/80 shadow-2xl overflow-hidden animate-in fade-in-0 zoom-in-95">
+      <div className="w-full max-w-lg max-h-[90vh] flex flex-col glass-card rounded-2xl border border-slate-700/80 shadow-2xl overflow-hidden animate-in fade-in-0 zoom-in-95">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700/60 bg-gradient-to-r from-orange-950/60 to-slate-900/60">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700/60 bg-gradient-to-r from-orange-950/60 to-slate-900/60 flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-orange-500/20 border border-orange-500/30 flex items-center justify-center">
               <ShoppingCart className="w-4.5 h-4.5 text-orange-400" />
             </div>
             <div>
               <h2 className="text-base font-bold text-white">Add Amazon Item</h2>
-              <p className="text-[11px] text-slate-400">Paste a link or ASIN to import into inventory</p>
+              <p className="text-[11px] text-slate-400">Paste Product URL, Order URL, ASIN, or Order ID</p>
             </div>
           </div>
           <button
@@ -139,43 +216,84 @@ export function AmazonItemModal({ isOpen, platforms = [], onClose, onCreated }) 
         </div>
 
         {/* Body */}
-        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4 flex-1 overflow-y-auto min-h-0">
 
-          {/* ASIN / URL */}
+          {/* URL / ASIN / Order ID input + Search Button */}
           <div>
             <label className="block text-[11px] font-semibold text-slate-400 mb-1.5 uppercase tracking-wide">
-              Amazon URL or ASIN
+              Amazon Product URL, Order Link, ASIN, or Order #
             </label>
-            <div className="relative">
-              <Link className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
-              <input
-                autoFocus
-                type="text"
-                className="input-field !pl-10 text-sm"
-                placeholder="https://amazon.com/dp/B0XXXXXXXX  or  B0XXXXXXXX"
-                value={asinInput}
-                onChange={e => setAsinInput(e.target.value)}
-              />
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Link className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+                <input
+                  autoFocus
+                  type="text"
+                  className="input-field !pl-10 text-sm"
+                  placeholder="https://amazon.com/dp/... or order-details?orderID=111-..."
+                  value={asinInput}
+                  onChange={e => setAsinInput(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && !e.shiftKey && !itemName) {
+                      e.preventDefault();
+                      handleFetchInfo();
+                    }
+                  }}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleFetchInfo}
+                disabled={fetching || !asinInput.trim()}
+                className="px-4 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-orange-500/20 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+                title="Search and auto-fetch product information"
+              >
+                {fetching ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5 stroke-[2.5]" />}
+                <span>{fetching ? 'Searching...' : 'Search'}</span>
+              </button>
             </div>
-            {asin ? (
-              <div className="flex items-center gap-2 mt-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
-                <span className="text-[11px] text-emerald-400 font-mono">ASIN: {asin}</span>
+
+            {/* Parsing badges */}
+            <div className="flex items-center flex-wrap gap-2 mt-2">
+              {orderId && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-amber-500/15 border border-amber-500/30 text-[11px] font-mono text-amber-300">
+                  <PackageCheck className="w-3 h-3 text-amber-400" /> Order #: {orderId}
+                </span>
+              )}
+              {asin && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-[11px] font-mono text-emerald-300">
+                  <CheckCircle2 className="w-3 h-3 text-emerald-400" /> ASIN: {asin}
+                </span>
+              )}
+              {(asin || orderId) && (
                 <a
-                  href={buildAmazonUrl(asin)}
+                  href={buildAmazonUrl(asin, orderId)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-[11px] text-blue-400 hover:underline ml-auto"
+                  className="text-[11px] text-blue-400 hover:underline flex items-center gap-1 ml-auto"
                 >
-                  View on Amazon →
+                  View on Amazon <ExternalLink className="w-3 h-3" />
                 </a>
-              </div>
-            ) : asinInput.trim() ? (
-              <p className="text-[11px] text-amber-400 mt-1.5 flex items-center gap-1">
-                <AlertCircle className="w-3 h-3" /> Could not extract a valid ASIN from this input.
+              )}
+            </div>
+
+            {fetchMsg && (
+              <p className="text-[11px] text-emerald-400 mt-1.5 flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3" /> {fetchMsg}
               </p>
-            ) : null}
+            )}
           </div>
+
+          {/* Fetched Product Image Preview */}
+          {imageUrl && (
+            <div className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-800/40 border border-slate-700/40">
+              <img src={imageUrl} alt="Product" className="w-12 h-12 object-contain rounded-lg bg-white p-1 flex-shrink-0" />
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-semibold text-slate-200 truncate">{itemName || 'Fetched Product'}</p>
+                <p className="text-[10px] text-emerald-400 font-mono mt-0.5">{unitPrice ? `$${unitPrice}` : 'Price extracted'}</p>
+              </div>
+            </div>
+          )}
 
           {/* Product Name */}
           <div>
@@ -183,6 +301,7 @@ export function AmazonItemModal({ isOpen, platforms = [], onClose, onCreated }) 
               Product Name <span className="text-red-400">*</span>
             </label>
             <input
+              ref={nameInputRef}
               type="text"
               className="input-field text-sm"
               placeholder="e.g. LEGO Star Wars Millennium Falcon"
@@ -215,7 +334,7 @@ export function AmazonItemModal({ isOpen, platforms = [], onClose, onCreated }) 
                 <input
                   type="number"
                   step="0.01"
-                  min="0.01"
+                  min="0"
                   className="input-field !pl-9 text-sm"
                   placeholder="0.00"
                   value={unitPrice}
@@ -241,10 +360,12 @@ export function AmazonItemModal({ isOpen, platforms = [], onClose, onCreated }) 
           </div>
 
           {/* Invoice ref preview */}
-          {asin && (
+          {(orderId || asin) && (
             <div className="px-3 py-2 rounded-lg bg-slate-800/60 border border-slate-700/40">
               <p className="text-[10px] text-slate-500 uppercase tracking-wide mb-0.5">Invoice Reference (auto-generated)</p>
-              <p className="text-xs font-mono text-amber-400">AMAZON-{asin}-{new Date().toISOString().split('T')[0]}</p>
+              <p className="text-xs font-mono text-amber-400">
+                {orderId ? `AMAZON-ORDER-${orderId}` : `AMAZON-${asin}-${new Date().toISOString().split('T')[0]}`}
+              </p>
             </div>
           )}
 
@@ -273,7 +394,7 @@ export function AmazonItemModal({ isOpen, platforms = [], onClose, onCreated }) 
             </button>
             <button
               type="submit"
-              disabled={submitting || success || !asin}
+              disabled={submitting || success || (!asin && !orderId)}
               className="flex-1 btn-primary px-4 py-2.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {submitting

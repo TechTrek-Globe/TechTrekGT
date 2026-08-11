@@ -15,8 +15,14 @@ export function cleanEbaySearchQuery(itemName, athlete, authenticator) {
   text = text.replace(/^\d{5,12}\s*[-–—:]\s*/g, '');
   text = text.replace(/^\d{5,12}\s+/g, '');
 
-  // Strip standalone non-year 5-12 digit numbers anywhere in text (e.g. internal lot IDs like "5261 894")
-  text = text.replace(/\b(?!(?:19|20)\d{2})\d{5,12}\b/g, '');
+  // Strip Amazon-style compatibility clauses that make eBay queries too specific
+  text = text.replace(/\bcompatible\s+(?:with\s+)?[\w\s,/&-]*/gi, '');
+  text = text.replace(/\bfits?\s+(?:for\s+)?[\w\s,/&-]*/gi, '');
+  text = text.replace(/\bfor\s+[A-Z][\w\s,/&-]*/g, '');
+  text = text.replace(/\bwith\s+[A-Z][\w\s,/&-]*/g, '');
+
+  // Strip standalone non-year 4-digit+ numbers (model numbers, part numbers)
+  text = text.replace(/\b(?!(?:19|20)\d{2})\d{4,}\b/g, '');
   text = text.replace(/\s+/g, ' ').trim();
 
   // If athlete provided and not in text, prepend athlete
@@ -38,7 +44,20 @@ export function cleanEbaySearchQuery(itemName, athlete, authenticator) {
   // Clean special characters except word characters, spaces, and hyphens
   text = text.replace(/[^\w\s-]/g, '').replace(/\s+/g, ' ').trim();
 
-  return text;
+  // Limit to first 12 meaningful words
+  const words = text.split(' ').filter(w => w.length > 1);
+  const uniqueWords = [];
+  const seen = new Set();
+  for (const w of words) {
+    const lower = w.toLowerCase();
+    if (!seen.has(lower)) {
+      seen.add(lower);
+      uniqueWords.push(w);
+    }
+    if (uniqueWords.length >= 12) break;
+  }
+
+  return uniqueWords.join(' ');
 }
 
 function buildEbaySearchUrl(itemName, athlete, authenticator) {

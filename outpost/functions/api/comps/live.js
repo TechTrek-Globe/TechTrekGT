@@ -8,22 +8,45 @@ import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
  * calculates the statistical average/median comps, and returns structured data.
  */
 
-function cleanEbaySearchQuery(queryText) {
-  let text = String(queryText || '').trim();
+function cleanEbaySearchQuery(rawText) {
+  if (!rawText) return '';
+  let text = String(rawText).trim();
 
   // Strip leading Item #, Lot #, or standalone 5-12 digit numbers
   text = text.replace(/^(?:item\s*#?|lot\s*#?|#)\s*\d{4,12}(?:\s*[-–—:]\s*|\s+)?/gi, '');
   text = text.replace(/^\d{5,12}\s*[-–—:]\s*/g, '');
-  text = text.replace(/^\d{5,12}\s+/g, '');
 
-  // Strip standalone non-year 5-12 digit numbers anywhere in text (e.g. internal lot IDs like "5261 894")
-  text = text.replace(/\b(?!(?:19|20)\d{2})\d{5,12}\b/g, '');
-  text = text.replace(/\s+/g, ' ').trim();
+  // Strip Amazon-style compatibility clauses that make eBay queries too specific
+  // e.g. "Compatible with Kawasaki Mule 4000 4010..." or "Fits for X Y Z"
+  text = text.replace(/\bcompatible\s+(?:with\s+)?[\w\s,/&-]*/gi, '');
+  text = text.replace(/\bfits?\s+(?:for\s+)?[\w\s,/&-]*/gi, '');
+  text = text.replace(/\bfor\s+[A-Z][\w\s,/&-]*/g, '');
+  text = text.replace(/\bwith\s+[A-Z][\w\s,/&-]*/g, '');
+  text = text.replace(/\bw\/\s*[A-Z][\w\s,/&-]*/g, '');
+
+  // Strip long hyphenated spec strings (e.g. "Scratch-Resistant Folding Windscreen with Pre-Installed Rubb")
+  text = text.replace(/\b\w+-\w+\b/g, m => m); // keep hyphenated words but not strip them
+
+  // Strip standalone non-year 4-digit+ numbers (model numbers, part numbers)
+  text = text.replace(/\b(?!(?:19|20)\d{2})\d{4,}\b/g, '');
 
   // Clean special characters except word characters, spaces, and hyphens
   text = text.replace(/[^\w\s-]/g, '').replace(/\s+/g, ' ').trim();
 
-  return text;
+  // Limit to first 12 meaningful words
+  const words = text.split(' ').filter(w => w.length > 1);
+  const uniqueWords = [];
+  const seen = new Set();
+  for (const w of words) {
+    const lower = w.toLowerCase();
+    if (!seen.has(lower)) {
+      seen.add(lower);
+      uniqueWords.push(w);
+    }
+    if (uniqueWords.length >= 12) break;
+  }
+
+  return uniqueWords.join(' ');
 }
 
 export async function onRequestGet(context) {
@@ -57,16 +80,29 @@ export async function onRequestPost(context) {
       ).bind(itemId, userId).first();
 
       if (itemRow) {
-        let nameText = cleanEbaySearchQuery(itemRow.item_name);
-        if (itemRow.athlete_person && !nameText.toLowerCase().includes(itemRow.athlete_person.toLowerCase())) {
-          const cleanAthlete = cleanEbaySearchQuery(itemRow.athlete_person);
-          if (cleanAthlete) nameText = `${cleanAthlete} ${nameText}`;
+        let parts = [];
+        const cleanAthlete = itemRow.athlete_person ? cleanEbaySearchQuery(itemRow.athlete_person) : '';
+        const cleanName    = itemRow.item_name ? cleanEbaySearchQuery(itemRow.item_name) : '';
+
+        if (cleanAthlete) parts.push(cleanAthlete);
+
+        // Prepend athlete if not already in item_name
+        if (cleanName) {
+          if (cleanAthlete && cleanName.toLowerCase().includes(cleanAthlete.toLowerCase())) {
+            parts = [cleanName];
+          } else {
+            parts.push(cleanName);
+          }
         }
-        if (itemRow.authenticator && itemRow.authenticator.toLowerCase() !== 'other' && !nameText.toLowerCase().includes(itemRow.authenticator.toLowerCase())) {
+
+        if (itemRow.authenticator && itemRow.authenticator.toLowerCase() !== 'other' && itemRow.authenticator.toLowerCase() !== 'unlabeled') {
           const cleanAuth = itemRow.authenticator.replace(/#.*$/, '').trim();
-          if (cleanAuth) nameText = `${nameText} ${cleanAuth}`;
+          if (cleanAuth && !parts.join(' ').toLowerCase().includes(cleanAuth.toLowerCase())) {
+            parts.push(cleanAuth);
+          }
         }
-        query = cleanEbaySearchQuery(nameText);
+
+        query = parts.join(' ');
       }
     }
 
@@ -78,7 +114,7 @@ export async function onRequestPost(context) {
 
     const results = await fetchEbaySoldComps(query);
 
-    // If itemId provided, automatically persist live avg & comps into auction_comps
+    // If itemId provided and comps found, automatically persist into auction_comps
     if (itemId && env.DB && results.live_avg > 0) {
       const compId = `comp-${crypto.randomUUID()}`;
       await env.DB.prepare(`
@@ -124,9 +160,10 @@ async function fetchEbaySoldComps(rawQuery) {
     const response = await fetch(ebaySearchUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9',
-        'Cache-Control': 'no-cache'
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
       }
     });
 
@@ -138,8 +175,7 @@ async function fetchEbaySoldComps(rawQuery) {
     const prices = [];
     const items = [];
 
-    // Extract sold items using regex over eBay HTML structure
-    // Matches s-item blocks: titles and prices
+    // Strategy A: Parse item blocks with s-item class
     const itemBlockRegex = /<li[^>]*class="[^"]*s-item[^"]*"[^>]*>([\s\S]*?)<\/li>/gi;
     let blockMatch;
 
@@ -148,19 +184,21 @@ async function fetchEbaySoldComps(rawQuery) {
       if (block.includes('s-item__title--tag') || block.includes('Shop on eBay')) continue;
 
       // Extract Title
-      const titleMatch = block.match(/<span[^>]*role="heading"[^>]*>([^<]+)<\/span>/i) ||
-                         block.match(/<div[^>]*class="[^"]*s-item__title[^"]*"[^>]*>[\s\S]*?<span[^>]*>([^<]+)<\/span>/i);
+      const titleMatch = block.match(/<span[^>]*role="heading"[^>]*>([^<]+)<\/span>/i)
+        || block.match(/<div[^>]*class="[^"]*s-item__title[^"]*"[^>]*>[\s\S]*?<span[^>]*>([^<]+)<\/span>/i);
       const title = titleMatch ? titleMatch[1].replace(/<!--.*?-->/g, '').trim() : '';
 
-      // Extract Sold Price (e.g., "$45.00" or "$120.50 to $150.00")
-      const priceMatch = block.match(/<span[^>]*class="[^"]*s-item__price[^"]*"[^>]*>([\s\S]*?)<\/span>/i);
+      // Extract Price - handle various eBay price markup versions
+      const priceMatch = block.match(/<span[^>]*class="[^"]*s-item__price[^"]*"[^>]*>([\s\S]*?)<\/span>/i)
+        || block.match(/<span[^>]*class="[^"]*POSITIVE[^"]*"[^>]*>([\s\S]*?)<\/span>/i);
+
       if (!priceMatch) continue;
 
       const rawPrice = priceMatch[1].replace(/<!--.*?-->/g, '').replace(/<[^>]+>/g, '').trim();
       const numMatch = rawPrice.match(/\$([\d,]+\.?\d*)/);
       if (numMatch) {
         const numVal = parseFloat(numMatch[1].replace(/,/g, ''));
-        if (!isNaN(numVal) && numVal > 0) {
+        if (!isNaN(numVal) && numVal > 0 && numVal < 100000) {
           prices.push(numVal);
           items.push({
             title: title || query,
@@ -171,14 +209,15 @@ async function fetchEbaySoldComps(rawQuery) {
       }
     }
 
+    // Strategy B: Fallback regex scanning for price spans
     if (prices.length === 0) {
-      // Fallback parser looking directly for positive sold price spans
-      const altPriceRegex = /\$([0-9]{1,4}(?:,[0-9]{3})*(?:\.[0-9]{2})?)/g;
+      const altPriceRegex = /class="s-item__price"[^>]*>\s*\$([\d,]+\.?\d*)/gi;
       let m;
-      while ((m = altPriceRegex.exec(html)) !== null && prices.length < 6) {
+      while ((m = altPriceRegex.exec(html)) !== null && prices.length < 10) {
         const val = parseFloat(m[1].replace(/,/g, ''));
-        if (val > 5 && val < 50000) {
+        if (!isNaN(val) && val > 1 && val < 50000) {
           prices.push(val);
+          items.push({ title: query, price: val, price_formatted: `$${val.toFixed(2)}` });
         }
       }
     }
@@ -194,9 +233,9 @@ async function fetchEbaySoldComps(rawQuery) {
         success: true,
         query,
         count: prices.length,
-        comp_1: prices[0] || null,
-        comp_2: prices[1] || null,
-        comp_3: prices[2] || null,
+        comp_1: sorted[0] || null,
+        comp_2: sorted[Math.floor(sorted.length / 2)] || null,
+        comp_3: sorted[sorted.length - 1] || null,
         live_avg,
         median,
         min_comp: sorted[0],
@@ -224,6 +263,6 @@ function fallbackCompsResponse(query, ebaySearchUrl) {
     median: null,
     ebay_search_url: ebaySearchUrl,
     items: [],
-    notice: 'Live lookup generated search link. Direct HTML scraping restricted by marketplace origin.'
+    notice: 'Direct automated lookup returned 0 live matches. Click eBay Comps ↗ to view sold listings on eBay.'
   };
 }

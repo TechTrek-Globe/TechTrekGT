@@ -1,6 +1,6 @@
 /**
  * outpostBridge.js
- * VHelper Chrome Extension - TechTrek Outpost Integration
+ * VineScout Chrome Extension - TechTrek Outpost Integration
  *
  * Pushes Amazon Vine item data to TechTrek Outpost inventory via the
  * POST /api/import/amazon endpoint, authenticated with a user API token.

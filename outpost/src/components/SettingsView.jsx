@@ -1045,7 +1045,7 @@ function VineScoutSection({ token, loading, rotating, copied, onLoad, onRotate, 
             VineScout / Amazon Integration
           </h2>
           <p className="text-xs text-slate-400 mt-0.5">
-            Push Amazon Vine items directly into Outpost from your VHelper Chrome extension
+            Push Amazon Vine items directly into Outpost from your VineScout Chrome extension
           </p>
         </div>
         {!token && (
@@ -1064,7 +1064,7 @@ function VineScoutSection({ token, loading, rotating, copied, onLoad, onRotate, 
       <div className="grid grid-cols-3 gap-3 text-center">
         {[
           { step: '1', text: 'Copy your API token below' },
-          { step: '2', text: 'Paste it in VHelper → Outpost Settings' },
+          { step: '2', text: 'Paste it in VineScout → Outpost Settings' },
           { step: '3', text: 'Click "Send to Outpost" on any Vine item page' }
         ].map(({ step, text }) => (
           <div key={step} className="p-3 rounded-xl bg-slate-800/40 border border-slate-700/40">

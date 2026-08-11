@@ -208,6 +208,7 @@ export function InventoryView() {
   const [search,    setSearch]    = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [pagination, setPagination] = useState({ total: 0, page: 1, pages: 1 });
+  const [deleting,  setDeleting]  = useState(null);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
 
   // Settings: Column Visibility & Column Widths

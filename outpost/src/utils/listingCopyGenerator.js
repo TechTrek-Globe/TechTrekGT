@@ -51,9 +51,22 @@ export function generateEbayCopy(item, options = {}) {
     'Thank you for viewing TechTrek Outpost inventory!'
   ].filter(line => line !== null).join('\n');
 
+  const isSports = category.toLowerCase().includes('sport') || 
+                   category.toLowerCase().includes('card') || 
+                   category.toLowerCase().includes('memorabilia') || 
+                   athlete.trim().length > 0;
+  const bannerUrl = isSports 
+    ? 'https://raw.githubusercontent.com/TechTrek-Globe/TechTrekGT/main/outpost/public/ebay-banner-sports.png'
+    : 'https://raw.githubusercontent.com/TechTrek-Globe/TechTrekGT/main/outpost/public/ebay-banner-collectibles.jpg';
+
   // Modern Responsive HTML Template for eBay Description Editor
   const htmlBody = `
 <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 750px; margin: 0 auto; background: #0f172a; color: #f8fafc; border-radius: 16px; overflow: hidden; border: 1px solid #334155;">
+  <!-- Header Image Banner -->
+  <div style="width: 100%; overflow: hidden; border-bottom: 1px solid #334155;">
+    <img src="${bannerUrl}" alt="TechTrek Outpost Banner" style="width: 100%; display: block; height: auto; border: 0;" />
+  </div>
+
   <!-- Header Banner -->
   <div style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 24px 28px; border-bottom: 2px solid #f59e0b;">
     <span style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; color: #f59e0b;">TechTrek Outpost · Authentic Memorabilia</span>

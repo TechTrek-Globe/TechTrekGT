@@ -12,7 +12,7 @@ import { ListingCopyModal } from './ListingCopyModal';
 import { EditItemModal } from './EditItemModal';
 import { fmtCurrency, fmtPct } from '../utils/formulaPreview';
 import { getApiUrl } from '../utils/api';
-import { FileSpreadsheet, ShieldCheck, Copy } from 'lucide-react';
+import { FileSpreadsheet, ShieldCheck, Copy, Upload } from 'lucide-react';
 import { getCertVerificationUrl, getAuthenticatorMeta } from '../utils/certLookup';
 import { DEFAULT_COLUMNS, DEFAULT_CATEGORIES, getStoredUserSettings, saveUserSettings } from '../utils/userSettings';
 import { cleanItemName, cleanAthleteName, cleanItemDescription } from '../utils/spreadsheetParser';
@@ -369,17 +369,19 @@ export function InventoryView() {
           <button
             id="import-excel-btn"
             onClick={() => setImporterOpen(true)}
-            className="btn-secondary w-auto px-4 py-2.5 text-sm flex items-center gap-2"
+            className="btn-primary w-auto px-5 py-2.5 text-sm flex items-center gap-2 font-bold shadow-lg shadow-amber-500/20 cursor-pointer"
+            title="Import items in bulk from CSV, Excel, or Pristine Auction spreadsheets"
           >
-            <FileSpreadsheet className="w-4 h-4 text-amber-400" />
+            <Upload className="w-4 h-4 text-slate-950 stroke-[2.5]" />
             <span>Import Spreadsheet</span>
           </button>
           <button
             id="add-invoice-btn"
             onClick={() => setModalOpen(true)}
-            className="btn-primary w-auto px-5 py-2.5 text-sm"
+            className="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-300 bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 hover:border-amber-500/40 transition-all flex items-center gap-1.5 cursor-pointer"
+            title="Manually enter a single item invoice"
           >
-            <Plus className="w-4 h-4" /> Add Invoice
+            <Plus className="w-3.5 h-3.5 text-amber-400" /> Manual Invoice
           </button>
           <button
             id="log-sale-header-btn"
@@ -387,9 +389,10 @@ export function InventoryView() {
               setItemToSell(null);
               setSaleModalOpen(true);
             }}
-            className="px-4 py-2.5 rounded-xl text-sm font-semibold text-emerald-300 bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-500/40 hover:border-emerald-500/60 transition-all flex items-center gap-1.5 shadow-lg"
+            className="px-3.5 py-2 rounded-xl text-xs font-semibold text-emerald-300 bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-500/40 hover:border-emerald-500/60 transition-all flex items-center gap-1.5 shadow-lg cursor-pointer"
+            title="Log a new completed sale"
           >
-            <DollarSign className="w-4 h-4" /> Log Sale
+            <DollarSign className="w-3.5 h-3.5" /> Log Sale
           </button>
         </div>
       </div>

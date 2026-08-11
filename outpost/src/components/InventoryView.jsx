@@ -351,6 +351,16 @@ export function InventoryView() {
           >
             <Plus className="w-4 h-4" /> Add Invoice
           </button>
+          <button
+            id="log-sale-header-btn"
+            onClick={() => {
+              setItemToSell(null);
+              setSaleModalOpen(true);
+            }}
+            className="px-4 py-2.5 rounded-xl text-sm font-semibold text-emerald-300 bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-500/40 hover:border-emerald-500/60 transition-all flex items-center gap-1.5 shadow-lg"
+          >
+            <DollarSign className="w-4 h-4" /> Log Sale
+          </button>
         </div>
       </div>
 
@@ -482,6 +492,25 @@ export function InventoryView() {
                       {item.athlete_person && !item.item_name?.toLowerCase().includes(item.athlete_person.toLowerCase()) && (
                         <p className="text-slate-500 text-[10px] mt-0.5 pointer-events-none truncate">{cleanAthleteName(item.athlete_person)}</p>
                       )}
+                    </td>
+                  )}
+
+                  {/* Athlete / Signer */}
+                  {columnVisibility.athlete_person !== false && (
+                    <td
+                      style={{
+                        width: `${columnWidths.athlete_person || 150}px`,
+                        minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'athlete_person')?.minWidth || 120}px`,
+                        maxWidth: `${columnWidths.athlete_person || 150}px`
+                      }}
+                      className="px-4 py-3 whitespace-nowrap overflow-hidden"
+                    >
+                      <InlineEditCell
+                        value={item.athlete_person}
+                        itemId={item.id}
+                        field="athlete_person"
+                        onUpdated={handleItemUpdated}
+                      />
                     </td>
                   )}
 

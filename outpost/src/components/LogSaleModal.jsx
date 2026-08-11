@@ -100,7 +100,7 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
     setPlatform(platName);
     const plat = (platforms || []).find(p => p.name === platName) || defaultPlatform;
     if (plat) {
-      setPlatformFeePct((plat.fee_pct * 100).toString());
+      setPlatformFeePct(String(parseFloat((plat.fee_pct * 100).toFixed(4))));
       setPlatformFlatFee(plat.flat_fee.toString());
     }
     if (item && item.est_shipping_cost) {
@@ -112,7 +112,7 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
     setPlatform(newPlat);
     const plat = (platforms || []).find(p => p.name === newPlat);
     if (plat) {
-      setPlatformFeePct((plat.fee_pct * 100).toString());
+      setPlatformFeePct(String(parseFloat((plat.fee_pct * 100).toFixed(4))));
       setPlatformFlatFee(plat.flat_fee.toString());
     }
   };

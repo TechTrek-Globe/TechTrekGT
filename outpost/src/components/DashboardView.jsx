@@ -98,56 +98,10 @@ export function DashboardView({ onNavigate }) {
           <button
             id="refresh-dashboard-btn"
             onClick={fetchDashboard}
-            className="w-9 h-9 rounded-xl border border-slate-700 flex items-center justify-center text-slate-500 hover:text-amber-400 hover:border-amber-500/40 transition-all mr-1"
+            className="w-9 h-9 rounded-xl border border-slate-700 flex items-center justify-center text-slate-500 hover:text-amber-400 hover:border-amber-500/40 transition-all"
             title="Refresh dashboard metrics"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-          <button
-            id="quick-card-show-btn"
-            onClick={() => setCardShowOpen(true)}
-            className="px-3 py-2 rounded-xl text-xs font-semibold text-amber-300 bg-amber-950/60 hover:bg-amber-900/60 border border-amber-500/40 hover:border-amber-500/60 transition-all flex items-center gap-1.5"
-            title="Open Mobile Card Show Calculator"
-          >
-            <Calculator className="w-3.5 h-3.5" /> Show Calc
-          </button>
-          <button
-            id="quick-supplies-btn"
-            onClick={() => setSuppliesOpen(true)}
-            className="px-3 py-2 rounded-xl text-xs font-semibold text-blue-300 bg-blue-950/60 hover:bg-blue-900/60 border border-blue-500/40 hover:border-blue-500/60 transition-all flex items-center gap-1.5"
-            title="Open Packaging & Supplies Expense Tracker"
-          >
-            <Boxes className="w-3.5 h-3.5" /> Supplies
-          </button>
-          <button
-            id="quick-tax-btn"
-            onClick={() => setTaxReportOpen(true)}
-            className="px-3 py-2 rounded-xl text-xs font-semibold text-amber-300 bg-amber-950/60 hover:bg-amber-900/60 border border-amber-500/40 hover:border-amber-500/60 transition-all flex items-center gap-1.5"
-            title="View IRS Schedule C & Tax Valuation Report"
-          >
-            <FileSpreadsheet className="w-3.5 h-3.5" /> Taxes
-          </button>
-          <button
-            id="quick-finance-sync-btn"
-            onClick={() => setFinanceSyncOpen(true)}
-            className="px-3 py-2 rounded-xl text-xs font-semibold text-emerald-300 bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-500/40 hover:border-emerald-500/60 transition-all flex items-center gap-1.5"
-            title="Sync realized net profits with TechTrek Finance"
-          >
-            <ArrowRightLeft className="w-3.5 h-3.5" /> Sync
-          </button>
-          <button
-            id="quick-add-invoice-btn"
-            onClick={() => setAddInvoiceOpen(true)}
-            className="btn-primary w-auto px-3.5 py-2 text-xs flex items-center gap-1.5"
-          >
-            <Plus className="w-3.5 h-3.5" /> Add Invoice
-          </button>
-          <button
-            id="quick-log-sale-btn"
-            onClick={() => setLogSaleOpen(true)}
-            className="px-4 py-2 rounded-xl text-xs font-semibold text-blue-300 bg-blue-950/60 hover:bg-blue-900/60 border border-blue-500/40 hover:border-blue-500/60 transition-all flex items-center gap-1.5"
-          >
-            <DollarSign className="w-3.5 h-3.5" /> Log Sale
           </button>
         </div>
       </div>

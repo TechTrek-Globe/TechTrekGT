@@ -6,6 +6,7 @@
 
 export const DEFAULT_COLUMNS = [
   { key: 'item_name',            label: 'Item Description', defaultVisible: true, minWidth: 150, defaultWidth: 220 },
+  { key: 'athlete_person',        label: 'Athlete / Signer', defaultVisible: true, minWidth: 120, defaultWidth: 150 },
   { key: 'status',               label: 'Status',          defaultVisible: true, minWidth: 100, defaultWidth: 130 },
   { key: 'category',             label: 'Category',        defaultVisible: true, minWidth: 100, defaultWidth: 120 },
   { key: 'authenticator',        label: 'Authenticator',   defaultVisible: true, minWidth: 110, defaultWidth: 130 },

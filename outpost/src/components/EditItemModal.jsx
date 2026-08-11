@@ -56,7 +56,7 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
         cert_number: item.cert_number || '',
         status: item.status || 'Available',
         platform: item.platform || '',
-        platform_fee_pct: item.platform_fee_pct != null ? String(item.platform_fee_pct * 100) : '13.5',
+        platform_fee_pct: item.platform_fee_pct != null ? String(parseFloat((item.platform_fee_pct * 100).toFixed(4))) : '13.5',
         platform_flat_fee: item.platform_flat_fee != null ? String(item.platform_flat_fee) : '0.40',
         current_list_price: item.current_list_price != null ? String(item.current_list_price) : '',
         target_margin_pct: item.target_margin_pct != null ? String(item.target_margin_pct * 100) : '20',

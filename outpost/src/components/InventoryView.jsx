@@ -10,9 +10,10 @@ import { LogSaleModal } from './LogSaleModal';
 import { SpreadsheetImporterModal } from './SpreadsheetImporterModal';
 import { ListingCopyModal } from './ListingCopyModal';
 import { EditItemModal } from './EditItemModal';
+import { AmazonItemModal } from './AmazonItemModal';
 import { fmtCurrency, fmtPct } from '../utils/formulaPreview';
 import { getApiUrl } from '../utils/api';
-import { FileSpreadsheet, ShieldCheck, Copy, Upload } from 'lucide-react';
+import { FileSpreadsheet, ShieldCheck, Copy, Upload, ShoppingCart } from 'lucide-react';
 import { getCertVerificationUrl, getAuthenticatorMeta } from '../utils/certLookup';
 import { DEFAULT_COLUMNS, DEFAULT_CATEGORIES, getStoredUserSettings, saveUserSettings } from '../utils/userSettings';
 import { cleanItemName, cleanAthleteName, cleanItemDescription } from '../utils/spreadsheetParser';
@@ -201,6 +202,7 @@ export function InventoryView() {
   const [platforms, setPlatforms] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [importerOpen, setImporterOpen] = useState(false);
+  const [amazonModalOpen, setAmazonModalOpen] = useState(false);
   const [saleModalOpen, setSaleModalOpen] = useState(false);
   const [copyModalItem, setCopyModalItem] = useState(null);
   const [editModalItem, setEditModalItem] = useState(null);
@@ -375,6 +377,14 @@ export function InventoryView() {
           >
             <Upload className="w-4 h-4 text-slate-950 stroke-[2.5]" />
             <span>Import Spreadsheet</span>
+          </button>
+          <button
+            id="add-amazon-item-btn"
+            onClick={() => setAmazonModalOpen(true)}
+            className="px-3.5 py-2 rounded-xl text-xs font-semibold text-orange-300 bg-orange-950/60 hover:bg-orange-900/60 border border-orange-500/40 hover:border-orange-500/60 transition-all flex items-center gap-1.5 cursor-pointer"
+            title="Import an Amazon item by ASIN or product URL"
+          >
+            <ShoppingCart className="w-3.5 h-3.5" /> Amazon Item
           </button>
           <button
             id="add-invoice-btn"
@@ -846,6 +856,12 @@ export function InventoryView() {
         isOpen={modalOpen}
         platforms={platforms}
         onClose={() => setModalOpen(false)}
+        onCreated={() => fetchItems(1)}
+      />
+      <AmazonItemModal
+        isOpen={amazonModalOpen}
+        platforms={platforms}
+        onClose={() => setAmazonModalOpen(false)}
         onCreated={() => fetchItems(1)}
       />
       <SpreadsheetImporterModal

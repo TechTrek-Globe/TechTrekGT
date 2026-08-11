@@ -19,6 +19,8 @@ import { onRequestGet as compGetHandler, onRequestPut as compPutHandler, onReque
 import { onRequestGet as compsLiveGetHandler, onRequestPost as compsLivePostHandler } from '../functions/api/comps/live.js';
 import { onRequestGet as dashboardHandler } from '../functions/api/dashboard.js';
 import { onRequestPost as batchImportHandler } from '../functions/api/import/batch.js';
+import { onRequestPost as amazonImportHandler } from '../functions/api/import/amazon.js';
+import { onRequestGet as amazonTokenGetHandler, onRequestPost as amazonTokenPostHandler } from '../functions/api/import/amazon-token.js';
 import { onRequestGet as syncFinanceGetHandler, onRequestPost as syncFinancePostHandler } from '../functions/api/sync/finance.js';
 import { onRequestGet as suppliesListHandler, onRequestPost as suppliesCreateHandler } from '../functions/api/supplies/index.js';
 import { onRequestPut as supplyPutHandler, onRequestDelete as supplyDeleteHandler } from '../functions/api/supplies/[id].js';
@@ -192,6 +194,13 @@ export default {
       // --- Batch Import ---
       } else if (apiPath === '/api/import/batch' && request.method === 'POST') {
         response = await batchImportHandler(context);
+      // --- Amazon / VineScout Import ---
+      } else if (apiPath === '/api/import/amazon' && request.method === 'POST') {
+        response = await amazonImportHandler(context);
+      } else if (apiPath === '/api/import/amazon-token' && request.method === 'GET') {
+        response = await amazonTokenGetHandler(context);
+      } else if (apiPath === '/api/import/amazon-token' && request.method === 'POST') {
+        response = await amazonTokenPostHandler(context);
       // --- TechTrek Finance Sync ---
       } else if (apiPath === '/api/sync/finance' && request.method === 'GET') {
         response = await syncFinanceGetHandler(context);

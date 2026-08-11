@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   Settings, Shield, Download, RefreshCw, Plus, Edit2, Trash2,
   CheckCircle2, AlertCircle, Loader2, Save, FileText, Database, User, ShieldCheck,
-  FileSpreadsheet, Upload, ArrowRightLeft, Sparkles, Boxes, Calculator, LayoutGrid, ArrowUp, ArrowDown, Eye, EyeOff
+  FileSpreadsheet, Upload, ArrowRightLeft, Sparkles, Boxes, Calculator, LayoutGrid, ArrowUp, ArrowDown, Eye, EyeOff,
+  ShoppingCart, Copy, RotateCcw, ExternalLink
 } from 'lucide-react';
 import { SpreadsheetImporterModal } from './SpreadsheetImporterModal';
 import { FinanceSyncModal } from './FinanceSyncModal';
@@ -40,6 +41,12 @@ export function SettingsView() {
 
   // Export state
   const [exporting, setExporting] = useState(false);
+
+  // VineScout / Amazon API token
+  const [amazonToken, setAmazonToken] = useState(null);
+  const [tokenLoading, setTokenLoading] = useState(false);
+  const [tokenRotating, setTokenRotating] = useState(false);
+  const [tokenCopied, setTokenCopied] = useState(false);
 
   const toggleColumnVisibility = (colKey) => {
     const updated = {
@@ -959,6 +966,38 @@ export function SettingsView() {
         </div>
       )}
 
+      {/* Section: VineScout / Amazon Integration */}
+      <VineScoutSection
+        token={amazonToken}
+        loading={tokenLoading}
+        rotating={tokenRotating}
+        copied={tokenCopied}
+        onLoad={async () => {
+          setTokenLoading(true);
+          try {
+            const res = await fetch('/outpost/api/import/amazon-token', { credentials: 'include' });
+            const d = await res.json();
+            setAmazonToken(d.token || null);
+          } catch (e) { console.error(e); } finally { setTokenLoading(false); }
+        }}
+        onRotate={async () => {
+          if (!window.confirm('Regenerate your API token? The old token will stop working immediately.')) return;
+          setTokenRotating(true);
+          try {
+            const res = await fetch('/outpost/api/import/amazon-token', { method: 'POST', credentials: 'include' });
+            const d = await res.json();
+            setAmazonToken(d.token || null);
+            showSuccess('API token regenerated successfully.');
+          } catch (e) { console.error(e); } finally { setTokenRotating(false); }
+        }}
+        onCopy={() => {
+          if (!amazonToken) return;
+          navigator.clipboard.writeText(amazonToken);
+          setTokenCopied(true);
+          setTimeout(() => setTokenCopied(false), 2000);
+        }}
+      />
+
       {/* Spreadsheet Importer Modal */}
       <SpreadsheetImporterModal
         isOpen={importerOpen}
@@ -983,6 +1022,124 @@ export function SettingsView() {
         isOpen={taxReportOpen}
         onClose={() => setTaxReportOpen(false)}
       />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// VineScout / Amazon Integration Section
+// ---------------------------------------------------------------------------
+function VineScoutSection({ token, loading, rotating, copied, onLoad, onRotate, onCopy }) {
+  const [revealed, setRevealed] = React.useState(false);
+
+  const displayToken = token
+    ? (revealed ? token : token.slice(0, 6) + '••••••••••••••••••••••••••••••••••')
+    : null;
+
+  return (
+    <div className="glass-card rounded-2xl p-6 border border-orange-900/30 bg-orange-950/10 space-y-5">
+      <div className="flex items-center justify-between border-b border-slate-800/60 pb-4">
+        <div>
+          <h2 className="text-base font-bold text-slate-100 flex items-center gap-2">
+            <ShoppingCart className="w-4 h-4 text-orange-400" />
+            VineScout / Amazon Integration
+          </h2>
+          <p className="text-xs text-slate-400 mt-0.5">
+            Push Amazon Vine items directly into Outpost from your VHelper Chrome extension
+          </p>
+        </div>
+        {!token && (
+          <button
+            onClick={onLoad}
+            disabled={loading}
+            className="px-3.5 py-2 rounded-xl text-xs font-semibold text-orange-300 bg-orange-950/60 hover:bg-orange-900/60 border border-orange-500/40 transition-all flex items-center gap-1.5 disabled:opacity-50"
+          >
+            {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShoppingCart className="w-3.5 h-3.5" />}
+            {loading ? 'Loading...' : 'Show API Token'}
+          </button>
+        )}
+      </div>
+
+      {/* How it works */}
+      <div className="grid grid-cols-3 gap-3 text-center">
+        {[
+          { step: '1', text: 'Copy your API token below' },
+          { step: '2', text: 'Paste it in VHelper → Outpost Settings' },
+          { step: '3', text: 'Click "Send to Outpost" on any Vine item page' }
+        ].map(({ step, text }) => (
+          <div key={step} className="p-3 rounded-xl bg-slate-800/40 border border-slate-700/40">
+            <div className="w-6 h-6 rounded-full bg-orange-500/20 border border-orange-500/30 text-orange-400 text-xs font-bold flex items-center justify-center mx-auto mb-1.5">{step}</div>
+            <p className="text-[11px] text-slate-400">{text}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* API Token */}
+      {token ? (
+        <div className="space-y-3">
+          <div>
+            <label className="block text-[11px] font-semibold text-slate-400 mb-1.5 uppercase tracking-wide">
+              Your API Token
+            </label>
+            <div className="flex items-center gap-2">
+              <div className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 font-mono text-xs text-amber-300 overflow-hidden whitespace-nowrap overflow-ellipsis">
+                {displayToken}
+              </div>
+              <button
+                onClick={() => setRevealed(r => !r)}
+                className="px-3 py-2.5 rounded-xl text-xs border border-slate-700 text-slate-400 hover:text-slate-200 transition-all"
+                title={revealed ? 'Hide token' : 'Reveal token'}
+              >
+                {revealed ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+              </button>
+              <button
+                onClick={onCopy}
+                className={`px-3 py-2.5 rounded-xl text-xs border transition-all flex items-center gap-1.5 ${
+                  copied
+                    ? 'text-emerald-400 border-emerald-500/40 bg-emerald-950/30'
+                    : 'text-slate-400 border-slate-700 hover:text-slate-200'
+                }`}
+                title="Copy token"
+              >
+                {copied ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                {copied ? 'Copied!' : 'Copy'}
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-semibold text-slate-400 mb-1.5 uppercase tracking-wide">
+              Endpoint URL
+            </label>
+            <div className="flex items-center gap-2">
+              <div className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 font-mono text-xs text-blue-300 overflow-hidden whitespace-nowrap">
+                https://techtrekgt.com/outpost/api/import/amazon
+              </div>
+              <button
+                onClick={() => navigator.clipboard.writeText('https://techtrekgt.com/outpost/api/import/amazon')}
+                className="px-3 py-2.5 rounded-xl text-xs border border-slate-700 text-slate-400 hover:text-slate-200 transition-all"
+                title="Copy endpoint URL"
+              >
+                <Copy className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between pt-2 border-t border-slate-800/40">
+            <p className="text-[11px] text-slate-500">Token is user-scoped and never expires unless rotated.</p>
+            <button
+              onClick={onRotate}
+              disabled={rotating}
+              className="px-3.5 py-2 rounded-xl text-xs font-semibold text-red-400 bg-red-950/40 hover:bg-red-900/40 border border-red-800/40 transition-all flex items-center gap-1.5 disabled:opacity-50"
+            >
+              {rotating ? <Loader2 className="w-3 h-3 animate-spin" /> : <RotateCcw className="w-3 h-3" />}
+              Rotate Token
+            </button>
+          </div>
+        </div>
+      ) : (
+        <p className="text-xs text-slate-500 text-center py-2">Click "Show API Token" above to reveal your integration credentials.</p>
+      )}
     </div>
   );
 }

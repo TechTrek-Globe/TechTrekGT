@@ -245,15 +245,15 @@ export function PricingIntelligenceView() {
   const coveragePct = totalItems > 0 ? (itemsWithComps / totalItems) * 100 : 0;
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 space-y-5">
+    <div className="flex-1 flex flex-col min-h-0 space-y-3">
       {/* Top Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-black text-white flex items-center gap-2">
-            <Sparkles className="w-6 h-6 text-amber-400" />
-            Pricing Intelligence & Market Comps
+          <h1 className="text-lg font-black text-white flex items-center gap-1.5">
+            <Sparkles className="w-4 h-4 text-amber-400" />
+            Pricing Intelligence &amp; Market Comps
           </h1>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-[10px] text-slate-400 mt-0.5">
             Cross-reference live eBay sold comps, calculate market averages, and safeguard your profit margins
           </p>
         </div>
@@ -262,44 +262,44 @@ export function PricingIntelligenceView() {
           <button
             id="refresh-comps-btn"
             onClick={fetchCompsData}
-            className="w-9 h-9 rounded-xl border border-slate-700 flex items-center justify-center text-slate-500 hover:text-amber-400 hover:border-amber-500/40 transition-all mr-1"
+            className="w-7 h-7 rounded-lg border border-slate-700 flex items-center justify-center text-slate-500 hover:text-amber-400 hover:border-amber-500/40 transition-all mr-1"
             title="Refresh Comps"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           </button>
         </div>
       </div>
 
       {/* Overview Metric Banner */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="glass-card rounded-xl p-4 border border-slate-800 flex items-center justify-between">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+        <div className="glass-card rounded-lg p-2.5 border border-slate-800 flex items-center justify-between">
           <div>
-            <p className="text-xs text-slate-400">Inventory Monitored</p>
-            <p className="text-2xl font-black text-white mt-1">{totalItems} <span className="text-xs font-normal text-slate-500">items</span></p>
+            <p className="text-[10px] text-slate-400">Inventory Monitored</p>
+            <p className="text-lg font-black text-white mt-0.5">{totalItems} <span className="text-[10px] font-normal text-slate-500">items</span></p>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-400 font-bold">
-            <TrendingUp className="w-5 h-5" />
+          <div className="w-7 h-7 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-400 font-bold">
+            <TrendingUp className="w-4 h-4" />
           </div>
         </div>
 
-        <div className="glass-card rounded-xl p-4 border border-slate-800 flex items-center justify-between">
+        <div className="glass-card rounded-lg p-2.5 border border-slate-800 flex items-center justify-between">
           <div>
-            <p className="text-xs text-slate-400">Market Comps Coverage</p>
-            <p className="text-2xl font-black text-amber-400 mt-1">{itemsWithComps} <span className="text-xs font-normal text-slate-500">/ {totalItems} ({Math.round(coveragePct)}%)</span></p>
+            <p className="text-[10px] text-slate-400">Market Comps Coverage</p>
+            <p className="text-lg font-black text-amber-400 mt-0.5">{itemsWithComps} <span className="text-[10px] font-normal text-slate-500">/ {totalItems} ({Math.round(coveragePct)}%)</span></p>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 font-bold">
-            <CheckCircle2 className="w-5 h-5" />
+          <div className="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400 font-bold">
+            <CheckCircle2 className="w-4 h-4" />
           </div>
         </div>
 
-        <div className="glass-card rounded-xl p-4 border border-slate-800 flex items-center justify-between">
+        <div className="glass-card rounded-lg p-2.5 border border-slate-800 flex items-center justify-between">
           <div>
-            <p className="text-xs text-slate-400">Comp Strategy</p>
-            <p className="text-xs font-semibold text-slate-200 mt-1">3-Comp Median & Sold Valuation</p>
-            <p className="text-[10px] text-slate-500">Automated query builder with eBay API sync</p>
+            <p className="text-[10px] text-slate-400">Comp Strategy</p>
+            <p className="text-[11px] font-semibold text-slate-200 mt-0.5">3-Comp Median &amp; Sold Valuation</p>
+            <p className="text-[9px] text-slate-500">Automated query builder with eBay API sync</p>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400 font-bold">
-            <ExternalLink className="w-5 h-5" />
+          <div className="w-7 h-7 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-400 font-bold">
+            <ExternalLink className="w-4 h-4" />
           </div>
         </div>
       </div>
@@ -426,19 +426,97 @@ export function PricingIntelligenceView() {
 
                   {/* Financial Safeguards */}
                   <div className="flex items-center gap-4 bg-slate-900/60 rounded-xl px-3.5 py-2 border border-slate-800">
-                    <div className="text-right">
-                      <p className="text-[10px] text-slate-500">True Landed Cost</p>
+                    {/* True Landed Cost */}
+                    <div className="text-right relative group">
+                      <p className="text-[10px] text-slate-500 cursor-help">True Landed Cost</p>
                       <p className="text-xs font-black text-amber-400">{fmtCurrency(item.true_total_cost)}</p>
+                      <div className="absolute bottom-full right-0 mb-2 w-64 z-50 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-150">
+                        <div className="bg-slate-950 border border-amber-500/30 rounded-xl p-3 text-left shadow-2xl shadow-black/60">
+                          <p className="text-[10px] font-bold text-amber-400 mb-1.5 uppercase tracking-wider">True Landed Cost</p>
+                          <div className="space-y-0.5 text-[10px] text-slate-300">
+                            <div className="flex justify-between gap-4">
+                              <span className="text-slate-500">Unit Purchase Price</span>
+                              <span className="font-mono text-white">{fmtCurrency(item.unit_price)}</span>
+                            </div>
+                            <div className="flex justify-between gap-4">
+                              <span className="text-slate-500">+ Prorated Shipping / Tax</span>
+                              <span className="font-mono text-slate-300">{fmtCurrency((item.true_total_cost || 0) - (item.unit_price || 0))}</span>
+                            </div>
+                            <div className="border-t border-slate-800 my-1" />
+                            <div className="flex justify-between gap-4 font-bold">
+                              <span className="text-amber-300">= True Landed Cost</span>
+                              <span className="font-mono text-amber-400">{fmtCurrency(item.true_total_cost)}</span>
+                            </div>
+                          </div>
+                          <p className="text-[9px] text-slate-600 mt-2">Unit Price + prorated invoice shipping, taxes &amp; discounts</p>
+                        </div>
+                        <div className="w-2 h-2 bg-slate-950 border-r border-b border-amber-500/30 rotate-45 absolute -bottom-1 right-4" />
+                      </div>
                     </div>
                     <div className="w-px h-6 bg-slate-800" />
-                    <div className="text-right">
-                      <p className="text-[10px] text-slate-500">Break-Even Floor</p>
+                    {/* Break-Even Floor */}
+                    <div className="text-right relative group">
+                      <p className="text-[10px] text-slate-500 cursor-help">Break-Even Floor</p>
                       <p className="text-xs font-black text-cyan-400">{fmtCurrency(item.min_sell_price)}</p>
+                      <div className="absolute bottom-full right-0 mb-2 w-72 z-50 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-150">
+                        <div className="bg-slate-950 border border-cyan-500/30 rounded-xl p-3 text-left shadow-2xl shadow-black/60">
+                          <p className="text-[10px] font-bold text-cyan-400 mb-1.5 uppercase tracking-wider">Break-Even Floor</p>
+                          <div className="space-y-0.5 text-[10px] text-slate-300">
+                            <div className="flex justify-between gap-4">
+                              <span className="text-slate-500">True Landed Cost</span>
+                              <span className="font-mono text-white">{fmtCurrency(item.true_total_cost)}</span>
+                            </div>
+                            <div className="flex justify-between gap-4">
+                              <span className="text-slate-500">+ Est. Outbound Shipping</span>
+                              <span className="font-mono text-slate-300">{fmtCurrency(item.est_shipping_cost)}</span>
+                            </div>
+                            <div className="flex justify-between gap-4">
+                              <span className="text-slate-500">Platform Fee %</span>
+                              <span className="font-mono text-slate-300">{((item.platform_fee_pct || 0) * 100).toFixed(1)}%</span>
+                            </div>
+                            <div className="border-t border-slate-800 my-1" />
+                            <div className="flex justify-between gap-4 font-bold">
+                              <span className="text-cyan-300">= (Cost + Ship) / (1 - Fee%)</span>
+                              <span className="font-mono text-cyan-400">{fmtCurrency(item.min_sell_price)}</span>
+                            </div>
+                          </div>
+                          <p className="text-[9px] text-slate-600 mt-2">Minimum list price to fully recover all costs after platform fees</p>
+                        </div>
+                        <div className="w-2 h-2 bg-slate-950 border-r border-b border-cyan-500/30 rotate-45 absolute -bottom-1 right-4" />
+                      </div>
                     </div>
                     <div className="w-px h-6 bg-slate-800" />
-                    <div className="text-right">
-                      <p className="text-[10px] text-slate-500">Active List Price</p>
+                    {/* Active List Price */}
+                    <div className="text-right relative group">
+                      <p className="text-[10px] text-slate-500 cursor-help">Active List Price</p>
                       <p className="text-xs font-black text-white">{item.current_list_price ? fmtCurrency(item.current_list_price) : 'Not Listed'}</p>
+                      {item.current_list_price && item.min_sell_price > 0 && (
+                        <div className="absolute bottom-full right-0 mb-2 w-64 z-50 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-150">
+                          <div className="bg-slate-950 border border-slate-600/40 rounded-xl p-3 text-left shadow-2xl shadow-black/60">
+                            <p className="text-[10px] font-bold text-slate-300 mb-1.5 uppercase tracking-wider">Active List Price</p>
+                            <div className="space-y-0.5 text-[10px] text-slate-300">
+                              <div className="flex justify-between gap-4">
+                                <span className="text-slate-500">Current List Price</span>
+                                <span className="font-mono text-white">{fmtCurrency(item.current_list_price)}</span>
+                              </div>
+                              <div className="flex justify-between gap-4">
+                                <span className="text-slate-500">Break-Even Floor</span>
+                                <span className="font-mono text-cyan-400">{fmtCurrency(item.min_sell_price)}</span>
+                              </div>
+                              <div className="flex justify-between gap-4">
+                                <span className="text-slate-500">Spread over Floor</span>
+                                <span className={`font-mono font-bold ${item.current_list_price >= item.min_sell_price ? 'text-emerald-400' : 'text-red-400'}`}>{item.current_list_price >= item.min_sell_price ? '+' : ''}{fmtCurrency(item.current_list_price - item.min_sell_price)}</span>
+                              </div>
+                              <div className="border-t border-slate-800 my-1" />
+                              <div className="flex justify-between gap-4 font-bold">
+                                <span className="text-slate-300">Gross Margin</span>
+                                <span className={`font-mono ${item.current_list_price > item.true_total_cost ? 'text-emerald-400' : 'text-red-400'}`}>{item.true_total_cost > 0 ? Math.round(((item.current_list_price - item.true_total_cost) / item.current_list_price) * 100) : 0}%</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="w-2 h-2 bg-slate-950 border-r border-b border-slate-600/40 rotate-45 absolute -bottom-1 right-4" />
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -548,15 +626,38 @@ export function PricingIntelligenceView() {
 
                   {/* Average & Recommended Price Target */}
                   <div className="lg:col-span-4 flex items-center justify-between gap-3 bg-slate-900/40 rounded-xl p-2.5 border border-slate-800">
-                    <div>
-                      <span className="text-[10px] text-slate-400">Comp Avg:</span>
+                    {/* Comp Avg */}
+                    <div className="relative group">
+                      <span className="text-[10px] text-slate-400 cursor-help">Comp Avg:</span>
                       <p className="text-sm font-black text-amber-400">
                         {liveAvg ? fmtCurrency(liveAvg) : '--'}
                       </p>
+                      {liveAvg && (
+                        <div className="absolute bottom-full left-0 mb-2 w-60 z-50 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-150">
+                          <div className="bg-slate-950 border border-amber-500/30 rounded-xl p-3 text-left shadow-2xl shadow-black/60">
+                            <p className="text-[10px] font-bold text-amber-400 mb-1.5 uppercase tracking-wider">Comp Average</p>
+                            <div className="space-y-0.5 text-[10px] text-slate-300">
+                              {[draft.comp_1, draft.comp_2, draft.comp_3].filter(v => v !== '' && !isNaN(Number(v)) && Number(v) > 0).map((v, i) => (
+                                <div key={i} className="flex justify-between gap-4">
+                                  <span className="text-slate-500">Comp #{i + 1}</span>
+                                  <span className="font-mono text-white">{fmtCurrency(Number(v))}</span>
+                                </div>
+                              ))}
+                              <div className="border-t border-slate-800 my-1" />
+                              <div className="flex justify-between gap-4 font-bold">
+                                <span className="text-amber-300">= Sum / {vals.length} comps</span>
+                                <span className="font-mono text-amber-400">{fmtCurrency(liveAvg)}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="w-2 h-2 bg-slate-950 border-r border-b border-amber-500/30 rotate-45 absolute -bottom-1 left-4" />
+                        </div>
+                      )}
                     </div>
 
-                    <div className="w-28">
-                      <label className="block text-[10px] font-bold text-slate-300 mb-0.5">Target Price</label>
+                    {/* Target Price */}
+                    <div className="w-28 relative group">
+                      <label className="block text-[10px] font-bold text-slate-300 mb-0.5 cursor-help">Target Price</label>
                       <div className="relative">
                         <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-slate-500">$</span>
                         <input
@@ -568,6 +669,41 @@ export function PricingIntelligenceView() {
                           className="input-field py-1 pl-5 pr-2 text-xs font-bold text-white"
                         />
                       </div>
+                      {draft.recommended_list_price && item.min_sell_price > 0 && (
+                        <div className="absolute bottom-full right-0 mb-2 w-64 z-50 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-150">
+                          <div className="bg-slate-950 border border-slate-500/30 rounded-xl p-3 text-left shadow-2xl shadow-black/60">
+                            <p className="text-[10px] font-bold text-slate-200 mb-1.5 uppercase tracking-wider">Target Price Breakdown</p>
+                            <div className="space-y-0.5 text-[10px] text-slate-300">
+                              <div className="flex justify-between gap-4">
+                                <span className="text-slate-500">Target List Price</span>
+                                <span className="font-mono text-white">{fmtCurrency(Number(draft.recommended_list_price))}</span>
+                              </div>
+                              <div className="flex justify-between gap-4">
+                                <span className="text-slate-500">Break-Even Floor</span>
+                                <span className="font-mono text-cyan-400">{fmtCurrency(item.min_sell_price)}</span>
+                              </div>
+                              <div className="flex justify-between gap-4">
+                                <span className="text-slate-500">Spread</span>
+                                <span className={`font-mono font-bold ${Number(draft.recommended_list_price) >= item.min_sell_price ? 'text-emerald-400' : 'text-red-400'}`}>{Number(draft.recommended_list_price) >= item.min_sell_price ? '+' : ''}{fmtCurrency(Number(draft.recommended_list_price) - item.min_sell_price)}</span>
+                              </div>
+                              {item.true_total_cost > 0 && (
+                                <>
+                                  <div className="border-t border-slate-800 my-1" />
+                                  <div className="flex justify-between gap-4">
+                                    <span className="text-slate-500">Gross Margin</span>
+                                    <span className="font-mono font-bold text-amber-400">{Math.round(((Number(draft.recommended_list_price) - item.true_total_cost) / Number(draft.recommended_list_price)) * 100)}%</span>
+                                  </div>
+                                  <div className="flex justify-between gap-4">
+                                    <span className="text-slate-500">Gross Profit $</span>
+                                    <span className={`font-mono font-bold ${Number(draft.recommended_list_price) > item.true_total_cost ? 'text-emerald-400' : 'text-red-400'}`}>{fmtCurrency(Number(draft.recommended_list_price) - item.true_total_cost)}</span>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                          <div className="w-2 h-2 bg-slate-950 border-r border-b border-slate-500/30 rotate-45 absolute -bottom-1 right-4" />
+                        </div>
+                      )}
                     </div>
 
                     {/* Action buttons */}

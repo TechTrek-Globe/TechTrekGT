@@ -105,6 +105,8 @@ export async function onRequestGet(context) {
         i.status,
         i.platform,
         i.date_acquired,
+        i.est_shipping_cost,
+        i.platform_fee_pct,
         inv.invoice_ref
       FROM auction_items i
       LEFT JOIN auction_comps c ON i.id = c.item_id AND c.user_id = i.user_id

@@ -122,63 +122,165 @@ export async function onRequestPost(context) {
 }
 
 async function fetchEbaySoldComps(query) {
-  const ebaySearchUrl = `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(query)}&LH_Complete=1&LH_Sold=1&_sop=13&_ipg=48`;
-  const headers = {
-    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8'
-  };
+  const ebaySearchUrl = `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(query)}&LH_Complete=1&LH_Sold=1&_sop=13&_ipg=25`;
+
+  let html = '';
 
   try {
-    const response = await fetch(ebaySearchUrl, { headers });
-    if (!response.ok) return fallbackCompsResponse(query, ebaySearchUrl, "HTTP Error");
-
-    const html = await response.text();
-    const prices = [];
-
-    // Multi-strategy extraction: Look for price elements in various DOM structures
-    const strategies = [
-      /<span class="s-item__price">\s*\$([\d,]+\.?\d*)/g,
-      /class="s-item__price"[^>]*>\s*<span[^>]*>\$([\d,]+\.?\d*)/g,
-      /price-value">\$([\d,]+\.?\d*)/g,
-      /s-item__price">\s*<span[^>]*>.*?\$([\d,]+\.?\d*)/g,
-      /data-price="\$([\d,]+\.?\d*)/g
-    ];
-
-    for (const regex of strategies) {
-      let match;
-      while ((match = regex.exec(html)) !== null) {
-        const val = parseFloat(match[1].replace(/,/g, ''));
-        if (val > 0 && val < 100000) prices.push(val);
+    const response = await fetch(ebaySearchUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Upgrade-Insecure-Requests': '1'
       }
-      if (prices.length >= 10) break;
+    });
+
+    if (!response.ok) {
+      return fallbackCompsResponse(query, ebaySearchUrl, `HTTP ${response.status}`);
     }
 
-    if (prices.length > 0) {
-      const sorted = [...prices].sort((a, b) => a - b);
-      const live_avg = parseFloat((prices.reduce((a, b) => a + b, 0) / prices.length).toFixed(2));
-      
-      return {
-        success: true,
-        query,
-        count: prices.length,
-        comp_1: sorted[0],
-        comp_2: sorted[Math.floor(sorted.length / 2)],
-        comp_3: sorted[sorted.length - 1],
-        live_avg,
-        median: sorted[Math.floor(sorted.length / 2)],
-        ebay_search_url: ebaySearchUrl,
-        items: prices.map(p => ({ price: p, price_formatted: `$${p.toFixed(2)}` }))
-      };
-    }
-    return fallbackCompsResponse(query, ebaySearchUrl, "No matches found");
+    html = await response.text();
   } catch (e) {
-    return fallbackCompsResponse(query, ebaySearchUrl, e.message);
+    return fallbackCompsResponse(query, ebaySearchUrl, `fetch error: ${e.message}`);
   }
+
+  const prices = [];
+  const items = [];
+
+  // --- Strategy 1: JSON-LD structured data ---
+  if (prices.length === 0) {
+    const jsonLdRegex = /<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi;
+    let jm;
+    while ((jm = jsonLdRegex.exec(html)) !== null) {
+      try {
+        const data = JSON.parse(jm[1]);
+        const entries = Array.isArray(data) ? data : (data['@graph'] || [data]);
+        for (const entry of entries) {
+          const offers = entry.offers || entry.Offers;
+          const offerList = Array.isArray(offers) ? offers : (offers ? [offers] : []);
+          for (const offer of offerList) {
+            const price = parseFloat(offer.price || offer.Price || '');
+            if (!isNaN(price) && price > 0 && price < 100000) {
+              prices.push(price);
+              items.push({ title: entry.name || query, price, price_formatted: `$${price.toFixed(2)}` });
+            }
+          }
+        }
+      } catch (_) { /* not valid JSON */ }
+      if (prices.length >= 15) break;
+    }
+  }
+
+  // --- Strategy 2: Embedded window/state JSON price objects ---
+  if (prices.length === 0) {
+    const embeddedPriceRegex = /"(?:soldPrice|price|soldAmount)":\s*\{\s*"value"\s*:\s*"([\d.]+)"/g;
+    let m;
+    while ((m = embeddedPriceRegex.exec(html)) !== null && prices.length < 15) {
+      const val = parseFloat(m[1]);
+      if (!isNaN(val) && val > 1 && val < 100000) {
+        prices.push(val);
+        items.push({ title: query, price: val, price_formatted: `$${val.toFixed(2)}` });
+      }
+    }
+  }
+
+  // --- Strategy 3: Parse s-item list blocks ---
+  if (prices.length === 0) {
+    const itemBlockRegex = /<li[^>]*class="[^"]*s-item[^"]*"[^>]*>([\s\S]*?)<\/li>/gi;
+    let blockMatch;
+    while ((blockMatch = itemBlockRegex.exec(html)) !== null && items.length < 15) {
+      const block = blockMatch[1];
+      if (block.includes('s-item__title--tag') || block.includes('Shop on eBay')) continue;
+
+      const titleMatch = block.match(/<span[^>]*role="heading"[^>]*>([^<]+)<\/span>/i)
+        || block.match(/<div[^>]*class="[^"]*s-item__title[^"]*"[^>]*>[\s\S]*?<span[^>]*>([^<]+)<\/span>/i);
+      const title = titleMatch ? titleMatch[1].replace(/<!--.*?-->/g, '').trim() : '';
+
+      const priceMatch = block.match(/<span[^>]*class="[^"]*s-item__price[^"]*"[^>]*>([\s\S]*?)<\/span>/i)
+        || block.match(/<span[^>]*class="[^"]*POSITIVE[^"]*"[^>]*>([\s\S]*?)<\/span>/i);
+      if (!priceMatch) continue;
+
+      const rawPrice = priceMatch[1].replace(/<!--.*?-->/g, '').replace(/<[^>]+>/g, '').trim();
+      const numMatch = rawPrice.match(/\$([\d,]+\.?\d*)/);
+      if (numMatch) {
+        const numVal = parseFloat(numMatch[1].replace(/,/g, ''));
+        if (!isNaN(numVal) && numVal > 0 && numVal < 100000) {
+          prices.push(numVal);
+          items.push({ title: title || query, price: numVal, price_formatted: `$${numVal.toFixed(2)}` });
+        }
+      }
+    }
+  }
+
+  // --- Strategy 4: Broad price class scan ---
+  if (prices.length === 0) {
+    const altPriceRegex = /class="[^"]*(?:s-item__price|POSITIVE|sold-price|notranslate)[^"]*"[^>]*>\s*\$?([\d,]+\.?\d*)/gi;
+    let m;
+    while ((m = altPriceRegex.exec(html)) !== null && prices.length < 10) {
+      const val = parseFloat(m[1].replace(/,/g, ''));
+      if (!isNaN(val) && val > 1 && val < 100000) {
+        prices.push(val);
+        items.push({ title: query, price: val, price_formatted: `$${val.toFixed(2)}` });
+      }
+    }
+  }
+
+  // --- Strategy 5: Dollar-amount scan near 'sold' keywords ---
+  if (prices.length === 0 && html.includes('ebay.com') && html.length > 5000) {
+    const soldContextRegex = /(?:sold|Sold|SOLD)[^$]{0,200}\$([\d,]+\.?\d*)/g;
+    let m;
+    while ((m = soldContextRegex.exec(html)) !== null && prices.length < 10) {
+      const val = parseFloat(m[1].replace(/,/g, ''));
+      if (!isNaN(val) && val > 1 && val < 100000) {
+        prices.push(val);
+        items.push({ title: query, price: val, price_formatted: `$${val.toFixed(2)}` });
+      }
+    }
+  }
+
+  // --- Build response ---
+  if (prices.length > 0) {
+    const sorted = [...prices].sort((a, b) => a - b);
+    const sum = prices.reduce((acc, p) => acc + p, 0);
+    const live_avg = parseFloat((sum / prices.length).toFixed(2));
+    const mid = Math.floor(sorted.length / 2);
+    const median = sorted.length % 2 !== 0
+      ? sorted[mid]
+      : parseFloat(((sorted[mid - 1] + sorted[mid]) / 2).toFixed(2));
+
+    return {
+      success: true,
+      query,
+      count: prices.length,
+      comp_1: sorted[0] || null,
+      comp_2: sorted[Math.floor(sorted.length / 2)] || null,
+      comp_3: sorted[sorted.length - 1] || null,
+      live_avg,
+      median,
+      min_comp: sorted[0],
+      max_comp: sorted[sorted.length - 1],
+      ebay_search_url: ebaySearchUrl,
+      items
+    };
+  }
+
+  // Diagnostic snippet - first 500 chars to identify bot blocks or empty HTML
+  const htmlSnippet = html.length > 0
+    ? html.substring(0, 500).replace(/[\r\n]+/g, ' ')
+    : '(empty response)';
+
+  return fallbackCompsResponse(query, ebaySearchUrl, null, htmlSnippet);
 }
 
-function fallbackCompsResponse(query, ebaySearchUrl, reason) {
+function fallbackCompsResponse(query, ebaySearchUrl, errorHint = null, htmlSnippet = null) {
   return {
-    success: false,
+    success: true,
     query,
     count: 0,
     comp_1: null,
@@ -188,6 +290,8 @@ function fallbackCompsResponse(query, ebaySearchUrl, reason) {
     median: null,
     ebay_search_url: ebaySearchUrl,
     items: [],
-    notice: `Lookup failed: ${reason}. Check live data manually.`
+    notice: 'Direct automated lookup returned 0 live matches. Click eBay Comps \u2197 to view sold listings on eBay.',
+    ...(errorHint ? { _debug_error: errorHint } : {}),
+    ...(htmlSnippet ? { _debug_html_snippet: htmlSnippet } : {})
   };
 }

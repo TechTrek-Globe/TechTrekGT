@@ -208,7 +208,7 @@ export function InventoryView() {
   const [search,    setSearch]    = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [pagination, setPagination] = useState({ total: 0, page: 1, pages: 1 });
-  const [deleting,  setDeleting]  = useState(null);
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
 
   // Settings: Column Visibility & Column Widths
   const [userSettings, setUserSettings] = useState(getStoredUserSettings);
@@ -234,6 +234,36 @@ export function InventoryView() {
     const itemCats = items.map(it => it.category).filter(Boolean);
     return Array.from(new Set([...configured, ...itemCats]));
   }, [userSettings?.categoryOrder, items]);
+
+  const handleSort = (key) => {
+    if (key === 'actions') return;
+    setSortConfig(prev => {
+      if (prev.key === key) {
+        return { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
+      }
+      return { key, direction: 'asc' };
+    });
+  };
+
+  const sortedItems = useMemo(() => {
+    if (!sortConfig.key) return items;
+    return [...items].sort((a, b) => {
+      let valA = a[sortConfig.key];
+      let valB = b[sortConfig.key];
+      if (valA == null) valA = '';
+      if (valB == null) valB = '';
+      
+      if (typeof valA === 'number' && typeof valB === 'number') {
+        return sortConfig.direction === 'asc' ? valA - valB : valB - valA;
+      }
+      
+      const strA = String(valA).toLowerCase();
+      const strB = String(valB).toLowerCase();
+      if (strA < strB) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (strA > strB) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [items, sortConfig]);
 
   // Column Resizing Handler
   const handleResizeStart = (colKey, e) => {
@@ -425,17 +455,31 @@ export function InventoryView() {
                 {visibleColumns.map(col => {
                   const width = columnWidths[col.key] || col.defaultWidth;
                   const isItemName = col.key === 'item_name';
+                  const isSorted = sortConfig.key === col.key;
+                  const isAction = col.key === 'actions';
                   return (
                     <th
                       key={col.key}
                       style={{ width: `${width}px`, minWidth: `${col.minWidth}px`, maxWidth: `${width}px` }}
-                      className={`px-4 py-3 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide whitespace-nowrap relative select-none group/th sticky top-0 bg-slate-900 border-b border-slate-700/80 shadow-md ${
+                      className={`px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap relative select-none group/th sticky top-0 bg-slate-900 border-b border-slate-700/80 shadow-md ${
                         isItemName ? 'left-0 z-40 border-r border-slate-700/80 shadow-r' : 'z-30'
+                      } ${!isAction ? 'cursor-pointer hover:bg-slate-800/80 hover:text-amber-400 transition-colors' : ''} ${
+                        isSorted ? 'text-amber-400 font-bold' : 'text-slate-400'
                       }`}
+                      onClick={() => handleSort(col.key)}
+                      title={!isAction ? `Sort by ${col.label}` : undefined}
                     >
-                      <span>{col.label}</span>
+                      <div className="flex items-center gap-1.5 pr-2">
+                        <span>{col.label}</span>
+                        {!isAction && (
+                          <ArrowUpDown className={`w-3 h-3 transition-opacity ${
+                            isSorted ? 'opacity-100 text-amber-400' : 'opacity-30 group-hover/th:opacity-75'
+                          }`} />
+                        )}
+                      </div>
                       <div
                         onMouseDown={(e) => handleResizeStart(col.key, e)}
+                        onClick={(e) => e.stopPropagation()}
                         className="absolute right-0 top-0 bottom-0 w-2 cursor-col-resize hover:bg-amber-500/40 group-hover/th:bg-slate-700/60 transition-colors z-30"
                         title="Drag to resize column"
                       />
@@ -462,7 +506,7 @@ export function InventoryView() {
                   </td>
                 </tr>
               )}
-              {items.map((item, i) => (
+              {sortedItems.map((item, i) => (
                 <tr
                   key={item.id}
                   className={`border-b border-slate-800/30 hover:bg-slate-800/20 transition-colors group ${i % 2 === 0 ? 'bg-transparent' : 'bg-slate-950/20'}`}

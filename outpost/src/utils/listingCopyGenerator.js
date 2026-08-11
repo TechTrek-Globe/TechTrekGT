@@ -51,68 +51,182 @@ export function generateEbayCopy(item, options = {}) {
     'Thank you for viewing TechTrek Outpost inventory!'
   ].filter(line => line !== null).join('\n');
 
-  const isSports = category.toLowerCase().includes('sport') || 
-                   category.toLowerCase().includes('card') || 
-                   category.toLowerCase().includes('memorabilia') || 
+  const isSports = category.toLowerCase().includes('sport') ||
+                   category.toLowerCase().includes('card') ||
+                   category.toLowerCase().includes('memorabilia') ||
                    athlete.trim().length > 0;
-  const bannerUrl = isSports 
-    ? 'https://raw.githubusercontent.com/TechTrek-Globe/TechTrekGT/main/outpost/public/ebay-banner-sports.png'
-    : 'https://raw.githubusercontent.com/TechTrek-Globe/TechTrekGT/main/outpost/public/ebay-banner-collectibles.jpg';
 
-  // Modern Responsive HTML Template for eBay Description Editor
-  const htmlBody = `
-<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 750px; margin: 0 auto; background: #0f172a; color: #f8fafc; border-radius: 16px; overflow: hidden; border: 1px solid #334155;">
-  <!-- Header Image Banner -->
-  <div style="width: 100%; overflow: hidden; border-bottom: 1px solid #334155;">
-    <img src="${bannerUrl}" alt="TechTrek Outpost Banner" style="width: 100%; display: block; height: auto; border: 0;" />
-  </div>
+  const inscription = item.inscription || '';
+  const authType = item.auth_type || authenticator;
+  const additionalDescription = item.additional_description || '';
 
-  <!-- Header Banner -->
-  <div style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 24px 28px; border-bottom: 2px solid #f59e0b;">
-    <span style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; color: #f59e0b;">TechTrek Outpost · Authentic Memorabilia</span>
-    <h1 style="font-size: 20px; font-weight: 900; color: #ffffff; margin: 6px 0 0 0; line-height: 1.3;">${item.item_name}</h1>
-  </div>
+  // eBay listing HTML template
+  const htmlBody = `<div style="font-family: Arial, Helvetica, sans-serif; color: #222222; max-width: 900px; margin: 0 auto; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border-radius: 8px; border: 1px solid #d8d8d8; background-color: #ffffff; overflow: hidden;">
 
-  <!-- Specs Grid -->
-  <div style="padding: 24px 28px;">
-    <div style="background: #1e293b; border-radius: 12px; padding: 18px; border: 1px solid #334155; margin-bottom: 20px;">
-      <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
-        ${athlete ? `<tr><td style="padding: 6px 0; color: #94a3b8; width: 35%;">Athlete / Subject:</td><td style="padding: 6px 0; color: #ffffff; font-weight: 700;">${athlete}</td></tr>` : ''}
-        <tr><td style="padding: 6px 0; color: #94a3b8;">Category:</td><td style="padding: 6px 0; color: #ffffff; font-weight: 700;">${category}</td></tr>
-        <tr><td style="padding: 6px 0; color: #94a3b8;">Authenticator / Grade:</td><td style="padding: 6px 0; color: #f59e0b; font-weight: 800;">${authenticator} ${certNumber ? `(#${certNumber})` : ''}</td></tr>
-        ${certUrl ? `<tr><td style="padding: 6px 0; color: #94a3b8;">Cert Verification:</td><td style="padding: 6px 0;"><a href="${certUrl}" target="_blank" style="color: #38bdf8; text-decoration: underline; font-weight: 700;">Verify Online ↗</a></td></tr>` : ''}
-        <tr><td style="padding: 6px 0; color: #94a3b8;">Condition:</td><td style="padding: 6px 0; color: #10b981; font-weight: 700;">${condition}</td></tr>
-      </table>
-    </div>
-
-    <!-- Description Details -->
-    <h3 style="font-size: 14px; font-weight: 800; text-transform: uppercase; color: #f59e0b; letter-spacing: 1px; margin: 20px 0 8px 0;">Authentication & Quality</h3>
-    <ul style="font-size: 13px; color: #cbd5e1; line-height: 1.7; padding-left: 20px; margin: 0 0 20px 0;">
-      <li>100% Guaranteed Authentic signed collectible piece.</li>
-      ${certNumber ? `<li>Tamper-evident certification registered with <strong>${authenticator}</strong>.</li>` : ''}
-      <li>Carefully inspected and stored in temperature-controlled, smoke-free conditions.</li>
-      <li>Actual item pictured in listing photos.</li>
-    </ul>
-
-    <!-- Shipping Section -->
-    <h3 style="font-size: 14px; font-weight: 800; text-transform: uppercase; color: #38bdf8; letter-spacing: 1px; margin: 20px 0 8px 0;">Fast & Secure Shipping</h3>
-    <p style="font-size: 13px; color: #cbd5e1; line-height: 1.6; margin: 0 0 20px 0;">
-      ${shippingPolicy} Every collectible is individually protected in reinforced packaging to prevent any transit damage.
-    </p>
-
-    <!-- Return Policy -->
-    <h3 style="font-size: 14px; font-weight: 800; text-transform: uppercase; color: #10b981; letter-spacing: 1px; margin: 20px 0 8px 0;">Peace of Mind Guarantee</h3>
-    <p style="font-size: 13px; color: #cbd5e1; line-height: 1.6; margin: 0;">
-      ${returnPolicy}
-    </p>
-  </div>
-
-  <!-- Footer -->
-  <div style="background: #090d16; padding: 14px 28px; text-align: center; border-top: 1px solid #1e293b; font-size: 11px; color: #64748b;">
-    TechTrek Outpost · Verified Sports Memorabilia & Collectibles
-  </div>
+<div style="background-color: #111111; padding: 4%; text-align: center;">
+<img src="https://raw.githubusercontent.com/TechTrek-Globe/TechTrekGT/main/outpost/public/ebay-banner-sports.png" alt="TechTrek Outpost - Authentic Signed Memorabilia" style="margin: 10px auto 28px auto; text-align: center; max-width: 100%; height: auto; display: block;">
+<h1 style="font-size: 28px; margin: 0; color: #ffffff; line-height: 1.25;">
+${title}
+</h1>
+<h2 style="font-size: 18px; margin: 10px 0 0 0; color: #b37a16; font-weight: bold;">
+${inscription ? `"${inscription}" Inscription | ` : ''}${authenticator} Authentication${certNumber ? ` | Cert #${certNumber}` : ''}
+</h2>
 </div>
-`.trim();
+
+<div style="margin: 22px 4%; padding: 16px; background-color: #f7f2e8; border: 1px solid #d6b56d; text-align: center; border-radius: 6px;">
+<div style="font-size: 20px; font-weight: bold; color: #111111;">
+Authenticated Memorabilia You Can Verify
+</div>
+<div style="font-size: 15px; margin-top: 8px; color: #333333;">
+This autograph has been authenticated by ${authenticator} and includes a ${authType} hologram.
+</div>
+</div>
+
+<div style="padding: 10px 4% 0 4%;">
+<h3 style="font-size: 20px; color: #111111; border-bottom: 2px solid #b37a16; padding-bottom: 6px;">
+Item Description
+</h3>
+
+<p style="font-size: 16px; line-height: 1.6;">
+Offered here is a <strong>${item.item_name}</strong> hand-signed by ${athlete}.${inscription ? ` The item includes ${athlete}'s <strong>"${inscription}" inscription</strong>.` : ''}
+</p>
+${additionalDescription ? `
+<p style="font-size: 16px; line-height: 1.6;">
+${additionalDescription}
+</p>` : ''}
+</div>
+
+<div style="margin: 22px 4%; padding: 18px; border: 2px solid #b37a16; background-color: #fffaf0; border-radius: 6px;">
+<h3 style="font-size: 22px; color: #111111; margin-top: 0; text-align: center;">
+Authentication Details
+</h3>
+
+<table style="width: 100%; border-collapse: collapse; font-size: 16px; text-align: left;">
+<tr>
+<th scope="row" style="padding: 8px; border-bottom: 1px solid #e5d3a4; width: 35%;">Authentication Company</th>
+<td style="padding: 8px; border-bottom: 1px solid #e5d3a4;">${authenticator}</td>
+</tr>
+<tr>
+<th scope="row" style="padding: 8px; border-bottom: 1px solid #e5d3a4;">Authentication Type</th>
+<td style="padding: 8px; border-bottom: 1px solid #e5d3a4;">${authType}</td>
+</tr>
+<tr>
+<th scope="row" style="padding: 8px; border-bottom: 1px solid #e5d3a4;">Certification Number</th>
+<td style="padding: 8px; border-bottom: 1px solid #e5d3a4;"><strong>${certNumber}</strong></td>
+</tr>
+<tr>
+<th scope="row" style="padding: 8px;">Verification</th>
+<td style="padding: 8px;">Verify directly through the official ${authenticator} authentication lookup using certification number <strong>${certNumber}</strong>.</td>
+</tr>
+</table>
+
+<div style="margin-top: 16px; padding: 14px; background-color: #ffffff; border: 1px solid #dddddd; text-align: center; border-radius: 4px;">
+<div style="font-size: 17px; font-weight: bold; color: #111111;">
+${authenticator} Certification Number: ${certNumber}
+</div>
+<div style="font-size: 14px; color: #555555; margin-top: 6px;">
+To verify, visit the official ${authenticator} website and enter the certification number above.
+</div>
+</div>
+</div>
+
+<div style="padding: 0 4%;">
+<h3 style="font-size: 20px; color: #111111; border-bottom: 2px solid #b37a16; padding-bottom: 6px;">
+Item Details
+</h3>
+
+<table style="width: 100%; border-collapse: collapse; font-size: 16px; margin-bottom: 20px; text-align: left;">
+<tr>
+<th scope="row" style="padding: 9px; border-bottom: 1px solid #eeeeee; width: 35%;">Player</th>
+<td style="padding: 9px; border-bottom: 1px solid #eeeeee;">${athlete}</td>
+</tr>
+<tr>
+<th scope="row" style="padding: 9px; border-bottom: 1px solid #eeeeee;">Item</th>
+<td style="padding: 9px; border-bottom: 1px solid #eeeeee;">${item.item_name}</td>
+</tr>
+<tr>
+<th scope="row" style="padding: 9px; border-bottom: 1px solid #eeeeee;">Autograph</th>
+<td style="padding: 9px; border-bottom: 1px solid #eeeeee;">Hand Signed</td>
+</tr>
+${inscription ? `<tr>
+<th scope="row" style="padding: 9px; border-bottom: 1px solid #eeeeee;">Inscription</th>
+<td style="padding: 9px; border-bottom: 1px solid #eeeeee;">"${inscription}"</td>
+</tr>` : ''}
+<tr>
+<th scope="row" style="padding: 9px; border-bottom: 1px solid #eeeeee;">Authentication</th>
+<td style="padding: 9px; border-bottom: 1px solid #eeeeee;">${authType}</td>
+</tr>
+<tr>
+<th scope="row" style="padding: 9px; border-bottom: 1px solid #eeeeee;">Certification Number</th>
+<td style="padding: 9px; border-bottom: 1px solid #eeeeee;">${certNumber}</td>
+</tr>
+<tr>
+<th scope="row" style="padding: 9px;">Condition</th>
+<td style="padding: 9px;">Please review all photos carefully. The item pictured is the exact item you will receive.</td>
+</tr>
+</table>
+</div>
+
+<div style="margin: 22px 4%; padding: 16px; background-color: #f7f7f7; border: 1px solid #dddddd; text-align: center; border-radius: 6px;">
+  <h3 style="font-size: 19px; color: #111111; margin-top: 0;">Explore More Inventory</h3>
+  <p style="font-size: 15px; line-height: 1.6; color: #333333; margin-bottom: 0;">
+    <a href="https://www.ebay.com/sch/i.html?_ssn=tt_globetrotter" target="_blank" style="color: #b37a16; text-decoration: none; font-weight: bold;">
+      Click here to visit the TechTrek Outpost eBay shop for more authenticated memorabilia.
+    </a>
+  </p>
+</div>
+
+<div style="margin: 22px 4%; padding: 18px; background-color: #111111; color: #ffffff; border-radius: 6px;">
+<h3 style="font-size: 22px; margin-top: 0; color: #f1c15b; text-align: center;">
+Why Buy From TechTrek Outpost?
+</h3>
+
+<p style="font-size: 16px; line-height: 1.6; text-align: center; color: #ffffff;">
+At TechTrek Outpost, we focus on authentic, collector-focused memorabilia with clear authentication details and careful packaging.
+</p>
+
+<table style="width: 100%; border-collapse: collapse; font-size: 15px; color: #ffffff; margin-top: 12px; text-align: left;">
+<tr>
+<td style="padding: 8px; width: 50%;">&#10003; Authenticated memorabilia only</td>
+<td style="padding: 8px; width: 50%;">&#10003; Third-party authentication details provided</td>
+</tr>
+<tr>
+<td style="padding: 8px;">&#10003; Exact item shown in photos</td>
+<td style="padding: 8px;">&#10003; Professionally packaged with care</td>
+</tr>
+<tr>
+<td style="padding: 8px;">&#10003; Clear certification information</td>
+<td style="padding: 8px;">&#10003; Collector-friendly buying experience</td>
+</tr>
+</table>
+</div>
+
+<div style="padding: 0 4% 10px 4%;">
+<h3 style="font-size: 20px; color: #111111; border-bottom: 2px solid #b37a16; padding-bottom: 6px;">
+Shipping &amp; Handling
+</h3>
+
+<p style="font-size: 16px; line-height: 1.6;">
+This collectible will be carefully packaged to help ensure it arrives safely and in the condition shown in the listing photos.
+</p>
+</div>
+
+<div style="margin: 22px 4%; padding: 16px; background-color: #fff4f4; border: 1px solid #d8a6a6; border-radius: 6px;">
+<h3 style="font-size: 19px; color: #111111; margin-top: 0;">
+Please Review Photos
+</h3>
+
+<p style="font-size: 15px; line-height: 1.6; margin-bottom: 0;">
+Please review all listing photos carefully for condition, autograph placement, inscription, and authentication details.
+The item shown in the photos is the exact item you will receive.
+</p>
+</div>
+
+<div style="background-color: #111111; color: #f1c15b; padding: 16px; text-align: center; font-size: 14px;">
+TechTrek Outpost | Authentic Memorabilia | Carefully Sourced | Securely Packaged
+</div>
+
+</div>`.trim();
 
   return { title, textBody, htmlBody };
 }

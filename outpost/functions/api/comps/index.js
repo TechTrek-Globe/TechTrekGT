@@ -1,5 +1,31 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
 
+/**
+ * Parses the "Image: <url>" fragment out of the notes column.
+ * AmazonItemModal stores notes as pipe-delimited: "Order ID: ... | ASIN: ... | Image: https://..."
+ */
+function parseImageFromNotes(notes) {
+  if (!notes) return null;
+  const match = String(notes).match(/\bImage:\s*(https?:\/\/[^\s|]+)/i);
+  return match ? match[1].trim() : null;
+}
+
+/**
+ * Parses a clean user-facing note by stripping the auto-injected Amazon meta tokens.
+ */
+function parseUserNote(notes) {
+  if (!notes) return null;
+  // Remove known auto-injected fragments
+  let cleaned = String(notes)
+    .replace(/Order ID:\s*[\d-]+\s*\|?\s*/gi, '')
+    .replace(/ASIN:\s*[A-Z0-9]{10}\s*\|?\s*/gi, '')
+    .replace(/Image:\s*https?:\/\/[^\s|]+\s*\|?\s*/gi, '')
+    .replace(/Imported from Amazon\s*/gi, '')
+    .replace(/^\s*\|\s*|\s*\|\s*$/g, '')
+    .trim();
+  return cleaned || null;
+}
+
 function computeManualAvg(comp1, comp2, comp3) {
   const vals = [comp1, comp2, comp3].filter(v => v !== null && v !== undefined && v !== '' && !isNaN(Number(v)) && Number(v) > 0).map(Number);
   if (vals.length === 0) return null;
@@ -107,6 +133,7 @@ export async function onRequestGet(context) {
         i.date_acquired,
         i.est_shipping_cost,
         i.platform_fee_pct,
+        i.notes,
         inv.invoice_ref
       FROM auction_items i
       LEFT JOIN auction_comps c ON i.id = c.item_id AND c.user_id = i.user_id
@@ -127,13 +154,16 @@ export async function onRequestGet(context) {
 
     const rows = await env.DB.prepare(query).bind(...bindings).all();
     const results = (rows.results || []).map(row => {
-      const cleanName = cleanEbaySearchQuery(row.item_name);
-      // Always compute clean search URL
+      const isAmazon = typeof row.invoice_ref === 'string' && row.invoice_ref.startsWith('AMAZON-');
+      const imageUrl = parseImageFromNotes(row.notes);
+      const userNote = parseUserNote(row.notes);
       const searchUrl = buildEbaySearchUrl(row.item_name, row.athlete_person, row.authenticator);
       return {
         ...row,
-        item_name: cleanName,
-        ebay_search_url: searchUrl
+        ebay_search_url: searchUrl,
+        image_url: imageUrl,
+        user_note: userNote,
+        is_amazon: isAmazon
       };
     });
 

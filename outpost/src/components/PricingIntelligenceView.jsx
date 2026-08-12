@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { getComps, saveComp, updateItem, fetchLiveComps } from '../utils/auctionApi';
 import { fmtCurrency, fmtPct } from '../utils/formulaPreview';
-import { getCertVerificationUrl } from '../utils/certLookup';
+import { getCertVerificationUrl, getAuthenticatorMeta } from '../utils/certLookup';
 import { ListingCopyModal } from './ListingCopyModal';
 import { cleanItemName, cleanAthleteName, cleanItemDescription } from '../utils/spreadsheetParser';
 
@@ -387,45 +387,106 @@ export function PricingIntelligenceView() {
                 className="glass-card rounded-2xl p-5 border border-slate-800/80 hover:border-amber-500/30 transition-all space-y-4"
               >
                 {/* Item Top Info Bar */}
-                <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-800/60 pb-3">
+                <div className="flex items-start gap-4 border-b border-slate-800/60 pb-4">
+
+                  {/* Product Thumbnail */}
+                  <div className="flex-shrink-0">
+                    {item.image_url ? (
+                      <div className="w-16 h-16 rounded-xl bg-white flex items-center justify-center overflow-hidden border border-slate-700/60 shadow-md">
+                        <img
+                          src={item.image_url}
+                          alt={item.item_name}
+                          className="w-full h-full object-contain p-1"
+                          onError={e => { e.target.style.display = 'none'; e.target.parentNode.classList.add('placeholder-icon'); }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-16 h-16 rounded-xl overflow-hidden border border-slate-700/40 flex-shrink-0">
+                        <img
+                          src="https://raw.githubusercontent.com/TechTrek-Globe/TechTrekGT/main/outpost/public/ebay-banner-sports.png"
+                          alt="Item"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Left: Title + meta */}
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
+                    {/* Badge row */}
+                    <div className="flex flex-wrap items-center gap-1.5 mb-1">
                       <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-500/10 text-amber-400 border border-amber-500/20">
                         {item.category || 'General'}
                       </span>
-                      {item.authenticator && (
-                        getCertVerificationUrl(item.authenticator, item.cert_number) ? (
-                          <a
-                            href={getCertVerificationUrl(item.authenticator, item.cert_number)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-500/10 text-blue-300 border border-blue-500/20 hover:bg-blue-500/20 hover:text-blue-200 transition-colors flex items-center gap-1"
-                            title={`Verify with ${item.authenticator} Database`}
-                          >
-                            <ShieldCheck className="w-3 h-3 text-blue-400" />
-                            {item.authenticator} {item.cert_number ? `#${item.cert_number}` : ''}
-                            <ExternalLink className="w-2.5 h-2.5 opacity-60 ml-0.5" />
-                          </a>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-500/10 text-blue-300 border border-blue-500/20 flex items-center gap-1">
-                            <ShieldCheck className="w-3 h-3 text-blue-400" />
-                            {item.authenticator} {item.cert_number ? `#${item.cert_number}` : ''}
-                          </span>
-                        )
-                      )}
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${item.status === 'Sold' ? 'bg-purple-500/10 text-purple-400' : item.status === 'Listed' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-800 text-slate-300'}`}>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${item.status === 'Sold' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' : item.status === 'Listed' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-slate-800 text-slate-300 border border-slate-700/40'}`}>
                         {item.status}
                       </span>
+                      {/* Auth badge - suppressed for Amazon items and blank/Other authenticators */}
+                      {!item.is_amazon && item.authenticator && item.authenticator.toLowerCase() !== 'other' && item.cert_number && (() => {
+                        const authMeta = getAuthenticatorMeta(item.authenticator);
+                        const certUrl = getCertVerificationUrl(item.authenticator, item.cert_number);
+                        const badgeContent = (
+                          <>
+                            <ShieldCheck className="w-3 h-3" />
+                            {item.authenticator} #{item.cert_number}
+                            {certUrl && <ExternalLink className="w-2.5 h-2.5 opacity-60 ml-0.5" />}
+                          </>
+                        );
+                        return certUrl ? (
+                          <a
+                            href={certUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`px-2 py-0.5 rounded text-[10px] font-semibold border flex items-center gap-1 hover:opacity-80 transition-opacity ${authMeta.badgeColor}`}
+                            title={`Verify with ${item.authenticator} Database`}
+                          >
+                            {badgeContent}
+                          </a>
+                        ) : (
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-semibold border flex items-center gap-1 ${authMeta.badgeColor}`}>
+                            {badgeContent}
+                          </span>
+                        );
+                      })()}
                     </div>
-                    <h3 className="text-base font-black text-slate-100 mt-1 truncate">{cleanItemDescription(item.item_name, item.athlete_person, item.authenticator)}</h3>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      {item.athlete_person ? <span>Player: <strong className="text-slate-300">{cleanAthleteName(item.athlete_person)}</strong> · </span> : ''}
-                      Invoice Ref: <span className="font-mono text-slate-300">{item.invoice_ref || 'N/A'}</span>
-                    </p>
+
+                    {/* Item title */}
+                    <h3 className="text-base font-black text-slate-100 leading-tight line-clamp-2">
+                      {item.is_amazon ? item.item_name : cleanItemDescription(item.item_name, item.athlete_person, item.authenticator)}
+                    </h3>
+
+                    {/* Metadata row */}
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1.5 text-[11px] text-slate-500">
+                      {item.athlete_person && (
+                        <span>
+                          Player: <strong className="text-slate-300 font-semibold">{cleanAthleteName(item.athlete_person)}</strong>
+                        </span>
+                      )}
+                      {item.sport_genre && (
+                        <span>Sport: <strong className="text-slate-400 font-medium">{item.sport_genre}</strong></span>
+                      )}
+                      {item.platform && (
+                        <span>Platform: <strong className="text-slate-400 font-medium">{item.platform}</strong></span>
+                      )}
+                      {item.date_acquired && (
+                        <span>Acquired: <strong className="text-slate-400 font-medium">{item.date_acquired}</strong></span>
+                      )}
+                      {item.invoice_ref && (
+                        <span className="font-mono text-slate-600 text-[10px]">{item.invoice_ref}</span>
+                      )}
+                    </div>
+
+                    {/* User note blurb */}
+                    {item.user_note && (
+                      <p className="mt-1.5 text-[11px] text-slate-500 italic line-clamp-1">
+                        {item.user_note}
+                      </p>
+                    )}
                   </div>
 
                   {/* Financial Safeguards */}
-                  <div className="flex items-center gap-4 bg-slate-900/60 rounded-xl px-3.5 py-2 border border-slate-800">
+                  <div className="flex items-center gap-4 bg-slate-900/60 rounded-xl px-3.5 py-2 border border-slate-800 flex-shrink-0">
+
                     {/* True Landed Cost */}
                     <div className="text-right relative group">
                       <p className="text-[10px] text-slate-500 cursor-help">True Landed Cost</p>

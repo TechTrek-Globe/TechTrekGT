@@ -81,8 +81,11 @@ ${authenticator} Authenticated${certNumber ? ` | Cert ${certNumber}` : ''}${insc
 Item Description
 </h3>
 <p style="margin: 0; color: #111111; font-size: 16px; line-height: 1.6;">
-Offered is the exact item shown in the listing photographs, hand-signed by ${athlete}.${additionalDescription ? ` ${additionalDescription}` : ''}
+Offered is the exact ${item.item_name} shown in the listing photographs, hand-signed by ${athlete}.
 </p>
+${additionalDescription ? `<p style="margin: 8px 0 0; color: #111111; font-size: 16px; line-height: 1.6;">
+${additionalDescription}
+</p>` : ''}
 </div>
 
 <div style="margin: 0 28px 22px; padding: 16px; background-color: #fffaf0; color: #111111; border: 2px solid #b37a16;">

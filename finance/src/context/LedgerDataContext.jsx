@@ -370,17 +370,27 @@ export function LedgerDataProvider({ children }) {
           // Check earner deposit match
           let matchedPerson = metadataState.people.find(p => p.name && descLower.includes(p.name.toLowerCase()));
           if (!matchedPerson && (descLower.includes('usaa') || descLower.includes('transfer') || descLower.includes('paycheck') || descLower.includes('payroll'))) {
-            // Check if amount matches earner deposit for this account
-            matchedPerson = metadataState.people.find(p => {
-              const dep = p.accountAllocations?.[accountId] || (p.grossPerPay ? p.grossPerPay / 2 : 0);
-              return Math.abs(dep - actualAmount) < 1;
-            }) || metadataState.people[0];
+            if (descLower.includes('hp') || descLower.includes('gym')) {
+              matchedPerson = metadataState.people.find(p => p.name.toLowerCase().includes('ronnie') || p.name.toLowerCase().includes('gym')) || metadataState.people[1] || metadataState.people[0];
+            } else {
+              matchedPerson = metadataState.people.find(p => p.name.toLowerCase() === 'jon') || metadataState.people[0];
+            }
           }
 
           if (matchedPerson) {
             const creditKey = `${accountId}_${monthKey}_${actualDay}_credit_${matchedPerson.id}`;
             const existingCredit = matrixUpdates[creditKey] || 0;
             matrixUpdates[creditKey] = Math.round((existingCredit + actualAmount) * 100) / 100;
+
+            // Zero out the scheduled payday in this half of the month so it isn't duplicated
+            const targetPayDay = actualDay <= 15 ? (matchedPerson.payDay1 || 15) : (matchedPerson.payDay2 === 'last' ? 31 : (matchedPerson.payDay2 || 30));
+            const numericPayDay = typeof targetPayDay === 'number' ? targetPayDay : parseInt(targetPayDay) || (actualDay <= 15 ? 15 : 30);
+            if (numericPayDay !== actualDay) {
+              const schedCreditKey = `${accountId}_${monthKey}_${numericPayDay}_credit_${matchedPerson.id}`;
+              if (matrixUpdates[schedCreditKey] === undefined) {
+                matrixUpdates[schedCreditKey] = 0;
+              }
+            }
           } else {
             // Unmatched credit -> credit other
             const otherKey = `${accountId}_${monthKey}_${actualDay}_other_amount`;
@@ -436,9 +446,14 @@ export function LedgerDataProvider({ children }) {
         }
       });
 
-      if (lineItemUpdates.length > 0) {
+      if (lineItemUpdates.length > 0 || strategies.transactions === 'override') {
         setLineItems(prev => {
-          const updated = [...prev];
+          let base = prev;
+          if (strategies.transactions === 'override' && data.targetAccountId) {
+            const accountBillIds = new Set(metadataState.bills.filter(b => b.accountId === data.targetAccountId).map(b => b.id));
+            base = prev.filter(li => !accountBillIds.has(li.billId));
+          }
+          const updated = [...base];
           lineItemUpdates.forEach(({ billId, monthKey, actualAmount }) => {
             const existingIdx = updated.findIndex(li => li.billId === billId && li.monthKey === monthKey);
             const entry = { billId, monthKey, actualAmount, updatedAt: Date.now() };
@@ -452,15 +467,24 @@ export function LedgerDataProvider({ children }) {
         });
       }
 
-      if (Object.keys(matrixUpdates).length > 0 || matrixNoteShifts.length > 0) {
+      if (Object.keys(matrixUpdates).length > 0 || matrixNoteShifts.length > 0 || strategies.transactions === 'override') {
         setDailyMatrix(prev => {
-          const next = { ...prev, ...matrixUpdates };
+          const next = {};
+          if (strategies.transactions === 'override' && data.targetAccountId) {
+            Object.entries(prev).forEach(([k, v]) => {
+              if (!k.startsWith(`${data.targetAccountId}_`)) {
+                next[k] = v;
+              }
+            });
+          } else {
+            Object.assign(next, prev);
+          }
+          Object.assign(next, matrixUpdates);
+
           matrixNoteShifts.forEach(({ projNoteKey, actualNoteKey }) => {
             const existingNote = prev[projNoteKey];
             if (existingNote) {
-              // Only migrate if the target row doesn't already have a user note
               if (!next[actualNoteKey]) next[actualNoteKey] = existingNote;
-              // Clear the note from the old projected-day coordinate
               next[projNoteKey] = '';
             }
           });

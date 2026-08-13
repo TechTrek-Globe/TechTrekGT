@@ -368,13 +368,15 @@ export function LedgerDataProvider({ children }) {
 
         if (isCredit) {
           // Check earner deposit match
-          let matchedPerson = metadataState.people.find(p => p.name && descLower.includes(p.name.toLowerCase()));
-          if (!matchedPerson && (descLower.includes('usaa') || descLower.includes('transfer') || descLower.includes('paycheck') || descLower.includes('payroll'))) {
-            if (descLower.includes('hp') || descLower.includes('gym')) {
-              matchedPerson = metadataState.people.find(p => p.name.toLowerCase().includes('ronnie') || p.name.toLowerCase().includes('gym')) || metadataState.people[1] || metadataState.people[0];
-            } else {
-              matchedPerson = metadataState.people.find(p => p.name.toLowerCase() === 'jon') || metadataState.people[0];
-            }
+          let matchedPerson = null;
+          if (descLower.includes('hp') || descLower.includes('gym')) {
+            matchedPerson = metadataState.people.find(p => p.name.toLowerCase().includes('gym'));
+          } else if (descLower.includes('jon') || descLower.includes('usaa') || descLower.includes('transfer')) {
+            matchedPerson = metadataState.people.find(p => p.name.toLowerCase() === 'jon') || metadataState.people[0];
+          } else if (descLower.includes('ronnie')) {
+            matchedPerson = metadataState.people.find(p => p.name.toLowerCase() === 'ronnie');
+          } else {
+            matchedPerson = metadataState.people.find(p => p.name && descLower.includes(p.name.toLowerCase()));
           }
 
           if (matchedPerson) {

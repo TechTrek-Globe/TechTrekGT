@@ -491,6 +491,7 @@ function DailySpreadsheetMatrix() {
         }
 
         // --- Rule B: Manual / Forward Projection Mode ---
+        const isPastDate = dateObj < new Date(todayObj.getFullYear(), todayObj.getMonth(), todayObj.getDate());
 
         // 1. Credits (Deposits)
         const personCredits = {};
@@ -502,9 +503,11 @@ function DailySpreadsheetMatrix() {
 
           if (customCredit !== undefined) {
             personCredits[p.id] = parseFloat(customCredit) || 0;
-          } else {
+          } else if (!isPastDate) {
             const isDepDay = isPersonDepositDay(p, year, month, day);
             personCredits[p.id] = isDepDay ? getPersonDepositAmountForAccount(p, selectedAccountId) : 0;
+          } else {
+            personCredits[p.id] = 0;
           }
 
           personExtraCredits[p.id] = customExtraCredit !== undefined ? (parseFloat(customExtraCredit) || 0) : 0;
@@ -522,24 +525,22 @@ function DailySpreadsheetMatrix() {
           let amt = 0;
 
           if (customBillVal !== undefined) {
-            // Tier 1: manual dailyMatrix override (drag-drop or inline edit) wins outright
+            // Tier 1: manual dailyMatrix override (drag-drop, inline edit, or actual transaction) wins outright
             amt = parseFloat(customBillVal) || 0;
-          } else {
+          } else if (!isPastDate) {
             // Tier 2: month-scoped actual amount from import reconciliation
             const actualAmt = getActualAmount(b.id, monthKey);
             if (actualAmt !== null && parseInt(b.dueDay) === day && isBillDueInMonth(b, month, true)) {
-              // Actual amount recorded for this month - use it on the projected due day.
-              // If the payment day also shifted, the matrixUpdates from reconciliation will have
-              // zeroed this cell and written the real day via getDailyMatrixCell (Tier 1 above).
               amt = actualAmt;
             } else if (actualAmt !== null) {
-              // An actual exists but the date shifted - this day's amount is either 0 (projected
-              // day was zeroed by matrixUpdate) or the real amount (actual day, handled by Tier 1).
               amt = 0;
             } else if (parseInt(b.dueDay) === day && isBillDueInMonth(b, month, true)) {
-              // Tier 3: standard projection - no actual recorded, use scheduled bill amount
+              // Tier 3: standard projection for future scheduled bills
               amt = parseFloat(b.amount) || 0;
             }
+          } else {
+            // On past dates with no recorded transaction, do not add phantom scheduled bills
+            amt = 0;
           }
 
           billValues[b.id] = amt;

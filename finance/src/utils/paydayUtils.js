@@ -129,29 +129,18 @@ export function getPersonDepositAmountForAccount(person, selectedAccountId = 'al
 
   const allocations = person.accountAllocations;
   if (allocations && typeof allocations === 'object' && Object.keys(allocations).length > 0) {
-    let fixedSum = 0;
-    let hasAllocations = false;
-    let remainingAccountsCount = 0;
-
-    Object.entries(allocations).forEach(([accId, val]) => {
-      if (val === 'remaining') {
-        remainingAccountsCount++;
-        hasAllocations = true;
-      } else {
-        const amt = parseFloat(val);
-        if (!isNaN(amt) && amt > 0) {
-          fixedSum += amt;
-          hasAllocations = true;
-        }
-      }
-    });
-
-    if (!hasAllocations) {
-      return netPay;
-    }
-
     const targetVal = allocations[selectedAccountId];
     if (targetVal === 'remaining') {
+      let fixedSum = 0;
+      let remainingAccountsCount = 0;
+      Object.entries(allocations).forEach(([accId, val]) => {
+        if (val === 'remaining') {
+          remainingAccountsCount++;
+        } else {
+          const amt = parseFloat(val);
+          if (!isNaN(amt) && amt > 0) fixedSum += amt;
+        }
+      });
       const remainingTotal = Math.max(0, netPay - fixedSum);
       return remainingAccountsCount > 0 ? remainingTotal / remainingAccountsCount : remainingTotal;
     }
@@ -164,7 +153,12 @@ export function getPersonDepositAmountForAccount(person, selectedAccountId = 'al
     return 0;
   }
 
-  return netPay;
+  // If no explicit accountAllocations exist, only primary earners deposit full netPay into the primary checking account; other accounts get 0 unless allocated.
+  if (person.role === 'Primary' || person.isPrimary) {
+    return netPay;
+  }
+
+  return 0;
 }
 
 /**

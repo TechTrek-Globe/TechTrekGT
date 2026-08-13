@@ -409,7 +409,36 @@ function DailySpreadsheetMatrix() {
       ? budget.accounts.reduce((sum, a) => sum + (parseFloat(a.extraStartingBalance) || 0), 0)
       : (parseFloat(selectedAccount?.extraStartingBalance) || 0);
 
-    let isFirstRow = true;
+    // If monthList starts after startDateObj, accumulate all transactions between startDateObj and monthList[0]
+    if (monthList.length > 0) {
+      const firstMonthStart = new Date(monthList[0].year, monthList[0].month, 1);
+      if (firstMonthStart > startDateObj) {
+        let cur = new Date(startDateObj);
+        while (cur < firstMonthStart) {
+          const y = cur.getFullYear();
+          const m = cur.getMonth();
+          const d = cur.getDate();
+          const mKey = `${y}-${String(m + 1).padStart(2, '0')}`;
+
+          people.forEach(p => {
+            const customCredit = getDailyMatrixCell(selectedAccountId, mKey, d, `credit_${p.id}`);
+            if (customCredit !== undefined) runningRegBeg += parseFloat(customCredit) || 0;
+            const customExtra = getDailyMatrixCell(selectedAccountId, mKey, d, `extra_credit_${p.id}`);
+            if (customExtra !== undefined) runningExtraBeg += parseFloat(customExtra) || 0;
+          });
+
+          accountBills.forEach(b => {
+            const customBill = getDailyMatrixCell(selectedAccountId, mKey, d, `bill_${b.id}`);
+            if (customBill !== undefined) runningRegBeg -= parseFloat(customBill) || 0;
+          });
+
+          const customOther = getDailyMatrixCell(selectedAccountId, mKey, d, 'other_amount');
+          if (customOther !== undefined) runningRegBeg -= parseFloat(customOther) || 0;
+
+          cur.setDate(cur.getDate() + 1);
+        }
+      }
+    }
 
     monthList.forEach(mItem => {
       const { year, month, monthKey, daysInMonth } = mItem;
@@ -420,17 +449,6 @@ function DailySpreadsheetMatrix() {
         // Filter out dates before startDateObj - nothing before start date
         if (dateObj < startDateObj) {
           continue;
-        }
-
-        if (isFirstRow) {
-          isFirstRow = false;
-          // Re-initialize starting balance for first active date row
-          runningRegBeg = selectedAccountId === 'all'
-            ? budget.accounts.reduce((sum, a) => sum + (parseFloat(a.startingBalance) || 0), 0)
-            : (parseFloat(selectedAccount?.startingBalance) || 0);
-          runningExtraBeg = selectedAccountId === 'all'
-            ? budget.accounts.reduce((sum, a) => sum + (parseFloat(a.extraStartingBalance) || 0), 0)
-            : (parseFloat(selectedAccount?.extraStartingBalance) || 0);
         }
 
         const dayOfWeekName = DAYS_OF_WEEK[dateObj.getDay()];

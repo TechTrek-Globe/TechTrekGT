@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   Upload, FileSpreadsheet, CheckCircle2, AlertTriangle,
   ChevronDown, ChevronRight, ArrowRight, RotateCcw,

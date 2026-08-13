@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { useBudget } from '../context/BudgetContext';
-import { Wallet, Calendar, AlertCircle, ArrowDownRight, ArrowUpRight, Filter } from 'lucide-react';
+import { Wallet, Calendar, AlertCircle, ArrowDownRight, ArrowUpRight, Filter, Upload } from 'lucide-react';
 import { fmtMoney } from '../utils/formatters';
 import { isBillDueInMonth } from '../utils/paydayUtils';
+import { SpreadsheetImporter } from './SpreadsheetImporter';
 
 export function AccountLedgerView() {
   const { budget, getBillMonthlyCost, isPersonDepositDay, getPersonDepositAmountForAccount } = useBudget();
   const [selectedAccountId, setSelectedAccountId] = useState(budget.accounts[0]?.id || 'all');
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
   const selectedAccount = budget.accounts.find(a => a.id === selectedAccountId);
 
@@ -100,22 +102,48 @@ export function AccountLedgerView() {
           </p>
         </div>
 
-        {/* Account Selector Filter */}
-        <div className="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800">
-          <Filter className="w-4 h-4 text-slate-400" />
-          <label className="text-xs text-slate-400">Account:</label>
-          <select
-            value={selectedAccountId}
-            onChange={e => setSelectedAccountId(e.target.value)}
-            className="bg-transparent text-xs font-semibold text-slate-200 focus:outline-none"
+        {/* Account Selector Filter and Import Button */}
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setIsImportModalOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-600/30 transition-all cursor-pointer active:scale-95 shrink-0"
+            title={selectedAccountId !== 'all' && selectedAccount ? `Import CSV or Spreadsheet directly into ${selectedAccount.name}` : 'Import CSV or Spreadsheet'}
           >
-            <option value="all">All Linked Accounts (Combined)</option>
-            {budget.accounts.map(acc => (
-              <option key={acc.id} value={acc.id}>{acc.name}</option>
-            ))}
-          </select>
+            <Upload className="w-3.5 h-3.5 text-indigo-200" />
+            <span>Import CSV/Spreadsheet</span>
+          </button>
+
+          <div className="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800">
+            <Filter className="w-4 h-4 text-slate-400" />
+            <label className="text-xs text-slate-400">Account:</label>
+            <select
+              value={selectedAccountId}
+              onChange={e => setSelectedAccountId(e.target.value)}
+              className="bg-transparent text-xs font-semibold text-slate-200 focus:outline-none cursor-pointer"
+            >
+              <option value="all">All Linked Accounts (Combined)</option>
+              {budget.accounts.map(acc => (
+                <option key={acc.id} value={acc.id}>{acc.name}</option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
+
+      {/* Account-Bound Spreadsheet Importer Modal */}
+      {isImportModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-4xl p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto my-auto">
+            <SpreadsheetImporter
+              targetAccountId={selectedAccountId !== 'all' ? selectedAccountId : null}
+              targetAccountName={selectedAccountId !== 'all' ? selectedAccount?.name : null}
+              isModal={true}
+              onClose={() => setIsImportModalOpen(false)}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Ledger Table */}
       <div className="overflow-x-auto matrix-scrollbar rounded-2xl border border-slate-800 glass-panel">

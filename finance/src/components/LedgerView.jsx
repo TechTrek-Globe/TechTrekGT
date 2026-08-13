@@ -837,17 +837,15 @@ function DailySpreadsheetMatrix() {
           </button>
 
           {/* Account-Bound Import Button */}
-          {selectedAccountId !== 'all' && (
-            <button
-              type="button"
-              onClick={() => setIsImportModalOpen(true)}
-              className="flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 border border-indigo-500/50 hover:border-indigo-400 font-bold text-[11px] shadow-sm transition-all cursor-pointer active:scale-95"
-              title={`Import CSV or Spreadsheet into ${selectedAccount?.name || 'this account'}`}
-            >
-              <Upload className="w-3 h-3 text-indigo-400" />
-              <span>Import CSV/Spreadsheet</span>
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => setIsImportModalOpen(true)}
+            className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[11px] shadow-sm shadow-indigo-600/30 transition-all cursor-pointer active:scale-95 flex-shrink-0"
+            title={selectedAccountId !== 'all' && selectedAccount ? `Import CSV or Spreadsheet directly into ${selectedAccount.name}` : 'Import CSV or Spreadsheet'}
+          >
+            <Upload className="w-3 h-3 text-indigo-200" />
+            <span>Import CSV/Spreadsheet</span>
+          </button>
 
           {/* Archived Bills Drawer Toggle */}
           {archivedBills.length > 0 && (

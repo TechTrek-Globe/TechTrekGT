@@ -310,6 +310,7 @@ export function LedgerDataProvider({ children }) {
     if (namespaces.transactions && Array.isArray(data.transactions)) {
       const lineItemUpdates = [];
       const matrixUpdates = {};
+      const matrixNoteShifts = [];
 
       data.transactions.forEach(txn => {
         // Resolve billId - parser stamps it when a column header fuzzy-matches a bill.
@@ -345,6 +346,12 @@ export function LedgerDataProvider({ children }) {
           const actualKey = `${accountId}_${monthKey}_${actualDay}_bill_${resolvedBillId}`;
           matrixUpdates[projKey] = 0;
           matrixUpdates[actualKey] = actualAmount;
+
+          // Migrate the user note (other_desc) from the projected day to the actual payment day.
+          // Notes are keyed by row coordinate; without this shift they become orphaned.
+          const projNoteKey = `${accountId}_${monthKey}_${bill.dueDay}_other_desc`;
+          const actualNoteKey = `${accountId}_${monthKey}_${actualDay}_other_desc`;
+          matrixNoteShifts.push({ projNoteKey, actualNoteKey });
         }
       });
 
@@ -364,8 +371,20 @@ export function LedgerDataProvider({ children }) {
         });
       }
 
-      if (Object.keys(matrixUpdates).length > 0) {
-        setDailyMatrix(prev => ({ ...prev, ...matrixUpdates }));
+      if (Object.keys(matrixUpdates).length > 0 || matrixNoteShifts.length > 0) {
+        setDailyMatrix(prev => {
+          const next = { ...prev, ...matrixUpdates };
+          matrixNoteShifts.forEach(({ projNoteKey, actualNoteKey }) => {
+            const existingNote = prev[projNoteKey];
+            if (existingNote) {
+              // Only migrate if the target row doesn't already have a user note
+              if (!next[actualNoteKey]) next[actualNoteKey] = existingNote;
+              // Clear the note from the old projected-day coordinate
+              next[projNoteKey] = '';
+            }
+          });
+          return next;
+        });
       }
     }
 

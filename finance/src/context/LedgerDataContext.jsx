@@ -246,14 +246,28 @@ export function LedgerDataProvider({ children }) {
 
           data.accounts.forEach(incomingAcc => {
             const normName = incomingAcc.name.toLowerCase().trim();
-            const match = existingAccounts.find(a =>
+            const matchIdx = existingAccounts.findIndex(a =>
               a.name.toLowerCase().trim() === normName ||
               a.name.toLowerCase().includes(normName) ||
               normName.includes(a.name.toLowerCase().trim())
             );
 
-            if (match) {
+            if (matchIdx >= 0) {
+              const match = existingAccounts[matchIdx];
               accountIdMap.set(incomingAcc.id, match.id);
+              // Bug 1 fix: propagate imported ledger metadata onto the matched account
+              const patches = {};
+              if (typeof incomingAcc.startingBalance === 'number' && incomingAcc.startingBalance !== 0) {
+                patches.startingBalance = incomingAcc.startingBalance;
+              }
+              if (incomingAcc.balanceAsOfDate) patches.balanceAsOfDate = incomingAcc.balanceAsOfDate;
+              if (incomingAcc.importedLedgerRows && Object.keys(incomingAcc.importedLedgerRows).length > 0) {
+                patches.importedLedgerRows = incomingAcc.importedLedgerRows;
+                patches.ledgerMode = 'import';
+              }
+              if (Object.keys(patches).length > 0) {
+                existingAccounts[matchIdx] = { ...match, ...patches };
+              }
             } else {
               newAccountsToAdd.push(incomingAcc);
               accountIdMap.set(incomingAcc.id, incomingAcc.id);
@@ -287,6 +301,71 @@ export function LedgerDataProvider({ children }) {
           const existingKeys = new Set(prev.map(key));
           return [...prev, ...data.transactions.filter(t => !existingKeys.has(key(t)))];
         });
+      }
+    }
+
+    // Bug 2 fix (Option B): reconcile imported actual transactions against projected bills.
+    // Uses month-scoped lineItem overrides for amount and dailyMatrix cell moves for date
+    // shifts - non-destructive to future projections (bill definition is never altered).
+    if (namespaces.transactions && Array.isArray(data.transactions)) {
+      const lineItemUpdates = [];
+      const matrixUpdates = {};
+
+      data.transactions.forEach(txn => {
+        // Resolve billId - parser stamps it when a column header fuzzy-matches a bill.
+        // If the parser couldn't match (e.g. abbreviated column name), do a secondary
+        // name-based lookup here against the live bill registry.
+        let resolvedBillId = txn.billId;
+        if (!resolvedBillId && txn.description) {
+          const descLower = txn.description.toLowerCase();
+          const matched = metadataState.bills.find(b => {
+            const bName = b.name.toLowerCase();
+            return descLower.includes(bName) || bName.includes(descLower);
+          });
+          if (matched) resolvedBillId = matched.id;
+        }
+        if (!resolvedBillId || !txn.date || txn.amount === undefined) return;
+        const parts = txn.date.split('-');
+        if (parts.length !== 3) return;
+        const actualDay = parseInt(parts[2], 10);
+        const actualAmount = Math.abs(parseFloat(txn.amount) || 0);
+        if (!actualAmount || isNaN(actualDay)) return;
+
+        const monthKey = `${parts[0]}-${parts[1]}`;
+
+        // Amount override: upsert a month-scoped lineItem so only this month reflects the actual
+        lineItemUpdates.push({ billId: resolvedBillId, monthKey, actualAmount });
+
+        // Date shift: if the actual payment day differs from the projected dueDay,
+        // zero out the projected cell and write the actual amount on the real date.
+        const bill = metadataState.bills.find(b => b.id === resolvedBillId);
+        const accountId = txn.accountId || (bill ? bill.accountId : null);
+        if (bill && accountId && bill.dueDay !== actualDay) {
+          const projKey = `${accountId}_${monthKey}_${bill.dueDay}_bill_${resolvedBillId}`;
+          const actualKey = `${accountId}_${monthKey}_${actualDay}_bill_${resolvedBillId}`;
+          matrixUpdates[projKey] = 0;
+          matrixUpdates[actualKey] = actualAmount;
+        }
+      });
+
+      if (lineItemUpdates.length > 0) {
+        setLineItems(prev => {
+          const updated = [...prev];
+          lineItemUpdates.forEach(({ billId, monthKey, actualAmount }) => {
+            const existingIdx = updated.findIndex(li => li.billId === billId && li.monthKey === monthKey);
+            const entry = { billId, monthKey, actualAmount, updatedAt: Date.now() };
+            if (existingIdx >= 0) {
+              updated[existingIdx] = { ...updated[existingIdx], ...entry };
+            } else {
+              updated.push(entry);
+            }
+          });
+          return updated;
+        });
+      }
+
+      if (Object.keys(matrixUpdates).length > 0) {
+        setDailyMatrix(prev => ({ ...prev, ...matrixUpdates }));
       }
     }
 

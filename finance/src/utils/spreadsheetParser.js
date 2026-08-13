@@ -42,7 +42,7 @@ const RESERVED_COLS = new Set([
 /**
  * Parse an Excel file ArrayBuffer or string into clean budget state
  */
-export function parseSpreadsheet(fileData, fileName = '') {
+export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
   try {
     const workbook = typeof fileData === 'string'
       ? XLSX.read(fileData, { type: 'string', cellFormulas: true })
@@ -334,7 +334,28 @@ export function parseSpreadsheet(fileData, fileName = '') {
                     (lowerH.includes('youtube') && bName.includes('youtube'));
                 });
 
-                if (matchedBill) billId = matchedBill.id;
+                if (matchedBill) {
+                  billId = matchedBill.id;
+                } else {
+                  // Secondary match: cross-reference existing app bills (handles month-only ledger sheets
+                  // where billsList is empty because no budget sheet was included in the import)
+                  const existingMatch = existingBills.find(b => {
+                    const bName = b.name.toLowerCase();
+                    return bName.includes(lowerH) || lowerH.includes(bName) ||
+                      (lowerH.includes('water') && bName.includes('water')) ||
+                      (lowerH.includes('power') && bName.includes('power')) ||
+                      (lowerH.includes('gas') && bName.includes('gas')) ||
+                      (lowerH.includes('electric') && bName.includes('electric')) ||
+                      (lowerH.includes('cell') && bName.includes('cell')) ||
+                      (lowerH.includes('gym') && bName.includes('gym')) ||
+                      (lowerH.includes('insurance') && bName.includes('insurance')) ||
+                      (lowerH.includes('hoa') && bName.includes('hoa')) ||
+                      (lowerH.includes('mortgage') && bName.includes('mortgage')) ||
+                      (lowerH.includes('comcast') && bName.includes('comcast')) ||
+                      (lowerH.includes('youtube') && bName.includes('youtube'));
+                  });
+                  if (existingMatch) billId = existingMatch.id;
+                }
 
                 const isCredit = lowerH.includes('credit') || lowerH.includes('deposit') || lowerH.includes('income');
                 const txnAmount = isCredit ? Math.abs(num) : -Math.abs(num);

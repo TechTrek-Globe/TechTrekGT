@@ -235,6 +235,7 @@ function DailySpreadsheetMatrix() {
     archiveBill,
     unarchiveBill,
     updateAccount,
+    getActualAmount,
     isPersonDepositDay,
     getPersonDepositAmountForAccount
   } = useBudget();
@@ -501,9 +502,24 @@ function DailySpreadsheetMatrix() {
           let amt = 0;
 
           if (customBillVal !== undefined) {
+            // Tier 1: manual dailyMatrix override (drag-drop or inline edit) wins outright
             amt = parseFloat(customBillVal) || 0;
-          } else if (parseInt(b.dueDay) === day && isBillDueInMonth(b, month, true)) {
-            amt = parseFloat(b.amount) || 0;
+          } else {
+            // Tier 2: month-scoped actual amount from import reconciliation
+            const actualAmt = getActualAmount(b.id, monthKey);
+            if (actualAmt !== null && parseInt(b.dueDay) === day && isBillDueInMonth(b, month, true)) {
+              // Actual amount recorded for this month - use it on the projected due day.
+              // If the payment day also shifted, the matrixUpdates from reconciliation will have
+              // zeroed this cell and written the real day via getDailyMatrixCell (Tier 1 above).
+              amt = actualAmt;
+            } else if (actualAmt !== null) {
+              // An actual exists but the date shifted - this day's amount is either 0 (projected
+              // day was zeroed by matrixUpdate) or the real amount (actual day, handled by Tier 1).
+              amt = 0;
+            } else if (parseInt(b.dueDay) === day && isBillDueInMonth(b, month, true)) {
+              // Tier 3: standard projection - no actual recorded, use scheduled bill amount
+              amt = parseFloat(b.amount) || 0;
+            }
           }
 
           billValues[b.id] = amt;

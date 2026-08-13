@@ -171,7 +171,7 @@ export function SpreadsheetImporter() {
 
       if (detectedType === 'emory_parc') {
         // Use existing rich parser - no column mapping needed
-        const result = parseSpreadsheet(arrayBuffer, file.name);
+        const result = parseSpreadsheet(arrayBuffer, file.name, budget.bills || []);
         if (!result.success) throw new Error(result.error);
 
         const payload = {

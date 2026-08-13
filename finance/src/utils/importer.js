@@ -10,12 +10,13 @@ import * as XLSX from 'xlsx';
 // --- Internal Field Definitions ---
 
 export const INTERNAL_TRANSACTION_FIELDS = [
-  { key: 'date',        label: 'Date',        required: true  },
-  { key: 'description', label: 'Description', required: true  },
-  { key: 'amount',      label: 'Amount',      required: true  },
-  { key: 'accountId',  label: 'Account',     required: false },
-  { key: 'category',   label: 'Category',    required: false },
-  { key: 'notes',      label: 'Notes',       required: false },
+  { key: 'date',        label: 'Date',            required: true  },
+  { key: 'description', label: 'Description',     required: true  },
+  { key: 'amount',      label: 'Amount ($)',      required: true  },
+  { key: 'balance',     label: 'Running Balance', required: false },
+  { key: 'accountId',   label: 'Account',         required: false },
+  { key: 'category',    label: 'Category',        required: false },
+  { key: 'notes',       label: 'Notes',           required: false },
 ];
 
 export const INTERNAL_BILL_FIELDS = [
@@ -30,9 +31,10 @@ export const INTERNAL_BILL_FIELDS = [
 
 // Synonym map for fuzzy column auto-match
 const TRANSACTION_SYNONYMS = {
-  date:        ['date', 'post date', 'posting date', 'transaction date', 'trans date', 'settled', 'value date'],
-  description: ['description', 'desc', 'memo', 'payee', 'merchant', 'name', 'details', 'narrative'],
-  amount:      ['amount', 'amt', 'debit', 'credit', 'charge', 'payment', 'withdrawal', 'deposit', 'value'],
+  date:        ['date', 'post date', 'posting date', 'transaction date', 'trans date', 'settled', 'value date', 'trans_date'],
+  description: ['description', 'desc', 'memo', 'payee', 'merchant', 'name', 'details', 'narrative', 'transaction description'],
+  amount:      ['amount', 'amt', 'debit', 'credit', 'charge', 'payment', 'withdrawal', 'deposit', 'value', 'transaction amount'],
+  balance:     ['balance', 'running balance', 'ending balance', 'total balance', 'current balance', 'bal', 'running bal', 'account balance'],
   accountId:   ['account', 'account name', 'bank account', 'account number', 'acct'],
   category:    ['category', 'cat', 'type', 'transaction type', 'trans type'],
   notes:       ['notes', 'note', 'comment', 'reference', 'ref', 'remarks'],
@@ -47,6 +49,29 @@ const BILL_SYNONYMS = {
   paymentSource: ['payment source', 'source', 'method', 'pay method', 'paid by'],
   notes:         ['notes', 'note', 'comment', 'remarks'],
 };
+
+// Date normalization helper
+export function normalizeIsoDate(rawDate) {
+  if (!rawDate) return null;
+  const str = String(rawDate).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(str)) {
+    const [m, d, y] = str.split('/');
+    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+  if (/^\d{4}\/\d{1,2}\/\d{1,2}$/.test(str)) {
+    const [y, m, d] = str.split('/');
+    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+  const parsed = new Date(str);
+  if (!isNaN(parsed.getTime())) {
+    const y = parsed.getFullYear();
+    const m = String(parsed.getMonth() + 1).padStart(2, '0');
+    const d = String(parsed.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  return str;
+}
 
 // --- File Type Detection ---
 
@@ -147,11 +172,15 @@ export function autoMatchColumns(headers, schema = 'transactions') {
  * Applies a column map to produce normalized transaction records.
  * @param {Record<string, string>[]} rows
  * @param {Record<string, string>} columnMap - { detectedHeader -> internalFieldKey }
- * @returns {{ records: object[], skipped: number }}
+ * @param {string} defaultAccountId - Optional accountId to assign to all rows
+ * @returns {{ records: object[], skipped: number, importedLedgerRows: Record<string, number>, earliestDate: string|null, startingBalance: number|null }}
  */
-export function applyTransactionMapping(rows, columnMap) {
+export function applyTransactionMapping(rows, columnMap, defaultAccountId = '') {
   const records = [];
+  const importedLedgerRows = {};
   let skipped = 0;
+  let earliestDate = null;
+  let startingBalance = null;
 
   rows.forEach((row, idx) => {
     const mapped = {};
@@ -161,21 +190,37 @@ export function applyTransactionMapping(rows, columnMap) {
       }
     });
 
-    const amount = parseFloat(String(mapped.amount || '').replace(/[^0-9.-]+/g, ''));
-    if (!mapped.date || isNaN(amount)) { skipped++; return; }
+    const rawAmt = String(mapped.amount || '').replace(/[^0-9.-]+/g, '');
+    const amount = parseFloat(rawAmt);
+    const isoDate = normalizeIsoDate(mapped.date);
+
+    if (!isoDate || isNaN(amount)) { skipped++; return; }
+
+    const rawBal = mapped.balance !== undefined && mapped.balance !== '' ? String(mapped.balance).replace(/[^0-9.-]+/g, '') : null;
+    const balance = rawBal !== null ? parseFloat(rawBal) : undefined;
+
+    if (balance !== undefined && !isNaN(balance)) {
+      importedLedgerRows[isoDate] = balance;
+      if (earliestDate === null || isoDate < earliestDate) {
+        earliestDate = isoDate;
+        startingBalance = balance;
+      }
+    }
 
     records.push({
       id: `txn-${Date.now()}-${idx}`,
-      date: mapped.date,
+      date: isoDate,
       description: mapped.description || '',
       amount,
+      balance: balance !== undefined && !isNaN(balance) ? balance : undefined,
+      accountId: mapped.accountId || defaultAccountId,
       category: mapped.category || '',
       notes: mapped.notes || '',
       importedAt: Date.now(),
     });
   });
 
-  return { records, skipped };
+  return { records, skipped, importedLedgerRows, earliestDate, startingBalance };
 }
 
 /**

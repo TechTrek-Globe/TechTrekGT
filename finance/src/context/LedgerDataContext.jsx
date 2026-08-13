@@ -255,7 +255,7 @@ export function LedgerDataProvider({ children }) {
             if (matchIdx >= 0) {
               const match = existingAccounts[matchIdx];
               accountIdMap.set(incomingAcc.id, match.id);
-              // Bug 1 fix: propagate imported ledger metadata onto the matched account
+              // Propagate imported ledger metadata onto the matched account
               const patches = {};
               if (typeof incomingAcc.startingBalance === 'number' && incomingAcc.startingBalance !== 0) {
                 patches.startingBalance = incomingAcc.startingBalance;
@@ -279,6 +279,33 @@ export function LedgerDataProvider({ children }) {
       }
     }
 
+    // Direct Target Account Metadata Binding (for account-bound CSV/spreadsheet imports)
+    if (data.targetAccountId) {
+      setMetadataState(prev => ({
+        ...prev,
+        accounts: (prev.accounts || []).map(acc => {
+          if (acc.id === data.targetAccountId) {
+            const patches = {};
+            if (typeof data.startingBalance === 'number' && data.startingBalance !== 0) {
+              patches.startingBalance = data.startingBalance;
+            }
+            if (data.balanceAsOfDate) {
+              patches.balanceAsOfDate = data.balanceAsOfDate;
+            }
+            if (data.importedLedgerRows && Object.keys(data.importedLedgerRows).length > 0) {
+              patches.importedLedgerRows = { ...(acc.importedLedgerRows || {}), ...data.importedLedgerRows };
+              patches.ledgerMode = 'import';
+            }
+            if (data.targetAccount && typeof data.targetAccount === 'object') {
+              Object.assign(patches, data.targetAccount);
+            }
+            return Object.keys(patches).length > 0 ? { ...acc, ...patches } : acc;
+          }
+          return acc;
+        })
+      }));
+    }
+
     // 3. Process Bills
     if (namespaces.bills && Array.isArray(data.bills)) {
       setMetadataState(prev => {
@@ -293,13 +320,18 @@ export function LedgerDataProvider({ children }) {
 
     // 4. Process Transactions
     if (namespaces.transactions && Array.isArray(data.transactions)) {
+      const stampedTransactions = data.transactions.map(t => ({
+        ...t,
+        accountId: t.accountId || data.targetAccountId || ''
+      }));
+
       if (strategies.transactions === 'override') {
-        setTransactions(data.transactions);
+        setTransactions(stampedTransactions);
       } else {
         setTransactions(prev => {
-          const key = t => `${t.date}|${(t.description || '').toLowerCase()}|${t.amount}`;
+          const key = t => `${t.accountId || ''}|${t.date}|${(t.description || '').toLowerCase()}|${t.amount}`;
           const existingKeys = new Set(prev.map(key));
-          return [...prev, ...data.transactions.filter(t => !existingKeys.has(key(t)))];
+          return [...prev, ...stampedTransactions.filter(t => !existingKeys.has(key(t)))];
         });
       }
     }

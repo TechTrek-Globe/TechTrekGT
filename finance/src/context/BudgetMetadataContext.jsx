@@ -130,7 +130,7 @@ export function BudgetMetadataProvider({ children }) {
   // Account Operations
   const addAccount = (accountData) => {
     const newAcc = {
-      id: `acc-${Date.now()}`,
+      id: accountData.id || `acc-${Date.now()}`,
       name: accountData.name || 'New Account',
       type: accountData.type || 'checking',
       startingBalance: parseFloat(accountData.startingBalance) || 0,
@@ -140,13 +140,14 @@ export function BudgetMetadataProvider({ children }) {
       enableExtraSavings: accountData.enableExtraSavings ?? true,
       color: accountData.color || 'blue',
       notes: accountData.notes || '',
-      ledgerMode: 'manual',
-      importedLedgerRows: {}
+      ledgerMode: accountData.ledgerMode || (accountData.importedLedgerRows && Object.keys(accountData.importedLedgerRows).length > 0 ? 'import' : 'manual'),
+      importedLedgerRows: accountData.importedLedgerRows || {}
     };
     setMetadataState(prev => ({
       ...prev,
       accounts: [...prev.accounts, newAcc]
     }));
+    return newAcc;
   };
 
   const updateAccount = (id, updatedData) => {

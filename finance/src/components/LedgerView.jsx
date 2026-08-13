@@ -15,9 +15,12 @@ import {
   Info,
   Archive,
   RotateCcw,
-  GripVertical
+  GripVertical,
+  Upload,
+  FileSpreadsheet
 } from 'lucide-react';
 import { InlineEdit } from './InlineEdit';
+import { SpreadsheetImporter } from './SpreadsheetImporter';
 
 import { fmtMoney, fmtNum } from '../utils/formatters';
 import { isBillDueInMonth } from '../utils/paydayUtils';
@@ -245,6 +248,7 @@ function DailySpreadsheetMatrix() {
   const [selectedMonth, setSelectedMonth] = useState(today.getMonth());
   const [selectedYear, setSelectedYear] = useState(today.getFullYear());
   const [showArchivedBills, setShowArchivedBills] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
   // Timeline window state (default 3 months back to 6 months forward relative to selected month for 75% faster DOM rendering)
   const [monthsBack, setMonthsBack] = useState(3);
@@ -832,6 +836,19 @@ function DailySpreadsheetMatrix() {
             <span>Today</span>
           </button>
 
+          {/* Account-Bound Import Button */}
+          {selectedAccountId !== 'all' && (
+            <button
+              type="button"
+              onClick={() => setIsImportModalOpen(true)}
+              className="flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 border border-indigo-500/50 hover:border-indigo-400 font-bold text-[11px] shadow-sm transition-all cursor-pointer active:scale-95"
+              title={`Import CSV or Spreadsheet into ${selectedAccount?.name || 'this account'}`}
+            >
+              <Upload className="w-3 h-3 text-indigo-400" />
+              <span>Import CSV/Spreadsheet</span>
+            </button>
+          )}
+
           {/* Archived Bills Drawer Toggle */}
           {archivedBills.length > 0 && (
             <button
@@ -1269,6 +1286,20 @@ function DailySpreadsheetMatrix() {
           </div>
         ) : null}
       </DragOverlay>
+
+      {/* Account-Bound Spreadsheet Importer Modal */}
+      {isImportModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-4xl p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto my-auto">
+            <SpreadsheetImporter
+              targetAccountId={selectedAccountId}
+              targetAccountName={selectedAccount?.name}
+              isModal={true}
+              onClose={() => setIsImportModalOpen(false)}
+            />
+          </div>
+        </div>
+      )}
     </div>
     </DndContext>
   );

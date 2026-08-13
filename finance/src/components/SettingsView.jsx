@@ -33,6 +33,8 @@ import {
   X
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { parseSpreadsheet } from '../utils/spreadsheetParser';
+import { detectFileType, parseGenericFlat, autoMatchColumns, applyTransactionMapping } from '../utils/importer';
 import { MONTH_SHORT_NAMES, getAccountSaveExtraPersonPortion } from '../utils/paydayUtils';
 import { NoYearCalendarPicker } from './NoYearCalendarPicker';
 import { useAuth } from '../context/AuthContext';
@@ -71,6 +73,7 @@ export function SettingsView() {
     restoreFromBackup,
     pushCloudBackup,
     pullCloudRestore,
+    importSpreadsheetSelective,
     isAutoCloudBackupEnabled,
     toggleAutoCloudBackup,
     lastCloudSyncTime,
@@ -171,6 +174,76 @@ export function SettingsView() {
   const [newAccForm, setNewAccForm] = useState({ name: '', type: 'checking', startingBalance: 0, balanceAsOfDate: new Date().toISOString().split('T')[0], saveExtraMonthly: 0, extraStartingBalance: 0, enableExtraSavings: true, color: 'blue', notes: '' });
   const [newPersonForm, setNewPersonForm] = useState({ name: '', role: 'Member', payFrequency: 'bi-weekly', grossPerPay: 0, netPerPay: 0, payDay1: 15, payDay2: 'last', payOffsetDays: 0 });
   const [newBillForm, setNewBillForm] = useState({ name: '', amount: 0, period: 'Monthly', accountId: budget.accounts[0]?.id || '', dueDay: 1, dueMonths: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], paymentSource: 'Auto Pay', notes: '' });
+
+  // Account creation spreadsheet import state
+  const [accImportPayload, setAccImportPayload] = useState(null);
+  const [accImportStatus, setAccImportStatus] = useState(null);
+  const [accImportError, setAccImportError] = useState('');
+  const [isAccImporting, setIsAccImporting] = useState(false);
+  const accFileInputRef = useRef(null);
+
+  const handleAccFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAccImportError('');
+    setIsAccImporting(true);
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const detected = detectFileType(file.name);
+      if (detected === 'emory_parc') {
+        const res = parseSpreadsheet(arrayBuffer, file.name, budget.bills || []);
+        if (!res.success) throw new Error(res.error || 'Failed to parse workbook.');
+        const matchingAcc = res.budget?.accounts?.[0];
+        const txns = res.budget?.transactions || [];
+        setAccImportPayload({
+          records: txns,
+          importedLedgerRows: matchingAcc?.importedLedgerRows || {},
+          startingBalance: matchingAcc?.startingBalance ?? null,
+          earliestDate: matchingAcc?.balanceAsOfDate ?? null
+        });
+        setNewAccForm(prev => ({
+          ...prev,
+          name: prev.name || matchingAcc?.name || file.name.replace(/\.[^/.]+$/, ''),
+          startingBalance: matchingAcc?.startingBalance ?? prev.startingBalance,
+          balanceAsOfDate: matchingAcc?.balanceAsOfDate ?? prev.balanceAsOfDate
+        }));
+        setAccImportStatus({
+          fileName: file.name,
+          count: txns.length,
+          startingBal: matchingAcc?.startingBalance,
+          date: matchingAcc?.balanceAsOfDate
+        });
+      } else {
+        const { headers, rows } = parseGenericFlat(arrayBuffer);
+        if (headers.length === 0) throw new Error('No valid columns found.');
+        const { mapping } = autoMatchColumns(headers, 'transactions');
+        const { records, importedLedgerRows, earliestDate, startingBalance } = applyTransactionMapping(rows, mapping);
+        setAccImportPayload({
+          records,
+          importedLedgerRows,
+          startingBalance,
+          earliestDate
+        });
+        setNewAccForm(prev => ({
+          ...prev,
+          name: prev.name || file.name.replace(/\.[^/.]+$/, ''),
+          startingBalance: startingBalance !== null && !isNaN(startingBalance) ? startingBalance : prev.startingBalance,
+          balanceAsOfDate: earliestDate || prev.balanceAsOfDate
+        }));
+        setAccImportStatus({
+          fileName: file.name,
+          count: records.length,
+          startingBal: startingBalance,
+          date: earliestDate
+        });
+      }
+    } catch (err) {
+      setAccImportError(err.message || 'Failed to parse file.');
+    } finally {
+      setIsAccImporting(false);
+      e.target.value = '';
+    }
+  };
 
   const addAccountModalRef = useRef(null);
   const addPersonModalRef = useRef(null);
@@ -1389,10 +1462,108 @@ export function SettingsView() {
                     <form onSubmit={(e) => {
                       e.preventDefault();
                       if (!newAccForm.name) return;
-                      addAccount(newAccForm);
+                      const newAccId = `acc-${Date.now()}`;
+                      const startingBal = parseFloat(newAccForm.startingBalance) || 0;
+                      const asOfDate = newAccForm.balanceAsOfDate || new Date().toISOString().split('T')[0];
+                      const impRows = accImportPayload?.importedLedgerRows || {};
+                      const hasImpRows = Object.keys(impRows).length > 0;
+
+                      addAccount({
+                        ...newAccForm,
+                        id: newAccId,
+                        startingBalance: startingBal,
+                        balanceAsOfDate: asOfDate,
+                        importedLedgerRows: impRows,
+                        ledgerMode: hasImpRows ? 'import' : 'manual'
+                      });
+
+                      if (accImportPayload?.records && accImportPayload.records.length > 0) {
+                        importSpreadsheetSelective({
+                          namespaces: { transactions: true },
+                          strategies: { transactions: 'merge' },
+                          data: {
+                            targetAccountId: newAccId,
+                            transactions: accImportPayload.records,
+                            importedLedgerRows: impRows,
+                            startingBalance: startingBal,
+                            balanceAsOfDate: asOfDate
+                          }
+                        });
+                      }
+
                       setNewAccForm({ name: '', type: 'checking', startingBalance: 0, balanceAsOfDate: new Date().toISOString().split('T')[0], saveExtraMonthly: 0, extraStartingBalance: 0, enableExtraSavings: true, color: 'blue', notes: '' });
+                      setAccImportPayload(null);
+                      setAccImportStatus(null);
+                      setAccImportError('');
                       setIsAddAccountModalOpen(false);
                     }} className="space-y-4">
+                      {/* Initial Spreadsheet / CSV Upload Dropzone */}
+                      <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                            <FileSpreadsheet className="w-3.5 h-3.5 text-indigo-400" />
+                            <span>Initial Spreadsheet / Bank CSV (Optional)</span>
+                          </label>
+                          {accImportStatus && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAccImportPayload(null);
+                                setAccImportStatus(null);
+                                setAccImportError('');
+                              }}
+                              className="text-[10px] text-slate-400 hover:text-rose-400 font-semibold cursor-pointer"
+                            >
+                              Remove file
+                            </button>
+                          )}
+                        </div>
+
+                        <input
+                          ref={accFileInputRef}
+                          type="file"
+                          accept=".csv,.xlsx"
+                          onChange={handleAccFileUpload}
+                          className="hidden"
+                        />
+
+                        {accImportStatus ? (
+                          <div className="flex items-center gap-2 p-2.5 rounded-lg bg-emerald-950/40 border border-emerald-800 text-emerald-300 text-xs">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                            <div className="min-w-0 flex-1">
+                              <span className="font-bold text-white block truncate">{accImportStatus.fileName}</span>
+                              <span className="text-[11px] text-emerald-400/90">
+                                {accImportStatus.count} transactions parsed &bull; auto-bound to this new account
+                              </span>
+                            </div>
+                          </div>
+                        ) : (
+                          <div
+                            onClick={() => accFileInputRef.current?.click()}
+                            className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl border border-dashed border-slate-700 hover:border-indigo-500 bg-slate-900/50 hover:bg-slate-900 cursor-pointer transition-all text-xs text-slate-400 hover:text-slate-200"
+                          >
+                            {isAccImporting ? (
+                              <div className="flex items-center gap-2 text-indigo-300">
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <span>Analyzing spreadsheet...</span>
+                              </div>
+                            ) : (
+                              <>
+                                <Upload className="w-4 h-4 text-indigo-400" />
+                                <span>Click to upload <strong className="text-slate-300">.csv</strong> or <strong className="text-slate-300">.xlsx</strong> to auto-fill</span>
+                              </>
+                            )}
+                          </div>
+                        )}
+
+                        {accImportError && (
+                          <p className="text-[11px] text-rose-400 flex items-center gap-1">
+                            <AlertTriangle className="w-3 h-3" />
+                            <span>{accImportError}</span>
+                          </p>
+                        )}
+                      </div>
+
                       <div>
                         <label className="block text-xs font-medium text-slate-300 mb-1">Account Name *</label>
                         <input
@@ -1486,7 +1657,12 @@ export function SettingsView() {
                       <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
                         <button
                           type="button"
-                          onClick={() => setIsAddAccountModalOpen(false)}
+                          onClick={() => {
+                            setAccImportPayload(null);
+                            setAccImportStatus(null);
+                            setAccImportError('');
+                            setIsAddAccountModalOpen(false);
+                          }}
                           className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors cursor-pointer"
                         >
                           Cancel

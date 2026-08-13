@@ -53,6 +53,18 @@ const BILL_SYNONYMS = {
 // Date normalization helper
 export function normalizeIsoDate(rawDate) {
   if (!rawDate) return null;
+  if (typeof rawDate === 'number' || (!isNaN(Number(rawDate)) && !String(rawDate).includes('-') && !String(rawDate).includes('/'))) {
+    const num = Number(rawDate);
+    if (num > 1000 && num < 100000) {
+      const date = new Date(Math.round((num - 25569) * 86400 * 1000));
+      if (!isNaN(date.getTime())) {
+        const y = date.getUTCFullYear();
+        const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+        const d = String(date.getUTCDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+      }
+    }
+  }
   const str = String(rawDate).trim();
   if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
   if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(str)) {
@@ -64,7 +76,7 @@ export function normalizeIsoDate(rawDate) {
     return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
   }
   const parsed = new Date(str);
-  if (!isNaN(parsed.getTime())) {
+  if (!isNaN(parsed.getTime()) && !/^\d+$/.test(str)) {
     const y = parsed.getFullYear();
     const m = String(parsed.getMonth() + 1).padStart(2, '0');
     const d = String(parsed.getDate()).padStart(2, '0');
@@ -100,7 +112,7 @@ export function detectFileType(fileName, sheetNames = []) {
  * @returns {{ headers: string[], rows: Record<string, string>[], rawRows: any[][] }}
  */
 export function parseGenericFlat(arrayBuffer) {
-  const workbook = XLSX.read(arrayBuffer, { type: 'array', cellDates: false });
+  const workbook = XLSX.read(arrayBuffer, { type: 'array', raw: true, cellDates: false });
   const sheetName = workbook.SheetNames[0];
   const sheet = workbook.Sheets[sheetName];
   const rawRows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
@@ -180,7 +192,10 @@ export function applyTransactionMapping(rows, columnMap, defaultAccountId = '') 
   const importedLedgerRows = {};
   let skipped = 0;
   let earliestDate = null;
-  let startingBalance = null;
+  let latestDate = null;
+  let earliestRecord = null;
+  let latestRecord = null;
+  let explicitStartingBal = null;
 
   rows.forEach((row, idx) => {
     const mapped = {};
@@ -198,27 +213,51 @@ export function applyTransactionMapping(rows, columnMap, defaultAccountId = '') 
 
     const rawBal = mapped.balance !== undefined && mapped.balance !== '' ? String(mapped.balance).replace(/[^0-9.-]+/g, '') : null;
     const balance = rawBal !== null ? parseFloat(rawBal) : undefined;
+    const desc = (mapped.description || '').trim();
 
-    if (balance !== undefined && !isNaN(balance)) {
-      importedLedgerRows[isoDate] = balance;
-      if (earliestDate === null || isoDate < earliestDate) {
-        earliestDate = isoDate;
-        startingBalance = balance;
-      }
-    }
-
-    records.push({
+    const record = {
       id: `txn-${Date.now()}-${idx}`,
       date: isoDate,
-      description: mapped.description || '',
+      description: desc,
       amount,
       balance: balance !== undefined && !isNaN(balance) ? balance : undefined,
       accountId: mapped.accountId || defaultAccountId,
       category: mapped.category || '',
       notes: mapped.notes || '',
       importedAt: Date.now(),
-    });
+    };
+
+    records.push(record);
+
+    if (balance !== undefined && !isNaN(balance)) {
+      // The balance recorded on a transaction row represents the post-transaction running balance
+      importedLedgerRows[isoDate] = balance;
+
+      const lowerDesc = desc.toLowerCase();
+      const isStartBalRow = lowerDesc.includes('beginning balance') || lowerDesc.includes('starting balance') || lowerDesc.includes('opening balance');
+
+      if (isStartBalRow) {
+        explicitStartingBal = balance;
+      }
+
+      if (earliestDate === null || isoDate < earliestDate) {
+        earliestDate = isoDate;
+        earliestRecord = record;
+      }
+      if (latestDate === null || isoDate > latestDate) {
+        latestDate = isoDate;
+        latestRecord = record;
+      }
+    }
   });
+
+  let startingBalance = null;
+  if (explicitStartingBal !== null) {
+    startingBalance = explicitStartingBal;
+  } else if (earliestRecord && earliestRecord.balance !== undefined) {
+    // Pre-transaction opening balance = post-transaction balance - transaction amount
+    startingBalance = Math.round((earliestRecord.balance - earliestRecord.amount) * 100) / 100;
+  }
 
   return { records, skipped, importedLedgerRows, earliestDate, startingBalance };
 }

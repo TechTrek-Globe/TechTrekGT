@@ -441,7 +441,22 @@ function DailySpreadsheetMatrix() {
         // If this ISO date exists in the imported map, use it verbatim as historical fact.
         const isoDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         if (isImportMode && importedRows[isoDate] !== undefined) {
-          const lockedEndBal = importedRows[isoDate];
+          const rawLock = importedRows[isoDate];
+          const lockedRegEnd = typeof rawLock === 'object' && rawLock !== null
+            ? (rawLock.regEnding !== undefined ? rawLock.regEnding : (rawLock.totalEnding ?? rawLock.balance ?? runningRegBeg))
+            : rawLock;
+          const lockedExtraEnd = typeof rawLock === 'object' && rawLock !== null && rawLock.extraEnding !== undefined
+            ? rawLock.extraEnding
+            : runningExtraBeg;
+          const lockedTotalEnd = typeof rawLock === 'object' && rawLock !== null && rawLock.totalEnding !== undefined
+            ? rawLock.totalEnding
+            : (lockedRegEnd + lockedExtraEnd);
+
+          if (isFirstRow && typeof rawLock === 'object' && rawLock !== null && rawLock.regBeg !== undefined) {
+            runningRegBeg = rawLock.regBeg;
+            runningExtraBeg = rawLock.extraBeg ?? runningExtraBeg;
+          }
+
           rows.push({
             rowKey: `${monthKey}-${day}`,
             day,
@@ -463,14 +478,15 @@ function DailySpreadsheetMatrix() {
             billValues: {},
             otherAmt: 0,
             otherDesc: '',
-            regEnding: lockedEndBal,
-            extraEnding: runningExtraBeg,
-            totalEnd: lockedEndBal + runningExtraBeg,
-            isDeficit: lockedEndBal + runningExtraBeg < 0,
+            regEnding: lockedRegEnd,
+            extraEnding: lockedExtraEnd,
+            totalEnd: lockedTotalEnd,
+            isDeficit: lockedTotalEnd < 0,
             isHistoricalLock: true
           });
           // Carry the locked balance forward as the next day's opening
-          runningRegBeg = lockedEndBal;
+          runningRegBeg = lockedRegEnd;
+          runningExtraBeg = lockedExtraEnd;
           continue;
         }
 

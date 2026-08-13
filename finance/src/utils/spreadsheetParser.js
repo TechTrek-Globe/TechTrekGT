@@ -237,44 +237,79 @@ export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
 
           const targetAccountId = getOrCreateAccount(sheetAccName);
 
-          // Build a full per-date balance map (Rule A: historical truth)
-          const totalBalColIdx = headers.findIndex(h =>
-            h.toLowerCase().includes('total end') ||
-            h.toLowerCase().includes('total ending') ||
-            h.toLowerCase().includes('total beg') ||
-            h.toLowerCase().includes('total balance')
-          );
+          // Safe date parsing helper
+          const parseRowDate = (val) => {
+            if (!val) return '';
+            if (typeof val === 'number') {
+              const ssf = XLSX.SSF;
+              if (ssf && ssf.parse_date_code) {
+                const d = ssf.parse_date_code(val);
+                if (d) return `${d.y}-${String(d.m).padStart(2, '0')}-${String(d.d).padStart(2, '0')}`;
+              }
+              const date = new Date(Math.round((val - 25569) * 86400 * 1000));
+              if (!isNaN(date.getTime())) {
+                const y = date.getUTCFullYear();
+                const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+                const d = String(date.getUTCDate()).padStart(2, '0');
+                return `${y}-${m}-${d}`;
+              }
+            }
+            return String(val).trim();
+          };
 
-          // importedLedgerRows: { 'YYYY-MM-DD': endingBalance }
+          // Detect balance column indices
+          const regBegIdx = headers.findIndex(h => h.toLowerCase().includes('regular beg') || h.toLowerCase().includes('reg beg'));
+          const extraBegIdx = headers.findIndex(h => h.toLowerCase().includes('extra beg'));
+          const totalBegIdx = headers.findIndex(h => h.toLowerCase().includes('total beg'));
+
+          const regEndIdx = headers.findIndex(h => h.toLowerCase().includes('regular end') || h.toLowerCase().includes('reg end') || h.toLowerCase().includes('regular ending'));
+          const extraEndIdx = headers.findIndex(h => h.toLowerCase().includes('extra end') || h.toLowerCase().includes('extra ending'));
+          const totalEndIdx = headers.findIndex(h => h.toLowerCase().includes('total end') || h.toLowerCase().includes('total ending') || h.toLowerCase().includes('total balance'));
+
+          // importedLedgerRows: { 'YYYY-MM-DD': { regEnding, extraEnding, totalEnding, regBeg, extraBeg } }
           const importedLedgerRows = {};
           let firstRowDate = null;
-          let firstRowBal = null;
+          let firstRowRegBeg = 0;
+          let firstRowExtraBeg = 0;
+          let firstRowTotalBeg = 0;
 
           for (let i = headerRowIdx + 1; i < rows.length; i++) {
             const r = rows[i];
             if (!r || !r[dateColIdx]) continue;
-            let dateStr = String(r[dateColIdx]);
-            if (typeof r[dateColIdx] === 'number') {
-              const d = XLSX.SSF.parse_date_code(r[dateColIdx]);
-              if (d) {
-                const m = String(d.m).padStart(2, '0');
-                const day = String(d.d).padStart(2, '0');
-                dateStr = `${d.y}-${m}-${day}`;
-              }
-            }
+            const dateStr = parseRowDate(r[dateColIdx]);
+            if (!dateStr || dateStr.length < 8) continue;
 
-            if (totalBalColIdx < 0) continue;
-            const balCell = r[totalBalColIdx];
-            const numBal = typeof balCell === 'number'
-              ? balCell
-              : parseFloat(String(balCell || '').replace(/[^0-9.-]+/g, ''));
+            const rRegBeg = regBegIdx >= 0 ? cleanNum(r[regBegIdx]) : 0;
+            const rExtraBeg = extraBegIdx >= 0 ? cleanNum(r[extraBegIdx]) : 0;
+            const rTotalBeg = totalBegIdx >= 0 ? cleanNum(r[totalBegIdx]) : (rRegBeg + rExtraBeg);
 
-            if (!isNaN(numBal)) {
-              importedLedgerRows[dateStr] = numBal;
-              // Track the earliest date as the anchor for startingBalance
+            const rRegEnd = regEndIdx >= 0 ? cleanNum(r[regEndIdx]) : null;
+            const rExtraEnd = extraEndIdx >= 0 ? cleanNum(r[extraEndIdx]) : 0;
+            const rTotalEnd = totalEndIdx >= 0 ? cleanNum(r[totalEndIdx]) : (rRegEnd !== null ? (rRegEnd + rExtraEnd) : null);
+
+            if (rRegEnd !== null || rTotalEnd !== null) {
+              importedLedgerRows[dateStr] = {
+                regEnding: rRegEnd !== null ? rRegEnd : (rTotalEnd - rExtraEnd),
+                extraEnding: rExtraEnd,
+                totalEnding: rTotalEnd !== null ? rTotalEnd : ((rRegEnd || 0) + rExtraEnd),
+                regBeg: rRegBeg,
+                extraBeg: rExtraBeg,
+                totalBeg: rTotalBeg
+              };
+
               if (firstRowDate === null || dateStr < firstRowDate) {
                 firstRowDate = dateStr;
-                firstRowBal = numBal;
+                firstRowRegBeg = rRegBeg;
+                firstRowExtraBeg = rExtraBeg;
+                firstRowTotalBeg = rTotalBeg;
+                if (firstRowRegBeg === 0 && firstRowTotalBeg > 0) {
+                  if (firstRowExtraBeg > 0) firstRowRegBeg = firstRowTotalBeg - firstRowExtraBeg;
+                  else if (rRegEnd !== null && rRegEnd > 0) firstRowRegBeg = rRegEnd;
+                  else firstRowRegBeg = firstRowTotalBeg;
+                }
+                if (firstRowExtraBeg === 0 && firstRowTotalBeg > firstRowRegBeg) {
+                  firstRowExtraBeg = firstRowTotalBeg - firstRowRegBeg;
+                }
               }
             }
           }
@@ -282,7 +317,8 @@ export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
           // Attach the historical map and stamp ledgerMode on the account
           const accObj = Array.from(accountsMap.values()).find(a => a.id === targetAccountId);
           if (accObj && Object.keys(importedLedgerRows).length > 0) {
-            accObj.startingBalance = firstRowBal ?? accObj.startingBalance;
+            accObj.startingBalance = firstRowRegBeg || accObj.startingBalance;
+            accObj.extraStartingBalance = firstRowExtraBeg || accObj.extraStartingBalance || 0;
             accObj.balanceAsOfDate = firstRowDate ?? accObj.balanceAsOfDate;
             accObj.importedLedgerRows = importedLedgerRows;
             accObj.ledgerMode = 'import';
@@ -294,16 +330,8 @@ export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
 
             const rawDate = r[dateColIdx];
             if (!rawDate) continue;
-
-            let dateStr = String(rawDate);
-            if (typeof rawDate === 'number') {
-              const d = XLSX.SSF.parse_date_code(rawDate);
-              if (d) {
-                const m = String(d.m).padStart(2, '0');
-                const day = String(d.d).padStart(2, '0');
-                dateStr = `${d.y}-${m}-${day}`;
-              }
-            }
+            const dateStr = parseRowDate(rawDate);
+            if (!dateStr) continue;
 
             headers.forEach((h, colIdx) => {
               if (!h || colIdx === dateColIdx || colIdx === otherDescIdx) return;

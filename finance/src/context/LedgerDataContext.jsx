@@ -5,6 +5,7 @@ import { fakeDemoBudgetData } from '../demoPresetData';
 import { useBudgetMetadata } from './BudgetMetadataContext';
 import { getApiUrl, pushCloudBackupOptimistic, flushPendingCloudSync } from '../utils/api';
 import { saveBudgetData, clearAndRestoreBudgetData, clearBudgetData } from '../utils/indexedDB';
+import { normalizeIsoDate } from '../utils/importer';
 
 const LedgerDataContext = createContext();
 
@@ -257,8 +258,11 @@ export function LedgerDataProvider({ children }) {
               accountIdMap.set(incomingAcc.id, match.id);
               // Propagate imported ledger metadata onto the matched account
               const patches = {};
-              if (typeof incomingAcc.startingBalance === 'number' && incomingAcc.startingBalance !== 0) {
+              if (typeof incomingAcc.startingBalance === 'number' && !isNaN(incomingAcc.startingBalance)) {
                 patches.startingBalance = incomingAcc.startingBalance;
+              }
+              if (typeof incomingAcc.extraStartingBalance === 'number' && !isNaN(incomingAcc.extraStartingBalance)) {
+                patches.extraStartingBalance = incomingAcc.extraStartingBalance;
               }
               if (incomingAcc.balanceAsOfDate) patches.balanceAsOfDate = incomingAcc.balanceAsOfDate;
               if (incomingAcc.importedLedgerRows && Object.keys(incomingAcc.importedLedgerRows).length > 0) {
@@ -286,8 +290,11 @@ export function LedgerDataProvider({ children }) {
         accounts: (prev.accounts || []).map(acc => {
           if (acc.id === data.targetAccountId) {
             const patches = {};
-            if (typeof data.startingBalance === 'number' && data.startingBalance !== 0) {
+            if (typeof data.startingBalance === 'number' && !isNaN(data.startingBalance)) {
               patches.startingBalance = data.startingBalance;
+            }
+            if (typeof data.extraStartingBalance === 'number' && !isNaN(data.extraStartingBalance)) {
+              patches.extraStartingBalance = data.extraStartingBalance;
             }
             if (data.balanceAsOfDate) {
               patches.balanceAsOfDate = data.balanceAsOfDate;
@@ -336,7 +343,7 @@ export function LedgerDataProvider({ children }) {
       }
     }
 
-    // Bug 2 fix (Option B): reconcile imported actual transactions against projected bills.
+    // Bug 2 fix (Option B): reconcile imported actual transactions against projected bills, deposits, and other expenses.
     // Uses month-scoped lineItem overrides for amount and dailyMatrix cell moves for date
     // shifts - non-destructive to future projections (bill definition is never altered).
     if (namespaces.transactions && Array.isArray(data.transactions)) {
@@ -345,45 +352,87 @@ export function LedgerDataProvider({ children }) {
       const matrixNoteShifts = [];
 
       data.transactions.forEach(txn => {
-        // Resolve billId - parser stamps it when a column header fuzzy-matches a bill.
-        // If the parser couldn't match (e.g. abbreviated column name), do a secondary
-        // name-based lookup here against the live bill registry.
-        let resolvedBillId = txn.billId;
-        if (!resolvedBillId && txn.description) {
-          const descLower = txn.description.toLowerCase();
-          const matched = metadataState.bills.find(b => {
-            const bName = b.name.toLowerCase();
-            return descLower.includes(bName) || bName.includes(descLower);
-          });
-          if (matched) resolvedBillId = matched.id;
-        }
-        if (!resolvedBillId || !txn.date || txn.amount === undefined) return;
-        const parts = txn.date.split('-');
+        if (!txn.date || txn.amount === undefined) return;
+        const normDate = normalizeIsoDate(txn.date);
+        if (!normDate) return;
+        const parts = normDate.split('-');
         if (parts.length !== 3) return;
         const actualDay = parseInt(parts[2], 10);
-        const actualAmount = Math.abs(parseFloat(txn.amount) || 0);
-        if (!actualAmount || isNaN(actualDay)) return;
-
+        const rawAmount = parseFloat(txn.amount);
+        if (isNaN(actualDay) || isNaN(rawAmount)) return;
+        const actualAmount = Math.abs(rawAmount);
+        const isCredit = rawAmount > 0;
         const monthKey = `${parts[0]}-${parts[1]}`;
+        const accountId = txn.accountId || data.targetAccountId || (metadataState.accounts[0]?.id || '');
+        const descLower = (txn.description || '').toLowerCase();
 
-        // Amount override: upsert a month-scoped lineItem so only this month reflects the actual
-        lineItemUpdates.push({ billId: resolvedBillId, monthKey, actualAmount });
+        if (isCredit) {
+          // Check earner deposit match
+          let matchedPerson = metadataState.people.find(p => p.name && descLower.includes(p.name.toLowerCase()));
+          if (!matchedPerson && (descLower.includes('usaa') || descLower.includes('transfer') || descLower.includes('paycheck') || descLower.includes('payroll'))) {
+            // Check if amount matches earner deposit for this account
+            matchedPerson = metadataState.people.find(p => {
+              const dep = p.accountAllocations?.[accountId] || (p.grossPerPay ? p.grossPerPay / 2 : 0);
+              return Math.abs(dep - actualAmount) < 1;
+            }) || metadataState.people[0];
+          }
 
-        // Date shift: if the actual payment day differs from the projected dueDay,
-        // zero out the projected cell and write the actual amount on the real date.
-        const bill = metadataState.bills.find(b => b.id === resolvedBillId);
-        const accountId = txn.accountId || (bill ? bill.accountId : null);
-        if (bill && accountId && bill.dueDay !== actualDay) {
-          const projKey = `${accountId}_${monthKey}_${bill.dueDay}_bill_${resolvedBillId}`;
-          const actualKey = `${accountId}_${monthKey}_${actualDay}_bill_${resolvedBillId}`;
-          matrixUpdates[projKey] = 0;
-          matrixUpdates[actualKey] = actualAmount;
+          if (matchedPerson) {
+            const creditKey = `${accountId}_${monthKey}_${actualDay}_credit_${matchedPerson.id}`;
+            const existingCredit = matrixUpdates[creditKey] || 0;
+            matrixUpdates[creditKey] = Math.round((existingCredit + actualAmount) * 100) / 100;
+          } else {
+            // Unmatched credit -> credit other
+            const otherKey = `${accountId}_${monthKey}_${actualDay}_other_amount`;
+            const otherDescKey = `${accountId}_${monthKey}_${actualDay}_other_desc`;
+            const existingOther = matrixUpdates[otherKey] || 0;
+            matrixUpdates[otherKey] = Math.round((existingOther - actualAmount) * 100) / 100;
+            matrixUpdates[otherDescKey] = txn.description;
+          }
+        } else {
+          // Debit / Expense: resolve bill
+          let resolvedBillId = txn.billId;
+          if (!resolvedBillId && txn.description) {
+            const matched = metadataState.bills.find(b => {
+              if (b.accountId && accountId && b.accountId !== accountId) return false;
+              const bName = b.name.toLowerCase();
+              const pSource = (b.paymentSource || '').toLowerCase();
+              if (bName && (descLower.includes(bName) || bName.includes(descLower))) return true;
+              if (pSource && (descLower.includes(pSource) || pSource.includes(descLower))) return true;
+              if (descLower.includes('wells fargo') && (bName.includes('cell') || pSource.includes('wells'))) return true;
+              if (descLower.includes('bank of america') && (bName.includes('gym') || pSource.includes('america'))) return true;
+              if (descLower.includes('georgia power') && (bName.includes('power') || bName.includes('electric'))) return true;
+              if (descLower.includes('water') && bName.includes('water')) return true;
+              if (descLower.includes('comcast') && bName.includes('comcast')) return true;
+              if (descLower.includes('youtube') && bName.includes('youtube')) return true;
+              if (Math.abs(parseFloat(b.amount || 0) - actualAmount) < 0.01 && (!b.accountId || b.accountId === accountId)) return true;
+              return false;
+            });
+            if (matched) resolvedBillId = matched.id;
+          }
 
-          // Migrate the user note (other_desc) from the projected day to the actual payment day.
-          // Notes are keyed by row coordinate; without this shift they become orphaned.
-          const projNoteKey = `${accountId}_${monthKey}_${bill.dueDay}_other_desc`;
-          const actualNoteKey = `${accountId}_${monthKey}_${actualDay}_other_desc`;
-          matrixNoteShifts.push({ projNoteKey, actualNoteKey });
+          if (resolvedBillId) {
+            lineItemUpdates.push({ billId: resolvedBillId, monthKey, actualAmount });
+            const bill = metadataState.bills.find(b => b.id === resolvedBillId);
+            const actualKey = `${accountId}_${monthKey}_${actualDay}_bill_${resolvedBillId}`;
+            const existingBillAmt = matrixUpdates[actualKey] || 0;
+            matrixUpdates[actualKey] = Math.round((existingBillAmt + actualAmount) * 100) / 100;
+
+            if (bill && bill.dueDay !== actualDay) {
+              const projKey = `${accountId}_${monthKey}_${bill.dueDay}_bill_${resolvedBillId}`;
+              if (matrixUpdates[projKey] === undefined) matrixUpdates[projKey] = 0;
+              const projNoteKey = `${accountId}_${monthKey}_${bill.dueDay}_other_desc`;
+              const actualNoteKey = `${accountId}_${monthKey}_${actualDay}_other_desc`;
+              matrixNoteShifts.push({ projNoteKey, actualNoteKey });
+            }
+          } else {
+            // Unmatched debit -> Other expense
+            const otherKey = `${accountId}_${monthKey}_${actualDay}_other_amount`;
+            const otherDescKey = `${accountId}_${monthKey}_${actualDay}_other_desc`;
+            const existingOther = matrixUpdates[otherKey] || 0;
+            matrixUpdates[otherKey] = Math.round((existingOther + actualAmount) * 100) / 100;
+            matrixUpdates[otherDescKey] = txn.description;
+          }
         }
       });
 

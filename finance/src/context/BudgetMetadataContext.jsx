@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { initialBudgetData, DEFAULT_DASHBOARD_WIDGETS } from '../initialData';
 import { useAuth } from './AuthContext';
 import { isPersonDepositDay, getPersonDepositAmountForAccount, getAccountSaveExtraPersonPortion, getNextBillDueDate } from '../utils/paydayUtils';
@@ -41,6 +41,11 @@ export function BudgetMetadataProvider({ children }) {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState('accounts');
   const [activeView, setActiveView] = useState('dashboard');
+
+  const metadataStateRef = useRef(metadataState);
+  useEffect(() => {
+    metadataStateRef.current = metadataState;
+  }, [metadataState]);
 
   useEffect(() => {
     try { localStorage.removeItem('trekledger_active_view'); }
@@ -443,12 +448,12 @@ export function BudgetMetadataProvider({ children }) {
   }, []);
 
   const getTotalMonthlyNetIncome = useCallback(() => {
-    return (metadataState.people || []).reduce((sum, p) => sum + getMonthlyNetIncome(p), 0);
-  }, [metadataState.people, getMonthlyNetIncome]);
+    return (metadataStateRef.current.people || []).reduce((sum, p) => sum + getMonthlyNetIncome(p), 0);
+  }, [getMonthlyNetIncome]);
 
   const getTotalMonthlyGrossIncome = useCallback(() => {
-    return (metadataState.people || []).reduce((sum, p) => sum + getMonthlyGrossIncome(p), 0);
-  }, [metadataState.people, getMonthlyGrossIncome]);
+    return (metadataStateRef.current.people || []).reduce((sum, p) => sum + getMonthlyGrossIncome(p), 0);
+  }, [getMonthlyGrossIncome]);
 
   const getBillMonthlyCost = useCallback((bill) => {
     if (!bill) return 0;
@@ -461,14 +466,14 @@ export function BudgetMetadataProvider({ children }) {
   }, []);
 
   const getTotalMonthlyExpenses = useCallback(() => {
-    return (metadataState.bills || []).reduce((sum, b) => sum + getBillMonthlyCost(b), 0);
-  }, [metadataState.bills, getBillMonthlyCost]);
+    return (metadataStateRef.current.bills || []).reduce((sum, b) => sum + getBillMonthlyCost(b), 0);
+  }, [getBillMonthlyCost]);
 
   const getAccountMonthlyExpenses = useCallback((accountId) => {
-    return (metadataState.bills || [])
+    return (metadataStateRef.current.bills || [])
       .filter(b => b.accountId === accountId)
       .reduce((sum, b) => sum + getBillMonthlyCost(b), 0);
-  }, [metadataState.bills, getBillMonthlyCost]);
+  }, [getBillMonthlyCost]);
 
   const getBillPersonMonthlyPortion = useCallback((bill, personId) => {
     if (!bill) return 0;
@@ -478,17 +483,18 @@ export function BudgetMetadataProvider({ children }) {
   }, [getBillMonthlyCost]);
 
   const getPersonMonthlyTotal = useCallback((personId) => {
-    const person = (metadataState.people || []).find(p => p.id === personId);
-    const billsTotal = (metadataState.bills || []).reduce((sum, b) => sum + getBillPersonMonthlyPortion(b, personId), 0);
+    const state = metadataStateRef.current;
+    const person = (state.people || []).find(p => p.id === personId);
+    const billsTotal = (state.bills || []).reduce((sum, b) => sum + getBillPersonMonthlyPortion(b, personId), 0);
     if (!person) return billsTotal;
-    const extraSavingsTotal = (metadataState.accounts || []).reduce((sum, acc) => {
-      return sum + getAccountSaveExtraPersonPortion(acc, person, metadataState);
+    const extraSavingsTotal = (state.accounts || []).reduce((sum, acc) => {
+      return sum + getAccountSaveExtraPersonPortion(acc, person, state);
     }, 0);
     return billsTotal + extraSavingsTotal;
-  }, [metadataState, getBillPersonMonthlyPortion]);
+  }, [getBillPersonMonthlyPortion]);
 
   const getPersonPerPaycheckTotal = useCallback((personId) => {
-    const person = (metadataState.people || []).find(p => p.id === personId);
+    const person = (metadataStateRef.current.people || []).find(p => p.id === personId);
     if (!person) return 0;
     const monthlyTotal = getPersonMonthlyTotal(personId);
     if (person.payFrequency === 'semi-monthly' || person.payFrequency === 'bi-weekly') {
@@ -497,15 +503,16 @@ export function BudgetMetadataProvider({ children }) {
       return (monthlyTotal * 12) / 52;
     }
     return monthlyTotal;
-  }, [metadataState.people, getPersonMonthlyTotal]);
+  }, [getPersonMonthlyTotal]);
 
   const getUpcomingBills = useCallback((limit = 5) => {
+    const state = metadataStateRef.current;
     const today = new Date();
-    const mapped = (metadataState.bills || []).map(bill => {
+    const mapped = (state.bills || []).map(bill => {
       const dueDate = getNextBillDueDate(bill, today);
       const diffTime = dueDate.getTime() - today.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      const acc = (metadataState.accounts || []).find(a => a.id === bill.accountId);
+      const acc = (state.accounts || []).find(a => a.id === bill.accountId);
       return {
         ...bill,
         monthlyCost: getBillMonthlyCost(bill),
@@ -516,7 +523,7 @@ export function BudgetMetadataProvider({ children }) {
       };
     });
     return mapped.sort((a, b) => a.daysUntilDue - b.daysUntilDue).slice(0, limit);
-  }, [metadataState.bills, metadataState.accounts, getBillMonthlyCost]);
+  }, [getBillMonthlyCost]);
 
   const getTotalCashOnHand = useCallback(() => {
     // Balance derivation now lives in LedgerDataContext (getAccountDerivedBalance)

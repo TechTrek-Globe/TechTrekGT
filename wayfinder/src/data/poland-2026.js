@@ -1473,9 +1473,9 @@ export const polandJourney = {
         description: 'A colossal 360-degree panoramic rotunda painting (15x114 meters) depicting the 1794 Battle of Racławice with special lighting and terrain effects.',
         imageUrl: '/wayfinder/Poland-2026/images/wroclaw/attractions/panorama-raclawice.jpg',
         imageSrc: '/wayfinder/Poland-2026/images/wroclaw/attractions/panorama-raclawice.jpg',
-        location: 'Panorama, MC, Greece',
-        lat: 40.58963,
-        lng: 23.038622,
+        location: 'ul. Jana Ewangelisty Purkyniego 11, 50-155 Wrocław',
+        lat: 51.1101,
+        lng: 17.0443,
         howToGetThere: '10-min walk east from Rynek or Tram 3/5.',
         pricing: '50 PLN (~$13.35 USD) incl. audio guide (advance booking required)',
         openTimes: 'Tue-Sun 8:30 AM - 6:00 PM'

@@ -8,5 +8,17 @@ export default defineConfig({
   server: {
     port: 3001,
     open: true
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('lucide-react')) return 'vendor-icons';
+            if (id.includes('react') || id.includes('scheduler')) return 'vendor-react';
+          }
+        }
+      }
+    }
   }
 });

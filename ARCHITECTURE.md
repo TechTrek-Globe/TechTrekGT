@@ -144,7 +144,7 @@ Views are conditionally rendered inside `MainContent` based on `activeView`, whi
 | `/wayfinder/poland-christmas-2026/private*` | `PrivateHub` | Auth-gated itinerary/documents |
 | any other `/wayfinder/*` | 404 fallback | "Component under construction" |
 
-Wayfinder uses `React.lazy()` + `<Suspense>` for code-split route components:
+Wayfinder and Outpost use `React.lazy()` + `<Suspense>` for code-split route components and dynamically load heavy importers (`xlsx`, `pdfjs-dist`) on demand:
 
 ```jsx
 const CityPage = React.lazy(() => import('./components/CityPage').then(m => ({ default: m.CityPage })));

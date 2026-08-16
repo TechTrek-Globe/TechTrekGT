@@ -3,8 +3,6 @@ import {
   Upload, FileSpreadsheet, FileText, CheckCircle2, AlertCircle,
   X, Loader2, ArrowRight, Database, RefreshCw, Layers, Check
 } from 'lucide-react';
-import { parseAuctionWorkbook } from '../utils/spreadsheetParser';
-import { parsePristineAuctionPdf } from '../utils/pdfInvoiceParser';
 import { getApiUrl } from '../utils/api';
 
 /**
@@ -42,9 +40,14 @@ export function SpreadsheetImporterModal({ isOpen, onClose, onImportSuccess }) {
     try {
       const buffer = await fileObj.arrayBuffer();
       const isPdf = fileObj.name.toLowerCase().endsWith('.pdf');
-      const result = isPdf
-        ? await parsePristineAuctionPdf(buffer)
-        : parseAuctionWorkbook(buffer);
+      let result;
+      if (isPdf) {
+        const { parsePristineAuctionPdf } = await import('../utils/pdfInvoiceParser');
+        result = await parsePristineAuctionPdf(buffer);
+      } else {
+        const { parseAuctionWorkbook } = await import('../utils/spreadsheetParser');
+        result = await parseAuctionWorkbook(buffer);
+      }
 
       if (!result || !result.items || result.items.length === 0) {
         throw new Error('No valid inventory items found in file. Check sheet structure or PDF content.');

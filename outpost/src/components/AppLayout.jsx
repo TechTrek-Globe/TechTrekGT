@@ -10,8 +10,8 @@ import { CardShowCalculatorModal } from './CardShowCalculatorModal';
 import { SuppliesTrackerModal } from './SuppliesTrackerModal';
 import { TaxReportModal } from './TaxReportModal';
 
-import outpostLogo from '../assets/outpost-logo.png';
-import outpostHeaderBanner from '../assets/outpost-ai-cropped.png';
+import outpostLogo from '../assets/outpost-logo.webp';
+import outpostHeaderBanner from '../assets/outpost-ai-cropped.webp';
 
 const NAV_ITEMS = [
   { id: 'dashboard',   label: 'Dashboard',            icon: LayoutDashboard },

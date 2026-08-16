@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import outpostLogo from '../assets/outpost-logo.png';
-import outpostHeaderBanner from '../assets/outpost-ai-cropped.png';
+import outpostLogo from '../assets/outpost-logo.webp';
+import outpostHeaderBanner from '../assets/outpost-ai-cropped.webp';
 import {
   Gavel,
   Lock,

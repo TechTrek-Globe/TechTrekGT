@@ -1,4 +1,3 @@
-import * as XLSX from 'xlsx';
 
 /**
  * Convert Excel serial date or date string to YYYY-MM-DD string
@@ -300,9 +299,10 @@ const NOTES_ALIASES = ['notes', 'note', 'comments', 'comment', 'descriptionnotes
 /**
  * Parse an Excel or CSV file buffer and extract Auction entities
  * @param {ArrayBuffer} buffer
- * @returns {{ invoices: any[], items: any[], sales: any[], comps: any[], summary: any }}
+ * @returns {Promise<{ invoices: any[], items: any[], sales: any[], comps: any[], summary: any }>}
  */
-export function parseAuctionWorkbook(buffer) {
+export async function parseAuctionWorkbook(buffer) {
+  const XLSX = await import('xlsx');
   const wb = XLSX.read(buffer, { type: 'array' });
   const sheetNames = wb.SheetNames;
 

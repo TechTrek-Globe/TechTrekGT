@@ -1,16 +1,5 @@
-import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
-import pdfWorkerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url';
 import { parseCleanNumber, formatExcelDate, extractMetadataFromTitle, cleanItemName } from './spreadsheetParser.js';
 import { computePricingFloors } from './formulaPreview.js';
-
-// Configure PDF.js worker in browser environments
-if (typeof window !== 'undefined' && pdfWorkerUrl) {
-  try {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
-  } catch {
-    // Ignore worker assignment if already set
-  }
-}
 
 /**
  * Extract structured text lines from a PDF binary ArrayBuffer using PDF.js
@@ -20,6 +9,21 @@ if (typeof window !== 'undefined' && pdfWorkerUrl) {
  * @returns {Promise<string>}
  */
 export async function extractTextFromPdfBuffer(buffer) {
+  const [pdfjsLib, { default: pdfWorkerUrl }] = await Promise.all([
+    import('pdfjs-dist/legacy/build/pdf.mjs'),
+    import('pdfjs-dist/legacy/build/pdf.worker.min.mjs?url')
+  ]);
+
+  // Configure PDF.js worker in browser environments
+  if (typeof window !== 'undefined' && pdfWorkerUrl) {
+    try {
+      if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
+      }
+    } catch {
+      // Ignore worker assignment if already set
+    }
+  }
   const loadingTask = pdfjsLib.getDocument({
     data: new Uint8Array(buffer),
     useSystemFonts: true,

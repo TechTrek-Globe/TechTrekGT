@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AuthPage } from './components/AuthPage';
 import { AppLayout } from './components/AppLayout';
-import { DashboardView } from './components/DashboardView';
-import { InventoryView } from './components/InventoryView';
-import { SalesLogView } from './components/SalesLogView';
-import { PricingIntelligenceView } from './components/PricingIntelligenceView';
-import { SettingsView } from './components/SettingsView';
+const DashboardView = React.lazy(() => import('./components/DashboardView').then(m => ({ default: m.DashboardView })));
+const InventoryView = React.lazy(() => import('./components/InventoryView').then(m => ({ default: m.InventoryView })));
+const SalesLogView = React.lazy(() => import('./components/SalesLogView').then(m => ({ default: m.SalesLogView })));
+const PricingIntelligenceView = React.lazy(() => import('./components/PricingIntelligenceView').then(m => ({ default: m.PricingIntelligenceView })));
+const SettingsView = React.lazy(() => import('./components/SettingsView').then(m => ({ default: m.SettingsView })));
 
 const VIEWS = ['dashboard', 'inventory', 'sales', 'pricing', 'settings'];
 
@@ -102,11 +102,17 @@ function MainContent({ pathname, navigateTo }) {
   return (
     <AppLayout activeView={activeView} onNavigate={handleNavigate}>
       <ErrorBoundary key={activeView}>
-        {activeView === 'dashboard' && <DashboardView onNavigate={handleNavigate} />}
-        {activeView === 'inventory' && <InventoryView />}
-        {activeView === 'sales' && <SalesLogView />}
-        {activeView === 'pricing' && <PricingIntelligenceView />}
-        {activeView === 'settings' && <SettingsView />}
+        <React.Suspense fallback={
+          <div className="flex items-center justify-center p-12">
+            <div className="w-8 h-8 border-2 border-amber-500/30 border-t-amber-400 rounded-full animate-spin" />
+          </div>
+        }>
+          {activeView === 'dashboard' && <DashboardView onNavigate={handleNavigate} />}
+          {activeView === 'inventory' && <InventoryView />}
+          {activeView === 'sales' && <SalesLogView />}
+          {activeView === 'pricing' && <PricingIntelligenceView />}
+          {activeView === 'settings' && <SettingsView />}
+        </React.Suspense>
       </ErrorBoundary>
     </AppLayout>
   );

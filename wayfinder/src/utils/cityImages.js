@@ -1,78 +1,50 @@
-import krakowImg from '../assets/krakow/markets/krakow-rynek-glowny.png';
-import wroclawImg from '../assets/wroclaw/markets/wroclaw.png';
-import poznanImg from '../assets/poznan/markets/poznan.png';
-import torunImg from '../assets/torun/markets/torun.png';
-import gdanskImg from '../assets/gdansk/markets/gdansk.png';
-
-import krakowRynekGlownyImg from '../assets/krakow/markets/krakow-rynek-glowny.png';
-import krakowMalyRynekImg from '../assets/krakow/markets/krakow-maly-rynek.png';
-import krakowPlacWolnicaImg from '../assets/krakow/markets/krakow-plac-wolnica.png';
-import krakowRynekPodgorskiImg from '../assets/krakow/markets/krakow-rynek-podgorski.png';
-
-import krakowWawelImg from '../assets/krakow/attractions/wawel-castle.jpg';
-import krakowStMarysImg from '../assets/krakow/attractions/st-marys-basilica.jpg';
-import krakowClothHallImg from '../assets/krakow/attractions/cloth-hall.jpg';
-import krakowKazimierzImg from '../assets/krakow/attractions/kazimierz.jpg';
-import krakowPlantyImg from '../assets/krakow/attractions/planty-park-barbican.jpg';
-import krakowAuschwitzImg from '../assets/krakow/attractions/auschwitz-birkenau.jpg';
-import krakowWieliczkaImg from '../assets/krakow/attractions/wieliczka-salt-mine.jpg';
-import krakowSchindlerImg from '../assets/krakow/attractions/schindler-factory.jpg';
-import krakowThermalBathsImg from '../assets/krakow/attractions/thermal-baths.jpg';
-import krakowWalkingTourImg from '../assets/krakow/attractions/walking-tour.jpg';
-import krakowLgbtqKazimierzImg from '../assets/krakow/attractions/lgbtq-kazimierz.jpg';
-
-import wroclawMarketSquareImg from '../assets/wroclaw/attractions/wroclaw-market-square.jpg';
-import wroclawOstrowTumskiImg from '../assets/wroclaw/attractions/ostrow-tumski.jpg';
-import wroclawDwarfsImg from '../assets/wroclaw/attractions/wroclaw-dwarfs.jpg';
-import wroclawTumskiBridgeImg from '../assets/wroclaw/attractions/tumski-bridge.jpg';
-import wroclawCentennialHallImg from '../assets/wroclaw/attractions/centennial-hall.jpg';
-import wroclawPanoramaRaclawiceImg from '../assets/wroclaw/attractions/panorama-raclawice.jpg';
-import wroclawWalkingTourImg from '../assets/wroclaw/attractions/wroclaw-walking-tour.jpg';
-
-import wroclawPlacSolnyImg from '../assets/wroclaw/markets/wroclaw-plac-solny.jpg';
-import wroclawSwidnickaImg from '../assets/wroclaw/markets/wroclaw-swidnicka.jpg';
-
 export const cityImages = {
-  krakow: krakowImg,
-  wroclaw: wroclawImg,
-  poznan: poznanImg,
-  torun: torunImg,
-  gdansk: gdanskImg,
+  krakow: '/wayfinder/Poland-2026/images/krakow/markets/krakow-rynek-glowny.png',
+  wroclaw: '/wayfinder/Poland-2026/images/wroclaw/markets/wroclaw.png',
+  poznan: '/wayfinder/Poland-2026/images/poznan/markets/poznan.png',
+  torun: '/wayfinder/Poland-2026/images/torun/markets/torun.png',
+  gdansk: '/wayfinder/Poland-2026/images/gdansk/markets/gdansk.png',
 };
 
 export const marketImages = {
-  'rynek-glowny': krakowRynekGlownyImg,
-  'maly-rynek': krakowMalyRynekImg,
-  'kazimierz-wolnica': krakowPlacWolnicaImg,
-  'podgorze': krakowRynekPodgorskiImg,
-  'wroclaw-rynek': wroclawImg,
-  'wroclaw-plac-solny': wroclawPlacSolnyImg,
-  'wroclaw-swidnicka': wroclawSwidnickaImg,
+  'rynek-glowny': '/wayfinder/Poland-2026/images/krakow/markets/krakow-rynek-glowny.png',
+  'maly-rynek': '/wayfinder/Poland-2026/images/krakow/markets/krakow-maly-rynek.png',
+  'kazimierz-wolnica': '/wayfinder/Poland-2026/images/krakow/markets/krakow-plac-wolnica.png',
+  'podgorze': '/wayfinder/Poland-2026/images/krakow/markets/krakow-rynek-podgorski.png',
+  'wroclaw-rynek': '/wayfinder/Poland-2026/images/wroclaw/markets/wroclaw.png',
+  'wroclaw-plac-solny': '/wayfinder/Poland-2026/images/wroclaw/markets/wroclaw-plac-solny.jpg',
+  'wroclaw-swidnicka': '/wayfinder/Poland-2026/images/wroclaw/markets/wroclaw-swidnicka.jpg',
 };
 
 export const attractionImages = {
-  'wawel-castle.jpg': krakowWawelImg,
-  'st-marys-basilica.jpg': krakowStMarysImg,
-  'cloth-hall.jpg': krakowClothHallImg,
-  'kazimierz.jpg': krakowKazimierzImg,
-  'planty-park-barbican.jpg': krakowPlantyImg,
-  'auschwitz-birkenau.jpg': krakowAuschwitzImg,
-  'wieliczka-salt-mine.jpg': krakowWieliczkaImg,
-  'schindler-factory.jpg': krakowSchindlerImg,
-  'thermal-baths.jpg': krakowThermalBathsImg,
-  'walking-tour.jpg': krakowWalkingTourImg,
-  'lgbtq-kazimierz.jpg': krakowLgbtqKazimierzImg,
-  'wroclaw-market-square.jpg': wroclawMarketSquareImg,
-  'ostrow-tumski.jpg': wroclawOstrowTumskiImg,
-  'wroclaw-dwarfs.jpg': wroclawDwarfsImg,
-  'tumski-bridge.jpg': wroclawTumskiBridgeImg,
-  'centennial-hall.jpg': wroclawCentennialHallImg,
-  'panorama-raclawice.jpg': wroclawPanoramaRaclawiceImg,
-  'wroclaw-walking-tour.jpg': wroclawWalkingTourImg
+  'wawel-castle.jpg': '/wayfinder/Poland-2026/images/krakow/attractions/wawel-castle.jpg',
+  'st-marys-basilica.jpg': '/wayfinder/Poland-2026/images/krakow/attractions/st-marys-basilica.jpg',
+  'cloth-hall.jpg': '/wayfinder/Poland-2026/images/krakow/attractions/cloth-hall.jpg',
+  'kazimierz.jpg': '/wayfinder/Poland-2026/images/krakow/attractions/kazimierz.jpg',
+  'planty-park-barbican.jpg': '/wayfinder/Poland-2026/images/krakow/attractions/planty-park-barbican.jpg',
+  'auschwitz-birkenau.jpg': '/wayfinder/Poland-2026/images/krakow/attractions/auschwitz-birkenau.jpg',
+  'wieliczka-salt-mine.jpg': '/wayfinder/Poland-2026/images/krakow/attractions/wieliczka-salt-mine.jpg',
+  'schindler-factory.jpg': '/wayfinder/Poland-2026/images/krakow/attractions/schindler-factory.jpg',
+  'thermal-baths.jpg': '/wayfinder/Poland-2026/images/krakow/attractions/thermal-baths.jpg',
+  'walking-tour.jpg': '/wayfinder/Poland-2026/images/krakow/attractions/walking-tour.jpg',
+  'lgbtq-kazimierz.jpg': '/wayfinder/Poland-2026/images/krakow/attractions/lgbtq-kazimierz.jpg',
+  'wroclaw-market-square.jpg': '/wayfinder/Poland-2026/images/wroclaw/attractions/wroclaw-market-square.jpg',
+  'ostrow-tumski.jpg': '/wayfinder/Poland-2026/images/wroclaw/attractions/ostrow-tumski.jpg',
+  'wroclaw-dwarfs.jpg': '/wayfinder/Poland-2026/images/wroclaw/attractions/wroclaw-dwarfs.jpg',
+  'tumski-bridge.jpg': '/wayfinder/Poland-2026/images/wroclaw/attractions/tumski-bridge.jpg',
+  'centennial-hall.jpg': '/wayfinder/Poland-2026/images/wroclaw/attractions/centennial-hall.jpg',
+  'panorama-raclawice.jpg': '/wayfinder/Poland-2026/images/wroclaw/attractions/panorama-raclawice.jpg',
+  'wroclaw-walking-tour.jpg': '/wayfinder/Poland-2026/images/wroclaw/attractions/wroclaw-walking-tour.jpg'
 };
 
 export function getAttractionImage(cardImage = '', cardTitle = '', cityName = 'Kraków') {
   if (cardImage) {
+    if (cardImage.startsWith('/wayfinder/')) {
+      return cardImage;
+    }
+    if (cardImage.startsWith('/Poland-2026/')) {
+      return `/wayfinder${cardImage}`;
+    }
     const filename = cardImage.split('/').pop();
     if (attractionImages[filename]) {
       return attractionImages[filename];
@@ -106,3 +78,4 @@ export function getAttractionImage(cardImage = '', cardTitle = '', cityName = 'K
 
   return cityImages[cName] || cityImages.krakow;
 }
+

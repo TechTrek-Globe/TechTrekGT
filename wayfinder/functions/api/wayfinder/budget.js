@@ -3,7 +3,7 @@
 
 export async function handleBudget(context, url, method) {
   const { env, user } = context;
-  const journeyId = url.searchParams.get('journey_id');
+  const journeyId = url.searchParams.get('journey_id') || url.searchParams.get('journeyId');
 
   try {
     if (!env.DB) return json({ error: 'Database not available' }, 503);

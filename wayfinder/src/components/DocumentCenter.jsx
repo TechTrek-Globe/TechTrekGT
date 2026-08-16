@@ -41,6 +41,7 @@ export function DocumentCenter() {
   const closeViewer = () => {
     setSelectedDoc(null);
     window.history.pushState({}, '', window.location.pathname);
+    window.dispatchEvent(new PopStateEvent('popstate'));
   };
 
   return (
@@ -81,7 +82,7 @@ export function DocumentCenter() {
             <div className="p-4 border-b border-white/10 flex items-center justify-between bg-wf-navy">
               <div className="flex items-center space-x-3">
                 <FileText className="w-5 h-5 text-wf-blue-lt" />
-                <h3 className="text-white font-medium truncate">{selectedDoc.filename}</h3>
+                <h3 className="text-white font-medium truncate">{selectedDoc.safe_display_name || selectedDoc.filename}</h3>
                 {selectedDoc.sensitive_blocked === 1 && (
                   <span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-wf-cranberry/20 text-wf-cranberry border border-wf-cranberry/30">
                     Sensitive Info Redacted
@@ -102,14 +103,14 @@ export function DocumentCenter() {
             <div className="flex-1 bg-white/5 p-4 flex items-center justify-center overflow-auto">
               <div className="text-center text-wf-muted">
                 <FileText className="w-16 h-16 mx-auto mb-4 opacity-50" />
-                <p>Preview rendering active for: <strong>{selectedDoc.filename}</strong></p>
+                <p>Preview rendering active for: <strong>{selectedDoc.safe_display_name || selectedDoc.filename}</strong></p>
                 <p className="text-sm mt-2 opacity-60">In production, this area embeds PDF.js or an image tag.</p>
               </div>
             </div>
             
             <div className="p-4 border-t border-white/10 bg-wf-navy text-xs text-wf-muted flex justify-between">
-              <span>Uploaded: {new Date(selectedDoc.uploaded_at).toLocaleString()}</span>
-              <span>Size: {(selectedDoc.file_size / 1024).toFixed(1)} KB</span>
+              <span>Uploaded: {new Date(selectedDoc.upload_date || selectedDoc.uploaded_at || Date.now()).toLocaleString()}</span>
+              <span>Size: {(((selectedDoc.file_size_bytes || selectedDoc.file_size || 0)) / 1024).toFixed(1)} KB</span>
             </div>
           </div>
         </div>
@@ -137,13 +138,13 @@ export function DocumentCenter() {
                   </div>
                 </div>
                 
-                <h4 className="text-white text-sm font-medium truncate mb-1" title={doc.filename}>
-                  {doc.filename}
+                <h4 className="text-white text-sm font-medium truncate mb-1" title={doc.safe_display_name || doc.filename}>
+                  {doc.safe_display_name || doc.filename}
                 </h4>
                 
                 <div className="flex items-center justify-between mt-auto pt-2">
                   <span className="text-xs text-wf-muted">
-                    {new Date(doc.uploaded_at).toLocaleDateString()}
+                    {new Date(doc.upload_date || doc.uploaded_at || Date.now()).toLocaleDateString()}
                   </span>
                   
                   {doc.sensitive_blocked === 1 && (

@@ -7,14 +7,15 @@ import { generateId } from '../../utils/id.js';
 
 export async function handleItinerary(context, url, method) {
   const { env, user, request } = context;
-  const parts  = url.pathname.split('/').filter(Boolean);
-  const itemId = parts[4] || null;
+  const parts = url.pathname.split('/').filter(Boolean);
+  const itIdx = parts.indexOf('itinerary');
+  const itemId = itIdx !== -1 ? (parts[itIdx + 1] || null) : null;
 
   try {
     if (!env.DB) return json({ error: 'Database not available' }, 503);
 
     if (method === 'GET') {
-      const journeyId = url.searchParams.get('journey_id');
+      const journeyId = url.searchParams.get('journey_id') || url.searchParams.get('journeyId');
       if (!journeyId) return json({ error: 'journey_id required' }, 400);
 
       // Verify ownership
@@ -36,7 +37,8 @@ export async function handleItinerary(context, url, method) {
 
     if (method === 'POST') {
       const body = await request.json().catch(() => ({}));
-      const { journey_id, item_type, title, destination_id, local_date, local_time,
+      const journey_id = body.journey_id || body.journeyId;
+      const { item_type, title, destination_id, local_date, local_time,
               end_date, end_time, timezone, location, provider, notes, source_document_id } = body;
 
       if (!journey_id || !item_type || !title) {

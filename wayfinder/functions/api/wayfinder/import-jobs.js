@@ -14,14 +14,27 @@ const CRITICAL_FIELDS = new Set([
 
 export async function handleImportJobs(context, url, method) {
   const { env, user, request } = context;
-  const parts  = url.pathname.split('/').filter(Boolean);
-  // ['api','wayfinder','import-jobs', docId, action]
-  const docId  = parts[3] || null;
-  const action = parts[4] || null;
+  const parts = url.pathname.split('/').filter(Boolean);
+  const jobIdx = parts.indexOf('import-jobs');
+  const docId = jobIdx !== -1 ? (parts[jobIdx + 1] || null) : null;
+  const action = jobIdx !== -1 ? (parts[jobIdx + 2] || null) : null;
 
   try {
     if (!env.DB) return json({ error: 'Database not available' }, 503);
-    if (!docId)  return json({ error: 'document id required' }, 400);
+
+    // --- GET all jobs for user when no docId is specified ---
+    if (method === 'GET' && !docId) {
+      const jobs = await env.DB.prepare(
+        `SELECT j.*, d.safe_display_name, d.detected_provider, d.detected_doc_type, d.upload_date, d.journey_id
+         FROM wayfinder_extraction_jobs j
+         JOIN wayfinder_documents d ON j.document_id = d.id
+         WHERE d.user_id = ? AND d.deleted_at IS NULL
+         ORDER BY j.created_at DESC`
+      ).bind(user.userId).all();
+      return json({ jobs: jobs.results });
+    }
+
+    if (!docId) return json({ error: 'document id required' }, 400);
 
     // Verify document ownership
     const doc = await env.DB.prepare(
@@ -103,7 +116,8 @@ export async function handleImportJobs(context, url, method) {
     // --- POST approve: user approves extraction, create itinerary item ---
     if (method === 'POST' && action === 'approve') {
       const body = await request.json().catch(() => ({}));
-      const { journey_id, field_overrides = {} } = body;
+      const journey_id = body.journey_id || body.journeyId;
+      const { field_overrides = {} } = body;
 
       if (!journey_id) return json({ error: 'journey_id required' }, 400);
 

@@ -16,7 +16,7 @@ export function WayfinderProvider({ children }) {
   const fetchItinerary = useCallback(async (journeyId = 'poland-christmas-2026') => {
     if (!isAuthenticated) return;
     try {
-      const res = await fetch(getApiUrl(`/api/wayfinder/itinerary?journeyId=${journeyId}`), { credentials: 'include' });
+      const res = await fetch(getApiUrl(`/api/wayfinder/itinerary?journey_id=${journeyId}`), { credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
         setItinerary(data.items || []);
@@ -29,7 +29,7 @@ export function WayfinderProvider({ children }) {
   const fetchDocuments = useCallback(async (journeyId = 'poland-christmas-2026') => {
     if (!isAuthenticated) return;
     try {
-      const res = await fetch(getApiUrl(`/api/wayfinder/documents?journeyId=${journeyId}`), { credentials: 'include' });
+      const res = await fetch(getApiUrl(`/api/wayfinder/documents?journey_id=${journeyId}`), { credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
         setDocuments(data.documents || []);
@@ -54,7 +54,7 @@ export function WayfinderProvider({ children }) {
 
   const uploadDocument = async (journeyId, file, type, extractionResult = null) => {
     const formData = new FormData();
-    formData.append('journeyId', journeyId);
+    formData.append('journey_id', journeyId);
     formData.append('file', file);
     formData.append('type', type);
     if (extractionResult) {

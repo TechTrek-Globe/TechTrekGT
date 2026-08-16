@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSettings } from '../context/SettingsContext';
+import { getApiUrl } from '../utils/api';
 
 const STORAGE_KEY = 'wayfinder_pln_usd_rate';
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -118,7 +119,7 @@ export function useExchangeRate() {
       }
 
       setRates((prev) => ({ ...prev, loading: true }));
-      const res = await fetch('https://open.er-api.com/v6/latest/USD');
+      const res = await fetch(getApiUrl('/api/wayfinder/exchange-rate'));
       if (!res.ok) throw new Error('Network response failed');
       const data = await res.json();
 
@@ -126,8 +127,8 @@ export function useExchangeRate() {
         const pln = data.rates.PLN;
         const eurRate = data.rates.EUR || 0.92;
         const gbpRate = data.rates.GBP || 0.78;
-        const eur = pln / eurRate;
-        const gbp = pln / gbpRate;
+        const eur = data.rates.EUR ? (pln / data.rates.EUR) : 4.30;
+        const gbp = data.rates.GBP ? (pln / data.rates.GBP) : 4.95;
         const formattedTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         const now = Date.now();
 

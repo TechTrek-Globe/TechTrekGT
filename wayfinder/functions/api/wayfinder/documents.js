@@ -15,14 +15,14 @@ const ALLOWED_MIME  = new Set([
 export async function handleDocuments(context, url, method) {
   const { env, user, request } = context;
   const parts = url.pathname.split('/').filter(Boolean);
-  // ['api','wayfinder','documents','register' | :id]
-  const subpath = parts[3] || null;
+  const docIdx = parts.indexOf('documents');
+  const subpath = docIdx !== -1 ? (parts[docIdx + 1] || null) : null;
 
   try {
     if (!env.DB) return json({ error: 'Database not available' }, 503);
 
     if (method === 'GET') {
-      const journeyId = url.searchParams.get('journey_id');
+      const journeyId = url.searchParams.get('journey_id') || url.searchParams.get('journeyId');
       let docs;
       if (journeyId) {
         // Verify journey ownership
@@ -41,9 +41,33 @@ export async function handleDocuments(context, url, method) {
       return json({ documents: docs.results.map(safeDoc) });
     }
 
-    if (method === 'POST' && subpath === 'register') {
-      const body = await request.json().catch(() => ({}));
-      const { original_filename, mime_type, file_size_bytes, file_hash, journey_id } = body;
+    if (method === 'POST' && (subpath === 'register' || subpath === null)) {
+      let original_filename = null;
+      let mime_type = null;
+      let file_size_bytes = null;
+      let file_hash = null;
+      let journey_id = null;
+
+      const contentType = request.headers.get('content-type') || '';
+      if (contentType.includes('multipart/form-data')) {
+        const formData = await request.formData().catch(() => null);
+        if (formData) {
+          const file = formData.get('file');
+          if (file && typeof file === 'object') {
+            original_filename = file.name || 'uploaded_document';
+            mime_type = file.type || 'application/pdf';
+            file_size_bytes = file.size || 0;
+          }
+          journey_id = formData.get('journey_id') || formData.get('journeyId');
+        }
+      } else {
+        const body = await request.json().catch(() => ({}));
+        original_filename = body.original_filename || body.filename;
+        mime_type = body.mime_type || body.type;
+        file_size_bytes = body.file_size_bytes || body.size;
+        file_hash = body.file_hash || body.hash;
+        journey_id = body.journey_id || body.journeyId;
+      }
 
       if (!original_filename || !mime_type) {
         return json({ error: 'original_filename and mime_type are required' }, 400);
@@ -103,6 +127,7 @@ export async function handleDocuments(context, url, method) {
         document_id: id,
         extraction_job_id: jobId,
         safe_display_name: safeName,
+        filename: safeName,
         storage_note: 'R2 storage not yet configured - document metadata registered. File extraction available client-side.',
       }, 201);
     }
@@ -135,9 +160,13 @@ function safeDoc(doc) {
     id:                  doc.id,
     journey_id:          doc.journey_id,
     safe_display_name:   doc.safe_display_name,
+    filename:            doc.safe_display_name,
+    original_filename:   doc.original_filename,
     mime_type:           doc.mime_type,
     file_size_bytes:     doc.file_size_bytes,
+    file_size:           doc.file_size_bytes,
     upload_date:         doc.upload_date,
+    uploaded_at:         doc.upload_date,
     processing_status:   doc.processing_status,
     detected_provider:   doc.detected_provider,
     detected_doc_type:   doc.detected_doc_type,

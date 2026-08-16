@@ -4,8 +4,8 @@
 export async function handleJourneys(context, url, method) {
   const { env, user } = context;
   const parts = url.pathname.split('/').filter(Boolean);
-  // parts: ['api', 'wayfinder', 'journeys', ...rest]
-  const slug = parts[3] || null;
+  const journeyIdx = parts.indexOf('journeys');
+  const slug = journeyIdx !== -1 ? (parts[journeyIdx + 1] || null) : null;
 
   try {
     if (!env.DB) {

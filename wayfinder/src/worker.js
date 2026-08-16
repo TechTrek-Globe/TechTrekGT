@@ -46,6 +46,7 @@ function addSecurityHeaders(response, isLocal = false) {
       "connect-src 'self' https://techtrekgt.com",
       "img-src 'self' data: blob: https://fonts.gstatic.com https://www.transparenttextures.com",
       "font-src 'self' data: https://fonts.gstatic.com",
+      "frame-src 'self' https://www.youtube-nocookie.com https://www.youtube.com https://www.openstreetmap.org",
       "frame-ancestors 'none'",
       "form-action 'self'",
       "base-uri 'self'",

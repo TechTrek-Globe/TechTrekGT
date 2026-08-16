@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   TrendingUp, Search, ExternalLink, Save, CheckCircle2,
-  AlertCircle, Loader2, RefreshCw, BarChart2, ShieldCheck,
-  DollarSign, ArrowUpRight, Filter, Sparkles, SlidersHorizontal, Zap, Copy
+  AlertCircle, Loader2, RefreshCw, ShieldCheck,
+  ArrowUpRight, Sparkles, Zap, Copy
 } from 'lucide-react';
-import { getComps, saveComp, updateItem, fetchLiveComps } from '../utils/auctionApi';
-import { fmtCurrency, fmtPct } from '../utils/formulaPreview';
+import { getComps, saveComp, fetchLiveComps } from '../utils/auctionApi';
+import { fmtCurrency } from '../utils/formulaPreview';
 import { getCertVerificationUrl, getAuthenticatorMeta } from '../utils/certLookup';
 import { ListingCopyModal } from './ListingCopyModal';
-import { cleanItemName, cleanAthleteName, cleanItemDescription } from '../utils/spreadsheetParser';
+import { cleanAthleteName, cleanItemDescription } from '../utils/spreadsheetParser';
 
 function cleanEbaySearchQuery(itemName, athlete, authenticator) {
   let text = String(itemName || '').trim();

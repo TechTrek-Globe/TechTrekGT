@@ -1,22 +1,20 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
-  Plus, Search, Filter, RefreshCw, Loader2, AlertCircle,
-  Package, Pencil, Trash2, Check, X, ChevronDown, ExternalLink,
-  ArrowUpDown, Eye, EyeOff, DollarSign
+  Plus, Search, RefreshCw, Loader2, AlertCircle,
+  Package, Pencil, Trash2, Check, ChevronDown,
+  ArrowUpDown, DollarSign, Copy, Upload, ShoppingCart
 } from 'lucide-react';
-import { getItems, updateItem, deleteItem, getInvoices } from '../utils/auctionApi';
+import { getItems, updateItem, deleteItem } from '../utils/auctionApi';
 import { AddInvoiceModal } from './AddInvoiceModal';
 import { LogSaleModal } from './LogSaleModal';
 import { SpreadsheetImporterModal } from './SpreadsheetImporterModal';
 import { ListingCopyModal } from './ListingCopyModal';
 import { EditItemModal } from './EditItemModal';
 import { AmazonItemModal } from './AmazonItemModal';
-import { fmtCurrency, fmtPct } from '../utils/formulaPreview';
+import { fmtCurrency } from '../utils/formulaPreview';
 import { getApiUrl } from '../utils/api';
-import { FileSpreadsheet, ShieldCheck, Copy, Upload, ShoppingCart } from 'lucide-react';
-import { getCertVerificationUrl, getAuthenticatorMeta } from '../utils/certLookup';
 import { DEFAULT_COLUMNS, DEFAULT_CATEGORIES, getStoredUserSettings, saveUserSettings } from '../utils/userSettings';
-import { cleanItemName, cleanAthleteName, cleanItemDescription } from '../utils/spreadsheetParser';
+import { cleanAthleteName, cleanItemDescription } from '../utils/spreadsheetParser';
 
 const STATUS_META = {
   'Available':     { color: 'text-emerald-400', bg: 'bg-emerald-500/10',  border: 'border-emerald-500/20' },
@@ -44,8 +42,12 @@ function InlineStatusSelect({ itemId, current, onUpdated }) {
     if (status === current) { setOpen(false); return; }
     setSaving(true);
     try {
-      await updateItem(itemId, { status });
-      onUpdated(itemId, { status });
+      const res = await updateItem(itemId, { status });
+      const patch = { status };
+      if (res?.min_sell_price !== undefined) patch.min_sell_price = res.min_sell_price;
+      if (res?.suggested_list_price !== undefined) patch.suggested_list_price = res.suggested_list_price;
+      if (res?.days_on_market !== undefined) patch.days_on_market = res.days_on_market;
+      onUpdated(itemId, patch);
     } catch (e) {
       console.error(e);
     } finally {
@@ -95,8 +97,12 @@ function InlineEditCell({ value, itemId, field, type = 'text', prefix, suffix, c
     if (parsed === value) { cancel(); return; }
     setSaving(true);
     try {
-      await updateItem(itemId, { [field]: parsed });
-      if (onUpdated) onUpdated(itemId, { [field]: parsed });
+      const res = await updateItem(itemId, { [field]: parsed });
+      const patch = { [field]: parsed };
+      if (res?.min_sell_price !== undefined) patch.min_sell_price = res.min_sell_price;
+      if (res?.suggested_list_price !== undefined) patch.suggested_list_price = res.suggested_list_price;
+      if (res?.days_on_market !== undefined) patch.days_on_market = res.days_on_market;
+      if (onUpdated) onUpdated(itemId, patch);
     } catch (e) {
       console.error(e);
     } finally {
@@ -147,8 +153,12 @@ function InlineSelectCell({ value, itemId, field, options = [], onUpdated }) {
     if (val === value) { setEditing(false); return; }
     setSaving(true);
     try {
-      await updateItem(itemId, { [field]: val });
-      if (onUpdated) onUpdated(itemId, { [field]: val });
+      const res = await updateItem(itemId, { [field]: val });
+      const patch = { [field]: val };
+      if (res?.min_sell_price !== undefined) patch.min_sell_price = res.min_sell_price;
+      if (res?.suggested_list_price !== undefined) patch.suggested_list_price = res.suggested_list_price;
+      if (res?.days_on_market !== undefined) patch.days_on_market = res.days_on_market;
+      if (onUpdated) onUpdated(itemId, patch);
     } catch (e) {
       console.error(e);
     } finally {
@@ -335,6 +345,16 @@ export function InventoryView() {
 
   const handleItemUpdated = (id, patch) => {
     setItems(prev => prev.map(it => it.id === id ? { ...it, ...patch } : it));
+  };
+
+  const handleFieldSave = async (id, patch) => {
+    const res = await updateItem(id, patch);
+    const merged = { ...patch };
+    if (res?.min_sell_price !== undefined) merged.min_sell_price = res.min_sell_price;
+    if (res?.suggested_list_price !== undefined) merged.suggested_list_price = res.suggested_list_price;
+    if (res?.days_on_market !== undefined) merged.days_on_market = res.days_on_market;
+    handleItemUpdated(id, merged);
+    return res;
   };
 
   const handleDelete = async (id) => {

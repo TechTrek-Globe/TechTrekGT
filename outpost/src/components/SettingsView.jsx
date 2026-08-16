@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Settings, Shield, Download, RefreshCw, Plus, Edit2, Trash2,
-  CheckCircle2, AlertCircle, Loader2, Save, FileText, Database, User, ShieldCheck,
+  Settings, Download, RefreshCw, Plus, Edit2, Trash2,
+  CheckCircle2, AlertCircle, Loader2, Save, FileText, Database, ShieldCheck,
   FileSpreadsheet, Upload, ArrowRightLeft, Sparkles, Boxes, Calculator, LayoutGrid, ArrowUp, ArrowDown, Eye, EyeOff,
-  ShoppingCart, Copy, RotateCcw, ExternalLink
+  ShoppingCart, Copy, RotateCcw
 } from 'lucide-react';
 import { SpreadsheetImporterModal } from './SpreadsheetImporterModal';
 import { FinanceSyncModal } from './FinanceSyncModal';
@@ -12,7 +12,7 @@ import { TaxReportModal } from './TaxReportModal';
 import { useAuth } from '../context/AuthContext';
 import {
   getPlatforms, createPlatform, updatePlatform, deletePlatform, resetPlatforms,
-  getItems, getSales, getInvoices, getComps
+  getItems, getSales, getInvoices, getComps, getApiUrl
 } from '../utils/auctionApi';
 import { fmtCurrency, fmtPct } from '../utils/formulaPreview';
 import { DEFAULT_COLUMNS, DEFAULT_CATEGORIES, getStoredUserSettings, saveUserSettings, resetColumnWidths } from '../utils/userSettings';
@@ -975,7 +975,7 @@ export function SettingsView() {
         onLoad={async () => {
           setTokenLoading(true);
           try {
-            const res = await fetch('/outpost/api/import/amazon-token', { credentials: 'include' });
+            const res = await fetch(getApiUrl('/api/import/amazon-token'), { credentials: 'include' });
             const d = await res.json();
             setAmazonToken(d.token || null);
           } catch (e) { console.error(e); } finally { setTokenLoading(false); }
@@ -984,7 +984,7 @@ export function SettingsView() {
           if (!window.confirm('Regenerate your API token? The old token will stop working immediately.')) return;
           setTokenRotating(true);
           try {
-            const res = await fetch('/outpost/api/import/amazon-token', { method: 'POST', credentials: 'include' });
+            const res = await fetch(getApiUrl('/api/import/amazon-token'), { method: 'POST', credentials: 'include' });
             const d = await res.json();
             setAmazonToken(d.token || null);
             showSuccess('API token regenerated successfully.');

@@ -1,32 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   DollarSign, TrendingUp, Package, Gavel, Clock, BarChart2,
-  RefreshCw, Loader2, AlertCircle, ArrowUpRight, Plus, CheckCircle2,
-  ShieldCheck, ShoppingBag, Layers, Award, Tag, ArrowRightLeft, Calculator,
-  Boxes, FileSpreadsheet
+  RefreshCw, Loader2, AlertCircle,
+  ShieldCheck, ShoppingBag, Layers, Tag
 } from 'lucide-react';
-import { getDashboard, getPlatforms } from '../utils/auctionApi';
-import { AddInvoiceModal } from './AddInvoiceModal';
-import { LogSaleModal } from './LogSaleModal';
-import { FinanceSyncModal } from './FinanceSyncModal';
-import { CardShowCalculatorModal } from './CardShowCalculatorModal';
-import { SuppliesTrackerModal } from './SuppliesTrackerModal';
-import { TaxReportModal } from './TaxReportModal';
+import { getDashboard } from '../utils/auctionApi';
 import { fmtCurrency, fmtPct } from '../utils/formulaPreview';
 
 export function DashboardView({ onNavigate }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [platforms, setPlatforms] = useState([]);
-
-  // Quick action modals
-  const [addInvoiceOpen, setAddInvoiceOpen] = useState(false);
-  const [logSaleOpen, setLogSaleOpen] = useState(false);
-  const [financeSyncOpen, setFinanceSyncOpen] = useState(false);
-  const [cardShowOpen, setCardShowOpen] = useState(false);
-  const [suppliesOpen, setSuppliesOpen] = useState(false);
-  const [taxReportOpen, setTaxReportOpen] = useState(false);
 
   const fetchDashboard = useCallback(async () => {
     setLoading(true);
@@ -41,19 +25,9 @@ export function DashboardView({ onNavigate }) {
     }
   }, []);
 
-  const fetchPlatforms = useCallback(async () => {
-    try {
-      const res = await getPlatforms();
-      setPlatforms(res.platforms || []);
-    } catch (err) {
-      console.error(err);
-    }
-  }, []);
-
   useEffect(() => {
     fetchDashboard();
-    fetchPlatforms();
-  }, [fetchDashboard, fetchPlatforms]);
+  }, [fetchDashboard]);
 
   if (loading && !data) {
     return (
@@ -495,40 +469,6 @@ export function DashboardView({ onNavigate }) {
           )}
         </div>
       </div>
-
-      {/* Modals */}
-      <AddInvoiceModal
-        isOpen={addInvoiceOpen}
-        platforms={platforms}
-        onClose={() => setAddInvoiceOpen(false)}
-        onCreated={fetchDashboard}
-      />
-      <LogSaleModal
-        isOpen={logSaleOpen}
-        platforms={platforms}
-        onClose={() => setLogSaleOpen(false)}
-        onCreated={fetchDashboard}
-      />
-      <FinanceSyncModal
-        isOpen={financeSyncOpen}
-        onClose={() => {
-          setFinanceSyncOpen(false);
-          fetchDashboard();
-        }}
-      />
-      <CardShowCalculatorModal
-        isOpen={cardShowOpen}
-        onClose={() => setCardShowOpen(false)}
-        onItemAdded={fetchDashboard}
-      />
-      <SuppliesTrackerModal
-        isOpen={suppliesOpen}
-        onClose={() => setSuppliesOpen(false)}
-      />
-      <TaxReportModal
-        isOpen={taxReportOpen}
-        onClose={() => setTaxReportOpen(false)}
-      />
     </div>
   );
 }

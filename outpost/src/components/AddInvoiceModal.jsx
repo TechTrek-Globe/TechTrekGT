@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  X, Plus, Trash2, ChevronDown, Loader2, AlertCircle,
-  Package, DollarSign, Truck, Tag
+  X, Plus, Trash2, Loader2, AlertCircle,
+  DollarSign, Truck, Tag
 } from 'lucide-react';
-import { createInvoice, getItems } from '../utils/auctionApi';
+import { createInvoice } from '../utils/auctionApi';
 import { computeItemProration, computePricingFloors } from '../utils/formulaPreview';
 
 const CATEGORIES = ['Jersey', 'Photo', 'Card', 'Baseball', 'Bat', 'Football',

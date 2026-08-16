@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import {
   Package, X, Save, Loader2, ExternalLink, ShieldCheck, Tag,
-  DollarSign, Calendar, FileText, Sparkles, CheckCircle2, AlertCircle, Copy
+  DollarSign, Calendar, CheckCircle2, AlertCircle
 } from 'lucide-react';
 import { updateItem } from '../utils/auctionApi';
 import { getCertVerificationUrl, getAuthenticatorMeta } from '../utils/certLookup';
-import { fmtCurrency, fmtPct } from '../utils/formulaPreview';
-import { cleanItemName, cleanAthleteName, cleanItemDescription } from '../utils/spreadsheetParser';
+import { fmtCurrency } from '../utils/formulaPreview';
+import { cleanAthleteName, cleanItemDescription } from '../utils/spreadsheetParser';
 
 const PLATFORM_FEE_PRESETS = {
   'eBay':         { fee_pct: 13.5, flat_fee: 0.40 },

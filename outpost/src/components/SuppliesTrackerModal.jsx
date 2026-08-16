@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  X, Package, Plus, Trash2, Download, RefreshCw,
-  Loader2, CheckCircle2, AlertCircle, DollarSign, Tag, Calendar, Layers
+  X, Package, Plus, Trash2, Download,
+  Loader2, CheckCircle2, AlertCircle
 } from 'lucide-react';
 import { getSupplies, createSupply, deleteSupply } from '../utils/auctionApi';
 

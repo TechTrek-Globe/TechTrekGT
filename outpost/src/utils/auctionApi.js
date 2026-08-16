@@ -1,4 +1,5 @@
 import { getApiUrl } from '../utils/api';
+export { getApiUrl };
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
 const OPTS = { credentials: 'include' };

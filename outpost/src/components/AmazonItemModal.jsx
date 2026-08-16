@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import {
-  X, ShoppingCart, Link, Hash, DollarSign, Tag, Loader2, AlertCircle, CheckCircle2, Search, ExternalLink, PackageCheck
+  X, ShoppingCart, Link, DollarSign, Loader2, AlertCircle, CheckCircle2, Search, ExternalLink, PackageCheck
 } from 'lucide-react';
-import { createInvoice } from '../utils/auctionApi';
+import { createInvoice, getApiUrl } from '../utils/auctionApi';
 
 const CATEGORIES = [
   'Electronics', 'Toys & Games', 'Books', 'Home & Kitchen', 'Sports', 'Health',
@@ -91,7 +91,7 @@ export function AmazonItemModal({ isOpen, platforms = [], onClose, onCreated }) 
     setFetchMsg('Fetching product metadata...');
 
     try {
-      const res = await fetch('/outpost/api/import/amazon-fetch', {
+      const res = await fetch(getApiUrl('/api/import/amazon-fetch'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

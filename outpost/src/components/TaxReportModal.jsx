@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
-  X, FileSpreadsheet, Download, Printer, RefreshCw,
-  Loader2, DollarSign, Calculator, TrendingUp, ShieldCheck,
-  Calendar, Layers, CheckCircle2, AlertCircle, Building2
+  X, FileSpreadsheet, Download, Printer,
+  Loader2, Calculator, Calendar, Layers, AlertCircle, Building2
 } from 'lucide-react';
 import { getTaxReport } from '../utils/auctionApi';
 

@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import {
-  Gavel, LayoutDashboard, Package, ShoppingCart, BarChart2,
+  LayoutDashboard, Package, ShoppingCart, BarChart2,
   Settings, LogOut, ChevronRight, Calculator, ArrowRightLeft,
-  Sparkles, Boxes, FileSpreadsheet
+  Boxes, FileSpreadsheet
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { FinanceSyncModal } from './FinanceSyncModal';
@@ -11,7 +11,6 @@ import { SuppliesTrackerModal } from './SuppliesTrackerModal';
 import { TaxReportModal } from './TaxReportModal';
 
 import outpostLogo from '../assets/outpost-logo.webp';
-import outpostHeaderBanner from '../assets/outpost-ai-cropped.webp';
 
 const NAV_ITEMS = [
   { id: 'dashboard',   label: 'Dashboard',            icon: LayoutDashboard },

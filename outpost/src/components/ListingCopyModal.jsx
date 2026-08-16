@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {
-  X, Copy, Check, ExternalLink, Sparkles, FileCode,
-  FileText, ShieldCheck, Tag, ShoppingBag, Eye, Sliders
+  X, Copy, Check, Sparkles, FileCode,
+  FileText, Eye
 } from 'lucide-react';
 import {
   generateEbayCopy,

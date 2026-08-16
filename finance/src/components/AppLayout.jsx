@@ -31,13 +31,11 @@ const NAV_ITEMS = [
 
 const SIDEBAR_KEY = 'trekledger_sidebar_collapsed';
 
-const SidebarContent = ({ collapsed, activeView, cashOnHand, netIncome, netFlow, setActiveView, onNavigateView, setIsSettingsOpen, onClose, isLight = false }) => {
+const SidebarContent = ({ collapsed, activeView = 'dashboard', cashOnHand, netIncome, netFlow, onNavigateView, setIsSettingsOpen, onClose, isLight = false }) => {
   const logoSrc = isLight ? headerLogoLight : headerLogoDark;
   const handleViewClick = (viewId) => {
     if (onNavigateView) {
       onNavigateView(viewId);
-    } else {
-      setActiveView(viewId);
     }
   };
   return (
@@ -118,15 +116,13 @@ const SidebarContent = ({ collapsed, activeView, cashOnHand, netIncome, netFlow,
   );
 };
 
-export function AppLayout({ children, onNavigateHome, onNavigateView }) {
+export function AppLayout({ children, onNavigateHome, onNavigateView, activeView = 'dashboard' }) {
   const {
     budget,
     isDbLoaded,
     saveError,
     theme,
     setTheme,
-    activeView,
-    setActiveView,
     setIsSettingsOpen,
     getTotalMonthlyNetIncome,
     getTotalMonthlyExpenses,
@@ -172,7 +168,6 @@ export function AppLayout({ children, onNavigateHome, onNavigateView }) {
           netIncome={netIncome}
           netFlow={netFlow}
           isLight={isLight}
-          setActiveView={setActiveView}
           onNavigateView={onNavigateView}
           setIsSettingsOpen={setIsSettingsOpen}
         />
@@ -216,7 +211,6 @@ export function AppLayout({ children, onNavigateHome, onNavigateView }) {
               netIncome={netIncome}
               netFlow={netFlow}
               isLight={isLight}
-              setActiveView={setActiveView}
               onNavigateView={onNavigateView}
               setIsSettingsOpen={setIsSettingsOpen}
               onClose={() => setMobileOpen(false)}
@@ -304,8 +298,6 @@ export function AppLayout({ children, onNavigateHome, onNavigateView }) {
             onClick={() => {
               if (onNavigateView) {
                 onNavigateView('settings');
-              } else {
-                setActiveView('settings');
               }
             }}
             aria-label="Open settings view"

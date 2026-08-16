@@ -91,13 +91,14 @@ function getViewFromPathname(pathname) {
 }
 
 function MainContent({ pathname, navigateTo, onNavigateHome }) {
-  const { activeView, setActiveView, isSettingsOpen } = useBudget();
+  const { isSettingsOpen } = useBudget();
   const { isAuthenticated } = useAuth();
+
+  const normalized = (pathname || '').toLowerCase().replace(/\/$/, '');
+  const activeView = getViewFromPathname(normalized);
 
   // Synchronize view state and URL pathname based on auth state
   useEffect(() => {
-    const normalized = (pathname || '').toLowerCase().replace(/\/$/, '');
-
     if (!isAuthenticated) {
       if (normalized.startsWith('/finance') && normalized !== '/finance') {
         if (typeof window !== 'undefined') {
@@ -112,12 +113,7 @@ function MainContent({ pathname, navigateTo, onNavigateHome }) {
       navigateTo('/finance/dashboard');
       return;
     }
-
-    const targetView = getViewFromPathname(normalized);
-    if (targetView && targetView !== activeView) {
-      setActiveView(targetView);
-    }
-  }, [pathname, isAuthenticated]);
+  }, [normalized, isAuthenticated, navigateTo]);
 
   if (!isAuthenticated) {
     return (
@@ -129,17 +125,20 @@ function MainContent({ pathname, navigateTo, onNavigateHome }) {
   }
 
   const handleNavigateView = (viewId) => {
-    setActiveView(viewId);
-    navigateTo(`/finance/${viewId}`);
+    if (viewId === 'main_budget') {
+      navigateTo('/finance/main-budget');
+    } else {
+      navigateTo(`/finance/${viewId}`);
+    }
   };
 
   return (
-    <AppLayout onNavigateHome={onNavigateHome} onNavigateView={handleNavigateView}>
-      {activeView === 'dashboard'   && <DashboardView />}
-      {activeView === 'main_budget' && <MainBudgetView />}
-      {activeView === 'ledger'      && <LedgerView />}
-      {activeView === 'amortization'&& <AmortizationView />}
-      {activeView === 'settings'    && <SettingsView />}
+    <AppLayout activeView={activeView} onNavigateHome={onNavigateHome} onNavigateView={handleNavigateView}>
+      {activeView === 'dashboard'   && <DashboardView onNavigateView={handleNavigateView} />}
+      {activeView === 'main_budget' && <MainBudgetView onNavigateView={handleNavigateView} />}
+      {activeView === 'ledger'      && <LedgerView onNavigateView={handleNavigateView} />}
+      {activeView === 'amortization'&& <AmortizationView onNavigateView={handleNavigateView} />}
+      {activeView === 'settings'    && <SettingsView onNavigateView={handleNavigateView} />}
       {isSettingsOpen && <SettingsModal />}
       <AuthModal />
     </AppLayout>

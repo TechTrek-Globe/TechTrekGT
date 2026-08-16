@@ -128,7 +128,7 @@ const navigateTo = (path) => {
 | `/finance/amortization` | `AmortizationView` |
 | `/finance/settings` | `SettingsView` |
 
-Views are conditionally rendered inside `MainContent` based on `activeView`, which is kept in sync with the URL via `useEffect`.
+Views are conditionally rendered inside `MainContent` based on `activeView`, which is derived directly from `window.location.pathname` in the custom router and passed down to layout and view components.
 
 **Wayfinder route table** (richer, lazy-loaded):
 

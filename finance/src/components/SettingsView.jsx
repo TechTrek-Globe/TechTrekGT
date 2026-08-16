@@ -42,7 +42,7 @@ import { PRESET_SECURITY_QUESTIONS } from './AuthModal';
 import { getApiUrl } from '../utils/api';
 import { SpreadsheetImporter } from './SpreadsheetImporter';
 
-export function SettingsView() {
+export function SettingsView({ onNavigateView }) {
   const { 
     budget, 
     theme,
@@ -54,7 +54,6 @@ export function SettingsView() {
     resetDashboardWidgets,
     settingsTab,
     setSettingsTab,
-    setActiveView,
     addAccount,
     updateAccount,
     deleteAccount,
@@ -418,7 +417,7 @@ export function SettingsView() {
 
         <div className="flex items-center gap-2 self-start sm:self-center">
           <button
-            onClick={() => setActiveView('dashboard')}
+            onClick={() => (onNavigateView ? onNavigateView('dashboard') : (window.location.pathname = '/finance/dashboard'))}
             className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold border border-slate-700 transition-all flex items-center gap-2 cursor-pointer shadow-md"
           >
             <ArrowLeft className="w-4 h-4 text-blue-400" />

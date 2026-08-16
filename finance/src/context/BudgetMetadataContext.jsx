@@ -40,7 +40,6 @@ export function BudgetMetadataProvider({ children }) {
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState('accounts');
-  const [activeView, setActiveView] = useState('dashboard');
 
   const metadataStateRef = useRef(metadataState);
   useEffect(() => {
@@ -541,7 +540,6 @@ export function BudgetMetadataProvider({ children }) {
     hideDashboardHeader: Boolean(metadataState.hideDashboardHeader),
     dashboardWidgets: getDashboardWidgets(),
     selectedPersonId,
-    activeView,
     isSettingsOpen,
     settingsTab,
     isDbLoaded,
@@ -554,7 +552,6 @@ export function BudgetMetadataProvider({ children }) {
     theme,
     getDashboardWidgets,
     selectedPersonId,
-    activeView,
     isSettingsOpen,
     settingsTab,
     isDbLoaded,
@@ -575,7 +572,6 @@ export function BudgetMetadataProvider({ children }) {
     reorderDashboardWidgets,
     resetDashboardWidgets,
     setSelectedPersonId,
-    setActiveView,
     setIsSettingsOpen,
     setSettingsTab,
     setSaveError,

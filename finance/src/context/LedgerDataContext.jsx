@@ -1,11 +1,11 @@
 // @ts-nocheck
-import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { initialBudgetData } from '../initialData';
 import { fakeDemoBudgetData } from '../demoPresetData';
 import { useBudgetMetadata } from './BudgetMetadataContext';
 import { getApiUrl, pushCloudBackupOptimistic, flushPendingCloudSync } from '../utils/api';
 import { saveBudgetData, clearAndRestoreBudgetData, clearBudgetData } from '../utils/indexedDB';
-import { normalizeIsoDate } from '../utils/importer';
+import { processSpreadsheetImport } from '../utils/spreadsheet';
 
 export const LedgerDataContext = createContext(null);
 export const LedgerDataStateContext = createContext(null);
@@ -47,6 +47,20 @@ export function LedgerDataProvider({ children }) {
 
   const budgetRef = useRef(null);
 
+  // Track unsaved local changes to avoid losing data on tab close or navigation
+  const isPendingSaveRef = useRef(false);
+
+  const flushSaveToIndexedDB = useCallback(() => {
+    if (!isPendingSaveRef.current || !budgetRef.current) return;
+    isPendingSaveRef.current = false;
+    saveBudgetData(budgetRef.current)
+      .then(() => setSaveError(null))
+      .catch(err => {
+        console.error('Failed to flush budget to IndexedDB:', err);
+        setSaveError('Local storage save failed. Browser storage quota may be exceeded.');
+      });
+  }, [setSaveError]);
+
   // Sync initial seed loaded from IndexedDB by BudgetMetadataProvider
   useEffect(() => {
     if (isDbLoaded && initialLedgerSeed) {
@@ -75,16 +89,43 @@ export function LedgerDataProvider({ children }) {
   // Silently save combined budget to IndexedDB whenever metadata or ledger state changes (debounced 500ms)
   useEffect(() => {
     if (!isDbLoaded) return;
+    isPendingSaveRef.current = true;
     const timer = setTimeout(() => {
-      saveBudgetData(budget)
-        .then(() => setSaveError(null))
-        .catch(err => {
-          console.error('Failed to save budget to IndexedDB:', err);
-          setSaveError('Local storage save failed. Browser storage quota may be exceeded.');
-        });
+      if (isPendingSaveRef.current && budgetRef.current) {
+        isPendingSaveRef.current = false;
+        saveBudgetData(budgetRef.current)
+          .then(() => setSaveError(null))
+          .catch(err => {
+            console.error('Failed to save budget to IndexedDB:', err);
+            setSaveError('Local storage save failed. Browser storage quota may be exceeded.');
+          });
+      }
     }, 500);
     return () => clearTimeout(timer);
   }, [budget, isDbLoaded, setSaveError]);
+
+  // Flush pending save on tab close, page hide, or visibility change
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        flushSaveToIndexedDB();
+      }
+    };
+    const handleBeforeUnload = () => {
+      flushSaveToIndexedDB();
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('pagehide', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      flushSaveToIndexedDB();
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('pagehide', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [flushSaveToIndexedDB]);
 
   // Cloud Vault Push Backup (Optimistic + Fallback Queue)
   const pushCloudBackup = useCallback(async (passcode) => {
@@ -141,17 +182,20 @@ export function LedgerDataProvider({ children }) {
     return data;
   }, [restoreFromBackup]);
 
-  // Export complete JSON backup helper
+  // Export complete JSON backup helper using Blob API
   const exportBackupJson = useCallback(() => {
     try {
-      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(budgetRef.current, null, 2));
+      const jsonStr = JSON.stringify(budgetRef.current, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
       const downloadAnchor = document.createElement('a');
       const dateStr = new Date().toISOString().split('T')[0];
-      downloadAnchor.setAttribute("href", dataStr);
-      downloadAnchor.setAttribute("download", `techtrek_backup_${dateStr}.json`);
+      downloadAnchor.href = url;
+      downloadAnchor.download = `techtrek_backup_${dateStr}.json`;
       document.body.appendChild(downloadAnchor);
       downloadAnchor.click();
       downloadAnchor.remove();
+      URL.revokeObjectURL(url);
       return true;
     } catch (err) {
       console.error('Failed to export JSON backup:', err);
@@ -249,267 +293,35 @@ export function LedgerDataProvider({ children }) {
 
   // Selective per-namespace spreadsheet import
   const importSpreadsheetSelective = useCallback(({ namespaces, strategies, data }) => {
-    if (!namespaces || !data) return { success: false, error: 'Invalid payload.' };
+    const result = processSpreadsheetImport({
+      namespaces,
+      strategies,
+      data,
+      metadataState: metadataStateRef.current,
+      lineItems: lineItemsRef.current,
+      dailyMatrix: dailyMatrixRef.current,
+      transactions: transactionsRef.current
+    });
 
-    // 1. Process People
-    if (namespaces.people && Array.isArray(data.people)) {
-      if (strategies.people === 'override') {
-        setMetadataState(prev => ({ ...prev, people: data.people }));
-      } else {
-        setMetadataState(prev => {
-          const existingNames = new Set(prev.people.map(p => p.name.toLowerCase()));
-          return { ...prev, people: [...prev.people, ...data.people.filter(p => !existingNames.has(p.name.toLowerCase()))] };
-        });
-      }
+    if (!result.success) return result;
+
+    if (result.metadataState) {
+      setMetadataState(result.metadataState);
     }
-
-    // 2. Process Accounts
-    const accountIdMap = new Map();
-    if (namespaces.accounts && Array.isArray(data.accounts)) {
-      if (strategies.accounts === 'override') {
-        setMetadataState(prev => ({ ...prev, accounts: data.accounts }));
-        data.accounts.forEach(a => accountIdMap.set(a.id, a.id));
-      } else {
-        setMetadataState(prev => {
-          const existingAccounts = [...(prev.accounts || [])];
-          const newAccountsToAdd = [];
-
-          data.accounts.forEach(incomingAcc => {
-            const normName = incomingAcc.name.toLowerCase().trim();
-            const matchIdx = existingAccounts.findIndex(a =>
-              a.name.toLowerCase().trim() === normName ||
-              a.name.toLowerCase().includes(normName) ||
-              normName.includes(a.name.toLowerCase().trim())
-            );
-
-            if (matchIdx >= 0) {
-              const match = existingAccounts[matchIdx];
-              accountIdMap.set(incomingAcc.id, match.id);
-              // Propagate imported ledger metadata onto the matched account
-              const patches = {};
-              if (incomingAcc.importedLedgerRows && Object.keys(incomingAcc.importedLedgerRows).length > 0) {
-                patches.importedLedgerRows = incomingAcc.importedLedgerRows;
-                patches.ledgerMode = 'import';
-              }
-              if (Object.keys(patches).length > 0) {
-                existingAccounts[matchIdx] = { ...match, ...patches };
-              }
-            } else {
-              newAccountsToAdd.push(incomingAcc);
-              accountIdMap.set(incomingAcc.id, incomingAcc.id);
-            }
-          });
-
-          return { ...prev, accounts: [...existingAccounts, ...newAccountsToAdd] };
-        });
-      }
+    if (result.lineItems) {
+      setLineItems(result.lineItems);
     }
-
-    // Direct Target Account Metadata Binding (for account-bound CSV/spreadsheet imports)
-    if (data.targetAccountId) {
-      setMetadataState(prev => ({
-        ...prev,
-        accounts: (prev.accounts || []).map(acc => {
-          if (acc.id === data.targetAccountId) {
-            const patches = {};
-            if (data.importedLedgerRows && Object.keys(data.importedLedgerRows).length > 0) {
-              patches.importedLedgerRows = { ...(acc.importedLedgerRows || {}), ...data.importedLedgerRows };
-              patches.ledgerMode = 'import';
-            }
-            if (data.targetAccount && typeof data.targetAccount === 'object') {
-              Object.assign(patches, data.targetAccount);
-            }
-            return Object.keys(patches).length > 0 ? { ...acc, ...patches } : acc;
-          }
-          return acc;
-        })
-      }));
+    if (result.dailyMatrix) {
+      dailyMatrixRef.current = result.dailyMatrix;
+      setDailyMatrix(result.dailyMatrix);
+      setMatrixVersion(v => v + 1);
     }
-
-    // 3. Process Bills
-    if (namespaces.bills && Array.isArray(data.bills)) {
-      setMetadataState(prev => {
-        if (strategies.bills === 'override') {
-          return { ...prev, bills: data.bills };
-        } else {
-          const existingNames = new Set((prev.bills || []).map(b => b.name.toLowerCase().trim()));
-          return { ...prev, bills: [...(prev.bills || []), ...data.bills.filter(b => !existingNames.has(b.name.toLowerCase().trim()))] };
-        }
-      });
-    }
-
-    // 4. Process Transactions
-    if (namespaces.transactions && Array.isArray(data.transactions)) {
-      const stampedTransactions = data.transactions.map(t => ({
-        ...t,
-        accountId: t.accountId || data.targetAccountId || ''
-      }));
-
-      if (strategies.transactions === 'override') {
-        setTransactions(stampedTransactions);
-      } else {
-        setTransactions(prev => {
-          const key = t => `${t.accountId || ''}|${t.date}|${(t.description || '').toLowerCase()}|${t.amount}`;
-          const existingKeys = new Set(prev.map(key));
-          return [...prev, ...stampedTransactions.filter(t => !existingKeys.has(key(t)))];
-        });
-      }
-    }
-
-    // Bug 2 fix (Option B): reconcile imported actual transactions against projected bills, deposits, and other expenses.
-    // Uses month-scoped lineItem overrides for amount and dailyMatrix cell moves for date
-    // shifts - non-destructive to future projections (bill definition is never altered).
-    if (namespaces.transactions && Array.isArray(data.transactions)) {
-      const lineItemUpdates = [];
-      const matrixUpdates = {};
-      const matrixNoteShifts = [];
-
-      data.transactions.forEach(txn => {
-        if (!txn.date || txn.amount === undefined) return;
-        const normDate = normalizeIsoDate(txn.date);
-        if (!normDate) return;
-        const parts = normDate.split('-');
-        if (parts.length !== 3) return;
-        const actualDay = parseInt(parts[2], 10);
-        const rawAmount = parseFloat(txn.amount);
-        if (isNaN(actualDay) || isNaN(rawAmount)) return;
-        const actualAmount = Math.abs(rawAmount);
-        const isCredit = rawAmount > 0;
-        const monthKey = `${parts[0]}-${parts[1]}`;
-        const accountId = txn.accountId || data.targetAccountId || (metadataState.accounts[0]?.id || '');
-        const descLower = (txn.description || '').toLowerCase();
-
-        if (isCredit) {
-          // Check earner deposit match
-          let matchedPerson = null;
-          if (descLower.includes('hp') || descLower.includes('gym')) {
-            matchedPerson = metadataState.people.find(p => p.name.toLowerCase().includes('gym'));
-          } else if (descLower.includes('jon') || descLower.includes('usaa') || descLower.includes('transfer')) {
-            matchedPerson = metadataState.people.find(p => p.name.toLowerCase() === 'jon') || metadataState.people[0];
-          } else if (descLower.includes('ronnie')) {
-            matchedPerson = metadataState.people.find(p => p.name.toLowerCase() === 'ronnie');
-          } else {
-            matchedPerson = metadataState.people.find(p => p.name && descLower.includes(p.name.toLowerCase()));
-          }
-
-          if (matchedPerson) {
-            const creditKey = `${accountId}_${monthKey}_${actualDay}_credit_${matchedPerson.id}`;
-            const existingCredit = matrixUpdates[creditKey] || 0;
-            matrixUpdates[creditKey] = Math.round((existingCredit + actualAmount) * 100) / 100;
-
-            // Zero out the scheduled payday in this half of the month so it isn't duplicated
-            const targetPayDay = actualDay <= 15 ? (matchedPerson.payDay1 || 15) : (matchedPerson.payDay2 === 'last' ? 31 : (matchedPerson.payDay2 || 30));
-            const numericPayDay = typeof targetPayDay === 'number' ? targetPayDay : parseInt(targetPayDay) || (actualDay <= 15 ? 15 : 30);
-            if (numericPayDay !== actualDay) {
-              const schedCreditKey = `${accountId}_${monthKey}_${numericPayDay}_credit_${matchedPerson.id}`;
-              if (matrixUpdates[schedCreditKey] === undefined) {
-                matrixUpdates[schedCreditKey] = 0;
-              }
-            }
-          } else {
-            // Unmatched credit -> credit other
-            const otherKey = `${accountId}_${monthKey}_${actualDay}_other_amount`;
-            const otherDescKey = `${accountId}_${monthKey}_${actualDay}_other_desc`;
-            const existingOther = matrixUpdates[otherKey] || 0;
-            matrixUpdates[otherKey] = Math.round((existingOther - actualAmount) * 100) / 100;
-            matrixUpdates[otherDescKey] = txn.description;
-          }
-        } else {
-          // Debit / Expense: resolve bill
-          let resolvedBillId = txn.billId;
-          if (!resolvedBillId && txn.description) {
-            const matched = metadataState.bills.find(b => {
-              if (b.accountId && accountId && b.accountId !== accountId) return false;
-              const bName = b.name.toLowerCase();
-              const pSource = (b.paymentSource || '').toLowerCase();
-              if (bName && (descLower.includes(bName) || bName.includes(descLower))) return true;
-              if (pSource && (descLower.includes(pSource) || pSource.includes(descLower))) return true;
-              if (descLower.includes('wells fargo') && (bName.includes('cell') || pSource.includes('wells'))) return true;
-              if (descLower.includes('bank of america') && (bName.includes('gym') || pSource.includes('america'))) return true;
-              if (descLower.includes('georgia power') && (bName.includes('power') || bName.includes('electric'))) return true;
-              if (descLower.includes('water') && bName.includes('water')) return true;
-              if (descLower.includes('comcast') && bName.includes('comcast')) return true;
-              if (descLower.includes('youtube') && bName.includes('youtube')) return true;
-              if (Math.abs(parseFloat(b.amount || 0) - actualAmount) < 0.01 && (!b.accountId || b.accountId === accountId)) return true;
-              return false;
-            });
-            if (matched) resolvedBillId = matched.id;
-          }
-
-          if (resolvedBillId) {
-            lineItemUpdates.push({ billId: resolvedBillId, monthKey, actualAmount });
-            const bill = metadataState.bills.find(b => b.id === resolvedBillId);
-            const actualKey = `${accountId}_${monthKey}_${actualDay}_bill_${resolvedBillId}`;
-            const existingBillAmt = matrixUpdates[actualKey] || 0;
-            matrixUpdates[actualKey] = Math.round((existingBillAmt + actualAmount) * 100) / 100;
-
-            if (bill && bill.dueDay !== actualDay) {
-              const projKey = `${accountId}_${monthKey}_${bill.dueDay}_bill_${resolvedBillId}`;
-              if (matrixUpdates[projKey] === undefined) matrixUpdates[projKey] = 0;
-              const projNoteKey = `${accountId}_${monthKey}_${bill.dueDay}_other_desc`;
-              const actualNoteKey = `${accountId}_${monthKey}_${actualDay}_other_desc`;
-              matrixNoteShifts.push({ projNoteKey, actualNoteKey });
-            }
-          } else {
-            // Unmatched debit -> Other expense
-            const otherKey = `${accountId}_${monthKey}_${actualDay}_other_amount`;
-            const otherDescKey = `${accountId}_${monthKey}_${actualDay}_other_desc`;
-            const existingOther = matrixUpdates[otherKey] || 0;
-            matrixUpdates[otherKey] = Math.round((existingOther + actualAmount) * 100) / 100;
-            matrixUpdates[otherDescKey] = txn.description;
-          }
-        }
-      });
-
-      if (lineItemUpdates.length > 0 || strategies.transactions === 'override') {
-        setLineItems(prev => {
-          let base = prev;
-          if (strategies.transactions === 'override' && data.targetAccountId) {
-            const accountBillIds = new Set(metadataState.bills.filter(b => b.accountId === data.targetAccountId).map(b => b.id));
-            base = prev.filter(li => !accountBillIds.has(li.billId));
-          }
-          const updated = [...base];
-          lineItemUpdates.forEach(({ billId, monthKey, actualAmount }) => {
-            const existingIdx = updated.findIndex(li => li.billId === billId && li.monthKey === monthKey);
-            const entry = { billId, monthKey, actualAmount, updatedAt: Date.now() };
-            if (existingIdx >= 0) {
-              updated[existingIdx] = { ...updated[existingIdx], ...entry };
-            } else {
-              updated.push(entry);
-            }
-          });
-          return updated;
-        });
-      }
-
-      if (Object.keys(matrixUpdates).length > 0 || matrixNoteShifts.length > 0 || strategies.transactions === 'override') {
-        setDailyMatrix(prev => {
-          const next = {};
-          if (strategies.transactions === 'override' && data.targetAccountId) {
-            Object.entries(prev).forEach(([k, v]) => {
-              if (!k.startsWith(`${data.targetAccountId}_`)) {
-                next[k] = v;
-              }
-            });
-          } else {
-            Object.assign(next, prev);
-          }
-          Object.assign(next, matrixUpdates);
-
-          matrixNoteShifts.forEach(({ projNoteKey, actualNoteKey }) => {
-            const existingNote = prev[projNoteKey];
-            if (existingNote) {
-              if (!next[actualNoteKey]) next[actualNoteKey] = existingNote;
-              next[projNoteKey] = '';
-            }
-          });
-          return next;
-        });
-      }
+    if (result.transactions) {
+      setTransactions(result.transactions);
     }
 
     return { success: true };
-  }, [metadataState, setMetadataState]);
+  }, [setMetadataState]);
 
   // Import Parsed Spreadsheet Data (legacy path)
   const importParsedSpreadsheet = useCallback((parsedData, mode = 'replace') => {

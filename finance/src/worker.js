@@ -57,8 +57,7 @@ function addSecurityHeaders(response, isLocalhost = false) {
   const allowedOrigins = [
     'https://techtrekgt.com',
     'https://techtrek-budget.pages.dev',
-    'http://localhost:3000',
-    'http://127.0.0.1:3000'
+    'http://localhost:3000'
   ];
   const origin = response.headers.get('Origin');
   if (origin && allowedOrigins.includes(origin)) {

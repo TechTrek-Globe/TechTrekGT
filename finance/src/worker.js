@@ -6,6 +6,26 @@ import { onRequestPost as forgotPasswordHandler } from '../functions/api/auth/fo
 import { onRequestPost as resetPasswordHandler } from '../functions/api/auth/reset-password.js';
 import { onRequestPost as securityQuestionHandler } from '../functions/api/auth/security-question.js';
 import { onRequestPost as updateProfileHandler } from '../functions/api/auth/update-profile.js';
+import { getTokenFromRequest, verifyToken } from '../functions/utils/auth.js';
+
+async function timingSafeStringEqual(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  const encoder = new TextEncoder();
+  const aBuf = encoder.encode(a);
+  const bBuf = encoder.encode(b);
+  
+  const aHash = await crypto.subtle.digest('SHA-256', aBuf);
+  const bHash = await crypto.subtle.digest('SHA-256', bBuf);
+  
+  const aView = new Uint8Array(aHash);
+  const bView = new Uint8Array(bHash);
+  
+  let mismatch = 0;
+  for (let i = 0; i < aView.length; i++) {
+    mismatch |= (aView[i] ^ bView[i]);
+  }
+  return mismatch === 0;
+}
 
 /**
  * @param {Response} response
@@ -72,7 +92,7 @@ async function handleVerifySyncCode(context) {
     const code = body?.code || '';
     const secretCode = env?.SYNC_UNLOCK_CODE || '123456';
 
-    if (!code || String(code).trim() !== String(secretCode).trim()) {
+    if (!code || !(await timingSafeStringEqual(String(code).trim(), String(secretCode).trim()))) {
       return new Response(JSON.stringify({ error: 'Invalid access passcode' }), {
         status: 401,
         headers: { 'Content-Type': 'application/json' }
@@ -91,15 +111,26 @@ async function handleVerifySyncCode(context) {
   }
 }
 
-function verifySyncGuard(request, env) {
+async function verifySyncGuard(request, env) {
   const passcode = request.headers.get('x-sync-passcode') || request.headers.get('authorization')?.replace('Bearer ', '') || '';
   const secretCode = env?.SYNC_UNLOCK_CODE || '123456';
-  return Boolean(passcode && String(passcode).trim() === String(secretCode).trim());
+  return await timingSafeStringEqual(String(passcode).trim(), String(secretCode).trim());
 }
 
 async function handleSyncBackup(context) {
   const { request, env } = context;
-  if (!verifySyncGuard(request, env)) {
+
+  const token = getTokenFromRequest(request);
+  const payload = await verifyToken(token, env?.JWT_SECRET);
+  if (!payload || !payload.id) {
+    return new Response(JSON.stringify({ error: 'Unauthorized: Invalid JWT session' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+  const userId = payload.id;
+
+  if (!(await verifySyncGuard(request, env))) {
     return new Response(JSON.stringify({ error: 'Unauthorized: Invalid or missing vault passcode' }), {
       status: 401,
       headers: { 'Content-Type': 'application/json' }
@@ -119,17 +150,18 @@ async function handleSyncBackup(context) {
 
     await env.DB.prepare(`
       CREATE TABLE IF NOT EXISTS user_backups (
-        id TEXT PRIMARY KEY DEFAULT 'default_vault',
+        user_id TEXT PRIMARY KEY,
         data TEXT NOT NULL,
-        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
       )
     `).run();
 
     await env.DB.prepare(`
-      INSERT INTO user_backups (id, data, updated_at)
-      VALUES ('default_vault', ?, datetime('now'))
-      ON CONFLICT(id) DO UPDATE SET data=excluded.data, updated_at=datetime('now')
-    `).bind(dataStr).run();
+      INSERT INTO user_backups (user_id, data, updated_at)
+      VALUES (?, ?, datetime('now'))
+      ON CONFLICT(user_id) DO UPDATE SET data=excluded.data, updated_at=datetime('now')
+    `).bind(userId, dataStr).run();
 
     return new Response(JSON.stringify({ success: true, timestamp: new Date().toISOString() }), {
       status: 200,
@@ -145,7 +177,18 @@ async function handleSyncBackup(context) {
 
 async function handleSyncRestore(context) {
   const { request, env } = context;
-  if (!verifySyncGuard(request, env)) {
+
+  const token = getTokenFromRequest(request);
+  const payload = await verifyToken(token, env?.JWT_SECRET);
+  if (!payload || !payload.id) {
+    return new Response(JSON.stringify({ error: 'Unauthorized: Invalid JWT session' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+  const userId = payload.id;
+
+  if (!(await verifySyncGuard(request, env))) {
     return new Response(JSON.stringify({ error: 'Unauthorized: Invalid or missing vault passcode' }), {
       status: 401,
       headers: { 'Content-Type': 'application/json' }
@@ -162,13 +205,14 @@ async function handleSyncRestore(context) {
   try {
     await env.DB.prepare(`
       CREATE TABLE IF NOT EXISTS user_backups (
-        id TEXT PRIMARY KEY DEFAULT 'default_vault',
+        user_id TEXT PRIMARY KEY,
         data TEXT NOT NULL,
-        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
       )
     `).run();
 
-    const row = await env.DB.prepare('SELECT data, updated_at FROM user_backups WHERE id = ?').bind('default_vault').first();
+    const row = await env.DB.prepare('SELECT data, updated_at FROM user_backups WHERE user_id = ?').bind(userId).first();
 
     if (!row || !row.data) {
       return new Response(JSON.stringify({ error: 'No cloud vault backup found' }), {

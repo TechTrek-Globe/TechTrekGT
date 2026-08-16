@@ -27,6 +27,10 @@ export function LedgerDataProvider({ children }) {
   const [lineItems, setLineItems] = useState([]);
   const [transactions, setTransactions] = useState([]);
 
+  // Memory-only storage for cloud vault
+  const [syncPasscode, setSyncPasscode] = useState('');
+  const [isSyncUnlocked, setIsSyncUnlocked] = useState(false);
+
   // Sync initial seed loaded from IndexedDB by BudgetMetadataProvider
   useEffect(() => {
     if (isDbLoaded && initialLedgerSeed) {
@@ -137,36 +141,37 @@ export function LedgerDataProvider({ children }) {
   // Silent background retry effect for pending sync queue on app load or network recovery
   useEffect(() => {
     const handleOnlineRetry = async () => {
-      const flushed = await flushPendingCloudSync();
+      if (!syncPasscode) return;
+      const flushed = await flushPendingCloudSync(syncPasscode);
       if (flushed) {
         setLastCloudSyncTime(new Date().toLocaleTimeString());
       }
     };
 
-    handleOnlineRetry();
+    if (syncPasscode) {
+      handleOnlineRetry();
+    }
 
     window.addEventListener('online', handleOnlineRetry);
     return () => window.removeEventListener('online', handleOnlineRetry);
-  }, []);
+  }, [syncPasscode, setLastCloudSyncTime]);
 
   // Debounced Auto Cloud Backup effect
   useEffect(() => {
     if (!isDbLoaded || !isAutoCloudBackupEnabled) return;
 
-    const isUnlocked = localStorage.getItem('cf_sync_unlocked') === 'true';
-    const passcode = localStorage.getItem('cf_sync_passcode');
-    if (!isUnlocked || !passcode) return;
+    if (!isSyncUnlocked || !syncPasscode) return;
 
     const timer = setTimeout(async () => {
       try {
-        await pushCloudBackup(passcode);
+        await pushCloudBackup(syncPasscode);
       } catch (err) {
         console.error('Auto cloud backup failed:', err);
       }
     }, 3000);
 
     return () => clearTimeout(timer);
-  }, [financialDataChecksum, isDbLoaded, isAutoCloudBackupEnabled]);
+  }, [financialDataChecksum, isDbLoaded, isAutoCloudBackupEnabled, isSyncUnlocked, syncPasscode]);
 
   // Load 100% Fake Demo Preset Data
   const loadDemoPreset = () => {
@@ -677,7 +682,11 @@ export function LedgerDataProvider({ children }) {
         exportBackupJson,
         restoreFromBackup,
         pushCloudBackup,
-        pullCloudRestore
+        pullCloudRestore,
+        syncPasscode,
+        setSyncPasscode,
+        isSyncUnlocked,
+        setIsSyncUnlocked
       }}
     >
       {children}

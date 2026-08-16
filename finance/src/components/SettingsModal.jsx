@@ -77,22 +77,17 @@ export function SettingsModal() {
     importSpreadsheetSelective,
     isAutoCloudBackupEnabled,
     toggleAutoCloudBackup,
-    lastCloudSyncTime
+    lastCloudSyncTime,
+    syncPasscode: cloudPasscode,
+    setSyncPasscode: setCloudPasscode,
+    isSyncUnlocked: isCloudUnlocked,
+    setIsSyncUnlocked: setIsCloudUnlocked
   } = useBudget();
 
   // Local form state for new item creation
   const fileInputRef = useRef(null);
   const [backupStatus, setBackupStatus] = useState(null);
 
-  // Cloud Vault Sync state
-  const [isCloudUnlocked, setIsCloudUnlocked] = useState(() => {
-    try { return localStorage.getItem('cf_sync_unlocked') === 'true'; }
-    catch { return false; }
-  });
-  const [cloudPasscode, setCloudPasscode] = useState(() => {
-    try { return localStorage.getItem('cf_sync_passcode') || ''; }
-    catch { return ''; }
-  });
   const [passcodeInput, setPasscodeInput] = useState('');
   const [passcodeError, setPasscodeError] = useState('');
   const [isVerifyingCode, setIsVerifyingCode] = useState(false);
@@ -113,10 +108,6 @@ export function SettingsModal() {
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        try {
-          localStorage.setItem('cf_sync_unlocked', 'true');
-          localStorage.setItem('cf_sync_passcode', passcodeInput);
-        } catch {}
         setCloudPasscode(passcodeInput);
         setIsCloudUnlocked(true);
         setPasscodeInput('');
@@ -132,10 +123,6 @@ export function SettingsModal() {
   };
 
   const handleLockCloudVault = () => {
-    try {
-      localStorage.removeItem('cf_sync_unlocked');
-      localStorage.removeItem('cf_sync_passcode');
-    } catch {}
     setIsCloudUnlocked(false);
     setCloudPasscode('');
     setCloudSyncStatus(null);

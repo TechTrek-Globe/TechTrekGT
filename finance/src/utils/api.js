@@ -30,7 +30,6 @@ export function savePendingSync(payload, passcode) {
   try {
     const data = {
       payload,
-      passcode,
       timestamp: Date.now()
     };
     localStorage.setItem(PENDING_SYNC_KEY, JSON.stringify(data));
@@ -107,9 +106,9 @@ export async function pushCloudBackupOptimistic(passcode, budgetData) {
  * Retries flushing any pending payload in the queue to Cloudflare.
  * @returns {Promise<boolean>}
  */
-export async function flushPendingCloudSync() {
+export async function flushPendingCloudSync(passcode) {
   const pending = getPendingSync();
-  if (!pending || !pending.payload || !pending.passcode) return false;
+  if (!pending || !pending.payload || !passcode) return false;
 
   if (typeof navigator !== 'undefined' && !navigator.onLine) return false;
 
@@ -118,7 +117,7 @@ export async function flushPendingCloudSync() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Sync-Passcode': pending.passcode
+        'X-Sync-Passcode': passcode
       },
       body: JSON.stringify({ budget: pending.payload })
     });

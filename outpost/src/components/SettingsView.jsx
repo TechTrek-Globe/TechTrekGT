@@ -33,7 +33,7 @@ export function SettingsView() {
   // Add platform modal state
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [importerOpen, setImporterOpen] = useState(false);
-  const [addForm, setAddForm] = useState({ name: '', fee_pct: '', flat_fee: '', notes: '', is_default: false });
+  const [newPlatform, setNewPlatform] = useState({ name: '', fee_pct: '', flat_fee: '', notes: '', is_default: false });
 
   // User Preferences (Column Visibility & Category Ordering)
   const [userSettings, setUserSettingsState] = useState(getStoredUserSettings);
@@ -176,7 +176,7 @@ export function SettingsView() {
         is_default: newPlatform.is_default ? 1 : 0
       });
       setAddModalOpen(false);
-      setNewPlatform({ name: '', fee_pct: '0.10', flat_fee: '0.30', notes: '', is_default: false });
+      setNewPlatform({ name: '', fee_pct: '', flat_fee: '', notes: '', is_default: false });
       showSuccess('Platform added successfully.');
       fetchPlatformsList();
     } catch (err) {

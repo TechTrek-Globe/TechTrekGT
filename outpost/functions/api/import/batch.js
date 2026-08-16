@@ -299,7 +299,10 @@ export async function onRequestPost(context) {
     }
 
     if (statements.length > 0) {
-      await env.DB.batch(statements);
+      const CHUNK_SIZE = 50;
+      for (let i = 0; i < statements.length; i += CHUNK_SIZE) {
+        await env.DB.batch(statements.slice(i, i + CHUNK_SIZE));
+      }
     }
 
     return ok({

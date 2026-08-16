@@ -53,11 +53,12 @@ class ErrorBoundary extends React.Component {
 }
 
 function MainContent({ pathname, navigateTo }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
   const [activeView, setActiveView] = useState(() => getViewFromPathname(pathname));
 
   // Sync view from URL
   useEffect(() => {
+    if (isLoading) return;
     const normalized = (pathname || '').toLowerCase().replace(/\/$/, '');
     if (!isAuthenticated) {
       if (normalized !== '/outpost' && normalized !== '/auction') {
@@ -72,7 +73,18 @@ function MainContent({ pathname, navigateTo }) {
     }
     const v = getViewFromPathname(normalized);
     if (v && v !== activeView) setActiveView(v);
-  }, [pathname, isAuthenticated]);
+  }, [pathname, isAuthenticated, isLoading]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-8 h-8 border-2 border-amber-500/30 border-t-amber-400 rounded-full animate-spin" />
+          <p className="text-slate-500 text-xs font-mono tracking-widest uppercase">Verifying session...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return (

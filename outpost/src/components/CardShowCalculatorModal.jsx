@@ -77,22 +77,25 @@ export function CardShowCalculatorModal({ isOpen, onClose, onItemAdded }) {
       const invoiceRef = `SHOW-${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}-${Math.floor(1000 + Math.random()*9000)}`;
 
       await createInvoice({
-        invoice_date: now.toISOString().slice(0, 10),
         invoice_ref: invoiceRef,
-        source: 'Card Show / Live Event',
-        buyer_premium_pct: 0,
-        flat_tax_rate_pct: 0,
-        shipping_handling_flat: parseFloat(shippingCost) || 0,
+        description: 'Card Show / Live Event',
+        date_acquired: now.toISOString().slice(0, 10),
+        discount: 0,
+        shipping: parseFloat(shippingCost) || 0,
+        tax: 0,
         items: [
           {
             item_name: itemName.trim(),
-            athlete_person: '',
             category,
+            athlete_person: '',
             authenticator,
             cert_number: '',
-            hammer_price: parseFloat(askingPrice) || 0,
+            unit_price: parseFloat(askingPrice) || 0,
             target_margin_pct: targetMarginPct,
-            current_list_price: calculations.targetListPrice
+            current_list_price: calculations.targetListPrice,
+            platform: selectedPlatform.name,
+            platform_fee_pct: selectedPlatform.feePct,
+            platform_flat_fee: selectedPlatform.feeFlat
           }
         ]
       });

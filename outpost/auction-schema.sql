@@ -125,6 +125,8 @@ CREATE TABLE IF NOT EXISTS auction_comps (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_auction_comps_item ON auction_comps(item_id);
+
 -- ============================================================
 -- AUCTION PLATFORMS (fee reference table)
 -- ============================================================

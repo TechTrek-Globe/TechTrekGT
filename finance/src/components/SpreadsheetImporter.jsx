@@ -222,7 +222,7 @@ export function SpreadsheetImporter({
 
         if (confidence >= 1.0) {
           // All required fields matched - skip mapper, go straight to selecting
-          const { records, importedLedgerRows, earliestDate, startingBalance } = applyTransactionMapping(rows, mapping, effectiveAccountId);
+          const { records, importedLedgerRows } = applyTransactionMapping(rows, mapping, effectiveAccountId);
           const payload = {
             people: [],
             accounts: [],
@@ -231,8 +231,6 @@ export function SpreadsheetImporter({
             transactions: records,
             targetAccountId: effectiveAccountId,
             importedLedgerRows,
-            startingBalance,
-            balanceAsOfDate: earliestDate,
           };
           setParsedPayload(payload);
           setNsEnabled({ people: false, accounts: false, bills: false, loans: false, transactions: records.length > 0 });
@@ -288,7 +286,7 @@ export function SpreadsheetImporter({
       };
 
       if (mappingSchema === 'transactions') {
-        const { records, importedLedgerRows, earliestDate, startingBalance } = applyTransactionMapping(flatRows, columnMap, effectiveAccountId);
+        const { records, importedLedgerRows } = applyTransactionMapping(flatRows, columnMap, effectiveAccountId);
         // Resolve _accountName -> accountId by fuzzy name match if available
         const resolved = records.map(r => {
           if (r._accountName) {
@@ -303,8 +301,6 @@ export function SpreadsheetImporter({
         });
         payload.transactions = resolved;
         payload.importedLedgerRows = importedLedgerRows;
-        payload.startingBalance = startingBalance;
-        payload.balanceAsOfDate = earliestDate;
         setNsEnabled(prev => ({ ...prev, transactions: resolved.length > 0 }));
       } else {
         const { records } = applyBillMapping(flatRows, columnMap, effectiveAccountId || budget.accounts[0]?.id || '');
@@ -385,7 +381,7 @@ export function SpreadsheetImporter({
       icon: CreditCard,
       color: 'indigo',
       records: parsedPayload?.accounts || [],
-      previewCols: ['name', 'type', 'startingBalance'],
+      previewCols: ['name', 'type', 'color'],
       description: 'Checking, savings, credit, and mortgage funding accounts.',
     },
     {

@@ -258,13 +258,6 @@ export function LedgerDataProvider({ children }) {
               accountIdMap.set(incomingAcc.id, match.id);
               // Propagate imported ledger metadata onto the matched account
               const patches = {};
-              if (typeof incomingAcc.startingBalance === 'number' && !isNaN(incomingAcc.startingBalance)) {
-                patches.startingBalance = incomingAcc.startingBalance;
-              }
-              if (typeof incomingAcc.extraStartingBalance === 'number' && !isNaN(incomingAcc.extraStartingBalance)) {
-                patches.extraStartingBalance = incomingAcc.extraStartingBalance;
-              }
-              if (incomingAcc.balanceAsOfDate) patches.balanceAsOfDate = incomingAcc.balanceAsOfDate;
               if (incomingAcc.importedLedgerRows && Object.keys(incomingAcc.importedLedgerRows).length > 0) {
                 patches.importedLedgerRows = incomingAcc.importedLedgerRows;
                 patches.ledgerMode = 'import';
@@ -290,15 +283,6 @@ export function LedgerDataProvider({ children }) {
         accounts: (prev.accounts || []).map(acc => {
           if (acc.id === data.targetAccountId) {
             const patches = {};
-            if (typeof data.startingBalance === 'number' && !isNaN(data.startingBalance)) {
-              patches.startingBalance = data.startingBalance;
-            }
-            if (typeof data.extraStartingBalance === 'number' && !isNaN(data.extraStartingBalance)) {
-              patches.extraStartingBalance = data.extraStartingBalance;
-            }
-            if (data.balanceAsOfDate) {
-              patches.balanceAsOfDate = data.balanceAsOfDate;
-            }
             if (data.importedLedgerRows && Object.keys(data.importedLedgerRows).length > 0) {
               patches.importedLedgerRows = { ...(acc.importedLedgerRows || {}), ...data.importedLedgerRows };
               patches.ledgerMode = 'import';
@@ -584,18 +568,43 @@ export function LedgerDataProvider({ children }) {
       .reduce((sum, b) => sum + getEffectiveAmount(b, monthKey), 0);
   };
 
-  const getAccountProjectedEndBalance = (accountId, monthKey) => {
+  // --- Derived Balance Helpers ---
+
+  // Derives the latest known balance for an account from importedLedgerRows or transactions
+  const getAccountDerivedBalance = (accountId) => {
     const acc = (metadataState.accounts || []).find(a => a.id === accountId);
     if (!acc) return 0;
+
+    // Priority 1: importedLedgerRows (most recent date's total ending balance)
+    if (acc.importedLedgerRows && typeof acc.importedLedgerRows === 'object') {
+      const dates = Object.keys(acc.importedLedgerRows).sort();
+      if (dates.length > 0) {
+        const latest = acc.importedLedgerRows[dates[dates.length - 1]];
+        if (typeof latest === 'number') return latest;
+        if (latest && typeof latest === 'object' && typeof latest.totalEnding === 'number') return latest.totalEnding;
+      }
+    }
+
+    // Priority 2: transactions with running balance
+    const accTxns = (transactions || []).filter(t => t.accountId === accountId && t.balance !== undefined);
+    if (accTxns.length > 0) {
+      const sorted = [...accTxns].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+      return sorted[sorted.length - 1].balance;
+    }
+
+    return 0;
+  };
+
+  const getAccountProjectedEndBalance = (accountId, monthKey) => {
+    const derivedBalance = getAccountDerivedBalance(accountId);
     const projectedExpenses = monthKey ? getAccountActualExpenses(accountId, monthKey) : getAccountMonthlyExpenses(accountId);
-    return (acc.startingBalance || 0) - projectedExpenses;
+    return derivedBalance - projectedExpenses;
   };
 
   const getAccountActualEndBalance = (accountId, monthKey) => {
-    const acc = (metadataState.accounts || []).find(a => a.id === accountId);
-    if (!acc) return 0;
+    const derivedBalance = getAccountDerivedBalance(accountId);
     const actualExpenses = getAccountActualExpenses(accountId, monthKey);
-    return (acc.startingBalance || 0) - actualExpenses;
+    return derivedBalance - actualExpenses;
   };
 
   // --- Daily Matrix Cell Operations ---
@@ -657,6 +666,7 @@ export function LedgerDataProvider({ children }) {
         getEffectiveAmount,
         getTotalActualExpenses,
         getAccountActualExpenses,
+        getAccountDerivedBalance,
         getAccountProjectedEndBalance,
         getAccountActualEndBalance,
         loadDemoPreset,

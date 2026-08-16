@@ -30,7 +30,7 @@ interface Account {
   id: string;            // "acc-{timestamp}"
   name: string;          // "USAA Bills Checking - 7071"
   type: 'checking' | 'savings' | 'credit';
-  startingBalance: number;
+  importedLedgerRows: Record<string, any>;
   color: string;
   notes: string;
 }
@@ -54,6 +54,7 @@ interface Bill {
   period: 'Monthly' | 'Semi-Annual' | 'Annual' | 'Weekly';
   accountId: string;     // FK -> Account
   dueDay: number;
+  dueMonths?: number[];
   paymentSource: string;
   notes: string;
   splits: Record<string, number>; // personId -> split percentage
@@ -128,7 +129,6 @@ CREATE TABLE accounts (
   household_id UUID NOT NULL REFERENCES households(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   type account_type NOT NULL DEFAULT 'checking',
-  starting_balance DECIMAL(12,2) NOT NULL DEFAULT 0.00,
   color TEXT NOT NULL DEFAULT 'blue',
   notes TEXT,
   is_archived BOOLEAN NOT NULL DEFAULT FALSE,
@@ -173,6 +173,7 @@ CREATE TABLE bills (
   amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
   period bill_period NOT NULL DEFAULT 'Monthly',
   due_day INTEGER NOT NULL CHECK (due_day >= 1 AND due_day <= 31),
+  due_months JSON,
   payment_source TEXT NOT NULL DEFAULT 'Auto Pay',
   notes TEXT,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
@@ -342,7 +343,7 @@ User edits actual amount
     -> setBudget() triggers re-render
       -> useMemo recalculates totalActual, variance
         -> getAccountActualExpenses() recalculates per-account totals
-          -> getAccountActualEndBalance() = startingBalance - actualExpenses
+          -> getAccountActualEndBalance() = getAccountDerivedBalance() - actualExpenses
             -> All UI cells update reactively (< 1ms)
 ```
 
@@ -353,8 +354,9 @@ User edits actual amount
 | `getEffectiveAmount(bill, monthKey)` | Actual if overridden, else projected | bill.amount, lineItems |
 | `getTotalActualExpenses(monthKey)` | Sum of all effective amounts | lineItems, bills |
 | `getAccountActualExpenses(accountId, monthKey)` | Sum per account | lineItems, bills |
-| `getAccountProjectedEndBalance(accountId)` | startingBalance - projectedExpenses | accounts, bills |
-| `getAccountActualEndBalance(accountId, monthKey)` | startingBalance - actualExpenses | accounts, lineItems, bills |
+| `getAccountDerivedBalance(accountId)` | Latest ledger balance or transaction running total | accounts, transactions |
+| `getAccountProjectedEndBalance(accountId)` | getAccountDerivedBalance - projectedExpenses | accounts, bills, transactions |
+| `getAccountActualEndBalance(accountId, monthKey)` | getAccountDerivedBalance - actualExpenses | accounts, lineItems, bills, transactions |
 
 ### Variance Color Coding
 - Actual < Projected: Green (saved money)

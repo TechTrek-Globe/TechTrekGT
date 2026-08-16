@@ -170,7 +170,7 @@ export function SettingsModal() {
   const [isAddAccountModalOpen, setIsAddAccountModalOpen] = useState(false);
   const [isAddPersonModalOpen, setIsAddPersonModalOpen] = useState(false);
   const [isAddBillModalOpen, setIsAddBillModalOpen] = useState(false);
-  const [newAccForm, setNewAccForm] = useState({ name: '', type: 'checking', startingBalance: 0, balanceAsOfDate: new Date().toISOString().split('T')[0], saveExtraMonthly: 0, extraStartingBalance: 0, enableExtraSavings: true, color: 'blue', notes: '' });
+  const [newAccForm, setNewAccForm] = useState({ name: '', type: 'checking', saveExtraMonthly: 0, enableExtraSavings: true, color: 'blue', notes: '' });
   const [newPersonForm, setNewPersonForm] = useState({ name: '', role: 'Member', payFrequency: 'bi-weekly', grossPerPay: 0, netPerPay: 0, payDay1: 15, payDay2: 'last', payOffsetDays: 0 });
   const [newBillForm, setNewBillForm] = useState({ name: '', amount: 0, period: 'Monthly', accountId: budget.accounts[0]?.id || '', dueDay: 1, dueMonths: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], paymentSource: 'Auto Pay', notes: '' });
 
@@ -197,43 +197,31 @@ export function SettingsModal() {
         setAccImportPayload({
           records: txns,
           importedLedgerRows: matchingAcc?.importedLedgerRows || {},
-          startingBalance: matchingAcc?.startingBalance ?? null,
-          earliestDate: matchingAcc?.balanceAsOfDate ?? null
         });
         setNewAccForm(prev => ({
           ...prev,
           name: prev.name || matchingAcc?.name || file.name.replace(/\.[^/.]+$/, ''),
-          startingBalance: matchingAcc?.startingBalance ?? prev.startingBalance,
-          balanceAsOfDate: matchingAcc?.balanceAsOfDate ?? prev.balanceAsOfDate
         }));
         setAccImportStatus({
           fileName: file.name,
           count: txns.length,
-          startingBal: matchingAcc?.startingBalance,
-          date: matchingAcc?.balanceAsOfDate
         });
       } else {
         const { headers, rows } = parseGenericFlat(arrayBuffer);
         if (headers.length === 0) throw new Error('No valid columns found.');
         const { mapping } = autoMatchColumns(headers, 'transactions');
-        const { records, importedLedgerRows, earliestDate, startingBalance } = applyTransactionMapping(rows, mapping);
+        const { records, importedLedgerRows, earliestDate } = applyTransactionMapping(rows, mapping);
         setAccImportPayload({
           records,
           importedLedgerRows,
-          startingBalance,
-          earliestDate
         });
         setNewAccForm(prev => ({
           ...prev,
           name: prev.name || file.name.replace(/\.[^/.]+$/, ''),
-          startingBalance: startingBalance !== null && !isNaN(startingBalance) ? startingBalance : prev.startingBalance,
-          balanceAsOfDate: earliestDate || prev.balanceAsOfDate
         }));
         setAccImportStatus({
           fileName: file.name,
           count: records.length,
-          startingBal: startingBalance,
-          date: earliestDate
         });
       }
     } catch (err) {
@@ -350,7 +338,6 @@ export function SettingsModal() {
         ID: a.id,
         Name: a.name,
         Type: a.type,
-        StartingBalance: a.startingBalance,
         Notes: a.notes
       }));
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(accsData), 'Accounts');
@@ -490,7 +477,7 @@ export function SettingsModal() {
     e.preventDefault();
     if (!newAccForm.name) return;
     addAccount(newAccForm);
-    setNewAccForm({ name: '', type: 'checking', startingBalance: 0, color: 'blue', notes: '' });
+    setNewAccForm({ name: '', type: 'checking', saveExtraMonthly: 0, enableExtraSavings: true, color: 'blue', notes: '' });
   };
 
   const handleAddPerson = (e) => {
@@ -892,16 +879,12 @@ export function SettingsModal() {
                       e.preventDefault();
                       if (!newAccForm.name) return;
                       const newAccId = `acc-${Date.now()}`;
-                      const startingBal = parseFloat(newAccForm.startingBalance) || 0;
-                      const asOfDate = newAccForm.balanceAsOfDate || new Date().toISOString().split('T')[0];
                       const impRows = accImportPayload?.importedLedgerRows || {};
                       const hasImpRows = Object.keys(impRows).length > 0;
 
                       addAccount({
                         ...newAccForm,
                         id: newAccId,
-                        startingBalance: startingBal,
-                        balanceAsOfDate: asOfDate,
                         importedLedgerRows: impRows,
                         ledgerMode: hasImpRows ? 'import' : 'manual'
                       });
@@ -914,13 +897,11 @@ export function SettingsModal() {
                             targetAccountId: newAccId,
                             transactions: accImportPayload.records,
                             importedLedgerRows: impRows,
-                            startingBalance: startingBal,
-                            balanceAsOfDate: asOfDate
                           }
                         });
                       }
 
-                      setNewAccForm({ name: '', type: 'checking', startingBalance: 0, balanceAsOfDate: new Date().toISOString().split('T')[0], saveExtraMonthly: 0, extraStartingBalance: 0, enableExtraSavings: true, color: 'blue', notes: '' });
+                      setNewAccForm({ name: '', type: 'checking', saveExtraMonthly: 0, enableExtraSavings: true, color: 'blue', notes: '' });
                       setAccImportPayload(null);
                       setAccImportStatus(null);
                       setAccImportError('');
@@ -1019,26 +1000,6 @@ export function SettingsModal() {
                             <option value="credit">Credit Card Account</option>
                           </select>
                         </div>
-                        <div>
-                          <label className="block text-xs font-medium text-slate-300 mb-1">Starting Balance ($)</label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            placeholder="0.00"
-                            value={newAccForm.startingBalance}
-                            onChange={e => setNewAccForm({ ...newAccForm, startingBalance: parseFloat(e.target.value) || 0 })}
-                            className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-100 font-mono focus:outline-none focus:border-blue-500"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-amber-300 mb-1">Start Date / Day</label>
-                          <input
-                            type="date"
-                            value={newAccForm.balanceAsOfDate || new Date().toISOString().split('T')[0]}
-                            onChange={e => setNewAccForm({ ...newAccForm, balanceAsOfDate: e.target.value })}
-                            className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-amber-200 font-mono focus:outline-none focus:border-blue-500"
-                          />
-                        </div>
                       </div>
 
                       <div className="pt-2 border-t border-slate-800 space-y-3">
@@ -1070,14 +1031,7 @@ export function SettingsModal() {
                             </div>
                             <div>
                               <label className="block text-xs font-medium text-slate-400 mb-1">Extra Current Balance ($)</label>
-                              <input
-                                type="number"
-                                step="0.01"
-                                placeholder="0.00"
-                                value={newAccForm.extraStartingBalance || 0}
-                                onChange={e => setNewAccForm({ ...newAccForm, extraStartingBalance: parseFloat(e.target.value) || 0 })}
-                                className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-200 font-mono focus:outline-none focus:border-blue-500"
-                              />
+                              <p className="text-xs text-slate-500 italic">Derived from transaction history</p>
                             </div>
                           </div>
                         )}
@@ -1152,25 +1106,6 @@ export function SettingsModal() {
                           <option value="credit">Credit Card</option>
                         </select>
                       </div>
-                      <div>
-                        <label className="text-[11px] font-semibold text-slate-400 block mb-1.5">Starting Balance ($)</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={acc.startingBalance}
-                          onChange={e => updateAccount(acc.id, { startingBalance: parseFloat(e.target.value) || 0 })}
-                          className="w-full bg-slate-950 border border-slate-800/80 rounded-xl px-2.5 py-2 text-slate-100 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/80 transition-all"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[11px] font-semibold text-amber-400/90 block mb-1.5">Start Date / Day</label>
-                        <input
-                          type="date"
-                          value={acc.balanceAsOfDate || new Date().toISOString().split('T')[0]}
-                          onChange={e => updateAccount(acc.id, { balanceAsOfDate: e.target.value })}
-                          className="w-full bg-slate-950 border border-slate-800/80 rounded-xl px-2.5 py-2 text-amber-200 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/80 transition-all [color-scheme:dark]"
-                        />
-                      </div>
                     </div>
 
                     {/* Extra Savings Toggle Switch */}
@@ -1208,13 +1143,7 @@ export function SettingsModal() {
                           </div>
                           <div>
                             <label className="text-[11px] font-semibold text-slate-400 block mb-1.5">Extra Current Balance ($)</label>
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={acc.extraStartingBalance || 0}
-                              onChange={e => updateAccount(acc.id, { extraStartingBalance: parseFloat(e.target.value) || 0 })}
-                              className="w-full bg-slate-950 border border-slate-800/80 rounded-xl px-3 py-2 text-slate-200 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/80 transition-all"
-                            />
+                            <p className="text-xs text-slate-500 italic">Derived from transaction history</p>
                           </div>
                         </div>
                       </div>

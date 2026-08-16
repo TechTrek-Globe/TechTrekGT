@@ -192,10 +192,6 @@ export function applyTransactionMapping(rows, columnMap, defaultAccountId = '') 
   const importedLedgerRows = {};
   let skipped = 0;
   let earliestDate = null;
-  let latestDate = null;
-  let earliestRecord = null;
-  let latestRecord = null;
-  let explicitStartingBal = null;
 
   rows.forEach((row, idx) => {
     const mapped = {};
@@ -233,33 +229,13 @@ export function applyTransactionMapping(rows, columnMap, defaultAccountId = '') 
       // The balance recorded on a transaction row represents the post-transaction running balance
       importedLedgerRows[isoDate] = balance;
 
-      const lowerDesc = desc.toLowerCase();
-      const isStartBalRow = lowerDesc.includes('beginning balance') || lowerDesc.includes('starting balance') || lowerDesc.includes('opening balance');
-
-      if (isStartBalRow) {
-        explicitStartingBal = balance;
-      }
-
       if (earliestDate === null || isoDate < earliestDate) {
         earliestDate = isoDate;
-        earliestRecord = record;
-      }
-      if (latestDate === null || isoDate > latestDate) {
-        latestDate = isoDate;
-        latestRecord = record;
       }
     }
   });
 
-  let startingBalance = null;
-  if (explicitStartingBal !== null) {
-    startingBalance = explicitStartingBal;
-  } else if (earliestRecord && earliestRecord.balance !== undefined) {
-    // Pre-transaction opening balance = post-transaction balance - transaction amount
-    startingBalance = Math.round((earliestRecord.balance - earliestRecord.amount) * 100) / 100;
-  }
-
-  return { records, skipped, importedLedgerRows, earliestDate, startingBalance };
+  return { records, skipped, importedLedgerRows, earliestDate };
 }
 
 /**

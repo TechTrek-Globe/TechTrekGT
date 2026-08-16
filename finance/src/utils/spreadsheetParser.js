@@ -73,7 +73,6 @@ export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
           (norm.includes('mortgage') && key.includes('mortgage')) ||
           (norm.includes('hoa') && key.includes('hoa'))
         ) {
-          if (balance > 0 && acc.startingBalance === 0) acc.startingBalance = balance;
           return acc.id;
         }
       }
@@ -90,8 +89,6 @@ export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
         id,
         name,
         type: norm.includes('sav') ? 'savings' : norm.includes('credit') ? 'credit' : type,
-        startingBalance: balance,
-        extraStartingBalance: 0,
         saveExtraMonthly: 0,
         enableExtraSavings: true,
         color,
@@ -268,10 +265,6 @@ export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
 
           // importedLedgerRows: { 'YYYY-MM-DD': { regEnding, extraEnding, totalEnding, regBeg, extraBeg } }
           const importedLedgerRows = {};
-          let firstRowDate = null;
-          let firstRowRegBeg = 0;
-          let firstRowExtraBeg = 0;
-          let firstRowTotalBeg = 0;
 
           for (let i = headerRowIdx + 1; i < rows.length; i++) {
             const r = rows[i];
@@ -296,30 +289,12 @@ export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
                 extraBeg: rExtraBeg,
                 totalBeg: rTotalBeg
               };
-
-              if (firstRowDate === null || dateStr < firstRowDate) {
-                firstRowDate = dateStr;
-                firstRowRegBeg = rRegBeg;
-                firstRowExtraBeg = rExtraBeg;
-                firstRowTotalBeg = rTotalBeg;
-                if (firstRowRegBeg === 0 && firstRowTotalBeg > 0) {
-                  if (firstRowExtraBeg > 0) firstRowRegBeg = firstRowTotalBeg - firstRowExtraBeg;
-                  else if (rRegEnd !== null && rRegEnd > 0) firstRowRegBeg = rRegEnd;
-                  else firstRowRegBeg = firstRowTotalBeg;
-                }
-                if (firstRowExtraBeg === 0 && firstRowTotalBeg > firstRowRegBeg) {
-                  firstRowExtraBeg = firstRowTotalBeg - firstRowRegBeg;
-                }
-              }
             }
           }
 
           // Attach the historical map and stamp ledgerMode on the account
           const accObj = Array.from(accountsMap.values()).find(a => a.id === targetAccountId);
           if (accObj && Object.keys(importedLedgerRows).length > 0) {
-            accObj.startingBalance = firstRowRegBeg || accObj.startingBalance;
-            accObj.extraStartingBalance = firstRowExtraBeg || accObj.extraStartingBalance || 0;
-            accObj.balanceAsOfDate = firstRowDate ?? accObj.balanceAsOfDate;
             accObj.importedLedgerRows = importedLedgerRows;
             accObj.ledgerMode = 'import';
           }

@@ -42,7 +42,7 @@ export function StaysAndFoodPage() {
                 <p className="text-wf-cream font-medium mb-4">{city.base}</p>
                 
                 <div className="space-y-2">
-                  {city.hotels.map((hotel, idx) => (
+                  {(city.hotels && city.hotels.length > 0 ? city.hotels : [`Base: ${city.base}`]).map((hotel, idx) => (
                     <div key={idx} className="text-sm text-wf-muted flex items-start space-x-2">
                       <span className="text-wf-evergreen mt-0.5">•</span>
                       <span>{hotel}</span>
@@ -58,7 +58,7 @@ export function StaysAndFoodPage() {
                 </h3>
                 
                 <div className="space-y-2">
-                  {city.foodTargets.map((food, idx) => (
+                  {(city.foodTargets || []).map((food, idx) => (
                     <div key={idx} className="text-sm text-wf-muted flex items-start space-x-2">
                       <span className="text-wf-amber mt-0.5">•</span>
                       <span>{food}</span>

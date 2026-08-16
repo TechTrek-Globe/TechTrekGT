@@ -161,6 +161,7 @@ export function AuthProvider({ children }) {
     setUser(null);
     if (typeof window !== 'undefined') {
       window.history.pushState({}, '', '/wayfinder');
+      window.dispatchEvent(new PopStateEvent('popstate'));
     }
     try {
       await fetch(getApiUrl('/api/auth/logout'), { method: 'POST', credentials: 'include' });

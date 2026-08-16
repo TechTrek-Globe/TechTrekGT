@@ -7,6 +7,7 @@ const CityPage = React.lazy(() => import('./components/CityPage').then(m => ({ d
 const RouteVisualization = React.lazy(() => import('./components/RouteVisualization').then(m => ({ default: m.RouteVisualization })));
 const MarketsPage = React.lazy(() => import('./components/MarketsPage').then(m => ({ default: m.MarketsPage })));
 const PracticalPage = React.lazy(() => import('./components/PracticalPage').then(m => ({ default: m.PracticalPage })));
+const StaysAndFoodPage = React.lazy(() => import('./components/StaysAndFoodPage').then(m => ({ default: m.StaysAndFoodPage })));
 const PrivateHub = React.lazy(() => import('./components/PrivateHub').then(m => ({ default: m.PrivateHub })));
 
 // Simple client-side router
@@ -53,6 +54,10 @@ function App() {
       return <MarketsPage />;
     }
 
+    if (normalizedPath === '/wayfinder/poland-christmas-2026/stays-and-food') {
+      return <StaysAndFoodPage />;
+    }
+
     if (normalizedPath === '/wayfinder/poland-christmas-2026/practical') {
       return <PracticalPage />;
     }
@@ -71,6 +76,8 @@ function App() {
         subPage = 'markets';
       } else if (['restaurants', 'food', 'dining', 'top-restaurants', 'food-drink', 'drinks', 'bars', 'pubs', 'breweries'].includes(rawSub)) {
         subPage = 'restaurants';
+      } else if (['hotels', 'hotel', 'stays', 'lodging', 'accommodations'].includes(rawSub)) {
+        subPage = 'hotels';
       } else if (['lgbtq', 'gay', 'queer', 'lgbt', 'lgbtq-guide'].includes(rawSub)) {
         subPage = 'lgbtq';
       }

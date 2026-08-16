@@ -1,12 +1,15 @@
 // @ts-nocheck
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { initialBudgetData, DEFAULT_DASHBOARD_WIDGETS } from '../initialData';
 import { useAuth } from './AuthContext';
 import { isPersonDepositDay, getPersonDepositAmountForAccount, getAccountSaveExtraPersonPortion, getNextBillDueDate } from '../utils/paydayUtils';
 import { getApiUrl } from '../utils/api';
 import { getBudgetData } from '../utils/indexedDB';
 
-const BudgetMetadataContext = createContext();
+export const BudgetMetadataContext = createContext(null);
+export const BudgetMetadataStateContext = createContext(null);
+export const BudgetMetadataDispatchContext = createContext(null);
+
 const STORAGE_KEY = 'personal_budget_app_data_v1';
 
 export function BudgetMetadataProvider({ children }) {
@@ -120,15 +123,15 @@ export function BudgetMetadataProvider({ children }) {
   });
   const [lastCloudSyncTime, setLastCloudSyncTime] = useState(null);
 
-  const toggleAutoCloudBackup = (enableBool) => {
+  const toggleAutoCloudBackup = useCallback((enableBool) => {
     const val = Boolean(enableBool);
     try { localStorage.setItem('cf_auto_backup_enabled', String(val)); }
     catch {}
     setIsAutoCloudBackupEnabled(val);
-  };
+  }, []);
 
   // Account Operations
-  const addAccount = (accountData) => {
+  const addAccount = useCallback((accountData) => {
     const newAcc = {
       id: accountData.id || `acc-${Date.now()}`,
       name: accountData.name || 'New Account',
@@ -145,25 +148,25 @@ export function BudgetMetadataProvider({ children }) {
       accounts: [...prev.accounts, newAcc]
     }));
     return newAcc;
-  };
+  }, []);
 
-  const updateAccount = (id, updatedData) => {
+  const updateAccount = useCallback((id, updatedData) => {
     setMetadataState(prev => ({
       ...prev,
       accounts: prev.accounts.map(acc => acc.id === id ? { ...acc, ...updatedData } : acc)
     }));
-  };
+  }, []);
 
-  const deleteAccount = (id) => {
+  const deleteAccount = useCallback((id) => {
     setMetadataState(prev => ({
       ...prev,
       accounts: prev.accounts.filter(acc => acc.id !== id),
       bills: prev.bills.map(b => b.accountId === id ? { ...b, accountId: prev.accounts.find(a => a.id !== id)?.id || '' } : b)
     }));
-  };
+  }, []);
 
   // Person Operations
-  const addPerson = (personData) => {
+  const addPerson = useCallback((personData) => {
     const newPersonId = `person-${Date.now()}`;
     const newPerson = {
       id: newPersonId,
@@ -186,16 +189,16 @@ export function BudgetMetadataProvider({ children }) {
         splits: { ...b.splits, [newPersonId]: 0 }
       }))
     }));
-  };
+  }, []);
 
-  const updatePerson = (id, updatedData) => {
+  const updatePerson = useCallback((id, updatedData) => {
     setMetadataState(prev => ({
       ...prev,
       people: prev.people.map(p => p.id === id ? { ...p, ...updatedData } : p)
     }));
-  };
+  }, []);
 
-  const deletePerson = (id) => {
+  const deletePerson = useCallback((id) => {
     setMetadataState(prev => ({
       ...prev,
       people: prev.people.filter(p => p.id !== id),
@@ -205,10 +208,10 @@ export function BudgetMetadataProvider({ children }) {
         return { ...b, splits: newSplits };
       })
     }));
-  };
+  }, []);
 
   // Bill Operations
-  const addBill = (billData) => {
+  const addBill = useCallback((billData) => {
     setMetadataState(prev => {
       const count = prev.people.length || 1;
       const initialSplits = {};
@@ -242,45 +245,45 @@ export function BudgetMetadataProvider({ children }) {
         bills: [...prev.bills, newBill]
       };
     });
-  };
+  }, []);
 
-  const updateBill = (id, updatedData) => {
+  const updateBill = useCallback((id, updatedData) => {
     setMetadataState(prev => ({
       ...prev,
       bills: prev.bills.map(b => b.id === id ? { ...b, ...updatedData } : b)
     }));
-  };
+  }, []);
 
-  const deleteBill = (id) => {
+  const deleteBill = useCallback((id) => {
     setMetadataState(prev => ({
       ...prev,
       bills: prev.bills.filter(b => b.id !== id)
     }));
-  };
+  }, []);
 
-  const updateBillSplits = (billId, splitsMap) => {
+  const updateBillSplits = useCallback((billId, splitsMap) => {
     setMetadataState(prev => ({
       ...prev,
       bills: prev.bills.map(b => b.id === billId ? { ...b, splits: splitsMap } : b)
     }));
-  };
+  }, []);
 
-  const archiveBill = (id) => {
+  const archiveBill = useCallback((id) => {
     setMetadataState(prev => ({
       ...prev,
       bills: prev.bills.map(b => b.id === id ? { ...b, isArchived: true } : b)
     }));
-  };
+  }, []);
 
-  const unarchiveBill = (id) => {
+  const unarchiveBill = useCallback((id) => {
     setMetadataState(prev => ({
       ...prev,
       bills: prev.bills.map(b => b.id === id ? { ...b, isArchived: false } : b)
     }));
-  };
+  }, []);
 
   // Loan Operations
-  const addLoan = (loanData) => {
+  const addLoan = useCallback((loanData) => {
     const newLoan = {
       id: `loan-${Date.now()}`,
       name: loanData?.name || 'New Loan',
@@ -298,96 +301,115 @@ export function BudgetMetadataProvider({ children }) {
       ...prev,
       loans: [...(prev.loans || []), newLoan]
     }));
-  };
+  }, []);
 
-  const updateLoan = (id, loanData) => {
+  const updateLoan = useCallback((id, loanData) => {
     setMetadataState(prev => ({
       ...prev,
       loans: (prev.loans || []).map(l => l.id === id ? { ...l, ...loanData } : l)
     }));
-  };
+  }, []);
 
-  const archiveLoan = (id) => {
+  const archiveLoan = useCallback((id) => {
     setMetadataState(prev => ({
       ...prev,
       loans: (prev.loans || []).map(l => l.id === id ? { ...l, isArchived: true } : l)
     }));
-  };
+  }, []);
 
-  const unarchiveLoan = (id) => {
+  const unarchiveLoan = useCallback((id) => {
     setMetadataState(prev => ({
       ...prev,
       loans: (prev.loans || []).map(l => l.id === id ? { ...l, isArchived: false } : l)
     }));
-  };
+  }, []);
 
-  const deleteLoan = (id) => {
+  const deleteLoan = useCallback((id) => {
     setMetadataState(prev => ({
       ...prev,
       loans: (prev.loans || []).filter(l => l.id !== id)
     }));
-  };
+  }, []);
 
   // Dashboard Widgets & Theme
-  const getDashboardWidgets = () => {
+  const getDashboardWidgets = useCallback(() => {
     if (metadataState.dashboardWidgets && Array.isArray(metadataState.dashboardWidgets) && metadataState.dashboardWidgets.length > 0) {
       return metadataState.dashboardWidgets;
     }
     return DEFAULT_DASHBOARD_WIDGETS;
-  };
+  }, [metadataState.dashboardWidgets]);
 
-  const updateDashboardWidgets = (newWidgets) => {
+  const updateDashboardWidgets = useCallback((newWidgets) => {
     setMetadataState(prev => ({
       ...prev,
       dashboardWidgets: newWidgets
     }));
-  };
+  }, []);
 
-  const toggleDashboardWidgetVisibility = (id) => {
-    const current = getDashboardWidgets();
-    const updated = current.map(w => w.id === id ? { ...w, visible: !w.visible } : w);
-    updateDashboardWidgets(updated);
-  };
+  const toggleDashboardWidgetVisibility = useCallback((id) => {
+    setMetadataState(prev => {
+      const current = (prev.dashboardWidgets && Array.isArray(prev.dashboardWidgets) && prev.dashboardWidgets.length > 0)
+        ? prev.dashboardWidgets
+        : DEFAULT_DASHBOARD_WIDGETS;
+      const updated = current.map(w => w.id === id ? { ...w, visible: !w.visible } : w);
+      return { ...prev, dashboardWidgets: updated };
+    });
+  }, []);
 
-  const reorderDashboardWidgets = (fromIndex, toIndex) => {
-    const current = [...getDashboardWidgets()];
-    if (fromIndex < 0 || fromIndex >= current.length || toIndex < 0 || toIndex >= current.length) return;
-    const [moved] = current.splice(fromIndex, 1);
-    current.splice(toIndex, 0, moved);
-    updateDashboardWidgets(current);
-  };
+  const reorderDashboardWidgets = useCallback((fromIndex, toIndex) => {
+    setMetadataState(prev => {
+      const current = [...((prev.dashboardWidgets && Array.isArray(prev.dashboardWidgets) && prev.dashboardWidgets.length > 0)
+        ? prev.dashboardWidgets
+        : DEFAULT_DASHBOARD_WIDGETS)];
+      if (fromIndex < 0 || fromIndex >= current.length || toIndex < 0 || toIndex >= current.length) return prev;
+      const [moved] = current.splice(fromIndex, 1);
+      current.splice(toIndex, 0, moved);
+      return { ...prev, dashboardWidgets: current };
+    });
+  }, []);
 
-  const setDashboardWidgetWidth = (id, width) => {
-    const current = getDashboardWidgets();
-    const updated = current.map(w => w.id === id ? { ...w, width, customWidth: undefined, customHeight: undefined } : w);
-    updateDashboardWidgets(updated);
-  };
+  const setDashboardWidgetWidth = useCallback((id, width) => {
+    setMetadataState(prev => {
+      const current = (prev.dashboardWidgets && Array.isArray(prev.dashboardWidgets) && prev.dashboardWidgets.length > 0)
+        ? prev.dashboardWidgets
+        : DEFAULT_DASHBOARD_WIDGETS;
+      const updated = current.map(w => w.id === id ? { ...w, width, customWidth: undefined, customHeight: undefined } : w);
+      return { ...prev, dashboardWidgets: updated };
+    });
+  }, []);
 
-  const setDashboardWidgetCustomSize = (id, customSize) => {
-    const current = getDashboardWidgets();
-    const updated = current.map(w => w.id === id ? { ...w, customWidth: customSize?.customWidth, customHeight: customSize?.customHeight } : w);
-    updateDashboardWidgets(updated);
-  };
+  const setDashboardWidgetCustomSize = useCallback((id, customSize) => {
+    setMetadataState(prev => {
+      const current = (prev.dashboardWidgets && Array.isArray(prev.dashboardWidgets) && prev.dashboardWidgets.length > 0)
+        ? prev.dashboardWidgets
+        : DEFAULT_DASHBOARD_WIDGETS;
+      const updated = current.map(w => w.id === id ? { ...w, customWidth: customSize?.customWidth, customHeight: customSize?.customHeight } : w);
+      return { ...prev, dashboardWidgets: updated };
+    });
+  }, []);
 
-  const resetDashboardWidgets = () => {
-    updateDashboardWidgets(DEFAULT_DASHBOARD_WIDGETS);
-  };
+  const resetDashboardWidgets = useCallback(() => {
+    setMetadataState(prev => ({
+      ...prev,
+      dashboardWidgets: DEFAULT_DASHBOARD_WIDGETS
+    }));
+  }, []);
 
-  const toggleHideDashboardHeader = (hideVal) => {
+  const toggleHideDashboardHeader = useCallback((hideVal) => {
     setMetadataState(prev => ({
       ...prev,
       hideDashboardHeader: hideVal !== undefined ? Boolean(hideVal) : !prev.hideDashboardHeader
     }));
-  };
+  }, []);
 
   const theme = metadataState.theme || 'dark';
 
-  const setTheme = (newTheme) => {
+  const setTheme = useCallback((newTheme) => {
     setMetadataState(prev => ({
       ...prev,
       theme: newTheme
     }));
-  };
+  }, []);
 
   useEffect(() => {
     if (typeof document !== 'undefined') {
@@ -402,33 +424,33 @@ export function BudgetMetadataProvider({ children }) {
   }, [theme]);
 
   // Calculation Utilities
-  const getMonthlyNetIncome = (person) => {
+  const getMonthlyNetIncome = useCallback((person) => {
     if (!person) return 0;
     const net = parseFloat(person.netPerPay) || 0;
     if (person.payFrequency === 'semi-monthly') return net * 2;
     if (person.payFrequency === 'bi-weekly') return (net * 26) / 12;
     if (person.payFrequency === 'weekly') return (net * 52) / 12;
     return net;
-  };
+  }, []);
 
-  const getMonthlyGrossIncome = (person) => {
+  const getMonthlyGrossIncome = useCallback((person) => {
     if (!person) return 0;
     const gross = parseFloat(person.grossPerPay) || 0;
     if (person.payFrequency === 'semi-monthly') return gross * 2;
     if (person.payFrequency === 'bi-weekly') return (gross * 26) / 12;
     if (person.payFrequency === 'weekly') return (gross * 52) / 12;
     return gross;
-  };
+  }, []);
 
-  const getTotalMonthlyNetIncome = () => {
+  const getTotalMonthlyNetIncome = useCallback(() => {
     return (metadataState.people || []).reduce((sum, p) => sum + getMonthlyNetIncome(p), 0);
-  };
+  }, [metadataState.people, getMonthlyNetIncome]);
 
-  const getTotalMonthlyGrossIncome = () => {
+  const getTotalMonthlyGrossIncome = useCallback(() => {
     return (metadataState.people || []).reduce((sum, p) => sum + getMonthlyGrossIncome(p), 0);
-  };
+  }, [metadataState.people, getMonthlyGrossIncome]);
 
-  const getBillMonthlyCost = (bill) => {
+  const getBillMonthlyCost = useCallback((bill) => {
     if (!bill) return 0;
     const amt = Math.abs(parseFloat(bill.amount) || 0);
     if (bill.period === 'Semi-Annual') return amt / 6;
@@ -436,26 +458,26 @@ export function BudgetMetadataProvider({ children }) {
     if (bill.period === 'Quarterly') return amt / 3;
     if (bill.period === 'Weekly') return (amt * 52) / 12;
     return amt;
-  };
+  }, []);
 
-  const getTotalMonthlyExpenses = () => {
+  const getTotalMonthlyExpenses = useCallback(() => {
     return (metadataState.bills || []).reduce((sum, b) => sum + getBillMonthlyCost(b), 0);
-  };
+  }, [metadataState.bills, getBillMonthlyCost]);
 
-  const getAccountMonthlyExpenses = (accountId) => {
+  const getAccountMonthlyExpenses = useCallback((accountId) => {
     return (metadataState.bills || [])
       .filter(b => b.accountId === accountId)
       .reduce((sum, b) => sum + getBillMonthlyCost(b), 0);
-  };
+  }, [metadataState.bills, getBillMonthlyCost]);
 
-  const getBillPersonMonthlyPortion = (bill, personId) => {
+  const getBillPersonMonthlyPortion = useCallback((bill, personId) => {
     if (!bill) return 0;
     const monthlyCost = getBillMonthlyCost(bill);
     const pct = parseFloat(bill.splits?.[personId]) || 0;
     return (monthlyCost * pct) / 100;
-  };
+  }, [getBillMonthlyCost]);
 
-  const getPersonMonthlyTotal = (personId) => {
+  const getPersonMonthlyTotal = useCallback((personId) => {
     const person = (metadataState.people || []).find(p => p.id === personId);
     const billsTotal = (metadataState.bills || []).reduce((sum, b) => sum + getBillPersonMonthlyPortion(b, personId), 0);
     if (!person) return billsTotal;
@@ -463,9 +485,9 @@ export function BudgetMetadataProvider({ children }) {
       return sum + getAccountSaveExtraPersonPortion(acc, person, metadataState);
     }, 0);
     return billsTotal + extraSavingsTotal;
-  };
+  }, [metadataState, getBillPersonMonthlyPortion]);
 
-  const getPersonPerPaycheckTotal = (personId) => {
+  const getPersonPerPaycheckTotal = useCallback((personId) => {
     const person = (metadataState.people || []).find(p => p.id === personId);
     if (!person) return 0;
     const monthlyTotal = getPersonMonthlyTotal(personId);
@@ -475,9 +497,9 @@ export function BudgetMetadataProvider({ children }) {
       return (monthlyTotal * 12) / 52;
     }
     return monthlyTotal;
-  };
+  }, [metadataState.people, getPersonMonthlyTotal]);
 
-  const getUpcomingBills = (limit = 5) => {
+  const getUpcomingBills = useCallback((limit = 5) => {
     const today = new Date();
     const mapped = (metadataState.bills || []).map(bill => {
       const dueDate = getNextBillDueDate(bill, today);
@@ -494,87 +516,151 @@ export function BudgetMetadataProvider({ children }) {
       };
     });
     return mapped.sort((a, b) => a.daysUntilDue - b.daysUntilDue).slice(0, limit);
-  };
+  }, [metadataState.bills, metadataState.accounts, getBillMonthlyCost]);
 
-  const getTotalCashOnHand = () => {
+  const getTotalCashOnHand = useCallback(() => {
     // Balance derivation now lives in LedgerDataContext (getAccountDerivedBalance)
     // This returns 0 as a fallback; callers should use the ledger context's derived balance
     return 0;
-  };
+  }, []);
+
+  const stateValue = useMemo(() => ({
+    metadataState,
+    accounts: metadataState.accounts,
+    people: metadataState.people,
+    bills: metadataState.bills,
+    loans: metadataState.loans,
+    theme,
+    hideDashboardHeader: Boolean(metadataState.hideDashboardHeader),
+    dashboardWidgets: getDashboardWidgets(),
+    selectedPersonId,
+    activeView,
+    isSettingsOpen,
+    settingsTab,
+    isDbLoaded,
+    saveError,
+    initialLedgerSeed,
+    isAutoCloudBackupEnabled,
+    lastCloudSyncTime
+  }), [
+    metadataState,
+    theme,
+    getDashboardWidgets,
+    selectedPersonId,
+    activeView,
+    isSettingsOpen,
+    settingsTab,
+    isDbLoaded,
+    saveError,
+    initialLedgerSeed,
+    isAutoCloudBackupEnabled,
+    lastCloudSyncTime
+  ]);
+
+  const actionsValue = useMemo(() => ({
+    setMetadataState,
+    setTheme,
+    toggleHideDashboardHeader,
+    updateDashboardWidgets,
+    toggleDashboardWidgetVisibility,
+    setDashboardWidgetWidth,
+    setDashboardWidgetCustomSize,
+    reorderDashboardWidgets,
+    resetDashboardWidgets,
+    setSelectedPersonId,
+    setActiveView,
+    setIsSettingsOpen,
+    setSettingsTab,
+    setSaveError,
+    // actions
+    addAccount,
+    updateAccount,
+    deleteAccount,
+    addPerson,
+    updatePerson,
+    deletePerson,
+    addBill,
+    updateBill,
+    deleteBill,
+    archiveBill,
+    unarchiveBill,
+    updateBillSplits,
+    addLoan,
+    updateLoan,
+    archiveLoan,
+    unarchiveLoan,
+    deleteLoan,
+    toggleAutoCloudBackup,
+    setLastCloudSyncTime,
+    // calculations
+    getMonthlyNetIncome,
+    getMonthlyGrossIncome,
+    getTotalMonthlyNetIncome,
+    getTotalMonthlyGrossIncome,
+    getBillMonthlyCost,
+    getTotalMonthlyExpenses,
+    getAccountMonthlyExpenses,
+    getBillPersonMonthlyPortion,
+    getPersonMonthlyTotal,
+    getPersonPerPaycheckTotal,
+    getUpcomingBills,
+    getTotalCashOnHand,
+    isPersonDepositDay,
+    getPersonDepositAmountForAccount
+  }), [
+    setTheme,
+    toggleHideDashboardHeader,
+    updateDashboardWidgets,
+    toggleDashboardWidgetVisibility,
+    setDashboardWidgetWidth,
+    setDashboardWidgetCustomSize,
+    reorderDashboardWidgets,
+    resetDashboardWidgets,
+    addAccount,
+    updateAccount,
+    deleteAccount,
+    addPerson,
+    updatePerson,
+    deletePerson,
+    addBill,
+    updateBill,
+    deleteBill,
+    archiveBill,
+    unarchiveBill,
+    updateBillSplits,
+    addLoan,
+    updateLoan,
+    archiveLoan,
+    unarchiveLoan,
+    deleteLoan,
+    toggleAutoCloudBackup,
+    getMonthlyNetIncome,
+    getMonthlyGrossIncome,
+    getTotalMonthlyNetIncome,
+    getTotalMonthlyGrossIncome,
+    getBillMonthlyCost,
+    getTotalMonthlyExpenses,
+    getAccountMonthlyExpenses,
+    getBillPersonMonthlyPortion,
+    getPersonMonthlyTotal,
+    getPersonPerPaycheckTotal,
+    getUpcomingBills,
+    getTotalCashOnHand
+  ]);
+
+  const contextValue = useMemo(() => ({
+    ...stateValue,
+    ...actionsValue
+  }), [stateValue, actionsValue]);
 
   return (
-    <BudgetMetadataContext.Provider
-      value={{
-        metadataState,
-        setMetadataState,
-        accounts: metadataState.accounts,
-        people: metadataState.people,
-        bills: metadataState.bills,
-        loans: metadataState.loans,
-        theme,
-        setTheme,
-        hideDashboardHeader: Boolean(metadataState.hideDashboardHeader),
-        toggleHideDashboardHeader,
-        dashboardWidgets: getDashboardWidgets(),
-        updateDashboardWidgets,
-        toggleDashboardWidgetVisibility,
-        setDashboardWidgetWidth,
-        setDashboardWidgetCustomSize,
-        reorderDashboardWidgets,
-        resetDashboardWidgets,
-        selectedPersonId,
-        setSelectedPersonId,
-        activeView,
-        setActiveView,
-        isSettingsOpen,
-        setIsSettingsOpen,
-        settingsTab,
-        setSettingsTab,
-        isDbLoaded,
-        saveError,
-        setSaveError,
-        initialLedgerSeed,
-        // actions
-        addAccount,
-        updateAccount,
-        deleteAccount,
-        addPerson,
-        updatePerson,
-        deletePerson,
-        addBill,
-        updateBill,
-        deleteBill,
-        archiveBill,
-        unarchiveBill,
-        updateBillSplits,
-        addLoan,
-        updateLoan,
-        archiveLoan,
-        unarchiveLoan,
-        deleteLoan,
-        isAutoCloudBackupEnabled,
-        toggleAutoCloudBackup,
-        lastCloudSyncTime,
-        setLastCloudSyncTime,
-        // calculations
-        getMonthlyNetIncome,
-        getMonthlyGrossIncome,
-        getTotalMonthlyNetIncome,
-        getTotalMonthlyGrossIncome,
-        getBillMonthlyCost,
-        getTotalMonthlyExpenses,
-        getAccountMonthlyExpenses,
-        getBillPersonMonthlyPortion,
-        getPersonMonthlyTotal,
-        getPersonPerPaycheckTotal,
-        getUpcomingBills,
-        getTotalCashOnHand,
-        isPersonDepositDay,
-        getPersonDepositAmountForAccount
-      }}
-    >
-      {children}
-    </BudgetMetadataContext.Provider>
+    <BudgetMetadataDispatchContext.Provider value={actionsValue}>
+      <BudgetMetadataStateContext.Provider value={stateValue}>
+        <BudgetMetadataContext.Provider value={contextValue}>
+          {children}
+        </BudgetMetadataContext.Provider>
+      </BudgetMetadataStateContext.Provider>
+    </BudgetMetadataDispatchContext.Provider>
   );
 }
 
@@ -585,3 +671,20 @@ export function useBudgetMetadata() {
   }
   return ctx;
 }
+
+export function useBudgetMetadataState() {
+  const ctx = useContext(BudgetMetadataStateContext);
+  if (!ctx) {
+    throw new Error('useBudgetMetadataState must be used within a BudgetMetadataProvider');
+  }
+  return ctx;
+}
+
+export function useBudgetMetadataDispatch() {
+  const ctx = useContext(BudgetMetadataDispatchContext);
+  if (!ctx) {
+    throw new Error('useBudgetMetadataDispatch must be used within a BudgetMetadataProvider');
+  }
+  return ctx;
+}
+

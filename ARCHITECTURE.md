@@ -221,13 +221,13 @@ All four React apps share the same auth design:
               └── <MainContent>           # view routing based on activeView
 ```
 
-`useBudget()` (composes both):
+`useBudget()` (composes both with `useMemo` for stable consumer references):
 
 ```js
 export function useBudget() {
   const metadata = useBudgetMetadata();
   const ledger = useLedgerData();
-  return { ...metadata, ...ledger };
+  return useMemo(() => ({ ...metadata, ...ledger }), [metadata, ledger]);
 }
 ```
 
@@ -391,6 +391,7 @@ The decision to run all four apps against a single Cloudflare D1 (SQLite) instan
 
 - The shared `users` table is the only true cross-app dependency; each app's domain tables are logically separate.
 - Finance uses IndexedDB as its primary local persistence, with D1 only for auth and cloud vault backup/restore, reducing its write pressure on the shared instance.
+- Finance auto-cloud backup is debounced to 45 seconds (45,000ms) with a financial data checksum guard to prevent rapid write locking on the shared D1 instance during continuous cell editing.
 - Bigworm's D1 usage is limited to auth; its operational state lives in Guacamole and KV.
 
 **Future roadmap (not yet implemented):**

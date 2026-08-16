@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { initialBudgetData } from '../initialData';
 import { fakeDemoBudgetData } from '../demoPresetData';
 import { useBudgetMetadata } from './BudgetMetadataContext';
@@ -7,7 +7,9 @@ import { getApiUrl, pushCloudBackupOptimistic, flushPendingCloudSync } from '../
 import { saveBudgetData, clearAndRestoreBudgetData, clearBudgetData } from '../utils/indexedDB';
 import { normalizeIsoDate } from '../utils/importer';
 
-const LedgerDataContext = createContext();
+export const LedgerDataContext = createContext(null);
+export const LedgerDataStateContext = createContext(null);
+export const LedgerDataDispatchContext = createContext(null);
 
 export function LedgerDataProvider({ children }) {
   const metadata = useBudgetMetadata();
@@ -41,12 +43,12 @@ export function LedgerDataProvider({ children }) {
   }, [isDbLoaded, initialLedgerSeed]);
 
   // Combined full budget object representation for compatibility and persistence
-  const budget = {
+  const budget = useMemo(() => ({
     ...metadataState,
     dailyMatrix,
     lineItems,
     transactions
-  };
+  }), [metadataState, dailyMatrix, lineItems, transactions]);
 
   // Silently save combined budget to IndexedDB whenever metadata or ledger state changes (debounced 500ms)
   useEffect(() => {
@@ -60,19 +62,19 @@ export function LedgerDataProvider({ children }) {
         });
     }, 500);
     return () => clearTimeout(timer);
-  }, [metadataState, dailyMatrix, lineItems, transactions, isDbLoaded]);
+  }, [budget, isDbLoaded, setSaveError]);
 
   // Cloud Vault Push Backup (Optimistic + Fallback Queue)
-  const pushCloudBackup = async (passcode) => {
+  const pushCloudBackup = useCallback(async (passcode) => {
     const result = await pushCloudBackupOptimistic(passcode, budget);
     if (result.success) {
       setLastCloudSyncTime(new Date().toLocaleTimeString());
     }
     return result;
-  };
+  }, [budget, setLastCloudSyncTime]);
 
   // Restore budget state from imported JSON backup
-  const restoreFromBackup = async (parsedData) => {
+  const restoreFromBackup = useCallback(async (parsedData) => {
     if (!parsedData || typeof parsedData !== 'object') {
       throw new Error('Invalid backup file format.');
     }
@@ -99,10 +101,10 @@ export function LedgerDataProvider({ children }) {
     setLineItems(newLineItems);
     setTransactions(newTransactions);
     return true;
-  };
+  }, [setMetadataState]);
 
   // Cloud Vault Pull Restore
-  const pullCloudRestore = async (passcode) => {
+  const pullCloudRestore = useCallback(async (passcode) => {
     const res = await fetch(getApiUrl('/api/sync/restore'), {
       method: 'GET',
       headers: {
@@ -115,10 +117,10 @@ export function LedgerDataProvider({ children }) {
     }
     await restoreFromBackup(data.budget);
     return data;
-  };
+  }, [restoreFromBackup]);
 
   // Export complete JSON backup helper
-  const exportBackupJson = () => {
+  const exportBackupJson = useCallback(() => {
     try {
       const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(budget, null, 2));
       const downloadAnchor = document.createElement('a');
@@ -133,7 +135,7 @@ export function LedgerDataProvider({ children }) {
       console.error('Failed to export JSON backup:', err);
       return false;
     }
-  };
+  }, [budget]);
 
   // Financial data checksum key to prevent UI-only updates (theme, widgets) from triggering cloud backups
   const financialDataChecksum = `${(metadataState.accounts || []).length}_${(metadataState.bills || []).length}_${(metadataState.people || []).length}_${(metadataState.loans || []).length}_${(lineItems || []).length}_${Object.keys(dailyMatrix || {}).length}`;
@@ -156,7 +158,7 @@ export function LedgerDataProvider({ children }) {
     return () => window.removeEventListener('online', handleOnlineRetry);
   }, [syncPasscode, setLastCloudSyncTime]);
 
-  // Debounced Auto Cloud Backup effect
+  // Debounced Auto Cloud Backup effect (45-second debounce to mitigate Cloudflare D1 write lock contention)
   useEffect(() => {
     if (!isDbLoaded || !isAutoCloudBackupEnabled) return;
 
@@ -168,13 +170,13 @@ export function LedgerDataProvider({ children }) {
       } catch (err) {
         console.error('Auto cloud backup failed:', err);
       }
-    }, 3000);
+    }, 45000);
 
     return () => clearTimeout(timer);
-  }, [financialDataChecksum, isDbLoaded, isAutoCloudBackupEnabled, isSyncUnlocked, syncPasscode]);
+  }, [financialDataChecksum, isDbLoaded, isAutoCloudBackupEnabled, isSyncUnlocked, syncPasscode, pushCloudBackup]);
 
   // Load 100% Fake Demo Preset Data
-  const loadDemoPreset = () => {
+  const loadDemoPreset = useCallback(() => {
     setMetadataState({
       accounts: fakeDemoBudgetData.accounts || [],
       people: fakeDemoBudgetData.people || [],
@@ -187,10 +189,10 @@ export function LedgerDataProvider({ children }) {
     setDailyMatrix(fakeDemoBudgetData.dailyMatrix || {});
     setLineItems(fakeDemoBudgetData.lineItems || []);
     setTransactions(fakeDemoBudgetData.transactions || []);
-  };
+  }, [setMetadataState]);
 
   // Reset to default budget data
-  const resetToDefaults = async () => {
+  const resetToDefaults = useCallback(async () => {
     setMetadataState({
       accounts: initialBudgetData.accounts || [],
       people: initialBudgetData.people || [],
@@ -204,10 +206,10 @@ export function LedgerDataProvider({ children }) {
     setLineItems(initialBudgetData.lineItems || []);
     setTransactions(initialBudgetData.transactions || []);
     await saveBudgetData(initialBudgetData);
-  };
+  }, [setMetadataState]);
 
   // Clear all data (100% clean slate)
-  const clearAllData = async () => {
+  const clearAllData = useCallback(async () => {
     await clearBudgetData();
     setMetadataState({
       accounts: [],
@@ -221,10 +223,10 @@ export function LedgerDataProvider({ children }) {
     setDailyMatrix({});
     setLineItems([]);
     setTransactions([]);
-  };
+  }, [setMetadataState]);
 
   // Selective per-namespace spreadsheet import
-  const importSpreadsheetSelective = ({ namespaces, strategies, data }) => {
+  const importSpreadsheetSelective = useCallback(({ namespaces, strategies, data }) => {
     if (!namespaces || !data) return { success: false, error: 'Invalid payload.' };
 
     // 1. Process People
@@ -485,10 +487,10 @@ export function LedgerDataProvider({ children }) {
     }
 
     return { success: true };
-  };
+  }, [metadataState, setMetadataState]);
 
   // Import Parsed Spreadsheet Data (legacy path)
-  const importParsedSpreadsheet = (parsedData, mode = 'replace') => {
+  const importParsedSpreadsheet = useCallback((parsedData, mode = 'replace') => {
     if (!parsedData || !parsedData.accounts) return { success: false, error: 'Invalid parsed data.' };
 
     if (mode === 'replace') {
@@ -529,14 +531,14 @@ export function LedgerDataProvider({ children }) {
     }
 
     return { success: true };
-  };
+  }, [setMetadataState]);
 
   // --- Line Item Operations ---
-  const getLineItem = (billId, monthKey) => {
+  const getLineItem = useCallback((billId, monthKey) => {
     return lineItems.find(li => li.billId === billId && li.monthKey === monthKey);
-  };
+  }, [lineItems]);
 
-  const upsertLineItem = (billId, monthKey, actualAmount) => {
+  const upsertLineItem = useCallback((billId, monthKey, actualAmount) => {
     setLineItems(prev => {
       const existing = prev.findIndex(li => li.billId === billId && li.monthKey === monthKey);
       const updated = [...prev];
@@ -548,35 +550,35 @@ export function LedgerDataProvider({ children }) {
       }
       return updated;
     });
-  };
+  }, []);
 
-  const getActualAmount = (billId, monthKey) => {
-    const li = getLineItem(billId, monthKey);
+  const getActualAmount = useCallback((billId, monthKey) => {
+    const li = lineItems.find(item => item.billId === billId && item.monthKey === monthKey);
     return li ? li.actualAmount : null;
-  };
+  }, [lineItems]);
 
-  const getEffectiveAmount = (bill, monthKey) => {
-    const li = getLineItem(bill.id, monthKey);
+  const getEffectiveAmount = useCallback((bill, monthKey) => {
+    const li = lineItems.find(item => item.billId === bill?.id && item.monthKey === monthKey);
     return li ? li.actualAmount : getBillMonthlyCost(bill);
-  };
+  }, [lineItems, getBillMonthlyCost]);
 
-  const getTotalActualExpenses = (monthKey) => {
+  const getTotalActualExpenses = useCallback((monthKey) => {
     return (metadataState.bills || []).reduce((sum, b) => {
-      const li = getLineItem(b.id, monthKey);
+      const li = lineItems.find(item => item.billId === b.id && item.monthKey === monthKey);
       return sum + (li ? li.actualAmount : getBillMonthlyCost(b));
     }, 0);
-  };
+  }, [metadataState.bills, lineItems, getBillMonthlyCost]);
 
-  const getAccountActualExpenses = (accountId, monthKey) => {
+  const getAccountActualExpenses = useCallback((accountId, monthKey) => {
     return (metadataState.bills || [])
       .filter(b => b.accountId === accountId)
       .reduce((sum, b) => sum + getEffectiveAmount(b, monthKey), 0);
-  };
+  }, [metadataState.bills, getEffectiveAmount]);
 
   // --- Derived Balance Helpers ---
 
   // Derives the latest known balance for an account from importedLedgerRows or transactions
-  const getAccountDerivedBalance = (accountId) => {
+  const getAccountDerivedBalance = useCallback((accountId) => {
     const acc = (metadataState.accounts || []).find(a => a.id === accountId);
     if (!acc) return 0;
 
@@ -598,99 +600,154 @@ export function LedgerDataProvider({ children }) {
     }
 
     return 0;
-  };
+  }, [metadataState.accounts, transactions]);
 
-  const getAccountProjectedEndBalance = (accountId, monthKey) => {
+  const getAccountProjectedEndBalance = useCallback((accountId, monthKey) => {
     const derivedBalance = getAccountDerivedBalance(accountId);
     const projectedExpenses = monthKey ? getAccountActualExpenses(accountId, monthKey) : getAccountMonthlyExpenses(accountId);
     return derivedBalance - projectedExpenses;
-  };
+  }, [getAccountDerivedBalance, getAccountActualExpenses, getAccountMonthlyExpenses]);
 
-  const getAccountActualEndBalance = (accountId, monthKey) => {
+  const getAccountActualEndBalance = useCallback((accountId, monthKey) => {
     const derivedBalance = getAccountDerivedBalance(accountId);
     const actualExpenses = getAccountActualExpenses(accountId, monthKey);
     return derivedBalance - actualExpenses;
-  };
+  }, [getAccountDerivedBalance, getAccountActualExpenses]);
 
   // --- Daily Matrix Cell Operations ---
-  const getDailyMatrixCell = (accountId, monthKey, day, field) => {
+  const getDailyMatrixCell = useCallback((accountId, monthKey, day, field) => {
     const key = `${accountId}_${monthKey}_${day}_${field}`;
     return dailyMatrix[key];
-  };
+  }, [dailyMatrix]);
 
-  const updateDailyMatrixCell = (accountId, monthKey, day, field, value) => {
+  const updateDailyMatrixCell = useCallback((accountId, monthKey, day, field, value) => {
     const key = `${accountId}_${monthKey}_${day}_${field}`;
-    setDailyMatrix(prev => ({
-      ...prev,
-      [key]: value
-    }));
-  };
+    setDailyMatrix(prev => {
+      if (prev[key] === value) return prev;
+      if ((prev[key] === undefined || prev[key] === null || prev[key] === '') && (value === undefined || value === null || value === '')) {
+        return prev;
+      }
+      return {
+        ...prev,
+        [key]: value
+      };
+    });
+  }, []);
 
-  const updateDailyMatrixCells = (updates) => {
-    setDailyMatrix(prev => ({
-      ...prev,
-      ...updates
-    }));
-  };
+  const updateDailyMatrixCells = useCallback((updates) => {
+    if (!updates || typeof updates !== 'object') return;
+    setDailyMatrix(prev => {
+      let hasChanges = false;
+      const next = { ...prev };
+      for (const [k, v] of Object.entries(updates)) {
+        if (prev[k] !== v) {
+          next[k] = v;
+          hasChanges = true;
+        }
+      }
+      return hasChanges ? next : prev;
+    });
+  }, []);
 
-  const moveDailyMatrixCell = (accountId, sourceMonthKey, sourceDay, targetMonthKey, targetDay, field, value, extraData = {}) => {
+  const moveDailyMatrixCell = useCallback((accountId, sourceMonthKey, sourceDay, targetMonthKey, targetDay, field, value, extraData = {}) => {
     const sourceKey = `${accountId}_${sourceMonthKey}_${sourceDay}_${field}`;
     const targetKey = `${accountId}_${targetMonthKey}_${targetDay}_${field}`;
 
-    const updates = {
-      [sourceKey]: 0,
-      [targetKey]: value
-    };
+    setDailyMatrix(prev => {
+      const updates = {
+        [sourceKey]: 0,
+        [targetKey]: value
+      };
 
-    if (field === 'other_amount') {
-      const sourceDescKey = `${accountId}_${sourceMonthKey}_${sourceDay}_other_desc`;
-      const targetDescKey = `${accountId}_${targetMonthKey}_${targetDay}_other_desc`;
-      const sourceDesc = extraData.otherDesc ?? (dailyMatrix[sourceDescKey] || '');
-      updates[sourceDescKey] = '';
-      updates[targetDescKey] = sourceDesc;
-    }
+      if (field === 'other_amount') {
+        const sourceDescKey = `${accountId}_${sourceMonthKey}_${sourceDay}_other_desc`;
+        const targetDescKey = `${accountId}_${targetMonthKey}_${targetDay}_other_desc`;
+        const sourceDesc = extraData.otherDesc ?? (prev[sourceDescKey] || '');
+        updates[sourceDescKey] = '';
+        updates[targetDescKey] = sourceDesc;
+      }
 
-    updateDailyMatrixCells(updates);
-  };
+      return {
+        ...prev,
+        ...updates
+      };
+    });
+  }, []);
+
+  const stateValue = useMemo(() => ({
+    budget,
+    dailyMatrix,
+    lineItems,
+    transactions,
+    syncPasscode,
+    isSyncUnlocked
+  }), [budget, dailyMatrix, lineItems, transactions, syncPasscode, isSyncUnlocked]);
+
+  const actionsValue = useMemo(() => ({
+    getDailyMatrixCell,
+    updateDailyMatrixCell,
+    updateDailyMatrixCells,
+    moveDailyMatrixCell,
+    upsertLineItem,
+    getLineItem,
+    getActualAmount,
+    getEffectiveAmount,
+    getTotalActualExpenses,
+    getAccountActualExpenses,
+    getAccountDerivedBalance,
+    getAccountProjectedEndBalance,
+    getAccountActualEndBalance,
+    loadDemoPreset,
+    resetToDefaults,
+    clearAllData,
+    importSpreadsheetSelective,
+    importParsedSpreadsheet,
+    exportBackupJson,
+    restoreFromBackup,
+    pushCloudBackup,
+    pullCloudRestore,
+    setSyncPasscode,
+    setIsSyncUnlocked
+  }), [
+    getDailyMatrixCell,
+    updateDailyMatrixCell,
+    updateDailyMatrixCells,
+    moveDailyMatrixCell,
+    upsertLineItem,
+    getLineItem,
+    getActualAmount,
+    getEffectiveAmount,
+    getTotalActualExpenses,
+    getAccountActualExpenses,
+    getAccountDerivedBalance,
+    getAccountProjectedEndBalance,
+    getAccountActualEndBalance,
+    loadDemoPreset,
+    resetToDefaults,
+    clearAllData,
+    importSpreadsheetSelective,
+    importParsedSpreadsheet,
+    exportBackupJson,
+    restoreFromBackup,
+    pushCloudBackup,
+    pullCloudRestore,
+    setSyncPasscode,
+    setIsSyncUnlocked
+  ]);
+
+  const contextValue = useMemo(() => ({
+    ...stateValue,
+    ...actionsValue
+  }), [stateValue, actionsValue]);
 
   return (
-    <LedgerDataContext.Provider
-      value={{
-        budget,
-        dailyMatrix,
-        lineItems,
-        transactions,
-        // actions
-        getDailyMatrixCell,
-        updateDailyMatrixCell,
-        updateDailyMatrixCells,
-        moveDailyMatrixCell,
-        upsertLineItem,
-        getLineItem,
-        getActualAmount,
-        getEffectiveAmount,
-        getTotalActualExpenses,
-        getAccountActualExpenses,
-        getAccountDerivedBalance,
-        getAccountProjectedEndBalance,
-        getAccountActualEndBalance,
-        loadDemoPreset,
-        resetToDefaults,
-        clearAllData,
-        importSpreadsheetSelective,
-        importParsedSpreadsheet,
-        exportBackupJson,
-        restoreFromBackup,
-        pushCloudBackup,
-        pullCloudRestore,
-        syncPasscode,
-        setSyncPasscode,
-        isSyncUnlocked,
-        setIsSyncUnlocked
-      }}
-    >
-      {children}
-    </LedgerDataContext.Provider>
+    <LedgerDataDispatchContext.Provider value={actionsValue}>
+      <LedgerDataStateContext.Provider value={stateValue}>
+        <LedgerDataContext.Provider value={contextValue}>
+          {children}
+        </LedgerDataContext.Provider>
+      </LedgerDataStateContext.Provider>
+    </LedgerDataDispatchContext.Provider>
   );
 }
 
@@ -701,3 +758,20 @@ export function useLedgerData() {
   }
   return ctx;
 }
+
+export function useLedgerDataState() {
+  const ctx = useContext(LedgerDataStateContext);
+  if (!ctx) {
+    throw new Error('useLedgerDataState must be used within a LedgerDataProvider');
+  }
+  return ctx;
+}
+
+export function useLedgerDataDispatch() {
+  const ctx = useContext(LedgerDataDispatchContext);
+  if (!ctx) {
+    throw new Error('useLedgerDataDispatch must be used within a LedgerDataProvider');
+  }
+  return ctx;
+}
+

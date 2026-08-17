@@ -3239,621 +3239,271 @@ export const polandJourney = {
     }
 ,
 {
-      id: "torun",
-      name: "Toruń",
-      nights: 0,
-      base: "Day Stop Only",
-      focus: "Low-hassle medieval break: lockers, gingerbread, UNESCO core, lunch, and onward train to Gdańsk.",
-      marketStrategy: "Walk the medieval core, try gingerbread, photograph the red-brick streets, and have one sit-down lunch.",
-      dates: "Nov 21, 2026 - Dec 21, 2026",
-      openingHours: "Mon-Thu 12pm-9pm, Fri 12pm-10pm, Sat 10am-10pm, Sun 10am-9pm.",
-      hours: "Mon-Thu 12pm-9pm, Fri 12pm-10pm, Sat 10am-10pm, Sun 10am-9pm.",
-      kaucja: "30 PLN (~$8.00 USD)",
-      foodTargets: [
-"Karczma Spichrz",
-"Restauracja Manekin",
-"Restauracja Pod Aniołem",
-"Pierogarnia Stary Toruń",
-"Jan Olbracht Browar"
-      ],
-      imageDetails: {
-        location: "Rynek Staromiejski (Old Town Square)",
-        landmark: "UNESCO Medieval Gothic Town Hall & Copernicus Monument",
-        description: "Set within a preserved 13th-century red-brick medieval core. Famous for rich ginger aromas, traditional hand-painted wooden trinkets, and centuries-old Toruń gingerbread (pierniki) baked from secret spice recipes."
-      },
-      history: "Toruń is one of Poland’s oldest and most intact medieval cities, founded in 1233 by the Teutonic Knights along the Vistula River. Inscribed on the UNESCO World Heritage List in 1997, its magnificent red-brick Gothic Old Town survived World War II without a single bomb falling on its historic core. Toruń is world-renowned as the birthplace of astronomer Nicolaus Copernicus - who \"stopped the Sun and moved the Earth\" - and as Europe's ancient gingerbread capital, baking Toruńskie Pierniki for over 700 years.",
-      historyStats: [
-{
-          label: "Founded",
-          value: "1233 (Teutonic Order Charter)",
-          icon: "Landmark"
-        },
-{
-          label: "UNESCO Heritage",
-          value: "1997 (Intact Brick Gothic)",
-          icon: "Award"
-        },
-{
-          label: "Pierniki Tradition",
-          value: "700+ Years (Since 1380)",
-          icon: "Crown"
-        },
-{
-          label: "Copernicus Birth",
-          value: "Feb 19, 1473",
-          icon: "MapPin"
-        }
-      ],
-      historyEpochs: [
-{
-          era: "1233 - 1454",
-          title: "Teutonic Knights & Hanseatic River Port",
-          subtitle: "Teutonic castle fortress and Baltic grain trade wealth",
-          description: "Founded by the Teutonic Order in 1233, Toruń quickly joined the Hanseatic League and grew into a wealthy river trading hub. Grand Gothic monuments rose across the city, including the monumental Town Hall on Rynek Staromiejski, St. John's Cathedral, and the fortified city walls with the iconic Leaning Tower (Krzywa Wieża)."
-        },
-{
-          era: "1454 - 1466",
-          title: "The Thirteen Years' War & Return to Poland",
-          subtitle: "Burghers demolish the Teutonic castle and pledge loyalty to the Polish Crown",
-          description: "Frustrated by heavy Teutonic taxes, Toruń burghers rebelled in 1454, besieging and completely demolishing the Teutonic Castle. They pledged loyalty to Polish King Casimir IV Jagiellon, sparking the Thirteen Years' War that ended with the 1466 Second Peace of Toruń, returning Royal Prussia to the Polish realm with extensive autonomous privileges."
-        },
-{
-          era: "1473",
-          title: "The Birth of Nicolaus Copernicus",
-          subtitle: "The Renaissance astronomer who revolutionized human understanding of the universe",
-          description: "On February 19, 1473, Mikołaj Kopernik (Nicolaus Copernicus) was born in a Gothic townhouse on St. Anne Street. Educated at Kraków and in Italy, his groundbreaking treatise De revolutionibus orbium coelestium placed the Sun at the center of the solar system, launching the modern scientific revolution."
-        },
-{
-          era: "16th - 18th Century",
-          title: "Golden Age of Patrician Palaces & Pierniki",
-          subtitle: "Renaissance art, gingerbread guilds, and the House Under the Star",
-          description: "Toruń patrician families built exquisite Renaissance townhouses like the House Under the Star (Kamienica Pod Gwiazdą). The Toruń gingerbread baking guild established secret spice recipes blending Asian ginger, cinnamon, nutmeg, and regional Vistula honey, earning royal acclaim across European courts."
-        },
-{
-          era: "1793 - 1920",
-          title: "Prussian Rule & The Fortress of Toruń",
-          subtitle: "Ring of artillery forts and cultural preservation under partition",
-          description: "Following the Second Partition of Poland in 1793, Toruń became a key border stronghold of Prussia (Festung Thorn). A formidable ring of over 200 artillery forts and defensive works was constructed, protecting the medieval core while industrial railways linked the city to Berlin, Warsaw, and Danzig."
-        },
-{
-          era: "1945 - Present",
-          title: "Miraculous Preservation & UNESCO Recognition",
-          subtitle: "Undamaged architectural treasure and academic center",
-          description: "Spared from destructive street battles during WWII, Toruń emerged as one of Poland's purest preserved medieval cities. In 1945, displaced Polish professors from Stefan Batory University in Wilno (Vilnius) founded Nicolaus Copernicus University (UMK), cementing Toruń as a premier academic and cultural destination."
-        }
-      ],
-      historyLegends: [
-{
-          icon: "🎻",
-          title: "The Toruń Raftsman (Flisak) & The Frog Plague",
-          description: "When Toruń was overrun by an overwhelming plague of frogs, the mayor offered gold and his daughter's hand in marriage to whoever could rid the town of them. A humble raftsman named Iwo played his violin so enchantingly that all the frogs followed his melody out through Chełmno Gate into the Vistula marshlands."
-        },
-{
-          icon: "🏰",
-          title: "The Leaning Tower of Toruń (Krzywa Wieża)",
-          description: "Built in the 14th century, this 15-meter tower leans 1.4 meters off-center. Medieval legend says a Teutonic knight built it as penance for falling in love with a local woman. Visitors are challenged to stand with their heels and back against the wall without falling over - proving they possess a pure and honest heart."
-        },
-{
-          icon: "🍪",
-          title: "The Legend of Katarzynka Gingerbread",
-          description: "When a medieval baker fell ill before the Polish King's visit, his clever daughter Katarzyna baked spiced honey cookies using six overlapping circles of dough. The King was so impressed by the unique shape and delicious flavor that he declared them Poland's official gingerbread, named \"Katarzynki\" in her honor."
-        }
-      ],
-      quickReference: {
-        dates: "Nov 21, 2026 - Dec 21, 2026",
-        daylight: "Sunrise ~7:45 AM | Sunset ~3:35 PM (~7.8 hrs daylight)",
-        peakHours: "4:30 PM - 7:30 PM (Gothic Town Hall illumination & gingerbread aromas)",
-        kaucja: "30 PLN (~$8.00 USD) deposit per mug (EXACT CASH REQUIRED)"
-      },
-      holidayClosures: {
-        dec24: "Market closed. Day stop itinerary recommends visiting earlier in December prior to holiday shutdown.",
-        dec25: "Christmas Day: All museums, tourist facilities, and gingerbread workshops CLOSED.",
-        dec26: "Boxing Day: Limited afternoon café operations."
-      },
-      kaucjaCallout: {
-        deposit: "30 PLN (~$8.00 USD)",
-        notes: "Exact cash required for commemorative Toruń ceramic mug deposit. Full cash refund upon returning your mug to any market drink chalet."
-      },
-      culinaryHighlights: [
-{
-          name: "Toruńskie Pierniki",
-          phonetic: "toh-ROON-skyeh pyehr-NEE-kee",
-          english: "Traditional Toruń Gingerbread",
-          description: "Centuries-old recipe of dark spiced honey dough baked in hand-carved wooden molds, filled with wild plum or rose petal jam and glazed with dark chocolate or sugar icing.",
-          tip: "Buy fresh Katarzynki from the official Kopernik factory shop or Żywe Muzeum Piernika."
-        },
-{
-          name: "Grzany Miód Toruński",
-          phonetic: "GZH-ah-ny MYOOD toh-ROON-skee",
-          english: "Hot Spiced Toruń Honey Mead",
-          description: "Regional fermented honey wine spiced with cloves, nutmeg, star anise, and lemon peel, served steaming hot in stone mugs.",
-          tip: "Sample Trójniak or Dwójniak grades for rich floral honey sweetness."
-        },
-{
-          name: "Gęsina po Toruńsku",
-          phonetic: "gen-SHEE-nah poh toh-ROON-skoo",
-          english: "Kuyavian Roast Goose with Apples & Marjoram",
-          description: "Succulent slow-roasted local Kuyavian goose seasoned with wild marjoram, served with tart baked apples, red cabbage, and roasted potatoes.",
-          tip: "St. Martin’s Day and winter tradition across Kuyavia (Kujawy-Pomorze)."
-        },
-{
-          name: "Piernikowe Piwo Ciemne",
-          phonetic: "pyehr-nee-KOH-veh PEE-voh CHEHM-neh",
-          english: "Dark Spiced Gingerbread Craft Beer",
-          description: "Rich dark lager brewed with roasted malts, regional honey, ginger, and aromatic Christmas spices.",
-          tip: "Enjoy on tap at Jan Olbracht Browar Staromiejski."
-        },
-{
-          name: "Piecuchy Toruńskie",
-          phonetic: "pyeh-TSOO-khee toh-ROON-skyeh",
-          english: "Oven-Baked Crusty Meat & Herb Dumplings",
-          description: "Large, golden wood-oven baked yeast dough dumplings stuffed with slow-cooked seasoned beef, mushrooms, or smoked cheese, served with garlic-herb dip.",
-          tip: "Specialty of Pierogarnia Stary Toruń on Mostowa street."
-        },
-{
-          name: "Zupa Grzybowa w Chlebku",
-          phonetic: "ZOO-pah gzhy-BOH-vah v KHLEP-koo",
-          english: "Wild Forest Mushroom Soup in Bread Bowl",
-          description: "Creamy soup made with dried Boletus mushrooms foraged from northern Polish pine forests, served in a crusty sourdough bread cauldron.",
-          tip: "Perfect warming lunch at Karczma Spichrz."
-        }
-      ],
-      transit: {
-        airport: "Nearest international airports are Bydgoszcz (BZG, 50 km) or Gdańsk (GDN, 170 km). Direct PKP InterCity trains connect Toruń Główny directly with Poznań (1h 20m) and Gdańsk (1h 35m).",
-        cityTransit: "Operated by MZK Toruń. Single tickets cost 3.80 PLN (~$1.00 USD). Purchase on board using contactless card tap or via the Jakdojade app. Bus lines 22 and 27 connect Toruń Główny railway station directly to the Old Town (Plac Rapackiego / Aleja Solidarności) in 7 minutes.",
-        station: "Toruń Główny station is located south of the Vistula River. Use the luggage storage lockers at the station or take Bus 22 across the bridge to Plac Rapackiego (5-min ride) to enter the medieval pedestrian core."
-      },
-      practical: {
-        weather: "December in Toruń averages -1°C to 4°C (30°F–39°F) with brisk river winds off the Vistula. Warm layers, wind-resistant outer shell, gloves, a hat, and rugged waterproof walking footwear are essential for red-brick cobblestones.",
-        currency: "Poland uses the Polish Złoty (PLN). Cards and contactless mobile pay are widely accepted, but retain 30–50 PLN (~$8.00–$13.35 USD) in cash for ceramic mug deposits and small craft bakery stalls.",
-        restrooms: "Public WCs are available in the Town Hall (Ratusz Staromiejski) basement, at Bulwar Filadelfijski riverfront, and inside the Toruń Plaza and Copernicus shopping arcades (2–4 PLN (~$0.50–$1.05 USD))."
-      },
-      markets: [
-{
-          id: "torun-rynek-staromiejski",
-          name: "Rynek Staromiejski Medieval Christmas Market",
-          shortName: "Rynek Staromiejski",
-          location: "Rynek Staromiejski, 87-114 Toruń, Poland",
-          lat: 53.0105442,
-          lng: 18.6037339,
+          id: "torun",
+          name: "Toruń",
+          nights: 0,
+          base: "Day Stop Only (4-6 Hours)",
+          focus: "Time-boxed medieval break: station luggage lockers, Copernicus highlights, Rynek Staromiejski, quick lunch, and onward train.",
+          marketStrategy: "Maximize 4-6 hours: walk straight from the bus/station to Rynek Staromiejski, try authentic Toruń gingerbread, and grab lunch at a nearby spot.",
           dates: "Nov 21, 2026 - Dec 21, 2026",
-          hours: "Mon-Thu 12:00 PM - 9:00 PM, Fri 12:00 PM - 10:00 PM, Sat 10:00 AM - 10:00 PM, Sun 10:00 AM - 9:00 PM",
-          bestTime: "4:30 PM - 7:00 PM (Gothic Town Hall illumination & gingerbread aromas)",
-          specialty: "Authentic 700-year-old Toruń gingerbread, spiced honey wines, and Gothic square ambiance",
-          details: "Nestled beneath the towering red-brick 13th-century Town Hall and Copernicus Monument, Toruń’s Christmas Market is famous for world-renowned spiced gingerbread and warm medieval charm.",
-          description: "Enclosed by intact 13th-century brick Gothic townhouses, Toruń's market fills the medieval square with festive wooden chalets, glowing arches, master gingerbread bakers, and live highlander carolers.",
-          highlights: [
-"Authentic Toruń Pierniki (Katarzynki & Heart Molds)",
-"Copernicus Monument & Gothic Ratusz Illumination",
-"Hot Spiced Toruń Honey Mead (Miód Toruński)",
-"Woodfired Grilled Kielbasa & Smoked Meats"
+          openingHours: "Mon-Thu 12pm-9pm, Fri 12pm-10pm, Sat 10am-10pm, Sun 10am-9pm.",
+          hours: "Mon-Thu 12pm-9pm, Fri 12pm-10pm, Sat 10am-10pm, Sun 10am-9pm.",
+          kaucja: "30 PLN (~$8.00 USD)",
+          foodTargets: [
+                "Karczma Spichrz",
+                "Restauracja Manekin",
+                "Jan Olbracht Browar",
+                "Kawiarnia Lenkiewicz"
           ],
-          mustTry: [
-"Toruńskie Pierniki z Powidłami (Plum Jam Spiced Gingerbread)",
-"Grzany Miód Toruński (Hot Toruń Spiced Mead)",
-"Barszcz Czerwony z Uszkami (Beetroot Borscht)"
+          imageDetails: {
+                location: "Rynek Staromiejski (Old Town Square)",
+                landmark: "UNESCO Medieval Gothic Town Hall & Copernicus Monument",
+                description: "Set within a preserved 13th-century red-brick medieval core. Famous for rich ginger aromas, traditional hand-painted wooden trinkets, and centuries-old Toruń gingerbread (pierniki)."
+          },
+          history: "Toruń is one of Poland's oldest and most intact medieval cities, founded in 1233 by the Teutonic Knights along the Vistula River. Inscribed on the UNESCO World Heritage List in 1997, its magnificent red-brick Gothic Old Town survived World War II without a single bomb falling on its historic core. Toruń is world-renowned as the birthplace of astronomer Nicolaus Copernicus - who 'stopped the Sun and moved the Earth' - and as Europe's ancient gingerbread capital.",
+          historyStats: [
+                {
+                      label: "Founded",
+                      value: "1233 (Teutonic Order Charter)",
+                      icon: "Landmark"
+                },
+                {
+                      label: "UNESCO Heritage",
+                      value: "1997 (Intact Brick Gothic)",
+                      icon: "Award"
+                },
+                {
+                      label: "Copernicus Birth",
+                      value: "Feb 19, 1473",
+                      icon: "MapPin"
+                }
           ],
-          souvenirs: [
-"Decorated Wooden Pierniki Molds",
-"Hand-Painted Copernicus Glass Ornaments",
-"Kashubian & Kuyavian Handcrafted Ceramics"
+          historyEpochs: [
+                {
+                      era: "1233 - 1454",
+                      title: "Teutonic Knights & Hanseatic River Port",
+                      subtitle: "Teutonic castle fortress and Baltic grain trade wealth",
+                      description: "Founded by the Teutonic Order in 1233, Toruń quickly joined the Hanseatic League and grew into a wealthy river trading hub."
+                },
+                {
+                      era: "1473",
+                      title: "The Birth of Nicolaus Copernicus",
+                      subtitle: "The Renaissance astronomer who revolutionized human understanding",
+                      description: "On February 19, 1473, Mikołaj Kopernik was born in a Gothic townhouse on St. Anne Street."
+                }
           ],
-          imageSrc: "/wayfinder/Poland-2026/images/torun/markets/torun-rynek-staromiejski.jpg",
-          imageUrl: "/wayfinder/Poland-2026/images/torun/markets/torun-rynek-staromiejski.jpg"
-        },
-{
-          id: "torun-rynek-nowomiejski",
-          name: "Rynek Nowomiejski Craft & Artisan Fair",
-          shortName: "Rynek Nowomiejski",
-          location: "Rynek Nowomiejski, 87-113 Toruń, Poland",
-          lat: 53.0117024,
-          lng: 18.6105403,
-          dates: "Nov 27, 2026 - Dec 20, 2026",
-          hours: "11:00 AM - 8:00 PM daily",
-          bestTime: "3:00 PM - 6:00 PM (Quiet artisan shopping & local bakery stalls)",
-          specialty: "Handcrafted toys, beeswax goods, and local Kuyavian craft foods",
-          details: "A quieter, charming sister market set in the New Town Market Square centered around master woodturners, organic beekeepers, and regional Kuyavian bakers.",
-          description: "Set on the octagonal New Town Square, this market offers an intimate, relaxed stroll focused on small-batch beekeepers, hand-loomed winter scarves, and local organic delicacies.",
-          highlights: [
-"Small-Batch Beekeepers & Propolis Honey",
-"Handmade Wooden Christmas Toys",
-"Cozy Family Gingerbread Decorating Stalls",
-"Hot Spiced Apple Cider Chalets"
+          historyLegends: [
+                {
+                      icon: "🏰",
+                      title: "The Leaning Tower of Toruń (Krzywa Wieża)",
+                      description: "Built in the 14th century, this 15-meter tower leans 1.4 meters off-center. Medieval legend says a Teutonic knight built it as penance for falling in love with a local woman."
+                }
           ],
-          mustTry: [
-"Katarzynka Gingerbread with Dark Chocolate",
-"Hot Mulled Cider with Cloves and Cinnamon",
-"Warm Toruń Pretzels"
+          quickReference: {
+                dates: "Nov 21, 2026 - Dec 21, 2026",
+                daylight: "Sunrise ~7:45 AM | Sunset ~3:35 PM (~7.8 hrs daylight)",
+                peakHours: "4:30 PM - 7:30 PM (Gothic Town Hall illumination & gingerbread aromas)",
+                kaucja: "30 PLN (~$8.00 USD) deposit per mug (EXACT CASH REQUIRED)"
+          },
+          holidayClosures: {
+                dec24: "Market closed. Day stop itinerary recommends visiting earlier in December prior to holiday shutdown.",
+                dec25: "Christmas Day: All museums, tourist facilities, and gingerbread workshops CLOSED.",
+                dec26: "Boxing Day: Limited afternoon café operations."
+          },
+          kaucjaCallout: {
+                deposit: "30 PLN (~$8.00 USD)",
+                notes: "Exact cash required for commemorative Toruń ceramic mug deposit."
+          },
+          culinaryHighlights: [
+                {
+                      name: "Toruńskie Pierniki",
+                      phonetic: "toh-ROON-skyeh pyehr-NEE-kee",
+                      english: "Traditional Toruń Gingerbread",
+                      description: "Centuries-old recipe of dark spiced honey dough baked in hand-carved wooden molds, filled with wild plum or rose petal jam and glazed with dark chocolate.",
+                      tip: "Buy fresh Katarzynki from the official Kopernik factory shop."
+                },
+                {
+                      name: "Piernikowe Piwo Ciemne",
+                      phonetic: "pyehr-nee-KOH-veh PEE-voh CHEHM-neh",
+                      english: "Dark Spiced Gingerbread Craft Beer",
+                      description: "Rich dark lager brewed with roasted malts, regional honey, ginger, and aromatic Christmas spices.",
+                      tip: "Enjoy on tap at Jan Olbracht Browar Staromiejski."
+                }
           ],
-          souvenirs: [
-"Natural Beeswax Candles",
-"Hand-Knit Kuyavian Wool Mittens",
-"Artisan Wooden Kitchen Utensils"
+          transit: {
+                airport: "Nearest international airports are Bydgoszcz (BZG, 50 km) or Gdańsk (GDN, 170 km).",
+                cityTransit: "Operated by MZK Toruń. Single tickets cost 3.80 PLN (~$1.00 USD). Bus lines 22 and 27 connect Toruń Główny railway station directly to the Old Town (Plac Rapackiego) in 7 minutes.",
+                station: "Toruń Główny station is located south of the Vistula River. Secure luggage storage lockers are available in the main station waiting room (approx. 15 PLN/day, card accepted). After storing bags, take Bus 22 across the bridge to Plac Rapackiego (5-min ride) to enter the medieval pedestrian core."
+          },
+          practical: {
+                weather: "December in Toruń averages -1°C to 4°C (30°F–39°F) with brisk river winds off the Vistula.",
+                currency: "Poland uses the Polish Złoty (PLN). Cards and contactless mobile pay are widely accepted.",
+                restrooms: "Public WCs are available in the Town Hall (Ratusz Staromiejski) basement."
+          },
+          markets: [
+                {
+                      id: "torun-rynek-staromiejski",
+                      name: "Rynek Staromiejski Medieval Christmas Market",
+                      shortName: "Rynek Staromiejski",
+                      location: "Rynek Staromiejski, 87-114 Toruń, Poland",
+                      lat: 53.0105442,
+                      lng: 18.6037339,
+                      dates: "Nov 21, 2026 - Dec 21, 2026",
+                      hours: "Mon-Thu 12:00 PM - 9:00 PM, Fri 12:00 PM - 10:00 PM, Sat 10:00 AM - 10:00 PM, Sun 10:00 AM - 9:00 PM",
+                      bestTime: "4:30 PM - 7:00 PM (Gothic Town Hall illumination & gingerbread aromas)",
+                      specialty: "Authentic 700-year-old Toruń gingerbread, spiced honey wines, and Gothic square ambiance",
+                      details: "Nestled beneath the towering red-brick 13th-century Town Hall and Copernicus Monument, Toruń’s Christmas Market is famous for world-renowned spiced gingerbread and warm medieval charm.",
+                      description: "Enclosed by intact 13th-century brick Gothic townhouses, Toruń's market fills the medieval square with festive wooden chalets.",
+                      highlights: [
+                            "Authentic Toruń Pierniki (Katarzynki & Heart Molds)",
+                            "Copernicus Monument & Gothic Ratusz Illumination",
+                            "Hot Spiced Toruń Honey Mead (Miód Toruński)"
+                      ],
+                      mustTry: [
+                            "Toruńskie Pierniki z Powidłami (Plum Jam Spiced Gingerbread)",
+                            "Grzany Miód Toruński (Hot Toruń Spiced Mead)"
+                      ],
+                      souvenirs: [
+                            "Decorated Wooden Pierniki Molds",
+                            "Hand-Painted Copernicus Glass Ornaments"
+                      ],
+                      imageSrc: "/wayfinder/Poland-2026/images/torun/markets/torun-rynek-staromiejski.jpg",
+                      imageUrl: "/wayfinder/Poland-2026/images/torun/markets/torun-rynek-staromiejski.jpg"
+                }
           ],
-          imageSrc: "/wayfinder/Poland-2026/images/torun/markets/torun-rynek-nowomiejski.jpg",
-          imageUrl: "/wayfinder/Poland-2026/images/torun/markets/torun-rynek-nowomiejski.jpg"
-        }
-      ],
-      mustSee: [
-{
-          id: "torun-ratusz-staromiejski",
-          name: "Old Town Hall & Copernicus Monument (Ratusz Staromiejski)",
-          title: "Old Town Hall & Copernicus Monument (Ratusz Staromiejski)",
-          category: "UNESCO Brick Gothic",
-          location: "Rynek Staromiejski 1, 87-100 Toruń, Poland",
-          lat: 53.0103944,
-          lng: 18.6046954,
-          description: "One of the largest and most intact Gothic brick town halls in Europe, built between 1391 and 1399. Climb the 40-meter tower for a panoramic view over the red-tiled medieval roofs and Vistula River.",
-          howToGetThere: "Center of Rynek Staromiejski (Old Market Square).",
-          pricing: "Museum entry ~18 PLN (~$4.80 USD); Tower climb ~15 PLN (~$4.00 USD)",
-          openTimes: "Tue-Sun 10:00 AM - 4:00 PM (Winter hours)",
-          imageUrl: "/wayfinder/Poland-2026/images/torun/attractions/torun-ratusz-staromiejski.jpg",
-          imageSrc: "/wayfinder/Poland-2026/images/torun/attractions/torun-ratusz-staromiejski.jpg",
-          websiteUrl: "https://muzeum.torun.pl/ratusz-staromiejski/"
-        },
-{
-          id: "torun-muzeum-piernika",
-          name: "Living Museum of Gingerbread (Żywe Muzeum Piernika)",
-          title: "Living Museum of Gingerbread (Żywe Muzeum Piernika)",
-          category: "Living History & Bakery",
-          location: "Rabiańska 9, 87-100 Toruń, Poland",
-          lat: 53.0086424,
-          lng: 18.6047937,
-          description: "An extraordinary 16th-century living bakery museum where Master Bakers guide visitors through crushing spices, kneading honey dough into wooden molds, and baking authentic Toruń gingerbread to take home.",
-          howToGetThere: "3-min walk south of Rynek Staromiejski on Rabiańska street.",
-          pricing: "34–39 PLN (~$9.00–$10.50 USD) incl. hands-on baking workshop",
-          openTimes: "Daily 10:00 AM - 6:00 PM (English shows run at 1:00 PM & 4:00 PM; advance booking advised)",
-          imageUrl: "/wayfinder/Poland-2026/images/torun/attractions/torun-muzeum-piernika.jpg",
-          imageSrc: "/wayfinder/Poland-2026/images/torun/attractions/torun-muzeum-piernika.jpg",
-          websiteUrl: "https://muzeumpiernika.pl/en/"
-        },
-{
-          id: "torun-dom-kopernika",
-          name: "Nicolaus Copernicus House (Dom Mikołaja Kopernika)",
-          title: "Nicolaus Copernicus House (Dom Mikołaja Kopernika)",
-          category: "Scientific Heritage & Museum",
-          location: "Mikołaja Kopernika 15, 87-100 Toruń, Poland",
-          lat: 53.0092628,
-          lng: 18.6038807,
-          description: "The reconstructed 15th-century Gothic patrician townhouse where Nicolaus Copernicus was born in 1473. Interactive multimedia exhibits explore his astronomical breakthroughs, medieval trade, and Renaissance instruments.",
-          howToGetThere: "3-min walk southwest from Rynek Staromiejski along Kopernika street.",
-          pricing: "20 PLN (~$5.35 USD)",
-          openTimes: "Tue-Sun 10:00 AM - 4:00 PM",
-          imageUrl: "/wayfinder/Poland-2026/images/torun/attractions/torun-dom-kopernika.jpg",
-          imageSrc: "/wayfinder/Poland-2026/images/torun/attractions/torun-dom-kopernika.jpg",
-          websiteUrl: "https://muzeum.torun.pl/dom-mikolaja-kopernika/"
-        },
-{
-          id: "torun-krzywa-wieza",
-          name: "The Leaning Tower of Toruń (Krzywa Wieża)",
-          title: "The Leaning Tower of Toruń (Krzywa Wieża)",
-          category: "Medieval Fortification",
-          location: "Krzywa Wieża, Pod Krzywą Wieżą 1, 87-100 Toruń, Poland",
-          lat: 53.0083773,
-          lng: 18.6020713,
-          description: "A 14th-century Gothic defensive tower tilting 1.46 meters off vertical. According to medieval legend, visitors test their honesty by standing with their heels and back against the wall without toppling forward.",
-          howToGetThere: "5-min walk west of Rynek Staromiejski along the defensive city walls.",
-          pricing: "Exterior free; Interior exhibition ~10 PLN (~$2.65 USD)",
-          openTimes: "Exterior open 24/7",
-          imageUrl: "/wayfinder/Poland-2026/images/torun/attractions/torun-krzywa-wieza.jpg",
-          imageSrc: "/wayfinder/Poland-2026/images/torun/attractions/torun-krzywa-wieza.jpg",
-          websiteUrl: "https://krzywawieza.torun.pl/"
-        },
-{
-          id: "torun-zamek-krzyzacki",
-          name: "Teutonic Castle Ruins (Zamek Krzyżacki)",
-          title: "Teutonic Castle Ruins (Zamek Krzyżacki)",
-          category: "Medieval Fortress",
-          location: "Przedzamcze 3, 87-100 Toruń, Poland",
-          lat: 53.009652,
-          lng: 18.6103345,
-          description: "The horseshoe-shaped brick ruins of the 13th-century Teutonic Knights' fortress, demolished by rebellious Toruń townspeople in 1454 during the Thirteen Years' War to assert civic freedom.",
-          howToGetThere: "5-min walk east from Rynek Staromiejski along Szeroka and Przedzamcze.",
-          pricing: "15 PLN (~$4.00 USD) for castle grounds and subterranean vaults",
-          openTimes: "Daily 10:00 AM - 4:00 PM (Winter hours)",
-          imageUrl: "/wayfinder/Poland-2026/images/torun/attractions/torun-zamek-krzyzacki.jpg",
-          imageSrc: "/wayfinder/Poland-2026/images/torun/attractions/torun-zamek-krzyzacki.jpg",
-          websiteUrl: "https://zamek.torun.pl/"
-        },
-{
-          id: "torun-katedra-sw-jana",
-          name: "Cathedral of SS. John the Baptist and John the Evangelist",
-          title: "Cathedral of SS. John the Baptist and John the Evangelist",
-          category: "Brick Gothic Cathedral",
-          location: "Żeglarska 16, 87-100 Toruń, Poland",
-          lat: 53.0089689,
-          lng: 18.6061534,
-          description: "Monumental 13th-century Gothic cathedral housing the original 13th-century font where Copernicus was baptized, as well as the famous 7-ton 'Tuba Dei' (God's Trumpet) bell cast in 1500.",
-          howToGetThere: "2-min walk south from Rynek Staromiejski on Żeglarska street.",
-          pricing: "Free entry to cathedral; Bell tower climb ~12 PLN (~$3.20 USD)",
-          openTimes: "Mon-Sat 9:00 AM - 5:00 PM, Sun 12:30 PM - 5:30 PM",
-          imageUrl: "/wayfinder/Poland-2026/images/torun/attractions/torun-katedra-sw-jana.jpg",
-          imageSrc: "/wayfinder/Poland-2026/images/torun/attractions/torun-katedra-sw-jana.jpg",
-          websiteUrl: "https://katedratorun.pl/"
-        },
-{
-          id: "torun-walking-tour",
-          name: "Toruń UNESCO Medieval Gothic & Pierniki Guided Walking Tour",
-          title: "Toruń UNESCO Medieval Gothic & Pierniki Guided Walking Tour",
-          category: "Top Rated Guided Tour",
-          location: "Rynek Staromiejski, 87-114 Toruń, Poland",
-          lat: 53.0105442,
-          lng: 18.6037339,
-          description: "Delightful 2-hour guided walking tour exploring the undamaged UNESCO medieval center, Copernicus birthplace, the Leaning Tower, and historic gingerbread bakeries.",
-          howToGetThere: "Departs from the Nicolaus Copernicus Monument in Rynek Staromiejski.",
-          pricing: "60–80 PLN (~$16.00–$21.50 USD) per person",
-          openTimes: "Departs 11:00 AM & 1:30 PM daily",
-          imageUrl: "/wayfinder/Poland-2026/images/torun/attractions/torun-walking-tour.jpg",
-          imageSrc: "/wayfinder/Poland-2026/images/torun/attractions/torun-walking-tour.jpg"
-        }
-      ],
-      restaurants: [
-"Karczma Spichrz (18th Century Historic Granary Dining)",
-"Restauracja Manekin (Iconic Toruń Creperie)",
-"Restauracja Pod Aniołem (Gothic Cellar Polish)",
-"Pierogarnia Stary Toruń (Oven-Baked Pierogi)",
-"Jan Olbracht Browar Staromiejski (Royal Craft Brewery)"
-      ],
-      torunRestaurantsDetailed: [
-{
-          id: "karczma-spichrz",
-          name: "Karczma Spichrz",
-          category: "must-haves",
-          categoryLabel: "Must-Have & Historic Granary",
-          priceTier: "$$",
-          priceEstimatePln: "50 - 100 PLN per person",
-          address: "Mostowa 1, 87-100 Toruń, Poland",
-          lat: 53.0087101,
-          lng: 18.6086621,
-          neighborhood: "Stare Miasto (Vistula Gate)",
-          cuisine: "Authentic Kuyavian & Old Polish Hearth Cooking",
-          signature: "Roasted Pork Ribs in Gingerbread Glaze, Duck with Apples, Hunter’s Bigos in Loaf",
-          description: "Set inside a monumental 18th-century timber-framed granary by the river gate, serving hearty Polish delicacies cooked over open charcoal hearths.",
-          imageSrc: "/wayfinder/Poland-2026/images/torun/food/karczma-spichrz.jpg",
-          imageUrl: "/wayfinder/Poland-2026/images/torun/food/karczma-spichrz.jpg",
-          websiteUrl: "https://spichrz.pl"
-        },
-{
-          id: "manekin-torun",
-          name: "Restauracja Manekin Toruń",
-          category: "must-haves",
-          categoryLabel: "Must-Have & Cult Classic",
-          priceTier: "$",
-          priceEstimatePln: "22 - 45 PLN per person",
-          address: "Rynek Staromiejski 16, 87-100 Toruń, Poland",
-          lat: 53.0106929,
-          lng: 18.6031658,
-          neighborhood: "Stare Miasto (Rynek Staromiejski)",
-          cuisine: "Savory & Sweet Gourmet Polish Crepes (Naleśniki)",
-          signature: "Baked Crepes with Chanterelles and Chicken, Sweet Cottage Cheese & Pierniki Crepe",
-          description: "The original flagship birthplace of Poland's beloved Manekin creperie chain, serving over 50 varieties of oversized savory and dessert crepes at incredible value.",
-          imageSrc: "/wayfinder/Poland-2026/images/torun/food/manekin-torun.jpg",
-          imageUrl: "/wayfinder/Poland-2026/images/torun/food/manekin-torun.jpg",
-          websiteUrl: "https://manekin.pl"
-        },
-{
-          id: "restauracja-pod-aniolem",
-          name: "Restauracja Pod Aniołem",
-          category: "local",
-          categoryLabel: "Local Fares & Gothic Vault",
-          priceTier: "$$",
-          priceEstimatePln: "55 - 110 PLN per person",
-          address: "Rynek Staromiejski 1, 87-100 Toruń, Poland",
-          lat: 53.0103944,
-          lng: 18.6046954,
-          neighborhood: "Stare Miasto (Town Hall Cellar)",
-          cuisine: "Royal Polish & Toruń Gingerbread Infused Specialties",
-          signature: "Venison Stew in Bread Bowl, Roast Duck in Honey-Spice Sauce, Homemade Pierogi",
-          description: "Atmospheric restaurant nestled in the 14th-century brick cellar vaults beneath Toruń Town Hall, renowned for traditional game recipes and candlelit romance.",
-          imageSrc: "/wayfinder/Poland-2026/images/torun/food/restauracja-pod-aniolem.jpg",
-          imageUrl: "/wayfinder/Poland-2026/images/torun/food/restauracja-pod-aniolem.jpg",
-          websiteUrl: "https://podaniolem.torun.pl"
-        },
-{
-          id: "pierogarnia-stary-torun",
-          name: "Pierogarnia Stary Toruń",
-          category: "local",
-          categoryLabel: "Local Fares & Handcrafted Pierogi",
-          priceTier: "$",
-          priceEstimatePln: "25 - 45 PLN per person",
-          address: "Mostowa 8, 87-100 Toruń, Poland",
-          lat: 53.009118,
-          lng: 18.6089421,
-          neighborhood: "Stare Miasto (Mostowa Street)",
-          cuisine: "Traditional Boiled & Wood-Oven Baked Pierogi",
-          signature: "Oven-Baked Piecuchy with Smoked Meat, Boiled Ruskie Pierogi with Fried Onions",
-          description: "Charming medieval-themed dumpling tavern famous for giant oven-baked crusty pierogi with rich garlic dipping sauce and hearty winter soups.",
-          imageSrc: "/wayfinder/Poland-2026/images/torun/food/pierogarnia-stary-torun.jpg",
-          imageUrl: "/wayfinder/Poland-2026/images/torun/food/pierogarnia-stary-torun.jpg",
-          websiteUrl: "https://pierogarniastarytorun.pl"
-        },
-{
-          id: "szeroka-no-9",
-          name: "Restauracja Szeroka No 9",
-          category: "expensive",
-          categoryLabel: "Fine Dining & Modern Polish",
-          priceTier: "$$$",
-          priceEstimatePln: "120 - 220 PLN per person",
-          address: "Szeroka 9, 87-100 Toruń, Poland",
-          lat: 53.0105724,
-          lng: 18.6081424,
-          neighborhood: "Stare Miasto (Main Promenade)",
-          cuisine: "Modern Polish & European Fine Dining",
-          signature: "Sous-vide Deer Loin, Wild Sea Trout with Herbal Risotto, Artisanal Dessert Selection",
-          description: "Elegant fine dining on Toruń's central pedestrian boulevard, marrying regional Vistula ingredients with contemporary culinary flair and an extensive wine cellar.",
-          imageSrc: "/wayfinder/Poland-2026/images/torun/food/szeroka-no-9.jpg",
-          imageUrl: "/wayfinder/Poland-2026/images/torun/food/szeroka-no-9.jpg",
-          websiteUrl: "https://szerokano9.pl"
-        }
-      ],
-      torunDrinksDetailed: [
-        {
-          id: "jan-olbracht-browar-staromiejski",
-          name: "Jan Olbracht Browar Staromiejski",
-          category: "brewery",
-          categoryLabel: "Royal Microbrewery & Tavern",
-          priceTier: "$$",
-          priceEstimatePln: "40 - 80 PLN per person",
-          address: "Jan Olbracht Browar Staromiejski, Szczytna 15, 87-100 Toruń, Poland",
-          lat: 53.0110214,
-          lng: 18.605633,
-          neighborhood: "Stare Miasto (Near Rynek)",
-          cuisine: "Artisan Craft Beer & Polish Tavern Fare",
-          signature: "Piernikowe Dark Gingerbread Beer, Olbracht Pilsner, Crispy Golonka Pork Knuckle",
-          description: "Toruń's premier craft brewery named after King Jan Olbracht, brewing unique seasonal beers including the city's signature dark spiced Piernikowe gingerbread beer.",
-          imageSrc: "/wayfinder/Poland-2026/images/torun/food/jan-olbracht-browar-staromiejski.jpg",
-          imageUrl: "/wayfinder/Poland-2026/images/torun/food/jan-olbracht-browar-staromiejski.jpg",
-          websiteUrl: "https://browar-olbracht.pl"
-        }
-      ],
-      torunCafesDetailed: [
-        {
-          id: "kawiarnia-lenkiewicz",
-          name: "Kawiarnia Lenkiewicz",
-          category: "coffee-breakfast",
-          categoryLabel: "Legendary Toruń Bakery & Coffee",
-          priceTier: "$",
-          priceEstimatePln: "15 - 32 PLN per person",
-          address: "Rynek Staromiejski 33, 87-100 Toruń, Poland",
-          lat: 53.0107778,
-          lng: 18.6050775,
-          neighborhood: "Stare Miasto (Rynek Staromiejski)",
-          cuisine: "Artisan Ice Cream, Pastries & Specialty Coffee",
-          signature: "Signature Piernik Cake, Artisan Hot Chocolate with Cinnamon, Handcrafted Ice Cream",
-          description: "Beloved Toruń confectionery institution founded in 1945, world-famous for irresistible cakes, hot chocolates, and freshly baked pastries right on the Market Square.",
-          imageSrc: "/wayfinder/Poland-2026/images/torun/food/kawiarnia-lenkiewicz.jpg",
-          imageUrl: "/wayfinder/Poland-2026/images/torun/food/kawiarnia-lenkiewicz.jpg",
-          websiteUrl: "https://lenkiewicz.net"
-        }
-      ],
-      restaurantsDetailed: [
-{
-          id: "karczma-spichrz",
-          name: "Karczma Spichrz",
-          category: "must-haves",
-          categoryLabel: "Must-Have & Historic Granary",
-          priceTier: "$$",
-          priceEstimatePln: "50 - 100 PLN per person",
-          address: "Mostowa 1, 87-100 Toruń, Poland",
-          lat: 53.0087101,
-          lng: 18.6086621,
-          neighborhood: "Stare Miasto (Vistula Gate)",
-          cuisine: "Authentic Kuyavian & Old Polish Hearth Cooking",
-          signature: "Roasted Pork Ribs in Gingerbread Glaze, Duck with Apples, Hunter’s Bigos in Loaf",
-          description: "Set inside a monumental 18th-century timber-framed granary by the river gate, serving hearty Polish delicacies cooked over open charcoal hearths.",
-          imageSrc: "/wayfinder/Poland-2026/images/torun/food/karczma-spichrz.jpg",
-          imageUrl: "/wayfinder/Poland-2026/images/torun/food/karczma-spichrz.jpg",
-          websiteUrl: "https://spichrz.pl"
-        },
-{
-          id: "manekin-torun",
-          name: "Restauracja Manekin Toruń",
-          category: "must-haves",
-          categoryLabel: "Must-Have & Cult Classic",
-          priceTier: "$",
-          priceEstimatePln: "22 - 45 PLN per person",
-          address: "Rynek Staromiejski 16, 87-100 Toruń, Poland",
-          lat: 53.0106929,
-          lng: 18.6031658,
-          neighborhood: "Stare Miasto (Rynek Staromiejski)",
-          cuisine: "Savory & Sweet Gourmet Polish Crepes (Naleśniki)",
-          signature: "Baked Crepes with Chanterelles and Chicken, Sweet Cottage Cheese & Pierniki Crepe",
-          description: "The original flagship birthplace of Poland's beloved Manekin creperie chain, serving over 50 varieties of oversized savory and dessert crepes at incredible value.",
-          imageSrc: "/wayfinder/Poland-2026/images/torun/food/manekin-torun.jpg",
-          imageUrl: "/wayfinder/Poland-2026/images/torun/food/manekin-torun.jpg",
-          websiteUrl: "https://manekin.pl"
-        },
-{
-          id: "restauracja-pod-aniolem",
-          name: "Restauracja Pod Aniołem",
-          category: "local",
-          categoryLabel: "Local Fares & Gothic Vault",
-          priceTier: "$$",
-          priceEstimatePln: "55 - 110 PLN per person",
-          address: "Rynek Staromiejski 1, 87-100 Toruń, Poland",
-          lat: 53.0103944,
-          lng: 18.6046954,
-          neighborhood: "Stare Miasto (Town Hall Cellar)",
-          cuisine: "Royal Polish & Toruń Gingerbread Infused Specialties",
-          signature: "Venison Stew in Bread Bowl, Roast Duck in Honey-Spice Sauce, Homemade Pierogi",
-          description: "Atmospheric restaurant nestled in the 14th-century brick cellar vaults beneath Toruń Town Hall, renowned for traditional game recipes and candlelit romance.",
-          imageSrc: "/wayfinder/Poland-2026/images/torun/food/restauracja-pod-aniolem.jpg",
-          imageUrl: "/wayfinder/Poland-2026/images/torun/food/restauracja-pod-aniolem.jpg",
-          websiteUrl: "https://podaniolem.torun.pl"
-        },
-{
-          id: "pierogarnia-stary-torun",
-          name: "Pierogarnia Stary Toruń",
-          category: "local",
-          categoryLabel: "Local Fares & Handcrafted Pierogi",
-          priceTier: "$",
-          priceEstimatePln: "25 - 45 PLN per person",
-          address: "Mostowa 8, 87-100 Toruń, Poland",
-          lat: 53.009118,
-          lng: 18.6089421,
-          neighborhood: "Stare Miasto (Mostowa Street)",
-          cuisine: "Traditional Boiled & Wood-Oven Baked Pierogi",
-          signature: "Oven-Baked Piecuchy with Smoked Meat, Boiled Ruskie Pierogi with Fried Onions",
-          description: "Charming medieval-themed dumpling tavern famous for giant oven-baked crusty pierogi with rich garlic dipping sauce and hearty winter soups.",
-          imageSrc: "/wayfinder/Poland-2026/images/torun/food/pierogarnia-stary-torun.jpg",
-          imageUrl: "/wayfinder/Poland-2026/images/torun/food/pierogarnia-stary-torun.jpg",
-          websiteUrl: "https://pierogarniastarytorun.pl"
-        },
-{
-          id: "szeroka-no-9",
-          name: "Restauracja Szeroka No 9",
-          category: "expensive",
-          categoryLabel: "Fine Dining & Modern Polish",
-          priceTier: "$$$",
-          priceEstimatePln: "120 - 220 PLN per person",
-          address: "Szeroka 9, 87-100 Toruń, Poland",
-          lat: 53.0105724,
-          lng: 18.6081424,
-          neighborhood: "Stare Miasto (Main Promenade)",
-          cuisine: "Modern Polish & European Fine Dining",
-          signature: "Sous-vide Deer Loin, Wild Sea Trout with Herbal Risotto, Artisanal Dessert Selection",
-          description: "Elegant fine dining on Toruń's central pedestrian boulevard, marrying regional Vistula ingredients with contemporary culinary flair and an extensive wine cellar.",
-          imageSrc: "/wayfinder/Poland-2026/images/torun/food/szeroka-no-9.jpg",
-          imageUrl: "/wayfinder/Poland-2026/images/torun/food/szeroka-no-9.jpg",
-          websiteUrl: "https://szerokano9.pl"
-        },
-{
-          id: "jan-olbracht-browar-staromiejski",
-          name: "Jan Olbracht Browar Staromiejski",
-          category: "brewery",
-          categoryLabel: "Royal Microbrewery & Tavern",
-          priceTier: "$$",
-          priceEstimatePln: "40 - 80 PLN per person",
-          address: "Jan Olbracht Browar Staromiejski, Szczytna 15, 87-100 Toruń, Poland",
-          lat: 53.0110214,
-          lng: 18.605633,
-          neighborhood: "Stare Miasto (Near Rynek)",
-          cuisine: "Artisan Craft Beer & Polish Tavern Fare",
-          signature: "Piernikowe Dark Gingerbread Beer, Olbracht Pilsner, Crispy Golonka Pork Knuckle",
-          description: "Toruń's premier craft brewery named after King Jan Olbracht, brewing unique seasonal beers including the city's signature dark spiced Piernikowe gingerbread beer.",
-          imageSrc: "/wayfinder/Poland-2026/images/torun/food/jan-olbracht-browar-staromiejski.jpg",
-          imageUrl: "/wayfinder/Poland-2026/images/torun/food/jan-olbracht-browar-staromiejski.jpg",
-          websiteUrl: "https://browar-olbracht.pl"
-        },
-{
-          id: "kawiarnia-lenkiewicz",
-          name: "Kawiarnia Lenkiewicz",
-          category: "coffee-breakfast",
-          categoryLabel: "Legendary Toruń Bakery & Coffee",
-          priceTier: "$",
-          priceEstimatePln: "15 - 32 PLN per person",
-          address: "Rynek Staromiejski 33, 87-100 Toruń, Poland",
-          lat: 53.0107778,
-          lng: 18.6050775,
-          neighborhood: "Stare Miasto (Rynek Staromiejski)",
-          cuisine: "Artisan Ice Cream, Pastries & Specialty Coffee",
-          signature: "Signature Piernik Cake, Artisan Hot Chocolate with Cinnamon, Handcrafted Ice Cream",
-          description: "Beloved Toruń confectionery institution founded in 1945, world-famous for irresistible cakes, hot chocolates, and freshly baked pastries right on the Market Square.",
-          imageSrc: "/wayfinder/Poland-2026/images/torun/food/kawiarnia-lenkiewicz.jpg",
-          imageUrl: "/wayfinder/Poland-2026/images/torun/food/kawiarnia-lenkiewicz.jpg",
-          websiteUrl: "https://lenkiewicz.net"
-        }
-      ]
+          mustSee: [
+                {
+                      id: "torun-ratusz-staromiejski",
+                      name: "Old Town Hall & Copernicus Monument (Ratusz Staromiejski)",
+                      title: "Old Town Hall & Copernicus Monument",
+                      category: "UNESCO Brick Gothic",
+                      location: "Rynek Staromiejski 1",
+                      lat: 53.0103944,
+                      lng: 18.6046954,
+                      description: "Climb the 40-meter tower for a panoramic view over the red-tiled medieval roofs and Vistula River. Efficient 30-min stop.",
+                      howToGetThere: "Center of Rynek Staromiejski.",
+                      pricing: "Tower climb ~15 PLN (~$4.00 USD)",
+                      openTimes: "Tue-Sun 10:00 AM - 4:00 PM",
+                      imageUrl: "/wayfinder/Poland-2026/images/torun/attractions/torun-ratusz-staromiejski.jpg",
+                      imageSrc: "/wayfinder/Poland-2026/images/torun/attractions/torun-ratusz-staromiejski.jpg",
+                      websiteUrl: "https://muzeum.torun.pl/ratusz-staromiejski/"
+                },
+                {
+                      id: "torun-dom-kopernika",
+                      name: "Nicolaus Copernicus House",
+                      title: "Nicolaus Copernicus House",
+                      category: "Scientific Heritage & Museum",
+                      location: "Mikołaja Kopernika 15",
+                      lat: 53.0092628,
+                      lng: 18.6038807,
+                      description: "Gothic patrician townhouse where Nicolaus Copernicus was born in 1473. Quick 45-min multimedia tour.",
+                      howToGetThere: "3-min walk southwest from Rynek Staromiejski.",
+                      pricing: "20 PLN (~$5.35 USD)",
+                      openTimes: "Tue-Sun 10:00 AM - 4:00 PM",
+                      imageUrl: "/wayfinder/Poland-2026/images/torun/attractions/torun-dom-kopernika.jpg",
+                      imageSrc: "/wayfinder/Poland-2026/images/torun/attractions/torun-dom-kopernika.jpg",
+                      websiteUrl: "https://muzeum.torun.pl/dom-mikolaja-kopernika/"
+                },
+                {
+                      id: "torun-krzywa-wieza",
+                      name: "The Leaning Tower of Toruń",
+                      title: "The Leaning Tower of Toruń",
+                      category: "Medieval Fortification",
+                      location: "Pod Krzywą Wieżą 1",
+                      lat: 53.0083773,
+                      lng: 18.6020713,
+                      description: "A 14th-century Gothic defensive tower tilting 1.46 meters. Fun 5-minute photo op for a day trip.",
+                      howToGetThere: "5-min walk west of Rynek Staromiejski.",
+                      pricing: "Exterior free",
+                      openTimes: "Exterior open 24/7",
+                      imageUrl: "/wayfinder/Poland-2026/images/torun/attractions/torun-krzywa-wieza.jpg",
+                      imageSrc: "/wayfinder/Poland-2026/images/torun/attractions/torun-krzywa-wieza.jpg"
+                }
+          ],
+          restaurants: [
+                "Karczma Spichrz (Quick hearty lunch)",
+                "Restauracja Manekin (Iconic Crepes)",
+                "Jan Olbracht Browar Staromiejski"
+          ],
+          torunRestaurantsDetailed: [
+                {
+                      id: "karczma-spichrz",
+                      name: "Karczma Spichrz",
+                      category: "must-haves",
+                      categoryLabel: "Must-Have & Historic Granary",
+                      priceTier: "$$",
+                      priceEstimatePln: "50 - 100 PLN per person",
+                      address: "Mostowa 1",
+                      lat: 53.0087101,
+                      lng: 18.6086621,
+                      neighborhood: "Stare Miasto (Vistula Gate)",
+                      cuisine: "Authentic Kuyavian & Old Polish Hearth Cooking",
+                      signature: "Roasted Pork Ribs in Gingerbread Glaze",
+                      description: "Inside a monumental 18th-century timber-framed granary. Excellent for a fast, atmospheric sit-down lunch.",
+                      imageSrc: "/wayfinder/Poland-2026/images/torun/food/karczma-spichrz.jpg",
+                      imageUrl: "/wayfinder/Poland-2026/images/torun/food/karczma-spichrz.jpg",
+                      websiteUrl: "https://spichrz.pl"
+                },
+                {
+                      id: "manekin-torun",
+                      name: "Restauracja Manekin Toruń",
+                      category: "must-haves",
+                      categoryLabel: "Must-Have & Cult Classic",
+                      priceTier: "$",
+                      priceEstimatePln: "22 - 45 PLN per person",
+                      address: "Rynek Staromiejski 16",
+                      lat: 53.0106929,
+                      lng: 18.6031658,
+                      neighborhood: "Stare Miasto",
+                      cuisine: "Savory & Sweet Gourmet Polish Crepes",
+                      signature: "Baked Crepes with Chanterelles",
+                      description: "The original birthplace of Poland's beloved Manekin creperie chain. Very fast service, perfect for a day trip.",
+                      imageSrc: "/wayfinder/Poland-2026/images/torun/food/manekin-torun.jpg",
+                      imageUrl: "/wayfinder/Poland-2026/images/torun/food/manekin-torun.jpg",
+                      websiteUrl: "https://manekin.pl"
+                }
+          ],
+          torunDrinksDetailed: [
+                {
+                      id: "jan-olbracht-browar-staromiejski",
+                      name: "Jan Olbracht Browar Staromiejski",
+                      category: "brewery",
+                      categoryLabel: "Royal Microbrewery & Tavern",
+                      priceTier: "$$",
+                      priceEstimatePln: "40 - 80 PLN per person",
+                      address: "Szczytna 15",
+                      lat: 53.0110214,
+                      lng: 18.605633,
+                      neighborhood: "Stare Miasto",
+                      cuisine: "Artisan Craft Beer & Polish Tavern Fare",
+                      signature: "Piernikowe Dark Gingerbread Beer",
+                      description: "Great for a quick pint of gingerbread beer before heading back to the train station.",
+                      imageSrc: "/wayfinder/Poland-2026/images/torun/food/jan-olbracht-browar-staromiejski.jpg",
+                      imageUrl: "/wayfinder/Poland-2026/images/torun/food/jan-olbracht-browar-staromiejski.jpg",
+                      websiteUrl: "https://browar-olbracht.pl"
+                }
+          ],
+          torunCafesDetailed: [
+                {
+                      id: "kawiarnia-lenkiewicz",
+                      name: "Kawiarnia Lenkiewicz",
+                      category: "coffee-breakfast",
+                      categoryLabel: "Legendary Toruń Bakery & Coffee",
+                      priceTier: "$",
+                      priceEstimatePln: "15 - 32 PLN per person",
+                      address: "Rynek Staromiejski 33",
+                      lat: 53.0107778,
+                      lng: 18.6050775,
+                      neighborhood: "Stare Miasto",
+                      cuisine: "Artisan Ice Cream, Pastries & Specialty Coffee",
+                      signature: "Signature Piernik Cake",
+                      description: "Grab a hot chocolate or coffee here to warm up while waiting for your return bus to the station.",
+                      imageSrc: "/wayfinder/Poland-2026/images/torun/food/kawiarnia-lenkiewicz.jpg",
+                      imageUrl: "/wayfinder/Poland-2026/images/torun/food/kawiarnia-lenkiewicz.jpg",
+                      websiteUrl: "https://lenkiewicz.net"
+                }
+          ],
+          restaurantsDetailed: []
     },
 {
       id: "gdansk",

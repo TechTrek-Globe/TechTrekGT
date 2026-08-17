@@ -1817,6 +1817,8 @@ export const polandJourney = {
           imageUrl: "/wayfinder/Poland-2026/images/wroclaw/attractions/panorama-raclawice.jpg",
           imageSrc: "/wayfinder/Poland-2026/images/wroclaw/attractions/panorama-raclawice.jpg",
           location: "ul. Jana Ewangelisty Purkyniego 11, 50-155 Wrocław",
+          address: "ul. Jana Ewangelisty Purkyniego 11, 50-155 Wrocław",
+          locationData: "ul. Jana Ewangelisty Purkyniego 11, 50-155 Wrocław",
           lat: 51.1101,
           lng: 17.0443,
           howToGetThere: "10-min walk east from Rynek or Tram 3/5.",
@@ -3193,8 +3195,10 @@ export const polandJourney = {
           imageSrc: "/wayfinder/Poland-2026/images/poznan/food/muga-poznan.jpg",
           imageUrl: "/wayfinder/Poland-2026/images/poznan/food/muga-poznan.jpg",
           websiteUrl: "https://restauracjamuga.pl"
-        },
-{
+        }
+      ],
+      poznanDrinksDetailed: [
+        {
           id: "pijalnia-wodki-poznan",
           name: "Pijalnia Wódki i Piwa Poznań",
           category: "vodka-house",
@@ -3211,7 +3215,7 @@ export const polandJourney = {
           imageSrc: "/wayfinder/Poland-2026/images/poznan/food/pijalnia-wodki-poznan.jpg",
           imageUrl: "/wayfinder/Poland-2026/images/poznan/food/pijalnia-wodki-poznan.jpg"
         },
-{
+        {
           id: "ministerstwo-browaru",
           name: "Ministerstwo Browaru Taproom",
           category: "brewery",
@@ -3228,8 +3232,10 @@ export const polandJourney = {
           imageSrc: "/wayfinder/Poland-2026/images/poznan/food/ministerstwo-browaru.jpg",
           imageUrl: "/wayfinder/Poland-2026/images/poznan/food/ministerstwo-browaru.jpg",
           websiteUrl: "https://ministerstwobrowaru.pl"
-        },
-{
+        }
+      ],
+      poznanCafesDetailed: [
+        {
           id: "kawiarnia-stonewall",
           name: "Kawiarnia Stonewall",
           category: "coffee-breakfast",
@@ -3840,8 +3846,10 @@ export const polandJourney = {
           imageSrc: "/wayfinder/Poland-2026/images/torun/food/szeroka-no-9.jpg",
           imageUrl: "/wayfinder/Poland-2026/images/torun/food/szeroka-no-9.jpg",
           websiteUrl: "https://szerokano9.pl"
-        },
-{
+        }
+      ],
+      torunDrinksDetailed: [
+        {
           id: "jan-olbracht-browar-staromiejski",
           name: "Jan Olbracht Browar Staromiejski",
           category: "brewery",
@@ -3858,8 +3866,10 @@ export const polandJourney = {
           imageSrc: "/wayfinder/Poland-2026/images/torun/food/jan-olbracht-browar-staromiejski.jpg",
           imageUrl: "/wayfinder/Poland-2026/images/torun/food/jan-olbracht-browar-staromiejski.jpg",
           websiteUrl: "https://browar-olbracht.pl"
-        },
-{
+        }
+      ],
+      torunCafesDetailed: [
+        {
           id: "kawiarnia-lenkiewicz",
           name: "Kawiarnia Lenkiewicz",
           category: "coffee-breakfast",
@@ -4539,7 +4549,44 @@ export const polandJourney = {
           imageUrl: "/wayfinder/Poland-2026/images/gdansk/food/gdanski-bowke.jpg",
           websiteUrl: "https://gdanskibowke.com"
         },
-{
+        {
+          id: "bar-mleczny-neptun",
+          name: "Bar Mleczny Neptun",
+          category: "cheap",
+          categoryLabel: "Cheap Eats & Classic Milk Bar",
+          priceTier: "$",
+          priceEstimatePln: "15 - 28 PLN per person",
+          address: "Długa 33/34, Gdańsk, 80-827 Gdansk, Poland",
+          lat: 54.348839,
+          lng: 18.651674,
+          neighborhood: "Główne Miasto (Długa Promenade)",
+          cuisine: "Authentic Traditional Polish Milk Bar Fare",
+          signature: "Kompocik, Kotlet Schabowy with Potatoes, Pomidorowa Tomato Soup with Noodles",
+          description: "A genuine, beloved Polish milk bar operating on picturesque Długa street since 1958, serving fast, honest, comforting home-cooked meals at unbeatable budget prices.",
+          imageSrc: "/wayfinder/Poland-2026/images/gdansk/food/bar-mleczny-neptun.jpg",
+          imageUrl: "/wayfinder/Poland-2026/images/gdansk/food/bar-mleczny-neptun.jpg"
+        },
+        {
+          id: "fino-gdansk",
+          name: "Restauracja Fino Gdańsk",
+          category: "expensive",
+          categoryLabel: "Fine Dining & Modern Baltic",
+          priceTier: "$$$$",
+          priceEstimatePln: "240 - 390 PLN per person",
+          address: "Neptun Apart, Grząska 1, 80-833 Gdańsk, Poland",
+          lat: 54.3492178,
+          lng: 18.6552105,
+          neighborhood: "Główne Miasto (Near St. Mary’s)",
+          cuisine: "Modern Polish & Baltic Fine Dining",
+          signature: "Seasonal Degustation Tasting Menu, Halibut with Sea Buckthorn, Wild Venison Tartare",
+          description: "Intimate, critically acclaimed culinary sanctuary in the heart of Old Town celebrating seasonal Baltic ingredients with innovative textures and delicate plating.",
+          imageSrc: "/wayfinder/Poland-2026/images/gdansk/food/fino-gdansk.jpg",
+          imageUrl: "/wayfinder/Poland-2026/images/gdansk/food/fino-gdansk.jpg",
+          websiteUrl: "https://restauracjafino.pl"
+        }
+      ],
+      gdanskDrinksDetailed: [
+        {
           id: "brovarnia-gdansk",
           name: "Brovarnia Gdańsk",
           category: "brewery",
@@ -4557,42 +4604,7 @@ export const polandJourney = {
           imageUrl: "/wayfinder/Poland-2026/images/gdansk/food/brovarnia-gdansk.jpg",
           websiteUrl: "https://brovarnia.pl"
         },
-{
-          id: "bar-mleczny-neptun",
-          name: "Bar Mleczny Neptun",
-          category: "cheap",
-          categoryLabel: "Cheap Eats & Classic Milk Bar",
-          priceTier: "$",
-          priceEstimatePln: "15 - 28 PLN per person",
-          address: "Długa 33/34, Gdańsk, 80-827 Gdansk, Poland",
-          lat: 54.348839,
-          lng: 18.651674,
-          neighborhood: "Główne Miasto (Długa Promenade)",
-          cuisine: "Authentic Traditional Polish Milk Bar Fare",
-          signature: "Kompocik, Kotlet Schabowy with Potatoes, Pomidorowa Tomato Soup with Noodles",
-          description: "A genuine, beloved Polish milk bar operating on picturesque Długa street since 1958, serving fast, honest, comforting home-cooked meals at unbeatable budget prices.",
-          imageSrc: "/wayfinder/Poland-2026/images/gdansk/food/bar-mleczny-neptun.jpg",
-          imageUrl: "/wayfinder/Poland-2026/images/gdansk/food/bar-mleczny-neptun.jpg"
-        },
-{
-          id: "fino-gdansk",
-          name: "Restauracja Fino Gdańsk",
-          category: "expensive",
-          categoryLabel: "Fine Dining & Modern Baltic",
-          priceTier: "$$$$",
-          priceEstimatePln: "240 - 390 PLN per person",
-          address: "Neptun Apart, Grząska 1, 80-833 Gdańsk, Poland",
-          lat: 54.3492178,
-          lng: 18.6552105,
-          neighborhood: "Główne Miasto (Near St. Mary’s)",
-          cuisine: "Modern Polish & Baltic Fine Dining",
-          signature: "Seasonal Degustation Tasting Menu, Halibut with Sea Buckthorn, Wild Venison Tartare",
-          description: "Intimate, critically acclaimed culinary sanctuary in the heart of Old Town celebrating seasonal Baltic ingredients with innovative textures and delicate plating.",
-          imageSrc: "/wayfinder/Poland-2026/images/gdansk/food/fino-gdansk.jpg",
-          imageUrl: "/wayfinder/Poland-2026/images/gdansk/food/fino-gdansk.jpg",
-          websiteUrl: "https://restauracjafino.pl"
-        },
-{
+        {
           id: "wisniewski-gdansk",
           name: "Wiśniewski Cherry Liqueur House",
           category: "vodka-house",
@@ -4610,7 +4622,7 @@ export const polandJourney = {
           imageUrl: "/wayfinder/Poland-2026/images/gdansk/food/wisniewski-gdansk.jpg",
           websiteUrl: "https://wisniewski.pl"
         },
-{
+        {
           id: "duda-pub-gdansk",
           name: "Pub Pułapka Craft Beer",
           category: "pub-bars",
@@ -4627,8 +4639,10 @@ export const polandJourney = {
           imageSrc: "/wayfinder/Poland-2026/images/gdansk/food/duda-pub-gdansk.jpg",
           imageUrl: "/wayfinder/Poland-2026/images/gdansk/food/duda-pub-gdansk.jpg",
           websiteUrl: "https://pubpulapka.pl"
-        },
-{
+        }
+      ],
+      gdanskCafesDetailed: [
+        {
           id: "drukarnia-cafe-gdansk",
           name: "Drukarnia Café",
           category: "coffee-breakfast",

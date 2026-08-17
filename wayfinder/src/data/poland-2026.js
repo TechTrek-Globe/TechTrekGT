@@ -287,7 +287,7 @@ export const polandJourney = {
 "Indie artisan ceramics & handmade jewelry",
 "Proximity to Plac Nowy late-night Zapiekanki food plaza"
           ],
-          hours: "Dec 1 – Dec 24 | Daily 12:00 PM – 9:00 PM",
+          hours: "Short-duration event (typically early-mid Dec). Exact 2026 dates pending autumn announcement.",
           address: "Plac Wolnica, 31-060 Kraków (Tram: Plac Wolnica - Trams 1, 6, 8, 10, 13)",
           mustTry: [
 "Plac Nowy Zapiekanki",
@@ -304,35 +304,6 @@ export const polandJourney = {
           tips: "Located in the historic Jewish Quarter. Combine a market visit with dinner at nearby historic Jewish quarter restaurants, craft stouts, and late-night Zapiekanki at Plac Nowy.",
           specialty: "Vintage antiques, indie artisan crafts, craft beer stalls, and gourmet local street food.",
           details: "Set in the historic heart of Kazimierz, this market offers a bohemian, relaxed holiday atmosphere. Browse vintage vinyl, handmade ceramics, and indie art while sipping hot spiced cider or craft stouts."
-        },
-{
-          id: "podgorze",
-          name: "Rynek Podgórski Fair",
-          shortName: "Rynek Podgórski",
-          location: "Podgórze District (Across Vistula)",
-          vibe: "Fairytale, Family-Friendly & Charming",
-          bestTime: "4:30 PM – 7:00 PM (Sunset backdrop against St. Joseph Church)",
-          highlights: [
-"Breathtaking fairytale backdrop of neo-gothic St. Joseph's Church",
-"Vintage 19th-century Victorian carousel for children",
-"Neighborhood cookie & ornament crafting workshops",
-"Authentic community choir performances"
-          ],
-          hours: "Dec 5 – Dec 22 | Fri - Sun 11:00 AM – 8:00 PM",
-          address: "Rynek Podgórski, 30-518 Kraków (Tram: Korona or Rynek Podgórski)",
-          mustTry: [
-"Traditional Makowiec (Poppy seed cake)",
-"Hot Spiced Apple Cider",
-"Warm Pretzels",
-"Grilled Highlander Skewers"
-          ],
-          souvenirs: [
-"Handcrafted wooden Christmas tree stars",
-"Hand-painted glass trinkets",
-"Knitted winter mittens"
-          ],
-          tips: "Framed by the breathtaking neo-gothic spire of St. Joseph's Church. Features a retro 19th-century Victorian carousel for kids, neighborhood baking workshops, and live local choir caroling.",
-          details: "Located in front of the fairytale-like St. Joseph's Church, this neighborhood fair highlights local Krakow artisans, community choirs, and festive baking workshops."
         }
       ],
       mustSee: [

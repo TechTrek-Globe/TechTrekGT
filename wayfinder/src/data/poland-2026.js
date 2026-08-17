@@ -1766,7 +1766,7 @@ export const polandJourney = {
           name: "Panorama of Racławice (Panorama Racławicka)",
           title: "Panorama of Racławice (Panorama Racławicka)",
           category: "Masterpiece Art Museum",
-          websiteUrl: "https://mnwr.pl/en/branches/panorama-of-raclawice/",
+          websiteUrl: "https://mnwr.pl/",
           description: "A colossal 360-degree panoramic rotunda painting (15x114 meters) depicting the 1794 Battle of Racławice with special lighting and terrain effects.",
           imageUrl: "/wayfinder/Poland-2026/images/wroclaw/attractions/panorama-raclawice.jpg",
           imageSrc: "/wayfinder/Poland-2026/images/wroclaw/attractions/panorama-raclawice.jpg",
@@ -1932,7 +1932,7 @@ export const polandJourney = {
           ratingCount: "7,100+ reviews",
           priceTier: "$$$",
           priceEstimatePln: "80 - 200 PLN per person",
-          address: "Rynek 48, 50-116 Wrocław, Poland",
+          address: "Rynek 23/24, 50-101 Wrocław, Poland",
           lat: 51.11021,
           lng: 17.03211,
           neighborhood: "Stare Miasto (Rynek)",
@@ -2082,7 +2082,7 @@ export const polandJourney = {
           signature: "Bok Złoty Amber Lager, Pitbull IPA, Roasted Pork Ribs in Beer Glaze",
           description: "Vibrant microbrewery located right on the Market Square. Brews copper-vat ales on site paired with hearty Silesian roasts and pub snacks.",
           hours: "Open daily 12:00 PM - 12:00 AM",
-          websiteUrl: "https://zlotypies.com.pl/",
+          websiteUrl: "https://zlotypies.com/",
           imageSrc: "/wayfinder/Poland-2026/images/wroclaw/food/browar-zloty-pies.jpg"
         },
 {
@@ -2184,7 +2184,7 @@ export const polandJourney = {
           signature: "Aeropress Single-Origin Brew, Flat White, Freshly Baked Cinnamon Buns",
           description: "Run by World Aeropress Champion Filip Kucharczyk inside the historic 1908 brick Market Hall (Stoisko 11). Renowned for serving the finest specialty coffee in Silesia.",
           hours: "Mon-Sat 8:00 AM - 6:30 PM (Closed Sun)",
-          websiteUrl: "http://cafetargowa.pl",
+          websiteUrl: "https://www.facebook.com/cafetargowa/",
           imageSrc: "/wayfinder/Poland-2026/images/wroclaw/food/cafe-targowa.jpg"
         },
 {
@@ -2204,7 +2204,7 @@ export const polandJourney = {
           signature: "Shakshuka, Syrniki, Avocado & Poached Eggs on Sourdough, Espresso Tonic, Vegan Tartlets",
           description: "Stylish, light-filled coffee house on Świdnicka street serving gourmet morning breakfasts, avocado toasts, single-origin pour-overs, and laptop-friendly workspace.",
           hours: "Open daily 8:00 AM - 8:00 PM",
-          websiteUrl: "https://gniazdo.cafe/",
+          websiteUrl: "https://www.instagram.com/kawagniazdo/",
           imageSrc: "/wayfinder/Poland-2026/images/wroclaw/food/gniazdo.jpg"
         },
 {

@@ -2255,7 +2255,7 @@ export const polandJourney = {
         primaryArea: "Four Denominations District & Ruska Street",
         landmark: "Ruska 46 Courtyard & Surowiec Club",
         landmarkDescription: "The alternative neon courtyard on Ruska Street surrounded by queer-friendly art spaces, club Surowiec, and retro cocktail lounges.",
-        imageUrl: "/wayfinder/Poland-2026/images/wroclaw/markets/wroclaw.png",
+        imageUrl: "/wayfinder/Poland-2026/images/wroclaw/attractions/lgbtq-wroclaw.jpg",
         safetyAndLegal: {
           legalContext: "Wrocław has long housed the headquarters of Poland's Campaign Against Homophobia (KPH). The city council officially supports Wrocław Pride and has welcomed the city's queer community with official mayoral patronage.",
           safetyRating: "Safe & Welcoming in Central Districts",
@@ -2276,46 +2276,71 @@ export const polandJourney = {
           ]
         },
         neighborhoods: [
-{
+          {
             name: "Four Denominations District (Czterech Wyznań)",
             vibe: "Interfaith harmony & rainbow oasis",
             description: "A unique square where the Evangelical-Augsburg Church of Divine Providence, Orthodox Church of St. Cyril and Methodius, White Stork Synagogue, and St. Anthony Catholic church all converge. Hugely popular with progressive crowds and home to Wrocław's queer social spaces."
           },
-{
+          {
             name: "Ruska Street & Neon Courtyards",
             vibe: "Alternative art, neon & nightlife",
             description: "The Ruska 46 neon courtyard anchors Wrocław's alternative scene with art galleries, vinyl bars, nightclubs, and inclusive social venues."
           }
         ],
         barsAndClubs: [
-{
+          {
+            name: "Beyond Music & Club (formerly HAH)",
+            address: "Łaciarska 61, 50-123 Wrocław, Poland",
+            lat: 51.108102,
+            lng: 17.034830,
+            type: "Premier Dedicated LGBTQ+ Nightclub",
+            description: "The flagship inclusive LGBTQ+ multi-room dance club in central Wrocław (formerly HAH). Features multiple dance floors, drag queen shows, pop/techno rooms, karaoke, and welcoming queer energy.",
+            vibe: "High-energy queer dance floors, drag spectacles & multi-level party rooms",
+            websiteUrl: "https://www.beyondmusicclub.pl/",
+            imageSrc: "/wayfinder/Poland-2026/images/wroclaw/food/beyond-club.jpg"
+          },
+          {
             name: "Surowiec",
-            address: "Surowiec, Ruska 46a, 50-079 Wrocław, Poland",
-            lat: 51.1102855,
-            lng: 17.0245017,
-            type: "Cultural Club & Queer Dance Venue",
-            description: "Alternative art space, cocktail bar, and queer-friendly dance floor set within the dramatic industrial-chic Ruska 46 neon courtyard.",
-            vibe: "Post-industrial neon courtyard dancing till dawn",
+            address: "Ruska 46A, 50-079 Wrocław, Poland",
+            lat: 51.110370,
+            lng: 17.024469,
+            type: "Queer Cultural Bar & Alternative Club",
+            description: "Located in the iconic Ruska 46 neon courtyard. A celebrated alternative queer haven hosting drag bingo, queer DJ sets, live indie music, and open-minded community gatherings.",
+            vibe: "Post-industrial neon courtyard, drag bingo & eclectic queer sets",
+            websiteUrl: "https://www.facebook.com/surowiec.wro/",
             imageSrc: "/wayfinder/Poland-2026/images/wroclaw/food/surowiec.jpg"
           },
-{
-            name: "Bezsenność",
-            address: "ul. Ruska 51",
-            lat: 51.1089776,
-            lng: 17.0326689,
-            type: "Retro Speakeasy Lounge",
-            description: "Vintage speakeasy lounge attracting a diverse, open-minded crowd in the heart of the nightlife quarter.",
-            vibe: "Retro cocktails, vinyl jazz & open-minded mingling",
-            imageSrc: "/wayfinder/Poland-2026/images/wroclaw/food/bezsennosc.jpg"
+          {
+            name: "Klubokawiarnia Mleczarnia",
+            address: "Pawła Włodkowica 5, 50-072 Wrocław, Poland",
+            lat: 51.108109,
+            lng: 17.025244,
+            type: "Bohemian Candlelit Courtyard & Queer Oasis",
+            description: "Nestled beside the White Stork Synagogue in the Four Denominations District. A beloved bohemian institution with vintage armchairs, romantic garden seating, and a warm, inclusive queer vibe.",
+            vibe: "Romantic candlelit chatter, mulled wine & cozy bohemian garden",
+            websiteUrl: "https://www.facebook.com/KlubokawiarniaMleczarnia/",
+            imageSrc: "/wayfinder/Poland-2026/images/wroclaw/food/mleczarnia.jpg"
           },
-{
+          {
+            name: "Transformator Club",
+            address: "Tęczowa 57, 50-950 Wrocław, Poland",
+            lat: 51.105343,
+            lng: 17.012763,
+            type: "Underground Electronic Club & Queer Party Host",
+            description: "Gritty warehouse venue located fittingly on Tęczowa ('Rainbow') Street. Wrocław's leading underground electronic and techno hub, hosting inclusive queer parties and progressive rave collectives.",
+            vibe: "Industrial warehouse raves, queer techno nights & safe space policy",
+            websiteUrl: "http://www.transformatorclub.com/",
+            imageSrc: "/wayfinder/Poland-2026/images/wroclaw/food/transformator.jpg"
+          },
+          {
             name: "Przedwojenna Bistro & Bar",
-            address: "Przedwojenna, Świętego Mikołaja 81, 50-126 Wrocław, Poland",
-            lat: 51.1110735,
-            lng: 17.0302814,
-            type: "24/7 Pre-War Vodka Bistro",
-            description: "24/7 retro bistro beloved by Wrocław's late-night queer crowd, famous for chilled Polish vodkas, beef tartare, and nostalgic Art Deco decor.",
-            vibe: "Prewar glamour, vodka flights & all-night vibes",
+            address: "Świętego Mikołaja 81, 50-126 Wrocław, Poland",
+            lat: 51.111074,
+            lng: 17.030281,
+            type: "24/7 Pre-War Polish Vodka Bar",
+            description: "Iconic 24/7 pre-war bistro on the border of the Four Denominations District. A traditional post-club gathering hub for the local queer community for late-night vodka shots and classic Polish tapas.",
+            vibe: "Late-night vodka shots, art deco nostalgia & post-club mingling",
+            websiteUrl: "https://www.facebook.com/pages/Przedwojenna-Bistro/135956789794298",
             imageSrc: "/wayfinder/Poland-2026/images/wroclaw/food/przedwojenna.jpg"
           }
         ],
@@ -2342,17 +2367,23 @@ export const polandJourney = {
           }
         ],
         communityAndCulture: [
-{
-            name: "Wrocław Pride (Parada Równości)",
-            type: "Annual Equality March",
-            description: "Wrocław's annual pride march, one of Poland's largest, celebrates queer visibility with municipal support and draws tens of thousands of participants.",
-            highlight: "Held each June, routes from Rynek to the National Forum of Music"
+          {
+            name: "Równe Miejsce — Centrum LGBT+ Wrocław",
+            type: "Official LGBTQ+ Community Center & Safe Space",
+            description: "Run by association Kultura Równości at ul. Kniaziewicza 28. Wrocław's dedicated queer community center featuring a queer library, cultural evenings, support groups, and integration events.",
+            highlight: "Kultura Równości community hub, workshops & library"
           },
-{
-            name: "Campaign Against Homophobia (KPH) HQ",
-            type: "Poland's Leading LGBTQ+ Organization",
-            description: "Oldest and largest Polish LGBTQ+ rights advocacy organization, headquartered in Wrocław, offering legal aid, community events, and national campaigns.",
-            highlight: "Organizers of Poland's National Equality March"
+          {
+            name: "Wrocław Pride (Marsz Równości)",
+            type: "Annual Equality March & Festival",
+            description: "Wrocław's annual pride march, one of Poland's largest and most vibrant, celebrating queer visibility under official municipal patronage with tens of thousands of participants.",
+            highlight: "Annual march & festival from Rynek to the National Forum of Music"
+          },
+          {
+            name: "Campaign Against Homophobia (KPH) Wrocław",
+            type: "Poland's Leading LGBTQ+ Rights Organization",
+            description: "Leading Polish LGBTQ+ advocacy and legal aid organization with strong regional presence in Wrocław, organizing anti-discrimination education and community initiatives.",
+            highlight: "Advocacy, legal aid & equality campaigns"
           }
         ],
         winterExperiences: [
@@ -2601,9 +2632,9 @@ export const polandJourney = {
       hours: "Open 11am-9pm. Open on Christmas Day.",
       kaucja: "30 PLN (~$8.00 USD)",
       foodTargets: [
-"Brovaria",
-"Bamberka",
-"Wiejskie Jadło"
+        "Brovaria",
+        "Bamberka",
+        "Wiejskie Jadło"
       ],
       imageDetails: {
         location: "Stare Miasto & Plac Wolności",
@@ -2612,59 +2643,59 @@ export const polandJourney = {
       },
       history: "Poznań is celebrated as the cradle of the Polish state and the birthplace of the nation. It was on Ostrów Tumski (Cathedral Island) in 966 that Duke Mieszko I was baptized, uniting Slavic tribes under Christianity and establishing Poland. Poznań grew into a major mercantile crossroads, renowned for its Italian Renaissance Town Hall with its famous head-butting mechanical goats, the victorious Greater Poland Uprising of 1918, and the cherished tradition of St. Martin's croissants.",
       historyStats: [
-{
+        {
           label: "Nation Birthplace",
           value: "966 AD (Baptism of Poland)",
           icon: "Landmark"
         },
-{
+        {
           label: "Royal Tombs",
           value: "1st Polish Kings (Mieszko I)",
           icon: "Crown"
         },
-{
+        {
           label: "Old Market Square",
           value: "Chartered 1253 (Stary Rynek)",
           icon: "MapPin"
         },
-{
+        {
           label: "Victorious Uprising",
           value: "1918-1919 (Greater Poland)",
           icon: "Award"
         }
       ],
       historyEpochs: [
-{
+        {
           era: "966 - 1038",
           title: "The Cradle of the Polish Nation",
           subtitle: "Ostrów Tumski, Duke Mieszko I, and Poland's first cathedral",
           description: "On Cathedral Island in Poznań, Duke Mieszko I built his fortified palace and accepted Christian baptism in 966, founding the Polish state. Poland's first cathedral (St. Peter and Paul) was erected here in 968, housing the Golden Chapel tombs of Mieszko I and Poland's first crowned king, Bolesław the Brave."
         },
-{
+        {
           era: "1253 - 1550",
           title: "Medieval Trade Hub & Renaissance Splendor",
           subtitle: "Magdeburg Law charter and Giovanni Battista di Quadro's Town Hall",
           description: "In 1253, Duke Przemysł I relocated the city center across the Warta River to the present-day Stary Rynek. Following a destructive fire in 1536, Italian master architect Giovanni Battista di Quadro rebuilt the Town Hall into one of Northern Europe's finest Renaissance civic masterpieces, incorporating the famous mechanical clock goats."
         },
-{
+        {
           era: "1550 - 1793",
           title: "The Golden Age of Merchant Guilds & Academia",
           subtitle: "Lubrański Academy, Baroque parish churches, and European trade crossroads",
           description: "Poznań flourished as a vital hub of international commerce along routes connecting Nuremberg, Wrocław, Toruń, and Baltic ports. Bishop Jan Lubrański established the Lubrański Academy in 1518, while Jesuit masters crafted the magnificent pink-and-gold Baroque Fara Church (St. Stanislaus Parish Basilica)."
         },
-{
+        {
           era: "1793 - 1918",
           title: "Prussian Partition & The Citadel Fortress",
           subtitle: "Festung Posen fortification, economic resistance, and organic work movement",
           description: "Annexed by Prussia during the Partitions of Poland, Poznań was turned into a garrison fortress city (Festung Posen) centered on the massive Winiary Fort (Citadel). Local Polish patriots pioneered the \"Organic Work\" philosophy, founding the Bazar Hotel, Cegielski manufacturing plants, and agricultural cooperatives to maintain Polish economic autonomy."
         },
-{
+        {
           era: "1918 - 1919",
           title: "The Victorious Greater Poland Uprising",
           subtitle: "Ignacy Jan Paderewski's rallying speech and triumphant reunification",
           description: "On December 26, 1918, world-renowned pianist and statesman Ignacy Jan Paderewski arrived at Poznań Główny station, giving an electrifying speech at the Bazar Hotel. The following day, the Greater Poland Uprising erupted - one of the very few completely victorious Polish military uprisings in history, freeing the region and reuniting it with the Second Polish Republic."
         },
-{
+        {
           era: "Post-WWII - Present",
           title: "Poznań June 1956 & Modern Commercial Crossroads",
           subtitle: "Historic workers' strike for \"Bread and Freedom\" and international commerce",
@@ -2672,17 +2703,17 @@ export const polandJourney = {
         }
       ],
       historyLegends: [
-{
+        {
           icon: "🐐",
           title: "The Poznań Town Hall Goats (Koziołki)",
           description: "Legend says a clumsy young chef named Pietrek accidentally burned the roast deer intended for the Voivode's banquet. In panic, he stole two billy goats from a meadow to cook, but they escaped up the Town Hall tower and started head-butting, delighting the guests so much they were spared forever."
         },
-{
+        {
           icon: "🥐",
           title: "St. Martin's Horseshoe Croissant (Rogale)",
           description: "In 1891, inspired by priest Jan Lewicki's sermon about St. Martin's generosity, baker Józef Melzer baked horseshoe-shaped pastries filled with white poppy seeds, almonds, and honey to distribute free to the city's poor, creating Poznań's proudest culinary tradition."
         },
-{
+        {
           icon: "👑",
           title: "Lech, Czech, and Rus at Poznań",
           description: "Slavic folklore tells that three founding brothers - Lech, Czech, and Rus - had been separated for years during their travels across Europe. When they unexpectedly met again by the Warta River, they joyfully cried out \"Poznać!\" (\"To recognize!\"), and built a stronghold on that very spot."
@@ -2691,72 +2722,76 @@ export const polandJourney = {
       lgbtq: {
         title: "LGBTQ+ Traveler's Guide to Poznań",
         subtitle: "Poland's Rainbow Capital, Grupa Stonewall, Lokomotywa Club, and bohemian Jeżyce",
-        overview: "Poznań is widely recognized as Poland's most progressive, open-minded, and LGBTQ+-friendly city. Home to Grupa Stonewall—one of Central Europe's most active and impactful queer organizations—Poznań features queer-owned cafés (Kawiarnia Stonewall), LGBTQ+ health services, the legendary Lokomotywa nightclub, and Poland's most celebrated Poznań Pride Week. Queer travelers will find unmatched visibility, rainbow flags in storefronts, and a relaxed, welcoming metropolitan energy.",
+        overview: "Poznań is widely recognized as Poland's most progressive, open-minded, and LGBTQ+-friendly city. Home to Grupa Stonewall—one of Central Europe's most active and impactful queer organizations—Poznań features queer-owned cafés (Lokum Stonewall), LGBTQ+ health services, the legendary Lokomotywa nightclub, and Poland's most celebrated Poznań Pride Week. Queer travelers will find unmatched visibility, rainbow flags in storefronts, and a relaxed, welcoming metropolitan energy.",
         primaryArea: "Jeżyce District & Stare Miasto (Old Town)",
-        landmark: "Kawiarnia Stonewall & Plac Wolności",
+        landmark: "Lokum Stonewall & Plac Wolności",
         landmarkDescription: "Queer-owned community café and activist hub in Jeżyce, minutes from the lively Christmas market on Plac Wolności.",
-        imageUrl: "/wayfinder/Poland-2026/images/poznan/markets/poznan.png",
+        imageUrl: "/wayfinder/Poland-2026/images/poznan/attractions/lgbtq-poznan.jpg",
         safetyAndLegal: {
           legalContext: "Poznań has long been Poland's leader in municipal anti-discrimination policies, with official mayoral patronage for Pride marches since 2015.",
           safetyRating: "Highest in Poland (Very Safe & Progressive)",
           pdaAdvice: "Public Displays of Affection: Very comfortable throughout the city center, Jeżyce, and Old Town.",
           helplines: [
-{
+            {
               name: "Grupa Stonewall",
               contact: "Poland's flagship LGBTQ+ organization & community center"
             },
-{
-              name: "Kawiarnia Stonewall",
-              contact: "ul. Za Bramką 1 / ul. Garbary — queer community café"
+            {
+              name: "Nowe Lokum Stonewall",
+              contact: "Fredry 7 — queer community café and event space"
             }
           ]
         },
         neighborhoods: [
-{
+          {
             name: "Jeżyce District",
             vibe: "Hipster, culinary & progressive queer hub",
             description: "Poznań's trendiest neighborhood, packed with Art Nouveau tenements, queer-welcoming vegan eateries, specialty coffee, and vintage stores."
           },
-{
+          {
             name: "Stare Miasto & Plac Wolności",
             vibe: "Historic market plaza & nightlife center",
             description: "Surrounding the Old Market Square and Plac Wolności, home to historic cellar pubs, cocktail lounges, and seasonal festivals."
           }
         ],
         barsAndClubs: [
-{
-            name: "Lokomotywa Club",
-            address: "ul. Dworcowa 1 (Near Main Station)",
+          {
+            name: "LokoMotyw (Lokomotywa Club)",
+            address: "Masztowa 3, 61-345 Poznań",
             type: "Legendary Dedicated LGBTQ+ Nightclub",
-            description: "Poznań's iconic gay dance club with two dance floors, energetic DJ sets, drag shows, and friendly weekend crowds.",
-            vibe: "Classic gay dance floor, drag revues & weekend party vibes"
+            description: "Poznań's iconic gay dance club with energetic DJ sets, drag shows, and friendly weekend crowds.",
+            vibe: "Classic gay dance floor, drag revues & weekend party vibes",
+            imageUrl: "/wayfinder/Poland-2026/images/poznan/food/lokomotywa-club.jpg"
           },
-{
-            name: "Punto Punct Club",
-            address: "ul. Wielka 10",
+          {
+            name: "Punkt G (Punto Punct)",
+            address: "Zamkowa 5, 61-768 Poznań",
             type: "Alternative & Queer Social Lounge",
-            description: "Intimate downtown venue hosting queer dance parties, karaoke nights, and community gatherings.",
-            vibe: "Welcoming lounge & community parties"
+            description: "Intimate downtown venue hosting queer dance parties, karaoke nights, and community gatherings right off the Old Town square.",
+            vibe: "Welcoming lounge & community parties",
+            imageUrl: "/wayfinder/Poland-2026/images/poznan/food/punto-punct.jpg"
           }
         ],
         cafesAndDining: [
-{
-            name: "Kawiarnia Stonewall",
-            address: "ul. Garbary 67 / ul. Wroniecka",
+          {
+            name: "Nowe Lokum Stonewall",
+            address: "Fredry 7, 61-701 Poznań",
             type: "100% Queer-Owned Community Café",
             description: "Social enterprise café run by Grupa Stonewall where 100% of profits fund local LGBTQ+ mental health and community services.",
-            signature: "Specialty coffee, delicious cakes & rainbow souvenirs"
+            signature: "Specialty coffee, delicious cakes & rainbow souvenirs",
+            imageUrl: "/wayfinder/Poland-2026/images/poznan/food/kawiarnia-stonewall.jpg"
           },
-{
-            name: "Kraszkebab (Jeżyce)",
-            address: "ul. Kraszewskiego 9",
+          {
+            name: "Kraszkebab",
+            address: "Kraszewskiego 9B, 60-501 Poznań",
             type: "Beloved Vegan Culinary Hotspot",
             description: "Cult plant-based eatery in Jeżyce loved by the queer community for plant-based wraps, craft drinks, and friendly staff.",
-            signature: "Vegan seitan kebabs, fries & homemade sauces"
+            signature: "Vegan seitan kebabs, fries & homemade sauces",
+            imageUrl: "/wayfinder/Poland-2026/images/poznan/food/kraszkebab.jpg"
           }
         ],
         communityAndCulture: [
-{
+          {
             name: "Poznań Pride Week & Marsz Równości",
             type: "Poland's Flagship Pride Festival",
             description: "A massive week-long festival featuring film screenings, panel debates, drag contests, and a Pride march supported by the city council.",
@@ -2764,9 +2799,9 @@ export const polandJourney = {
           }
         ],
         winterExperiences: [
-{
-            title: "Coffee & Community at Kawiarnia Stonewall",
-            description: "Warm up after the Christmas market on Plac Wolności with specialty brew at Kawiarnia Stonewall."
+          {
+            title: "Coffee & Community at Lokum Stonewall",
+            description: "Warm up after the Christmas market on Plac Wolności with specialty brew at Lokum Stonewall."
           }
         ]
       },
@@ -2788,42 +2823,42 @@ export const polandJourney = {
         notes: "Exact cash required for ceramic boot mug deposit. Full cash refund upon returning your mug to any drink chalet."
       },
       culinaryHighlights: [
-{
+        {
           name: "Rogal Świętomarciński",
           phonetic: "ROH-gahl shvyeh-toh-mar-CHEEN-skee",
           english: "St. Martin's Horseshoe Croissant",
           description: "Protected EU-certified horseshoe pastry filled with rich white poppy seeds, ground almonds, vanilla, sugar, and candied orange peel, glazed with sweet icing and chopped walnuts.",
           tip: "Look for bakeries displaying the official Cech Cukierników certificate of authenticity."
         },
-{
+        {
           name: "Gzik z Pyrami",
           phonetic: "GZEEK z PIH-rah-mee",
           english: "Poznań Cottage Cheese w/ Jacket Potatoes",
           description: "Greater Poland specialty of whipped curd cheese mixed with fresh sour cream, chopped chives, radishes, and flaxseed oil, served alongside steaming jacket-boiled potatoes.",
           tip: "The ultimate comforting vegetarian winter dish of Greater Poland."
         },
-{
+        {
           name: "Kaczka po Poznańsku",
           phonetic: "KACH-kah poh poz-NAHN-skoo",
           english: "Poznań Roasted Duck w/ Apples & Pyzy",
           description: "Crisp roasted half duck seasoned with marjoram and tart apples, served with sweet braised red cabbage and fluffy steamed yeast dumplings (pyzy).",
           tip: "Try at Brovaria or Restauracja Bamberka on Stary Rynek."
         },
-{
+        {
           name: "Czernina z Kluskami",
           phonetic: "chehr-NEE-nah z kloos-KAH-mee",
           english: "Traditional Duck Broth Soup w/ Dried Fruits",
           description: "Centuries-old Polish sweet-and-sour duck broth flavored with dried prunes, pears, and vinegar, served with hand-cut egg noodles.",
           tip: "A historic culinary delicacy of Greater Poland folklore."
         },
-{
+        {
           name: "Szare Kluchy z Boczkiem",
           phonetic: "SHAH-reh KLOO-khih z BOCH-kyem",
           english: "Grey Potato Dumplings w/ Crispy Pork Cracklings",
           description: "Grated raw potato dumplings boiled until tender and tossed in sizzling lard, crispy smoked bacon cracklings, and warm fried sauerkraut.",
           tip: "Pair with ice-cold Greater Poland craft pilsner."
         },
-{
+        {
           name: "Grzaniec z Wiśniówką",
           phonetic: "GZH-ah-nyets z veesh-NYOOF-koh",
           english: "Mulled Wine w/ Cherry Cordial Shot",
@@ -2842,7 +2877,7 @@ export const polandJourney = {
         restrooms: "Public WCs are located beneath Stary Rynek near the Town Hall, at Plac Wolności underground lot, and inside the Stary Browar and Avenida shopping centers (2–4 PLN (~$0.50–$1.05 USD))."
       },
       markets: [
-{
+        {
           id: "poznan-plac-wolnosci",
           name: "Plac Wolności Christmas Market (Betlejem Poznańskie)",
           shortName: "Plac Wolności",
@@ -2856,25 +2891,25 @@ export const polandJourney = {
           details: "The centerpiece of Betlejem Poznańskie featuring over 60 wooden stalls, an open-air ice rink, an illuminated ferris wheel, and holiday stages.",
           description: "Set on Poznań's grand public square, Betlejem Poznańskie on Plac Wolności features an illuminated 33-meter ferris wheel, authentic wooden stalls, hot mulled wine in commemorative boot mugs, and fresh Rogale Świętomarcińskie.",
           highlights: [
-"33-meter Panoramic Ferris Wheel",
-"Official St. Martin's Croissant Bakeries",
-"Open-Air Ice Skating Rink",
-"Winter Fire Pit & Wooden Chalets"
+            "33-meter Panoramic Ferris Wheel",
+            "Official St. Martin's Croissant Bakeries",
+            "Open-Air Ice Skating Rink",
+            "Winter Fire Pit & Wooden Chalets"
           ],
           mustTry: [
-"Rogal Świętomarciński (White Poppy Seed Croissant)",
-"Grzaniec z Wiśniówką (Mulled Wine w/ Cherry)",
-"Smażone Pierogi z Kapustą i Grzybami"
+            "Rogal Świętomarciński (White Poppy Seed Croissant)",
+            "Grzaniec z Wiśniówką (Mulled Wine w/ Cherry)",
+            "Smażone Pierogi z Kapustą i Grzybami"
           ],
           souvenirs: [
-"Bolesławiec Style Christmas Ceramics",
-"Handmade Wooden Nutcrackers",
-"Artisan Gingerbread Hearts"
+            "Bolesławiec Style Christmas Ceramics",
+            "Handmade Wooden Nutcrackers",
+            "Artisan Gingerbread Hearts"
           ],
           imageSrc: "/wayfinder/Poland-2026/images/poznan/markets/poznan-plac-wolnosci.jpg",
           imageUrl: "/wayfinder/Poland-2026/images/poznan/markets/poznan-plac-wolnosci.jpg"
         },
-{
+        {
           id: "poznan-stary-rynek",
           name: "Stary Rynek Old Market Square Fair",
           shortName: "Stary Rynek",
@@ -2888,25 +2923,25 @@ export const polandJourney = {
           details: "Surrounding the iconic 16th-century Renaissance Town Hall, this historic fair hosts the annual International Ice Sculpture Festival and regional Wielkopolska crafts.",
           description: "Framed by colorful merchant houses and the Renaissance Town Hall, Stary Rynek is the cultural heart of Poznań festivities with live woodcarvers, ice sculptors, and regional folk choirs.",
           highlights: [
-"International Ice Sculpture Festival Competitions",
-"Renaissance Town Hall & Goat Clock Tower Backdrop",
-"Regional Greater Poland Smoked Meats & Cheeses",
-"Artisan Leather & Hand-Loomed Wool Chalets"
+            "International Ice Sculpture Festival Competitions",
+            "Renaissance Town Hall & Goat Clock Tower Backdrop",
+            "Regional Greater Poland Smoked Meats & Cheeses",
+            "Artisan Leather & Hand-Loomed Wool Chalets"
           ],
           mustTry: [
-"Gzik Wielkopolski z Pyrami (Cottage Cheese & Baked Potatoes)",
-"Kiełbasa z Kotła (Hot Cauldron Sausage)",
-"Gorący Miód Pitny (Hot Spiced Mead)"
+            "Gzik Wielkopolski z Pyrami (Cottage Cheese & Baked Potatoes)",
+            "Kiełbasa z Kotła (Hot Cauldron Sausage)",
+            "Gorący Miód Pitny (Hot Spiced Mead)"
           ],
           souvenirs: [
-"Carved Wooden Poznań Goats",
-"Hand-blown Glass Baubles (Bombki)",
-"Natural Beeswax Candles"
+            "Carved Wooden Poznań Goats",
+            "Hand-blown Glass Baubles (Bombki)",
+            "Natural Beeswax Candles"
           ],
           imageSrc: "/wayfinder/Poland-2026/images/poznan/markets/poznan-stary-rynek.jpg",
           imageUrl: "/wayfinder/Poland-2026/images/poznan/markets/poznan-stary-rynek.jpg"
         },
-{
+        {
           id: "poznan-mtp",
           name: "Międzynarodowe Targi Poznańskie (MTP) Winter Fair",
           shortName: "Targi MTP",
@@ -2920,27 +2955,27 @@ export const polandJourney = {
           details: "A contemporary winter fair hosted at Poland’s premier exhibition grounds featuring illuminated light labyrinths, indoor artisan gift halls, and gourmet culinary pavilions.",
           description: "MTP Winter Fair transforms the historic trade fair grounds with thousands of twinkling LEDs, covered winter artisan pavilions, food trucks, and interactive family activities.",
           highlights: [
-"Massive Walk-Through LED Light Labyrinth",
-"Indoor Heated Artisan Market Pavilions",
-"Gourmet Craft Food Truck Village",
-"Kids Holiday Baking & Crafts Workshops"
+            "Massive Walk-Through LED Light Labyrinth",
+            "Indoor Heated Artisan Market Pavilions",
+            "Gourmet Craft Food Truck Village",
+            "Kids Holiday Baking & Crafts Workshops"
           ],
           mustTry: [
-"Hot Spiced Apple Cider",
-"Gourmet Belgian Waffles with Plum Jam",
-"Roasted Chestnuts"
+            "Hot Spiced Apple Cider",
+            "Gourmet Belgian Waffles with Plum Jam",
+            "Roasted Chestnuts"
           ],
           souvenirs: [
-"Designer Polish Crafts & Jewelry",
-"Regional Honeys & Fruit Cordials",
-"Artisan Winter Textiles"
+            "Designer Polish Crafts & Jewelry",
+            "Regional Honeys & Fruit Cordials",
+            "Artisan Winter Textiles"
           ],
           imageSrc: "/wayfinder/Poland-2026/images/poznan/markets/poznan-mtp.jpg",
           imageUrl: "/wayfinder/Poland-2026/images/poznan/markets/poznan-mtp.jpg"
         }
       ],
       mustSee: [
-{
+        {
           id: "poznan-ratusz",
           name: "Poznań Town Hall (Ratusz) & Mechanical Goats",
           title: "Poznań Town Hall (Ratusz) & Mechanical Goats",
@@ -2956,7 +2991,7 @@ export const polandJourney = {
           imageSrc: "/wayfinder/Poland-2026/images/poznan/attractions/poznan-ratusz.jpg",
           websiteUrl: "https://mnp.art.pl/oddzialy/muzeum-historii-miasta-poznania/"
         },
-{
+        {
           id: "poznan-ostrow-tumski",
           name: "Ostrów Tumski & Poznań Cathedral of SS. Peter and Paul",
           title: "Ostrów Tumski & Poznań Cathedral of SS. Peter and Paul",
@@ -2972,7 +3007,7 @@ export const polandJourney = {
           imageSrc: "/wayfinder/Poland-2026/images/poznan/attractions/poznan-ostrow-tumski.jpg",
           websiteUrl: "https://katedra.archpoznan.pl/"
         },
-{
+        {
           id: "poznan-zamek-cesarski",
           name: "Imperial Castle (Zamek Cesarski)",
           title: "Imperial Castle (Zamek Cesarski)",
@@ -2988,7 +3023,7 @@ export const polandJourney = {
           imageSrc: "/wayfinder/Poland-2026/images/poznan/attractions/poznan-zamek-cesarski.jpg",
           websiteUrl: "https://ckzamek.pl/"
         },
-{
+        {
           id: "poznan-rogalowe-muzeum",
           name: "Rogalowe Muzeum Poznania (Croissant Museum)",
           title: "Rogalowe Muzeum Poznania (Croissant Museum)",
@@ -3004,7 +3039,7 @@ export const polandJourney = {
           imageSrc: "/wayfinder/Poland-2026/images/poznan/attractions/poznan-rogalowe-muzeum.jpg",
           websiteUrl: "https://rogalowemuzeum.pl/en/"
         },
-{
+        {
           id: "poznan-park-cytadela",
           name: "Citadel Park (Park Cytadela) & Fort Winiary",
           title: "Citadel Park (Park Cytadela) & Fort Winiary",
@@ -3020,7 +3055,7 @@ export const polandJourney = {
           imageSrc: "/wayfinder/Poland-2026/images/poznan/attractions/poznan-park-cytadela.jpg",
           websiteUrl: "https://poznan.travel/en/r/warto-zobaczyc/park-cytadela"
         },
-{
+        {
           id: "poznan-fara",
           name: "Poznań Fara Church (St. Stanislaus Basilica)",
           title: "Poznań Fara Church (St. Stanislaus Basilica)",
@@ -3036,7 +3071,7 @@ export const polandJourney = {
           imageSrc: "/wayfinder/Poland-2026/images/poznan/attractions/poznan-fara.jpg",
           websiteUrl: "https://fara.archpoznan.pl/"
         },
-{
+        {
           id: "poznan-walking-tour",
           name: "Poznań Old Town & Croissant Tasting Guided Walking Tour",
           title: "Poznań Old Town & Croissant Tasting Guided Walking Tour",
@@ -3052,164 +3087,8 @@ export const polandJourney = {
           imageSrc: "/wayfinder/Poland-2026/images/poznan/attractions/poznan-walking-tour.jpg"
         }
       ],
-      restaurants: [
-"Brovaria (Brewery & Polish Dining)",
-"Restauracja Bamberka (Regional Polish)",
-"Wiejskie Jadło (Rustic Polish Comfort)",
-"Pierogarnia Stary Młyn (Handcrafted Pierogi)",
-"Restauracja Muga (Michelin Starred Fine Dining)"
-      ],
-      poznanRestaurantsDetailed: [
-{
-          id: "brovaria",
-          name: "Brovaria Hotel & Microbrewery",
-          category: "must-haves",
-          categoryLabel: "Must-Have & Microbrewery",
-          priceTier: "$$",
-          priceEstimatePln: "55 - 110 PLN per person",
-          address: "Stary Rynek 73/74, 61-768 Poznan, Poland",
-          lat: 52.4080513,
-          lng: 16.9323743,
-          neighborhood: "Stare Miasto (Stary Rynek)",
-          cuisine: "Craft Microbrewery & Modern Polish Feast",
-          signature: "House Pilsner & Honey Beer, Braised Pork Knuckle, Roasted Duck with Dumplings (Pyzy)",
-          description: "Award-winning microbrewery on the Market Square where copper brewing vats gleam behind dining tables, serving fresh unfiltered beer and hearty Wielkopolska classics.",
-          imageSrc: "/wayfinder/Poland-2026/images/poznan/food/brovaria.jpg",
-          imageUrl: "/wayfinder/Poland-2026/images/poznan/food/brovaria.jpg",
-          websiteUrl: "https://brovaria.pl"
-        },
-{
-          id: "bamberka",
-          name: "Restauracja Bamberka",
-          category: "must-haves",
-          categoryLabel: "Must-Have & Heritage",
-          priceTier: "$$",
-          priceEstimatePln: "50 - 95 PLN per person",
-          address: "Stary Rynek 2, 61-772 Poznan, Poland",
-          lat: 52.4085827,
-          lng: 16.933367,
-          neighborhood: "Stare Miasto (Old Market Square)",
-          cuisine: "Traditional Bambrzy & Greater Poland Heritage",
-          signature: "Poznań Duck with Red Cabbage & Steamed Pyzy, Czernina Soup, Baked Zander",
-          description: "Tribute restaurant honoring the 18th-century German Bambrzy settlers who shaped Poznań folklore, offering warm authentic dining beside the famous Bamberka fountain.",
-          imageSrc: "/wayfinder/Poland-2026/images/poznan/food/bamberka.jpg",
-          imageUrl: "/wayfinder/Poland-2026/images/poznan/food/bamberka.jpg",
-          websiteUrl: "https://bamberka.com.pl"
-        },
-{
-          id: "wiejskie-jadlo-poznan",
-          name: "Wiejskie Jadło Poznań",
-          category: "local",
-          categoryLabel: "Local Fares & Rustic Hearth",
-          priceTier: "$$",
-          priceEstimatePln: "45 - 85 PLN per person",
-          address: "Stary Rynek 77, 61-772 Poznan, Poland",
-          lat: 52.4083118,
-          lng: 16.9322498,
-          neighborhood: "Stare Miasto (Stary Rynek)",
-          cuisine: "Rustic Polish Village Cuisine",
-          signature: "Żurek in Sourdough Bread Loaf, Bigos Myśliwski, Pan-Fried Ruskie Pierogi",
-          description: "Cozy folk-art interior with painted timbers and clay pottery, specializing in comforting traditional home-cooked Polish recipes and warm mulled ciders.",
-          imageSrc: "/wayfinder/Poland-2026/images/poznan/food/wiejskie-jadlo-poznan.jpg",
-          imageUrl: "/wayfinder/Poland-2026/images/poznan/food/wiejskie-jadlo-poznan.jpg",
-          websiteUrl: "https://wiejskiejadlo.pl"
-        },
-{
-          id: "pierogarnia-stary-mlyn-poznan",
-          name: "Pierogarnia Stary Młyn Poznań",
-          category: "local",
-          categoryLabel: "Local Fares & Hand-Rolled Pierogi",
-          priceTier: "$",
-          priceEstimatePln: "28 - 48 PLN per person",
-          address: "Zamkowa 7, 61-768 Poznan, Poland",
-          lat: 52.4089936,
-          lng: 16.93213,
-          neighborhood: "Stare Miasto (Near Royal Castle)",
-          cuisine: "Traditional & Oven-Baked Pierogi (Piecuchy)",
-          signature: "Oven-Baked Piecuchy with Smoked Bacon, Boiled Wild Forest Mushroom Pierogi",
-          description: "Acclaimed dumpling specialist renowned for traditional boiled pierogi and giant crispy oven-baked crusty piecuchy stuffed with savory meats and cheeses.",
-          imageSrc: "/wayfinder/Poland-2026/images/poznan/food/pierogarnia-stary-mlyn-poznan.jpg",
-          imageUrl: "/wayfinder/Poland-2026/images/poznan/food/pierogarnia-stary-mlyn-poznan.jpg",
-          websiteUrl: "https://www.pierogarnie.com"
-        },
-{
-          id: "muga-poznan",
-          name: "Restauracja Muga (1 Michelin Star)",
-          category: "expensive",
-          categoryLabel: "Fine Dining & 1 Michelin Star",
-          priceTier: "$$$$",
-          priceEstimatePln: "380 - 550 PLN per person",
-          address: "Bolesława Krysiewicza 5, 61-825 Poznan, Poland",
-          lat: 52.4039736,
-          lng: 16.9290364,
-          neighborhood: "Centrum (Near Stary Browar)",
-          cuisine: "Contemporary Polish Haute Cuisine",
-          signature: "Seasonal Tasting Menu with Regional Foraged Ingredients, Sommelier Wine Pairings",
-          description: "Poznań's first Michelin-starred culinary gem offering an unforgettable sensory journey of refined modern European gastronomy curated by Chef Artur Skotarczyk.",
-          imageSrc: "/wayfinder/Poland-2026/images/poznan/food/muga-poznan.jpg",
-          imageUrl: "/wayfinder/Poland-2026/images/poznan/food/muga-poznan.jpg",
-          websiteUrl: "https://restauracjamuga.pl"
-        }
-      ],
-      poznanDrinksDetailed: [
-        {
-          id: "pijalnia-wodki-poznan",
-          name: "Pijalnia Wódki i Piwa Poznań",
-          category: "vodka-house",
-          categoryLabel: "Historic Vodka House & Bites",
-          priceTier: "$",
-          priceEstimatePln: "15 - 35 PLN per person",
-          address: "Wrocławska 8, 61-838 Poznan, Poland",
-          lat: 52.4067522,
-          lng: 16.9328191,
-          neighborhood: "Stare Miasto (Wrocławska Nightlife Street)",
-          cuisine: "Retro Polish PRL Tapas & Infused Vodka Shots",
-          signature: "Chili-Lemon & Salted Caramel Vodka Shots, Pickled Herring (Śledź), Steak Tartare",
-          description: "Vibrant retro 1960s Polish PRL bar serving budget-friendly ice-cold vodka shots and classic drinking appetizers on bustling Wrocławska street.",
-          imageSrc: "/wayfinder/Poland-2026/images/poznan/food/pijalnia-wodki-poznan.jpg",
-          imageUrl: "/wayfinder/Poland-2026/images/poznan/food/pijalnia-wodki-poznan.jpg"
-        },
-        {
-          id: "ministerstwo-browaru",
-          name: "Ministerstwo Browaru Taproom",
-          category: "brewery",
-          categoryLabel: "Craft Brewery & Tap Bar",
-          priceTier: "$$",
-          priceEstimatePln: "30 - 65 PLN per person",
-          address: "Franciszka Ratajczaka 34, 61-816 Poznan, Poland",
-          lat: 52.4061184,
-          lng: 16.9253095,
-          neighborhood: "Centrum / Stare Miasto Border",
-          cuisine: "Polish Craft Beer on Tap & Bar Snacks",
-          signature: "Rotating 16 Polish Craft Draft Taps (IPAs, Baltic Porters, Sours), Warm Pretzels",
-          description: "A temple for Polish craft beer enthusiasts with sixteen continuously rotating artisanal taps from top Polish microbreweries and a lively cellar atmosphere.",
-          imageSrc: "/wayfinder/Poland-2026/images/poznan/food/ministerstwo-browaru.jpg",
-          imageUrl: "/wayfinder/Poland-2026/images/poznan/food/ministerstwo-browaru.jpg",
-          websiteUrl: "https://ministerstwobrowaru.pl"
-        }
-      ],
-      poznanCafesDetailed: [
-        {
-          id: "kawiarnia-stonewall",
-          name: "Kawiarnia Stonewall",
-          category: "coffee-breakfast",
-          categoryLabel: "Specialty Coffee & Community",
-          priceTier: "$",
-          priceEstimatePln: "18 - 36 PLN per person",
-          address: "Garbary 67, 61-758 Poznan, Poland",
-          lat: 52.4082918,
-          lng: 16.9378991,
-          neighborhood: "Stare Miasto / Garbary",
-          cuisine: "Third-Wave Coffee, Specialty Teas & Cakes",
-          signature: "Single-Origin Aeropress Brews, Vegan Cheesecake, Hot Spiced Winter Latte",
-          description: "A welcoming, inclusive community café run by Grupa Stonewall where 100% of proceeds support local equality initiatives, serving top-tier specialty coffee and artisan cakes.",
-          imageSrc: "/wayfinder/Poland-2026/images/poznan/food/kawiarnia-stonewall.jpg",
-          imageUrl: "/wayfinder/Poland-2026/images/poznan/food/kawiarnia-stonewall.jpg",
-          websiteUrl: "https://grupastonewall.pl"
-        }
-      ],
       restaurantsDetailed: [
-{
+        {
           id: "brovaria",
           name: "Brovaria Hotel & Microbrewery",
           category: "must-haves",
@@ -3227,7 +3106,7 @@ export const polandJourney = {
           imageUrl: "/wayfinder/Poland-2026/images/poznan/food/brovaria.jpg",
           websiteUrl: "https://brovaria.pl"
         },
-{
+        {
           id: "bamberka",
           name: "Restauracja Bamberka",
           category: "must-haves",
@@ -3245,7 +3124,7 @@ export const polandJourney = {
           imageUrl: "/wayfinder/Poland-2026/images/poznan/food/bamberka.jpg",
           websiteUrl: "https://bamberka.com.pl"
         },
-{
+        {
           id: "wiejskie-jadlo-poznan",
           name: "Wiejskie Jadło Poznań",
           category: "local",
@@ -3263,7 +3142,7 @@ export const polandJourney = {
           imageUrl: "/wayfinder/Poland-2026/images/poznan/food/wiejskie-jadlo-poznan.jpg",
           websiteUrl: "https://wiejskiejadlo.pl"
         },
-{
+        {
           id: "pierogarnia-stary-mlyn-poznan",
           name: "Pierogarnia Stary Młyn Poznań",
           category: "local",
@@ -3281,7 +3160,7 @@ export const polandJourney = {
           imageUrl: "/wayfinder/Poland-2026/images/poznan/food/pierogarnia-stary-mlyn-poznan.jpg",
           websiteUrl: "https://www.pierogarnie.com"
         },
-{
+        {
           id: "muga-poznan",
           name: "Restauracja Muga (1 Michelin Star)",
           category: "expensive",
@@ -3298,8 +3177,10 @@ export const polandJourney = {
           imageSrc: "/wayfinder/Poland-2026/images/poznan/food/muga-poznan.jpg",
           imageUrl: "/wayfinder/Poland-2026/images/poznan/food/muga-poznan.jpg",
           websiteUrl: "https://restauracjamuga.pl"
-        },
-{
+        }
+      ],
+      drinksDetailed: [
+        {
           id: "pijalnia-wodki-poznan",
           name: "Pijalnia Wódki i Piwa Poznań",
           category: "vodka-house",
@@ -3316,7 +3197,7 @@ export const polandJourney = {
           imageSrc: "/wayfinder/Poland-2026/images/poznan/food/pijalnia-wodki-poznan.jpg",
           imageUrl: "/wayfinder/Poland-2026/images/poznan/food/pijalnia-wodki-poznan.jpg"
         },
-{
+        {
           id: "ministerstwo-browaru",
           name: "Ministerstwo Browaru Taproom",
           category: "brewery",
@@ -3333,18 +3214,20 @@ export const polandJourney = {
           imageSrc: "/wayfinder/Poland-2026/images/poznan/food/ministerstwo-browaru.jpg",
           imageUrl: "/wayfinder/Poland-2026/images/poznan/food/ministerstwo-browaru.jpg",
           websiteUrl: "https://ministerstwobrowaru.pl"
-        },
-{
+        }
+      ],
+      cafesDetailed: [
+        {
           id: "kawiarnia-stonewall",
-          name: "Kawiarnia Stonewall",
+          name: "Nowe Lokum Stonewall",
           category: "coffee-breakfast",
           categoryLabel: "Specialty Coffee & Community",
           priceTier: "$",
           priceEstimatePln: "18 - 36 PLN per person",
-          address: "Garbary 67, 61-758 Poznan, Poland",
+          address: "Fredry 7, 61-701 Poznań, Poland",
           lat: 52.4082918,
           lng: 16.9378991,
-          neighborhood: "Stare Miasto / Garbary",
+          neighborhood: "Stare Miasto / Jeżyce Edge",
           cuisine: "Third-Wave Coffee, Specialty Teas & Cakes",
           signature: "Single-Origin Aeropress Brews, Vegan Cheesecake, Hot Spiced Winter Latte",
           description: "A welcoming, inclusive community café run by Grupa Stonewall where 100% of proceeds support local equality initiatives, serving top-tier specialty coffee and artisan cakes.",
@@ -3353,7 +3236,8 @@ export const polandJourney = {
           websiteUrl: "https://grupastonewall.pl"
         }
       ]
-    },
+    }
+,
 {
       id: "torun",
       name: "Toruń",
@@ -4077,7 +3961,7 @@ export const polandJourney = {
         primaryArea: "Główne Miasto (Main Town) & Dolne Miasto",
         landmark: "Bunkier Club & Motława Waterfront",
         landmarkDescription: "A massive 6-story converted wartime air-raid bunker turned into an eclectic arts venue and inclusive multi-floor nightclub near the Old Town.",
-        imageUrl: "/wayfinder/Poland-2026/images/gdansk/markets/gdansk.png",
+        imageUrl: "/wayfinder/Poland-2026/images/gdansk/attractions/lgbtq-gdansk.jpg",
         safetyAndLegal: {
           legalContext: "Gdańsk pioneered Poland's first municipal Equality Charter and celebrates official City Hall patronage for its Equality March (Trójmiejski Marsz Równości).",
           safetyRating: "Very Safe & Cosmopolitan",

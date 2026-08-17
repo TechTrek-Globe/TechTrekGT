@@ -1,0 +1,617 @@
+{
+      id: "poznan",
+      name: "Poznań",
+      nights: 2,
+      base: "Old Town / Stare Miasto",
+      focus: "Efficient midpoint: compact historic core, Cathedral Island, markets, cafés, and easy rail positioning.",
+      marketStrategy: "First Poznań market evening. Seasonal displays, possible ice-sculpture or market events.",
+      dates: "Nov 21, 2026 - Jan 6, 2027 (Plac Wolności)",
+      openingHours: "Open 11am-9pm. Open on Christmas Day.",
+      hours: "Open 11am-9pm. Open on Christmas Day.",
+      kaucja: "30 PLN (~$8.00 USD)",
+      foodTargets: [
+        "Brovaria",
+        "Bamberka",
+        "Wiejskie Jadło"
+      ],
+      imageDetails: {
+        location: "Stare Miasto & Plac Wolności",
+        landmark: "Renaissance Town Hall & Betlejem Poznańskie",
+        description: "Home to the famous International Ice Sculpture Festival. Features a giant illuminated ferris wheel, wooden craft stalls, and warm bakery stands serving official St. Martin's Croissants (Rogale Świętomarcińskie)."
+      },
+      history: "Poznań is celebrated as the cradle of the Polish state and the birthplace of the nation. It was on Ostrów Tumski (Cathedral Island) in 966 that Duke Mieszko I was baptized, uniting Slavic tribes under Christianity and establishing Poland. Poznań grew into a major mercantile crossroads, renowned for its Italian Renaissance Town Hall with its famous head-butting mechanical goats, the victorious Greater Poland Uprising of 1918, and the cherished tradition of St. Martin's croissants.",
+      historyStats: [
+        {
+          label: "Nation Birthplace",
+          value: "966 AD (Baptism of Poland)",
+          icon: "Landmark"
+        },
+        {
+          label: "Royal Tombs",
+          value: "1st Polish Kings (Mieszko I)",
+          icon: "Crown"
+        },
+        {
+          label: "Old Market Square",
+          value: "Chartered 1253 (Stary Rynek)",
+          icon: "MapPin"
+        },
+        {
+          label: "Victorious Uprising",
+          value: "1918-1919 (Greater Poland)",
+          icon: "Award"
+        }
+      ],
+      historyEpochs: [
+        {
+          era: "966 - 1038",
+          title: "The Cradle of the Polish Nation",
+          subtitle: "Ostrów Tumski, Duke Mieszko I, and Poland's first cathedral",
+          description: "On Cathedral Island in Poznań, Duke Mieszko I built his fortified palace and accepted Christian baptism in 966, founding the Polish state. Poland's first cathedral (St. Peter and Paul) was erected here in 968, housing the Golden Chapel tombs of Mieszko I and Poland's first crowned king, Bolesław the Brave."
+        },
+        {
+          era: "1253 - 1550",
+          title: "Medieval Trade Hub & Renaissance Splendor",
+          subtitle: "Magdeburg Law charter and Giovanni Battista di Quadro's Town Hall",
+          description: "In 1253, Duke Przemysł I relocated the city center across the Warta River to the present-day Stary Rynek. Following a destructive fire in 1536, Italian master architect Giovanni Battista di Quadro rebuilt the Town Hall into one of Northern Europe's finest Renaissance civic masterpieces, incorporating the famous mechanical clock goats."
+        },
+        {
+          era: "1550 - 1793",
+          title: "The Golden Age of Merchant Guilds & Academia",
+          subtitle: "Lubrański Academy, Baroque parish churches, and European trade crossroads",
+          description: "Poznań flourished as a vital hub of international commerce along routes connecting Nuremberg, Wrocław, Toruń, and Baltic ports. Bishop Jan Lubrański established the Lubrański Academy in 1518, while Jesuit masters crafted the magnificent pink-and-gold Baroque Fara Church (St. Stanislaus Parish Basilica)."
+        },
+        {
+          era: "1793 - 1918",
+          title: "Prussian Partition & The Citadel Fortress",
+          subtitle: "Festung Posen fortification, economic resistance, and organic work movement",
+          description: "Annexed by Prussia during the Partitions of Poland, Poznań was turned into a garrison fortress city (Festung Posen) centered on the massive Winiary Fort (Citadel). Local Polish patriots pioneered the \"Organic Work\" philosophy, founding the Bazar Hotel, Cegielski manufacturing plants, and agricultural cooperatives to maintain Polish economic autonomy."
+        },
+        {
+          era: "1918 - 1919",
+          title: "The Victorious Greater Poland Uprising",
+          subtitle: "Ignacy Jan Paderewski's rallying speech and triumphant reunification",
+          description: "On December 26, 1918, world-renowned pianist and statesman Ignacy Jan Paderewski arrived at Poznań Główny station, giving an electrifying speech at the Bazar Hotel. The following day, the Greater Poland Uprising erupted - one of the very few completely victorious Polish military uprisings in history, freeing the region and reuniting it with the Second Polish Republic."
+        },
+        {
+          era: "Post-WWII - Present",
+          title: "Poznań June 1956 & Modern Commercial Crossroads",
+          subtitle: "Historic workers' strike for \"Bread and Freedom\" and international commerce",
+          description: "On June 28, 1956, over 100,000 workers took to the streets demanding \"Bread and Freedom\", sparking Poland's first major revolt against communist dictatorship. Commemorated by the towering Monument of the Poznań Crosses, modern Poznań has evolved into Poland's leading international trade fair hub and a dynamic cultural capital."
+        }
+      ],
+      historyLegends: [
+        {
+          icon: "🐐",
+          title: "The Poznań Town Hall Goats (Koziołki)",
+          description: "Legend says a clumsy young chef named Pietrek accidentally burned the roast deer intended for the Voivode's banquet. In panic, he stole two billy goats from a meadow to cook, but they escaped up the Town Hall tower and started head-butting, delighting the guests so much they were spared forever."
+        },
+        {
+          icon: "🥐",
+          title: "St. Martin's Horseshoe Croissant (Rogale)",
+          description: "In 1891, inspired by priest Jan Lewicki's sermon about St. Martin's generosity, baker Józef Melzer baked horseshoe-shaped pastries filled with white poppy seeds, almonds, and honey to distribute free to the city's poor, creating Poznań's proudest culinary tradition."
+        },
+        {
+          icon: "👑",
+          title: "Lech, Czech, and Rus at Poznań",
+          description: "Slavic folklore tells that three founding brothers - Lech, Czech, and Rus - had been separated for years during their travels across Europe. When they unexpectedly met again by the Warta River, they joyfully cried out \"Poznać!\" (\"To recognize!\"), and built a stronghold on that very spot."
+        }
+      ],
+      lgbtq: {
+        title: "LGBTQ+ Traveler's Guide to Poznań",
+        subtitle: "Poland's Rainbow Capital, Grupa Stonewall, Lokomotywa Club, and bohemian Jeżyce",
+        overview: "Poznań is widely recognized as Poland's most progressive, open-minded, and LGBTQ+-friendly city. Home to Grupa Stonewall—one of Central Europe's most active and impactful queer organizations—Poznań features queer-owned cafés (Lokum Stonewall), LGBTQ+ health services, the legendary Lokomotywa nightclub, and Poland's most celebrated Poznań Pride Week. Queer travelers will find unmatched visibility, rainbow flags in storefronts, and a relaxed, welcoming metropolitan energy.",
+        primaryArea: "Jeżyce District & Stare Miasto (Old Town)",
+        landmark: "Lokum Stonewall & Plac Wolności",
+        landmarkDescription: "Queer-owned community café and activist hub in Jeżyce, minutes from the lively Christmas market on Plac Wolności.",
+        imageUrl: "/wayfinder/Poland-2026/images/poznan/attractions/lgbtq-poznan.jpg",
+        safetyAndLegal: {
+          legalContext: "Poznań has long been Poland's leader in municipal anti-discrimination policies, with official mayoral patronage for Pride marches since 2015.",
+          safetyRating: "Highest in Poland (Very Safe & Progressive)",
+          pdaAdvice: "Public Displays of Affection: Very comfortable throughout the city center, Jeżyce, and Old Town.",
+          helplines: [
+            {
+              name: "Grupa Stonewall",
+              contact: "Poland's flagship LGBTQ+ organization & community center"
+            },
+            {
+              name: "Nowe Lokum Stonewall",
+              contact: "Fredry 7 — queer community café and event space"
+            }
+          ]
+        },
+        neighborhoods: [
+          {
+            name: "Jeżyce District",
+            vibe: "Hipster, culinary & progressive queer hub",
+            description: "Poznań's trendiest neighborhood, packed with Art Nouveau tenements, queer-welcoming vegan eateries, specialty coffee, and vintage stores."
+          },
+          {
+            name: "Stare Miasto & Plac Wolności",
+            vibe: "Historic market plaza & nightlife center",
+            description: "Surrounding the Old Market Square and Plac Wolności, home to historic cellar pubs, cocktail lounges, and seasonal festivals."
+          }
+        ],
+        barsAndClubs: [
+          {
+            name: "LokoMotyw (Lokomotywa Club)",
+            address: "Masztowa 3, 61-345 Poznań",
+            type: "Legendary Dedicated LGBTQ+ Nightclub",
+            description: "Poznań's iconic gay dance club with energetic DJ sets, drag shows, and friendly weekend crowds.",
+            vibe: "Classic gay dance floor, drag revues & weekend party vibes",
+            imageUrl: "/wayfinder/Poland-2026/images/poznan/food/lokomotywa-club.jpg"
+          },
+          {
+            name: "Punkt G (Punto Punct)",
+            address: "Zamkowa 5, 61-768 Poznań",
+            type: "Alternative & Queer Social Lounge",
+            description: "Intimate downtown venue hosting queer dance parties, karaoke nights, and community gatherings right off the Old Town square.",
+            vibe: "Welcoming lounge & community parties",
+            imageUrl: "/wayfinder/Poland-2026/images/poznan/food/punto-punct.jpg"
+          }
+        ],
+        cafesAndDining: [
+          {
+            name: "Nowe Lokum Stonewall",
+            address: "Fredry 7, 61-701 Poznań",
+            type: "100% Queer-Owned Community Café",
+            description: "Social enterprise café run by Grupa Stonewall where 100% of profits fund local LGBTQ+ mental health and community services.",
+            signature: "Specialty coffee, delicious cakes & rainbow souvenirs",
+            imageUrl: "/wayfinder/Poland-2026/images/poznan/food/kawiarnia-stonewall.jpg"
+          },
+          {
+            name: "Kraszkebab",
+            address: "Kraszewskiego 9B, 60-501 Poznań",
+            type: "Beloved Vegan Culinary Hotspot",
+            description: "Cult plant-based eatery in Jeżyce loved by the queer community for plant-based wraps, craft drinks, and friendly staff.",
+            signature: "Vegan seitan kebabs, fries & homemade sauces",
+            imageUrl: "/wayfinder/Poland-2026/images/poznan/food/kraszkebab.jpg"
+          }
+        ],
+        communityAndCulture: [
+          {
+            name: "Poznań Pride Week & Marsz Równości",
+            type: "Poland's Flagship Pride Festival",
+            description: "A massive week-long festival featuring film screenings, panel debates, drag contests, and a Pride march supported by the city council.",
+            highlight: "Organized by Grupa Stonewall with nationwide participation"
+          }
+        ],
+        winterExperiences: [
+          {
+            title: "Coffee & Community at Lokum Stonewall",
+            description: "Warm up after the Christmas market on Plac Wolności with specialty brew at Lokum Stonewall."
+          }
+        ]
+      },
+      quickReference: {
+        dates: "Nov 21, 2026 - Jan 6, 2027",
+        daylight: "Sunrise ~7:45 AM | Sunset ~3:40 PM (~8 hrs daylight)",
+        peakHours: "5:00 PM - 8:00 PM (Ferris wheel illuminations & stage shows)",
+        kaucja: "30 PLN (~$8.00 USD) deposit per mug (EXACT CASH REQUIRED)"
+      },
+      holidayClosures: {
+        dec24: "Market closes early at ~2:00 PM (Wigilia family dinner).",
+        dec25: "Christmas Day: Plac Wolności market open 1:00 PM - 9:00 PM with select food stalls.",
+        dec26: "Boxing Day: Full market operations resume (11:00 AM - 9:00 PM).",
+        dec31: "New Year’s Eve: Extended evening hours through countdown celebrations.",
+        jan1: "New Year’s Day: Open 1:00 PM - 9:00 PM."
+      },
+      kaucjaCallout: {
+        deposit: "30 PLN (~$8.00 USD)",
+        notes: "Exact cash required for ceramic boot mug deposit. Full cash refund upon returning your mug to any drink chalet."
+      },
+      culinaryHighlights: [
+        {
+          name: "Rogal Świętomarciński",
+          phonetic: "ROH-gahl shvyeh-toh-mar-CHEEN-skee",
+          english: "St. Martin's Horseshoe Croissant",
+          description: "Protected EU-certified horseshoe pastry filled with rich white poppy seeds, ground almonds, vanilla, sugar, and candied orange peel, glazed with sweet icing and chopped walnuts.",
+          tip: "Look for bakeries displaying the official Cech Cukierników certificate of authenticity."
+        },
+        {
+          name: "Gzik z Pyrami",
+          phonetic: "GZEEK z PIH-rah-mee",
+          english: "Poznań Cottage Cheese w/ Jacket Potatoes",
+          description: "Greater Poland specialty of whipped curd cheese mixed with fresh sour cream, chopped chives, radishes, and flaxseed oil, served alongside steaming jacket-boiled potatoes.",
+          tip: "The ultimate comforting vegetarian winter dish of Greater Poland."
+        },
+        {
+          name: "Kaczka po Poznańsku",
+          phonetic: "KACH-kah poh poz-NAHN-skoo",
+          english: "Poznań Roasted Duck w/ Apples & Pyzy",
+          description: "Crisp roasted half duck seasoned with marjoram and tart apples, served with sweet braised red cabbage and fluffy steamed yeast dumplings (pyzy).",
+          tip: "Try at Brovaria or Restauracja Bamberka on Stary Rynek."
+        },
+        {
+          name: "Czernina z Kluskami",
+          phonetic: "chehr-NEE-nah z kloos-KAH-mee",
+          english: "Traditional Duck Broth Soup w/ Dried Fruits",
+          description: "Centuries-old Polish sweet-and-sour duck broth flavored with dried prunes, pears, and vinegar, served with hand-cut egg noodles.",
+          tip: "A historic culinary delicacy of Greater Poland folklore."
+        },
+        {
+          name: "Szare Kluchy z Boczkiem",
+          phonetic: "SHAH-reh KLOO-khih z BOCH-kyem",
+          english: "Grey Potato Dumplings w/ Crispy Pork Cracklings",
+          description: "Grated raw potato dumplings boiled until tender and tossed in sizzling lard, crispy smoked bacon cracklings, and warm fried sauerkraut.",
+          tip: "Pair with ice-cold Greater Poland craft pilsner."
+        },
+        {
+          name: "Grzaniec z Wiśniówką",
+          phonetic: "GZH-ah-nyets z veesh-NYOOF-koh",
+          english: "Mulled Wine w/ Cherry Cordial Shot",
+          description: "Steaming mulled red wine infused with cinnamon bark and cloves, finished with a shot of rich Polish wild cherry liqueur.",
+          tip: "Order in the collectible Betlejem Poznańskie ceramic mug."
+        }
+      ],
+      transit: {
+        airport: "Poznań-Ławica Airport (POZ) is 7 km west of the center. Take Express Bus 159 directly to Poznań Główny central station (~20 mins, 4.00 PLN (~$1.05 USD)) or taxi/Bolt (~30-40 PLN (~$8-11 USD)).",
+        cityTransit: "Operated by ZTM Poznań. Single 15-min tickets cost 4.00 PLN (~$1.05 USD); 24-hr passes cost 15.00 PLN (~$4.00 USD). Purchase via contactless card on board or through the Jakdojade app. Trams 2, 5, 9, 13, and 16 connect Central Station directly with Plac Wolności and Stary Rynek.",
+        station: "Poznań Główny is integrated with the Avenida shopping mall. Walk 15 mins northeast to Stary Rynek, or catch Tram 5 or 9 for a quick 5-min transit."
+      },
+      practical: {
+        weather: "December in Poznań averages 0°C to 4°C (32°F–39°F) with brisk westerly winds. Pack thermal underlayers, a windproof winter coat, warm gloves, a fleece beanie, and comfortable waterproof walking shoes for historic cobblestones.",
+        currency: "Poland uses the Polish Złoty (PLN). Contactless card/mobile payments are accepted at ~95% of market stalls, but keep 30–50 PLN (~$8.00–$13.35 USD) cash for ceramic mug deposits and small souvenir chalets.",
+        restrooms: "Public WCs are located beneath Stary Rynek near the Town Hall, at Plac Wolności underground lot, and inside the Stary Browar and Avenida shopping centers (2–4 PLN (~$0.50–$1.05 USD))."
+      },
+      markets: [
+        {
+          id: "poznan-plac-wolnosci",
+          name: "Plac Wolności Christmas Market (Betlejem Poznańskie)",
+          shortName: "Plac Wolności",
+          location: "Plac Wolności, 60-914 Poznan, Poland",
+          lat: 52.4078438,
+          lng: 16.9273774,
+          dates: "Nov 21, 2026 - Jan 6, 2027",
+          hours: "11:00 AM - 9:00 PM daily (Open Christmas Day)",
+          bestTime: "5:00 PM - 7:30 PM (Ferris wheel illuminations & stage performances)",
+          specialty: "St. Martin's Croissants, artisan ceramics, and giant illuminated ferris wheel",
+          details: "The centerpiece of Betlejem Poznańskie featuring over 60 wooden stalls, an open-air ice rink, an illuminated ferris wheel, and holiday stages.",
+          description: "Set on Poznań's grand public square, Betlejem Poznańskie on Plac Wolności features an illuminated 33-meter ferris wheel, authentic wooden stalls, hot mulled wine in commemorative boot mugs, and fresh Rogale Świętomarcińskie.",
+          highlights: [
+            "33-meter Panoramic Ferris Wheel",
+            "Official St. Martin's Croissant Bakeries",
+            "Open-Air Ice Skating Rink",
+            "Winter Fire Pit & Wooden Chalets"
+          ],
+          mustTry: [
+            "Rogal Świętomarciński (White Poppy Seed Croissant)",
+            "Grzaniec z Wiśniówką (Mulled Wine w/ Cherry)",
+            "Smażone Pierogi z Kapustą i Grzybami"
+          ],
+          souvenirs: [
+            "Bolesławiec Style Christmas Ceramics",
+            "Handmade Wooden Nutcrackers",
+            "Artisan Gingerbread Hearts"
+          ],
+          imageSrc: "/wayfinder/Poland-2026/images/poznan/markets/poznan-plac-wolnosci.jpg",
+          imageUrl: "/wayfinder/Poland-2026/images/poznan/markets/poznan-plac-wolnosci.jpg"
+        },
+        {
+          id: "poznan-stary-rynek",
+          name: "Stary Rynek Old Market Square Fair",
+          shortName: "Stary Rynek",
+          location: "Stary Rynek, 61-772 Poznan, Poland",
+          lat: 52.4077551,
+          lng: 16.9337029,
+          dates: "Nov 21, 2026 - Dec 23, 2026",
+          hours: "11:00 AM - 9:00 PM daily",
+          bestTime: "11:45 AM (Daily Town Hall Goat Clashing) & 6:00 PM (Dusk glow)",
+          specialty: "Historic Renaissance backdrop & international ice sculpture displays",
+          details: "Surrounding the iconic 16th-century Renaissance Town Hall, this historic fair hosts the annual International Ice Sculpture Festival and regional Wielkopolska crafts.",
+          description: "Framed by colorful merchant houses and the Renaissance Town Hall, Stary Rynek is the cultural heart of Poznań festivities with live woodcarvers, ice sculptors, and regional folk choirs.",
+          highlights: [
+            "International Ice Sculpture Festival Competitions",
+            "Renaissance Town Hall & Goat Clock Tower Backdrop",
+            "Regional Greater Poland Smoked Meats & Cheeses",
+            "Artisan Leather & Hand-Loomed Wool Chalets"
+          ],
+          mustTry: [
+            "Gzik Wielkopolski z Pyrami (Cottage Cheese & Baked Potatoes)",
+            "Kiełbasa z Kotła (Hot Cauldron Sausage)",
+            "Gorący Miód Pitny (Hot Spiced Mead)"
+          ],
+          souvenirs: [
+            "Carved Wooden Poznań Goats",
+            "Hand-blown Glass Baubles (Bombki)",
+            "Natural Beeswax Candles"
+          ],
+          imageSrc: "/wayfinder/Poland-2026/images/poznan/markets/poznan-stary-rynek.jpg",
+          imageUrl: "/wayfinder/Poland-2026/images/poznan/markets/poznan-stary-rynek.jpg"
+        },
+        {
+          id: "poznan-mtp",
+          name: "Międzynarodowe Targi Poznańskie (MTP) Winter Fair",
+          shortName: "Targi MTP",
+          location: "Pawilon 12 (Pałac Targowy), Głogowska 14, 60-702 Poznan, Poland",
+          lat: 52.4030144,
+          lng: 16.9079869,
+          dates: "Dec 1, 2026 - Dec 22, 2026",
+          hours: "12:00 PM - 8:00 PM daily",
+          bestTime: "4:30 PM - 7:00 PM (Family light labyrinth & workshops)",
+          specialty: "Indoor-outdoor winter wonderland with massive light installations",
+          details: "A contemporary winter fair hosted at Poland’s premier exhibition grounds featuring illuminated light labyrinths, indoor artisan gift halls, and gourmet culinary pavilions.",
+          description: "MTP Winter Fair transforms the historic trade fair grounds with thousands of twinkling LEDs, covered winter artisan pavilions, food trucks, and interactive family activities.",
+          highlights: [
+            "Massive Walk-Through LED Light Labyrinth",
+            "Indoor Heated Artisan Market Pavilions",
+            "Gourmet Craft Food Truck Village",
+            "Kids Holiday Baking & Crafts Workshops"
+          ],
+          mustTry: [
+            "Hot Spiced Apple Cider",
+            "Gourmet Belgian Waffles with Plum Jam",
+            "Roasted Chestnuts"
+          ],
+          souvenirs: [
+            "Designer Polish Crafts & Jewelry",
+            "Regional Honeys & Fruit Cordials",
+            "Artisan Winter Textiles"
+          ],
+          imageSrc: "/wayfinder/Poland-2026/images/poznan/markets/poznan-mtp.jpg",
+          imageUrl: "/wayfinder/Poland-2026/images/poznan/markets/poznan-mtp.jpg"
+        }
+      ],
+      mustSee: [
+        {
+          id: "poznan-ratusz",
+          name: "Poznań Town Hall (Ratusz) & Mechanical Goats",
+          title: "Poznań Town Hall (Ratusz) & Mechanical Goats",
+          category: "Renaissance Masterpiece",
+          location: "Ratusz, Stary Rynek 1, 61-772 Poznan, Poland",
+          lat: 52.4085774,
+          lng: 16.9340166,
+          description: "One of Northern Europe's most magnificent Renaissance civic buildings designed by Giovanni Battista di Quadro. Every day at 12:00 noon (and 3:00 PM), two mechanical metal billy goats emerge above the clock tower to butt heads 12 times.",
+          howToGetThere: "Located in the center of Stary Rynek (Old Market Square).",
+          pricing: "Square free; Town Hall Museum ~15 PLN (~$4.00 USD)",
+          openTimes: "Square 24/7; Museum Tue-Sun 10:00 AM - 5:00 PM",
+          imageUrl: "/wayfinder/Poland-2026/images/poznan/attractions/poznan-ratusz.jpg",
+          imageSrc: "/wayfinder/Poland-2026/images/poznan/attractions/poznan-ratusz.jpg",
+          websiteUrl: "https://mnp.art.pl/oddzialy/muzeum-historii-miasta-poznania/"
+        },
+        {
+          id: "poznan-ostrow-tumski",
+          name: "Ostrów Tumski & Poznań Cathedral of SS. Peter and Paul",
+          title: "Ostrów Tumski & Poznań Cathedral of SS. Peter and Paul",
+          category: "Birthplace of Poland",
+          location: "Plebania, Ostrów Tumski 17, 61-109 Poznan, Poland",
+          lat: 52.4119234,
+          lng: 16.9493706,
+          description: "The ancient island cradle where Poland began in 966 AD. Inside Poland’s oldest cathedral, the Golden Chapel holds the royal sarcophagi of Poland’s first rulers: Duke Mieszko I and King Bolesław the Brave.",
+          howToGetThere: "15-min walk east from Old Town or Tram 3, 4, 8 to Katedra stop.",
+          pricing: "Cathedral free; Crypt & Royal Tombs ~10 PLN (~$2.65 USD)",
+          openTimes: "Daily 9:00 AM - 5:00 PM (except during religious services)",
+          imageUrl: "/wayfinder/Poland-2026/images/poznan/attractions/poznan-ostrow-tumski.jpg",
+          imageSrc: "/wayfinder/Poland-2026/images/poznan/attractions/poznan-ostrow-tumski.jpg",
+          websiteUrl: "https://katedra.archpoznan.pl/"
+        },
+        {
+          id: "poznan-zamek-cesarski",
+          name: "Imperial Castle (Zamek Cesarski)",
+          title: "Imperial Castle (Zamek Cesarski)",
+          category: "Imperial History & Culture",
+          location: "Święty Marcin 80/82, 61-809 Poznan, Poland",
+          lat: 52.4078391,
+          lng: 16.9191652,
+          description: "The last imperial palace built in Europe (1910) for German Emperor Wilhelm II, later redesigned during WWII and now thriving as Poznań's vibrant cultural center with galleries, cinema, and winter courtyards.",
+          howToGetThere: "10-min walk west of Plac Wolności or Tram 2, 5, 13 to Zamek stop.",
+          pricing: "Castle courtyards free; Exhibitions ~15–20 PLN (~$4.00–$5.35 USD)",
+          openTimes: "Daily 10:00 AM - 9:00 PM",
+          imageUrl: "/wayfinder/Poland-2026/images/poznan/attractions/poznan-zamek-cesarski.jpg",
+          imageSrc: "/wayfinder/Poland-2026/images/poznan/attractions/poznan-zamek-cesarski.jpg",
+          websiteUrl: "https://ckzamek.pl/"
+        },
+        {
+          id: "poznan-rogalowe-muzeum",
+          name: "Rogalowe Muzeum Poznania (Croissant Museum)",
+          title: "Rogalowe Muzeum Poznania (Croissant Museum)",
+          category: "Living Culinary Experience",
+          location: "Stary Rynek 41, 61-765 Poznan, Poland",
+          lat: 52.4083948,
+          lng: 16.9348606,
+          description: "An interactive comedy and culinary show housed in a Renaissance townhouse overlooking the Town Hall. Learn the secret recipe and legend of St. Martin’s croissants and earn an apprentice baker certificate.",
+          howToGetThere: "Located on Stary Rynek directly opposite the Town Hall.",
+          pricing: "32–38 PLN (~$8.50–$10.00 USD) incl. fresh croissant tasting",
+          openTimes: "Shows run daily (English sessions available at 2:00 PM; reserve online)",
+          imageUrl: "/wayfinder/Poland-2026/images/poznan/attractions/poznan-rogalowe-muzeum.jpg",
+          imageSrc: "/wayfinder/Poland-2026/images/poznan/attractions/poznan-rogalowe-muzeum.jpg",
+          websiteUrl: "https://rogalowemuzeum.pl/en/"
+        },
+        {
+          id: "poznan-park-cytadela",
+          name: "Citadel Park (Park Cytadela) & Fort Winiary",
+          title: "Citadel Park (Park Cytadela) & Fort Winiary",
+          category: "Fortress & Sculpture Park",
+          location: "Armii Poznań, 61-441 Poznan, Poland",
+          lat: 52.3538833,
+          lng: 16.9020446,
+          description: "A 100-hectare park built upon the ruins of Prussia's massive 19th-century Fort Winiary. Features Magdalena Abakanowicz's monumental iron sculpture installation 'The Unrecognized' (Nierozpoznani) and military history museums.",
+          howToGetThere: "Tram 3, 4, 10 to Garbary or Armii Poznań stop (~10 mins from Old Town).",
+          pricing: "Park grounds free; Military museums ~12 PLN (~$3.20 USD)",
+          openTimes: "Park open 24/7; Museums Tue-Sun 10:00 AM - 4:00 PM",
+          imageUrl: "/wayfinder/Poland-2026/images/poznan/attractions/poznan-park-cytadela.jpg",
+          imageSrc: "/wayfinder/Poland-2026/images/poznan/attractions/poznan-park-cytadela.jpg",
+          websiteUrl: "https://poznan.travel/en/r/warto-zobaczyc/park-cytadela"
+        },
+        {
+          id: "poznan-fara",
+          name: "Poznań Fara Church (St. Stanislaus Basilica)",
+          title: "Poznań Fara Church (St. Stanislaus Basilica)",
+          category: "Baroque Masterpiece",
+          location: "Gołębia 1, 61-834 Poznan, Poland",
+          lat: 52.4063949,
+          lng: 16.9349898,
+          description: "One of Central Europe’s most breathtaking High Baroque basilicas, boasting towering pink marbleized columns, gilded altars, and a legendary 19th-century organ built by Friedrich Ladegast.",
+          howToGetThere: "2-min walk south from Stary Rynek along Świętosławska street.",
+          pricing: "Free entry (donations appreciated); Organ concerts free/donation",
+          openTimes: "Mon-Sat 6:30 AM - 7:30 PM, Sun 7:00 AM - 8:30 PM",
+          imageUrl: "/wayfinder/Poland-2026/images/poznan/attractions/poznan-fara.jpg",
+          imageSrc: "/wayfinder/Poland-2026/images/poznan/attractions/poznan-fara.jpg",
+          websiteUrl: "https://fara.archpoznan.pl/"
+        },
+        {
+          id: "poznan-walking-tour",
+          name: "Poznań Old Town & Croissant Tasting Guided Walking Tour",
+          title: "Poznań Old Town & Croissant Tasting Guided Walking Tour",
+          category: "Top Rated Guided Tour",
+          location: "Stary Rynek, 61-772 Poznan, Poland",
+          lat: 52.4077551,
+          lng: 16.9337029,
+          description: "Immersive 2.5-hour walking tour covering the Renaissance Stary Rynek, goat legends, Baroque Fara, Ostrów Tumski birthplace of Poland, and a warm St. Martin croissant and coffee tasting.",
+          howToGetThere: "Departs from the Bamberka Fountain on Stary Rynek.",
+          pricing: "70–90 PLN (~$18.50–$24.00 USD) per person",
+          openTimes: "Departs 10:30 AM & 2:00 PM daily",
+          imageUrl: "/wayfinder/Poland-2026/images/poznan/attractions/poznan-walking-tour.jpg",
+          imageSrc: "/wayfinder/Poland-2026/images/poznan/attractions/poznan-walking-tour.jpg"
+        }
+      ],
+      restaurantsDetailed: [
+        {
+          id: "brovaria",
+          name: "Brovaria Hotel & Microbrewery",
+          category: "must-haves",
+          categoryLabel: "Must-Have & Microbrewery",
+          priceTier: "$$",
+          priceEstimatePln: "55 - 110 PLN per person",
+          address: "Stary Rynek 73/74, 61-768 Poznan, Poland",
+          lat: 52.4080513,
+          lng: 16.9323743,
+          neighborhood: "Stare Miasto (Stary Rynek)",
+          cuisine: "Craft Microbrewery & Modern Polish Feast",
+          signature: "House Pilsner & Honey Beer, Braised Pork Knuckle, Roasted Duck with Dumplings (Pyzy)",
+          description: "Award-winning microbrewery on the Market Square where copper brewing vats gleam behind dining tables, serving fresh unfiltered beer and hearty Wielkopolska classics.",
+          imageSrc: "/wayfinder/Poland-2026/images/poznan/food/brovaria.jpg",
+          imageUrl: "/wayfinder/Poland-2026/images/poznan/food/brovaria.jpg",
+          websiteUrl: "https://brovaria.pl"
+        },
+        {
+          id: "bamberka",
+          name: "Restauracja Bamberka",
+          category: "must-haves",
+          categoryLabel: "Must-Have & Heritage",
+          priceTier: "$$",
+          priceEstimatePln: "50 - 95 PLN per person",
+          address: "Stary Rynek 2, 61-772 Poznan, Poland",
+          lat: 52.4085827,
+          lng: 16.933367,
+          neighborhood: "Stare Miasto (Old Market Square)",
+          cuisine: "Traditional Bambrzy & Greater Poland Heritage",
+          signature: "Poznań Duck with Red Cabbage & Steamed Pyzy, Czernina Soup, Baked Zander",
+          description: "Tribute restaurant honoring the 18th-century German Bambrzy settlers who shaped Poznań folklore, offering warm authentic dining beside the famous Bamberka fountain.",
+          imageSrc: "/wayfinder/Poland-2026/images/poznan/food/bamberka.jpg",
+          imageUrl: "/wayfinder/Poland-2026/images/poznan/food/bamberka.jpg",
+          websiteUrl: "https://bamberka.com.pl"
+        },
+        {
+          id: "wiejskie-jadlo-poznan",
+          name: "Wiejskie Jadło Poznań",
+          category: "local",
+          categoryLabel: "Local Fares & Rustic Hearth",
+          priceTier: "$$",
+          priceEstimatePln: "45 - 85 PLN per person",
+          address: "Stary Rynek 77, 61-772 Poznan, Poland",
+          lat: 52.4083118,
+          lng: 16.9322498,
+          neighborhood: "Stare Miasto (Stary Rynek)",
+          cuisine: "Rustic Polish Village Cuisine",
+          signature: "Żurek in Sourdough Bread Loaf, Bigos Myśliwski, Pan-Fried Ruskie Pierogi",
+          description: "Cozy folk-art interior with painted timbers and clay pottery, specializing in comforting traditional home-cooked Polish recipes and warm mulled ciders.",
+          imageSrc: "/wayfinder/Poland-2026/images/poznan/food/wiejskie-jadlo-poznan.jpg",
+          imageUrl: "/wayfinder/Poland-2026/images/poznan/food/wiejskie-jadlo-poznan.jpg",
+          websiteUrl: "https://wiejskiejadlo.pl"
+        },
+        {
+          id: "pierogarnia-stary-mlyn-poznan",
+          name: "Pierogarnia Stary Młyn Poznań",
+          category: "local",
+          categoryLabel: "Local Fares & Hand-Rolled Pierogi",
+          priceTier: "$",
+          priceEstimatePln: "28 - 48 PLN per person",
+          address: "Zamkowa 7, 61-768 Poznan, Poland",
+          lat: 52.4089936,
+          lng: 16.93213,
+          neighborhood: "Stare Miasto (Near Royal Castle)",
+          cuisine: "Traditional & Oven-Baked Pierogi (Piecuchy)",
+          signature: "Oven-Baked Piecuchy with Smoked Bacon, Boiled Wild Forest Mushroom Pierogi",
+          description: "Acclaimed dumpling specialist renowned for traditional boiled pierogi and giant crispy oven-baked crusty piecuchy stuffed with savory meats and cheeses.",
+          imageSrc: "/wayfinder/Poland-2026/images/poznan/food/pierogarnia-stary-mlyn-poznan.jpg",
+          imageUrl: "/wayfinder/Poland-2026/images/poznan/food/pierogarnia-stary-mlyn-poznan.jpg",
+          websiteUrl: "https://www.pierogarnie.com"
+        },
+        {
+          id: "muga-poznan",
+          name: "Restauracja Muga (1 Michelin Star)",
+          category: "expensive",
+          categoryLabel: "Fine Dining & 1 Michelin Star",
+          priceTier: "$$$$",
+          priceEstimatePln: "380 - 550 PLN per person",
+          address: "Bolesława Krysiewicza 5, 61-825 Poznan, Poland",
+          lat: 52.4039736,
+          lng: 16.9290364,
+          neighborhood: "Centrum (Near Stary Browar)",
+          cuisine: "Contemporary Polish Haute Cuisine",
+          signature: "Seasonal Tasting Menu with Regional Foraged Ingredients, Sommelier Wine Pairings",
+          description: "Poznań's first Michelin-starred culinary gem offering an unforgettable sensory journey of refined modern European gastronomy curated by Chef Artur Skotarczyk.",
+          imageSrc: "/wayfinder/Poland-2026/images/poznan/food/muga-poznan.jpg",
+          imageUrl: "/wayfinder/Poland-2026/images/poznan/food/muga-poznan.jpg",
+          websiteUrl: "https://restauracjamuga.pl"
+        }
+      ],
+      drinksDetailed: [
+        {
+          id: "pijalnia-wodki-poznan",
+          name: "Pijalnia Wódki i Piwa Poznań",
+          category: "vodka-house",
+          categoryLabel: "Historic Vodka House & Bites",
+          priceTier: "$",
+          priceEstimatePln: "15 - 35 PLN per person",
+          address: "Wrocławska 8, 61-838 Poznan, Poland",
+          lat: 52.4067522,
+          lng: 16.9328191,
+          neighborhood: "Stare Miasto (Wrocławska Nightlife Street)",
+          cuisine: "Retro Polish PRL Tapas & Infused Vodka Shots",
+          signature: "Chili-Lemon & Salted Caramel Vodka Shots, Pickled Herring (Śledź), Steak Tartare",
+          description: "Vibrant retro 1960s Polish PRL bar serving budget-friendly ice-cold vodka shots and classic drinking appetizers on bustling Wrocławska street.",
+          imageSrc: "/wayfinder/Poland-2026/images/poznan/food/pijalnia-wodki-poznan.jpg",
+          imageUrl: "/wayfinder/Poland-2026/images/poznan/food/pijalnia-wodki-poznan.jpg"
+        },
+        {
+          id: "ministerstwo-browaru",
+          name: "Ministerstwo Browaru Taproom",
+          category: "brewery",
+          categoryLabel: "Craft Brewery & Tap Bar",
+          priceTier: "$$",
+          priceEstimatePln: "30 - 65 PLN per person",
+          address: "Franciszka Ratajczaka 34, 61-816 Poznan, Poland",
+          lat: 52.4061184,
+          lng: 16.9253095,
+          neighborhood: "Centrum / Stare Miasto Border",
+          cuisine: "Polish Craft Beer on Tap & Bar Snacks",
+          signature: "Rotating 16 Polish Craft Draft Taps (IPAs, Baltic Porters, Sours), Warm Pretzels",
+          description: "A temple for Polish craft beer enthusiasts with sixteen continuously rotating artisanal taps from top Polish microbreweries and a lively cellar atmosphere.",
+          imageSrc: "/wayfinder/Poland-2026/images/poznan/food/ministerstwo-browaru.jpg",
+          imageUrl: "/wayfinder/Poland-2026/images/poznan/food/ministerstwo-browaru.jpg",
+          websiteUrl: "https://ministerstwobrowaru.pl"
+        }
+      ],
+      cafesDetailed: [
+        {
+          id: "kawiarnia-stonewall",
+          name: "Nowe Lokum Stonewall",
+          category: "coffee-breakfast",
+          categoryLabel: "Specialty Coffee & Community",
+          priceTier: "$",
+          priceEstimatePln: "18 - 36 PLN per person",
+          address: "Fredry 7, 61-701 Poznań, Poland",
+          lat: 52.4082918,
+          lng: 16.9378991,
+          neighborhood: "Stare Miasto / Jeżyce Edge",
+          cuisine: "Third-Wave Coffee, Specialty Teas & Cakes",
+          signature: "Single-Origin Aeropress Brews, Vegan Cheesecake, Hot Spiced Winter Latte",
+          description: "A welcoming, inclusive community café run by Grupa Stonewall where 100% of proceeds support local equality initiatives, serving top-tier specialty coffee and artisan cakes.",
+          imageSrc: "/wayfinder/Poland-2026/images/poznan/food/kawiarnia-stonewall.jpg",
+          imageUrl: "/wayfinder/Poland-2026/images/poznan/food/kawiarnia-stonewall.jpg",
+          websiteUrl: "https://grupastonewall.pl"
+        }
+      ]
+    }

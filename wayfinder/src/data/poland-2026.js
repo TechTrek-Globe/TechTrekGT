@@ -402,8 +402,8 @@ export const polandJourney = {
           location: "Oświęcim",
           locationData: "Oświęcim",
           howToGetThere: "Bus from MDA Bus Station (approx 1.5 hrs) to Oświęcim, or guided tour.",
-          pricing: "Free without guide; ~100 PLN (~$27.00 USD) for guided tour (highly recommended)",
-          costData: "Free without guide; ~100 PLN (~$27.00 USD) for guided tour (highly recommended)",
+          pricing: "Free entry without guide; ~130 PLN (~$34.00 USD) for educator guided tour (online reservation mandatory; no on-site sales)",
+          costData: "Free entry without guide; ~130 PLN (~$34.00 USD) for educator guided tour (online reservation mandatory)",
           openTimes: "8:00 AM - 3:00 PM (winter), up to 7:00 PM (summer)",
           hoursData: "8:00 AM - 3:00 PM (winter), up to 7:00 PM (summer)",
           daysClosed: "Dec 25, Jan 1, Easter Sunday"
@@ -419,8 +419,8 @@ export const polandJourney = {
           location: "Wieliczka",
           locationData: "Wieliczka",
           howToGetThere: "SKA1 Train from Kraków Główny to Wieliczka Rynek-Kopalnia (approx 20 mins).",
-          pricing: "122 PLN (~$32.00 USD) for foreign language guided tour",
-          costData: "122 PLN (~$32.00 USD) for foreign language guided tour",
+          pricing: "169 PLN (~$43.00 USD) for standard foreign language guided tour",
+          costData: "169 PLN (~$43.00 USD) for standard foreign language guided tour",
           openTimes: "8:30 AM - 5:00 PM",
           hoursData: "8:30 AM - 5:00 PM",
           daysClosed: "Dec 24-25, Jan 1, Easter Sunday"

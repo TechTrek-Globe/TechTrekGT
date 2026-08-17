@@ -1,0 +1,72 @@
+{
+  "urls": {
+    "https://muzeum.torun.pl/ratusz-staromiejski/": 200,
+    "https://muzeumpiernika.pl/en/": 200,
+    "https://muzeum.torun.pl/dom-mikolaja-kopernika/": 200,
+    "https://krzywawieza.torun.pl/": "fetch failed",
+    "https://zamek.torun.pl/": "fetch failed",
+    "https://katedratorun.pl/": 200,
+    "https://spichrz.pl": 403,
+    "https://manekin.pl": 200,
+    "https://podaniolem.torun.pl": "fetch failed",
+    "https://pierogarniastarytorun.pl": "fetch failed",
+    "https://szerokano9.pl": "fetch failed",
+    "https://browar-olbracht.pl": 200,
+    "https://lenkiewicz.net": 200
+  },
+  "places": {
+    "torun-rynek-staromiejski": {
+      "error": "Not found"
+    },
+    "torun-rynek-nowomiejski": {
+      "error": "Not found"
+    },
+    "torun-ratusz-staromiejski": {
+      "error": "Not found"
+    },
+    "torun-muzeum-piernika": {
+      "error": "Not found"
+    },
+    "torun-dom-kopernika": {
+      "error": "Not found"
+    },
+    "torun-krzywa-wieza": {
+      "error": "Not found"
+    },
+    "torun-zamek-krzyzacki": {
+      "error": "Not found"
+    },
+    "torun-katedra-sw-jana": {
+      "error": "Not found"
+    },
+    "karczma-spichrz": {
+      "error": "Not found"
+    },
+    "manekin-torun": {
+      "error": "Not found"
+    },
+    "restauracja-pod-aniolem": {
+      "error": "Not found"
+    },
+    "pierogarnia-stary-torun": {
+      "error": "Not found"
+    },
+    "szeroka-no-9": {
+      "error": "Not found"
+    },
+    "jan-olbracht-browar-staromiejski": {
+      "error": "Not found"
+    },
+    "kawiarnia-lenkiewicz": {
+      "error": "Not found"
+    }
+  },
+  "distance": {
+    "transit": {
+      "error": "Cannot read properties of undefined (reading 'elements')"
+    },
+    "walking": {
+      "error": "Cannot read properties of undefined (reading 'elements')"
+    }
+  }
+}

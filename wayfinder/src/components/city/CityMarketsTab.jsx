@@ -29,7 +29,14 @@ export function CityMarketsTab({
 
         {/* Compact Embedded 4K Walking Tour Mini-Player */}
         {(() => {
-          const videoId = city.id === 'krakow' ? 'DUFYxovB_80' : (city.id === 'wroclaw' ? 'lZfJ3H5kL50' : null);
+          const videoMap = {
+            krakow: 'DUFYxovB_80',
+            wroclaw: 'iHzCbzTy-Ls',
+            poznan: 'nfsgZAHUb-0',
+            gdansk: 'MUc89IVdL-k',
+            torun: 'Tl5wCHrFNRk'
+          };
+          const videoId = videoMap[city.id] || null;
           if (!videoId) return null;
           return (
             <div className="w-44 sm:w-48 md:w-52 shrink-0 rounded-xl overflow-hidden border border-amber-500/30 bg-slate-950 shadow-lg shadow-amber-950/30 group">

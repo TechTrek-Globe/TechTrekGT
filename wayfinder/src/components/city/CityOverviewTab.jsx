@@ -128,8 +128,36 @@ export function CityOverviewTab({ city, baseUrl, handleSubPageTabClick, mapUrl, 
         )}
       </div>
 
+      {/* Day Trip Guide Section */}
+      {city.dayTripGuide && (
+        <section className="space-y-6 pt-4">
+          <div className="flex items-center space-x-3 mb-2">
+            <Compass className="w-7 h-7 text-emerald-400" />
+            <h2 className="text-2xl sm:text-3xl font-black text-white">{city.dayTripGuide.title}</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {city.dayTripGuide.steps.map((step, idx) => (
+              <div key={idx} className="glass-panel p-5 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 relative overflow-hidden group hover:border-emerald-500/40 transition-all">
+                <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
+                  <span className="text-7xl font-black text-emerald-500">{step.step}</span>
+                </div>
+                <div className="flex items-start space-x-4 relative z-10">
+                  <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0 mt-0.5 border border-emerald-500/30">
+                    <span className="text-emerald-400 font-bold">{step.step}</span>
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-bold text-white mb-1.5">{step.title}</h4>
+                    <p className="text-sm text-wf-cream leading-relaxed"><FormatText text={step.description} /></p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Transit & Interactive City Map */}
-      <section className="space-y-6">
+      <section className="space-y-6 pt-4 border-t border-white/10">
         <h2 className="text-3xl font-black text-white flex items-center space-x-3">
           <Map className="w-7 h-7 text-wf-blue-lt" />
           <span>City Map & Transit Guide</span>

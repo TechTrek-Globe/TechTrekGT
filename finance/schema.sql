@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS bills (
   due_months TEXT NOT NULL DEFAULT '[1,2,3,4,5,6,7,8,9,10,11,12]',
   payment_source TEXT NOT NULL DEFAULT 'Auto Pay',
   notes TEXT,
+  matching_key TEXT DEFAULT '',
   is_archived INTEGER NOT NULL DEFAULT 0,
   FOREIGN KEY (household_id) REFERENCES households(id) ON DELETE CASCADE,
   FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE

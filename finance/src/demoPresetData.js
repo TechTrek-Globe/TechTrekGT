@@ -85,6 +85,7 @@ export const fakeDemoBudgetData = {
       dueDay: 1,
       paymentSource: 'Auto Pay',
       notes: 'Downtown loft 2BR lease',
+      matchingKey: 'APARTMENT RENT, LOFT 2BR, RENT PAYMENT',
       splits: {
         'person-demo-1': 50,
         'person-demo-2': 50
@@ -99,6 +100,7 @@ export const fakeDemoBudgetData = {
       dueDay: 12,
       paymentSource: 'Auto Pay',
       notes: 'City power grid utility bill',
+      matchingKey: 'METRO ELECTRIC, GA POWER, POWER BILL',
       splits: {
         'person-demo-1': 50,
         'person-demo-2': 50
@@ -113,6 +115,7 @@ export const fakeDemoBudgetData = {
       dueDay: 18,
       paymentSource: 'Credit Card',
       notes: 'High-speed 1Gbps fiber broadband',
+      matchingKey: 'FIBER GIGABIT, COMCAST, XFINITY',
       splits: {
         'person-demo-1': 50,
         'person-demo-2': 50
@@ -127,6 +130,7 @@ export const fakeDemoBudgetData = {
       dueDay: 5,
       paymentSource: 'Credit Card',
       notes: 'Estimated monthly shared food budget',
+      matchingKey: 'WHOLE FOODS, GROCERY',
       splits: {
         'person-demo-1': 50,
         'person-demo-2': 50
@@ -141,6 +145,7 @@ export const fakeDemoBudgetData = {
       dueDay: 22,
       paymentSource: 'Credit Card',
       notes: 'Shared family entertainment pass',
+      matchingKey: 'STREAMMAX, YOUTUBE, SPOTIFY',
       splits: {
         'person-demo-1': 50,
         'person-demo-2': 50
@@ -155,6 +160,7 @@ export const fakeDemoBudgetData = {
       dueDay: 15,
       paymentSource: 'Auto Pay',
       notes: 'Taylor direct vehicle financing',
+      matchingKey: 'TESLA LEASE, TESLA FINANCE',
       splits: {
         'person-demo-1': 0,
         'person-demo-2': 100
@@ -170,6 +176,7 @@ export const fakeDemoBudgetData = {
       dueMonths: [3, 9],
       paymentSource: 'Auto Pay',
       notes: 'Bi-annual vehicle coverage (March & September)',
+      matchingKey: 'PROGRESSIVE, AUTO INSURANCE, GEICO',
       splits: {
         'person-demo-1': 50,
         'person-demo-2': 50
@@ -185,6 +192,7 @@ export const fakeDemoBudgetData = {
       dueMonths: [11],
       paymentSource: 'Credit Card',
       notes: 'Annual membership renewal (November)',
+      matchingKey: 'AMAZON PRIME, CLOUD VAULT',
       splits: {
         'person-demo-1': 50,
         'person-demo-2': 50

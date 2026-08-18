@@ -159,7 +159,7 @@ export function SettingsView({ onNavigateView }) {
   const [isAddBillModalOpen, setIsAddBillModalOpen] = useState(false);
   const [newAccForm, setNewAccForm] = useState({ name: '', type: 'checking', saveExtraMonthly: 0, enableExtraSavings: true, color: 'blue', notes: '' });
   const [newPersonForm, setNewPersonForm] = useState({ name: '', role: 'Member', payFrequency: 'bi-weekly', grossPerPay: 0, netPerPay: 0, payDay1: 15, payDay2: 'last', payOffsetDays: 0 });
-  const [newBillForm, setNewBillForm] = useState({ name: '', amount: 0, period: 'Monthly', accountId: budget.accounts[0]?.id || '', dueDay: 1, dueMonths: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], paymentSource: 'Auto Pay', notes: '' });
+  const [newBillForm, setNewBillForm] = useState({ name: '', amount: 0, period: 'Monthly', accountId: budget.accounts[0]?.id || '', dueDay: 1, dueMonths: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], paymentSource: 'Auto Pay', matchingKey: '', notes: '' });
 
   // Account creation spreadsheet import state
   const [accImportPayload, setAccImportPayload] = useState(null);
@@ -982,6 +982,14 @@ export function SettingsView({ onNavigateView }) {
                                       value={bill.name}
                                       onChange={e => updateBill(bill.id, { name: e.target.value })}
                                       className="bg-transparent border-b border-transparent hover:border-slate-700 focus:border-emerald-500 focus:outline-none w-full truncate text-xs"
+                                    />
+                                    <input
+                                      type="text"
+                                      placeholder="Match key (e.g. GA POWER, COMCAST)"
+                                      value={bill.matchingKey || ''}
+                                      onChange={e => updateBill(bill.id, { matchingKey: e.target.value })}
+                                      className="bg-transparent text-[10px] text-blue-400 placeholder:text-slate-600 border-b border-transparent hover:border-slate-700 focus:border-blue-500 focus:outline-none w-full truncate font-mono mt-0.5"
+                                      title="Bank Document Matching Key for reconciliation"
                                     />
                                   </td>
                                   <td className="px-2 py-1.5 font-mono">
@@ -1907,7 +1915,7 @@ export function SettingsView({ onNavigateView }) {
                       e.preventDefault();
                       if (!newBillForm.name) return;
                       addBill(newBillForm);
-                      setNewBillForm({ name: '', amount: 0, period: 'Monthly', accountId: budget.accounts[0]?.id || '', dueDay: 1, paymentSource: 'Auto Pay', notes: '' });
+                      setNewBillForm({ name: '', amount: 0, period: 'Monthly', accountId: budget.accounts[0]?.id || '', dueDay: 1, dueMonths: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], paymentSource: 'Auto Pay', matchingKey: '', notes: '' });
                       setIsAddBillModalOpen(false);
                     }} className="space-y-4 pb-12">
                       <div>
@@ -2018,6 +2026,18 @@ export function SettingsView({ onNavigateView }) {
                             className="w-full justify-between px-3 py-2 bg-slate-950 rounded-xl"
                           />
                         </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1">Bank Document Matching Key</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. GEORGIA POWER, COMCAST, PROGRESSIVE (comma-separated)"
+                          value={newBillForm.matchingKey || ''}
+                          onChange={e => setNewBillForm({ ...newBillForm, matchingKey: e.target.value })}
+                          className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-100 font-mono text-xs focus:outline-none focus:border-emerald-500"
+                        />
+                        <p className="text-[10px] text-slate-500 mt-1">Automatic account reconciliation key used to match bank statement rows</p>
                       </div>
 
                       <div>

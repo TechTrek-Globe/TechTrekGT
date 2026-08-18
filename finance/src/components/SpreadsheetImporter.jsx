@@ -390,7 +390,7 @@ export function SpreadsheetImporter({
       icon: Receipt,
       color: 'blue',
       records: parsedPayload?.bills || [],
-      previewCols: ['name', 'amount', 'period', 'accountId', 'splits'],
+      previewCols: ['name', 'amount', 'matchingKey', 'period', 'accountId', 'splits'],
       description: 'Recurring bill schedules and payment allocations.',
     },
     {

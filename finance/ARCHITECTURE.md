@@ -56,6 +56,7 @@ interface Bill {
   dueDay: number;
   dueMonths?: number[];
   paymentSource: string;
+  matchingKey?: string;  // Bank document matching key for automated reconciliation
   notes: string;
   splits: Record<string, number>; // personId -> split percentage
 }

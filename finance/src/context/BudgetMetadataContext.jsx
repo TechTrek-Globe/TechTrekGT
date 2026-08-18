@@ -241,6 +241,7 @@ export function BudgetMetadataProvider({ children }) {
         dueMonths: defaultDueMonths,
         paymentSource: billData.paymentSource || 'Auto Pay',
         notes: billData.notes || '',
+        matchingKey: billData.matchingKey || billData.matching_key || '',
         splits: billData.splits || initialSplits
       };
 

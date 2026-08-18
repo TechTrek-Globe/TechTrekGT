@@ -80,6 +80,7 @@ export function MainBudgetView({ onNavigateView }) {
                     ))}
                     <th className="p-3.5 text-center">Due Day</th>
                     <th className="p-3.5">Payment Notes</th>
+                    <th className="p-3.5">Bank Match Key</th>
                     <th className="p-3.5">Notes</th>
                   </tr>
                 </thead>
@@ -157,6 +158,18 @@ export function MainBudgetView({ onNavigateView }) {
                           />
                         </td>
 
+                        {/* Bank Match Key - inline editable */}
+                        <td className="p-3.5 text-slate-300 text-xs">
+                          <InlineEdit
+                            value={bill.matchingKey || ''}
+                            type="text"
+                            onCommit={(/** @type {string} */ v) => updateBill(bill.id, { matchingKey: v })}
+                            className="text-slate-300 text-xs"
+                            placeholder="e.g. GA POWER, COMCAST"
+                            displayFn={(/** @type {string} */ v) => v ? <span className="px-1.5 py-0.5 rounded bg-blue-950/70 border border-blue-800/50 text-blue-300 font-mono text-[10px]">{v}</span> : <span className="text-slate-600 italic">—</span>}
+                          />
+                        </td>
+
                         {/* Notes */}
                         <td className="p-3.5 text-slate-500 italic max-w-xs truncate text-xs">
                           <InlineEdit
@@ -182,7 +195,7 @@ export function MainBudgetView({ onNavigateView }) {
                         <td key={p.id} className="p-3.5 text-right font-mono text-purple-300">${pTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                       );
                     })}
-                    <td colSpan={3} />
+                    <td colSpan={4} />
                   </tr>
                 </tfoot>
               </table>

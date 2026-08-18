@@ -1,4 +1,4 @@
-import { normalizeIsoDate } from './importer.js';
+import { normalizeIsoDate, mergeBills, mergeTransactions } from './importer.js';
 
 /**
  * Pure utility function to reconcile and apply selective spreadsheet/CSV imports.
@@ -133,12 +133,8 @@ export function processSpreadsheetImport({
       nextBills = data.bills;
       metadataChanged = true;
     } else {
-      const existingNames = new Set(nextBills.map(b => (b.name || '').toLowerCase().trim()));
-      const toAdd = data.bills.filter(b => !existingNames.has((b.name || '').toLowerCase().trim()));
-      if (toAdd.length > 0) {
-        nextBills = [...nextBills, ...toAdd];
-        metadataChanged = true;
-      }
+      nextBills = mergeBills(nextBills, data.bills);
+      metadataChanged = true;
     }
   }
 
@@ -153,13 +149,8 @@ export function processSpreadsheetImport({
       nextTransactions = stampedTransactions;
       transactionsChanged = true;
     } else {
-      const key = t => `${t.accountId || ''}|${t.date}|${(t.description || '').toLowerCase()}|${t.amount}`;
-      const existingKeys = new Set(nextTransactions.map(key));
-      const toAdd = stampedTransactions.filter(t => !existingKeys.has(key(t)));
-      if (toAdd.length > 0) {
-        nextTransactions = [...nextTransactions, ...toAdd];
-        transactionsChanged = true;
-      }
+      nextTransactions = mergeTransactions(nextTransactions, stampedTransactions);
+      transactionsChanged = true;
     }
   }
 
@@ -183,6 +174,7 @@ export function processSpreadsheetImport({
       const monthKey = `${parts[0]}-${parts[1]}`;
       const accountId = txn.accountId || data.targetAccountId || (nextAccounts[0]?.id || '');
       const descLower = (txn.description || '').toLowerCase();
+      const notesLower = (txn.notes || '').toLowerCase();
 
       if (isCredit) {
         // Check earner deposit match
@@ -217,12 +209,37 @@ export function processSpreadsheetImport({
           const otherDescKey = `${accountId}_${monthKey}_${actualDay}_other_desc`;
           const existingOther = matrixUpdates[otherKey] ?? nextDailyMatrix[otherKey] ?? 0;
           matrixUpdates[otherKey] = Math.round((existingOther - actualAmount) * 100) / 100;
-          matrixUpdates[otherDescKey] = txn.description;
+
+          const existingOtherDesc = matrixUpdates[otherDescKey] ?? nextDailyMatrix[otherDescKey] ?? '';
+          if (existingOtherDesc && txn.description && !existingOtherDesc.includes(txn.description)) {
+            matrixUpdates[otherDescKey] = `${existingOtherDesc} | ${txn.description}`;
+          } else {
+            matrixUpdates[otherDescKey] = existingOtherDesc || txn.description;
+          }
         }
       } else {
         // Debit / Expense: resolve bill
         let resolvedBillId = txn.billId;
-        if (!resolvedBillId && txn.description) {
+
+        // 1. Match by Bank Document Matching Key (Highest priority)
+        if (!resolvedBillId && (descLower || notesLower)) {
+          const matchedByKey = nextBills.find(b => {
+            if (b.accountId && accountId && b.accountId !== accountId) return false;
+            if (!b.matchingKey || !b.matchingKey.trim()) return false;
+            const keys = String(b.matchingKey).split(/[,;/|]+/).map(k => k.trim().toLowerCase()).filter(Boolean);
+            return keys.some(k => (
+              (descLower && descLower.includes(k)) ||
+              (descLower && k.length >= 3 && k.includes(descLower)) ||
+              (notesLower && notesLower.includes(k))
+            ));
+          });
+          if (matchedByKey) {
+            resolvedBillId = matchedByKey.id;
+          }
+        }
+
+        // 2. Secondary match: Heuristic name and synonym matches
+        if (!resolvedBillId && descLower) {
           const matched = nextBills.find(b => {
             if (b.accountId && accountId && b.accountId !== accountId) return false;
             const bName = (b.name || '').toLowerCase();
@@ -261,7 +278,13 @@ export function processSpreadsheetImport({
           const otherDescKey = `${accountId}_${monthKey}_${actualDay}_other_desc`;
           const existingOther = matrixUpdates[otherKey] ?? nextDailyMatrix[otherKey] ?? 0;
           matrixUpdates[otherKey] = Math.round((existingOther + actualAmount) * 100) / 100;
-          matrixUpdates[otherDescKey] = txn.description;
+
+          const existingOtherDesc = matrixUpdates[otherDescKey] ?? nextDailyMatrix[otherDescKey] ?? '';
+          if (existingOtherDesc && txn.description && !existingOtherDesc.includes(txn.description)) {
+            matrixUpdates[otherDescKey] = `${existingOtherDesc} | ${txn.description}`;
+          } else {
+            matrixUpdates[otherDescKey] = existingOtherDesc || txn.description;
+          }
         }
       }
     });
@@ -300,9 +323,14 @@ export function processSpreadsheetImport({
       Object.assign(next, matrixUpdates);
 
       matrixNoteShifts.forEach(({ projNoteKey, actualNoteKey }) => {
-        const existingNote = nextDailyMatrix[projNoteKey];
-        if (existingNote) {
-          if (!next[actualNoteKey]) next[actualNoteKey] = existingNote;
+        const existingProjNote = nextDailyMatrix[projNoteKey];
+        const existingActualNote = next[actualNoteKey] || nextDailyMatrix[actualNoteKey] || '';
+        if (existingProjNote) {
+          if (!existingActualNote) {
+            next[actualNoteKey] = existingProjNote;
+          } else if (!existingActualNote.includes(existingProjNote)) {
+            next[actualNoteKey] = `${existingActualNote} | ${existingProjNote}`;
+          }
           next[projNoteKey] = '';
         }
       });

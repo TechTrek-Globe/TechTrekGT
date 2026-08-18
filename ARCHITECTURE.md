@@ -247,6 +247,7 @@ export function useBudget() {
 - **Custom hooks** for async data: `wayfinder/src/hooks/useExchangeRate.js`.
 - **Cloud sync** (finance): `SYNC_UNLOCK_CODE` passcode guard protects `/api/sync/backup` and `/api/sync/restore`.
 - **Batch import** (outpost): `/api/import/batch` for Excel/CSV payloads.
+- **Spreadsheet reconciliation** (finance): Row-by-row merge engine with comment matching and automated account reconciliation via `matching_key` / bank document matching keys on `bills`.
 
 ---
 

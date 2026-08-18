@@ -188,9 +188,10 @@ export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
             const targetAccName = accCell || currentAccountName;
             const accountId = getOrCreateAccount(targetAccName);
 
-            // Payment Source & Notes
+            // Payment Source & Notes & Matching Key
             const paymentSource = row[8] || row[7] || row[9] || 'Auto Pay';
             const notes = row[9] || row[10] || '';
+            const matchingKey = cleanText(row[10] || row[11] || billName);
 
             const defaultDueMonths = periodStr === 'Annual' ? [1] : periodStr === 'Semi-Annual' ? [1, 7] : periodStr === 'Quarterly' ? [1, 4, 7, 10] : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
@@ -206,6 +207,7 @@ export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
                 dueDay: Math.max(1, Math.min(31, dueDay)),
                 dueMonths: defaultDueMonths,
                 paymentSource,
+                matchingKey: matchingKey || billName,
                 notes,
                 splits: {
                   [defaultJonId]: 50,
@@ -322,42 +324,63 @@ export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
 
                 // Match to existing bill if debit
                 let billId = null;
-                const matchedBill = billsList.find(b => {
-                  const bName = b.name.toLowerCase();
-                  return bName.includes(lowerH) || lowerH.includes(bName) ||
-                    (lowerH.includes('cell') && bName.includes('cell')) ||
-                    (lowerH.includes('gym') && bName.includes('gym')) ||
-                    (lowerH.includes('insurance') && bName.includes('insurance')) ||
-                    (lowerH.includes('hoa') && bName.includes('hoa')) ||
-                    (lowerH.includes('mortgage') && bName.includes('mortgage')) ||
-                    (lowerH.includes('water') && bName.includes('water')) ||
-                    (lowerH.includes('power') && bName.includes('power')) ||
-                    (lowerH.includes('gas') && bName.includes('gas')) ||
-                    (lowerH.includes('comcast') && bName.includes('comcast')) ||
-                    (lowerH.includes('youtube') && bName.includes('youtube'));
+
+                // 1. Primary matchingKey check on billsList
+                const matchedByKey = billsList.find(b => {
+                  if (!b.matchingKey) return false;
+                  const keys = String(b.matchingKey).split(/[,;/|]+/).map(k => k.trim().toLowerCase()).filter(Boolean);
+                  return keys.some(k => lowerH.includes(k) || (k.length >= 3 && k.includes(lowerH)) || (otherDesc && otherDesc.toLowerCase().includes(k)));
                 });
 
-                if (matchedBill) {
-                  billId = matchedBill.id;
+                if (matchedByKey) {
+                  billId = matchedByKey.id;
                 } else {
-                  // Secondary match: cross-reference existing app bills (handles month-only ledger sheets
-                  // where billsList is empty because no budget sheet was included in the import)
-                  const existingMatch = existingBills.find(b => {
+                  const matchedBill = billsList.find(b => {
                     const bName = b.name.toLowerCase();
                     return bName.includes(lowerH) || lowerH.includes(bName) ||
-                      (lowerH.includes('water') && bName.includes('water')) ||
-                      (lowerH.includes('power') && bName.includes('power')) ||
-                      (lowerH.includes('gas') && bName.includes('gas')) ||
-                      (lowerH.includes('electric') && bName.includes('electric')) ||
                       (lowerH.includes('cell') && bName.includes('cell')) ||
                       (lowerH.includes('gym') && bName.includes('gym')) ||
                       (lowerH.includes('insurance') && bName.includes('insurance')) ||
                       (lowerH.includes('hoa') && bName.includes('hoa')) ||
                       (lowerH.includes('mortgage') && bName.includes('mortgage')) ||
+                      (lowerH.includes('water') && bName.includes('water')) ||
+                      (lowerH.includes('power') && bName.includes('power')) ||
+                      (lowerH.includes('gas') && bName.includes('gas')) ||
                       (lowerH.includes('comcast') && bName.includes('comcast')) ||
                       (lowerH.includes('youtube') && bName.includes('youtube'));
                   });
-                  if (existingMatch) billId = existingMatch.id;
+
+                  if (matchedBill) {
+                    billId = matchedBill.id;
+                  } else {
+                    // Secondary match: cross-reference existing app bills by matchingKey first, then name
+                    const existingKeyMatch = existingBills.find(b => {
+                      if (!b.matchingKey) return false;
+                      const keys = String(b.matchingKey).split(/[,;/|]+/).map(k => k.trim().toLowerCase()).filter(Boolean);
+                      return keys.some(k => lowerH.includes(k) || (k.length >= 3 && k.includes(lowerH)) || (otherDesc && otherDesc.toLowerCase().includes(k)));
+                    });
+
+                    if (existingKeyMatch) {
+                      billId = existingKeyMatch.id;
+                    } else {
+                      const existingMatch = existingBills.find(b => {
+                        const bName = b.name.toLowerCase();
+                        return bName.includes(lowerH) || lowerH.includes(bName) ||
+                          (lowerH.includes('water') && bName.includes('water')) ||
+                          (lowerH.includes('power') && bName.includes('power')) ||
+                          (lowerH.includes('gas') && bName.includes('gas')) ||
+                          (lowerH.includes('electric') && bName.includes('electric')) ||
+                          (lowerH.includes('cell') && bName.includes('cell')) ||
+                          (lowerH.includes('gym') && bName.includes('gym')) ||
+                          (lowerH.includes('insurance') && bName.includes('insurance')) ||
+                          (lowerH.includes('hoa') && bName.includes('hoa')) ||
+                          (lowerH.includes('mortgage') && bName.includes('mortgage')) ||
+                          (lowerH.includes('comcast') && bName.includes('comcast')) ||
+                          (lowerH.includes('youtube') && bName.includes('youtube'));
+                      });
+                      if (existingMatch) billId = existingMatch.id;
+                    }
+                  }
                 }
 
                 const isCredit = lowerH.includes('credit') || lowerH.includes('deposit') || lowerH.includes('income');

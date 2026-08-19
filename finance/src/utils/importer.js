@@ -552,3 +552,123 @@ export function mergePeople(existing, incoming) {
   const existingNames = new Set(existing.map(p => p.name.toLowerCase()));
   return [...existing, ...incoming.filter(p => !existingNames.has(p.name.toLowerCase()))];
 }
+
+/**
+ * Detects if a sheet's first row is an extra grouping/category row
+ * (e.g. ",,,,Credits,,,,Outgoing Payments (Debits),,,,,,,,,,")
+ * and row 1 is the actual column header row ("Date, Total Beg Balance, ...").
+ * @param {any[][]} rawRows
+ * @returns {{ hasExtraHeader: boolean, suggestedHeaderIdx: number, confidence: string, reason: string }}
+ */
+export function detectExtraHeaderRow(rawRows = []) {
+  if (!rawRows || rawRows.length < 2) {
+    return { hasExtraHeader: false, suggestedHeaderIdx: 0, confidence: 'low', reason: 'Too few rows' };
+  }
+
+  const row0 = (rawRows[0] || []).map(c => String(c || '').trim());
+  const row1 = (rawRows[1] || []).map(c => String(c || '').trim());
+
+  const row0Joined = row0.join(' ').toLowerCase();
+  const row1Joined = row1.join(' ').toLowerCase();
+
+  // Check for grouping keywords in row0
+  const groupingKeywords = ['credit', 'outgoing', 'debit', 'payment', 'expense', 'income', 'category', 'transfer'];
+  const hasGroupingWords = groupingKeywords.some(k => row0Joined.includes(k));
+
+  // Check if row0 has many empty leading/sparse cells
+  const row0NonEmptyCount = row0.filter(Boolean).length;
+  const row1NonEmptyCount = row1.filter(Boolean).length;
+
+  // Check if row1 has 'date', 'balance', 'total', etc.
+  const hasDateInRow1 = row1.some(c => c.toLowerCase().includes('date'));
+  const hasDateInRow0 = row0.some(c => c.toLowerCase().includes('date'));
+
+  if (!hasDateInRow0 && hasDateInRow1) {
+    return {
+      hasExtraHeader: true,
+      suggestedHeaderIdx: 1,
+      confidence: 'high',
+      reason: `Row 1 contains grouping headers (${row0.filter(Boolean).slice(0, 3).join(', ') || 'categories'}) while Row 2 contains column headers ("${row1.filter(Boolean).slice(0, 3).join(', ')}")`
+    };
+  }
+
+  if (hasGroupingWords && row1NonEmptyCount > row0NonEmptyCount * 1.3) {
+    return {
+      hasExtraHeader: true,
+      suggestedHeaderIdx: 1,
+      confidence: 'high',
+      reason: `Row 1 contains sparse category groupings, Row 2 contains ${row1NonEmptyCount} column names`
+    };
+  }
+
+  return {
+    hasExtraHeader: false,
+    suggestedHeaderIdx: 0,
+    confidence: 'medium',
+    reason: 'Row 1 appears to be the primary column header row'
+  };
+}
+
+/**
+ * Inspects all sheets in a workbook array buffer, extracting metadata, previews, and header detection.
+ * @param {ArrayBuffer} arrayBuffer
+ * @param {string} fileName
+ * @param {object[]} existingAccounts
+ * @returns {{ isWorkbook: boolean, sheetNames: string[], sheetsInfo: object[] }}
+ */
+export function inspectWorkbookSheets(arrayBuffer, fileName = '', existingAccounts = []) {
+  const workbook = XLSX.read(arrayBuffer, { type: 'array', raw: true, cellDates: false });
+  const sheetNames = workbook.SheetNames || [];
+
+  const sheetsInfo = sheetNames.map(name => {
+    const sheet = workbook.Sheets[name];
+    const rawRows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+    const rowCount = rawRows.length;
+    const previewRows = rawRows.slice(0, 5);
+
+    const headerDetection = detectExtraHeaderRow(previewRows);
+
+    // Suggest a matching existing account with priority for specific account keywords
+    const lowerName = name.toLowerCase();
+    const lowerFileName = (fileName || '').toLowerCase();
+    
+    let matchedAccount = existingAccounts.find(acc => {
+      const accNorm = acc.name.toLowerCase();
+      if (accNorm.includes(lowerName) || lowerName.includes(accNorm)) return true;
+      if (lowerName.includes('mortgage') && accNorm.includes('mortgage')) return true;
+      if (lowerName.includes('hoa') && accNorm.includes('hoa')) return true;
+      if (lowerName.includes('bills') && accNorm.includes('bills')) return true;
+      return false;
+    });
+
+    if (!matchedAccount) {
+      matchedAccount = existingAccounts.find(acc => {
+        const accNorm = acc.name.toLowerCase();
+        if (lowerName.includes('checking') && accNorm.includes('checking')) return true;
+        if (lowerName.includes('sav') && accNorm.includes('sav')) return true;
+        if (lowerFileName.includes('mortgage') && accNorm.includes('mortgage')) return true;
+        if (lowerFileName.includes('hoa') && accNorm.includes('hoa')) return true;
+        return false;
+      });
+    }
+
+    return {
+      name,
+      rowCount,
+      previewRows,
+      rawRows,
+      hasExtraHeader: headerDetection.hasExtraHeader,
+      suggestedHeaderIdx: headerDetection.suggestedHeaderIdx,
+      detectionReason: headerDetection.reason,
+      suggestedAccountId: matchedAccount ? matchedAccount.id : (existingAccounts[0]?.id || ''),
+      suggestedAccountName: matchedAccount ? matchedAccount.name : (existingAccounts[0]?.name || name),
+    };
+  });
+
+  return {
+    isWorkbook: sheetNames.length > 1,
+    sheetNames,
+    sheetsInfo
+  };
+}
+

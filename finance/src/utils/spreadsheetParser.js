@@ -519,3 +519,227 @@ export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
     };
   }
 }
+
+/**
+ * Parses a single sheet's raw rows with a specific header row index and target account.
+ * @param {object} params
+ * @param {any[][]} params.rawRows
+ * @param {string} params.sheetName
+ * @param {number} params.headerRowIdx
+ * @param {string} params.targetAccountId
+ * @param {string} params.targetAccountName
+ * @param {object[]} params.existingBills
+ * @param {object[]} params.existingPeople
+ * @returns {{ transactions: object[], importedLedgerRows: object, discoveredBills: object[], discoveredPeople: object[] }}
+ */
+export function parseSingleSheet({
+  rawRows = [],
+  sheetName = 'Sheet',
+  headerRowIdx = 0,
+  targetAccountId = '',
+  targetAccountName = '',
+  existingBills = [],
+  existingPeople = []
+}) {
+  if (!rawRows || rawRows.length <= headerRowIdx) {
+    return { transactions: [], importedLedgerRows: {}, discoveredBills: [], discoveredPeople: [] };
+  }
+
+  const rawHeaders = rawRows[headerRowIdx] || [];
+  const headers = rawHeaders.map(h => cleanText(h));
+  const dateColIdx = headers.findIndex(h => h.toLowerCase().includes('date'));
+  const otherDescIdx = headers.findIndex(h => h.toLowerCase().includes('other desc') || h.toLowerCase().includes('other expl'));
+
+  if (dateColIdx < 0) {
+    logWarn('PARSER', `No date column found at header row ${headerRowIdx} in sheet "${sheetName}"`);
+    return { transactions: [], importedLedgerRows: {}, discoveredBills: [], discoveredPeople: [] };
+  }
+
+  const balanceRegex = /\b(beg|beginning|end|ending|balance|subtotal|total)\b/i;
+
+  const parseRowDate = (val) => {
+    if (!val) return '';
+    if (typeof val === 'number') {
+      const ssf = XLSX.SSF;
+      if (ssf && ssf.parse_date_code) {
+        const d = ssf.parse_date_code(val);
+        if (d) return `${d.y}-${String(d.m).padStart(2, '0')}-${String(d.d).padStart(2, '0')}`;
+      }
+      const date = new Date(Math.round((val - 25569) * 86400 * 1000));
+      if (!isNaN(date.getTime())) {
+        const y = date.getUTCFullYear();
+        const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+        const d = String(date.getUTCDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+      }
+    }
+    const str = String(val).trim().replace(/^["']|["']$/g, '');
+    if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(str)) {
+      const [m, d, y] = str.split('/');
+      return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    }
+    if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(str)) {
+      const [y, m, d] = str.split('-');
+      return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    }
+    return str;
+  };
+
+  // Balance column indices
+  const regBegIdx = headers.findIndex(h => h.toLowerCase().includes('regular beg') || h.toLowerCase().includes('reg beg'));
+  const extraBegIdx = headers.findIndex(h => h.toLowerCase().includes('extra beg'));
+  const totalBegIdx = headers.findIndex(h => h.toLowerCase().includes('total beg'));
+
+  const regEndIdx = headers.findIndex(h => h.toLowerCase().includes('regular end') || h.toLowerCase().includes('reg end') || h.toLowerCase().includes('regular ending'));
+  const extraEndIdx = headers.findIndex(h => h.toLowerCase().includes('extra end') || h.toLowerCase().includes('extra ending'));
+  const totalEndIdx = headers.findIndex(h => h.toLowerCase().includes('total end') || h.toLowerCase().includes('total ending') || h.toLowerCase().includes('total balance'));
+
+  const importedLedgerRows = {};
+  const transactions = [];
+  const discoveredBills = [];
+  const discoveredPeople = [];
+
+  // 1. Build importedLedgerRows map
+  for (let i = headerRowIdx + 1; i < rawRows.length; i++) {
+    const r = rawRows[i];
+    if (!r || !r[dateColIdx]) continue;
+    const dateStr = parseRowDate(r[dateColIdx]);
+    if (!dateStr || dateStr.length < 8) continue;
+
+    const rRegBeg = regBegIdx >= 0 ? cleanNum(r[regBegIdx]) : 0;
+    const rExtraBeg = extraBegIdx >= 0 ? cleanNum(r[extraBegIdx]) : 0;
+    const rTotalBeg = totalBegIdx >= 0 ? cleanNum(r[totalBegIdx]) : (rRegBeg + rExtraBeg);
+
+    const rRegEnd = regEndIdx >= 0 ? cleanNum(r[regEndIdx]) : null;
+    const rExtraEnd = extraEndIdx >= 0 ? cleanNum(r[extraEndIdx]) : 0;
+    const rTotalEnd = totalEndIdx >= 0 ? cleanNum(r[totalEndIdx]) : (rRegEnd !== null ? (rRegEnd + rExtraEnd) : null);
+
+    if (rRegEnd !== null || rTotalEnd !== null) {
+      importedLedgerRows[dateStr] = {
+        regEnding: rRegEnd !== null ? rRegEnd : (rTotalEnd - rExtraEnd),
+        extraEnding: rExtraEnd,
+        totalEnding: rTotalEnd !== null ? rTotalEnd : ((rRegEnd || 0) + rExtraEnd),
+        regBeg: rRegBeg,
+        extraBeg: rExtraBeg,
+        totalBeg: rTotalBeg
+      };
+    }
+  }
+
+  // 2. Discover Earner columns
+  headers.forEach((h) => {
+    const lowerH = h.toLowerCase();
+    if (lowerH.includes('credit') && !lowerH.includes('card')) {
+      const parts = h.split(/\s+/);
+      const name = parts[0];
+      if (name && name.length >= 2 && !['extra', 'total', 'beg', 'end', 'other'].includes(name.toLowerCase())) {
+        if (!discoveredPeople.some(p => p.name.toLowerCase() === name.toLowerCase()) && !existingPeople.some(p => p.name.toLowerCase() === name.toLowerCase())) {
+          discoveredPeople.push({
+            id: `person-${name.toLowerCase()}`,
+            name: name,
+            role: 'Member',
+            payFrequency: 'bi-weekly',
+            grossPerPay: 0,
+            netPerPay: 0
+          });
+        }
+      }
+    }
+  });
+
+  // 3. Parse Transactions from non-zero cells
+  for (let i = headerRowIdx + 1; i < rawRows.length; i++) {
+    const r = rawRows[i];
+    if (!r || r.length === 0) continue;
+
+    const rawDate = r[dateColIdx];
+    if (!rawDate) continue;
+    const dateStr = parseRowDate(rawDate);
+    if (!dateStr) continue;
+
+    headers.forEach((h, colIdx) => {
+      if (!h || colIdx === dateColIdx || colIdx === otherDescIdx) return;
+      if (balanceRegex.test(h)) return;
+
+      const val = r[colIdx];
+      const num = typeof val === 'number' ? val : parseFloat(String(val || '').replace(/[^0-9.-]+/g, ''));
+
+      if (!isNaN(num) && num !== 0) {
+        const lowerH = h.toLowerCase();
+        const otherDesc = (otherDescIdx >= 0 && r[otherDescIdx]) ? String(r[otherDescIdx]).trim() : '';
+
+        // Clean description logic: do not prefix with "Other $"
+        let desc = h;
+        if (lowerH.includes('other')) {
+          desc = otherDesc || 'Other Expense';
+        }
+
+        const isCredit = lowerH.includes('credit') || lowerH.includes('deposit') || lowerH.includes('income');
+        const txnAmount = isCredit ? Math.abs(num) : -Math.abs(num);
+
+        // Match bill
+        let billId = null;
+        if (!isCredit) {
+          const matchedBill = existingBills.find(b => {
+            const bName = b.name.toLowerCase();
+            const bKey = (b.matchingKey || '').toLowerCase();
+            return (
+              (bKey && (lowerH.includes(bKey) || bKey.includes(lowerH))) ||
+              bName.includes(lowerH) ||
+              lowerH.includes(bName)
+            );
+          });
+          if (matchedBill) {
+            billId = matchedBill.id;
+          } else if (!lowerH.includes('other') && !lowerH.includes('credit') && !RESERVED_COLS.has(lowerH)) {
+            // Discovered potential bill
+            if (!discoveredBills.some(db => db.name.toLowerCase() === h.toLowerCase())) {
+              discoveredBills.push({
+                id: `bill-${Date.now()}-${discoveredBills.length}`,
+                name: h,
+                amount: Math.abs(num),
+                period: 'Monthly',
+                dueDay: 15,
+                accountId: targetAccountId,
+                paymentSource: 'Auto Pay',
+                matchingKey: h
+              });
+            }
+          }
+        }
+
+        let category = 'Uncategorized';
+        if (isCredit) category = 'Income / Transfer';
+        else if (lowerH.includes('power') || lowerH.includes('gas') || lowerH.includes('water') || lowerH.includes('comcast') || lowerH.includes('utility') || lowerH.includes('electric')) category = 'Utilities';
+        else if (lowerH.includes('mortgage') || lowerH.includes('hoa') || lowerH.includes('rent')) category = 'Housing';
+        else if (lowerH.includes('gym') || lowerH.includes('phone') || lowerH.includes('youtube') || lowerH.includes('cell')) category = 'Subscriptions';
+        else if (lowerH.includes('insurance')) category = 'Insurance';
+
+        transactions.push({
+          id: `txn-${Date.now()}-${transactions.length}`,
+          date: dateStr,
+          description: desc,
+          amount: txnAmount,
+          accountId: targetAccountId,
+          billId,
+          category,
+          notes: otherDesc ? otherDesc : `Imported from ${sheetName}`
+        });
+      }
+    });
+  }
+
+  logDebug('PARSER', `Parsed sheet "${sheetName}": ${transactions.length} txns, ${Object.keys(importedLedgerRows).length} ledger rows`, {
+    targetAccountId,
+    headerRowIdx,
+    txnCount: transactions.length
+  });
+
+  return {
+    transactions,
+    importedLedgerRows,
+    discoveredBills,
+    discoveredPeople
+  };
+}
+

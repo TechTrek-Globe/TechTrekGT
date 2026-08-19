@@ -22,8 +22,8 @@ The flagship expedition is **Poland: Winter Christmas Markets 2026**, covering K
 +---------------------------------------+ +-----------------------------------------+
 |        Static Asset Storage           | |           Data & API Layer              |
 |  env.ASSETS (dist/client)             | |  Cloudflare D1 (personal-budget-db)     |
-|  public/Poland-2026/images/           | |  External APIs: Google Maps, Geoapify,  |
-|  (attractions, food, markets)         | |                 Foursquare, NBP         |
+|  public/Poland-2026/images/           | |  External APIs: Google Places & Maps, |
+|  (attractions, food, markets)         | |                 Geoapify, NBP         |
 +---------------------------------------+ +-----------------------------------------+
 ```
 
@@ -292,21 +292,17 @@ CREATE TABLE wayfinder_budget_allocations (...);
 
 ## 9. External API Integrations
 
-### 9.1 Google Maps API & Location Lookups
+### 9.1 Google Places & Maps API
 - **API Key Configuration**: `GOOGLE_MAPS_API_KEY` / `VITE_GOOGLE_MAPS_API_KEY` in `.dev.vars` (and Cloudflare secrets for production).
-- **Lookup Mechanism**: Dynamic search queries, Places API lookups, and directions URLs (`https://www.google.com/maps/search/?api=1&query=...` and `https://www.google.com/maps/dir/?api=1&destination=...`).
-- **Purpose**: Powers live neighborhood hotel lookups, walking routes between transit stations and market squares, and attraction navigation without maintaining static hotel commercial data.
+- **Lookup Mechanism**: Google Places API (New) (`places.googleapis.com`) for venue lookup, ratings, and curated photography; dynamic Google Maps search and directions URLs (`https://www.google.com/maps/search/?api=1&query=...` and `https://www.google.com/maps/dir/?api=1&destination=...`).
+- **Purpose**: Powers live neighborhood hotel lookups, venue details, walking routes between transit stations and market squares, and attraction navigation without maintaining static commercial directories.
 
 ### 9.2 Geoapify API (POI Generation & Geocoding)
 - **Key**: `GEOAPIFY_API_KEY` in `.dev.vars`.
 - **Purpose**: Batch geocoding and real venue coordinate verification for attractions, restaurants, and Christmas market squares.
 - **Categories Queried**: `tourism.sights`, `catering.restaurant`, `leisure`.
 
-### 9.3 Foursquare Places API (Curated Photos & Venue Details)
-- **Key**: `FOURSQUARE_API_KEY` in `.dev.vars`.
-- **Purpose**: Discovery and local ingestion of high-resolution photography for attractions, markets, and dining targets via the `/v3/places/{fsq_id}/photos` endpoint.
-
-### 9.4 National Bank of Poland (NBP) API (Live Exchange Rates)
+### 9.3 National Bank of Poland (NBP) API (Live Exchange Rates)
 - **Endpoint**: `https://api.nbp.pl/api/exchangerates/rates/a/usd/?format=json`
 - **Proxy**: Routed via `/api/wayfinder/exchange-rate` to prevent client CORS restrictions, caching exchange rate data locally for 12 hours.
 

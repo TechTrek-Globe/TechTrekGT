@@ -54,9 +54,8 @@ TechTrekGT is a multi-application platform hosted on `techtrekgt.com`. The repos
 
 | Service | Primary App | Purpose |
 |---------|-------------|---------|
-| **Google Maps API** | `wayfinder` | Live neighborhood & hotel lookup queries, destination routing, and coordinate navigation links |
+| **Google Places & Maps API** | `wayfinder` | Live venue details, ratings, photography, neighborhood & hotel lookup queries, and coordinate navigation links |
 | **Geoapify API** | `wayfinder` | Primary POI generation, geocoding, and venue coordinate verification |
-| **Foursquare Places API** | `wayfinder` | Venue discovery and curated high-resolution photography ingestion |
 | **National Bank of Poland (NBP) API** | `wayfinder` | Real-time PLN/USD and PLN/EUR exchange rates via worker proxy |
 
 ---
@@ -593,7 +592,7 @@ Each project reads local secrets from a `.dev.vars` file (git-ignored) that is l
 |---------|---------------------|---------------|
 | `finance/` | (uses local `.dev.vars`; no committed example) | `JWT_SECRET`, `SYNC_UNLOCK_CODE` |
 | `outpost/` | `.dev.vars.example` | `JWT_SECRET`, `SYNC_UNLOCK_CODE` |
-| `wayfinder/` | `.dev.vars.example` | `JWT_SECRET`, `FOURSQUARE_API_KEY`, `GEOAPIFY_API_KEY`, `GOOGLE_MAPS_API_KEY` |
+| `wayfinder/` | `.dev.vars.example` | `JWT_SECRET`, `GEOAPIFY_API_KEY`, `GOOGLE_MAPS_API_KEY` |
 | `bigworm/` | `.dev.vars.example` | `JWT_SECRET`, `GUACAMOLE_INTERNAL_URL`, `GUAC_USERNAME`, `GUAC_PASSWORD` |
 
 > Note: `finance/` has a local `.dev.vars` but no committed `.dev.vars.example`. The `outpost/.dev.vars.example` explicitly instructs copying the `JWT_SECRET` from the finance `.dev.vars` so the shared auth cookie works across both apps.

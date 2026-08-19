@@ -44,9 +44,9 @@ BEFORE writing, editing, or generating any code, data, or components:
 ---
 
 ## 5. Wayfinder Asset Management & Directory Standardization
-* **Strict Image Hierarchy:** All images for the Wayfinder application MUST be stored locally following this exact path convention: `public/Poland-2026/images/[city_name]/[category]/`. Valid categories are limited to `hotels`, `food`, `markets`, and `attractions`.
-* **Asset Sourcing via Foursquare API:** When adding or modifying a POI, verify that a local image exists. If missing, write and execute a Node.js utility script that uses the Foursquare Places API (specifically the `/photos` endpoint) to autonomously download a high-quality venue photo and save it to the strict hierarchical folder. Never leave external image URLs in the data source.
-* **Global Image Migration Mandate:** If you detect any images stored in legacy or root directories (e.g., `public/images/hotels/`), autonomously move the files to their correct city/category folders using Node.js file system commands, then update all data files and React components to reference the new paths.
+* **Strict Image Hierarchy:** All images for the Wayfinder application MUST be stored locally following this exact path convention: `public/Poland-2026/images/[city_name]/[category]/`. Valid categories are limited to `attractions`, `food`, and `markets` (commercial hotel directories are deprecated; booked hotels live in private user data).
+* **Asset Sourcing via Google Places & Geoapify:** When adding or modifying a POI, verify that a local image exists. If missing, write and execute a Node.js utility script that uses the Google Places API or Geoapify to download a high-quality venue photo and save it to the strict hierarchical folder. Never leave external image URLs in the data source.
+* **Global Image Migration Mandate:** If you detect any images stored in legacy or root directories (e.g., `public/images/`), autonomously move the files to their correct city/category folders using Node.js file system commands, then update all data files and React components to reference the new paths.
 * **Critical: Validate Data Integrity for "Things to Do" Functionality**
    Before activating the "Things to Do" feature, you MUST:
    1. **Image URL Validation:** Audit all image URLs to confirm they point to valid, local resources within the strict directory structure.
@@ -56,13 +56,13 @@ BEFORE writing, editing, or generating any code, data, or components:
 
 ---
 
-## 6. External API Integration Rules (Foursquare & Geoapify)
-* **Foursquare Places API (Primary Photos & Venue Details):**
-  - **API Keys:** The Foursquare API key is stored as `FOURSQUARE_API_KEY` in `.dev.vars`.
-  - **Fetching Data:** Pass the key via the `Authorization` header when querying `https://api.foursquare.com/v3/places/search` (for venue data) or `https://api.foursquare.com/v3/places/{fsq_id}/photos` (for images).
+## 6. External API Integration Rules (Google Places & Geoapify)
+* **Google Places & Maps API (Primary Photos, Venue Details & Navigation):**
+  - **API Keys:** The Google Maps API key is stored as `GOOGLE_MAPS_API_KEY` / `VITE_GOOGLE_MAPS_API_KEY` in `.dev.vars`.
+  - **Fetching Data:** Pass the key via headers/URL parameters when querying `https://places.googleapis.com/v1/places:searchText` (for venue data/photos) or Google Maps URL scheme for navigation.
 * **Geoapify API (Primary POI Generation & Geocoding):**
   - **API Keys:** Access the Geoapify API key via `GEOAPIFY_API_KEY` in `.dev.vars`.
-  - **Zero Hallucination POI Generation:** Whenever populating hotels, attractions, or Christmas market locations for a city (e.g., Wrocław, Poznań, Kraków):
+  - **Zero Hallucination POI Generation:** Whenever populating attractions, dining, or Christmas market locations for a city (e.g., Wrocław, Poznań, Kraków):
     1. Use Geoapify Places API (`https://api.geoapify.com/v2/places`) or Geocoding API to query real venues for the target city.
-    2. Categories to query: `accommodation.hotel`, `tourism.sights`, `catering.restaurant`, `leisure`.
+    2. Categories to query: `tourism.sights`, `catering.restaurant`, `leisure`.
     3. Save the fetched venue names, addresses, star ratings, and coordinates directly into the central data file (`wayfinder/src/data/poland-2026.js`).

@@ -17,7 +17,7 @@
 | **Backend Runtime** | Cloudflare Workers (ESM) | `src/worker.js` with Pages-Functions style handlers in `functions/api/` |
 | **Database** | Cloudflare D1 (SQLite) | Shared `personal-budget-db` with `wayfinder_*` relational schema |
 | **Auth & Security** | WebCrypto PBKDF2 / HS256 JWT | Shared SSO HttpOnly cookies (`credentials: 'include'`) |
-| **External APIs** | NBP API, Geoapify, Foursquare | Live exchange rates, geocoded venues, and curated POI photography |
+| **External APIs** | Google Maps & Places API, Geoapify API, NBP API | Live venue exploration, geocoded POIs, and live exchange rates |
 
 ---
 
@@ -114,7 +114,6 @@ copy .dev.vars.example .dev.vars
 Configure `.dev.vars` with real development secrets:
 ```ini
 JWT_SECRET=your_shared_sso_secret_here
-FOURSQUARE_API_KEY=your_foursquare_api_key_here
 GEOAPIFY_API_KEY=your_geoapify_api_key_here
 GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here
 VITE_GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here
@@ -210,7 +209,7 @@ public/Poland-2026/images/
 ```
 
 - **Resolution Utility (`src/utils/cityImages.js`)**: Maps attraction names and city identifiers directly to local assets with keyword matching fallbacks.
-- **External Image Mandate**: External image links are strictly forbidden in production datasets. All photography is downloaded and curated locally using Foursquare / Geoapify integrations.
+- **External Image Mandate**: External image links are strictly forbidden in production datasets. All photography is downloaded and curated locally using Geoapify / Google Places integrations.
 - **Google Maps Integration**: Direct Google Maps lookup queries and directions URLs are embedded for dynamic navigation and live hotel exploration.
 
 ---

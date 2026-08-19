@@ -308,6 +308,8 @@ export const polandJourney = {
       ],
       mustSee: [
 {
+          lat: 50.0619474,
+          lng: 19.9368564,
           name: "Wawel Royal Castle & Cathedral",
           title: "Wawel Royal Castle & Cathedral",
           category: "Royal Heritage",
@@ -325,6 +327,8 @@ export const polandJourney = {
           daysClosed: "Mondays (most exhibitions closed)"
         },
 {
+          lat: 50.0616547,
+          lng: 19.9394485,
           name: "St. Mary's Basilica (Kościół Mariacki)",
           title: "St. Mary's Basilica (Kościół Mariacki)",
           category: "Architecture & Tradition",
@@ -342,6 +346,8 @@ export const polandJourney = {
           daysClosed: "During mass"
         },
 {
+          lat: 50.0617012,
+          lng: 19.9373511,
           name: "Cloth Hall (Sukiennice) & Rynek Underground",
           title: "Cloth Hall (Sukiennice) & Rynek Underground",
           category: "Museums & Shopping",
@@ -359,6 +365,8 @@ export const polandJourney = {
           daysClosed: "Underground closed second Monday of month"
         },
 {
+          lat: 50.051855,
+          lng: 19.9449466,
           name: "Kazimierz (Historic Jewish Quarter)",
           title: "Kazimierz (Historic Jewish Quarter)",
           category: "Culture & Nightlife",
@@ -375,6 +383,8 @@ export const polandJourney = {
           daysClosed: "Synagogues closed on Saturdays (Shabbat) and Jewish holidays"
         },
 {
+          lat: 50.0602088,
+          lng: 19.9419072,
           name: "Planty Park & Barbican Fortress",
           title: "Planty Park & Barbican Fortress",
           category: "Scenic Walk",
@@ -392,6 +402,8 @@ export const polandJourney = {
           daysClosed: "Barbican often closed in deep winter (Dec-Mar)"
         },
 {
+          lat: 50.0357,
+          lng: 19.1783,
           name: "Auschwitz-Birkenau Memorial and Museum",
           title: "Auschwitz-Birkenau Memorial and Museum",
           category: "History & Memorial",
@@ -409,6 +421,8 @@ export const polandJourney = {
           daysClosed: "Dec 25, Jan 1, Easter Sunday"
         },
 {
+          lat: 49.985429,
+          lng: 20.0575731,
           name: "Wieliczka Salt Mine",
           title: "Wieliczka Salt Mine",
           category: "UNESCO Underground",
@@ -426,6 +440,8 @@ export const polandJourney = {
           daysClosed: "Dec 24-25, Jan 1, Easter Sunday"
         },
 {
+          lat: 50.0474554,
+          lng: 19.9617094,
           name: "Oskar Schindler's Enamel Factory",
           title: "Oskar Schindler's Enamel Factory",
           category: "WWII History",
@@ -443,6 +459,8 @@ export const polandJourney = {
           daysClosed: "First Tuesday of every month"
         },
 {
+          lat: 49.3668,
+          lng: 19.8136,
           name: "Chochołów Thermal Baths (Chochołowskie Termy)",
           title: "Chochołów Thermal Baths (Chochołowskie Termy)",
           category: "Wellness & Thermal Spa",
@@ -460,6 +478,8 @@ export const polandJourney = {
           daysClosed: "Open 365 days a year (special holiday hours apply)"
         },
 {
+          lat: 50.0619474,
+          lng: 19.9368564,
           name: "Kraków Christmas Markets & Old Town Guided Walking Tour",
           title: "Kraków Christmas Markets & Old Town Guided Walking Tour",
           category: "Top Rated Guided Tour",
@@ -478,6 +498,8 @@ export const polandJourney = {
           viatorUrl: "https://www.viator.com/searchResults/all?text=Krakow+Christmas+Market+walking+tour"
         },
 {
+          lat: 50.050269,
+          lng: 19.944256,
           name: "Kazimierz Jewish Quarter & Schindler's Factory Walking Tour",
           title: "Kazimierz Jewish Quarter & Schindler's Factory Walking Tour",
           category: "History & Culture Tour",
@@ -527,8 +549,10 @@ export const polandJourney = {
         }
       ],
       restaurantsDetailed: [
-{
+        {
           id: "morskie-oko",
+          lat: 50.0634887,
+          lng: 19.9347486,
           name: "Morskie Oko",
           category: "must-haves",
           categoryLabel: "Must-Have & Iconic",
@@ -542,8 +566,10 @@ export const polandJourney = {
           websiteUrl: "https://www.morskieoko.krakow.pl",
           imageSrc: "/wayfinder/Poland-2026/images/krakow/food/morskie-oko.jpg"
         },
-{
+        {
           id: "czarna-kaczka",
+          lat: 50.0582402,
+          lng: 19.939193,
           name: "Czarna Kaczka (The Black Duck)",
           category: "must-haves",
           categoryLabel: "Must-Have & Iconic",
@@ -559,6 +585,8 @@ export const polandJourney = {
         },
 {
           id: "stary-port",
+          lat: 50.0613266,
+          lng: 19.9318704,
           name: "Stary Port Cellar Tavern",
           category: "must-haves",
           categoryLabel: "Must-Have & Iconic",
@@ -573,6 +601,8 @@ export const polandJourney = {
         },
 {
           id: "pierogarnia-glowna",
+          lat: 50.0648662,
+          lng: 19.9388807,
           name: "Pierogarnia Główna",
           category: "local",
           categoryLabel: "Local Fares & Hand-Rolled Pierogi",
@@ -587,6 +617,8 @@ export const polandJourney = {
         },
 {
           id: "restauracja-starka",
+          lat: 50.0506546,
+          lng: 19.9443719,
           name: "Restauracja Starka",
           category: "local",
           categoryLabel: "Local Fares & Infused Vodkas",
@@ -601,6 +633,8 @@ export const polandJourney = {
         },
 {
           id: "pod-wawelem",
+          lat: 50.0551139,
+          lng: 19.9379441,
           name: "Pod Wawelem Kompania Kuflowa",
           category: "local",
           categoryLabel: "Local Fares & Beer Hall",
@@ -616,6 +650,8 @@ export const polandJourney = {
         },
 {
           id: "bottiglieria-1881",
+          lat: 50.0486583,
+          lng: 19.9460918,
           name: "Bottiglieria 1881 (2 Michelin Stars)",
           category: "expensive",
           categoryLabel: "Fine Dining & 2 Michelin Stars",
@@ -631,6 +667,8 @@ export const polandJourney = {
         },
 {
           id: "fiorentina-ristorante",
+          lat: 50.0559212,
+          lng: 19.9379707,
           name: "Fiorentina Ristorante (Michelin Bib Gourmand)",
           category: "expensive",
           categoryLabel: "Fine Dining & Michelin Bib Gourmand",
@@ -646,6 +684,8 @@ export const polandJourney = {
         },
 {
           id: "trzy-rybki",
+          lat: 50.0631806,
+          lng: 19.9365572,
           name: "Trzy Rybki (Hotel Stary)",
           category: "expensive",
           categoryLabel: "Fine Dining & Luxury Vaults",
@@ -661,6 +701,8 @@ export const polandJourney = {
         },
 {
           id: "ed-red-steakhouse",
+          lat: 50.0633007,
+          lng: 19.9373699,
           name: "Ed Red Steakhouse",
           category: "steak",
           categoryLabel: "Steakhouse & Dry-Aged Beef",
@@ -675,6 +717,8 @@ export const polandJourney = {
         },
 {
           id: "muu-muu-steakhouse",
+          lat: 50.0606117,
+          lng: 19.940345,
           name: "Moo Moo Steak & Wine",
           category: "steak",
           categoryLabel: "Steakhouse & Hot Stone Grill",
@@ -690,6 +734,8 @@ export const polandJourney = {
         },
 {
           id: "bar-mleczny-pod-temida",
+          lat: 50.05858,
+          lng: 19.9377078,
           name: "Bar Mleczny Pod Temidą",
           category: "cheap",
           categoryLabel: "Cheap Eats & Historic Milk Bar",
@@ -702,8 +748,10 @@ export const polandJourney = {
           description: "Legendary subsidized Polish Milk Bar on Grodzka street serving dirt-cheap, piping-hot traditional home cooking.",
           imageSrc: "/wayfinder/Poland-2026/images/krakow/food/bar-mleczny-pod-temida.jpg"
         },
-{
+        {
           id: "plac-nowy-zapiekanki",
+          lat: 50.0517373,
+          lng: 19.9446185,
           name: "Plac Nowy Zapiekanki (Kazimierz)",
           category: "cheap",
           categoryLabel: "Cheap Eats & Street Food",
@@ -718,6 +766,8 @@ export const polandJourney = {
         },
 {
           id: "pierogarnia-u-vincenta",
+          lat: 50.0515887,
+          lng: 19.9435425,
           name: "Pierogarnia u Vincenta",
           category: "cheap",
           categoryLabel: "Cheap Eats & Pierogi Parlor",
@@ -734,6 +784,8 @@ export const polandJourney = {
       drinksDetailed: [
 {
           id: "wodka-cafe-bar",
+          lat: 50.0612761,
+          lng: 19.9415289,
           name: "Wódka Cafe Bar",
           category: "vodka-house",
           categoryLabel: "Must-See Historic Vodka Flight House",
@@ -749,6 +801,8 @@ export const polandJourney = {
         },
 {
           id: "pijalnia-wodki",
+          lat: 50.0629774,
+          lng: 19.9387179,
           name: "Pijalnia Wódki i Piwa",
           category: "vodka-house",
           categoryLabel: "Classic 24/7 Polish Shot Bar",
@@ -764,6 +818,8 @@ export const polandJourney = {
         },
 {
           id: "singer-bar",
+          lat: 50.0512117,
+          lng: 19.9457931,
           name: "Singer Bar (Kazimierz)",
           category: "historic-bar",
           categoryLabel: "Must-See Bohemian Antique Bar",
@@ -778,6 +834,8 @@ export const polandJourney = {
         },
 {
           id: "ck-browar",
+          lat: 50.0630779,
+          lng: 19.9322126,
           name: "CK Browar (Kraków Microbrewery)",
           category: "brewery",
           categoryLabel: "Subterranean Microbrewery & Pub",
@@ -793,6 +851,8 @@ export const polandJourney = {
         },
 {
           id: "multi-qlti-tap-bar",
+          lat: 50.062896,
+          lng: 19.9344292,
           name: "Multi Qlti Tap Bar",
           category: "brewery",
           categoryLabel: "Craft Beer Taproom (20+ Taps)",
@@ -807,6 +867,8 @@ export const polandJourney = {
         },
 {
           id: "house-of-beer",
+          lat: 50.0619803,
+          lng: 19.9424591,
           name: "House of Beer Pub",
           category: "pub",
           categoryLabel: "Top Pub & Belgian Ale House",
@@ -821,6 +883,8 @@ export const polandJourney = {
         },
 {
           id: "alchemia",
+          lat: 50.052262,
+          lng: 19.9449326,
           name: "Alchemia (Kazimierz)",
           category: "pub",
           categoryLabel: "Iconic Subterranean Alchemist Bar",
@@ -836,6 +900,8 @@ export const polandJourney = {
         },
 {
           id: "nowa-prowincja",
+          lat: 50.0605592,
+          lng: 19.9362306,
           name: "Nowa Prowincja",
           category: "watering-hole",
           categoryLabel: "Literary Cellar & Mulled Wine Vault",
@@ -850,6 +916,8 @@ export const polandJourney = {
         },
 {
           id: "piwnica-pod-baranami",
+          lat: 50.061538,
+          lng: 19.935568,
           name: "Piwnica Pod Baranami",
           category: "watering-hole",
           categoryLabel: "Historic Cabaret Cellar Bar",
@@ -865,6 +933,8 @@ export const polandJourney = {
         },
 {
           id: "bierhalle-krakow",
+          lat: 50.0608386,
+          lng: 19.940442,
           name: "Bierhalle Kraków (Mały Rynek)",
           category: "beer-hall",
           categoryLabel: "Bavarian-Style Polish Beer Hall",
@@ -880,6 +950,8 @@ export const polandJourney = {
         },
 {
           id: "stara-zajezdnia",
+          lat: 50.0505867,
+          lng: 19.9469127,
           name: "Stara Zajezdnia Kraków (Kazimierz Brewery)",
           category: "beer-hall",
           categoryLabel: "Historic Tram Depot Brewery Hall",
@@ -895,6 +967,8 @@ export const polandJourney = {
         },
 {
           id: "cechowa-guild-cellar",
+          lat: 50.0619974,
+          lng: 19.9343668,
           name: "Cechowa (Historic Guild Cellar Beer Hall)",
           category: "beer-hall",
           categoryLabel: "Historic Guild Cellar Beer Hall",
@@ -909,6 +983,8 @@ export const polandJourney = {
         },
 {
           id: "u-szwejka",
+          lat: 50.0635705,
+          lng: 19.9402751,
           name: "U Szwejka (Floriańska Street)",
           category: "beer-hall",
           categoryLabel: "Classic Central European Beer Hall",
@@ -923,6 +999,8 @@ export const polandJourney = {
         },
 {
           id: "bropub-brokreacja",
+          lat: 50.0532505,
+          lng: 19.939794,
           name: "BroPub by BroKreacja (Craft Beer Cellar)",
           category: "pub",
           categoryLabel: "Underground Craft Beer Cellar",
@@ -937,6 +1015,8 @@ export const polandJourney = {
         },
 {
           id: "taverna-krowa",
+          lat: 50.0638934,
+          lng: 19.9374405,
           name: "Taverna Krowa (The Cow Cellar Pub)",
           category: "pub",
           categoryLabel: "Rustic Underground Cellar Pub",
@@ -953,6 +1033,8 @@ export const polandJourney = {
       cafesDetailed: [
 {
           id: "camelot-cafe",
+          lat: 50.0630026,
+          lng: 19.9392024,
           name: "Camelot Cafe",
           category: "coffee-breakfast",
           categoryLabel: "Historic Bohemian Breakfast & Café",
@@ -967,6 +1049,8 @@ export const polandJourney = {
         },
 {
           id: "wesola-cafe",
+          lat: 50.0667853,
+          lng: 19.9521483,
           name: "Wesoła Cafe",
           category: "coffee-breakfast",
           categoryLabel: "Specialty Coffee & All-Day Brunch Shrine",
@@ -981,6 +1065,8 @@ export const polandJourney = {
         },
 {
           id: "massolit-books-cafe",
+          lat: 50.0583913,
+          lng: 19.9296211,
           name: "Massolit Books & Cafe",
           category: "coffee-breakfast",
           categoryLabel: "Independent English Bookstore & Café",
@@ -995,6 +1081,8 @@ export const polandJourney = {
         },
 {
           id: "poranki-kazimierz",
+          lat: 50.048889,
+          lng: 19.9447879,
           name: "Poranki (Kazimierz)",
           category: "coffee-breakfast",
           categoryLabel: "Artisanal All-Day Breakfast & Bakery",
@@ -1009,6 +1097,8 @@ export const polandJourney = {
         },
 {
           id: "cafe-charlotte",
+          lat: 50.063294,
+          lng: 19.9347821,
           name: "Cafe Charlotte Chleb i Wino",
           category: "coffee-breakfast",
           categoryLabel: "French Bistro Bakery & Jam Bar",
@@ -1560,6 +1650,8 @@ export const polandJourney = {
         },
 {
           id: "wroclaw-walking-tour",
+          lat: 51.1089776,
+          lng: 17.0326689,
           name: "Wrocław Christmas Market & Dwarf Hunting Guided Tour",
           title: "Wrocław Christmas Market & Dwarf Hunting Guided Tour",
           category: "Top Rated Guided Tour",

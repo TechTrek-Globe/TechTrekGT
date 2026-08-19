@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useBudget } from '../context/BudgetContext';
-import { ReceiptText, Plus } from 'lucide-react';
+import { ReceiptText, Plus, Filter } from 'lucide-react';
 import { InlineEdit } from './InlineEdit';
 import { formatBillDueMonths } from '../utils/paydayUtils';
 
@@ -15,17 +15,23 @@ export function MainBudgetView({ onNavigateView }) {
     updateBill,
   } = useBudget();
 
+  const [selectedAccountId, setSelectedAccountId] = useState('all');
+
   const totalMonthlyExpenses = getTotalMonthlyExpenses();
 
-  return (
-    <div className="space-y-8 animate-fade-in pb-16">
+  const displayedAccounts = selectedAccountId === 'all'
+    ? budget.accounts
+    : budget.accounts.filter((/** @type {any} */ a) => a.id === selectedAccountId);
 
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+  return (
+    <div className="space-y-6 animate-fade-in pb-16">
+
+      {/* Header with Account Filter & Add Bill Button */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-slate-950/80 p-4 rounded-2xl border border-slate-800 shadow-lg backdrop-blur">
         <div>
           <h2 className="text-xl font-black text-slate-100 flex items-center gap-2">
             <ReceiptText className="w-5 h-5 text-blue-400" />
-            Bills &amp; Allocations
+            Bills
           </h2>
           <p className="text-xs text-slate-400 mt-0.5">
             Click any <span className="text-blue-400 font-medium">name</span>,{' '}
@@ -33,30 +39,52 @@ export function MainBudgetView({ onNavigateView }) {
             <span className="text-blue-400 font-medium">due day</span> to edit inline
           </p>
         </div>
-        <button
-          onClick={() => {
-            setSettingsTab('bills');
-            if (onNavigateView) {
-              onNavigateView('settings');
-            } else {
-              window.location.pathname = '/finance/settings';
-            }
-          }}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-medium shadow-md shadow-blue-600/20 transition-all"
-        >
-          <Plus className="w-4 h-4" />
-          Add / Edit Bills
-        </button>
+
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* Account Filter Selector */}
+          <div className="flex items-center gap-2 bg-slate-900 hover:bg-slate-850 px-3 py-1.5 rounded-xl border border-slate-700 shadow-sm text-xs transition-colors">
+            <Filter className="w-3.5 h-3.5 text-blue-400" />
+            <select
+              value={selectedAccountId}
+              onChange={e => setSelectedAccountId(e.target.value)}
+              className="bg-transparent text-xs font-bold text-slate-100 focus:outline-none cursor-pointer"
+            >
+              <option value="all" className="bg-slate-900 text-slate-100 py-1">All Accounts Combined</option>
+              {budget.accounts.map((/** @type {any} */ acc) => (
+                <option key={acc.id} value={acc.id} className="bg-slate-900 text-slate-100 py-1">{acc.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <button
+            onClick={() => {
+              setSettingsTab('bills');
+              if (onNavigateView) {
+                onNavigateView('settings');
+              } else {
+                window.location.pathname = '/finance/settings';
+              }
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-md shadow-blue-600/20 transition-all cursor-pointer active:scale-95"
+          >
+            <Plus className="w-4 h-4" />
+            Add / Edit Bills
+          </button>
+        </div>
       </div>
 
-      {/* Per-account tables */}
-      {budget.accounts.map((/** @type {any} */ account) => {
-        const accountBills = budget.bills.filter((/** @type {any} */ b) => b.accountId === account.id);
-        if (accountBills.length === 0) return null;
+      {/* Per-account tables with Sticky Headers */}
+      {displayedAccounts.map((/** @type {any} */ account) => {
+        const accountBills = budget.bills.filter((/** @type {any} */ b) => b.accountId === account.id && !b.isArchived);
+        if (accountBills.length === 0 && selectedAccountId === 'all') return null;
         const accountTotal = accountBills.reduce((/** @type {number} */ sum, /** @type {any} */ b) => sum + getBillMonthlyCost(b), 0);
 
+        const accountPeople = (account.enabledEarners && Array.isArray(account.enabledEarners))
+          ? budget.people.filter((/** @type {any} */ p) => account.enabledEarners.includes(p.id))
+          : budget.people;
+
         return (
-          <div key={account.id} className="space-y-2">
+          <div key={account.id} className="space-y-3">
             <div className="flex items-center justify-between px-1">
               <div className="flex items-center gap-3">
                 <div className="w-3 h-3 rounded-full bg-blue-500" />
@@ -68,128 +96,137 @@ export function MainBudgetView({ onNavigateView }) {
               </span>
             </div>
 
-            <div className="overflow-x-auto matrix-scrollbar rounded-2xl border border-slate-800 glass-panel">
-              <table className="w-full text-left text-xs text-slate-300">
-                <thead className="bg-slate-900/90 text-slate-500 uppercase font-semibold text-[10px] border-b border-slate-800">
+            <div className="overflow-x-auto matrix-scrollbar rounded-2xl border border-slate-800 glass-panel relative shadow-xl">
+              <table className="w-full text-left text-xs text-slate-300 border-separate border-spacing-0">
+                {/* Sticky Header Row */}
+                <thead className="sticky top-0 z-20 bg-slate-950 text-slate-300 uppercase font-bold text-[10px] tracking-wider border-b border-slate-700 shadow-md">
                   <tr>
-                    <th className="p-3.5">Bill Name</th>
-                    <th className="p-3.5 text-right">Monthly Amount</th>
-                    <th className="p-3.5 text-right">Bi-Weekly (Per Pay)</th>
-                    {budget.people.map((/** @type {any} */ p) => (
-                      <th key={p.id} className="p-3.5 text-right">{p.name.split(' ')[0]} Portion</th>
+                    <th className="p-3.5 sticky top-0 z-20 bg-slate-950 border-b border-slate-700 text-slate-200">Bill Name</th>
+                    <th className="p-3.5 sticky top-0 z-20 bg-slate-950 border-b border-slate-700 text-right text-slate-200">Monthly Amount</th>
+                    <th className="p-3.5 sticky top-0 z-20 bg-slate-950 border-b border-slate-700 text-right text-slate-200">Bi-Weekly (Per Pay)</th>
+                    {accountPeople.map((/** @type {any} */ p) => (
+                      <th key={p.id} className="p-3.5 sticky top-0 z-20 bg-slate-950 border-b border-slate-700 text-right text-emerald-300">{p.name.split(' ')[0]} Portion</th>
                     ))}
-                    <th className="p-3.5 text-center">Due Day</th>
-                    <th className="p-3.5">Payment Notes</th>
-                    <th className="p-3.5">Bank Match Key</th>
-                    <th className="p-3.5">Notes</th>
+                    <th className="p-3.5 sticky top-0 z-20 bg-slate-950 border-b border-slate-700 text-center text-slate-200">Due Day</th>
+                    <th className="p-3.5 sticky top-0 z-20 bg-slate-950 border-b border-slate-700 text-slate-200">Payment Notes</th>
+                    <th className="p-3.5 sticky top-0 z-20 bg-slate-950 border-b border-slate-700 text-slate-200">Bank Match Key</th>
+                    <th className="p-3.5 sticky top-0 z-20 bg-slate-950 border-b border-slate-700 text-slate-200">Notes</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">
-                  {accountBills.map((/** @type {any} */ bill) => {
-                    const monthlyCost  = getBillMonthlyCost(bill);
-                    const biWeeklyCost = monthlyCost / 2;
+                  {accountBills.length === 0 ? (
+                    <tr>
+                      <td colSpan={7 + accountPeople.length} className="p-8 text-center text-slate-500 italic">
+                        No active bills assigned to this account.
+                      </td>
+                    </tr>
+                  ) : (
+                    accountBills.map((/** @type {any} */ bill) => {
+                      const monthlyCost  = getBillMonthlyCost(bill);
+                      const biWeeklyCost = monthlyCost / 2;
 
-                    return (
-                      <tr key={bill.id} className="hover:bg-slate-900/30 transition-colors group/row">
+                      return (
+                        <tr key={bill.id} className="hover:bg-slate-900/40 transition-colors group/row">
 
-                        {/* Bill Name - inline editable */}
-                        <td className="p-3.5 font-semibold">
-                          <InlineEdit
-                            value={bill.name}
-                            type="text"
-                            onCommit={(/** @type {string} */ v) => updateBill(bill.id, { name: v })}
-                            className="text-slate-200 font-semibold text-xs"
-                          />
-                        </td>
-
-                        {/* Monthly Amount - inline editable (writes to bill.amount) */}
-                        <td className="p-3.5 text-right">
-                          <InlineEdit
-                            value={bill.amount}
-                            type="currency"
-                            onCommit={(/** @type {number} */ v) => updateBill(bill.id, { amount: v })}
-                            className="font-mono text-slate-100 text-xs justify-end"
-                          />
-                        </td>
-
-                        {/* Bi-weekly - derived, read-only */}
-                        <td className="p-3.5 text-right font-mono text-blue-400 text-xs">
-                          ${biWeeklyCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </td>
-
-                        {/* Person portions - derived */}
-                        {budget.people.map((/** @type {any} */ p) => {
-                          const portion = getBillPersonMonthlyPortion(bill, p.id);
-                          return (
-                            <td key={p.id} className="p-3.5 text-right font-mono text-purple-300 text-xs">
-                              ${portion.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </td>
-                          );
-                        })}
-
-                        {/* Due Day - inline editable */}
-                        <td className="p-3.5 text-center">
-                          <div className="flex flex-col items-center gap-0.5">
+                          {/* Bill Name - inline editable */}
+                          <td className="p-3.5 font-semibold">
                             <InlineEdit
-                              value={bill.dueDay}
-                              type="integer"
-                              prefix="Day "
-                              min={1}
-                              max={31}
-                              onCommit={(/** @type {number} */ v) => updateBill(bill.id, { dueDay: v })}
-                              className="font-mono text-slate-400 text-xs justify-center"
+                              value={bill.name}
+                              type="text"
+                              onCommit={(/** @type {string} */ v) => updateBill(bill.id, { name: v })}
+                              className="text-slate-200 font-semibold text-xs"
                             />
-                            {bill.period !== 'Monthly' && (
-                              <span className="text-[10px] text-emerald-400 font-semibold px-1.5 py-0.2 rounded bg-emerald-950/60 border border-emerald-800/40">
-                                {formatBillDueMonths(bill)}
-                              </span>
-                            )}
-                          </div>
-                        </td>
+                          </td>
 
-                        {/* Payment Notes - inline editable */}
-                        <td className="p-3.5 text-slate-300 text-xs">
-                          <InlineEdit
-                            value={bill.paymentNotes || bill.paymentSource || ''}
-                            type="text"
-                            onCommit={(/** @type {string} */ v) => updateBill(bill.id, { paymentNotes: v, paymentSource: v })}
-                            className="text-slate-300 text-xs"
-                            displayFn={(/** @type {string} */ v) => v || '—'}
-                          />
-                        </td>
+                          {/* Monthly Amount - inline editable (writes to bill.amount) */}
+                          <td className="p-3.5 text-right">
+                            <InlineEdit
+                              value={bill.amount}
+                              type="currency"
+                              onCommit={(/** @type {number} */ v) => updateBill(bill.id, { amount: v })}
+                              className="font-mono text-slate-100 text-xs justify-end"
+                            />
+                          </td>
 
-                        {/* Bank Match Key - inline editable */}
-                        <td className="p-3.5 text-slate-300 text-xs">
-                          <InlineEdit
-                            value={bill.matchingKey || ''}
-                            type="text"
-                            onCommit={(/** @type {string} */ v) => updateBill(bill.id, { matchingKey: v })}
-                            className="text-slate-300 text-xs"
-                            placeholder="e.g. GA POWER, COMCAST"
-                            displayFn={(/** @type {string} */ v) => v ? <span className="px-1.5 py-0.5 rounded bg-blue-950/70 border border-blue-800/50 text-blue-300 font-mono text-[10px]">{v}</span> : <span className="text-slate-600 italic">—</span>}
-                          />
-                        </td>
+                          {/* Bi-weekly - derived, read-only */}
+                          <td className="p-3.5 text-right font-mono text-blue-400 text-xs">
+                            ${biWeeklyCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
 
-                        {/* Notes */}
-                        <td className="p-3.5 text-slate-500 italic max-w-xs truncate text-xs">
-                          <InlineEdit
-                            value={bill.notes || ''}
-                            type="text"
-                            onCommit={(/** @type {string} */ v) => updateBill(bill.id, { notes: v })}
-                            className="text-slate-500 italic max-w-xs truncate text-xs"
-                            displayFn={(/** @type {string} */ v) => v || '—'}
-                          />
-                        </td>
-                      </tr>
-                    );
-                  })}
+                          {/* Person portions - derived */}
+                          {accountPeople.map((/** @type {any} */ p) => {
+                            const portion = getBillPersonMonthlyPortion(bill, p.id);
+                            return (
+                              <td key={p.id} className="p-3.5 text-right font-mono text-purple-300 text-xs">
+                                ${portion.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </td>
+                            );
+                          })}
+
+                          {/* Due Day - inline editable */}
+                          <td className="p-3.5 text-center">
+                            <div className="flex flex-col items-center gap-0.5">
+                              <InlineEdit
+                                value={bill.dueDay}
+                                type="integer"
+                                prefix="Day "
+                                min={1}
+                                max={31}
+                                onCommit={(/** @type {number} */ v) => updateBill(bill.id, { dueDay: v })}
+                                className="font-mono text-slate-400 text-xs justify-center"
+                              />
+                              {bill.period !== 'Monthly' && (
+                                <span className="text-[10px] text-emerald-400 font-semibold px-1.5 py-0.2 rounded bg-emerald-950/60 border border-emerald-800/40">
+                                  {formatBillDueMonths(bill)}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* Payment Notes - inline editable */}
+                          <td className="p-3.5 text-slate-300 text-xs">
+                            <InlineEdit
+                              value={bill.paymentNotes || bill.paymentSource || ''}
+                              type="text"
+                              onCommit={(/** @type {string} */ v) => updateBill(bill.id, { paymentNotes: v, paymentSource: v })}
+                              className="text-slate-300 text-xs"
+                              displayFn={(/** @type {string} */ v) => v || '—'}
+                            />
+                          </td>
+
+                          {/* Bank Match Key - inline editable */}
+                          <td className="p-3.5 text-slate-300 text-xs">
+                            <InlineEdit
+                              value={bill.matchingKey || ''}
+                              type="text"
+                              onCommit={(/** @type {string} */ v) => updateBill(bill.id, { matchingKey: v })}
+                              className="text-slate-300 text-xs"
+                              placeholder="e.g. GA POWER, COMCAST"
+                              displayFn={(/** @type {string} */ v) => v ? <span className="px-1.5 py-0.5 rounded bg-blue-950/70 border border-blue-800/50 text-blue-300 font-mono text-[10px]">{v}</span> : <span className="text-slate-600 italic">—</span>}
+                            />
+                          </td>
+
+                          {/* Notes */}
+                          <td className="p-3.5 text-slate-500 italic max-w-xs truncate text-xs">
+                            <InlineEdit
+                              value={bill.notes || ''}
+                              type="text"
+                              onCommit={(/** @type {string} */ v) => updateBill(bill.id, { notes: v })}
+                              className="text-slate-500 italic max-w-xs truncate text-xs"
+                              displayFn={(/** @type {string} */ v) => v || '—'}
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
-                <tfoot className="bg-slate-900/80 font-bold border-t border-slate-700/80 text-slate-200">
+                <tfoot className="bg-slate-900 font-bold border-t-2 border-slate-700 text-slate-200 sticky bottom-0 z-10 shadow-lg">
                   <tr>
                     <td className="p-3.5 text-slate-400">Account Subtotal</td>
                     <td className="p-3.5 text-right font-mono text-rose-400">${accountTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                     <td className="p-3.5 text-right font-mono text-blue-400">${(accountTotal / 2).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                    {budget.people.map((/** @type {any} */ p) => {
+                    {accountPeople.map((/** @type {any} */ p) => {
                       const pTotal = accountBills.reduce((/** @type {number} */ s, /** @type {any} */ b) => s + getBillPersonMonthlyPortion(b, p.id), 0);
                       return (
                         <td key={p.id} className="p-3.5 text-right font-mono text-purple-300">${pTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
@@ -203,29 +240,6 @@ export function MainBudgetView({ onNavigateView }) {
           </div>
         );
       })}
-
-      {/* Grand Total Footer */}
-      <div className="p-6 rounded-2xl glass-panel border border-slate-800 flex flex-col md:flex-row items-center justify-between gap-4">
-        <div>
-          <h3 className="text-base font-bold text-slate-100">Total Monthly Budget Expenses</h3>
-          <p className="text-[11px] text-slate-400">Sum of all accounts combined - updates instantly on any edit</p>
-        </div>
-        <div className="flex items-center gap-6">
-          <div>
-            <span className="text-xs text-slate-400 block">Total Monthly</span>
-            <span className="text-2xl font-black text-rose-400 font-mono">
-              ${totalMonthlyExpenses.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </span>
-          </div>
-          <div className="h-8 w-px bg-slate-800" />
-          <div>
-            <span className="text-xs text-slate-400 block">Bi-Weekly Target</span>
-            <span className="text-2xl font-black text-blue-400 font-mono">
-              ${(totalMonthlyExpenses / 2).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </span>
-          </div>
-        </div>
-      </div>
 
     </div>
   );

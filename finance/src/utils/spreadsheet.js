@@ -255,11 +255,12 @@ export function processSpreadsheetImport({
           const existingOther = matrixUpdates[otherKey] ?? nextDailyMatrix[otherKey] ?? 0;
           matrixUpdates[otherKey] = Math.round((existingOther - actualAmount) * 100) / 100;
 
-          const existingOtherDesc = matrixUpdates[otherDescKey] ?? nextDailyMatrix[otherDescKey] ?? '';
-          if (existingOtherDesc && txn.description && !existingOtherDesc.includes(txn.description)) {
-            matrixUpdates[otherDescKey] = `${existingOtherDesc} | ${txn.description}`;
+          const cleanDesc = (txn.description || '').replace(/^Other\s*\$?\s*\(?(.*?)\)?$/i, '$1').trim() || txn.description;
+          const existingOtherDesc = (matrixUpdates[otherDescKey] ?? nextDailyMatrix[otherDescKey] ?? '').replace(/^Other\s*\$?\s*\(?(.*?)\)?$/i, '$1').trim();
+          if (existingOtherDesc && cleanDesc && !existingOtherDesc.includes(cleanDesc)) {
+            matrixUpdates[otherDescKey] = `${existingOtherDesc} | ${cleanDesc}`;
           } else {
-            matrixUpdates[otherDescKey] = existingOtherDesc || txn.description;
+            matrixUpdates[otherDescKey] = existingOtherDesc || cleanDesc;
           }
 
           logDebug('MATCH', `Credit transaction #${txnIdx + 1} unmatched to known earner; routed to Other Income`, {
@@ -344,11 +345,12 @@ export function processSpreadsheetImport({
           const existingOther = matrixUpdates[otherKey] ?? nextDailyMatrix[otherKey] ?? 0;
           matrixUpdates[otherKey] = Math.round((existingOther + actualAmount) * 100) / 100;
 
-          const existingOtherDesc = matrixUpdates[otherDescKey] ?? nextDailyMatrix[otherDescKey] ?? '';
-          if (existingOtherDesc && txn.description && !existingOtherDesc.includes(txn.description)) {
-            matrixUpdates[otherDescKey] = `${existingOtherDesc} | ${txn.description}`;
+          const cleanDesc = (txn.description || '').replace(/^Other\s*\$?\s*\(?(.*?)\)?$/i, '$1').trim() || txn.description;
+          const existingOtherDesc = (matrixUpdates[otherDescKey] ?? nextDailyMatrix[otherDescKey] ?? '').replace(/^Other\s*\$?\s*\(?(.*?)\)?$/i, '$1').trim();
+          if (existingOtherDesc && cleanDesc && !existingOtherDesc.includes(cleanDesc)) {
+            matrixUpdates[otherDescKey] = `${existingOtherDesc} | ${cleanDesc}`;
           } else {
-            matrixUpdates[otherDescKey] = existingOtherDesc || txn.description;
+            matrixUpdates[otherDescKey] = existingOtherDesc || cleanDesc;
           }
 
           logWarn('MATCH', `Debit transaction #${txnIdx + 1} unmatched to any bill; routed to Other Expense`, {

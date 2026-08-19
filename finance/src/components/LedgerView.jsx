@@ -4,6 +4,8 @@ import {
   Wallet,
   Calendar,
   Filter,
+  Users,
+  Check,
   ReceiptText,
   Pencil,
   AlertTriangle,
@@ -183,23 +185,25 @@ const DroppableCellTd = React.memo(function DroppableCellTd({
   );
 });
 
-// Fully isolated text input for descriptions to prevent global renders on keystrokes
+// Fully isolated text input for descriptions with interactive focus states and instant commit
 const IsolatedTextInput = React.memo(function IsolatedTextInput({ 
   value, 
   monthKey, 
   day, 
   field, 
   onCommit, 
-  placeholder, 
+  placeholder = '—', 
   className 
 }) {
   const [draft, setDraft] = useState(value || '');
+  const [isFocused, setIsFocused] = useState(false);
 
   useEffect(() => {
     setDraft(value || '');
   }, [value]);
 
   const handleBlur = () => {
+    setIsFocused(false);
     if (draft !== value && onCommit) {
       onCommit(monthKey, day, field, draft);
     }
@@ -207,6 +211,9 @@ const IsolatedTextInput = React.memo(function IsolatedTextInput({
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter') {
+      e.target.blur();
+    } else if (e.key === 'Escape') {
+      setDraft(value || '');
       e.target.blur();
     }
   };
@@ -216,10 +223,12 @@ const IsolatedTextInput = React.memo(function IsolatedTextInput({
       type="text"
       placeholder={placeholder}
       value={draft}
+      title={draft || value || 'Click to edit description'}
+      onFocus={() => setIsFocused(true)}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={handleBlur}
       onKeyDown={handleKeyDown}
-      className={className}
+      className={`${className} ${isFocused ? 'bg-slate-800 text-white ring-1 ring-blue-500 border border-blue-500 rounded px-1' : ''}`}
     />
   );
 });
@@ -249,6 +258,10 @@ function DailySpreadsheetMatrix() {
   const [selectedYear, setSelectedYear] = useState(today.getFullYear());
   const [showArchivedBills, setShowArchivedBills] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [editingBillId, setEditingBillId] = useState(null);
+  const [billDraftName, setBillDraftName] = useState('');
+  const [billToArchive, setBillToArchive] = useState(null);
+  const [selectedRowKey, setSelectedRowKey] = useState(null);
 
   // Timeline window state (default 3 months back to 6 months forward relative to selected month for 75% faster DOM rendering)
   const [monthsBack, setMonthsBack] = useState(3);
@@ -297,8 +310,9 @@ function DailySpreadsheetMatrix() {
   }, []);
 
   const handleCellCommit = useCallback((monthKey, day, field, val) => {
-    updateDailyMatrixCell(selectedAccountId, monthKey, day, field, val);
-  }, [updateDailyMatrixCell, selectedAccountId]);
+    const targetAccId = selectedAccountId === 'all' ? (budget.accounts[0]?.id || 'all') : selectedAccountId;
+    updateDailyMatrixCell(targetAccId, monthKey, day, field, val);
+  }, [updateDailyMatrixCell, selectedAccountId, budget.accounts]);
 
 
   const monthKey = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`;
@@ -328,6 +342,46 @@ function DailySpreadsheetMatrix() {
 
   // Household earners
   const people = budget.people || [];
+
+  // Earner filter dropdown state
+  const [showEarnerDropdown, setShowEarnerDropdown] = useState(false);
+  const earnerDropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (earnerDropdownRef.current && !earnerDropdownRef.current.contains(e.target)) {
+        setShowEarnerDropdown(false);
+      }
+    };
+    if (showEarnerDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showEarnerDropdown]);
+
+  // Relevant active earners/creditors assigned to this account
+  const accountPeople = useMemo(() => {
+    if (selectedAccountId === 'all') return people;
+    if (selectedAccount?.enabledEarners && Array.isArray(selectedAccount.enabledEarners)) {
+      return people.filter(p => selectedAccount.enabledEarners.includes(p.id));
+    }
+    return people;
+  }, [people, selectedAccountId, selectedAccount]);
+
+  const handleToggleEarner = (personId) => {
+    if (!selectedAccount) return;
+    const currentEnabled = selectedAccount.enabledEarners && Array.isArray(selectedAccount.enabledEarners)
+      ? selectedAccount.enabledEarners
+      : people.map(p => p.id);
+
+    let updated;
+    if (currentEnabled.includes(personId)) {
+      updated = currentEnabled.filter(id => id !== personId);
+    } else {
+      updated = [...currentEnabled, personId];
+    }
+    updateAccount(selectedAccountId, { enabledEarners: updated });
+  };
 
   // Effective start date based on selected account (or earliest account date when All Accounts is selected)
   const effectiveStartDateStr = useMemo(() => {
@@ -387,6 +441,10 @@ function DailySpreadsheetMatrix() {
     }
     return list;
   }, [selectedYear, selectedMonth, monthsBack, monthsForward, startDateObj]);
+
+  const showExtraColumns = selectedAccountId === 'all'
+    ? budget.accounts.some(a => a.enableExtraSavings !== false)
+    : (selectedAccount?.enableExtraSavings !== false);
 
   // Generate continuous daily matrix rows across monthList (starting on startDateObj with no prior dates)
   const matrixData = useMemo(() => {
@@ -459,13 +517,11 @@ function DailySpreadsheetMatrix() {
         const isoDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         const isLockedDay = isImportMode && importedRows[isoDate] !== undefined;
 
-        // 1. Credits (Deposits)
+        // 1. Credits (Deposits) for enabled account earners
         const personCredits = {};
-        const personExtraCredits = {};
 
-        people.forEach(p => {
+        accountPeople.forEach(p => {
           const customCredit = getDailyMatrixCell(selectedAccountId, monthKey, day, `credit_${p.id}`);
-          const customExtraCredit = getDailyMatrixCell(selectedAccountId, monthKey, day, `extra_credit_${p.id}`);
 
           if (customCredit !== undefined) {
             personCredits[p.id] = parseFloat(customCredit) || 0;
@@ -475,12 +531,9 @@ function DailySpreadsheetMatrix() {
           } else {
             personCredits[p.id] = 0;
           }
-
-          personExtraCredits[p.id] = customExtraCredit !== undefined ? (parseFloat(customExtraCredit) || 0) : 0;
         });
 
         const totalRegCredits = Object.values(personCredits).reduce((s, v) => s + v, 0);
-        const totalExtraCredits = Object.values(personExtraCredits).reduce((s, v) => s + v, 0);
 
         // 2. Individual Bill Deductions
         const billValues = {};
@@ -514,9 +567,31 @@ function DailySpreadsheetMatrix() {
         });
 
         // 3. Other Expense
-        const customOther = getDailyMatrixCell(selectedAccountId, monthKey, day, 'other_amount');
-        const otherAmt = customOther !== undefined ? (parseFloat(customOther) || 0) : 0;
-        const customOtherDesc = getDailyMatrixCell(selectedAccountId, monthKey, day, 'other_desc') || '';
+        let otherAmt = 0;
+        let rawOtherDesc = '';
+
+        if (selectedAccountId === 'all') {
+          budget.accounts.forEach(a => {
+            const accOther = getDailyMatrixCell(a.id, monthKey, day, 'other_amount');
+            if (accOther !== undefined) otherAmt += parseFloat(accOther) || 0;
+            const accDesc = getDailyMatrixCell(a.id, monthKey, day, 'other_desc');
+            if (accDesc) {
+              rawOtherDesc = rawOtherDesc ? `${rawOtherDesc} | ${accDesc}` : accDesc;
+            }
+          });
+          const allOther = getDailyMatrixCell('all', monthKey, day, 'other_amount');
+          if (allOther !== undefined) otherAmt += parseFloat(allOther) || 0;
+          const allDesc = getDailyMatrixCell('all', monthKey, day, 'other_desc');
+          if (allDesc) {
+            rawOtherDesc = rawOtherDesc ? `${rawOtherDesc} | ${allDesc}` : allDesc;
+          }
+        } else {
+          const customOther = getDailyMatrixCell(selectedAccountId, monthKey, day, 'other_amount');
+          otherAmt = customOther !== undefined ? (parseFloat(customOther) || 0) : 0;
+          rawOtherDesc = getDailyMatrixCell(selectedAccountId, monthKey, day, 'other_desc') || '';
+        }
+
+        const customOtherDesc = rawOtherDesc.replace(/^Other\s*\$?\s*\(?(.*?)\)?$/i, '$1').trim();
         totalDayBills += otherAmt;
 
         // 4. Determine Beginning and Ending Balances
@@ -545,11 +620,22 @@ function DailySpreadsheetMatrix() {
           totalEnd = lockedTotalEnd;
           isHistoricalLock = true;
         } else {
+          // Extra balance additions (from custom entries or account extra savings)
+          let dayExtraAdd = 0;
+          accountPeople.forEach(p => {
+            const customExtra = getDailyMatrixCell(selectedAccountId, monthKey, day, `extra_credit_${p.id}`);
+            if (customExtra !== undefined) {
+              dayExtraAdd += parseFloat(customExtra) || 0;
+            }
+          });
+
           regEnding = runningRegBeg + totalRegCredits - totalDayBills;
-          extraEnding = runningExtraBeg + totalExtraCredits;
+          extraEnding = runningExtraBeg + dayExtraAdd;
           totalEnd = regEnding + extraEnding;
           isHistoricalLock = false;
         }
+
+        const totalBeg = runningRegBeg + (showExtraColumns ? runningExtraBeg : 0);
 
         rows.push({
           rowKey: `${monthKey}-${day}`,
@@ -563,12 +649,11 @@ function DailySpreadsheetMatrix() {
           dayOfWeekName,
           isPayday,
           isToday,
+          totalBeg,
           regBeg: runningRegBeg,
           extraBeg: runningExtraBeg,
           personCredits,
-          personExtraCredits,
           totalRegCredits,
-          totalExtraCredits,
           billValues,
           otherAmt,
           otherDesc: customOtherDesc,
@@ -595,7 +680,8 @@ function DailySpreadsheetMatrix() {
     people,
     getDailyMatrixCell,
     todayObj,
-    startDateObj
+    startDateObj,
+    showExtraColumns
   ]);
 
   // Group matrix rows by month so each month gets its own tbody with a sticky month banner
@@ -705,17 +791,14 @@ function DailySpreadsheetMatrix() {
   const columnTotals = useMemo(() => {
     const totals = {
       regCredits: {},
-      extraCredits: {},
       bills: {},
       other: 0,
       totalRegCredits: 0,
-      totalExtraCredits: 0,
       totalBills: 0
     };
 
-    people.forEach(p => {
+    accountPeople.forEach(p => {
       totals.regCredits[p.id] = 0;
-      totals.extraCredits[p.id] = 0;
     });
 
     accountBills.forEach(b => {
@@ -725,9 +808,8 @@ function DailySpreadsheetMatrix() {
     const selectedMonthRows = matrixData.filter(r => r.month === selectedMonth && r.year === selectedYear);
 
     selectedMonthRows.forEach(r => {
-      people.forEach(p => {
+      accountPeople.forEach(p => {
         totals.regCredits[p.id] += r.personCredits[p.id] || 0;
-        totals.extraCredits[p.id] += r.personExtraCredits[p.id] || 0;
       });
 
       accountBills.forEach(b => {
@@ -736,19 +818,14 @@ function DailySpreadsheetMatrix() {
 
       totals.other += r.otherAmt || 0;
       totals.totalRegCredits += r.totalRegCredits;
-      totals.totalExtraCredits += r.totalExtraCredits;
     });
 
     totals.totalBills = Object.values(totals.bills).reduce((s, v) => s + v, 0) + totals.other;
 
     return totals;
-  }, [matrixData, selectedMonth, selectedYear, people, accountBills]);
+  }, [matrixData, selectedMonth, selectedYear, accountPeople, accountBills]);
 
   const finalEndingBalance = matrixData[matrixData.length - 1]?.totalEnd || 0;
-
-  const showExtraColumns = selectedAccountId === 'all'
-    ? budget.accounts.some(a => a.enableExtraSavings !== false)
-    : (selectedAccount?.enableExtraSavings !== false);
 
   return (
     <DndContext
@@ -759,52 +836,90 @@ function DailySpreadsheetMatrix() {
     >
       <div className="flex-1 min-h-0 flex flex-col overflow-hidden rounded-2xl border border-slate-800 glass-panel shadow-2xl">
 
-      {/* Compact Fixed Toolbar Header - Tier 1 (Outside Table Scroll Viewport) */}
-      <div className="bg-slate-950 border-b border-slate-800 px-3 py-1.5 h-10 flex items-center justify-between gap-2 shadow-md shrink-0 whitespace-nowrap text-xs z-30">
-        <div className="flex items-center gap-1.5 flex-shrink-0">
-          <Wallet className="w-3.5 h-3.5 text-emerald-400" />
-          <h3 className="text-[11px] font-black text-slate-100 uppercase tracking-wider hidden sm:inline">Daily Transactions Register</h3>
-        </div>
-
-        {/* Integrated KPI Metrics Pill Bar */}
-        <div className="hidden xl:flex items-center gap-2.5 bg-slate-900 px-2.5 py-0.5 rounded-lg border border-slate-800 text-[10px] font-mono flex-shrink-0">
-          <div className="flex items-center gap-1">
-            <span className="text-slate-400">Start:</span>
-            <span className="text-slate-200 font-bold">{fmtMoney(matrixData[0]?.regBeg || 0)}</span>
-          </div>
-          <div className="h-2.5 w-px bg-slate-800" />
-          <div className="flex items-center gap-1">
-            <span className="text-slate-400">Deposits:</span>
-            <span className="text-emerald-400 font-bold">+{fmtMoney(columnTotals.totalRegCredits)}</span>
-          </div>
-          <div className="h-2.5 w-px bg-slate-800" />
-          <div className="flex items-center gap-1">
-            <span className="text-slate-400">Bills:</span>
-            <span className="text-rose-400 font-bold">-{fmtMoney(columnTotals.totalBills)}</span>
-          </div>
-          <div className="h-2.5 w-px bg-slate-800" />
-          <div className="flex items-center gap-1">
-            <span className="text-slate-400">End Total:</span>
-            <span className={`font-bold ${finalEndingBalance < 0 ? 'text-rose-400' : 'text-blue-400'}`}>
-              {fmtMoney(finalEndingBalance)}
-            </span>
-          </div>
-        </div>
-
+      {/* Compact Fixed Toolbar Header - Scooted to Left for Maximum Workspace */}
+      <div className="relative z-50 bg-slate-950/95 backdrop-blur border-b border-slate-800 px-3 py-1.5 min-h-[42px] flex items-center justify-between gap-3 shadow-lg shrink-0 whitespace-nowrap text-xs">
         <div className="flex items-center gap-2 flex-shrink-0">
           {/* Account Selector */}
-          <div className="flex items-center gap-1 bg-slate-800/90 hover:bg-slate-800 px-2 py-0.5 rounded-lg border border-slate-700 hover:border-blue-500/50 shadow-sm transition-all text-xs">
-            <Filter className="w-3 h-3 text-blue-400" />
+          <div className="flex items-center gap-1.5 bg-slate-800/90 hover:bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-700 hover:border-blue-500/50 shadow-sm transition-all text-xs">
+            <Filter className="w-3.5 h-3.5 text-blue-400" />
             <select
               value={selectedAccountId}
               onChange={e => setSelectedAccountId(e.target.value)}
-              className="bg-transparent text-[11px] font-bold text-slate-100 focus:outline-none cursor-pointer"
+              className="bg-transparent text-xs font-bold text-slate-100 focus:outline-none cursor-pointer"
             >
               <option value="all" className="bg-slate-900 text-slate-100 py-1">All Accounts Combined</option>
               {budget.accounts.map(acc => (
                 <option key={acc.id} value={acc.id} className="bg-slate-900 text-slate-100 py-1">{acc.name}</option>
               ))}
             </select>
+          </div>
+
+          {/* Earner / Creditor Filter Popover */}
+          <div className="relative" ref={earnerDropdownRef}>
+            <button
+              type="button"
+              onClick={() => setShowEarnerDropdown(!showEarnerDropdown)}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border font-bold text-xs shadow-sm transition-all cursor-pointer ${
+                accountPeople.length < people.length
+                  ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/60 hover:bg-emerald-900/80'
+                  : 'bg-slate-800/90 hover:bg-slate-800 text-slate-200 border-slate-700'
+              }`}
+              title="Filter Creditors / Earners shown for this account"
+            >
+              <Users className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Earners ({accountPeople.length}/{people.length})</span>
+              <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${showEarnerDropdown ? 'rotate-180' : ''}`} />
+            </button>
+
+            {showEarnerDropdown && (
+              <div className="absolute left-0 mt-2 w-60 bg-slate-900 border border-slate-700/90 rounded-xl shadow-2xl p-3 z-[100] space-y-2 animate-fade-in text-xs">
+                <div className="flex items-center justify-between pb-1.5 border-b border-slate-800">
+                  <span className="font-bold text-slate-200 text-[11px]">Creditors for {selectedAccount?.name || 'View'}</span>
+                  {selectedAccountId !== 'all' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const allIds = people.map(p => p.id);
+                        updateAccount(selectedAccountId, { enabledEarners: allIds });
+                      }}
+                      className="text-[10px] text-blue-400 hover:text-blue-300 font-semibold"
+                    >
+                      Select All
+                    </button>
+                  )}
+                </div>
+                <div className="space-y-1 max-h-48 overflow-y-auto">
+                  {people.map(p => {
+                    const isChecked = accountPeople.some(ap => ap.id === p.id);
+                    return (
+                      <label
+                        key={p.id}
+                        className={`flex items-center justify-between p-1.5 rounded-lg cursor-pointer transition-colors ${
+                          isChecked ? 'bg-slate-800/80 text-slate-100' : 'text-slate-400 hover:bg-slate-800/40'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => handleToggleEarner(p.id)}
+                            disabled={selectedAccountId === 'all'}
+                            className="rounded border-slate-700 bg-slate-950 text-emerald-500 focus:ring-0 focus:outline-none cursor-pointer"
+                          />
+                          <span className="font-medium text-xs">{p.name}</span>
+                        </div>
+                        <span className="text-[10px] text-slate-500 font-mono">{p.role || 'Earner'}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+                {selectedAccountId === 'all' && (
+                  <p className="text-[10px] text-slate-500 italic pt-1 border-t border-slate-800">
+                    Select a specific account above to customize its creditors.
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Month / Year Selector */}
@@ -839,21 +954,23 @@ function DailySpreadsheetMatrix() {
                 }
               }, 50);
             }}
-            className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/50 hover:border-amber-400 font-bold text-[11px] shadow-sm transition-all cursor-pointer active:scale-95"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/50 hover:border-amber-400 font-bold text-xs shadow-sm transition-all cursor-pointer active:scale-95"
             title="Jump to Today's Date"
           >
-            <Sparkles className="w-3 h-3 text-amber-400" />
+            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
             <span>Today</span>
           </button>
+        </div>
 
+        <div className="flex items-center gap-2 flex-shrink-0">
           {/* Account-Bound Import Button */}
           <button
             type="button"
             onClick={() => setIsImportModalOpen(true)}
-            className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[11px] shadow-sm shadow-indigo-600/30 transition-all cursor-pointer active:scale-95 flex-shrink-0"
+            className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-sm shadow-indigo-600/30 transition-all cursor-pointer active:scale-95 flex-shrink-0"
             title={selectedAccountId !== 'all' && selectedAccount ? `Import CSV or Spreadsheet directly into ${selectedAccount.name}` : 'Import CSV or Spreadsheet'}
           >
-            <Upload className="w-3 h-3 text-indigo-200" />
+            <Upload className="w-3.5 h-3.5 text-indigo-200" />
             <span>Import CSV/Spreadsheet</span>
           </button>
 
@@ -862,14 +979,14 @@ function DailySpreadsheetMatrix() {
             <button
               type="button"
               onClick={() => setShowArchivedBills(!showArchivedBills)}
-              className={`flex items-center gap-1 px-2 py-0.5 rounded-lg border font-bold text-[11px] shadow-sm transition-all cursor-pointer ${
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border font-bold text-xs shadow-sm transition-all cursor-pointer ${
                 showArchivedBills
                   ? 'bg-amber-600/20 text-amber-300 border-amber-500/60'
                   : 'bg-slate-800/90 hover:bg-slate-800 text-amber-400 border-slate-700'
               }`}
               title="View & Restore Archived Bills"
             >
-              <Archive className="w-3 h-3 text-amber-400" />
+              <Archive className="w-3.5 h-3.5 text-amber-400" />
               <span>Archived ({archivedBills.length})</span>
             </button>
           )}
@@ -912,128 +1029,132 @@ function DailySpreadsheetMatrix() {
           {/* Header Row 1 & 2: Sticky Matrix Header */}
           <thead>
             {/* Header Row 1: Category Banners & Spanning Headers */}
-            <tr className="bg-slate-950 text-slate-300 uppercase font-extrabold text-xs tracking-wider h-7">
-              {/* Date & Day Banner Container */}
-              <th colSpan={2} className="p-0 h-7 bg-slate-950 border-r border-slate-700 sticky left-0 top-0 z-50 shadow-[2px_0_5px_rgba(0,0,0,0.5)]"></th>
+            <tr className="bg-slate-950 text-slate-300 uppercase font-extrabold text-[9px] tracking-wider h-6">
+              {/* Date, Day & Total Beg Banner Container */}
+              <th colSpan={3} className="p-0 h-6 bg-slate-950 border-r border-slate-700 sticky left-0 top-0 z-30 shadow-[2px_0_5px_rgba(0,0,0,0.5)]"></th>
 
               {/* Beg Balances Banner */}
-              <th colSpan={showExtraColumns ? 2 : 1} className="p-1 h-7 text-center border-r-2 border-blue-600 bg-blue-950 text-blue-100 font-black shadow-sm sticky top-0 z-40 align-middle">Beg Balances</th>
-              <th colSpan={people.length * (showExtraColumns ? 2 : 1)} className="p-1 h-7 text-center border-r border-slate-800 bg-emerald-950 text-emerald-300 font-black sticky top-0 z-40 align-middle">Credits (Deposits)</th>
-              <th colSpan={accountBills.length + 2} className="p-1 h-7 text-center border-r border-slate-800 bg-rose-950 text-rose-300 font-black sticky top-0 z-40 align-middle">Bills &amp; Deductions</th>
-              <th colSpan={showExtraColumns ? 2 : 1} className="p-1 h-7 text-center border-r border-slate-800 bg-purple-950 text-purple-300 font-black sticky top-0 z-40 align-middle">Ending Balances</th>
+              <th colSpan={showExtraColumns ? 2 : 1} className="px-2 h-6 text-center border-r-2 border-blue-600 bg-blue-950 text-blue-200 font-black sticky top-0 z-20 align-middle">Beg Balances</th>
+              <th colSpan={accountPeople.length} className="px-2 h-6 text-center border-r border-slate-800 bg-emerald-950 text-emerald-300 font-black sticky top-0 z-20 align-middle">Credits (Deposits)</th>
+              <th colSpan={accountBills.length + 2} className="px-2 h-6 text-center border-r border-slate-800 bg-rose-950 text-rose-300 font-black sticky top-0 z-20 align-middle">Bills &amp; Deductions</th>
+              <th colSpan={showExtraColumns ? 2 : 1} className="px-2 h-6 text-center border-r border-slate-800 bg-purple-950 text-purple-300 font-black sticky top-0 z-20 align-middle">Ending Balances</th>
               
               {/* Total End Banner Container */}
-              <th colSpan={1} className="p-0 h-7 min-w-[72px] w-[72px] max-w-[72px] bg-slate-950 border-l border-slate-700 sticky right-0 top-0 z-50 shadow-[-4px_0_8px_rgba(0,0,0,0.5)]"></th>
+              <th colSpan={1} className="p-0 h-6 min-w-[76px] w-[76px] max-w-[76px] bg-slate-950 border-l border-slate-700 sticky right-0 top-0 z-30 shadow-[-4px_0_8px_rgba(0,0,0,0.5)]"></th>
             </tr>
 
-            {/* Header Row 2: Individual Columns (Stacked titles) */}
-            <tr className="bg-slate-950 text-slate-300 font-bold text-xs h-10">
+            {/* Header Row 2: Individual Columns (2-Line Responsive Headers, Full Legibility) */}
+            <tr className="bg-slate-900 text-slate-300 font-bold text-xs h-10">
               {/* Date & Day Subheaders */}
-              <th className="p-1 h-10 min-w-[90px] w-[90px] max-w-[90px] bg-slate-950 text-slate-200 font-bold text-center align-middle sticky left-0 top-[28px] z-50 border-b-2 border-blue-500 shadow-[2px_0_5px_rgba(0,0,0,0.5)]">
-                <div className="flex items-center justify-center h-full">Date</div>
+              <th className="px-1 h-10 min-w-[80px] w-[80px] max-w-[80px] bg-slate-950 text-slate-200 font-bold text-center align-middle sticky left-0 top-[24px] z-30 border-b border-slate-700 shadow-[2px_0_5px_rgba(0,0,0,0.5)]">
+                Date
               </th>
-              <th className="p-1 h-10 min-w-[48px] w-[48px] max-w-[48px] bg-slate-950 text-slate-200 font-bold text-center align-middle border-r border-slate-700 sticky left-[90px] top-[28px] z-50 border-b-2 border-blue-500 shadow-[4px_0_8px_rgba(0,0,0,0.5)]">
-                <div className="flex items-center justify-center h-full">Day</div>
+              <th className="px-1 h-10 min-w-[46px] w-[46px] max-w-[46px] bg-slate-950 text-slate-200 font-bold text-center align-middle sticky left-[80px] top-[24px] z-30 border-b border-slate-700">
+                Day
               </th>
 
-              {/* Beg Balances */}
-              <th className="p-1 h-10 text-right min-w-[65px] bg-blue-950 text-blue-200 font-extrabold border-r border-blue-900/60 align-middle sticky top-[28px] z-40 border-b-2 border-blue-500">
-                <div className="flex flex-col items-end justify-center leading-tight text-xs h-full">
-                  <span>Beg</span>
-                  <span>Bal</span>
-                </div>
+              {/* Total Beg (Sticky Frozen Left) */}
+              <th className="px-1.5 h-10 min-w-[76px] w-[76px] max-w-[76px] bg-slate-950 text-blue-300 font-black text-right align-middle sticky left-[126px] top-[24px] z-30 border-b border-slate-700 border-r border-slate-700 shadow-[4px_0_8px_rgba(0,0,0,0.5)]">
+                <span className="block text-[11px] leading-tight">Total<br/>Beg</span>
+              </th>
+
+              {/* Regular Beg Balance */}
+              <th className="px-1.5 h-10 text-right min-w-[72px] bg-slate-900 text-blue-300 font-bold border-r border-blue-900/80 align-middle sticky top-[24px] z-20 border-b border-slate-700">
+                <span className="block text-[11px] leading-tight">Reg<br/>Beg</span>
               </th>
               {showExtraColumns && (
-                <th className="p-1 h-10 text-right min-w-[65px] border-r-2 border-blue-600 bg-blue-950 text-blue-200 font-extrabold align-middle sticky top-[28px] z-40 border-b-2 border-blue-500">
-                  <div className="flex flex-col items-end justify-center leading-tight text-xs h-full">
-                    <span>Extra</span>
-                    <span>Beg</span>
-                  </div>
+                <th className="px-1.5 h-10 text-right min-w-[72px] border-r-2 border-blue-600 bg-slate-900 text-blue-300 font-bold align-middle sticky top-[24px] z-20 border-b border-slate-700">
+                  <span className="block text-[11px] leading-tight">Extra<br/>Beg</span>
                 </th>
               )}
 
               {/* Credits */}
-              {people.map(p => (
-                <th key={`hdr-cred-${p.id}`} className="p-1 h-10 text-right min-w-[60px] text-emerald-400 bg-emerald-950 align-middle sticky top-[28px] z-40 border-b-2 border-blue-500">
-                  <div className="flex flex-col items-end justify-center leading-tight text-xs h-full">
-                    <span>{p.name.split(' ')[0]}</span>
-                    <span>Credit</span>
-                  </div>
-                </th>
-              ))}
-              {showExtraColumns && people.map(p => (
-                <th key={`hdr-ext-cred-${p.id}`} className="p-1 h-10 text-right min-w-[60px] text-emerald-300 bg-emerald-950 border-r border-slate-800 align-middle sticky top-[28px] z-40 border-b-2 border-blue-500">
-                  <div className="flex flex-col items-end justify-center leading-tight text-xs h-full">
-                    <span>{p.name.split(' ')[0]}</span>
-                    <span>Extra</span>
-                  </div>
+              {accountPeople.map(p => (
+                <th key={`hdr-cred-${p.id}`} className="px-2 h-10 text-right min-w-[85px] text-emerald-400 bg-slate-900 border-r border-slate-800 align-middle sticky top-[24px] z-20 border-b border-slate-700 font-bold" title={`${p.name} Deposit`}>
+                  <span className="block text-[11px] leading-tight break-words whitespace-normal text-right">{p.name}</span>
                 </th>
               ))}
 
-              {/* Bill Columns */}
+              {/* Bill Columns with Direct Inline Editing and 2nd Confirmation Archive */}
               {accountBills.map(b => (
-                <th key={`hdr-bill-${b.id}`} className="p-1 h-10 text-right min-w-[70px] text-rose-300 bg-rose-950 group align-middle sticky top-[28px] z-40 border-b-2 border-blue-500 relative" title={b.name}>
+                <th key={`hdr-bill-${b.id}`} className="px-2 h-10 text-right min-w-[115px] text-rose-300 bg-slate-900 group align-middle sticky top-[24px] z-20 border-b border-slate-700 border-r border-slate-800 relative font-bold" title={`${b.name} ($${b.amount})`}>
                   <button
                     type="button"
-                    onClick={() => archiveBill(b.id)}
-                    className="opacity-0 group-hover:opacity-100 hover:scale-110 p-0.5 text-slate-400 hover:text-amber-400 transition-all rounded absolute top-0.5 left-0.5 z-10"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setBillToArchive(b);
+                    }}
+                    className="opacity-0 group-hover:opacity-100 hover:scale-110 p-0.5 text-slate-400 hover:text-amber-400 transition-all rounded absolute top-1 left-0.5 z-10 cursor-pointer"
                     title={`Archive bill "${b.name}"`}
                   >
-                    <Archive className="w-2.5 h-2.5" />
+                    <Archive className="w-3 h-3" />
                   </button>
-                  <div className="flex flex-col items-end justify-center leading-tight text-right text-xs w-full h-full" title={b.name}>
-                    <span className="block truncate max-w-[85px] font-bold">{b.name}</span>
-                  </div>
+                  {editingBillId === b.id ? (
+                    <input
+                      type="text"
+                      value={billDraftName}
+                      autoFocus
+                      onChange={e => setBillDraftName(e.target.value)}
+                      onBlur={() => {
+                        if (billDraftName.trim() && billDraftName.trim() !== b.name) {
+                          updateBill(b.id, { name: billDraftName.trim() });
+                        }
+                        setEditingBillId(null);
+                      }}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') e.target.blur();
+                        if (e.key === 'Escape') setEditingBillId(null);
+                      }}
+                      className="bg-slate-950 text-rose-200 border border-rose-500 rounded px-1 py-0.5 text-[11px] font-bold text-right w-full outline-none"
+                    />
+                  ) : (
+                    <div
+                      onClick={() => {
+                        setEditingBillId(b.id);
+                        setBillDraftName(b.name);
+                      }}
+                      className="cursor-pointer hover:text-white hover:underline transition-colors block text-[11px] leading-tight font-bold text-rose-300 break-words whitespace-normal text-right"
+                      title={`Click to rename "${b.name}"`}
+                    >
+                      {b.name}
+                    </div>
+                  )}
                 </th>
               ))}
-              <th className="p-1 h-10 text-right min-w-[55px] text-rose-300 bg-rose-950 align-middle sticky top-[28px] z-40 border-b-2 border-blue-500">
-                <div className="flex flex-col items-end justify-center leading-tight text-xs h-full">
-                  <span>Other</span>
-                </div>
+              <th className="px-1.5 h-10 text-right min-w-[65px] text-rose-300 bg-slate-900 align-middle sticky top-[24px] z-20 border-b border-slate-700 border-r border-slate-800 font-bold">
+                <span className="block text-[11px] leading-tight">Other<br/>$</span>
               </th>
-              <th className="p-1 h-10 text-left min-w-[90px] text-rose-300 bg-rose-950 border-r border-slate-800 align-middle sticky top-[28px] z-40 border-b-2 border-blue-500">
-                <div className="flex flex-col items-start justify-center leading-tight text-xs h-full">
-                  <span>Other</span>
-                  <span>Desc</span>
-                </div>
+              <th className="px-2 h-10 text-left min-w-[120px] text-rose-300/80 bg-slate-900 border-r border-slate-800 align-middle sticky top-[24px] z-20 border-b border-slate-700 font-semibold">
+                <span className="block text-[11px] leading-tight">Other<br/>Description</span>
               </th>
 
               {/* Ending Balances */}
-              <th className="p-1 h-10 text-right min-w-[65px] text-slate-200 bg-purple-950 align-middle sticky top-[28px] z-40 border-b-2 border-blue-500">
-                <div className="flex flex-col items-end justify-center leading-tight text-xs h-full">
-                  <span>Reg</span>
-                  <span>Ending</span>
-                </div>
+              <th className="px-1.5 h-10 text-right min-w-[72px] text-purple-300 bg-slate-900 align-middle sticky top-[24px] z-20 border-b border-slate-700 border-r border-slate-800 font-bold">
+                <span className="block text-[11px] leading-tight">Reg<br/>End</span>
               </th>
               {showExtraColumns && (
-                <th className="p-1 h-10 text-right min-w-[65px] text-slate-200 bg-purple-950 border-r border-slate-800 align-middle sticky top-[28px] z-40 border-b-2 border-blue-500">
-                  <div className="flex flex-col items-end justify-center leading-tight text-xs h-full">
-                    <span>Extra</span>
-                    <span>Ending</span>
-                  </div>
+                <th className="px-1.5 h-10 text-right min-w-[72px] text-purple-300 bg-slate-900 border-r border-slate-800 align-middle sticky top-[24px] z-20 border-b border-slate-700 font-bold">
+                  <span className="block text-[11px] leading-tight">Extra<br/>End</span>
                 </th>
               )}
 
               {/* Total End Subheader */}
-              <th className="p-1 h-10 min-w-[72px] w-[72px] max-w-[72px] bg-slate-950 text-blue-300 font-black sticky right-0 top-[28px] z-50 align-middle text-right border-b-2 border-blue-500 border-l border-slate-700 shadow-[-4px_0_8px_rgba(0,0,0,0.5)]">
-                <div className="flex flex-col items-end justify-center leading-tight text-xs h-full">
-                  <span>Total</span>
-                  <span>End</span>
-                </div>
+              <th className="px-1.5 h-10 min-w-[76px] w-[76px] max-w-[76px] bg-slate-950 text-blue-300 font-black sticky right-0 top-[24px] z-30 align-middle text-right border-b border-slate-700 border-l border-slate-700 shadow-[-4px_0_8px_rgba(0,0,0,0.5)]">
+                <span className="block text-[11px] leading-tight">Total<br/>End</span>
               </th>
             </tr>
           </thead>
 
-          {/* Matrix Rows (Continuous Multi-Month Stream with Sticky Month Banners) */}
+          {/* Matrix Rows (Continuous Multi-Month Stream with Natural In-Flow Month Banners) */}
           {monthGroups.map(group => (
             <tbody key={group.monthKey} className="divide-y divide-slate-800/50 font-mono text-[10px]">
-              {/* Sticky Month Divider Bar pinned right beneath the table header */}
-              <tr className="sticky top-[68px] z-30 shadow-md">
+              {/* Natural In-Flow Month Header Row (Non-sticky so it never obscures date rows) */}
+              <tr className="bg-slate-950 border-b border-slate-800">
                 <td
                   colSpan={100}
-                  className="py-1 px-3 bg-blue-950 text-blue-200 border-b border-blue-700/80 sticky left-0 top-[68px] z-30 shadow-sm"
+                  className="py-1 px-3 bg-slate-950 text-slate-300 border-b border-slate-800"
                 >
-                  <div className="sticky left-[146px] inline-flex items-center gap-2 font-mono uppercase tracking-widest text-[11px] font-black z-30">
+                  <div className="inline-flex items-center gap-1.5 font-mono uppercase tracking-wider text-[11px] font-bold text-blue-400">
                     <Calendar className="w-3.5 h-3.5 text-blue-400" />
                     <span>{group.monthLabel}</span>
                   </div>
@@ -1043,6 +1164,7 @@ function DailySpreadsheetMatrix() {
               {group.rows.map(row => {
                 const isFirstSelectedDay = row.month === selectedMonth && row.year === selectedYear && row.day === 1;
                 const rowRef = row.isToday ? todayRowRef : (isFirstSelectedDay ? firstSelectedMonthRowRef : null);
+                const isSelected = row.rowKey === selectedRowKey;
 
                 return (
                   <tr
@@ -1051,66 +1173,101 @@ function DailySpreadsheetMatrix() {
                     data-month={row.month}
                     data-year={row.year}
                     data-rowkey={row.rowKey}
-                    className={`snap-start transition-colors ${
-                      row.isToday
-                        ? 'bg-amber-950/70 border-l-4 border-l-amber-400 border-r-2 border-r-amber-400 border-y border-y-amber-400/80 ring-1 ring-amber-400/50 shadow-[0_0_15px_rgba(251,191,36,0.35)] font-extrabold text-amber-100 z-10'
-                        : row.isHistoricalLock
-                          ? 'bg-indigo-950/20 border-l-2 border-l-indigo-500/60 opacity-70 hover:opacity-90 hover:bg-indigo-950/30'
-                          : row.isDeficit
-                            ? 'bg-rose-950/30 hover:bg-slate-800/40'
-                            : row.isPayday
-                              ? 'bg-emerald-950/25 border-l-2 border-l-emerald-500 hover:bg-slate-800/40'
-                              : 'hover:bg-slate-800/40'
+                    onClick={(e) => {
+                      if (e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT') {
+                        setSelectedRowKey(prev => prev === row.rowKey ? null : row.rowKey);
+                      }
+                    }}
+                    className={`snap-start transition-all cursor-pointer ${
+                      row.isToday && isSelected
+                        ? 'bg-amber-900/90 border-l-4 border-l-amber-300 border-r-2 border-r-amber-300 border-y-2 border-y-amber-300 ring-2 ring-amber-300 shadow-[0_0_20px_rgba(251,191,36,0.6)] font-extrabold text-amber-100 z-10'
+                        : row.isToday
+                          ? 'bg-amber-950/70 border-l-4 border-l-amber-400 border-r-2 border-r-amber-400 border-y border-y-amber-400/80 ring-1 ring-amber-400/50 shadow-[0_0_15px_rgba(251,191,36,0.35)] font-extrabold text-amber-100 z-10'
+                          : isSelected
+                            ? 'bg-blue-950/80 border-l-4 border-l-blue-400 border-r-2 border-r-blue-400 border-y-2 border-y-blue-500 ring-2 ring-blue-500/70 shadow-[0_0_18px_rgba(59,130,246,0.45)] font-bold text-blue-100 z-10'
+                            : row.isHistoricalLock
+                              ? 'bg-indigo-950/20 border-l-2 border-l-indigo-500/60 opacity-70 hover:opacity-90 hover:bg-indigo-950/30'
+                              : row.isDeficit
+                                ? 'bg-rose-950/30 hover:bg-slate-800/40'
+                                : row.isPayday
+                                  ? 'bg-emerald-950/25 border-l-2 border-l-emerald-500 hover:bg-slate-800/40'
+                                  : 'hover:bg-slate-800/50'
                     }`}
                   >
-                      {/* Date (Frozen Left & Today Highlight) */}
-                      <td className={`p-1 font-black whitespace-nowrap min-w-[90px] w-[90px] max-w-[90px] sticky left-0 z-20 shadow-[2px_0_5px_rgba(0,0,0,0.4)] ${
-                        row.isToday ? 'bg-amber-950 text-amber-300 border-l-4 border-l-amber-400 border-y border-y-amber-400/80' : 'bg-slate-900 text-slate-300'
+                      {/* Date (Frozen Left & Highlight) */}
+                      <td className={`p-1 font-black whitespace-nowrap min-w-[80px] w-[80px] max-w-[80px] sticky left-0 z-20 shadow-[2px_0_5px_rgba(0,0,0,0.4)] ${
+                        row.isToday
+                          ? 'bg-amber-950 text-amber-300 border-l-4 border-l-amber-400 border-y border-y-amber-400/80'
+                          : isSelected
+                            ? 'bg-blue-950 text-blue-200 border-l-4 border-l-blue-400 border-y border-y-blue-500'
+                            : 'bg-slate-900 text-slate-300'
                       }`}>
-                        <div className="flex items-center justify-between gap-1">
+                        <div className="flex items-center justify-center font-mono">
                           <span>{row.dateFormatted}</span>
-                          {row.isToday && (
-                            <span className="px-1 py-0.2 rounded bg-amber-400 text-slate-950 text-xs font-black uppercase tracking-wider animate-pulse flex-shrink-0">
-                              NOW
-                            </span>
-                          )}
                         </div>
                       </td>
 
-                      {/* Day of Week (Frozen Left & Today Highlight) */}
-                      <td className={`p-1 whitespace-nowrap min-w-[48px] w-[48px] max-w-[48px] border-r border-slate-700 sticky left-[90px] z-20 shadow-[4px_0_8px_rgba(0,0,0,0.5)] ${
-                        row.isToday ? 'bg-amber-950 text-amber-300 border-y border-y-amber-400/80' : 'bg-slate-900 text-slate-300'
+                      {/* Day of Week / NOW Highlight (Frozen Left) */}
+                      <td className={`p-1 text-center whitespace-nowrap min-w-[46px] w-[46px] max-w-[46px] sticky left-[80px] z-20 ${
+                        row.isToday
+                          ? 'bg-amber-950 text-amber-300 border-y border-y-amber-400/80'
+                          : isSelected
+                            ? 'bg-blue-950 text-blue-200 border-y border-y-blue-500'
+                            : 'bg-slate-900 text-slate-300'
                       }`}>
-                        <span className={`px-1 py-0.5 rounded text-xs ${
+                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
                           row.isToday
-                            ? 'bg-amber-400 text-slate-950 font-black shadow-md'
-                            : row.isPayday
-                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-semibold'
-                              : 'text-slate-400 font-semibold'
+                            ? 'bg-amber-400 text-slate-950 font-black uppercase tracking-wider shadow-md animate-pulse'
+                            : isSelected
+                              ? 'bg-blue-500 text-white font-black shadow-md'
+                              : row.isPayday
+                                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                                : 'text-slate-400'
                         }`}>
-                          {row.dayOfWeekName.substring(0, 3)}
+                          {row.isToday ? 'NOW' : row.dayOfWeekName.substring(0, 3)}
                         </span>
                       </td>
 
-                      {/* Beg Balance */}
-                      <td className={`p-1 text-right font-black border-r border-blue-900/60 ${
-                        row.isToday ? 'bg-amber-950/90 text-amber-200 border-y border-y-amber-400/80' : 'bg-blue-950/40 text-blue-200'
+                      {/* Total Beg Balance (Frozen Left) */}
+                      <td className={`p-1 text-right font-black min-w-[76px] w-[76px] max-w-[76px] sticky left-[126px] z-20 border-r border-slate-700 shadow-[4px_0_8px_rgba(0,0,0,0.5)] ${
+                        row.isToday
+                          ? 'bg-amber-950 text-amber-200 border-y border-y-amber-400/80'
+                          : isSelected
+                            ? 'bg-blue-950 text-blue-100 border-y border-y-blue-500'
+                            : 'bg-slate-950 text-blue-300'
+                      }`}>
+                        {fmtMoney(row.totalBeg)}
+                      </td>
+
+                      {/* Regular Beg Balance */}
+                      <td className={`p-1 text-right font-bold border-r border-blue-900/60 min-w-[66px] ${
+                        row.isToday
+                          ? 'bg-amber-950/90 text-amber-200 border-y border-y-amber-400/80'
+                          : isSelected
+                            ? 'bg-blue-900/40 text-blue-100 border-y border-y-blue-500/80'
+                            : 'bg-blue-950/40 text-blue-200'
                       }`}>{fmtMoney(row.regBeg)}</td>
 
                       {/* Extra Beg Balance */}
                       {showExtraColumns && (
-                        <td className={`p-1 text-right font-black border-r-2 border-blue-600/80 ${
-                          row.isToday ? 'bg-amber-950/90 text-amber-200 border-y border-y-amber-400/80' : 'bg-blue-950/40 text-blue-200'
+                        <td className={`p-1 text-right font-bold border-r-2 border-blue-600/80 min-w-[66px] ${
+                          row.isToday
+                            ? 'bg-amber-950/90 text-amber-200 border-y border-y-amber-400/80'
+                            : isSelected
+                              ? 'bg-blue-900/40 text-blue-100 border-y border-y-blue-500/80'
+                              : 'bg-blue-950/40 text-blue-200'
                         }`}>{fmtMoney(row.extraBeg)}</td>
                       )}
 
                       {/* Earner Credits */}
-                      {people.map(p => (
+                      {accountPeople.map(p => (
                         <DroppableCellTd
                           key={`cred-${row.rowKey}-${p.id}`}
                           row={row}
                           field={`credit_${p.id}`}
-                          className="p-1 text-right min-w-[60px] transition-colors relative"
+                          className={`p-1 text-right min-w-[65px] border-r border-slate-800/80 transition-colors relative ${
+                            isSelected && !row.isToday ? 'bg-blue-950/30' : ''
+                          }`}
                           activeCellData={activeCellData}
                         >
                           <MatrixCell
@@ -1127,36 +1284,15 @@ function DailySpreadsheetMatrix() {
                         </DroppableCellTd>
                       ))}
 
-                      {/* Earner Extra Credits */}
-                      {showExtraColumns && people.map(p => (
-                        <DroppableCellTd
-                          key={`ext-cred-${row.rowKey}-${p.id}`}
-                          row={row}
-                          field={`extra_credit_${p.id}`}
-                          className="p-1 text-right border-r border-slate-800/80 min-w-[60px] transition-colors relative"
-                          activeCellData={activeCellData}
-                        >
-                          <MatrixCell
-                            value={row.personExtraCredits[p.id]}
-                            isCredit
-                            monthKey={row.monthKey}
-                            day={row.day}
-                            field={`extra_credit_${p.id}`}
-                            onCommit={handleCellCommit}
-                            draggable={Boolean(row.personExtraCredits[p.id] && row.personExtraCredits[p.id] > 0)}
-                            dragLabel={`${p.name.split(' ')[0]} Extra`}
-                            selectedAccountId={selectedAccountId}
-                          />
-                        </DroppableCellTd>
-                      ))}
-
                       {/* Individual Bill Columns */}
                       {accountBills.map(b => (
                         <DroppableCellTd
                           key={`bill-${row.rowKey}-${b.id}`}
                           row={row}
                           field={`bill_${b.id}`}
-                          className="p-1 text-right min-w-[70px] transition-colors relative"
+                          className={`p-1 text-right min-w-[70px] transition-colors relative ${
+                            isSelected && !row.isToday ? 'bg-blue-950/30' : ''
+                          }`}
                           activeCellData={activeCellData}
                           isBillField
                         >
@@ -1178,7 +1314,9 @@ function DailySpreadsheetMatrix() {
                       <DroppableCellTd
                         row={row}
                         field="other_amount"
-                        className="p-1 text-right min-w-[55px] transition-colors relative"
+                        className={`p-1 text-right min-w-[55px] transition-colors relative ${
+                          isSelected && !row.isToday ? 'bg-blue-950/30' : ''
+                        }`}
                         activeCellData={activeCellData}
                         isBillField
                       >
@@ -1197,7 +1335,9 @@ function DailySpreadsheetMatrix() {
                       </DroppableCellTd>
 
                       {/* Other Description */}
-                      <td className="p-1 border-r border-slate-800/80">
+                      <td className={`p-1 border-r border-slate-800/80 min-w-[120px] ${
+                        isSelected && !row.isToday ? 'bg-blue-950/30' : ''
+                      }`} title={row.otherDesc || 'Click to edit other description'}>
                         <IsolatedTextInput
                           value={row.otherDesc}
                           monthKey={row.monthKey}
@@ -1205,25 +1345,31 @@ function DailySpreadsheetMatrix() {
                           field="other_desc"
                           onCommit={handleCellCommit}
                           placeholder="—"
-                          className="bg-transparent text-[10px] text-slate-300 hover:bg-slate-800/60 focus:bg-slate-800 px-1 py-0.5 rounded outline-none w-full"
+                          className="bg-transparent text-[10px] text-slate-300 hover:bg-slate-800/70 focus:bg-slate-800 focus:text-white px-1.5 py-0.5 rounded outline-none w-full truncate cursor-text transition-colors border border-transparent hover:border-slate-700/60"
                         />
                       </td>
 
                       {/* Regular Ending Balance */}
-                      <td className="p-1 text-right font-bold text-slate-200">{fmtMoney(row.regEnding)}</td>
+                      <td className={`p-1 text-right font-bold ${
+                        isSelected && !row.isToday ? 'text-blue-100 bg-blue-950/40' : 'text-slate-200'
+                      }`}>{fmtMoney(row.regEnding)}</td>
 
                       {/* Extra Ending Balance */}
                       {showExtraColumns && (
-                        <td className="p-1 text-right text-slate-300 border-r border-slate-800/80">{fmtMoney(row.extraEnding)}</td>
+                        <td className={`p-1 text-right text-slate-300 border-r border-slate-800/80 ${
+                          isSelected && !row.isToday ? 'bg-blue-950/40 text-blue-100' : ''
+                        }`}>{fmtMoney(row.extraEnding)}</td>
                       )}
 
                       {/* Total End Balance (Sticky Right) */}
                       <td className={`p-1 min-w-[72px] w-[72px] max-w-[72px] text-right font-extrabold sticky right-0 z-20 border-l border-slate-700 shadow-[-4px_0_8px_rgba(0,0,0,0.5)] ${
                         row.isToday
                           ? 'bg-amber-950 text-amber-100 border-y border-y-amber-400/80'
-                          : row.isDeficit
-                            ? 'bg-slate-900 text-rose-400 animate-pulse'
-                            : 'bg-slate-900 text-blue-300'
+                          : isSelected
+                            ? 'bg-blue-950 text-blue-100 border-y border-y-blue-500'
+                            : row.isDeficit
+                              ? 'bg-slate-900 text-rose-400 animate-pulse'
+                              : 'bg-slate-900 text-blue-300'
                       }`}>
                         {fmtMoney(row.totalEnd)}
                       </td>
@@ -1236,25 +1382,17 @@ function DailySpreadsheetMatrix() {
           {/* Matrix Footers (Sticky Totals) */}
           <tfoot className="sticky bottom-0 z-30 bg-slate-900 font-extrabold text-[10px] text-slate-100 border-t-2 border-slate-700 shadow-lg">
             <tr>
-              <td colSpan={2} className="p-1 text-slate-300 bg-slate-900 border-r border-slate-700 sticky left-0 z-40 shadow-[4px_0_8px_rgba(0,0,0,0.5)]">Monthly Subtotals</td>
+              <td colSpan={3} className="p-1 text-slate-300 bg-slate-900 border-r border-slate-700 sticky left-0 z-40 shadow-[4px_0_8px_rgba(0,0,0,0.5)]">Monthly Subtotals</td>
               <td className="p-1 text-right text-slate-400 bg-slate-900">&mdash;</td>
               {showExtraColumns && (
                 <td className="p-1 text-right text-slate-400 bg-slate-900 border-r border-slate-800">&mdash;</td>
               )}
 
               {/* Credit Subtotals */}
-              {people.map(p => {
+              {accountPeople.map(p => {
                 const tot = columnTotals.regCredits[p.id] || 0;
                 return (
-                  <td key={`tot-cred-${p.id}`} className={`p-1 text-right font-mono bg-slate-900 min-w-[60px] ${tot < 0 ? 'text-rose-400 font-bold' : 'text-emerald-400'}`}>
-                    {tot >= 0 ? `+${fmtMoney(tot)}` : fmtMoney(tot)}
-                  </td>
-                );
-              })}
-              {showExtraColumns && people.map(p => {
-                const tot = columnTotals.extraCredits[p.id] || 0;
-                return (
-                  <td key={`tot-ext-cred-${p.id}`} className={`p-1 text-right font-mono bg-slate-900 border-r border-slate-800 min-w-[60px] ${tot < 0 ? 'text-rose-400 font-bold' : 'text-emerald-300'}`}>
+                  <td key={`tot-cred-${p.id}`} className={`p-1 text-right font-mono bg-slate-900 min-w-[72px] border-r border-slate-800 ${tot < 0 ? 'text-rose-400 font-bold' : 'text-emerald-400'}`}>
                     {tot >= 0 ? `+${fmtMoney(tot)}` : fmtMoney(tot)}
                   </td>
                 );
@@ -1262,7 +1400,7 @@ function DailySpreadsheetMatrix() {
 
               {/* Bill Subtotals */}
               {accountBills.map(b => (
-                <td key={`tot-bill-${b.id}`} className="p-1 text-right text-rose-400 font-mono bg-slate-900 min-w-[70px]">
+                <td key={`tot-bill-${b.id}`} className="p-1 text-right text-rose-400 font-mono bg-slate-900 min-w-[82px]">
                   -{fmtMoney(columnTotals.bills[b.id])}
                 </td>
               ))}
@@ -1272,12 +1410,12 @@ function DailySpreadsheetMatrix() {
               <td className="p-1 bg-slate-900 border-r border-slate-800">&mdash;</td>
 
               {/* Ending Balances Subtotals */}
-              <td className="p-1 text-right font-mono text-slate-200 bg-slate-900">&mdash;</td>
+              <td className="p-1 text-right font-mono text-slate-200 bg-slate-900 min-w-[66px]">&mdash;</td>
               {showExtraColumns && (
-                <td className="p-1 text-right font-mono text-slate-200 bg-slate-900 border-r border-slate-800">&mdash;</td>
+                <td className="p-1 text-right font-mono text-slate-200 bg-slate-900 border-r border-slate-800 min-w-[66px]">&mdash;</td>
               )}
               {/* Sticky Right Total End Footer */}
-              <td className="p-1 text-right font-mono text-blue-400 font-black bg-slate-900 border-l border-slate-700 sticky right-0 z-40 shadow-[-4px_0_8px_rgba(0,0,0,0.5)]">
+              <td className="p-1 text-right font-mono text-blue-400 font-black bg-slate-950 border-l border-slate-700 sticky right-0 z-40 shadow-[-4px_0_8px_rgba(0,0,0,0.5)] min-w-[76px] w-[76px] max-w-[76px]">
                 {fmtMoney(finalEndingBalance)}
               </td>
             </tr>
@@ -1305,6 +1443,45 @@ function DailySpreadsheetMatrix() {
               isModal={true}
               onClose={() => setIsImportModalOpen(false)}
             />
+          </div>
+        </div>
+      )}
+
+      {/* Archive Bill Confirmation Modal (2nd Confirmation Popup) */}
+      {billToArchive && (
+        <div className="fixed inset-0 z-[200] bg-black/75 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-5 max-w-sm w-full shadow-2xl space-y-4">
+            <div className="flex items-center gap-3 text-amber-400">
+              <div className="p-2.5 rounded-xl bg-amber-500/20 border border-amber-500/30">
+                <Archive className="w-5 h-5 text-amber-400" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-slate-100">Archive Bill Column?</h4>
+                <p className="text-xs text-amber-300/90 font-mono font-bold">"{billToArchive.name}"</p>
+              </div>
+            </div>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Are you sure you want to archive the <strong className="text-white font-bold">{billToArchive.name}</strong> column? It will be hidden from your active spreadsheet register, but you can restore it anytime from the <span className="text-amber-400 font-semibold">Archived Bills</span> drawer.
+            </p>
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setBillToArchive(null)}
+                className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  archiveBill(billToArchive.id);
+                  setBillToArchive(null);
+                }}
+                className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/25 transition-all cursor-pointer"
+              >
+                Archive Bill
+              </button>
+            </div>
           </div>
         </div>
       )}

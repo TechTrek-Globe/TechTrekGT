@@ -463,8 +463,9 @@ export function LedgerDataProvider({ children }) {
       return;
     }
     
-    // Mutate ref to eliminate O(N) full dictionary spread thrashing
+    // Mutate ref and sync state for reactive components and persistence
     dailyMatrixRef.current[key] = value;
+    setDailyMatrix({ ...dailyMatrixRef.current });
     setMatrixVersion(v => v + 1);
   }, []);
 
@@ -478,6 +479,7 @@ export function LedgerDataProvider({ children }) {
       }
     }
     if (hasChanges) {
+      setDailyMatrix({ ...dailyMatrixRef.current });
       setMatrixVersion(v => v + 1);
     }
   }, []);
@@ -506,6 +508,7 @@ export function LedgerDataProvider({ children }) {
     }
 
     if (hasChanges) {
+      setDailyMatrix({ ...dailyMatrixRef.current });
       setMatrixVersion(v => v + 1);
     }
   }, []);

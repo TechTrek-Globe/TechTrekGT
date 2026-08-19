@@ -286,6 +286,8 @@ export function SettingsModal() {
   const [isAddAccountModalOpen, setIsAddAccountModalOpen] = useState(false);
   const [isAddPersonModalOpen, setIsAddPersonModalOpen] = useState(false);
   const [isAddBillModalOpen, setIsAddBillModalOpen] = useState(false);
+  const [billFilterTab, setBillFilterTab] = useState('active');
+  const [selectedBillsAccountId, setSelectedBillsAccountId] = useState('all');
   const [newAccForm, setNewAccForm] = useState({ name: '', type: 'checking', saveExtraMonthly: 0, enableExtraSavings: true, color: 'blue', notes: '' });
   const [newPersonForm, setNewPersonForm] = useState({ name: '', role: 'Member', payFrequency: 'bi-weekly', grossPerPay: 0, netPerPay: 0, payDay1: 15, payDay2: 'last', payOffsetDays: 0 });
   const [newBillForm, setNewBillForm] = useState({ name: '', amount: 0, period: 'Monthly', accountId: budget.accounts[0]?.id || '', dueDay: 1, dueMonths: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], paymentSource: 'Auto Pay', matchingKey: '', notes: '' });
@@ -436,7 +438,7 @@ export function SettingsModal() {
       setNewBillForm(prev => ({ ...prev, accountId: budget.accounts[0].id }));
     }
   }, [budget.accounts, newBillForm.accountId]);
-  const [billFilterTab, setBillFilterTab] = useState('active'); // 'active' | 'archived'
+
   const [setupSubTab, setSetupSubTab] = useState('accounts'); // 'accounts' | 'bills'
   const [billsSubView, setBillsSubView] = useState('list'); // 'list' | 'splits'
   const [jsonInput, setJsonInput] = useState('');
@@ -1178,654 +1180,241 @@ export function SettingsModal() {
                           className="px-5 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/20 transition-all cursor-pointer"
                         >
                           Create Account
-                        </button>
+</button>
                       </div>
                     </form>
                   </div>
                 </div>
               )}
 
-              {/* Accounts Soft Cards List */}
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
-                {budget.accounts.map(acc => (
-                  <div 
-                    key={acc.id} 
-                    className="p-5 sm:p-6 rounded-2xl bg-slate-900/40 hover:bg-slate-900/60 border border-slate-800/80 hover:border-slate-700/80 shadow-lg shadow-black/20 backdrop-blur-xl transition-all duration-300 space-y-5"
-                  >
-                    {/* Header: Icon, Editable Title & Delete */}
-                    <div className="flex items-center justify-between gap-3 pb-1 border-b border-slate-800/40">
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
-                          <CreditCard className="w-4 h-4" />
-                        </div>
-                        <input
-                          type="text"
-                          value={acc.name}
-                          onChange={e => updateAccount(acc.id, { name: e.target.value })}
-                          className="w-full bg-transparent font-bold text-slate-100 text-sm sm:text-base focus:bg-slate-950/80 focus:outline-none focus:ring-1 focus:ring-blue-500/40 rounded-lg px-2 py-1 transition-all truncate"
-                          placeholder="Account Name"
-                        />
-                      </div>
-                      <button
-                        onClick={() => deleteAccount(acc.id)}
-                        className="p-2 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-xl transition-all shrink-0 cursor-pointer"
-                        title="Delete Account"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+              {/* High-Density Accounts Table */}
+              <div className="overflow-x-auto matrix-scrollbar rounded-xl border border-slate-800 bg-slate-950/60 shadow-md">
+                <table className="w-full text-left text-xs text-slate-300">
+                  <thead className="bg-slate-900 text-slate-400 uppercase font-medium text-[9px] border-b border-slate-800">
+                    <tr>
+                      <th className="px-3 py-2 w-[28%]">Account Name</th>
+                      <th className="px-3 py-2 w-[16%]">Type</th>
+                      <th className="px-3 py-2 w-[22%]">Extra Savings Target</th>
+                      <th className="px-3 py-2 w-[28%]">Active Split Earners</th>
+                      <th className="px-3 py-2 w-[6%] text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/80">
+                    {budget.accounts.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="p-4 text-center text-slate-500 italic text-xs">No accounts found.</td>
+                      </tr>
+                    ) : (
+                      budget.accounts.map(acc => {
+                        const enabledList = (acc.enabledEarners && Array.isArray(acc.enabledEarners))
+                          ? acc.enabledEarners
+                          : budget.people.map(person => person.id);
 
-                    {/* Account Controls Grid */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                      <div>
-                        <label className="text-[11px] font-semibold text-slate-400 block mb-1.5">Account Type</label>
-                        <select
-                          value={acc.type}
-                          onChange={e => updateAccount(acc.id, { type: e.target.value })}
-                          className="w-full bg-slate-950 border border-slate-800/80 rounded-xl px-2.5 py-2 text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/80 transition-all cursor-pointer [color-scheme:dark]"
-                        >
-                          <option value="checking">Checking</option>
-                          <option value="savings">Savings</option>
-                          <option value="credit">Credit Card</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    {/* Extra Savings Toggle Switch */}
-                    <div className="pt-2 flex items-center gap-3">
-                      <button
-                        type="button"
-                        role="switch"
-                        aria-checked={acc.enableExtraSavings !== false}
-                        onClick={() => updateAccount(acc.id, { enableExtraSavings: acc.enableExtraSavings === false })}
-                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${acc.enableExtraSavings !== false ? 'bg-blue-600' : 'bg-slate-700'}`}
-                        id={`chk-extra-modal-${acc.id}`}
-                      >
-                        <span
-                          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${acc.enableExtraSavings !== false ? 'translate-x-4' : 'translate-x-0'}`}
-                        />
-                      </button>
-                      <label htmlFor={`chk-extra-modal-${acc.id}`} className="text-xs text-slate-300 font-medium cursor-pointer select-none">
-                        Track Extra Savings Bucket
-                      </label>
-                    </div>
-
-                    {/* Extra Savings Sub-Card */}
-                    {acc.enableExtraSavings !== false && (
-                      <div className="p-4 bg-slate-950/60 border border-slate-800/60 rounded-xl space-y-3">
-                        <div className="grid grid-cols-2 gap-3 text-xs">
-                          <div>
-                            <label className="text-[11px] font-semibold text-indigo-300 block mb-1.5">Save Extra Target ($/mo)</label>
-                            <input
-                              type="number"
-                              step="10"
-                              value={acc.saveExtraMonthly || 0}
-                              onChange={e => updateAccount(acc.id, { saveExtraMonthly: parseFloat(e.target.value) || 0 })}
-                              className="w-full bg-slate-950 border border-slate-800/80 rounded-xl px-3 py-2 text-emerald-400 font-mono font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/80 transition-all"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-[11px] font-semibold text-slate-400 block mb-1.5">Extra Current Balance ($)</label>
-                            <p className="text-xs text-slate-500 italic">Derived from transaction history</p>
-                          </div>
-                        </div>
-                      </div>
+                        return (
+                          <tr key={acc.id} className="hover:bg-slate-900/50 transition-colors">
+                            <td className="px-3 py-1.5 font-bold text-slate-200">
+                              <input
+                                type="text"
+                                value={acc.name}
+                                onChange={e => updateAccount(acc.id, { name: e.target.value })}
+                                className="bg-transparent border-b border-transparent hover:border-slate-700 focus:border-blue-500 focus:outline-none w-full text-xs font-bold text-slate-100"
+                                placeholder="Account Name"
+                              />
+                            </td>
+                            <td className="px-3 py-1.5">
+                              <select
+                                value={acc.type}
+                                onChange={e => updateAccount(acc.id, { type: e.target.value })}
+                                className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-slate-200 text-xs focus:border-blue-500 focus:outline-none cursor-pointer"
+                              >
+                                <option value="checking">Checking</option>
+                                <option value="savings">Savings</option>
+                                <option value="credit">Credit Card</option>
+                              </select>
+                            </td>
+                            <td className="px-3 py-1.5">
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  role="switch"
+                                  aria-checked={acc.enableExtraSavings !== false}
+                                  onClick={() => updateAccount(acc.id, { enableExtraSavings: acc.enableExtraSavings === false })}
+                                  className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${acc.enableExtraSavings !== false ? 'bg-blue-600' : 'bg-slate-700'}`}
+                                  title="Toggle Extra Savings Goal"
+                                >
+                                  <span
+                                    className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow transition duration-200 ease-in-out ${acc.enableExtraSavings !== false ? 'translate-x-3' : 'translate-x-0'}`}
+                                  />
+                                </button>
+                                {acc.enableExtraSavings !== false ? (
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-[11px] text-slate-400 font-mono">$</span>
+                                    <input
+                                      type="number"
+                                      step="10"
+                                      value={acc.saveExtraMonthly || 0}
+                                      onChange={e => updateAccount(acc.id, { saveExtraMonthly: parseFloat(e.target.value) || 0 })}
+                                      className="w-18 bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-emerald-400 font-mono text-xs focus:border-blue-500 focus:outline-none"
+                                    />
+                                    <span className="text-[10px] text-slate-500">/mo</span>
+                                  </div>
+                                ) : (
+                                  <span className="text-[10px] text-slate-500 italic">Off</span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-3 py-1.5">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                {budget.people.map(p => {
+                                  const isChecked = enabledList.includes(p.id);
+                                  return (
+                                    <button
+                                      key={p.id}
+                                      type="button"
+                                      onClick={() => {
+                                        let updated;
+                                        if (isChecked) {
+                                          if (enabledList.length <= 1) return;
+                                          updated = enabledList.filter(id => id !== p.id);
+                                        } else {
+                                          updated = [...enabledList, p.id];
+                                        }
+                                        updateAccount(acc.id, { enabledEarners: updated });
+                                      }}
+                                      className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold border transition-all cursor-pointer ${
+                                        isChecked
+                                          ? 'bg-purple-950/70 border-purple-600/60 text-purple-200'
+                                          : 'bg-slate-900/60 border-slate-800 text-slate-500 opacity-60 hover:opacity-100'
+                                      }`}
+                                    >
+                                      <span className={`w-1.5 h-1.5 rounded-full ${isChecked ? 'bg-purple-400' : 'bg-slate-600'}`} />
+                                      <span>{p.name.split(' ')[0]}</span>
+                                      <span className="text-[9px]">{isChecked ? '✓' : '—'}</span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </td>
+                            <td className="px-3 py-1.5 text-right">
+                              <button
+                                onClick={() => deleteAccount(acc.id)}
+                                className="p-1 text-slate-500 hover:text-rose-400 rounded transition-colors cursor-pointer"
+                                title="Delete Account"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
                     )}
-                  </div>
-                ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
 
           {/* SETUP: EARNERS (stacked below Accounts in Accounts & Earners view) */}
           {(settingsTab === 'accounts' || settingsTab === 'people') && (
-            <div className="space-y-6 pt-6">
+            <div className="space-y-3 pt-3">
               {/* Earners Header & Action Bar */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center">
-                      <Users className="w-4 h-4" />
-                    </div>
-                    <h3 className="text-base font-semibold text-slate-100 tracking-tight">
-                      Household Members &amp; Earners ({budget.people.length})
-                    </h3>
-                  </div>
-                  <p className="text-xs text-slate-400 pl-10">
-                    Configure earners, pay frequencies, and net/gross income schedules.
-                  </p>
+              <div className="flex items-center justify-between gap-3 pb-2 border-b border-slate-800">
+                <div className="flex items-center gap-2">
+                  <Users className="w-4 h-4 text-purple-400" />
+                  <h3 className="text-xs font-bold text-slate-100">
+                    Household Earners ({budget.people.length})
+                  </h3>
+                  <span className="text-[11px] text-slate-400 hidden sm:inline">• Configure incomes and pay frequency schedules</span>
                 </div>
                 <button
                   type="button"
                   onClick={() => setIsAddPersonModalOpen(true)}
-                  className="self-start sm:self-center flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-semibold shadow-sm hover:shadow transition-all cursor-pointer"
+                  className="flex items-center gap-1.5 px-3 py-1 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-semibold shadow-sm transition-all cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Add Member</span>
                 </button>
               </div>
 
-              {/* Pop-up Modal: Add New Person */}
-              {isAddPersonModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in overflow-y-auto">
-                  <div
-                    ref={addPersonModalRef}
-                    role="dialog"
-                    aria-modal="true"
-                    aria-labelledby="add-person-modal-title"
-                    className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto my-auto"
-                  >
-                    <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                      <h3 id="add-person-modal-title" className="text-base font-bold text-slate-100 flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-lg bg-purple-600/20 flex items-center justify-center text-purple-400">
-                          <Plus className="w-4 h-4" />
-                        </div>
-                        Add Household Member
-                      </h3>
-                      <button
-                        type="button"
-                        onClick={() => setIsAddPersonModalOpen(false)}
-                        className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-
-                    <form onSubmit={(e) => {
-                      e.preventDefault();
-                      if (!newPersonForm.name) return;
-                      addPerson(newPersonForm);
-                      setNewPersonForm({ name: '', role: 'Member', payFrequency: 'bi-weekly', grossPerPay: 0, netPerPay: 0, payDay1: 15, payDay2: 'last', payOffsetDays: 0 });
-                      setIsAddPersonModalOpen(false);
-                    }} className="space-y-4">
-                      <div>
-                        <label className="block text-xs font-medium text-slate-300 mb-1">Member Name *</label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="e.g. Jon Kemp"
-                          value={newPersonForm.name}
-                          onChange={e => setNewPersonForm({ ...newPersonForm, name: e.target.value })}
-                          className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-purple-500"
-                          autoFocus
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs font-medium text-slate-300 mb-1">Pay Schedule</label>
-                          <select
-                            value={newPersonForm.payFrequency}
-                            onChange={e => setNewPersonForm({ ...newPersonForm, payFrequency: e.target.value })}
-                            className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-purple-500"
-                          >
-                            <option value="bi-weekly">Bi-weekly (26/yr)</option>
-                            <option value="semi-monthly">Semi-Monthly (24/yr)</option>
-                            <option value="monthly">Monthly (12/yr)</option>
-                            <option value="weekly">Weekly (52/yr)</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-slate-300 mb-1">Role / Title</label>
-                          <input
-                            type="text"
-                            placeholder="e.g. Primary Earner"
-                            value={newPersonForm.role || ''}
-                            onChange={e => setNewPersonForm({ ...newPersonForm, role: e.target.value })}
-                            className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-purple-500"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Pay Dates Customization & Presets */}
-                      {(() => {
-                        const isMulti = newPersonForm.payFrequency === 'bi-weekly' || newPersonForm.payFrequency === 'semi-monthly';
-                        return (
-                          <div className="p-3 bg-slate-950/60 border border-slate-800 rounded-xl space-y-2">
-                            <div className="flex items-center justify-between">
-                              <label className="block text-xs font-semibold text-purple-300">Payment Dates / Schedule</label>
-                              {isMulti && (
-                                <div className="flex items-center gap-1">
-                                  <button
-                                    type="button"
-                                    onClick={() => setNewPersonForm({ ...newPersonForm, payDay1: '1st', payDay2: '15th' })}
-                                    className="px-2 py-0.5 text-[10px] rounded bg-purple-950/80 hover:bg-purple-900 text-purple-300 border border-purple-800 transition-colors"
-                                  >
-                                    1st & 15th
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => setNewPersonForm({ ...newPersonForm, payDay1: '15th', payDay2: 'End of Month' })}
-                                    className="px-2 py-0.5 text-[10px] rounded bg-purple-950/80 hover:bg-purple-900 text-purple-300 border border-purple-800 transition-colors"
-                                  >
-                                    15th & End
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => setNewPersonForm({ ...newPersonForm, payDay1: 'Every 2 Wks', payDay2: 'Fridays' })}
-                                    className="px-2 py-0.5 text-[10px] rounded bg-purple-950/80 hover:bg-purple-900 text-purple-300 border border-purple-800 transition-colors"
-                                  >
-                                    Bi-Weekly
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                            <div className={`grid gap-3 ${isMulti ? 'grid-cols-3' : 'grid-cols-2'}`}>
-                              <div>
-                                <label className="block text-[10px] text-slate-400 mb-1">
-                                  {isMulti ? 'Pay Date 1 (e.g. 1st / 1)' : 'Pay Date (e.g. 1st / 15th)'}
-                                </label>
-                                <input
-                                  type="text"
-                                  placeholder="e.g. 1st or 1"
-                                  value={newPersonForm.payDay1 || ''}
-                                  onChange={e => setNewPersonForm({ ...newPersonForm, payDay1: e.target.value })}
-                                  className="w-full px-3 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:border-purple-500 font-mono"
-                                />
-                              </div>
-                              {isMulti && (
-                                <div>
-                                  <label className="block text-[10px] text-slate-400 mb-1">Pay Date 2 (e.g. 15th / 15)</label>
-                                  <input
-                                    type="text"
-                                    placeholder="e.g. 15th or 15"
-                                    value={newPersonForm.payDay2 || ''}
-                                    onChange={e => setNewPersonForm({ ...newPersonForm, payDay2: e.target.value })}
-                                    className="w-full px-3 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:border-purple-500 font-mono"
-                                  />
-                                </div>
-                              )}
-                              <div>
-                                <label className="block text-[10px] text-amber-300 font-semibold mb-1">Early Pay Deposit Offset</label>
-                                <select
-                                  value={newPersonForm.payOffsetDays ?? 0}
-                                  onChange={e => setNewPersonForm({ ...newPersonForm, payOffsetDays: parseInt(e.target.value) || 0 })}
-                                  className="w-full px-3 py-1.5 text-xs bg-slate-900 border border-amber-500/40 rounded-lg text-amber-200 focus:outline-none focus:border-purple-500 font-mono"
-                                >
-                                  <option value={0}>Exact Payday (0 Days)</option>
-                                  <option value={-1}>1 Day Early (-1 Day)</option>
-                                  <option value={-2}>2 Days Early (-2 Days e.g. USAA)</option>
-                                  <option value={-3}>3 Days Early (-3 Days)</option>
-                                </select>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })()}
-
-                      {/* Per-Account Direct Deposit Allocations (if multiple accounts exist) */}
-                      {budget.accounts.length > 1 && (
-                        <div className="p-3 bg-slate-950/60 border border-slate-800 rounded-xl space-y-2">
-                          <div className="flex items-center justify-between">
-                            <label className="block text-xs font-semibold text-purple-300">Direct Deposit Allocations (Per Paycheck)</label>
-                            {(() => {
-                              const allocs = newPersonForm.accountAllocations || {};
-                              const totalAllocated = Object.values(allocs).reduce((/** @type {number} */ sum, /** @type {any} */ val) => sum + (val === 'remaining' ? 0 : (parseFloat(val) || 0)), 0);
-                              const hasRemaining = Object.values(allocs).includes('remaining');
-                              const netPay = parseFloat(newPersonForm.netPerPay) || 0;
-                              const remVal = Math.max(0, netPay - totalAllocated);
-                              const isBalanced = (hasRemaining && totalAllocated <= netPay) || (Math.abs(totalAllocated - netPay) < 0.01 && netPay > 0);
-                              return (
-                                <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
-                                  isBalanced
-                                    ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
-                                    : 'bg-amber-950 text-amber-300 border border-amber-800'
-                                }`}>
-                                  Allocated: ${totalAllocated.toLocaleString('en-US', { minimumFractionDigits: 2 })} {hasRemaining ? `+ Remaining ($${remVal.toLocaleString('en-US', { minimumFractionDigits: 2 })})` : `/ $${netPay.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
-                                </span>
-                              );
-                            })()}
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                            {budget.accounts.map(acc => {
-                              const rawVal = newPersonForm.accountAllocations?.[acc.id];
-                              const isRemaining = rawVal === 'remaining';
-                              const val = isRemaining ? '' : (rawVal ?? '');
-                              return (
-                                <div key={acc.id} className={`flex items-center justify-between p-2 rounded-lg text-xs transition-colors ${
-                                  isRemaining ? 'bg-emerald-950/40 border border-emerald-800/60' : 'bg-slate-900/80 border border-slate-800'
-                                }`}>
-                                  <span className="text-slate-300 font-medium truncate max-w-[110px]">{acc.name}</span>
-                                  <div className="flex items-center gap-1.5">
-                                    {!isRemaining ? (
-                                      <>
-                                        <span className="text-slate-500 font-mono">$</span>
-                                        <input
-                                          type="number"
-                                          step="0.01"
-                                          placeholder="0.00"
-                                          value={val}
-                                          onChange={e => {
-                                            const amount = parseFloat(e.target.value) || 0;
-                                            setNewPersonForm({
-                                              ...newPersonForm,
-                                              accountAllocations: { ...(newPersonForm.accountAllocations || {}), [acc.id]: amount }
-                                            });
-                                          }}
-                                          className="w-20 px-2 py-1 bg-slate-950 border border-slate-700 rounded text-right text-slate-100 font-mono focus:outline-none focus:border-purple-500"
-                                        />
-                                      </>
-                                    ) : (
-                                      <span className="text-[10px] font-mono font-semibold text-emerald-400 px-1.5 py-0.5 bg-emerald-950 border border-emerald-800 rounded">
-                                        Remaining
-                                      </span>
-                                    )}
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const currentAlloc = { ...(newPersonForm.accountAllocations || {}) };
-                                        if (isRemaining) {
-                                          delete currentAlloc[acc.id];
-                                        } else {
-                                          Object.keys(currentAlloc).forEach(k => {
-                                            if (currentAlloc[k] === 'remaining') delete currentAlloc[k];
-                                          });
-                                          currentAlloc[acc.id] = 'remaining';
-                                        }
-                                        setNewPersonForm({
-                                          ...newPersonForm,
-                                          accountAllocations: currentAlloc
-                                        });
-                                      }}
-                                      className={`px-2 py-1 text-[10px] font-semibold rounded transition-colors ${
-                                        isRemaining
-                                          ? 'bg-emerald-500 text-slate-950 hover:bg-emerald-400'
-                                          : 'bg-slate-800 text-slate-300 hover:bg-purple-950 hover:text-purple-300 border border-slate-700'
-                                      }`}
-                                      title="Toggle Remaining (allocates all unallocated paycheck income to this account)"
-                                    >
-                                      {isRemaining ? 'Remaining ✓' : 'Set Remaining'}
-                                    </button>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-800">
-                        <div>
-                          <label className="block text-xs font-medium text-slate-300 mb-1">Gross Per Paycheck ($)</label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            placeholder="3000.00"
-                            value={newPersonForm.grossPerPay || 0}
-                            onChange={e => setNewPersonForm({ ...newPersonForm, grossPerPay: parseFloat(e.target.value) || 0 })}
-                            className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-100 font-mono focus:outline-none focus:border-purple-500"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-slate-300 mb-1">Net Per Paycheck ($)</label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            placeholder="2200.00"
-                            value={newPersonForm.netPerPay || 0}
-                            onChange={e => setNewPersonForm({ ...newPersonForm, netPerPay: parseFloat(e.target.value) || 0 })}
-                            className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-emerald-400 font-mono font-bold focus:outline-none focus:border-purple-500"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
-                        <button
-                          type="button"
-                          onClick={() => setIsAddPersonModalOpen(false)}
-                          className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors cursor-pointer"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="submit"
-                          className="px-5 py-2 rounded-xl text-xs font-semibold bg-purple-600 hover:bg-purple-500 text-white shadow-md shadow-purple-600/20 transition-all cursor-pointer"
-                        >
-                          Add Member
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-                </div>
-              )}
-
-              {/* People List */}
-              <div className="space-y-4">
-                {budget.people.map(person => {
-                  const isMulti = person.payFrequency === 'bi-weekly' || person.payFrequency === 'semi-monthly';
-                  const totalAllocated = Object.values(person.accountAllocations || {}).reduce((/** @type {number} */ sum, /** @type {any} */ val) => sum + (parseFloat(val) || 0), 0);
-
-                  return (
-                    <div 
-                      key={person.id} 
-                      className="p-5 sm:p-6 rounded-2xl bg-slate-900/40 hover:bg-slate-900/60 border border-slate-800/80 hover:border-slate-700/80 shadow-lg shadow-black/20 backdrop-blur-xl transition-all duration-300 space-y-5"
-                    >
-                      <div className="flex items-center justify-between gap-3 pb-1 border-b border-slate-800/40">
-                        <div className="flex items-center gap-3 min-w-0 flex-1">
-                          <div className="w-9 h-9 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center shrink-0">
-                            <Users className="w-4 h-4" />
-                          </div>
-                          <input
-                            type="text"
-                            value={person.name}
-                            onChange={e => updatePerson(person.id, { name: e.target.value })}
-                            className="w-full bg-transparent font-bold text-slate-100 text-sm sm:text-base focus:bg-slate-950/80 focus:outline-none focus:ring-1 focus:ring-purple-500/40 rounded-lg px-2 py-1 transition-all truncate"
-                            placeholder="Member Name"
-                          />
-                          <span className="text-[10px] font-semibold px-2.5 py-1 rounded-full bg-purple-500/10 text-purple-300 border border-purple-500/20 shrink-0">
-                            {person.payFrequency}
-                          </span>
-                          {person.payOffsetDays ? (
-                            <span className="text-[10px] px-2 py-0.5 rounded bg-amber-950/80 text-amber-300 border border-amber-800 font-mono shrink-0">
-                              {person.payOffsetDays}d Early
-                            </span>
-                          ) : null}
-                        </div>
-                        <button
-                          onClick={() => deletePerson(person.id)}
-                          className="p-2 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-xl transition-all shrink-0 cursor-pointer"
-                          title="Delete Member"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-
-                      <div className="space-y-3">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 text-xs">
-                          <div>
-                            <label className="text-[11px] font-semibold text-slate-400 block mb-1.5">Pay Frequency</label>
+              {/* High-Density Earners Table */}
+              <div className="overflow-x-auto matrix-scrollbar rounded-xl border border-slate-800 bg-slate-950/60 shadow-md">
+                <table className="w-full text-left text-xs text-slate-300">
+                  <thead className="bg-slate-900 text-slate-400 uppercase font-medium text-[9px] border-b border-slate-800">
+                    <tr>
+                      <th className="px-3 py-2 w-[30%]">Member Name</th>
+                      <th className="px-3 py-2 w-[24%]">Pay Frequency</th>
+                      <th className="px-3 py-2 w-[20%]">Gross Per Pay ($)</th>
+                      <th className="px-3 py-2 w-[20%]">Net Per Pay ($)</th>
+                      <th className="px-3 py-2 w-[6%] text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/80">
+                    {budget.people.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="p-4 text-center text-slate-500 italic text-xs">No earners found.</td>
+                      </tr>
+                    ) : (
+                      budget.people.map(person => (
+                        <tr key={person.id} className="hover:bg-slate-900/50 transition-colors">
+                          <td className="px-3 py-1.5 font-bold text-slate-200">
+                            <input
+                              type="text"
+                              value={person.name}
+                              onChange={e => updatePerson(person.id, { name: e.target.value })}
+                              className="bg-transparent border-b border-transparent hover:border-slate-700 focus:border-purple-500 focus:outline-none w-full text-xs font-bold text-slate-100"
+                              placeholder="Member Name"
+                            />
+                          </td>
+                          <td className="px-3 py-1.5">
                             <select
                               value={person.payFrequency}
                               onChange={e => updatePerson(person.id, { payFrequency: e.target.value })}
-                              className="w-full bg-slate-950 border border-slate-800/80 rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500/80 transition-all cursor-pointer [color-scheme:dark]"
+                              className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-slate-200 text-xs focus:border-purple-500 focus:outline-none cursor-pointer"
                             >
                               <option value="bi-weekly">Bi-weekly (26/yr)</option>
                               <option value="semi-monthly">Semi-Monthly (24/yr)</option>
                               <option value="monthly">Monthly (12/yr)</option>
                               <option value="weekly">Weekly (52/yr)</option>
                             </select>
-                          </div>
-                          <div>
-                            <label className="text-[11px] font-medium text-slate-400 block mb-1.5">Gross Per Pay ($)</label>
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={person.grossPerPay}
-                              onChange={e => updatePerson(person.id, { grossPerPay: parseFloat(e.target.value) || 0 })}
-                              className="w-full bg-slate-950/80 border border-slate-800/80 rounded-xl px-3 py-2 text-slate-200 font-mono focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500/80 transition-all"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-[11px] font-medium text-slate-400 block mb-1.5">Net Per Pay ($)</label>
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={person.netPerPay}
-                              onChange={e => updatePerson(person.id, { netPerPay: parseFloat(e.target.value) || 0 })}
-                              className="w-full bg-slate-950/80 border border-slate-800/80 rounded-xl px-3 py-2 text-emerald-400 font-bold font-mono focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500/80 transition-all"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Pay Dates Bar with Presets & Custom Fields & Early Deposit Offset */}
-                        <div className="p-2.5 bg-slate-950/40 border border-slate-800 rounded-lg space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[11px] font-semibold text-purple-300">Payment Dates & Deposit Schedule:</span>
-                            {isMulti && (
-                              <div className="flex items-center gap-1.5">
-                                <button
-                                  type="button"
-                                  onClick={() => updatePerson(person.id, { payDay1: '1st', payDay2: '15th' })}
-                                  className="px-2 py-0.5 text-[10px] rounded bg-purple-950/80 hover:bg-purple-900 text-purple-300 border border-purple-800 transition-colors"
-                                >
-                                  1st & 15th
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => updatePerson(person.id, { payDay1: '15th', payDay2: 'End of Month' })}
-                                  className="px-2 py-0.5 text-[10px] rounded bg-purple-950/80 hover:bg-purple-900 text-purple-300 border border-purple-800 transition-colors"
-                                >
-                                  15th & End
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => updatePerson(person.id, { payDay1: 'Every 2 Wks', payDay2: 'Fridays' })}
-                                  className="px-2 py-0.5 text-[10px] rounded bg-purple-950/80 hover:bg-purple-900 text-purple-300 border border-purple-800 transition-colors"
-                                >
-                                  Bi-Weekly
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                          <div className={`grid gap-3 text-xs ${isMulti ? 'grid-cols-1 md:grid-cols-3' : 'grid-cols-1 md:grid-cols-2'}`}>
-                            <div>
-                              <label className="text-slate-400 text-[10px]">
-                                {isMulti ? 'Pay Date 1 (e.g. 1st / 1)' : 'Pay Date (e.g. 1st / 15th)'}
-                              </label>
+                          </td>
+                          <td className="px-3 py-1.5 font-mono">
+                            <div className="flex items-center gap-1">
+                              <span className="text-[11px] text-slate-500">$</span>
                               <input
-                                type="text"
-                                value={person.payDay1 || ''}
-                                onChange={e => updatePerson(person.id, { payDay1: e.target.value })}
-                                className="mt-0.5 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-200 font-mono w-full focus:outline-none focus:border-purple-500"
-                                placeholder="e.g. 1st or 1"
+                                type="number"
+                                step="0.01"
+                                value={person.grossPerPay}
+                                onChange={e => updatePerson(person.id, { grossPerPay: parseFloat(e.target.value) || 0 })}
+                                className="w-24 bg-slate-900 border border-slate-800 rounded px-2 py-1 text-slate-200 font-mono text-xs focus:border-purple-500 focus:outline-none"
                               />
                             </div>
-                            {isMulti && (
-                              <div>
-                                <label className="text-slate-400 text-[10px]">Pay Date 2 (e.g. 15th / 15)</label>
-                                <input
-                                  type="text"
-                                  value={person.payDay2 || ''}
-                                  onChange={e => updatePerson(person.id, { payDay2: e.target.value })}
-                                  className="mt-0.5 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-200 font-mono w-full focus:outline-none focus:border-purple-500"
-                                  placeholder="e.g. 15th or 15"
-                                />
-                              </div>
-                            )}
-                            <div>
-                              <label className="text-amber-300 text-[10px] font-semibold">Early Direct Deposit Offset</label>
-                              <select
-                                value={person.payOffsetDays ?? 0}
-                                onChange={e => updatePerson(person.id, { payOffsetDays: parseInt(e.target.value) || 0 })}
-                                className="mt-0.5 bg-slate-900 border border-amber-500/40 rounded px-2 py-1 text-amber-200 font-mono w-full focus:outline-none focus:border-purple-500"
-                              >
-                                <option value={0}>Exact Payday (0 Days)</option>
-                                <option value={-1}>1 Day Early (-1 Day)</option>
-                                <option value={-2}>2 Days Early (-2 Days e.g. USAA)</option>
-                                <option value={-3}>3 Days Early (-3 Days)</option>
-                              </select>
+                          </td>
+                          <td className="px-3 py-1.5 font-mono">
+                            <div className="flex items-center gap-1">
+                              <span className="text-[11px] text-emerald-500 font-bold">$</span>
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={person.netPerPay}
+                                onChange={e => updatePerson(person.id, { netPerPay: parseFloat(e.target.value) || 0 })}
+                                className="w-24 bg-slate-900 border border-slate-800 rounded px-2 py-1 text-emerald-400 font-bold font-mono text-xs focus:border-purple-500 focus:outline-none"
+                              />
                             </div>
-                          </div>
-                        </div>
-
-                        {/* Per-Account Direct Deposit Allocations (if multiple accounts exist) */}
-                        {budget.accounts.length > 1 && (
-                          <div className="p-2.5 bg-slate-950/40 border border-slate-800 rounded-lg space-y-2">
-                            <div className="flex items-center justify-between">
-                              <span className="text-[11px] font-semibold text-purple-300">Direct Deposit Account Allocations (Per Paycheck):</span>
-                              {(() => {
-                                const allocs = person.accountAllocations || {};
-                                const totalAlloc = Object.values(allocs).reduce((sum, val) => sum + (val === 'remaining' ? 0 : (parseFloat(val) || 0)), 0);
-                                const hasRem = Object.values(allocs).includes('remaining');
-                                const netPay = parseFloat(person.netPerPay) || 0;
-                                const remVal = Math.max(0, netPay - totalAlloc);
-                                const isBalanced = (hasRem && totalAlloc <= netPay) || (Math.abs(totalAlloc - netPay) < 0.01 && netPay > 0);
-                                return (
-                                  <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
-                                    isBalanced
-                                      ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
-                                      : 'bg-amber-950 text-amber-300 border border-amber-800'
-                                  }`}>
-                                    Allocated: ${totalAlloc.toLocaleString('en-US', { minimumFractionDigits: 2 })} {hasRem ? `+ Remaining ($${remVal.toLocaleString('en-US', { minimumFractionDigits: 2 })})` : `/ $${netPay.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
-                                  </span>
-                                );
-                              })()}
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-                              {budget.accounts.map(acc => {
-                                const rawVal = person.accountAllocations?.[acc.id];
-                                const isRemaining = rawVal === 'remaining';
-                                const allocatedVal = isRemaining ? '' : (rawVal ?? '');
-                                return (
-                                  <div key={acc.id} className={`flex items-center justify-between p-2 rounded-lg border transition-colors ${
-                                    isRemaining ? 'bg-emerald-950/40 border border-emerald-800/60' : 'bg-slate-900/80 border border-slate-800'
-                                  }`}>
-                                    <span className="text-slate-300 font-medium truncate max-w-[110px]">{acc.name}</span>
-                                    <div className="flex items-center gap-1.5">
-                                      {!isRemaining ? (
-                                        <>
-                                          <span className="text-slate-500 font-mono">$</span>
-                                          <input
-                                            type="number"
-                                            step="0.01"
-                                            value={allocatedVal}
-                                            onChange={e => {
-                                              const val = parseFloat(e.target.value) || 0;
-                                              const newAlloc = { ...(person.accountAllocations || {}), [acc.id]: val };
-                                              updatePerson(person.id, { accountAllocations: newAlloc });
-                                            }}
-                                            className="w-20 px-2 py-1 bg-slate-950 border border-slate-700 rounded text-right text-slate-100 font-mono focus:outline-none focus:border-purple-500"
-                                          />
-                                        </>
-                                      ) : (
-                                        <span className="text-[10px] font-mono font-semibold text-emerald-400 px-1.5 py-0.5 bg-emerald-950 border border-emerald-800 rounded">
-                                          Remaining
-                                        </span>
-                                      )}
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          const newAlloc = { ...(person.accountAllocations || {}) };
-                                          if (isRemaining) {
-                                            delete newAlloc[acc.id];
-                                          } else {
-                                            Object.keys(newAlloc).forEach(k => {
-                                              if (newAlloc[k] === 'remaining') delete newAlloc[k];
-                                            });
-                                            newAlloc[acc.id] = 'remaining';
-                                          }
-                                          updatePerson(person.id, { accountAllocations: newAlloc });
-                                        }}
-                                        className={`px-2 py-1 text-[10px] font-semibold rounded transition-colors ${
-                                          isRemaining
-                                            ? 'bg-emerald-500 text-slate-950 hover:bg-emerald-400'
-                                            : 'bg-slate-800 text-slate-300 hover:bg-purple-950 hover:text-purple-300 border border-slate-700'
-                                        }`}
-                                        title="Toggle Remaining (allocates all unallocated paycheck income to this account)"
-                                      >
-                                        {isRemaining ? 'Remaining ✓' : 'Set Remaining'}
-                                      </button>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+                          </td>
+                          <td className="px-3 py-1.5 text-right">
+                            <button
+                              onClick={() => deletePerson(person.id)}
+                              className="p-1 text-slate-500 hover:text-rose-400 rounded transition-colors cursor-pointer"
+                              title="Delete Member"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
@@ -1834,36 +1423,52 @@ export function SettingsModal() {
           {(settingsTab === 'bills' || settingsTab === 'splits') && (
             <div className="space-y-4">
               {/* Active / Archived Bills Filter Bar & Add Bill Button */}
-              {/* Active / Archived Bills Filter Bar & Add Bill Button */}
-              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setBillFilterTab('active')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                      billFilterTab === 'active'
-                        ? 'bg-blue-600 text-white shadow-sm'
-                        : 'bg-slate-900 text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    Active Bills ({budget.bills.filter(b => !b.isArchived).length})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setBillFilterTab('archived')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                      billFilterTab === 'archived'
-                        ? 'bg-amber-600 text-white shadow-sm'
-                        : 'bg-slate-900 text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    Archived Bills ({budget.bills.filter(b => b.isArchived).length})
-                  </button>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-800 pb-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex items-center bg-slate-900 rounded-xl p-0.5 border border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => setBillFilterTab('active')}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                        billFilterTab === 'active'
+                          ? 'bg-blue-600 text-white shadow-sm'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      Active ({budget.bills.filter(b => !b.isArchived).length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setBillFilterTab('archived')}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                        billFilterTab === 'archived'
+                          ? 'bg-amber-600 text-white shadow-sm'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      Archived ({budget.bills.filter(b => b.isArchived).length})
+                    </button>
+                  </div>
+
+                  {/* Account Selector Dropdown */}
+                  <div className="flex items-center gap-1.5 bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-750 border-slate-700 shadow-sm text-xs">
+                    <Filter className="w-3.5 h-3.5 text-blue-400" />
+                    <select
+                      value={selectedBillsAccountId}
+                      onChange={e => setSelectedBillsAccountId(e.target.value)}
+                      className="bg-transparent text-xs font-bold text-slate-100 focus:outline-none cursor-pointer"
+                    >
+                      <option value="all" className="bg-slate-900 text-slate-100 py-1">All Accounts Combined</option>
+                      {budget.accounts.map(acc => (
+                        <option key={acc.id} value={acc.id} className="bg-slate-900 text-slate-100 py-1">{acc.name}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setIsAddBillModalOpen(true)}
-                  className="flex items-center gap-2 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
                 >
                   <Plus className="w-4 h-4" />
                   Add Bill
@@ -2057,213 +1662,300 @@ export function SettingsModal() {
               )}
 
               {/* Unified Bills Manager Table Grouped by Account */}
-              <div className="space-y-6">
-                {displayAccounts.map(account => {
-                  const accountBills = budget.bills.filter(b => 
-                    (account.id === 'unassigned' ? !knownAccountIds.has(b.accountId) : b.accountId === account.id) && 
-                    (billFilterTab === 'archived' ? b.isArchived : !b.isArchived)
-                  );
-                  const accountTotal = accountBills.reduce((sum, b) => {
-                    const amt = b.amount || 0;
-                    return sum + (b.period === 'Annual' ? amt / 12 : b.period === 'Semi-Annual' ? amt / 6 : amt);
-                  }, 0);
+              {(() => {
+                const knownAccountIds = new Set(budget.accounts.map(a => a.id));
+                const displayAccounts = selectedBillsAccountId === 'all'
+                  ? budget.accounts
+                  : budget.accounts.filter(a => a.id === selectedBillsAccountId);
 
-                  return (
-                    <div key={account.id} className="rounded-xl border border-slate-800 glass-card overflow-hidden">
-                      <div className="bg-slate-900/95 px-4 py-2.5 border-b border-slate-800 flex items-center justify-between">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-                          <h4 className="text-xs font-bold text-slate-200">{account.name}</h4>
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 capitalize">{account.type}</span>
-                          <span className="text-[10px] text-slate-500">({accountBills.length} bill{accountBills.length !== 1 ? 's' : ''})</span>
-                        </div>
-                        <span className="text-xs text-slate-400">
-                          Account Subtotal: <span className="font-bold text-rose-400 font-mono">${accountTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/mo</span>
-                        </span>
-                      </div>
+                return (
+                  <div className="space-y-6">
+                    {displayAccounts.map(account => {
+                      const accountBills = budget.bills.filter(b => 
+                        (account.id === 'unassigned' ? !knownAccountIds.has(b.accountId) : b.accountId === account.id) && 
+                        (billFilterTab === 'archived' ? b.isArchived : !b.isArchived)
+                      );
+                      const accountTotal = accountBills.reduce((sum, b) => {
+                        const amt = b.amount || 0;
+                        return sum + (b.period === 'Annual' ? amt / 12 : b.period === 'Semi-Annual' ? amt / 6 : amt);
+                      }, 0);
 
-                      <div className="overflow-x-auto matrix-scrollbar">
-                        <table className="w-full text-left text-[11px] text-slate-300">
-                          <thead className="bg-slate-900 text-slate-400 uppercase font-medium text-[9px] border-b border-slate-800">
-                            <tr>
-                              <th className="px-2 py-2 w-[22%]">Bill Name</th>
-                              <th className="px-2 py-2 w-[11%]">Amount ($)</th>
-                              <th className="px-2 py-2 w-[12%]">Frequency</th>
-                              <th className="px-2 py-2 w-[10%]">Due Day</th>
-                              <th className="px-2 py-2 w-[18%]">Assigned Account</th>
-                              <th className="px-2 py-2 w-[22%]">Responsible / Split</th>
-                              <th className="px-2 py-2 w-[5%] text-right">Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-800 bg-slate-950/40">
-                            {accountBills.length === 0 ? (
-                              <tr>
-                                <td colSpan={7} className="p-4 text-center text-slate-500 italic text-xs">
-                                  No {billFilterTab === 'archived' ? 'archived' : 'active'} bills assigned to this account
-                                </td>
-                              </tr>
-                            ) : (
-                              accountBills.map(bill => (
-                                <tr key={bill.id} className="hover:bg-slate-900/60 transition-colors">
-                                  <td className="px-2 py-1.5 font-semibold text-slate-200">
-                                    <input
-                                      type="text"
-                                      value={bill.name}
-                                      onChange={e => updateBill(bill.id, { name: e.target.value })}
-                                      className="bg-transparent border-b border-transparent hover:border-slate-700 focus:border-emerald-500 focus:outline-none w-full truncate text-xs"
-                                    />
-                                    <input
-                                      type="text"
-                                      placeholder="Match key (e.g. GA POWER, COMCAST)"
-                                      value={bill.matchingKey || ''}
-                                      onChange={e => updateBill(bill.id, { matchingKey: e.target.value })}
-                                      className="bg-transparent text-[10px] text-blue-400 placeholder:text-slate-600 border-b border-transparent hover:border-slate-700 focus:border-blue-500 focus:outline-none w-full truncate font-mono mt-0.5"
-                                      title="Bank Document Matching Key for reconciliation"
-                                    />
-                                  </td>
-                                  <td className="px-2 py-1.5 font-mono">
-                                    <input
-                                      type="number"
-                                      step="0.01"
-                                      value={bill.amount}
-                                      onChange={e => updateBill(bill.id, { amount: parseFloat(e.target.value) || 0 })}
-                                      className="w-16 bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-slate-200 font-mono text-xs focus:border-emerald-500 focus:outline-none"
-                                    />
-                                  </td>
-                                  <td className="px-2 py-1.5">
-                                    <select
-                                      value={bill.period || 'Monthly'}
-                                      onChange={e => updateBill(bill.id, { period: e.target.value })}
-                                      className="w-full bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-slate-200 text-[11px] truncate focus:border-emerald-500 focus:outline-none"
-                                    >
-                                      <option value="Monthly">Monthly</option>
-                                      <option value="Quarterly">Quarterly</option>
-                                      <option value="Semi-Annual">Semi-Annual</option>
-                                      <option value="Annual">Annual</option>
-                                    </select>
-                                  </td>
-                                  <td className="px-2 py-1.5 font-mono text-xs">
-                                    <div className="flex items-center gap-1">
-                                      <span className="text-slate-400 text-[10px]">Day</span>
-                                      <input
-                                        type="number"
-                                        min="1"
-                                        max="31"
-                                        value={bill.dueDay || 1}
-                                        onChange={e => updateBill(bill.id, { dueDay: parseInt(e.target.value, 10) || 1 })}
-                                        className="w-10 bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-slate-200 text-center font-mono text-[11px] focus:border-emerald-500 focus:outline-none"
-                                      />
-                                    </div>
-                                  </td>
-                                  <td className="px-2 py-1.5">
-                                    <select
-                                      value={bill.accountId}
-                                      onChange={e => updateBill(bill.id, { accountId: e.target.value })}
-                                      className="w-full bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-slate-200 text-[11px] truncate focus:border-emerald-500 focus:outline-none"
-                                    >
-                                      {budget.accounts.map(acc => (
-                                        <option key={acc.id} value={acc.id}>{acc.name}</option>
-                                      ))}
-                                    </select>
-                                  </td>
-                                  <td className="px-2 py-1.5">
-                                    <div className="flex flex-col gap-1">
-                                      <div className="flex items-center gap-1.5 flex-wrap">
-                                        {budget.people.map(p => {
-                                          const val = bill.splits?.[p.id] ?? (100 / (budget.people.length || 1));
-                                          return (
-                                            <div key={p.id} className="inline-flex items-center gap-1 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800 text-[10px]">
-                                              <span className="text-slate-400 font-medium truncate max-w-[45px]">{p.name.split(' ')[0]}:</span>
-                                              <input
-                                                type="number"
-                                                min="0"
-                                                max="100"
-                                                value={val}
-                                                onChange={e => {
-                                                  const num = parseFloat(e.target.value) || 0;
-                                                  const newSplits = { ...bill.splits, [p.id]: num };
-                                                  updateBillSplits(bill.id, newSplits);
-                                                }}
-                                                className="w-9 bg-transparent text-center font-mono font-bold text-slate-200 focus:outline-none focus:bg-slate-800 rounded"
-                                              />
-                                              <span className="text-slate-500">%</span>
-                                            </div>
-                                          );
-                                        })}
-                                      </div>
-                                      {budget.people.length > 1 && (
-                                        <div className="flex items-center gap-1 text-[9px]">
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              const splits = {};
-                                              const count = budget.people.length || 1;
-                                              budget.people.forEach(p => splits[p.id] = 100 / count);
-                                              updateBillSplits(bill.id, splits);
-                                            }}
-                                            className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded cursor-pointer"
-                                          >
-                                            Equal
-                                          </button>
-                                          {budget.people.map(p => (
-                                            <button
-                                              key={p.id}
-                                              type="button"
-                                              onClick={() => {
-                                                const splits = {};
-                                                budget.people.forEach(person => splits[person.id] = person.id === p.id ? 100 : 0);
-                                                updateBillSplits(bill.id, splits);
-                                              }}
-                                              className="px-1.5 py-0.5 bg-blue-900/40 hover:bg-blue-800/70 text-blue-300 rounded cursor-pointer truncate max-w-[65px]"
-                                            >
-                                              100% {p.name.split(' ')[0]}
-                                            </button>
-                                          ))}
-                                        </div>
-                                      )}
-                                    </div>
-                                  </td>
-                                  <td className="px-2 py-1.5 text-right">
-                                    <div className="flex items-center justify-end gap-1">
-                                      {bill.isArchived ? (
-                                        <button
-                                          type="button"
-                                          onClick={() => unarchiveBill(bill.id)}
-                                          className="p-1 text-emerald-400 hover:text-emerald-300 rounded transition-colors cursor-pointer"
-                                          title="Restore Bill"
-                                        >
-                                          <RotateCcw className="w-3.5 h-3.5" />
-                                        </button>
-                                      ) : (
-                                        <button
-                                          type="button"
-                                          onClick={() => archiveBill(bill.id)}
-                                          className="p-1 text-amber-400 hover:text-amber-300 rounded transition-colors cursor-pointer"
-                                          title="Archive Bill"
-                                        >
-                                          <Archive className="w-3.5 h-3.5" />
-                                        </button>
-                                      )}
-                                      <button
-                                        type="button"
-                                        onClick={() => deleteBill(bill.id)}
-                                        className="p-1 text-slate-500 hover:text-rose-400 rounded transition-colors cursor-pointer"
-                                        title="Delete Bill"
-                                      >
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                      </button>
-                                    </div>
-                                  </td>
+                      const accountEnabledEarners = (account.enabledEarners && Array.isArray(account.enabledEarners))
+                        ? account.enabledEarners
+                        : budget.people.map(p => p.id);
+
+                      const eligiblePeople = budget.people.filter(p => accountEnabledEarners.includes(p.id));
+
+                      return (
+                        <div key={account.id} className="rounded-xl border border-slate-800 glass-card overflow-hidden shadow-lg">
+                          <div className="bg-slate-900/95 px-4 py-2.5 border-b border-slate-800 flex items-center justify-between flex-wrap gap-2">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+                              <h4 className="text-xs font-bold text-slate-200">{account.name}</h4>
+                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 capitalize">{account.type}</span>
+                              <span className="text-[10px] text-slate-500">({accountBills.length} bill{accountBills.length !== 1 ? 's' : ''})</span>
+                            </div>
+                            <span className="text-xs text-slate-400">
+                              Account Subtotal: <span className="font-bold text-rose-400 font-mono">${accountTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/mo</span>
+                            </span>
+                          </div>
+
+                          {/* Master Earner & Split Participant Selector for this Account */}
+                          <div className="bg-slate-900/60 px-4 py-2 border-b border-slate-800/80 flex items-center justify-between flex-wrap gap-2 text-xs">
+                            <div className="flex items-center gap-2">
+                              <Users className="w-3.5 h-3.5 text-purple-400" />
+                              <span className="text-slate-300 font-semibold text-[11px]">Participating Split Earners for {account.name}:</span>
+                            </div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {budget.people.map(p => {
+                                const isChecked = accountEnabledEarners.includes(p.id);
+
+                                return (
+                                  <button
+                                    key={p.id}
+                                    type="button"
+                                    onClick={() => {
+                                      let updated;
+                                      if (isChecked) {
+                                        if (accountEnabledEarners.length <= 1) return;
+                                        updated = accountEnabledEarners.filter(id => id !== p.id);
+                                      } else {
+                                        updated = [...accountEnabledEarners, p.id];
+                                      }
+                                      updateAccount(account.id, { enabledEarners: updated });
+                                    }}
+                                    className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer border ${
+                                      isChecked
+                                        ? 'bg-purple-950/80 border-purple-500/70 text-purple-200 shadow-sm'
+                                        : 'bg-slate-900 border-slate-800 text-slate-500 opacity-60 hover:opacity-100 hover:border-slate-700'
+                                    }`}
+                                    title={`Toggle whether ${p.name} participates in bills and credits on ${account.name}`}
+                                  >
+                                    <span className={`w-2 h-2 rounded-full ${isChecked ? 'bg-purple-400' : 'bg-slate-600'}`} />
+                                    <span>{p.name.split(' ')[0]}</span>
+                                    <span className="text-[9px] font-mono">{isChecked ? '✓' : '—'}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          <div className="overflow-x-auto matrix-scrollbar">
+                            <table className="w-full text-left text-[11px] text-slate-300">
+                              <thead className="bg-slate-900 text-slate-400 uppercase font-medium text-[9px] border-b border-slate-800">
+                                <tr>
+                                  <th className="px-2 py-2 w-[22%]">Bill Name</th>
+                                  <th className="px-2 py-2 w-[11%]">Amount ($)</th>
+                                  <th className="px-2 py-2 w-[12%]">Frequency</th>
+                                  <th className="px-2 py-2 w-[10%]">Due Day</th>
+                                  <th className="px-2 py-2 w-[18%]">Assigned Account</th>
+                                  <th className="px-2 py-2 w-[22%]">Responsible / Split</th>
+                                  <th className="px-2 py-2 w-[5%] text-right">Actions</th>
                                 </tr>
-                              ))
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+                              </thead>
+                              <tbody className="divide-y divide-slate-800 bg-slate-950/40">
+                                {accountBills.length === 0 ? (
+                                  <tr>
+                                    <td colSpan={7} className="p-4 text-center text-slate-500 italic text-xs">
+                                      No {billFilterTab === 'archived' ? 'archived' : 'active'} bills assigned to this account
+                                    </td>
+                                  </tr>
+                                ) : (
+                                  accountBills.map(bill => {
+                                    const sumSplits = eligiblePeople.reduce((sum, p) => sum + (parseFloat(bill.splits?.[p.id]) || 0), 0);
+                                    const isValid100 = Math.abs(sumSplits - 100) < 0.01;
+
+                                    const handleSplitChange = (personId, valStr) => {
+                                      let num = Math.max(0, Math.min(100, parseFloat(valStr) || 0));
+                                      if (eligiblePeople.length === 2) {
+                                        const otherP = eligiblePeople.find(p => p.id !== personId);
+                                        const otherVal = Math.max(0, Math.min(100, Math.round((100 - num) * 100) / 100));
+                                        updateBillSplits(bill.id, {
+                                          ...(bill.splits || {}),
+                                          [personId]: num,
+                                          [otherP.id]: otherVal
+                                        });
+                                      } else {
+                                        const otherSum = eligiblePeople
+                                          .filter(p => p.id !== personId)
+                                          .reduce((sum, p) => sum + (parseFloat(bill.splits?.[p.id]) || 0), 0);
+                                        const maxVal = Math.max(0, 100 - otherSum);
+                                        const clamped = Math.min(num, maxVal);
+                                        updateBillSplits(bill.id, {
+                                          ...(bill.splits || {}),
+                                          [personId]: clamped
+                                        });
+                                      }
+                                    };
+
+                                    return (
+                                      <tr key={bill.id} className="hover:bg-slate-900/60 transition-colors">
+                                        <td className="px-2 py-1.5 font-semibold text-slate-200">
+                                          <input
+                                            type="text"
+                                            value={bill.name}
+                                            onChange={e => updateBill(bill.id, { name: e.target.value })}
+                                            className="bg-transparent border-b border-transparent hover:border-slate-700 focus:border-emerald-500 focus:outline-none w-full truncate text-xs"
+                                          />
+                                          <input
+                                            type="text"
+                                            placeholder="Match key (e.g. GA POWER, COMCAST)"
+                                            value={bill.matchingKey || ''}
+                                            onChange={e => updateBill(bill.id, { matchingKey: e.target.value })}
+                                            className="bg-transparent text-[10px] text-blue-400 placeholder:text-slate-600 border-b border-transparent hover:border-slate-700 focus:border-blue-500 focus:outline-none w-full truncate font-mono mt-0.5"
+                                            title="Bank Document Matching Key for reconciliation"
+                                          />
+                                        </td>
+                                        <td className="px-2 py-1.5 font-mono">
+                                          <input
+                                            type="number"
+                                            step="0.01"
+                                            value={bill.amount}
+                                            onChange={e => updateBill(bill.id, { amount: parseFloat(e.target.value) || 0 })}
+                                            className="w-16 bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-slate-200 font-mono text-xs focus:border-emerald-500 focus:outline-none"
+                                          />
+                                        </td>
+                                        <td className="px-2 py-1.5">
+                                          <select
+                                            value={bill.period || 'Monthly'}
+                                            onChange={e => updateBill(bill.id, { period: e.target.value })}
+                                            className="w-full bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-slate-200 text-[11px] truncate focus:border-emerald-500 focus:outline-none"
+                                          >
+                                            <option value="Monthly">Monthly</option>
+                                            <option value="Quarterly">Quarterly</option>
+                                            <option value="Semi-Annual">Semi-Annual</option>
+                                            <option value="Annual">Annual</option>
+                                          </select>
+                                        </td>
+                                        <td className="px-2 py-1.5 font-mono text-xs">
+                                          <div className="flex items-center gap-1">
+                                            <span className="text-slate-400 text-[10px]">Day</span>
+                                            <input
+                                              type="number"
+                                              min="1"
+                                              max="31"
+                                              value={bill.dueDay || 1}
+                                              onChange={e => updateBill(bill.id, { dueDay: parseInt(e.target.value, 10) || 1 })}
+                                              className="w-10 bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-slate-200 text-center font-mono text-[11px] focus:border-emerald-500 focus:outline-none"
+                                            />
+                                          </div>
+                                        </td>
+                                        <td className="px-2 py-1.5">
+                                          <select
+                                            value={bill.accountId}
+                                            onChange={e => updateBill(bill.id, { accountId: e.target.value })}
+                                            className="w-full bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-slate-200 text-[11px] truncate focus:border-emerald-500 focus:outline-none"
+                                          >
+                                            {budget.accounts.map(acc => (
+                                              <option key={acc.id} value={acc.id}>{acc.name}</option>
+                                            ))}
+                                          </select>
+                                        </td>
+                                        <td className="px-2 py-1.5">
+                                          <div className="flex flex-col gap-1">
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                              {eligiblePeople.map(p => {
+                                                const val = bill.splits?.[p.id] ?? (eligiblePeople.length > 0 ? (100 / eligiblePeople.length) : 100);
+                                                return (
+                                                  <div key={p.id} className="inline-flex items-center gap-1 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800 text-[10px]">
+                                                    <span className="text-slate-400 font-medium truncate max-w-[45px]">{p.name.split(' ')[0]}:</span>
+                                                    <input
+                                                      type="number"
+                                                      min="0"
+                                                      max="100"
+                                                      step="1"
+                                                      value={Math.round(val * 10) / 10}
+                                                      onChange={e => handleSplitChange(p.id, e.target.value)}
+                                                      className="w-9 bg-transparent text-center font-mono font-bold text-slate-200 focus:outline-none focus:bg-slate-800 rounded"
+                                                    />
+                                                    <span className="text-slate-500">%</span>
+                                                  </div>
+                                                );
+                                              })}
+                                              <span className={`text-[9px] font-mono font-bold px-1.5 py-0.2 rounded border ${
+                                                isValid100
+                                                  ? 'bg-emerald-950/80 text-emerald-300 border-emerald-800/60'
+                                                  : 'bg-rose-950/80 text-rose-300 border-rose-800/60 animate-pulse'
+                                              }`}>
+                                                {Math.round(sumSplits)}%
+                                              </span>
+                                            </div>
+                                            {eligiblePeople.length > 1 && (
+                                              <div className="flex items-center gap-1 text-[9px] flex-wrap">
+                                                <button
+                                                  type="button"
+                                                  onClick={() => {
+                                                    const splits = {};
+                                                    const count = eligiblePeople.length || 1;
+                                                    eligiblePeople.forEach(p => splits[p.id] = Math.round((100 / count) * 100) / 100);
+                                                    updateBillSplits(bill.id, splits);
+                                                  }}
+                                                  className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded cursor-pointer"
+                                                >
+                                                  Equal
+                                                </button>
+                                                {eligiblePeople.map(p => (
+                                                  <button
+                                                    key={p.id}
+                                                    type="button"
+                                                    onClick={() => {
+                                                      const splits = {};
+                                                      eligiblePeople.forEach(person => splits[person.id] = person.id === p.id ? 100 : 0);
+                                                      updateBillSplits(bill.id, splits);
+                                                    }}
+                                                    className="px-1.5 py-0.5 bg-blue-900/40 hover:bg-blue-800/70 text-blue-300 rounded cursor-pointer truncate max-w-[65px]"
+                                                  >
+                                                    100% {p.name.split(' ')[0]}
+                                                  </button>
+                                                ))}
+                                              </div>
+                                            )}
+                                          </div>
+                                        </td>
+                                        <td className="px-2 py-1.5 text-right">
+                                          <div className="flex items-center justify-end gap-1">
+                                            {bill.isArchived ? (
+                                              <button
+                                                type="button"
+                                                onClick={() => unarchiveBill(bill.id)}
+                                                className="p-1 text-emerald-400 hover:text-emerald-300 rounded transition-colors cursor-pointer"
+                                                title="Restore Bill"
+                                              >
+                                                <RotateCcw className="w-3.5 h-3.5" />
+                                              </button>
+                                            ) : (
+                                              <button
+                                                type="button"
+                                                onClick={() => archiveBill(bill.id)}
+                                                className="p-1 text-amber-400 hover:text-amber-300 rounded transition-colors cursor-pointer"
+                                                title="Archive Bill"
+                                              >
+                                                <Archive className="w-3.5 h-3.5" />
+                                              </button>
+                                            )}
+                                            <button
+                                              type="button"
+                                              onClick={() => deleteBill(bill.id)}
+                                              className="p-1 text-slate-500 hover:text-rose-400 rounded transition-colors cursor-pointer"
+                                              title="Delete Bill"
+                                            >
+                                              <Trash2 className="w-3.5 h-3.5" />
+                                            </button>
+                                          </div>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </div>
           )}
 

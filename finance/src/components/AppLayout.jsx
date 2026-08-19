@@ -24,7 +24,7 @@ import headerLogoLight from '../assets/header-logo-light.png';
 const NAV_ITEMS = [
   { id: 'dashboard',   label: 'Dashboard',            icon: LayoutDashboard, color: 'text-blue-400' },
   { id: 'ledger',      label: 'Transactions',         icon: TrendingUp,      color: 'text-emerald-400' },
-  { id: 'main_budget', label: 'Bills & Allocations',   icon: ReceiptText,     color: 'text-violet-400' },
+  { id: 'main_budget', label: 'Bills',                icon: ReceiptText,     color: 'text-violet-400' },
   { id: 'amortization',label: 'Loan Amortization',     icon: Calculator,      color: 'text-rose-400' },
   { id: 'settings',    label: 'Setup Accounts, People, Bills, Splits', icon: Settings, color: 'text-amber-400' },
 ];
@@ -313,7 +313,7 @@ export function AppLayout({ children, onNavigateHome, onNavigateView, activeView
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 min-h-0 flex flex-col overflow-y-auto px-4 sm:px-6 lg:px-8 py-6">
+        <main className={`flex-1 min-h-0 flex flex-col ${activeView === 'ledger' ? 'p-2 sm:p-3 overflow-hidden' : 'overflow-y-auto px-4 sm:px-6 lg:px-8 py-6'}`}>
           {!isDbLoaded ? (
             <div className="flex flex-col items-center justify-center h-64 gap-3 text-slate-400">
               <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />

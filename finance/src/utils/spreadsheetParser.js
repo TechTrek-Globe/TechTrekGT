@@ -331,7 +331,7 @@ export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
               if (!isNaN(num) && num !== 0) {
                 const lowerH = h.toLowerCase();
                 const otherDesc = (otherDescIdx >= 0 && r[otherDescIdx]) ? String(r[otherDescIdx]).trim() : '';
-                const desc = lowerH.includes('other') && otherDesc ? `${h} (${otherDesc})` : h;
+                const desc = lowerH.includes('other') ? (otherDesc || h) : h;
 
                 // Match to existing bill if debit
                 let billId = null;

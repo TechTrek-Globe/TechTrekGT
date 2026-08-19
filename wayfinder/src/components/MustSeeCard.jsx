@@ -3,6 +3,8 @@ import { MapPin, Navigation, Compass, Plus, Check, CalendarX, ExternalLink } fro
 import { cityImages, marketImages, getAttractionImage } from '../utils/cityImages';
 import { useAuth } from '../context/AuthContext';
 import { FormatText } from './Formatters';
+import { UrgentBookingAlert } from './UrgentBookingAlert';
+import { WinterExclusive } from './WinterExclusive';
 
 /**
  * Extracts a concise vital stats list for the quick stats row.
@@ -131,6 +133,10 @@ export function MustSeeCard(props) {
     onAddToItinerary
   } = props;
 
+  const cardUrgentAlert = sight?.urgentAlert || null;
+  const cardIsWinterExclusive = sight?.isWinterExclusive || false;
+  const cardWinterLabel = sight?.winterExclusiveLabel || 'Winter Exclusive';
+
   // Normalize data whether passed via individual props or a sight object
   const cardTitle = title || sight?.name || sight?.title || 'Attraction';
   const cardCategory = category || sight?.category || 'Must-See Sight';
@@ -195,6 +201,13 @@ export function MustSeeCard(props) {
             {cardCategory}
           </span>
         </div>
+
+        {/* Winter Exclusive badge floating on Image */}
+        {cardIsWinterExclusive && (
+          <div className="absolute top-3.5 right-3.5 z-10">
+            <WinterExclusive label={cardWinterLabel} />
+          </div>
+        )}
       </div>
 
       {/* 2. Content Body (Middle): Flex-column body section with flex-grow: 1 */}
@@ -207,6 +220,9 @@ export function MustSeeCard(props) {
           <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-medium">
             {cardDescription}
           </p>
+
+          {/* Urgent booking/capacity warning banner */}
+          {cardUrgentAlert && <UrgentBookingAlert message={cardUrgentAlert} />}
         </div>
 
         {/* 3. Quick Stats Row (Lower Middle): Exposed vital logistical data */}

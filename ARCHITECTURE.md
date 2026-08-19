@@ -282,7 +282,7 @@ The codebase follows a pragmatic split:
 | App | Components |
 |-----|-----------|
 | finance | `AccountLedgerView`, `AccountTransferSummary`, `InlineEdit`, `NoYearCalendarPicker`, `SpreadsheetImporter` |
-| wayfinder | `AttractionCard`, `MustSeeCard`, `Formatters`, `CurrencyConverterModal` |
+| wayfinder | `AttractionCard`, `MustSeeCard`, `UrgentBookingAlert`, `WinterExclusive`, `Formatters`, `CurrencyConverterModal` |
 | outpost | `AddInvoiceModal`, `LogSaleModal`, `ListingCopyModal`, `TaxReportModal`, `SuppliesTrackerModal`, `FinanceSyncModal`, `CardShowCalculatorModal` |
 
 **Shared layout components:**

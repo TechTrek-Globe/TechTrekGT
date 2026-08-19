@@ -10,7 +10,12 @@ export function CityFoodTab({
   toggleItinerary, 
   isAuthenticated 
 }) {
-  const hasDetailed = city[`${city.id}RestaurantsDetailed`] || city[`${city.id}DrinksDetailed`] || city[`${city.id}CafesDetailed`];
+  const detailedItems = [
+    ...(city.restaurantsDetailed || city[`${city.id}RestaurantsDetailed`] || []),
+    ...(city.drinksDetailed || city[`${city.id}DrinksDetailed`] || []),
+    ...(city.cafesDetailed || city[`${city.id}CafesDetailed`] || [])
+  ];
+  const hasDetailed = detailedItems.length > 0;
   if (!hasDetailed && (!city.restaurants || city.restaurants.length === 0)) return null;
 
   return (
@@ -40,11 +45,7 @@ export function CityFoodTab({
       {hasDetailed && (
         <div className="sticky top-[118px] z-30 py-2.5 px-3 sm:px-5 rounded-2xl bg-slate-950/95 backdrop-blur-xl border border-amber-500/30 shadow-2xl transition-all">
           <DrillDownFilters 
-            items={[
-              ...(city[`${city.id}RestaurantsDetailed`] || []),
-              ...(city[`${city.id}DrinksDetailed`] || []),
-              ...(city[`${city.id}CafesDetailed`] || [])
-            ]}
+            items={detailedItems}
             activeFilter={restaurantCategoryFilter} 
             onFilterChange={setRestaurantCategoryFilter} 
           />
@@ -54,11 +55,7 @@ export function CityFoodTab({
       {/* Cards Grid */}
       {hasDetailed ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[
-            ...(city[`${city.id}RestaurantsDetailed`] || []),
-            ...(city[`${city.id}DrinksDetailed`] || []),
-            ...(city[`${city.id}CafesDetailed`] || [])
-          ]
+          {detailedItems
             .filter((item) => {
               if (restaurantCategoryFilter === 'all') return true;
               if (restaurantCategoryFilter === 'drink-all') return ['vodka-house', 'brewery', 'historic-bar', 'pub', 'watering-hole', 'beer-hall', 'pub-bars'].includes(item.category);

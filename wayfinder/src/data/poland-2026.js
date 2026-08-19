@@ -526,7 +526,7 @@ export const polandJourney = {
           notes: "Essential Krakow late-night snack served from the central rotunda in Kazimierz."
         }
       ],
-      krakowRestaurantsDetailed: [
+      restaurantsDetailed: [
 {
           id: "morskie-oko",
           name: "Morskie Oko",
@@ -731,7 +731,7 @@ export const polandJourney = {
           imageSrc: "/wayfinder/Poland-2026/images/krakow/food/pierogarnia-u-vincenta.jpg"
         }
       ],
-      krakowDrinksDetailed: [
+      drinksDetailed: [
 {
           id: "wodka-cafe-bar",
           name: "Wódka Cafe Bar",
@@ -950,7 +950,7 @@ export const polandJourney = {
           imageSrc: "/wayfinder/Poland-2026/images/krakow/food/taverna-krowa.jpg"
         }
       ],
-      krakowCafesDetailed: [
+      cafesDetailed: [
 {
           id: "camelot-cafe",
           name: "Camelot Cafe",
@@ -1192,228 +1192,7 @@ export const polandJourney = {
         location: "Rynek Główny (Main Market Square)",
         landmark: "Christmas Market at Rynek Główny & Sukiennice",
         description: "Europe's largest medieval market square dressed in festive winter illuminations, wooden artisan stalls, and warm glowing festive lights in historic Kraków."
-      },
-      restaurantsDetailed: [
-{
-          id: "morskie-oko",
-          name: "Morskie Oko",
-          category: "must-haves",
-          categoryLabel: "Must-Have & Iconic",
-          priceTier: "$$",
-          priceEstimatePln: "60 - 110 PLN per person",
-          address: "ul. Szczepańska 3 (Old Town)",
-          neighborhood: "Stare Miasto (100m from Rynek)",
-          cuisine: "Highlander Polish (Podhale Mountain Region)",
-          signature: "Góralski Pierogi, Roasted Duck with Apples & Cranberries, Grilled Oscypek Cheese",
-          description: "Rustic wooden log cabin interior with live highlander folk musicians, crackling stone fireplaces, and rich mountain hospitality.",
-          websiteUrl: "https://www.morskieoko.krakow.pl",
-          imageSrc: "/wayfinder/Poland-2026/images/krakow/food/morskie-oko.jpg"
-        },
-{
-          id: "czarna-kaczka",
-          name: "Czarna Kaczka (The Black Duck)",
-          category: "must-haves",
-          categoryLabel: "Must-Have & Iconic",
-          priceTier: "$$ - $$$",
-          priceEstimatePln: "70 - 130 PLN per person",
-          address: "ul. Poselska 22 (Old Town)",
-          neighborhood: "Stare Miasto (Near Wawel)",
-          cuisine: "Classic Royal Polish Fowl & Game",
-          signature: "Roasted Half Duck with Red Cabbage & Plum Sauce, Wild Mushroom Soup in Bread Bowl",
-          description: "Romantic, candle-lit Old Town dining room praised for authentic centuries-old Royal Polish duck and game bird preparations.",
-          websiteUrl: "https://czarnakaczka.pl",
-          imageSrc: "/wayfinder/Poland-2026/images/krakow/food/czarna-kaczka.jpg"
-        },
-{
-          id: "stary-port",
-          name: "Stary Port Cellar Tavern",
-          category: "must-haves",
-          categoryLabel: "Must-Have & Iconic",
-          priceTier: "$$",
-          priceEstimatePln: "50 - 90 PLN per person",
-          address: "ul. Straszewskiego 27 (Planty Park)",
-          neighborhood: "Planty Ring & Wawel Border",
-          cuisine: "Polish Maritime & Subterranean Comfort",
-          signature: "Hot Spiced Honey Mead, Creamy Garlic Soup in Loaf, Smoked Trout, Pierogi Platters",
-          description: "Uniquely themed subterranean sailor tavern carved inside a 19th-century cellar near Wawel with warm wooden booths and historic relics.",
-          imageSrc: "/wayfinder/Poland-2026/images/krakow/food/stary-port.jpg"
-        },
-{
-          id: "pierogarnia-glowna",
-          name: "Pierogarnia Główna",
-          category: "local",
-          categoryLabel: "Local Fares & Hand-Rolled Pierogi",
-          priceTier: "$",
-          priceEstimatePln: "25 - 42 PLN per person",
-          address: "ul. Sławkowska 23 (Old Town)",
-          neighborhood: "Stare Miasto (Old Town)",
-          cuisine: "Handmade Traditional Polish Pierogi",
-          signature: "Ruskie Pierogi (Potato & Cottage Cheese), Wild Mushroom & Cabbage, Sweet Cherry Pierogi",
-          description: "Acclaimed, dedicated handmade pierogi spot where dumplings are rolled, stuffed, and boiled fresh right before your eyes.",
-          imageSrc: "/wayfinder/Poland-2026/images/krakow/food/pierogarnia-glowna.jpg"
-        },
-{
-          id: "restauracja-starka",
-          name: "Restauracja Starka",
-          category: "local",
-          categoryLabel: "Local Fares & Infused Vodkas",
-          priceTier: "$$",
-          priceEstimatePln: "65 - 120 PLN per person",
-          address: "ul. Józefa 14 (Kazimierz)",
-          neighborhood: "Kazimierz Jewish Quarter",
-          cuisine: "Bohemian Polish & Homemade Infused Vodkas",
-          signature: "Chili-Honey & Cranberry Infused Vodkas, Pork Tenderloin in Creamy Chanterelle Sauce",
-          description: "Warm, vibrant Kazimierz institution famous for artisanal house-infused vodkas and hearty Polish comfort classics.",
-          imageSrc: "/wayfinder/Poland-2026/images/krakow/food/restauracja-starka.jpg"
-        },
-{
-          id: "pod-wawelem",
-          name: "Pod Wawelem Kompania Kuflowa",
-          category: "local",
-          categoryLabel: "Local Fares & Beer Hall",
-          priceTier: "$ - $$",
-          priceEstimatePln: "45 - 90 PLN per person",
-          address: "ul. św. Idziego 1 (Foot of Wawel)",
-          neighborhood: "Wawel Hill & Planty Park",
-          cuisine: "Traditional Polish Feast & Beer Hall",
-          signature: "Giant Schnitzels, Grilled Meat Skewers (Szaszłyk), Crispy Pork Knuckle (Golonka), Draft Beers",
-          description: "Lively, festive beer hall at the foot of Wawel Castle with massive portions, brass band energy, and family-style wooden tables.",
-          websiteUrl: "https://www.podwawelem.eu",
-          imageSrc: "/wayfinder/Poland-2026/images/krakow/food/pod-wawelem.jpg"
-        },
-{
-          id: "bottiglieria-1881",
-          name: "Bottiglieria 1881 (2 Michelin Stars)",
-          category: "expensive",
-          categoryLabel: "Fine Dining & 2 Michelin Stars",
-          priceTier: "$$$$",
-          priceEstimatePln: "450 - 650 PLN per person",
-          address: "ul. Bocheńska 5 (Kazimierz)",
-          neighborhood: "Kazimierz (Riverfront Slope)",
-          cuisine: "Modern Polish Fine Dining",
-          signature: "Seasonal Małopolska Foraged Tasting Menu, Smoked Sturgeon, Artisanal Butter & Natural Wines",
-          description: "Poland's premier 2-Michelin-starred culinary temple in Kazimierz, transforming local Małopolska farm ingredients into modern art.",
-          websiteUrl: "https://1881.com.pl",
-          imageSrc: "/wayfinder/Poland-2026/images/krakow/food/bottiglieria-1881.jpg"
-        },
-{
-          id: "fiorentina-ristorante",
-          name: "Fiorentina Ristorante (Michelin Bib Gourmand)",
-          category: "expensive",
-          categoryLabel: "Fine Dining & Michelin Bib Gourmand",
-          priceTier: "$$$ - $$$$",
-          priceEstimatePln: "180 - 320 PLN per person",
-          address: "ul. Grodzka 63 (Old Town Royal Route)",
-          neighborhood: "Stare Miasto (Royal Route)",
-          cuisine: "Modern Florentine & Fine Polish Fusion",
-          signature: "Bistecca alla Fiorentina (Dry-Aged Chianina Beef), Truffle Tagliatelle, Wild Boar Carpaccio",
-          description: "Award-winning fine dining housed in a restored Gothic palace on the Royal Route with an romantic glass courtyard atrium.",
-          websiteUrl: "https://fiorentina.com.pl/",
-          imageSrc: "/wayfinder/Poland-2026/images/krakow/food/fiorentina-ristorante.jpg"
-        },
-{
-          id: "trzy-rybki",
-          name: "Trzy Rybki (Hotel Stary)",
-          category: "expensive",
-          categoryLabel: "Fine Dining & Luxury Vaults",
-          priceTier: "$$$$",
-          priceEstimatePln: "220 - 380 PLN per person",
-          address: "ul. Szczepańska 5 (Old Town)",
-          neighborhood: "Stare Miasto (Old Town)",
-          cuisine: "Refined Polish Modern Gastronomy",
-          signature: "Venison Loin with Juniper, Roasted Goose Breast, Crayfish Soup, Fine Wine Pairing",
-          description: "Elegantly soaring Renaissance vaulted hall inside 5-star Hotel Stary, offering inventive modern Polish gastronomy.",
-          websiteUrl: "https://stary.hotel.com.pl/en/trzy-rybki/",
-          imageSrc: "/wayfinder/Poland-2026/images/krakow/food/trzy-rybki.jpg"
-        },
-{
-          id: "ed-red-steakhouse",
-          name: "Ed Red Steakhouse",
-          category: "steak",
-          categoryLabel: "Steakhouse & Dry-Aged Beef",
-          priceTier: "$$$ - $$$$",
-          priceEstimatePln: "120 - 280 PLN per person",
-          address: "ul. Sławkowska 3 (Old Town)",
-          neighborhood: "Stare Miasto (Near Main Square)",
-          cuisine: "Dry-Aged Beef & Polish Red Cattle",
-          signature: "30-90 Day Dry-Aged Polish Red Cattle Ribeye, Bone Marrow Toast, Beef Tartare",
-          description: "Pioneering Polish steakhouse dedicated to dry-aging heritage Polish Red cattle breeds over aromatic wood embers.",
-          imageSrc: "/wayfinder/Poland-2026/images/krakow/food/ed-red-steakhouse.jpg"
-        },
-{
-          id: "pampas-steakhouse",
-          name: "PAMPAS Steakhouse & Asador",
-          category: "steak",
-          categoryLabel: "Steakhouse & Argentine Charcoal Grill",
-          priceTier: "$$$ - $$$$",
-          priceEstimatePln: "130 - 300 PLN per person",
-          address: "ul. św. Marka 21 (Old Town)",
-          neighborhood: "Stare Miasto (Old Town)",
-          cuisine: "South American & Argentine Charcoal Grill",
-          signature: "Argentine Black Angus Bife de Lomo, Chimichurri Ribeye, Charcoal-Grilled Lamb Chops",
-          description: "Intimate, rustic stone cellar steakhouse specializing in prime South American charcoal-grilled cuts and Malbec pairings.",
-          websiteUrl: "https://pampas.pl/",
-          imageSrc: "/wayfinder/Poland-2026/images/krakow/food/pampas-steakhouse.jpg"
-        },
-{
-          id: "muu-muu-steakhouse",
-          name: "Muu Muu Steakhouse",
-          category: "steak",
-          categoryLabel: "Steakhouse & Hot Stone Grill",
-          priceTier: "$$$ - $$$$",
-          priceEstimatePln: "110 - 250 PLN per person",
-          address: "ul. św. Krzyża 9 (Old Town)",
-          neighborhood: "Stare Miasto (Near Planty)",
-          cuisine: "International Premium Steakhouses & Grill",
-          signature: "T-Bone Steak, Wagyu Skirt Steak, Charcoal Grilled Burgers, Potato Wedges with Truffle Dip",
-          description: "Cozy brick-walled steakhouse near Planty Park serving sizzling hot-stone steaks and craft draft beers.",
-          websiteUrl: "https://muumuu.pl/",
-          imageSrc: "/wayfinder/Poland-2026/images/krakow/food/muu-muu-steakhouse.jpg"
-        },
-{
-          id: "bar-mleczny-pod-temida",
-          name: "Bar Mleczny Pod Temidą",
-          category: "cheap",
-          categoryLabel: "Cheap Eats & Historic Milk Bar",
-          priceTier: "$",
-          priceEstimatePln: "15 - 28 PLN per person",
-          address: "ul. Grodzka 27 (Old Town Royal Route)",
-          neighborhood: "Stare Miasto (Royal Route)",
-          cuisine: "Authentic Post-Communist Polish Milk Bar",
-          signature: "Żurek Sour Rye Soup, Placki Ziemniaczane (Potato Pancakes), Pierogi Ruskie",
-          description: "Legendary subsidized Polish Milk Bar on Grodzka street serving dirt-cheap, piping-hot traditional home cooking.",
-          imageSrc: "/wayfinder/Poland-2026/images/krakow/food/bar-mleczny-pod-temida.jpg"
-        },
-{
-          id: "plac-nowy-zapiekanki",
-          name: "Plac Nowy Zapiekanki (Kazimierz)",
-          category: "cheap",
-          categoryLabel: "Cheap Eats & Street Food",
-          priceTier: "$",
-          priceEstimatePln: "14 - 22 PLN per item",
-          address: "Plac Nowy (Center Rotunda, Kazimierz)",
-          neighborhood: "Kazimierz (Plac Nowy)",
-          cuisine: "Iconic Polish Open-Face Baguette Street Food",
-          signature: "Toasted Zapiekanki with sautéed mushrooms, melted cheese, chives, fried onions & garlic sauce",
-          description: "Kraków's most famous late-night budget street food experience served steaming hot from the Kazimierz rotunda.",
-          imageSrc: "/wayfinder/Poland-2026/images/krakow/food/plac-nowy-zapiekanki.jpg"
-        },
-{
-          id: "pierogarnia-u-vincenta",
-          name: "Pierogarnia u Vincenta",
-          category: "cheap",
-          categoryLabel: "Cheap Eats & Pierogi Parlor",
-          priceTier: "$",
-          priceEstimatePln: "20 - 35 PLN per person",
-          address: "ul. Józefa 25 (Kazimierz)",
-          neighborhood: "Kazimierz (Józefa Street)",
-          cuisine: "Vincent van Gogh Themed Pierogi Parlor",
-          signature: "Spinach & Feta Pierogi, Sweet Cottage Cheese Dumplings, Beetroot Barszcz",
-          description: "Whimsical, colorful budget pierogi spot in Kazimierz with Van Gogh-inspired wall murals and delicious low prices.",
-          websiteUrl: "https://uvincenta.pl/",
-          imageSrc: "/wayfinder/Poland-2026/images/krakow/food/pierogarnia-u-vincenta.jpg"
-        }
-      ]
+      }
     },
 {
       id: "wroclaw",
@@ -1802,7 +1581,7 @@ export const polandJourney = {
 "Pierogarnia Stary Młyn",
 "Piwnica Świdnicka"
       ],
-      wroclawRestaurantsDetailed: [
+      restaurantsDetailed: [
 {
           id: "konspira",
           name: "Restauracja Konspira",
@@ -2024,7 +1803,7 @@ export const polandJourney = {
           imageSrc: "/wayfinder/Poland-2026/images/wroclaw/food/restauracja-tarasowa.jpg"
         }
       ],
-      wroclawDrinksDetailed: [
+      drinksDetailed: [
 {
           id: "spiz",
           name: "Browar Spiż",
@@ -2166,7 +1945,7 @@ export const polandJourney = {
           imageSrc: "/wayfinder/Poland-2026/images/wroclaw/food/szajba.jpg"
         }
       ],
-      wroclawCafesDetailed: [
+      cafesDetailed: [
 {
           id: "cafe-targowa",
           name: "Café Targowa",
@@ -2387,238 +2166,16 @@ export const polandJourney = {
           }
         ],
         winterExperiences: [
-{
+          {
             title: "Christmas Market & Neon Courtyard Stroll",
             description: "After the Rynek Christmas market, wander to the Ruska 46 neon courtyard for hot spiced mead (grzany miód) and inclusive DJ sets."
           },
-{
+          {
             title: "Gas Lantern Lighter Walk on Ostrów Tumski",
             description: "Join the romantic dusk lantern-lighting ceremony across Cathedral Island, one of Poland's most atmospheric winter rituals."
           }
         ]
-      },
-      restaurantsDetailed: [
-{
-          id: "konspira",
-          name: "Restauracja Konspira",
-          category: "must-haves",
-          categoryLabel: "Must-Have & Iconic",
-          rating: 4.5,
-          ratingCount: "4,800+ reviews",
-          priceTier: "$$",
-          priceEstimatePln: "40 - 80 PLN per person",
-          address: "Plac Solny 11, 50-061 Wrocław, Poland",
-          lat: 51.1092597,
-          lng: 17.0283023,
-          neighborhood: "Stare Miasto (Plac Solny)",
-          cuisine: "Anti-Communist Resistance & Polish Comfort Food",
-          signature: "Solidarność Ribs, Giant Pierogi Platter, Bigos in Bread Bowl",
-          description: "Immersive restaurant themed around the 1980s Polish anti-communist Solidarity movement. Hidden passageways behind secret bookcases, vintage radio broadcasts, and hearty traditional Polish cooking.",
-          hours: "Mon-Thu 1:00 PM–11:00 PM, Fri-Sat 12:00 PM–11:45 PM, Sun 12:00 PM–11:00 PM",
-          websiteUrl: "https://restauracjakonspira.pl/",
-          imageSrc: "/wayfinder/Poland-2026/images/wroclaw/food/konspira.jpg"
-        },
-{
-          id: "mloda-polska",
-          name: "Młoda Polska Bistro & Pianino",
-          category: "must-haves",
-          categoryLabel: "Michelin-Selected Modern Polish",
-          rating: 4.5,
-          ratingCount: "1,900+ reviews",
-          priceTier: "$$",
-          priceEstimatePln: "60 - 180 PLN per person",
-          address: "Plac Solny 4, 50-060 Wrocław, Poland",
-          lat: 51.10915,
-          lng: 17.0289,
-          neighborhood: "Stare Miasto (Plac Solny)",
-          cuisine: "Michelin-Selected Modern Polish & Live Piano",
-          signature: "Beef Tartare with Smoked Egg Yolk, Pork Schnitzel (Schabowy) with Anchovies, Craft Spirits",
-          description: "Founded by celebrity chef Beata Śniechowska. Featured in the Michelin Guide for its modern take on Polish comfort food, vibrant cocktail program, and live piano music.",
-          hours: "Mon-Thu 4 PM–9 PM, Fri 4 PM–11 PM, Sat 12 PM–11 PM, Sun 12 PM–8 PM",
-          websiteUrl: "https://mlodapolskabistro.pl/",
-          imageSrc: "/wayfinder/Poland-2026/images/wroclaw/food/mloda-polska.jpg"
-        },
-{
-          id: "karczma-lwowska",
-          name: "Karczma Lwowska",
-          category: "local",
-          categoryLabel: "Historic Market Square Tavern",
-          rating: 4,
-          ratingCount: "2,100+ reviews",
-          priceTier: "$$",
-          priceEstimatePln: "60 - 95 PLN per person",
-          address: "Rynek 4, 50-106 Wrocław, Poland",
-          lat: 51.1106064,
-          lng: 17.0304181,
-          neighborhood: "Stare Miasto (Rynek)",
-          cuisine: "Traditional Polish & Lwów Borderlands",
-          signature: "Hunter's Stew (Bigos), Lwów-Style Roast Duck with Apples, Wild Mushroom Soup",
-          description: "Rustic wooden timbered tavern located directly on Market Square in the historic Pod Złotym Orłem building, serving hearty pre-war Lwów borderlands recipes since 1999.",
-          hours: "Open daily 12:00 PM - 11:00 PM",
-          websiteUrl: "https://www.lwowska.com.pl/",
-          imageSrc: "/wayfinder/Poland-2026/images/wroclaw/food/karczma-lwowska.jpg"
-        },
-{
-          id: "kurna-chata",
-          name: "Kurna Chata",
-          category: "local",
-          categoryLabel: "Authentic Polish Wooden Cottage",
-          rating: 4.9,
-          ratingCount: "6,400+ reviews",
-          priceTier: "$$",
-          priceEstimatePln: "45 - 85 PLN per person",
-          address: "Odrzańska 24-29, 50-114 Wrocław, Poland",
-          lat: 51.11321,
-          lng: 17.03154,
-          neighborhood: "Stare Miasto (Near Oder River)",
-          cuisine: "Homestyle Polish Comfort & Folk Recipes",
-          signature: "Potato Pancakes with Goulash (Placki Po Zbójnicku), Dumplings in Clay Bowls, Żurek Soup",
-          description: "Charming folk-inspired restaurant with wooden log walls and rustic hearth decor, serving generous portions of authentic Polish homestyle cooking near the Oder riverbank.",
-          hours: "Open daily 12:00 PM - 10:00 PM",
-          websiteUrl: "https://kurnachata.pl/",
-          imageSrc: "/wayfinder/Poland-2026/images/wroclaw/food/kurna-chata.jpg"
-        },
-{
-          id: "pod-fredra",
-          name: "Restauracja Pod Fredrą",
-          category: "steak",
-          categoryLabel: "Hearth-Grilled Meats & Steaks",
-          rating: 4.2,
-          ratingCount: "3,400+ reviews",
-          priceTier: "$$$",
-          priceEstimatePln: "60 - 180 PLN per person",
-          address: "Rynek - Ratusz 1, 50-116 Wrocław, Poland",
-          lat: 51.1098401,
-          lng: 17.0316018,
-          neighborhood: "Stare Miasto (Rynek)",
-          cuisine: "Oak Wood Flame Grills & Prime Polish Steaks",
-          signature: "Wood-Fired Seasoned Pork Knuckle (Golonka), Dry-Aged Ribeye Steak, House Smoked Sausages",
-          description: "Located right next to the Town Hall, featuring open hearth fires where prime Polish meats and game are roasted over seasoned beechwood and oak coals.",
-          hours: "Open daily 12:00 PM - 11:00 PM",
-          websiteUrl: "https://www.podfredra.pl/",
-          imageSrc: "/wayfinder/Poland-2026/images/wroclaw/food/pod-fredra.jpg"
-        },
-{
-          id: "campo-steakhouse",
-          name: "Campo Modern Grill",
-          category: "steak",
-          categoryLabel: "Award-Winning South American Steakhouse",
-          rating: 4.9,
-          ratingCount: "2,800+ reviews",
-          priceTier: "$$$",
-          priceEstimatePln: "180 - 350 PLN per person",
-          address: "Podwale 83, 50-414 Wrocław, Poland",
-          lat: 51.10612,
-          lng: 17.04231,
-          neighborhood: "OVO Building / Stare Miasto",
-          cuisine: "Argentine Ribeye & Prime South American Steaks",
-          signature: "Black Angus Argentine Ribeye, Tenderloin Skewers, Chimichurri & Charred Vegetables",
-          description: "Premier steakhouse housed in the sleek OVO building. Winner of global restaurant design awards, specializing in prime Argentine cuts cooked over charcoal flames.",
-          hours: "Mon-Thu 2 PM–10 PM, Fri-Sat 12 PM–11 PM, Sun 12 PM–9 PM",
-          websiteUrl: "https://campomoderngrill.pl/",
-          imageSrc: "/wayfinder/Poland-2026/images/wroclaw/food/campo-steakhouse.jpg"
-        },
-{
-          id: "whiskey-in-the-jar",
-          name: "Whiskey in the Jar Wrocław",
-          category: "steak",
-          categoryLabel: "Rock & Roll Steakhouse",
-          rating: 4.6,
-          ratingCount: "7,100+ reviews",
-          priceTier: "$$$",
-          priceEstimatePln: "80 - 200 PLN per person",
-          address: "Rynek 48, 50-116 Wrocław, Poland",
-          lat: 51.11021,
-          lng: 17.03211,
-          neighborhood: "Stare Miasto (Rynek)",
-          cuisine: "Prime Beef Steaks & Jar Cocktails",
-          signature: "Tomahawk Ribeye Steak, BBQ Pork Ribs, Signature Bourbon Jar Cocktails",
-          description: "High-energy rock & roll steakhouse located directly on Market Square. Known for sizzling lava stone steaks, live music vibes, and oversized bourbon cocktails in glass jars.",
-          hours: "Open daily 12:00 PM - 1:00 AM",
-          websiteUrl: "https://whiskeyinthejar.pl/",
-          imageSrc: "/wayfinder/Poland-2026/images/wroclaw/food/whiskey-in-the-jar.jpg"
-        },
-{
-          id: "pierogarnia-stary-mlyn",
-          name: "Pierogarnia Stary Młyn",
-          category: "cheap",
-          categoryLabel: "Hand-Crafted Pierogi House",
-          rating: 4.3,
-          ratingCount: "5,200+ reviews",
-          priceTier: "$",
-          priceEstimatePln: "25 - 45 PLN per person",
-          address: "Rynek 29, 50-127 Wrocław, Poland",
-          lat: 51.1091783,
-          lng: 17.0330937,
-          neighborhood: "Stare Miasto (Rynek)",
-          cuisine: "Baked & Boiled Traditional Pierogi",
-          signature: "Opiekane (Crispy Baked Pierogi in Clay Ovens), Ruskie with Crispy Onions, Sweet Cottage Cheese Dumplings",
-          description: "Famous pierogi bakery where dumplings are rolled by hand and either boiled or baked in clay ovens until golden and bubbling.",
-          hours: "Mon 8:00 AM–10:00 PM, Tue-Sun 8:00 AM–11:00 PM",
-          websiteUrl: "https://www.pierogarnie.com/restauracje/stary-mlyn-wroclaw/",
-          imageSrc: "/wayfinder/Poland-2026/images/wroclaw/food/pierogarnia-stary-mlyn.jpg"
-        },
-{
-          id: "bar-mleczny-mis",
-          name: "Bar Mleczny Miś",
-          category: "cheap",
-          categoryLabel: "Legendary Historic Milk Bar (Est. 1960s)",
-          rating: 4.4,
-          ratingCount: "4,600+ reviews",
-          priceTier: "$",
-          priceEstimatePln: "12 - 25 PLN per person",
-          address: "ul. Kuźnicza 48, 50-138 Wrocław, Poland",
-          lat: 51.11292,
-          lng: 17.03385,
-          neighborhood: "Stare Miasto (Near Wrocław University)",
-          cuisine: "Traditional Polish Milk Bar Comfort Food",
-          signature: "Żurek with Egg (3 PLN), Kotlet Schabowy, Leniwe (Sweet Cottage Cheese Dumplings)",
-          description: "Iconic 1960s Polish milk bar serving wholesome, retro cafeteria-style meals at incredibly low prices. A beloved local cultural institution popular with students and travelers alike.",
-          hours: "Mon-Fri 7:00 AM - 6:00 PM, Sat 8:00 AM - 5:00 PM (Closed Sun)",
-          websiteUrl: "https://www.wroclaw.pl/",
-          imageSrc: "/wayfinder/Poland-2026/images/wroclaw/food/bar-mleczny-mis.jpg"
-        },
-{
-          id: "piwnica-swidnicka",
-          name: "Piwnica Świdnicka",
-          category: "expensive",
-          categoryLabel: "Europe's Oldest Restaurant (Est. 1273)",
-          rating: 4.1,
-          ratingCount: "3,800+ reviews",
-          priceTier: "$$$",
-          priceEstimatePln: "80 - 220 PLN per person",
-          address: "Rynek Ratusz 1A, 50-106 Wrocław, Poland",
-          lat: 51.1094574,
-          lng: 17.0319896,
-          neighborhood: "Stare Miasto (Underground Ratusz)",
-          cuisine: "Medieval Royal Polish & Craft Brewery",
-          signature: "Royal Roast Wild Boar, Silesian Heaven (Śląskie Niebo), White Wine Steamed Mussels",
-          description: "Operating continuously in the brick vaults beneath Wrocław Town Hall since 1273. Fryderyk Chopin, Goethe, and Polish kings dined here over 700 years of history.",
-          hours: "Open daily 12:00 PM - 12:00 AM",
-          websiteUrl: "https://piwnicaswidnicka.pl/",
-          imageSrc: "/wayfinder/Poland-2026/images/wroclaw/food/piwnica-swidnicka.jpg"
-        },
-{
-          id: "restauracja-tarasowa",
-          name: "Restauracja Tarasowa",
-          category: "expensive",
-          categoryLabel: "Michelin Bib Gourmand Fine Dining",
-          rating: 4.7,
-          ratingCount: "950+ reviews",
-          priceTier: "$$$",
-          priceEstimatePln: "120 - 360 PLN per person",
-          address: "ul. Wystawowa 1, 51-618 Wrocław, Poland",
-          lat: 51.10682,
-          lng: 17.07351,
-          neighborhood: "Centennial Hall (Hala Stulecia)",
-          cuisine: "Michelin Bib Gourmand Contemporary Polish",
-          signature: "Seasonal Tasting Menu, Confit Silesian Duck, Pergola Terrace Cocktail Pairings",
-          description: "Awarded Michelin Bib Gourmand status. Set inside the UNESCO Centennial Hall complex overlooking the Pergola fountain, serving exquisite modern Silesian gastronomy.",
-          hours: "Tue-Fri 4 PM–10 PM, Sat-Sun 12 PM–10 PM (Closed Mon)",
-          websiteUrl: "https://restauracjatarasowa.pl/",
-          imageSrc: "/wayfinder/Poland-2026/images/wroclaw/food/restauracja-tarasowa.jpg"
-        }
-      ]
+      }
     },
 {
       id: "poznan",
@@ -2812,14 +2369,18 @@ export const polandJourney = {
         kaucja: "30 PLN (~$8.00 USD) deposit per mug (EXACT CASH REQUIRED)"
       },
       holidayClosures: {
-        dec24: "Market closes early at ~2:00 PM (Wigilia family dinner).",
+        title: "Critical Holiday Operating Hours (Dec 24 - 26 / New Year)",
+        dec24: "Dec 24 (Wigilia): Market closes early at ~2:00 PM (Wigilia family dinner).",
         dec25: "Christmas Day: Plac Wolności market open 1:00 PM - 9:00 PM with select food stalls.",
         dec26: "Boxing Day: Full market operations resume (11:00 AM - 9:00 PM).",
-        dec31: "New Year’s Eve: Extended evening hours through countdown celebrations.",
-        jan1: "New Year’s Day: Open 1:00 PM - 9:00 PM."
+        dec31: "New Year's Eve: Extended evening hours through countdown celebrations.",
+        jan1: "New Year's Day: Open 1:00 PM - 9:00 PM."
       },
       kaucjaCallout: {
-        deposit: "30 PLN (~$8.00 USD)",
+        title: "Kaucja (Ceramic Mug Deposit)",
+        deposit: "30 PLN (~$8.00 USD) per mug",
+        cashWarning: "CASH MANDATORY: Card payments are accepted for food and crafts, but vendors require exact CASH in PLN (~$8.00 USD) for ceramic mug deposits.",
+        details: "Pay 30 PLN (~$8.00 USD) cash deposit per ceramic boot mug when ordering Betlejem Poznańskie mulled wine or hot spiced cider. Return mug to any official drink chalet for a full cash refund, or keep it as an authentic souvenir!",
         notes: "Exact cash required for ceramic boot mug deposit. Full cash refund upon returning your mug to any drink chalet."
       },
       culinaryHighlights: [
@@ -3086,6 +2647,13 @@ export const polandJourney = {
           imageUrl: "/wayfinder/Poland-2026/images/poznan/attractions/poznan-walking-tour.jpg",
           imageSrc: "/wayfinder/Poland-2026/images/poznan/attractions/poznan-walking-tour.jpg"
         }
+      ],
+      restaurants: [
+        "Brovaria (Craft Microbrewery on Stary Rynek)",
+        "Restauracja Bamberka (Traditional Bambrzy & Greater Poland Heritage)",
+        "Wiejskie Jadło Poznań (Rustic Polish Village Cuisine)",
+        "Pierogarnia Stary Młyn Poznań (Traditional & Oven-Baked Piecuchy)",
+        "Restauracja Muga (1 Michelin Star Contemporary Fine Dining)"
       ],
       restaurantsDetailed: [
         {
@@ -3425,7 +2993,7 @@ export const polandJourney = {
                 "Restauracja Manekin (Iconic Crepes)",
                 "Jan Olbracht Browar Staromiejski"
           ],
-          torunRestaurantsDetailed: [
+          restaurantsDetailed: [
                 {
                       id: "karczma-spichrz",
                       name: "Karczma Spichrz",
@@ -3463,7 +3031,7 @@ export const polandJourney = {
                       websiteUrl: "https://manekin.pl"
                 }
           ],
-          torunDrinksDetailed: [
+          drinksDetailed: [
                 {
                       id: "jan-olbracht-browar-staromiejski",
                       name: "Jan Olbracht Browar Staromiejski",
@@ -3483,7 +3051,7 @@ export const polandJourney = {
                       websiteUrl: "https://browar-olbracht.pl"
                 }
           ],
-          torunCafesDetailed: [
+          cafesDetailed: [
                 {
                       id: "kawiarnia-lenkiewicz",
                       name: "Kawiarnia Lenkiewicz",
@@ -3503,7 +3071,6 @@ export const polandJourney = {
                       websiteUrl: "https://lenkiewicz.net"
                 }
           ],
-          restaurantsDetailed: [],
           dayTripGuide: {
                 title: "Toruń 4-Hour Medieval Stopover Guide",
                 steps: [

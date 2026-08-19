@@ -1,0 +1,173 @@
+[
+  {
+    "id": "collegium-maius",
+    "name": "Collegium Maius",
+    "city": "krakow",
+    "coords": {
+      "lat": 50.0615639,
+      "lng": 19.9339308
+    },
+    "formattedAddress": "Jagiellońska 15, 31-010 Kraków, Poland",
+    "rating": 4.7,
+    "userRatingsTotal": 1515,
+    "website": "https://maius.uj.edu.pl/",
+    "imageSaved": true,
+    "imagePath": "public/Poland-2026/images/krakow/attractions/collegium-maius.jpg",
+    "photoSource": "Google Places API"
+  },
+  {
+    "id": "czartoryski-museum",
+    "name": "Czartoryski Museum",
+    "city": "krakow",
+    "coords": {
+      "lat": 50.0646918,
+      "lng": 19.9400993
+    },
+    "formattedAddress": "Pijarska 15, 31-015 Kraków, Poland",
+    "rating": 4.8,
+    "userRatingsTotal": 10368,
+    "website": "https://mnk.pl/oddzial/mnk-muzeum-czartoryskich",
+    "imageSaved": true,
+    "imagePath": "public/Poland-2026/images/krakow/attractions/czartoryski-museum.jpg",
+    "photoSource": "Google Places API"
+  },
+  {
+    "id": "szopki-competition",
+    "name": "Szopki Krakowskie Competition",
+    "city": "krakow",
+    "coords": {
+      "lat": 50.0626956,
+      "lng": 19.9366334
+    },
+    "formattedAddress": "Rynek Główny 35, 33-332 Kraków, Poland",
+    "website": "https://muzeumkrakowa.pl/oddzialy/palac-krzysztofory",
+    "imageSaved": true,
+    "imagePath": "public/Poland-2026/images/krakow/attractions/szopki-competition.jpg",
+    "photoSource": "Wikimedia Commons"
+  },
+  {
+    "id": "hydropolis-wroclaw",
+    "name": "Hydropolis Centre for Ecological Education",
+    "city": "wroclaw",
+    "coords": {
+      "lat": 51.103524,
+      "lng": 17.0572038
+    },
+    "formattedAddress": "Na Grobli 17, 50-421 Wrocław, Poland",
+    "rating": 4.5,
+    "userRatingsTotal": 9780,
+    "website": "https://hydropolis.pl/",
+    "imageSaved": true,
+    "imagePath": "public/Poland-2026/images/wroclaw/attractions/hydropolis.jpg",
+    "photoSource": "Google Places API"
+  },
+  {
+    "id": "lumina-park-wroclaw",
+    "name": "Lumina Park Zamek Topacz",
+    "city": "wroclaw",
+    "coords": {
+      "lat": 51.0347166,
+      "lng": 16.9899269
+    },
+    "formattedAddress": "Templariuszy 1, 55-040 Ślęza, Poland",
+    "rating": 4.7,
+    "userRatingsTotal": 8633,
+    "website": "http://www.zamektopacz.pl/",
+    "imageSaved": true,
+    "imagePath": "public/Poland-2026/images/wroclaw/attractions/lumina-park.jpg",
+    "photoSource": "Google Places API"
+  },
+  {
+    "id": "poznan-palmiarnia",
+    "name": "Poznan Palm House",
+    "city": "poznan",
+    "coords": {
+      "lat": 52.4020176,
+      "lng": 16.9018524
+    },
+    "formattedAddress": "Matejki 18, 60-767 Poznań, Poland",
+    "rating": 4.7,
+    "userRatingsTotal": 21208,
+    "website": "http://www.palmiarnia.poznan.pl/",
+    "imageSaved": true,
+    "imagePath": "public/Poland-2026/images/poznan/attractions/poznan-palmiarnia.jpg",
+    "photoSource": "Google Places API"
+  },
+  {
+    "id": "ice-sculpture-festival-poznan",
+    "name": "Poznan International Ice Sculpture Festival",
+    "city": "poznan",
+    "coords": {
+      "lat": 52.4088499,
+      "lng": 16.9337748
+    },
+    "formattedAddress": "Stary Rynek, 61-001 Poznań, Poland",
+    "imageSaved": true,
+    "imagePath": "public/Poland-2026/images/poznan/attractions/ice-sculpture-festival.jpg",
+    "photoSource": "Google Places API"
+  },
+  {
+    "id": "torun-zamek-krzyzacki",
+    "name": "Teutonic Castle Ruins Torun",
+    "city": "torun",
+    "coords": {
+      "lat": 53.0096709,
+      "lng": 18.610399
+    },
+    "formattedAddress": "Przedzamcze 3, 87-100 Toruń, Poland",
+    "rating": 4.6,
+    "userRatingsTotal": 7060,
+    "website": "https://www.zamektorun.pl/",
+    "imageSaved": true,
+    "imagePath": "public/Poland-2026/images/torun/attractions/torun-zamek-krzyzacki.jpg",
+    "photoSource": "Google Places API"
+  },
+  {
+    "id": "torun-zywemu-muzeum-piernika",
+    "name": "Living Museum of Gingerbread Torun",
+    "city": "torun",
+    "coords": {
+      "lat": 53.008692,
+      "lng": 18.60485
+    },
+    "formattedAddress": "Rabiańska 9, 87-100 Toruń, Poland",
+    "rating": 4.8,
+    "userRatingsTotal": 13918,
+    "website": "https://muzeumpiernika.pl/",
+    "imageSaved": true,
+    "imagePath": "public/Poland-2026/images/torun/attractions/torun-zywemu-muzeum-piernika.jpg",
+    "photoSource": "Google Places API"
+  },
+  {
+    "id": "gdansk-katedra-oliwa",
+    "name": "Oliwa Cathedral Gdansk",
+    "city": "gdansk",
+    "coords": {
+      "lat": 54.4109789,
+      "lng": 18.5580156
+    },
+    "formattedAddress": "Biskupa Edmunda Nowickiego 5, 80-300 Gdańsk, Poland",
+    "rating": 4.8,
+    "userRatingsTotal": 5592,
+    "website": "http://www.archikatedraoliwa.pl/",
+    "imageSaved": true,
+    "imagePath": "public/Poland-2026/images/gdansk/attractions/gdansk-katedra-oliwa.jpg",
+    "photoSource": "Google Places API"
+  },
+  {
+    "id": "gdansk-oliwa-park-illuminations",
+    "name": "Oliwa Park Winter Illuminations",
+    "city": "gdansk",
+    "coords": {
+      "lat": 54.4112209,
+      "lng": 18.5620805
+    },
+    "formattedAddress": "Opata Jacka Rybińskiego, 80-320 Gdańsk, Poland",
+    "rating": 4.8,
+    "userRatingsTotal": 36576,
+    "website": "http://www.parkoliwski.gdansk.pl/",
+    "imageSaved": true,
+    "imagePath": "public/Poland-2026/images/gdansk/attractions/gdansk-oliwa-park-illuminations.jpg",
+    "photoSource": "Google Places API"
+  }
+]

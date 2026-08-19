@@ -35,6 +35,9 @@ export const attractionImages = {
   'schindler-factory.jpg': '/wayfinder/Poland-2026/images/krakow/attractions/schindler-factory.jpg',
   'thermal-baths.jpg': '/wayfinder/Poland-2026/images/krakow/attractions/thermal-baths.jpg',
   'walking-tour.jpg': '/wayfinder/Poland-2026/images/krakow/attractions/walking-tour.jpg',
+  'collegium-maius.jpg': '/wayfinder/Poland-2026/images/krakow/attractions/collegium-maius.jpg',
+  'czartoryski-museum.jpg': '/wayfinder/Poland-2026/images/krakow/attractions/czartoryski-museum.jpg',
+  'szopki-competition.jpg': '/wayfinder/Poland-2026/images/krakow/attractions/szopki-competition.jpg',
   'lgbtq-kazimierz.jpg': '/wayfinder/Poland-2026/images/krakow/attractions/lgbtq-kazimierz.jpg',
   'lgbtq-wroclaw.jpg': '/wayfinder/Poland-2026/images/wroclaw/attractions/lgbtq-wroclaw.jpg',
   'beyond-club.jpg': '/wayfinder/Poland-2026/images/wroclaw/food/beyond-club.jpg',
@@ -50,6 +53,8 @@ export const attractionImages = {
   'centennial-hall.jpg': '/wayfinder/Poland-2026/images/wroclaw/attractions/centennial-hall.jpg',
   'panorama-raclawice.jpg': '/wayfinder/Poland-2026/images/wroclaw/attractions/panorama-raclawice.jpg',
   'wroclaw-walking-tour.jpg': '/wayfinder/Poland-2026/images/wroclaw/attractions/wroclaw-walking-tour.jpg',
+  'hydropolis.jpg': '/wayfinder/Poland-2026/images/wroclaw/attractions/hydropolis.jpg',
+  'lumina-park.jpg': '/wayfinder/Poland-2026/images/wroclaw/attractions/lumina-park.jpg',
   'poznan-ratusz.jpg': '/wayfinder/Poland-2026/images/poznan/attractions/poznan-ratusz.jpg',
   'poznan-ostrow-tumski.jpg': '/wayfinder/Poland-2026/images/poznan/attractions/poznan-ostrow-tumski.jpg',
   'poznan-zamek-cesarski.jpg': '/wayfinder/Poland-2026/images/poznan/attractions/poznan-zamek-cesarski.jpg',
@@ -57,8 +62,11 @@ export const attractionImages = {
   'poznan-park-cytadela.jpg': '/wayfinder/Poland-2026/images/poznan/attractions/poznan-park-cytadela.jpg',
   'poznan-fara.jpg': '/wayfinder/Poland-2026/images/poznan/attractions/poznan-fara.jpg',
   'poznan-walking-tour.jpg': '/wayfinder/Poland-2026/images/poznan/attractions/poznan-walking-tour.jpg',
+  'poznan-palmiarnia.jpg': '/wayfinder/Poland-2026/images/poznan/attractions/poznan-palmiarnia.jpg',
+  'ice-sculpture-festival.jpg': '/wayfinder/Poland-2026/images/poznan/attractions/ice-sculpture-festival.jpg',
   'torun-ratusz-staromiejski.jpg': '/wayfinder/Poland-2026/images/torun/attractions/torun-ratusz-staromiejski.jpg',
   'torun-muzeum-piernika.jpg': '/wayfinder/Poland-2026/images/torun/attractions/torun-muzeum-piernika.jpg',
+  'torun-zywemu-muzeum-piernika.jpg': '/wayfinder/Poland-2026/images/torun/attractions/torun-zywemu-muzeum-piernika.jpg',
   'torun-dom-kopernika.jpg': '/wayfinder/Poland-2026/images/torun/attractions/torun-dom-kopernika.jpg',
   'torun-krzywa-wieza.jpg': '/wayfinder/Poland-2026/images/torun/attractions/torun-krzywa-wieza.jpg',
   'torun-zamek-krzyzacki.jpg': '/wayfinder/Poland-2026/images/torun/attractions/torun-zamek-krzyzacki.jpg',
@@ -71,7 +79,9 @@ export const attractionImages = {
   'gdansk-muzeum-ii-wojny.jpg': '/wayfinder/Poland-2026/images/gdansk/attractions/gdansk-muzeum-ii-wojny.jpg',
   'gdansk-ecs-solidarnosc.jpg': '/wayfinder/Poland-2026/images/gdansk/attractions/gdansk-ecs-solidarnosc.jpg',
   'gdansk-amber-museum.jpg': '/wayfinder/Poland-2026/images/gdansk/attractions/gdansk-amber-museum.jpg',
-  'gdansk-walking-tour.jpg': '/wayfinder/Poland-2026/images/gdansk/attractions/gdansk-walking-tour.jpg'
+  'gdansk-walking-tour.jpg': '/wayfinder/Poland-2026/images/gdansk/attractions/gdansk-walking-tour.jpg',
+  'gdansk-katedra-oliwa.jpg': '/wayfinder/Poland-2026/images/gdansk/attractions/gdansk-katedra-oliwa.jpg',
+  'gdansk-oliwa-park-illuminations.jpg': '/wayfinder/Poland-2026/images/gdansk/attractions/gdansk-oliwa-park-illuminations.jpg'
 };
 
 export function getAttractionImage(cardImage = '', cardTitle = '', cityName = 'Kraków') {
@@ -92,6 +102,8 @@ export function getAttractionImage(cardImage = '', cardTitle = '', cityName = 'K
   const cName = (cityName || '').toLowerCase();
 
   if (cName.includes('wrocław') || cName.includes('wroclaw')) {
+    if (name.includes('hydropolis')) return attractionImages['hydropolis.jpg'];
+    if (name.includes('lumina') || name.includes('topacz')) return attractionImages['lumina-park.jpg'];
     if (name.includes('dwarf') || name.includes('krasnal')) return attractionImages['wroclaw-dwarfs.jpg'];
     if (name.includes('tumski') && name.includes('bridge')) return attractionImages['tumski-bridge.jpg'];
     if (name.includes('tumski') || name.includes('cathedral')) return attractionImages['ostrow-tumski.jpg'];
@@ -103,6 +115,8 @@ export function getAttractionImage(cardImage = '', cardTitle = '', cityName = 'K
   }
 
   if (cName.includes('poznan') || cName.includes('poznań')) {
+    if (name.includes('palm') || name.includes('palmiarnia')) return attractionImages['poznan-palmiarnia.jpg'];
+    if (name.includes('ice') || name.includes('sculpture')) return attractionImages['ice-sculpture-festival.jpg'];
     if (name.includes('goat') || name.includes('ratusz') || name.includes('town hall')) return attractionImages['poznan-ratusz.jpg'];
     if (name.includes('tumski') || name.includes('cathedral') || name.includes('katedra')) return attractionImages['poznan-ostrow-tumski.jpg'];
     if (name.includes('zamek') || name.includes('castle')) return attractionImages['poznan-zamek-cesarski.jpg'];
@@ -114,6 +128,7 @@ export function getAttractionImage(cardImage = '', cardTitle = '', cityName = 'K
   }
 
   if (cName.includes('torun') || cName.includes('toruń')) {
+    if (name.includes('living') || name.includes('żywe')) return attractionImages['torun-zywemu-muzeum-piernika.jpg'];
     if (name.includes('gingerbread') || name.includes('piernik')) return attractionImages['torun-muzeum-piernika.jpg'];
     if (name.includes('copernicus') || name.includes('kopernik')) return attractionImages['torun-dom-kopernika.jpg'];
     if (name.includes('leaning') || name.includes('krzywa')) return attractionImages['torun-krzywa-wieza.jpg'];
@@ -125,6 +140,8 @@ export function getAttractionImage(cardImage = '', cardTitle = '', cityName = 'K
   }
 
   if (cName.includes('gdansk') || cName.includes('gdańsk')) {
+    if (name.includes('oliwa') && (name.includes('park') || name.includes('illumination'))) return attractionImages['gdansk-oliwa-park-illuminations.jpg'];
+    if (name.includes('oliwa') || name.includes('organ')) return attractionImages['gdansk-katedra-oliwa.jpg'];
     if (name.includes('neptune') || name.includes('neptun')) return attractionImages['gdansk-fontanna-neptuna.jpg'];
     if (name.includes('mariacka') || name.includes('mary')) return attractionImages['gdansk-bazylika-mariacka.jpg'];
     if (name.includes('crane') || name.includes('żuraw') || name.includes('zuraw')) return attractionImages['gdansk-zuraw.jpg'];
@@ -136,6 +153,9 @@ export function getAttractionImage(cardImage = '', cardTitle = '', cityName = 'K
     return cityImages.gdansk;
   }
 
+  if (name.includes('collegium') || name.includes('maius')) return attractionImages['collegium-maius.jpg'];
+  if (name.includes('czartoryski') || name.includes('ermine')) return attractionImages['czartoryski-museum.jpg'];
+  if (name.includes('szopki') || name.includes('crib')) return attractionImages['szopki-competition.jpg'];
   if (name.includes('walk') || name.includes('tour') || name.includes('guided')) return attractionImages['walking-tour.jpg'];
   if (name.includes('thermal') || name.includes('termy') || name.includes('bath') || name.includes('chochoł')) return attractionImages['thermal-baths.jpg'];
   if (name.includes('wawel')) return attractionImages['wawel-castle.jpg'];
@@ -149,4 +169,11 @@ export function getAttractionImage(cardImage = '', cardTitle = '', cityName = 'K
 
   return cityImages[cName] || cityImages.krakow;
 }
+
+export default {
+  cityImages,
+  marketImages,
+  attractionImages,
+  getAttractionImage,
+};
 

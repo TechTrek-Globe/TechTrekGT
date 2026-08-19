@@ -1,0 +1,174 @@
+{
+  "cities": {
+    "krakow": {
+      "name": "Kraków",
+      "categories": {
+        "Christmas Markets": {
+          "count": 3,
+          "pois": []
+        },
+        "Must-See Attractions": {
+          "count": 11,
+          "pois": []
+        },
+        "Restaurants": {
+          "count": 14,
+          "pois": []
+        },
+        "Bars & Nightlife": {
+          "count": 15,
+          "pois": []
+        },
+        "Cafés & Dessert": {
+          "count": 5,
+          "pois": []
+        },
+        "Hotels (Deprecated/Base)": {
+          "count": 0,
+          "status": "No commercial hotel POIs (Conforms with Rule 5 deprecation)"
+        }
+      },
+      "totalPois": 48,
+      "compliantPois": 48,
+      "issues": []
+    },
+    "wroclaw": {
+      "name": "Wrocław",
+      "categories": {
+        "Christmas Markets": {
+          "count": 3,
+          "pois": []
+        },
+        "Must-See Attractions": {
+          "count": 7,
+          "pois": []
+        },
+        "Restaurants": {
+          "count": 11,
+          "pois": []
+        },
+        "Bars & Nightlife": {
+          "count": 7,
+          "pois": []
+        },
+        "Cafés & Dessert": {
+          "count": 4,
+          "pois": []
+        },
+        "Hotels (Deprecated/Base)": {
+          "count": 0,
+          "status": "No commercial hotel POIs (Conforms with Rule 5 deprecation)"
+        }
+      },
+      "totalPois": 32,
+      "compliantPois": 32,
+      "issues": []
+    },
+    "poznan": {
+      "name": "Poznań",
+      "categories": {
+        "Christmas Markets": {
+          "count": 3,
+          "pois": []
+        },
+        "Must-See Attractions": {
+          "count": 7,
+          "pois": []
+        },
+        "Restaurants": {
+          "count": 5,
+          "pois": []
+        },
+        "Bars & Nightlife": {
+          "count": 2,
+          "pois": []
+        },
+        "Cafés & Dessert": {
+          "count": 1,
+          "pois": []
+        },
+        "Hotels (Deprecated/Base)": {
+          "count": 0,
+          "status": "No commercial hotel POIs (Conforms with Rule 5 deprecation)"
+        }
+      },
+      "totalPois": 18,
+      "compliantPois": 18,
+      "issues": []
+    },
+    "torun": {
+      "name": "Toruń",
+      "categories": {
+        "Christmas Markets": {
+          "count": 1,
+          "pois": []
+        },
+        "Must-See Attractions": {
+          "count": 3,
+          "pois": []
+        },
+        "Restaurants": {
+          "count": 2,
+          "pois": []
+        },
+        "Bars & Nightlife": {
+          "count": 1,
+          "pois": []
+        },
+        "Cafés & Dessert": {
+          "count": 1,
+          "pois": []
+        },
+        "Hotels (Deprecated/Base)": {
+          "count": 0,
+          "status": "No commercial hotel POIs (Conforms with Rule 5 deprecation)"
+        }
+      },
+      "totalPois": 8,
+      "compliantPois": 8,
+      "issues": []
+    },
+    "gdansk": {
+      "name": "Gdańsk",
+      "categories": {
+        "Christmas Markets": {
+          "count": 3,
+          "pois": []
+        },
+        "Must-See Attractions": {
+          "count": 8,
+          "pois": []
+        },
+        "Restaurants": {
+          "count": 5,
+          "pois": []
+        },
+        "Bars & Nightlife": {
+          "count": 3,
+          "pois": []
+        },
+        "Cafés & Dessert": {
+          "count": 1,
+          "pois": []
+        },
+        "Hotels (Deprecated/Base)": {
+          "count": 0,
+          "status": "No commercial hotel POIs (Conforms with Rule 5 deprecation)"
+        }
+      },
+      "totalPois": 20,
+      "compliantPois": 20,
+      "issues": []
+    }
+  },
+  "summary": {
+    "totalPoisChecked": 126,
+    "fullyCompliant": 126,
+    "missingDescription": 0,
+    "missingCoordinates": 0,
+    "missingImageRef": 0,
+    "invalidImageHierarchy": 0,
+    "imageFileNotFound": 0
+  },
+  "detailedIssues": []
+}

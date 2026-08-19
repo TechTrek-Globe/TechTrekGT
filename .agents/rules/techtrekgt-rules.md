@@ -56,7 +56,8 @@ BEFORE writing, editing, or generating any code, data, or components:
 
 ---
 
-## 6. External API Integration Rules (Google Places & Geoapify)
+## 6. External API Integration Rules & Mandatory Dual Verification (Google Places & Geoapify)
+* **Mandatory Dual-Verification Standard:** All external API data ingestion for POIs (coordinates, addresses, venue existence, and metadata) MUST use dual verification across both Google Places API and Geoapify API. No single provider data may be committed without cross-provider validation.
 * **Google Places & Maps API (Primary Photos, Venue Details & Navigation):**
   - **API Keys:** The Google Maps API key is stored as `GOOGLE_MAPS_API_KEY` / `VITE_GOOGLE_MAPS_API_KEY` in `.dev.vars`.
   - **Fetching Data:** Pass the key via headers/URL parameters when querying `https://places.googleapis.com/v1/places:searchText` (for venue data/photos) or Google Maps URL scheme for navigation.
@@ -65,4 +66,5 @@ BEFORE writing, editing, or generating any code, data, or components:
   - **Zero Hallucination POI Generation:** Whenever populating attractions, dining, or Christmas market locations for a city (e.g., Wrocław, Poznań, Kraków):
     1. Use Geoapify Places API (`https://api.geoapify.com/v2/places`) or Geocoding API to query real venues for the target city.
     2. Categories to query: `tourism.sights`, `catering.restaurant`, `leisure`.
-    3. Save the fetched venue names, addresses, star ratings, and coordinates directly into the central data file (`wayfinder/src/data/poland-2026.js`).
+    3. Cross-verify coordinates and address metadata against Google Places API results (calculating delta threshold < 250 meters).
+    4. Save the dual-verified venue names, addresses, star ratings, and coordinates directly into the central data file (`wayfinder/src/data/poland-2026.js`).

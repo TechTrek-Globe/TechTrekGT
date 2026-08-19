@@ -216,6 +216,10 @@ export const polandJourney = {
           name: "Rynek Główny Main Market",
           shortName: "Rynek Główny",
           location: "Grand Main Square (Old Town)",
+          lat: 50.0614167,
+          lng: 19.9364255,
+          imageSrc: "/wayfinder/Poland-2026/images/krakow/markets/krakow-rynek-glowny.png",
+          imageUrl: "/wayfinder/Poland-2026/images/krakow/markets/krakow-rynek-glowny.png",
           hours: "Nov 28, 2026 – Jan 1, 2027 | Open 10am-8pm. Early close on Dec 24 (~2pm).",
           address: "Rynek Główny 1, 31-042 Kraków (Tram: Teatr Bagatela or Dworzec Główny)",
           vibe: "Bustling, Grand & Iconic",
@@ -241,6 +245,7 @@ export const polandJourney = {
           unescoTradition: "UNESCO Intangible Cultural Heritage: Szopki Krakowskie (Christmas Cribs). The annual competition takes place on the first Thursday of December (Dec 3, 2026) at the Mickiewicz monument, followed by an exhibition at Krzysztofory Palace.",
           tips: "Peak crowds are 5:30 PM - 8:00 PM. Hot drink mugs require a 30 PLN (~$8.00 USD) cash deposit (refundable upon returning the mug). Stage caroling occurs daily around 5:00 PM / 6:00 PM. Dec 24 hours: 10:00 AM - 2:00 PM.",
           specialty: "Hand-carved wooden trinkets, Baltic amber, hand-blown glass ornaments (Bombki), and piping hot Grzaniec Galicyjski.",
+          description: "The crown jewel of Polish Christmas markets! Over 100 wooden chalets surround the Renaissance Cloth Hall (Sukiennice) under the illuminated towers of St. Mary's Basilica. Feast on grilled Oscypek smoked cheese with cranberry jam, sizzling pierogi, and roasted kielbasa while carols echo across the square.",
           details: "The crown jewel of Polish Christmas markets! Over 100 wooden chalets surround the Renaissance Cloth Hall (Sukiennice) under the illuminated towers of St. Mary's Basilica. Feast on grilled Oscypek smoked cheese with cranberry jam, sizzling pierogi, and roasted kielbasa while carols echo across the square."
         },
 {
@@ -248,6 +253,10 @@ export const polandJourney = {
           name: "Mały Rynek Craft Corner",
           shortName: "Mały Rynek",
           location: "Small Square (Behind St. Mary's)",
+          lat: 50.0610715,
+          lng: 19.9401271,
+          imageSrc: "/wayfinder/Poland-2026/images/krakow/markets/krakow-maly-rynek.png",
+          imageUrl: "/wayfinder/Poland-2026/images/krakow/markets/krakow-maly-rynek.png",
           hours: "Late Nov – Dec 26 | Daily 11:00 AM – 9:00 PM",
           address: "Mały Rynek, 31-041 Kraków (2-min walk from Main Square)",
           vibe: "Cozy, Artisanal & Intimate",
@@ -272,6 +281,7 @@ export const polandJourney = {
           ],
           tips: "Much quieter and less crowded than the Main Square. Ideal spot to sip hot spiced mead without long lines and sample local organic honey jams.",
           specialty: "Artisanal honeys, hot spiced mead (Miód Pitny), organic gingerbread, and boutique hand-loomed woolens.",
+          description: "A cozy, intimate extension located just behind St. Mary's Basilica. Mały Rynek focuses on regional food producers, small-batch gingerbread bakers, and master craftsmen selling one-of-a-kind wooden toys and wool slippers.",
           details: "A cozy, intimate extension located just behind St. Mary's Basilica. Mały Rynek focuses on regional food producers, small-batch gingerbread bakers, and master craftsmen selling one-of-a-kind wooden toys and wool slippers."
         },
 {
@@ -279,6 +289,10 @@ export const polandJourney = {
           name: "Plac Wolnica Market",
           shortName: "Plac Wolnica",
           location: "Kazimierz (Jewish Quarter)",
+          lat: 50.0487502,
+          lng: 19.9442715,
+          imageSrc: "/wayfinder/Poland-2026/images/krakow/markets/krakow-plac-wolnica.png",
+          imageUrl: "/wayfinder/Poland-2026/images/krakow/markets/krakow-plac-wolnica.png",
           vibe: "Bohemian, Vintage & Eclectic",
           bestTime: "6:00 PM – 9:00 PM (Combine with Kazimierz nightlife & Zapiekanki)",
           highlights: [
@@ -303,6 +317,7 @@ export const polandJourney = {
           ],
           tips: "Located in the historic Jewish Quarter. Combine a market visit with dinner at nearby historic Jewish quarter restaurants, craft stouts, and late-night Zapiekanki at Plac Nowy.",
           specialty: "Vintage antiques, indie artisan crafts, craft beer stalls, and gourmet local street food.",
+          description: "Set in the historic heart of Kazimierz, this market offers a bohemian, relaxed holiday atmosphere. Browse vintage vinyl, handmade ceramics, and indie art while sipping hot spiced cider or craft stouts.",
           details: "Set in the historic heart of Kazimierz, this market offers a bohemian, relaxed holiday atmosphere. Browse vintage vinyl, handmade ceramics, and indie art while sipping hot spiced cider or craft stouts."
         }
       ],

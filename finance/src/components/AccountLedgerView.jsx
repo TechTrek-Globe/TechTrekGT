@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { useBudget } from '../context/BudgetContext';
+import { useBudgetMetadata } from '../context/BudgetContext';
 import { Wallet, Calendar, AlertCircle, ArrowDownRight, ArrowUpRight, Filter, Upload } from 'lucide-react';
 import { fmtMoney } from '../utils/formatters';
 import { isBillDueInMonth } from '../utils/paydayUtils';
 import { SpreadsheetImporter } from './SpreadsheetImporter';
 
 export function AccountLedgerView() {
-  const { budget, getBillMonthlyCost, isPersonDepositDay, getPersonDepositAmountForAccount } = useBudget();
+  const { budget, getBillMonthlyCost, isPersonDepositDay, getPersonDepositAmountForAccount } = useBudgetMetadata();
   const [selectedAccountId, setSelectedAccountId] = useState(budget.accounts[0]?.id || 'all');
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 

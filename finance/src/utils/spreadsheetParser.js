@@ -57,6 +57,8 @@ export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
     const billsList = [];
     const loansList = [];
     const lineItemsList = [];
+    // GAP-4: monotonic counter prevents duplicate IDs when multiple txns are produced in the same ms
+    let txnIdCounter = 0;
 
     // Pre-populate Jon Kemp's known earners if detected
     const defaultJonId = 'person-jon';
@@ -394,8 +396,12 @@ export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
                   }
                 }
 
-                const isCredit = lowerH.includes('credit') || lowerH.includes('deposit') || lowerH.includes('income');
-                const txnAmount = isCredit ? Math.abs(num) : -Math.abs(num);
+                const isOtherCol = lowerH.includes('other') && !lowerH.includes('credit');
+                const isCredit = isOtherCol
+                  ? num > 0
+                  : (lowerH.includes('credit') || lowerH.includes('deposit') || lowerH.includes('income'));
+                // BUG-1 fix: For Other col preserve raw sign; for named cols enforce sign from category.
+                const txnAmount = isOtherCol ? num : (isCredit ? Math.abs(num) : -Math.abs(num));
 
                 // Infer category
                 let category = 'Uncategorized';
@@ -406,7 +412,7 @@ export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
                 else if (lowerH.includes('insurance')) category = 'Insurance';
 
                 lineItemsList.push({
-                  id: `txn-${Date.now()}-${lineItemsList.length}`,
+                  id: `txn-${Date.now()}-${txnIdCounter++}`,
                   date: dateStr,
                   description: desc,
                   amount: txnAmount,

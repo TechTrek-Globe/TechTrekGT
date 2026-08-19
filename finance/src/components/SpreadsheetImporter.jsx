@@ -19,7 +19,7 @@ import {
   INTERNAL_TRANSACTION_FIELDS,
   INTERNAL_BILL_FIELDS,
 } from '../utils/importer';
-import { useBudget } from '../context/BudgetContext';
+import { useBudgetMetadataState, useLedgerDataDispatch } from '../context/BudgetContext';
 import { logDebug, logInfo, logWarn, logError } from '../utils/debugLogger';
 
 // --- Stage constants ---
@@ -89,7 +89,8 @@ export function SpreadsheetImporter({
   onClose = null,
   onImportComplete = null,
 }) {
-  const { budget, importSpreadsheetSelective } = useBudget();
+  const { budget } = useBudgetMetadataState();
+  const { importSpreadsheetSelective } = useLedgerDataDispatch();
 
   // Target Account selection (locked if targetAccountId prop is passed)
   const [selectedTargetAccountId, setSelectedTargetAccountId] = useState(targetAccountId || '');
@@ -187,6 +188,8 @@ export function SpreadsheetImporter({
 
     try {
       const arrayBuffer = await file.arrayBuffer();
+      // UX-1: Yield to browser so the PARSING spinner paints before synchronous XLSX CPU work begins
+      await new Promise(resolve => setTimeout(resolve, 0));
       const inspection = inspectWorkbookSheets(arrayBuffer, file.name, budget.accounts || []);
 
       if (!inspection.sheetNames || inspection.sheetNames.length === 0) {
@@ -332,13 +335,27 @@ export function SpreadsheetImporter({
       });
 
       setParsedPayload(payload);
-      setNsEnabled({
+
+      const nsEnabledNext = {
         people: payload.people.length > 0,
         accounts: payload.accounts.length > 0,
         bills: payload.bills.length > 0,
         loans: false,
         transactions: payload.transactions.length > 0,
-      });
+      };
+
+      // UX-2: Guard against empty-payload advancing to a useless SELECTING stage
+      const hasAnyData = Object.values(nsEnabledNext).some(Boolean);
+      if (!hasAnyData) {
+        setParseError(
+          `No importable data found in worksheet "${selectedSheetName}". The sheet may have no transaction rows, ` +
+          `no recognizable header columns, or an incorrect header row selection. ` +
+          `Try adjusting the Header Row setting and re-parsing.`
+        );
+        return;
+      }
+
+      setNsEnabled(nsEnabledNext);
       setStage(STAGE.SELECTING);
     } catch (err) {
       logError('IMPORT', `Error parsing sheet: ${err.message}`, { error: err.message });

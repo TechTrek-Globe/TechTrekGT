@@ -91,9 +91,9 @@ export function normalizeIsoDate(rawDate) {
   }
   const parsed = new Date(str);
   if (!isNaN(parsed.getTime()) && !/^\d+$/.test(str)) {
-    const y = parsed.getFullYear();
-    const m = String(parsed.getMonth() + 1).padStart(2, '0');
-    const d = String(parsed.getDate()).padStart(2, '0');
+    const y = parsed.getUTCFullYear();
+    const m = String(parsed.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(parsed.getUTCDate()).padStart(2, '0');
     return `${y}-${m}-${d}`;
   }
   return null;
@@ -160,9 +160,11 @@ export function parseGenericFlat(arrayBuffer) {
     if (rawRows[i].some(c => c !== '')) { headerRowIdx = i; break; }
   }
 
-  const headers = rawRows[headerRowIdx].map(h => String(h).trim()).filter(h => h !== '');
+  // GAP-1: Strip UTF-8 BOM that Windows/Excel adds to the first CSV byte
+  const headers = rawRows[headerRowIdx].map(h => String(h).replace(/^\uFEFF/, '').trim()).filter(h => h !== '');
+  // GAP-3: Tighten filter - exclude rows where every cell is empty or whitespace-only
   const dataRows = rawRows.slice(headerRowIdx + 1)
-    .filter(r => r.some(c => c !== ''));
+    .filter(r => r.some(c => String(c).trim() !== ''));
 
   const rows = dataRows.map(r => {
     const obj = {};
@@ -252,6 +254,8 @@ export function applyTransactionMapping(rows, columnMap, defaultAccountId = '') 
   const records = [];
   const importedLedgerRows = {};
   let skipped = 0;
+  // GAP-4: Monotonic counter to guarantee unique IDs within the same millisecond
+  let txnCounter = 0;
   const skippedDetails = [];
   let earliestDate = null;
 
@@ -271,8 +275,11 @@ export function applyTransactionMapping(rows, columnMap, defaultAccountId = '') 
       }
     });
 
-    const rawAmt = String(mapped.amount !== undefined ? mapped.amount : '').replace(/[^0-9.-]+/g, '');
-    let amount = parseFloat(rawAmt);
+    // BUG-2: Detect accounting-style negatives like (1,234.56) before stripping non-numeric chars
+    const rawAmtStr = String(mapped.amount !== undefined ? mapped.amount : '');
+    const isParenNeg = /^\(.*\)$/.test(rawAmtStr.trim());
+    const rawAmt = rawAmtStr.replace(/[^0-9.-]+/g, '');
+    let amount = parseFloat(isParenNeg && rawAmt !== '' ? `-${rawAmt}` : rawAmt);
     if (!isNaN(amount)) amount = Math.round(amount * 100) / 100;
     const isoDate = normalizeIsoDate(mapped.date);
 
@@ -298,7 +305,7 @@ export function applyTransactionMapping(rows, columnMap, defaultAccountId = '') 
     const desc = (mapped.description || '').trim();
 
     const record = {
-      id: `txn-${Date.now()}-${idx}`,
+      id: `txn-${Date.now()}-${txnCounter++}`,
       date: isoDate,
       description: desc,
       amount,
@@ -348,6 +355,8 @@ export function applyBillMapping(rows, columnMap, defaultAccountId = '') {
   const records = [];
   let skipped = 0;
   const skippedDetails = [];
+  // GAP-4: Monotonic counter to guarantee unique IDs within the same millisecond
+  let billCounter = 0;
 
   rows.forEach((row, idx) => {
     const mapped = {};
@@ -390,7 +399,7 @@ export function applyBillMapping(rows, columnMap, defaultAccountId = '') {
     const matchingKey = (mapped.matchingKey || '').trim();
 
     records.push({
-      id: `bill-${Date.now()}-${idx}`,
+      id: `bill-${Date.now()}-${billCounter++}`,
       name,
       amount,
       period,

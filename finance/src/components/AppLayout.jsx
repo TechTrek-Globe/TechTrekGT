@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useBudget } from '../context/BudgetContext';
+import { useBudgetMetadata } from '../context/BudgetContext';
 import {
   LayoutDashboard,
   ReceiptText,
@@ -127,7 +127,7 @@ export function AppLayout({ children, onNavigateHome, onNavigateView, activeView
     getTotalMonthlyNetIncome,
     getTotalMonthlyExpenses,
     getTotalCashOnHand,
-  } = useBudget();
+  } = useBudgetMetadata();
 
   const [collapsed, setCollapsed] = useState(() => {
     try { return localStorage.getItem(SIDEBAR_KEY) === 'true'; }

@@ -1,10 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import { fmtMoney } from '../utils/formatters';
-import { useBudget } from '../context/BudgetContext';
+import { useBudgetMetadata } from '../context/BudgetContext';
 import { Calculator, DollarSign, TrendingDown, Clock, ShieldCheck, Sparkles, Plus, Trash2, Edit2, Check, CreditCard, Building, RefreshCw, Layers, Archive, RotateCcw } from 'lucide-react';
 
 export function AmortizationView() {
-  const { budget, addLoan, updateLoan, archiveLoan, unarchiveLoan, deleteLoan, addBill, updateBill } = useBudget();
+  const { budget, addLoan, updateLoan, archiveLoan, unarchiveLoan, deleteLoan, addBill, updateBill } = useBudgetMetadata();
 
   // Normalize loans array
   const loans = useMemo(() => {

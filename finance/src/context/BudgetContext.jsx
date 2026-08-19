@@ -2,13 +2,11 @@
 import React, { useMemo } from 'react';
 import {
   BudgetMetadataProvider,
-  useBudgetMetadata,
   useBudgetMetadataState,
   useBudgetMetadataDispatch
 } from './BudgetMetadataContext';
 import {
   LedgerDataProvider,
-  useLedgerData,
   useLedgerDataState,
   useLedgerDataDispatch
 } from './LedgerDataContext';
@@ -37,12 +35,16 @@ export function BudgetProvider({ children }) {
 }
 
 export function useBudget() {
-  const metadata = useBudgetMetadata();
-  const ledger = useLedgerData();
+  const metadataState = useBudgetMetadataState();
+  const metadataDispatch = useBudgetMetadataDispatch();
+  const ledgerState = useLedgerDataState();
+  const ledgerDispatch = useLedgerDataDispatch();
 
   return useMemo(() => ({
-    ...metadata,
-    ...ledger
-  }), [metadata, ledger]);
+    ...metadataState,
+    ...metadataDispatch,
+    ...ledgerState,
+    ...ledgerDispatch
+  }), [metadataState, metadataDispatch, ledgerState, ledgerDispatch]);
 }
 

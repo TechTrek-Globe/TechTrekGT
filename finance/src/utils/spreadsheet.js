@@ -358,25 +358,23 @@ export function processSpreadsheetImport({
             }
           }
         } else {
-          // Unmatched credit -> credit other
-          const otherKey = `${accountId}_${monthKey}_${actualDay}_other_amount`;
+          // Unmatched credit: do NOT write to the debit other_amount key.
+          // BUG-3 fix: credits and debits must not accumulate on the same matrix cell.
+          // The credit will surface only via the imported transactions list.
+          // Capture description only so it can be viewed in debug/notes.
           const otherDescKey = `${accountId}_${monthKey}_${actualDay}_other_desc`;
-          const existingOther = matrixUpdates[otherKey] ?? 0;
-          matrixUpdates[otherKey] = Math.round((existingOther - actualAmount) * 100) / 100;
-
           const cleanDesc = (txn.description || '').replace(/^Other\s*\$?\s*\(?(.*?)\)?$/i, '$1').trim() || txn.description;
           const existingOtherDesc = (matrixUpdates[otherDescKey] ?? nextDailyMatrix[otherDescKey] ?? '').replace(/^Other\s*\$?\s*\(?(.*?)\)?$/i, '$1').trim();
           if (existingOtherDesc && cleanDesc && !existingOtherDesc.includes(cleanDesc)) {
-            matrixUpdates[otherDescKey] = `${existingOtherDesc} | ${cleanDesc}`;
-          } else {
-            matrixUpdates[otherDescKey] = existingOtherDesc || cleanDesc;
+            matrixUpdates[otherDescKey] = `${existingOtherDesc} | ${cleanDesc} (credit)`;
+          } else if (!existingOtherDesc) {
+            matrixUpdates[otherDescKey] = cleanDesc ? `${cleanDesc} (credit)` : '';
           }
 
-          logDebug('MATCH', `Credit transaction #${txnIdx + 1} unmatched to known earner; routed to Other Income`, {
+          logDebug('MATCH', `Credit transaction #${txnIdx + 1} unmatched to known earner; kept in transactions only (not written to other_amount)`, {
             date: normDate,
             desc: txn.description,
-            amount: actualAmount,
-            otherKey
+            amount: actualAmount
           });
         }
       } else {

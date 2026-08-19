@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useBudget } from '../context/BudgetContext';
+import { useBudgetMetadata } from '../context/BudgetContext';
 import { ReceiptText, Plus, Filter } from 'lucide-react';
 import { InlineEdit } from './InlineEdit';
 import { formatBillDueMonths } from '../utils/paydayUtils';
@@ -13,7 +13,7 @@ export function MainBudgetView({ onNavigateView }) {
     getBillPersonMonthlyPortion,
     getTotalMonthlyExpenses,
     updateBill,
-  } = useBudget();
+  } = useBudgetMetadata();
 
   const [selectedAccountId, setSelectedAccountId] = useState('all');
 

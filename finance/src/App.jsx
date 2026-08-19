@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { BudgetMetadataProvider } from './context/BudgetMetadataContext';
 import { LedgerDataProvider } from './context/LedgerDataContext';
-import { useBudget } from './context/BudgetContext';
+import { useBudgetMetadataState } from './context/BudgetContext';
 import { AppLayout } from './components/AppLayout';
 import { SettingsModal } from './components/SettingsModal';
 import { SettingsView } from './components/SettingsView';
@@ -91,7 +91,7 @@ function getViewFromPathname(pathname) {
 }
 
 function MainContent({ pathname, navigateTo, onNavigateHome }) {
-  const { isSettingsOpen } = useBudget();
+  const { isSettingsOpen } = useBudgetMetadataState();
   const { isAuthenticated } = useAuth();
 
   const normalized = (pathname || '').toLowerCase().replace(/\/$/, '');
@@ -165,14 +165,14 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  const navigateTo = (path) => {
+  const navigateTo = useCallback((path) => {
     if (typeof window !== 'undefined') {
       if (window.location.pathname !== path) {
         window.history.pushState({}, '', path);
       }
       setPathname(path);
     }
-  };
+  }, []);
 
   return (
     <ErrorBoundary>

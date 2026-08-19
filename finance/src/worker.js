@@ -148,15 +148,6 @@ async function handleSyncBackup(context) {
     const dataStr = JSON.stringify(body.budget || body);
 
     await env.DB.prepare(`
-      CREATE TABLE IF NOT EXISTS user_backups (
-        user_id TEXT PRIMARY KEY,
-        data TEXT NOT NULL,
-        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-      )
-    `).run();
-
-    await env.DB.prepare(`
       INSERT INTO user_backups (user_id, data, updated_at)
       VALUES (?, ?, datetime('now'))
       ON CONFLICT(user_id) DO UPDATE SET data=excluded.data, updated_at=datetime('now')
@@ -202,15 +193,6 @@ async function handleSyncRestore(context) {
   }
 
   try {
-    await env.DB.prepare(`
-      CREATE TABLE IF NOT EXISTS user_backups (
-        user_id TEXT PRIMARY KEY,
-        data TEXT NOT NULL,
-        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-      )
-    `).run();
-
     const row = await env.DB.prepare('SELECT data, updated_at FROM user_backups WHERE user_id = ?').bind(userId).first();
 
     if (!row || !row.data) {

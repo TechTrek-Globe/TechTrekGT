@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState, useRef, useEffect } from 'react';
-import { useBudget } from '../context/BudgetContext';
+import { useBudgetMetadata, useLedgerDataState, useLedgerDataDispatch } from '../context/BudgetContext';
 import { 
   X, 
   Plus, 
@@ -79,6 +79,17 @@ export function SettingsModal() {
     archiveBill,
     unarchiveBill,
     updateBillSplits,
+    isAutoCloudBackupEnabled,
+    toggleAutoCloudBackup,
+    lastCloudSyncTime,
+    isDebugMode,
+    setDebugMode,
+    debugLogs,
+    clearDebugLogs,
+    addDebugLog
+  } = useBudgetMetadata();
+  const { syncPasscode: cloudPasscode, isSyncUnlocked: isCloudUnlocked } = useLedgerDataState();
+  const {
     resetToDefaults,
     clearAllData,
     clearAccountTransactions,
@@ -87,19 +98,10 @@ export function SettingsModal() {
     pushCloudBackup,
     pullCloudRestore,
     importSpreadsheetSelective,
-    isAutoCloudBackupEnabled,
-    toggleAutoCloudBackup,
-    lastCloudSyncTime,
-    syncPasscode: cloudPasscode,
+    loadDemoPreset,
     setSyncPasscode: setCloudPasscode,
-    isSyncUnlocked: isCloudUnlocked,
     setIsSyncUnlocked: setIsCloudUnlocked,
-    isDebugMode,
-    setDebugMode,
-    debugLogs,
-    clearDebugLogs,
-    addDebugLog
-  } = useBudget();
+  } = useLedgerDataDispatch();
 
   // Debugging tab filter and interaction state
   const [debugFilterLevel, setDebugFilterLevel] = useState('all');

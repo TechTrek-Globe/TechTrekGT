@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useBudget } from '../context/BudgetContext';
+import { useBudgetMetadata } from '../context/BudgetContext';
 import {
   ArrowRightLeft,
   Filter,
@@ -19,7 +19,7 @@ export function AccountTransferSummary() {
     getBillPersonMonthlyPortion,
     getTotalMonthlyExpenses,
     getPersonDepositAmountForAccount
-  } = useBudget();
+  } = useBudgetMetadata();
 
   // State to toggle which earner columns are visible in this table
   const [visiblePersonIds, setVisiblePersonIds] = useState(() => new Set(budget.people.map(p => p.id)));

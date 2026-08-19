@@ -88,13 +88,34 @@ export function processSpreadsheetImport({
         const incomingTargetAcc = data.accounts.find(a => a.id === data.targetAccountId) || data.accounts[0];
         nextAccounts = nextAccounts.map(a => {
           if (a.id === data.targetAccountId) {
+            const importedRows = incomingTargetAcc?.importedLedgerRows || data.importedLedgerRows || {};
+            let newStartingBalance = a.startingBalance;
+            let newExtraStarting = a.extraStartingBalance || 0;
+            
+            let newStartDate = a.startDate;
+            let newBalanceAsOfDate = a.balanceAsOfDate;
+            if (strategies.transactions === 'override') {
+              const dates = Object.keys(importedRows).sort();
+              if (dates.length > 0) {
+                const earliestRow = importedRows[dates[0]];
+                newStartingBalance = earliestRow.regBeg ?? earliestRow.totalBeg ?? newStartingBalance;
+                newExtraStarting = earliestRow.extraBeg ?? (newExtraStarting ?? 0);
+                newStartDate = dates[0];
+                newBalanceAsOfDate = dates[0];
+              }
+            }
+
             return {
               ...a,
               ...(incomingTargetAcc || {}),
               id: a.id,
               name: incomingTargetAcc?.name || a.name,
-              importedLedgerRows: incomingTargetAcc?.importedLedgerRows || data.importedLedgerRows || {},
-              ledgerMode: 'import'
+              importedLedgerRows: importedRows,
+              ledgerMode: 'import',
+              startingBalance: newStartingBalance,
+              extraStartingBalance: newExtraStarting,
+              startDate: newStartDate,
+              balanceAsOfDate: newBalanceAsOfDate
             };
           }
           return a;
@@ -125,6 +146,17 @@ export function processSpreadsheetImport({
           if (incomingAcc.importedLedgerRows && Object.keys(incomingAcc.importedLedgerRows).length > 0) {
             patches.importedLedgerRows = { ...(match.importedLedgerRows || {}), ...incomingAcc.importedLedgerRows };
             patches.ledgerMode = 'import';
+            
+            if (strategies.transactions === 'override') {
+              const dates = Object.keys(incomingAcc.importedLedgerRows).sort();
+              if (dates.length > 0) {
+                const earliestRow = incomingAcc.importedLedgerRows[dates[0]];
+                patches.startingBalance = earliestRow.regBeg ?? earliestRow.totalBeg ?? match.startingBalance;
+                patches.extraStartingBalance = earliestRow.extraBeg ?? (match.extraStartingBalance || 0);
+                patches.startDate = dates[0];
+                patches.balanceAsOfDate = dates[0];
+              }
+            }
           }
           if (Object.keys(patches).length > 0) {
             updatedAccounts[matchIdx] = { ...match, ...patches };

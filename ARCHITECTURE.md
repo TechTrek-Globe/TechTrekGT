@@ -87,7 +87,7 @@ Every React project follows the same structural convention:
 | Project | Unique Directories | Notes |
 |---------|-------------------|-------|
 | `finance/` | `src/components/`, `src/context/`, `src/utils/`, `src/assets/` | 4 context providers, 13 components |
-| `wayfinder/` | `src/data/`, `src/hooks/` | `data/poland-2026.js` static content; `hooks/useExchangeRate.js` |
+| `wayfinder/` | `src/components/city/`, `src/data/`, `src/hooks/`, `functions/api/wayfinder/` | 10 city tab sub-components, `data/poland-2026.js` static dataset, `hooks/useExchangeRate.js`, D1 wayfinder APIs |
 | `outpost/` | `functions/api/` (largest) | invoices, items, sales, platforms, comps, supplies, reports, sync, import |
 | `bigworm/` | `guacamole-config/` | `guacamole.properties`, `user-mapping.xml` for Docker Guacamole |
 

@@ -952,13 +952,27 @@ export function SettingsView({ onNavigateView }) {
                               </div>
                             </td>
                             <td className="px-3 py-1.5 text-right">
-                              <button
-                                onClick={() => deleteAccount(acc.id)}
-                                className="p-1 text-slate-500 hover:text-rose-400 rounded transition-colors cursor-pointer"
-                                title="Delete Account"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setClearAccId(acc.id);
+                                    setIsClearAccConfirmOpen(true);
+                                  }}
+                                  className="p-1 text-slate-400 hover:text-amber-400 hover:bg-amber-950/40 rounded transition-colors cursor-pointer"
+                                  title={`Clear all transactions and reset balance for ${acc.name}`}
+                                >
+                                  <RotateCcw className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => deleteAccount(acc.id)}
+                                  className="p-1 text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 rounded transition-colors cursor-pointer"
+                                  title="Delete Account"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         );
@@ -1649,67 +1663,6 @@ export function SettingsView({ onNavigateView }) {
                   </button>
                 </div>
               </div>
-
-              {/* 2nd Step Confirmation Modal: Clear Account Transactions */}
-              {isClearAccConfirmOpen && (() => {
-                const targetAcc = budget.accounts.find(a => a.id === clearAccId);
-                const txnCount = (budget.transactions || []).filter(t => t.accountId === clearAccId).length;
-
-                return (
-                  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
-                    <div className="bg-slate-900 border border-amber-800/80 rounded-2xl w-full max-w-md p-5 shadow-2xl space-y-4">
-                      <div className="flex items-center gap-2.5 text-amber-400">
-                        <AlertTriangle className="w-5 h-5 shrink-0" />
-                        <h3 className="text-sm font-bold text-slate-100">
-                          Confirm Account Transaction Purge
-                        </h3>
-                      </div>
-
-                      <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-800/60 text-xs text-amber-200/90 space-y-1.5">
-                        <p>
-                          You are about to permanently remove all recorded transactions and reset ledger data for:
-                        </p>
-                        <p className="font-bold text-white text-sm">
-                          {targetAcc?.name || 'Selected Account'}
-                        </p>
-                        <ul className="list-disc list-inside text-[11px] text-slate-300 space-y-0.5 pt-1">
-                          <li><strong>{txnCount}</strong> transaction records will be permanently deleted</li>
-                          <li>All daily ledger manual edits & matrix actuals will be cleared</li>
-                          <li>Opening starting balance will be reset to <strong>$0.00</strong></li>
-                          <li>The account profile and recurring bills will remain safe</li>
-                        </ul>
-                      </div>
-
-                      <p className="text-[11px] text-slate-400 italic">
-                        Are you sure you want to proceed with this 2nd confirmation?
-                      </p>
-
-                      <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
-                        <button
-                          type="button"
-                          onClick={() => setIsClearAccConfirmOpen(false)}
-                          className="px-3.5 py-1.5 text-xs text-slate-400 hover:text-slate-200 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            await clearAccountTransactions(clearAccId);
-                            setIsClearAccConfirmOpen(false);
-                            setClearAccStatus(`Cleared all transactions for ${targetAcc?.name || 'account'}.`);
-                            setTimeout(() => setClearAccStatus(null), 4000);
-                          }}
-                          className="px-4 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-bold transition-all shadow-md cursor-pointer flex items-center gap-1.5"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          <span>Yes, Purge All Transactions</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
 
               {/* Reset Data Section */}
               <div className="p-3 rounded-xl border border-rose-900/40 bg-rose-950/10 space-y-2">
@@ -2749,6 +2702,66 @@ export function SettingsView({ onNavigateView }) {
                 </div>
               )}
 
+              {/* 2nd Step Confirmation Modal: Clear Account Transactions */}
+              {isClearAccConfirmOpen && (() => {
+                const targetAcc = budget.accounts.find(a => a.id === clearAccId);
+                const txnCount = (budget.transactions || []).filter(t => t.accountId === clearAccId).length;
+
+                return (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
+                    <div className="bg-slate-900 border border-amber-800/80 rounded-2xl w-full max-w-md p-5 shadow-2xl space-y-4">
+                      <div className="flex items-center gap-2.5 text-amber-400">
+                        <AlertTriangle className="w-5 h-5 shrink-0" />
+                        <h3 className="text-sm font-bold text-slate-100">
+                          Confirm Account Transaction Purge
+                        </h3>
+                      </div>
+
+                      <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-800/60 text-xs text-amber-200/90 space-y-1.5">
+                        <p>
+                          You are about to permanently remove all recorded transactions and reset ledger data for:
+                        </p>
+                        <p className="font-bold text-white text-sm">
+                          {targetAcc?.name || 'Selected Account'}
+                        </p>
+                        <ul className="list-disc list-inside text-[11px] text-slate-300 space-y-0.5 pt-1">
+                          <li><strong>{txnCount}</strong> transaction records will be permanently deleted</li>
+                          <li>All daily ledger manual edits & matrix actuals will be cleared</li>
+                          <li>Opening starting balance will be reset to <strong>$0.00</strong></li>
+                          <li>The account profile and recurring bills will remain safe</li>
+                        </ul>
+                      </div>
+
+                      <p className="text-[11px] text-slate-400 italic">
+                        Are you sure you want to proceed with this 2nd confirmation?
+                      </p>
+
+                      <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+                        <button
+                          type="button"
+                          onClick={() => setIsClearAccConfirmOpen(false)}
+                          className="px-3.5 py-1.5 text-xs text-slate-400 hover:text-slate-200 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            await clearAccountTransactions(clearAccId);
+                            setIsClearAccConfirmOpen(false);
+                            setClearAccStatus(`Cleared all transactions for ${targetAcc?.name || 'account'}.`);
+                            setTimeout(() => setClearAccStatus(null), 4000);
+                          }}
+                          className="px-4 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-bold transition-all shadow-md cursor-pointer flex items-center gap-1.5"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Yes, Purge All Transactions</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
         </div>
       </div>
     </div>

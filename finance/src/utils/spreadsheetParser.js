@@ -661,7 +661,7 @@ export function parseSingleSheet({
       if (!h || colIdx === dateColIdx || colIdx === otherDescIdx) return;
       if (balanceRegex.test(h)) return;
 
-      const num = cleanNum(val);
+      const num = cleanNum(r[colIdx]);
 
       if (num !== null && num !== 0) {
         const lowerH = h.toLowerCase();

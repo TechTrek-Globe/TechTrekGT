@@ -49,8 +49,8 @@
   - **Overview:** A 4-kilometer ring of parkland surrounding Old Town where medieval walls once stood, leading to the formidable 15th-century round Barbican defense tower.
   - **Access:** Surrounds the entire Old Town; Barbican is at the north end.
 - **Auschwitz-Birkenau Memorial and Museum** (History & Memorial)
-  - **Category:** History & Memorial | **Location:** Oświęcim | **Hours:** 8:00 AM - 3:00 PM (winter), up to 7:00 PM (summer) | **Cost:** Free entry without guide; ~130 PLN (~$34.00 USD) for educator guided tour (online reservation mandatory; no on-site sales)
-  - **Overview:** The former German Nazi concentration and extermination camp. A sobering and essential historical site requiring advance booking and respectful observance. **WINTER CAPACITY RESTRICTED:** Daily visitor quotas drop sharply in December. Guided tour slots sell out weeks in advance. Book timed-entry educator guided tours directly at auschwitz.org/en before arrival. No on-site ticket sales.
+  - **Category:** History & Memorial | **Location:** Więźniów Oświęcimia 55, 32-600 Oświęcim | **Hours:** 8:00 AM - 3:00 PM (winter), up to 7:00 PM (summer) | **Cost:** Free entry without guide; ~130 PLN (~$34.00 USD) for educator guided tour (online reservation mandatory; no on-site sales)
+  - **Overview:** The former German Nazi concentration and extermination camp. A sobering and essential historical site requiring advance booking and respectful observance. **WINTER CAPACITY RESTRICTED:** Booking educator guided tours months in advance is strictly mandatory. No on-site sales. Daily visitor quotas drop sharply in December. Guided tour slots sell out weeks in advance. Book timed-entry educator guided tours directly at auschwitz.org/en before arrival.
   - **Access:** Bus from MDA Bus Station (approx 1.5 hrs) to Oświęcim, or guided tour.
 - **Wieliczka Salt Mine** (UNESCO Underground)
   - **Category:** UNESCO Underground | **Location:** Wieliczka | **Hours:** 8:30 AM - 5:00 PM | **Cost:** 169 PLN (~$43.00 USD) for standard foreign language guided tour
@@ -73,17 +73,17 @@
   - **Overview:** Immersive guided walking tour through historic Kazimierz, ancient Szeroka Street synagogues, Ghetto Heroes Square, and skip-the-line entry to Schindler's Factory Museum.
   - **Access:** Starts at Szeroka Street in Kazimierz (tram 3, 8, or 24).
 - **Collegium Maius (Jagiellonian University Museum)** (Renaissance Courtyard & Science)
-  - **Category:** Renaissance Courtyard & Science | **Location:** Old Town | **Hours:** Mon-Fri 10:00 AM - 5:30 PM, Sat 10:00 AM - 3:00 PM | **Cost:** Courtyard free; Museum tour ~22 PLN (~$5.85 USD)
+  - **Category:** Renaissance Courtyard & Science | **Location:** ul. Jagiellońska 15, 31-010 Kraków | **Hours:** Mon-Fri 10:00 AM - 5:30 PM, Sat 10:00 AM - 3:00 PM | **Cost:** Courtyard free; Museum tour ~22 PLN (~$5.85 USD)
   - **Overview:** The oldest surviving university building in Poland (14th century), featuring a breathtaking Gothic arcaded courtyard, Copernicus-era astrolabes, medieval globes, and royal scientific instruments. A mechanical procession of university rectors emerges from the oriel clock daily at noon and 3:00 PM.
   - **Access:** 2-min walk west of Rynek Główny via Jagiellońska street.
 - **Czartoryski Museum (Leonardo's Lady with an Ermine)** (Premier Art Museum)
-  - **Category:** Premier Art Museum | **Location:** Old Town | **Hours:** Tue-Sun 10:00 AM - 6:00 PM | **Cost:** 32 PLN (~$8.50 USD)
+  - **Category:** Premier Art Museum | **Location:** ul. Pijarska 15, 31-015 Kraków | **Hours:** Tue-Sun 10:00 AM - 6:00 PM | **Cost:** 32 PLN (~$8.50 USD)
   - **Overview:** Houses Leonardo da Vinci's masterpiece "Lady with an Ermine" (c. 1490), one of only four surviving Leonardo portraits in the world, alongside medieval European arms, Flemish tapestries, and ancient Egyptian artifacts.
   - **Access:** 3-min walk north of Rynek Główny via ul. Pijarska.
 - **Szopki Krakowskie - UNESCO Christmas Crib Competition** (Winter Tradition - Dec Only)
-  - **Category:** Winter Tradition | **Location:** Rynek Główny | **Hours:** First Thursday of December at 12:00 PM; Exhibition daily through Jan 5 | **Cost:** Free to watch; Palace exhibition ~12 PLN (~$3.20 USD)
-  - **Overview:** UNESCO-listed Intangible Cultural Heritage event where master craftsmen compete with jewel-toned, multi-towered miniature nativity palaces incorporating replicas of Kraków's Gothic towers at the Mickiewicz Monument. Winning entries are exhibited at Krzysztofory Palace throughout December.
-  - **Access:** Competition at the Mickiewicz Monument, center of Main Market Square.
+  - **Category:** Winter Tradition | **Location:** Rynek Główny 35, 31-011 Kraków | **Hours:** First Thursday of December at 12:00 PM; Exhibition daily through Jan 5 | **Cost:** Free to watch; Palace exhibition ~12 PLN (~$3.20 USD)
+  - **Overview:** UNESCO-listed Intangible Cultural Heritage event where master craftsmen compete with jewel-toned, multi-towered miniature nativity palaces incorporating replicas of Kraków's Gothic towers at the Mickiewicz Monument. Winning entries are exhibited at Krzysztofory Palace (Rynek Główny 35) throughout December.
+  - **Access:** Competition at the Mickiewicz Monument, center of Main Market Square; Exhibition at Pałac Krzysztofory.
 
 ### Markets
 
@@ -320,20 +320,24 @@
   - **Access:** Tram 2, 4, or 10 from Rynek to Hala Stulecia stop (~15 mins).
 - **Panorama of Racławice (Panorama Racławicka)** (Masterpiece Art Museum)
   - **Category:** Masterpiece Art Museum | **Location:** ul. Jana Ewangelisty Purkyniego 11, 50-155 Wrocław | **Hours:** Tue-Sun 8:30 AM - 6:00 PM | **Cost:** 50 PLN (~$13.35 USD) incl. audio guide (advance booking required)
-  - **Overview:** A colossal 360-degree panoramic rotunda painting (15x114 meters) depicting the 1794 Battle of Racławice with special lighting and terrain effects. **BOOKING REQUIRED:** Winter weekend slots sell out by Tuesday each week. Timed-entry tickets must be reserved in advance at mnwr.pl. No walk-in entry.
+  - **Overview:** A colossal 360-degree panoramic rotunda painting (15x114 meters) depicting the 1794 Battle of Racławice with special lighting and terrain effects. **ADVANCE ROTUNDA BOOKING REQUIRED:** Rotunda viewing slots sell out days in advance during winter weekends. Timed-entry tickets must be reserved in advance at mnwr.pl. No walk-in entry for the rotunda.
   - **Access:** 10-min walk east from Rynek or Tram 3/5.
 - **Wrocław Christmas Market & Dwarf Hunting Guided Tour** (Top Rated Guided Tour)
   - **Category:** Top Rated Guided Tour | **Location:** Rynek (Old Town) | **Hours:** Departs 11:00 AM & 4:00 PM daily (2 hrs) | **Cost:** 70-90 PLN (~$18.00-$24.00 USD) per person
   - **Overview:** Top-rated 2-hour guided walking tour through illuminated Rynek market stalls, historic passages, dwarf legends, and mulled wine tastings.
   - **Access:** Departs from the Aleksander Fredro Statue in Rynek.
 - **Hydropolis - Interactive Centre for Water Knowledge** (Interactive Science Museum)
-  - **Category:** Interactive Science Museum | **Location:** Cathedral Island (Ostrów Tumski area) | **Hours:** Tue-Fri 10:00 AM - 6:00 PM, Sat-Sun 10:00 AM - 8:00 PM | **Cost:** 28 PLN (~$7.45 USD)
-  - **Overview:** A spectacular interactive science museum built inside a 19th-century underground drinking water cistern on Cathedral Island. Over 350 interactive exhibits explore the science, history, and future of water through projections, augmented reality, and immersive sound environments.
-  - **Access:** 10-min walk from Rynek across Tumski Bridge, or Tram 6/8/9.
+  - **Category:** Interactive Science Museum | **Location:** Na Grobli 17, 50-421 Wrocław (Oder Riverbank) | **Hours:** Tue-Fri 10:00 AM - 6:00 PM, Sat-Sun 10:00 AM - 8:00 PM | **Cost:** 28 PLN (~$7.45 USD)
+  - **Overview:** A spectacular interactive science museum built inside a 19th-century underground drinking water cistern on the Oder riverbank. Over 350 interactive exhibits explore the science, history, and future of water through projections, augmented reality, and immersive sound environments.
+  - **Access:** 15-min walk east from Cathedral Island along the Oder riverbank or Tram 3, 5 to Na Grobli stop.
+- **National Museum in Wrocław (Muzeum Narodowe)** (Regional Fine Arts)
+  - **Category:** Regional Fine Arts | **Location:** plac Powstańców Warszawy 5, 50-153 Wrocław | **Hours:** Tue-Sun 10:00 AM - 5:00 PM (winter hours) | **Cost:** Permanent exhibition ~25 PLN (~$6.65 USD); Free admission on Tuesdays
+  - **Overview:** Housed in a picturesque neo-Renaissance building along the Oder River, the National Museum holds one of Poland's richest collections of Medieval Silesian stone and wood sculpture, Silesian Gothic art, and Polish fine art from the 16th to 20th centuries.
+  - **Access:** 12-min walk east from Rynek along the river, or Tram 3, 5, 10 to Urząd Wojewódzki stop.
 - **Lumina Park at Zamek Topacz** (Winter Illuminations - Nov-Jan Only)
-  - **Category:** Winter Illuminations | **Location:** Zamek Topacz, Iłowa (22 km south) | **Hours:** Daily 5:00 PM - 10:00 PM (Nov-Jan) | **Cost:** 50 PLN (~$13.35 USD)
-  - **Overview:** A breathtaking after-dark walk through 3 kilometers of spectacular light installations at Zamek Topacz historic castle grounds south of Wrocław, featuring enchanted forests, luminous tunnels, fire gardens, and stargazing meadows.
-  - **Access:** Private car or taxi (~25 mins south via A4/DK8). Uber/Bolt roundtrip ~80-100 PLN (~$21-27 USD).
+  - **Category:** Winter Illuminations | **Location:** Zamek Topacz, Główna 12, 55-040 Ślęza (20-30 min south of center) | **Hours:** Daily 5:00 PM - 10:00 PM (Nov-Jan) | **Cost:** 50 PLN (~$13.35 USD)
+  - **Overview:** A breathtaking after-dark walk through 3 kilometers of spectacular light installations at Zamek Topacz historic castle grounds south of Wrocław, featuring enchanted forests, luminous tunnels, fire gardens, and stargazing meadows. **ADVANCE TIME-SLOT REQUIRED:** Entry is strictly by timed ticket booked online in advance at luminapark.pl.
+  - **Access:** Private car, taxi or rideshare (Uber/Bolt ~45-60 PLN, 20-30 mins south via A4/DK8).
 
 ### Markets
 
@@ -485,9 +489,9 @@
 
 ### Must Sees
 
-- **Poznań Town Hall (Ratusz) & Mechanical Goats** (Renaissance Masterpiece)
-  - **Category:** Renaissance Masterpiece | **Location:** Ratusz, Stary Rynek 1, 61-772 Poznan, Poland | **Hours:** Square 24/7; Museum Tue-Sun 10:00 AM - 5:00 PM | **Cost:** Square free; Town Hall Museum ~15 PLN (~$4.00 USD)
-  - **Overview:** One of Northern Europe's most magnificent Renaissance civic buildings designed by Giovanni Battista di Quadro. Every day at 12:00 noon (and 3:00 PM), two mechanical metal billy goats emerge above the clock tower to butt heads 12 times.
+- **Poznań Town Hall (Ratusz) & Old Market Square (Stary Rynek)** (Renaissance Masterpiece)
+  - **Category:** Renaissance Masterpiece | **Location:** Stary Rynek 1, 61-772 Poznań, Poland | **Hours:** Square 24/7; Museum Tue-Sun 10:00 AM - 5:00 PM | **Cost:** Square free; Town Hall Museum ~15 PLN (~$4.00 USD)
+  - **Overview:** One of Northern Europe's most magnificent Renaissance civic buildings, set on the completely renovated Old Market Square (Stary Rynek) featuring newly smoothed paving, expanded barrier-free accessibility, and illuminated water fountains. Every day at 12:00 noon (and 3:00 PM), two mechanical metal billy goats emerge above the clock tower to butt heads 12 times.
   - **Access:** Located in the center of Stary Rynek (Old Market Square).
 - **Ostrów Tumski & Poznań Cathedral of SS. Peter and Paul** (Birthplace of Poland)
   - **Category:** Birthplace of Poland | **Location:** Plebania, Ostrów Tumski 17, 61-109 Poznan, Poland | **Hours:** Daily 9:00 AM - 5:00 PM (except during religious services) | **Cost:** Cathedral free; Crypt & Royal Tombs ~10 PLN (~$2.65 USD)
@@ -514,11 +518,15 @@
   - **Overview:** Immersive 2.5-hour walking tour covering the Renaissance Stary Rynek, goat legends, Baroque Fara, Ostrów Tumski birthplace of Poland, and a warm St. Martin croissant and coffee tasting.
   - **Access:** Departs from the Bamberka Fountain on Stary Rynek.
 - **Poznań Palm House (Palmiarnia Poznańska)** (Botanical Gardens & Winter Warmth)
-  - **Category:** Botanical Gardens & Winter Warmth | **Location:** Park Wilsona, Poznań | **Hours:** Tue-Fri 9:00 AM - 5:00 PM, Sat-Sun 9:00 AM - 6:00 PM | **Cost:** 20 PLN (~$5.35 USD)
+  - **Category:** Botanical Gardens & Winter Warmth | **Location:** ul. Matejki 18, 60-767 Poznań (Park Wilsona) | **Hours:** Tue-Fri 9:00 AM - 5:00 PM, Sat-Sun 9:00 AM - 6:00 PM | **Cost:** 20 PLN (~$5.35 USD)
   - **Overview:** A spectacular Victorian wrought-iron greenhouse complex in Wilson Park housing 17,000 plant species across five climate zones. The heated interior provides a magical escape from the cold with seasonal poinsettia and amaryllis displays, an aquarium wing, and butterfly garden.
-  - **Access:** Tram 6, 9, or 12 to Rondo Kaponiera, then a short walk into Park Wilsona.
+  - **Access:** Tram 6, 9, or 12 to Rondo Kaponiera or Park Wilsona stop.
+- **Applied Arts Museum & Royal Castle Tower (Muzeum Sztuk Użytkowych)** (Royal Castle & Viewpoint)
+  - **Category:** Royal Castle & Viewpoint | **Location:** Góra Przemysła 1, 61-768 Poznań | **Hours:** Tue-Sun 10:00 AM - 5:00 PM | **Cost:** 20 PLN (~$5.35 USD) full museum + tower; Free admission on Tuesdays
+  - **Overview:** Located on Przemysł Hill (Góra Przemysła) within the reconstructed Royal Castle, this museum showcases decorative arts from the Middle Ages to modern design (fabrics, ceramics, furniture, armor). Climb or take the elevator to the 43-meter observation tower for the highest, most stunning 360-degree panoramic view over Poznań's Old Town and Stary Rynek.
+  - **Access:** 3-min walk up Przemysł Hill from Stary Rynek.
 - **International Ice Sculpture Festival (Stary Rynek)** (Winter Festival - Early Dec Only)
-  - **Category:** Winter Festival | **Location:** Stary Rynek (Old Market Square) | **Hours:** 3-day event, early December (approx Dec 5-7, 2026) | **Cost:** Free to watch
+  - **Category:** Winter Festival | **Location:** Stary Rynek, 61-772 Poznań | **Hours:** 3-day event, early December (approx Dec 5-7, 2026) | **Cost:** Free to watch
   - **Overview:** An internationally acclaimed 3-day live ice sculpting competition held on Stary Rynek during early December. World-class sculptors from across Europe carve monumental ice blocks into stunning figurative and abstract masterpieces in public view.
   - **Access:** Located on Stary Rynek, center of Old Town.
 
@@ -598,7 +606,7 @@
 - **Recommended Base Zone:** Day Stop Only (4-6 Hours)
 - **Market Operating Season:** Nov 21, 2026 - Dec 21, 2026 (Mon-Thu 12pm-9pm, Fri 12pm-10pm, Sat 10am-10pm, Sun 10am-9pm.)
 - **Mug Deposit (Kaucja):** 30 PLN (~$8.00 USD)
-- **Transit & Logistics:** Station: Toruń Główny station is located south of the Vistula River. Secure luggage storage lockers are available in the main station waiting room (approx. 15 PLN/day, card accepted). After storing bags, take Bus 22 across the bridge to Plac Rapackiego (5-min ride) to enter the medieval pedestrian core. | City Transit: Operated by MZK Toruń. Single tickets cost 3.80 PLN (~$1.00 USD). Bus lines 22 and 27 connect Toruń Główny railway station directly to the Old Town (Plac Rapackiego) in 7 minutes. | Airport: Nearest international airports are Bydgoszcz (BZG, 50 km) or Gdańsk (GDN, 170 km).
+- **Transit & Logistics:** Station: Toruń Główny station is located south of the Vistula River. **URGENT TRANSIT NOTE:** Station luggage lockers at Toruń Główny experience extremely high demand during December day trips. Arrive early or utilize the left luggage service desk to secure locker storage during your 4-6 hour stopover. Secure luggage storage lockers are available in the main station waiting room (approx. 15 PLN/day, card accepted). After storing bags, take Bus 22 across the bridge to Plac Rapackiego (5-min ride) to enter the medieval pedestrian core. | City Transit: Operated by MZK Toruń. Single tickets cost 3.80 PLN (~$1.00 USD). Bus lines 22 and 27 connect Toruń Główny railway station directly to the Old Town (Plac Rapackiego) in 7 minutes. | Airport: Nearest international airports are Bydgoszcz (BZG, 50 km) or Gdańsk (GDN, 170 km).
 
 ### Must Sees
 
@@ -615,13 +623,13 @@
   - **Overview:** A 14th-century Gothic defensive tower tilting 1.46 meters. Fun 5-minute photo op for a day trip.
   - **Access:** 5-min walk west of Rynek Staromiejski.
 - **Teutonic Castle Ruins (Zamek Krzyżacki)** (Medieval Ruins)
-  - **Category:** Medieval Ruins | **Location:** Vistula Riverbank | **Hours:** Ruins 24/7; Tower Tue-Sun 10:00 AM - 4:00 PM | **Cost:** Exterior ruins free; Tower museum ~10 PLN (~$2.65 USD)
+  - **Category:** Medieval Ruins | **Location:** Przedzamcze 3, 87-100 Toruń | **Hours:** Ruins 24/7; Tower Tue-Sun 10:00 AM - 4:00 PM | **Cost:** Exterior ruins free; Tower museum ~10 PLN (~$2.65 USD)
   - **Overview:** The dramatic riverside ruins of the 13th-century Teutonic Order castle, deliberately destroyed by Toruń's citizens in 1454 after rebelling against Teutonic rule. Only the tower and walls survive, offering excellent Vistula River views and medieval fortress archaeology.
   - **Access:** 7-min walk south from Rynek Staromiejski along the Vistula riverbank.
 - **Living Museum of Gingerbread (Żywe Muzeum Piernika)** (Immersive Culinary Experience - Peak Season)
-  - **Category:** Immersive Culinary Experience | **Location:** Stary Rynek | **Hours:** English sessions daily: 12:00 PM, 2:00 PM, 4:00 PM | **Cost:** 45 PLN (~$12.00 USD) per person
-  - **Overview:** A unique 1.5-hour immersive medieval gingerbread-making experience in a reconstructed 15th-century workshop on Stary Rynek. Dressed in period costume, grind spices, stamp traditional molds, bake, and ice your own Toruń gingerbread using the original 700-year-old recipe. **ADVANCE BOOKING REQUIRED:** English-language sessions sell out days in advance during December peak season. Book online at muzeumpiernika.pl.
-  - **Access:** Located directly on Stary Rynek near the Town Hall.
+  - **Category:** Immersive Culinary Experience | **Location:** Rabiańska 9, 87-100 Toruń | **Hours:** English sessions daily: 12:00 PM, 2:00 PM, 4:00 PM | **Cost:** 45 PLN (~$12.00 USD) per person
+  - **Overview:** A unique 1.5-hour immersive medieval gingerbread-making experience in a reconstructed 15th-century workshop on Rabiańska street. Dressed in period costume, grind spices, stamp traditional molds, bake, and ice your own Toruń gingerbread using the original 700-year-old recipe. **REQUIRED BOOKING BADGE:** English-language interactive shows run on strict schedules and sell out days in advance in December. Advance online reservation is strictly required at muzeumpiernika.pl. No walk-in availability during peak market times.
+  - **Access:** Located on Rabiańska street near the Old Town Hall.
 
 ### Markets
 
@@ -687,7 +695,7 @@
   - **Access:** 3-min walk north from Długi Targ along Piwna or Kramarska street.
 - **Motława Waterfront & Medieval Port Crane (Żuraw Gdański)** (Maritime Heritage Landmark)
   - **Category:** Maritime Heritage Landmark | **Location:** Brama Żuraw, Szeroka 67/68, 80-835 Gdańsk, Poland | **Hours:** Promenade 24/7; Museum Tue-Sun 10:00 AM - 4:00 PM | **Cost:** Promenade free; National Maritime Museum interior ~18 PLN (~$4.80 USD)
-  - **Overview:** The iconic 15th-century double-towered wooden harbor crane on the Motława River, once the largest in medieval Europe. Recently reopened following a comprehensive restoration, the interior human-powered treadwheels are operational again and viewable inside the National Maritime Museum.
+  - **Overview:** The iconic 15th-century double-towered wooden harbor crane on the Motława River, once the largest port crane in medieval Europe. Following comprehensive structural renovation, the interior wooden treadwheels that once hoisted cargo and stepped masts are reopened and operational inside the National Maritime Museum. An essential Gdańsk waterfront landmark.
   - **Access:** Walk along the river promenade (Długie Pobrzeże) from Green Gate.
 - **Museum of the Second World War (Muzeum II Wojny Światowej)** (World-Class WWII Museum)
   - **Category:** World-Class WWII Museum | **Location:** Plac Władysława Bartoszewskiego 1, 80-862 Gdańsk, Poland | **Hours:** Tue-Sun 10:00 AM - 6:00 PM (Mondays closed) | **Cost:** 29 PLN (~$7.75 USD) (Advance ticket booking strongly recommended)
@@ -706,11 +714,15 @@
   - **Overview:** Top-rated 2.5-hour tour covering the Royal Way, Neptune’s Fountain, St. Mary’s Basilica, amber workshops on picturesque Mariacka Street, and the Motława waterfront crane.
   - **Access:** Departs from Neptune’s Fountain on Długi Targ.
 - **Oliwa Cathedral & Baroque Organ Concerts** (Baroque Cathedral & Organ Music)
-  - **Category:** Baroque Cathedral & Organ Music | **Location:** Oliwa (Northern Gdańsk) | **Hours:** Mon-Sat 9:00 AM - 5:00 PM; Organ concerts at 10:00 AM, 12:00 PM & 3:00 PM | **Cost:** Cathedral free; Organ concerts 20 PLN (~$5.35 USD)
+  - **Category:** Baroque Cathedral & Organ Music | **Location:** ul. Biskupa Edmunda Nowickiego 5, 80-330 Gdańsk | **Hours:** Mon-Sat 9:00 AM - 5:00 PM; Organ concerts at 10:00 AM, 12:00 PM & 3:00 PM | **Cost:** Cathedral free; Organ concerts 20 PLN (~$5.35 USD)
   - **Overview:** A magnificent 12th-century Cistercian cathedral in the quiet Oliwa district featuring Poland's most celebrated Baroque organ with 7,876 pipes, moving angels, and rotating sunbursts. Free organ concerts run multiple times daily in December.
   - **Access:** SKM commuter train from Gdańsk Główny to Gdańsk Oliwa (~12 mins, 6.00 PLN).
+- **Sopot Pier (Molo w Sopocie) & Baltic Promenade** (Baltic Coastal Landmark)
+  - **Category:** Baltic Coastal Landmark | **Location:** Plac Zdrojowy 2, 81-723 Sopot | **Hours:** Open 24/7 year-round | **Cost:** Free in winter (Oct-Apr); ~10 PLN in summer peak season
+  - **Overview:** The longest wooden pier in Europe, stretching 511.5 meters into the Gulf of Gdańsk. In winter, experience crisp Baltic sea breezes, frosted coastal horizons, illuminated seaside promenades, and the adjacent Grand Hotel and Kuracyjny Square. An easy 15-minute SKM train ride north of Gdańsk.
+  - **Access:** SKM commuter train from Gdańsk Główny to Sopot (~15 mins, ~7.50 PLN ticket), then a 10-min walk down Bohaterów Monte Cassino street to the beach.
 - **Oliwa Park Winter Illuminations** (Winter Illuminations - Dec Only)
-  - **Category:** Winter Illuminations | **Location:** Oliwa Park, Northern Gdańsk | **Hours:** Daily 4:00 PM - 9:00 PM (Dec 1 - Dec 31) | **Cost:** Free entry
+  - **Category:** Winter Illuminations | **Location:** ul. Opata Jacka Rybińskiego, 80-320 Gdańsk (Oliwa Park) | **Hours:** Daily 4:00 PM - 9:00 PM (Dec 1 - Dec 31) | **Cost:** Free entry
   - **Overview:** The historic Oliwa Park is transformed each December into an illuminated winter wonderland with thousands of warm LED lights tracing 300-year-old avenues, fountains, and pond bridges from dusk until 9:00 PM.
   - **Access:** SKM commuter train from Gdańsk Główny to Gdańsk Oliwa (~12 mins, 6.00 PLN).
 

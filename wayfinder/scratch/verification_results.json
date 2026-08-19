@@ -1,0 +1,412 @@
+[
+  {
+    "venue": "Ed Red Steakhouse Kraków",
+    "city": "krakow",
+    "category": "food",
+    "google": {
+      "name": "Pałac Krzysztofory",
+      "address": "Rynek Główny 35, 33-332 Kraków, Poland",
+      "lat": 50.0626956,
+      "lng": 19.936633399999998
+    },
+    "geoapify": {
+      "formatted": "Rynek Główny 35, Kraków, 31-011 Krakow, Poland",
+      "lat": 50.062689,
+      "lng": 19.93665
+    },
+    "deltaMeters": 1.4,
+    "deltaPassed": true,
+    "imageFile": "ed-red-steakhouse.jpg",
+    "imageExists": true
+  },
+  {
+    "venue": "Auschwitz-Birkenau Memorial and Museum",
+    "city": "krakow",
+    "category": "attractions",
+    "google": {
+      "name": "Memorial and Museum Auschwitz-Birkenau",
+      "address": "Więźniów Oświęcimia 55, 32-600 Oświęcim, Poland",
+      "lat": 50.029390899999996,
+      "lng": 19.205494899999998,
+      "rating": 4.8,
+      "userRatingsTotal": 3862
+    },
+    "geoapify": {
+      "formatted": "PMO, Więźniów Oświęcimia 20, 32-600 Oświęcim, Poland",
+      "lat": 50.0268878,
+      "lng": 19.2024384
+    },
+    "deltaMeters": 353.7,
+    "deltaPassed": false,
+    "imageFile": "auschwitz-birkenau.jpg",
+    "imageExists": true
+  },
+  {
+    "venue": "Collegium Maius Jagiellonian University",
+    "city": "krakow",
+    "category": "attractions",
+    "google": {
+      "name": "Muzeum Uniwersytetu Jagiellońskiego Collegium Maius",
+      "address": "Jagiellońska 15, 31-010 Kraków, Poland",
+      "lat": 50.061563899999996,
+      "lng": 19.9339308,
+      "rating": 4.7,
+      "userRatingsTotal": 1515
+    },
+    "geoapify": {
+      "formatted": "Jagiellońska 15, 31-010 Krakow, Poland",
+      "lat": 50.0615762,
+      "lng": 19.9340136
+    },
+    "deltaMeters": 6.1,
+    "deltaPassed": true,
+    "imageFile": "collegium-maius.jpg",
+    "imageExists": true
+  },
+  {
+    "venue": "Czartoryski Museum Kraków",
+    "city": "krakow",
+    "category": "attractions",
+    "google": {
+      "name": "Czartoryski Museum",
+      "address": "Pijarska 15, 31-015 Kraków, Poland",
+      "lat": 50.0646918,
+      "lng": 19.9400993,
+      "rating": 4.8,
+      "userRatingsTotal": 10368
+    },
+    "geoapify": {
+      "formatted": "Pijarska 15, 31-015 Krakow, Poland",
+      "lat": 50.0647409,
+      "lng": 19.9400962
+    },
+    "deltaMeters": 5.5,
+    "deltaPassed": true,
+    "imageFile": "czartoryski-museum.jpg",
+    "imageExists": true
+  },
+  {
+    "venue": "Szopki Krakowskie (Pałac Krzysztofory)",
+    "city": "krakow",
+    "category": "attractions",
+    "google": {
+      "name": "Pałac Krzysztofory",
+      "address": "Rynek Główny 35, 33-332 Kraków, Poland",
+      "lat": 50.0626956,
+      "lng": 19.936633399999998
+    },
+    "geoapify": {
+      "formatted": "Rynek Główny 35, Kraków, 31-011 Krakow, Poland",
+      "lat": 50.062689,
+      "lng": 19.93665
+    },
+    "deltaMeters": 1.4,
+    "deltaPassed": true,
+    "imageFile": "szopki-competition.jpg",
+    "imageExists": true
+  },
+  {
+    "venue": "Panorama of Racławice",
+    "city": "wroclaw",
+    "category": "attractions",
+    "google": {
+      "name": "Racławice Panorama",
+      "address": "Jana Ewangelisty Purkyniego 11, 50-155 Wrocław, Poland",
+      "lat": 51.1103046,
+      "lng": 17.0449743,
+      "rating": 4.8,
+      "userRatingsTotal": 27735
+    },
+    "geoapify": {
+      "formatted": "Ul. Racławicka 11, 53-149 Wrocław, Poland",
+      "lat": 51.085628,
+      "lng": 17.009364
+    },
+    "deltaMeters": 3703,
+    "deltaPassed": false,
+    "imageFile": "panorama-raclawice.jpg",
+    "imageExists": true
+  },
+  {
+    "venue": "Hydropolis Wrocław",
+    "city": "wroclaw",
+    "category": "attractions",
+    "google": {
+      "name": "Hydropolis",
+      "address": "Na Grobli 17, 50-421 Wrocław, Poland",
+      "lat": 51.103524,
+      "lng": 17.0572038,
+      "rating": 4.5,
+      "userRatingsTotal": 9780
+    },
+    "geoapify": {
+      "formatted": "Na Grobli 17, 50-421 Wrocław, Poland",
+      "lat": 51.104238,
+      "lng": 17.0566224
+    },
+    "deltaMeters": 89.2,
+    "deltaPassed": true,
+    "imageFile": "hydropolis.jpg",
+    "imageExists": true
+  },
+  {
+    "venue": "National Museum in Wrocław (Muzeum Narodowe we Wrocławiu)",
+    "city": "wroclaw",
+    "category": "attractions",
+    "google": {
+      "name": "National Museum in Wrocław",
+      "address": "plac Powstańców Warszawy 5, 50-153 Wrocław, Poland",
+      "lat": 51.110637600000004,
+      "lng": 17.0474577,
+      "rating": 4.6,
+      "userRatingsTotal": 9605
+    },
+    "geoapify": {
+      "formatted": "National Museum, Plac Powstańców Warszawy 5, 50-153 Wrocław, Poland",
+      "lat": 51.1108793,
+      "lng": 17.0476455
+    },
+    "deltaMeters": 29.9,
+    "deltaPassed": true,
+    "imageFile": "wroclaw-national-museum.jpg",
+    "imageExists": true
+  },
+  {
+    "venue": "Lumina Park Zamek Topacz",
+    "city": "wroclaw",
+    "category": "attractions",
+    "google": {
+      "name": "Zamek Topacz",
+      "address": "Templariuszy 1, 55-040 Ślęza, Poland",
+      "lat": 51.034716599999996,
+      "lng": 16.9899269,
+      "rating": 4.7,
+      "userRatingsTotal": 8633
+    },
+    "geoapify": {
+      "formatted": "Dawny młyn wodny, Główna 12, 55-040 Ślęza, Poland",
+      "lat": 51.0358777,
+      "lng": 16.9890362
+    },
+    "deltaMeters": 143.3,
+    "deltaPassed": true,
+    "imageFile": "lumina-park.jpg",
+    "imageExists": true
+  },
+  {
+    "venue": "Old Market Square Poznań (Stary Rynek)",
+    "city": "poznan",
+    "category": "attractions",
+    "google": {
+      "name": "Stary Rynek",
+      "address": "Stary Rynek, 61-001 Poznań, Poland",
+      "lat": 52.4088499,
+      "lng": 16.9337748
+    },
+    "geoapify": {
+      "formatted": "Stary Rynek, 61-772 Poznan, Poland",
+      "lat": 52.4077551,
+      "lng": 16.9337029
+    },
+    "deltaMeters": 121.8,
+    "deltaPassed": true,
+    "imageFile": "poznan-ratusz.jpg",
+    "imageExists": true
+  },
+  {
+    "venue": "Poznań Palm House (Palmiarnia Poznańska)",
+    "city": "poznan",
+    "category": "attractions",
+    "google": {
+      "name": "Palmiarnia Poznańska",
+      "address": "Matejki 18, 60-767 Poznań, Poland",
+      "lat": 52.4020176,
+      "lng": 16.9018524,
+      "rating": 4.7,
+      "userRatingsTotal": 21208
+    },
+    "geoapify": {
+      "formatted": "Poznańska 18, 60-001 Poznan, Poland",
+      "lat": 52.336883,
+      "lng": 16.870037
+    },
+    "deltaMeters": 7557.9,
+    "deltaPassed": false,
+    "imageFile": "poznan-palmiarnia.jpg",
+    "imageExists": true
+  },
+  {
+    "venue": "Applied Arts Museum Tower (Muzeum Sztuk Użytkowych w Poznaniu)",
+    "city": "poznan",
+    "category": "attractions",
+    "google": {
+      "name": "Museum of Applied Arts",
+      "address": "Góra Przemysła 1, 61-768 Poznań, Poland",
+      "lat": 52.409209,
+      "lng": 16.931123499999998,
+      "rating": 4.6,
+      "userRatingsTotal": 1400
+    },
+    "geoapify": {
+      "formatted": "Museum of Applied Arts, Góra Przemysła 1, 61-768 Poznan, Poland",
+      "lat": 52.4093599,
+      "lng": 16.9313235
+    },
+    "deltaMeters": 21.6,
+    "deltaPassed": true,
+    "imageFile": "poznan-applied-arts-museum.jpg",
+    "imageExists": true
+  },
+  {
+    "venue": "International Ice Sculpture Festival (Stary Rynek Poznań)",
+    "city": "poznan",
+    "category": "attractions",
+    "google": {
+      "name": "Stary Rynek",
+      "address": "Stary Rynek, 61-001 Poznań, Poland",
+      "lat": 52.4088499,
+      "lng": 16.9337748
+    },
+    "geoapify": {
+      "formatted": "Stary Rynek, 61-772 Poznan, Poland",
+      "lat": 52.4077551,
+      "lng": 16.9337029
+    },
+    "deltaMeters": 121.8,
+    "deltaPassed": true,
+    "imageFile": "ice-sculpture-festival.jpg",
+    "imageExists": true
+  },
+  {
+    "venue": "Teutonic Castle Ruins (Zamek Krzyżacki w Toruniu)",
+    "city": "torun",
+    "category": "attractions",
+    "google": {
+      "name": "Zamek Krzyżacki w Toruniu",
+      "address": "Przedzamcze 3, 87-100 Toruń, Poland",
+      "lat": 53.009670899999996,
+      "lng": 18.610398999999997,
+      "rating": 4.6,
+      "userRatingsTotal": 7060
+    },
+    "geoapify": {
+      "formatted": "Przedzamcze 3, 87-100 Toruń, Poland",
+      "lat": 53.009652,
+      "lng": 18.6103345
+    },
+    "deltaMeters": 4.8,
+    "deltaPassed": true,
+    "imageFile": "torun-zamek-krzyzacki.jpg",
+    "imageExists": true
+  },
+  {
+    "venue": "Living Museum of Gingerbread (Żywe Muzeum Piernika)",
+    "city": "torun",
+    "category": "attractions",
+    "google": {
+      "name": "Muzeum Piernika",
+      "address": "Rabiańska 9, 87-100 Toruń, Poland",
+      "lat": 53.008691999999996,
+      "lng": 18.60485,
+      "rating": 4.8,
+      "userRatingsTotal": 13918
+    },
+    "geoapify": {
+      "formatted": "Żywe Muzeum Piernika, Rabiańska 9, 87-100 Toruń, Poland",
+      "lat": 53.0086698,
+      "lng": 18.6046724
+    },
+    "deltaMeters": 12.1,
+    "deltaPassed": true,
+    "imageFile": "torun-zywemu-muzeum-piernika.jpg",
+    "imageExists": true
+  },
+  {
+    "venue": "Medieval Port Crane (Żuraw Gdański)",
+    "city": "gdansk",
+    "category": "attractions",
+    "google": {
+      "name": "Old Port Crane",
+      "address": "Szeroka 67/68, 80-835 Gdańsk, Poland",
+      "lat": 54.350494299999994,
+      "lng": 18.657527899999998,
+      "rating": 4.8,
+      "userRatingsTotal": 1750
+    },
+    "geoapify": {
+      "formatted": "Brama Żuraw, Szeroka 67/68, 80-835 Gdańsk, Poland",
+      "lat": 54.3505596,
+      "lng": 18.6574831
+    },
+    "deltaMeters": 7.8,
+    "deltaPassed": true,
+    "imageFile": "gdansk-zuraw.jpg",
+    "imageExists": true
+  },
+  {
+    "venue": "Oliwa Cathedral (Bazylika archikatedralna w Gdańsku-Oliwie)",
+    "city": "gdansk",
+    "category": "attractions",
+    "google": {
+      "name": "Archikatedra Oliwska",
+      "address": "Biskupa Edmunda Nowickiego 5, 80-300 Gdańsk, Poland",
+      "lat": 54.410978899999996,
+      "lng": 18.558015599999997,
+      "rating": 4.8,
+      "userRatingsTotal": 5592
+    },
+    "geoapify": {
+      "formatted": "Plebania, Biskupa Edmunda Nowickiego 5, 80-330 Gdańsk, Poland",
+      "lat": 54.411337,
+      "lng": 18.5592437
+    },
+    "deltaMeters": 88.9,
+    "deltaPassed": true,
+    "imageFile": "gdansk-katedra-oliwa.jpg",
+    "imageExists": true
+  },
+  {
+    "venue": "Sopot Pier (Molo w Sopocie)",
+    "city": "gdansk",
+    "category": "attractions",
+    "google": {
+      "name": "Pier in Sopot",
+      "address": "Plac Zdrojowy 2, 81-723 Sopot, Poland",
+      "lat": 54.446506,
+      "lng": 18.5720474,
+      "rating": 4.6,
+      "userRatingsTotal": 126941
+    },
+    "geoapify": {
+      "formatted": "Sopot, Poland",
+      "lat": 54.43623,
+      "lng": 18.564968
+    },
+    "deltaMeters": 1230.9,
+    "deltaPassed": false,
+    "imageFile": "sopot-pier.jpg",
+    "imageExists": true
+  },
+  {
+    "venue": "Oliwa Park Illuminations (Park Oliwski)",
+    "city": "gdansk",
+    "category": "attractions",
+    "google": {
+      "name": "Oliwski Park",
+      "address": "Opata Jacka Rybińskiego, 80-320 Gdańsk, Poland",
+      "lat": 54.4112209,
+      "lng": 18.5620805,
+      "rating": 4.8,
+      "userRatingsTotal": 36576
+    },
+    "geoapify": {
+      "formatted": "Opata Jacka Rybińskiego, 80-317 Gdańsk, Poland",
+      "lat": 54.4096958,
+      "lng": 18.5626882
+    },
+    "deltaMeters": 174.1,
+    "deltaPassed": true,
+    "imageFile": "gdansk-oliwa-park-illuminations.jpg",
+    "imageExists": true
+  }
+]

@@ -54,6 +54,7 @@ export const attractionImages = {
   'panorama-raclawice.jpg': '/wayfinder/Poland-2026/images/wroclaw/attractions/panorama-raclawice.jpg',
   'wroclaw-walking-tour.jpg': '/wayfinder/Poland-2026/images/wroclaw/attractions/wroclaw-walking-tour.jpg',
   'hydropolis.jpg': '/wayfinder/Poland-2026/images/wroclaw/attractions/hydropolis.jpg',
+  'wroclaw-national-museum.jpg': '/wayfinder/Poland-2026/images/wroclaw/attractions/wroclaw-national-museum.jpg',
   'lumina-park.jpg': '/wayfinder/Poland-2026/images/wroclaw/attractions/lumina-park.jpg',
   'poznan-ratusz.jpg': '/wayfinder/Poland-2026/images/poznan/attractions/poznan-ratusz.jpg',
   'poznan-ostrow-tumski.jpg': '/wayfinder/Poland-2026/images/poznan/attractions/poznan-ostrow-tumski.jpg',
@@ -63,6 +64,7 @@ export const attractionImages = {
   'poznan-fara.jpg': '/wayfinder/Poland-2026/images/poznan/attractions/poznan-fara.jpg',
   'poznan-walking-tour.jpg': '/wayfinder/Poland-2026/images/poznan/attractions/poznan-walking-tour.jpg',
   'poznan-palmiarnia.jpg': '/wayfinder/Poland-2026/images/poznan/attractions/poznan-palmiarnia.jpg',
+  'poznan-applied-arts-museum.jpg': '/wayfinder/Poland-2026/images/poznan/attractions/poznan-applied-arts-museum.jpg',
   'ice-sculpture-festival.jpg': '/wayfinder/Poland-2026/images/poznan/attractions/ice-sculpture-festival.jpg',
   'torun-ratusz-staromiejski.jpg': '/wayfinder/Poland-2026/images/torun/attractions/torun-ratusz-staromiejski.jpg',
   'torun-muzeum-piernika.jpg': '/wayfinder/Poland-2026/images/torun/attractions/torun-muzeum-piernika.jpg',
@@ -81,6 +83,7 @@ export const attractionImages = {
   'gdansk-amber-museum.jpg': '/wayfinder/Poland-2026/images/gdansk/attractions/gdansk-amber-museum.jpg',
   'gdansk-walking-tour.jpg': '/wayfinder/Poland-2026/images/gdansk/attractions/gdansk-walking-tour.jpg',
   'gdansk-katedra-oliwa.jpg': '/wayfinder/Poland-2026/images/gdansk/attractions/gdansk-katedra-oliwa.jpg',
+  'sopot-pier.jpg': '/wayfinder/Poland-2026/images/gdansk/attractions/sopot-pier.jpg',
   'gdansk-oliwa-park-illuminations.jpg': '/wayfinder/Poland-2026/images/gdansk/attractions/gdansk-oliwa-park-illuminations.jpg'
 };
 
@@ -103,6 +106,7 @@ export function getAttractionImage(cardImage = '', cardTitle = '', cityName = 'K
 
   if (cName.includes('wrocław') || cName.includes('wroclaw')) {
     if (name.includes('hydropolis')) return attractionImages['hydropolis.jpg'];
+    if (name.includes('national museum') || name.includes('narodowe')) return attractionImages['wroclaw-national-museum.jpg'];
     if (name.includes('lumina') || name.includes('topacz')) return attractionImages['lumina-park.jpg'];
     if (name.includes('dwarf') || name.includes('krasnal')) return attractionImages['wroclaw-dwarfs.jpg'];
     if (name.includes('tumski') && name.includes('bridge')) return attractionImages['tumski-bridge.jpg'];
@@ -116,6 +120,7 @@ export function getAttractionImage(cardImage = '', cardTitle = '', cityName = 'K
 
   if (cName.includes('poznan') || cName.includes('poznań')) {
     if (name.includes('palm') || name.includes('palmiarnia')) return attractionImages['poznan-palmiarnia.jpg'];
+    if (name.includes('applied arts') || name.includes('sztuk użytkowych')) return attractionImages['poznan-applied-arts-museum.jpg'];
     if (name.includes('ice') || name.includes('sculpture')) return attractionImages['ice-sculpture-festival.jpg'];
     if (name.includes('goat') || name.includes('ratusz') || name.includes('town hall')) return attractionImages['poznan-ratusz.jpg'];
     if (name.includes('tumski') || name.includes('cathedral') || name.includes('katedra')) return attractionImages['poznan-ostrow-tumski.jpg'];
@@ -142,6 +147,7 @@ export function getAttractionImage(cardImage = '', cardTitle = '', cityName = 'K
   if (cName.includes('gdansk') || cName.includes('gdańsk')) {
     if (name.includes('oliwa') && (name.includes('park') || name.includes('illumination'))) return attractionImages['gdansk-oliwa-park-illuminations.jpg'];
     if (name.includes('oliwa') || name.includes('organ')) return attractionImages['gdansk-katedra-oliwa.jpg'];
+    if (name.includes('sopot') || name.includes('molo')) return attractionImages['sopot-pier.jpg'];
     if (name.includes('neptune') || name.includes('neptun')) return attractionImages['gdansk-fontanna-neptuna.jpg'];
     if (name.includes('mariacka') || name.includes('mary')) return attractionImages['gdansk-bazylika-mariacka.jpg'];
     if (name.includes('crane') || name.includes('żuraw') || name.includes('zuraw')) return attractionImages['gdansk-zuraw.jpg'];

@@ -183,15 +183,15 @@ Each destination model contains:
 - `historyStats`, `historyEpochs`, `historyLegends`: Deep-dive cultural timeline.
 - `transit`: Station name, platforms, luggage lockers, and walking route to Old Town.
 - `markets`: Array of market squares with dates, hours, chalets count, coordinates, and images.
-- `mustSee`: Array of top sights with ticket links, visit duration, addresses, and coordinates.
-- `restaurantsDetailed`, `drinksDetailed`, `cafesDetailed`: Multi-category dining catalog.
+- `mustSee`: Array of top sights with ticket links, visit duration, addresses, coordinates, `urgentAlert` banner strings (rendered via `<UrgentBookingAlert />`), and `isWinterExclusive` / `winterExclusiveLabel` tags (rendered via `<WinterExclusive />`).
+- `restaurantsDetailed`, `drinksDetailed`, `cafesDetailed`: Multi-category dining catalog with verified addresses, coordinates, price tiers, and signature items.
 - `lgbtq`: Safety score, legal context, vetted venues, and safety tips.
 
 ### 6.2 Dynamic Image Resolution (`src/utils/cityImages.js`)
 Resolves POI imagery with multi-tiered fallback:
 1. Exact static asset path (`/wayfinder/Poland-2026/images/[city]/[category]/[file]`).
-2. Exact filename dictionary match (`attractionImages[filename]`).
-3. Title & keyword heuristic matcher (e.g. `'tumski'`, `'dwarf'`, `'wawel'`, `'piernik'`).
+2. Exact filename dictionary match (`attractionImages[filename]`), including newly added sights: `wroclaw-national-museum.jpg`, `poznan-applied-arts-museum.jpg`, and `sopot-pier.jpg`.
+3. Title & keyword heuristic matcher (e.g. `'tumski'`, `'dwarf'`, `'wawel'`, `'piernik'`, `'national museum'`, `'applied arts'`, `'sopot'`).
 4. City default hero image fallback.
 
 ---
@@ -301,6 +301,7 @@ CREATE TABLE wayfinder_budget_allocations (...);
 - **Key**: `GEOAPIFY_API_KEY` in `.dev.vars`.
 - **Purpose**: Batch geocoding and real venue coordinate verification for attractions, restaurants, and Christmas market squares.
 - **Categories Queried**: `tourism.sights`, `catering.restaurant`, `leisure`.
+- **Mandatory Dual Verification Standard**: 100% of POIs (including newly ingested venues like Wrocław National Museum, Poznań Applied Arts Museum Tower, and Sopot Pier) undergo cross-provider coordinate and address verification between Google Places API v1 and Geoapify Geocoding API with delta distances strictly under 250 meters.
 
 ### 9.3 National Bank of Poland (NBP) API (Live Exchange Rates)
 - **Endpoint**: `https://api.nbp.pl/api/exchangerates/rates/a/usd/?format=json`

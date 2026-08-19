@@ -470,6 +470,7 @@ function DailySpreadsheetMatrix() {
             ? rawLock.totalEnding
             : (lockedRegEnd + lockedExtraEnd);
 
+          const isFirstRow = rows.length === 0;
           if (isFirstRow && typeof rawLock === 'object' && rawLock !== null && rawLock.regBeg !== undefined) {
             runningRegBeg = rawLock.regBeg;
             runningExtraBeg = rawLock.extraBeg ?? runningExtraBeg;

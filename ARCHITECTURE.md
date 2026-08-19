@@ -536,6 +536,7 @@ Observability is minimal and relies on Cloudflare's built-in platform telemetry 
 | Worker request logs | Enabled | All workers set `"observability": { "enabled": true }` in `wrangler.jsonc`, which enables Cloudflare's Workers Logs (request/response, status codes, exceptions). |
 | D1 query logs | Partial | D1 queries appear in Cloudflare's Workers Logs when invoked from a worker, but there is no dedicated D1 dashboard or custom query logging. |
 | Error surfacing | Client-side only | `ErrorBoundary` components in finance and outpost display errors to the user; worker errors return JSON `{ error: message }` with a 500 status. |
+| Client-side debug logging | Enabled (`finance`) | In-app real-time debug console in Settings with toggle, filtering, export, and execution telemetry for spreadsheet/CSV parsing and reconciliation. |
 | Structured logging | Not implemented | No `console.log`/`console.error` instrumentation strategy, no log correlation IDs, no request tracing. |
 | Alerting | Not implemented | No automated alerts on worker failures, D1 errors, or elevated error rates. |
 | Metrics dashboards | Not implemented | No Grafana, Datadog, or Cloudflare Analytics custom dashboards configured. |

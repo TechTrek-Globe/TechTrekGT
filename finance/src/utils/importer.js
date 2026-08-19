@@ -6,6 +6,7 @@
  * - Applies user-defined column maps to produce normalized records
  */
 import * as XLSX from 'xlsx';
+import { logDebug, logWarn, logInfo } from './debugLogger.js';
 
 // --- Internal Field Definitions ---
 
@@ -54,8 +55,8 @@ const BILL_SYNONYMS = {
 
 // Date normalization helper
 export function normalizeIsoDate(rawDate) {
-  if (!rawDate) return null;
-  if (typeof rawDate === 'number' || (!isNaN(Number(rawDate)) && !String(rawDate).includes('-') && !String(rawDate).includes('/'))) {
+  if (rawDate === undefined || rawDate === null || rawDate === '') return null;
+  if (typeof rawDate === 'number' || (!isNaN(Number(rawDate)) && !String(rawDate).includes('-') && !String(rawDate).includes('/') && !String(rawDate).includes('.'))) {
     const num = Number(rawDate);
     if (num > 1000 && num < 100000) {
       const date = new Date(Math.round((num - 25569) * 86400 * 1000));
@@ -67,14 +68,25 @@ export function normalizeIsoDate(rawDate) {
       }
     }
   }
-  const str = String(rawDate).trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+  const str = String(rawDate).trim().replace(/^["']|["']$/g, '');
+  if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(str)) {
+    const [y, m, d] = str.split('-');
+    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
   if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(str)) {
     const [m, d, y] = str.split('/');
     return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
   }
   if (/^\d{4}\/\d{1,2}\/\d{1,2}$/.test(str)) {
     const [y, m, d] = str.split('/');
+    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+  if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(str)) {
+    const [m, d, y] = str.split('-');
+    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+  if (/^\d{1,2}\.\d{1,2}\.\d{4}$/.test(str)) {
+    const [d, m, y] = str.split('.');
     return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
   }
   const parsed = new Date(str);
@@ -84,7 +96,7 @@ export function normalizeIsoDate(rawDate) {
     const d = String(parsed.getDate()).padStart(2, '0');
     return `${y}-${m}-${d}`;
   }
-  return str;
+  return null;
 }
 
 // --- File Type Detection ---
@@ -93,17 +105,34 @@ export function normalizeIsoDate(rawDate) {
  * Detects whether the uploaded file is an Emory Parc-style XLSX or a generic CSV.
  * @param {string} fileName
  * @param {string[]} sheetNames - workbook sheet names if available
+ * @param {string[]} sampleHeaders - header list from first sheet if available
  * @returns {'emory_parc' | 'generic_csv'}
  */
-export function detectFileType(fileName, sheetNames = []) {
-  const lower = (fileName || '').toLowerCase();
-  if (lower.endsWith('.csv')) return 'generic_csv';
+export function detectFileType(fileName, sheetNames = [], sampleHeaders = []) {
+  const isMatrixHeader = Array.isArray(sampleHeaders) && sampleHeaders.some(h => {
+    const s = String(h || '').toLowerCase().trim();
+    return s.includes('beg balance') || s.includes('ending balance') || s.includes('extra beg') || s.includes('regular beg') || s.includes('jon credit') || s.includes('ronnie credit');
+  });
 
-  const knownSheets = ['budget', 'dashboard', 'main', 'loan', 'amortization', 'account'];
+  if (isMatrixHeader) {
+    logDebug('PARSER', 'Detected Emory Parc / Daily matrix headers in file', { fileName, sampleHeaders });
+    return 'emory_parc';
+  }
+
+  const knownSheets = ['budget', 'dashboard', 'main', 'loan', 'amortization', 'account', 'checking', 'savings', 'ledger'];
   const hasKnownSheet = sheetNames.some(s =>
     knownSheets.some(k => s.toLowerCase().includes(k))
   );
-  return hasKnownSheet ? 'emory_parc' : 'generic_csv';
+
+  const lower = (fileName || '').toLowerCase();
+  if (lower.endsWith('.csv') && !hasKnownSheet) {
+    logDebug('PARSER', 'File extension is .csv -> generic_csv', { fileName });
+    return 'generic_csv';
+  }
+
+  const detected = hasKnownSheet ? 'emory_parc' : 'generic_csv';
+  logDebug('PARSER', `Workbook classified as: ${detected}`, { fileName, sheetNames, hasKnownSheet });
+  return detected;
 }
 
 // --- Generic CSV / Flat XLSX Parser ---
@@ -114,12 +143,14 @@ export function detectFileType(fileName, sheetNames = []) {
  * @returns {{ headers: string[], rows: Record<string, string>[], rawRows: any[][] }}
  */
 export function parseGenericFlat(arrayBuffer) {
+  logDebug('PARSER', 'Parsing generic flat spreadsheet / CSV buffer', { byteLength: arrayBuffer?.byteLength });
   const workbook = XLSX.read(arrayBuffer, { type: 'array', raw: true, cellDates: false });
   const sheetName = workbook.SheetNames[0];
   const sheet = workbook.Sheets[sheetName];
   const rawRows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
 
   if (!rawRows || rawRows.length < 2) {
+    logWarn('PARSER', 'Flat sheet has insufficient rows (< 2 rows found)', { rowCount: rawRows?.length || 0 });
     return { headers: [], rows: [], rawRows: [] };
   }
 
@@ -139,6 +170,12 @@ export function parseGenericFlat(arrayBuffer) {
     return obj;
   });
 
+  logDebug('PARSER', `Parsed sheet "${sheetName}": ${headers.length} headers, ${rows.length} data rows`, {
+    headers,
+    rowCount: rows.length,
+    firstRowSample: rows[0] || null
+  });
+
   return { headers, rows, rawRows: dataRows };
 }
 
@@ -151,12 +188,14 @@ export function parseGenericFlat(arrayBuffer) {
  * @returns {{ mapping: Record<string, string>, confidence: number }}
  */
 export function autoMatchColumns(headers, schema = 'transactions') {
+  logDebug('MATCH', `Auto-matching columns for schema "${schema}"`, { headers, schema });
   const synonyms = schema === 'bills' ? BILL_SYNONYMS : TRANSACTION_SYNONYMS;
   const requiredFields = (schema === 'bills' ? INTERNAL_BILL_FIELDS : INTERNAL_TRANSACTION_FIELDS)
     .filter(f => f.required).map(f => f.key);
 
   const mapping = {};
   const usedKeys = new Set();
+  const matchDetails = [];
 
   headers.forEach(header => {
     const h = header.toLowerCase().trim();
@@ -167,8 +206,13 @@ export function autoMatchColumns(headers, schema = 'transactions') {
       if (synonymList.some(syn => h === syn || h.includes(syn) || syn.includes(h))) {
         matched = fieldKey;
         usedKeys.add(fieldKey);
+        matchDetails.push({ header, mappedTo: fieldKey });
         break;
       }
+    }
+
+    if (matched === '__ignore__') {
+      matchDetails.push({ header, mappedTo: '__ignore__' });
     }
 
     mapping[header] = matched;
@@ -176,6 +220,20 @@ export function autoMatchColumns(headers, schema = 'transactions') {
 
   const matchedRequired = requiredFields.filter(k => usedKeys.has(k)).length;
   const confidence = requiredFields.length > 0 ? matchedRequired / requiredFields.length : 0;
+  const missingRequired = requiredFields.filter(k => !usedKeys.has(k));
+
+  logDebug('MATCH', `Auto-match finished with confidence ${(confidence * 100).toFixed(0)}%`, {
+    confidence,
+    requiredFields,
+    matchedRequiredCount: matchedRequired,
+    missingRequired,
+    mapping,
+    matchDetails
+  });
+
+  if (missingRequired.length > 0) {
+    logWarn('MATCH', `Auto-match incomplete. Missing required fields: ${missingRequired.join(', ')}`, { missingRequired });
+  }
 
   return { mapping, confidence };
 }
@@ -190,24 +248,48 @@ export function autoMatchColumns(headers, schema = 'transactions') {
  * @returns {{ records: object[], skipped: number, importedLedgerRows: Record<string, number>, earliestDate: string|null, startingBalance: number|null }}
  */
 export function applyTransactionMapping(rows, columnMap, defaultAccountId = '') {
+  logDebug('NORMALIZE', `Applying transaction column mapping to ${rows.length} rows`, { columnMap, defaultAccountId });
   const records = [];
   const importedLedgerRows = {};
   let skipped = 0;
+  const skippedDetails = [];
   let earliestDate = null;
 
   rows.forEach((row, idx) => {
     const mapped = {};
     Object.entries(columnMap).forEach(([srcCol, destKey]) => {
-      if (destKey !== '__ignore__' && row[srcCol] !== undefined) {
-        mapped[destKey] = row[srcCol];
+      if (destKey !== '__ignore__') {
+        let val = row[srcCol];
+        if (val === undefined) {
+          const cleanSrc = String(srcCol).trim().toLowerCase();
+          const foundKey = Object.keys(row).find(k => String(k).trim().toLowerCase() === cleanSrc);
+          if (foundKey) val = row[foundKey];
+        }
+        if (val !== undefined) {
+          mapped[destKey] = val;
+        }
       }
     });
 
-    const rawAmt = String(mapped.amount || '').replace(/[^0-9.-]+/g, '');
+    const rawAmt = String(mapped.amount !== undefined ? mapped.amount : '').replace(/[^0-9.-]+/g, '');
     const amount = parseFloat(rawAmt);
     const isoDate = normalizeIsoDate(mapped.date);
 
-    if (!isoDate || isNaN(amount)) { skipped++; return; }
+    if (!isoDate || isNaN(amount)) {
+      skipped++;
+      if (skippedDetails.length < 10) {
+        skippedDetails.push({
+          rowIdx: idx + 1,
+          rawDate: mapped.date !== undefined ? mapped.date : null,
+          normalizedDate: isoDate,
+          rawAmount: mapped.amount !== undefined ? mapped.amount : null,
+          parsedAmount: isNaN(amount) ? null : amount,
+          reason: !isoDate ? 'Invalid Date' : 'Invalid Amount',
+          rawData: row
+        });
+      }
+      return;
+    }
 
     const rawBal = mapped.balance !== undefined && mapped.balance !== '' ? String(mapped.balance).replace(/[^0-9.-]+/g, '') : null;
     const balance = rawBal !== null ? parseFloat(rawBal) : undefined;
@@ -237,6 +319,18 @@ export function applyTransactionMapping(rows, columnMap, defaultAccountId = '') 
     }
   });
 
+  logDebug('NORMALIZE', `Transaction normalization complete: ${records.length} valid records, ${skipped} skipped`, {
+    validCount: records.length,
+    skippedCount: skipped,
+    skippedSamples: skippedDetails,
+    earliestDate,
+    ledgerPointsCount: Object.keys(importedLedgerRows).length
+  });
+
+  if (skipped > 0) {
+    logWarn('NORMALIZE', `Skipped ${skipped} transaction rows during normalization`, { skippedSamples: skippedDetails });
+  }
+
   return { records, skipped, importedLedgerRows, earliestDate };
 }
 
@@ -248,20 +342,42 @@ export function applyTransactionMapping(rows, columnMap, defaultAccountId = '') 
  * @returns {{ records: object[], skipped: number }}
  */
 export function applyBillMapping(rows, columnMap, defaultAccountId = '') {
+  logDebug('NORMALIZE', `Applying bill column mapping to ${rows.length} rows`, { columnMap, defaultAccountId });
   const records = [];
   let skipped = 0;
+  const skippedDetails = [];
 
   rows.forEach((row, idx) => {
     const mapped = {};
     Object.entries(columnMap).forEach(([srcCol, destKey]) => {
-      if (destKey !== '__ignore__' && row[srcCol] !== undefined) {
-        mapped[destKey] = row[srcCol];
+      if (destKey !== '__ignore__') {
+        let val = row[srcCol];
+        if (val === undefined) {
+          const cleanSrc = String(srcCol).trim().toLowerCase();
+          const foundKey = Object.keys(row).find(k => String(k).trim().toLowerCase() === cleanSrc);
+          if (foundKey) val = row[foundKey];
+        }
+        if (val !== undefined) {
+          mapped[destKey] = val;
+        }
       }
     });
 
     const name = (mapped.name || '').trim();
     const parsedAmt = parseFloat(String(mapped.amount || '').replace(/[^0-9.-]+/g, ''));
-    if (!name || isNaN(parsedAmt)) { skipped++; return; }
+    if (!name || isNaN(parsedAmt)) {
+      skipped++;
+      if (skippedDetails.length < 10) {
+        skippedDetails.push({
+          rowIdx: idx + 1,
+          rawName: mapped.name !== undefined ? mapped.name : null,
+          rawAmount: mapped.amount !== undefined ? mapped.amount : null,
+          reason: !name ? 'Missing Name' : 'Invalid Amount',
+          rawData: row
+        });
+      }
+      return;
+    }
     const amount = Math.abs(parsedAmt);
 
     const rawPeriod = mapped.period || 'Monthly';
@@ -286,6 +402,16 @@ export function applyBillMapping(rows, columnMap, defaultAccountId = '') {
       splits: {},
     });
   });
+
+  logDebug('NORMALIZE', `Bill normalization complete: ${records.length} valid bills, ${skipped} skipped`, {
+    validCount: records.length,
+    skippedCount: skipped,
+    skippedSamples: skippedDetails
+  });
+
+  if (skipped > 0) {
+    logWarn('NORMALIZE', `Skipped ${skipped} bill rows during normalization`, { skippedSamples: skippedDetails });
+  }
 
   return { records, skipped };
 }

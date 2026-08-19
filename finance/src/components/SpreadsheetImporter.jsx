@@ -17,6 +17,7 @@ import {
   INTERNAL_BILL_FIELDS,
 } from '../utils/importer';
 import { useBudget } from '../context/BudgetContext';
+import { logDebug, logInfo, logWarn, logError } from '../utils/debugLogger';
 
 // --- Stage constants ---
 const STAGE = {
@@ -172,6 +173,7 @@ export function SpreadsheetImporter({
   // --- File processing ---
   const processFile = useCallback(async (file) => {
     if (!file) return;
+    logDebug('IMPORT', `Ingesting file "${file.name}"`, { fileName: file.name, sizeBytes: file.size, mimeType: file.type });
     setParseError('');
     setFileName(file.name);
     setStage(STAGE.PARSING);
@@ -179,14 +181,20 @@ export function SpreadsheetImporter({
     const arrayBuffer = await file.arrayBuffer();
 
     try {
-      // Detect workbook sheet names for type detection
+      // Detect workbook sheet names and header structure for type detection
       const wb = XLSX.read(arrayBuffer, { type: 'array' });
-      const detectedType = detectFileType(file.name, wb.SheetNames);
+      const firstSheet = wb.Sheets[wb.SheetNames[0]];
+      const previewRows = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: '' });
+      const firstHeaderRow = previewRows.find(r => r && r.some(c => String(c).toLowerCase().includes('date'))) || [];
+      const sampleHeaders = firstHeaderRow.map(c => String(c).trim());
+
+      const detectedType = detectFileType(file.name, wb.SheetNames, sampleHeaders);
       setFileType(detectedType);
 
       const effectiveAccountId = targetAccountId || selectedTargetAccountId || '';
 
       if (detectedType === 'emory_parc') {
+        logDebug('IMPORT', 'Detected Emory Parc / Daily matrix workbook format', { sheets: wb.SheetNames, sampleHeaders });
         // Use existing rich parser - no column mapping needed
         const result = parseSpreadsheet(arrayBuffer, file.name, budget.bills || []);
         if (!result.success) throw new Error(result.error);
@@ -209,6 +217,7 @@ export function SpreadsheetImporter({
         });
         setStage(STAGE.SELECTING);
       } else {
+        logDebug('IMPORT', 'Detected generic flat file format. Extracting headers & auto-matching columns');
         // Generic CSV - parse flat and run auto-match for transactions first
         const { headers, rows } = parseGenericFlat(arrayBuffer);
         if (headers.length === 0) throw new Error('No readable columns found. Ensure the file has a header row.');
@@ -221,6 +230,7 @@ export function SpreadsheetImporter({
         setMappingSchema('transactions');
 
         if (confidence >= 1.0) {
+          logDebug('IMPORT', 'Auto-match reached 100% confidence. Proceeding straight to namespace selection', { mapping });
           // All required fields matched - skip mapper, go straight to selecting
           const { records, importedLedgerRows } = applyTransactionMapping(rows, mapping, effectiveAccountId);
           const payload = {
@@ -236,11 +246,13 @@ export function SpreadsheetImporter({
           setNsEnabled({ people: false, accounts: false, bills: false, loans: false, transactions: records.length > 0 });
           setStage(STAGE.SELECTING);
         } else {
+          logWarn('IMPORT', `Auto-match confidence is ${(confidence * 100).toFixed(0)}%. Routing to manual column mapping screen`, { mapping, confidence });
           // Needs manual column mapping
           setStage(STAGE.MAPPING);
         }
       }
     } catch (err) {
+      logError('IMPORT', `File processing failed: ${err.message}`, { error: err.message, stack: err.stack });
       setParseError(err.message || 'Failed to parse file.');
       setStage(STAGE.IDLE);
     }
@@ -333,6 +345,19 @@ export function SpreadsheetImporter({
     const anyEnabled = Object.values(nsEnabled).some(Boolean);
     if (!anyEnabled) { setParseError('Select at least one data namespace to import.'); return; }
 
+    logDebug('IMPORT', 'Applying selective import with user-selected namespaces and strategies', {
+      namespaces: nsEnabled,
+      strategies: nsStrategy,
+      payloadSummary: {
+        people: parsedPayload.people?.length || 0,
+        accounts: parsedPayload.accounts?.length || 0,
+        bills: parsedPayload.bills?.length || 0,
+        transactions: parsedPayload.transactions?.length || 0,
+        loans: parsedPayload.loans?.length || 0,
+        targetAccountId: parsedPayload.targetAccountId
+      }
+    });
+
     const result = importSpreadsheetSelective({
       namespaces: nsEnabled,
       strategies: nsStrategy,
@@ -340,6 +365,7 @@ export function SpreadsheetImporter({
     });
 
     if (result.success) {
+      logInfo('IMPORT', 'Import committed successfully into budget context state');
       const parts = [];
       if (nsEnabled.people && parsedPayload.people?.length) parts.push(`${parsedPayload.people.length} earners`);
       if (nsEnabled.accounts && parsedPayload.accounts?.length) parts.push(`${parsedPayload.accounts.length} accounts`);
@@ -358,6 +384,7 @@ export function SpreadsheetImporter({
         onImportComplete({ success: true, payload: parsedPayload });
       }
     } else {
+      logError('IMPORT', `importSpreadsheetSelective returned failure: ${result.error}`, { error: result.error });
       setParseError(result.error || 'Import failed.');
     }
   };

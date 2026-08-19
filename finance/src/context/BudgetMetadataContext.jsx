@@ -5,6 +5,7 @@ import { useAuth } from './AuthContext';
 import { isPersonDepositDay, getPersonDepositAmountForAccount, getAccountSaveExtraPersonPortion, getNextBillDueDate } from '../utils/paydayUtils';
 import { getApiUrl } from '../utils/api';
 import { getBudgetData } from '../utils/indexedDB';
+import { getDebugEnabled, setDebugEnabled, subscribeToDebugLogs, logDebug, logInfo } from '../utils/debugLogger';
 
 export const BudgetMetadataContext = createContext(null);
 export const BudgetMetadataStateContext = createContext(null);
@@ -40,6 +41,38 @@ export function BudgetMetadataProvider({ children }) {
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState('accounts');
+
+  // Debug Logging State & Real-time Subscription
+  const [isDebugMode, setIsDebugModeState] = useState(() => getDebugEnabled());
+  const [debugLogs, setDebugLogs] = useState([]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeToDebugLogs((event) => {
+      if (event.type === 'STATUS_CHANGE') {
+        setIsDebugModeState(event.isDebugEnabled);
+      } else if (event.type === 'LOG_ENTRY') {
+        setDebugLogs(prev => [event.entry, ...prev].slice(0, 500));
+      }
+    });
+    return unsubscribe;
+  }, []);
+
+  const setDebugMode = useCallback((enabled) => {
+    const boolVal = Boolean(enabled);
+    setDebugEnabled(boolVal);
+    setIsDebugModeState(boolVal);
+    if (boolVal) {
+      logInfo('SYSTEM', 'Verbose debug mode activated');
+    }
+  }, []);
+
+  const clearDebugLogs = useCallback(() => {
+    setDebugLogs([]);
+  }, []);
+
+  const addDebugLog = useCallback((category, message, payload, level) => {
+    logDebug(category, message, payload, level);
+  }, []);
 
   const metadataStateRef = useRef(metadataState);
   useEffect(() => {
@@ -547,7 +580,9 @@ export function BudgetMetadataProvider({ children }) {
     saveError,
     initialLedgerSeed,
     isAutoCloudBackupEnabled,
-    lastCloudSyncTime
+    lastCloudSyncTime,
+    isDebugMode,
+    debugLogs
   }), [
     metadataState,
     theme,
@@ -559,7 +594,9 @@ export function BudgetMetadataProvider({ children }) {
     saveError,
     initialLedgerSeed,
     isAutoCloudBackupEnabled,
-    lastCloudSyncTime
+    lastCloudSyncTime,
+    isDebugMode,
+    debugLogs
   ]);
 
   const actionsValue = useMemo(() => ({
@@ -576,6 +613,9 @@ export function BudgetMetadataProvider({ children }) {
     setIsSettingsOpen,
     setSettingsTab,
     setSaveError,
+    setDebugMode,
+    clearDebugLogs,
+    addDebugLog,
     // actions
     addAccount,
     updateAccount,
@@ -638,6 +678,9 @@ export function BudgetMetadataProvider({ children }) {
     unarchiveLoan,
     deleteLoan,
     toggleAutoCloudBackup,
+    setDebugMode,
+    clearDebugLogs,
+    addDebugLog,
     getMonthlyNetIncome,
     getMonthlyGrossIncome,
     getTotalMonthlyNetIncome,

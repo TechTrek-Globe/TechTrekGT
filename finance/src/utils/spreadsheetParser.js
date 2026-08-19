@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx';
+import { logDebug, logWarn, logError } from './debugLogger.js';
 
 /**
  * Clean currency/number values from Excel strings or cells
@@ -44,9 +45,12 @@ const RESERVED_COLS = new Set([
  */
 export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
   try {
+    logDebug('PARSER', `Starting Emory Parc workbook parsing: "${fileName}"`, { fileName });
     const workbook = typeof fileData === 'string'
       ? XLSX.read(fileData, { type: 'string', cellFormulas: true })
       : XLSX.read(fileData, { type: 'array', cellFormulas: true });
+
+    logDebug('PARSER', `Workbook loaded with ${workbook.SheetNames.length} sheets`, { sheetNames: workbook.SheetNames });
 
     const accountsMap = new Map();
     const peopleMap = new Map();
@@ -220,7 +224,13 @@ export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
       }
 
       // --- SECTION D: Scan Checking & Savings Daily Matrix Sheets for Transactions ---
-      if (lowerSheet.includes('checking') || lowerSheet.includes('savings') || lowerSheet.includes('ledger') || lowerSheet.includes('matrix')) {
+      const isDailyMatrixSheet = lowerSheet.includes('checking') || lowerSheet.includes('savings') || lowerSheet.includes('ledger') || lowerSheet.includes('matrix') ||
+        (workbook.SheetNames.length === 1 && rows.some(r => r && r.some(c => {
+          const s = String(c || '').toLowerCase();
+          return s.includes('beg balance') || s.includes('ending balance') || s.includes('credit');
+        })));
+
+      if (isDailyMatrixSheet) {
         const headerRowIdx = rows.findIndex(r => r && r.some(c => c && String(c).toLowerCase().includes('date')));
         if (headerRowIdx >= 0) {
           const headers = (rows[headerRowIdx] || []).map(h => String(h || '').trim());
@@ -230,9 +240,10 @@ export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
           const balanceRegex = /\b(beg|beginning|end|ending|balance|subtotal|total)\b/i;
 
           // Map sheet to target account
+          const lowerFileName = (fileName || '').toLowerCase();
           let sheetAccName = 'USAA Bills Checking - 7071';
-          if (lowerSheet.includes('mortgage')) sheetAccName = 'USAA Mortgage Checking - 3223';
-          else if (lowerSheet.includes('hoa') || lowerSheet.includes('sav')) sheetAccName = 'USAA HOA Savings - 9575';
+          if (lowerSheet.includes('mortgage') || lowerFileName.includes('mortgage')) sheetAccName = 'USAA Mortgage Checking - 3223';
+          else if (lowerSheet.includes('hoa') || lowerSheet.includes('sav') || lowerFileName.includes('hoa') || lowerFileName.includes('sav')) sheetAccName = 'USAA HOA Savings - 9575';
 
           const targetAccountId = getOrCreateAccount(sheetAccName);
 
@@ -480,6 +491,14 @@ export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
     const accounts = Array.from(accountsMap.values());
     const people = Array.from(peopleMap.values());
 
+    logDebug('PARSER', `Emory Parc parsing complete: ${accounts.length} accounts, ${people.length} earners, ${billsList.length} bills, ${loansList.length} loans, ${lineItemsList.length} matrix entries`, {
+      accountsCount: accounts.length,
+      peopleCount: people.length,
+      billsCount: billsList.length,
+      loansCount: loansList.length,
+      lineItemsCount: lineItemsList.length
+    });
+
     return {
       success: true,
       budget: {
@@ -493,6 +512,7 @@ export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
     };
 
   } catch (err) {
+    logError('PARSER', `Failed to parse Emory Parc spreadsheet: ${err.message}`, { error: err.message, stack: err.stack });
     return {
       success: false,
       error: `Failed to parse spreadsheet: ${err.message}`

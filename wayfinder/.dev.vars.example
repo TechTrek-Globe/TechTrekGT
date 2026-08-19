@@ -4,5 +4,11 @@
 # Same JWT secret as Finance / Outpost / Bigworm for SSO
 JWT_SECRET=your-jwt-secret-here
 
+# External API Keys
+FOURSQUARE_API_KEY=your-foursquare-api-key
+GEOAPIFY_API_KEY=your-geoapify-api-key
+GOOGLE_MAPS_API_KEY=your-google-maps-api-key
+VITE_GOOGLE_MAPS_API_KEY=your-google-maps-api-key
+
 # Optional: KV namespace for rate limiting (create with wrangler kv:namespace create RATE_LIMIT_KV)
 # RATE_LIMIT_KV will be auto-bound via wrangler.jsonc once configured

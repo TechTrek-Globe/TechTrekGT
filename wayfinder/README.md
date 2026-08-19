@@ -116,6 +116,8 @@ Configure `.dev.vars` with real development secrets:
 JWT_SECRET=your_shared_sso_secret_here
 FOURSQUARE_API_KEY=your_foursquare_api_key_here
 GEOAPIFY_API_KEY=your_geoapify_api_key_here
+GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here
+VITE_GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here
 ```
 
 ### 2. Install Dependencies
@@ -159,10 +161,10 @@ Wayfinder implements a lightweight, zero-dependency router inside `App.jsx` usin
 | `/wayfinder/poland-christmas-2026` | `PolandLanding` | Poland 2026 flagship landing & route summary |
 | `/wayfinder/poland-christmas-2026/route` | `RouteVisualization` | High-speed rail itinerary and transit timings |
 | `/wayfinder/poland-christmas-2026/markets` | `MarketsPage` | Journey-wide Christmas market listings & culinary guide |
-| `/wayfinder/poland-christmas-2026/stays-and-food` | `StaysAndFoodPage` | Lodging zones and dining targets per city |
+| `/wayfinder/poland-christmas-2026/stays-and-food` | `StaysAndFoodPage` | Neighborhood lodging base zones and dining targets (no unbooked hotel listings) |
 | `/wayfinder/poland-christmas-2026/practical` | `PracticalPage` | Transit, currency, packing, daylight & emergency guide |
 | `/wayfinder/poland-christmas-2026/cities/:cityId/:subPage` | `CityPage` | Deep-dive city expedition guide (7 sub-tabs) |
-| `/wayfinder/poland-christmas-2026/private*` | `PrivateHub` | Auth-gated itinerary timeline & document center |
+| `/wayfinder/poland-christmas-2026/private*` | `PrivateHub` | Auth-gated itinerary timeline (including private booked hotels) & document center |
 
 ### 4.2 Dynamic City Sub-Pages (`CityPage.jsx`)
 City views resolve dynamic subpages with built-in route alias mapping:
@@ -171,7 +173,7 @@ City views resolve dynamic subpages with built-in route alias mapping:
 - `attractions`: Curated must-see sights with ticket links, duration, and itinerary bookmarking.
 - `markets`: Chalet listings, locations, opening hours, kaucja mug deposits, and culinary targets.
 - `restaurants`: Drill-down food guides (Traditional Polish, Pierogarnie, Milk Bars, High-End Dining, Craft Breweries, Pubs, Cocktails, Cafes).
-- `hotels`: Recommended neighborhood bases, proximity to markets, and transit links.
+- `hotels`: Recommended neighborhood base zones (market proximity, transit links, and live Google Maps lookups). No unbooked hotels are listed. Specific booked hotels appear exclusively in the authenticated private itinerary.
 - `lgbtq`: Safety score, legal rights overview, vetted queer-friendly venues, and safety advice.
 
 ---
@@ -190,7 +192,7 @@ City views resolve dynamic subpages with built-in route alias mapping:
 
 1. **`AuthContext`**: Manages user authentication state via HttpOnly session cookies. Interacts with `/api/auth/me`, `/api/auth/login`, `/api/auth/register`, `/api/auth/logout`, and password recovery endpoints. Controls global `AuthModal` visibility.
 2. **`SettingsContext`**: Controls user UI preferences including active currency (`USD`, `PLN`, `EUR`) and custom exchange rate overrides. Persists selections in `localStorage`.
-3. **`WayfinderContext`**: Fetches and caches server-side journeys, personalized itinerary events, travel documents, and OCR/import jobs via the `/api/wayfinder/*` Worker API.
+3. **`WayfinderContext`**: Fetches and caches server-side journeys, personalized itinerary events (including private booked hotels), travel documents, and OCR/import jobs via the `/api/wayfinder/*` Worker API.
 4. **`useExchangeRate`**: Real-time currency hook querying the National Bank of Poland (NBP) API at `/api/wayfinder/exchange-rate` with client-side caching and fallback rate safeguards.
 
 ---
@@ -201,15 +203,15 @@ All static venue photography and imagery MUST adhere to the standardized path st
 
 ```
 public/Poland-2026/images/
-├── [city_name]/                 # krakow, wroclaw, poznan, torun, gdansk, general
+├── [city_name]/                 # gdansk, general, krakow, poznan, torun, wroclaw
 │   ├── attractions/             # Historic sights, landmarks, and museums
 │   ├── food/                    # Restaurants, cafes, milk bars, and craft pubs
-│   ├── hotels/                  # Base hotels and lodging exterior/interiors
 │   └── markets/                 # Christmas market squares, chalets, and lights
 ```
 
 - **Resolution Utility (`src/utils/cityImages.js`)**: Maps attraction names and city identifiers directly to local assets with keyword matching fallbacks.
 - **External Image Mandate**: External image links are strictly forbidden in production datasets. All photography is downloaded and curated locally using Foursquare / Geoapify integrations.
+- **Google Maps Integration**: Direct Google Maps lookup queries and directions URLs are embedded for dynamic navigation and live hotel exploration.
 
 ---
 

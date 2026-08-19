@@ -50,6 +50,15 @@ TechTrekGT is a multi-application platform hosted on `techtrekgt.com`. The repos
 | Styling | Hand-written CSS with custom properties | Dark space theme with amber accents |
 | Deployment | Cloudflare Workers static assets | Served at the `techtrekgt.com` root |
 
+### 2.4 External API Integrations & Lookup Services
+
+| Service | Primary App | Purpose |
+|---------|-------------|---------|
+| **Google Maps API** | `wayfinder` | Live neighborhood & hotel lookup queries, destination routing, and coordinate navigation links |
+| **Geoapify API** | `wayfinder` | Primary POI generation, geocoding, and venue coordinate verification |
+| **Foursquare Places API** | `wayfinder` | Venue discovery and curated high-resolution photography ingestion |
+| **National Bank of Poland (NBP) API** | `wayfinder` | Real-time PLN/USD and PLN/EUR exchange rates via worker proxy |
+
 ---
 
 ## 3. Directory Structure
@@ -134,14 +143,14 @@ Views are conditionally rendered inside `MainContent` based on `activeView`, whi
 
 | Pathname | Component | Notes |
 |----------|-----------|-------|
-| `/wayfinder` | `WayfinderLanding` | Root landing |
-| `/wayfinder/poland-christmas-2026` | `PolandLanding` | Trip landing |
-| `/wayfinder/poland-christmas-2026/route` or `/rail` | `RouteVisualization` | Rail route map |
-| `/wayfinder/poland-christmas-2026/markets` | `MarketsPage` | Christmas markets |
-| `/wayfinder/poland-christmas-2026/stays-and-food` | `StaysAndFoodPage` | Hotels and food |
-| `/wayfinder/poland-christmas-2026/practical` | `PracticalPage` | Practical info |
-| `/wayfinder/poland-christmas-2026/cities/:cityId/:subPage` | `CityPage` | Per-city guides (overview, history, attractions, markets, restaurants, hotels, lgbtq) |
-| `/wayfinder/poland-christmas-2026/private*` | `PrivateHub` | Auth-gated itinerary/documents |
+| `/wayfinder` | `WayfinderLanding` | Root landing & platform catalog |
+| `/wayfinder/poland-christmas-2026` | `PolandLanding` | Flagship expedition landing & route summary |
+| `/wayfinder/poland-christmas-2026/route` or `/rail` | `RouteVisualization` | Rail route map & transit timings |
+| `/wayfinder/poland-christmas-2026/markets` | `MarketsPage` | Christmas market directory & culinary highlights |
+| `/wayfinder/poland-christmas-2026/stays-and-food` | `StaysAndFoodPage` | Neighborhood lodging base zones & food targets (no unbooked hotel listings) |
+| `/wayfinder/poland-christmas-2026/practical` | `PracticalPage` | Practical travel, currency, packing & daylight info |
+| `/wayfinder/poland-christmas-2026/cities/:cityId/:subPage` | `CityPage` | Per-city guides (overview, history, attractions, markets, restaurants, hotels [neighborhood base overview & Google Maps lookup], lgbtq) |
+| `/wayfinder/poland-christmas-2026/private*` | `PrivateHub` | Auth-gated itinerary (including private booked hotels) & travel documents |
 | any other `/wayfinder/*` | 404 fallback | "Component under construction" |
 
 Wayfinder and Outpost use `React.lazy()` + `<Suspense>` for code-split route components and dynamically load heavy importers (`xlsx`, `pdfjs-dist`) on demand:
@@ -584,7 +593,7 @@ Each project reads local secrets from a `.dev.vars` file (git-ignored) that is l
 |---------|---------------------|---------------|
 | `finance/` | (uses local `.dev.vars`; no committed example) | `JWT_SECRET`, `SYNC_UNLOCK_CODE` |
 | `outpost/` | `.dev.vars.example` | `JWT_SECRET`, `SYNC_UNLOCK_CODE` |
-| `wayfinder/` | `.dev.vars.example` | `JWT_SECRET` |
+| `wayfinder/` | `.dev.vars.example` | `JWT_SECRET`, `FOURSQUARE_API_KEY`, `GEOAPIFY_API_KEY`, `GOOGLE_MAPS_API_KEY` |
 | `bigworm/` | `.dev.vars.example` | `JWT_SECRET`, `GUACAMOLE_INTERNAL_URL`, `GUAC_USERNAME`, `GUAC_PASSWORD` |
 
 > Note: `finance/` has a local `.dev.vars` but no committed `.dev.vars.example`. The `outpost/.dev.vars.example` explicitly instructs copying the `JWT_SECRET` from the finance `.dev.vars` so the shared auth cookie works across both apps.

@@ -321,7 +321,8 @@ export function SpreadsheetImporter({
         loans: [],
         transactions: parsedSheet.transactions || [],
         targetAccountId: targetAccId,
-        sheetName: selectedSheetName
+        sheetName: selectedSheetName,
+        importedLedgerRows: parsedSheet.importedLedgerRows || {}
       };
 
       logInfo('IMPORT', `Parsed sheet "${selectedSheetName}": ${payload.transactions.length} txns, ${payload.bills.length} bills`, {

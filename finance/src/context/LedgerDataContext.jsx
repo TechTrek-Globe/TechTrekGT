@@ -291,6 +291,52 @@ export function LedgerDataProvider({ children }) {
     setTransactions([]);
   }, [setMetadataState]);
 
+  // Clear all transactions, matrix actuals, and imported balance history for a specific account
+  const clearAccountTransactions = useCallback(async (accountId) => {
+    if (!accountId) return { success: false, error: 'No account specified.' };
+
+    // 1. Remove all transactions for this account
+    const remainingTransactions = (transactionsRef.current || []).filter(t => t.accountId !== accountId);
+    transactionsRef.current = remainingTransactions;
+    setTransactions(remainingTransactions);
+
+    // 2. Clean out dailyMatrix cells for this account
+    const cleanMatrix = {};
+    Object.entries(dailyMatrixRef.current || {}).forEach(([k, v]) => {
+      if (!k.startsWith(`${accountId}_`)) {
+        cleanMatrix[k] = v;
+      }
+    });
+    dailyMatrixRef.current = cleanMatrix;
+    setDailyMatrix(cleanMatrix);
+    setMatrixVersion(v => v + 1);
+
+    // 3. Reset the account's ledger metadata (importedLedgerRows, ledgerMode, startingBalance, extraStartingBalance)
+    setMetadataState(prev => {
+      const updatedAccounts = (prev.accounts || []).map(acc => {
+        if (acc.id === accountId) {
+          return {
+            ...acc,
+            importedLedgerRows: {},
+            ledgerMode: 'projected',
+            startingBalance: 0,
+            extraStartingBalance: 0,
+            startDate: '2026-01-01',
+            balanceAsOfDate: '2026-01-01'
+          };
+        }
+        return acc;
+      });
+
+      return {
+        ...prev,
+        accounts: updatedAccounts
+      };
+    });
+
+    return { success: true };
+  }, [setMetadataState]);
+
   // Selective per-namespace spreadsheet import
   const importSpreadsheetSelective = useCallback(({ namespaces, strategies, data }) => {
     const result = processSpreadsheetImport({
@@ -539,6 +585,7 @@ export function LedgerDataProvider({ children }) {
     loadDemoPreset,
     resetToDefaults,
     clearAllData,
+    clearAccountTransactions,
     importSpreadsheetSelective,
     importParsedSpreadsheet,
     exportBackupJson,
@@ -564,6 +611,7 @@ export function LedgerDataProvider({ children }) {
     loadDemoPreset,
     resetToDefaults,
     clearAllData,
+    clearAccountTransactions,
     importSpreadsheetSelective,
     importParsedSpreadsheet,
     exportBackupJson,

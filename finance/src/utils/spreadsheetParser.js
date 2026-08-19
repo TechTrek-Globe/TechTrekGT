@@ -6,10 +6,10 @@ import { logDebug, logWarn, logError } from './debugLogger.js';
  */
 function cleanNum(val, defaultVal = 0) {
   if (val === undefined || val === null || val === '') return defaultVal;
-  if (typeof val === 'number') return isNaN(val) ? defaultVal : val;
+  if (typeof val === 'number') return isNaN(val) ? defaultVal : Math.round(val * 100) / 100;
   const cleaned = String(val).replace(/[^0-9.-]+/g, '');
   const num = parseFloat(cleaned);
-  return isNaN(num) ? defaultVal : num;
+  return isNaN(num) ? defaultVal : Math.round(num * 100) / 100;
 }
 
 /**
@@ -661,10 +661,9 @@ export function parseSingleSheet({
       if (!h || colIdx === dateColIdx || colIdx === otherDescIdx) return;
       if (balanceRegex.test(h)) return;
 
-      const val = r[colIdx];
-      const num = typeof val === 'number' ? val : parseFloat(String(val || '').replace(/[^0-9.-]+/g, ''));
+      const num = cleanNum(val);
 
-      if (!isNaN(num) && num !== 0) {
+      if (num !== null && num !== 0) {
         const lowerH = h.toLowerCase();
         const otherDesc = (otherDescIdx >= 0 && r[otherDescIdx]) ? String(r[otherDescIdx]).trim() : '';
 

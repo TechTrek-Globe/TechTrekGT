@@ -191,6 +191,17 @@ export function processSpreadsheetImport({
             patches.importedLedgerRows = { ...(acc.importedLedgerRows || {}), ...data.importedLedgerRows };
           }
           patches.ledgerMode = 'import';
+          
+          if (strategies.transactions === 'override') {
+            const dates = Object.keys(data.importedLedgerRows).sort();
+            if (dates.length > 0) {
+              const earliestRow = data.importedLedgerRows[dates[0]];
+              patches.startingBalance = earliestRow.regBeg ?? earliestRow.totalBeg ?? acc.startingBalance;
+              patches.extraStartingBalance = earliestRow.extraBeg ?? (acc.extraStartingBalance || 0);
+              patches.startDate = dates[0];
+              patches.balanceAsOfDate = dates[0];
+            }
+          }
         }
         if (data.targetAccount && typeof data.targetAccount === 'object') {
           Object.assign(patches, data.targetAccount);

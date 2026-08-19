@@ -272,7 +272,8 @@ export function applyTransactionMapping(rows, columnMap, defaultAccountId = '') 
     });
 
     const rawAmt = String(mapped.amount !== undefined ? mapped.amount : '').replace(/[^0-9.-]+/g, '');
-    const amount = parseFloat(rawAmt);
+    let amount = parseFloat(rawAmt);
+    if (!isNaN(amount)) amount = Math.round(amount * 100) / 100;
     const isoDate = normalizeIsoDate(mapped.date);
 
     if (!isoDate || isNaN(amount)) {
@@ -292,7 +293,8 @@ export function applyTransactionMapping(rows, columnMap, defaultAccountId = '') 
     }
 
     const rawBal = mapped.balance !== undefined && mapped.balance !== '' ? String(mapped.balance).replace(/[^0-9.-]+/g, '') : null;
-    const balance = rawBal !== null ? parseFloat(rawBal) : undefined;
+    let balance = rawBal !== null ? parseFloat(rawBal) : undefined;
+    if (balance !== undefined && !isNaN(balance)) balance = Math.round(balance * 100) / 100;
     const desc = (mapped.description || '').trim();
 
     const record = {
@@ -364,7 +366,9 @@ export function applyBillMapping(rows, columnMap, defaultAccountId = '') {
     });
 
     const name = (mapped.name || '').trim();
-    const parsedAmt = parseFloat(String(mapped.amount || '').replace(/[^0-9.-]+/g, ''));
+    let parsedAmt = parseFloat(String(mapped.amount || '').replace(/[^0-9.-]+/g, ''));
+    if (!isNaN(parsedAmt)) parsedAmt = Math.round(parsedAmt * 100) / 100;
+    
     if (!name || isNaN(parsedAmt)) {
       skipped++;
       if (skippedDetails.length < 10) {

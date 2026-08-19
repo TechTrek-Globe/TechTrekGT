@@ -491,7 +491,7 @@ function DailySpreadsheetMatrix() {
           });
 
           const customOther = getDailyMatrixCell(selectedAccountId, mKey, d, 'other_amount');
-          if (customOther !== undefined) runningRegBeg -= Math.abs(parseFloat(customOther) || 0);
+          if (customOther !== undefined) runningRegBeg -= parseFloat(customOther) || 0;
 
           cur.setDate(cur.getDate() + 1);
         }
@@ -573,21 +573,21 @@ function DailySpreadsheetMatrix() {
         if (selectedAccountId === 'all') {
           budget.accounts.forEach(a => {
             const accOther = getDailyMatrixCell(a.id, monthKey, day, 'other_amount');
-            if (accOther !== undefined) otherAmt += Math.abs(parseFloat(accOther) || 0);
+            if (accOther !== undefined) otherAmt += parseFloat(accOther) || 0;
             const accDesc = getDailyMatrixCell(a.id, monthKey, day, 'other_desc');
             if (accDesc) {
               rawOtherDesc = rawOtherDesc ? `${rawOtherDesc} | ${accDesc}` : accDesc;
             }
           });
           const allOther = getDailyMatrixCell('all', monthKey, day, 'other_amount');
-          if (allOther !== undefined) otherAmt += Math.abs(parseFloat(allOther) || 0);
+          if (allOther !== undefined) otherAmt += parseFloat(allOther) || 0;
           const allDesc = getDailyMatrixCell('all', monthKey, day, 'other_desc');
           if (allDesc) {
             rawOtherDesc = rawOtherDesc ? `${rawOtherDesc} | ${allDesc}` : allDesc;
           }
         } else {
           const customOther = getDailyMatrixCell(selectedAccountId, monthKey, day, 'other_amount');
-          otherAmt = customOther !== undefined ? Math.abs(parseFloat(customOther) || 0) : 0;
+          otherAmt = customOther !== undefined ? (parseFloat(customOther) || 0) : 0;
           rawOtherDesc = getDailyMatrixCell(selectedAccountId, monthKey, day, 'other_desc') || '';
         }
 

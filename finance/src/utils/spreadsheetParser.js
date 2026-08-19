@@ -673,8 +673,12 @@ export function parseSingleSheet({
           desc = otherDesc || 'Other Expense';
         }
 
-        const isCredit = lowerH.includes('credit') || lowerH.includes('deposit') || lowerH.includes('income');
-        const txnAmount = isCredit ? Math.abs(num) : -Math.abs(num);
+        const isOtherCol = lowerH.includes('other') && !lowerH.includes('credit');
+        const isCredit = isOtherCol
+          ? num > 0
+          : (lowerH.includes('credit') || lowerH.includes('deposit') || lowerH.includes('income'));
+        // For Other col: preserve the sign directly. For named bill/credit cols: force sign from category.
+        const txnAmount = isOtherCol ? num : (isCredit ? Math.abs(num) : -Math.abs(num));
 
         // Match bill
         let billId = null;

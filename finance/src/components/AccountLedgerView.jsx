@@ -131,13 +131,11 @@ export function AccountLedgerView() {
         </div>
       </div>
 
-      {/* Account-Bound Spreadsheet Importer Modal */}
+      {/* Smart Spreadsheet & Bank Importer Modal */}
       {isImportModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in overflow-y-auto">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-4xl p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto my-auto">
             <SpreadsheetImporter
-              targetAccountId={selectedAccountId !== 'all' ? selectedAccountId : null}
-              targetAccountName={selectedAccountId !== 'all' ? selectedAccount?.name : null}
               isModal={true}
               onClose={() => setIsImportModalOpen(false)}
             />

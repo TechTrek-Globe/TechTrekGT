@@ -63,8 +63,10 @@ export function processSpreadsheetImport({
   if (namespaces.people && Array.isArray(data.people)) {
     logDebug('RECONCILE', 'Reconciling people namespace', { strategy: strategies.people, incomingCount: data.people.length, existingCount: nextPeople.length });
     if (strategies.people === 'override') {
-      nextPeople = data.people;
-      metadataChanged = true;
+      if (data.people.length > 0) {
+        nextPeople = data.people;
+        metadataChanged = true;
+      }
     } else {
       const existingNames = new Set(nextPeople.map(p => (p.name || '').toLowerCase()));
       const toAdd = data.people.filter(p => !existingNames.has((p.name || '').toLowerCase()));
@@ -81,8 +83,27 @@ export function processSpreadsheetImport({
   if (namespaces.accounts && Array.isArray(data.accounts)) {
     logDebug('RECONCILE', 'Reconciling accounts namespace', { strategy: strategies.accounts, incomingCount: data.accounts.length, existingCount: nextAccounts.length });
     if (strategies.accounts === 'override') {
-      nextAccounts = data.accounts;
-      data.accounts.forEach(a => accountIdMap.set(a.id, a.id));
+      if (data.targetAccountId) {
+        // Reset the specific target account's importedLedgerRows and ledger metadata
+        const incomingTargetAcc = data.accounts.find(a => a.id === data.targetAccountId) || data.accounts[0];
+        nextAccounts = nextAccounts.map(a => {
+          if (a.id === data.targetAccountId) {
+            return {
+              ...a,
+              ...(incomingTargetAcc || {}),
+              id: a.id,
+              name: incomingTargetAcc?.name || a.name,
+              importedLedgerRows: incomingTargetAcc?.importedLedgerRows || data.importedLedgerRows || {},
+              ledgerMode: 'import'
+            };
+          }
+          return a;
+        });
+        accountIdMap.set(data.targetAccountId, data.targetAccountId);
+      } else {
+        nextAccounts = data.accounts;
+        data.accounts.forEach(a => accountIdMap.set(a.id, a.id));
+      }
       metadataChanged = true;
     } else {
       const updatedAccounts = [...nextAccounts];
@@ -102,7 +123,7 @@ export function processSpreadsheetImport({
           // Propagate imported ledger metadata onto the matched account
           const patches = {};
           if (incomingAcc.importedLedgerRows && Object.keys(incomingAcc.importedLedgerRows).length > 0) {
-            patches.importedLedgerRows = incomingAcc.importedLedgerRows;
+            patches.importedLedgerRows = { ...(match.importedLedgerRows || {}), ...incomingAcc.importedLedgerRows };
             patches.ledgerMode = 'import';
           }
           if (Object.keys(patches).length > 0) {
@@ -132,7 +153,11 @@ export function processSpreadsheetImport({
       if (acc.id === data.targetAccountId) {
         const patches = {};
         if (data.importedLedgerRows && Object.keys(data.importedLedgerRows).length > 0) {
-          patches.importedLedgerRows = { ...(acc.importedLedgerRows || {}), ...data.importedLedgerRows };
+          if (strategies.accounts === 'override') {
+            patches.importedLedgerRows = data.importedLedgerRows;
+          } else {
+            patches.importedLedgerRows = { ...(acc.importedLedgerRows || {}), ...data.importedLedgerRows };
+          }
           patches.ledgerMode = 'import';
         }
         if (data.targetAccount && typeof data.targetAccount === 'object') {
@@ -150,11 +175,24 @@ export function processSpreadsheetImport({
   // 3. Process Bills
   if (namespaces.bills && Array.isArray(data.bills)) {
     logDebug('RECONCILE', 'Reconciling bills namespace', { strategy: strategies.bills, incomingCount: data.bills.length, existingCount: nextBills.length });
+    
+    // Ensure all incoming bills are stamped with targetAccountId
+    const incomingBills = data.bills.map(b => ({
+      ...b,
+      accountId: b.accountId || data.targetAccountId || (nextAccounts[0]?.id || '')
+    }));
+
     if (strategies.bills === 'override') {
-      nextBills = data.bills;
+      if (data.targetAccountId) {
+        // Clear out existing bills for THIS specific account, keep bills of other accounts
+        const otherAccBills = nextBills.filter(b => b.accountId !== data.targetAccountId);
+        nextBills = [...otherAccBills, ...incomingBills];
+      } else {
+        nextBills = incomingBills;
+      }
       metadataChanged = true;
     } else {
-      nextBills = mergeBills(nextBills, data.bills);
+      nextBills = mergeBills(nextBills, incomingBills);
       metadataChanged = true;
     }
   }
@@ -176,7 +214,13 @@ export function processSpreadsheetImport({
     });
 
     if (strategies.transactions === 'override') {
-      nextTransactions = stampedTransactions;
+      if (data.targetAccountId) {
+        // Clear out existing transactions for THIS specific account, keep transactions of other accounts
+        const otherAccTransactions = nextTransactions.filter(t => t.accountId !== data.targetAccountId);
+        nextTransactions = [...otherAccTransactions, ...stampedTransactions];
+      } else {
+        nextTransactions = stampedTransactions;
+      }
       transactionsChanged = true;
     } else {
       nextTransactions = mergeTransactions(nextTransactions, stampedTransactions);
@@ -187,6 +231,28 @@ export function processSpreadsheetImport({
   // Reconcile imported actual transactions against projected bills, deposits, and other expenses.
   if (namespaces.transactions && Array.isArray(data.transactions)) {
     logDebug('RECONCILE', `Reconciling ${data.transactions.length} actual transactions against projected bills/deposits`);
+    
+    // If Overriding transactions, clean out existing matrix cells and line items for this account first
+    if (strategies.transactions === 'override') {
+      if (data.targetAccountId) {
+        const nextCleanMatrix = {};
+        Object.entries(nextDailyMatrix).forEach(([k, v]) => {
+          if (!k.startsWith(`${data.targetAccountId}_`)) {
+            nextCleanMatrix[k] = v;
+          }
+        });
+        nextDailyMatrix = nextCleanMatrix;
+
+        const accountBillIds = new Set(nextBills.filter(b => b.accountId === data.targetAccountId).map(b => b.id));
+        nextLineItems = nextLineItems.filter(li => !accountBillIds.has(li.billId));
+      } else {
+        nextDailyMatrix = {};
+        nextLineItems = [];
+      }
+      matrixChanged = true;
+      lineItemsChanged = true;
+    }
+
     const lineItemUpdates = [];
     const matrixUpdates = {};
     const matrixNoteShifts = [];
@@ -228,7 +294,7 @@ export function processSpreadsheetImport({
 
         if (matchedPerson) {
           const creditKey = `${accountId}_${monthKey}_${actualDay}_credit_${matchedPerson.id}`;
-          const existingCredit = matrixUpdates[creditKey] ?? nextDailyMatrix[creditKey] ?? 0;
+          const existingCredit = matrixUpdates[creditKey] ?? 0;
           matrixUpdates[creditKey] = Math.round((existingCredit + actualAmount) * 100) / 100;
 
           logDebug('MATCH', `Matched credit transaction #${txnIdx + 1} to earner "${matchedPerson.name}"`, {
@@ -252,7 +318,7 @@ export function processSpreadsheetImport({
           // Unmatched credit -> credit other
           const otherKey = `${accountId}_${monthKey}_${actualDay}_other_amount`;
           const otherDescKey = `${accountId}_${monthKey}_${actualDay}_other_desc`;
-          const existingOther = matrixUpdates[otherKey] ?? nextDailyMatrix[otherKey] ?? 0;
+          const existingOther = matrixUpdates[otherKey] ?? 0;
           matrixUpdates[otherKey] = Math.round((existingOther - actualAmount) * 100) / 100;
 
           const cleanDesc = (txn.description || '').replace(/^Other\s*\$?\s*\(?(.*?)\)?$/i, '$1').trim() || txn.description;
@@ -320,7 +386,7 @@ export function processSpreadsheetImport({
           lineItemUpdates.push({ billId: resolvedBillId, monthKey, actualAmount });
           const bill = nextBills.find(b => b.id === resolvedBillId);
           const actualKey = `${accountId}_${monthKey}_${actualDay}_bill_${resolvedBillId}`;
-          const existingBillAmt = matrixUpdates[actualKey] ?? nextDailyMatrix[actualKey] ?? 0;
+          const existingBillAmt = matrixUpdates[actualKey] ?? 0;
           matrixUpdates[actualKey] = Math.round((existingBillAmt + actualAmount) * 100) / 100;
 
           logDebug('MATCH', `Debit transaction #${txnIdx + 1} matched to bill "${bill?.name || resolvedBillId}" via ${matchStrategy}`, {
@@ -329,6 +395,17 @@ export function processSpreadsheetImport({
             amount: actualAmount,
             billId: resolvedBillId,
             actualKey
+          });
+
+          // If this bill previously had a recorded day in this month in nextDailyMatrix that differs from actualDay, zero it out so it cleanly moves to the new day
+          Object.keys(nextDailyMatrix).forEach(k => {
+            if (k.startsWith(`${accountId}_${monthKey}_`) && k.endsWith(`_bill_${resolvedBillId}`)) {
+              const dayStr = k.replace(`${accountId}_${monthKey}_`, '').replace(`_bill_${resolvedBillId}`, '');
+              const oldDay = parseInt(dayStr, 10);
+              if (oldDay !== actualDay && matrixUpdates[k] === undefined) {
+                matrixUpdates[k] = 0;
+              }
+            }
           });
 
           if (bill && bill.dueDay !== actualDay) {
@@ -342,7 +419,7 @@ export function processSpreadsheetImport({
           // Unmatched debit -> Other expense
           const otherKey = `${accountId}_${monthKey}_${actualDay}_other_amount`;
           const otherDescKey = `${accountId}_${monthKey}_${actualDay}_other_desc`;
-          const existingOther = matrixUpdates[otherKey] ?? nextDailyMatrix[otherKey] ?? 0;
+          const existingOther = matrixUpdates[otherKey] ?? 0;
           matrixUpdates[otherKey] = Math.round((existingOther + actualAmount) * 100) / 100;
 
           const cleanDesc = (txn.description || '').replace(/^Other\s*\$?\s*\(?(.*?)\)?$/i, '$1').trim() || txn.description;
@@ -364,13 +441,8 @@ export function processSpreadsheetImport({
       }
     });
 
-    if (lineItemUpdates.length > 0 || (strategies.transactions === 'override' && data.targetAccountId)) {
-      let base = nextLineItems;
-      if (strategies.transactions === 'override' && data.targetAccountId) {
-        const accountBillIds = new Set(nextBills.filter(b => b.accountId === data.targetAccountId).map(b => b.id));
-        base = base.filter(li => !accountBillIds.has(li.billId));
-      }
-      const updated = [...base];
+    if (lineItemUpdates.length > 0) {
+      const updated = [...nextLineItems];
       lineItemUpdates.forEach(({ billId, monthKey, actualAmount }) => {
         const existingIdx = updated.findIndex(li => li.billId === billId && li.monthKey === monthKey);
         const entry = { billId, monthKey, actualAmount, updatedAt: Date.now() };
@@ -384,18 +456,8 @@ export function processSpreadsheetImport({
       lineItemsChanged = true;
     }
 
-    if (Object.keys(matrixUpdates).length > 0 || matrixNoteShifts.length > 0 || (strategies.transactions === 'override' && data.targetAccountId)) {
-      const next = {};
-      if (strategies.transactions === 'override' && data.targetAccountId) {
-        Object.entries(nextDailyMatrix).forEach(([k, v]) => {
-          if (!k.startsWith(`${data.targetAccountId}_`)) {
-            next[k] = v;
-          }
-        });
-      } else {
-        Object.assign(next, nextDailyMatrix);
-      }
-      Object.assign(next, matrixUpdates);
+    if (Object.keys(matrixUpdates).length > 0 || matrixNoteShifts.length > 0) {
+      const next = { ...nextDailyMatrix, ...matrixUpdates };
 
       matrixNoteShifts.forEach(({ projNoteKey, actualNoteKey }) => {
         const existingProjNote = nextDailyMatrix[projNoteKey];

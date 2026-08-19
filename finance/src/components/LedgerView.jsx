@@ -595,47 +595,19 @@ function DailySpreadsheetMatrix() {
         totalDayBills += otherAmt;
 
         // 4. Determine Beginning and Ending Balances
-        let regEnding, extraEnding, totalEnd, isHistoricalLock;
-
-        if (isLockedDay) {
-          const rawLock = importedRows[isoDate];
-          const lockedRegEnd = typeof rawLock === 'object' && rawLock !== null
-            ? (rawLock.regEnding !== undefined ? rawLock.regEnding : (rawLock.totalEnding ?? rawLock.balance ?? runningRegBeg))
-            : rawLock;
-          const lockedExtraEnd = typeof rawLock === 'object' && rawLock !== null && rawLock.extraEnding !== undefined
-            ? rawLock.extraEnding
-            : runningExtraBeg;
-          const lockedTotalEnd = typeof rawLock === 'object' && rawLock !== null && rawLock.totalEnding !== undefined
-            ? rawLock.totalEnding
-            : (lockedRegEnd + lockedExtraEnd);
-
-          const isFirstRow = rows.length === 0;
-          if (isFirstRow && typeof rawLock === 'object' && rawLock !== null && rawLock.regBeg !== undefined) {
-            runningRegBeg = rawLock.regBeg;
-            runningExtraBeg = rawLock.extraBeg ?? runningExtraBeg;
+        let dayExtraAdd = 0;
+        accountPeople.forEach(p => {
+          const customExtra = getDailyMatrixCell(selectedAccountId, monthKey, day, `extra_credit_${p.id}`);
+          if (customExtra !== undefined) {
+            dayExtraAdd += parseFloat(customExtra) || 0;
           }
+        });
 
-          regEnding = lockedRegEnd;
-          extraEnding = lockedExtraEnd;
-          totalEnd = lockedTotalEnd;
-          isHistoricalLock = true;
-        } else {
-          // Extra balance additions (from custom entries or account extra savings)
-          let dayExtraAdd = 0;
-          accountPeople.forEach(p => {
-            const customExtra = getDailyMatrixCell(selectedAccountId, monthKey, day, `extra_credit_${p.id}`);
-            if (customExtra !== undefined) {
-              dayExtraAdd += parseFloat(customExtra) || 0;
-            }
-          });
-
-          regEnding = runningRegBeg + totalRegCredits - totalDayBills;
-          extraEnding = runningExtraBeg + dayExtraAdd;
-          totalEnd = regEnding + extraEnding;
-          isHistoricalLock = false;
-        }
-
-        const totalBeg = runningRegBeg + (showExtraColumns ? runningExtraBeg : 0);
+        const regEnding = Math.round((runningRegBeg + totalRegCredits - totalDayBills) * 100) / 100;
+        const extraEnding = Math.round((runningExtraBeg + dayExtraAdd) * 100) / 100;
+        const totalEnd = Math.round((regEnding + (showExtraColumns ? extraEnding : 0)) * 100) / 100;
+        const isHistoricalLock = isLockedDay;
+        const totalBeg = Math.round((runningRegBeg + (showExtraColumns ? runningExtraBeg : 0)) * 100) / 100;
 
         rows.push({
           rowKey: `${monthKey}-${day}`,
@@ -1433,13 +1405,11 @@ function DailySpreadsheetMatrix() {
         ) : null}
       </DragOverlay>
 
-      {/* Account-Bound Spreadsheet Importer Modal */}
+      {/* Smart Spreadsheet & Bank Importer Modal */}
       {isImportModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in overflow-y-auto">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-4xl p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto my-auto">
             <SpreadsheetImporter
-              targetAccountId={selectedAccountId}
-              targetAccountName={selectedAccount?.name}
               isModal={true}
               onClose={() => setIsImportModalOpen(false)}
             />

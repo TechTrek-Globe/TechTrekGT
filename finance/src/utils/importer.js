@@ -431,18 +431,35 @@ export function mergeTransactions(existing = [], incoming = []) {
   incoming.forEach(inc => {
     const incDate = normalizeIsoDate(inc.date);
     const incDesc = (inc.description || '').toLowerCase().trim();
-    const incAmt = Math.abs(parseFloat(inc.amount) || 0);
+    const incAmt = parseFloat(inc.amount) || 0;
+    const incMonth = incDate ? incDate.slice(0, 7) : '';
 
     const matchIdx = result.findIndex(ex => {
+      // 1. Exact ID match
+      if (ex.id && inc.id && ex.id === inc.id) return true;
+
+      // Ensure account alignment if accountId is defined
+      if (ex.accountId && inc.accountId && ex.accountId !== inc.accountId) return false;
+
       const exDate = normalizeIsoDate(ex.date);
       const exDesc = (ex.description || '').toLowerCase().trim();
-      const exAmt = Math.abs(parseFloat(ex.amount) || 0);
+      const exAmt = parseFloat(ex.amount) || 0;
+      const exMonth = exDate ? exDate.slice(0, 7) : '';
 
+      const descMatch = incDesc === exDesc || (incDesc.length >= 3 && exDesc.includes(incDesc)) || (exDesc.length >= 3 && incDesc.includes(exDesc));
       const dateMatch = incDate && exDate && incDate === exDate;
       const amtMatch = Math.abs(incAmt - exAmt) < 0.01;
-      const descMatch = incDesc === exDesc || (incDesc.length >= 3 && exDesc.includes(incDesc)) || (exDesc.length >= 3 && incDesc.includes(exDesc));
 
-      return (dateMatch && amtMatch && descMatch) || (ex.id && inc.id && ex.id === inc.id);
+      // Case A: exact date + matching description (update amount if changed)
+      if (dateMatch && descMatch) return true;
+
+      // Case B: same month + matching bill / earner description (e.g. date shifted or amount changed)
+      if (incMonth && exMonth && incMonth === exMonth && descMatch) return true;
+
+      // Case C: exact date + exact amount
+      if (dateMatch && amtMatch) return true;
+
+      return false;
     });
 
     if (matchIdx >= 0) {
@@ -462,6 +479,8 @@ export function mergeTransactions(existing = [], incoming = []) {
         ...ex,
         ...inc,
         id: ex.id || inc.id,
+        date: inc.date || ex.date,
+        amount: inc.amount !== undefined ? inc.amount : ex.amount,
         notes: mergedNotes,
         accountId: inc.accountId || ex.accountId,
         category: inc.category || ex.category || '',

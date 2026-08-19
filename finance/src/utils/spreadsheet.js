@@ -463,7 +463,7 @@ export function processSpreadsheetImport({
           const otherKey = `${accountId}_${monthKey}_${actualDay}_other_amount`;
           const otherDescKey = `${accountId}_${monthKey}_${actualDay}_other_desc`;
           const existingOther = matrixUpdates[otherKey] ?? 0;
-          matrixUpdates[otherKey] = Math.round((existingOther + actualAmount) * 100) / 100;
+          matrixUpdates[otherKey] = Math.round((existingOther + Math.abs(actualAmount)) * 100) / 100;
 
           const cleanDesc = (txn.description || '').replace(/^Other\s*\$?\s*\(?(.*?)\)?$/i, '$1').trim() || txn.description;
           const existingOtherDesc = (matrixUpdates[otherDescKey] ?? nextDailyMatrix[otherDescKey] ?? '').replace(/^Other\s*\$?\s*\(?(.*?)\)?$/i, '$1').trim();

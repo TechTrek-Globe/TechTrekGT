@@ -29,10 +29,16 @@ BEFORE writing, editing, or generating any code, data, or components:
 ---
 
 ## 3. Mandatory Build & Deploy Loop
-* **Automated Build Trigger:** Immediately upon completing source code modifications, `cd` into the target app directory and execute the production build (`npm run build`) using PowerShell.
-* **Zero-Error Mandate:** If the build fails (due to linting, unresolved imports, or bundle misconfigurations), the task is not complete. Surgically fix the regression and rebuild.
-* **Deployment Execution:** Upon a successful zero-error build, immediately deploy the application using `npm run deploy` (which triggers `wrangler deploy`).
-* **Verification:** Confirm the deployment completes successfully. Log the deployment status or Cloudflare Worker URL in your final task summary.
+
+**Automated Build Trigger:** Immediately upon completing source code modifications, `cd` into the target app directory and execute the production build (`npm run build`) using PowerShell.  Move to Deploy as next step assuming below rules are met.
+
+**Zero-Error Mandate:** If the build fails (due to linting, unresolved imports, or bundle misconfigurations), the task is not complete. Surgically fix the regression and rebuild.
+
+**Deployment Execution:** Upon a successful zero-error build, immediately deploy the application using `npm run deploy` (which triggers `wrangler deploy`).
+
+**Verification:** Confirm the deployment completes successfully. Log the deployment status or Cloudflare Worker URL in your final task summary.
+
+Atomic Execution Mandate: Never end a turn or present findings after npm run build without having already executed npm run deploy and verified the live Cloudflare deployment in the exact same turn.
 
 ---
 

@@ -162,10 +162,18 @@ export function processSpreadsheetImport({
   // 4. Process Transactions
   if (namespaces.transactions && Array.isArray(data.transactions)) {
     logDebug('RECONCILE', 'Reconciling transactions namespace', { strategy: strategies.transactions, incomingCount: data.transactions.length, existingCount: nextTransactions.length });
-    const stampedTransactions = data.transactions.map(t => ({
-      ...t,
-      accountId: t.accountId || data.targetAccountId || ''
-    }));
+    const stampedTransactions = data.transactions.map(t => {
+      let accId = t.accountId;
+      if (accountIdMap.has(accId)) {
+        accId = accountIdMap.get(accId);
+      } else if (data.targetAccountId) {
+        accId = data.targetAccountId;
+      }
+      return {
+        ...t,
+        accountId: accId || data.targetAccountId || ''
+      };
+    });
 
     if (strategies.transactions === 'override') {
       nextTransactions = stampedTransactions;
@@ -195,7 +203,13 @@ export function processSpreadsheetImport({
       const actualAmount = Math.abs(rawAmount);
       const isCredit = rawAmount > 0;
       const monthKey = `${parts[0]}-${parts[1]}`;
-      const accountId = txn.accountId || data.targetAccountId || (nextAccounts[0]?.id || '');
+      let accountId = txn.accountId;
+      if (accountIdMap.has(accountId)) {
+        accountId = accountIdMap.get(accountId);
+      } else if (data.targetAccountId) {
+        accountId = data.targetAccountId;
+      }
+      if (!accountId) accountId = nextAccounts[0]?.id || '';
       const descLower = (txn.description || '').toLowerCase();
       const notesLower = (txn.notes || '').toLowerCase();
 

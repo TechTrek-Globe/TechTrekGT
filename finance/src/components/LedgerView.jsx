@@ -455,62 +455,9 @@ function DailySpreadsheetMatrix() {
         const isPayday = people.some(p => isPersonDepositDay(p, year, month, day));
         const isToday = todayObj.getFullYear() === year && todayObj.getMonth() === month && todayObj.getDate() === day;
 
-        // --- Rule A: Import Mode lock ---
-        // If this ISO date exists in the imported map, use it verbatim as historical fact.
-        const isoDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        if (isImportMode && importedRows[isoDate] !== undefined) {
-          const rawLock = importedRows[isoDate];
-          const lockedRegEnd = typeof rawLock === 'object' && rawLock !== null
-            ? (rawLock.regEnding !== undefined ? rawLock.regEnding : (rawLock.totalEnding ?? rawLock.balance ?? runningRegBeg))
-            : rawLock;
-          const lockedExtraEnd = typeof rawLock === 'object' && rawLock !== null && rawLock.extraEnding !== undefined
-            ? rawLock.extraEnding
-            : runningExtraBeg;
-          const lockedTotalEnd = typeof rawLock === 'object' && rawLock !== null && rawLock.totalEnding !== undefined
-            ? rawLock.totalEnding
-            : (lockedRegEnd + lockedExtraEnd);
-
-          const isFirstRow = rows.length === 0;
-          if (isFirstRow && typeof rawLock === 'object' && rawLock !== null && rawLock.regBeg !== undefined) {
-            runningRegBeg = rawLock.regBeg;
-            runningExtraBeg = rawLock.extraBeg ?? runningExtraBeg;
-          }
-
-          rows.push({
-            rowKey: `${monthKey}-${day}`,
-            day,
-            month,
-            year,
-            monthKey,
-            isFirstDayOfMonth: day === 1,
-            monthLabel: `${MONTHS[month]} ${year}`,
-            dateFormatted: `${month + 1}/${day}/${year}`,
-            dayOfWeekName,
-            isPayday,
-            isToday,
-            regBeg: runningRegBeg,
-            extraBeg: runningExtraBeg,
-            personCredits: {},
-            personExtraCredits: {},
-            totalRegCredits: 0,
-            totalExtraCredits: 0,
-            billValues: {},
-            otherAmt: 0,
-            otherDesc: '',
-            regEnding: lockedRegEnd,
-            extraEnding: lockedExtraEnd,
-            totalEnd: lockedTotalEnd,
-            isDeficit: lockedTotalEnd < 0,
-            isHistoricalLock: true
-          });
-          // Carry the locked balance forward as the next day's opening
-          runningRegBeg = lockedRegEnd;
-          runningExtraBeg = lockedExtraEnd;
-          continue;
-        }
-
-        // --- Rule B: Manual / Forward Projection Mode ---
         const isPastDate = dateObj < new Date(todayObj.getFullYear(), todayObj.getMonth(), todayObj.getDate());
+        const isoDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const isLockedDay = isImportMode && importedRows[isoDate] !== undefined;
 
         // 1. Credits (Deposits)
         const personCredits = {};
@@ -522,7 +469,7 @@ function DailySpreadsheetMatrix() {
 
           if (customCredit !== undefined) {
             personCredits[p.id] = parseFloat(customCredit) || 0;
-          } else if (!isPastDate) {
+          } else if (!isPastDate && !isLockedDay) {
             const isDepDay = isPersonDepositDay(p, year, month, day);
             personCredits[p.id] = isDepDay ? getPersonDepositAmountForAccount(p, selectedAccountId) : 0;
           } else {
@@ -546,7 +493,7 @@ function DailySpreadsheetMatrix() {
           if (customBillVal !== undefined) {
             // Tier 1: manual dailyMatrix override (drag-drop, inline edit, or actual transaction) wins outright
             amt = parseFloat(customBillVal) || 0;
-          } else if (!isPastDate) {
+          } else if (!isPastDate && !isLockedDay) {
             // Tier 2: month-scoped actual amount from import reconciliation
             const actualAmt = getActualAmount(b.id, monthKey);
             if (actualAmt !== null && parseInt(b.dueDay) === day && isBillDueInMonth(b, month, true)) {
@@ -558,7 +505,7 @@ function DailySpreadsheetMatrix() {
               amt = parseFloat(b.amount) || 0;
             }
           } else {
-            // On past dates with no recorded transaction, do not add phantom scheduled bills
+            // On past or historical locked dates with no recorded transaction, do not add phantom scheduled bills
             amt = 0;
           }
 
@@ -572,10 +519,37 @@ function DailySpreadsheetMatrix() {
         const customOtherDesc = getDailyMatrixCell(selectedAccountId, monthKey, day, 'other_desc') || '';
         totalDayBills += otherAmt;
 
-        // 4. Calculate Ending Balances
-        const regEnding = runningRegBeg + totalRegCredits - totalDayBills;
-        const extraEnding = runningExtraBeg + totalExtraCredits;
-        const totalEnd = regEnding + extraEnding;
+        // 4. Determine Beginning and Ending Balances
+        let regEnding, extraEnding, totalEnd, isHistoricalLock;
+
+        if (isLockedDay) {
+          const rawLock = importedRows[isoDate];
+          const lockedRegEnd = typeof rawLock === 'object' && rawLock !== null
+            ? (rawLock.regEnding !== undefined ? rawLock.regEnding : (rawLock.totalEnding ?? rawLock.balance ?? runningRegBeg))
+            : rawLock;
+          const lockedExtraEnd = typeof rawLock === 'object' && rawLock !== null && rawLock.extraEnding !== undefined
+            ? rawLock.extraEnding
+            : runningExtraBeg;
+          const lockedTotalEnd = typeof rawLock === 'object' && rawLock !== null && rawLock.totalEnding !== undefined
+            ? rawLock.totalEnding
+            : (lockedRegEnd + lockedExtraEnd);
+
+          const isFirstRow = rows.length === 0;
+          if (isFirstRow && typeof rawLock === 'object' && rawLock !== null && rawLock.regBeg !== undefined) {
+            runningRegBeg = rawLock.regBeg;
+            runningExtraBeg = rawLock.extraBeg ?? runningExtraBeg;
+          }
+
+          regEnding = lockedRegEnd;
+          extraEnding = lockedExtraEnd;
+          totalEnd = lockedTotalEnd;
+          isHistoricalLock = true;
+        } else {
+          regEnding = runningRegBeg + totalRegCredits - totalDayBills;
+          extraEnding = runningExtraBeg + totalExtraCredits;
+          totalEnd = regEnding + extraEnding;
+          isHistoricalLock = false;
+        }
 
         rows.push({
           rowKey: `${monthKey}-${day}`,
@@ -602,10 +576,10 @@ function DailySpreadsheetMatrix() {
           extraEnding,
           totalEnd,
           isDeficit: totalEnd < 0,
-          isHistoricalLock: false
+          isHistoricalLock
         });
 
-        // Carry forward to next day
+        // Carry ending balances forward as the next day's opening
         runningRegBeg = regEnding;
         runningExtraBeg = extraEnding;
       }

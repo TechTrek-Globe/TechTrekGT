@@ -199,13 +199,19 @@ export function SpreadsheetImporter({
         const result = parseSpreadsheet(arrayBuffer, file.name, budget.bills || []);
         if (!result.success) throw new Error(result.error);
 
+        const txns = (result.budget.transactions || result.budget.lineItems || []).map(t => ({
+          ...t,
+          accountId: effectiveAccountId || t.accountId
+        }));
+
         const payload = {
           people: result.budget.people || [],
           accounts: result.budget.accounts || [],
           bills: result.budget.bills || [],
           loans: result.budget.loans || [],
-          transactions: result.budget.transactions || result.budget.lineItems || [],
+          transactions: txns,
           targetAccountId: effectiveAccountId,
+          importedLedgerRows: result.budget.accounts?.[0]?.importedLedgerRows || {}
         };
         setParsedPayload(payload);
         setNsEnabled({

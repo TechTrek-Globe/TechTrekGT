@@ -257,10 +257,9 @@ The `dailyMatrix` is a normalized dictionary mapping composite string keys to nu
 - Earner Deposits: `{accountId}_{monthKey}_{day}_credit_{personId}`
 - Extra Savings Allocations: `{accountId}_{monthKey}_{day}_extra_credit_{personId}`
 - Bill Deductions: `{accountId}_{monthKey}_{day}_bill_{billId}`
-- Unmatched Debits (Other Expense): `{accountId}_{monthKey}_{day}_other_amount` + `{accountId}_{monthKey}_{day}_other_desc`
-- Unmatched Credits (Other Inflow): `{accountId}_{monthKey}_{day}_other_credit_amount` + `{accountId}_{monthKey}_{day}_other_credit_desc`
+- Unmatched Debits & Credits (Consolidated Other): `{accountId}_{monthKey}_{day}_other_amount` + `{accountId}_{monthKey}_{day}_other_desc`
 
-> **Credit/Debit Segregation Standard:** Unmatched credits and debits from CSV/spreadsheet imports are strictly separated into dedicated matrix keys (`other_credit_amount` vs `other_amount`) to prevent credit inflows from colliding with or contaminating debit expenses.
+> **Consolidated Other Standard:** Unmatched items and direct "Other" adjustments are consolidated into a single "Other" column displaying positive (credits) and negative (debits) amounts with an associated "Other Description" column.
 
 ### 5.4 Data Fetching Patterns
 

@@ -392,28 +392,26 @@ export function processSpreadsheetImport({
             }
           }
         } else {
-          // Unmatched credit: accumulate into the dedicated other_credit_amount key.
-          // BUG-3 full fix: credits and debits are now separated into distinct matrix keys.
-          // other_amount (debit) and other_credit_amount (credit) never share a cell.
-          const otherCreditKey = `${accountId}_${monthKey}_${actualDay}_other_credit_amount`;
-          const otherCreditDescKey = `${accountId}_${monthKey}_${actualDay}_other_credit_desc`;
-          const existingCredit = matrixUpdates[otherCreditKey] ?? nextDailyMatrix[otherCreditKey] ?? 0;
-          matrixUpdates[otherCreditKey] = Math.round((parseFloat(existingCredit) + actualAmount) * 100) / 100;
+          // Unmatched credit: accumulate into consolidated other_amount (positive) and other_desc
+          const otherKey = `${accountId}_${monthKey}_${actualDay}_other_amount`;
+          const otherDescKey = `${accountId}_${monthKey}_${actualDay}_other_desc`;
+          const existingOther = matrixUpdates[otherKey] ?? nextDailyMatrix[otherKey] ?? 0;
+          matrixUpdates[otherKey] = Math.round((parseFloat(existingOther) + actualAmount) * 100) / 100;
 
           const cleanDesc = (txn.description || '').replace(/^Other\s*\$?\s*\(?(.*?)\)?$/i, '$1').trim() || txn.description;
-          const existingCreditDesc = (matrixUpdates[otherCreditDescKey] ?? nextDailyMatrix[otherCreditDescKey] ?? '').replace(/^Other\s*\$?\s*\(?(.*?)\)?$/i, '$1').trim();
-          if (existingCreditDesc && cleanDesc && !existingCreditDesc.includes(cleanDesc)) {
-            matrixUpdates[otherCreditDescKey] = `${existingCreditDesc} | ${cleanDesc}`;
-          } else if (!existingCreditDesc) {
-            matrixUpdates[otherCreditDescKey] = cleanDesc || '';
+          const existingOtherDesc = (matrixUpdates[otherDescKey] ?? nextDailyMatrix[otherDescKey] ?? '').replace(/^Other\s*\$?\s*\(?(.*?)\)?$/i, '$1').trim();
+          if (existingOtherDesc && cleanDesc && !existingOtherDesc.includes(cleanDesc)) {
+            matrixUpdates[otherDescKey] = `${existingOtherDesc} | ${cleanDesc}`;
+          } else if (!existingOtherDesc) {
+            matrixUpdates[otherDescKey] = cleanDesc || '';
           }
 
-          logDebug('MATCH', `Credit transaction #${txnIdx + 1} unmatched to known earner; routed to other_credit_amount`, {
+          logDebug('MATCH', `Credit transaction #${txnIdx + 1} unmatched to known earner; routed to other_amount`, {
             date: normDate,
             desc: txn.description,
             amount: actualAmount,
-            otherCreditKey,
-            otherCreditDescKey
+            otherKey,
+            otherDescKey
           });
         }
       } else {
@@ -447,7 +445,7 @@ export function processSpreadsheetImport({
             const pSource = (b.paymentSource || '').toLowerCase();
             if (bName && (descLower.includes(bName) || bName.includes(descLower))) return true;
             if (pSource && (descLower.includes(pSource) || pSource.includes(descLower))) return true;
-            if (descLower.includes('insurance') && bName.includes('insurance')) return true;
+            if ((descLower.includes('insurance') || descLower.includes('progressive') || descLower.includes('geico')) && (bName.includes('insurance') || bName.includes('vehicle') || bName.includes('auto'))) return true;
             if (descLower.includes('cell') && (bName.includes('cell') || bName.includes('phone'))) return true;
             if (descLower.includes('phone') && (bName.includes('cell') || bName.includes('phone'))) return true;
             if (descLower.includes('gym') && (bName.includes('gym') || bName.includes('membership'))) return true;
@@ -504,27 +502,62 @@ export function processSpreadsheetImport({
             matrixNoteShifts.push({ projNoteKey, actualNoteKey });
           }
         } else {
-          // Unmatched debit -> Other expense
-          const otherKey = `${accountId}_${monthKey}_${actualDay}_other_amount`;
-          const otherDescKey = `${accountId}_${monthKey}_${actualDay}_other_desc`;
-          const existingOther = matrixUpdates[otherKey] ?? 0;
-          matrixUpdates[otherKey] = Math.round((existingOther + Math.abs(actualAmount)) * 100) / 100;
+          const isOther = txn.isOther || descLower === 'other' || descLower.startsWith('other ') || descLower.startsWith('other$') || descLower === 'other expense' || descLower === 'other $' || (/^other\b/i.test(descLower) && !descLower.includes('desc'));
 
-          const cleanDesc = (txn.description || '').replace(/^Other\s*\$?\s*\(?(.*?)\)?$/i, '$1').trim() || txn.description;
-          const existingOtherDesc = (matrixUpdates[otherDescKey] ?? nextDailyMatrix[otherDescKey] ?? '').replace(/^Other\s*\$?\s*\(?(.*?)\)?$/i, '$1').trim();
-          if (existingOtherDesc && cleanDesc && !existingOtherDesc.includes(cleanDesc)) {
-            matrixUpdates[otherDescKey] = `${existingOtherDesc} | ${cleanDesc}`;
+          if (isOther) {
+            // Unmatched debit from explicit Other column -> Other expense (negative in consolidated other_amount)
+            const otherKey = `${accountId}_${monthKey}_${actualDay}_other_amount`;
+            const otherDescKey = `${accountId}_${monthKey}_${actualDay}_other_desc`;
+            const existingOther = matrixUpdates[otherKey] ?? nextDailyMatrix[otherKey] ?? 0;
+            matrixUpdates[otherKey] = Math.round((parseFloat(existingOther) - Math.abs(actualAmount)) * 100) / 100;
+
+            const cleanDesc = (txn.description || '').replace(/^Other\s*\$?\s*\(?(.*?)\)?$/i, '$1').trim() || txn.description;
+            const existingOtherDesc = (matrixUpdates[otherDescKey] ?? nextDailyMatrix[otherDescKey] ?? '').replace(/^Other\s*\$?\s*\(?(.*?)\)?$/i, '$1').trim();
+            if (existingOtherDesc && cleanDesc && !existingOtherDesc.includes(cleanDesc)) {
+              matrixUpdates[otherDescKey] = `${existingOtherDesc} | ${cleanDesc}`;
+            } else {
+              matrixUpdates[otherDescKey] = existingOtherDesc || cleanDesc;
+            }
+
+            logWarn('MATCH', `Debit transaction #${txnIdx + 1} from Other column routed to Other Expense`, {
+              date: normDate,
+              desc: txn.description,
+              amount: actualAmount,
+              otherKey,
+              otherDescKey
+            });
           } else {
-            matrixUpdates[otherDescKey] = existingOtherDesc || cleanDesc;
-          }
+            // Named column that had no matching bill: create a bill dynamically so it never routes to Other
+            const billName = descLower.includes('insurance') ? 'Insurance (Vehicle)' : (txn.description || 'Discovered Bill');
+            let autoBill = nextBills.find(b => b.name.toLowerCase() === billName.toLowerCase());
+            if (!autoBill) {
+              autoBill = {
+                id: txn.billId || `bill-${Date.now()}-${nextBills.length}`,
+                name: billName,
+                amount: Math.abs(actualAmount),
+                period: 'Monthly',
+                dueDay: actualDay,
+                accountId: accountId,
+                paymentSource: 'Auto Pay',
+                matchingKey: descLower.includes('insurance') ? 'PROGRESSIVE, AUTO INSURANCE, GEICO, INSURANCE, VEHICLE' : billName
+              };
+              nextBills.push(autoBill);
+              metadataChanged = true;
+            }
+            resolvedBillId = autoBill.id;
+            lineItemUpdates.push({ billId: resolvedBillId, monthKey, actualAmount });
+            const actualKey = `${accountId}_${monthKey}_${actualDay}_bill_${resolvedBillId}`;
+            const existingBillAmt = matrixUpdates[actualKey] ?? 0;
+            matrixUpdates[actualKey] = Math.round((existingBillAmt + actualAmount) * 100) / 100;
 
-          logWarn('MATCH', `Debit transaction #${txnIdx + 1} unmatched to any bill; routed to Other Expense`, {
-            date: normDate,
-            desc: txn.description,
-            amount: actualAmount,
-            otherKey,
-            otherDescKey
-          });
+            logDebug('MATCH', `Debit transaction #${txnIdx + 1} created new bill "${billName}" and routed to bill column`, {
+              date: normDate,
+              desc: txn.description,
+              amount: actualAmount,
+              billId: resolvedBillId,
+              actualKey
+            });
+          }
         }
       }
     });

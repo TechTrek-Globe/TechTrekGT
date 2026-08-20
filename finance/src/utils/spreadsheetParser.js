@@ -347,70 +347,98 @@ export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
               if (!isNaN(num) && num !== 0) {
                 const lowerH = h.toLowerCase();
                 const otherDesc = (otherDescIdx >= 0 && r[otherDescIdx]) ? String(r[otherDescIdx]).trim() : '';
-                const desc = lowerH.includes('other') ? (otherDesc || h) : h;
+                const isOtherCol = (lowerH === 'other' || lowerH.startsWith('other ') || lowerH.startsWith('other$') || lowerH === 'other $' || (/^other\b/i.test(lowerH) && !lowerH.includes('desc') && !lowerH.includes('credit')));
+                const desc = isOtherCol ? (otherDesc || 'Other') : (lowerH.includes('insurance') ? 'Insurance (Vehicle)' : h);
 
                 // Match to existing bill if debit
                 let billId = null;
 
-                // 1. Primary matchingKey check on billsList
-                const matchedByKey = billsList.find(b => {
-                  if (!b.matchingKey) return false;
-                  const keys = String(b.matchingKey).split(/[,;/|]+/).map(k => k.trim().toLowerCase()).filter(Boolean);
-                  return keys.some(k => lowerH.includes(k) || (k.length >= 3 && k.includes(lowerH)) || (otherDesc && otherDesc.toLowerCase().includes(k)));
-                });
-
-                if (matchedByKey) {
-                  billId = matchedByKey.id;
-                } else {
-                  const matchedBill = billsList.find(b => {
-                    const bName = b.name.toLowerCase();
-                    return bName.includes(lowerH) || lowerH.includes(bName) ||
-                      (lowerH.includes('cell') && bName.includes('cell')) ||
-                      (lowerH.includes('gym') && bName.includes('gym')) ||
-                      (lowerH.includes('insurance') && bName.includes('insurance')) ||
-                      (lowerH.includes('hoa') && bName.includes('hoa')) ||
-                      (lowerH.includes('mortgage') && bName.includes('mortgage')) ||
-                      (lowerH.includes('water') && bName.includes('water')) ||
-                      (lowerH.includes('power') && bName.includes('power')) ||
-                      (lowerH.includes('gas') && bName.includes('gas')) ||
-                      (lowerH.includes('comcast') && bName.includes('comcast')) ||
-                      (lowerH.includes('youtube') && bName.includes('youtube'));
+                if (!isOtherCol && !lowerH.includes('credit') && !lowerH.includes('deposit') && !lowerH.includes('income')) {
+                  // 1. Primary matchingKey check on billsList
+                  const matchedByKey = billsList.find(b => {
+                    if (!b.matchingKey) return false;
+                    const keys = String(b.matchingKey).split(/[,;/|]+/).map(k => k.trim().toLowerCase()).filter(Boolean);
+                    return keys.some(k => lowerH.includes(k) || (k.length >= 3 && k.includes(lowerH)) || (otherDesc && otherDesc.toLowerCase().includes(k)));
                   });
 
-                  if (matchedBill) {
-                    billId = matchedBill.id;
+                  if (matchedByKey) {
+                    billId = matchedByKey.id;
                   } else {
-                    // Secondary match: cross-reference existing app bills by matchingKey first, then name
-                    const existingKeyMatch = existingBills.find(b => {
-                      if (!b.matchingKey) return false;
-                      const keys = String(b.matchingKey).split(/[,;/|]+/).map(k => k.trim().toLowerCase()).filter(Boolean);
-                      return keys.some(k => lowerH.includes(k) || (k.length >= 3 && k.includes(lowerH)) || (otherDesc && otherDesc.toLowerCase().includes(k)));
+                    const matchedBill = billsList.find(b => {
+                      const bName = b.name.toLowerCase();
+                      return bName.includes(lowerH) || lowerH.includes(bName) ||
+                        (lowerH.includes('cell') && bName.includes('cell')) ||
+                        (lowerH.includes('gym') && bName.includes('gym')) ||
+                        (lowerH.includes('insurance') && (bName.includes('insurance') || bName.includes('vehicle') || bName.includes('auto'))) ||
+                        (lowerH.includes('hoa') && bName.includes('hoa')) ||
+                        (lowerH.includes('mortgage') && bName.includes('mortgage')) ||
+                        (lowerH.includes('water') && bName.includes('water')) ||
+                        (lowerH.includes('power') && bName.includes('power')) ||
+                        (lowerH.includes('gas') && bName.includes('gas')) ||
+                        (lowerH.includes('comcast') && bName.includes('comcast')) ||
+                        (lowerH.includes('youtube') && bName.includes('youtube'));
                     });
 
-                    if (existingKeyMatch) {
-                      billId = existingKeyMatch.id;
+                    if (matchedBill) {
+                      billId = matchedBill.id;
                     } else {
-                      const existingMatch = existingBills.find(b => {
-                        const bName = b.name.toLowerCase();
-                        return bName.includes(lowerH) || lowerH.includes(bName) ||
-                          (lowerH.includes('water') && bName.includes('water')) ||
-                          (lowerH.includes('power') && bName.includes('power')) ||
-                          (lowerH.includes('gas') && bName.includes('gas')) ||
-                          (lowerH.includes('electric') && bName.includes('electric')) ||
-                          (lowerH.includes('cell') && bName.includes('cell')) ||
-                          (lowerH.includes('gym') && bName.includes('gym')) ||
-                          (lowerH.includes('insurance') && bName.includes('insurance')) ||
-                          (lowerH.includes('hoa') && bName.includes('hoa')) ||
-                          (lowerH.includes('mortgage') && bName.includes('mortgage')) ||
-                          (lowerH.includes('comcast') && bName.includes('comcast')) ||
-                          (lowerH.includes('youtube') && bName.includes('youtube'));
+                      // Secondary match: cross-reference existing app bills by matchingKey first, then name
+                      const existingKeyMatch = existingBills.find(b => {
+                        if (!b.matchingKey) return false;
+                        const keys = String(b.matchingKey).split(/[,;/|]+/).map(k => k.trim().toLowerCase()).filter(Boolean);
+                        return keys.some(k => lowerH.includes(k) || (k.length >= 3 && k.includes(lowerH)) || (otherDesc && otherDesc.toLowerCase().includes(k)));
                       });
-                      if (existingMatch) billId = existingMatch.id;
+
+                      if (existingKeyMatch) {
+                        billId = existingKeyMatch.id;
+                      } else {
+                        const existingMatch = existingBills.find(b => {
+                          const bName = b.name.toLowerCase();
+                          return bName.includes(lowerH) || lowerH.includes(bName) ||
+                            (lowerH.includes('water') && bName.includes('water')) ||
+                            (lowerH.includes('power') && bName.includes('power')) ||
+                            (lowerH.includes('gas') && bName.includes('gas')) ||
+                            (lowerH.includes('electric') && bName.includes('electric')) ||
+                            (lowerH.includes('cell') && bName.includes('cell')) ||
+                            (lowerH.includes('gym') && bName.includes('gym')) ||
+                            (lowerH.includes('insurance') && (bName.includes('insurance') || bName.includes('vehicle') || bName.includes('auto'))) ||
+                            (lowerH.includes('hoa') && bName.includes('hoa')) ||
+                            (lowerH.includes('mortgage') && bName.includes('mortgage')) ||
+                            (lowerH.includes('comcast') && bName.includes('comcast')) ||
+                            (lowerH.includes('youtube') && bName.includes('youtube'));
+                        });
+                        if (existingMatch) {
+                          billId = existingMatch.id;
+                        } else {
+                          // Create new bill entry in billsList for this sheet
+                          const targetBillName = lowerH.includes('insurance') ? 'Insurance (Vehicle)' : h;
+                          let discovered = billsList.find(b => b.name.toLowerCase() === targetBillName.toLowerCase());
+                          if (!discovered) {
+                            discovered = {
+                              id: `bill-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+                              accountId: targetAccountId,
+                              name: targetBillName,
+                              amount: Math.abs(num),
+                              period: 'Monthly',
+                              dueDay: 15,
+                              dueMonths: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+                              paymentSource: 'Auto Pay',
+                              matchingKey: lowerH.includes('insurance') ? 'PROGRESSIVE, AUTO INSURANCE, GEICO, INSURANCE, VEHICLE' : h,
+                              notes: `Discovered from column ${h}`,
+                              splits: {
+                                [defaultJonId]: 50,
+                                [defaultRonnieId]: 50
+                              }
+                            };
+                            billsList.push(discovered);
+                          }
+                          billId = discovered.id;
+                        }
+                      }
                     }
                   }
                 }
 
-                const isOtherCol = lowerH.includes('other') && !lowerH.includes('credit');
                 const isCredit = isOtherCol
                   ? num > 0
                   : (lowerH.includes('credit') || lowerH.includes('deposit') || lowerH.includes('income'));
@@ -419,11 +447,12 @@ export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
 
                 // Infer category
                 let category = 'Uncategorized';
-                if (isCredit) category = 'Income / Transfer';
+                if (isOtherCol) category = 'Other';
+                else if (isCredit) category = 'Income / Transfer';
                 else if (lowerH.includes('power') || lowerH.includes('gas') || lowerH.includes('water') || lowerH.includes('comcast') || lowerH.includes('utility')) category = 'Utilities';
                 else if (lowerH.includes('mortgage') || lowerH.includes('hoa') || lowerH.includes('rent')) category = 'Housing';
                 else if (lowerH.includes('gym') || lowerH.includes('phone') || lowerH.includes('youtube') || lowerH.includes('cell')) category = 'Subscriptions';
-                else if (lowerH.includes('insurance')) category = 'Insurance';
+                else if (lowerH.includes('insurance')) category = 'Insurance (Vehicle)';
 
                 lineItemsList.push({
                   id: `txn-${Date.now()}-${txnIdCounter++}`,
@@ -433,6 +462,7 @@ export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
                   accountId: targetAccountId,
                   billId,
                   category,
+                  isOther: isOtherCol,
                   notes: `Imported from ${sheetName}`
                 });
               }
@@ -701,13 +731,9 @@ export function parseSingleSheet({
         const lowerH = h.toLowerCase();
         const otherDesc = (otherDescIdx >= 0 && r[otherDescIdx]) ? String(r[otherDescIdx]).trim() : '';
 
-        // Clean description logic: do not prefix with "Other $"
-        let desc = h;
-        if (lowerH.includes('other')) {
-          desc = otherDesc || 'Other Expense';
-        }
+        const isOtherCol = (lowerH === 'other' || lowerH.startsWith('other ') || lowerH.startsWith('other$') || lowerH === 'other $' || (/^other\b/i.test(lowerH) && !lowerH.includes('desc') && !lowerH.includes('credit')));
+        const desc = isOtherCol ? (otherDesc || 'Other') : (lowerH.includes('insurance') ? 'Insurance (Vehicle)' : h);
 
-        const isOtherCol = lowerH.includes('other') && !lowerH.includes('credit');
         const isCredit = isOtherCol
           ? num > 0
           : (lowerH.includes('credit') || lowerH.includes('deposit') || lowerH.includes('income'));
@@ -716,7 +742,7 @@ export function parseSingleSheet({
 
         // Match bill
         let billId = null;
-        if (!isCredit) {
+        if (!isCredit && !isOtherCol) {
           const matchedBill = existingBills.find(b => {
             const bName = b.name.toLowerCase();
             const bKey = (b.matchingKey || '').toLowerCase();
@@ -724,7 +750,7 @@ export function parseSingleSheet({
               (bKey && (lowerH.includes(bKey) || bKey.includes(lowerH))) ||
               bName.includes(lowerH) ||
               lowerH.includes(bName) ||
-              (lowerH.includes('insurance') && bName.includes('insurance')) ||
+              (lowerH.includes('insurance') && (bName.includes('insurance') || bName.includes('vehicle') || bName.includes('auto'))) ||
               (lowerH.includes('cell') && (bName.includes('cell') || bName.includes('phone'))) ||
               (lowerH.includes('phone') && (bName.includes('cell') || bName.includes('phone'))) ||
               (lowerH.includes('gym') && (bName.includes('gym') || bName.includes('membership'))) ||
@@ -740,29 +766,34 @@ export function parseSingleSheet({
           });
           if (matchedBill) {
             billId = matchedBill.id;
-          } else if (!lowerH.includes('other') && !lowerH.includes('credit') && !RESERVED_COLS.has(lowerH)) {
+          } else if (!RESERVED_COLS.has(lowerH)) {
             // Discovered potential bill
-            if (!discoveredBills.some(db => db.name.toLowerCase() === h.toLowerCase())) {
-              discoveredBills.push({
+            const targetBillName = lowerH.includes('insurance') ? 'Insurance (Vehicle)' : h;
+            let disc = discoveredBills.find(db => db.name.toLowerCase() === targetBillName.toLowerCase());
+            if (!disc) {
+              disc = {
                 id: `bill-${Date.now()}-${discoveredBills.length}`,
-                name: h,
+                name: targetBillName,
                 amount: Math.abs(num),
                 period: 'Monthly',
                 dueDay: 15,
                 accountId: targetAccountId,
                 paymentSource: 'Auto Pay',
-                matchingKey: h
-              });
+                matchingKey: lowerH.includes('insurance') ? 'PROGRESSIVE, AUTO INSURANCE, GEICO, INSURANCE, VEHICLE' : h
+              };
+              discoveredBills.push(disc);
             }
+            billId = disc.id;
           }
         }
 
         let category = 'Uncategorized';
-        if (isCredit) category = 'Income / Transfer';
+        if (isOtherCol) category = 'Other';
+        else if (isCredit) category = 'Income / Transfer';
         else if (lowerH.includes('power') || lowerH.includes('gas') || lowerH.includes('water') || lowerH.includes('comcast') || lowerH.includes('utility') || lowerH.includes('electric')) category = 'Utilities';
         else if (lowerH.includes('mortgage') || lowerH.includes('hoa') || lowerH.includes('rent')) category = 'Housing';
         else if (lowerH.includes('gym') || lowerH.includes('phone') || lowerH.includes('youtube') || lowerH.includes('cell')) category = 'Subscriptions';
-        else if (lowerH.includes('insurance')) category = 'Insurance';
+        else if (lowerH.includes('insurance')) category = 'Insurance (Vehicle)';
 
         transactions.push({
           id: `txn-${Date.now()}-${transactions.length}`,
@@ -772,6 +803,7 @@ export function parseSingleSheet({
           accountId: targetAccountId,
           billId,
           category,
+          isOther: isOtherCol,
           notes: otherDesc ? otherDesc : `Imported from ${sheetName}`
         });
       }

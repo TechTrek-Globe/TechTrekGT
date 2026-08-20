@@ -298,17 +298,31 @@ export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
             if (rRegEnd !== null || rTotalEnd !== null) {
               let parsedRegEnd = rRegEnd !== null ? rRegEnd : (rTotalEnd - rExtraEnd);
               let parsedExtraEnd = rExtraEnd;
-              if (parsedRegEnd < 0) {
-                parsedExtraEnd = Math.round((parsedExtraEnd + parsedRegEnd) * 100) / 100;
-                parsedRegEnd = 0;
+              if (parsedRegEnd < 0 && parsedExtraEnd > 0) {
+                const transfer = Math.min(parsedExtraEnd, -parsedRegEnd);
+                parsedRegEnd += transfer;
+                parsedExtraEnd -= transfer;
+              } else if (parsedExtraEnd < 0 && parsedRegEnd > 0) {
+                const transfer = Math.min(parsedRegEnd, -parsedExtraEnd);
+                parsedExtraEnd += transfer;
+                parsedRegEnd -= transfer;
               }
+              parsedRegEnd = Math.round(parsedRegEnd * 100) / 100 || 0;
+              parsedExtraEnd = Math.round(parsedExtraEnd * 100) / 100 || 0;
 
               let parsedRegBeg = rRegBeg;
               let parsedExtraBeg = rExtraBeg;
-              if (parsedRegBeg < 0) {
-                parsedExtraBeg = Math.round((parsedExtraBeg + parsedRegBeg) * 100) / 100;
-                parsedRegBeg = 0;
+              if (parsedRegBeg < 0 && parsedExtraBeg > 0) {
+                const transfer = Math.min(parsedExtraBeg, -parsedRegBeg);
+                parsedRegBeg += transfer;
+                parsedExtraBeg -= transfer;
+              } else if (parsedExtraBeg < 0 && parsedRegBeg > 0) {
+                const transfer = Math.min(parsedRegBeg, -parsedExtraBeg);
+                parsedExtraBeg += transfer;
+                parsedRegBeg -= transfer;
               }
+              parsedRegBeg = Math.round(parsedRegBeg * 100) / 100 || 0;
+              parsedExtraBeg = Math.round(parsedExtraBeg * 100) / 100 || 0;
 
               importedLedgerRows[dateStr] = {
                 regEnding: parsedRegEnd,
@@ -667,17 +681,31 @@ export function parseSingleSheet({
     if (rRegEnd !== null || rTotalEnd !== null) {
       let parsedRegEnd = rRegEnd !== null ? rRegEnd : (rTotalEnd - rExtraEnd);
       let parsedExtraEnd = rExtraEnd;
-      if (parsedRegEnd < 0) {
-        parsedExtraEnd = Math.round((parsedExtraEnd + parsedRegEnd) * 100) / 100;
-        parsedRegEnd = 0;
+      if (parsedRegEnd < 0 && parsedExtraEnd > 0) {
+        const transfer = Math.min(parsedExtraEnd, -parsedRegEnd);
+        parsedRegEnd += transfer;
+        parsedExtraEnd -= transfer;
+      } else if (parsedExtraEnd < 0 && parsedRegEnd > 0) {
+        const transfer = Math.min(parsedRegEnd, -parsedExtraEnd);
+        parsedExtraEnd += transfer;
+        parsedRegEnd -= transfer;
       }
+      parsedRegEnd = Math.round(parsedRegEnd * 100) / 100 || 0;
+      parsedExtraEnd = Math.round(parsedExtraEnd * 100) / 100 || 0;
 
       let parsedRegBeg = rRegBeg;
       let parsedExtraBeg = rExtraBeg;
-      if (parsedRegBeg < 0) {
-        parsedExtraBeg = Math.round((parsedExtraBeg + parsedRegBeg) * 100) / 100;
-        parsedRegBeg = 0;
+      if (parsedRegBeg < 0 && parsedExtraBeg > 0) {
+        const transfer = Math.min(parsedExtraBeg, -parsedRegBeg);
+        parsedRegBeg += transfer;
+        parsedExtraBeg -= transfer;
+      } else if (parsedExtraBeg < 0 && parsedRegBeg > 0) {
+        const transfer = Math.min(parsedRegBeg, -parsedExtraBeg);
+        parsedExtraBeg += transfer;
+        parsedRegBeg -= transfer;
       }
+      parsedRegBeg = Math.round(parsedRegBeg * 100) / 100 || 0;
+      parsedExtraBeg = Math.round(parsedExtraBeg * 100) / 100 || 0;
 
       importedLedgerRows[dateStr] = {
         regEnding: parsedRegEnd,

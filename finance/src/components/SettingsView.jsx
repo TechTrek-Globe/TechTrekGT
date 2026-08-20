@@ -1348,7 +1348,7 @@ export function SettingsView({ onNavigateView }) {
                                         <div className="flex flex-col gap-1">
                                           <div className="flex items-center gap-1.5 flex-wrap">
                                             {eligiblePeople.map(p => {
-                                              const val = bill.splits?.[p.id] ?? (eligiblePeople.length > 0 ? (100 / eligiblePeople.length) : 100);
+                                              const val = bill.splits?.[p.id] !== undefined ? (parseFloat(bill.splits[p.id]) || 0) : 0;
                                               return (
                                                 <div key={p.id} className="inline-flex items-center gap-1 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800 text-[10px]">
                                                   <span className="text-slate-400 font-medium truncate max-w-[45px]">{p.name.split(' ')[0]}:</span>
@@ -1365,13 +1365,20 @@ export function SettingsView({ onNavigateView }) {
                                                 </div>
                                               );
                                             })}
-                                            <span className={`text-[9px] font-mono font-bold px-1.5 py-0.2 rounded border ${
-                                              isValid100
-                                                ? 'bg-emerald-950/80 text-emerald-300 border-emerald-800/60'
-                                                : 'bg-rose-950/80 text-rose-300 border-rose-800/60 animate-pulse'
-                                            }`}>
-                                              {Math.round(sumSplits)}%
-                                            </span>
+                                            {(() => {
+                                              const isUnassigned = !bill.splits || Object.keys(bill.splits).length === 0 || Object.values(bill.splits).every(v => !parseFloat(v));
+                                              return (
+                                                <span className={`text-[9px] font-mono font-bold px-1.5 py-0.2 rounded border ${
+                                                  isValid100
+                                                    ? 'bg-emerald-950/80 text-emerald-300 border-emerald-800/60'
+                                                    : isUnassigned
+                                                      ? 'bg-amber-950/80 text-amber-300 border-amber-800/60 animate-pulse'
+                                                      : 'bg-rose-950/80 text-rose-300 border-rose-800/60 animate-pulse'
+                                                }`}>
+                                                  {isUnassigned ? 'Unassigned' : `${Math.round(sumSplits)}%`}
+                                                </span>
+                                              );
+                                            })()}
                                           </div>
                                           {eligiblePeople.length > 1 && (
                                             <div className="flex items-center gap-1 text-[9px] flex-wrap">

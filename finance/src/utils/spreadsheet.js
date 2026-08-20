@@ -105,13 +105,19 @@ export function processSpreadsheetImport({
               if (dates.length > 0) {
                 const rawReg = earliestRow.regBeg ?? earliestRow.totalBeg ?? newStartingBalance;
                 const rawExtra = earliestRow.extraBeg ?? (newExtraStarting ?? 0);
-                if (rawReg < 0) {
-                  newStartingBalance = 0;
-                  newExtraStarting = Math.round((rawExtra + rawReg) * 100) / 100;
-                } else {
-                  newStartingBalance = rawReg;
-                  newExtraStarting = rawExtra;
+                let startReg = rawReg;
+                let startExtra = rawExtra;
+                if (startReg < 0 && startExtra > 0) {
+                  const transfer = Math.min(startExtra, -startReg);
+                  startReg += transfer;
+                  startExtra -= transfer;
+                } else if (startExtra < 0 && startReg > 0) {
+                  const transfer = Math.min(startReg, -startExtra);
+                  startExtra += transfer;
+                  startReg -= transfer;
                 }
+                newStartingBalance = Math.round(startReg * 100) / 100 || 0;
+                newExtraStarting = Math.round(startExtra * 100) / 100 || 0;
                 newStartDate = dates[0];
                 newBalanceAsOfDate = dates[0];
               }
@@ -164,13 +170,19 @@ export function processSpreadsheetImport({
               if (dates.length > 0) {
                 const rawReg = earliestRow.regBeg ?? earliestRow.totalBeg ?? match.startingBalance;
                 const rawExtra = earliestRow.extraBeg ?? (match.extraStartingBalance || 0);
-                if (rawReg < 0) {
-                  patches.startingBalance = 0;
-                  patches.extraStartingBalance = Math.round((rawExtra + rawReg) * 100) / 100;
-                } else {
-                  patches.startingBalance = rawReg;
-                  patches.extraStartingBalance = rawExtra;
+                let startReg = rawReg;
+                let startExtra = rawExtra;
+                if (startReg < 0 && startExtra > 0) {
+                  const transfer = Math.min(startExtra, -startReg);
+                  startReg += transfer;
+                  startExtra -= transfer;
+                } else if (startExtra < 0 && startReg > 0) {
+                  const transfer = Math.min(startReg, -startExtra);
+                  startExtra += transfer;
+                  startReg -= transfer;
                 }
+                patches.startingBalance = Math.round(startReg * 100) / 100 || 0;
+                patches.extraStartingBalance = Math.round(startExtra * 100) / 100 || 0;
                 patches.startDate = dates[0];
                 patches.balanceAsOfDate = dates[0];
               }
@@ -216,13 +228,19 @@ export function processSpreadsheetImport({
               const earliestRow = data.importedLedgerRows[dates[0]];
               const rawReg = earliestRow.regBeg ?? earliestRow.totalBeg ?? acc.startingBalance;
               const rawExtra = earliestRow.extraBeg ?? (acc.extraStartingBalance || 0);
-              if (rawReg < 0) {
-                patches.startingBalance = 0;
-                patches.extraStartingBalance = Math.round((rawExtra + rawReg) * 100) / 100;
-              } else {
-                patches.startingBalance = rawReg;
-                patches.extraStartingBalance = rawExtra;
+              let startReg = rawReg;
+              let startExtra = rawExtra;
+              if (startReg < 0 && startExtra > 0) {
+                const transfer = Math.min(startExtra, -startReg);
+                startReg += transfer;
+                startExtra -= transfer;
+              } else if (startExtra < 0 && startReg > 0) {
+                const transfer = Math.min(startReg, -startExtra);
+                startExtra += transfer;
+                startReg -= transfer;
               }
+              patches.startingBalance = Math.round(startReg * 100) / 100 || 0;
+              patches.extraStartingBalance = Math.round(startExtra * 100) / 100 || 0;
               patches.startDate = dates[0];
               patches.balanceAsOfDate = dates[0];
             }
@@ -539,7 +557,8 @@ export function processSpreadsheetImport({
                 dueDay: actualDay,
                 accountId: accountId,
                 paymentSource: 'Auto Pay',
-                matchingKey: descLower.includes('insurance') ? 'PROGRESSIVE, AUTO INSURANCE, GEICO, INSURANCE, VEHICLE' : billName
+                matchingKey: descLower.includes('insurance') ? 'PROGRESSIVE, AUTO INSURANCE, GEICO, INSURANCE, VEHICLE' : billName,
+                splits: {}
               };
               nextBills.push(autoBill);
               metadataChanged = true;
@@ -622,4 +641,134 @@ export function processSpreadsheetImport({
     dailyMatrix: matrixChanged ? nextDailyMatrix : dailyMatrix,
     transactions: transactionsChanged ? nextTransactions : transactions
   };
+}
+
+/**
+ * Calculates the ledger's running balance for a specific account as of a given date (YYYY-MM-DD).
+ * Simulates daily cash flow up to targetDate (credits, bills, other debits/credits, overrides).
+ *
+ * @param {Object} params
+ * @param {string} params.targetAccountId Account ID to calculate balance for
+ * @param {string} [params.targetDate] Max date (YYYY-MM-DD) to calculate balance as of
+ * @param {Object} params.metadataState Metadata containing accounts, people, bills
+ * @param {Object} [params.dailyMatrix] Daily matrix key-value mapping
+ * @param {Array} [params.transactions] Transactions list
+ * @returns {number} The calculated running balance as of targetDate
+ */
+export function getLedgerRunningBalanceAsOfDate({
+  targetAccountId,
+  targetDate,
+  metadataState = {},
+  dailyMatrix = {},
+  transactions = []
+}) {
+  const accounts = metadataState.accounts || [];
+  const targetAcc = accounts.find(a => a.id === targetAccountId) || accounts[0];
+  if (!targetAcc) return 0;
+
+  const showExtra = targetAcc.enableExtraSavings !== false;
+  const startReg = parseFloat(targetAcc.startingBalance) || 0;
+  const startExtra = showExtra ? (parseFloat(targetAcc.extraStartingBalance) || 0) : 0;
+
+  const effectiveStartDateStr = targetAcc.balanceAsOfDate || targetAcc.startDate || '2024-01-01';
+
+  if (!targetDate) {
+    return Math.round((startReg + startExtra) * 100) / 100;
+  }
+
+  const parseIso = (str) => {
+    if (!str || typeof str !== 'string') return null;
+    const parts = str.split('-');
+    if (parts.length === 3) {
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10) - 1;
+      const d = parseInt(parts[2], 10);
+      if (!isNaN(y) && !isNaN(m) && !isNaN(d)) return new Date(y, m, d);
+    }
+    return null;
+  };
+
+  const startDateObj = parseIso(effectiveStartDateStr) || new Date(2024, 0, 1);
+  const targetDateObj = parseIso(targetDate);
+
+  if (!targetDateObj || targetDateObj < startDateObj) {
+    const accTxns = (transactions || []).filter(t => t.accountId === targetAccountId && t.date && t.date <= targetDate);
+    const sum = accTxns.reduce((s, t) => s + (parseFloat(t.amount) || 0), 0);
+    return Math.round((startReg + startExtra + sum) * 100) / 100;
+  }
+
+  const allAccTxnDates = (transactions || [])
+    .filter(t => t.accountId === targetAccountId && t.date)
+    .map(t => t.date)
+    .sort();
+  const earliestTxnDate = allAccTxnDates.length > 0 ? parseIso(allAccTxnDates[0]) : null;
+
+  let simulationStartDate = startDateObj;
+  if (earliestTxnDate && earliestTxnDate < simulationStartDate) {
+    simulationStartDate = earliestTxnDate;
+  }
+
+  const people = metadataState.people || [];
+  const bills = (metadataState.bills || []).filter(b => b.accountId === targetAccountId);
+
+  let runningReg = startReg;
+  let runningExtra = startExtra;
+
+  let cur = new Date(simulationStartDate);
+  while (cur <= targetDateObj) {
+    const y = cur.getFullYear();
+    const m = cur.getMonth();
+    const d = cur.getDate();
+    const mKey = `${y}-${String(m + 1).padStart(2, '0')}`;
+
+    let dayCredits = 0;
+    let dayExtraCredits = 0;
+    people.forEach(p => {
+      const c = dailyMatrix[`${targetAccountId}_${mKey}_${d}_credit_${p.id}`];
+      if (c !== undefined && c !== null && c !== '') dayCredits += parseFloat(c) || 0;
+      const ec = dailyMatrix[`${targetAccountId}_${mKey}_${d}_extra_credit_${p.id}`];
+      if (ec !== undefined && ec !== null && ec !== '') dayExtraCredits += parseFloat(ec) || 0;
+    });
+
+    let dayBills = 0;
+    bills.forEach(b => {
+      const bVal = dailyMatrix[`${targetAccountId}_${mKey}_${d}_bill_${b.id}`];
+      if (bVal !== undefined && bVal !== null && bVal !== '') dayBills += parseFloat(bVal) || 0;
+    });
+
+    const oVal = dailyMatrix[`${targetAccountId}_${mKey}_${d}_other_amount`];
+    const dayOther = oVal !== undefined && oVal !== null && oVal !== '' ? (parseFloat(oVal) || 0) : 0;
+
+    const ocVal = dailyMatrix[`${targetAccountId}_${mKey}_${d}_other_credit_amount`];
+    const dayOtherCredit = ocVal !== undefined && ocVal !== null && ocVal !== '' ? (parseFloat(ocVal) || 0) : 0;
+
+    const tentativeReg = runningReg + dayCredits - dayBills;
+    const tentativeExtra = runningExtra + dayExtraCredits + dayOtherCredit + dayOther;
+
+    const customReg = dailyMatrix[`${targetAccountId}_${mKey}_${d}_reg_ending`];
+    const customExtra = dailyMatrix[`${targetAccountId}_${mKey}_${d}_extra_ending`];
+
+    let reg = customReg !== undefined && customReg !== null && customReg !== '' ? parseFloat(customReg) : tentativeReg;
+    let extra = customExtra !== undefined && customExtra !== null && customExtra !== '' ? parseFloat(customExtra) : tentativeExtra;
+
+    if ((customReg === undefined || customReg === null || customReg === '') &&
+        (customExtra === undefined || customExtra === null || customExtra === '')) {
+      if (reg < 0 && extra > 0) {
+        const transfer = Math.min(extra, -reg);
+        reg += transfer;
+        extra -= transfer;
+      } else if (extra < 0 && reg > 0) {
+        const transfer = Math.min(reg, -extra);
+        extra += transfer;
+        reg -= transfer;
+      }
+    }
+
+    runningReg = Math.round(reg * 100) / 100 || 0;
+    runningExtra = Math.round(extra * 100) / 100 || 0;
+
+    cur.setDate(cur.getDate() + 1);
+  }
+
+  return Math.round((runningReg + (showExtra ? runningExtra : 0)) * 100) / 100;
 }

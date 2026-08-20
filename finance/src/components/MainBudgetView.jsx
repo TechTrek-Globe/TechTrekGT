@@ -130,12 +130,19 @@ export function MainBudgetView({ onNavigateView }) {
 
                           {/* Bill Name - inline editable */}
                           <td className="p-3.5 font-semibold">
-                            <InlineEdit
-                              value={bill.name}
-                              type="text"
-                              onCommit={(/** @type {string} */ v) => updateBill(bill.id, { name: v })}
-                              className="text-slate-200 font-semibold text-xs"
-                            />
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <InlineEdit
+                                value={bill.name}
+                                type="text"
+                                onCommit={(/** @type {string} */ v) => updateBill(bill.id, { name: v })}
+                                className="text-slate-200 font-semibold text-xs"
+                              />
+                              {(!bill.splits || Object.keys(bill.splits).length === 0 || Object.values(bill.splits).every(v => !parseFloat(v))) && (
+                                <span className="text-[9px] bg-amber-950/80 text-amber-300 border border-amber-800/60 px-1.5 py-0.2 rounded font-sans font-semibold">
+                                  Unassigned
+                                </span>
+                              )}
+                            </div>
                           </td>
 
                           {/* Monthly Amount - inline editable (writes to bill.amount) */}

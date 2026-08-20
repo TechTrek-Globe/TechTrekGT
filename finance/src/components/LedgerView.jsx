@@ -509,13 +509,37 @@ function DailySpreadsheetMatrix() {
           const tentativeRegEnding = runningRegBeg + dayCredits - dayBills;
           const tentativeExtraEnding = runningExtraBeg + dayExtraCredits + dayOtherCredit + dayOther;
 
-          if (tentativeRegEnding < 0) {
-            runningRegBeg = 0;
-            runningExtraBeg = Math.round((tentativeExtraEnding + tentativeRegEnding) * 100) / 100;
+          let customRegEnd;
+          let customExtraEnd;
+          if (selectedAccountId === 'all') {
+            const allReg = getDailyMatrixCell('all', mKey, d, 'reg_ending');
+            const allExtra = getDailyMatrixCell('all', mKey, d, 'extra_ending');
+            if (allReg !== undefined && allReg !== null && allReg !== '') customRegEnd = parseFloat(allReg);
+            if (allExtra !== undefined && allExtra !== null && allExtra !== '') customExtraEnd = parseFloat(allExtra);
           } else {
-            runningRegBeg = Math.round(tentativeRegEnding * 100) / 100;
-            runningExtraBeg = Math.round(tentativeExtraEnding * 100) / 100;
+            const accReg = getDailyMatrixCell(selectedAccountId, mKey, d, 'reg_ending');
+            const accExtra = getDailyMatrixCell(selectedAccountId, mKey, d, 'extra_ending');
+            if (accReg !== undefined && accReg !== null && accReg !== '') customRegEnd = parseFloat(accReg);
+            if (accExtra !== undefined && accExtra !== null && accExtra !== '') customExtraEnd = parseFloat(accExtra);
           }
+
+          let reg = customRegEnd !== undefined && !isNaN(customRegEnd) ? customRegEnd : tentativeRegEnding;
+          let extra = customExtraEnd !== undefined && !isNaN(customExtraEnd) ? customExtraEnd : tentativeExtraEnding;
+
+          if (customRegEnd === undefined && customExtraEnd === undefined) {
+            if (reg < 0 && extra > 0) {
+              const transfer = Math.min(extra, -reg);
+              reg += transfer;
+              extra -= transfer;
+            } else if (extra < 0 && reg > 0) {
+              const transfer = Math.min(reg, -extra);
+              extra += transfer;
+              reg -= transfer;
+            }
+          }
+
+          runningRegBeg = Math.round(reg * 100) / 100 || 0;
+          runningExtraBeg = Math.round(extra * 100) / 100 || 0;
 
           cur.setDate(cur.getDate() + 1);
         }
@@ -648,16 +672,45 @@ function DailySpreadsheetMatrix() {
         const tentativeRegEnding = runningRegBeg + totalRegCredits - totalDayBills;
         const tentativeExtraEnding = runningExtraBeg + dayExtraAdd + otherAmt;
 
-        let regEnding;
-        let extraEnding;
+        let customRegEnd;
+        let customExtraEnd;
 
-        if (tentativeRegEnding < 0) {
-          regEnding = 0;
-          extraEnding = Math.round((tentativeExtraEnding + tentativeRegEnding) * 100) / 100;
+        if (selectedAccountId === 'all') {
+          const allReg = getDailyMatrixCell('all', monthKey, day, 'reg_ending');
+          const allExtra = getDailyMatrixCell('all', monthKey, day, 'extra_ending');
+          if (allReg !== undefined && allReg !== null && allReg !== '') customRegEnd = parseFloat(allReg);
+          if (allExtra !== undefined && allExtra !== null && allExtra !== '') customExtraEnd = parseFloat(allExtra);
         } else {
-          regEnding = Math.round(tentativeRegEnding * 100) / 100;
-          extraEnding = Math.round(tentativeExtraEnding * 100) / 100;
+          const accReg = getDailyMatrixCell(selectedAccountId, monthKey, day, 'reg_ending');
+          const accExtra = getDailyMatrixCell(selectedAccountId, monthKey, day, 'extra_ending');
+          if (accReg !== undefined && accReg !== null && accReg !== '') customRegEnd = parseFloat(accReg);
+          if (accExtra !== undefined && accExtra !== null && accExtra !== '') customExtraEnd = parseFloat(accExtra);
         }
+
+        if (customRegEnd === undefined && isImportMode && importedRows[isoDate]?.regEnding !== undefined) {
+          customRegEnd = importedRows[isoDate].regEnding;
+        }
+        if (customExtraEnd === undefined && isImportMode && importedRows[isoDate]?.extraEnding !== undefined) {
+          customExtraEnd = importedRows[isoDate].extraEnding;
+        }
+
+        let reg = customRegEnd !== undefined && !isNaN(customRegEnd) ? customRegEnd : tentativeRegEnding;
+        let extra = customExtraEnd !== undefined && !isNaN(customExtraEnd) ? customExtraEnd : tentativeExtraEnding;
+
+        if (customRegEnd === undefined && customExtraEnd === undefined) {
+          if (reg < 0 && extra > 0) {
+            const transfer = Math.min(extra, -reg);
+            reg += transfer;
+            extra -= transfer;
+          } else if (extra < 0 && reg > 0) {
+            const transfer = Math.min(reg, -extra);
+            extra += transfer;
+            reg -= transfer;
+          }
+        }
+
+        const regEnding = Math.round(reg * 100) / 100 || 0;
+        const extraEnding = Math.round(extra * 100) / 100 || 0;
 
         const totalEnd = Math.round((regEnding + (showExtraColumns ? extraEnding : 0)) * 100) / 100;
         const isHistoricalLock = isLockedDay;
@@ -1156,11 +1209,11 @@ function DailySpreadsheetMatrix() {
               </th>
 
               {/* Ending Balances */}
-              <th className="px-1.5 h-10 text-right min-w-[72px] text-purple-300 bg-slate-900 align-middle sticky top-[24px] z-20 border-b border-slate-700 border-r border-slate-800 font-bold">
+              <th className="px-1.5 h-10 text-right min-w-[72px] text-purple-300 bg-slate-900 align-middle sticky top-[24px] z-20 border-b border-slate-700 border-r border-slate-800 font-bold" title="Click any row cell below to edit Regular Ending Balance">
                 <span className="block text-[11px] leading-tight">Reg<br/>End</span>
               </th>
               {showExtraColumns && (
-                <th className="px-1.5 h-10 text-right min-w-[72px] text-purple-300 bg-slate-900 border-r border-slate-800 align-middle sticky top-[24px] z-20 border-b border-slate-700 font-bold">
+                <th className="px-1.5 h-10 text-right min-w-[72px] text-purple-300 bg-slate-900 border-r border-slate-800 align-middle sticky top-[24px] z-20 border-b border-slate-700 font-bold" title="Click any row cell below to edit Extra Ending Balance">
                   <span className="block text-[11px] leading-tight">Extra<br/>End</span>
                 </th>
               )}
@@ -1376,16 +1429,52 @@ function DailySpreadsheetMatrix() {
                         />
                       </td>
 
-                      {/* Regular Ending Balance */}
-                      <td className={`p-1 text-right font-bold ${
-                        isSelected && !row.isToday ? 'text-blue-100 bg-blue-950/40' : 'text-slate-200'
-                      }`}>{fmtMoney(row.regEnding)}</td>
+                      {/* Regular Ending Balance (Editable) */}
+                      <td className={`p-1 text-right font-bold min-w-[72px] ${
+                        isSelected && !row.isToday ? 'text-blue-100 bg-blue-950/40' : (row.regEnding < 0 ? 'text-rose-400' : 'text-slate-200')
+                      }`}>
+                        <InlineEdit
+                          value={row.regEnding}
+                          type="currency"
+                          onCommit={(val) => handleCellCommit(row.monthKey, row.day, 'reg_ending', val)}
+                          displayFn={() => (
+                            <span className={`font-mono text-[10px] font-bold ${
+                              isSelected && !row.isToday
+                                ? 'text-blue-100'
+                                : row.regEnding < 0
+                                  ? 'text-rose-400'
+                                  : 'text-slate-200'
+                            }`}>
+                              {fmtMoney(row.regEnding)}
+                            </span>
+                          )}
+                          className="justify-end w-full"
+                        />
+                      </td>
 
-                      {/* Extra Ending Balance */}
+                      {/* Extra Ending Balance (Editable) */}
                       {showExtraColumns && (
-                        <td className={`p-1 text-right text-slate-300 border-r border-slate-800/80 ${
-                          isSelected && !row.isToday ? 'bg-blue-950/40 text-blue-100' : ''
-                        }`}>{fmtMoney(row.extraEnding)}</td>
+                        <td className={`p-1 text-right border-r border-slate-800/80 min-w-[72px] ${
+                          isSelected && !row.isToday ? 'bg-blue-950/40 text-blue-100' : (row.extraEnding < 0 ? 'text-rose-400' : 'text-slate-300')
+                        }`}>
+                          <InlineEdit
+                            value={row.extraEnding}
+                            type="currency"
+                            onCommit={(val) => handleCellCommit(row.monthKey, row.day, 'extra_ending', val)}
+                            displayFn={() => (
+                              <span className={`font-mono text-[10px] ${
+                                isSelected && !row.isToday
+                                  ? 'text-blue-100'
+                                  : row.extraEnding < 0
+                                    ? 'text-rose-400'
+                                    : 'text-slate-300'
+                              }`}>
+                                {fmtMoney(row.extraEnding)}
+                              </span>
+                            )}
+                            className="justify-end w-full"
+                          />
+                        </td>
                       )}
 
                       {/* Total End Balance (Sticky Right) */}

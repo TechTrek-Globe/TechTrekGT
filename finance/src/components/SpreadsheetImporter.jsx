@@ -19,6 +19,7 @@ import {
   INTERNAL_TRANSACTION_FIELDS,
   INTERNAL_BILL_FIELDS,
 } from '../utils/importer';
+import { getLedgerRunningBalanceAsOfDate } from '../utils/spreadsheet';
 import { useBudgetMetadataState, useLedgerDataDispatch } from '../context/BudgetContext';
 import { logDebug, logInfo, logWarn, logError } from '../utils/debugLogger';
 
@@ -139,7 +140,7 @@ export function SpreadsheetImporter({
   // Reconciliation state
   const [conflicts, setConflicts] = useState([]);
   const [resolutions, setResolutions] = useState({});
-  const [balanceDetails, setBalanceDetails] = useState({ stated: 0, calculated: 0, delta: 0 });
+  const [balanceDetails, setBalanceDetails] = useState({ stated: 0, calculated: 0, delta: 0, maxImportDate: null });
 
   // --- Resolve helpers ---
   const resolveAccountName = (accountId) => {
@@ -266,21 +267,22 @@ export function SpreadsheetImporter({
     setNsStrategy({ people: 'merge', accounts: 'merge', bills: 'merge', transactions: 'merge', loans: 'merge' });
     setConflicts([]);
     setResolutions({});
-    setBalanceDetails({ stated: 0, calculated: 0, delta: 0 });
+    setBalanceDetails({ stated: 0, calculated: 0, delta: 0, maxImportDate: null });
   };
 
   const handleForceBalanceAdjustment = () => {
     if (!parsedPayload) return;
     const targetAccId = parsedPayload.targetAccountId || targetAccountId || selectedTargetAccountId || budget.accounts[0]?.id || '';
+    const adjDate = balanceDetails.maxImportDate || new Date().toISOString().split('T')[0];
     
     parsedPayload.transactions.push({
       id: `txn-${Date.now()}-adj`,
-      date: new Date().toISOString().split('T')[0],
+      date: adjDate,
       description: 'Reconciliation Adjustment',
       amount: Math.round((balanceDetails.stated - balanceDetails.calculated) * 100) / 100,
       accountId: targetAccId,
       category: 'Adjustment',
-      notes: 'Auto-generated to match file ending balance'
+      notes: `Auto-generated to match file balance as of ${adjDate}`
     });
 
     const result = importSpreadsheetSelective({
@@ -437,29 +439,81 @@ export function SpreadsheetImporter({
         return;
       }
 
-      // Check ending balance
+      // Check date-matched balance as of latest import date
       if (dryResult.projected) {
         const targetAccId = parsedPayload.targetAccountId || targetAccountId || selectedTargetAccountId || budget.accounts[0]?.id || '';
         
+        // Extract latest transaction/row date from the imported payload
+        const txnDates = (parsedPayload.transactions || [])
+          .map(t => t.date)
+          .filter(Boolean);
+        const ledgerDates = Object.keys(parsedPayload.importedLedgerRows || {}).filter(Boolean);
+        const allImportDates = Array.from(new Set([...txnDates, ...ledgerDates])).sort();
+        const maxImportDate = allImportDates.length > 0 ? allImportDates[allImportDates.length - 1] : null;
+
+        // Extract the stated balance from the imported file as of maxImportDate
         let stated = null;
-        const dates = Object.keys(parsedPayload.importedLedgerRows || {}).sort();
-        if (dates.length > 0) {
-          const lastRow = parsedPayload.importedLedgerRows[dates[dates.length - 1]];
-          stated = typeof lastRow === 'object' ? (lastRow.totalEnding ?? lastRow.regEnding ?? lastRow.totalBeg) : lastRow;
+        if (ledgerDates.length > 0) {
+          const targetDateKey = (maxImportDate && parsedPayload.importedLedgerRows[maxImportDate] !== undefined)
+            ? maxImportDate
+            : ledgerDates[ledgerDates.length - 1];
+          const row = parsedPayload.importedLedgerRows[targetDateKey];
+          if (typeof row === 'number') {
+            stated = row;
+          } else if (row && typeof row === 'object') {
+            stated = row.totalEnding ?? row.regEnding ?? row.totalBeg ?? null;
+          }
         }
 
-        const projAccounts = dryResult.projected.metadataState.accounts || [];
-        const projAcc = projAccounts.find(a => a.id === targetAccId);
-        const startingBal = projAcc?.startingBalance || 0;
-        
-        const projTxns = dryResult.projected.transactions.filter(t => t.accountId === targetAccId);
-        const sumTxns = projTxns.reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
-        
-        const calculated = Math.round((startingBal + sumTxns) * 100) / 100;
-        const delta = stated !== null ? Math.abs(calculated - stated) : 0;
+        if ((stated === null || stated === undefined || isNaN(stated)) && parsedPayload.transactions?.length > 0) {
+          const txnsWithBal = parsedPayload.transactions
+            .filter(t => t.balance !== undefined && t.balance !== null && !isNaN(parseFloat(t.balance)))
+            .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+          if (txnsWithBal.length > 0) {
+            const matchTxn = (maxImportDate ? [...txnsWithBal].reverse().find(t => t.date === maxImportDate) : null)
+              || txnsWithBal[txnsWithBal.length - 1];
+            stated = parseFloat(matchTxn.balance);
+          }
+        }
+
+        if (stated !== null && stated !== undefined && !isNaN(stated)) {
+          stated = Math.round(stated * 100) / 100;
+        } else {
+          stated = null;
+        }
+
+        // Fetch the ledger's calculated running balance exactly as of the import date
+        let calculated = 0;
+        if (maxImportDate) {
+          calculated = getLedgerRunningBalanceAsOfDate({
+            targetAccountId: targetAccId,
+            targetDate: maxImportDate,
+            metadataState: dryResult.projected.metadataState || { accounts: budget.accounts, people: budget.people, bills: budget.bills },
+            dailyMatrix: dryResult.projected.dailyMatrix || {},
+            transactions: dryResult.projected.transactions || []
+          });
+        } else {
+          const projAccounts = dryResult.projected.metadataState?.accounts || budget.accounts || [];
+          const projAcc = projAccounts.find(a => a.id === targetAccId);
+          const startingBal = projAcc?.startingBalance || 0;
+          const extraBal = projAcc?.enableExtraSavings !== false ? (projAcc?.extraStartingBalance || 0) : 0;
+          const projTxns = (dryResult.projected.transactions || []).filter(t => t.accountId === targetAccId);
+          const sumTxns = projTxns.reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
+          calculated = Math.round((startingBal + extraBal + sumTxns) * 100) / 100;
+        }
+
+        const delta = stated !== null ? Math.round(Math.abs(calculated - stated) * 100) / 100 : 0;
+
+        logDebug('RECONCILE', `Balance check as of import date "${maxImportDate || 'all'}"`, {
+          maxImportDate,
+          stated,
+          calculated,
+          delta,
+          targetAccId
+        });
 
         if (delta > 0.01 && stated !== null && typeof stated === 'number') {
-          setBalanceDetails({ stated, calculated, delta });
+          setBalanceDetails({ stated, calculated, delta, maxImportDate });
           setStage(STAGE.BALANCE_CHECK);
           return;
         }
@@ -1225,7 +1279,7 @@ export function SpreadsheetImporter({
               <h3 className="font-bold text-sm text-rose-200">Reconciliation Failed</h3>
             </div>
             <p className="text-xs text-rose-300">
-              The projected ending balance of your ledger does not perfectly match the ending balance stated on the imported file. The import queue has been paused to enforce strict Single Source of Truth rules.
+              The calculated running balance of your ledger as of {balanceDetails.maxImportDate ? `the import date (${balanceDetails.maxImportDate})` : 'the latest transaction date'} does not match the stated balance on the imported file. The import queue has been paused to enforce strict Single Source of Truth rules.
             </p>
             
             <div className="grid grid-cols-2 gap-4 p-4 bg-black/40 rounded-lg">
@@ -1234,7 +1288,9 @@ export function SpreadsheetImporter({
                 <p className="text-lg font-mono text-emerald-400">${balanceDetails.stated.toFixed(2)}</p>
               </div>
               <div>
-                <p className="text-[10px] uppercase font-bold text-slate-500">Calculated Balance (Ledger)</p>
+                <p className="text-[10px] uppercase font-bold text-slate-500">
+                  Calculated Balance (Ledger{balanceDetails.maxImportDate ? ` as of ${balanceDetails.maxImportDate}` : ''})
+                </p>
                 <p className="text-lg font-mono text-rose-400">${balanceDetails.calculated.toFixed(2)}</p>
               </div>
               <div className="col-span-2 pt-2 border-t border-rose-800/30">

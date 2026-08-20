@@ -16,7 +16,8 @@ import {
   Maximize2,
   Minimize2,
   X,
-  Users
+  Users,
+  AlertCircle
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis } from 'recharts';
 import { fmtMoney, fmtPct } from '../utils/formatters';
@@ -275,6 +276,7 @@ export function DashboardView() {
     getAccountActualExpenses,
     getAccountActualEndBalance,
     updateAccount,
+    updateBillSplits,
     getPersonDepositAmountForAccount
   } = useBudget();
 
@@ -770,6 +772,9 @@ export function DashboardView() {
 
       case 'split_pairings': {
         const splitGroups = {};
+        const peopleList = budget?.people || [];
+        const wageEarners = peopleList.filter(p => !p.name.toLowerCase().includes('credit') && p.role !== 'Credit' && p.role !== 'Reimbursement');
+        const activePeople = wageEarners.length > 0 ? wageEarners : peopleList;
 
         // 1. Group Bills
         (budget?.bills || []).filter(b => !b.isArchived).forEach(b => {
@@ -781,11 +786,11 @@ export function DashboardView() {
           let groupLabel = 'Unassigned';
           if (activeEntries.length === 1) {
             const pId = activeEntries[0][0];
-            const person = (budget?.people || []).find(p => p.id === pId);
+            const person = peopleList.find(p => p.id === pId);
             groupLabel = `100% ${person ? person.name : pId}`;
           } else if (activeEntries.length > 1) {
             const names = activeEntries.map(([pId]) => {
-              const person = (budget?.people || []).find(p => p.id === pId);
+              const person = peopleList.find(p => p.id === pId);
               return person ? person.name : pId;
             });
             groupLabel = names.join(' & ');
@@ -797,22 +802,34 @@ export function DashboardView() {
               totalMonthlyCost: 0,
               billsCount: 0,
               savingsCount: 0,
-              participantPortions: {}
+              participantPortions: {},
+              unassignedBills: []
             };
           }
 
           splitGroups[groupLabel].totalMonthlyCost += monthlyCost;
           splitGroups[groupLabel].billsCount += 1;
 
-          activeEntries.forEach(([pId, pct]) => {
-            const person = (budget?.people || []).find(p => p.id === pId);
-            const pName = person ? person.name : pId;
-            const portion = (monthlyCost * (parseFloat(pct) || 0)) / 100;
-            if (!splitGroups[groupLabel].participantPortions[pName]) {
-              splitGroups[groupLabel].participantPortions[pName] = 0;
-            }
-            splitGroups[groupLabel].participantPortions[pName] += portion;
-          });
+          if (groupLabel === 'Unassigned') {
+            const acc = (budget?.accounts || []).find(a => a.id === b.accountId);
+            splitGroups[groupLabel].unassignedBills.push({
+              id: b.id,
+              name: b.name,
+              amount: b.amount,
+              monthlyCost,
+              accountName: acc?.name || 'Unassigned Account'
+            });
+          } else {
+            activeEntries.forEach(([pId, pct]) => {
+              const person = peopleList.find(p => p.id === pId);
+              const pName = person ? person.name : pId;
+              const portion = (monthlyCost * (parseFloat(pct) || 0)) / 100;
+              if (!splitGroups[groupLabel].participantPortions[pName]) {
+                splitGroups[groupLabel].participantPortions[pName] = 0;
+              }
+              splitGroups[groupLabel].participantPortions[pName] += portion;
+            });
+          }
         });
 
         // 2. Group Account Extra Savings
@@ -821,22 +838,21 @@ export function DashboardView() {
           if (extraAmt <= 0) return;
 
           const splits = acc.saveExtraSplits || {};
-          const people = budget?.people || [];
           let activeEntries = Object.entries(splits).filter(([_, val]) => parseFloat(val) > 0);
 
-          if (activeEntries.length === 0 && people.length > 0) {
-            const equalPct = 100 / people.length;
-            activeEntries = people.map(p => [p.id, equalPct]);
+          if (activeEntries.length === 0 && activePeople.length > 0) {
+            const equalPct = 100 / activePeople.length;
+            activeEntries = activePeople.map(p => [p.id, equalPct]);
           }
 
           let groupLabel = 'Unassigned Savings';
           if (activeEntries.length === 1) {
             const pId = activeEntries[0][0];
-            const person = (budget?.people || []).find(p => p.id === pId);
+            const person = peopleList.find(p => p.id === pId);
             groupLabel = `100% ${person ? person.name : pId}`;
           } else if (activeEntries.length > 1) {
             const names = activeEntries.map(([pId]) => {
-              const person = (budget?.people || []).find(p => p.id === pId);
+              const person = peopleList.find(p => p.id === pId);
               return person ? person.name : pId;
             });
             groupLabel = names.join(' & ');
@@ -848,7 +864,8 @@ export function DashboardView() {
               totalMonthlyCost: 0,
               billsCount: 0,
               savingsCount: 0,
-              participantPortions: {}
+              participantPortions: {},
+              unassignedBills: []
             };
           }
 
@@ -856,7 +873,7 @@ export function DashboardView() {
           splitGroups[groupLabel].savingsCount += 1;
 
           activeEntries.forEach(([pId, val]) => {
-            const person = (budget?.people || []).find(p => p.id === pId);
+            const person = peopleList.find(p => p.id === pId);
             const pName = person ? person.name : pId;
             const splitType = acc.saveExtraSplitType || 'percentage';
             let portion = 0;
@@ -872,6 +889,22 @@ export function DashboardView() {
           });
         });
 
+        const handleAssignBill = (billId, targetValue) => {
+          if (!targetValue) return;
+          if (targetValue.startsWith('single:')) {
+            const personId = targetValue.replace('single:', '');
+            updateBillSplits(billId, { [personId]: 100 });
+          } else if (targetValue === 'equal') {
+            const count = activePeople.length || 1;
+            const share = Math.floor(100 / count);
+            const splits = {};
+            activePeople.forEach((p, idx) => {
+              splits[p.id] = (idx === count - 1) ? (100 - share * (count - 1)) : share;
+            });
+            updateBillSplits(billId, splits);
+          }
+        };
+
         const groupsList = Object.values(splitGroups);
 
         if (groupsList.length === 0) {
@@ -885,10 +918,64 @@ export function DashboardView() {
         return (
           <div className="grid gap-2.5 grid-cols-1 sm:grid-cols-2">
             {groupsList.map(group => {
+              const isUnassigned = group.label === 'Unassigned' || group.label === 'Unassigned Savings';
               const itemsCountText = [
                 group.billsCount > 0 ? `${group.billsCount} bill${group.billsCount !== 1 ? 's' : ''}` : '',
                 group.savingsCount > 0 ? `${group.savingsCount} savings bucket${group.savingsCount !== 1 ? 's' : ''}` : ''
               ].filter(Boolean).join(' + ');
+
+              if (isUnassigned) {
+                return (
+                  <div key={group.label} className="p-3.5 rounded-xl bg-amber-950/20 border border-amber-800/60 space-y-2.5 text-xs font-mono">
+                    <div className="flex items-center justify-between pb-2 border-b border-amber-800/40">
+                      <div className="flex items-center gap-1.5">
+                        <AlertCircle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                        <span className="font-sans font-bold text-amber-300 text-[12px]">Unassigned / Unknown Bills</span>
+                      </div>
+                      <span className="font-bold text-amber-400 text-[12px]">
+                        {fmtMoney(group.totalMonthlyCost)}
+                        <span className="text-xs text-amber-400/70 font-normal font-sans ml-1">/ mo ({itemsCountText})</span>
+                      </span>
+                    </div>
+
+                    <div className="space-y-2 text-[11px]">
+                      <p className="text-[10px] text-amber-300/80 font-sans">
+                        Newly discovered or unassigned bills. Assign each bill to an earner split group below:
+                      </p>
+                      {group.unassignedBills.map(bill => (
+                        <div key={bill.id} className="p-2 rounded-lg bg-slate-900/80 border border-amber-800/40 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="font-sans font-semibold text-slate-200 truncate">{bill.name}</p>
+                            <p className="text-[10px] text-slate-400 font-sans">{bill.accountName} • <span className="text-emerald-400 font-mono font-bold">{fmtMoney(bill.monthlyCost)}/mo</span></p>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <select
+                              defaultValue=""
+                              onChange={e => {
+                                handleAssignBill(bill.id, e.target.value);
+                                e.target.value = '';
+                              }}
+                              className="px-2 py-1 bg-slate-950 border border-amber-700/60 hover:border-amber-500 rounded-lg text-amber-200 text-[10px] font-sans font-semibold focus:outline-none cursor-pointer"
+                            >
+                              <option value="" disabled>Assign to Group...</option>
+                              {activePeople.map(p => (
+                                <option key={p.id} value={`single:${p.id}`} className="bg-slate-900 text-slate-100">
+                                  100% {p.name}
+                                </option>
+                              ))}
+                              {activePeople.length >= 2 && (
+                                <option value="equal" className="bg-slate-900 text-slate-100">
+                                  Equal Split ({activePeople.map(p => p.name.split(' ')[0]).join(' & ')})
+                                </option>
+                              )}
+                            </select>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              }
 
               return (
                 <div key={group.label} className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2.5 text-xs font-mono">
@@ -902,8 +989,9 @@ export function DashboardView() {
 
                   <div className="space-y-1.5 text-[11px]">
                     {Object.entries(group.participantPortions).map(([pName, portionAmt]) => {
-                      const person = (budget?.people || []).find(p => p.name === pName || p.id === pName);
-                      const isNonMonthly = person && (person.payFrequency === 'semi-monthly' || person.payFrequency === 'bi-weekly' || person.payFrequency === 'weekly');
+                      const person = peopleList.find(p => p.name === pName || p.id === pName);
+                      const isCredit = person && (person.name.toLowerCase().includes('credit') || person.role === 'Credit' || person.role === 'Reimbursement');
+                      const isNonMonthly = person && !isCredit && (person.payFrequency === 'semi-monthly' || person.payFrequency === 'bi-weekly' || person.payFrequency === 'weekly');
                       
                       let perPaycheckAmt = portionAmt;
                       if (person?.payFrequency === 'semi-monthly' || person?.payFrequency === 'bi-weekly') {

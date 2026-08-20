@@ -77,7 +77,7 @@ const MatrixCell = React.memo(function MatrixCell({
   }, [onCommit, monthKey, day, field]);
 
   const cellId = `${monthKey}-${day}-${field}`;
-  const extraData = field === 'other_amount' ? { otherDesc } : {};
+  const extraData = field === 'other_amount' ? { otherDesc } : (field === 'other_credit_amount' ? { otherCreditDesc: otherDesc } : {});
   const payload = useMemo(() => ({
     accountId: selectedAccountId,
     sourceMonthKey: monthKey,
@@ -493,6 +493,9 @@ function DailySpreadsheetMatrix() {
           const customOther = getDailyMatrixCell(selectedAccountId, mKey, d, 'other_amount');
           if (customOther !== undefined) runningRegBeg -= parseFloat(customOther) || 0;
 
+          const customOtherCredit = getDailyMatrixCell(selectedAccountId, mKey, d, 'other_credit_amount');
+          if (customOtherCredit !== undefined) runningRegBeg += parseFloat(customOtherCredit) || 0;
+
           cur.setDate(cur.getDate() + 1);
         }
       }
@@ -566,7 +569,7 @@ function DailySpreadsheetMatrix() {
           totalDayBills += amt;
         });
 
-        // 3. Other Expense
+        // 3. Other Expense (unmatched debits)
         let otherAmt = 0;
         let rawOtherDesc = '';
 
@@ -594,6 +597,33 @@ function DailySpreadsheetMatrix() {
         const customOtherDesc = rawOtherDesc.replace(/^Other\s*\$?\s*\(?(.*?)\)?$/i, '$1').trim();
         totalDayBills += otherAmt;
 
+        // 3b. Other Credit (unmatched credits - BUG-3 full fix)
+        let otherCreditAmt = 0;
+        let rawOtherCreditDesc = '';
+
+        if (selectedAccountId === 'all') {
+          budget.accounts.forEach(a => {
+            const accOtherCredit = getDailyMatrixCell(a.id, monthKey, day, 'other_credit_amount');
+            if (accOtherCredit !== undefined) otherCreditAmt += parseFloat(accOtherCredit) || 0;
+            const accCreditDesc = getDailyMatrixCell(a.id, monthKey, day, 'other_credit_desc');
+            if (accCreditDesc) {
+              rawOtherCreditDesc = rawOtherCreditDesc ? `${rawOtherCreditDesc} | ${accCreditDesc}` : accCreditDesc;
+            }
+          });
+          const allOtherCredit = getDailyMatrixCell('all', monthKey, day, 'other_credit_amount');
+          if (allOtherCredit !== undefined) otherCreditAmt += parseFloat(allOtherCredit) || 0;
+          const allCreditDesc = getDailyMatrixCell('all', monthKey, day, 'other_credit_desc');
+          if (allCreditDesc) {
+            rawOtherCreditDesc = rawOtherCreditDesc ? `${rawOtherCreditDesc} | ${allCreditDesc}` : allCreditDesc;
+          }
+        } else {
+          const customOtherCredit = getDailyMatrixCell(selectedAccountId, monthKey, day, 'other_credit_amount');
+          otherCreditAmt = customOtherCredit !== undefined ? (parseFloat(customOtherCredit) || 0) : 0;
+          rawOtherCreditDesc = getDailyMatrixCell(selectedAccountId, monthKey, day, 'other_credit_desc') || '';
+        }
+
+        const customOtherCreditDesc = rawOtherCreditDesc.replace(/^Other\s*\$?\s*\(?(.*?)\)?$/i, '$1').trim();
+
         // 4. Determine Beginning and Ending Balances
         let dayExtraAdd = 0;
         accountPeople.forEach(p => {
@@ -603,7 +633,7 @@ function DailySpreadsheetMatrix() {
           }
         });
 
-        const regEnding = Math.round((runningRegBeg + totalRegCredits - totalDayBills) * 100) / 100;
+        const regEnding = Math.round((runningRegBeg + totalRegCredits + otherCreditAmt - totalDayBills) * 100) / 100;
         const extraEnding = Math.round((runningExtraBeg + dayExtraAdd) * 100) / 100;
         const totalEnd = Math.round((regEnding + (showExtraColumns ? extraEnding : 0)) * 100) / 100;
         const isHistoricalLock = isLockedDay;
@@ -629,6 +659,8 @@ function DailySpreadsheetMatrix() {
           billValues,
           otherAmt,
           otherDesc: customOtherDesc,
+          otherCreditAmt,
+          otherCreditDesc: customOtherCreditDesc,
           regEnding,
           extraEnding,
           totalEnd,
@@ -765,6 +797,7 @@ function DailySpreadsheetMatrix() {
       regCredits: {},
       bills: {},
       other: 0,
+      otherCredit: 0,
       totalRegCredits: 0,
       totalBills: 0
     };
@@ -789,7 +822,8 @@ function DailySpreadsheetMatrix() {
       });
 
       totals.other += r.otherAmt || 0;
-      totals.totalRegCredits += r.totalRegCredits;
+      totals.otherCredit += r.otherCreditAmt || 0;
+      totals.totalRegCredits += r.totalRegCredits + (r.otherCreditAmt || 0);
     });
 
     totals.totalBills = Object.values(totals.bills).reduce((s, v) => s + v, 0) + totals.other;
@@ -1009,6 +1043,7 @@ function DailySpreadsheetMatrix() {
               <th colSpan={showExtraColumns ? 2 : 1} className="px-2 h-6 text-center border-r-2 border-blue-600 bg-blue-950 text-blue-200 font-black sticky top-0 z-20 align-middle">Beg Balances</th>
               <th colSpan={accountPeople.length} className="px-2 h-6 text-center border-r border-slate-800 bg-emerald-950 text-emerald-300 font-black sticky top-0 z-20 align-middle">Credits (Deposits)</th>
               <th colSpan={accountBills.length + 2} className="px-2 h-6 text-center border-r border-slate-800 bg-rose-950 text-rose-300 font-black sticky top-0 z-20 align-middle">Bills &amp; Deductions</th>
+              <th colSpan={2} className="px-2 h-6 text-center border-r border-slate-800 bg-emerald-950/60 text-emerald-300 font-black sticky top-0 z-20 align-middle">Other Credits</th>
               <th colSpan={showExtraColumns ? 2 : 1} className="px-2 h-6 text-center border-r border-slate-800 bg-purple-950 text-purple-300 font-black sticky top-0 z-20 align-middle">Ending Balances</th>
               
               {/* Total End Banner Container */}
@@ -1098,6 +1133,14 @@ function DailySpreadsheetMatrix() {
               </th>
               <th className="px-2 h-10 text-left min-w-[120px] text-rose-300/80 bg-slate-900 border-r border-slate-800 align-middle sticky top-[24px] z-20 border-b border-slate-700 font-semibold">
                 <span className="block text-[11px] leading-tight">Other<br/>Description</span>
+              </th>
+
+              {/* Other Credit Columns (BUG-3 full fix) */}
+              <th className="px-1.5 h-10 text-right min-w-[65px] text-emerald-400 bg-slate-900 align-middle sticky top-[24px] z-20 border-b border-slate-700 border-r border-slate-800 font-bold">
+                <span className="block text-[11px] leading-tight">Other<br/>Credit</span>
+              </th>
+              <th className="px-2 h-10 text-left min-w-[120px] text-emerald-400/80 bg-slate-900 border-r border-slate-800 align-middle sticky top-[24px] z-20 border-b border-slate-700 font-semibold">
+                <span className="block text-[11px] leading-tight">Credit<br/>Desc</span>
               </th>
 
               {/* Ending Balances */}
@@ -1321,6 +1364,45 @@ function DailySpreadsheetMatrix() {
                         />
                       </td>
 
+                      {/* Other Credit Column (BUG-3 full fix) */}
+                      <DroppableCellTd
+                        row={row}
+                        field="other_credit_amount"
+                        className={`p-1 text-right min-w-[55px] transition-colors relative ${
+                          isSelected && !row.isToday ? 'bg-blue-950/30' : ''
+                        }`}
+                        activeCellData={activeCellData}
+                        isBillField={false}
+                      >
+                        <MatrixCell
+                          value={row.otherCreditAmt}
+                          isCredit
+                          monthKey={row.monthKey}
+                          day={row.day}
+                          field="other_credit_amount"
+                          onCommit={handleCellCommit}
+                          draggable={Boolean(row.otherCreditAmt && row.otherCreditAmt > 0)}
+                          dragLabel={row.otherCreditDesc ? `Credit (${row.otherCreditDesc})` : 'Other Credit'}
+                          otherDesc={row.otherCreditDesc}
+                          selectedAccountId={selectedAccountId}
+                        />
+                      </DroppableCellTd>
+
+                      {/* Other Credit Description */}
+                      <td className={`p-1 border-r border-slate-800/80 min-w-[120px] ${
+                        isSelected && !row.isToday ? 'bg-blue-950/30' : ''
+                      }`} title={row.otherCreditDesc || 'Click to edit credit description'}>
+                        <IsolatedTextInput
+                          value={row.otherCreditDesc}
+                          monthKey={row.monthKey}
+                          day={row.day}
+                          field="other_credit_desc"
+                          onCommit={handleCellCommit}
+                          placeholder="—"
+                          className="bg-transparent text-[10px] text-emerald-400/90 hover:bg-slate-800/70 focus:bg-slate-800 focus:text-white px-1.5 py-0.5 rounded outline-none w-full truncate cursor-text transition-colors border border-transparent hover:border-slate-700/60"
+                        />
+                      </td>
+
                       {/* Regular Ending Balance */}
                       <td className={`p-1 text-right font-bold ${
                         isSelected && !row.isToday ? 'text-blue-100 bg-blue-950/40' : 'text-slate-200'
@@ -1378,6 +1460,12 @@ function DailySpreadsheetMatrix() {
               ))}
               <td className="p-1 text-right text-rose-300 font-mono bg-slate-900 min-w-[55px]">
                 -{fmtMoney(columnTotals.other)}
+              </td>
+              <td className="p-1 bg-slate-900 border-r border-slate-800">&mdash;</td>
+
+              {/* Other Credit Subtotals */}
+              <td className="p-1 text-right text-emerald-400 font-mono bg-slate-900 min-w-[55px]">
+                {columnTotals.otherCredit > 0 ? `+${fmtMoney(columnTotals.otherCredit)}` : '—'}
               </td>
               <td className="p-1 bg-slate-900 border-r border-slate-800">&mdash;</td>
 

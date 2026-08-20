@@ -565,6 +565,7 @@ export function BudgetMetadataProvider({ children }) {
   }, []);
 
   const stateValue = useMemo(() => ({
+    budget: metadataState,
     metadataState,
     accounts: metadataState.accounts,
     people: metadataState.people,

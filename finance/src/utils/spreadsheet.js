@@ -358,23 +358,28 @@ export function processSpreadsheetImport({
             }
           }
         } else {
-          // Unmatched credit: do NOT write to the debit other_amount key.
-          // BUG-3 fix: credits and debits must not accumulate on the same matrix cell.
-          // The credit will surface only via the imported transactions list.
-          // Capture description only so it can be viewed in debug/notes.
-          const otherDescKey = `${accountId}_${monthKey}_${actualDay}_other_desc`;
+          // Unmatched credit: accumulate into the dedicated other_credit_amount key.
+          // BUG-3 full fix: credits and debits are now separated into distinct matrix keys.
+          // other_amount (debit) and other_credit_amount (credit) never share a cell.
+          const otherCreditKey = `${accountId}_${monthKey}_${actualDay}_other_credit_amount`;
+          const otherCreditDescKey = `${accountId}_${monthKey}_${actualDay}_other_credit_desc`;
+          const existingCredit = matrixUpdates[otherCreditKey] ?? nextDailyMatrix[otherCreditKey] ?? 0;
+          matrixUpdates[otherCreditKey] = Math.round((parseFloat(existingCredit) + actualAmount) * 100) / 100;
+
           const cleanDesc = (txn.description || '').replace(/^Other\s*\$?\s*\(?(.*?)\)?$/i, '$1').trim() || txn.description;
-          const existingOtherDesc = (matrixUpdates[otherDescKey] ?? nextDailyMatrix[otherDescKey] ?? '').replace(/^Other\s*\$?\s*\(?(.*?)\)?$/i, '$1').trim();
-          if (existingOtherDesc && cleanDesc && !existingOtherDesc.includes(cleanDesc)) {
-            matrixUpdates[otherDescKey] = `${existingOtherDesc} | ${cleanDesc} (credit)`;
-          } else if (!existingOtherDesc) {
-            matrixUpdates[otherDescKey] = cleanDesc ? `${cleanDesc} (credit)` : '';
+          const existingCreditDesc = (matrixUpdates[otherCreditDescKey] ?? nextDailyMatrix[otherCreditDescKey] ?? '').replace(/^Other\s*\$?\s*\(?(.*?)\)?$/i, '$1').trim();
+          if (existingCreditDesc && cleanDesc && !existingCreditDesc.includes(cleanDesc)) {
+            matrixUpdates[otherCreditDescKey] = `${existingCreditDesc} | ${cleanDesc}`;
+          } else if (!existingCreditDesc) {
+            matrixUpdates[otherCreditDescKey] = cleanDesc || '';
           }
 
-          logDebug('MATCH', `Credit transaction #${txnIdx + 1} unmatched to known earner; kept in transactions only (not written to other_amount)`, {
+          logDebug('MATCH', `Credit transaction #${txnIdx + 1} unmatched to known earner; routed to other_credit_amount`, {
             date: normDate,
             desc: txn.description,
-            amount: actualAmount
+            amount: actualAmount,
+            otherCreditKey,
+            otherCreditDescKey
           });
         }
       } else {

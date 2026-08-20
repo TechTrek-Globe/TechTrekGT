@@ -23,6 +23,8 @@ interface BudgetData {
   people: Person[];
   bills: Bill[];
   lineItems: LineItem[];
+  transactions: Transaction[];
+  dailyMatrix: Record<string, number | string>; // Composite keys: {accountId}_{monthKey}_{day}_{field}
   loan: Loan;
 }
 

@@ -369,49 +369,6 @@ export function LedgerDataProvider({ children }) {
     return { success: true };
   }, [setMetadataState]);
 
-  // Import Parsed Spreadsheet Data (legacy path)
-  const importParsedSpreadsheet = useCallback((parsedData, mode = 'replace') => {
-    if (!parsedData || !parsedData.accounts) return { success: false, error: 'Invalid parsed data.' };
-
-    if (mode === 'replace') {
-      setMetadataState({
-        accounts: parsedData.accounts || [],
-        people: parsedData.people || [],
-        bills: parsedData.bills || [],
-        loans: parsedData.loans || [],
-        dashboardWidgets: initialBudgetData.dashboardWidgets,
-        theme: 'dark',
-        hideDashboardHeader: false
-      });
-      setDailyMatrix({});
-      setLineItems([]);
-      setTransactions([]);
-    } else {
-      setMetadataState(prev => {
-        const existingAccNames = new Set(prev.accounts.map(a => a.name.toLowerCase()));
-        const newAccs = (parsedData.accounts || []).filter(a => !existingAccNames.has(a.name.toLowerCase()));
-
-        const existingBillNames = new Set(prev.bills.map(b => b.name.toLowerCase()));
-        const newBills = (parsedData.bills || []).filter(b => !existingBillNames.has(b.name.toLowerCase()));
-
-        const existingPeopleNames = new Set(prev.people.map(p => p.name.toLowerCase()));
-        const newPeople = (parsedData.people || []).filter(p => !existingPeopleNames.has(p.name.toLowerCase()));
-
-        const existingLoanNames = new Set((prev.loans || []).map(l => l.name.toLowerCase()));
-        const newLoans = (parsedData.loans || []).filter(l => !existingLoanNames.has(l.name.toLowerCase()));
-
-        return {
-          ...prev,
-          accounts: [...prev.accounts, ...newAccs],
-          people: [...prev.people, ...newPeople],
-          bills: [...prev.bills, ...newBills],
-          loans: [...(prev.loans || []), ...newLoans]
-        };
-      });
-    }
-
-    return { success: true };
-  }, [setMetadataState]);
 
   // --- Line Item Operations ---
   const getLineItem = useCallback((billId, monthKey) => {
@@ -551,6 +508,14 @@ export function LedgerDataProvider({ children }) {
       dailyMatrixRef.current[sourceDescKey] = '';
       dailyMatrixRef.current[targetDescKey] = sourceDesc;
       hasChanges = true;
+    } else if (field === 'other_credit_amount') {
+      // BUG-3 full fix: move paired other_credit_desc alongside other_credit_amount
+      const sourceDescKey = `${accountId}_${sourceMonthKey}_${sourceDay}_other_credit_desc`;
+      const targetDescKey = `${accountId}_${targetMonthKey}_${targetDay}_other_credit_desc`;
+      const sourceDesc = extraData.otherCreditDesc ?? (dailyMatrixRef.current[sourceDescKey] || '');
+      dailyMatrixRef.current[sourceDescKey] = '';
+      dailyMatrixRef.current[targetDescKey] = sourceDesc;
+      hasChanges = true;
     }
 
     if (hasChanges) {
@@ -587,7 +552,6 @@ export function LedgerDataProvider({ children }) {
     clearAllData,
     clearAccountTransactions,
     importSpreadsheetSelective,
-    importParsedSpreadsheet,
     exportBackupJson,
     restoreFromBackup,
     pushCloudBackup,
@@ -613,7 +577,6 @@ export function LedgerDataProvider({ children }) {
     clearAllData,
     clearAccountTransactions,
     importSpreadsheetSelective,
-    importParsedSpreadsheet,
     exportBackupJson,
     restoreFromBackup,
     pushCloudBackup,

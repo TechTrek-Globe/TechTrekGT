@@ -22,7 +22,7 @@ export function AccountTransferSummary() {
   } = useBudgetMetadata();
 
   // State to toggle which earner columns are visible in this table
-  const [visiblePersonIds, setVisiblePersonIds] = useState(() => new Set(budget.people.map(p => p.id)));
+  const [visiblePersonIds, setVisiblePersonIds] = useState(() => new Set((budget?.people || []).map(p => p.id)));
   // State for earner portion mode override: personId -> 'monthly' | 'paycheck'
   const [personPortionModes, setPersonPortionModes] = useState({});
   // Calculation Basis: 'auto' | 'direct_deposit' | 'bills'
@@ -32,14 +32,14 @@ export function AccountTransferSummary() {
   useEffect(() => {
     setVisiblePersonIds(prev => {
       const next = new Set();
-      budget.people.forEach(p => {
+      (budget?.people || []).forEach(p => {
         if (prev.has(p.id) || prev.size === 0) {
           next.add(p.id);
         }
       });
-      return next.size > 0 ? next : new Set(budget.people.map(p => p.id));
+      return next.size > 0 ? next : new Set((budget?.people || []).map(p => p.id));
     });
-  }, [budget.people]);
+  }, [budget?.people]);
 
   const togglePersonVisibility = (id) => {
     setVisiblePersonIds(prev => {
@@ -60,11 +60,11 @@ export function AccountTransferSummary() {
     }));
   };
 
-  const visiblePeople = budget.people.filter(p => visiblePersonIds.has(p.id));
+  const visiblePeople = (budget?.people || []).filter(p => visiblePersonIds.has(p.id));
 
   // Compute per-account rows data
-  const accountRows = budget.accounts.map(acc => {
-    const accountBills = budget.bills.filter(b => b.accountId === acc.id);
+  const accountRows = (budget?.accounts || []).map(acc => {
+    const accountBills = (budget?.bills || []).filter(b => b.accountId === acc.id);
     const monthlyExpenses = getAccountMonthlyExpenses(acc.id);
 
     // Earner portions for this account
@@ -186,7 +186,7 @@ export function AccountTransferSummary() {
               <Filter className="w-3 h-3 text-emerald-500" />
               Tracked Earners:
             </span>
-            {budget.people.map(p => {
+            {(budget?.people || []).map(p => {
               const isVisible = visiblePersonIds.has(p.id);
               return (
                 <button

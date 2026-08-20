@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useBudget } from '../context/BudgetContext';
 import { InlineEdit } from './InlineEdit';
 import { AccountTransferSummary } from './AccountTransferSummary';
@@ -17,7 +17,8 @@ import {
   Minimize2,
   X,
   Users,
-  AlertCircle
+  AlertCircle,
+  Info
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis } from 'recharts';
 import { fmtMoney, fmtPct } from '../utils/formatters';
@@ -282,6 +283,18 @@ export function DashboardView() {
 
   const [resizingSizes, setResizingSizes] = useState({});
   const [activeWidgetId, setActiveWidgetId] = useState(null);
+  const [pinnedSplitTooltip, setPinnedSplitTooltip] = useState(null);
+
+  useEffect(() => {
+    if (!pinnedSplitTooltip) return;
+    const handleClickOutside = (e) => {
+      if (!e.target.closest('[data-split-tooltip]')) {
+        setPinnedSplitTooltip(null);
+      }
+    };
+    window.addEventListener('click', handleClickOutside);
+    return () => window.removeEventListener('click', handleClickOutside);
+  }, [pinnedSplitTooltip]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -803,6 +816,7 @@ export function DashboardView() {
               billsCount: 0,
               savingsCount: 0,
               participantPortions: {},
+              participantItems: {},
               unassignedBills: []
             };
           }
@@ -823,11 +837,22 @@ export function DashboardView() {
             activeEntries.forEach(([pId, pct]) => {
               const person = peopleList.find(p => p.id === pId);
               const pName = person ? person.name : pId;
-              const portion = (monthlyCost * (parseFloat(pct) || 0)) / 100;
+              const splitPct = parseFloat(pct) || 0;
+              const portion = (monthlyCost * splitPct) / 100;
               if (!splitGroups[groupLabel].participantPortions[pName]) {
                 splitGroups[groupLabel].participantPortions[pName] = 0;
+                splitGroups[groupLabel].participantItems[pName] = [];
               }
               splitGroups[groupLabel].participantPortions[pName] += portion;
+              const acc = (budget?.accounts || []).find(a => a.id === b.accountId);
+              splitGroups[groupLabel].participantItems[pName].push({
+                type: 'bill',
+                name: b.name,
+                fullAmount: monthlyCost,
+                splitPct,
+                portionAmt: portion,
+                accountName: acc?.name || 'Account'
+              });
             });
           }
         });
@@ -838,11 +863,23 @@ export function DashboardView() {
           if (extraAmt <= 0) return;
 
           const splits = acc.saveExtraSplits || {};
-          let activeEntries = Object.entries(splits).filter(([_, val]) => parseFloat(val) > 0);
+          let activeEntries = Object.entries(splits).filter(([pId, val]) => {
+            if (parseFloat(val) <= 0) return false;
+            if (acc.enabledEarners && Array.isArray(acc.enabledEarners) && acc.enabledEarners.length > 0) {
+              return acc.enabledEarners.includes(pId);
+            }
+            return true;
+          });
 
-          if (activeEntries.length === 0 && activePeople.length > 0) {
-            const equalPct = 100 / activePeople.length;
-            activeEntries = activePeople.map(p => [p.id, equalPct]);
+          if (activeEntries.length === 0) {
+            const accEarners = (acc.enabledEarners && Array.isArray(acc.enabledEarners) && acc.enabledEarners.length > 0)
+              ? acc.enabledEarners
+              : (activePeople.length > 0 ? activePeople.map(p => p.id) : peopleList.map(p => p.id));
+
+            if (accEarners.length > 0) {
+              const equalPct = 100 / accEarners.length;
+              activeEntries = accEarners.map(id => [id, equalPct]);
+            }
           }
 
           let groupLabel = 'Unassigned Savings';
@@ -865,6 +902,7 @@ export function DashboardView() {
               billsCount: 0,
               savingsCount: 0,
               participantPortions: {},
+              participantItems: {},
               unassignedBills: []
             };
           }
@@ -877,15 +915,27 @@ export function DashboardView() {
             const pName = person ? person.name : pId;
             const splitType = acc.saveExtraSplitType || 'percentage';
             let portion = 0;
+            let splitPct = 0;
             if (splitType === 'amount') {
               portion = parseFloat(val) || 0;
+              splitPct = extraAmt > 0 ? Math.round((portion / extraAmt) * 100) : 0;
             } else {
-              portion = (extraAmt * (parseFloat(val) || 0)) / 100;
+              splitPct = parseFloat(val) || 0;
+              portion = (extraAmt * splitPct) / 100;
             }
             if (!splitGroups[groupLabel].participantPortions[pName]) {
               splitGroups[groupLabel].participantPortions[pName] = 0;
+              splitGroups[groupLabel].participantItems[pName] = [];
             }
             splitGroups[groupLabel].participantPortions[pName] += portion;
+            splitGroups[groupLabel].participantItems[pName].push({
+              type: 'savings',
+              name: `${acc.name} (Extra Savings)`,
+              fullAmount: extraAmt,
+              splitPct,
+              portionAmt: portion,
+              accountName: acc.name
+            });
           });
         });
 
@@ -977,8 +1027,10 @@ export function DashboardView() {
                 );
               }
 
+              const isGroupPinned = Boolean(pinnedSplitTooltip && pinnedSplitTooltip.startsWith(group.label + '___'));
+
               return (
-                <div key={group.label} className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2.5 text-xs font-mono">
+                <div key={group.label} className={`p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2.5 text-xs font-mono relative transition-all ${isGroupPinned ? 'z-30' : 'hover:z-20'}`}>
                   <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
                     <span className="font-sans font-bold text-purple-300 text-[12px]">{group.label}</span>
                     <span className="font-bold text-emerald-400 text-[12px]">
@@ -987,11 +1039,14 @@ export function DashboardView() {
                     </span>
                   </div>
 
-                  <div className="space-y-1.5 text-[11px]">
+                  <div className="space-y-1 text-[11px]">
                     {Object.entries(group.participantPortions).map(([pName, portionAmt]) => {
                       const person = peopleList.find(p => p.name === pName || p.id === pName);
                       const isCredit = person && (person.name.toLowerCase().includes('credit') || person.role === 'Credit' || person.role === 'Reimbursement');
                       const isNonMonthly = person && !isCredit && (person.payFrequency === 'semi-monthly' || person.payFrequency === 'bi-weekly' || person.payFrequency === 'weekly');
+                      const items = group.participantItems?.[pName] || [];
+                      const tooltipKey = `${group.label}___${pName}`;
+                      const isPinned = pinnedSplitTooltip === tooltipKey;
                       
                       let perPaycheckAmt = portionAmt;
                       if (person?.payFrequency === 'semi-monthly' || person?.payFrequency === 'bi-weekly') {
@@ -1001,8 +1056,28 @@ export function DashboardView() {
                       }
 
                       return (
-                        <div key={pName} className="flex items-center justify-between text-slate-300">
-                          <span className="font-sans text-slate-400 font-medium">{pName}:</span>
+                        <div
+                          key={pName}
+                          data-split-tooltip="true"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPinnedSplitTooltip(prev => prev === tooltipKey ? null : tooltipKey);
+                          }}
+                          className={`group/row relative flex items-center justify-between text-slate-300 py-1 px-1.5 -mx-1.5 rounded-lg transition-all cursor-pointer select-none ${
+                            isPinned
+                              ? 'bg-slate-800 ring-1 ring-purple-500/60 shadow-md text-slate-100 z-30'
+                              : 'hover:bg-slate-800/60 hover:text-slate-100'
+                          }`}
+                        >
+                          <div className="flex items-center gap-1.5 font-sans text-slate-400 font-medium">
+                            <span className={isPinned ? 'text-purple-300 font-semibold' : 'group-hover/row:text-slate-100 transition-colors'}>
+                              {pName}:
+                            </span>
+                            <Info className={`w-3 h-3 transition-colors ${
+                              isPinned ? 'text-purple-400' : 'text-slate-500 group-hover/row:text-blue-400'
+                            }`} />
+                          </div>
+
                           <span className="font-bold text-slate-200">
                             {fmtMoney(portionAmt)}
                             <span className="text-xs text-slate-400 font-normal ml-1">/mo</span>
@@ -1012,6 +1087,78 @@ export function DashboardView() {
                               </span>
                             )}
                           </span>
+
+                          {/* Hover/Pinned Tooltip showing itemized breakdown */}
+                          <div
+                            onClick={(e) => e.stopPropagation()}
+                            className={`absolute right-0 bottom-full mb-2 flex-col w-72 sm:w-84 p-3 bg-slate-950/98 border rounded-xl shadow-2xl backdrop-blur-md z-50 text-[11px] font-sans transition-all cursor-default pointer-events-auto ${
+                              isPinned
+                                ? 'flex border-purple-500/70 ring-1 ring-purple-500/40 shadow-purple-950/40'
+                                : 'hidden group-hover/row:flex border-slate-700 hover:flex'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between pb-1.5 border-b border-slate-800 font-bold text-slate-200">
+                              <span className="flex items-center gap-1.5">
+                                <span className={`w-2 h-2 rounded-full ${isPinned ? 'bg-purple-400 animate-pulse' : 'bg-blue-400'}`}></span>
+                                {pName}'s Allocated Items
+                              </span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-emerald-400 font-mono">{fmtMoney(portionAmt)}/mo</span>
+                                {isPinned && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setPinnedSplitTooltip(null);
+                                    }}
+                                    className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-100 cursor-pointer transition-colors"
+                                    title="Close (unpin)"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="divide-y divide-slate-800/60 max-h-56 overflow-y-auto matrix-scrollbar my-1.5 space-y-1 pr-0.5">
+                              {items.length === 0 ? (
+                                <p className="text-slate-500 italic py-1 text-[10px]">No specific items recorded.</p>
+                              ) : (
+                                items.map((item, i) => (
+                                  <div key={i} className="pt-1.5 first:pt-0 flex items-start justify-between gap-2">
+                                    <div className="min-w-0">
+                                      <p className="font-semibold text-slate-200 truncate">{item.name}</p>
+                                      <p className="text-[9px] text-slate-400">
+                                        <span className={item.type === 'savings' ? 'text-amber-400 font-semibold' : 'text-blue-400 font-semibold'}>
+                                          {item.type === 'savings' ? 'Savings' : 'Bill'}
+                                        </span>
+                                        {' '}• {item.accountName} • {Math.round(item.splitPct * 10) / 10}% of {fmtMoney(item.fullAmount)}
+                                      </p>
+                                    </div>
+                                    <span className="font-mono font-bold text-slate-200 shrink-0">
+                                      {fmtMoney(item.portionAmt)}
+                                    </span>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+
+                            <div className="pt-1.5 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-slate-400">
+                              <span className="flex items-center gap-1.5">
+                                <span>{items.length} item{items.length !== 1 ? 's' : ''} total</span>
+                                {isPinned && (
+                                  <span className="px-1.5 py-0.2 rounded bg-purple-950 text-purple-300 border border-purple-800/60 text-[9px] font-semibold">
+                                    Pinned
+                                  </span>
+                                )}
+                              </span>
+                              {isNonMonthly && (
+                                <span className="text-blue-300 font-mono font-semibold">
+                                  {fmtMoney(perPaycheckAmt)}/pay
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       );
                     })}

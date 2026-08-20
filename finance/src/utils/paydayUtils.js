@@ -174,6 +174,13 @@ export function getAccountSaveExtraPersonPortion(account, person, budget) {
   const totalExtra = parseFloat(account.saveExtraMonthly) || 0;
   if (totalExtra <= 0 || !person) return 0;
 
+  // If the account has an explicit list of enabled split earners, check if this person is included
+  if (account.enabledEarners && Array.isArray(account.enabledEarners) && account.enabledEarners.length > 0) {
+    if (!account.enabledEarners.includes(person.id)) {
+      return 0;
+    }
+  }
+
   const splits = account.saveExtraSplits;
   const splitType = account.saveExtraSplitType || 'percentage';
 
@@ -186,10 +193,13 @@ export function getAccountSaveExtraPersonPortion(account, person, budget) {
     }
   }
 
-  const people = budget?.people || [];
-  if (people.length === 0) return totalExtra;
+  const enabledList = (account.enabledEarners && Array.isArray(account.enabledEarners) && account.enabledEarners.length > 0)
+    ? account.enabledEarners
+    : (budget?.people || []).map(p => p.id);
 
-  return totalExtra / people.length;
+  if (enabledList.length === 0) return totalExtra;
+
+  return totalExtra / enabledList.length;
 }
 
 export const MONTH_NAMES = [

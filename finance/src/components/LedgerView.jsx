@@ -478,23 +478,37 @@ function DailySpreadsheetMatrix() {
           const d = cur.getDate();
           const mKey = `${y}-${String(m + 1).padStart(2, '0')}`;
 
+          let dayCredits = 0;
+          let dayExtraCredits = 0;
           people.forEach(p => {
             const customCredit = getDailyMatrixCell(selectedAccountId, mKey, d, `credit_${p.id}`);
-            if (customCredit !== undefined) runningRegBeg += parseFloat(customCredit) || 0;
+            if (customCredit !== undefined) dayCredits += parseFloat(customCredit) || 0;
             const customExtra = getDailyMatrixCell(selectedAccountId, mKey, d, `extra_credit_${p.id}`);
-            if (customExtra !== undefined) runningExtraBeg += parseFloat(customExtra) || 0;
+            if (customExtra !== undefined) dayExtraCredits += parseFloat(customExtra) || 0;
           });
 
+          let dayBills = 0;
           accountBills.forEach(b => {
             const customBill = getDailyMatrixCell(selectedAccountId, mKey, d, `bill_${b.id}`);
-            if (customBill !== undefined) runningRegBeg -= parseFloat(customBill) || 0;
+            if (customBill !== undefined) dayBills += parseFloat(customBill) || 0;
           });
 
           const customOther = getDailyMatrixCell(selectedAccountId, mKey, d, 'other_amount');
-          if (customOther !== undefined) runningRegBeg -= parseFloat(customOther) || 0;
+          const dayOther = customOther !== undefined ? (parseFloat(customOther) || 0) : 0;
 
           const customOtherCredit = getDailyMatrixCell(selectedAccountId, mKey, d, 'other_credit_amount');
-          if (customOtherCredit !== undefined) runningRegBeg += parseFloat(customOtherCredit) || 0;
+          if (customOtherCredit !== undefined) dayCredits += parseFloat(customOtherCredit) || 0;
+
+          const tentativeRegEnding = runningRegBeg + dayCredits - dayBills;
+          const tentativeExtraEnding = runningExtraBeg + dayExtraCredits + dayOther;
+
+          if (tentativeRegEnding < 0) {
+            runningRegBeg = 0;
+            runningExtraBeg = tentativeExtraEnding + tentativeRegEnding;
+          } else {
+            runningRegBeg = tentativeRegEnding;
+            runningExtraBeg = tentativeExtraEnding;
+          }
 
           cur.setDate(cur.getDate() + 1);
         }
@@ -595,7 +609,6 @@ function DailySpreadsheetMatrix() {
         }
 
         const customOtherDesc = rawOtherDesc.replace(/^Other\s*\$?\s*\(?(.*?)\)?$/i, '$1').trim();
-        totalDayBills += otherAmt;
 
         // 3b. Other Credit (unmatched credits - BUG-3 full fix)
         let otherCreditAmt = 0;
@@ -633,8 +646,20 @@ function DailySpreadsheetMatrix() {
           }
         });
 
-        const regEnding = Math.round((runningRegBeg + totalRegCredits + otherCreditAmt - totalDayBills) * 100) / 100;
-        const extraEnding = Math.round((runningExtraBeg + dayExtraAdd) * 100) / 100;
+        const tentativeRegEnding = runningRegBeg + totalRegCredits + otherCreditAmt - totalDayBills;
+        const tentativeExtraEnding = runningExtraBeg + dayExtraAdd + otherAmt;
+
+        let regEnding;
+        let extraEnding;
+
+        if (tentativeRegEnding < 0) {
+          regEnding = 0;
+          extraEnding = Math.round((tentativeExtraEnding + tentativeRegEnding) * 100) / 100;
+        } else {
+          regEnding = Math.round(tentativeRegEnding * 100) / 100;
+          extraEnding = Math.round(tentativeExtraEnding * 100) / 100;
+        }
+
         const totalEnd = Math.round((regEnding + (showExtraColumns ? extraEnding : 0)) * 100) / 100;
         const isHistoricalLock = isLockedDay;
         const totalBeg = Math.round((runningRegBeg + (showExtraColumns ? runningExtraBeg : 0)) * 100) / 100;
@@ -826,7 +851,7 @@ function DailySpreadsheetMatrix() {
       totals.totalRegCredits += r.totalRegCredits + (r.otherCreditAmt || 0);
     });
 
-    totals.totalBills = Object.values(totals.bills).reduce((s, v) => s + v, 0) + totals.other;
+    totals.totalBills = Object.values(totals.bills).reduce((s, v) => s + v, 0);
 
     return totals;
   }, [matrixData, selectedMonth, selectedYear, accountPeople, accountBills]);

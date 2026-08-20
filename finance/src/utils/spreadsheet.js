@@ -97,9 +97,15 @@ export function processSpreadsheetImport({
             if (strategies.transactions === 'override') {
               const dates = Object.keys(importedRows).sort();
               if (dates.length > 0) {
-                const earliestRow = importedRows[dates[0]];
-                newStartingBalance = earliestRow.regBeg ?? earliestRow.totalBeg ?? newStartingBalance;
-                newExtraStarting = earliestRow.extraBeg ?? (newExtraStarting ?? 0);
+                const rawReg = earliestRow.regBeg ?? earliestRow.totalBeg ?? newStartingBalance;
+                const rawExtra = earliestRow.extraBeg ?? (newExtraStarting ?? 0);
+                if (rawReg < 0) {
+                  newStartingBalance = 0;
+                  newExtraStarting = Math.round((rawExtra + rawReg) * 100) / 100;
+                } else {
+                  newStartingBalance = rawReg;
+                  newExtraStarting = rawExtra;
+                }
                 newStartDate = dates[0];
                 newBalanceAsOfDate = dates[0];
               }
@@ -150,9 +156,15 @@ export function processSpreadsheetImport({
             if (strategies.transactions === 'override') {
               const dates = Object.keys(incomingAcc.importedLedgerRows).sort();
               if (dates.length > 0) {
-                const earliestRow = incomingAcc.importedLedgerRows[dates[0]];
-                patches.startingBalance = earliestRow.regBeg ?? earliestRow.totalBeg ?? match.startingBalance;
-                patches.extraStartingBalance = earliestRow.extraBeg ?? (match.extraStartingBalance || 0);
+                const rawReg = earliestRow.regBeg ?? earliestRow.totalBeg ?? match.startingBalance;
+                const rawExtra = earliestRow.extraBeg ?? (match.extraStartingBalance || 0);
+                if (rawReg < 0) {
+                  patches.startingBalance = 0;
+                  patches.extraStartingBalance = Math.round((rawExtra + rawReg) * 100) / 100;
+                } else {
+                  patches.startingBalance = rawReg;
+                  patches.extraStartingBalance = rawExtra;
+                }
                 patches.startDate = dates[0];
                 patches.balanceAsOfDate = dates[0];
               }
@@ -196,8 +208,15 @@ export function processSpreadsheetImport({
             const dates = Object.keys(data.importedLedgerRows).sort();
             if (dates.length > 0) {
               const earliestRow = data.importedLedgerRows[dates[0]];
-              patches.startingBalance = earliestRow.regBeg ?? earliestRow.totalBeg ?? acc.startingBalance;
-              patches.extraStartingBalance = earliestRow.extraBeg ?? (acc.extraStartingBalance || 0);
+              const rawReg = earliestRow.regBeg ?? earliestRow.totalBeg ?? acc.startingBalance;
+              const rawExtra = earliestRow.extraBeg ?? (acc.extraStartingBalance || 0);
+              if (rawReg < 0) {
+                patches.startingBalance = 0;
+                patches.extraStartingBalance = Math.round((rawExtra + rawReg) * 100) / 100;
+              } else {
+                patches.startingBalance = rawReg;
+                patches.extraStartingBalance = rawExtra;
+              }
               patches.startDate = dates[0];
               patches.balanceAsOfDate = dates[0];
             }
@@ -413,11 +432,19 @@ export function processSpreadsheetImport({
             const pSource = (b.paymentSource || '').toLowerCase();
             if (bName && (descLower.includes(bName) || bName.includes(descLower))) return true;
             if (pSource && (descLower.includes(pSource) || pSource.includes(descLower))) return true;
+            if (descLower.includes('insurance') && bName.includes('insurance')) return true;
+            if (descLower.includes('cell') && (bName.includes('cell') || bName.includes('phone'))) return true;
+            if (descLower.includes('phone') && (bName.includes('cell') || bName.includes('phone'))) return true;
+            if (descLower.includes('gym') && (bName.includes('gym') || bName.includes('membership'))) return true;
             if (descLower.includes('wells fargo') && (bName.includes('cell') || pSource.includes('wells'))) return true;
             if (descLower.includes('bank of america') && (bName.includes('gym') || pSource.includes('america'))) return true;
             if (descLower.includes('georgia power') && (bName.includes('power') || bName.includes('electric'))) return true;
+            if ((descLower.includes('power') || descLower.includes('electric')) && (bName.includes('power') || bName.includes('electric'))) return true;
             if (descLower.includes('water') && bName.includes('water')) return true;
-            if (descLower.includes('comcast') && bName.includes('comcast')) return true;
+            if (descLower.includes('gas') && bName.includes('gas')) return true;
+            if (descLower.includes('hoa') && bName.includes('hoa')) return true;
+            if (descLower.includes('mortgage') && bName.includes('mortgage')) return true;
+            if (descLower.includes('comcast') && (bName.includes('comcast') || bName.includes('internet') || bName.includes('xfinity'))) return true;
             if (descLower.includes('youtube') && bName.includes('youtube')) return true;
             if (Math.abs(parseFloat(b.amount || 0) - actualAmount) < 0.01 && (!b.accountId || b.accountId === accountId)) return true;
             return false;

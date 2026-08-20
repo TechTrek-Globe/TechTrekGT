@@ -296,12 +296,26 @@ export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
             const rTotalEnd = totalEndIdx >= 0 ? cleanNum(r[totalEndIdx]) : (rRegEnd !== null ? (rRegEnd + rExtraEnd) : null);
 
             if (rRegEnd !== null || rTotalEnd !== null) {
+              let parsedRegEnd = rRegEnd !== null ? rRegEnd : (rTotalEnd - rExtraEnd);
+              let parsedExtraEnd = rExtraEnd;
+              if (parsedRegEnd < 0) {
+                parsedExtraEnd = Math.round((parsedExtraEnd + parsedRegEnd) * 100) / 100;
+                parsedRegEnd = 0;
+              }
+
+              let parsedRegBeg = rRegBeg;
+              let parsedExtraBeg = rExtraBeg;
+              if (parsedRegBeg < 0) {
+                parsedExtraBeg = Math.round((parsedExtraBeg + parsedRegBeg) * 100) / 100;
+                parsedRegBeg = 0;
+              }
+
               importedLedgerRows[dateStr] = {
-                regEnding: rRegEnd !== null ? rRegEnd : (rTotalEnd - rExtraEnd),
-                extraEnding: rExtraEnd,
-                totalEnding: rTotalEnd !== null ? rTotalEnd : ((rRegEnd || 0) + rExtraEnd),
-                regBeg: rRegBeg,
-                extraBeg: rExtraBeg,
+                regEnding: parsedRegEnd,
+                extraEnding: parsedExtraEnd,
+                totalEnding: rTotalEnd !== null ? rTotalEnd : Math.round((parsedRegEnd + parsedExtraEnd) * 100) / 100,
+                regBeg: parsedRegBeg,
+                extraBeg: parsedExtraBeg,
                 totalBeg: rTotalBeg
               };
             }
@@ -621,12 +635,26 @@ export function parseSingleSheet({
     const rTotalEnd = totalEndIdx >= 0 ? cleanNum(r[totalEndIdx]) : (rRegEnd !== null ? (rRegEnd + rExtraEnd) : null);
 
     if (rRegEnd !== null || rTotalEnd !== null) {
+      let parsedRegEnd = rRegEnd !== null ? rRegEnd : (rTotalEnd - rExtraEnd);
+      let parsedExtraEnd = rExtraEnd;
+      if (parsedRegEnd < 0) {
+        parsedExtraEnd = Math.round((parsedExtraEnd + parsedRegEnd) * 100) / 100;
+        parsedRegEnd = 0;
+      }
+
+      let parsedRegBeg = rRegBeg;
+      let parsedExtraBeg = rExtraBeg;
+      if (parsedRegBeg < 0) {
+        parsedExtraBeg = Math.round((parsedExtraBeg + parsedRegBeg) * 100) / 100;
+        parsedRegBeg = 0;
+      }
+
       importedLedgerRows[dateStr] = {
-        regEnding: rRegEnd !== null ? rRegEnd : (rTotalEnd - rExtraEnd),
-        extraEnding: rExtraEnd,
-        totalEnding: rTotalEnd !== null ? rTotalEnd : ((rRegEnd || 0) + rExtraEnd),
-        regBeg: rRegBeg,
-        extraBeg: rExtraBeg,
+        regEnding: parsedRegEnd,
+        extraEnding: parsedExtraEnd,
+        totalEnding: rTotalEnd !== null ? rTotalEnd : Math.round((parsedRegEnd + parsedExtraEnd) * 100) / 100,
+        regBeg: parsedRegBeg,
+        extraBeg: parsedExtraBeg,
         totalBeg: rTotalBeg
       };
     }
@@ -695,7 +723,19 @@ export function parseSingleSheet({
             return (
               (bKey && (lowerH.includes(bKey) || bKey.includes(lowerH))) ||
               bName.includes(lowerH) ||
-              lowerH.includes(bName)
+              lowerH.includes(bName) ||
+              (lowerH.includes('insurance') && bName.includes('insurance')) ||
+              (lowerH.includes('cell') && (bName.includes('cell') || bName.includes('phone'))) ||
+              (lowerH.includes('phone') && (bName.includes('cell') || bName.includes('phone'))) ||
+              (lowerH.includes('gym') && (bName.includes('gym') || bName.includes('membership'))) ||
+              (lowerH.includes('water') && bName.includes('water')) ||
+              (lowerH.includes('power') && (bName.includes('power') || bName.includes('electric'))) ||
+              (lowerH.includes('electric') && (bName.includes('power') || bName.includes('electric'))) ||
+              (lowerH.includes('gas') && bName.includes('gas')) ||
+              (lowerH.includes('hoa') && bName.includes('hoa')) ||
+              (lowerH.includes('mortgage') && bName.includes('mortgage')) ||
+              (lowerH.includes('comcast') && (bName.includes('comcast') || bName.includes('internet') || bName.includes('xfinity'))) ||
+              (lowerH.includes('youtube') && bName.includes('youtube'))
             );
           });
           if (matchedBill) {

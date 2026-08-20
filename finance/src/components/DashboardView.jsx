@@ -123,7 +123,7 @@ function SortableDashboardWidget({
           : isDragging
             ? 'border-blue-500 ring-2 ring-blue-500/80 shadow-2xl scale-[1.01] bg-slate-800/95 text-slate-100'
             : 'bg-slate-900/90 border-slate-800/90 shadow-xl hover:border-slate-700 text-slate-100'
-      } overflow-hidden transition-all duration-200 group/card`}
+      } ${widget.id === 'split_pairings' ? 'overflow-visible z-20' : 'overflow-hidden'} transition-all duration-200 group/card`}
     >
       {/* Header Drag, Reorder & Size Bar */}
       <div className={`flex items-center justify-between px-4 py-2 border-b text-xs ${
@@ -872,13 +872,17 @@ export function DashboardView() {
           });
 
           if (activeEntries.length === 0) {
-            const accEarners = (acc.enabledEarners && Array.isArray(acc.enabledEarners) && acc.enabledEarners.length > 0)
+            const rawEarners = (acc.enabledEarners && Array.isArray(acc.enabledEarners) && acc.enabledEarners.length > 0)
               ? acc.enabledEarners
               : (activePeople.length > 0 ? activePeople.map(p => p.id) : peopleList.map(p => p.id));
 
-            if (accEarners.length > 0) {
-              const equalPct = 100 / accEarners.length;
-              activeEntries = accEarners.map(id => [id, equalPct]);
+            const enabledPeople = peopleList.filter(p => rawEarners.includes(p.id));
+            const nonCreditEarners = enabledPeople.filter(p => !p.name.toLowerCase().includes('credit') && p.role !== 'Credit' && p.role !== 'Reimbursement');
+            const targetEarners = nonCreditEarners.length > 0 ? nonCreditEarners : enabledPeople;
+
+            if (targetEarners.length > 0) {
+              const equalPct = 100 / targetEarners.length;
+              activeEntries = targetEarners.map(p => [p.id, equalPct]);
             }
           }
 
@@ -1091,7 +1095,7 @@ export function DashboardView() {
                           {/* Hover/Pinned Tooltip showing itemized breakdown */}
                           <div
                             onClick={(e) => e.stopPropagation()}
-                            className={`absolute right-0 bottom-full mb-2 flex-col w-72 sm:w-84 p-3 bg-slate-950/98 border rounded-xl shadow-2xl backdrop-blur-md z-50 text-[11px] font-sans transition-all cursor-default pointer-events-auto ${
+                            className={`absolute right-0 top-full mt-1.5 flex-col w-72 sm:w-84 p-3 bg-slate-950/98 border rounded-xl shadow-2xl backdrop-blur-md z-50 text-[11px] font-sans transition-all cursor-default pointer-events-auto ${
                               isPinned
                                 ? 'flex border-purple-500/70 ring-1 ring-purple-500/40 shadow-purple-950/40'
                                 : 'hidden group-hover/row:flex border-slate-700 hover:flex'

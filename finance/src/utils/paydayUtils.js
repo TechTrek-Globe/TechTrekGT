@@ -193,13 +193,20 @@ export function getAccountSaveExtraPersonPortion(account, person, budget) {
     }
   }
 
-  const enabledList = (account.enabledEarners && Array.isArray(account.enabledEarners) && account.enabledEarners.length > 0)
+  const rawEnabledList = (account.enabledEarners && Array.isArray(account.enabledEarners) && account.enabledEarners.length > 0)
     ? account.enabledEarners
     : (budget?.people || []).map(p => p.id);
 
-  if (enabledList.length === 0) return totalExtra;
+  const people = budget?.people || [];
+  const enabledPeople = people.filter(p => rawEnabledList.includes(p.id));
+  const nonCreditEarners = enabledPeople.filter(p => !p.name.toLowerCase().includes('credit') && p.role !== 'Credit' && p.role !== 'Reimbursement');
+  const targetEarners = nonCreditEarners.length > 0 ? nonCreditEarners : enabledPeople;
 
-  return totalExtra / enabledList.length;
+  if (!targetEarners.some(p => p.id === person.id)) {
+    return 0;
+  }
+
+  return totalExtra / targetEarners.length;
 }
 
 export const MONTH_NAMES = [

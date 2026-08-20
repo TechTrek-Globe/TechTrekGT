@@ -921,35 +921,80 @@ export function SettingsView({ onNavigateView }) {
                               </div>
                             </td>
                             <td className="px-3 py-1.5">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                {budget.people.map(p => {
-                                  const isChecked = enabledList.includes(p.id);
-                                  return (
-                                    <button
-                                      key={p.id}
-                                      type="button"
-                                      onClick={() => {
-                                        let updated;
-                                        if (isChecked) {
-                                          if (enabledList.length <= 1) return;
-                                          updated = enabledList.filter(id => id !== p.id);
-                                        } else {
-                                          updated = [...enabledList, p.id];
-                                        }
-                                        updateAccount(acc.id, { enabledEarners: updated });
-                                      }}
-                                      className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold border transition-all cursor-pointer ${
-                                        isChecked
-                                          ? 'bg-purple-950/70 border-purple-600/60 text-purple-200'
-                                          : 'bg-slate-900/60 border-slate-800 text-slate-500 opacity-60 hover:opacity-100'
-                                      }`}
-                                    >
-                                      <span className={`w-1.5 h-1.5 rounded-full ${isChecked ? 'bg-purple-400' : 'bg-slate-600'}`} />
-                                      <span>{p.name.split(' ')[0]}</span>
-                                      <span className="text-[9px]">{isChecked ? '✓' : '—'}</span>
-                                    </button>
-                                  );
-                                })}
+                              <div className="flex flex-col gap-1.5">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  {budget.people.map(p => {
+                                    const isChecked = enabledList.includes(p.id);
+                                    return (
+                                      <button
+                                        key={p.id}
+                                        type="button"
+                                        onClick={() => {
+                                          let updated;
+                                          if (isChecked) {
+                                            if (enabledList.length <= 1) return;
+                                            updated = enabledList.filter(id => id !== p.id);
+                                          } else {
+                                            updated = [...enabledList, p.id];
+                                          }
+                                          updateAccount(acc.id, { enabledEarners: updated });
+                                        }}
+                                        className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold border transition-all cursor-pointer ${
+                                          isChecked
+                                            ? 'bg-purple-950/70 border-purple-600/60 text-purple-200'
+                                            : 'bg-slate-900/60 border-slate-800 text-slate-500 opacity-60 hover:opacity-100'
+                                        }`}
+                                      >
+                                        <span className={`w-1.5 h-1.5 rounded-full ${isChecked ? 'bg-purple-400' : 'bg-slate-600'}`} />
+                                        <span>{p.name.split(' ')[0]}</span>
+                                        <span className="text-[9px]">{isChecked ? '✓' : '—'}</span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                                {acc.enableExtraSavings !== false && parseFloat(acc.saveExtraMonthly) > 0 && (
+                                  <div className="pt-1 border-t border-slate-800/80 flex items-center gap-1.5 flex-wrap">
+                                    <span className="text-[9px] text-slate-400 font-semibold">Savings Split:</span>
+                                    {budget.people.filter(p => enabledList.includes(p.id)).map(p => {
+                                      const isCredit = p.name.toLowerCase().includes('credit') || p.role === 'Credit';
+                                      const activeNonCredits = budget.people.filter(pe => enabledList.includes(pe.id) && !pe.name.toLowerCase().includes('credit') && pe.role !== 'Credit');
+                                      const defaultSplit = isCredit ? 0 : (
+                                        100 / Math.max(1, activeNonCredits.length)
+                                      );
+                                      const currentVal = acc.saveExtraSplits?.[p.id] !== undefined
+                                        ? parseFloat(acc.saveExtraSplits[p.id])
+                                        : Math.round(defaultSplit * 10) / 10;
+
+                                      return (
+                                        <div key={p.id} className="inline-flex items-center gap-0.5 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800 text-[10px]">
+                                          <span className="text-slate-400 font-medium truncate max-w-[45px]">{p.name.split(' ')[0]}:</span>
+                                          <input
+                                            type="number"
+                                            min="0"
+                                            max="100"
+                                            step="1"
+                                            value={currentVal}
+                                            onChange={e => {
+                                              const num = Math.max(0, Math.min(100, parseFloat(e.target.value) || 0));
+                                              const activeEarners = budget.people.filter(pe => enabledList.includes(pe.id));
+                                              let nextSplits = { ...(acc.saveExtraSplits || {}) };
+                                              if (activeEarners.length === 2) {
+                                                const other = activeEarners.find(pe => pe.id !== p.id);
+                                                nextSplits[p.id] = num;
+                                                if (other) nextSplits[other.id] = Math.max(0, 100 - num);
+                                              } else {
+                                                nextSplits[p.id] = num;
+                                              }
+                                              updateAccount(acc.id, { saveExtraSplits: nextSplits });
+                                            }}
+                                            className="w-8 bg-transparent text-center font-mono font-bold text-slate-200 focus:outline-none focus:bg-slate-800 rounded"
+                                          />
+                                          <span className="text-slate-500">%</span>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
                               </div>
                             </td>
                             <td className="px-3 py-1.5 text-right">

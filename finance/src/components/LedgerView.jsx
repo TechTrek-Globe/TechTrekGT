@@ -35,9 +35,11 @@ import {
   useSensors,
   useDraggable,
   useDroppable,
+  useDndContext,
+  pointerWithin,
+  closestCenter,
   DragOverlay
 } from '@dnd-kit/core';
-import { CSS } from '@dnd-kit/utilities';
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -93,7 +95,6 @@ const MatrixCell = React.memo(function MatrixCell({
     attributes,
     listeners,
     setNodeRef,
-    transform,
     isDragging
   } = useDraggable({
     id: cellId,
@@ -101,14 +102,9 @@ const MatrixCell = React.memo(function MatrixCell({
     disabled: !draggable
   });
 
-  const style = transform ? {
-    transform: CSS.Translate.toString(transform)
-  } : undefined;
-
   return (
     <div
       ref={setNodeRef}
-      style={style}
       {...(draggable ? attributes : {})}
       {...(draggable ? listeners : {})}
       className={`group/matrix relative flex items-center justify-end w-full ${
@@ -150,13 +146,32 @@ const MatrixCell = React.memo(function MatrixCell({
   );
 });
 
+// Custom matrix collision detection:
+// 1. Filters droppable containers to only those matching the dragged item's field
+// 2. Uses exact pointer coordinates (pointerWithin) for pixel-perfect drop targeting under the cursor
+// 3. Falls back to closestCenter among the valid column cells if cursor is on cell boundaries
+const matrixCollisionDetection = (args) => {
+  const activeField = args.active?.data?.current?.field;
+  const filteredContainers = activeField
+    ? args.droppableContainers.filter(c => c.data?.current?.field === activeField)
+    : args.droppableContainers;
+
+  const filteredArgs = activeField ? { ...args, droppableContainers: filteredContainers } : args;
+
+  const pointerCollisions = pointerWithin(filteredArgs);
+  if (pointerCollisions.length > 0) {
+    return pointerCollisions;
+  }
+
+  return closestCenter(filteredArgs);
+};
+
 // Droppable Table Cell TD Wrapper for Matrix
 const DroppableCellTd = React.memo(function DroppableCellTd({
   row,
   field,
   children,
   className,
-  activeCellData,
   isBillField = false
 }) {
   const dropId = `drop-${row.monthKey}-${row.day}-${field}`;
@@ -168,15 +183,13 @@ const DroppableCellTd = React.memo(function DroppableCellTd({
     field
   }), [row.rowKey, row.monthKey, row.day, field]);
 
-  const isDisabled = !activeCellData || activeCellData.field !== field;
-
-  const { isOver, setNodeRef } = useDroppable({
+  const { isOver, setNodeRef, active } = useDroppable({
     id: dropId,
-    data: dropPayload,
-    disabled: isDisabled
+    data: dropPayload
   });
 
-  const activeHighlight = isOver && activeCellData?.field === field
+  const isMatchingField = active?.data?.current?.field === field;
+  const activeHighlight = isOver && isMatchingField
     ? isBillField
       ? 'bg-rose-500/30 ring-2 ring-rose-400 ring-inset shadow-[0_0_10px_rgba(244,63,94,0.3)]'
       : 'bg-emerald-500/30 ring-2 ring-emerald-400 ring-inset shadow-[0_0_10px_rgba(16,185,129,0.3)]'
@@ -191,6 +204,21 @@ const DroppableCellTd = React.memo(function DroppableCellTd({
     </td>
   );
 });
+
+// Floating drag preview reading directly from DndContext to isolate renders from table
+function MatrixDragOverlay() {
+  const { active } = useDndContext();
+  const activeData = active?.data?.current;
+
+  if (!activeData) return null;
+
+  return (
+    <div className="bg-slate-900/95 border border-blue-500 text-blue-100 px-3 py-1.5 rounded-full shadow-2xl backdrop-blur flex items-center gap-2 text-xs font-mono font-bold pointer-events-none scale-105 ring-2 ring-blue-500/80 z-50">
+      <Sparkles className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 animate-spin" />
+      <span>{activeData.label} ({fmtMoney(activeData.value)})</span>
+    </div>
+  );
+}
 
 // Fully isolated text input for descriptions with interactive focus states and instant commit
 const IsolatedTextInput = React.memo(function IsolatedTextInput({ 
@@ -270,13 +298,8 @@ function DailySpreadsheetMatrix() {
   const [billToArchive, setBillToArchive] = useState(null);
   const [selectedRowKey, setSelectedRowKey] = useState(null);
 
-  // Timeline window state (default 3 months back to 6 months forward relative to selected month for 75% faster DOM rendering)
-  const [monthsBack, setMonthsBack] = useState(3);
-  const [monthsForward, setMonthsForward] = useState(6);
 
-  // Drag and drop state for per-day matrix values via @dnd-kit
-  const [activeCellData, setActiveCellData] = useState(null);
-
+  // Drag and drop sensor configuration
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -285,10 +308,6 @@ function DailySpreadsheetMatrix() {
     }),
     useSensor(KeyboardSensor)
   );
-
-  const handleDragStart = useCallback((event) => {
-    setActiveCellData(event.active.data.current);
-  }, []);
 
   const handleDragEnd = useCallback((event) => {
     const { active, over } = event;
@@ -309,12 +328,7 @@ function DailySpreadsheetMatrix() {
         );
       }
     }
-    setActiveCellData(null);
   }, [moveDailyMatrixCell, selectedAccountId]);
-
-  const handleDragCancel = useCallback(() => {
-    setActiveCellData(null);
-  }, []);
 
   const handleCellCommit = useCallback((monthKey, day, field, val) => {
     const targetAccId = selectedAccountId === 'all' ? (budget.accounts[0]?.id || 'all') : selectedAccountId;
@@ -419,20 +433,16 @@ function DailySpreadsheetMatrix() {
   const isProgrammaticScrollRef = useRef(false);
   const firstSelectedMonthRowRef = useRef(null);
 
-  // Optimized continuous timeline window starting from effective start month
+  // Continuous stable timeline from effective start month through end of next calendar year
   const monthList = useMemo(() => {
     const list = [];
-    const baseDate = new Date(selectedYear, selectedMonth, 1);
     const startMonthDate = new Date(startDateObj.getFullYear(), startDateObj.getMonth(), 1);
-    let startBase = new Date(baseDate.getFullYear(), baseDate.getMonth() - monthsBack, 1);
-    if (startBase < startMonthDate) {
-      startBase = startMonthDate;
-    }
-    const endBase = new Date(baseDate.getFullYear(), baseDate.getMonth() + monthsForward + 1, 1);
+    const endYear = Math.max(todayObj.getFullYear() + 1, selectedYear + 1);
+    const endMonthDate = new Date(endYear, 11, 1);
 
-    let cur = new Date(startBase);
+    let cur = new Date(startMonthDate);
     let offset = 0;
-    while (cur <= endBase) {
+    while (cur <= endMonthDate) {
       const mYear = cur.getFullYear();
       const mMonth = cur.getMonth();
       const mKey = `${mYear}-${String(mMonth + 1).padStart(2, '0')}`;
@@ -447,7 +457,7 @@ function DailySpreadsheetMatrix() {
       cur.setMonth(cur.getMonth() + 1);
     }
     return list;
-  }, [selectedYear, selectedMonth, monthsBack, monthsForward, startDateObj]);
+  }, [startDateObj, todayObj, selectedYear]);
 
   const showExtraColumns = selectedAccountId === 'all'
     ? budget.accounts.some(a => a.enableExtraSavings !== false)
@@ -784,37 +794,43 @@ function DailySpreadsheetMatrix() {
   }, [matrixData]);
 
   const containerRef = useRef(null);
-  const scrollRafRef = useRef(null);
 
-  // Sync toolbar Month & Year selector to currently visible row as user scrolls (throttled with rAF)
-  const handleScroll = useCallback(() => {
-    if (isProgrammaticScrollRef.current) return;
-    if (scrollRafRef.current) return;
+  // Sync toolbar Month & Year selector using IntersectionObserver on month headers (zero forced reflows)
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
 
-    scrollRafRef.current = requestAnimationFrame(() => {
-      scrollRafRef.current = null;
-      if (!containerRef.current) return;
+    const headers = container.querySelectorAll('tr[data-month-header]');
+    if (!headers.length) return;
 
-      const containerBounds = containerRef.current.getBoundingClientRect();
-      const sampleY = containerBounds.top + 80;
-      const rowEls = containerRef.current.querySelectorAll('tr[data-month]');
-
-      for (let el of rowEls) {
-        const rect = el.getBoundingClientRect();
-        if (rect.top <= sampleY && rect.bottom >= sampleY) {
-          const m = parseInt(el.getAttribute('data-month'));
-          const y = parseInt(el.getAttribute('data-year'));
-          if (!isNaN(m) && !isNaN(y) && (m !== selectedMonth || y !== selectedYear)) {
-            isProgrammaticScrollRef.current = true;
-            setSelectedMonth(m);
-            setSelectedYear(y);
-            setTimeout(() => { isProgrammaticScrollRef.current = false; }, 100);
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (isProgrammaticScrollRef.current) return;
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            const raw = entry.target.getAttribute('data-month-header');
+            if (raw) {
+              const [yStr, mStr] = raw.split('-');
+              const y = parseInt(yStr, 10);
+              const m = parseInt(mStr, 10);
+              if (!isNaN(y) && !isNaN(m)) {
+                setSelectedMonth(m);
+                setSelectedYear(y);
+              }
+            }
           }
-          break;
         }
+      },
+      {
+        root: container,
+        rootMargin: '0px 0px -75% 0px',
+        threshold: 0
       }
-    });
-  }, [selectedMonth, selectedYear]);
+    );
+
+    headers.forEach(h => observer.observe(h));
+    return () => observer.disconnect();
+  }, [monthGroups]);
 
   // Scroll to selected month when user picks a new month from the dropdown
   const handleMonthSelect = (m) => {
@@ -845,25 +861,6 @@ function DailySpreadsheetMatrix() {
     if (todayRowRef.current) {
       todayRowRef.current.scrollIntoView({ behavior: 'auto', block: 'center' });
     }
-  }, []);
-
-  // Controlled fine-grained mouse wheel scrolling (scrolls 1 day row ~32px per notch)
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    const handleWheelStep = (e) => {
-      if (Math.abs(e.deltaY) >= 40 && Math.abs(e.deltaX) < Math.abs(e.deltaY)) {
-        e.preventDefault();
-        const direction = Math.sign(e.deltaY);
-        container.scrollBy({ top: direction * 32, behavior: 'auto' });
-      }
-    };
-
-    container.addEventListener('wheel', handleWheelStep, { passive: false });
-    return () => {
-      container.removeEventListener('wheel', handleWheelStep);
-    };
   }, []);
 
   // Column totals for selected month
@@ -910,9 +907,8 @@ function DailySpreadsheetMatrix() {
   return (
     <DndContext
       sensors={sensors}
-      onDragStart={handleDragStart}
+      collisionDetection={matrixCollisionDetection}
       onDragEnd={handleDragEnd}
-      onDragCancel={handleDragCancel}
     >
       <div className="flex-1 min-h-0 flex flex-col overflow-hidden rounded-2xl border border-slate-800 glass-panel shadow-2xl">
 
@@ -1102,7 +1098,6 @@ function DailySpreadsheetMatrix() {
       {/* SPREADSHEET MATRIX TABLE CONTAINER (Scrolls table vertically & horizontally) */}
       <div
         ref={containerRef}
-        onScroll={handleScroll}
         className="flex-1 min-h-0 overflow-auto matrix-scrollbar relative"
       >
         <table className="w-full text-left text-[10px] border-separate border-spacing-0">
@@ -1229,7 +1224,10 @@ function DailySpreadsheetMatrix() {
           {monthGroups.map(group => (
             <tbody key={group.monthKey} className="divide-y divide-slate-800/50 font-mono text-[10px]">
               {/* Natural In-Flow Month Header Row (Non-sticky so it never obscures date rows) */}
-              <tr className="bg-slate-950 border-b border-slate-800">
+              <tr
+                className="bg-slate-950 border-b border-slate-800"
+                data-month-header={`${group.year}-${group.month}`}
+              >
                 <td
                   colSpan={100}
                   className="py-1 px-3 bg-slate-950 text-slate-300 border-b border-slate-800"
@@ -1258,7 +1256,7 @@ function DailySpreadsheetMatrix() {
                         setSelectedRowKey(prev => prev === row.rowKey ? null : row.rowKey);
                       }
                     }}
-                    className={`snap-start transition-all cursor-pointer ${
+                    className={`transition-colors cursor-pointer ${
                       row.isToday && isSelected
                         ? 'bg-amber-900/90 border-l-4 border-l-amber-300 border-r-2 border-r-amber-300 border-y-2 border-y-amber-300 ring-2 ring-amber-300 shadow-[0_0_20px_rgba(251,191,36,0.6)] font-extrabold text-amber-100 z-10'
                         : row.isToday
@@ -1348,7 +1346,6 @@ function DailySpreadsheetMatrix() {
                           className={`p-1 text-right min-w-[65px] border-r border-slate-800/80 transition-colors relative ${
                             isSelected && !row.isToday ? 'bg-blue-950/30' : ''
                           }`}
-                          activeCellData={activeCellData}
                         >
                           <MatrixCell
                             value={row.personCredits[p.id]}
@@ -1373,7 +1370,6 @@ function DailySpreadsheetMatrix() {
                           className={`p-1 text-right min-w-[70px] transition-colors relative ${
                             isSelected && !row.isToday ? 'bg-blue-950/30' : ''
                           }`}
-                          activeCellData={activeCellData}
                           isBillField
                         >
                           <MatrixCell
@@ -1397,7 +1393,6 @@ function DailySpreadsheetMatrix() {
                         className={`p-1 text-right min-w-[55px] transition-colors relative ${
                           isSelected && !row.isToday ? 'bg-blue-950/30' : ''
                         }`}
-                        activeCellData={activeCellData}
                         isBillField={row.otherAmt < 0}
                       >
                         <MatrixCell
@@ -1546,13 +1541,8 @@ function DailySpreadsheetMatrix() {
       </div>
 
       {/* Floating Drag Overlay */}
-      <DragOverlay>
-        {activeCellData ? (
-          <div className="bg-slate-900/95 border border-blue-500 text-blue-100 px-3 py-1.5 rounded-full shadow-2xl backdrop-blur flex items-center gap-2 text-xs font-mono font-bold pointer-events-none scale-105 ring-2 ring-blue-500/80 z-50">
-            <Sparkles className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 animate-spin" />
-            <span>{activeCellData.label} ({fmtMoney(activeCellData.value)})</span>
-          </div>
-        ) : null}
+      <DragOverlay dropAnimation={null}>
+        <MatrixDragOverlay />
       </DragOverlay>
 
       {/* Smart Spreadsheet & Bank Importer Modal */}

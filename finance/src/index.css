@@ -124,8 +124,6 @@
 .matrix-scrollbar {
   scrollbar-width: thin;
   scrollbar-color: #f59e0b #050811;
-  scroll-snap-type: y proximity;
-  scroll-padding-top: 68px;
 }
 .matrix-scrollbar::-webkit-scrollbar {
   height: 14px;

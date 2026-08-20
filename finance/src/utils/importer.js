@@ -431,27 +431,17 @@ export function applyBillMapping(rows, columnMap, defaultAccountId = '') {
 
 // --- Merge / Deduplication Helpers ---
 
-/**
- * Row-by-row merge of incoming transactions with existing transactions.
- * Matches rows by date+amount+description, preserves existing comments/notes, and merges new data.
- * @param {object[]} existing
- * @param {object[]} incoming
- * @returns {object[]}
- */
-export function mergeTransactions(existing = [], incoming = []) {
-  const result = existing.map(e => ({ ...e }));
-
+export function detectTransactionConflicts(existing = [], incoming = []) {
+  const conflicts = [];
+  
   incoming.forEach(inc => {
     const incDate = normalizeIsoDate(inc.date);
     const incDesc = (inc.description || '').toLowerCase().trim();
     const incAmt = parseFloat(inc.amount) || 0;
     const incMonth = incDate ? incDate.slice(0, 7) : '';
 
-    const matchIdx = result.findIndex(ex => {
-      // 1. Exact ID match
+    const matches = existing.filter(ex => {
       if (ex.id && inc.id && ex.id === inc.id) return true;
-
-      // Ensure account alignment if accountId is defined
       if (ex.accountId && inc.accountId && ex.accountId !== inc.accountId) return false;
 
       const exDate = normalizeIsoDate(ex.date);
@@ -462,22 +452,89 @@ export function mergeTransactions(existing = [], incoming = []) {
       const descMatch = incDesc === exDesc || (incDesc.length >= 3 && exDesc.includes(incDesc)) || (exDesc.length >= 3 && incDesc.includes(exDesc));
       const dateMatch = incDate && exDate && incDate === exDate;
       const amtMatch = Math.abs(incAmt - exAmt) < 0.01;
+      
+      const dateDiff = (incDate && exDate) ? Math.abs(new Date(incDate) - new Date(exDate)) / 86400000 : 999;
 
-      // Case A: exact date + matching description (update amount if changed)
+      // Case A: exact date + matching description
       if (dateMatch && descMatch) return true;
 
-      // Case B: same month + matching bill / earner description (e.g. date shifted or amount changed)
+      // Case B: same month + matching description
       if (incMonth && exMonth && incMonth === exMonth && descMatch) return true;
 
       // Case C: exact date + exact amount
       if (dateMatch && amtMatch) return true;
+      
+      // Doubt/Duplicate (close date + exact amount)
+      if (dateDiff <= 3 && amtMatch) return true;
 
       return false;
     });
 
+    if (matches.length > 0) {
+      conflicts.push({
+        incoming: inc,
+        matches: matches
+      });
+    }
+  });
+
+  return conflicts;
+}
+
+/**
+ * Row-by-row merge of incoming transactions with existing transactions.
+ * Matches rows by date+amount+description, preserves existing comments/notes, and merges new data.
+ * @param {object[]} existing
+ * @param {object[]} incoming
+ * @param {object} resolutions - map of incoming ID to { action: 'merge'|'new'|'skip', targetId: 'existingTxnId' }
+ * @returns {object[]}
+ */
+export function mergeTransactions(existing = [], incoming = [], resolutions = {}) {
+  const result = existing.map(e => ({ ...e }));
+
+  incoming.forEach(inc => {
+    const res = resolutions[inc.id];
+    if (res && res.action === 'skip') return;
+    if (res && res.action === 'new') {
+      result.push({ ...inc });
+      return;
+    }
+
+    const incDate = normalizeIsoDate(inc.date);
+    const incDesc = (inc.description || '').toLowerCase().trim();
+    const incAmt = parseFloat(inc.amount) || 0;
+    const incMonth = incDate ? incDate.slice(0, 7) : '';
+
+    let matchIdx = -1;
+    if (res && res.action === 'merge' && res.targetId) {
+      matchIdx = result.findIndex(ex => ex.id === res.targetId);
+    } else if (!res) {
+      // Fallback heuristic if no explicit resolution provided
+      matchIdx = result.findIndex(ex => {
+        if (ex.id && inc.id && ex.id === inc.id) return true;
+        if (ex.accountId && inc.accountId && ex.accountId !== inc.accountId) return false;
+
+        const exDate = normalizeIsoDate(ex.date);
+        const exDesc = (ex.description || '').toLowerCase().trim();
+        const exAmt = parseFloat(ex.amount) || 0;
+        const exMonth = exDate ? exDate.slice(0, 7) : '';
+
+        const descMatch = incDesc === exDesc || (incDesc.length >= 3 && exDesc.includes(incDesc)) || (exDesc.length >= 3 && incDesc.includes(exDesc));
+        const dateMatch = incDate && exDate && incDate === exDate;
+        const amtMatch = Math.abs(incAmt - exAmt) < 0.01;
+        const dateDiff = (incDate && exDate) ? Math.abs(new Date(incDate) - new Date(exDate)) / 86400000 : 999;
+
+        if (dateMatch && descMatch) return true;
+        if (incMonth && exMonth && incMonth === exMonth && descMatch) return true;
+        if (dateMatch && amtMatch) return true;
+        if (dateDiff <= 3 && amtMatch) return true;
+
+        return false;
+      });
+    }
+
     if (matchIdx >= 0) {
       const ex = result[matchIdx];
-      // Merge comments/notes: retain existing comment if incoming is empty, or join if both exist
       let mergedNotes = ex.notes || '';
       if (inc.notes && inc.notes.trim()) {
         const incNotesTrim = inc.notes.trim();
@@ -488,6 +545,7 @@ export function mergeTransactions(existing = [], incoming = []) {
         }
       }
 
+      // Hierarchy rule: Imported file amounts and dates are truth.
       result[matchIdx] = {
         ...ex,
         ...inc,

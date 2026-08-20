@@ -1,4 +1,4 @@
-import { normalizeIsoDate, mergeBills, mergeTransactions } from './importer.js';
+import { normalizeIsoDate, mergeBills, mergeTransactions, detectTransactionConflicts } from './importer.js';
 import { logDebug, logWarn, logInfo } from './debugLogger.js';
 
 /**
@@ -14,9 +14,13 @@ import { logDebug, logWarn, logInfo } from './debugLogger.js';
  * @param {Array} [params.lineItems] Current line items
  * @param {Object} [params.dailyMatrix] Current daily matrix
  * @param {Array} [params.transactions] Current transactions
+ * @param {boolean} [params.dryRun] If true, halts and returns conflicts instead of committing
+ * @param {Object} [params.resolutions] Map of incoming ID -> { action, targetId } for resolving conflicts
  * @returns {{
  *   success: boolean,
  *   error?: string,
+ *   requiresResolution?: boolean,
+ *   conflicts?: Array,
  *   metadataState?: Object,
  *   lineItems?: Array,
  *   dailyMatrix?: Object,
@@ -30,7 +34,9 @@ export function processSpreadsheetImport({
   metadataState = {},
   lineItems = [],
   dailyMatrix = {},
-  transactions = []
+  transactions = [],
+  dryRun = false,
+  resolutions = {}
 }) {
   if (!namespaces || !data) {
     logWarn('RECONCILE', 'processSpreadsheetImport invoked with invalid payload', { namespaces, dataExists: Boolean(data) });
@@ -285,7 +291,16 @@ export function processSpreadsheetImport({
       }
       transactionsChanged = true;
     } else {
-      nextTransactions = mergeTransactions(nextTransactions, stampedTransactions);
+      if (dryRun) {
+        const conflicts = detectTransactionConflicts(nextTransactions, stampedTransactions);
+        // Only return conflicts if there are any that haven't been resolved yet
+        const unresolvedConflicts = conflicts.filter(c => !resolutions[c.incoming.id]);
+        if (unresolvedConflicts.length > 0) {
+          logDebug('RECONCILE', `Dry run detected ${unresolvedConflicts.length} unresolved transaction conflicts`);
+          return { success: true, requiresResolution: true, conflicts: unresolvedConflicts };
+        }
+      }
+      nextTransactions = mergeTransactions(nextTransactions, stampedTransactions, resolutions);
       transactionsChanged = true;
     }
   }

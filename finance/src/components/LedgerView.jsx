@@ -497,17 +497,17 @@ function DailySpreadsheetMatrix() {
           const dayOther = customOther !== undefined ? (parseFloat(customOther) || 0) : 0;
 
           const customOtherCredit = getDailyMatrixCell(selectedAccountId, mKey, d, 'other_credit_amount');
-          if (customOtherCredit !== undefined) dayCredits += parseFloat(customOtherCredit) || 0;
+          const dayOtherCredit = customOtherCredit !== undefined ? (parseFloat(customOtherCredit) || 0) : 0;
 
           const tentativeRegEnding = runningRegBeg + dayCredits - dayBills;
-          const tentativeExtraEnding = runningExtraBeg + dayExtraCredits + dayOther;
+          const tentativeExtraEnding = runningExtraBeg + dayExtraCredits + dayOtherCredit - dayOther;
 
           if (tentativeRegEnding < 0) {
             runningRegBeg = 0;
-            runningExtraBeg = tentativeExtraEnding + tentativeRegEnding;
+            runningExtraBeg = Math.round((tentativeExtraEnding + tentativeRegEnding) * 100) / 100;
           } else {
-            runningRegBeg = tentativeRegEnding;
-            runningExtraBeg = tentativeExtraEnding;
+            runningRegBeg = Math.round(tentativeRegEnding * 100) / 100;
+            runningExtraBeg = Math.round(tentativeExtraEnding * 100) / 100;
           }
 
           cur.setDate(cur.getDate() + 1);
@@ -646,8 +646,8 @@ function DailySpreadsheetMatrix() {
           }
         });
 
-        const tentativeRegEnding = runningRegBeg + totalRegCredits + otherCreditAmt - totalDayBills;
-        const tentativeExtraEnding = runningExtraBeg + dayExtraAdd + otherAmt;
+        const tentativeRegEnding = runningRegBeg + totalRegCredits - totalDayBills;
+        const tentativeExtraEnding = runningExtraBeg + dayExtraAdd + otherCreditAmt - otherAmt;
 
         let regEnding;
         let extraEnding;
@@ -848,7 +848,7 @@ function DailySpreadsheetMatrix() {
 
       totals.other += r.otherAmt || 0;
       totals.otherCredit += r.otherCreditAmt || 0;
-      totals.totalRegCredits += r.totalRegCredits + (r.otherCreditAmt || 0);
+      totals.totalRegCredits += r.totalRegCredits;
     });
 
     totals.totalBills = Object.values(totals.bills).reduce((s, v) => s + v, 0);
@@ -1490,7 +1490,7 @@ function DailySpreadsheetMatrix() {
 
               {/* Other Credit Subtotals */}
               <td className="p-1 text-right text-emerald-400 font-mono bg-slate-900 min-w-[55px]">
-                {columnTotals.otherCredit > 0 ? `+${fmtMoney(columnTotals.otherCredit)}` : '—'}
+                {columnTotals.otherCredit !== 0 ? (columnTotals.otherCredit > 0 ? `+${fmtMoney(columnTotals.otherCredit)}` : fmtMoney(columnTotals.otherCredit)) : '—'}
               </td>
               <td className="p-1 bg-slate-900 border-r border-slate-800">&mdash;</td>
 

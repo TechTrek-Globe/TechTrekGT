@@ -338,7 +338,7 @@ export function LedgerDataProvider({ children }) {
   }, [setMetadataState]);
 
   // Selective per-namespace spreadsheet import
-  const importSpreadsheetSelective = useCallback(({ namespaces, strategies, data }) => {
+  const importSpreadsheetSelective = useCallback(({ namespaces, strategies, data, dryRun = false, resolutions = {} }) => {
     const result = processSpreadsheetImport({
       namespaces,
       strategies,
@@ -346,10 +346,17 @@ export function LedgerDataProvider({ children }) {
       metadataState: metadataStateRef.current,
       lineItems: lineItemsRef.current,
       dailyMatrix: dailyMatrixRef.current,
-      transactions: transactionsRef.current
+      transactions: transactionsRef.current,
+      dryRun,
+      resolutions
     });
 
     if (!result.success) return result;
+    if (result.requiresResolution) return result;
+    
+    if (dryRun) {
+      return { success: true, projected: result };
+    }
 
     if (result.metadataState) {
       setMetadataState(result.metadataState);

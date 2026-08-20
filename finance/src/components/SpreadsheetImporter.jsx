@@ -30,6 +30,8 @@ const STAGE = {
   SHEET_WIZARD: 'sheet_wizard',
   MAPPING: 'mapping',
   SELECTING: 'selecting',
+  RECONCILIATION: 'reconciliation',
+  BALANCE_CHECK: 'balance_check',
   DONE: 'done',
 };
 
@@ -133,6 +135,11 @@ export function SpreadsheetImporter({
   const [parsedPayload, setParsedPayload] = useState(null);
   // Full preview modal state
   const [fullPreviewNs, setFullPreviewNs] = useState(null);
+
+  // Reconciliation state
+  const [conflicts, setConflicts] = useState([]);
+  const [resolutions, setResolutions] = useState({});
+  const [balanceDetails, setBalanceDetails] = useState({ stated: 0, calculated: 0, delta: 0 });
 
   // --- Resolve helpers ---
   const resolveAccountName = (accountId) => {
@@ -257,6 +264,44 @@ export function SpreadsheetImporter({
     setParsedPayload(null);
     setNsEnabled({ people: true, accounts: true, bills: true, transactions: true, loans: true });
     setNsStrategy({ people: 'merge', accounts: 'merge', bills: 'merge', transactions: 'merge', loans: 'merge' });
+    setConflicts([]);
+    setResolutions({});
+    setBalanceDetails({ stated: 0, calculated: 0, delta: 0 });
+  };
+
+  const handleForceBalanceAdjustment = () => {
+    if (!parsedPayload) return;
+    const targetAccId = parsedPayload.targetAccountId || targetAccountId || selectedTargetAccountId || budget.accounts[0]?.id || '';
+    
+    parsedPayload.transactions.push({
+      id: `txn-${Date.now()}-adj`,
+      date: new Date().toISOString().split('T')[0],
+      description: 'Reconciliation Adjustment',
+      amount: Math.round((balanceDetails.stated - balanceDetails.calculated) * 100) / 100,
+      accountId: targetAccId,
+      category: 'Adjustment',
+      notes: 'Auto-generated to match file ending balance'
+    });
+
+    const result = importSpreadsheetSelective({
+      namespaces: nsEnabled,
+      strategies: nsStrategy,
+      data: parsedPayload,
+      resolutions
+    });
+
+    if (result.success) {
+      if (!completedSheetNames.includes(selectedSheetName)) {
+        setCompletedSheetNames(prev => [...prev, selectedSheetName]);
+      }
+      setResultMsg(`Import complete (with adjustment) for "${selectedSheetName}".`);
+      setStage(STAGE.DONE);
+      if (onImportComplete) {
+        onImportComplete({ success: true, payload: parsedPayload });
+      }
+    } else {
+      setParseError(result.error || 'Import failed.');
+    }
   };
 
   const handleStartSheetWizard = () => {
@@ -373,19 +418,59 @@ export function SpreadsheetImporter({
     logDebug('IMPORT', 'Applying selective import with user-selected namespaces and strategies', {
       namespaces: nsEnabled,
       strategies: nsStrategy,
-      sheetName: selectedSheetName,
-      payloadSummary: {
-        people: parsedPayload.people?.length || 0,
-        accounts: parsedPayload.accounts?.length || 0,
-        bills: parsedPayload.bills?.length || 0,
-        transactions: parsedPayload.transactions?.length || 0,
-      }
+      sheetName: selectedSheetName
     });
+
+    if (stage === STAGE.SELECTING || stage === STAGE.RECONCILIATION) {
+      logDebug('IMPORT', 'Running dry-run reconciliation check');
+      const dryResult = importSpreadsheetSelective({
+        namespaces: nsEnabled,
+        strategies: nsStrategy,
+        data: parsedPayload,
+        dryRun: true,
+        resolutions
+      });
+
+      if (dryResult.requiresResolution) {
+        setConflicts(dryResult.conflicts);
+        setStage(STAGE.RECONCILIATION);
+        return;
+      }
+
+      // Check ending balance
+      if (dryResult.projected) {
+        const targetAccId = parsedPayload.targetAccountId || targetAccountId || selectedTargetAccountId || budget.accounts[0]?.id || '';
+        
+        let stated = null;
+        const dates = Object.keys(parsedPayload.importedLedgerRows || {}).sort();
+        if (dates.length > 0) {
+          const lastRow = parsedPayload.importedLedgerRows[dates[dates.length - 1]];
+          stated = typeof lastRow === 'object' ? (lastRow.totalEnding ?? lastRow.regEnding ?? lastRow.totalBeg) : lastRow;
+        }
+
+        const projAccounts = dryResult.projected.metadataState.accounts || [];
+        const projAcc = projAccounts.find(a => a.id === targetAccId);
+        const startingBal = projAcc?.startingBalance || 0;
+        
+        const projTxns = dryResult.projected.transactions.filter(t => t.accountId === targetAccId);
+        const sumTxns = projTxns.reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
+        
+        const calculated = Math.round((startingBal + sumTxns) * 100) / 100;
+        const delta = stated !== null ? Math.abs(calculated - stated) : 0;
+
+        if (delta > 0.01 && stated !== null && typeof stated === 'number') {
+          setBalanceDetails({ stated, calculated, delta });
+          setStage(STAGE.BALANCE_CHECK);
+          return;
+        }
+      }
+    }
 
     const result = importSpreadsheetSelective({
       namespaces: nsEnabled,
       strategies: nsStrategy,
       data: parsedPayload,
+      resolutions
     });
 
     if (result.success) {
@@ -1039,6 +1124,141 @@ export function SpreadsheetImporter({
               <CheckCircle2 className="w-4 h-4" />
               Apply Import ({selectedSheetName})
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ---- STAGE: RECONCILIATION ---- */}
+      {stage === STAGE.RECONCILIATION && (
+        <div className="space-y-4 animate-fade-in">
+          <div className="p-4 bg-orange-950/40 border border-orange-800/60 rounded-xl space-y-2">
+            <div className="flex items-center gap-2 text-orange-400">
+              <AlertTriangle className="w-5 h-5" />
+              <h3 className="font-bold text-sm text-orange-200">Action Required: Data Conflicts Detected</h3>
+            </div>
+            <p className="text-xs text-orange-300">
+              We found {conflicts.length} incoming transaction(s) that match existing ledger entries but have some ambiguity (mismatched amounts, potential duplicates, etc). You must explicitly resolve them before importing. The imported file data is the absolute truth.
+            </p>
+          </div>
+
+          <div className="space-y-3 max-h-96 overflow-y-auto matrix-scrollbar pr-2">
+            {conflicts.map((conf, idx) => {
+              const inc = conf.incoming;
+              const res = resolutions[inc.id] || { action: 'skip', targetId: null };
+              return (
+                <div key={inc.id || idx} className="p-3 bg-slate-900/60 border border-slate-700/60 rounded-xl space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Incoming Row</span>
+                      <p className="text-xs font-medium text-slate-200">{inc.date} • {inc.description}</p>
+                      <p className="text-xs text-emerald-400 font-mono">${parseFloat(inc.amount).toFixed(2)}</p>
+                    </div>
+                  </div>
+                  <div className="pl-3 border-l-2 border-slate-700 space-y-2">
+                    <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Potential Matches in Ledger</span>
+                    {conf.matches.map(ex => (
+                      <label key={ex.id} className="flex items-start gap-2 cursor-pointer p-2 rounded-lg hover:bg-slate-800/50 transition-colors">
+                        <input
+                          type="radio"
+                          name={`res-${inc.id}`}
+                          checked={res.action === 'merge' && res.targetId === ex.id}
+                          onChange={() => setResolutions(prev => ({ ...prev, [inc.id]: { action: 'merge', targetId: ex.id } }))}
+                          className="mt-0.5 accent-indigo-500"
+                        />
+                        <div>
+                          <p className="text-xs text-slate-300">{ex.date} • {ex.description}</p>
+                          <p className="text-[11px] text-emerald-500/70 font-mono">${parseFloat(ex.amount).toFixed(2)}</p>
+                        </div>
+                      </label>
+                    ))}
+                    <label className="flex items-start gap-2 cursor-pointer p-2 rounded-lg hover:bg-slate-800/50 transition-colors">
+                      <input
+                        type="radio"
+                        name={`res-${inc.id}`}
+                        checked={res.action === 'new'}
+                        onChange={() => setResolutions(prev => ({ ...prev, [inc.id]: { action: 'new', targetId: null } }))}
+                        className="mt-0.5 accent-emerald-500"
+                      />
+                      <span className="text-xs text-emerald-300">Import as New (Do not merge)</span>
+                    </label>
+                    <label className="flex items-start gap-2 cursor-pointer p-2 rounded-lg hover:bg-slate-800/50 transition-colors">
+                      <input
+                        type="radio"
+                        name={`res-${inc.id}`}
+                        checked={res.action === 'skip'}
+                        onChange={() => setResolutions(prev => ({ ...prev, [inc.id]: { action: 'skip', targetId: null } }))}
+                        className="mt-0.5 accent-rose-500"
+                      />
+                      <span className="text-xs text-rose-300">Skip / Ignore this incoming row</span>
+                    </label>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="flex items-center justify-between pt-2">
+            <button
+              type="button"
+              onClick={() => setStage(STAGE.SELECTING)}
+              className="px-4 py-2 text-xs text-slate-400 hover:text-slate-200 bg-slate-900 border border-slate-700 rounded-xl"
+            >
+              Back
+            </button>
+            <button
+              type="button"
+              onClick={handleApplyImport}
+              className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold"
+            >
+              Confirm Resolutions & Continue
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ---- STAGE: BALANCE_CHECK ---- */}
+      {stage === STAGE.BALANCE_CHECK && (
+        <div className="space-y-4 animate-fade-in">
+          <div className="p-5 bg-rose-950/40 border border-rose-800/60 rounded-xl space-y-4">
+            <div className="flex items-center gap-2 text-rose-400">
+              <AlertTriangle className="w-5 h-5" />
+              <h3 className="font-bold text-sm text-rose-200">Reconciliation Failed</h3>
+            </div>
+            <p className="text-xs text-rose-300">
+              The projected ending balance of your ledger does not perfectly match the ending balance stated on the imported file. The import queue has been paused to enforce strict Single Source of Truth rules.
+            </p>
+            
+            <div className="grid grid-cols-2 gap-4 p-4 bg-black/40 rounded-lg">
+              <div>
+                <p className="text-[10px] uppercase font-bold text-slate-500">Stated Balance (File)</p>
+                <p className="text-lg font-mono text-emerald-400">${balanceDetails.stated.toFixed(2)}</p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase font-bold text-slate-500">Calculated Balance (Ledger)</p>
+                <p className="text-lg font-mono text-rose-400">${balanceDetails.calculated.toFixed(2)}</p>
+              </div>
+              <div className="col-span-2 pt-2 border-t border-rose-800/30">
+                <p className="text-[10px] uppercase font-bold text-slate-500">Discrepancy (Delta)</p>
+                <p className="text-sm font-mono text-rose-300">${balanceDetails.delta.toFixed(2)}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setStage(STAGE.SELECTING)}
+                className="px-4 py-2 text-xs text-slate-300 bg-slate-800 hover:bg-slate-700 rounded-lg font-medium"
+              >
+                Go Back (Abort)
+              </button>
+              <button
+                type="button"
+                onClick={handleForceBalanceAdjustment}
+                className="px-4 py-2 text-xs text-white bg-rose-700 hover:bg-rose-600 rounded-lg font-bold shadow-lg shadow-rose-900/50"
+              >
+                Force Match (Add Adjustment Txn)
+              </button>
+            </div>
           </div>
         </div>
       )}

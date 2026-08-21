@@ -8,6 +8,7 @@ const RouteVisualization = React.lazy(() => import('./components/RouteVisualizat
 const MarketsPage = React.lazy(() => import('./components/MarketsPage').then(m => ({ default: m.MarketsPage })));
 const PracticalPage = React.lazy(() => import('./components/PracticalPage').then(m => ({ default: m.PracticalPage })));
 const StaysAndFoodPage = React.lazy(() => import('./components/StaysAndFoodPage').then(m => ({ default: m.StaysAndFoodPage })));
+const ItineraryView = React.lazy(() => import('./components/ItineraryView').then(m => ({ default: m.ItineraryView })));
 const PrivateHub = React.lazy(() => import('./components/PrivateHub').then(m => ({ default: m.PrivateHub })));
 
 // Simple client-side router
@@ -60,6 +61,10 @@ function App() {
 
     if (normalizedPath === '/wayfinder/poland-christmas-2026/practical') {
       return <PracticalPage />;
+    }
+
+    if (normalizedPath === '/wayfinder/poland-christmas-2026/itinerary' || normalizedPath === '/wayfinder/poland-christmas-2026/timeline') {
+      return <ItineraryView />;
     }
 
     if (normalizedPath.startsWith('/wayfinder/poland-christmas-2026/cities/')) {

@@ -21,14 +21,23 @@ export function PrivateHub({ currentPath }) {
         </div>
         <h2 className="text-2xl font-bold text-white mb-2">Private Operations Hub</h2>
         <p className="text-wf-muted mb-6 max-w-md">
-          Sign in to access exact dates, live reservations, and securely imported travel documents.
+          Sign in to access securely imported travel documents, OCR extraction tools, and private booking records.
         </p>
-        <button
-          onClick={() => setIsAuthModalOpen(true)}
-          className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-wf-blue to-wf-blue-lt hover:opacity-90 text-white font-medium shadow-lg hover-lift"
-        >
-          Sign In / Create Account
-        </button>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <button
+            onClick={() => setIsAuthModalOpen(true)}
+            className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-wf-blue to-wf-blue-lt hover:opacity-90 text-white font-medium shadow-lg hover-lift"
+          >
+            Sign In / Create Account
+          </button>
+          <a
+            href="/wayfinder/poland-christmas-2026/itinerary"
+            onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026/itinerary')}
+            className="px-6 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white font-medium text-center"
+          >
+            View Public Itinerary
+          </a>
+        </div>
       </div>
     );
   }

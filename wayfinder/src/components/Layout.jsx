@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Compass, Map, User, LogOut, ShieldCheck, ChevronRight, Menu, X, Coins, ArrowLeftRight, Settings } from 'lucide-react';
+import { Compass, Map, User, LogOut, ShieldCheck, ChevronRight, Menu, X, Coins, ArrowLeftRight, Settings, Calendar } from 'lucide-react';
 import { CurrencyConverterModal } from './CurrencyConverterModal';
 import { SettingsModal } from './SettingsModal';
 import { useExchangeRate } from '../hooks/useExchangeRate';
@@ -28,6 +28,7 @@ export function Layout({ children }) {
   const navLinks = [
     { label: 'Destinations', href: '/wayfinder' },
     { label: 'Poland 2026', href: '/wayfinder/poland-christmas-2026' },
+    { label: 'Itinerary & Timeline', href: '/wayfinder/poland-christmas-2026/itinerary' },
   ];
 
   const pushRoute = (e, path) => {
@@ -75,20 +76,30 @@ export function Layout({ children }) {
             </a>
           </div>
 
-          <div className="hidden md:flex items-center space-x-4">
-            {/* Quick Currency Converter Trigger (Desktop) - Only show when trip is selected */}
+          <div className="hidden md:flex items-center space-x-3">
+            {/* Quick Itinerary & Currency Converter Trigger (Desktop) - Only show when trip is selected */}
             {showCurrencyConverter && (
-              <button
-                onClick={() => setIsConverterOpen(!isConverterOpen)}
-                className="flex items-center space-x-2 px-3 py-1.5 rounded-xl bg-wf-amber/10 border border-wf-amber/30 text-wf-amber text-sm font-bold hover:bg-wf-amber/20 transition-all shadow-sm active:scale-95 group"
-                title="Open Currency Converter"
-              >
-                <Coins className="w-4 h-4 text-wf-amber group-hover:rotate-12 transition-transform" />
-                <span>Currency Converter</span>
-                <span className="text-xs bg-wf-amber/20 px-1.5 py-0.5 rounded-md font-semibold text-wf-cream">
-                  {symbol} {rate.toFixed(2)}
-                </span>
-              </button>
+              <>
+                <a
+                  href="/wayfinder/poland-christmas-2026/itinerary"
+                  onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026/itinerary')}
+                  className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-slate-200 text-sm font-bold hover:text-white hover:bg-white/10 transition-all shadow-sm"
+                >
+                  <Calendar className="w-4 h-4 text-amber-400" />
+                  <span>Itinerary</span>
+                </a>
+                <button
+                  onClick={() => setIsConverterOpen(!isConverterOpen)}
+                  className="flex items-center space-x-2 px-3 py-1.5 rounded-xl bg-wf-amber/10 border border-wf-amber/30 text-wf-amber text-sm font-bold hover:bg-wf-amber/20 transition-all shadow-sm active:scale-95 group"
+                  title="Open Currency Converter"
+                >
+                  <Coins className="w-4 h-4 text-wf-amber group-hover:rotate-12 transition-transform" />
+                  <span>Currency Converter</span>
+                  <span className="text-xs bg-wf-amber/20 px-1.5 py-0.5 rounded-md font-semibold text-wf-cream">
+                    {symbol} {rate.toFixed(2)}
+                  </span>
+                </button>
+              </>
             )}
 
             {isAuthenticated ? (

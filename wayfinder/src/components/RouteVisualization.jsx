@@ -1,5 +1,5 @@
 import React from 'react';
-import { Map, MapPin, Train, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Map, MapPin, Train, ArrowRight, ArrowLeft, Calendar } from 'lucide-react';
 import { polandJourney } from '../data/poland-2026';
 
 export function RouteVisualization() {
@@ -11,7 +11,7 @@ export function RouteVisualization() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <a href="/wayfinder/poland-christmas-2026" onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026')} className="inline-flex items-center text-sm font-medium text-wf-muted hover:text-white transition-colors mb-4">
             <ArrowLeft className="w-4 h-4 mr-1" /> Back to Overview
@@ -21,14 +21,23 @@ export function RouteVisualization() {
             <span>Route Map & Connections</span>
           </h1>
         </div>
+
+        <a
+          href="/wayfinder/poland-christmas-2026/itinerary"
+          onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026/itinerary')}
+          className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold flex items-center space-x-1.5 transition-all shadow-md shadow-amber-500/20 self-start sm:self-auto"
+        >
+          <Calendar className="w-4 h-4" />
+          <span>Full 10-Day Itinerary</span>
+        </a>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
         {/* Left Column: Abstract Map */}
         <div className="lg:col-span-5 relative">
           <div className="sticky top-24 glass-card rounded-3xl p-8 h-[600px] flex items-center justify-center">
-            {/* Very simple abstract vertical line map representing South to North progression */}
-            <div className="relative h-full w-full max-w-[200px] mx-auto flex flex-col justify-between py-12">
+            {/* Vertical line map representing South to North progression with stay dates */}
+            <div className="relative h-full w-full max-w-[240px] mx-auto flex flex-col justify-between py-12">
               <div className="absolute top-12 bottom-12 left-1/2 -ml-1 w-2 bg-wf-navy-lt rounded-full" />
               <div className="absolute top-12 bottom-12 left-1/2 -ml-1 w-2 bg-gradient-to-t from-wf-blue via-wf-blue-lt to-wf-evergreen rounded-full opacity-50" />
               
@@ -37,12 +46,18 @@ export function RouteVisualization() {
                 const isKrakow = city.id === 'krakow';
                 return (
                   <div key={city.id} className="relative z-10 flex items-center">
-                    <div className="w-1/2 flex justify-end pr-6 text-right">
-                      <div className="text-white font-bold">{city.name}</div>
+                    <div className="w-1/2 flex justify-end pr-5 text-right">
+                      <div>
+                        <div className="text-white font-bold text-sm leading-tight">{city.name}</div>
+                        {city.itineraryDates && (
+                          <div className="text-[10px] text-amber-300 font-mono font-medium">{city.itineraryDates.split(',')[0]}</div>
+                        )}
+                      </div>
                     </div>
-                    <div className={`w-4 h-4 rounded-full border-4 border-wf-navy-mid ${isGdansk ? 'bg-wf-evergreen' : isKrakow ? 'bg-wf-blue' : 'bg-wf-amber'}`} />
-                    <div className="w-1/2 pl-6">
-                      <div className="text-xs text-wf-muted">{city.nights > 0 ? `${city.nights} nights` : 'Day Stop'}</div>
+                    <div className={`w-4 h-4 rounded-full border-4 border-wf-navy-mid shrink-0 ${isGdansk ? 'bg-wf-evergreen' : isKrakow ? 'bg-wf-blue' : 'bg-wf-amber'}`} />
+                    <div className="w-1/2 pl-5">
+                      <div className="text-xs text-wf-muted leading-tight">{city.nights > 0 ? `${city.nights} nights` : 'Day Stop'}</div>
+                      <div className="text-[10px] text-wf-cream/70 font-medium">{city.travelDays}</div>
                     </div>
                   </div>
                 );
@@ -50,7 +65,7 @@ export function RouteVisualization() {
             </div>
             
             <div className="absolute bottom-6 left-0 right-0 text-center text-xs text-wf-muted">
-              South to North Progression
+              South to North Progression ({polandJourney.dates})
             </div>
           </div>
         </div>

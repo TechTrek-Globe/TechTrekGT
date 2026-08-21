@@ -3,7 +3,12 @@ export const polandJourney = {
   "title": "Poland: A Christmas Journey",
   "tagline": "Winter Markets, Historic Cities, and Scenic Rails",
   "description": "A curated winter expedition traversing Poland from south to north. Experience the medieval grandeur of Kraków, the fairytale bridges of Wrocław, the vibrant squares of Poznań, a daytime stop in gingerbread-famed Toruń, and a coastal finale in the Hanseatic city of Gdańsk.",
-  "dates": "December 2026",
+  "dates": "Dec 4 - Dec 13, 2026",
+  "startDate": "2026-12-04",
+  "endDate": "2026-12-13",
+  "outboundFlightDate": "2026-12-03",
+  "totalNights": 9,
+  "totalDays": 10,
   "culinaryHighlights": [
     {
       "name": "Grzaniec Galicyjski",
@@ -53,6 +58,10 @@ export const polandJourney = {
       "id": "krakow",
       "name": "Kraków",
       "nights": 3,
+      "itineraryDates": "Dec 4 - Dec 7, 2026",
+      "travelDays": "Days 1-3",
+      "startDate": "2026-12-04",
+      "endDate": "2026-12-07",
       "base": "Old Town or Kazimierz",
       "focus": "Biggest historic start: Rynek Główny, Wawel, cafés, market atmosphere, and optional deeper history day.",
       "marketStrategy": "First Christmas market pass. Keep dinner simple with pierogi, grilled oscypek, or mulled wine snacks.",
@@ -1371,6 +1380,10 @@ export const polandJourney = {
       "id": "wroclaw",
       "name": "Wrocław",
       "nights": 2,
+      "itineraryDates": "Dec 7 - Dec 9, 2026",
+      "travelDays": "Days 4-5",
+      "startDate": "2026-12-07",
+      "endDate": "2026-12-09",
       "historyBadge": "City of Dwarfs & European Capital of Culture",
       "base": "Market Square or Cathedral Island",
       "focus": "Most fairytale-like stop: colorful square, bridges, dwarfs, Ostrów Tumski, and strong evening lights.",
@@ -2423,6 +2436,10 @@ export const polandJourney = {
       "id": "poznan",
       "name": "Poznań",
       "nights": 2,
+      "itineraryDates": "Dec 9 - Dec 11, 2026",
+      "travelDays": "Days 6-7",
+      "startDate": "2026-12-09",
+      "endDate": "2026-12-11",
       "base": "Old Town / Stare Miasto",
       "focus": "Efficient midpoint: compact historic core, Cathedral Island, markets, cafés, and easy rail positioning.",
       "marketStrategy": "First Poznań market evening. Seasonal displays, possible ice-sculpture or market events.",
@@ -3117,6 +3134,10 @@ export const polandJourney = {
       "id": "torun",
       "name": "Toruń",
       "nights": 0,
+      "itineraryDates": "Dec 11, 2026",
+      "travelDays": "Day 8 (Day Stop)",
+      "startDate": "2026-12-11",
+      "endDate": "2026-12-11",
       "base": "Day Stop Only (4-6 Hours)",
       "focus": "Time-boxed medieval break: station luggage lockers, Copernicus highlights, Rynek Staromiejski, quick lunch, and onward train.",
       "marketStrategy": "Maximize 4-6 hours: walk straight from the bus/station to Rynek Staromiejski, try authentic Toruń gingerbread, and grab lunch at a nearby spot.",
@@ -3475,6 +3496,10 @@ export const polandJourney = {
       "id": "gdansk",
       "name": "Gdańsk",
       "nights": 2,
+      "itineraryDates": "Dec 11 - Dec 13, 2026",
+      "travelDays": "Days 8-10",
+      "startDate": "2026-12-11",
+      "endDate": "2026-12-13",
       "base": "Old Town, Waterfront, or Granary Island",
       "focus": "Coastal finale: Motława waterfront, amber, Hanseatic streets, and final Christmas market night.",
       "marketStrategy": "Final Christmas market at Targ Węglowy, then pack and stage luggage for the airport transfer.",
@@ -4218,5 +4243,535 @@ export const polandJourney = {
     "phrases": "Cześć (Hello), Dzień dobry (Good morning), Dziękuję (Thank you), Proszę (Please/Here you go), Ile to kosztuje? (How much is this?), Czy można kartą? (Can I pay by card?), Poproszę grzańca (Mulled wine, please), Poproszę piwo (Beer, please), Na zdrowie (Cheers).",
     "packing": "Waterproof boots, thermal layers, winter parka, hat, scarf, gloves, merino socks, compact daypack, power bank, Type C/E adapters, printed rail and flight documents.",
     "emergency": "Store passport copies, insurance, reservations, train tickets, airline check-in details, hotel addresses, and payment backup offline. Use Jakdojade for transit and Uber or Bolt for quick point-to-point rides."
-  }
+  },
+  "itinerary": [
+    {
+      "day": 1,
+      "date": "2026-12-04",
+      "displayDate": "Friday, Dec 4, 2026",
+      "cityId": "krakow",
+      "cityName": "Kraków",
+      "theme": "Arrival & Old Town Illuminations",
+      "base": "Hotel Stary (Old Town Base)",
+      "highlights": ["Arrival at KRK Airport", "SKA1 Airport Train", "Rynek Główny Christmas Market", "Mulled Wine & Oscypek"],
+      "schedule": [
+        {
+          "time": "14:15",
+          "itemType": "flight",
+          "title": "Arrive at Kraków Airport (KRK)",
+          "description": "Land at Kraków John Paul II International Airport (KRK) via transatlantic connection. Clear border control and collect luggage.",
+          "location": "Kraków Airport (KRK)",
+          "badge": "Transit Arrival"
+        },
+        {
+          "time": "15:00",
+          "itemType": "rail",
+          "title": "SKA1 Airport Train to Kraków Główny",
+          "description": "Board direct SKA1 commuter rail from airport terminal directly into Kraków Główny central station (17-min journey, ~17 PLN).",
+          "location": "Kraków Główny Central Station",
+          "badge": "17 min Transit"
+        },
+        {
+          "time": "15:45",
+          "itemType": "hotel",
+          "title": "Check-in at Hotel Stary",
+          "description": "Check in to historic Old Town luxury base on ul. Szczepańska, 50 meters from the Grand Main Square.",
+          "location": "ul. Szczepańska 5, Kraków",
+          "badge": "Base Lodging"
+        },
+        {
+          "time": "17:00",
+          "itemType": "market",
+          "title": "Rynek Główny Christmas Market Opening Evening",
+          "description": "Step out into Europe's largest medieval market square illuminated with holiday lights. Sip steaming Grzaniec Galicyjski mulled wine from oak barrels and sample grilled Oscypek sheep's cheese with warm cranberry preserves.",
+          "location": "Rynek Główny, 31-042 Kraków",
+          "badge": "Market Anchor"
+        },
+        {
+          "time": "19:30",
+          "itemType": "food",
+          "title": "Traditional Dinner at Morskie Oko",
+          "description": "Highlander folk dining near Main Square featuring sizzling pierogi, roasted meats, and rustic wooden lodge atmosphere.",
+          "location": "Plac Szczepański 8, Kraków",
+          "badge": "Dinner Target"
+        }
+      ]
+    },
+    {
+      "day": 2,
+      "date": "2026-12-05",
+      "displayDate": "Saturday, Dec 5, 2026",
+      "cityId": "krakow",
+      "cityName": "Kraków",
+      "theme": "Royal Wawel & Medieval Kraków",
+      "base": "Hotel Stary (Old Town Base)",
+      "highlights": ["Wawel Royal Castle", "St. Mary's Basilica", "Cloth Hall & Rynek Underground", "Mały Rynek Craft Market"],
+      "schedule": [
+        {
+          "time": "09:30",
+          "itemType": "sight",
+          "title": "Wawel Royal Castle & Cathedral",
+          "description": "Explore royal state rooms, Renaissance arcaded courtyard, Royal Sigismund Bell in the cathedral tower, and the bronze fire-breathing Wawel Dragon at the riverbank.",
+          "location": "Wawel Hill, Kraków",
+          "badge": "UNESCO Royal Site"
+        },
+        {
+          "time": "12:00",
+          "itemType": "sight",
+          "title": "St. Mary's Basilica & Hejnał Bugle Call",
+          "description": "Admire the 15th-century carved wooden Veit Stoss altarpiece inside the twin-towered basilica and listen to the hourly Hejnał Mariacki trumpet call.",
+          "location": "Rynek Główny, Kraków",
+          "badge": "Iconic Landmark"
+        },
+        {
+          "time": "14:00",
+          "itemType": "sight",
+          "title": "Cloth Hall (Sukiennice) & Rynek Underground",
+          "description": "Browse amber jewelry inside the Renaissance Cloth Hall, then descend 4 meters beneath the square into the state-of-the-art archaeological museum.",
+          "location": "Rynek Główny 1, Kraków",
+          "badge": "Museum"
+        },
+        {
+          "time": "16:30",
+          "itemType": "market",
+          "title": "Mały Rynek Craft Corner & Hot Spiced Mead",
+          "description": "Visit the intimate craft market behind St. Mary's Basilica for small-batch artisanal honeys, Trójniak spiced mead, and hand-carved wooden souvenirs.",
+          "location": "Mały Rynek, Kraków",
+          "badge": "Craft Market"
+        },
+        {
+          "time": "19:00",
+          "itemType": "food",
+          "title": "Dinner at Czarna Kaczka (The Black Duck)",
+          "description": "Renowned Old Town tavern specializing in traditional roasted duck with apples, red cabbage, and rich Polish delicacies.",
+          "location": "ul. Poselska 22, Kraków",
+          "badge": "Dinner Target"
+        }
+      ]
+    },
+    {
+      "day": 3,
+      "date": "2026-12-06",
+      "displayDate": "Sunday, Dec 6, 2026",
+      "cityId": "krakow",
+      "cityName": "Kraków",
+      "theme": "Underground Wonders & Bohemian Kazimierz",
+      "base": "Hotel Stary (Old Town Base)",
+      "highlights": ["Wieliczka Salt Mine UNESCO Tour", "Historic Jewish Quarter Kazimierz", "Plac Wolnica Market", "Plac Nowy Zapiekanki"],
+      "schedule": [
+        {
+          "time": "09:45",
+          "itemType": "sight",
+          "title": "Wieliczka Salt Mine Guided Tour",
+          "description": "Subterranean expedition through chambers, subterranean saline lakes, and the monumental St. Kinga's Chapel carved entirely of rock salt.",
+          "location": "Daniłowicza 10, 32-020 Wieliczka",
+          "badge": "UNESCO Wonder"
+        },
+        {
+          "time": "14:00",
+          "itemType": "sight",
+          "title": "Kazimierz Jewish Heritage Walk",
+          "description": "Explore Szeroka Street, the 16th-century Remuh Synagogue and historic cemetery, and bohemian art galleries in Kraków's historic Jewish quarter.",
+          "location": "Kazimierz, Kraków",
+          "badge": "Cultural Heritage"
+        },
+        {
+          "time": "17:00",
+          "itemType": "market",
+          "title": "Plac Wolnica Bohemian Market",
+          "description": "Browse vintage vinyl, indie artisan ceramics, and craft cider chalets in the heart of Kazimierz.",
+          "location": "Plac Wolnica, Kraków",
+          "badge": "Indie Market"
+        },
+        {
+          "time": "19:30",
+          "itemType": "food",
+          "title": "Late-Night Zapiekanki at Plac Nowy",
+          "description": "Sample the iconic toasted open-faced baguettes with sautéed mushrooms, melted cheese, and custom gourmet toppings from the central Okrąglak rotunda.",
+          "location": "Plac Nowy, Kazimierz",
+          "badge": "Street Food Classic"
+        }
+      ]
+    },
+    {
+      "day": 4,
+      "date": "2026-12-07",
+      "displayDate": "Monday, Dec 7, 2026",
+      "cityId": "wroclaw",
+      "cityName": "Wrocław",
+      "theme": "Scenic Rail to Lower Silesia & Fairytale Market",
+      "base": "The Bridge Wrocław MGallery (Cathedral Island Base)",
+      "highlights": ["PKP Intercity 1st Class Train", "The Bridge Wrocław Check-in", "Wrocław Market Square", "Dwarf Hunting Trail"],
+      "schedule": [
+        {
+          "time": "10:30",
+          "itemType": "hotel",
+          "title": "Check-out & Transfer to Kraków Główny",
+          "description": "Pack bags and take a short walk through Planty Park to Kraków Główny central station.",
+          "location": "Kraków Główny",
+          "badge": "Departure"
+        },
+        {
+          "time": "11:30",
+          "itemType": "rail",
+          "title": "Direct IC Train: Kraków Główny to Wrocław Główny",
+          "description": "Relax in comfortable 1st Class seating on PKP Intercity IC train across southwestern Poland. Scenic winter countryside views.",
+          "location": "PKP Intercity (11:30 - 14:15)",
+          "badge": "1st Class Rail"
+        },
+        {
+          "time": "14:45",
+          "itemType": "hotel",
+          "title": "Check-in at The Bridge Wrocław MGallery",
+          "description": "Arrive at luxury boutique base located directly on historic Ostrów Tumski (Cathedral Island) along the Oder River.",
+          "location": "Plac Katedralny 8, Wrocław",
+          "badge": "Base Lodging"
+        },
+        {
+          "time": "16:30",
+          "itemType": "market",
+          "title": "Wrocław Christmas Market & Windmill Chalet",
+          "description": "Immerse in Poland's most enchanting fairytale market. Marvel at the 3-story wooden windmill pyramid, illuminated fairytale forest, and hot cherry mulled wine.",
+          "location": "Rynek we Wrocławiu, 50-106 Wrocław",
+          "badge": "Market Anchor"
+        },
+        {
+          "time": "19:30",
+          "itemType": "food",
+          "title": "Dinner at Konspira or Piwnica Świdnicka",
+          "description": "Dine in historic underground cellars (Piwnica Świdnicka, dating to 1273) or enjoy Solidarity-themed Polish dishes at Konspira.",
+          "location": "Rynek Ratusz 1 / Plac Solny 11, Wrocław",
+          "badge": "Historic Dining"
+        }
+      ]
+    },
+    {
+      "day": 5,
+      "date": "2026-12-08",
+      "displayDate": "Tuesday, Dec 8, 2026",
+      "cityId": "wroclaw",
+      "cityName": "Wrocław",
+      "theme": "Cathedral Island, Dwarfs & Gaslit Twilight",
+      "base": "The Bridge Wrocław MGallery (Cathedral Island Base)",
+      "highlights": ["Ostrów Tumski Cathedral", "Centennial Hall UNESCO Dome", "Panorama Racławicka", "Gas Lantern Lighter Walk"],
+      "schedule": [
+        {
+          "time": "09:30",
+          "itemType": "sight",
+          "title": "Ostrów Tumski & St. John the Baptist Cathedral",
+          "description": "Walk the cobblestone streets of Cathedral Island, cross the iron Bridge of Locks (Most Tumski), and take the elevator up the cathedral tower.",
+          "location": "Plac Katedralny, Wrocław",
+          "badge": "Cathedral Island"
+        },
+        {
+          "time": "12:00",
+          "itemType": "sight",
+          "title": "Panorama Racławicka & Centennial Hall",
+          "description": "Witness the monumental 360-degree circular battle painting (114m x 15m), followed by a tram visit to Max Berg's 1913 UNESCO Centennial Hall.",
+          "location": "ul. Purkyniego 11 / Wystawowa 1, Wrocław",
+          "badge": "UNESCO & Art"
+        },
+        {
+          "time": "15:00",
+          "itemType": "sight",
+          "title": "Old Town Dwarf Hunt & Plac Solny",
+          "description": "Search for Wrocław's whimsical bronze dwarfs (Krasnale) scattered across Old Town streets, the Old Town Hall, and flower-filled Plac Solny.",
+          "location": "Stare Miasto, Wrocław",
+          "badge": "City Tradition"
+        },
+        {
+          "time": "16:45",
+          "itemType": "sight",
+          "title": "Traditional Gas Lantern Lighter at Twilight",
+          "description": "Watch the cloaked municipal lamplighter manually light the authentic gas lanterns of Cathedral Island as dusk falls.",
+          "location": "Ostrów Tumski, Wrocław",
+          "badge": "Winter Ritual"
+        },
+        {
+          "time": "18:30",
+          "itemType": "food",
+          "title": "Dinner at Karczma Lwowska",
+          "description": "Atmospheric Galician and Lower Silesian cuisine right on Wrocław Market Square, accompanied by warm spiced honey beer.",
+          "location": "Rynek 4, Wrocław",
+          "badge": "Dinner Target"
+        }
+      ]
+    },
+    {
+      "day": 6,
+      "date": "2026-12-09",
+      "displayDate": "Wednesday, Dec 9, 2026",
+      "cityId": "poznan",
+      "cityName": "Poznań",
+      "theme": "North to Greater Poland & Betlejem Poznańskie",
+      "base": "Old Town / Plac Wolności Base",
+      "highlights": ["PKP Direct IC Train", "Town Hall Mechanical Goats", "St. Martin's Croissant Museum", "Betlejem Poznańskie Market"],
+      "schedule": [
+        {
+          "time": "09:45",
+          "itemType": "hotel",
+          "title": "Check-out & Transfer to Wrocław Główny",
+          "description": "Check out from The Bridge and head to Wrocław Główny central station.",
+          "location": "Wrocław Główny",
+          "badge": "Departure"
+        },
+        {
+          "time": "10:35",
+          "itemType": "rail",
+          "title": "Direct IC Train: Wrocław Główny to Poznań Główny",
+          "description": "Smooth 1st Class journey northward into Wielkopolska (Greater Poland).",
+          "location": "PKP Intercity (10:35 - 12:15)",
+          "badge": "1st Class Rail"
+        },
+        {
+          "time": "12:45",
+          "itemType": "hotel",
+          "title": "Check-in at Stare Miasto Base",
+          "description": "Check in to central Old Town base near Stary Rynek and Plac Wolności.",
+          "location": "Stare Miasto, Poznań",
+          "badge": "Base Lodging"
+        },
+        {
+          "time": "14:30",
+          "itemType": "sight",
+          "title": "St. Martin's Croissant Museum (Rogalowe Muzeum)",
+          "description": "Interactive demonstration and tasting of authentic EU-protected Poznań St. Martin's croissants packed with white poppy seeds and almond paste.",
+          "location": "Stary Rynek 41, Poznań",
+          "badge": "Culinary Heritage"
+        },
+        {
+          "time": "17:00",
+          "itemType": "market",
+          "title": "Betlejem Poznańskie on Plac Wolności",
+          "description": "Experience Poznań's vibrant Christmas festival featuring a giant glowing ferris wheel, wooden craft chalets, and hot regional plum punch.",
+          "location": "Plac Wolności, 61-738 Poznań",
+          "badge": "Market Anchor"
+        },
+        {
+          "time": "19:30",
+          "itemType": "food",
+          "title": "Dinner & Craft Brews at Brovaria",
+          "description": "Microbrewery restaurant right on the Old Market Square serving fresh unfiltered winter ales, roast pork knuckles, and potato pancakes.",
+          "location": "Stary Rynek 73-74, Poznań",
+          "badge": "Brewery & Dinner"
+        }
+      ]
+    },
+    {
+      "day": 7,
+      "date": "2026-12-10",
+      "displayDate": "Thursday, Dec 10, 2026",
+      "cityId": "poznan",
+      "cityName": "Poznań",
+      "theme": "Cradle of Poland & Cultural Discovery",
+      "base": "Old Town / Plac Wolności Base",
+      "highlights": ["Poznań Cathedral Island", "Porta Posnania Heritage Hub", "Stary Browar Arts Center", "Market Evening at Stary Rynek"],
+      "schedule": [
+        {
+          "time": "09:30",
+          "itemType": "sight",
+          "title": "Ostrów Tumski & Poznań Cathedral",
+          "description": "Visit Poland's oldest cathedral, containing the Golden Chapel and tombs of Poland's first Christian rulers, Duke Mieszko I and King Bolesław the Brave.",
+          "location": "Ostrów Tumski 17, Poznań",
+          "badge": "Birthplace of Poland"
+        },
+        {
+          "time": "11:30",
+          "itemType": "sight",
+          "title": "Porta Posnania Interactive Heritage Centre",
+          "description": "Award-winning architectural center narrating the thousand-year story of Cathedral Island via multimedia exhibits.",
+          "location": "ul. Gdańska 2, Poznań",
+          "badge": "Heritage Museum"
+        },
+        {
+          "time": "14:30",
+          "itemType": "sight",
+          "title": "Stary Browar Arts & Shopping Center",
+          "description": "Explore the beautifully converted 19th-century red-brick brewery housing contemporary art installations, cafés, and boutique shopping.",
+          "location": "ul. Półwiejska 42, Poznań",
+          "badge": "Architecture & Art"
+        },
+        {
+          "time": "17:30",
+          "itemType": "market",
+          "title": "Stary Rynek Evening Stroll & Market Stalls",
+          "description": "Stroll through illuminated Renaissance Town Hall arcades, enjoy roasted nuts and hot honey wine.",
+          "location": "Stary Rynek, Poznań",
+          "badge": "Evening Market"
+        },
+        {
+          "time": "19:30",
+          "itemType": "food",
+          "title": "Dinner at Bamberka or Wiejskie Jadło",
+          "description": "Authentic regional Greater Poland dishes including Pyry z gzikiem (baked potatoes with seasoned curd cheese) and braised beef roulade.",
+          "location": "Stary Rynek 55, Poznań",
+          "badge": "Dinner Target"
+        }
+      ]
+    },
+    {
+      "day": 8,
+      "date": "2026-12-11",
+      "displayDate": "Friday, Dec 11, 2026",
+      "cityId": "torun",
+      "cityName": "Toruń & Gdańsk",
+      "theme": "Medieval Gingerbread in Toruń & Baltic Coastal Arrival",
+      "base": "Granary Island / Waterfront Base (Gdańsk)",
+      "highlights": ["Toruń UNESCO Old Town", "Copernicus House", "Living Gingerbread Museum", "Gdańsk Targ Węglowy Market"],
+      "schedule": [
+        {
+          "time": "08:30",
+          "itemType": "rail",
+          "title": "Morning PKP Train: Poznań Główny to Toruń Główny",
+          "description": "Depart Poznań on morning train to Toruń. Store luggage in Toruń Główny station lockers and take short bus across the Vistula River.",
+          "location": "PKP Intercity (08:30 - 10:15)",
+          "badge": "Morning Rail"
+        },
+        {
+          "time": "10:30",
+          "itemType": "sight",
+          "title": "Toruń UNESCO Old Town & Copernicus House",
+          "description": "Walk through pristine red-brick Gothic streets untouched by WWII. Visit the birthplace of astronomer Nicolaus Copernicus and the 13th-century Old Town Hall.",
+          "location": "ul. Kopernika 15/17, Toruń",
+          "badge": "UNESCO Heritage"
+        },
+        {
+          "time": "12:00",
+          "itemType": "sight",
+          "title": "Living Museum of Gingerbread (Żywe Muzeum Piernika)",
+          "description": "Interactive hands-on workshop kneading spices, pressing historic wooden molds, and baking authentic Toruń gingerbread according to 16th-century recipes.",
+          "location": "ul. Rabiańska 9, Toruń",
+          "badge": "Gingerbread Workshop"
+        },
+        {
+          "time": "13:30",
+          "itemType": "food",
+          "title": "Lunch at Karczma Spichrz",
+          "description": "Rustic feast inside a preserved 18th-century granary overlooking the Vistula defensive walls.",
+          "location": "ul. Mostowa 1, Toruń",
+          "badge": "Historic Lunch"
+        },
+        {
+          "time": "15:45",
+          "itemType": "rail",
+          "title": "Afternoon PKP Train: Toruń Główny to Gdańsk Główny",
+          "description": "Collect luggage from station lockers and board direct train northward to the Baltic coast.",
+          "location": "PKP Intercity (15:45 - 17:30)",
+          "badge": "Coastal Rail"
+        },
+        {
+          "time": "18:00",
+          "itemType": "hotel",
+          "title": "Check-in at Gdańsk Waterfront Base",
+          "description": "Check in to boutique hotel on Granary Island (Wyspa Spichrzów) with stunning Motława river views.",
+          "location": "Wyspa Spichrzów / Old Town, Gdańsk",
+          "badge": "Base Lodging"
+        },
+        {
+          "time": "19:00",
+          "itemType": "market",
+          "title": "Gdańsk Christmas Market at Targ Węglowy",
+          "description": "Experience one of Europe's top-voted Christmas markets. Greet the Talking Moose Lucek, ride the Venetian carousel, and sip Grzaniec Gdański along the illuminated Coal Market.",
+          "location": "Targ Węglowy, 80-836 Gdańsk",
+          "badge": "Market Anchor"
+        }
+      ]
+    },
+    {
+      "day": 9,
+      "date": "2026-12-12",
+      "displayDate": "Saturday, Dec 12, 2026",
+      "cityId": "gdansk",
+      "cityName": "Gdańsk",
+      "theme": "Hanseatic Grandeur & Amber Coastline",
+      "base": "Granary Island / Waterfront Base (Gdańsk)",
+      "highlights": ["Royal Way & Long Market", "St. Mary's Church Tower", "Mariacka Amber Street", "Targ Węglowy Market Finale"],
+      "schedule": [
+        {
+          "time": "09:30",
+          "itemType": "sight",
+          "title": "The Royal Way (Droga Królewska) & Długi Targ",
+          "description": "Walk beneath the Golden Gate, past Dutch Mannerist merchant townhouses, Neptune's Fountain, and the magnificent Main Town Hall to the Green Gate.",
+          "location": "Długi Targ, Gdańsk",
+          "badge": "Royal Way"
+        },
+        {
+          "time": "11:30",
+          "itemType": "sight",
+          "title": "St. Mary's Basilica & Astronomical Clock",
+          "description": "Tour the largest brick church in the world. Climb the 400-step bell tower for panoramic views across the Motława River and Baltic shipyards.",
+          "location": "ul. Podkramarska 5, Gdańsk",
+          "badge": "Colossal Basilica"
+        },
+        {
+          "time": "14:00",
+          "itemType": "sight",
+          "title": "Mariacka Street Amber Chalets & Waterfront Crane",
+          "description": "Explore Gdańsk's most atmospheric cobblestone street lined with gargoyle rain gutters and master amber jewelers, leading out to the medieval harbor Crane (Żuraw).",
+          "location": "ul. Mariacka / Szeroka, Gdańsk",
+          "badge": "Amber Street"
+        },
+        {
+          "time": "16:30",
+          "itemType": "market",
+          "title": "Grand Finale at Targ Węglowy Christmas Market",
+          "description": "Final festive market evening: sample smoked Baltic salmon, hot apple cider, gourmet pierogi, and purchase last-minute hand-blown Polish glass ornaments.",
+          "location": "Targ Węglowy, Gdańsk",
+          "badge": "Market Finale"
+        },
+        {
+          "time": "19:30",
+          "itemType": "food",
+          "title": "Dinner at Kubicki or Gdański Bowke",
+          "description": "Celebratory final dinner at Gdańsk's oldest restaurant (operating since 1918) along the waterfront, enjoying duck roasted with apples and Goldwasser herbal liqueur.",
+          "location": "ul. Wartka 5, Gdańsk",
+          "badge": "Historic Dinner"
+        }
+      ]
+    },
+    {
+      "day": 10,
+      "date": "2026-12-13",
+      "displayDate": "Sunday, Dec 13, 2026",
+      "cityId": "gdansk",
+      "cityName": "Gdańsk",
+      "theme": "Baltic Farewell & Return Flight",
+      "base": "Departure Day",
+      "highlights": ["Motława Morning Walk", "Specialty Coffee at Drukarnia", "Airport Transfer to GDN", "Return Flight Home"],
+      "schedule": [
+        {
+          "time": "08:30",
+          "itemType": "sight",
+          "title": "Morning Stroll along Motława Riverfront",
+          "description": "Enjoy the peaceful winter morning mist over the river and the pedestrian footbridge between Old Town and Granary Island.",
+          "location": "Długie Pobrzeże, Gdańsk",
+          "badge": "Waterfront Walk"
+        },
+        {
+          "time": "09:30",
+          "itemType": "food",
+          "title": "Breakfast & Coffee at Drukarnia Café",
+          "description": "Savor single-origin filter coffee, avocado sourdough toast, and fresh warm cinnamon buns on Mariacka Street.",
+          "location": "ul. Mariacka 36, Gdańsk",
+          "badge": "Specialty Breakfast"
+        },
+        {
+          "time": "11:30",
+          "itemType": "hotel",
+          "title": "Check-out & Airport Transfer",
+          "description": "Final bag packing and 25-minute taxi or direct SKM commuter train transfer to Gdańsk Lech Wałęsa Airport (GDN).",
+          "location": "Gdańsk Airport (GDN)",
+          "badge": "Transfer"
+        },
+        {
+          "time": "14:00",
+          "itemType": "flight",
+          "title": "Departure Flight Home",
+          "description": "Board international flight connecting from GDN to transatlantic destination. End of an unforgettable Poland Christmas expedition!",
+          "location": "Gdańsk Lech Wałęsa Airport (GDN)",
+          "badge": "Homeward Flight"
+        }
+      ]
+    }
+  ]
 };

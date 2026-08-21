@@ -29,9 +29,16 @@ function CityRouteCard({ city, idx, totalCount, pushRoute }) {
           Stop 0{idx + 1}
         </div>
         <h3 className="text-xl font-bold text-white mb-1 drop-shadow-md">{city.name}</h3>
-        <p className="text-xs text-amber-100/80 mb-2 font-medium">
-          {city.nights > 0 ? `${city.nights} nights` : 'Day Stop'}
-        </p>
+        <div className="flex items-center justify-between gap-1 mb-2">
+          <p className="text-xs text-amber-100/80 font-medium">
+            {city.nights > 0 ? `${city.nights} nights` : 'Day Stop'}
+          </p>
+          {city.itineraryDates && (
+            <span className="text-[10px] px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
+              {city.itineraryDates.split(',')[0]}
+            </span>
+          )}
+        </div>
         <div className="text-xs text-wf-cream/80 line-clamp-2 leading-relaxed">
           {city.focus}
         </div>
@@ -98,12 +105,12 @@ export function PolandLanding() {
                 <span>View Full Route</span>
               </a>
               <a
-                href="/wayfinder/poland-christmas-2026/private"
-                onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026/private')}
+                href="/wayfinder/poland-christmas-2026/itinerary"
+                onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026/itinerary')}
                 className="px-4 py-3 sm:py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-xs flex items-center space-x-1.5 transition-colors min-h-[44px] sm:min-h-0"
               >
                 <Calendar className="w-4 h-4" />
-                <span>Private Itinerary</span>
+                <span>Trip Itinerary</span>
               </a>
             </div>
           </div>

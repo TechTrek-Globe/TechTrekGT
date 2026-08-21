@@ -147,12 +147,13 @@ Views are conditionally rendered inside `MainContent` based on `activeView`, whi
 |----------|-----------|-------|
 | `/wayfinder` | `WayfinderLanding` | Root landing & platform catalog |
 | `/wayfinder/poland-christmas-2026` | `PolandLanding` | Flagship expedition landing & route summary |
+| `/wayfinder/poland-christmas-2026/itinerary` or `/timeline` | `ItineraryView` | Public 10-day chronological itinerary & timeline |
 | `/wayfinder/poland-christmas-2026/route` or `/rail` | `RouteVisualization` | Rail route map & transit timings |
 | `/wayfinder/poland-christmas-2026/markets` | `MarketsPage` | Christmas market directory & culinary highlights |
 | `/wayfinder/poland-christmas-2026/stays-and-food` | `StaysAndFoodPage` | Neighborhood lodging base zones & food targets (no unbooked hotel listings) |
 | `/wayfinder/poland-christmas-2026/practical` | `PracticalPage` | Practical travel, currency, packing & daylight info |
 | `/wayfinder/poland-christmas-2026/cities/:cityId/:subPage` | `CityPage` | Per-city guides (overview, history, attractions, markets, restaurants, hotels [neighborhood base overview & Google Maps lookup], lgbtq) |
-| `/wayfinder/poland-christmas-2026/private*` | `PrivateHub` | Auth-gated itinerary (including private booked hotels) & travel documents |
+| `/wayfinder/poland-christmas-2026/private*` | `PrivateHub` | Auth-gated private travel documents & OCR extraction hub |
 | any other `/wayfinder/*` | 404 fallback | "Component under construction" |
 
 Wayfinder and Outpost use `React.lazy()` + `<Suspense>` for code-split route components and dynamically load heavy importers (`xlsx`, `pdfjs-dist`) on demand:

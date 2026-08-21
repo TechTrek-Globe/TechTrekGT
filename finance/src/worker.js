@@ -121,13 +121,13 @@ async function handleSyncBackup(context) {
 
   const token = getTokenFromRequest(request);
   const payload = await verifyToken(token, env?.JWT_SECRET);
-  if (!payload || !payload.id) {
+  const userId = payload?.userId || payload?.id;
+  if (!payload || !userId) {
     return new Response(JSON.stringify({ error: 'Unauthorized: Invalid JWT session' }), {
       status: 401,
       headers: { 'Content-Type': 'application/json' }
     });
   }
-  const userId = payload.id;
 
   if (!(await verifySyncGuard(request, env))) {
     return new Response(JSON.stringify({ error: 'Unauthorized: Invalid or missing vault passcode' }), {
@@ -170,13 +170,13 @@ async function handleSyncRestore(context) {
 
   const token = getTokenFromRequest(request);
   const payload = await verifyToken(token, env?.JWT_SECRET);
-  if (!payload || !payload.id) {
+  const userId = payload?.userId || payload?.id;
+  if (!payload || !userId) {
     return new Response(JSON.stringify({ error: 'Unauthorized: Invalid JWT session' }), {
       status: 401,
       headers: { 'Content-Type': 'application/json' }
     });
   }
-  const userId = payload.id;
 
   if (!(await verifySyncGuard(request, env))) {
     return new Response(JSON.stringify({ error: 'Unauthorized: Invalid or missing vault passcode' }), {

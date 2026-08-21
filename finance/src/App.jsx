@@ -92,13 +92,15 @@ function getViewFromPathname(pathname) {
 
 function MainContent({ pathname, navigateTo, onNavigateHome }) {
   const { isSettingsOpen } = useBudgetMetadataState();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
 
   const normalized = (pathname || '').toLowerCase().replace(/\/$/, '');
   const activeView = getViewFromPathname(normalized);
 
   // Synchronize view state and URL pathname based on auth state
   useEffect(() => {
+    if (isLoading) return;
+
     if (!isAuthenticated) {
       if (normalized.startsWith('/finance') && normalized !== '/finance') {
         if (typeof window !== 'undefined') {
@@ -113,7 +115,18 @@ function MainContent({ pathname, navigateTo, onNavigateHome }) {
       navigateTo('/finance/dashboard');
       return;
     }
-  }, [normalized, isAuthenticated, navigateTo]);
+  }, [normalized, isAuthenticated, isLoading, navigateTo]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-400 rounded-full animate-spin" />
+          <p className="text-slate-500 text-xs font-mono tracking-widest uppercase">Verifying session...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return (

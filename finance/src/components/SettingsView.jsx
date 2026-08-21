@@ -243,6 +243,7 @@ export function SettingsView({ onNavigateView }) {
       const res = await fetch(getApiUrl('/api/verify-sync-code'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ code: passcodeInput })
       });
       const data = await res.json();

@@ -170,6 +170,7 @@ export function LedgerDataProvider({ children }) {
   const pullCloudRestore = useCallback(async (passcode) => {
     const res = await fetch(getApiUrl('/api/sync/restore'), {
       method: 'GET',
+      credentials: 'include',
       headers: {
         'X-Sync-Passcode': passcode
       }

@@ -78,6 +78,7 @@ export async function pushCloudBackupOptimistic(passcode, budgetData) {
   try {
     const res = await fetch(getApiUrl('/api/sync/backup'), {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
         'X-Sync-Passcode': passcode
@@ -115,6 +116,7 @@ export async function flushPendingCloudSync(passcode) {
   try {
     const res = await fetch(getApiUrl('/api/sync/backup'), {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
         'X-Sync-Passcode': passcode

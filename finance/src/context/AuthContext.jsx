@@ -11,8 +11,32 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [householdId, setHouseholdId] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
+  // Restore session on mount via /api/auth/me
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch(getApiUrl('/api/auth/me'), {
+          credentials: 'include'
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.user) {
+            setUser(data.user);
+            setHouseholdId(data.householdId || null);
+            setIsAuthenticated(true);
+            setIsAuthModalOpen(false);
+          }
+        }
+      } catch (e) {
+        // No active session or network offline
+      } finally {
+        setIsLoading(false);
+      }
+    })();
+  }, []);
 
   // Inactivity timeout handler (event-driven timer reset)
   useEffect(() => {

@@ -1,4 +1,4 @@
-import { hashPassword, createToken } from '../../utils/auth.js';
+import { hashPassword, createToken, buildAuthCookie } from '../../utils/auth.js';
 import { checkRateLimit } from '../../utils/rateLimit.js';
 
 const DEFAULT_PLATFORMS = [
@@ -16,11 +16,6 @@ const DEFAULT_PLATFORMS = [
   { name: 'Other', fee_pct: 0, flat_fee: 0, notes: 'Custom', is_default: 0 },
 ];
 
-async function ensureUserSchema(db) {
-  if (!db) return;
-  try { await db.prepare('ALTER TABLE users ADD COLUMN security_question TEXT').run(); } catch (e) {}
-  try { await db.prepare('ALTER TABLE users ADD COLUMN security_answer_hash TEXT').run(); } catch (e) {}
-}
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -79,8 +74,6 @@ export async function onRequestPost(context) {
       });
     }
 
-    await ensureUserSchema(env.DB);
-
     const existing = await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(cleanEmail).first();
     if (existing) {
       return new Response(JSON.stringify({ error: 'User with this email already exists' }), {
@@ -117,14 +110,6 @@ export async function onRequestPost(context) {
     const token = await createToken({ userId, email: cleanEmail, name: name.trim() }, env.JWT_SECRET);
 
     const maxAge = body.rememberMe ? 30 * 24 * 3600 : 24 * 3600;
-    const cookieOptions = [
-      `auth_token=${token}`,
-      'HttpOnly',
-      'Secure',
-      'SameSite=Lax',
-      'Path=/',
-      `Max-Age=${maxAge}`
-    ].join('; ');
 
     return new Response(JSON.stringify({
       success: true,
@@ -133,7 +118,7 @@ export async function onRequestPost(context) {
       status: 201,
       headers: {
         'Content-Type': 'application/json',
-        'Set-Cookie': cookieOptions
+        'Set-Cookie': buildAuthCookie(token, maxAge)
       }
     });
 

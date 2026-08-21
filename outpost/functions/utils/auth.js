@@ -154,6 +154,24 @@ export async function verifyToken(token, secret) {
   }
 }
 
+/**
+ * Builds a canonical Set-Cookie header string for the auth_token.
+ * All handlers MUST use this helper to ensure consistent cookie attributes.
+ * @param {string} token - The signed JWT.
+ * @param {number} maxAge - Max-Age in seconds (e.g. 86400 for 1 day, 2592000 for 30 days).
+ * @returns {string}
+ */
+export function buildAuthCookie(token, maxAge) {
+  return [
+    `auth_token=${token}`,
+    'HttpOnly',
+    'Secure',
+    'SameSite=Strict',
+    'Path=/',
+    `Max-Age=${maxAge}`
+  ].join('; ');
+}
+
 export function getTokenFromRequest(request) {
   const cookieHeader = request.headers.get('Cookie') || '';
   const match = cookieHeader.match(/(?:^|;\s*)auth_token=([^;]+)/);

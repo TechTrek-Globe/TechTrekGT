@@ -160,3 +160,24 @@ CREATE TABLE IF NOT EXISTS auction_supplies (
 
 CREATE INDEX IF NOT EXISTS idx_auction_supplies_user ON auction_supplies(user_id);
 
+-- ============================================================
+-- PASSWORD RESETS (server-side reset sessions)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS password_resets (
+  id          TEXT PRIMARY KEY,
+  user_id     TEXT NOT NULL,
+  email       TEXT NOT NULL,
+  token       TEXT NOT NULL,
+  expires_at  INTEGER NOT NULL,
+  used        INTEGER DEFAULT 0,
+  created_at  INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_password_resets_email ON password_resets(email, used);
+
+-- ============================================================
+-- USERS TABLE - additional columns for security Q&A
+-- (applied via ALTER TABLE on first migration if not present)
+-- ============================================================
+-- ALTER TABLE users ADD COLUMN security_question TEXT;
+-- ALTER TABLE users ADD COLUMN security_answer_hash TEXT;

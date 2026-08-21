@@ -27,7 +27,7 @@ import { onRequestGet as suppliesListHandler, onRequestPost as suppliesCreateHan
 import { onRequestPut as supplyPutHandler, onRequestDelete as supplyDeleteHandler } from '../functions/api/supplies/[id].js';
 import { onRequestGet as taxReportGetHandler } from '../functions/api/reports/tax.js';
 
-function addSecurityHeaders(response, isLocalhost = false) {
+function addSecurityHeaders(response, isLocalhost = false, requestOrigin = '') {
   const newHeaders = new Headers(response.headers);
   if (!isLocalhost) {
     newHeaders.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
@@ -55,9 +55,9 @@ function addSecurityHeaders(response, isLocalhost = false) {
     'http://localhost:3001',
     'http://127.0.0.1:3001'
   ];
-  const origin = response.headers.get('Origin');
-  if (origin && allowedOrigins.includes(origin)) {
-    newHeaders.set('Access-Control-Allow-Origin', origin);
+  // Read origin from the request (not the response) - LOW-3 fix
+  if (requestOrigin && allowedOrigins.includes(requestOrigin)) {
+    newHeaders.set('Access-Control-Allow-Origin', requestOrigin);
   } else {
     newHeaders.set('Access-Control-Allow-Origin', 'https://techtrekgt.com');
   }
@@ -86,6 +86,7 @@ export default {
     const context = { request, env, ctx };
 
     const isLocalhost = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+    const requestOrigin = request.headers.get('Origin') || '';
     if (!isLocalhost && (url.protocol === 'http:' || request.headers.get('x-forwarded-proto') === 'http')) {
       url.protocol = 'https:';
       return Response.redirect(url.toString(), 301);
@@ -101,7 +102,7 @@ export default {
     }
 
     if (request.method === 'OPTIONS') {
-      return addSecurityHeaders(new Response(null, { status: 204 }), isLocalhost);
+      return addSecurityHeaders(new Response(null, { status: 204 }), isLocalhost, requestOrigin);
     }
 
     let response;
@@ -267,6 +268,6 @@ export default {
       });
     }
 
-    return addSecurityHeaders(response, isLocalhost);
+    return addSecurityHeaders(response, isLocalhost, requestOrigin);
   }
 };

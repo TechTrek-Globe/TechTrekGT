@@ -1,23 +1,6 @@
 import { verifyPassword } from '../../utils/auth.js';
 import { checkRateLimit } from '../../utils/rateLimit.js';
 
-async function ensureResetTable(db) {
-  if (!db) return;
-  try {
-    await db.prepare(`
-      CREATE TABLE IF NOT EXISTS password_resets (
-        id TEXT PRIMARY KEY,
-        user_id TEXT NOT NULL,
-        email TEXT NOT NULL,
-        token TEXT NOT NULL,
-        expires_at INTEGER NOT NULL,
-        used INTEGER DEFAULT 0,
-        created_at INTEGER NOT NULL
-      )
-    `).run();
-  } catch (e) {}
-}
-
 export async function onRequestPost(context) {
   const { request, env } = context;
 
@@ -31,6 +14,12 @@ export async function onRequestPost(context) {
       headers: { 'Content-Type': 'application/json', 'Retry-After': String(retryAfter) }
     });
   }
+
+  // Generic response used for both "no account" and "no security question" to prevent enumeration
+  const genericOk = new Response(JSON.stringify({
+    success: true,
+    message: 'If an account with this email exists and has a security question set, a reset session has been created.'
+  }), { status: 200, headers: { 'Content-Type': 'application/json' } });
 
   try {
     const body = await request.json();
@@ -56,59 +45,72 @@ export async function onRequestPost(context) {
       });
     }
 
-    await ensureResetTable(env.DB);
+    // Artificial delay prevents timing-based enumeration regardless of path taken
+    const delayPromise = new Promise(r => setTimeout(r, 200));
 
     const user = await env.DB.prepare(
       'SELECT id, email, name, security_question, security_answer_hash FROM users WHERE email = ?'
     ).bind(cleanEmail).first();
 
-    if (!user) {
-      return new Response(JSON.stringify({ error: 'No account found with this email address.' }), {
-        status: 404, headers: { 'Content-Type': 'application/json' }
+    // No account or no security answer - return identical generic response (HIGH-1, HIGH-2)
+    if (!user || !user.security_answer_hash) {
+      await delayPromise;
+      return genericOk;
+    }
+
+    if (!securityAnswer) {
+      return new Response(JSON.stringify({ error: 'Security answer is required.' }), {
+        status: 400, headers: { 'Content-Type': 'application/json' }
       });
     }
 
-    if (user.security_answer_hash) {
-      if (!securityAnswer) {
-        return new Response(JSON.stringify({ error: 'Security answer is required.' }), {
-          status: 400, headers: { 'Content-Type': 'application/json' }
-        });
-      }
+    const cleanAnswer = securityAnswer.trim().toLowerCase();
+    const isValidAnswer = await verifyPassword(cleanAnswer, user.security_answer_hash);
 
-      const cleanAnswer = securityAnswer.trim().toLowerCase();
-      const isValidAnswer = await verifyPassword(cleanAnswer, user.security_answer_hash);
-
-      if (!isValidAnswer) {
-        return new Response(JSON.stringify({ error: 'Incorrect security answer. Please try again.' }), {
-          status: 400, headers: { 'Content-Type': 'application/json' }
-        });
-      }
+    if (!isValidAnswer) {
+      await delayPromise;
+      return new Response(JSON.stringify({ error: 'Incorrect security answer. Please try again.' }), {
+        status: 400, headers: { 'Content-Type': 'application/json' }
+      });
     }
 
-    const randomArray = new Uint32Array(1);
-    crypto.getRandomValues(randomArray);
-    const resetCode = String((randomArray[0] % 900000) + 100000);
+    // Issue a server-side reset session - NEVER return the token in the response body (CRITICAL-1)
+    const sessionId = crypto.randomUUID();
     const resetId = `rst-${crypto.randomUUID()}`;
     const now = Date.now();
-    const expiresAt = now + (15 * 60 * 1000);
+    const expiresAt = now + (15 * 60 * 1000); // 15-minute window
 
+    // Invalidate any previous unused reset sessions for this email
     await env.DB.prepare('UPDATE password_resets SET used = 1 WHERE email = ? AND used = 0').bind(cleanEmail).run();
 
     await env.DB.prepare(
       'INSERT INTO password_resets (id, user_id, email, token, expires_at, used, created_at) VALUES (?, ?, ?, ?, ?, 0, ?)'
-    ).bind(resetId, user.id, cleanEmail, resetCode, expiresAt, now).run();
+    ).bind(resetId, user.id, cleanEmail, sessionId, expiresAt, now).run();
 
+    // Return the session ID as an HttpOnly cookie only - never in the response body
+    const resetSessionCookie = [
+      `reset_session=${sessionId}`,
+      'HttpOnly',
+      'Secure',
+      'SameSite=Strict',
+      'Path=/api/auth/reset-password',
+      'Max-Age=900'
+    ].join('; ');
+
+    await delayPromise;
     return new Response(JSON.stringify({
       success: true,
-      message: 'Password reset code generated successfully.',
-      resetToken: resetCode,
-      email: cleanEmail
+      message: 'Security answer verified. You may now set a new password.'
     }), {
-      status: 200, headers: { 'Content-Type': 'application/json' }
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'Set-Cookie': resetSessionCookie
+      }
     });
 
   } catch (err) {
-    console.error('[auction forgot-password] error:', err);
+    console.error('[outpost forgot-password] error:', err);
     return new Response(JSON.stringify({ error: 'An internal error occurred. Please try again.' }), {
       status: 500, headers: { 'Content-Type': 'application/json' }
     });

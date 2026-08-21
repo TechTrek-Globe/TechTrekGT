@@ -1,4 +1,4 @@
-import { verifyPassword, createToken } from '../../utils/auth.js';
+import { verifyPassword, createToken, buildAuthCookie } from '../../utils/auth.js';
 import { checkRateLimit } from '../../utils/rateLimit.js';
 
 export async function onRequestPost(context) {
@@ -67,14 +67,6 @@ export async function onRequestPost(context) {
     );
 
     const maxAge = body.rememberMe ? 30 * 24 * 3600 : 24 * 3600;
-    const cookieOptions = [
-      `auth_token=${token}`,
-      'HttpOnly',
-      'Secure',
-      'SameSite=Lax',
-      'Path=/',
-      `Max-Age=${maxAge}`
-    ].join('; ');
 
     return new Response(JSON.stringify({
       success: true,
@@ -83,7 +75,7 @@ export async function onRequestPost(context) {
       status: 200,
       headers: {
         'Content-Type': 'application/json',
-        'Set-Cookie': cookieOptions
+        'Set-Cookie': buildAuthCookie(token, maxAge)
       }
     });
 

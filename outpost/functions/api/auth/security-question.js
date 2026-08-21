@@ -32,13 +32,24 @@ export async function onRequestPost(context) {
       });
     }
 
+    // Artificial delay prevents timing-based enumeration (HIGH-1)
+    const delayPromise = new Promise(r => setTimeout(r, 200));
+
     const user = await env.DB.prepare(
       'SELECT security_question FROM users WHERE email = ?'
     ).bind(cleanEmail).first();
 
+    await delayPromise;
+
+    // Return 200 regardless of whether the account exists to prevent enumeration (HIGH-1)
     if (!user) {
-      return new Response(JSON.stringify({ error: 'No account found with this email address.' }), {
-        status: 404, headers: { 'Content-Type': 'application/json' }
+      return new Response(JSON.stringify({
+        success: true,
+        email: cleanEmail,
+        securityQuestion: null,
+        hasSecurityQuestion: false
+      }), {
+        status: 200, headers: { 'Content-Type': 'application/json' }
       });
     }
 
@@ -52,7 +63,7 @@ export async function onRequestPost(context) {
     });
 
   } catch (err) {
-    console.error('[auction security-question] error:', err);
+    console.error('[outpost security-question] error:', err);
     return new Response(JSON.stringify({ error: 'An internal error occurred.' }), {
       status: 500, headers: { 'Content-Type': 'application/json' }
     });

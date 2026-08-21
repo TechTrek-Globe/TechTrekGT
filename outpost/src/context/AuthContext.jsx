@@ -136,17 +136,19 @@ export function AuthProvider({ children }) {
 
     const data = await res.json();
     if (!res.ok) {
-      throw new Error(data.error || 'Failed to generate reset code');
+      throw new Error(data.error || 'Failed to verify security answer');
     }
+    // resetToken is intentionally NOT returned - the server sets an HttpOnly reset_session cookie
     return data;
   };
 
-  const resetPassword = async (email, token, newPassword) => {
+  const resetPassword = async (email, newPassword) => {
     const res = await fetch(getApiUrl('/api/auth/reset-password'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ email, token, newPassword })
+      // token is NOT sent in the body - the server reads the HttpOnly reset_session cookie
+      body: JSON.stringify({ email, newPassword })
     });
 
     const data = await res.json();

@@ -7,7 +7,6 @@ import {
   User,
   ArrowRight,
   Loader2,
-  KeyRound,
   CheckCircle2,
   HelpCircle,
   ChevronLeft,
@@ -43,10 +42,10 @@ export function AuthPage({ onAuthSuccess }) {
 
   const [name, setName] = useState('');
   const [rememberMe, setRememberMe] = useState(() => {
-    try { return Boolean(localStorage.getItem('outpost_saved_email') || localStorage.getItem('auction_saved_email')); } catch (e) { return false; }
+    try { return Boolean(sessionStorage.getItem('outpost_saved_email')); } catch (e) { return false; }
   });
   const [email, setEmail] = useState(() => {
-    try { return localStorage.getItem('outpost_saved_email') || localStorage.getItem('auction_saved_email') || ''; } catch (e) { return ''; }
+    try { return sessionStorage.getItem('outpost_saved_email') || ''; } catch (e) { return ''; }
   });
   const [password, setPassword] = useState('');
   const [securityQuestion, setSecurityQuestion] = useState(PRESET_SECURITY_QUESTIONS[0]);
@@ -54,7 +53,6 @@ export function AuthPage({ onAuthSuccess }) {
 
   const [forgotStep, setForgotStep] = useState(1);
   const [loadedQuestion, setLoadedQuestion] = useState('');
-  const [resetToken, setResetToken] = useState('');
   const [newPassword, setNewPassword] = useState('');
 
   const [error, setError] = useState('');
@@ -76,10 +74,9 @@ export function AuthPage({ onAuthSuccess }) {
     setError('');
     try {
       if (rememberMe) {
-        localStorage.setItem('outpost_saved_email', email.trim().toLowerCase());
+        sessionStorage.setItem('outpost_saved_email', email.trim().toLowerCase());
       } else {
-        localStorage.removeItem('outpost_saved_email');
-        localStorage.removeItem('auction_saved_email');
+        sessionStorage.removeItem('outpost_saved_email');
       }
       await login(email, password, rememberMe);
       onAuthSuccess?.();
@@ -133,9 +130,9 @@ export function AuthPage({ onAuthSuccess }) {
     setError('');
     try {
       const data = await forgotPassword(email, securityAnswer);
-      setResetToken(data.resetToken || '');
+      void data; // reset_session cookie set by server; no token in response body
       setForgotStep(3);
-      setInfoMessage('Your reset code has been generated. Enter it below to create a new password.');
+      setInfoMessage('Identity verified. Enter your new password below.');
     } catch (err) {
       setError(err.message || 'Security answer verification failed.');
     } finally {
@@ -152,7 +149,7 @@ export function AuthPage({ onAuthSuccess }) {
     setIsSubmitting(true);
     setError('');
     try {
-      await resetPassword(email, resetToken, newPassword);
+      await resetPassword(email, newPassword);
       setInfoMessage('Password reset successfully! You can now sign in with your new password.');
       setTimeout(() => switchMode('signin'), 2500);
     } catch (err) {
@@ -452,13 +449,6 @@ export function AuthPage({ onAuthSuccess }) {
                 {forgotStep === 3 && (
                   <form onSubmit={handleResetPassword} className="space-y-4" id="reset-password-form">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-300 mb-1.5">Reset code</label>
-                      <div className="relative">
-                        <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                        <input id="reset-token" type="text" className="input-field pl-10" placeholder="6-digit code" value={resetToken} onChange={e => setResetToken(e.target.value)} />
-                      </div>
-                    </div>
-                    <div>
                       <label className="block text-xs font-semibold text-slate-300 mb-1.5">New password</label>
                       <div className="relative">
                         <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
@@ -472,6 +462,7 @@ export function AuthPage({ onAuthSuccess }) {
                 )}
               </>
             )}
+
           </div>
 
           {/* Secure Footer */}

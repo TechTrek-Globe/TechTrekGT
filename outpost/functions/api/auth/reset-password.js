@@ -17,16 +17,15 @@ export async function onRequestPost(context) {
 
   try {
     const body = await request.json();
-    const { email, token, newPassword } = body;
+    const { email, newPassword } = body;
 
-    if (!email || !token || !newPassword) {
-      return new Response(JSON.stringify({ error: 'Email, reset token, and new password are required.' }), {
+    if (!email || !newPassword) {
+      return new Response(JSON.stringify({ error: 'Email and new password are required.' }), {
         status: 400, headers: { 'Content-Type': 'application/json' }
       });
     }
 
     const cleanEmail = email.trim().toLowerCase();
-    const cleanToken = token.trim();
 
     if (newPassword.length < 8) {
       return new Response(JSON.stringify({ error: 'New password must be at least 8 characters long.' }), {
@@ -52,19 +51,30 @@ export async function onRequestPost(context) {
       });
     }
 
+    // Read the reset session from HttpOnly cookie (CRITICAL-1 - never from the request body)
+    const cookieHeader = request.headers.get('Cookie') || '';
+    const sessionMatch = cookieHeader.match(/(?:^|;\s*)reset_session=([^;]+)/);
+    const sessionId = sessionMatch ? sessionMatch[1].trim() : null;
+
+    if (!sessionId) {
+      return new Response(JSON.stringify({ error: 'No active password reset session. Please restart the reset flow.' }), {
+        status: 400, headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
     const resetRecord = await env.DB.prepare(
-      'SELECT * FROM password_resets WHERE email = ? AND token = ? AND used = 0'
-    ).bind(cleanEmail, cleanToken).first();
+      'SELECT * FROM password_resets WHERE token = ? AND email = ? AND used = 0'
+    ).bind(sessionId, cleanEmail).first();
 
     if (!resetRecord) {
-      return new Response(JSON.stringify({ error: 'Invalid or expired password reset token.' }), {
+      return new Response(JSON.stringify({ error: 'Invalid or expired password reset session. Please restart the reset flow.' }), {
         status: 400, headers: { 'Content-Type': 'application/json' }
       });
     }
 
     if (resetRecord.expires_at < Date.now()) {
       await env.DB.prepare('UPDATE password_resets SET used = 1 WHERE id = ?').bind(resetRecord.id).run();
-      return new Response(JSON.stringify({ error: 'Password reset token has expired. Please request a new code.' }), {
+      return new Response(JSON.stringify({ error: 'Password reset session has expired. Please request a new one.' }), {
         status: 400, headers: { 'Content-Type': 'application/json' }
       });
     }
@@ -80,15 +90,29 @@ export async function onRequestPost(context) {
     await env.DB.prepare('UPDATE users SET password_hash = ? WHERE id = ?').bind(newPasswordHash, user.id).run();
     await env.DB.prepare('UPDATE password_resets SET used = 1 WHERE id = ?').bind(resetRecord.id).run();
 
+    // Clear the reset_session cookie
+    const clearCookie = [
+      'reset_session=',
+      'HttpOnly',
+      'Secure',
+      'SameSite=Strict',
+      'Path=/api/auth/reset-password',
+      'Max-Age=0'
+    ].join('; ');
+
     return new Response(JSON.stringify({
       success: true,
       message: 'Password reset successfully. You can now sign in with your new password.'
     }), {
-      status: 200, headers: { 'Content-Type': 'application/json' }
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'Set-Cookie': clearCookie
+      }
     });
 
   } catch (err) {
-    console.error('[auction reset-password] error:', err);
+    console.error('[outpost reset-password] error:', err);
     return new Response(JSON.stringify({ error: 'An internal error occurred. Please try again.' }), {
       status: 500, headers: { 'Content-Type': 'application/json' }
     });

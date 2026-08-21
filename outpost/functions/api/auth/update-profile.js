@@ -1,4 +1,5 @@
-import { verifyToken, getTokenFromRequest, hashPassword, verifyPassword, createToken } from '../../utils/auth.js';
+import { verifyToken, getTokenFromRequest, hashPassword, verifyPassword, createToken, buildAuthCookie } from '../../utils/auth.js';
+import { checkRateLimit } from '../../utils/rateLimit.js';
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -15,6 +16,16 @@ export async function onRequestPost(context) {
     if (!payload || !payload.userId) {
       return new Response(JSON.stringify({ error: 'Unauthorized: Invalid token' }), {
         status: 401, headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Rate limit update-profile by userId to prevent currentPassword brute-force (HIGH-3)
+    const rlKey = `profile:${payload.userId}`;
+    const { allowed, retryAfter } = await checkRateLimit(env.RATE_LIMIT_KV, rlKey, 5, 300);
+    if (!allowed) {
+      return new Response(JSON.stringify({ error: 'Too many profile update attempts. Please wait.' }), {
+        status: 429,
+        headers: { 'Content-Type': 'application/json', 'Retry-After': String(retryAfter) }
       });
     }
 
@@ -110,13 +121,10 @@ export async function onRequestPost(context) {
       name: updatedName
     }, env.JWT_SECRET);
 
-    const cookieOptions = [
-      `auth_token=${newToken}`,
-      'HttpOnly',
-      'Secure',
-      'SameSite=Strict',
-      'Path=/'
-    ].join('; ');
+    // Preserve remaining JWT lifetime so rememberMe users don't get downgraded (MEDIUM-2)
+    const remainingSeconds = payload.exp
+      ? Math.max(payload.exp - Math.floor(Date.now() / 1000), 3600)
+      : 24 * 3600;
 
     return new Response(JSON.stringify({
       success: true,
@@ -132,12 +140,12 @@ export async function onRequestPost(context) {
       status: 200,
       headers: {
         'Content-Type': 'application/json',
-        'Set-Cookie': cookieOptions
+        'Set-Cookie': buildAuthCookie(newToken, remainingSeconds)
       }
     });
 
   } catch (err) {
-    console.error('[auction update-profile] error:', err);
+    console.error('[outpost update-profile] error:', err);
     return new Response(JSON.stringify({ error: 'An internal error occurred.' }), {
       status: 500, headers: { 'Content-Type': 'application/json' }
     });

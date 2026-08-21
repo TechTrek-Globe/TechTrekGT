@@ -1204,10 +1204,10 @@ export function SettingsModal() {
                 <table className="w-full text-left text-xs text-slate-300">
                   <thead className="bg-slate-900 text-slate-400 uppercase font-medium text-[9px] border-b border-slate-800">
                     <tr>
-                      <th className="px-3 py-2 w-[28%]">Account Name</th>
-                      <th className="px-3 py-2 w-[16%]">Type</th>
-                      <th className="px-3 py-2 w-[22%]">Extra Savings Target</th>
-                      <th className="px-3 py-2 w-[28%]">Active Split Earners</th>
+                      <th className="px-3 py-2 w-[22%]">Account Name</th>
+                      <th className="px-2 py-2 w-[13%]">Type</th>
+                      <th className="px-2 py-2 w-[20%]">Extra Savings Goal</th>
+                      <th className="px-2 py-2 w-[39%]">Active Earners &amp; Savings Split</th>
                       <th className="px-3 py-2 w-[6%] text-right">Actions</th>
                     </tr>
                   </thead>
@@ -1233,56 +1233,70 @@ export function SettingsModal() {
                                 placeholder="Account Name"
                               />
                             </td>
-                            <td className="px-3 py-1.5">
+                            <td className="px-2 py-1.5">
                               <select
                                 value={acc.type}
                                 onChange={e => updateAccount(acc.id, { type: e.target.value })}
-                                className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-slate-200 text-xs focus:border-blue-500 focus:outline-none cursor-pointer"
+                                className="bg-slate-900 border border-slate-800 rounded-lg px-1.5 py-0.5 text-slate-300 text-xs font-medium focus:border-blue-500 focus:outline-none cursor-pointer w-full"
                               >
                                 <option value="checking">Checking</option>
                                 <option value="savings">Savings</option>
                                 <option value="credit">Credit Card</option>
                               </select>
                             </td>
-                            <td className="px-3 py-1.5">
-                              <div className="flex items-center gap-2">
+                            <td className="px-2 py-1.5">
+                              <div className="flex items-center gap-1.5">
                                 <button
                                   type="button"
                                   role="switch"
                                   aria-checked={acc.enableExtraSavings !== false}
                                   onClick={() => updateAccount(acc.id, { enableExtraSavings: acc.enableExtraSavings === false })}
-                                  className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${acc.enableExtraSavings !== false ? 'bg-blue-600' : 'bg-slate-700'}`}
+                                  className={`relative inline-flex h-3.5 w-6 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${acc.enableExtraSavings !== false ? 'bg-emerald-600' : 'bg-slate-700'}`}
                                   title="Toggle Extra Savings Goal"
                                 >
                                   <span
-                                    className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow transition duration-200 ease-in-out ${acc.enableExtraSavings !== false ? 'translate-x-3' : 'translate-x-0'}`}
+                                    className={`pointer-events-none inline-block h-2.5 w-2.5 transform rounded-full bg-white shadow transition duration-200 ease-in-out ${acc.enableExtraSavings !== false ? 'translate-x-2.5' : 'translate-x-0.5'} mt-0.5`}
                                   />
                                 </button>
                                 {acc.enableExtraSavings !== false ? (
-                                  <div className="flex items-center gap-1">
-                                    <span className="text-[11px] text-slate-400 font-mono">$</span>
+                                  <div className="flex items-center gap-0.5 bg-slate-900/90 border border-slate-800 rounded-lg px-1.5 py-0.5 text-xs">
+                                    <span className="text-[10px] text-slate-500 font-mono">$</span>
                                     <input
                                       type="number"
                                       step="10"
                                       value={acc.saveExtraMonthly || 0}
                                       onChange={e => updateAccount(acc.id, { saveExtraMonthly: parseFloat(e.target.value) || 0 })}
-                                      className="w-18 bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-emerald-400 font-mono text-xs focus:border-blue-500 focus:outline-none"
+                                      className="w-14 bg-transparent text-emerald-400 font-mono font-bold text-xs focus:outline-none text-right"
                                     />
-                                    <span className="text-[10px] text-slate-500">/mo</span>
+                                    <span className="text-[9px] text-slate-500">/mo</span>
                                   </div>
                                 ) : (
                                   <span className="text-[10px] text-slate-500 italic">Off</span>
                                 )}
                               </div>
                             </td>
-                            <td className="px-3 py-1.5">
-                              <div className="flex flex-col gap-1.5">
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  {budget.people.map(p => {
-                                    const isChecked = enabledList.includes(p.id);
-                                    return (
+                            <td className="px-2 py-1.5">
+                              <div className="flex items-center gap-1.5 flex-nowrap overflow-x-auto py-0.5">
+                                {budget.people.map(p => {
+                                  const isChecked = enabledList.includes(p.id);
+                                  const isCredit = p.name.toLowerCase().includes('credit') || p.role === 'Credit';
+                                  const activeNonCredits = budget.people.filter(pe => enabledList.includes(pe.id) && !pe.name.toLowerCase().includes('credit') && pe.role !== 'Credit');
+                                  const defaultSplit = isCredit ? 0 : (100 / Math.max(1, activeNonCredits.length));
+                                  const currentVal = acc.saveExtraSplits?.[p.id] !== undefined
+                                    ? parseFloat(acc.saveExtraSplits[p.id])
+                                    : Math.round(defaultSplit * 10) / 10;
+                                  const showSplitInput = isChecked && acc.enableExtraSavings !== false && parseFloat(acc.saveExtraMonthly) > 0;
+
+                                  return (
+                                    <div
+                                      key={p.id}
+                                      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-xs font-bold border transition-all shrink-0 ${
+                                        isChecked
+                                          ? 'bg-purple-950/70 border-purple-600/60 text-purple-200'
+                                          : 'bg-slate-900/60 border-slate-800 text-slate-500 opacity-50 hover:opacity-90'
+                                      }`}
+                                    >
                                       <button
-                                        key={p.id}
                                         type="button"
                                         onClick={() => {
                                           let updated;
@@ -1294,43 +1308,23 @@ export function SettingsModal() {
                                           }
                                           updateAccount(acc.id, { enabledEarners: updated });
                                         }}
-                                        className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold border transition-all cursor-pointer ${
-                                          isChecked
-                                            ? 'bg-purple-950/70 border-purple-600/60 text-purple-200'
-                                            : 'bg-slate-900/60 border-slate-800 text-slate-500 opacity-60 hover:opacity-100'
-                                        }`}
+                                        className="flex items-center gap-1 cursor-pointer hover:text-white"
+                                        title={isChecked ? `Click to exclude ${p.name}` : `Click to include ${p.name}`}
                                       >
                                         <span className={`w-1.5 h-1.5 rounded-full ${isChecked ? 'bg-purple-400' : 'bg-slate-600'}`} />
                                         <span>{p.name.split(' ')[0]}</span>
-                                        <span className="text-[9px]">{isChecked ? '✓' : '—'}</span>
+                                        {!showSplitInput && <span className="text-[10px]">{isChecked ? '✓' : '—'}</span>}
                                       </button>
-                                    );
-                                  })}
-                                </div>
-                                {acc.enableExtraSavings !== false && parseFloat(acc.saveExtraMonthly) > 0 && (
-                                  <div className="pt-1 border-t border-slate-800/80 flex items-center gap-1.5 flex-wrap">
-                                    <span className="text-[9px] text-slate-400 font-semibold">Savings Split:</span>
-                                    {budget.people.filter(p => enabledList.includes(p.id)).map(p => {
-                                      const isCredit = p.name.toLowerCase().includes('credit') || p.role === 'Credit';
-                                      const activeNonCredits = budget.people.filter(pe => enabledList.includes(pe.id) && !pe.name.toLowerCase().includes('credit') && pe.role !== 'Credit');
-                                      const defaultSplit = isCredit ? 0 : (
-                                        100 / Math.max(1, activeNonCredits.length)
-                                      );
-                                      const currentVal = acc.saveExtraSplits?.[p.id] !== undefined
-                                        ? parseFloat(acc.saveExtraSplits[p.id])
-                                        : Math.round(defaultSplit * 10) / 10;
 
-                                      return (
-                                        <div key={p.id} className="inline-flex items-center gap-0.5 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800 text-[10px]">
-                                          <span className="text-slate-400 font-medium truncate max-w-[45px]">{p.name.split(' ')[0]}:</span>
+                                      {showSplitInput && (
+                                        <div className="inline-flex items-center gap-0.5 pl-1.5 border-l border-purple-800/60">
                                           <input
-                                            type="number"
-                                            min="0"
-                                            max="100"
-                                            step="1"
+                                            type="text"
+                                            inputMode="numeric"
                                             value={currentVal}
                                             onChange={e => {
-                                              const num = Math.max(0, Math.min(100, parseFloat(e.target.value) || 0));
+                                              const val = e.target.value.replace(/[^0-9.]/g, '');
+                                              const num = Math.max(0, Math.min(100, parseFloat(val) || 0));
                                               const activeEarners = budget.people.filter(pe => enabledList.includes(pe.id));
                                               let nextSplits = { ...(acc.saveExtraSplits || {}) };
                                               if (activeEarners.length === 2) {
@@ -1342,14 +1336,14 @@ export function SettingsModal() {
                                               }
                                               updateAccount(acc.id, { saveExtraSplits: nextSplits });
                                             }}
-                                            className="w-8 bg-transparent text-center font-mono font-bold text-slate-200 focus:outline-none focus:bg-slate-800 rounded"
+                                            className="w-8 text-center font-mono font-bold text-emerald-400 bg-slate-900/90 rounded px-1 py-0 border border-purple-500/40 focus:border-emerald-400 focus:outline-none text-xs"
                                           />
-                                          <span className="text-slate-500">%</span>
+                                          <span className="text-purple-300 text-[10px] font-bold">%</span>
                                         </div>
-                                      );
-                                    })}
-                                  </div>
-                                )}
+                                      )}
+                                    </div>
+                                  );
+                                })}
                               </div>
                             </td>
                             <td className="px-3 py-1.5 text-right">
@@ -1740,7 +1734,7 @@ export function SettingsModal() {
                   : budget.accounts.filter(a => a.id === selectedBillsAccountId);
 
                 return (
-                  <div className="space-y-6">
+                  <div className="space-y-4">
                     {displayAccounts.map(account => {
                       const accountBills = budget.bills.filter(b => 
                         (account.id === 'unassigned' ? !knownAccountIds.has(b.accountId) : b.accountId === account.id) && 
@@ -1759,28 +1753,21 @@ export function SettingsModal() {
 
                       return (
                         <div key={account.id} className="rounded-xl border border-slate-800 glass-card overflow-hidden shadow-lg">
-                          <div className="bg-slate-900/95 px-4 py-2.5 border-b border-slate-800 flex items-center justify-between flex-wrap gap-2">
-                            <div className="flex items-center gap-2.5">
-                              <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-                              <h4 className="text-xs font-bold text-slate-200">{account.name}</h4>
-                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 capitalize">{account.type}</span>
-                              <span className="text-[10px] text-slate-500">({accountBills.length} bill{accountBills.length !== 1 ? 's' : ''})</span>
-                            </div>
-                            <span className="text-xs text-slate-400">
-                              Account Subtotal: <span className="font-bold text-rose-400 font-mono">${accountTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/mo</span>
-                            </span>
+                        {/* Streamlined Combined Account Header */}
+                        <div className="bg-slate-900/95 px-4 py-2.5 border-b border-slate-800 flex items-center justify-between flex-wrap gap-2.5">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+                            <h4 className="text-xs font-bold text-slate-100">{account.name}</h4>
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 capitalize font-medium">{account.type}</span>
+                            <span className="text-[10px] text-slate-500">({accountBills.length} bill{accountBills.length !== 1 ? 's' : ''})</span>
                           </div>
 
-                          {/* Master Earner & Split Participant Selector for this Account */}
-                          <div className="bg-slate-900/60 px-4 py-2 border-b border-slate-800/80 flex items-center justify-between flex-wrap gap-2 text-xs">
-                            <div className="flex items-center gap-2">
-                              <Users className="w-3.5 h-3.5 text-purple-400" />
-                              <span className="text-slate-300 font-semibold text-[11px]">Participating Split Earners for {account.name}:</span>
-                            </div>
-                            <div className="flex items-center gap-2 flex-wrap">
+                          {/* Inline Account Earner Participation Badges */}
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-slate-400 font-semibold hidden sm:inline">Account Earners:</span>
+                            <div className="flex items-center gap-1">
                               {budget.people.map(p => {
                                 const isChecked = accountEnabledEarners.includes(p.id);
-
                                 return (
                                   <button
                                     key={p.id}
@@ -1795,14 +1782,14 @@ export function SettingsModal() {
                                       }
                                       updateAccount(account.id, { enabledEarners: updated });
                                     }}
-                                    className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer border ${
+                                    className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold transition-all cursor-pointer border ${
                                       isChecked
-                                        ? 'bg-purple-950/80 border-purple-500/70 text-purple-200 shadow-sm'
-                                        : 'bg-slate-900 border-slate-800 text-slate-500 opacity-60 hover:opacity-100 hover:border-slate-700'
+                                        ? 'bg-purple-950/80 border-purple-500/70 text-purple-200'
+                                        : 'bg-slate-900 border-slate-800 text-slate-500 opacity-50 hover:opacity-90'
                                     }`}
-                                    title={`Toggle whether ${p.name} participates in bills and credits on ${account.name}`}
+                                    title={`Toggle ${p.name} on ${account.name}`}
                                   >
-                                    <span className={`w-2 h-2 rounded-full ${isChecked ? 'bg-purple-400' : 'bg-slate-600'}`} />
+                                    <span className={`w-1.5 h-1.5 rounded-full ${isChecked ? 'bg-purple-400' : 'bg-slate-600'}`} />
                                     <span>{p.name.split(' ')[0]}</span>
                                     <span className="text-[9px] font-mono">{isChecked ? '✓' : '—'}</span>
                                   </button>
@@ -1811,217 +1798,221 @@ export function SettingsModal() {
                             </div>
                           </div>
 
-                          <div className="overflow-x-auto matrix-scrollbar">
-                            <table className="w-full text-left text-[11px] text-slate-300">
-                              <thead className="bg-slate-900 text-slate-400 uppercase font-medium text-[9px] border-b border-slate-800">
-                                <tr>
-                                  <th className="px-2 py-2 w-[22%]">Bill Name</th>
-                                  <th className="px-2 py-2 w-[11%]">Amount ($)</th>
-                                  <th className="px-2 py-2 w-[12%]">Frequency</th>
-                                  <th className="px-2 py-2 w-[10%]">Due Day</th>
-                                  <th className="px-2 py-2 w-[18%]">Assigned Account</th>
-                                  <th className="px-2 py-2 w-[22%]">Responsible / Split</th>
-                                  <th className="px-2 py-2 w-[5%] text-right">Actions</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-slate-800 bg-slate-950/40">
-                                {accountBills.length === 0 ? (
-                                  <tr>
-                                    <td colSpan={7} className="p-4 text-center text-slate-500 italic text-xs">
-                                      No {billFilterTab === 'archived' ? 'archived' : 'active'} bills assigned to this account
-                                    </td>
-                                  </tr>
-                                ) : (
-                                  accountBills.map(bill => {
-                                    const sumSplits = eligiblePeople.reduce((sum, p) => sum + (parseFloat(bill.splits?.[p.id]) || 0), 0);
-                                    const isValid100 = Math.abs(sumSplits - 100) < 0.01;
-
-                                    const handleSplitChange = (personId, valStr) => {
-                                      let num = Math.max(0, Math.min(100, parseFloat(valStr) || 0));
-                                      if (eligiblePeople.length === 2) {
-                                        const otherP = eligiblePeople.find(p => p.id !== personId);
-                                        const otherVal = Math.max(0, Math.min(100, Math.round((100 - num) * 100) / 100));
-                                        updateBillSplits(bill.id, {
-                                          ...(bill.splits || {}),
-                                          [personId]: num,
-                                          [otherP.id]: otherVal
-                                        });
-                                      } else {
-                                        const otherSum = eligiblePeople
-                                          .filter(p => p.id !== personId)
-                                          .reduce((sum, p) => sum + (parseFloat(bill.splits?.[p.id]) || 0), 0);
-                                        const maxVal = Math.max(0, 100 - otherSum);
-                                        const clamped = Math.min(num, maxVal);
-                                        updateBillSplits(bill.id, {
-                                          ...(bill.splits || {}),
-                                          [personId]: clamped
-                                        });
-                                      }
-                                    };
-
-                                    return (
-                                      <tr key={bill.id} className="hover:bg-slate-900/60 transition-colors">
-                                        <td className="px-2 py-1.5 font-semibold text-slate-200">
-                                          <input
-                                            type="text"
-                                            value={bill.name}
-                                            onChange={e => updateBill(bill.id, { name: e.target.value })}
-                                            className="bg-transparent border-b border-transparent hover:border-slate-700 focus:border-emerald-500 focus:outline-none w-full truncate text-xs"
-                                          />
-                                          <input
-                                            type="text"
-                                            placeholder="Match key (e.g. GA POWER, COMCAST)"
-                                            value={bill.matchingKey || ''}
-                                            onChange={e => updateBill(bill.id, { matchingKey: e.target.value })}
-                                            className="bg-transparent text-[10px] text-blue-400 placeholder:text-slate-600 border-b border-transparent hover:border-slate-700 focus:border-blue-500 focus:outline-none w-full truncate font-mono mt-0.5"
-                                            title="Bank Document Matching Key for reconciliation"
-                                          />
-                                        </td>
-                                        <td className="px-2 py-1.5 font-mono">
-                                          <input
-                                            type="number"
-                                            step="0.01"
-                                            value={bill.amount}
-                                            onChange={e => updateBill(bill.id, { amount: parseFloat(e.target.value) || 0 })}
-                                            className="w-16 bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-slate-200 font-mono text-xs focus:border-emerald-500 focus:outline-none"
-                                          />
-                                        </td>
-                                        <td className="px-2 py-1.5">
-                                          <select
-                                            value={bill.period || 'Monthly'}
-                                            onChange={e => updateBill(bill.id, { period: e.target.value })}
-                                            className="w-full bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-slate-200 text-[11px] truncate focus:border-emerald-500 focus:outline-none"
-                                          >
-                                            <option value="Monthly">Monthly</option>
-                                            <option value="Quarterly">Quarterly</option>
-                                            <option value="Semi-Annual">Semi-Annual</option>
-                                            <option value="Annual">Annual</option>
-                                          </select>
-                                        </td>
-                                        <td className="px-2 py-1.5 font-mono text-xs">
-                                          <div className="flex items-center gap-1">
-                                            <span className="text-slate-400 text-[10px]">Day</span>
-                                            <input
-                                              type="number"
-                                              min="1"
-                                              max="31"
-                                              value={bill.dueDay || 1}
-                                              onChange={e => updateBill(bill.id, { dueDay: parseInt(e.target.value, 10) || 1 })}
-                                              className="w-10 bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-slate-200 text-center font-mono text-[11px] focus:border-emerald-500 focus:outline-none"
-                                            />
-                                          </div>
-                                        </td>
-                                        <td className="px-2 py-1.5">
-                                          <select
-                                            value={bill.accountId}
-                                            onChange={e => updateBill(bill.id, { accountId: e.target.value })}
-                                            className="w-full bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-slate-200 text-[11px] truncate focus:border-emerald-500 focus:outline-none"
-                                          >
-                                            {budget.accounts.map(acc => (
-                                              <option key={acc.id} value={acc.id}>{acc.name}</option>
-                                            ))}
-                                          </select>
-                                        </td>
-                                        <td className="px-2 py-1.5">
-                                          <div className="flex flex-col gap-1">
-                                            <div className="flex items-center gap-1.5 flex-wrap">
-                                              {eligiblePeople.map(p => {
-                                                const val = bill.splits?.[p.id] ?? (eligiblePeople.length > 0 ? (100 / eligiblePeople.length) : 100);
-                                                return (
-                                                  <div key={p.id} className="inline-flex items-center gap-1 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800 text-[10px]">
-                                                    <span className="text-slate-400 font-medium truncate max-w-[45px]">{p.name.split(' ')[0]}:</span>
-                                                    <input
-                                                      type="number"
-                                                      min="0"
-                                                      max="100"
-                                                      step="1"
-                                                      value={Math.round(val * 10) / 10}
-                                                      onChange={e => handleSplitChange(p.id, e.target.value)}
-                                                      className="w-9 bg-transparent text-center font-mono font-bold text-slate-200 focus:outline-none focus:bg-slate-800 rounded"
-                                                    />
-                                                    <span className="text-slate-500">%</span>
-                                                  </div>
-                                                );
-                                              })}
-                                              <span className={`text-[9px] font-mono font-bold px-1.5 py-0.2 rounded border ${
-                                                isValid100
-                                                  ? 'bg-emerald-950/80 text-emerald-300 border-emerald-800/60'
-                                                  : 'bg-rose-950/80 text-rose-300 border-rose-800/60 animate-pulse'
-                                              }`}>
-                                                {Math.round(sumSplits)}%
-                                              </span>
-                                            </div>
-                                            {eligiblePeople.length > 1 && (
-                                              <div className="flex items-center gap-1 text-[9px] flex-wrap">
-                                                <button
-                                                  type="button"
-                                                  onClick={() => {
-                                                    const splits = {};
-                                                    const count = eligiblePeople.length || 1;
-                                                    eligiblePeople.forEach(p => splits[p.id] = Math.round((100 / count) * 100) / 100);
-                                                    updateBillSplits(bill.id, splits);
-                                                  }}
-                                                  className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded cursor-pointer"
-                                                >
-                                                  Equal
-                                                </button>
-                                                {eligiblePeople.map(p => (
-                                                  <button
-                                                    key={p.id}
-                                                    type="button"
-                                                    onClick={() => {
-                                                      const splits = {};
-                                                      eligiblePeople.forEach(person => splits[person.id] = person.id === p.id ? 100 : 0);
-                                                      updateBillSplits(bill.id, splits);
-                                                    }}
-                                                    className="px-1.5 py-0.5 bg-blue-900/40 hover:bg-blue-800/70 text-blue-300 rounded cursor-pointer truncate max-w-[65px]"
-                                                  >
-                                                    100% {p.name.split(' ')[0]}
-                                                  </button>
-                                                ))}
-                                              </div>
-                                            )}
-                                          </div>
-                                        </td>
-                                        <td className="px-2 py-1.5 text-right">
-                                          <div className="flex items-center justify-end gap-1">
-                                            {bill.isArchived ? (
-                                              <button
-                                                type="button"
-                                                onClick={() => unarchiveBill(bill.id)}
-                                                className="p-1 text-emerald-400 hover:text-emerald-300 rounded transition-colors cursor-pointer"
-                                                title="Restore Bill"
-                                              >
-                                                <RotateCcw className="w-3.5 h-3.5" />
-                                              </button>
-                                            ) : (
-                                              <button
-                                                type="button"
-                                                onClick={() => archiveBill(bill.id)}
-                                                className="p-1 text-amber-400 hover:text-amber-300 rounded transition-colors cursor-pointer"
-                                                title="Archive Bill"
-                                              >
-                                                <Archive className="w-3.5 h-3.5" />
-                                              </button>
-                                            )}
-                                            <button
-                                              type="button"
-                                              onClick={() => deleteBill(bill.id)}
-                                              className="p-1 text-slate-500 hover:text-rose-400 rounded transition-colors cursor-pointer"
-                                              title="Delete Bill"
-                                            >
-                                              <Trash2 className="w-3.5 h-3.5" />
-                                            </button>
-                                          </div>
-                                        </td>
-                                      </tr>
-                                    );
-                                  })
-                                )}
-                              </tbody>
-                            </table>
+                          <div className="text-xs text-slate-400">
+                            Subtotal: <span className="font-bold text-rose-400 font-mono text-xs">${accountTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/mo</span>
                           </div>
                         </div>
+
+                        {/* Modern List-Row Bill Items */}
+                        <div className="divide-y divide-slate-800/70 bg-slate-950/40">
+                          {accountBills.length === 0 ? (
+                            <div className="p-5 text-center text-slate-500 italic text-xs">
+                              No {billFilterTab === 'archived' ? 'archived' : 'active'} bills assigned to this account
+                            </div>
+                          ) : (
+                            accountBills.map(bill => {
+                              const sumSplits = eligiblePeople.reduce((sum, p) => sum + (parseFloat(bill.splits?.[p.id]) || 0), 0);
+                              const isValid100 = Math.abs(sumSplits - 100) < 0.01;
+
+                              const handleSplitChange = (personId, valStr) => {
+                                let num = Math.max(0, Math.min(100, parseFloat(valStr) || 0));
+                                if (eligiblePeople.length === 2) {
+                                  const otherP = eligiblePeople.find(p => p.id !== personId);
+                                  const otherVal = Math.max(0, Math.min(100, Math.round((100 - num) * 100) / 100));
+                                  updateBillSplits(bill.id, {
+                                    ...(bill.splits || {}),
+                                    [personId]: num,
+                                    [otherP.id]: otherVal
+                                  });
+                                } else {
+                                  const otherSum = eligiblePeople
+                                    .filter(p => p.id !== personId)
+                                    .reduce((sum, p) => sum + (parseFloat(bill.splits?.[p.id]) || 0), 0);
+                                  const maxVal = Math.max(0, 100 - otherSum);
+                                  const clamped = Math.min(num, maxVal);
+                                  updateBillSplits(bill.id, {
+                                    ...(bill.splits || {}),
+                                    [personId]: clamped
+                                  });
+                                }
+                              };
+
+                              return (
+                                <div
+                                  key={bill.id}
+                                  className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 px-4 py-2.5 hover:bg-slate-900/60 transition-colors"
+                                >
+                                  {/* Left: Bill Name & Bank Match Key */}
+                                  <div className="flex-1 min-w-[200px]">
+                                    <input
+                                      type="text"
+                                      value={bill.name}
+                                      onChange={e => updateBill(bill.id, { name: e.target.value })}
+                                      className="bg-transparent border-b border-transparent hover:border-slate-700 focus:border-emerald-500 focus:outline-none w-full text-xs font-semibold text-slate-100 placeholder:text-slate-500"
+                                      placeholder="Bill Name"
+                                    />
+                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                      <span className="text-[9px] text-slate-500 font-mono">key:</span>
+                                      <input
+                                        type="text"
+                                        placeholder="Bank match key (e.g. GA POWER, COMCAST)"
+                                        value={bill.matchingKey || ''}
+                                        onChange={e => updateBill(bill.id, { matchingKey: e.target.value })}
+                                        className="bg-transparent text-[10px] text-blue-400 placeholder:text-slate-600 border-b border-transparent hover:border-slate-700 focus:border-blue-500 focus:outline-none w-full font-mono"
+                                        title="Bank Document Matching Key for reconciliation"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  {/* Right Controls Group (Schedule + Splits + Actions) */}
+                                  <div className="flex items-center gap-2.5 flex-wrap lg:flex-nowrap shrink-0">
+                                    {/* Amount Input */}
+                                    <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-lg px-2 py-1">
+                                      <span className="text-slate-500 font-mono text-xs">$</span>
+                                      <input
+                                        type="number"
+                                        step="0.01"
+                                        value={bill.amount}
+                                        onChange={e => updateBill(bill.id, { amount: parseFloat(e.target.value) || 0 })}
+                                        className="w-16 bg-transparent text-slate-100 font-mono font-bold text-xs focus:outline-none"
+                                      />
+                                    </div>
+
+                                    {/* Frequency & Due Day Pill */}
+                                    <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-xs">
+                                      <select
+                                        value={bill.period || 'Monthly'}
+                                        onChange={e => updateBill(bill.id, { period: e.target.value })}
+                                        className="bg-transparent text-slate-200 text-xs font-medium focus:outline-none cursor-pointer"
+                                      >
+                                        <option value="Monthly" className="bg-slate-900 text-slate-200">Monthly</option>
+                                        <option value="Quarterly" className="bg-slate-900 text-slate-200">Quarterly</option>
+                                        <option value="Semi-Annual" className="bg-slate-900 text-slate-200">Semi-Annual</option>
+                                        <option value="Annual" className="bg-slate-900 text-slate-200">Annual</option>
+                                      </select>
+                                      <span className="text-slate-600">•</span>
+                                      <span className="text-slate-500 text-[11px]">Due</span>
+                                      <input
+                                        type="number"
+                                        min="1"
+                                        max="31"
+                                        value={bill.dueDay || 1}
+                                        onChange={e => updateBill(bill.id, { dueDay: parseInt(e.target.value, 10) || 1 })}
+                                        className="w-5 bg-transparent text-slate-100 text-center font-mono font-bold text-xs focus:outline-none"
+                                        title="Due day of the month (1-31)"
+                                      />
+                                    </div>
+
+                                    {/* Earner Split Chips */}
+                                    <div className="flex items-center gap-1.5">
+                                      {eligiblePeople.map(p => {
+                                        const val = bill.splits?.[p.id] !== undefined ? (parseFloat(bill.splits[p.id]) || 0) : 0;
+                                        return (
+                                          <div
+                                            key={p.id}
+                                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold border border-slate-800 bg-slate-900 text-slate-200"
+                                          >
+                                            <span className="text-slate-400 font-medium text-[11px] truncate max-w-[50px]">{p.name.split(' ')[0]}:</span>
+                                            <input
+                                              type="text"
+                                              inputMode="numeric"
+                                              value={Math.round(val * 10) / 10}
+                                              onChange={e => {
+                                                const clean = e.target.value.replace(/[^0-9.]/g, '');
+                                                handleSplitChange(p.id, clean);
+                                              }}
+                                              className="w-7 text-center font-mono font-bold text-emerald-400 bg-slate-950/80 rounded px-0.5 py-0 border border-slate-700/80 focus:border-emerald-400 focus:outline-none text-xs"
+                                            />
+                                            <span className="text-slate-500 text-[10px]">%</span>
+                                          </div>
+                                        );
+                                      })}
+
+                                      {/* Split Validation Status Badge */}
+                                      {(() => {
+                                        const isUnassigned = !bill.splits || Object.keys(bill.splits).length === 0 || Object.values(bill.splits).every(v => !parseFloat(v));
+                                        return (
+                                          <span className={`text-[10px] font-mono font-bold px-2 py-1 rounded-lg border ${
+                                            isValid100
+                                              ? 'bg-emerald-950/80 text-emerald-300 border-emerald-800/60'
+                                              : isUnassigned
+                                                ? 'bg-amber-950/80 text-amber-300 border-amber-800/60 animate-pulse'
+                                                : 'bg-rose-950/80 text-rose-300 border-rose-800/60 animate-pulse'
+                                          }`}>
+                                            {isUnassigned ? 'Unassigned' : `${Math.round(sumSplits)}%`}
+                                          </span>
+                                        );
+                                      })()}
+
+                                      {/* ⚡ Quick Split Preset Dropdown */}
+                                      {eligiblePeople.length > 1 && (
+                                        <select
+                                          onChange={e => {
+                                            const val = e.target.value;
+                                            if (!val) return;
+                                            if (val === 'equal') {
+                                              const splits = {};
+                                              const count = eligiblePeople.length || 1;
+                                              eligiblePeople.forEach(p => splits[p.id] = Math.round((100 / count) * 100) / 100);
+                                              updateBillSplits(bill.id, splits);
+                                            } else if (val.startsWith('100_')) {
+                                              const targetPersonId = val.replace('100_', '');
+                                              const splits = {};
+                                              eligiblePeople.forEach(person => splits[person.id] = person.id === targetPersonId ? 100 : 0);
+                                              updateBillSplits(bill.id, splits);
+                                            }
+                                            e.target.value = '';
+                                          }}
+                                          defaultValue=""
+                                          className="bg-slate-900 border border-slate-800 text-slate-300 hover:text-slate-100 hover:border-slate-700 rounded-lg px-2 py-1 text-xs font-semibold focus:outline-none cursor-pointer"
+                                          title="Apply quick split preset"
+                                        >
+                                          <option value="" disabled>⚡ Split</option>
+                                          <option value="equal" className="bg-slate-900 text-slate-200">50/50 Equal</option>
+                                          {eligiblePeople.map(p => (
+                                            <option key={p.id} value={`100_${p.id}`} className="bg-slate-900 text-slate-200">100% {p.name}</option>
+                                          ))}
+                                        </select>
+                                      )}
+                                    </div>
+
+                                    {/* Action Buttons (Archive, Delete) */}
+                                    <div className="flex items-center gap-1 border-l border-slate-800 pl-2">
+                                      {bill.isArchived ? (
+                                        <button
+                                          type="button"
+                                          onClick={() => unarchiveBill(bill.id)}
+                                          className="p-1 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-950/40 rounded transition-colors cursor-pointer"
+                                          title="Restore Bill"
+                                        >
+                                          <RotateCcw className="w-3.5 h-3.5" />
+                                        </button>
+                                      ) : (
+                                        <button
+                                          type="button"
+                                          onClick={() => archiveBill(bill.id)}
+                                          className="p-1 text-amber-400 hover:text-amber-300 hover:bg-amber-950/40 rounded transition-colors cursor-pointer"
+                                          title="Archive Bill"
+                                        >
+                                          <Archive className="w-3.5 h-3.5" />
+                                        </button>
+                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={() => deleteBill(bill.id)}
+                                        className="p-1 text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 rounded transition-colors cursor-pointer"
+                                        title="Delete Bill"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      </div>
                       );
                     })}
                   </div>

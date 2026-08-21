@@ -153,10 +153,14 @@ export function BudgetMetadataProvider({ children }) {
     initLocalStorageOrIndexedDB();
   }, []);
 
-  // Auto Cloud Backup State & Control
+  // Auto Cloud Backup State & Control (defaults to true for authenticated users)
   const [isAutoCloudBackupEnabled, setIsAutoCloudBackupEnabled] = useState(() => {
-    try { return localStorage.getItem('cf_auto_backup_enabled') === 'true'; }
-    catch { return false; }
+    try {
+      const stored = localStorage.getItem('cf_auto_backup_enabled');
+      return stored === null ? true : stored === 'true';
+    } catch {
+      return true;
+    }
   });
   const [lastCloudSyncTime, setLastCloudSyncTime] = useState(null);
 

@@ -69,20 +69,22 @@ export function clearPendingSync() {
  * @returns {Promise<{success: boolean, status: string, error?: string, data?: Object}>}
  */
 export async function pushCloudBackupOptimistic(passcode, budgetData) {
-  savePendingSync(budgetData, passcode);
+  savePendingSync(budgetData, passcode || '');
 
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
     return { success: false, status: 'queued', error: 'Network offline. Payload queued.' };
   }
 
   try {
+    const headers = { 'Content-Type': 'application/json' };
+    if (passcode) {
+      headers['X-Sync-Passcode'] = passcode;
+    }
+
     const res = await fetch(getApiUrl('/api/sync/backup'), {
       method: 'POST',
       credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Sync-Passcode': passcode
-      },
+      headers,
       body: JSON.stringify({ budget: budgetData })
     });
 
@@ -109,18 +111,20 @@ export async function pushCloudBackupOptimistic(passcode, budgetData) {
  */
 export async function flushPendingCloudSync(passcode) {
   const pending = getPendingSync();
-  if (!pending || !pending.payload || !passcode) return false;
+  if (!pending || !pending.payload) return false;
 
   if (typeof navigator !== 'undefined' && !navigator.onLine) return false;
 
   try {
+    const headers = { 'Content-Type': 'application/json' };
+    if (passcode) {
+      headers['X-Sync-Passcode'] = passcode;
+    }
+
     const res = await fetch(getApiUrl('/api/sync/backup'), {
       method: 'POST',
       credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Sync-Passcode': passcode
-      },
+      headers,
       body: JSON.stringify({ budget: pending.payload })
     });
 

@@ -123,14 +123,7 @@ async function handleSyncBackup(context) {
   const payload = await verifyToken(token, env?.JWT_SECRET);
   const userId = payload?.userId || payload?.id;
   if (!payload || !userId) {
-    return new Response(JSON.stringify({ error: 'Unauthorized: Invalid JWT session' }), {
-      status: 401,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
-
-  if (!(await verifySyncGuard(request, env))) {
-    return new Response(JSON.stringify({ error: 'Unauthorized: Invalid or missing vault passcode' }), {
+    return new Response(JSON.stringify({ error: 'Unauthorized: Please log in to sync data' }), {
       status: 401,
       headers: { 'Content-Type': 'application/json' }
     });
@@ -172,14 +165,7 @@ async function handleSyncRestore(context) {
   const payload = await verifyToken(token, env?.JWT_SECRET);
   const userId = payload?.userId || payload?.id;
   if (!payload || !userId) {
-    return new Response(JSON.stringify({ error: 'Unauthorized: Invalid JWT session' }), {
-      status: 401,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
-
-  if (!(await verifySyncGuard(request, env))) {
-    return new Response(JSON.stringify({ error: 'Unauthorized: Invalid or missing vault passcode' }), {
+    return new Response(JSON.stringify({ error: 'Unauthorized: Please log in to restore data' }), {
       status: 401,
       headers: { 'Content-Type': 'application/json' }
     });

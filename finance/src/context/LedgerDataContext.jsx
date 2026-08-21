@@ -3,8 +3,9 @@ import React, { createContext, useContext, useState, useEffect, useMemo, useCall
 import { initialBudgetData } from '../initialData';
 import { fakeDemoBudgetData } from '../demoPresetData';
 import { useBudgetMetadata } from './BudgetMetadataContext';
+import { useAuth } from './AuthContext';
 import { getApiUrl, pushCloudBackupOptimistic, flushPendingCloudSync } from '../utils/api';
-import { saveBudgetData, clearAndRestoreBudgetData, clearBudgetData } from '../utils/indexedDB';
+import { getBudgetData, saveBudgetData, clearAndRestoreBudgetData, clearBudgetData } from '../utils/indexedDB';
 import { processSpreadsheetImport } from '../utils/spreadsheet';
 
 export const LedgerDataContext = createContext(null);
@@ -12,6 +13,7 @@ export const LedgerDataStateContext = createContext(null);
 export const LedgerDataDispatchContext = createContext(null);
 
 export function LedgerDataProvider({ children }) {
+  const { isAuthenticated } = useAuth();
   const metadata = useBudgetMetadata();
   const {
     metadataState,
@@ -29,9 +31,10 @@ export function LedgerDataProvider({ children }) {
   const [lineItems, setLineItems] = useState([]);
   const [transactions, setTransactions] = useState([]);
 
-  // Memory-only storage for cloud vault
+  // Cloud vault sync state (unlocked automatically when user is signed in)
   const [syncPasscode, setSyncPasscode] = useState('');
-  const [isSyncUnlocked, setIsSyncUnlocked] = useState(false);
+  const [isSyncUnlockedManual, setIsSyncUnlockedManual] = useState(false);
+  const isSyncUnlocked = isAuthenticated || isSyncUnlockedManual;
 
   const dailyMatrixRef = useRef(dailyMatrix);
   const [matrixVersion, setMatrixVersion] = useState(0);
@@ -168,20 +171,24 @@ export function LedgerDataProvider({ children }) {
 
   // Cloud Vault Pull Restore
   const pullCloudRestore = useCallback(async (passcode) => {
+    const headers = { 'Content-Type': 'application/json' };
+    const code = passcode || syncPasscode;
+    if (code) {
+      headers['X-Sync-Passcode'] = code;
+    }
     const res = await fetch(getApiUrl('/api/sync/restore'), {
       method: 'GET',
       credentials: 'include',
-      headers: {
-        'X-Sync-Passcode': passcode
-      }
+      headers
     });
     const data = await res.json();
     if (!res.ok || !data.success || !data.budget) {
       throw new Error(data.error || 'Failed to restore data from Cloud Vault.');
     }
     await restoreFromBackup(data.budget);
+    setLastCloudSyncTime(new Date().toLocaleTimeString());
     return data;
-  }, [restoreFromBackup]);
+  }, [syncPasscode, restoreFromBackup, setLastCloudSyncTime]);
 
   // Export complete JSON backup helper using Blob API
   const exportBackupJson = useCallback(() => {
@@ -210,26 +217,44 @@ export function LedgerDataProvider({ children }) {
   // Silent background retry effect for pending sync queue on app load or network recovery
   useEffect(() => {
     const handleOnlineRetry = async () => {
-      if (!syncPasscode) return;
       const flushed = await flushPendingCloudSync(syncPasscode);
       if (flushed) {
         setLastCloudSyncTime(new Date().toLocaleTimeString());
       }
     };
 
-    if (syncPasscode) {
+    if (isAuthenticated) {
       handleOnlineRetry();
     }
 
     window.addEventListener('online', handleOnlineRetry);
     return () => window.removeEventListener('online', handleOnlineRetry);
-  }, [syncPasscode, setLastCloudSyncTime]);
+  }, [isAuthenticated, syncPasscode, setLastCloudSyncTime]);
+
+  // Initial auto cloud restore on authenticated load / fresh device
+  const hasAutoPulledRef = useRef(false);
+  useEffect(() => {
+    if (!isAuthenticated || !isDbLoaded || hasAutoPulledRef.current) return;
+
+    (async () => {
+      try {
+        hasAutoPulledRef.current = true;
+        const stored = await getBudgetData();
+        const localData = budgetRef.current;
+        const isLocalEmpty = !localData || (!localData.accounts?.length && !localData.bills?.length);
+        if (!stored || isLocalEmpty) {
+          await pullCloudRestore();
+        }
+      } catch (err) {
+        console.info('Initial cloud vault sync check:', err?.message || err);
+      }
+    })();
+  }, [isAuthenticated, isDbLoaded, pullCloudRestore]);
 
   // Debounced Auto Cloud Backup effect (45-second debounce to mitigate Cloudflare D1 write lock contention)
   useEffect(() => {
-    if (!isDbLoaded || !isAutoCloudBackupEnabled) return;
-
-    if (!isSyncUnlocked || !syncPasscode) return;
+    if (!isDbLoaded || !isAuthenticated) return;
+    if (isAutoCloudBackupEnabled === false) return;
 
     const timer = setTimeout(async () => {
       try {
@@ -240,7 +265,7 @@ export function LedgerDataProvider({ children }) {
     }, 45000);
 
     return () => clearTimeout(timer);
-  }, [financialDataChecksum, isDbLoaded, isAutoCloudBackupEnabled, isSyncUnlocked, syncPasscode, pushCloudBackup]);
+  }, [financialDataChecksum, isDbLoaded, isAutoCloudBackupEnabled, isAuthenticated, syncPasscode, pushCloudBackup]);
 
   // Load 100% Fake Demo Preset Data
   const loadDemoPreset = useCallback(() => {

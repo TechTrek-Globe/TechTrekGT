@@ -88,6 +88,7 @@ export function SettingsModal() {
     clearDebugLogs,
     addDebugLog
   } = useBudgetMetadata();
+  const { isAuthenticated } = useAuth();
   const { syncPasscode: cloudPasscode, isSyncUnlocked: isCloudUnlocked } = useLedgerDataState();
   const {
     resetToDefaults,
@@ -273,7 +274,7 @@ export function SettingsModal() {
   const handlePushCloudBackup = async () => {
     setCloudSyncStatus({ type: 'info', message: 'Saving changes locally & syncing with Cloud Vault in background...' });
     try {
-      const res = await pushCloudBackup(cloudPasscode);
+      const res = await pushCloudBackup();
       if (res && res.success) {
         setCloudSyncStatus({ type: 'success', message: `Successfully backed up data to Cloud Vault! (${new Date().toLocaleTimeString()})` });
       } else {
@@ -288,7 +289,7 @@ export function SettingsModal() {
     setCloudSyncStatus(null);
     setIsCloudSyncing(true);
     try {
-      await pullCloudRestore(cloudPasscode);
+      await pullCloudRestore();
       setCloudSyncStatus({ type: 'success', message: `Successfully restored data from Cloud Vault! Database & UI state refreshed.` });
     } catch (err) {
       setCloudSyncStatus({ type: 'error', message: `Cloud restore failed: ${err.message}` });
@@ -2158,64 +2159,35 @@ export function SettingsModal() {
 
               {/* Cloudflare D1 Vault Sync Section */}
               <div className="p-5 rounded-2xl glass-card border border-purple-800/60 bg-purple-950/10 space-y-4">
-                <div className={`flex items-center justify-between flex-wrap gap-2 transition-opacity ${!isCloudUnlocked ? 'opacity-50' : 'opacity-100'}`}>
+                <div className="flex items-center justify-between flex-wrap gap-2">
                   <div className="flex items-center gap-2.5">
                     <span className="p-2 rounded-xl bg-purple-600/20 text-purple-400 border border-purple-500/30">
                       <Cloud className="w-5 h-5" />
                     </span>
                     <div>
                       <h4 className="text-sm font-bold text-slate-100">Cloudflare D1 Vault Sync</h4>
-                      <p className="text-xs text-slate-400">Passcode-gated encrypted backup on Cloudflare D1</p>
+                      <p className="text-xs text-slate-400">Encrypted personal backup &amp; cross-device sync on Cloudflare D1</p>
                     </div>
                   </div>
-                  {isCloudUnlocked ? (
+                  {isAuthenticated ? (
                     <div className="flex items-center gap-2">
                       <span className="text-[10px] font-mono px-2.5 py-1 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800 font-semibold">
-                        Vault Unlocked
+                        Account Synced
                       </span>
-                      <button
-                        onClick={handleLockCloudVault}
-                        className="text-xs text-slate-400 hover:text-slate-200 underline cursor-pointer font-medium"
-                      >
-                        Lock Vault
-                      </button>
                     </div>
                   ) : (
                     <span className="text-[10px] font-mono px-2.5 py-1 rounded-full bg-slate-800 text-slate-400 border border-slate-700 font-semibold">
-                      Locked
+                      Sign-in Required
                     </span>
                   )}
                 </div>
 
-                {!isCloudUnlocked ? (
-                  <form onSubmit={handleUnlockCloudVault} className="space-y-3 pt-1">
-                    <p className="text-xs text-slate-300 opacity-50">
-                      Enter Access Passcode to Enable Cloud Sync across device sessions.
+                {!isAuthenticated ? (
+                  <div className="space-y-3 pt-1">
+                    <p className="text-xs text-slate-400">
+                      Sign in to your account to automatically sync your budget vault across all your computers and devices.
                     </p>
-                    <div className="flex items-center gap-2 opacity-100">
-                      <div className="relative flex-1">
-                        <KeyRound className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
-                        <input
-                          type="password"
-                          placeholder="Enter Access Passcode..."
-                          value={passcodeInput}
-                          onChange={e => setPasscodeInput(e.target.value)}
-                          className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-slate-100 font-mono focus:outline-none focus:border-purple-500"
-                        />
-                      </div>
-                      <button
-                        type="submit"
-                        disabled={isVerifyingCode || !passcodeInput}
-                        className="px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
-                      >
-                        {isVerifyingCode ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Lock className="w-3.5 h-3.5" />}
-                        <span>Unlock Vault</span>
-                      </button>
-                    </div>
-                    {passcodeError && (
-                      <p className="text-xs text-rose-400 font-semibold opacity-100">{passcodeError}</p>
-                    )}
-                  </form>
+                  </div>
                 ) : (
                   <div className="space-y-4 pt-1">
                     {/* Auto Backup Toggle Switch */}
@@ -2224,7 +2196,7 @@ export function SettingsModal() {
                         <div className="text-xs font-bold text-slate-200">Automatic Cloud Backup</div>
                         <div className="text-[11px] text-slate-400">
                           {isAutoCloudBackupEnabled
-                            ? (lastCloudSyncTime ? `Auto-sync active • Last backed up at ${lastCloudSyncTime}` : 'Auto-sync active • Syncs 3s after local changes')
+                            ? (lastCloudSyncTime ? `Auto-sync active • Last backed up at ${lastCloudSyncTime}` : 'Auto-sync active • Debounced cloud sync on local edits')
                             : 'Disabled • Local edits will not push to D1 automatically'}
                         </div>
                       </div>
@@ -2247,7 +2219,9 @@ export function SettingsModal() {
                       <div className={`p-3.5 rounded-xl text-xs flex items-center justify-between ${
                         cloudSyncStatus.type === 'success'
                           ? 'bg-emerald-950/80 border border-emerald-800 text-emerald-300'
-                          : 'bg-rose-950/80 border border-rose-800 text-rose-300'
+                          : cloudSyncStatus.type === 'info'
+                            ? 'bg-blue-950/80 border border-blue-800 text-blue-300'
+                            : 'bg-rose-950/80 border border-rose-800 text-rose-300'
                       }`}>
                         <span>{cloudSyncStatus.message}</span>
                         <button onClick={() => setCloudSyncStatus(null)} className="text-slate-400 hover:text-slate-200 text-xs cursor-pointer ml-2 font-bold">Dismiss</button>

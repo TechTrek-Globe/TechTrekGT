@@ -70,10 +70,15 @@ export async function onRequestPost(context) {
       });
     }
 
-    // Create JWT token
-    const token = await createToken({ userId: user.id, email: user.email, householdId, name: user.name }, env.JWT_SECRET);
-    
     const maxAge = body.rememberMe ? 30 * 24 * 3600 : 24 * 3600;
+
+    // Create JWT token
+    const token = await createToken(
+      { userId: user.id, email: user.email, householdId, name: user.name },
+      env.JWT_SECRET,
+      maxAge
+    );
+    
     const cookieOptions = [
       `auth_token=${token}`,
       'HttpOnly',

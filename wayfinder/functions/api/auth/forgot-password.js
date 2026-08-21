@@ -78,24 +78,31 @@ export async function onRequestPost(context) {
       });
     }
 
-    // Verify security answer if configured for user
-    if (user.security_answer_hash) {
-      if (!securityAnswer) {
-        return new Response(JSON.stringify({ error: 'Security answer is required.' }), {
-          status: 400,
-          headers: { 'Content-Type': 'application/json' }
-        });
-      }
+    // Require security question for automated account recovery
+    if (!user.security_answer_hash) {
+      return new Response(JSON.stringify({
+        error: 'This account does not have a security question configured for automated recovery. Please contact support.'
+      }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
 
-      const cleanAnswer = securityAnswer.trim().toLowerCase();
-      const isValidAnswer = await verifyPassword(cleanAnswer, user.security_answer_hash);
+    if (!securityAnswer) {
+      return new Response(JSON.stringify({ error: 'Security answer is required.' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
 
-      if (!isValidAnswer) {
-        return new Response(JSON.stringify({ error: 'Incorrect security answer. Please try again.' }), {
-          status: 400,
-          headers: { 'Content-Type': 'application/json' }
-        });
-      }
+    const cleanAnswer = securityAnswer.trim().toLowerCase();
+    const isValidAnswer = await verifyPassword(cleanAnswer, user.security_answer_hash);
+
+    if (!isValidAnswer) {
+      return new Response(JSON.stringify({ error: 'Incorrect security answer. Please try again.' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
 
     // Generate 6-digit numeric verification code
@@ -106,19 +113,24 @@ export async function onRequestPost(context) {
     const now = Date.now();
     const expiresAt = now + (15 * 60 * 1000); // 15 minutes validity
 
-    // Invalidate previous active tokens for this user
-    await env.DB.prepare('UPDATE password_resets SET used = 1 WHERE email = ? AND used = 0').bind(cleanEmail).run();
+    // Invalidate previous active tokens for this user and insert new reset token atomically
+    await env.DB.batch([
+      env.DB.prepare('UPDATE password_resets SET used = 1 WHERE email = ? AND used = 0').bind(cleanEmail),
+      env.DB.prepare(
+        'INSERT INTO password_resets (id, user_id, email, token, expires_at, used, created_at) VALUES (?, ?, ?, ?, ?, 0, ?)'
+      ).bind(resetId, user.id, cleanEmail, resetCode, expiresAt, now)
+    ]);
 
-    // Insert new reset token
-    await env.DB.prepare(
-      'INSERT INTO password_resets (id, user_id, email, token, expires_at, used, created_at) VALUES (?, ?, ?, ?, ?, 0, ?)'
-    ).bind(resetId, user.id, cleanEmail, resetCode, expiresAt, now).run();
+    const origin = request.headers.get('Origin') || '';
+    const isLocal = origin.includes('localhost') || origin.includes('127.0.0.1');
+
+    console.log(`[forgot-password] Password reset code generated for ${cleanEmail}: ${resetCode}`);
 
     return new Response(JSON.stringify({
       success: true,
-      message: 'Password reset code generated successfully.',
-      resetToken: resetCode,
-      email: cleanEmail
+      message: 'Security answer verified. Enter your reset verification code to update your password.',
+      email: cleanEmail,
+      ...(isLocal ? { resetToken: resetCode } : {})
     }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }

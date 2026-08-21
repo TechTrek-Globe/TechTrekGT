@@ -97,21 +97,20 @@ export async function onRequestPost(context) {
     const cleanSecurityAnswer = securityAnswer.trim().toLowerCase();
     const securityAnswerHash = await hashPassword(cleanSecurityAnswer);
 
-    // Insert User with security question and answer hash
-    await env.DB.prepare(
-      'INSERT INTO users (id, email, password_hash, name, security_question, security_answer_hash) VALUES (?, ?, ?, ?, ?, ?)'
-    ).bind(userId, cleanEmail, passwordHash, name.trim(), cleanSecurityQuestion, securityAnswerHash).run();
-
-    // Insert Household
-    await env.DB.prepare(
-      'INSERT INTO households (id, name) VALUES (?, ?)'
-    ).bind(householdId, `${name.trim()}'s Household`).run();
-
-    // Insert Household Member
     const memberId = `hm-${crypto.randomUUID()}`;
-    await env.DB.prepare(
-      'INSERT INTO household_members (id, household_id, user_id, role) VALUES (?, ?, ?, ?)'
-    ).bind(memberId, householdId, userId, 'owner').run();
+
+    // Batch insert User, Household, and Household Member
+    await env.DB.batch([
+      env.DB.prepare(
+        'INSERT INTO users (id, email, password_hash, name, security_question, security_answer_hash) VALUES (?, ?, ?, ?, ?, ?)'
+      ).bind(userId, cleanEmail, passwordHash, name.trim(), cleanSecurityQuestion, securityAnswerHash),
+      env.DB.prepare(
+        'INSERT INTO households (id, name) VALUES (?, ?)'
+      ).bind(householdId, `${name.trim()}'s Household`),
+      env.DB.prepare(
+        'INSERT INTO household_members (id, household_id, user_id, role) VALUES (?, ?, ?, ?)'
+      ).bind(memberId, householdId, userId, 'owner')
+    ]);
 
     if (!env.JWT_SECRET) {
       return new Response(JSON.stringify({ error: 'Server misconfiguration: missing JWT_SECRET' }), {
@@ -120,10 +119,15 @@ export async function onRequestPost(context) {
       });
     }
 
-    // Create JWT token
-    const token = await createToken({ userId, email: cleanEmail, householdId, name: name.trim() }, env.JWT_SECRET);
-
     const maxAge = body.rememberMe ? 30 * 24 * 3600 : 24 * 3600;
+
+    // Create JWT token
+    const token = await createToken(
+      { userId, email: cleanEmail, householdId, name: name.trim() },
+      env.JWT_SECRET,
+      maxAge
+    );
+
     const cookieOptions = [
       `auth_token=${token}`,
       'HttpOnly',

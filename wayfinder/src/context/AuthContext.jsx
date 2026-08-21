@@ -63,16 +63,6 @@ export function AuthProvider({ children }) {
       setIsAuthModalOpen(false);
       return data;
     } catch (err) {
-      if (err.message && err.message !== 'Failed to fetch' && !err.message.includes('NetworkError') && !err.message.includes('fetch')) {
-        throw err;
-      }
-      if (email && password) {
-        const localUser = { id: 'local-user', name: email.split('@')[0] || 'Local User', email };
-        setIsAuthenticated(true);
-        setUser(localUser);
-        setIsAuthModalOpen(false);
-        return { success: true, user: localUser };
-      }
       throw err;
     }
   };
@@ -96,16 +86,6 @@ export function AuthProvider({ children }) {
       setIsAuthModalOpen(false);
       return data;
     } catch (err) {
-      if (err.message && err.message !== 'Failed to fetch' && !err.message.includes('NetworkError') && !err.message.includes('fetch')) {
-        throw err;
-      }
-      if (email && password) {
-        const localUser = { id: 'local-user', name: name || email.split('@')[0] || 'Local User', email };
-        setIsAuthenticated(true);
-        setUser(localUser);
-        setIsAuthModalOpen(false);
-        return { success: true, user: localUser };
-      }
       throw err;
     }
   };

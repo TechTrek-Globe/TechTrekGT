@@ -74,6 +74,66 @@ export function WayfinderProvider({ children }) {
 
     const data = await res.json();
     await fetchDocuments(journeyId);
+    await fetchJobs();
+    return data;
+  };
+
+  const getJobFields = async (docId) => {
+    const res = await fetch(getApiUrl(`/api/wayfinder/import-jobs/${docId}`), { credentials: 'include' });
+    if (!res.ok) {
+      const errorData = await res.json();
+      throw new Error(errorData.error || 'Failed to fetch job fields');
+    }
+    return res.json();
+  };
+
+  const saveExtractedFields = async (docId, fields, provider = null, docType = null) => {
+    const res = await fetch(getApiUrl(`/api/wayfinder/import-jobs/${docId}/fields`), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ fields, provider, doc_type: docType })
+    });
+    if (!res.ok) {
+      const errorData = await res.json();
+      throw new Error(errorData.error || 'Failed to save extracted fields');
+    }
+    const data = await res.json();
+    await fetchDocuments();
+    await fetchJobs();
+    return data;
+  };
+
+  const approveImportJob = async (docId, journeyId = 'poland-christmas-2026', fieldOverrides = {}) => {
+    const res = await fetch(getApiUrl(`/api/wayfinder/import-jobs/${docId}/approve`), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ journey_id: journeyId, field_overrides: fieldOverrides })
+    });
+    if (!res.ok) {
+      const errorData = await res.json();
+      throw new Error(errorData.error || errorData.message || 'Failed to approve import job');
+    }
+    const data = await res.json();
+    await fetchItinerary(journeyId);
+    await fetchDocuments(journeyId);
+    await fetchJobs();
+    return data;
+  };
+
+  const rejectImportJob = async (docId) => {
+    const res = await fetch(getApiUrl(`/api/wayfinder/import-jobs/${docId}/reject`), {
+      method: 'POST',
+      credentials: 'include'
+    });
+    if (!res.ok) {
+      const errorData = await res.json();
+      throw new Error(errorData.error || 'Failed to reject import job');
+    }
+    const data = await res.json();
+    await fetchDocuments();
+    await fetchJobs();
     return data;
   };
 
@@ -99,7 +159,11 @@ export function WayfinderProvider({ children }) {
       fetchItinerary,
       fetchDocuments,
       fetchJobs,
-      uploadDocument
+      uploadDocument,
+      getJobFields,
+      saveExtractedFields,
+      approveImportJob,
+      rejectImportJob
     }}>
       {children}
     </WayfinderContext.Provider>

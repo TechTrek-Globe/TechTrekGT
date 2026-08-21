@@ -25,14 +25,14 @@ export async function handleDocuments(context, url, method) {
       const journeyId = url.searchParams.get('journey_id') || url.searchParams.get('journeyId');
       let docs;
       if (journeyId) {
-        // Verify journey ownership
+        // Verify journey ownership or public visibility
         const j = await env.DB.prepare(
-          'SELECT id FROM wayfinder_journeys WHERE id = ? AND created_by = ?'
-        ).bind(journeyId, user.userId).first();
+          `SELECT id FROM wayfinder_journeys WHERE (id = ? OR slug = ?) AND (created_by = ? OR visibility = 'public')`
+        ).bind(journeyId, journeyId, user.userId).first();
         if (!j) return json({ error: 'Journey not found' }, 404);
         docs = await env.DB.prepare(
-          'SELECT * FROM wayfinder_documents WHERE user_id = ? AND journey_id = ? AND deleted_at IS NULL ORDER BY upload_date DESC'
-        ).bind(user.userId, journeyId).all();
+          'SELECT * FROM wayfinder_documents WHERE user_id = ? AND (journey_id = ? OR journey_id = ?) AND deleted_at IS NULL ORDER BY upload_date DESC'
+        ).bind(user.userId, journeyId, j.id).all();
       } else {
         docs = await env.DB.prepare(
           'SELECT * FROM wayfinder_documents WHERE user_id = ? AND deleted_at IS NULL ORDER BY upload_date DESC'
@@ -96,32 +96,36 @@ export async function handleDocuments(context, url, method) {
         }
       }
 
-      // Journey ownership check
+      // Journey ownership / public visibility check
       if (journey_id) {
         const j = await env.DB.prepare(
-          'SELECT id FROM wayfinder_journeys WHERE id = ? AND created_by = ?'
-        ).bind(journey_id, user.userId).first();
+          `SELECT id FROM wayfinder_journeys WHERE (id = ? OR slug = ?) AND (created_by = ? OR visibility = 'public')`
+        ).bind(journey_id, journey_id, user.userId).first();
         if (!j) return json({ error: 'Journey not found' }, 404);
+        journey_id = j.id;
       }
 
       const id = generateId();
       const safeName = sanitizeFilename(original_filename);
-
-      await env.DB.prepare(
-        `INSERT INTO wayfinder_documents
-         (id, user_id, journey_id, original_filename, safe_display_name, mime_type,
-          file_size_bytes, file_hash, storage_status, processing_status, security_scan_status)
-         VALUES (?,?,?,?,?,?,?,?,'pending_r2','pending','pending')`
-      ).bind(id, user.userId, journey_id || null, original_filename, safeName,
-             mime_type, file_size_bytes || null, file_hash || null).run();
-
-      // Create extraction job placeholder
       const jobId = generateId();
-      await env.DB.prepare(
-        'INSERT INTO wayfinder_extraction_jobs (id, document_id, status) VALUES (?,?,?)'
-      ).bind(jobId, id, 'pending').run();
+      const auditId = generateId();
 
-      await auditEvent(env, user.userId, journey_id, 'document', id, 'register');
+      // Batch document creation, extraction job placeholder, and audit event atomically
+      await env.DB.batch([
+        env.DB.prepare(
+          `INSERT INTO wayfinder_documents
+           (id, user_id, journey_id, original_filename, safe_display_name, mime_type,
+            file_size_bytes, file_hash, storage_status, processing_status, security_scan_status)
+           VALUES (?,?,?,?,?,?,?,?,'pending_r2','pending','pending')`
+        ).bind(id, user.userId, journey_id || null, original_filename, safeName,
+               mime_type, file_size_bytes || null, file_hash || null),
+        env.DB.prepare(
+          'INSERT INTO wayfinder_extraction_jobs (id, document_id, status) VALUES (?,?,?)'
+        ).bind(jobId, id, 'pending'),
+        env.DB.prepare(
+          'INSERT INTO wayfinder_audit_events (id, user_id, journey_id, entity_type, entity_id, action) VALUES (?,?,?,?,?,?)'
+        ).bind(auditId, user.userId, journey_id || null, 'document', id, 'register')
+      ]);
 
       return json({
         document_id: id,
@@ -140,11 +144,17 @@ export async function handleDocuments(context, url, method) {
       if (!doc) return json({ error: 'Document not found' }, 404);
 
       const now = new Date().toISOString();
-      await env.DB.prepare(
-        'UPDATE wayfinder_documents SET deleted_at = ?, deleted_by = ?, retention_status = ? WHERE id = ?'
-      ).bind(now, user.userId, 'deleted', docId).run();
+      const auditId = generateId();
 
-      await auditEvent(env, user.userId, doc.journey_id, 'document', docId, 'delete');
+      await env.DB.batch([
+        env.DB.prepare(
+          'UPDATE wayfinder_documents SET deleted_at = ?, deleted_by = ?, retention_status = ? WHERE id = ?'
+        ).bind(now, user.userId, 'deleted', docId),
+        env.DB.prepare(
+          'INSERT INTO wayfinder_audit_events (id, user_id, journey_id, entity_type, entity_id, action) VALUES (?,?,?,?,?,?)'
+        ).bind(auditId, user.userId, doc.journey_id, 'document', docId, 'delete')
+      ]);
+
       return json({ success: true });
     }
 

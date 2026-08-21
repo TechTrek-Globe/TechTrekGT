@@ -116,10 +116,17 @@ export async function handleImportJobs(context, url, method) {
     // --- POST approve: user approves extraction, create itinerary item ---
     if (method === 'POST' && action === 'approve') {
       const body = await request.json().catch(() => ({}));
-      const journey_id = body.journey_id || body.journeyId;
+      const journey_id = body.journey_id || body.journeyId || doc.journey_id;
       const { field_overrides = {} } = body;
 
       if (!journey_id) return json({ error: 'journey_id required' }, 400);
+
+      // Verify journey ownership or public visibility
+      const j = await env.DB.prepare(
+        `SELECT id FROM wayfinder_journeys WHERE (id = ? OR slug = ?) AND (created_by = ? OR visibility = 'public')`
+      ).bind(journey_id, journey_id, user.userId).first();
+      if (!j) return json({ error: 'Journey not found' }, 404);
+      const finalJourneyId = j.id;
 
       // Verify no low-confidence critical fields are unconfirmed
       const unconfirmed = await env.DB.prepare(
@@ -136,12 +143,16 @@ export async function handleImportJobs(context, url, method) {
       }
 
       // Apply user overrides to extracted fields
-      for (const [fieldName, value] of Object.entries(field_overrides)) {
-        await env.DB.prepare(
+      const overrideStmts = Object.entries(field_overrides).map(([fieldName, value]) => {
+        return env.DB.prepare(
           `UPDATE wayfinder_extracted_fields
            SET user_value = ?, verification_status = 'user_verified'
            WHERE document_id = ? AND field_name = ?`
-        ).bind(sanitizeText(String(value)), docId, fieldName).run();
+        ).bind(sanitizeText(String(value)), docId, fieldName);
+      });
+
+      if (overrideStmts.length > 0) {
+        await env.DB.batch(overrideStmts);
       }
 
       // Build itinerary item from fields
@@ -159,52 +170,64 @@ export async function handleImportJobs(context, url, method) {
       const title = buildTitle(docType, fieldMap, doc.safe_display_name);
 
       const itemId = generateId();
-      await env.DB.prepare(
-        `INSERT INTO wayfinder_itinerary_items
-         (id, journey_id, user_id, item_type, title, provider, local_date, local_time,
-          end_date, end_time, location, source_document_id, status, verification_status, visibility)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'confirmed','user_verified','private')`
-      ).bind(
-        itemId, journey_id, user.userId, itemType, title,
-        fieldMap.airline || fieldMap.hotel_name || fieldMap.carrier || fieldMap.supplier || doc.detected_provider || null,
-        fieldMap.departure_date || fieldMap.check_in_date || fieldMap.start_date || null,
-        fieldMap.departure_time || fieldMap.check_in_time || fieldMap.start_time || null,
-        fieldMap.arrival_date || fieldMap.check_out_date || fieldMap.end_date || null,
-        fieldMap.arrival_time || fieldMap.check_out_time || fieldMap.end_time || null,
-        fieldMap.destination_airport || fieldMap.hotel_address || fieldMap.meeting_point || null,
-        docId,
-      ).run();
+      const auditId1 = generateId();
+      const auditId2 = generateId();
+      const nowIso = new Date().toISOString();
 
-      // Mark job as approved
-      await env.DB.prepare(
-        `UPDATE wayfinder_extraction_jobs
-         SET status = 'approved', reviewed_at = ?, reviewed_by = ?, review_decision = 'approved'
-         WHERE document_id = ?`
-      ).bind(new Date().toISOString(), user.userId, docId).run();
-
-      await env.DB.prepare(
-        `UPDATE wayfinder_documents SET processing_status = 'imported' WHERE id = ?`
-      ).bind(docId).run();
-
-      await auditEvent(env, user.userId, journey_id, 'document', docId, 'approve');
-      await auditEvent(env, user.userId, journey_id, 'itinerary_item', itemId, 'create_from_import');
+      await env.DB.batch([
+        env.DB.prepare(
+          `INSERT INTO wayfinder_itinerary_items
+           (id, journey_id, user_id, item_type, title, provider, local_date, local_time,
+            end_date, end_time, location, source_document_id, status, verification_status, visibility)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'confirmed','user_verified','private')`
+        ).bind(
+          itemId, finalJourneyId, user.userId, itemType, title,
+          fieldMap.airline || fieldMap.hotel_name || fieldMap.carrier || fieldMap.supplier || doc.detected_provider || null,
+          fieldMap.departure_date || fieldMap.check_in_date || fieldMap.start_date || null,
+          fieldMap.departure_time || fieldMap.check_in_time || fieldMap.start_time || null,
+          fieldMap.arrival_date || fieldMap.check_out_date || fieldMap.end_date || null,
+          fieldMap.arrival_time || fieldMap.check_out_time || fieldMap.end_time || null,
+          fieldMap.destination_airport || fieldMap.hotel_address || fieldMap.meeting_point || null,
+          docId,
+        ),
+        env.DB.prepare(
+          `UPDATE wayfinder_extraction_jobs
+           SET status = 'approved', reviewed_at = ?, reviewed_by = ?, review_decision = 'approved'
+           WHERE document_id = ?`
+        ).bind(nowIso, user.userId, docId),
+        env.DB.prepare(
+          `UPDATE wayfinder_documents SET processing_status = 'imported' WHERE id = ?`
+        ).bind(docId),
+        env.DB.prepare(
+          'INSERT INTO wayfinder_audit_events (id, user_id, journey_id, entity_type, entity_id, action) VALUES (?,?,?,?,?,?)'
+        ).bind(auditId1, user.userId, finalJourneyId, 'document', docId, 'approve'),
+        env.DB.prepare(
+          'INSERT INTO wayfinder_audit_events (id, user_id, journey_id, entity_type, entity_id, action) VALUES (?,?,?,?,?,?)'
+        ).bind(auditId2, user.userId, finalJourneyId, 'itinerary_item', itemId, 'create_from_import')
+      ]);
 
       return json({ success: true, itinerary_item_id: itemId });
     }
 
     // --- POST reject ---
     if (method === 'POST' && action === 'reject') {
-      await env.DB.prepare(
-        `UPDATE wayfinder_extraction_jobs
-         SET status = 'rejected', reviewed_at = ?, reviewed_by = ?, review_decision = 'rejected'
-         WHERE document_id = ?`
-      ).bind(new Date().toISOString(), user.userId, docId).run();
+      const nowIso = new Date().toISOString();
+      const auditId = generateId();
 
-      await env.DB.prepare(
-        `UPDATE wayfinder_documents SET processing_status = 'rejected' WHERE id = ?`
-      ).bind(docId).run();
+      await env.DB.batch([
+        env.DB.prepare(
+          `UPDATE wayfinder_extraction_jobs
+           SET status = 'rejected', reviewed_at = ?, reviewed_by = ?, review_decision = 'rejected'
+           WHERE document_id = ?`
+        ).bind(nowIso, user.userId, docId),
+        env.DB.prepare(
+          `UPDATE wayfinder_documents SET processing_status = 'rejected' WHERE id = ?`
+        ).bind(docId),
+        env.DB.prepare(
+          'INSERT INTO wayfinder_audit_events (id, user_id, journey_id, entity_type, entity_id, action) VALUES (?,?,?,?,?,?)'
+        ).bind(auditId, user.userId, doc.journey_id, 'document', docId, 'reject')
+      ]);
 
-      await auditEvent(env, user.userId, null, 'document', docId, 'reject');
       return json({ success: true });
     }
 

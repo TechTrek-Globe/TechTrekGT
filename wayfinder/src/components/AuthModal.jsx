@@ -309,7 +309,7 @@ export function AuthModal() {
                     required
                     value={resetToken}
                     onChange={(e) => setResetToken(e.target.value)}
-                    placeholder="e.g. 649201"
+                    placeholder="Paste your reset code here"
                     className="w-full pl-10 pr-4 py-2.5 bg-wf-navy-mid border border-white/10 rounded-xl text-sm text-white font-mono tracking-wider placeholder-wf-subtle focus:outline-none focus:border-wf-blue transition-all"
                   />
                 </div>

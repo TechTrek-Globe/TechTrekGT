@@ -128,7 +128,20 @@ export async function handleImportJobs(context, url, method) {
       if (!j) return json({ error: 'Journey not found' }, 404);
       const finalJourneyId = j.id;
 
-      // Verify no low-confidence critical fields are unconfirmed
+      // Apply user overrides first - marks fields as user_verified before the gate check
+      const overrideStmts = Object.entries(field_overrides).map(([fieldName, value]) => {
+        return env.DB.prepare(
+          `UPDATE wayfinder_extracted_fields
+           SET user_value = ?, verification_status = 'user_verified'
+           WHERE document_id = ? AND field_name = ?`
+        ).bind(sanitizeText(String(value)), docId, fieldName);
+      });
+
+      if (overrideStmts.length > 0) {
+        await env.DB.batch(overrideStmts);
+      }
+
+      // Verify no low-confidence critical fields are still unconfirmed
       const unconfirmed = await env.DB.prepare(
         `SELECT field_name FROM wayfinder_extracted_fields
          WHERE document_id = ? AND requires_confirm = 1 AND verification_status = 'unverified'`
@@ -140,19 +153,6 @@ export async function handleImportJobs(context, url, method) {
           fields: unconfirmed.results.map(f => f.field_name),
           message: 'Please review and confirm low-confidence critical fields before approving.',
         }, 422);
-      }
-
-      // Apply user overrides to extracted fields
-      const overrideStmts = Object.entries(field_overrides).map(([fieldName, value]) => {
-        return env.DB.prepare(
-          `UPDATE wayfinder_extracted_fields
-           SET user_value = ?, verification_status = 'user_verified'
-           WHERE document_id = ? AND field_name = ?`
-        ).bind(sanitizeText(String(value)), docId, fieldName);
-      });
-
-      if (overrideStmts.length > 0) {
-        await env.DB.batch(overrideStmts);
       }
 
       // Build itinerary item from fields

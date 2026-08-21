@@ -99,7 +99,7 @@ export function WayfinderProvider({ children }) {
       throw new Error(errorData.error || 'Failed to save extracted fields');
     }
     const data = await res.json();
-    await fetchDocuments();
+    await fetchDocuments('poland-christmas-2026');
     await fetchJobs();
     return data;
   };
@@ -125,14 +125,16 @@ export function WayfinderProvider({ children }) {
   const rejectImportJob = async (docId) => {
     const res = await fetch(getApiUrl(`/api/wayfinder/import-jobs/${docId}/reject`), {
       method: 'POST',
-      credentials: 'include'
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({})
     });
     if (!res.ok) {
       const errorData = await res.json();
       throw new Error(errorData.error || 'Failed to reject import job');
     }
     const data = await res.json();
-    await fetchDocuments();
+    await fetchDocuments('poland-christmas-2026');
     await fetchJobs();
     return data;
   };

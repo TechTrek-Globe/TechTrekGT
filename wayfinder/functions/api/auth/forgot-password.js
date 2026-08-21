@@ -1,25 +1,6 @@
 import { verifyPassword } from '../../utils/auth.js';
 import { checkRateLimit } from '../../utils/rateLimit.js';
 
-async function ensureResetTable(db) {
-  if (!db) return;
-  try {
-    await db.prepare(`
-      CREATE TABLE IF NOT EXISTS password_resets (
-        id TEXT PRIMARY KEY,
-        user_id TEXT NOT NULL,
-        email TEXT NOT NULL,
-        token TEXT NOT NULL,
-        expires_at INTEGER NOT NULL,
-        used INTEGER DEFAULT 0,
-        created_at INTEGER NOT NULL
-      )
-    `).run();
-  } catch (e) {
-    // Table already exists or error
-  }
-}
-
 export async function onRequestPost(context) {
   const { request, env } = context;
 
@@ -64,8 +45,6 @@ export async function onRequestPost(context) {
       });
     }
 
-    await ensureResetTable(env.DB);
-
     // Look up user
     const user = await env.DB.prepare(
       'SELECT id, email, name, security_question, security_answer_hash FROM users WHERE email = ?'
@@ -105,10 +84,10 @@ export async function onRequestPost(context) {
       });
     }
 
-    // Generate 6-digit numeric verification code
-    const randomArray = new Uint32Array(1);
-    crypto.getRandomValues(randomArray);
-    const resetCode = String((randomArray[0] % 900000) + 100000);
+    // Generate a 64-char hex reset token (32 bytes of CSPRNG)
+    const rawBytes = new Uint8Array(32);
+    crypto.getRandomValues(rawBytes);
+    const resetCode = Array.from(rawBytes).map(b => b.toString(16).padStart(2, '0')).join('');
     const resetId = `rst-${crypto.randomUUID()}`;
     const now = Date.now();
     const expiresAt = now + (15 * 60 * 1000); // 15 minutes validity
@@ -124,7 +103,7 @@ export async function onRequestPost(context) {
     const origin = request.headers.get('Origin') || '';
     const isLocal = origin.includes('localhost') || origin.includes('127.0.0.1');
 
-    console.log(`[forgot-password] Password reset code generated for ${cleanEmail}: ${resetCode}`);
+    console.log('[forgot-password] Reset code generated (token redacted from logs)');
 
     return new Response(JSON.stringify({
       success: true,

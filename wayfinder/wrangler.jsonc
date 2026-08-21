@@ -33,11 +33,10 @@
     }
   ],
   "kv_namespaces": [
-    // Add after running: npx wrangler kv:namespace create RATE_LIMIT_KV
-    // {
-    //   "binding": "RATE_LIMIT_KV",
-    //   "id": "<YOUR_KV_NAMESPACE_ID>"
-    // }
+    {
+      "binding": "RATE_LIMIT_KV",
+      "id": "12e45afc7ced4359949d1c1ae5537ec8"
+    }
   ]
   // R2 bucket (required for document storage - not yet configured):
   // "r2_buckets": [

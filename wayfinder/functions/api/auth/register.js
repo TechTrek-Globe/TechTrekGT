@@ -1,16 +1,6 @@
 import { hashPassword, createToken } from '../../utils/auth.js';
 import { checkRateLimit } from '../../utils/rateLimit.js';
 
-async function ensureUserSchema(db) {
-  if (!db) return;
-  try {
-    await db.prepare('ALTER TABLE users ADD COLUMN security_question TEXT').run();
-  } catch (e) {}
-  try {
-    await db.prepare('ALTER TABLE users ADD COLUMN security_answer_hash TEXT').run();
-  } catch (e) {}
-}
-
 export async function onRequestPost(context) {
   const { request, env } = context;
 
@@ -79,8 +69,6 @@ export async function onRequestPost(context) {
       });
     }
 
-    await ensureUserSchema(env.DB);
-
     // Check existing user
     const existing = await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(cleanEmail).first();
     if (existing) {
@@ -132,7 +120,7 @@ export async function onRequestPost(context) {
       `auth_token=${token}`,
       'HttpOnly',
       'Secure',
-      'SameSite=Lax',
+      'SameSite=Strict',
       'Path=/',
       `Max-Age=${maxAge}`
     ].join('; ');

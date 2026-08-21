@@ -116,8 +116,7 @@ CREATE TABLE IF NOT EXISTS household_settings (
 );
 
 CREATE TABLE IF NOT EXISTS user_backups (
-  user_id TEXT PRIMARY KEY,
+  id TEXT PRIMARY KEY DEFAULT 'default_vault',
   data TEXT NOT NULL,
-  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );

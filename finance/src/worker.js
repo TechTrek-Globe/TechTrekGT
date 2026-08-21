@@ -148,9 +148,9 @@ async function handleSyncBackup(context) {
     const dataStr = JSON.stringify(body.budget || body);
 
     await env.DB.prepare(`
-      INSERT INTO user_backups (user_id, data, updated_at)
+      INSERT INTO user_backups (id, data, updated_at)
       VALUES (?, ?, datetime('now'))
-      ON CONFLICT(user_id) DO UPDATE SET data=excluded.data, updated_at=datetime('now')
+      ON CONFLICT(id) DO UPDATE SET data=excluded.data, updated_at=datetime('now')
     `).bind(userId, dataStr).run();
 
     return new Response(JSON.stringify({ success: true, timestamp: new Date().toISOString() }), {
@@ -193,7 +193,9 @@ async function handleSyncRestore(context) {
   }
 
   try {
-    const row = await env.DB.prepare('SELECT data, updated_at FROM user_backups WHERE user_id = ?').bind(userId).first();
+    const row = await env.DB.prepare(`
+      SELECT data, updated_at FROM user_backups WHERE id = ? OR id = 'default_vault' ORDER BY (CASE WHEN id = ? THEN 0 ELSE 1 END) LIMIT 1
+    `).bind(userId, userId).first();
 
     if (!row || !row.data) {
       return new Response(JSON.stringify({ error: 'No cloud vault backup found' }), {

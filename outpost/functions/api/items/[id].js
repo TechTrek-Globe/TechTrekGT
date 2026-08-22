@@ -90,6 +90,15 @@ export async function onRequestPut(context) {
       target_margin_pct: updated.target_margin_pct
     });
 
+    // Auto-populate date_listed if status changed to Listed and not already set
+    if (updated.status === 'Listed' && !updated.date_listed) {
+      updated.date_listed = new Date().toISOString().split('T')[0];
+    }
+    // Auto-populate date_sold if status changed to Sold and not already set
+    if (updated.status === 'Sold' && !updated.date_sold) {
+      updated.date_sold = new Date().toISOString().split('T')[0];
+    }
+
     // Compute days on market if status changed to Sold
     let days_on_market = item.days_on_market;
     if (updated.status === 'Sold' && updated.date_listed && updated.date_sold) {

@@ -86,7 +86,7 @@ export function InventoryTableRow({
               minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'status')?.minWidth || 100}px`,
               maxWidth: `${columnWidths.status || 130}px`
             }}
-            className="px-3 py-1.5 whitespace-nowrap overflow-hidden text-xs"
+            className="px-3 py-1.5 whitespace-nowrap overflow-visible text-xs relative"
           >
             <InlineStatusSelect
               itemId={item.id}

@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import {
   Package, X, Save, Loader2, ExternalLink, ShieldCheck, Tag,
-  DollarSign, Calendar, CheckCircle2, AlertCircle
+  DollarSign, Calendar, CheckCircle2, AlertCircle, TrendingUp, Zap,
+  ArrowUpRight
 } from 'lucide-react';
-import { updateItem } from '../utils/auctionApi';
+import { updateItem, saveComp, fetchLiveComps } from '../utils/auctionApi';
 import { getCertVerificationUrl, getAuthenticatorMeta } from '../utils/certLookup';
-import { fmtCurrency } from '../utils/formulaPreview';
+import { fmtCurrency, roundPrice, computePricingFloors } from '../utils/formulaPreview';
 import { cleanAthleteName, cleanItemDescription } from '../utils/spreadsheetParser';
+import { buildEbaySearchUrl, cleanEbaySearchQuery } from '../utils/ebaySearch';
 
 const PLATFORM_FEE_PRESETS = {
   'eBay':         { fee_pct: 13.5, flat_fee: 0.40 },
@@ -19,7 +21,7 @@ const PLATFORM_FEE_PRESETS = {
 };
 
 export function EditItemModal({ isOpen, item, categoryOptions = [], platformOptions = [], onClose, onUpdated }) {
-  const [activeTab, setActiveTab] = useState('details'); // 'details' | 'financials' | 'status'
+  const [activeTab, setActiveTab] = useState('details'); // 'details' | 'pricing' | 'financials' | 'status'
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -45,6 +47,17 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
     notes: ''
   });
 
+  const [compsDraft, setCompsDraft] = useState({
+    comp_1: '',
+    comp_2: '',
+    comp_3: '',
+    recommended_list_price: '',
+    saving: false,
+    applied: false,
+    fetchingLive: false,
+    fetchMsg: null,
+  });
+
   useEffect(() => {
     if (item) {
       setForm({
@@ -67,6 +80,18 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
         best_listing_window: item.best_listing_window || '',
         notes: item.notes || ''
       });
+
+      setCompsDraft({
+        comp_1: item.comp_1 !== null && item.comp_1 !== undefined ? roundPrice(item.comp_1) : '',
+        comp_2: item.comp_2 !== null && item.comp_2 !== undefined ? roundPrice(item.comp_2) : '',
+        comp_3: item.comp_3 !== null && item.comp_3 !== undefined ? roundPrice(item.comp_3) : '',
+        recommended_list_price: roundPrice(item.recommended_list_price || item.current_list_price || item.suggested_list_price || ''),
+        saving: false,
+        applied: false,
+        fetchingLive: false,
+        fetchMsg: null,
+      });
+
       setError('');
       setSuccess('');
     }
@@ -105,22 +130,16 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
         est_shipping_cost: form.est_shipping_cost !== '' ? parseFloat(form.est_shipping_cost) : 0,
         date_listed: form.date_listed || null,
         date_sold: form.date_sold || null,
-        best_listing_window: form.best_listing_window.trim(),
-        notes: form.notes.trim()
+        best_listing_window: form.best_listing_window.trim() || null,
+        notes: form.notes.trim() || null
       };
 
       const res = await updateItem(item.id, payload);
-      setSuccess('Item details updated successfully.');
-      if (onUpdated) {
-        onUpdated(item.id, {
-          ...payload,
-          min_sell_price: res.min_sell_price ?? item.min_sell_price,
-          suggested_list_price: res.suggested_list_price ?? item.suggested_list_price
-        });
-      }
+      setSuccess('Item updated successfully!');
+      if (onUpdated) onUpdated(item.id, res);
       setTimeout(() => {
         onClose();
-      }, 600);
+      }, 500);
     } catch (err) {
       setError(err.message || 'Failed to update item.');
     } finally {
@@ -128,46 +147,144 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
     }
   };
 
-  const handlePlatformChange = (selectedPlatform) => {
-    const preset = PLATFORM_FEE_PRESETS[selectedPlatform];
+  const handlePlatformChange = (p) => {
+    const preset = PLATFORM_FEE_PRESETS[p];
     if (preset) {
       setForm(prev => ({
         ...prev,
-        platform: selectedPlatform,
+        platform: p,
         platform_fee_pct: String(preset.fee_pct),
         platform_flat_fee: String(preset.flat_fee)
       }));
     } else {
-      setForm(prev => ({ ...prev, platform: selectedPlatform }));
+      setForm(prev => ({ ...prev, platform: p }));
     }
   };
 
-  const liveDivisor = 1 - (parseFloat(form.platform_fee_pct || 0) / 100) - (parseFloat(form.boost_pct || 0) / 100);
-  const liveMinSell = liveDivisor > 0
-    ? Math.round(((item.true_total_cost + (parseFloat(form.est_shipping_cost || 0)) + (parseFloat(form.platform_flat_fee || 0))) / liveDivisor) * 100) / 100
-    : 0;
-  const liveSuggestedList = Math.round((liveMinSell * (1 + (parseFloat(form.target_margin_pct || 0) / 100))) * 100) / 100;
+  // Pricing calculations
+  const parsedFeePct = (parseFloat(form.platform_fee_pct) || 0) / 100;
+  const parsedFlatFee = parseFloat(form.platform_flat_fee) || 0;
+  const parsedBoost = (parseFloat(form.boost_pct) || 0) / 100;
+  const parsedMargin = (parseFloat(form.target_margin_pct) || 0) / 100;
+  const parsedShip = parseFloat(form.est_shipping_cost) || 0;
+
+  const { min_sell_price: liveMinSell, suggested_list_price: liveSuggestedList } = computePricingFloors({
+    true_total_cost: item.true_total_cost || 0,
+    platform_fee_pct: parsedFeePct,
+    boost_pct: parsedBoost,
+    platform_flat_fee: parsedFlatFee,
+    est_shipping_cost: parsedShip,
+    target_margin_pct: parsedMargin
+  });
+
+  // Comps calculations
+  const updateCompDraft = (field, value) => {
+    setCompsDraft(prev => {
+      const updated = { ...prev, [field]: value, applied: false };
+      if (field.startsWith('comp_')) {
+        const c1 = field === 'comp_1' ? value : prev.comp_1;
+        const c2 = field === 'comp_2' ? value : prev.comp_2;
+        const c3 = field === 'comp_3' ? value : prev.comp_3;
+        const vals = [c1, c2, c3].filter(v => v !== '' && !isNaN(Number(v)) && Number(v) > 0).map(Number);
+        if (vals.length > 0) {
+          updated.recommended_list_price = Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 100) / 100;
+        }
+      }
+      return updated;
+    });
+  };
+
+  const handleSaveComps = async (applyToItem = false) => {
+    setCompsDraft(prev => ({ ...prev, saving: true }));
+    setError('');
+    setSuccess('');
+    try {
+      await saveComp({
+        item_id: item.id,
+        comp_1: compsDraft.comp_1 === '' ? null : Number(compsDraft.comp_1),
+        comp_2: compsDraft.comp_2 === '' ? null : Number(compsDraft.comp_2),
+        comp_3: compsDraft.comp_3 === '' ? null : Number(compsDraft.comp_3),
+        recommended_list_price: compsDraft.recommended_list_price === '' ? null : Number(compsDraft.recommended_list_price),
+        apply_to_item: applyToItem
+      });
+      setCompsDraft(prev => ({ ...prev, saving: false, applied: applyToItem }));
+      setSuccess(applyToItem ? 'Target price applied to item listing!' : 'Market comps saved successfully!');
+      if (applyToItem && compsDraft.recommended_list_price) {
+        setForm(prev => ({ ...prev, current_list_price: String(compsDraft.recommended_list_price) }));
+        if (onUpdated) {
+          onUpdated(item.id, { current_list_price: Number(compsDraft.recommended_list_price) });
+        }
+      }
+    } catch (err) {
+      setError(`Save comps failed: ${err.message}`);
+      setCompsDraft(prev => ({ ...prev, saving: false }));
+    }
+  };
+
+  const handleFetchLiveComps = async () => {
+    setCompsDraft(prev => ({ ...prev, fetchingLive: true, fetchMsg: null }));
+    try {
+      const q = cleanEbaySearchQuery(form.item_name || item.item_name, form.athlete_person || item.athlete_person, form.authenticator || item.authenticator);
+      const res = await fetchLiveComps(q, item.id);
+      if (res && res.success && res.count > 0) {
+        setCompsDraft(prev => ({
+          ...prev,
+          comp_1: res.comp_1 !== null && res.comp_1 !== undefined ? roundPrice(res.comp_1) : prev.comp_1,
+          comp_2: res.comp_2 !== null && res.comp_2 !== undefined ? roundPrice(res.comp_2) : prev.comp_2,
+          comp_3: res.comp_3 !== null && res.comp_3 !== undefined ? roundPrice(res.comp_3) : prev.comp_3,
+          recommended_list_price: roundPrice(res.live_avg || res.median || prev.recommended_list_price),
+          fetchingLive: false,
+          fetchMsg: { type: 'success', text: `Found ${res.count} sold comps on eBay! Avg: $${res.live_avg}` },
+          applied: false,
+        }));
+      } else {
+        setCompsDraft(prev => ({
+          ...prev,
+          fetchingLive: false,
+          fetchMsg: { type: 'info', text: 'No sold comps found. Click eBay Comps link to inspect.' }
+        }));
+      }
+    } catch (err) {
+      setCompsDraft(prev => ({
+        ...prev,
+        fetchingLive: false,
+        fetchMsg: { type: 'error', text: err.message || 'Error fetching live eBay comps.' }
+      }));
+    }
+  };
+
+  const compVals = [compsDraft.comp_1, compsDraft.comp_2, compsDraft.comp_3].filter(v => v !== '' && !isNaN(Number(v)) && Number(v) > 0).map(Number);
+  const liveCompAvg = compVals.length > 0 ? compVals.reduce((a, b) => a + b, 0) / compVals.length : null;
+  const floorSpread = compsDraft.recommended_list_price && item.min_sell_price
+    ? (Number(compsDraft.recommended_list_price) - item.min_sell_price)
+    : null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto">
-      <div className="glass-card rounded-2xl border border-slate-800 shadow-2xl max-w-3xl w-full overflow-hidden flex flex-col max-h-[90vh] my-auto">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(6px)' }}
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-2xl bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] animate-in fade-in zoom-in-95 duration-150"
+        onClick={e => e.stopPropagation()}
+      >
         {/* Modal Header */}
-        <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/80 flex-shrink-0">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-950/60 flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
               <Package className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-black text-white leading-tight flex items-center gap-2">
-                Edit Item Details
-                <span className="text-xs font-mono font-normal text-slate-500">#{item.id?.slice(0, 8)}</span>
-              </h2>
-              <p className="text-xs text-slate-400 mt-0.5 line-clamp-1 max-w-md">
-                {item.item_name}
+              <h2 className="text-base font-bold text-white leading-tight">Edit Inventory Item</h2>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Item ID: <span className="font-mono text-slate-300">{item.id ? item.id.slice(0, 8) : '--'}...</span>
               </p>
             </div>
           </div>
+
           <button
+            type="button"
             onClick={onClose}
             className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
           >
@@ -176,7 +293,7 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex items-center gap-2 px-6 border-b border-slate-800/80 bg-slate-950/40 flex-shrink-0">
+        <div className="flex items-center border-b border-slate-800 bg-slate-950/40 px-6 gap-2 flex-shrink-0">
           <button
             type="button"
             onClick={() => setActiveTab('details')}
@@ -186,8 +303,21 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
-            <Tag className="w-3.5 h-3.5" /> General & Authentication
+            <ShieldCheck className="w-3.5 h-3.5" /> General & Auth
           </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('pricing')}
+            className={`py-3 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 ${
+              activeTab === 'pricing'
+                ? 'border-amber-400 text-amber-400'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <TrendingUp className="w-3.5 h-3.5" /> Pricing Intelligence
+          </button>
+
           <button
             type="button"
             onClick={() => setActiveTab('financials')}
@@ -197,8 +327,9 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
-            <DollarSign className="w-3.5 h-3.5" /> Costs & Pricing Floors
+            <DollarSign className="w-3.5 h-3.5" /> Costs & Platform Fees
           </button>
+
           <button
             type="button"
             onClick={() => setActiveTab('status')}
@@ -251,11 +382,11 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
                   <select
                     value={form.category}
                     onChange={e => setForm({ ...form, category: e.target.value })}
-                    className="input-field text-xs"
+                    className="input-field text-xs font-semibold"
                   >
                     <option value="">-- Select Category --</option>
-                    {categoryOptions.map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
+                    {categoryOptions.map(c => (
+                      <option key={c} value={c}>{c}</option>
                     ))}
                   </select>
                 </div>
@@ -267,64 +398,223 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
                     value={form.sport_genre}
                     onChange={e => setForm({ ...form, sport_genre: e.target.value })}
                     className="input-field text-xs"
-                    placeholder="e.g. Football, Baseball, Basketball"
+                    placeholder="e.g. NFL, MLB, Boxing, Entertainment"
                   />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">Athlete / Signer Person</label>
-                  <input
-                    type="text"
-                    value={form.athlete_person}
-                    onChange={e => setForm({ ...form, athlete_person: e.target.value })}
-                    className="input-field text-xs"
-                    placeholder="e.g. Derek Jeter"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">Authenticator Company</label>
-                  <select
-                    value={form.authenticator}
-                    onChange={e => setForm({ ...form, authenticator: e.target.value })}
-                    className="input-field text-xs"
-                  >
-                    <option value="">-- None / Raw --</option>
-                    {['Beckett', 'JSA', 'PSA', 'ACOA', 'Upper Deck', 'Fanatics', 'Tristar', 'Steiner', 'Schwartz', 'Other'].map(auth => (
-                      <option key={auth} value={auth}>{auth}</option>
-                    ))}
-                  </select>
                 </div>
               </div>
 
               <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs font-bold text-slate-300">Certification / Serial #</label>
+                <label className="block text-xs font-bold text-slate-300 mb-1">Athlete / Signer / Personality</label>
+                <input
+                  type="text"
+                  value={form.athlete_person}
+                  onChange={e => setForm({ ...form, athlete_person: e.target.value })}
+                  className="input-field text-xs"
+                  placeholder="e.g. Patrick Mahomes"
+                />
+              </div>
+
+              {/* Authentication & Cert Verification */}
+              <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                    <span className="text-xs font-bold text-slate-200">Authentication & Cert Details</span>
+                  </div>
                   {certUrl && (
                     <a
                       href={certUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-[11px] text-amber-400 hover:underline flex items-center gap-1 font-semibold"
+                      className="text-[11px] font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20 transition-colors"
                     >
-                      <ShieldCheck className="w-3 h-3" /> Verify Cert on {form.authenticator} <ExternalLink className="w-2.5 h-2.5" />
+                      <ExternalLink className="w-3 h-3" /> Verify Cert Database
                     </a>
                   )}
                 </div>
-                <input
-                  type="text"
-                  value={form.cert_number}
-                  onChange={e => setForm({ ...form, cert_number: e.target.value })}
-                  className="input-field text-xs font-mono"
-                  placeholder="e.g. WIT384910 or 104928"
-                />
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">Authenticator Company</label>
+                    <select
+                      value={form.authenticator}
+                      onChange={e => setForm({ ...form, authenticator: e.target.value })}
+                      className="input-field text-xs font-semibold text-amber-300"
+                    >
+                      <option value="">-- Unauthenticated / None --</option>
+                      {['Beckett', 'JSA', 'PSA', 'ACOA', 'Upper Deck', 'Fanatics', 'Tristar', 'Steiner', 'Schwartz', 'Other'].map(a => (
+                        <option key={a} value={a}>{a}</option>
+                      ))}
+                    </select>
+                    {form.authenticator && certMeta?.name && (
+                      <p className="text-[10px] text-slate-500 mt-1">
+                        Selected: <span className="text-slate-300 font-medium">{certMeta.name}</span>
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">Cert / Hologram #</label>
+                    <input
+                      type="text"
+                      value={form.cert_number}
+                      onChange={e => setForm({ ...form, cert_number: e.target.value })}
+                      className="input-field text-xs font-mono"
+                      placeholder="e.g. WIT384910 or 104928"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           )}
 
-          {/* TAB 2: COSTS & PRICING FLOORS */}
+          {/* TAB 2: PRICING INTELLIGENCE */}
+          {activeTab === 'pricing' && (
+            <div className="space-y-4">
+              {/* Auto Fetch Header Banner */}
+              <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 space-y-2.5">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div>
+                    <p className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+                      <Zap className="w-4 h-4 text-amber-400" />
+                      Live eBay Sold Comps Scraper
+                    </p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">
+                      Scan completed transactions to evaluate market value and calculate pricing floors.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <a
+                      href={buildEbaySearchUrl(form.item_name || item.item_name, form.athlete_person || item.athlete_person, form.authenticator || item.authenticator)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-blue-300 bg-blue-950/40 hover:bg-blue-900/50 border border-blue-500/30 flex items-center gap-1.5 transition-all"
+                    >
+                      <ExternalLink className="w-3 h-3" /> eBay Comps ↗
+                    </a>
+                    <button
+                      type="button"
+                      onClick={handleFetchLiveComps}
+                      disabled={compsDraft.fetchingLive}
+                      className="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-950 bg-amber-500 hover:bg-amber-400 transition-all flex items-center gap-1.5 disabled:opacity-50"
+                    >
+                      {compsDraft.fetchingLive ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
+                      <span>{compsDraft.fetchingLive ? 'Scanning...' : 'Auto-Fetch Comps'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {compsDraft.fetchMsg && (
+                  <div className={`p-2 rounded-lg text-xs flex items-center gap-1.5 ${
+                    compsDraft.fetchMsg.type === 'success'
+                      ? 'bg-emerald-950/60 border border-emerald-500/40 text-emerald-300'
+                      : compsDraft.fetchMsg.type === 'error'
+                        ? 'bg-red-950/60 border border-red-500/40 text-red-300'
+                        : 'bg-amber-950/60 border border-amber-500/40 text-amber-300'
+                  }`}>
+                    <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                    <span>{compsDraft.fetchMsg.text}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* 3 Manual Comp Inputs */}
+              <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
+                <p className="text-xs font-bold text-slate-200">Recent Sold Comps ($)</p>
+                <div className="grid grid-cols-3 gap-3">
+                  {['comp_1', 'comp_2', 'comp_3'].map((field, i) => (
+                    <div key={field}>
+                      <label className="block text-[10px] font-semibold text-slate-400 mb-1">Comp #{i + 1}</label>
+                      <div className="relative">
+                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-500">$</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          placeholder="0.00"
+                          value={compsDraft[field]}
+                          onChange={e => updateCompDraft(field, e.target.value)}
+                          className="input-field py-1.5 pl-6 pr-2 text-xs font-mono font-bold text-white text-center"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Intelligence Valuation Metrics */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-3.5 rounded-xl bg-slate-950/60 border border-slate-800">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-400">Comp Average</span>
+                  <p className="text-base font-black text-amber-400 mt-0.5">{liveCompAvg ? fmtCurrency(liveCompAvg) : '--'}</p>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-400">Min Floor Price</span>
+                  <p className="text-base font-black text-emerald-400 mt-0.5">{fmtCurrency(item.min_sell_price || liveMinSell)}</p>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-400">Spread Over Floor</span>
+                  <p className={`text-base font-black mt-0.5 ${floorSpread !== null ? (floorSpread >= 0 ? 'text-emerald-400' : 'text-red-400') : 'text-slate-500'}`}>
+                    {floorSpread !== null ? `${floorSpread >= 0 ? '+' : ''}${fmtCurrency(floorSpread)}` : '--'}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-400">Target Profit Margin</span>
+                  <p className="text-base font-black text-cyan-400 mt-0.5">
+                    {compsDraft.recommended_list_price && item.true_total_cost > 0
+                      ? `${Math.round(((Number(compsDraft.recommended_list_price) - item.true_total_cost) / Number(compsDraft.recommended_list_price)) * 100)}%`
+                      : '--'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Target Recommended Price + Actions */}
+              <div className="p-3.5 rounded-xl bg-slate-900/80 border border-amber-500/20 flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex-1 min-w-[200px]">
+                  <label className="block text-xs font-bold text-slate-200 mb-1">Target Recommended List Price ($)</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-500">$</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={compsDraft.recommended_list_price}
+                      onChange={e => updateCompDraft('recommended_list_price', e.target.value)}
+                      className="input-field text-sm font-bold pl-7 text-white"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 pt-4 sm:pt-0">
+                  <button
+                    type="button"
+                    onClick={() => handleSaveComps(false)}
+                    disabled={compsDraft.saving}
+                    className="px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    {compsDraft.saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                    <span>Save Comps</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleSaveComps(true)}
+                    disabled={compsDraft.saving || !compsDraft.recommended_list_price}
+                    className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                      compsDraft.applied
+                        ? 'bg-emerald-500 text-slate-950'
+                        : 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-md shadow-amber-500/20'
+                    }`}
+                  >
+                    {compsDraft.applied ? <CheckCircle2 className="w-3.5 h-3.5" /> : <ArrowUpRight className="w-3.5 h-3.5" />}
+                    <span>{compsDraft.applied ? 'Applied to Item!' : 'Apply to Listing'}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: COSTS & PRICING FLOORS */}
           {activeTab === 'financials' && (
             <div className="space-y-4">
               {/* Landed cost summary callout */}
@@ -476,7 +766,7 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
             </div>
           )}
 
-          {/* TAB 3: STATUS & NOTES */}
+          {/* TAB 4: STATUS & NOTES */}
           {activeTab === 'status' && (
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -550,14 +840,14 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
               <button
                 type="button"
                 onClick={onClose}
-                className="btn-secondary w-auto px-4 py-2 text-xs"
+                className="px-4 py-2 text-xs rounded-xl font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={saving}
-                className="btn-primary w-auto px-5 py-2 text-xs flex items-center gap-2"
+                className="px-5 py-2 text-xs font-bold rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 flex items-center gap-2 shadow-md shadow-amber-500/20 transition-all disabled:opacity-50"
               >
                 {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                 <span>Save Changes</span>

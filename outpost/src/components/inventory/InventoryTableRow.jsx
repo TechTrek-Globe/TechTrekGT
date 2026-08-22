@@ -26,9 +26,13 @@ export function InventoryTableRow({
   const colSpan = Object.values(columnVisibility).filter(v => v !== false).length;
   const hasComps = item.comp_1 > 0 || item.comp_2 > 0 || item.comp_3 > 0 || item.manual_avg > 0;
 
+  const isEven = index % 2 === 0;
+  const rowBg = isEven ? 'bg-[#0b101d]' : 'bg-[#141d30]';
+  const stickyBg = isEven ? 'bg-[#0b101d]' : 'bg-[#141d30]';
+
   return (
     <>
-      <tr className={`border-b border-slate-800/40 hover:bg-slate-800/20 transition-colors group ${index % 2 === 0 ? 'bg-slate-950/20' : 'bg-transparent'}`}>
+      <tr className={`border-b border-slate-800/70 transition-colors group ${rowBg} hover:bg-amber-500/[0.08]`}>
         {/* Item Name */}
         {columnVisibility.item_name !== false && (
           <td
@@ -37,9 +41,7 @@ export function InventoryTableRow({
               minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'item_name')?.minWidth || 150}px`,
               maxWidth: `${columnWidths.item_name || 220}px`
             }}
-            className={`px-3 py-1.5 sticky left-0 z-10 border-r border-slate-800/80 shadow-r transition-colors overflow-hidden ${
-              index % 2 === 0 ? 'bg-slate-950' : 'bg-slate-900'
-            } group-hover:bg-slate-900`}
+            className={`px-3 py-1.5 sticky left-0 z-10 border-r border-slate-800/80 shadow-r transition-colors overflow-hidden ${stickyBg} group-hover:bg-[#1a263d]`}
           >
             <div
               onClick={() => onOpenEditModal(item)}

@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import {
-  LayoutDashboard, Package, ShoppingCart, BarChart2,
+  LayoutDashboard, Package, ShoppingCart,
   Settings, LogOut, ChevronRight, Calculator, ArrowRightLeft,
-  Boxes, FileSpreadsheet
+  Boxes, FileSpreadsheet, PanelLeftClose, PanelLeftOpen
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { FinanceSyncModal } from './FinanceSyncModal';
@@ -29,30 +29,84 @@ export function AppLayout({ activeView, onNavigate, children }) {
   const [suppliesOpen, setSuppliesOpen] = useState(false);
   const [taxReportOpen, setTaxReportOpen] = useState(false);
 
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('outpost_sidebar_collapsed') === 'true';
+    }
+    return false;
+  });
+
+  const toggleSidebar = () => {
+    setIsCollapsed(prev => {
+      const next = !prev;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('outpost_sidebar_collapsed', String(next));
+      }
+      return next;
+    });
+  };
+
   return (
     <div className="h-screen max-h-screen bg-slate-950 flex font-sans overflow-hidden">
 
-      {/* --- Sidebar --- */}
-      <aside className="hidden lg:flex flex-col w-60 bg-slate-900/60 border-r border-slate-800/60 backdrop-blur-md flex-shrink-0 min-h-0 overflow-y-auto">
-        {/* Top Logo Header - 95% Width */}
-        <div className="flex items-center justify-center px-2 py-3.5 border-b border-slate-800/60 flex-shrink-0 bg-slate-950/40">
-          <img
-            src={outpostLogo}
-            alt="TechTrek Outpost Logo"
-            className="w-[95%] max-w-[220px] h-auto object-contain filter drop-shadow-md"
-          />
-        </div>
+      {/* --- Desktop Sidebar (Collapsible) --- */}
+      <aside className={`hidden lg:flex flex-col ${isCollapsed ? 'w-16' : 'w-60'} bg-slate-900/60 border-r border-slate-800/60 backdrop-blur-md flex-shrink-0 min-h-0 overflow-y-auto transition-all duration-300 ease-in-out`}>
+        {/* Top Header / Toggle */}
+        {!isCollapsed ? (
+          <div className="flex items-center justify-between px-3 py-3 border-b border-slate-800/60 flex-shrink-0 bg-slate-950/40">
+            <img
+              src={outpostLogo}
+              alt="TechTrek Outpost Logo"
+              className="w-[75%] max-w-[160px] h-auto object-contain filter drop-shadow-md"
+            />
+            <button
+              onClick={toggleSidebar}
+              title="Collapse sidebar"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-slate-800/60 transition-colors flex-shrink-0"
+            >
+              <PanelLeftClose className="w-4 h-4" />
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-center p-2.5 border-b border-slate-800/60 flex-shrink-0 bg-slate-950/40">
+            <button
+              onClick={toggleSidebar}
+              title="Expand sidebar"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-slate-800/60 transition-colors"
+            >
+              <PanelLeftOpen className="w-5 h-5 text-amber-400" />
+            </button>
+          </div>
+        )}
 
         {/* Nav */}
-        <nav className="px-3 py-3 space-y-0.5">
+        <nav className={`px-2 py-3 space-y-1 flex-1 ${isCollapsed ? 'flex flex-col items-center' : ''}`}>
           {NAV_ITEMS.map(({ id, label, icon: Icon }) => {
             const isActive = activeView === id;
+            if (isCollapsed) {
+              return (
+                <button
+                  key={id}
+                  id={`nav-${id}`}
+                  onClick={() => onNavigate(id)}
+                  title={label}
+                  className={`w-11 h-11 flex items-center justify-center rounded-xl transition-all duration-200 group relative ${
+                    isActive
+                      ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30 shadow-sm'
+                      : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200 border border-transparent'
+                  }`}
+                >
+                  <Icon className={`w-5 h-5 flex-shrink-0 ${isActive ? 'text-amber-400' : 'text-slate-500 group-hover:text-slate-300'}`} />
+                </button>
+              );
+            }
+
             return (
               <button
                 key={id}
                 id={`nav-${id}`}
                 onClick={() => onNavigate(id)}
-                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group ${
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 group ${
                   isActive
                     ? 'bg-amber-500/15 text-amber-400 border border-amber-500/20'
                     : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200 border border-transparent'
@@ -68,85 +122,162 @@ export function AppLayout({ activeView, onNavigate, children }) {
           })}
 
           {/* Quick Action Tools */}
-          <div className="pt-4 pb-1">
-            <p className="px-3 text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">Live Tools</p>
-            <div className="space-y-1">
+          {!isCollapsed ? (
+            <div className="pt-3 pb-1">
+              <p className="px-3 text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Live Tools</p>
+              <div className="space-y-1">
+                <button
+                  type="button"
+                  id="sidebar-card-show-btn"
+                  onClick={() => setCalcOpen(true)}
+                  className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 transition-all text-left group"
+                >
+                  <Calculator className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                  <span>Card Show Calc</span>
+                </button>
+
+                <button
+                  type="button"
+                  id="sidebar-finance-sync-btn"
+                  onClick={() => setFinanceSyncOpen(true)}
+                  className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 transition-all text-left group"
+                >
+                  <ArrowRightLeft className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                  <span>Finance Sync</span>
+                </button>
+
+                <button
+                  type="button"
+                  id="sidebar-supplies-btn"
+                  onClick={() => setSuppliesOpen(true)}
+                  className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-blue-300 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 transition-all text-left group"
+                >
+                  <Boxes className="w-4 h-4 text-blue-400 flex-shrink-0" />
+                  <span>Supplies Tracker</span>
+                </button>
+
+                <button
+                  type="button"
+                  id="sidebar-tax-report-btn"
+                  onClick={() => setTaxReportOpen(true)}
+                  className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 transition-all text-left group"
+                >
+                  <FileSpreadsheet className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                  <span>Tax / Schedule C</span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="pt-2 pb-1 border-t border-slate-800/60 my-2 space-y-1 flex flex-col items-center">
               <button
                 type="button"
                 id="sidebar-card-show-btn"
                 onClick={() => setCalcOpen(true)}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 transition-all text-left group"
+                title="Card Show Calc"
+                className="w-10 h-10 flex items-center justify-center rounded-xl text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 transition-all"
               >
                 <Calculator className="w-4 h-4 text-amber-400" />
-                <span>Card Show Calc</span>
               </button>
 
               <button
                 type="button"
                 id="sidebar-finance-sync-btn"
                 onClick={() => setFinanceSyncOpen(true)}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 transition-all text-left group"
+                title="Finance Sync"
+                className="w-10 h-10 flex items-center justify-center rounded-xl text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 transition-all"
               >
                 <ArrowRightLeft className="w-4 h-4 text-emerald-400" />
-                <span>Finance Sync</span>
               </button>
 
               <button
                 type="button"
                 id="sidebar-supplies-btn"
                 onClick={() => setSuppliesOpen(true)}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-blue-300 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 transition-all text-left group"
+                title="Supplies Tracker"
+                className="w-10 h-10 flex items-center justify-center rounded-xl text-blue-300 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 transition-all"
               >
                 <Boxes className="w-4 h-4 text-blue-400" />
-                <span>Supplies Tracker</span>
               </button>
 
               <button
                 type="button"
                 id="sidebar-tax-report-btn"
                 onClick={() => setTaxReportOpen(true)}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 transition-all text-left group"
+                title="Tax / Schedule C Report"
+                className="w-10 h-10 flex items-center justify-center rounded-xl text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 transition-all"
               >
                 <FileSpreadsheet className="w-4 h-4 text-amber-400" />
-                <span>Tax / Schedule C</span>
               </button>
             </div>
-          </div>
+          )}
         </nav>
 
         {/* Back to Finance Portal Link */}
-        <div className="px-3 py-2 border-t border-slate-800/40">
-          <a
-            href="https://techtrekgt.com"
-            className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-amber-400 hover:bg-slate-800/40 transition-colors group"
-          >
-            <span>TechTrek Finance</span>
-            <span className="text-[10px] text-slate-600 group-hover:text-amber-400">↗</span>
-          </a>
-        </div>
+        {!isCollapsed ? (
+          <div className="px-3 py-2 border-t border-slate-800/40">
+            <a
+              href="https://techtrekgt.com"
+              className="w-full flex items-center justify-between px-3 py-1.5 rounded-xl text-xs font-medium text-slate-400 hover:text-amber-400 hover:bg-slate-800/40 transition-colors group"
+            >
+              <span>TechTrek Finance</span>
+              <span className="text-[10px] text-slate-600 group-hover:text-amber-400">↗</span>
+            </a>
+          </div>
+        ) : (
+          <div className="p-2 border-t border-slate-800/40 flex justify-center">
+            <a
+              href="https://techtrekgt.com"
+              title="TechTrek Finance Portal"
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-slate-400 hover:text-amber-400 hover:bg-slate-800/60 transition-colors"
+            >
+              TT↗
+            </a>
+          </div>
+        )}
 
         {/* User strip */}
-        <div className="p-3 border-t border-slate-800/60">
-          <div className="flex items-center gap-2.5 px-2 py-2 rounded-xl hover:bg-slate-800/60 transition-colors group">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500/20 to-amber-700/20 border border-amber-500/20 flex items-center justify-center flex-shrink-0">
+        {!isCollapsed ? (
+          <div className="p-2.5 border-t border-slate-800/60">
+            <div className="flex items-center gap-2 px-2 py-1.5 rounded-xl hover:bg-slate-800/60 transition-colors group">
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-500/20 to-amber-700/20 border border-amber-500/20 flex items-center justify-center flex-shrink-0">
+                <span className="text-xs font-black text-amber-400">
+                  {user?.name?.charAt(0)?.toUpperCase() || 'A'}
+                </span>
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-semibold text-slate-200 truncate">{user?.name || 'Account'}</p>
+                <p className="text-[10px] text-slate-500 truncate leading-none">{user?.email || ''}</p>
+              </div>
+              <button
+                id="logout-btn"
+                onClick={logout}
+                title="Sign out"
+                className="flex-shrink-0 w-6 h-6 rounded-lg flex items-center justify-center text-slate-600 hover:text-red-400 hover:bg-red-900/20 transition-all duration-200"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="p-2 border-t border-slate-800/60 flex flex-col items-center gap-1.5">
+            <div
+              className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500/20 to-amber-700/20 border border-amber-500/20 flex items-center justify-center flex-shrink-0 cursor-default"
+              title={`${user?.name || 'Account'} (${user?.email || ''})`}
+            >
               <span className="text-xs font-black text-amber-400">
                 {user?.name?.charAt(0)?.toUpperCase() || 'A'}
               </span>
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold text-slate-200 truncate">{user?.name || 'Account'}</p>
-              <p className="text-[10px] text-slate-500 truncate">{user?.email || ''}</p>
             </div>
             <button
               id="logout-btn"
               onClick={logout}
               title="Sign out"
-              className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-slate-600 hover:text-red-400 hover:bg-red-900/20 transition-all duration-200"
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-600 hover:text-red-400 hover:bg-red-900/20 transition-all"
             >
               <LogOut className="w-3.5 h-3.5" />
             </button>
           </div>
-        </div>
+        )}
       </aside>
 
       {/* --- Main Content --- */}
@@ -226,4 +357,3 @@ export function AppLayout({ activeView, onNavigate, children }) {
     </div>
   );
 }
-

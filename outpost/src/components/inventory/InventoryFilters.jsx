@@ -42,6 +42,18 @@ export function InventoryFilters({
             </button>
           </div>
 
+          {/* Category Dropdown (Moved to left side) */}
+          <select
+            value={categoryFilter}
+            onChange={e => setCategoryFilter(e.target.value)}
+            className="bg-slate-900 border border-slate-700/80 rounded-lg py-1 px-2.5 text-xs text-slate-300 outline-none focus:border-amber-500 flex-shrink-0"
+          >
+            <option value="All">All Categories</option>
+            {categoryOptions.map(c => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+
           {/* Search */}
           <div className="relative flex-1 min-w-[160px] max-w-xs">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500 z-10 pointer-events-none" />
@@ -54,18 +66,6 @@ export function InventoryFilters({
               onChange={e => setSearch(e.target.value)}
             />
           </div>
-
-          {/* Category Dropdown */}
-          <select
-            value={categoryFilter}
-            onChange={e => setCategoryFilter(e.target.value)}
-            className="bg-slate-900 border border-slate-700/80 rounded-lg py-1 px-2.5 text-xs text-slate-300 outline-none focus:border-amber-500"
-          >
-            <option value="All">All Categories</option>
-            {categoryOptions.map(c => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
         </div>
 
         {/* Right: Refresh button */}

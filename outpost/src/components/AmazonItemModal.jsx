@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import {
-  X, ShoppingCart, Link, DollarSign, Loader2, AlertCircle, CheckCircle2, Search, ExternalLink, PackageCheck
+  X, ShoppingCart, Link, DollarSign, Loader2, AlertCircle, CheckCircle2, Search, ExternalLink, PackageCheck,
+  Sparkles, ClipboardPaste
 } from 'lucide-react';
 import { createInvoice, getApiUrl } from '../utils/auctionApi';
+import { parseAmazonProductContent } from '../utils/amazonParser';
 
 const CATEGORIES = [
   'Electronics', 'Toys & Games', 'Books', 'Home & Kitchen', 'Sports', 'Health',
@@ -57,6 +59,8 @@ export function AmazonItemModal({ isOpen, platforms = [], onClose, onCreated }) 
   const [fetchMsg, setFetchMsg]       = useState('');
   const [error, setError]             = useState('');
   const [success, setSuccess]         = useState(false);
+  const [showSmartPaste, setShowSmartPaste] = useState(false);
+  const [smartPasteText, setSmartPasteText] = useState('');
 
   const defaultPlatform = (platforms || []).find(p => p.is_default)
     || (platforms || [])[0]
@@ -73,11 +77,40 @@ export function AmazonItemModal({ isOpen, platforms = [], onClose, onCreated }) 
     setAsinInput(''); setAsin(''); setOrderId(''); setItemName('');
     setCategory('Electronics'); setUnitPrice(''); setNotes(''); setImageUrl('');
     setFetching(false); setError(''); setFetchMsg(''); setSuccess(false);
+    setShowSmartPaste(false); setSmartPasteText('');
   };
 
   const handleClose = () => { reset(); onClose(); };
 
   const nameInputRef = React.useRef(null);
+
+  // Handle Client-Side Smart Paste Extraction
+  const handleExtractSmartPaste = (customText) => {
+    const textToProcess = (customText !== undefined ? customText : smartPasteText).trim();
+    if (!textToProcess) {
+      setError('Please paste text or HTML from the Amazon product page first.');
+      return;
+    }
+
+    const parsed = parseAmazonProductContent(textToProcess);
+    let populatedCount = 0;
+    if (parsed.title) { setItemName(parsed.title); populatedCount++; }
+    if (parsed.price) { setUnitPrice(String(parsed.price)); populatedCount++; }
+    if (parsed.image) { setImageUrl(parsed.image); populatedCount++; }
+    if (parsed.brand && !notes.includes(parsed.brand)) {
+      setNotes(prev => prev ? `Brand: ${parsed.brand} | ${prev}` : `Brand: ${parsed.brand}`);
+      populatedCount++;
+    }
+
+    if (populatedCount > 0) {
+      setFetchMsg(`Smart Paste extracted ${populatedCount} item fields successfully!`);
+      setError('');
+      setSmartPasteText('');
+      setShowSmartPaste(false);
+    } else {
+      setError('Could not auto-detect standard Amazon patterns. Please enter fields manually.');
+    }
+  };
 
   // Search / Fetch Info from backend endpoint
   const handleFetchInfo = async () => {
@@ -104,7 +137,8 @@ export function AmazonItemModal({ isOpen, platforms = [], onClose, onCreated }) 
         if (data.asin && !asin) setAsin(data.asin);
         if (data.orderId && !orderId) setOrderId(data.orderId);
         setFetchMsg('');
-        setError(data.message || data.error || 'Automated lookup blocked by Amazon bot protection. Please enter details manually.');
+        setShowSmartPaste(true);
+        setError(data.message || data.error || 'Automated lookup challenged by Amazon bot protection. Use Smart Paste below.');
         setTimeout(() => nameInputRef.current?.focus(), 100);
         return;
       }
@@ -131,7 +165,8 @@ export function AmazonItemModal({ isOpen, platforms = [], onClose, onCreated }) 
     } catch (err) {
       console.error(err);
       setFetchMsg('');
-      setError(err.message || 'Could not auto-fetch metadata. Please enter details manually.');
+      setShowSmartPaste(true);
+      setError(err.message || 'Could not auto-fetch metadata. Use Smart Paste below.');
       setTimeout(() => nameInputRef.current?.focus(), 100);
     } finally {
       setFetching(false);
@@ -229,9 +264,23 @@ export function AmazonItemModal({ isOpen, platforms = [], onClose, onCreated }) 
 
           {/* URL / ASIN / Order ID input + Search Button */}
           <div>
-            <label className="block text-[11px] font-semibold text-slate-400 mb-1.5 uppercase tracking-wide">
-              Amazon Product URL, Order Link, ASIN, or Order #
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">
+                Amazon Product URL, Order Link, ASIN, or Order #
+              </label>
+              <button
+                type="button"
+                onClick={() => setShowSmartPaste(!showSmartPaste)}
+                className={`text-[11px] font-semibold px-2 py-0.5 rounded flex items-center gap-1 border transition-colors ${
+                  showSmartPaste
+                    ? 'bg-blue-500/20 text-blue-300 border-blue-500/30'
+                    : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+                }`}
+              >
+                <ClipboardPaste className="w-3 h-3" />
+                <span>{showSmartPaste ? 'Hide Smart Paste' : 'Smart Paste'}</span>
+              </button>
+            </div>
             <div className="flex items-center gap-2">
               <div className="relative flex-1">
                 <Link className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
@@ -285,6 +334,39 @@ export function AmazonItemModal({ isOpen, platforms = [], onClose, onCreated }) 
                 </a>
               )}
             </div>
+
+            {/* Smart Paste Drawer */}
+            {showSmartPaste && (
+              <div className="p-3 rounded-xl bg-slate-900/90 border border-blue-900/40 space-y-2 mt-2.5 animate-in fade-in-0 duration-150">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-blue-300 flex items-center gap-1">
+                    <ClipboardPaste className="w-3.5 h-3.5 text-blue-400" />
+                    1-Click Smart Paste (Bypasses Bot Checks)
+                  </span>
+                  <span className="text-[10px] text-slate-400">
+                    Paste text or HTML copied from Amazon
+                  </span>
+                </div>
+                <textarea
+                  rows={3}
+                  value={smartPasteText}
+                  onChange={e => setSmartPasteText(e.target.value)}
+                  placeholder="Paste product details or page HTML from Amazon..."
+                  className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono"
+                />
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleExtractSmartPaste()}
+                    disabled={!smartPasteText.trim()}
+                    className="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-950 bg-blue-400 hover:bg-blue-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Extract Details</span>
+                  </button>
+                </div>
+              </div>
+            )}
 
             {fetchMsg && (
               <p className="text-[11px] text-emerald-400 mt-1.5 flex items-center gap-1">

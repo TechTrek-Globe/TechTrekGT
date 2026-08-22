@@ -57,6 +57,7 @@ TechTrekGT is a multi-application platform hosted on `techtrekgt.com`. The repos
 | **Google Places & Maps API** | `wayfinder` | Live venue details, ratings, photography, neighborhood & hotel lookup queries, coordinate navigation links, and mandatory dual verification |
 | **Geoapify API** | `wayfinder` | Primary POI generation, geocoding, and venue coordinate dual verification |
 | **National Bank of Poland (NBP) API** | `wayfinder` | Real-time PLN/USD and PLN/EUR exchange rates via worker proxy |
+| **Amazon Lookup & Scraper Architecture** | `outpost` | Multi-tier product detail extraction: external proxy support (`SCRAPER_API_KEY`), mobile/sub-resource endpoint cascade in Cloudflare Worker, and client-side smart parser (`amazonParser.js`) with 1-click tab assist |
 
 > **Dual-Verification Standard:** All external API POI coordinates, venue geocoding, and address metadata MUST be dual-verified across both Google Places API and Geoapify API (delta distance threshold < 250m) prior to dataset ingestion in `wayfinder/src/data/poland-2026.js`.
 

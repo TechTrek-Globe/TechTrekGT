@@ -8,6 +8,7 @@ import { InventoryFilters } from './inventory/InventoryFilters';
 import { InventoryTable } from './inventory/InventoryTable';
 import { PricingCardList } from './inventory/PricingCardList';
 import { QueryEditModal } from './inventory/QueryEditModal';
+import { cleanEbaySearchQuery } from '../utils/ebaySearch';
 
 // Modals
 import { AddInvoiceModal } from './AddInvoiceModal';
@@ -69,10 +70,8 @@ export function InventoryHubView() {
   };
 
   const handleOpenQueryEdit = (item, onConfirm) => {
-    import('../utils/ebaySearch').then(({ cleanEbaySearchQuery }) => {
-      const q = cleanEbaySearchQuery(item.item_name, item.athlete_person, item.authenticator);
-      setQueryEditModal({ item, query: q, onConfirm });
-    });
+    const q = cleanEbaySearchQuery(item.item_name, item.athlete_person, item.authenticator);
+    setQueryEditModal({ item, query: q, onConfirm });
   };
 
   const handleConfirmSearch = (item, query) => {

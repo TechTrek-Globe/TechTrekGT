@@ -1,5 +1,5 @@
-import React from 'react';
-import { Copy, DollarSign, Trash2, Pencil, Loader2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Copy, DollarSign, Trash2, Pencil, Loader2, TrendingUp } from 'lucide-react';
 import { InlineEditCell } from './InlineEditCell';
 import { InlineStatusSelect } from './InlineStatusSelect';
 import { InlineSelectCell } from './InlineSelectCell';
@@ -22,7 +22,9 @@ export function InventoryTableRow({
   onOpenSaleModal,
   onOpenQueryEdit,
 }) {
+  const [pricingOpen, setPricingOpen] = useState(false);
   const colSpan = Object.values(columnVisibility).filter(v => v !== false).length;
+  const hasComps = item.comp_1 > 0 || item.comp_2 > 0 || item.comp_3 > 0 || item.manual_avg > 0;
 
   return (
     <>
@@ -35,7 +37,7 @@ export function InventoryTableRow({
               minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'item_name')?.minWidth || 150}px`,
               maxWidth: `${columnWidths.item_name || 220}px`
             }}
-            className={`px-4 py-3 sticky left-0 z-10 border-r border-slate-800/80 shadow-r transition-colors overflow-hidden ${
+            className={`px-3 py-1.5 sticky left-0 z-10 border-r border-slate-800/80 shadow-r transition-colors overflow-hidden ${
               index % 2 === 0 ? 'bg-slate-950' : 'bg-slate-900'
             } group-hover:bg-slate-900`}
           >
@@ -44,13 +46,13 @@ export function InventoryTableRow({
               className="group/name cursor-pointer flex items-center justify-between gap-1.5 hover:bg-slate-800/60 rounded px-1 -mx-1 py-0.5 transition-colors"
               title="Click to view & edit full item details"
             >
-              <span className="text-slate-200 font-medium group-hover/name:text-amber-400 group-hover/name:underline transition-colors truncate">
+              <span className="text-slate-200 font-medium group-hover/name:text-amber-400 group-hover/name:underline transition-colors truncate text-xs">
                 {cleanItemDescription(item.item_name, item.athlete_person, item.authenticator)}
               </span>
               <Pencil className="w-2.5 h-2.5 text-slate-500 group-hover/name:text-amber-400 transition-colors opacity-0 group-hover/name:opacity-100 flex-shrink-0" />
             </div>
             {item.athlete_person && !item.item_name?.toLowerCase().includes(item.athlete_person.toLowerCase()) && (
-              <p className="text-slate-500 text-[10px] mt-0.5 pointer-events-none truncate">{cleanAthleteName(item.athlete_person)}</p>
+              <p className="text-slate-500 text-[10px] pointer-events-none truncate leading-none">{cleanAthleteName(item.athlete_person)}</p>
             )}
           </td>
         )}
@@ -63,7 +65,7 @@ export function InventoryTableRow({
               minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'athlete_person')?.minWidth || 120}px`,
               maxWidth: `${columnWidths.athlete_person || 150}px`
             }}
-            className="px-4 py-3 whitespace-nowrap overflow-hidden"
+            className="px-3 py-1.5 whitespace-nowrap overflow-hidden text-xs"
           >
             <InlineEditCell
               value={item.athlete_person}
@@ -82,7 +84,7 @@ export function InventoryTableRow({
               minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'status')?.minWidth || 100}px`,
               maxWidth: `${columnWidths.status || 130}px`
             }}
-            className="px-4 py-3 whitespace-nowrap overflow-hidden"
+            className="px-3 py-1.5 whitespace-nowrap overflow-hidden text-xs"
           >
             <InlineStatusSelect
               itemId={item.id}
@@ -100,7 +102,7 @@ export function InventoryTableRow({
               minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'category')?.minWidth || 100}px`,
               maxWidth: `${columnWidths.category || 120}px`
             }}
-            className="px-4 py-3 text-slate-400 whitespace-nowrap overflow-hidden"
+            className="px-3 py-1.5 text-slate-400 whitespace-nowrap overflow-hidden text-xs"
           >
             <InlineSelectCell
               value={item.category}
@@ -120,7 +122,7 @@ export function InventoryTableRow({
               minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'authenticator')?.minWidth || 110}px`,
               maxWidth: `${columnWidths.authenticator || 130}px`
             }}
-            className="px-4 py-3 whitespace-nowrap overflow-hidden"
+            className="px-3 py-1.5 whitespace-nowrap overflow-hidden text-xs"
           >
             <InlineSelectCell
               value={item.authenticator ? item.authenticator.replace(/#.*$/, '').trim() : ''}
@@ -140,7 +142,7 @@ export function InventoryTableRow({
               minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'cert_number')?.minWidth || 100}px`,
               maxWidth: `${columnWidths.cert_number || 120}px`
             }}
-            className="px-4 py-3 whitespace-nowrap overflow-hidden"
+            className="px-3 py-1.5 whitespace-nowrap overflow-hidden text-xs"
           >
             <InlineEditCell
               value={item.cert_number}
@@ -159,7 +161,7 @@ export function InventoryTableRow({
               minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'true_total_cost')?.minWidth || 100}px`,
               maxWidth: `${columnWidths.true_total_cost || 120}px`
             }}
-            className="px-4 py-3 whitespace-nowrap overflow-hidden"
+            className="px-3 py-1.5 whitespace-nowrap overflow-hidden text-xs"
           >
             <InlineEditCell
               value={item.true_total_cost}
@@ -181,7 +183,7 @@ export function InventoryTableRow({
               minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'min_sell_price')?.minWidth || 90}px`,
               maxWidth: `${columnWidths.min_sell_price || 110}px`
             }}
-            className="px-4 py-3 whitespace-nowrap overflow-hidden"
+            className="px-3 py-1.5 whitespace-nowrap overflow-hidden text-xs"
           >
             <InlineEditCell
               value={item.min_sell_price}
@@ -203,7 +205,7 @@ export function InventoryTableRow({
               minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'suggested_list_price')?.minWidth || 110}px`,
               maxWidth: `${columnWidths.suggested_list_price || 130}px`
             }}
-            className="px-4 py-3 whitespace-nowrap overflow-hidden"
+            className="px-3 py-1.5 whitespace-nowrap overflow-hidden text-xs"
           >
             <InlineEditCell
               value={item.suggested_list_price}
@@ -225,7 +227,7 @@ export function InventoryTableRow({
               minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'current_list_price')?.minWidth || 110}px`,
               maxWidth: `${columnWidths.current_list_price || 130}px`
             }}
-            className="px-4 py-3 whitespace-nowrap overflow-hidden"
+            className="px-3 py-1.5 whitespace-nowrap overflow-hidden text-xs"
           >
             <InlineEditCell
               value={item.current_list_price}
@@ -247,7 +249,7 @@ export function InventoryTableRow({
               minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'platform')?.minWidth || 100}px`,
               maxWidth: `${columnWidths.platform || 120}px`
             }}
-            className="px-4 py-3 text-slate-400 whitespace-nowrap overflow-hidden"
+            className="px-3 py-1.5 text-slate-400 whitespace-nowrap overflow-hidden text-xs"
           >
             <InlineSelectCell
               value={item.platform}
@@ -267,7 +269,7 @@ export function InventoryTableRow({
               minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'invoice_ref')?.minWidth || 90}px`,
               maxWidth: `${columnWidths.invoice_ref || 110}px`
             }}
-            className="px-4 py-3 text-slate-500 whitespace-nowrap overflow-hidden"
+            className="px-3 py-1.5 text-slate-500 whitespace-nowrap overflow-hidden text-xs"
           >
             <InlineEditCell
               value={item.invoice_ref}
@@ -282,46 +284,61 @@ export function InventoryTableRow({
         {columnVisibility.actions !== false && (
           <td
             style={{
-              width: `${columnWidths.actions || 100}px`,
-              minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'actions')?.minWidth || 80}px`,
-              maxWidth: `${columnWidths.actions || 100}px`
+              width: `${columnWidths.actions || 110}px`,
+              minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'actions')?.minWidth || 90}px`,
+              maxWidth: `${columnWidths.actions || 110}px`
             }}
-            className="px-4 py-3 whitespace-nowrap overflow-hidden"
+            className="px-3 py-1.5 whitespace-nowrap overflow-hidden"
           >
-            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setPricingOpen(v => !v)}
+                title={pricingOpen ? "Hide pricing & comps drawer" : "Open pricing & comps drawer"}
+                className={`w-6 h-6 rounded flex items-center justify-center transition-all ${
+                  pricingOpen
+                    ? 'text-amber-400 bg-amber-500/20 border border-amber-500/30'
+                    : hasComps
+                      ? 'text-emerald-400 hover:bg-emerald-950/40 hover:text-emerald-300'
+                      : 'text-slate-500 hover:text-amber-400 hover:bg-slate-800/80'
+                }`}
+              >
+                <TrendingUp className="w-3 h-3" />
+              </button>
               <button
                 onClick={() => onOpenCopyModal(item)}
-                title="Generate multi-channel listing copy (eBay/Whatnot/Mercari)"
-                className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 hover:text-amber-400 hover:bg-amber-900/20 transition-all"
+                title="Generate listing copy"
+                className="w-6 h-6 rounded flex items-center justify-center text-slate-500 hover:text-amber-400 hover:bg-slate-800/80 transition-all opacity-0 group-hover:opacity-100"
               >
-                <Copy className="w-3.5 h-3.5" />
+                <Copy className="w-3 h-3" />
               </button>
               {item.status !== 'Sold' && (
                 <button
                   onClick={() => onOpenSaleModal(item)}
-                  title="Record sale for this item"
-                  className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 hover:text-emerald-400 hover:bg-emerald-900/20 transition-all"
+                  title="Record sale"
+                  className="w-6 h-6 rounded flex items-center justify-center text-slate-500 hover:text-emerald-400 hover:bg-slate-800/80 transition-all opacity-0 group-hover:opacity-100"
                 >
-                  <DollarSign className="w-3.5 h-3.5" />
+                  <DollarSign className="w-3 h-3" />
                 </button>
               )}
               <button
                 onClick={() => onDelete(item.id)}
                 disabled={deleting === item.id || item.status === 'Sold'}
                 title={item.status === 'Sold' ? 'Cannot delete a sold item' : 'Delete item'}
-                className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-600 hover:text-red-400 hover:bg-red-900/20 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                className="w-6 h-6 rounded flex items-center justify-center text-slate-600 hover:text-red-400 hover:bg-slate-800/80 transition-all opacity-0 group-hover:opacity-100 disabled:opacity-20 disabled:cursor-not-allowed"
               >
-                {deleting === item.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                {deleting === item.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
               </button>
             </div>
           </td>
         )}
       </tr>
 
-      {/* Pricing Drawer */}
+      {/* Pricing Drawer - renders only when expanded */}
       <PricingDrawer
         item={item}
         colSpan={colSpan}
+        isOpen={pricingOpen}
+        onClose={() => setPricingOpen(false)}
         onItemUpdated={onUpdateItem}
         onOpenCopyModal={onOpenCopyModal}
         onOpenQueryEdit={onOpenQueryEdit}

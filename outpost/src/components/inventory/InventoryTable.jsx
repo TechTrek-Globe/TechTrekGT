@@ -82,7 +82,7 @@ export function InventoryTable({
                   <th
                     key={key}
                     style={{ width: `${width}px`, minWidth: `${minWidth}px`, maxWidth: `${width}px` }}
-                    className={`font-semibold py-3 px-4 border-b border-slate-800 relative select-none ${
+                    className={`font-semibold py-2 px-3 border-b border-slate-800 relative select-none text-[11px] ${
                       key === 'item_name' ? 'sticky left-0 bg-slate-900/90 shadow-r z-30' : ''
                     }`}
                   >
@@ -140,22 +140,22 @@ export function InventoryTable({
 
       {/* Pagination */}
       {pagination && pagination.pages > 1 && (
-        <div className="flex items-center justify-between px-4 py-3 border-t border-slate-800/40 bg-slate-950/20">
-          <span className="text-xs text-slate-500">
+        <div className="flex items-center justify-between px-3 py-1.5 border-t border-slate-800/40 bg-slate-950/40">
+          <span className="text-[11px] text-slate-500">
             Page {pagination.page} of {pagination.pages} ({pagination.total} items)
           </span>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <button
               onClick={() => onPageChange(pagination.page - 1)}
               disabled={pagination.page <= 1}
-              className="px-3 py-1.5 rounded-lg text-xs border border-slate-700 text-slate-400 hover:text-slate-200 disabled:opacity-40 transition-all"
+              className="px-2.5 py-1 rounded-md text-[11px] border border-slate-700 text-slate-400 hover:text-slate-200 disabled:opacity-40 transition-all"
             >
               ← Prev
             </button>
             <button
               onClick={() => onPageChange(pagination.page + 1)}
               disabled={pagination.page >= pagination.pages}
-              className="px-3 py-1.5 rounded-lg text-xs border border-slate-700 text-slate-400 hover:text-slate-200 disabled:opacity-40 transition-all"
+              className="px-2.5 py-1 rounded-md text-[11px] border border-slate-700 text-slate-400 hover:text-slate-200 disabled:opacity-40 transition-all"
             >
               Next →
             </button>

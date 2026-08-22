@@ -3,8 +3,7 @@ import { TrendingUp, CheckCircle2, ExternalLink } from 'lucide-react';
 import { fmtCurrency } from '../../utils/formulaPreview';
 
 /**
- * InventoryMetrics - Unified metrics banner for the consolidated Inventory & Pricing view.
- * Displays active inventory count, total landed cost, comp coverage, and comp strategy.
+ * InventoryMetrics - Ultra-compact metrics banner for the consolidated Inventory & Pricing view.
  */
 export function InventoryMetrics({ items }) {
   const activeItems = items.filter(it => it.status === 'Available' || it.status === 'Listed');
@@ -13,45 +12,44 @@ export function InventoryMetrics({ items }) {
   const coveragePct = activeItems.length > 0 ? (itemsWithComps / activeItems.length) * 100 : 0;
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-      <div className="glass-card rounded-lg p-2.5 border border-slate-800 flex items-center justify-between">
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 flex-shrink-0">
+      <div className="glass-card rounded-lg px-2.5 py-1.5 border border-slate-800 flex items-center justify-between">
         <div>
-          <p className="text-[10px] text-slate-400">Active Inventory</p>
-          <p className="text-lg font-black text-white mt-0.5">{activeItems.length} <span className="text-[10px] font-normal text-slate-500">items</span></p>
+          <p className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold">Active Inventory</p>
+          <p className="text-sm font-black text-white">{activeItems.length} <span className="text-[10px] font-normal text-slate-500">items</span></p>
         </div>
-        <div className="w-7 h-7 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-400 font-bold">
-          <TrendingUp className="w-4 h-4" />
+        <div className="w-5 h-5 rounded-md bg-amber-500/10 flex items-center justify-center text-amber-400">
+          <TrendingUp className="w-3 h-3" />
         </div>
       </div>
 
-      <div className="glass-card rounded-lg p-2.5 border border-slate-800 flex items-center justify-between">
+      <div className="glass-card rounded-lg px-2.5 py-1.5 border border-slate-800 flex items-center justify-between">
         <div>
-          <p className="text-[10px] text-slate-400">Total Landed Cost</p>
-          <p className="text-lg font-black text-amber-400 mt-0.5">{fmtCurrency(totalLandedCost)}</p>
+          <p className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold">Total Landed Cost</p>
+          <p className="text-sm font-black text-amber-400">{fmtCurrency(totalLandedCost)}</p>
         </div>
-        <div className="w-7 h-7 rounded-lg bg-cyan-500/10 flex items-center justify-center text-cyan-400 font-bold">
-          <TrendingUp className="w-4 h-4" />
+        <div className="w-5 h-5 rounded-md bg-cyan-500/10 flex items-center justify-center text-cyan-400">
+          <TrendingUp className="w-3 h-3" />
         </div>
       </div>
 
-      <div className="glass-card rounded-lg p-2.5 border border-slate-800 flex items-center justify-between">
+      <div className="glass-card rounded-lg px-2.5 py-1.5 border border-slate-800 flex items-center justify-between">
         <div>
-          <p className="text-[10px] text-slate-400">Market Comps Coverage</p>
-          <p className="text-lg font-black text-emerald-400 mt-0.5">{itemsWithComps} <span className="text-[10px] font-normal text-slate-500">/ {activeItems.length} ({Math.round(coveragePct)}%)</span></p>
+          <p className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold">Comps Coverage</p>
+          <p className="text-sm font-black text-emerald-400">{itemsWithComps} <span className="text-[10px] font-normal text-slate-500">/ {activeItems.length} ({Math.round(coveragePct)}%)</span></p>
         </div>
-        <div className="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400 font-bold">
-          <CheckCircle2 className="w-4 h-4" />
+        <div className="w-5 h-5 rounded-md bg-emerald-500/10 flex items-center justify-center text-emerald-400">
+          <CheckCircle2 className="w-3 h-3" />
         </div>
       </div>
 
-      <div className="glass-card rounded-lg p-2.5 border border-slate-800 flex items-center justify-between">
-        <div>
-          <p className="text-[10px] text-slate-400">Comp Strategy</p>
-          <p className="text-[11px] font-semibold text-slate-200 mt-0.5">3-Comp Median &amp; Sold Valuation</p>
-          <p className="text-[9px] text-slate-500">Automated query builder with eBay API sync</p>
+      <div className="glass-card rounded-lg px-2.5 py-1.5 border border-slate-800 flex items-center justify-between">
+        <div className="truncate pr-1">
+          <p className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold">Comp Strategy</p>
+          <p className="text-xs font-semibold text-slate-200 truncate">3-Comp Median &amp; Sold</p>
         </div>
-        <div className="w-7 h-7 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-400 font-bold">
-          <ExternalLink className="w-4 h-4" />
+        <div className="w-5 h-5 rounded-md bg-blue-500/10 flex items-center justify-center text-blue-400 flex-shrink-0">
+          <ExternalLink className="w-3 h-3" />
         </div>
       </div>
     </div>

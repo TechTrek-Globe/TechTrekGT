@@ -201,7 +201,7 @@ export function AppLayout({ activeView, onNavigate, children }) {
         </nav>
 
         {/* Page content */}
-        <main className="flex-1 flex flex-col min-h-0 overflow-hidden p-3 lg:p-4 bg-grid-pattern">
+        <main className="flex-1 flex flex-col min-h-0 overflow-hidden p-2 lg:p-3 bg-grid-pattern">
           {children}
         </main>
       </div>

@@ -12,9 +12,7 @@ import { buildEbaySearchUrl } from '../../utils/ebaySearch';
  * Shows comp inputs, eBay auto-fetch, break-even floor, and apply-to-item action.
  * Collapsed by default; expands on user click.
  */
-export function PricingDrawer({ item, colSpan, onItemUpdated, onOpenCopyModal, onOpenQueryEdit }) {
-  const [open, setOpen] = useState(false);
-
+export function PricingDrawer({ item, colSpan, isOpen, onClose, onItemUpdated, onOpenCopyModal, onOpenQueryEdit }) {
   const initDraft = () => ({
     comp_1: item.comp_1 !== null && item.comp_1 !== undefined ? roundPrice(item.comp_1) : '',
     comp_2: item.comp_2 !== null && item.comp_2 !== undefined ? roundPrice(item.comp_2) : '',
@@ -28,10 +26,10 @@ export function PricingDrawer({ item, colSpan, onItemUpdated, onOpenCopyModal, o
 
   const [draft, setDraft] = useState(initDraft);
 
-  const handleOpen = () => {
-    if (!open) setDraft(initDraft());
-    setOpen(v => !v);
-  };
+  // Sync draft if item changes when opened
+  React.useEffect(() => {
+    if (isOpen) setDraft(initDraft());
+  }, [isOpen, item.id]);
 
   const updateDraft = (field, value) => {
     setDraft(prev => {
@@ -111,38 +109,24 @@ export function PricingDrawer({ item, colSpan, onItemUpdated, onOpenCopyModal, o
     ? (Number(draft.recommended_list_price) - item.min_sell_price)
     : null;
 
-  const hasComps = item.comp_1 > 0 || item.comp_2 > 0 || item.comp_3 > 0 || item.manual_avg > 0;
+  if (!isOpen) return null;
 
   return (
-    <>
-      {/* Toggle row */}
-      <tr className="border-b border-slate-800/20">
-        <td colSpan={colSpan} className="px-4 py-0">
+    <tr className="border-b border-amber-500/20 bg-slate-900/90 shadow-inner">
+      <td colSpan={colSpan} className="px-4 py-2.5">
+        <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-800">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-amber-400">Pricing & Market Comps</span>
+            <span className="text-[10px] text-slate-400 truncate max-w-md">for {item.item_name}</span>
+          </div>
           <button
-            onClick={handleOpen}
-            className={`flex items-center gap-1.5 py-1 text-[10px] font-semibold transition-colors ${
-              open ? 'text-amber-400' : 'text-slate-600 hover:text-slate-400'
-            }`}
-            title={open ? 'Collapse pricing panel' : 'Expand pricing panel'}
+            onClick={onClose}
+            className="text-[10px] text-slate-400 hover:text-slate-200 px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 transition-colors"
           >
-            {open
-              ? <ChevronDown className="w-3 h-3" />
-              : <ChevronRight className="w-3 h-3" />}
-            <span>{open ? 'Hide Pricing' : 'Pricing'}</span>
-            {hasComps && !open && (
-              <span className="ml-1 px-1.5 py-0.5 rounded text-[9px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                {item.recommended_list_price ? `Target: ${fmtCurrency(item.recommended_list_price)}` : 'Comps set'}
-              </span>
-            )}
+            Close ✕
           </button>
-        </td>
-      </tr>
-
-      {/* Expanded pricing panel */}
-      {open && (
-        <tr className="border-b border-amber-500/10 bg-slate-900/40">
-          <td colSpan={colSpan} className="px-4 py-3">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-center">
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-center">
 
               {/* eBay + Listing Copy actions */}
               <div className="lg:col-span-3 space-y-1.5">
@@ -274,7 +258,5 @@ export function PricingDrawer({ item, colSpan, onItemUpdated, onOpenCopyModal, o
             </div>
           </td>
         </tr>
-      )}
-    </>
   );
 }

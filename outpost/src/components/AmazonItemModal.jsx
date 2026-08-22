@@ -98,8 +98,16 @@ export function AmazonItemModal({ isOpen, platforms = [], onClose, onCreated }) 
         body: JSON.stringify({ input: asinInput.trim() })
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to fetch Amazon details');
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || data.error === 'AMAZON_BLOCKED' || data.success === false) {
+        if (data.asin && !asin) setAsin(data.asin);
+        if (data.orderId && !orderId) setOrderId(data.orderId);
+        setFetchMsg('');
+        setError(data.message || data.error || 'Automated lookup blocked by Amazon bot protection. Please enter details manually.');
+        setTimeout(() => nameInputRef.current?.focus(), 100);
+        return;
+      }
 
       if (data.asin && !asin) setAsin(data.asin);
       if (data.orderId && !orderId) setOrderId(data.orderId);
@@ -122,7 +130,8 @@ export function AmazonItemModal({ isOpen, platforms = [], onClose, onCreated }) 
       }
     } catch (err) {
       console.error(err);
-      setError(err.message || 'Could not auto-fetch metadata. Please enter title manually.');
+      setFetchMsg('');
+      setError(err.message || 'Could not auto-fetch metadata. Please enter details manually.');
       setTimeout(() => nameInputRef.current?.focus(), 100);
     } finally {
       setFetching(false);

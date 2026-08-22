@@ -54,45 +54,104 @@ export async function onRequestPost(context) {
           }
         });
 
-        if (res.ok) {
-          const html = await res.text();
+        if (!res.ok) {
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'AMAZON_BLOCKED',
+            message: 'Automated lookup blocked by Amazon bot protection. Please enter details manually.',
+            asin,
+            orderId,
+            url: `https://www.amazon.com/dp/${asin}`
+          }), {
+            status: 422,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
 
-          // Title extraction
-          const titleMatch = html.match(/<span[^>]*id=["']productTitle["'][^>]*>([\s\S]*?)<\/span>/i)
-            || html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i)
-            || html.match(/<title>([\s\S]*?)<\/title>/i);
+        const html = await res.text();
 
-          if (titleMatch) {
-            let rawTitle = titleMatch[1].replace(/<[^>]+>/g, '').trim();
-            // Strip common "Amazon.com: " prefix or trailing site name
-            rawTitle = rawTitle.replace(/^Amazon\.com\s*:\s*/i, '').replace(/\s*:\s*Amazon\.com.*$/i, '').trim();
-            if (rawTitle && !rawTitle.toLowerCase().includes('robot check') && !rawTitle.toLowerCase().includes('something went wrong')) {
-              title = rawTitle;
-            }
+        // Detect Amazon bot protection / CAPTCHA page
+        if (
+          /robot check/i.test(html) ||
+          /validateCaptcha/i.test(html) ||
+          /automated access/i.test(html) ||
+          /api-services-support@amazon\.com/i.test(html) ||
+          html.includes('To discuss automated access to Amazon data please contact')
+        ) {
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'AMAZON_BLOCKED',
+            message: 'Automated lookup blocked by Amazon bot protection. Please enter details manually.',
+            asin,
+            orderId,
+            url: `https://www.amazon.com/dp/${asin}`
+          }), {
+            status: 422,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+
+        // Title extraction
+        const titleMatch = html.match(/<span[^>]*id=["']productTitle["'][^>]*>([\s\S]*?)<\/span>/i)
+          || html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i)
+          || html.match(/<title>([\s\S]*?)<\/title>/i);
+
+        if (titleMatch) {
+          let rawTitle = titleMatch[1].replace(/<[^>]+>/g, '').trim();
+          // Strip common "Amazon.com: " prefix or trailing site name
+          rawTitle = rawTitle.replace(/^Amazon\.com\s*:\s*/i, '').replace(/\s*:\s*Amazon\.com.*$/i, '').trim();
+          if (rawTitle && !rawTitle.toLowerCase().includes('robot check') && !rawTitle.toLowerCase().includes('something went wrong')) {
+            title = rawTitle;
           }
+        }
 
-          // Image extraction
-          const imgMatch = html.match(/<img[^>]*id=["']landingImage["'][^>]*data-old-hires=["']([^"']+)["']/i)
-            || html.match(/<img[^>]*id=["']landingImage["'][^>]*src=["']([^"']+)["']/i)
-            || html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i);
+        // If title extraction yielded nothing, consider it an unparseable or blocked page
+        if (!title) {
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'AMAZON_BLOCKED',
+            message: 'Automated lookup blocked by Amazon bot protection. Please enter details manually.',
+            asin,
+            orderId,
+            url: `https://www.amazon.com/dp/${asin}`
+          }), {
+            status: 422,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
 
-          if (imgMatch && !imgMatch[1].includes('captcha')) {
-            image = imgMatch[1];
-          }
+        // Image extraction
+        const imgMatch = html.match(/<img[^>]*id=["']landingImage["'][^>]*data-old-hires=["']([^"']+)["']/i)
+          || html.match(/<img[^>]*id=["']landingImage["'][^>]*src=["']([^"']+)["']/i)
+          || html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i);
 
-          // Price extraction
-          const priceMatch = html.match(/<span[^>]*class=["'][^"']*a-offscreen[^"']*["'][^>]*>\s*\$([\d.,]+)\s*<\/span>/i)
-            || html.match(/class=["']a-price-whole["']>([\d.,]+)<\/span>/i);
+        if (imgMatch && !imgMatch[1].includes('captcha')) {
+          image = imgMatch[1];
+        }
 
-          if (priceMatch) {
-            const parsedPrice = parseFloat(priceMatch[1].replace(/,/g, ''));
-            if (!isNaN(parsedPrice) && parsedPrice > 0) {
-              price = parsedPrice;
-            }
+        // Price extraction
+        const priceMatch = html.match(/<span[^>]*class=["'][^"']*a-offscreen[^"']*["'][^>]*>\s*\$([\d.,]+)\s*<\/span>/i)
+          || html.match(/class=["']a-price-whole["']>([\d.,]+)<\/span>/i);
+
+        if (priceMatch) {
+          const parsedPrice = parseFloat(priceMatch[1].replace(/,/g, ''));
+          if (!isNaN(parsedPrice) && parsedPrice > 0) {
+            price = parsedPrice;
           }
         }
       } catch (err) {
         console.warn('Amazon fetch error:', err);
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'AMAZON_BLOCKED',
+          message: 'Automated lookup blocked by Amazon bot protection. Please enter details manually.',
+          asin,
+          orderId,
+          url: asin ? `https://www.amazon.com/dp/${asin}` : trimmed
+        }), {
+          status: 422,
+          headers: { 'Content-Type': 'application/json' }
+        });
       }
     }
 

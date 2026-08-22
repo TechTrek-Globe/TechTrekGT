@@ -28,7 +28,7 @@ All sub-applications within the TechTrekGT workspace adhere to the following sha
 ### 2. Finance OS (`finance`)
 - **Directory Path:** [`e:/TechTrekGT/finance`](file:///e:/TechTrekGT/finance)
 - **Core Purpose:** A multi-user personal finance platform featuring daily income matrices, bill schedules, account ledgers, and amortization calculators.
-- **Architecture Reference:** [finance/ARCHITECTURE.md](file:///e:/TechTrekGT/finance/ARCHITECTURE.md) (and [Workspace ARCHITECTURE.md](file:///e:/TechTrekGT/ARCHITECTURE.md))
+- **Architecture Reference:** [Workspace ARCHITECTURE.md](file:///e:/TechTrekGT/ARCHITECTURE.md)
 
 ### 3. Outpost Tracker (`outpost`)
 - **Directory Path:** [`e:/TechTrekGT/outpost`](file:///e:/TechTrekGT/outpost)
@@ -38,7 +38,7 @@ All sub-applications within the TechTrekGT workspace adhere to the following sha
 ### 4. Wayfinder Guide (`wayfinder`)
 - **Directory Path:** [`e:/TechTrekGT/wayfinder`](file:///e:/TechTrekGT/wayfinder)
 - **Core Purpose:** A dedicated travel guide and expedition planner for Poland Christmas 2026 featuring public itineraries, Christmas market guides, transit maps, and private credential vaults.
-- **Architecture Reference:** [wayfinder/ARCHITECTURE.md](file:///e:/TechTrekGT/wayfinder/ARCHITECTURE.md) (and [Workspace ARCHITECTURE.md](file:///e:/TechTrekGT/ARCHITECTURE.md))
+- **Architecture Reference:** [Workspace ARCHITECTURE.md](file:///e:/TechTrekGT/ARCHITECTURE.md)
 
 ### 5. Bigworm Gateway (`bigworm`)
 - **Directory Path:** [`e:/TechTrekGT/bigworm`](file:///e:/TechTrekGT/bigworm)

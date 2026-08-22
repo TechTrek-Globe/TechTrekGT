@@ -632,16 +632,7 @@ export function mergeBills(existing = [], incoming = []) {
   return result;
 }
 
-/**
- * Merges incoming people, deduplicating by name.
- * @param {object[]} existing
- * @param {object[]} incoming
- * @returns {object[]}
- */
-export function mergePeople(existing, incoming) {
-  const existingNames = new Set(existing.map(p => p.name.toLowerCase()));
-  return [...existing, ...incoming.filter(p => !existingNames.has(p.name.toLowerCase()))];
-}
+
 
 /**
  * Detects if a sheet's first row is an extra grouping/category row

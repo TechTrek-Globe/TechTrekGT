@@ -40,6 +40,13 @@ export const getItems = (params = {}) => {
   return apiFetch(`/api/items${qs ? `?${qs}` : ''}`);
 };
 
+export const getEnrichedItems = (params = {}) => {
+  const qs = new URLSearchParams(
+    Object.fromEntries(Object.entries(params).filter(([, v]) => v != null && v !== ''))
+  ).toString();
+  return apiFetch(`/api/items/enriched${qs ? `?${qs}` : ''}`);
+};
+
 export const updateItem = (id, body) =>
   apiFetch(`/api/items/${id}`, {
     method: 'PUT',

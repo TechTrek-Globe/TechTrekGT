@@ -9,6 +9,7 @@ import { onRequestPost as updateProfileHandler }  from '../functions/api/auth/up
 import { onRequestGet as invoicesListHandler, onRequestPost as invoicesCreateHandler } from '../functions/api/invoices/index.js';
 import { onRequestGet as invoiceGetHandler, onRequestPut as invoicePutHandler, onRequestDelete as invoiceDeleteHandler } from '../functions/api/invoices/[id].js';
 import { onRequestGet as itemsListHandler } from '../functions/api/items/index.js';
+import { onRequestGet as itemsEnrichedHandler } from '../functions/api/items/enriched.js';
 import { onRequestGet as itemGetHandler, onRequestPut as itemPutHandler, onRequestDelete as itemDeleteHandler } from '../functions/api/items/[id].js';
 import { onRequestGet as salesListHandler, onRequestPost as salesCreateHandler } from '../functions/api/sales/index.js';
 import { onRequestGet as saleGetHandler, onRequestPut as salePutHandler, onRequestDelete as saleDeleteHandler } from '../functions/api/sales/[id].js';
@@ -147,6 +148,8 @@ export default {
       } else if (/^\/api\/invoices\/[^/]+$/.test(apiPath) && request.method === 'DELETE') {
         response = await invoiceDeleteHandler(context);
       // --- Items ---
+      } else if (apiPath === '/api/items/enriched' && request.method === 'GET') {
+        response = await itemsEnrichedHandler(context);
       } else if (apiPath === '/api/items' && request.method === 'GET') {
         response = await itemsListHandler(context);
       } else if (/^\/api\/items\/[^/]+$/.test(apiPath) && request.method === 'GET') {

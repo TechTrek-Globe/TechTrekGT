@@ -61,3 +61,8 @@ export function fmtCurrency(n) {
   if (n == null || isNaN(n)) return '--';
   return `$${fmt(n)}`;
 }
+
+export function roundPrice(val) {
+  if (val === null || val === undefined || val === '' || isNaN(Number(val))) return '';
+  return Math.round(Number(val) * 100) / 100;
+}

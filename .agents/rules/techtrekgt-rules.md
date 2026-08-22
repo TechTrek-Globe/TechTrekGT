@@ -44,8 +44,8 @@ Atomic Execution Mandate: Never end a turn or present findings after npm run bui
 
 ## 4. Architectural Integrity & Documentation Sync
 * **Always Read First:** Before proposing or executing any structural changes (new directories, state providers, database tables, or routing paths), you MUST read the `ARCHITECTURE.md` file in the workspace root to ensure your approach aligns with the established system design.
-* **Mandatory Sync:** If your code modifications alter the tech stack, routing strategy, database schema, CI/CD pipeline, or deployment topology, you MUST automatically update the `ARCHITECTURE.md` file to accurately reflect the new state of the project before marking the task as complete.
-* **No Silent Drift:** Never leave the architecture document outdated. If a feature changes how the system works, document it immediately.
+* **Mandatory Sync:** If your code modifications alter the tech stack, routing strategy, database schema, CI/CD pipeline, or deployment topology, or any other relevent architecture information, you MUST automatically update the `ARCHITECTURE.md` file to accurately reflect the new state of the project before marking the task as complete.
+* **No Silent Drift:** Never leave the architecture document outdated. If a feature changes how the system works, document it immediately.  
 
 ---
 

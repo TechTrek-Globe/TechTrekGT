@@ -44,3 +44,8 @@ All sub-applications within the TechTrekGT workspace adhere to the following sha
 - **Directory Path:** [`e:/TechTrekGT/bigworm`](file:///e:/TechTrekGT/bigworm)
 - **Core Purpose:** A secure remote desktop portal and authentication bridge providing client access to Apache Guacamole instances via Cloudflare Tunnels.
 - **Architecture Reference:** [Workspace ARCHITECTURE.md](file:///e:/TechTrekGT/ARCHITECTURE.md)
+
+### 6. Vine Scout (`vinescout`)
+- **Directory Path:** [`e:/Vine/VineScout`](file:///e:/Vine/VineScout)
+- **Core Purpose:** A Chromium MV3 Amazon Vine shopping assistant utilizing Pure Vanilla JavaScript, a zero-bundler architecture, chunked local storage, and custom tax reconciliation logic.
+- **Architecture Reference:** [docs/ARCHITECTURE.md](file:///e:/Vine/VineScout/docs/ARCHITECTURE.md) (and [vinescout-rules.md](file:///e:/Vine/VineScout/.agents/rules/vinescout-rules.md))

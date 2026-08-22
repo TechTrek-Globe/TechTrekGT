@@ -200,7 +200,7 @@ All apps use **React Context + useState/useReducer**. There is no Redux, Zustand
 | App | Providers | Description |
 |-----|-----------|-------------|
 | `finance` | `AuthProvider`, `BudgetMetadataProvider`, `LedgerDataProvider` | `useBudget()` composes metadata + ledger contexts |
-| `outpost` | `AuthProvider` | Single auth context; views fetch their own data via API |
+| `outpost` | `AuthProvider`, `InventoryProvider` | Auth context + Unified inventory/pricing/filters context |
 | `wayfinder` | `AuthProvider`, `SettingsContext`, `WayfinderContext` | Auth + settings + itinerary/documents/jobs |
 | `bigworm` | `AuthProvider` | Single auth context gating GuacamoleView |
 
@@ -284,7 +284,7 @@ The codebase follows a pragmatic split:
 | App | Smart Components |
 |-----|-----------------|
 | finance | `DashboardView`, `MainBudgetView`, `LedgerView`, `AmortizationView`, `SettingsView`, `LandingPage`, `AuthPage` |
-| outpost | `DashboardView`, `InventoryView`, `SalesLogView`, `PricingIntelligenceView`, `SettingsView` |
+| outpost | `DashboardView`, `InventoryHubView`, `SalesLogView`, `SettingsView` |
 | wayfinder | `CityPage`, `MarketsPage`, `StaysAndFoodPage`, `PracticalPage`, `PrivateHub`, `PolandLanding` |
 | bigworm | `AuthPage`, `GuacamoleView` |
 

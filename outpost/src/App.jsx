@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { InventoryProvider } from './context/InventoryContext';
 import { AuthPage } from './components/AuthPage';
 import { AppLayout } from './components/AppLayout';
 const DashboardView = React.lazy(() => import('./components/DashboardView').then(m => ({ default: m.DashboardView })));
-const InventoryView = React.lazy(() => import('./components/InventoryView').then(m => ({ default: m.InventoryView })));
+const InventoryHubView = React.lazy(() => import('./components/InventoryHubView').then(m => ({ default: m.InventoryHubView })));
 const SalesLogView = React.lazy(() => import('./components/SalesLogView').then(m => ({ default: m.SalesLogView })));
-const PricingIntelligenceView = React.lazy(() => import('./components/PricingIntelligenceView').then(m => ({ default: m.PricingIntelligenceView })));
 const SettingsView = React.lazy(() => import('./components/SettingsView').then(m => ({ default: m.SettingsView })));
 
-const VIEWS = ['dashboard', 'inventory', 'sales', 'pricing', 'settings'];
+const VIEWS = ['dashboard', 'inventory', 'sales', 'settings'];
 
 function getViewFromPathname(pathname) {
   const path = (pathname || '').toLowerCase().replace(/\/$/, '');
@@ -72,6 +72,12 @@ function MainContent({ pathname, navigateTo }) {
       return;
     }
     const v = getViewFromPathname(normalized);
+    if (v === 'dashboard' && (normalized === '/outpost/pricing' || normalized === '/auction/pricing')) {
+      console.info('Pricing view has been consolidated into Inventory. Redirecting...');
+      setActiveView('inventory');
+      window.history.replaceState({}, '', '/outpost/inventory');
+      return;
+    }
     if (v && v !== activeView) setActiveView(v);
   }, [pathname, isAuthenticated, isLoading]);
 
@@ -100,21 +106,22 @@ function MainContent({ pathname, navigateTo }) {
   };
 
   return (
-    <AppLayout activeView={activeView} onNavigate={handleNavigate}>
-      <ErrorBoundary key={activeView}>
-        <React.Suspense fallback={
-          <div className="flex items-center justify-center p-12">
-            <div className="w-8 h-8 border-2 border-amber-500/30 border-t-amber-400 rounded-full animate-spin" />
-          </div>
-        }>
-          {activeView === 'dashboard' && <DashboardView onNavigate={handleNavigate} />}
-          {activeView === 'inventory' && <InventoryView />}
-          {activeView === 'sales' && <SalesLogView />}
-          {activeView === 'pricing' && <PricingIntelligenceView />}
-          {activeView === 'settings' && <SettingsView />}
-        </React.Suspense>
-      </ErrorBoundary>
-    </AppLayout>
+    <InventoryProvider>
+      <AppLayout activeView={activeView} onNavigate={handleNavigate}>
+        <ErrorBoundary key={activeView}>
+          <React.Suspense fallback={
+            <div className="flex items-center justify-center p-12">
+              <div className="w-8 h-8 border-2 border-amber-500/30 border-t-amber-400 rounded-full animate-spin" />
+            </div>
+          }>
+            {activeView === 'dashboard' && <DashboardView onNavigate={handleNavigate} />}
+            {activeView === 'inventory' && <InventoryHubView />}
+            {activeView === 'sales' && <SalesLogView />}
+            {activeView === 'settings' && <SettingsView />}
+          </React.Suspense>
+        </ErrorBoundary>
+      </AppLayout>
+    </InventoryProvider>
   );
 }
 

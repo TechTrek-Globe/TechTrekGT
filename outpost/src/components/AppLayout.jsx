@@ -13,10 +13,9 @@ import { TaxReportModal } from './TaxReportModal';
 import outpostLogo from '../assets/outpost-logo.webp';
 
 const NAV_ITEMS = [
-  { id: 'dashboard',   label: 'Dashboard',            icon: LayoutDashboard },
-  { id: 'inventory',   label: 'Inventory',             icon: Package },
+  { id: 'dashboard',   label: 'Dashboard',             icon: LayoutDashboard },
+  { id: 'inventory',   label: 'Inventory & Pricing',   icon: Package },
   { id: 'sales',       label: 'Sales Log',             icon: ShoppingCart },
-  { id: 'pricing',     label: 'Pricing Intelligence',  icon: BarChart2 },
   { id: 'settings',    label: 'Settings',              icon: Settings },
 ];
 

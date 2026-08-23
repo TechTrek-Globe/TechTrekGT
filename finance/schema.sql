@@ -120,3 +120,10 @@ CREATE TABLE IF NOT EXISTS user_backups (
   data TEXT NOT NULL,
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE INDEX IF NOT EXISTS idx_accounts_household ON accounts(household_id);
+CREATE INDEX IF NOT EXISTS idx_bills_account ON bills(account_id);
+CREATE INDEX IF NOT EXISTS idx_bills_household ON bills(household_id);
+CREATE INDEX IF NOT EXISTS idx_people_household ON people(household_id);
+CREATE INDEX IF NOT EXISTS idx_loans_household ON loans(household_id);
+CREATE INDEX IF NOT EXISTS idx_password_resets_email_token ON password_resets(email, token);

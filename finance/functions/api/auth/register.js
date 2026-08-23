@@ -1,15 +1,6 @@
 import { hashPassword, createToken } from '../../utils/auth.js';
 import { checkRateLimit } from '../../utils/rateLimit.js';
 
-async function ensureUserSchema(db) {
-  if (!db) return;
-  try {
-    await db.prepare('ALTER TABLE users ADD COLUMN security_question TEXT').run();
-  } catch (e) {}
-  try {
-    await db.prepare('ALTER TABLE users ADD COLUMN security_answer_hash TEXT').run();
-  } catch (e) {}
-}
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -79,7 +70,6 @@ export async function onRequestPost(context) {
       });
     }
 
-    await ensureUserSchema(env.DB);
 
     // Check existing user
     const existing = await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(cleanEmail).first();
@@ -97,27 +87,16 @@ export async function onRequestPost(context) {
     const cleanSecurityAnswer = securityAnswer.trim().toLowerCase();
     const securityAnswerHash = await hashPassword(cleanSecurityAnswer);
 
-    // Insert User with security question and answer hash
-    await env.DB.prepare(
-      'INSERT INTO users (id, email, password_hash, name, security_question, security_answer_hash) VALUES (?, ?, ?, ?, ?, ?)'
-    ).bind(userId, cleanEmail, passwordHash, name.trim(), cleanSecurityQuestion, securityAnswerHash).run();
-
-    // Insert Household
-    await env.DB.prepare(
-      'INSERT INTO households (id, name) VALUES (?, ?)'
-    ).bind(householdId, `${name.trim()}'s Household`).run();
-
-    // Insert Household Member
+    // Batch inserts for atomic registration
     const memberId = `hm-${crypto.randomUUID()}`;
-    await env.DB.prepare(
-      'INSERT INTO household_members (id, household_id, user_id, role) VALUES (?, ?, ?, ?)'
-    ).bind(memberId, householdId, userId, 'owner').run();
-
-    // Insert initial Person record for the new user (clean slate)
     const person1Id = `person-${crypto.randomUUID()}`;
-    await env.DB.prepare(
-      'INSERT INTO people (id, household_id, name, role, pay_frequency, pay_day1, pay_day2, gross_per_pay, net_per_pay, color) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-    ).bind(person1Id, householdId, name.trim(), 'Primary', 'bi-weekly', '15', 'last', 0, 0, 'purple').run();
+
+    await env.DB.batch([
+      env.DB.prepare('INSERT INTO users (id, email, password_hash, name, security_question, security_answer_hash) VALUES (?, ?, ?, ?, ?, ?)').bind(userId, cleanEmail, passwordHash, name.trim(), cleanSecurityQuestion, securityAnswerHash),
+      env.DB.prepare('INSERT INTO households (id, name) VALUES (?, ?)').bind(householdId, `${name.trim()}'s Household`),
+      env.DB.prepare('INSERT INTO household_members (id, household_id, user_id, role) VALUES (?, ?, ?, ?)').bind(memberId, householdId, userId, 'owner'),
+      env.DB.prepare('INSERT INTO people (id, household_id, name, role, pay_frequency, pay_day1, pay_day2, gross_per_pay, net_per_pay, color) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(person1Id, householdId, name.trim(), 'Primary', 'bi-weekly', '15', 'last', 0, 0, 'purple')
+    ]);
 
     if (!env.JWT_SECRET) {
       return new Response(JSON.stringify({ error: 'Server misconfiguration: missing JWT_SECRET' }), {

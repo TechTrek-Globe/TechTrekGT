@@ -4,15 +4,16 @@ import { BudgetMetadataProvider } from './context/BudgetMetadataContext';
 import { LedgerDataProvider } from './context/LedgerDataContext';
 import { useBudgetMetadataState } from './context/BudgetContext';
 import { AppLayout } from './components/AppLayout';
-import { SettingsModal } from './components/SettingsModal';
-import { SettingsView } from './components/SettingsView';
-import { DashboardView } from './components/DashboardView';
-import { MainBudgetView } from './components/MainBudgetView';
-import { LedgerView } from './components/LedgerView';
-import { AmortizationView } from './components/AmortizationView';
 import { LandingPage } from './components/LandingPage';
-import { AuthPage } from './components/AuthPage';
-import AuthModal from './components/AuthModal';
+
+const SettingsModal = React.lazy(() => import('./components/SettingsModal').then(m => ({ default: m.SettingsModal })));
+const SettingsView = React.lazy(() => import('./components/SettingsView').then(m => ({ default: m.SettingsView })));
+const DashboardView = React.lazy(() => import('./components/DashboardView').then(m => ({ default: m.DashboardView })));
+const MainBudgetView = React.lazy(() => import('./components/MainBudgetView').then(m => ({ default: m.MainBudgetView })));
+const LedgerView = React.lazy(() => import('./components/LedgerView').then(m => ({ default: m.LedgerView })));
+const AmortizationView = React.lazy(() => import('./components/AmortizationView').then(m => ({ default: m.AmortizationView })));
+const AuthPage = React.lazy(() => import('./components/AuthPage').then(m => ({ default: m.AuthPage })));
+const AuthModal = React.lazy(() => import('./components/AuthModal'));
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -130,10 +131,12 @@ function MainContent({ pathname, navigateTo, onNavigateHome }) {
 
   if (!isAuthenticated) {
     return (
-      <AuthPage
-        onNavigateHome={onNavigateHome}
-        onAuthSuccess={() => navigateTo('/finance/dashboard')}
-      />
+      <React.Suspense fallback={<div className="p-4 text-gray-400">Loading view...</div>}>
+        <AuthPage
+          onNavigateHome={onNavigateHome}
+          onAuthSuccess={() => navigateTo('/finance/dashboard')}
+        />
+      </React.Suspense>
     );
   }
 
@@ -147,13 +150,15 @@ function MainContent({ pathname, navigateTo, onNavigateHome }) {
 
   return (
     <AppLayout activeView={activeView} onNavigateHome={onNavigateHome} onNavigateView={handleNavigateView}>
-      {activeView === 'dashboard'   && <DashboardView onNavigateView={handleNavigateView} />}
-      {activeView === 'main_budget' && <MainBudgetView onNavigateView={handleNavigateView} />}
-      {activeView === 'ledger'      && <LedgerView onNavigateView={handleNavigateView} />}
-      {activeView === 'amortization'&& <AmortizationView onNavigateView={handleNavigateView} />}
-      {activeView === 'settings'    && <SettingsView onNavigateView={handleNavigateView} />}
-      {isSettingsOpen && <SettingsModal />}
-      <AuthModal />
+      <React.Suspense fallback={<div className="p-4 text-gray-400">Loading view...</div>}>
+        {activeView === 'dashboard'   && <DashboardView onNavigateView={handleNavigateView} />}
+        {activeView === 'main_budget' && <MainBudgetView onNavigateView={handleNavigateView} />}
+        {activeView === 'ledger'      && <LedgerView onNavigateView={handleNavigateView} />}
+        {activeView === 'amortization'&& <AmortizationView onNavigateView={handleNavigateView} />}
+        {activeView === 'settings'    && <SettingsView onNavigateView={handleNavigateView} />}
+        {isSettingsOpen && <SettingsModal />}
+        <AuthModal />
+      </React.Suspense>
     </AppLayout>
   );
 }

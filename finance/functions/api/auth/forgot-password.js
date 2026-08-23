@@ -1,24 +1,6 @@
 import { verifyPassword } from '../../utils/auth.js';
 import { checkRateLimit } from '../../utils/rateLimit.js';
 
-async function ensureResetTable(db) {
-  if (!db) return;
-  try {
-    await db.prepare(`
-      CREATE TABLE IF NOT EXISTS password_resets (
-        id TEXT PRIMARY KEY,
-        user_id TEXT NOT NULL,
-        email TEXT NOT NULL,
-        token TEXT NOT NULL,
-        expires_at INTEGER NOT NULL,
-        used INTEGER DEFAULT 0,
-        created_at INTEGER NOT NULL
-      )
-    `).run();
-  } catch (e) {
-    // Table already exists or error
-  }
-}
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -64,7 +46,6 @@ export async function onRequestPost(context) {
       });
     }
 
-    await ensureResetTable(env.DB);
 
     // Look up user
     const user = await env.DB.prepare(

@@ -33,7 +33,7 @@ export function LedgerDataProvider({ children }) {
 
   // Cloud vault sync state (unlocked automatically when user is signed in)
   const [syncPasscode, setSyncPasscode] = useState('');
-  const [isSyncUnlockedManual, setIsSyncUnlockedManual] = useState(false);
+  const [isSyncUnlockedManual, setIsSyncUnlocked] = useState(false);
   const isSyncUnlocked = isAuthenticated || isSyncUnlockedManual;
 
   const dailyMatrixRef = useRef(dailyMatrix);

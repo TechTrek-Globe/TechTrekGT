@@ -124,7 +124,7 @@ export async function onRequestPost(context) {
     // Preserve remaining JWT lifetime so rememberMe users don't get downgraded (MEDIUM-2)
     const remainingSeconds = payload.exp
       ? Math.max(payload.exp - Math.floor(Date.now() / 1000), 3600)
-      : 24 * 3600;
+      : 7200;
 
     return new Response(JSON.stringify({
       success: true,

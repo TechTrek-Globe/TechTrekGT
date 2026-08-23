@@ -70,7 +70,7 @@ export async function onRequestPost(context) {
       });
     }
 
-    const maxAge = body.rememberMe ? 30 * 24 * 3600 : 24 * 3600;
+    const maxAge = body.rememberMe ? 30 * 24 * 3600 : 7200;
 
     // Create JWT token
     const token = await createToken(
@@ -83,7 +83,7 @@ export async function onRequestPost(context) {
       `auth_token=${token}`,
       'HttpOnly',
       'Secure',
-      'SameSite=Strict',
+      'SameSite=Lax',
       'Path=/',
       `Max-Age=${maxAge}`
     ].join('; ');

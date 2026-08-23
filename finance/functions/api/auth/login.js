@@ -73,7 +73,7 @@ export async function onRequestPost(context) {
     // Create JWT token
     const token = await createToken({ userId: user.id, email: user.email, householdId, name: user.name }, env.JWT_SECRET);
     
-    const maxAge = body.rememberMe ? 30 * 24 * 3600 : 24 * 3600;
+    const maxAge = body.rememberMe ? 30 * 24 * 3600 : 7200;
     const cookieOptions = [
       `auth_token=${token}`,
       'HttpOnly',

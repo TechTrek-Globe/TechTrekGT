@@ -93,7 +93,7 @@ export async function createToken(payload, secret) {
   const encodedHeader = base64UrlEncode(JSON.stringify(header));
   const encodedPayload = base64UrlEncode(JSON.stringify({
     ...payload,
-    exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60)
+    exp: Math.floor(Date.now() / 1000) + (2 * 60 * 60)
   }));
 
   const dataToSign = `${encodedHeader}.${encodedPayload}`;
@@ -158,7 +158,7 @@ export async function verifyToken(token, secret) {
  * Builds a canonical Set-Cookie header string for the auth_token.
  * All handlers MUST use this helper to ensure consistent cookie attributes.
  * @param {string} token - The signed JWT.
- * @param {number} maxAge - Max-Age in seconds (e.g. 86400 for 1 day, 2592000 for 30 days).
+ * @param {number} maxAge - Max-Age in seconds (e.g. 7200 for 2 hours, 2592000 for 30 days).
  * @returns {string}
  */
 export function buildAuthCookie(token, maxAge) {
@@ -166,7 +166,7 @@ export function buildAuthCookie(token, maxAge) {
     `auth_token=${token}`,
     'HttpOnly',
     'Secure',
-    'SameSite=Strict',
+    'SameSite=Lax',
     'Path=/',
     `Max-Age=${maxAge}`
   ].join('; ');

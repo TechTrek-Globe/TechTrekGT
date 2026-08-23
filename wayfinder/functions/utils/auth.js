@@ -88,7 +88,7 @@ function base64UrlDecode(str) {
 }
 
 // Create Signed JWT Token
-export async function createToken(payload, secret, expiresInSeconds = 24 * 60 * 60) {
+export async function createToken(payload, secret, expiresInSeconds = 2 * 60 * 60) {
   if (!secret) throw new Error("JWT_SECRET is not defined in environment variables");
   const header = { alg: 'HS256', typ: 'JWT' };
   const encodedHeader = base64UrlEncode(JSON.stringify(header));

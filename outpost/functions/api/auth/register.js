@@ -109,7 +109,7 @@ export async function onRequestPost(context) {
 
     const token = await createToken({ userId, email: cleanEmail, name: name.trim() }, env.JWT_SECRET);
 
-    const maxAge = body.rememberMe ? 30 * 24 * 3600 : 24 * 3600;
+    const maxAge = body.rememberMe ? 30 * 24 * 3600 : 7200;
 
     return new Response(JSON.stringify({
       success: true,

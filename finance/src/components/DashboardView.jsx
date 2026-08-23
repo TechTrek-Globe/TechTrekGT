@@ -276,6 +276,7 @@ export function DashboardView() {
     getTotalActualExpenses,
     getAccountActualExpenses,
     getAccountActualEndBalance,
+    getCalculatedBalanceAsOf,
     updateAccount,
     updateBillSplits,
     getPersonDepositAmountForAccount
@@ -519,7 +520,14 @@ export function DashboardView() {
             {(budget?.accounts || []).map((acc, i) => {
               const monthlyCost = getAccountMonthlyExpenses(acc.id);
               const actualCost  = getAccountActualExpenses(acc.id, monthKey);
-              const actualEnd   = getAccountActualEndBalance(acc.id, monthKey);
+              
+              const currentBalObj = getCalculatedBalanceAsOf(acc.id, today);
+              const currentBalance = currentBalObj.totalEnd;
+              
+              // End balance for the current month
+              const endOfMonthObj = getCalculatedBalanceAsOf(acc.id, new Date(today.getFullYear(), today.getMonth() + 1, 0));
+              const actualEnd = endOfMonthObj.totalEnd;
+              
               const projEnd     = (acc.startingBalance || 0) - monthlyCost;
               const accentColor = ACCOUNT_COLORS[i % ACCOUNT_COLORS.length];
               const hasActualOverride = Math.abs(monthlyCost - actualCost) > 0.001;
@@ -537,12 +545,9 @@ export function DashboardView() {
                       <span className="text-xs text-slate-500 capitalize">{acc.type}</span>
                     </div>
                     <div className="text-right">
-                      <InlineEdit
-                        value={acc.startingBalance || 0}
-                        type="currency"
-                        onCommit={v => updateAccount(acc.id, { startingBalance: v })}
-                        className="text-xs font-black text-slate-100 font-mono justify-end"
-                      />
+                      <span className="text-xs font-black text-slate-100 font-mono block">
+                        {fmtMoney(currentBalance)}
+                      </span>
                       <span className="text-xs text-slate-500 block mt-0.5">Current Balance</span>
                     </div>
                   </div>

@@ -7,6 +7,7 @@ import { useAuth } from './AuthContext';
 import { getApiUrl, pushCloudBackupOptimistic, flushPendingCloudSync } from '../utils/api';
 import { getBudgetData, saveBudgetData, clearAndRestoreBudgetData, clearBudgetData } from '../utils/indexedDB';
 import { processSpreadsheetImport } from '../utils/spreadsheet';
+import { isBillDueInMonth } from '../utils/paydayUtils';
 
 export const LedgerDataContext = createContext(null);
 export const LedgerDataStateContext = createContext(null);
@@ -24,7 +25,9 @@ export function LedgerDataProvider({ children }) {
     getBillMonthlyCost,
     getAccountMonthlyExpenses,
     isAutoCloudBackupEnabled,
-    setLastCloudSyncTime
+    setLastCloudSyncTime,
+    isPersonDepositDay,
+    getPersonDepositAmountForAccount
   } = metadata;
 
   const [dailyMatrix, setDailyMatrix] = useState({});
@@ -447,6 +450,140 @@ export function LedgerDataProvider({ children }) {
 
   // --- Derived Balance Helpers ---
 
+  // Calculates true running balance from start date to target date using matrix simulation rules
+  const getCalculatedBalanceAsOf = useCallback((accountId, targetDateObj) => {
+    if (!accountId || !targetDateObj) return { regEnding: 0, extraEnding: 0, totalEnd: 0 };
+    const acc = (metadataStateRef.current.accounts || []).find(a => a.id === accountId);
+    if (!acc) return { regEnding: 0, extraEnding: 0, totalEnd: 0 };
+
+    const startDateStr = acc.startDate || acc.balanceAsOfDate || '2026-01-01';
+    const [sy, sm, sd] = startDateStr.split('-');
+    const startDateObj = new Date(parseInt(sy), parseInt(sm) - 1, parseInt(sd));
+    
+    // Normalize targetDate to midnight
+    const target = new Date(targetDateObj.getFullYear(), targetDateObj.getMonth(), targetDateObj.getDate());
+    
+    if (target < startDateObj) {
+        return { 
+          regEnding: parseFloat(acc.startingBalance) || 0, 
+          extraEnding: parseFloat(acc.extraStartingBalance) || 0, 
+          totalEnd: (parseFloat(acc.startingBalance) || 0) + (parseFloat(acc.extraStartingBalance) || 0) 
+        };
+    }
+
+    const isImportMode = acc.ledgerMode === 'import';
+    const importedRows = isImportMode ? (acc.importedLedgerRows || {}) : {};
+
+    let runningRegBeg = parseFloat(acc.startingBalance) || 0;
+    let runningExtraBeg = parseFloat(acc.extraStartingBalance) || 0;
+
+    const people = metadataStateRef.current.people || [];
+    const accountBills = (metadataStateRef.current.bills || []).filter(b => b.accountId === accountId);
+    
+    const today = new Date();
+    const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+    let cur = new Date(startDateObj);
+    while (cur <= target) {
+      const year = cur.getFullYear();
+      const month = cur.getMonth();
+      const day = cur.getDate();
+      const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`;
+      const isoDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      
+      const isPastDate = cur < todayMidnight;
+      const isLockedDay = isImportMode && importedRows[isoDate] !== undefined;
+
+      // 1. Credits
+      let dayCredits = 0;
+      let dayExtraAdd = 0;
+      people.forEach(p => {
+        const customCredit = getDailyMatrixCell(accountId, monthKey, day, `credit_${p.id}`);
+        if (customCredit !== undefined) {
+          dayCredits += parseFloat(customCredit) || 0;
+        } else if (!isPastDate && !isLockedDay) {
+          const isDepDay = isPersonDepositDay(p, year, month, day);
+          dayCredits += isDepDay ? getPersonDepositAmountForAccount(p, accountId) : 0;
+        }
+
+        const customExtra = getDailyMatrixCell(accountId, monthKey, day, `extra_credit_${p.id}`);
+        if (customExtra !== undefined) {
+          dayExtraAdd += parseFloat(customExtra) || 0;
+        }
+      });
+
+      // 2. Bills
+      let dayBills = 0;
+      accountBills.forEach(b => {
+        const customBill = getDailyMatrixCell(accountId, monthKey, day, `bill_${b.id}`);
+        let amt = 0;
+        if (customBill !== undefined) {
+          amt = parseFloat(customBill) || 0;
+        } else if (!isPastDate && !isLockedDay) {
+          const actualAmt = getActualAmount(b.id, monthKey);
+          if (actualAmt !== null && parseInt(b.dueDay) === day && isBillDueInMonth(b, month, true)) {
+            amt = actualAmt;
+          } else if (actualAmt !== null) {
+            amt = 0;
+          } else if (parseInt(b.dueDay) === day && isBillDueInMonth(b, month, true)) {
+            amt = parseFloat(b.amount) || 0;
+          }
+        }
+        dayBills += amt;
+      });
+
+      // 3. Other
+      const customOther = getDailyMatrixCell(accountId, monthKey, day, 'other_amount');
+      const customOtherCredit = getDailyMatrixCell(accountId, monthKey, day, 'other_credit_amount');
+      let otherAmt = 0;
+      if (customOther !== undefined) otherAmt += parseFloat(customOther) || 0;
+      if (customOtherCredit !== undefined) otherAmt += parseFloat(customOtherCredit) || 0;
+
+      const tentativeRegEnding = runningRegBeg + dayCredits - dayBills;
+      const tentativeExtraEnding = runningExtraBeg + dayExtraAdd + otherAmt;
+
+      let customRegEnd;
+      let customExtraEnd;
+      const accReg = getDailyMatrixCell(accountId, monthKey, day, 'reg_ending');
+      const accExtra = getDailyMatrixCell(accountId, monthKey, day, 'extra_ending');
+      if (accReg !== undefined && accReg !== null && accReg !== '') customRegEnd = parseFloat(accReg);
+      if (accExtra !== undefined && accExtra !== null && accExtra !== '') customExtraEnd = parseFloat(accExtra);
+
+      if (customRegEnd === undefined && isImportMode && importedRows[isoDate]?.regEnding !== undefined) {
+        customRegEnd = importedRows[isoDate].regEnding;
+      }
+      if (customExtraEnd === undefined && isImportMode && importedRows[isoDate]?.extraEnding !== undefined) {
+        customExtraEnd = importedRows[isoDate].extraEnding;
+      }
+
+      let reg = customRegEnd !== undefined && !isNaN(customRegEnd) ? customRegEnd : tentativeRegEnding;
+      let extra = customExtraEnd !== undefined && !isNaN(customExtraEnd) ? customExtraEnd : tentativeExtraEnding;
+
+      if (customRegEnd === undefined && customExtraEnd === undefined) {
+        if (reg < 0 && extra > 0) {
+          const transfer = Math.min(extra, -reg);
+          reg += transfer;
+          extra -= transfer;
+        } else if (extra < 0 && reg > 0) {
+          const transfer = Math.min(reg, -extra);
+          extra += transfer;
+          reg -= transfer;
+        }
+      }
+
+      runningRegBeg = Math.round(reg * 100) / 100 || 0;
+      runningExtraBeg = Math.round(extra * 100) / 100 || 0;
+
+      cur.setDate(cur.getDate() + 1);
+    }
+
+    return {
+      regEnding: runningRegBeg,
+      extraEnding: runningExtraBeg,
+      totalEnd: Math.round((runningRegBeg + runningExtraBeg) * 100) / 100
+    };
+  }, [getDailyMatrixCell, getActualAmount, isPersonDepositDay, getPersonDepositAmountForAccount, matrixVersion]);
+
   // Derives the latest known balance for an account from importedLedgerRows or transactions
   const getAccountDerivedBalance = useCallback((accountId) => {
     const acc = (metadataStateRef.current.accounts || []).find(a => a.id === accountId);
@@ -580,6 +717,7 @@ export function LedgerDataProvider({ children }) {
     getAccountDerivedBalance,
     getAccountProjectedEndBalance,
     getAccountActualEndBalance,
+    getCalculatedBalanceAsOf,
     loadDemoPreset,
     resetToDefaults,
     clearAllData,
@@ -605,6 +743,7 @@ export function LedgerDataProvider({ children }) {
     getAccountDerivedBalance,
     getAccountProjectedEndBalance,
     getAccountActualEndBalance,
+    getCalculatedBalanceAsOf,
     loadDemoPreset,
     resetToDefaults,
     clearAllData,

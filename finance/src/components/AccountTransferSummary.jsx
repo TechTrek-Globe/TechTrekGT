@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useBudgetMetadata } from '../context/BudgetContext';
+import { useBudget } from '../context/BudgetContext';
 import {
   ArrowRightLeft,
   Filter,
@@ -18,8 +18,9 @@ export function AccountTransferSummary() {
     getAccountMonthlyExpenses,
     getBillPersonMonthlyPortion,
     getTotalMonthlyExpenses,
-    getPersonDepositAmountForAccount
-  } = useBudgetMetadata();
+    getPersonDepositAmountForAccount,
+    getCalculatedBalanceAsOf
+  } = useBudget();
 
   // State to toggle which earner columns are visible in this table
   const [visiblePersonIds, setVisiblePersonIds] = useState(() => new Set((budget?.people || []).map(p => p.id)));
@@ -101,9 +102,10 @@ export function AccountTransferSummary() {
       earnerPortions[p.id] = Math.round(rawPortion * 100) / 100;
     });
 
-    const regBal = parseFloat(acc.startingBalance) || 0;
-    const extraBal = parseFloat(acc.extraStartingBalance) || 0;
-    const totalBal = regBal + extraBal;
+    const currentBalObj = getCalculatedBalanceAsOf(acc.id, new Date());
+    const regBal = currentBalObj.regEnding;
+    const extraBal = currentBalObj.extraEnding;
+    const totalBal = currentBalObj.totalEnd;
     const isOk = totalBal >= monthlyExpenses;
 
     return {

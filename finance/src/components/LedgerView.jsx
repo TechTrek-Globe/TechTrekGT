@@ -433,16 +433,21 @@ function DailySpreadsheetMatrix() {
   const isProgrammaticScrollRef = useRef(false);
   const firstSelectedMonthRowRef = useRef(null);
 
-  // Continuous stable timeline from effective start month through end of next calendar year
+  // Rolling window: previous, current, and next month for smooth scrolling
   const monthList = useMemo(() => {
     const list = [];
+    
+    // Start window 1 month before selected, but don't go before account start date
+    let cur = new Date(selectedYear, selectedMonth - 1, 1);
     const startMonthDate = new Date(startDateObj.getFullYear(), startDateObj.getMonth(), 1);
-    const endYear = Math.max(todayObj.getFullYear() + 1, selectedYear + 1);
-    const endMonthDate = new Date(endYear, 11, 1);
+    
+    if (cur < startMonthDate) {
+      cur = new Date(startMonthDate);
+    }
 
-    let cur = new Date(startMonthDate);
     let offset = 0;
-    while (cur <= endMonthDate) {
+    // Generate exactly 3 months (e.g. previous, current, next)
+    for (let i = 0; i < 3; i++) {
       const mYear = cur.getFullYear();
       const mMonth = cur.getMonth();
       const mKey = `${mYear}-${String(mMonth + 1).padStart(2, '0')}`;
@@ -457,7 +462,7 @@ function DailySpreadsheetMatrix() {
       cur.setMonth(cur.getMonth() + 1);
     }
     return list;
-  }, [startDateObj, todayObj, selectedYear]);
+  }, [startDateObj, selectedYear, selectedMonth]);
 
   const showExtraColumns = selectedAccountId === 'all'
     ? budget.accounts.some(a => a.enableExtraSavings !== false)

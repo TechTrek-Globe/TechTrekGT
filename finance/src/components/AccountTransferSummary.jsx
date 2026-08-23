@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useBudget } from '../context/BudgetContext';
 import {
   ArrowRightLeft,
@@ -64,60 +64,72 @@ export function AccountTransferSummary() {
   const visiblePeople = (budget?.people || []).filter(p => visiblePersonIds.has(p.id));
 
   // Compute per-account rows data
-  const accountRows = (budget?.accounts || []).map(acc => {
-    const accountBills = (budget?.bills || []).filter(b => b.accountId === acc.id);
-    const monthlyExpenses = getAccountMonthlyExpenses(acc.id);
-
-    // Earner portions for this account
-    const earnerPortions = {};
-    visiblePeople.forEach(p => {
-      const defaultMode = (p.payFrequency === 'bi-weekly' || p.payFrequency === 'semi-monthly' || p.payFrequency === 'weekly') ? 'paycheck' : 'monthly';
-      const mode = personPortionModes[p.id] || defaultMode;
-      const hasAllocations = p.accountAllocations && typeof p.accountAllocations === 'object' && Object.values(p.accountAllocations).some(v => parseFloat(v) > 0 || v === 'remaining');
-
-      let rawPortion = 0;
-      if (basisMode === 'direct_deposit' || (basisMode === 'auto' && hasAllocations)) {
-        const perPaycheckDeposit = getPersonDepositAmountForAccount(p, acc.id);
-        if (mode === 'paycheck') {
-          rawPortion = perPaycheckDeposit;
-        } else {
-          if (p.payFrequency === 'bi-weekly') {
-            rawPortion = (perPaycheckDeposit * 26) / 12;
-          } else if (p.payFrequency === 'weekly') {
-            rawPortion = (perPaycheckDeposit * 52) / 12;
-          } else if (p.payFrequency === 'semi-monthly') {
-            rawPortion = perPaycheckDeposit * 2;
-          } else {
+  const accountRows = useMemo(() => {
+    return (budget?.accounts || []).map(acc => {
+      const accountBills = (budget?.bills || []).filter(b => b.accountId === acc.id);
+      const monthlyExpenses = getAccountMonthlyExpenses(acc.id);
+  
+      // Earner portions for this account
+      const earnerPortions = {};
+      visiblePeople.forEach(p => {
+        const defaultMode = (p.payFrequency === 'bi-weekly' || p.payFrequency === 'semi-monthly' || p.payFrequency === 'weekly') ? 'paycheck' : 'monthly';
+        const mode = personPortionModes[p.id] || defaultMode;
+        const hasAllocations = p.accountAllocations && typeof p.accountAllocations === 'object' && Object.values(p.accountAllocations).some(v => parseFloat(v) > 0 || v === 'remaining');
+  
+        let rawPortion = 0;
+        if (basisMode === 'direct_deposit' || (basisMode === 'auto' && hasAllocations)) {
+          const perPaycheckDeposit = getPersonDepositAmountForAccount(p, acc.id);
+          if (mode === 'paycheck') {
             rawPortion = perPaycheckDeposit;
+          } else {
+            if (p.payFrequency === 'bi-weekly') {
+              rawPortion = (perPaycheckDeposit * 26) / 12;
+            } else if (p.payFrequency === 'weekly') {
+              rawPortion = (perPaycheckDeposit * 52) / 12;
+            } else if (p.payFrequency === 'semi-monthly') {
+              rawPortion = perPaycheckDeposit * 2;
+            } else {
+              rawPortion = perPaycheckDeposit;
+            }
           }
+        } else {
+          const extraPortion = getAccountSaveExtraPersonPortion(acc, p, budget);
+          const monthlyPortion = accountBills.reduce((sum, b) => sum + getBillPersonMonthlyPortion(b, p.id), 0) + extraPortion;
+          rawPortion = mode === 'paycheck'
+            ? (p.payFrequency === 'weekly' ? (monthlyPortion * 12) / 52 : monthlyPortion / 2)
+            : monthlyPortion;
         }
-      } else {
-        const extraPortion = getAccountSaveExtraPersonPortion(acc, p, budget);
-        const monthlyPortion = accountBills.reduce((sum, b) => sum + getBillPersonMonthlyPortion(b, p.id), 0) + extraPortion;
-        rawPortion = mode === 'paycheck'
-          ? (p.payFrequency === 'weekly' ? (monthlyPortion * 12) / 52 : monthlyPortion / 2)
-          : monthlyPortion;
-      }
-
-      earnerPortions[p.id] = Math.round(rawPortion * 100) / 100;
+  
+        earnerPortions[p.id] = Math.round(rawPortion * 100) / 100;
+      });
+  
+      const currentBalObj = getCalculatedBalanceAsOf(acc.id, new Date());
+      const regBal = currentBalObj.regEnding;
+      const extraBal = currentBalObj.extraEnding;
+      const totalBal = currentBalObj.totalEnd;
+      const isOk = totalBal >= monthlyExpenses;
+  
+      return {
+        account: acc,
+        earnerPortions,
+        regBal,
+        extraBal,
+        totalBal,
+        monthlyExpenses,
+        isOk
+      };
     });
-
-    const currentBalObj = getCalculatedBalanceAsOf(acc.id, new Date());
-    const regBal = currentBalObj.regEnding;
-    const extraBal = currentBalObj.extraEnding;
-    const totalBal = currentBalObj.totalEnd;
-    const isOk = totalBal >= monthlyExpenses;
-
-    return {
-      account: acc,
-      earnerPortions,
-      regBal,
-      extraBal,
-      totalBal,
-      monthlyExpenses,
-      isOk
-    };
-  });
+  }, [
+    budget,
+    visiblePeople,
+    personPortionModes,
+    basisMode,
+    getAccountMonthlyExpenses,
+    getPersonDepositAmountForAccount,
+    getAccountSaveExtraPersonPortion,
+    getBillPersonMonthlyPortion,
+    getCalculatedBalanceAsOf
+  ]);
 
   // Calculate Column Grand Totals for Footer Row
   const totalRegBal = accountRows.reduce((sum, r) => sum + r.regBal, 0);

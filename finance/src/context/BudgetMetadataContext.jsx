@@ -585,9 +585,7 @@ export function BudgetMetadataProvider({ children }) {
     saveError,
     initialLedgerSeed,
     isAutoCloudBackupEnabled,
-    lastCloudSyncTime,
-    isDebugMode,
-    debugLogs
+    lastCloudSyncTime
   }), [
     metadataState,
     theme,
@@ -599,9 +597,7 @@ export function BudgetMetadataProvider({ children }) {
     saveError,
     initialLedgerSeed,
     isAutoCloudBackupEnabled,
-    lastCloudSyncTime,
-    isDebugMode,
-    debugLogs
+    lastCloudSyncTime
   ]);
 
   const actionsValue = useMemo(() => ({

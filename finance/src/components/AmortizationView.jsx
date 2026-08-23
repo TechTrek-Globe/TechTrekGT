@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { fmtMoney } from '../utils/formatters';
 import { useBudgetMetadata } from '../context/BudgetContext';
 import { Calculator, DollarSign, TrendingDown, Clock, ShieldCheck, Sparkles, Plus, Trash2, Edit2, Check, CreditCard, Building, RefreshCw, Layers, Archive, RotateCcw } from 'lucide-react';
@@ -93,7 +93,7 @@ export function AmortizationView() {
   const totalMonthlyPayment = monthlyEquivalentPayment + extraPayment;
 
   // Generate Amortization Schedule with and without extra payments
-  const calculateSchedule = (withExtra = true) => {
+  const calculateSchedule = useCallback((withExtra = true) => {
     let balance = principal;
     const schedule = [];
     let period = 1;
@@ -144,10 +144,10 @@ export function AmortizationView() {
     }
 
     return { schedule, totalInterest, totalPeriods: period - 1 };
-  };
+  }, [principal, periodInterestRate, paymentType, scheduledPaymentPerPeriod, extraPaymentPerPeriod, totalPeriods, periodsPerYear]);
 
-  const withExtraResult = calculateSchedule(true);
-  const withoutExtraResult = calculateSchedule(false);
+  const withExtraResult = useMemo(() => calculateSchedule(true), [calculateSchedule]);
+  const withoutExtraResult = useMemo(() => calculateSchedule(false), [calculateSchedule]);
 
   const interestSaved = Math.max(0, withoutExtraResult.totalInterest - withExtraResult.totalInterest);
   const periodsSaved = Math.max(0, withoutExtraResult.totalPeriods - withExtraResult.totalPeriods);

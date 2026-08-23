@@ -81,16 +81,24 @@ export function LedgerDataProvider({ children }) {
   }, [isDbLoaded, initialLedgerSeed]);
 
   // Combined full budget object representation for compatibility and persistence
-  const budget = useMemo(() => {
-    const b = {
-      ...metadataState,
-      dailyMatrix: dailyMatrixRef.current,
-      lineItems,
-      transactions
-    };
-    budgetRef.current = b;
-    return b;
-  }, [metadataState, matrixVersion, lineItems, transactions]);
+  const getFullBudget = useCallback(() => ({
+    ...metadataStateRef.current,
+    dailyMatrix: dailyMatrixRef.current,
+    lineItems: lineItemsRef.current,
+    transactions: transactionsRef.current
+  }), []);
+
+  // Sync full budget to ref for persistence
+  useEffect(() => {
+    budgetRef.current = getFullBudget();
+  }, [metadataState, matrixVersion, lineItems, transactions, getFullBudget]);
+
+  // UI-facing budget that excludes frequently changing matrix data to prevent re-renders
+  const budgetForUI = useMemo(() => ({
+    ...metadataState,
+    lineItems,
+    transactions
+  }), [metadataState, lineItems, transactions]);
 
   // Silently save combined budget to IndexedDB whenever metadata or ledger state changes (debounced 500ms)
   useEffect(() => {
@@ -108,7 +116,7 @@ export function LedgerDataProvider({ children }) {
       }
     }, 500);
     return () => clearTimeout(timer);
-  }, [budget, isDbLoaded, setSaveError]);
+  }, [budgetForUI, matrixVersion, isDbLoaded, setSaveError]);
 
   // Flush pending save on tab close, page hide, or visibility change
   useEffect(() => {
@@ -492,7 +500,7 @@ export function LedgerDataProvider({ children }) {
   const getDailyMatrixCell = useCallback((accountId, monthKey, day, field) => {
     const key = `${accountId}_${monthKey}_${day}_${field}`;
     return dailyMatrixRef.current[key];
-  }, [matrixVersion]);
+  }, []);
 
   const updateDailyMatrixCell = useCallback((accountId, monthKey, day, field, value) => {
     const key = `${accountId}_${monthKey}_${day}_${field}`;
@@ -693,16 +701,15 @@ export function LedgerDataProvider({ children }) {
       extraEnding: runningExtraBeg,
       totalEnd: Math.round((runningRegBeg + runningExtraBeg) * 100) / 100
     };
-  }, [getDailyMatrixCell, getActualAmount, isPersonDepositDay, getPersonDepositAmountForAccount, matrixVersion]);
+  }, [getDailyMatrixCell, getActualAmount, isPersonDepositDay, getPersonDepositAmountForAccount]);
 
   const stateValue = useMemo(() => ({
-    budget,
-    dailyMatrix,
+    budget: budgetForUI,
     lineItems,
     transactions,
     syncPasscode,
     isSyncUnlocked
-  }), [budget, dailyMatrix, lineItems, transactions, syncPasscode, isSyncUnlocked]);
+  }), [budgetForUI, lineItems, transactions, syncPasscode, isSyncUnlocked]);
 
   const actionsValue = useMemo(() => ({
     getDailyMatrixCell,

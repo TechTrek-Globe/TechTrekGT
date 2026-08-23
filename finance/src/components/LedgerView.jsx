@@ -144,6 +144,22 @@ const MatrixCell = React.memo(function MatrixCell({
       />
     </div>
   );
+}, (prevProps, nextProps) => {
+  return (
+    prevProps.value === nextProps.value &&
+    prevProps.monthKey === nextProps.monthKey &&
+    prevProps.day === nextProps.day &&
+    prevProps.field === nextProps.field &&
+    prevProps.isCredit === nextProps.isCredit &&
+    prevProps.isBill === nextProps.isBill &&
+    prevProps.isOther === nextProps.isOther &&
+    prevProps.isTotal === nextProps.isTotal &&
+    prevProps.isNegative === nextProps.isNegative &&
+    prevProps.draggable === nextProps.draggable &&
+    prevProps.dragLabel === nextProps.dragLabel &&
+    prevProps.otherDesc === nextProps.otherDesc &&
+    prevProps.selectedAccountId === nextProps.selectedAccountId
+  );
 });
 
 // Custom matrix collision detection:
@@ -481,85 +497,101 @@ function DailySpreadsheetMatrix() {
       ? (selectedAccount?.importedLedgerRows || {})
       : {};
 
-    let runningRegBeg = selectedAccountId === 'all'
-      ? budget.accounts.reduce((sum, a) => sum + (parseFloat(a.startingBalance) || 0), 0)
-      : (parseFloat(selectedAccount?.startingBalance) || 0);
+    // Fast-Forward Math Loop wrapped in strict useMemo to prevent recalculating years of history on every UI change
+    const { initialRegBeg, initialExtraBeg } = useMemo(() => {
+      let regBeg = selectedAccountId === 'all'
+        ? budget.accounts.reduce((sum, a) => sum + (parseFloat(a.startingBalance) || 0), 0)
+        : (parseFloat(selectedAccount?.startingBalance) || 0);
 
-    let runningExtraBeg = selectedAccountId === 'all'
-      ? budget.accounts.reduce((sum, a) => sum + (parseFloat(a.extraStartingBalance) || 0), 0)
-      : (parseFloat(selectedAccount?.extraStartingBalance) || 0);
+      let extraBeg = selectedAccountId === 'all'
+        ? budget.accounts.reduce((sum, a) => sum + (parseFloat(a.extraStartingBalance) || 0), 0)
+        : (parseFloat(selectedAccount?.extraStartingBalance) || 0);
 
-    // If monthList starts after startDateObj, accumulate all transactions between startDateObj and monthList[0]
-    if (monthList.length > 0) {
-      const firstMonthStart = new Date(monthList[0].year, monthList[0].month, 1);
-      if (firstMonthStart > startDateObj) {
-        let cur = new Date(startDateObj);
-        while (cur < firstMonthStart) {
-          const y = cur.getFullYear();
-          const m = cur.getMonth();
-          const d = cur.getDate();
-          const mKey = `${y}-${String(m + 1).padStart(2, '0')}`;
+      if (monthList.length > 0) {
+        const firstMonthStart = new Date(monthList[0].year, monthList[0].month, 1);
+        if (firstMonthStart > startDateObj) {
+          let cur = new Date(startDateObj);
+          while (cur < firstMonthStart) {
+            const y = cur.getFullYear();
+            const m = cur.getMonth();
+            const d = cur.getDate();
+            const mKey = `${y}-${String(m + 1).padStart(2, '0')}`;
 
-          let dayCredits = 0;
-          let dayExtraCredits = 0;
-          people.forEach(p => {
-            const customCredit = getDailyMatrixCell(selectedAccountId, mKey, d, `credit_${p.id}`);
-            if (customCredit !== undefined) dayCredits += parseFloat(customCredit) || 0;
-            const customExtra = getDailyMatrixCell(selectedAccountId, mKey, d, `extra_credit_${p.id}`);
-            if (customExtra !== undefined) dayExtraCredits += parseFloat(customExtra) || 0;
-          });
+            let dayCredits = 0;
+            let dayExtraCredits = 0;
+            people.forEach(p => {
+              const customCredit = getDailyMatrixCell(selectedAccountId, mKey, d, `credit_${p.id}`);
+              if (customCredit !== undefined) dayCredits += parseFloat(customCredit) || 0;
+              const customExtra = getDailyMatrixCell(selectedAccountId, mKey, d, `extra_credit_${p.id}`);
+              if (customExtra !== undefined) dayExtraCredits += parseFloat(customExtra) || 0;
+            });
 
-          let dayBills = 0;
-          accountBills.forEach(b => {
-            const customBill = getDailyMatrixCell(selectedAccountId, mKey, d, `bill_${b.id}`);
-            if (customBill !== undefined) dayBills += parseFloat(customBill) || 0;
-          });
+            let dayBills = 0;
+            accountBills.forEach(b => {
+              const customBill = getDailyMatrixCell(selectedAccountId, mKey, d, `bill_${b.id}`);
+              if (customBill !== undefined) dayBills += parseFloat(customBill) || 0;
+            });
 
-          const customOther = getDailyMatrixCell(selectedAccountId, mKey, d, 'other_amount');
-          const dayOther = customOther !== undefined ? (parseFloat(customOther) || 0) : 0;
+            const customOther = getDailyMatrixCell(selectedAccountId, mKey, d, 'other_amount');
+            const dayOther = customOther !== undefined ? (parseFloat(customOther) || 0) : 0;
 
-          const customOtherCredit = getDailyMatrixCell(selectedAccountId, mKey, d, 'other_credit_amount');
-          const dayOtherCredit = customOtherCredit !== undefined ? (parseFloat(customOtherCredit) || 0) : 0;
+            const customOtherCredit = getDailyMatrixCell(selectedAccountId, mKey, d, 'other_credit_amount');
+            const dayOtherCredit = customOtherCredit !== undefined ? (parseFloat(customOtherCredit) || 0) : 0;
 
-          const tentativeRegEnding = runningRegBeg + dayCredits - dayBills;
-          const tentativeExtraEnding = runningExtraBeg + dayExtraCredits + dayOtherCredit + dayOther;
+            const tentativeRegEnding = regBeg + dayCredits - dayBills;
+            const tentativeExtraEnding = extraBeg + dayExtraCredits + dayOtherCredit + dayOther;
 
-          let customRegEnd;
-          let customExtraEnd;
-          if (selectedAccountId === 'all') {
-            const allReg = getDailyMatrixCell('all', mKey, d, 'reg_ending');
-            const allExtra = getDailyMatrixCell('all', mKey, d, 'extra_ending');
-            if (allReg !== undefined && allReg !== null && allReg !== '') customRegEnd = parseFloat(allReg);
-            if (allExtra !== undefined && allExtra !== null && allExtra !== '') customExtraEnd = parseFloat(allExtra);
-          } else {
-            const accReg = getDailyMatrixCell(selectedAccountId, mKey, d, 'reg_ending');
-            const accExtra = getDailyMatrixCell(selectedAccountId, mKey, d, 'extra_ending');
-            if (accReg !== undefined && accReg !== null && accReg !== '') customRegEnd = parseFloat(accReg);
-            if (accExtra !== undefined && accExtra !== null && accExtra !== '') customExtraEnd = parseFloat(accExtra);
-          }
-
-          let reg = customRegEnd !== undefined && !isNaN(customRegEnd) ? customRegEnd : tentativeRegEnding;
-          let extra = customExtraEnd !== undefined && !isNaN(customExtraEnd) ? customExtraEnd : tentativeExtraEnding;
-
-          if (customRegEnd === undefined && customExtraEnd === undefined) {
-            if (reg < 0 && extra > 0) {
-              const transfer = Math.min(extra, -reg);
-              reg += transfer;
-              extra -= transfer;
-            } else if (extra < 0 && reg > 0) {
-              const transfer = Math.min(reg, -extra);
-              extra += transfer;
-              reg -= transfer;
+            let customRegEnd;
+            let customExtraEnd;
+            if (selectedAccountId === 'all') {
+              const allReg = getDailyMatrixCell('all', mKey, d, 'reg_ending');
+              const allExtra = getDailyMatrixCell('all', mKey, d, 'extra_ending');
+              if (allReg !== undefined && allReg !== null && allReg !== '') customRegEnd = parseFloat(allReg);
+              if (allExtra !== undefined && allExtra !== null && allExtra !== '') customExtraEnd = parseFloat(allExtra);
+            } else {
+              const accReg = getDailyMatrixCell(selectedAccountId, mKey, d, 'reg_ending');
+              const accExtra = getDailyMatrixCell(selectedAccountId, mKey, d, 'extra_ending');
+              if (accReg !== undefined && accReg !== null && accReg !== '') customRegEnd = parseFloat(accReg);
+              if (accExtra !== undefined && accExtra !== null && accExtra !== '') customExtraEnd = parseFloat(accExtra);
             }
+
+            let reg = customRegEnd !== undefined && !isNaN(customRegEnd) ? customRegEnd : tentativeRegEnding;
+            let extra = customExtraEnd !== undefined && !isNaN(customExtraEnd) ? customExtraEnd : tentativeExtraEnding;
+
+            if (customRegEnd === undefined && customExtraEnd === undefined) {
+              if (reg < 0 && extra > 0) {
+                const transfer = Math.min(extra, -reg);
+                reg += transfer;
+                extra -= transfer;
+              } else if (extra < 0 && reg > 0) {
+                const transfer = Math.min(reg, -extra);
+                extra += transfer;
+                reg -= transfer;
+              }
+            }
+
+            regBeg = Math.round(reg * 100) / 100 || 0;
+            extraBeg = Math.round(extra * 100) / 100 || 0;
+
+            cur.setDate(cur.getDate() + 1);
           }
-
-          runningRegBeg = Math.round(reg * 100) / 100 || 0;
-          runningExtraBeg = Math.round(extra * 100) / 100 || 0;
-
-          cur.setDate(cur.getDate() + 1);
         }
       }
-    }
+
+      return { initialRegBeg: regBeg, initialExtraBeg: extraBeg };
+    }, [
+      selectedAccountId,
+      budget.accounts,
+      selectedAccount,
+      startDateObj,
+      monthList.length > 0 ? monthList[0].monthKey : null,
+      people,
+      accountBills,
+      getDailyMatrixCell
+    ]);
+
+    let runningRegBeg = initialRegBeg;
+    let runningExtraBeg = initialExtraBeg;
 
     monthList.forEach(mItem => {
       const { year, month, monthKey, daysInMonth } = mItem;

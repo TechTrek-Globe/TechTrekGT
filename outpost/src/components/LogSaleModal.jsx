@@ -210,8 +210,11 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
 
   const filteredItems = availableItems.filter(it => {
     if (!itemSearch) return true;
-    const match = `${it.item_name} ${it.athlete_person || ''} ${it.category || ''}`.toLowerCase();
-    return match.includes(itemSearch.toLowerCase());
+    let matchString = `${it.item_name} ${it.athlete_person || ''} ${it.category || ''}`;
+    if (it.category && it.category.toLowerCase().includes('sport')) {
+      matchString += ` ${it.team || ''}`;
+    }
+    return matchString.toLowerCase().includes(itemSearch.toLowerCase());
   });
 
   return (

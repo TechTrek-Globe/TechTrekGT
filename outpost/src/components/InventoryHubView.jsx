@@ -145,31 +145,30 @@ export function InventoryHubView() {
         </div>
       )}
 
-      {loading && items.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center text-slate-500">
-          <Loader2 className="w-8 h-8 animate-spin text-amber-400 mb-3" />
-          <p className="text-sm font-semibold">Loading Inventory...</p>
-        </div>
-      ) : (
-        <div className="flex-1 flex flex-col min-h-0 space-y-1.5">
-          <InventoryFilters
-            viewMode={viewMode}
-            setViewMode={setViewMode}
-            search={search}
-            setSearch={setSearch}
-            statusFilter={statusFilter}
-            setStatusFilter={setStatusFilter}
-            categoryFilter={categoryFilter}
-            setCategoryFilter={setCategoryFilter}
-            categoryOptions={categoryOptions}
-            statusCounts={statusCounts}
-            totalCount={pagination.total}
-            loading={loading}
-            onRefresh={refreshAll}
-          />
+      <InventoryFilters
+        viewMode={viewMode}
+        setViewMode={setViewMode}
+        search={search}
+        setSearch={setSearch}
+        statusFilter={statusFilter}
+        setStatusFilter={setStatusFilter}
+        categoryFilter={categoryFilter}
+        setCategoryFilter={setCategoryFilter}
+        categoryOptions={categoryOptions}
+        statusCounts={statusCounts}
+        totalCount={pagination.total}
+        loading={loading}
+        onRefresh={refreshAll}
+      />
 
-          {viewMode === 'table' ? (
-            <InventoryTable
+      <div className="flex-1 flex flex-col min-h-0 space-y-1.5 relative">
+        {loading && items.length === 0 ? (
+          <div className="flex-1 flex flex-col items-center justify-center text-slate-500">
+            <Loader2 className="w-8 h-8 animate-spin text-amber-400 mb-3" />
+            <p className="text-sm font-semibold">Loading Inventory...</p>
+          </div>
+        ) : viewMode === 'table' ? (
+          <InventoryTable
               items={displayItems}
               pagination={pagination}
               onPageChange={fetchItems}

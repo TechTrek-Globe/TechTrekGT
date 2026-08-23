@@ -35,10 +35,12 @@ function addSecurityHeaders(response, isLocalhost = false, requestOrigin = '') {
     newHeaders.set('Content-Security-Policy', [
       "default-src 'self'",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-      "script-src 'self'",
-      "connect-src 'self' https://techtrekgt.com",
-      "img-src 'self' data: blob:",
+      "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com",
+      "connect-src 'self' https://techtrekgt.com https://challenges.cloudflare.com",
+      "img-src 'self' data: blob: https://challenges.cloudflare.com",
       "font-src 'self' data: https://fonts.gstatic.com",
+      "frame-src 'self' https://challenges.cloudflare.com blob:",
+      "child-src 'self' https://challenges.cloudflare.com blob:",
       "frame-ancestors 'none'",
       "form-action 'self'",
       "base-uri 'self'"

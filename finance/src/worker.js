@@ -31,17 +31,19 @@ async function timingSafeStringEqual(a, b) {
  * @param {Response} response
  * @param {boolean} [isLocalhost]
  */
-function addSecurityHeaders(response, isLocalhost = false) {
+function addSecurityHeaders(response, isLocalhost = false, requestOrigin = '') {
   const newHeaders = new Headers(response.headers);
   if (!isLocalhost) {
     newHeaders.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
     newHeaders.set('Content-Security-Policy', [
       "default-src 'self'",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-      "script-src 'self'",
-      "connect-src 'self' https://techtrekgt.com",
-      "img-src 'self' data: blob:",
+      "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com",
+      "connect-src 'self' https://techtrekgt.com https://challenges.cloudflare.com",
+      "img-src 'self' data: blob: https://challenges.cloudflare.com",
       "font-src 'self' data: https://fonts.gstatic.com",
+      "frame-src 'self' https://challenges.cloudflare.com blob:",
+      "child-src 'self' https://challenges.cloudflare.com blob:",
       "frame-ancestors 'none'",
       "form-action 'self'",
       "base-uri 'self'"
@@ -59,9 +61,8 @@ function addSecurityHeaders(response, isLocalhost = false) {
     'https://techtrek-budget.pages.dev',
     'http://localhost:3000'
   ];
-  const origin = response.headers.get('Origin');
-  if (origin && allowedOrigins.includes(origin)) {
-    newHeaders.set('Access-Control-Allow-Origin', origin);
+  if (requestOrigin && allowedOrigins.includes(requestOrigin)) {
+    newHeaders.set('Access-Control-Allow-Origin', requestOrigin);
   } else {
     newHeaders.set('Access-Control-Allow-Origin', 'https://techtrekgt.com');
   }
@@ -212,6 +213,7 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const context = { request, env, ctx };
+    const requestOrigin = request.headers.get('Origin') || '';
 
     // Force HTTPS redirect if accessed via HTTP (except localhost)
     const isLocalhost = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
@@ -231,7 +233,7 @@ export default {
 
     // Handle OPTIONS preflight
     if (request.method === 'OPTIONS') {
-      return addSecurityHeaders(new Response(null, { status: 204 }), isLocalhost);
+      return addSecurityHeaders(new Response(null, { status: 204 }), isLocalhost, requestOrigin);
     }
 
     let response;
@@ -307,6 +309,6 @@ export default {
       });
     }
 
-    return addSecurityHeaders(response, isLocalhost);
+    return addSecurityHeaders(response, isLocalhost, requestOrigin);
   }
 };

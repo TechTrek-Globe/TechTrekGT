@@ -197,7 +197,6 @@ export function InventoryHubView() {
             />
           )}
         </div>
-      )}
 
       {/* Modals */}
       <AddInvoiceModal

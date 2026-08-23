@@ -454,7 +454,7 @@ Each React app follows:
 ### 9.3 Build Output
 
 - Vite builds into `dist/client` (configured via `outDir` in `vite.config.js`).
-- Wrangler serves this directory via the `ASSETS` binding with `not_found_handling: "single-page-application"` for SPA routing.
+- Wrangler serves this directory via the `ASSETS` binding with `run_worker_first: true` and `not_found_handling: "single-page-application"` to prevent edge static asset interception of worker API routes.
 - `finance` and `outpost` use the `@cloudflare/vite-plugin`; `wayfinder` and `bigworm` use plain Vite with outDir set to `dist/client`.
 
 ### 9.4 Secrets

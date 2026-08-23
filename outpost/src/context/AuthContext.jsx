@@ -20,9 +20,11 @@ export function AuthProvider({ children }) {
           credentials: 'include'
         });
         if (res.ok) {
-          const data = await res.json();
-          setUser(data.user);
-          setIsAuthenticated(true);
+          const data = await res.json().catch(() => ({}));
+          if (data.user) {
+            setUser(data.user);
+            setIsAuthenticated(true);
+          }
         }
       } catch (e) {
         // No session
@@ -75,9 +77,9 @@ export function AuthProvider({ children }) {
       body: JSON.stringify({ email, password, rememberMe })
     });
 
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      throw new Error(data.error || 'Login failed');
+      throw new Error(data.error || `Login failed (HTTP ${res.status})`);
     }
 
     setIsAuthenticated(true);
@@ -101,9 +103,9 @@ export function AuthProvider({ children }) {
       body: JSON.stringify({ name, email, password, securityQuestion, securityAnswer, rememberMe })
     });
 
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      throw new Error(data.error || 'Registration failed');
+      throw new Error(data.error || `Registration failed (HTTP ${res.status})`);
     }
 
     setIsAuthenticated(true);
@@ -119,9 +121,9 @@ export function AuthProvider({ children }) {
       body: JSON.stringify({ email })
     });
 
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      throw new Error(data.error || 'Failed to fetch security question');
+      throw new Error(data.error || `Failed to fetch security question (HTTP ${res.status})`);
     }
     return data;
   };
@@ -134,9 +136,9 @@ export function AuthProvider({ children }) {
       body: JSON.stringify({ email, securityAnswer })
     });
 
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      throw new Error(data.error || 'Failed to verify security answer');
+      throw new Error(data.error || `Failed to verify security answer (HTTP ${res.status})`);
     }
     // resetToken is intentionally NOT returned - the server sets an HttpOnly reset_session cookie
     return data;
@@ -151,9 +153,9 @@ export function AuthProvider({ children }) {
       body: JSON.stringify({ email, newPassword })
     });
 
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      throw new Error(data.error || 'Failed to reset password');
+      throw new Error(data.error || `Failed to reset password (HTTP ${res.status})`);
     }
     return data;
   };
@@ -166,9 +168,9 @@ export function AuthProvider({ children }) {
       body: JSON.stringify(profileData)
     });
 
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      throw new Error(data.error || 'Failed to update profile');
+      throw new Error(data.error || `Failed to update profile (HTTP ${res.status})`);
     }
     if (data.user) {
       setUser(data.user);

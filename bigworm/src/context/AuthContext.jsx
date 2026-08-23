@@ -20,9 +20,11 @@ export function AuthProvider({ children }) {
           credentials: 'include'
         });
         if (res.ok) {
-          const data = await res.json();
-          setUser(data.user);
-          setIsAuthenticated(true);
+          const data = await res.json().catch(() => ({}));
+          if (data.user) {
+            setUser(data.user);
+            setIsAuthenticated(true);
+          }
         }
       } catch (e) {
         // No session
@@ -70,9 +72,9 @@ export function AuthProvider({ children }) {
       body: JSON.stringify({ email, password, rememberMe })
     });
 
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      throw new Error(data.error || 'Login failed');
+      throw new Error(data.error || `Login failed (HTTP ${res.status})`);
     }
 
     setIsAuthenticated(true);

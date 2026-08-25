@@ -4,6 +4,18 @@ export { getApiUrl };
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
 const OPTS = { credentials: 'include' };
 
+/**
+ * Resolves the landing API gateway base URL.
+ * In local dev (localhost) routes to wrangler dev port 8787.
+ * In production routes to https://techtrekgt.com (techtrek-landing Worker).
+ */
+function getGatewayBase() {
+  if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+    return 'http://localhost:8787';
+  }
+  return 'https://techtrekgt.com';
+}
+
 async function apiFetch(path, options = {}) {
   const res = await fetch(getApiUrl(path), { ...OPTS, ...options });
   const data = await res.json().catch(() => ({}));
@@ -144,12 +156,35 @@ export const deleteComp = (id) =>
 export const getDashboard = () =>
   apiFetch('/api/dashboard');
 
-// --- Live eBay Comps Auto-Fetch ---
+// --- Live eBay Comps (via Central API Gateway) ---
+// Gateway endpoint: POST https://techtrekgt.com/api/ebay/comps
+// Uses official eBay REST API (Marketplace Insights + Browse fallback).
+// Option A: gateway returns raw data; caller uses saveComp() to persist to D1 if itemId is set.
 export const fetchLiveComps = (query, itemId = null) =>
-  apiFetch('/api/comps/live', {
+  fetch(`${getGatewayBase()}/api/ebay/comps`, {
     method: 'POST',
+    credentials: 'include',
     headers: JSON_HEADERS,
     body: JSON.stringify({ query, itemId })
+  }).then(async r => {
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+    return data;
+  });
+
+// --- Amazon Product Fetch (via Central API Gateway) ---
+// Gateway endpoint: POST https://techtrekgt.com/api/amazon/fetch
+// Scrapes/parses Amazon product metadata from a URL or ASIN.
+export const fetchAmazonProduct = (input) =>
+  fetch(`${getGatewayBase()}/api/amazon/fetch`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ input })
+  }).then(async r => {
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+    return data;
   });
 
 // --- TechTrek Finance Cross-Portal Sync ---

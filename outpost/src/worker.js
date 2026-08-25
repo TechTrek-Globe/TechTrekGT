@@ -17,12 +17,10 @@ import { onRequestGet as platformsListHandler, onRequestPost as platformsCreateH
 import { onRequestPut as platformPutHandler, onRequestDelete as platformDeleteHandler } from '../functions/api/platforms/[id].js';
 import { onRequestGet as compsListHandler, onRequestPost as compsCreateHandler } from '../functions/api/comps/index.js';
 import { onRequestGet as compGetHandler, onRequestPut as compPutHandler, onRequestDelete as compDeleteHandler } from '../functions/api/comps/[id].js';
-import { onRequestGet as compsLiveGetHandler, onRequestPost as compsLivePostHandler } from '../functions/api/comps/live.js';
 import { onRequestGet as dashboardHandler } from '../functions/api/dashboard.js';
 import { onRequestPost as batchImportHandler } from '../functions/api/import/batch.js';
 import { onRequestPost as amazonImportHandler } from '../functions/api/import/amazon.js';
 import { onRequestGet as amazonTokenGetHandler, onRequestPost as amazonTokenPostHandler } from '../functions/api/import/amazon-token.js';
-import { onRequestPost as amazonFetchHandler } from '../functions/api/import/amazon-fetch.js';
 import { onRequestGet as syncFinanceGetHandler, onRequestPost as syncFinancePostHandler } from '../functions/api/sync/finance.js';
 import { onRequestGet as suppliesListHandler, onRequestPost as suppliesCreateHandler } from '../functions/api/supplies/index.js';
 import { onRequestPut as supplyPutHandler, onRequestDelete as supplyDeleteHandler } from '../functions/api/supplies/[id].js';
@@ -180,11 +178,8 @@ export default {
         response = await platformPutHandler(context);
       } else if (/^\/api\/platforms\/[^/]+$/.test(apiPath) && request.method === 'DELETE') {
         response = await platformDeleteHandler(context);
-      // --- Comps / Pricing Intelligence ---
-      } else if (apiPath === '/api/comps/live' && request.method === 'GET') {
-        response = await compsLiveGetHandler(context);
-      } else if (apiPath === '/api/comps/live' && request.method === 'POST') {
-        response = await compsLivePostHandler(context);
+      // --- Comps / Pricing Intelligence (D1 CRUD) ---
+      // Note: Live eBay comps now served by the landing gateway at /api/ebay/comps
       } else if (apiPath === '/api/comps' && request.method === 'GET') {
         response = await compsListHandler(context);
       } else if (apiPath === '/api/comps' && request.method === 'POST') {
@@ -201,15 +196,14 @@ export default {
       // --- Batch Import ---
       } else if (apiPath === '/api/import/batch' && request.method === 'POST') {
         response = await batchImportHandler(context);
-      // --- Amazon / VineScout Import ---
+      // --- Amazon / VineScout Import (Bearer token auth - stays in outpost) ---
+      // Note: Amazon product fetch now served by landing gateway at /api/amazon/fetch
       } else if (apiPath === '/api/import/amazon' && request.method === 'POST') {
         response = await amazonImportHandler(context);
       } else if (apiPath === '/api/import/amazon-token' && request.method === 'GET') {
         response = await amazonTokenGetHandler(context);
       } else if (apiPath === '/api/import/amazon-token' && request.method === 'POST') {
         response = await amazonTokenPostHandler(context);
-      } else if (apiPath === '/api/import/amazon-fetch' && request.method === 'POST') {
-        response = await amazonFetchHandler(context);
       // --- TechTrek Finance Sync ---
       } else if (apiPath === '/api/sync/finance' && request.method === 'GET') {
         response = await syncFinanceGetHandler(context);

@@ -48,16 +48,21 @@ TechTrekGT is a multi-application platform hosted on `techtrekgt.com`. The repos
 |-------|-----------|-------|
 | Frontend | Static HTML5 + CSS3 + vanilla JS | No framework, no build step |
 | Styling | Hand-written CSS with custom properties | Dark space theme with amber accents |
-| Deployment | Cloudflare Workers static assets | Served at the `techtrekgt.com` root |
+| **Gateway Worker** | **Cloudflare Workers ESM** | **`src/worker.js` - programmatic Worker entry point; routes `/api/*` before falling back to static ASSETS** |
+| Deployment | Cloudflare Workers + static assets | `run_worker_first: true`; gateway intercepts API routes, ASSETS serves HTML/CSS/JS |
 
 ### 2.4 External API Integrations, Lookup Services & Dual Verification Standard
 
-| Service | Primary App | Purpose |
-|---------|-------------|---------|
-| **Google Places & Maps API** | `wayfinder` | Live venue details, ratings, photography, neighborhood & hotel lookup queries, coordinate navigation links, and mandatory dual verification |
-| **Geoapify API** | `wayfinder` | Primary POI generation, geocoding, and venue coordinate dual verification |
-| **National Bank of Poland (NBP) API** | `wayfinder` | Real-time PLN/USD and PLN/EUR exchange rates via worker proxy |
-| **Amazon Lookup & Scraper Architecture** | `outpost` | Multi-tier product detail extraction: external proxy support (`SCRAPER_API_KEY`), mobile/sub-resource endpoint cascade in Cloudflare Worker, and client-side smart parser (`amazonParser.js`) with 1-click tab assist |
+> **Central API Gateway (Phase 1 active):** External third-party API calls for eBay and Amazon have been migrated out of `outpost/` and into the `landing/` Central API Gateway (`src/gateway/`). All gateway endpoints require the shared SSO JWT cookie. Sub-apps call the gateway via absolute URL (`https://techtrekgt.com/api/...`) with `credentials: 'include'`.
+
+| Service | Gateway / App | Endpoint | Purpose |
+|---------|-------------|----------|---------|
+| **eBay REST API** | `landing` (gateway) | `GET/POST /api/ebay/comps` | Fetches recently sold comp listings via eBay OAuth CCF + Marketplace Insights API (Browse API fallback). Replaces anonymous HTML scraper in outpost. |
+| **Amazon Scraper** | `landing` (gateway) | `POST /api/amazon/fetch` | Multi-tier Amazon product detail extraction: external scraper proxy (`SCRAPER_API_KEY`) + direct Worker cascade. Replaces `outpost/functions/api/import/amazon-fetch.js`. |
+| **Google Places & Maps API** | `wayfinder` | (wayfinder-local) | Live venue details, ratings, photography, neighborhood & hotel lookup queries, coordinate navigation links, and mandatory dual verification. *(Phase 2: migrate to gateway `/api/places/search`)* |
+| **Geoapify API** | `wayfinder` | (wayfinder-local) | Primary POI generation, geocoding, and venue coordinate dual verification. *(Phase 2: migrate to gateway `/api/geo/places`)* |
+| **National Bank of Poland (NBP) API** | `wayfinder` | (wayfinder-local) | Real-time PLN/USD and PLN/EUR exchange rates via worker proxy. |
+| **Amazon VineScout Import** | `outpost` | `POST /api/import/amazon` | Chrome Extension Bearer-token endpoint; writes to D1 only - no external API call. Stays in outpost permanently. |
 
 > **Dual-Verification Standard:** All external API POI coordinates, venue geocoding, and address metadata MUST be dual-verified across both Google Places API and Geoapify API (delta distance threshold < 250m) prior to dataset ingestion in `wayfinder/src/data/poland-2026.js`.
 
@@ -463,7 +468,11 @@ Set via `wrangler secret put`:
 
 | Secret | Apps | Purpose |
 |--------|------|---------|
-| `JWT_SECRET` | all four React apps | Shared SSO signing key |
+| `JWT_SECRET` | all five apps (incl. landing gateway) | Shared SSO signing key |
+| `EBAY_CLIENT_ID` | `landing` (gateway) | eBay Developer App ID (OAuth Client ID) |
+| `EBAY_CLIENT_SECRET` | `landing` (gateway) | eBay Developer Cert ID (OAuth Client Secret) |
+| `SCRAPER_API_KEY` | `landing` (gateway) | Optional Amazon scraper proxy key (moved from outpost) |
+| `AMAZON_SCRAPER_URL` | `landing` (gateway) | Optional custom Amazon scraper proxy URL (moved from outpost) |
 | `GUACAMOLE_INTERNAL_URL` | bigworm | Internal Guacamole URL |
 | `GUAC_USERNAME` / `GUAC_PASSWORD` | bigworm | Guacamole credentials |
 | `SYNC_UNLOCK_CODE` | finance | Cloud vault backup passcode |

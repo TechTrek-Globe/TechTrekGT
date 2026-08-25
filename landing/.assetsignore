@@ -1,5 +1,10 @@
-﻿node_modules/
+node_modules/
 .wrangler/
 package.json
 package-lock.json
 wrangler.jsonc
+.dev.vars.example
+.dev.vars
+.env
+.gitignore
+

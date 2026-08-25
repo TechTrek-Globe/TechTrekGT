@@ -1,17 +1,20 @@
-import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
+import { requireGatewayAuth, withGatewayAuth, ok, err } from './guard.js';
 
 /**
- * POST /api/import/amazon-fetch
+ * POST /api/amazon/fetch
  *
  * Scrapes product title, price, main image, category, specs, and features
  * from a public Amazon DP URL or ASIN.
- * Supports optional external proxy (SCRAPER_API_KEY) and mobile fallback endpoints.
+ * Supports optional external proxy (SCRAPER_API_KEY or AMAZON_SCRAPER_URL).
+ *
+ * Extracted from outpost/functions/api/import/amazon-fetch.js.
+ * Secrets now live in landing/.dev.vars (not outpost).
  */
 
 export async function onRequestPost(context) {
   const { request, env } = context;
-  return withAuth(async () => {
-    await requireAuth(request, env);
+  return withGatewayAuth(async () => {
+    await requireGatewayAuth(request, env);
 
     const body = await request.json().catch(() => ({}));
     const { input } = body;
@@ -47,13 +50,12 @@ export async function onRequestPost(context) {
     const features = [];
     const specs = {};
 
-    // 3. If ASIN found, attempt multi-tier fetch
     if (asin) {
       const amazonDirectUrl = `https://www.amazon.com/dp/${asin}`;
       let html = '';
       let fetchSuccess = false;
 
-      // Tier 1: External Scraper API (if SCRAPER_API_KEY or AMAZON_SCRAPER_URL is configured)
+      // Tier 1: External Scraper API (if SCRAPER_API_KEY or AMAZON_SCRAPER_URL configured in landing/.dev.vars)
       if (env?.SCRAPER_API_KEY || env?.AMAZON_SCRAPER_URL) {
         try {
           const proxyUrl = env.AMAZON_SCRAPER_URL
@@ -71,7 +73,7 @@ export async function onRequestPost(context) {
             }
           }
         } catch (proxyErr) {
-          console.warn('Scraper API proxy error:', proxyErr);
+          console.warn('[amazon gateway] Scraper proxy error:', proxyErr);
         }
       }
 
@@ -116,12 +118,11 @@ export async function onRequestPost(context) {
               }
             }
           } catch (fetchErr) {
-            console.warn(`Direct fetch failed for ${targetUrl}:`, fetchErr);
+            console.warn(`[amazon gateway] Direct fetch failed for ${targetUrl}:`, fetchErr);
           }
         }
       }
 
-      // If all automated fetches were blocked or returned no usable HTML
       if (!fetchSuccess || !html) {
         return new Response(JSON.stringify({
           success: false,
@@ -136,8 +137,7 @@ export async function onRequestPost(context) {
         });
       }
 
-      // 4. HTML Extraction Logic
-      // Title extraction
+      // HTML Extraction
       const titleMatch = html.match(/<span[^>]*id=["']productTitle["'][^>]*>([\s\S]*?)<\/span>/i)
         || html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i)
         || html.match(/<title>([\s\S]*?)<\/title>/i);
@@ -166,9 +166,7 @@ export async function onRequestPost(context) {
 
       // Brand extraction
       const brandRowMatch = html.match(/<tr[^>]*class=["'][^"']*po-brand[^"']*["'][^>]*>[\s\S]*?<td[^>]*class=["'][^"']*a-span9[^"']*["'][^>]*>[\s\S]*?<span[^>]*class=["'][^"']*a-size-base[^"']*["'][^>]*>([\s\S]*?)<\/span>/i);
-      if (brandRowMatch) {
-        brand = brandRowMatch[1].replace(/<[^>]+>/g, '').trim();
-      }
+      if (brandRowMatch) { brand = brandRowMatch[1].replace(/<[^>]+>/g, '').trim(); }
       if (!brand) {
         const bylineMatch = html.match(/<a[^>]*id=["']bylineInfo["'][^>]*>([\s\S]*?)<\/a>/i);
         if (bylineMatch) {
@@ -178,7 +176,7 @@ export async function onRequestPost(context) {
         }
       }
 
-      // Bullet points / Features extraction
+      // Features extraction
       const featureBulletsMatch = html.match(/<div[^>]*id=["'](?:feature-bullets|featurebullets_feature_div)["'][^>]*>([\s\S]*?)<\/div>/i);
       if (featureBulletsMatch) {
         const itemMatches = featureBulletsMatch[1].matchAll(/<span[^>]*class=["']a-list-item["'][^>]*>([\s\S]*?)<\/span>/gi);
@@ -215,20 +213,14 @@ export async function onRequestPost(context) {
       const imgMatch = html.match(/<img[^>]*id=["']landingImage["'][^>]*data-old-hires=["']([^"']+)["']/i)
         || html.match(/<img[^>]*id=["']landingImage["'][^>]*src=["']([^"']+)["']/i)
         || html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i);
-
-      if (imgMatch && !imgMatch[1].includes('captcha')) {
-        image = imgMatch[1];
-      }
+      if (imgMatch && !imgMatch[1].includes('captcha')) { image = imgMatch[1]; }
 
       // Price extraction
       const priceMatch = html.match(/<span[^>]*class=["'][^"']*a-offscreen[^"']*["'][^>]*>\s*\$([\d.,]+)\s*<\/span>/i)
         || html.match(/class=["']a-price-whole["']>([\d.,]+)<\/span>/i);
-
       if (priceMatch) {
         const parsedPrice = parseFloat(priceMatch[1].replace(/,/g, ''));
-        if (!isNaN(parsedPrice) && parsedPrice > 0) {
-          price = parsedPrice;
-        }
+        if (!isNaN(parsedPrice) && parsedPrice > 0) { price = parsedPrice; }
       }
     }
 
@@ -244,7 +236,9 @@ export async function onRequestPost(context) {
       price: price || null,
       image: image || null,
       category: category || 'Other',
-      url: asin ? `https://www.amazon.com/dp/${asin}` : (orderId ? `https://www.amazon.com/gp/your-account/order-details?orderID=${orderId}` : trimmed)
+      url: asin
+        ? `https://www.amazon.com/dp/${asin}`
+        : (orderId ? `https://www.amazon.com/gp/your-account/order-details?orderID=${orderId}` : trimmed)
     });
   });
 }

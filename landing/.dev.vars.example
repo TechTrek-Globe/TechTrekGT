@@ -1,0 +1,23 @@
+# Landing API Gateway - local development secrets
+# Copy this file to .dev.vars and fill in real values.
+# NEVER commit .dev.vars to version control.
+
+# Shared SSO secret - must match the JWT_SECRET used in finance, outpost, wayfinder, bigworm.
+# Copy the value from outpost/.dev.vars (or finance/.dev.vars).
+JWT_SECRET=your_shared_jwt_secret_here
+
+# eBay Developer credentials (required for /api/ebay/comps).
+# Obtain from https://developer.ebay.com -> Application Keys.
+# EBAY_CLIENT_ID  = App ID (OAuth Client ID)
+# EBAY_CLIENT_SECRET = Cert ID (OAuth Client Secret)
+EBAY_CLIENT_ID=your_ebay_app_id_here
+EBAY_CLIENT_SECRET=your_ebay_cert_id_here
+
+# Optional: Amazon scraper proxy for /api/amazon/fetch.
+# Leave blank to use direct Worker fetch cascade (may be blocked by Amazon bot protection).
+SCRAPER_API_KEY=
+AMAZON_SCRAPER_URL=
+
+# Phase 2 placeholders - uncomment when implementing Places/Geoapify gateway endpoints.
+# GOOGLE_MAPS_API_KEY=
+# GEOAPIFY_API_KEY=

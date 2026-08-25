@@ -17,6 +17,7 @@ export function PricingDrawer({ item, colSpan, isOpen, onClose, onItemUpdated, o
     comp_1: item.comp_1 !== null && item.comp_1 !== undefined ? roundPrice(item.comp_1) : '',
     comp_2: item.comp_2 !== null && item.comp_2 !== undefined ? roundPrice(item.comp_2) : '',
     comp_3: item.comp_3 !== null && item.comp_3 !== undefined ? roundPrice(item.comp_3) : '',
+    live_avg: item.live_avg !== null && item.live_avg !== undefined ? roundPrice(item.live_avg) : null,
     recommended_list_price: roundPrice(item.recommended_list_price || item.current_list_price || item.suggested_list_price || ''),
     saving: false,
     applied: false,
@@ -55,6 +56,7 @@ export function PricingDrawer({ item, colSpan, isOpen, onClose, onItemUpdated, o
         comp_1: draft.comp_1 === '' ? null : Number(draft.comp_1),
         comp_2: draft.comp_2 === '' ? null : Number(draft.comp_2),
         comp_3: draft.comp_3 === '' ? null : Number(draft.comp_3),
+        live_avg: draft.live_avg === null || draft.live_avg === '' ? null : Number(draft.live_avg),
         recommended_list_price: draft.recommended_list_price === '' ? null : Number(draft.recommended_list_price),
         apply_to_item: applyToItem
       });
@@ -82,6 +84,7 @@ export function PricingDrawer({ item, colSpan, isOpen, onClose, onItemUpdated, o
           comp_1: res.comp_1 !== null && res.comp_1 !== undefined ? roundPrice(res.comp_1) : prev.comp_1,
           comp_2: res.comp_2 !== null && res.comp_2 !== undefined ? roundPrice(res.comp_2) : prev.comp_2,
           comp_3: res.comp_3 !== null && res.comp_3 !== undefined ? roundPrice(res.comp_3) : prev.comp_3,
+          live_avg: res.live_avg !== null && res.live_avg !== undefined ? roundPrice(res.live_avg) : prev.live_avg,
           recommended_list_price: roundPrice(res.live_avg || res.median || prev.recommended_list_price),
           fetchingLive: false,
           fetchMsg: { type: 'success', text: `Found ${res.count} sold comps on eBay! Avg: $${res.live_avg}` },

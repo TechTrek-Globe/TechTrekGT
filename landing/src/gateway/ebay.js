@@ -10,6 +10,8 @@ import { requireGatewayAuth, withGatewayAuth, ok, err } from './guard.js';
  * Required env secrets:
  *   EBAY_CLIENT_ID     - eBay Developer App ID (OAuth Client ID)
  *   EBAY_CLIENT_SECRET - eBay Developer Cert ID (OAuth Client Secret)
+ * Optional bindings:
+ *   GATEWAY_KV         - KV namespace for token caching (~2hr TTL)
  *
  * Returns structured comp data compatible with the outpost auction_comps schema.
  *
@@ -22,12 +24,13 @@ const EBAY_INSIGHTS_URL = 'https://api.ebay.com/buy/marketplace_insights/v1_beta
 const EBAY_BROWSE_URL = 'https://api.ebay.com/buy/browse/v1/item_summary/search';
 const EBAY_SCOPE = 'https://api.ebay.com/oauth/api_scope';
 
+const EBAY_TOKEN_KV_KEY = 'ebay_access_token';
+const EBAY_TOKEN_TTL_SECONDS = 6600; // 10 min buffer from eBay's 7200s lifetime
+
 /**
- * Obtains an OAuth 2.0 Application Access Token via Client Credentials Grant.
- * Tokens are valid for ~2 hours. In Phase 1 (stateless, no KV cache) we
- * fetch a fresh token per request. Phase 2 can add KV caching.
+ * Fetches a fresh eBay OAuth token via Client Credentials Grant.
  */
-async function getEbayAccessToken(env) {
+async function fetchFreshEbayToken(env) {
   if (!env.EBAY_CLIENT_ID || !env.EBAY_CLIENT_SECRET) {
     throw new Error('Missing eBay credentials: EBAY_CLIENT_ID and EBAY_CLIENT_SECRET required');
   }
@@ -57,11 +60,45 @@ async function getEbayAccessToken(env) {
 }
 
 /**
+ * Returns a valid eBay access token, reading from GATEWAY_KV cache when available.
+ * Falls back gracefully to a fresh token fetch when KV is not bound (local dev).
+ * Exported for reuse by ebayCatalog.js and ebayItem.js.
+ */
+export async function getCachedEbayToken(env) {
+  if (env.GATEWAY_KV) {
+    try {
+      const cached = await env.GATEWAY_KV.get(EBAY_TOKEN_KV_KEY, { type: 'json' });
+      if (cached && cached.token && cached.expires_at > Date.now()) {
+        return cached.token;
+      }
+    } catch (_) {
+      // KV read failure - fall through to fresh fetch
+    }
+  }
+
+  const token = await fetchFreshEbayToken(env);
+
+  if (env.GATEWAY_KV) {
+    try {
+      await env.GATEWAY_KV.put(
+        EBAY_TOKEN_KV_KEY,
+        JSON.stringify({ token, expires_at: Date.now() + EBAY_TOKEN_TTL_SECONDS * 1000 }),
+        { expirationTtl: EBAY_TOKEN_TTL_SECONDS }
+      );
+    } catch (_) {
+      // KV write failure - non-fatal, token still returned
+    }
+  }
+
+  return token;
+}
+
+/**
  * Searches eBay Marketplace Insights for recently sold listings.
  * Falls back to the Browse API (active listings) if Insights returns no results.
  */
 async function fetchEbaySoldComps(query, env) {
-  const accessToken = await getEbayAccessToken(env);
+  const accessToken = await getCachedEbayToken(env);
   const ebaySearchUrl = `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(query)}&LH_Complete=1&LH_Sold=1&_sop=13`;
 
   // --- Primary: Marketplace Insights API (sold/completed items) ---

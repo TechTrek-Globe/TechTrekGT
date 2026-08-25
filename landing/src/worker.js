@@ -1,5 +1,9 @@
 import { onRequestGet as ebayCompsGet, onRequestPost as ebayCompsPost }
   from './gateway/ebay.js';
+import { onRequestGet as ebayCatalogGet }
+  from './gateway/ebayCatalog.js';
+import { onRequestGet as ebayItemGet }
+  from './gateway/ebayItem.js';
 import { onRequestPost as amazonFetchPost }
   from './gateway/amazon.js';
 
@@ -77,6 +81,14 @@ export default {
           response = await ebayCompsGet(context);
         } else if (pathname === '/api/ebay/comps' && request.method === 'POST') {
           response = await ebayCompsPost(context);
+
+        // --- eBay Catalog Gateway ---
+        } else if (pathname === '/api/ebay/catalog' && request.method === 'GET') {
+          response = await ebayCatalogGet(context);
+
+        // --- eBay Item Detail Gateway ---
+        } else if (pathname.startsWith('/api/ebay/item/') && request.method === 'GET') {
+          response = await ebayItemGet(context);
 
         // --- Amazon Fetch Gateway ---
         } else if (pathname === '/api/amazon/fetch' && request.method === 'POST') {

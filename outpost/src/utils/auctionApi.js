@@ -172,6 +172,28 @@ export const fetchLiveComps = (query, itemId = null) =>
     return data;
   });
 
+// --- eBay Catalog Search (via Central API Gateway) ---
+export const fetchEbayCatalog = (query) =>
+  fetch(`${getGatewayBase()}/api/ebay/catalog?q=${encodeURIComponent(query)}`, {
+    credentials: 'include',
+    headers: JSON_HEADERS
+  }).then(async r => {
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+    return data;
+  });
+
+// --- eBay Item Details (via Central API Gateway) ---
+export const fetchEbayItemDetail = (itemId) =>
+  fetch(`${getGatewayBase()}/api/ebay/item/${encodeURIComponent(itemId)}`, {
+    credentials: 'include',
+    headers: JSON_HEADERS
+  }).then(async r => {
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+    return data;
+  });
+
 // --- Amazon Product Fetch (via Central API Gateway) ---
 // Gateway endpoint: POST https://techtrekgt.com/api/amazon/fetch
 // Scrapes/parses Amazon product metadata from a URL or ASIN.

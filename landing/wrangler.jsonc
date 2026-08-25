@@ -7,6 +7,12 @@
   "observability": {
     "enabled": true
   },
+  "kv_namespaces": [
+    {
+      "binding": "GATEWAY_KV",
+      "id": "cc72165de3434d898877572d1135df13"
+    }
+  ],
   "assets": {
     "directory": "./",
     "binding": "ASSETS",

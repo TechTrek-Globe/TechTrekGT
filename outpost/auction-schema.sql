@@ -181,3 +181,19 @@ CREATE INDEX IF NOT EXISTS idx_password_resets_email ON password_resets(email, u
 -- ============================================================
 -- ALTER TABLE users ADD COLUMN security_question TEXT;
 -- ALTER TABLE users ADD COLUMN security_answer_hash TEXT;
+
+-- ============================================================
+-- MARKET ALERTS (Feature B)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS auction_market_alerts (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  item_id TEXT NOT NULL,
+  alert_type TEXT NOT NULL,       -- 'SPIKE' or 'DROP'
+  old_value REAL NOT NULL,
+  new_value REAL NOT NULL,
+  percentage_change REAL NOT NULL,
+  is_read INTEGER DEFAULT 0,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (item_id) REFERENCES auction_items(id) ON DELETE CASCADE
+);

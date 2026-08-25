@@ -186,6 +186,7 @@ export async function onRequestPost(context) {
       comp_1,
       comp_2,
       comp_3,
+      live_avg,
       ebay_search_url,
       recommended_list_price,
       apply_to_item = false
@@ -216,12 +217,13 @@ export async function onRequestPost(context) {
     if (existingComp) {
       await env.DB.prepare(`
         UPDATE auction_comps
-        SET comp_1 = ?, comp_2 = ?, comp_3 = ?, manual_avg = ?, recommended_list_price = ?, ebay_search_url = ?, updated_at = datetime('now')
+        SET comp_1 = ?, comp_2 = ?, comp_3 = ?, live_avg = ?, manual_avg = ?, recommended_list_price = ?, ebay_search_url = ?, updated_at = datetime('now')
         WHERE id = ? AND user_id = ?
       `).bind(
         comp_1 !== undefined ? (comp_1 === '' ? null : Number(comp_1)) : null,
         comp_2 !== undefined ? (comp_2 === '' ? null : Number(comp_2)) : null,
         comp_3 !== undefined ? (comp_3 === '' ? null : Number(comp_3)) : null,
+        live_avg !== undefined ? (live_avg === '' ? null : Number(live_avg)) : null,
         manualAvg,
         recPrice,
         searchUrl,
@@ -231,8 +233,8 @@ export async function onRequestPost(context) {
     } else {
       compId = crypto.randomUUID();
       await env.DB.prepare(`
-        INSERT INTO auction_comps (id, item_id, user_id, comp_1, comp_2, comp_3, manual_avg, recommended_list_price, ebay_search_url, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+        INSERT INTO auction_comps (id, item_id, user_id, comp_1, comp_2, comp_3, live_avg, manual_avg, recommended_list_price, ebay_search_url, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
       `).bind(
         compId,
         item_id,
@@ -240,6 +242,7 @@ export async function onRequestPost(context) {
         comp_1 !== undefined ? (comp_1 === '' ? null : Number(comp_1)) : null,
         comp_2 !== undefined ? (comp_2 === '' ? null : Number(comp_2)) : null,
         comp_3 !== undefined ? (comp_3 === '' ? null : Number(comp_3)) : null,
+        live_avg !== undefined ? (live_avg === '' ? null : Number(live_avg)) : null,
         manualAvg,
         recPrice,
         searchUrl

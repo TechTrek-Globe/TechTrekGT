@@ -13,6 +13,7 @@ import {
 } from '../utils/listingCopyGenerator';
 import { getApiUrl } from '../utils/api';
 import { parseAmazonProductContent } from '../utils/amazonParser';
+import { fetchEbayItemDetail } from '../utils/auctionApi';
 
 /**
  * Extracts Order ID or ASIN from an item's notes or invoice_ref.
@@ -53,6 +54,9 @@ export function ListingCopyModal({ isOpen, onClose, item }) {
   const [amazonMsg, setAmazonMsg] = useState(null);
   const [showSmartPaste, setShowSmartPaste] = useState(false);
   const [smartPasteText, setSmartPasteText] = useState('');
+  
+  // eBay Item Fetch State
+  const [generatingReport, setGeneratingReport] = useState(false);
 
   // Initialize fields when item changes or modal opens
   useEffect(() => {
@@ -171,6 +175,60 @@ export function ListingCopyModal({ isOpen, onClose, item }) {
       });
     } finally {
       setFetchingAmazon(false);
+    }
+  };
+
+  // Handle Fetching eBay Item Details for Condition Report
+  const handleAutoGenerateCondition = async () => {
+    // Try to extract an eBay Item ID from asinInput or notes.
+    // eBay item IDs are usually 12 digits.
+    const searchStr = `${asinInput} ${item.notes || ''} ${item.invoice_ref || ''}`;
+    const match = searchStr.match(/\b(\d{12})\b/);
+    if (!match) {
+      alert("Could not detect a 12-digit eBay Item ID in the Amazon lookup field, notes, or invoice_ref.");
+      return;
+    }
+    const itemId = `v1|${match[1]}|0`;
+    
+    setGeneratingReport(true);
+    try {
+      const data = await fetchEbayItemDetail(itemId);
+      
+      let conditionText = data.condition || 'Unknown Condition';
+      if (data.conditionDescription) {
+        conditionText += ` - ${data.conditionDescription}`;
+      }
+      
+      setConditionHeader(data.condition || '');
+      setConditionSubheader(data.conditionDescription || '');
+      
+      let reportLines = [];
+      reportLines.push(`**Condition Report - ${new Date().toLocaleDateString()}**`);
+      reportLines.push('');
+      reportLines.push(`Based on our inspection and the original listing details (Item ID: ${match[1]}), this item is described as:`);
+      reportLines.push(`• ${conditionText}`);
+      reportLines.push('');
+      
+      if (item.authenticator && item.authenticator !== 'Other') {
+        reportLines.push(`**Authentication Guarantee:**`);
+        reportLines.push(`This item has been authenticated by ${item.authenticator}. Certificate Number: ${item.cert_number || 'Available upon request'}.`);
+        reportLines.push(`The authenticator's opinion is final and binding regarding the authenticity of the signature(s).`);
+        reportLines.push('');
+      }
+      
+      reportLines.push(`*Please review all provided high-resolution images carefully, as they constitute a major part of the condition report. If you have specific questions about corners, edges, or surfaces, please message us prior to purchase.*`);
+      
+      setDescription((prev) => {
+        if (prev) {
+          return prev + '\n\n' + reportLines.join('\n');
+        }
+        return reportLines.join('\n');
+      });
+      
+    } catch (err) {
+      alert(`Failed to fetch eBay item details: ${err.message}`);
+    } finally {
+      setGeneratingReport(false);
     }
   };
 
@@ -465,9 +523,20 @@ export function ListingCopyModal({ isOpen, onClose, item }) {
 
                 {/* Condition Headline */}
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    Condition Banner Headline
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      Condition Banner Headline
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleAutoGenerateCondition}
+                      disabled={generatingReport}
+                      className="text-[10px] text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 bg-amber-950/40 px-2 py-0.5 rounded border border-amber-500/20 disabled:opacity-50"
+                    >
+                      {generatingReport ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                      Auto-Gen Report
+                    </button>
+                  </div>
                   <input
                     type="text"
                     value={conditionHeader}

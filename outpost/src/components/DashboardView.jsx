@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { getDashboard } from '../utils/auctionApi';
 import { fmtCurrency, fmtPct } from '../utils/formulaPreview';
+import { MarketAlertsPanel } from './dashboard/MarketAlertsPanel';
 
 export function DashboardView({ onNavigate }) {
   const [data, setData] = useState(null);
@@ -380,10 +381,15 @@ export function DashboardView({ onNavigate }) {
         </div>
       </div>
 
-      {/* Two-Column Feeds: Recent Sales vs Recent Acquisitions */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Three-Column Feeds: Alerts vs Recent Sales vs Recent Acquisitions */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Market Alerts Panel */}
+        <div className="h-96">
+          <MarketAlertsPanel />
+        </div>
+
         {/* Recent Closed Sales */}
-        <div className="glass-card rounded-2xl p-5 border border-slate-800">
+        <div className="glass-card rounded-2xl p-5 border border-slate-800 h-96 overflow-y-auto">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-emerald-400" />
@@ -429,7 +435,7 @@ export function DashboardView({ onNavigate }) {
         </div>
 
         {/* Recent Inventory Additions */}
-        <div className="glass-card rounded-2xl p-5 border border-slate-800">
+        <div className="glass-card rounded-2xl p-5 border border-slate-800 h-96 overflow-y-auto">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
               <Package className="w-4 h-4 text-amber-400" />

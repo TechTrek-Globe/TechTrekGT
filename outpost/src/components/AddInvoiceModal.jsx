@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import {
   X, Plus, Trash2, Loader2, AlertCircle,
-  DollarSign, Truck, Tag
+  DollarSign, Truck, Tag, Sparkles
 } from 'lucide-react';
 import { createInvoice } from '../utils/auctionApi';
 import { computeItemProration, computePricingFloors } from '../utils/formulaPreview';
+import { CatalogSearchDropdown } from './inventory/CatalogSearchDropdown';
 
 const CATEGORIES = ['Jersey', 'Photo', 'Card', 'Baseball', 'Bat', 'Football',
   'Mask', 'Drum Stick', 'Helmet', 'Glove', 'Poster', 'Puck', 'Other'];
@@ -84,6 +85,29 @@ export function AddInvoiceModal({ open, isOpen, platforms = [], onClose, onCreat
   const addItem = () => setItems(prev => [...prev, { ...emptyItem(), platform: defaultPlatform.name }]);
   const removeItem = (key) => setItems(prev => prev.filter(i => i._key !== key));
   const updateItem = (key, field, val) => setItems(prev => prev.map(i => i._key === key ? { ...i, [field]: val } : i));
+
+  const handleSelectProduct = (key, product) => {
+    setItems(prev => prev.map(i => {
+      if (i._key !== key) return i;
+      
+      let updated = { ...i, item_name: product.title };
+      
+      // Attempt to map eBay catalog category to our local categories
+      if (product.category && CATEGORIES.includes(product.category)) {
+        updated.category = product.category;
+      }
+      
+      // Auto-populate notes with ePID and image URL for persistence
+      const notesFragments = [];
+      if (product.epid) notesFragments.push(`ePID: ${product.epid}`);
+      if (product.image) notesFragments.push(`Image: ${product.image}`);
+      if (notesFragments.length > 0) {
+        updated.notes = [i.notes, ...notesFragments].filter(Boolean).join(' | ');
+      }
+      
+      return updated;
+    }));
+  };
 
   const handleNext = () => {
     if (!invoiceRef.trim()) { setError('Invoice Reference is required.'); return; }
@@ -258,6 +282,14 @@ export function AddInvoiceModal({ open, isOpen, platforms = [], onClose, onCreat
                         </button>
                       )}
                     </div>
+                  </div>
+
+                  <div className="mb-4 bg-slate-900/50 p-3 rounded-xl border border-amber-500/20">
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                      <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">Smart Auto-Fill</span>
+                    </div>
+                    <CatalogSearchDropdown onSelectProduct={(product) => handleSelectProduct(it._key, product)} />
                   </div>
 
                   <div className="grid grid-cols-12 gap-3">

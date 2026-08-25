@@ -401,7 +401,7 @@ All apps (finance, outpost, wayfinder, bigworm) point at the same `personal-budg
 - **Shared `users` table**: the auth system is common, so registration in one app enables login across all.
 - **Resale/shop tables** (outpost) live in the same database, avoiding cross-database joins.
 - **`nodejs_compat` compatibility flag** enables Node APIs inside workers (e.g., crypto, path).
-- **KV** is used for rate limiting in bigworm (`RATE_LIMIT_KV`); finance and outpost have commented-out KV placeholders.
+- **KV usage**: `RATE_LIMIT_KV` in bigworm, `GATEWAY_KV` for API token caching in the landing gateway. Finance and outpost have commented-out KV placeholders.
 
 ### 8.4 Scalability Constraints & Write-Lock Risks
 

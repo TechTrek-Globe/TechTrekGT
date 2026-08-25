@@ -1,5 +1,5 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
-import { computePricingFloors } from '../../utils/auction.js';
+import { computePricingFloors, computeSaleMetrics, daysBetween } from '../../utils/auction.js';
 
 // ============================================================
 // GET    /api/items/:id  - get single item
@@ -101,10 +101,16 @@ export async function onRequestPut(context) {
 
     // Compute days on market if status changed to Sold
     let days_on_market = item.days_on_market;
-    if (updated.status === 'Sold' && updated.date_listed && updated.date_sold) {
-      const from = new Date(updated.date_listed).getTime();
-      const to   = new Date(updated.date_sold).getTime();
-      days_on_market = Math.floor((to - from) / (1000 * 60 * 60 * 24));
+    if (updated.status === 'Sold') {
+      const from = updated.date_listed || item.date_listed || item.date_acquired;
+      const to = updated.date_sold || new Date().toISOString().split('T')[0];
+      const diff = daysBetween(from, to);
+      days_on_market = diff != null && diff >= 0 ? diff : 0;
+    }
+
+    // Determine actual_sell_price if marking as Sold and no actual_sell_price provided
+    if (updated.status === 'Sold' && (updated.actual_sell_price == null || updated.actual_sell_price === 0)) {
+      updated.actual_sell_price = item.actual_sell_price || item.current_list_price || item.suggested_list_price || pricing.suggested_list_price || item.true_total_cost || 0;
     }
 
     await env.DB.prepare(`
@@ -130,6 +136,106 @@ export async function onRequestPut(context) {
       updated.notes, updated.best_listing_window,
       id, payload.userId
     ).run();
+
+    // Auto-sync Sold Tracker (auction_sales table)
+    if (updated.status === 'Sold') {
+      const saleDate = updated.date_sold || new Date().toISOString().split('T')[0];
+      const grossPrice = Number(updated.actual_sell_price) || 0;
+      const platformName = updated.platform || item.platform || 'eBay';
+      const shippingCost = Number(updated.est_shipping_cost ?? item.est_shipping_cost ?? 0);
+      const feePct = Number(updated.platform_fee_pct ?? item.platform_fee_pct ?? 0.135);
+      const flatFee = Number(updated.platform_flat_fee ?? item.platform_flat_fee ?? 0.40);
+      const daysToSell = days_on_market ?? 0;
+
+      const saleMetrics = computeSaleMetrics({
+        gross_sale_price: grossPrice,
+        buyer_shipping_paid: 0,
+        actual_shipping_cost: shippingCost,
+        platform_fee_pct: feePct,
+        platform_flat_fee: flatFee,
+        payment_processing_amt: 0,
+        promoted_listing_fee: 0,
+        true_total_cost: item.true_total_cost || 0
+      });
+
+      const existingSale = await env.DB.prepare(
+        'SELECT id FROM auction_sales WHERE item_id = ? AND user_id = ?'
+      ).bind(id, payload.userId).first();
+
+      if (existingSale) {
+        await env.DB.prepare(`
+          UPDATE auction_sales SET
+            sale_date = ?,
+            platform = ?,
+            gross_sale_price = ?,
+            platform_fee_pct = ?,
+            platform_flat_fee = ?,
+            platform_fees_amt = ?,
+            actual_shipping_cost = ?,
+            net_proceeds = ?,
+            true_total_cost = ?,
+            net_profit = ?,
+            roi_pct = ?,
+            days_to_sell = ?
+          WHERE id = ? AND user_id = ?
+        `).bind(
+          saleDate,
+          platformName,
+          grossPrice,
+          feePct,
+          flatFee,
+          saleMetrics.platform_fees_amt,
+          shippingCost,
+          saleMetrics.net_proceeds,
+          item.true_total_cost || 0,
+          saleMetrics.net_profit,
+          saleMetrics.roi_pct,
+          daysToSell,
+          existingSale.id,
+          payload.userId
+        ).run();
+      } else {
+        const saleId = `sale-${crypto.randomUUID()}`;
+        await env.DB.prepare(`
+          INSERT INTO auction_sales (
+            id, user_id, item_id, sale_date, platform, buyer_handle,
+            gross_sale_price, buyer_shipping_paid, actual_shipping_cost,
+            platform_fee_pct, platform_flat_fee, platform_fees_amt,
+            payment_processing_amt, promoted_listing_fee,
+            net_proceeds, true_total_cost, net_profit, roi_pct,
+            days_to_sell
+          ) VALUES (
+            ?, ?, ?, ?, ?, NULL,
+            ?, 0, ?,
+            ?, ?, ?,
+            0, 0,
+            ?, ?, ?, ?,
+            ?
+          )
+        `).bind(
+          saleId,
+          payload.userId,
+          id,
+          saleDate,
+          platformName,
+          grossPrice,
+          shippingCost,
+          feePct,
+          flatFee,
+          saleMetrics.platform_fees_amt,
+          saleMetrics.net_proceeds,
+          item.true_total_cost || 0,
+          saleMetrics.net_profit,
+          saleMetrics.roi_pct,
+          daysToSell
+        ).run();
+      }
+    } else if (item.status === 'Sold' && updated.status !== 'Sold') {
+      // Reverted away from Sold - remove corresponding sale record to keep Sold Tracker clean
+      await env.DB.prepare(
+        'DELETE FROM auction_sales WHERE item_id = ? AND user_id = ?'
+      ).bind(id, payload.userId).run();
+    }
 
     return ok({
       success: true,

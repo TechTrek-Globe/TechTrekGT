@@ -177,7 +177,7 @@ export function InventoryHubView() {
               categoryOptions={categoryOptions}
               platformOptions={platformOptions}
               deleting={deleting}
-              onUpdateItem={handleFieldSave}
+              onUpdateItem={updateItemLocal}
               onDelete={handleDelete}
               onOpenEditModal={setEditModalItem}
               onOpenCopyModal={setCopyModalItem}
@@ -193,7 +193,7 @@ export function InventoryHubView() {
               onPageChange={fetchItems}
               onOpenCopyModal={setCopyModalItem}
               onOpenQueryEdit={handleOpenQueryEdit}
-              onItemUpdated={handleFieldSave}
+              onItemUpdated={updateItemLocal}
             />
           )}
         </div>
@@ -234,7 +234,7 @@ export function InventoryHubView() {
         categoryOptions={categoryOptions}
         platformOptions={platformOptions}
         onClose={() => setEditModalItem(null)}
-        onUpdated={(id, patch) => handleFieldSave(id, patch)}
+        onUpdated={(id, patch) => updateItemLocal(id, patch)}
       />
       <QueryEditModal
         queryEditModal={queryEditModal}

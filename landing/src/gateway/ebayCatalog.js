@@ -1,5 +1,5 @@
 import { requireGatewayAuth, withGatewayAuth, ok, err } from './guard.js';
-import { getCachedEbayToken } from './ebay.js';
+import { getCachedEbayToken, getEbayEndpoints } from './ebay.js';
 
 /**
  * GET /api/ebay/catalog?q=<query>
@@ -7,8 +7,6 @@ import { getCachedEbayToken } from './ebay.js';
  * Calls the eBay Catalog API (v1_beta/product_summary/search)
  * Returns structured catalog metadata and pre-fills.
  */
-const EBAY_CATALOG_URL = 'https://api.ebay.com/commerce/catalog/v1_beta/product_summary/search';
-
 export async function onRequestGet(context) {
   const { request, env } = context;
   return withGatewayAuth(async () => {
@@ -19,9 +17,10 @@ export async function onRequestGet(context) {
     if (!q || q.length < 3) return err('q must be at least 3 characters', 400);
 
     const token = await getCachedEbayToken(env);
+    const endpoints = getEbayEndpoints(env);
     const params = new URLSearchParams({ q, limit: '5', fieldGroups: 'FULL' });
 
-    const res = await fetch(`${EBAY_CATALOG_URL}?${params}`, {
+    const res = await fetch(`${endpoints.catalogUrl}?${params}`, {
       headers: {
         Authorization: `Bearer ${token}`,
         'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US'

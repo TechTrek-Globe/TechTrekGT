@@ -127,10 +127,7 @@ export function InventoryProvider({ children }) {
    */
   const handleFieldSave = useCallback(async (id, patch) => {
     const res = await updateItem(id, patch);
-    const merged = { ...patch };
-    if (res?.min_sell_price !== undefined) merged.min_sell_price = res.min_sell_price;
-    if (res?.suggested_list_price !== undefined) merged.suggested_list_price = res.suggested_list_price;
-    if (res?.days_on_market !== undefined) merged.days_on_market = res.days_on_market;
+    const merged = { ...patch, ...(res?.item || res || {}) };
     updateItemLocal(id, merged);
     return res;
   }, [updateItemLocal]);

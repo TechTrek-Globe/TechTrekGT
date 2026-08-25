@@ -136,7 +136,8 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
 
       const res = await updateItem(item.id, payload);
       setSuccess('Item updated successfully!');
-      if (onUpdated) onUpdated(item.id, res);
+      const merged = { ...payload, ...(res?.item || res || {}) };
+      if (onUpdated) onUpdated(item.id, merged);
       setTimeout(() => {
         onClose();
       }, 500);

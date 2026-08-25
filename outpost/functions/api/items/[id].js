@@ -133,6 +133,14 @@ export async function onRequestPut(context) {
 
     return ok({
       success: true,
+      item: {
+        ...item,
+        ...updated,
+        min_sell_price: pricing.min_sell_price,
+        suggested_list_price: pricing.suggested_list_price,
+        days_on_market
+      },
+      ...updated,
       min_sell_price: pricing.min_sell_price,
       suggested_list_price: pricing.suggested_list_price,
       days_on_market

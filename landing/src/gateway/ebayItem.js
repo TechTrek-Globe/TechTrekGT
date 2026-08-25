@@ -1,5 +1,5 @@
 import { requireGatewayAuth, withGatewayAuth, ok, err } from './guard.js';
-import { getCachedEbayToken } from './ebay.js';
+import { getCachedEbayToken, getEbayEndpoints } from './ebay.js';
 
 /**
  * GET /api/ebay/item/:itemId
@@ -7,8 +7,6 @@ import { getCachedEbayToken } from './ebay.js';
  * Calls the eBay Browse API (buy/browse/v1/item/<itemId>)
  * Returns condition and descriptive metadata.
  */
-const EBAY_ITEM_URL = 'https://api.ebay.com/buy/browse/v1/item';
-
 export async function onRequestGet(context) {
   const { request, env } = context;
   return withGatewayAuth(async () => {
@@ -20,8 +18,9 @@ export async function onRequestGet(context) {
     if (!itemId) return err('itemId is required', 400);
 
     const token = await getCachedEbayToken(env);
+    const endpoints = getEbayEndpoints(env);
     
-    const res = await fetch(`${EBAY_ITEM_URL}/${encodeURIComponent(itemId)}?fieldgroups=PRODUCT,COMPACT`, {
+    const res = await fetch(`${endpoints.itemUrl}/${encodeURIComponent(itemId)}?fieldgroups=PRODUCT,COMPACT`, {
       headers: {
         Authorization: `Bearer ${token}`,
         'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US'

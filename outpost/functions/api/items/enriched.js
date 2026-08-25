@@ -28,43 +28,85 @@ function parseUserNote(notes) {
 
 function cleanEbaySearchQuery(itemName, athlete, authenticator) {
   let text = String(itemName || '').trim();
+  if (!text) return '';
 
-  text = text.replace(/^(?:item\s*#?|lot\s*#?|#)\s*\d{4,12}(?:\s*[-\u2013\u2014:]\s*|\s+)?/gi, '');
-  text = text.replace(/^\d{5,12}\s*[-\u2013\u2014:]\s*/g, '');
-  text = text.replace(/^\d{5,12}\s+/g, '');
+  // 1. Normalize unicode quotes, dashes, spaces
+  text = text.replace(/[\u2018\u2019\u201B\u2032]/g, "'");
+  text = text.replace(/[\u201C\u201D\u2033]/g, '"');
+  text = text.replace(/[\u2013\u2014\u2015]/g, '-');
 
-  text = text.replace(/\bcompatible\s+(?:with\s+)?[\w\s,/&-]*/gi, '');
-  text = text.replace(/\bfits?\s+(?:for\s+)?[\w\s,/&-]*/gi, '');
-  text = text.replace(/\bfor\s+[A-Z][\w\s,/&-]*/g, '');
-  text = text.replace(/\bwith\s+[A-Z][\w\s,/&-]*/g, '');
+  // 2. Normalize year ranges (e.g. 2021/22 or 2021-2022 -> 2021-22)
+  text = text.replace(/\b(19\d{2}|20\d{2})\/(2\d|\d{2})\b/g, '$1-$2');
+  text = text.replace(/\b(19\d{2}|20\d{2})-(?:19|20)(\d{2})\b/g, '$1-$2');
 
-  text = text.replace(/\b(?!(?:19|20)\d{2})\d{4,}\b/g, '');
-  text = text.replace(/\s+/g, ' ').trim();
+  // 3. Strip invoice, order, auction, lot, SKU, ASIN prefixes and item numbers
+  text = text.replace(/^(?:item|lot|inv|sku|asin|order|po|ref|id|auction|part)\s*#?\s*[:\-\s]*\w+\s*[:\-\s]*/gi, '');
+  text = text.replace(/^\s*#\s*\d{4,14}\s*[:\-\s]*/g, '');
+  text = text.replace(/^\s*\d{5,14}\s*[:\-\s]+/g, '');
 
+  // 4. Strip promotional and auction noise phrases / buzzwords
+  const noisePatterns = [
+    /\b(?:l[@o]{2}k|look|must\s+see|wow|rare|super\s+rare|grail|invest!?|fire!?|holy\s+grail)\b/gi,
+    /\b(?:free\s+ship(?:ping)?|fast\s+ship(?:ping)?|ships?\s+(?:fast|asap|today|same\s+day)|same\s+day\s+shipping)\b/gi,
+    /\b(?:read\s+desc(?:ription)?|check\s+pics|see\s+pics|see\s+photos|look\s+at\s+pics)\b/gi,
+    /\b(?:no\s+reserve|nr|obo|or\s+best\s+offer|estate\s+sale|consignment|wholesale|liquidation)\b/gi,
+    /\b(?:brand\s+new(?:\s+in\s+box|\s+sealed)?|bnib|nib|nwt|nwot|factory\s+sealed|sealed\s+box)\b/gi,
+    /\b(?:great\s+condition|very\s+nice|excellent\s+condition|awesome|authentic\s+original)\b/gi,
+    /\b(?:pristine\s+auction|whatnot|mercari|ebay\s+store)\b/gi,
+  ];
+  for (const np of noisePatterns) {
+    text = text.replace(np, ' ');
+  }
+
+  // 5. Normalize "Last, First" in title (e.g. "Mahomes, Patrick" -> "Patrick Mahomes")
+  text = text.replace(/\b([A-Z][a-z]+),\s+([A-Z][a-z]+)\b/g, '$2 $1');
+
+  // 6. Normalize athlete name
   if (athlete && athlete.trim()) {
-    const cleanAthlete = athlete.replace(/^\d{5,12}\s+/, '').trim();
-    if (cleanAthlete && !text.toLowerCase().includes(cleanAthlete.toLowerCase())) {
-      text = `${cleanAthlete} ${text}`;
+    let cleanAthlete = athlete.trim();
+    if (cleanAthlete.includes(',')) {
+      const parts = cleanAthlete.split(',').map(p => p.trim());
+      if (parts.length === 2 && parts[0] && parts[1]) {
+        cleanAthlete = `${parts[1]} ${parts[0]}`;
+      }
+    }
+    cleanAthlete = cleanAthlete.replace(/^\d{5,12}\s+/, '').trim();
+
+    const athleteLower = cleanAthlete.toLowerCase();
+    if (athleteLower && !text.toLowerCase().includes(athleteLower)) {
+      const athleteParts = athleteLower.split(/\s+/).filter(Boolean);
+      if (!athleteParts.every(p => text.toLowerCase().includes(p))) {
+        text = `${cleanAthlete} ${text}`;
+      }
     }
   }
 
-  if (authenticator && authenticator.trim() && authenticator.toLowerCase() !== 'other') {
+  // 7. Normalize authenticator
+  if (authenticator && authenticator.trim() && !['other', 'none', 'unknown', 'n/a'].includes(authenticator.trim().toLowerCase())) {
     const cleanAuth = authenticator.replace(/#.*$/, '').trim();
-    if (cleanAuth && !text.toLowerCase().includes(cleanAuth.toLowerCase())) {
+    const authLower = cleanAuth.toLowerCase();
+    if (authLower && !text.toLowerCase().includes(authLower)) {
       text = `${text} ${cleanAuth}`;
     }
   }
 
-  text = text.replace(/[^\w\s-]/g, '').replace(/\s+/g, ' ').trim();
+  // 8. Clean unwanted special characters but preserve serial numbers (/25), card numbers (#15), hyphens
+  text = text.replace(/(?<!\d)\/|\/(?!\d)/g, ' ');
+  text = text.replace(/[^\w\s\-\.#/]/g, ' ');
+  text = text.replace(/(?<=\s)#(?=\s|$)/g, '');
+  text = text.replace(/(?<=\s)-(?=\s|$)/g, '');
 
-  const words = text.split(' ').filter(w => w.length > 1);
+  // 9. Deduplicate tokens and limit word count to top 12 most relevant keywords
+  const rawWords = text.split(/\s+/).filter(Boolean);
   const uniqueWords = [];
   const seen = new Set();
-  for (const w of words) {
-    const lower = w.toLowerCase();
-    if (!seen.has(lower)) {
-      seen.add(lower);
-      uniqueWords.push(w);
+  for (const w of rawWords) {
+    const wClean = w.replace(/^[.,\-]+|[.,\-]+$/g, '');
+    if (!wClean) continue;
+    const wLower = wClean.toLowerCase();
+    if (!seen.has(wLower)) {
+      seen.add(wLower);
+      uniqueWords.push(wClean);
     }
     if (uniqueWords.length >= 12) break;
   }

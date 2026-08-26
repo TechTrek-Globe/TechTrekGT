@@ -11,13 +11,10 @@ export function MainBudgetView({ onNavigateView }) {
     setSettingsTab,
     getBillMonthlyCost,
     getBillPersonMonthlyPortion,
-    getTotalMonthlyExpenses,
     updateBill,
   } = useBudgetMetadata();
 
   const [selectedAccountId, setSelectedAccountId] = useState('all');
-
-  const totalMonthlyExpenses = getTotalMonthlyExpenses();
 
   const displayedAccounts = selectedAccountId === 'all'
     ? budget.accounts
@@ -62,7 +59,8 @@ export function MainBudgetView({ onNavigateView }) {
               if (onNavigateView) {
                 onNavigateView('settings');
               } else {
-                window.location.pathname = '/finance/settings';
+                window.history.pushState({}, '', '/finance/settings');
+                window.dispatchEvent(new PopStateEvent('popstate'));
               }
             }}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-md shadow-blue-600/20 transition-all cursor-pointer active:scale-95"

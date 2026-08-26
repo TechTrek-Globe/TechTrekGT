@@ -563,9 +563,21 @@ export function BudgetMetadataProvider({ children }) {
   }, [getBillMonthlyCost]);
 
   const getTotalCashOnHand = useCallback(() => {
-    // Balance derivation now lives in LedgerDataContext (getAccountDerivedBalance)
-    // This returns 0 as a fallback; callers should use the ledger context's derived balance
-    return 0;
+    return (metadataStateRef.current.accounts || []).reduce((sum, acc) => {
+      let bal = 0;
+      if (acc.importedLedgerRows && typeof acc.importedLedgerRows === 'object') {
+        const dates = Object.keys(acc.importedLedgerRows).sort();
+        if (dates.length > 0) {
+          const latest = acc.importedLedgerRows[dates[dates.length - 1]];
+          if (typeof latest === 'number') bal = latest;
+          else if (latest && typeof latest === 'object' && typeof latest.totalEnding === 'number') bal = latest.totalEnding;
+        }
+      }
+      if (!bal) {
+        bal = (parseFloat(acc.startingBalance) || 0) + (acc.enableExtraSavings !== false ? (parseFloat(acc.extraStartingBalance) || 0) : 0);
+      }
+      return sum + bal;
+    }, 0);
   }, []);
 
   const stateValue = useMemo(() => ({

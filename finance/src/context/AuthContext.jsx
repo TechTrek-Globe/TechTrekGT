@@ -43,11 +43,17 @@ export function AuthProvider({ children }) {
     if (!isAuthenticated) return;
 
     const INACTIVITY_TIMEOUT = 15 * 60 * 1000; // 15 minutes
+    const STORAGE_THROTTLE_MS = 10 * 1000; // Throttle sessionStorage writes to at most once per 10s
+    let lastStorageWrite = 0;
     let timer;
 
     const resetTimer = () => {
       clearTimeout(timer);
-      sessionStorage.setItem('personal_budget_last_activity', Date.now().toString());
+      const now = Date.now();
+      if (now - lastStorageWrite > STORAGE_THROTTLE_MS) {
+        sessionStorage.setItem('personal_budget_last_activity', now.toString());
+        lastStorageWrite = now;
+      }
       timer = setTimeout(() => {
         logout();
         setIsAuthModalOpen(true);

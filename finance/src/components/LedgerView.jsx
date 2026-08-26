@@ -577,7 +577,7 @@ function DailySpreadsheetMatrix() {
           }
 
           const tentativeRegEnding = regBeg + dayCredits - dayBills;
-          const tentativeExtraEnding = extraBeg + dayExtraCredits + dayOtherCredit + dayOther;
+          const tentativeExtraEnding = extraBeg + dayExtraCredits + otherAmt;
 
           let customRegEnd;
           let customExtraEnd;
@@ -1545,51 +1545,81 @@ function DailySpreadsheetMatrix() {
                         />
                       </td>
 
-                      {/* Regular Ending Balance (Editable) */}
+                      {/* Regular Ending Balance (Editable per account, read-only on combined 'all') */}
                       <td className={`p-1 text-right font-bold min-w-[72px] ${
                         isSelected && !row.isToday ? 'text-blue-100 bg-blue-950/40' : (row.regEnding < 0 ? 'text-rose-400' : 'text-slate-200')
                       }`}>
-                        <InlineEdit
-                          value={row.regEnding}
-                          type="currency"
-                          onCommit={(val) => handleCellCommit(row.monthKey, row.day, 'reg_ending', val)}
-                          displayFn={() => (
-                            <span className={`font-mono text-[10px] font-bold ${
+                        {selectedAccountId === 'all' ? (
+                          <span
+                            className={`font-mono text-[10px] font-bold block ${
                               isSelected && !row.isToday
                                 ? 'text-blue-100'
                                 : row.regEnding < 0
                                   ? 'text-rose-400'
                                   : 'text-slate-200'
-                            }`}>
-                              {fmtMoney(row.regEnding)}
-                            </span>
-                          )}
-                          className="justify-end w-full"
-                        />
+                            }`}
+                            title="Combined balance calculated across all accounts. Select a specific account above to edit ending balance."
+                          >
+                            {fmtMoney(row.regEnding)}
+                          </span>
+                        ) : (
+                          <InlineEdit
+                            value={row.regEnding}
+                            type="currency"
+                            onCommit={(val) => handleCellCommit(row.monthKey, row.day, 'reg_ending', val, selectedAccountId)}
+                            displayFn={() => (
+                              <span className={`font-mono text-[10px] font-bold ${
+                                isSelected && !row.isToday
+                                  ? 'text-blue-100'
+                                  : row.regEnding < 0
+                                    ? 'text-rose-400'
+                                    : 'text-slate-200'
+                              }`}>
+                                {fmtMoney(row.regEnding)}
+                              </span>
+                            )}
+                            className="justify-end w-full"
+                          />
+                        )}
                       </td>
 
-                      {/* Extra Ending Balance (Editable) */}
+                      {/* Extra Ending Balance (Editable per account, read-only on combined 'all') */}
                       {showExtraColumns && (
                         <td className={`p-1 text-right border-r border-slate-800/80 min-w-[72px] ${
                           isSelected && !row.isToday ? 'bg-blue-950/40 text-blue-100' : (row.extraEnding < 0 ? 'text-rose-400' : 'text-slate-300')
                         }`}>
-                          <InlineEdit
-                            value={row.extraEnding}
-                            type="currency"
-                            onCommit={(val) => handleCellCommit(row.monthKey, row.day, 'extra_ending', val)}
-                            displayFn={() => (
-                              <span className={`font-mono text-[10px] ${
+                          {selectedAccountId === 'all' ? (
+                            <span
+                              className={`font-mono text-[10px] block ${
                                 isSelected && !row.isToday
                                   ? 'text-blue-100'
                                   : row.extraEnding < 0
                                     ? 'text-rose-400'
                                     : 'text-slate-300'
-                              }`}>
-                                {fmtMoney(row.extraEnding)}
-                              </span>
-                            )}
-                            className="justify-end w-full"
-                          />
+                              }`}
+                              title="Combined extra savings calculated across all accounts. Select a specific account above to edit extra ending balance."
+                            >
+                              {fmtMoney(row.extraEnding)}
+                            </span>
+                          ) : (
+                            <InlineEdit
+                              value={row.extraEnding}
+                              type="currency"
+                              onCommit={(val) => handleCellCommit(row.monthKey, row.day, 'extra_ending', val, selectedAccountId)}
+                              displayFn={() => (
+                                <span className={`font-mono text-[10px] ${
+                                  isSelected && !row.isToday
+                                    ? 'text-blue-100'
+                                    : row.extraEnding < 0
+                                      ? 'text-rose-400'
+                                      : 'text-slate-300'
+                                }`}>
+                                  {fmtMoney(row.extraEnding)}
+                                </span>
+                              )}
+                              className="justify-end w-full"
+                            />
+                          )}
                         </td>
                       )}
 

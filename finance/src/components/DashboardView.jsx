@@ -352,11 +352,11 @@ export function DashboardView() {
   const today    = new Date();
   const monthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
 
-  const netIncome     = useMemo(() => getTotalMonthlyNetIncome(), [budget?.people]);
-  const totalExpenses  = useMemo(() => getTotalMonthlyExpenses(), [budget?.bills]);
+  const netIncome     = useMemo(() => getTotalMonthlyNetIncome(), [budget?.people, getTotalMonthlyNetIncome]);
+  const totalExpenses  = useMemo(() => getTotalMonthlyExpenses(), [budget?.bills, getTotalMonthlyExpenses]);
   const netCashFlow   = useMemo(() => netIncome - totalExpenses, [netIncome, totalExpenses]);
   const savingsRate   = useMemo(() => netIncome > 0 ? ((netCashFlow / netIncome) * 100) : 0, [netIncome, netCashFlow]);
-  const cashOnHand    = useMemo(() => getTotalCashOnHand(), [budget?.accounts]);
+  const cashOnHand    = useMemo(() => getTotalCashOnHand(), [budget?.accounts, getTotalCashOnHand]);
   const upcomingBills = useMemo(() => getUpcomingBills(5), [budget?.bills, getUpcomingBills]);
 
   // Budget health score (0-100)

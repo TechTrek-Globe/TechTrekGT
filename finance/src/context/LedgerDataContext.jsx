@@ -702,6 +702,14 @@ export function LedgerDataProvider({ children }) {
     };
   }, [getDailyMatrixCell, getActualAmount, isPersonDepositDay, getPersonDepositAmountForAccount]);
 
+  const getTotalCashOnHand = useCallback(() => {
+    const today = new Date();
+    return (metadataStateRef.current.accounts || []).reduce((sum, acc) => {
+      const balObj = getCalculatedBalanceAsOf(acc.id, today);
+      return sum + (balObj?.totalEnd ?? (parseFloat(acc.startingBalance) || 0));
+    }, 0);
+  }, [getCalculatedBalanceAsOf]);
+
   const stateValue = useMemo(() => ({
     budget: budgetForUI,
     lineItems,
@@ -725,6 +733,7 @@ export function LedgerDataProvider({ children }) {
     getAccountProjectedEndBalance,
     getAccountActualEndBalance,
     getCalculatedBalanceAsOf,
+    getTotalCashOnHand,
     loadDemoPreset,
     resetToDefaults,
     clearAllData,
@@ -751,6 +760,7 @@ export function LedgerDataProvider({ children }) {
     getAccountProjectedEndBalance,
     getAccountActualEndBalance,
     getCalculatedBalanceAsOf,
+    getTotalCashOnHand,
     loadDemoPreset,
     resetToDefaults,
     clearAllData,

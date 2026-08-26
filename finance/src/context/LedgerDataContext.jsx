@@ -610,7 +610,6 @@ export function LedgerDataProvider({ children }) {
       const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`;
       const isoDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       
-      const isPastDate = cur < todayMidnight;
       const isLockedDay = isImportMode && importedRows[isoDate] !== undefined;
 
       // 1. Credits
@@ -620,7 +619,7 @@ export function LedgerDataProvider({ children }) {
         const customCredit = getDailyMatrixCell(accountId, monthKey, day, `credit_${p.id}`);
         if (customCredit !== undefined) {
           dayCredits += parseFloat(customCredit) || 0;
-        } else if (!isPastDate && !isLockedDay) {
+        } else if (!isLockedDay) {
           const isDepDay = isPersonDepositDay(p, year, month, day);
           dayCredits += isDepDay ? getPersonDepositAmountForAccount(p, accountId) : 0;
         }
@@ -638,7 +637,7 @@ export function LedgerDataProvider({ children }) {
         let amt = 0;
         if (customBill !== undefined) {
           amt = parseFloat(customBill) || 0;
-        } else if (!isPastDate && !isLockedDay) {
+        } else if (!isLockedDay) {
           const actualAmt = getActualAmount(b.id, monthKey);
           if (actualAmt !== null && parseInt(b.dueDay) === day && isBillDueInMonth(b, month, true)) {
             amt = actualAmt;

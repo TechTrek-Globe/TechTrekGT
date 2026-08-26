@@ -76,8 +76,8 @@ const MatrixCell = React.memo(function MatrixCell({
   const isZero = !value || value === 0;
 
   const commitHandler = useCallback((val) => {
-    if (onCommit) onCommit(monthKey, day, field, val);
-  }, [onCommit, monthKey, day, field]);
+    if (onCommit) onCommit(monthKey, day, field, val, selectedAccountId);
+  }, [onCommit, monthKey, day, field, selectedAccountId]);
 
   const cellId = `${monthKey}-${day}-${field}`;
   const extraData = field === 'other_amount' ? { otherDesc } : {};
@@ -346,8 +346,8 @@ function DailySpreadsheetMatrix() {
     }
   }, [moveDailyMatrixCell, selectedAccountId]);
 
-  const handleCellCommit = useCallback((monthKey, day, field, val) => {
-    const targetAccId = selectedAccountId === 'all' ? (budget.accounts[0]?.id || 'all') : selectedAccountId;
+  const handleCellCommit = useCallback((monthKey, day, field, val, cellAccountId) => {
+    const targetAccId = (cellAccountId && cellAccountId !== 'all') ? cellAccountId : (selectedAccountId === 'all' ? (budget.accounts[0]?.id || 'all') : selectedAccountId);
     updateDailyMatrixCell(targetAccId, monthKey, day, field, val);
   }, [updateDailyMatrixCell, selectedAccountId, budget.accounts]);
 
@@ -484,6 +484,153 @@ function DailySpreadsheetMatrix() {
     ? budget.accounts.some(a => a.enableExtraSavings !== false)
     : (selectedAccount?.enableExtraSavings !== false);
 
+  // Fast-Forward Math Loop to calculate initial beginning balances for the rolling window
+  const { initialRegBeg, initialExtraBeg } = useMemo(() => {
+    let regBeg = selectedAccountId === 'all'
+      ? budget.accounts.reduce((sum, a) => sum + (parseFloat(a.startingBalance) || 0), 0)
+      : (parseFloat(selectedAccount?.startingBalance) || 0);
+
+    let extraBeg = selectedAccountId === 'all'
+      ? budget.accounts.reduce((sum, a) => sum + (parseFloat(a.extraStartingBalance) || 0), 0)
+      : (parseFloat(selectedAccount?.extraStartingBalance) || 0);
+
+    if (monthList.length > 0) {
+      const firstMonthStart = new Date(monthList[0].year, monthList[0].month, 1);
+      if (firstMonthStart > startDateObj) {
+        let cur = new Date(startDateObj);
+        while (cur < firstMonthStart) {
+          const y = cur.getFullYear();
+          const m = cur.getMonth();
+          const d = cur.getDate();
+          const mKey = `${y}-${String(m + 1).padStart(2, '0')}`;
+
+          let dayCredits = 0;
+          let dayExtraCredits = 0;
+          people.forEach(p => {
+            let customCredit;
+            let customExtra;
+            if (selectedAccountId === 'all') {
+              let creditSum = 0;
+              let hasCredit = false;
+              let extraSum = 0;
+              let hasExtra = false;
+              budget.accounts.forEach(a => {
+                const c = getDailyMatrixCell(a.id, mKey, d, `credit_${p.id}`);
+                if (c !== undefined) { creditSum += parseFloat(c) || 0; hasCredit = true; }
+                const ec = getDailyMatrixCell(a.id, mKey, d, `extra_credit_${p.id}`);
+                if (ec !== undefined) { extraSum += parseFloat(ec) || 0; hasExtra = true; }
+              });
+              if (hasCredit) customCredit = creditSum;
+              if (hasExtra) customExtra = extraSum;
+            } else {
+              customCredit = getDailyMatrixCell(selectedAccountId, mKey, d, `credit_${p.id}`);
+              customExtra = getDailyMatrixCell(selectedAccountId, mKey, d, `extra_credit_${p.id}`);
+            }
+
+            if (customCredit !== undefined) {
+              dayCredits += parseFloat(customCredit) || 0;
+            } else {
+              const isDepDay = isPersonDepositDay(p, y, m, d);
+              dayCredits += isDepDay ? getPersonDepositAmountForAccount(p, selectedAccountId) : 0;
+            }
+
+            if (customExtra !== undefined) dayExtraCredits += parseFloat(customExtra) || 0;
+          });
+
+          let dayBills = 0;
+          accountBills.forEach(b => {
+            const billAccId = selectedAccountId === 'all' ? b.accountId : selectedAccountId;
+            const customBill = getDailyMatrixCell(billAccId, mKey, d, `bill_${b.id}`);
+            let amt = 0;
+            if (customBill !== undefined) {
+              amt = parseFloat(customBill) || 0;
+            } else {
+              const actualAmt = getActualAmount(b.id, mKey);
+              if (actualAmt !== null && parseInt(b.dueDay) === d && isBillDueInMonth(b, m, true)) {
+                amt = actualAmt;
+              } else if (actualAmt !== null) {
+                amt = 0;
+              } else if (parseInt(b.dueDay) === d && isBillDueInMonth(b, m, true)) {
+                amt = parseFloat(b.amount) || 0;
+              }
+            }
+            dayBills += amt;
+          });
+
+          let otherAmt = 0;
+          if (selectedAccountId === 'all') {
+            budget.accounts.forEach(a => {
+              const accOther = getDailyMatrixCell(a.id, mKey, d, 'other_amount');
+              if (accOther !== undefined) otherAmt += parseFloat(accOther) || 0;
+              const accOtherCredit = getDailyMatrixCell(a.id, mKey, d, 'other_credit_amount');
+              if (accOtherCredit !== undefined) otherAmt += parseFloat(accOtherCredit) || 0;
+            });
+            const allOther = getDailyMatrixCell('all', mKey, d, 'other_amount');
+            if (allOther !== undefined) otherAmt += parseFloat(allOther) || 0;
+            const allOtherCredit = getDailyMatrixCell('all', mKey, d, 'other_credit_amount');
+            if (allOtherCredit !== undefined) otherAmt += parseFloat(allOtherCredit) || 0;
+          } else {
+            const customOther = getDailyMatrixCell(selectedAccountId, mKey, d, 'other_amount');
+            const customOtherCredit = getDailyMatrixCell(selectedAccountId, mKey, d, 'other_credit_amount');
+            if (customOther !== undefined) otherAmt += parseFloat(customOther) || 0;
+            if (customOtherCredit !== undefined) otherAmt += parseFloat(customOtherCredit) || 0;
+          }
+
+          const tentativeRegEnding = regBeg + dayCredits - dayBills;
+          const tentativeExtraEnding = extraBeg + dayExtraCredits + dayOtherCredit + dayOther;
+
+          let customRegEnd;
+          let customExtraEnd;
+          if (selectedAccountId === 'all') {
+            const allReg = getDailyMatrixCell('all', mKey, d, 'reg_ending');
+            const allExtra = getDailyMatrixCell('all', mKey, d, 'extra_ending');
+            if (allReg !== undefined && allReg !== null && allReg !== '') customRegEnd = parseFloat(allReg);
+            if (allExtra !== undefined && allExtra !== null && allExtra !== '') customExtraEnd = parseFloat(allExtra);
+          } else {
+            const accReg = getDailyMatrixCell(selectedAccountId, mKey, d, 'reg_ending');
+            const accExtra = getDailyMatrixCell(selectedAccountId, mKey, d, 'extra_ending');
+            if (accReg !== undefined && accReg !== null && accReg !== '') customRegEnd = parseFloat(accReg);
+            if (accExtra !== undefined && accExtra !== null && accExtra !== '') customExtraEnd = parseFloat(accExtra);
+          }
+
+          let reg = customRegEnd !== undefined && !isNaN(customRegEnd) ? customRegEnd : tentativeRegEnding;
+          let extra = customExtraEnd !== undefined && !isNaN(customExtraEnd) ? customExtraEnd : tentativeExtraEnding;
+
+          if (customRegEnd === undefined && customExtraEnd === undefined) {
+            if (reg < 0 && extra > 0) {
+              const transfer = Math.min(extra, -reg);
+              reg += transfer;
+              extra -= transfer;
+            } else if (extra < 0 && reg > 0) {
+              const transfer = Math.min(reg, -extra);
+              extra += transfer;
+              reg -= transfer;
+            }
+          }
+
+          regBeg = Math.round(reg * 100) / 100 || 0;
+          extraBeg = Math.round(extra * 100) / 100 || 0;
+
+          cur.setDate(cur.getDate() + 1);
+        }
+      }
+    }
+
+    return { initialRegBeg: regBeg, initialExtraBeg: extraBeg };
+  }, [
+    selectedAccountId,
+    budget.accounts,
+    selectedAccount,
+    startDateObj,
+    monthList,
+    people,
+    accountBills,
+    getDailyMatrixCell,
+    isPersonDepositDay,
+    getPersonDepositAmountForAccount,
+    getActualAmount
+  ]);
+
   // Generate continuous daily matrix rows across monthList (starting on startDateObj with no prior dates)
   const matrixData = useMemo(() => {
     const rows = [];
@@ -496,99 +643,6 @@ function DailySpreadsheetMatrix() {
     const importedRows = isImportMode
       ? (selectedAccount?.importedLedgerRows || {})
       : {};
-
-    // Fast-Forward Math Loop wrapped in strict useMemo to prevent recalculating years of history on every UI change
-    const { initialRegBeg, initialExtraBeg } = useMemo(() => {
-      let regBeg = selectedAccountId === 'all'
-        ? budget.accounts.reduce((sum, a) => sum + (parseFloat(a.startingBalance) || 0), 0)
-        : (parseFloat(selectedAccount?.startingBalance) || 0);
-
-      let extraBeg = selectedAccountId === 'all'
-        ? budget.accounts.reduce((sum, a) => sum + (parseFloat(a.extraStartingBalance) || 0), 0)
-        : (parseFloat(selectedAccount?.extraStartingBalance) || 0);
-
-      if (monthList.length > 0) {
-        const firstMonthStart = new Date(monthList[0].year, monthList[0].month, 1);
-        if (firstMonthStart > startDateObj) {
-          let cur = new Date(startDateObj);
-          while (cur < firstMonthStart) {
-            const y = cur.getFullYear();
-            const m = cur.getMonth();
-            const d = cur.getDate();
-            const mKey = `${y}-${String(m + 1).padStart(2, '0')}`;
-
-            let dayCredits = 0;
-            let dayExtraCredits = 0;
-            people.forEach(p => {
-              const customCredit = getDailyMatrixCell(selectedAccountId, mKey, d, `credit_${p.id}`);
-              if (customCredit !== undefined) dayCredits += parseFloat(customCredit) || 0;
-              const customExtra = getDailyMatrixCell(selectedAccountId, mKey, d, `extra_credit_${p.id}`);
-              if (customExtra !== undefined) dayExtraCredits += parseFloat(customExtra) || 0;
-            });
-
-            let dayBills = 0;
-            accountBills.forEach(b => {
-              const customBill = getDailyMatrixCell(selectedAccountId, mKey, d, `bill_${b.id}`);
-              if (customBill !== undefined) dayBills += parseFloat(customBill) || 0;
-            });
-
-            const customOther = getDailyMatrixCell(selectedAccountId, mKey, d, 'other_amount');
-            const dayOther = customOther !== undefined ? (parseFloat(customOther) || 0) : 0;
-
-            const customOtherCredit = getDailyMatrixCell(selectedAccountId, mKey, d, 'other_credit_amount');
-            const dayOtherCredit = customOtherCredit !== undefined ? (parseFloat(customOtherCredit) || 0) : 0;
-
-            const tentativeRegEnding = regBeg + dayCredits - dayBills;
-            const tentativeExtraEnding = extraBeg + dayExtraCredits + dayOtherCredit + dayOther;
-
-            let customRegEnd;
-            let customExtraEnd;
-            if (selectedAccountId === 'all') {
-              const allReg = getDailyMatrixCell('all', mKey, d, 'reg_ending');
-              const allExtra = getDailyMatrixCell('all', mKey, d, 'extra_ending');
-              if (allReg !== undefined && allReg !== null && allReg !== '') customRegEnd = parseFloat(allReg);
-              if (allExtra !== undefined && allExtra !== null && allExtra !== '') customExtraEnd = parseFloat(allExtra);
-            } else {
-              const accReg = getDailyMatrixCell(selectedAccountId, mKey, d, 'reg_ending');
-              const accExtra = getDailyMatrixCell(selectedAccountId, mKey, d, 'extra_ending');
-              if (accReg !== undefined && accReg !== null && accReg !== '') customRegEnd = parseFloat(accReg);
-              if (accExtra !== undefined && accExtra !== null && accExtra !== '') customExtraEnd = parseFloat(accExtra);
-            }
-
-            let reg = customRegEnd !== undefined && !isNaN(customRegEnd) ? customRegEnd : tentativeRegEnding;
-            let extra = customExtraEnd !== undefined && !isNaN(customExtraEnd) ? customExtraEnd : tentativeExtraEnding;
-
-            if (customRegEnd === undefined && customExtraEnd === undefined) {
-              if (reg < 0 && extra > 0) {
-                const transfer = Math.min(extra, -reg);
-                reg += transfer;
-                extra -= transfer;
-              } else if (extra < 0 && reg > 0) {
-                const transfer = Math.min(reg, -extra);
-                extra += transfer;
-                reg -= transfer;
-              }
-            }
-
-            regBeg = Math.round(reg * 100) / 100 || 0;
-            extraBeg = Math.round(extra * 100) / 100 || 0;
-
-            cur.setDate(cur.getDate() + 1);
-          }
-        }
-      }
-
-      return { initialRegBeg: regBeg, initialExtraBeg: extraBeg };
-    }, [
-      selectedAccountId,
-      budget.accounts,
-      selectedAccount,
-      startDateObj,
-      monthList.length > 0 ? monthList[0].monthKey : null,
-      people,
-      accountBills,
-      getDailyMatrixCell
-    ]);
 
     let runningRegBeg = initialRegBeg;
     let runningExtraBeg = initialExtraBeg;
@@ -608,7 +662,6 @@ function DailySpreadsheetMatrix() {
         const isPayday = people.some(p => isPersonDepositDay(p, year, month, day));
         const isToday = todayObj.getFullYear() === year && todayObj.getMonth() === month && todayObj.getDate() === day;
 
-        const isPastDate = dateObj < new Date(todayObj.getFullYear(), todayObj.getMonth(), todayObj.getDate());
         const isoDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         const isLockedDay = isImportMode && importedRows[isoDate] !== undefined;
 
@@ -616,11 +669,25 @@ function DailySpreadsheetMatrix() {
         const personCredits = {};
 
         accountPeople.forEach(p => {
-          const customCredit = getDailyMatrixCell(selectedAccountId, monthKey, day, `credit_${p.id}`);
+          let customCredit;
+          if (selectedAccountId === 'all') {
+            let sum = 0;
+            let hasCustom = false;
+            budget.accounts.forEach(a => {
+              const val = getDailyMatrixCell(a.id, monthKey, day, `credit_${p.id}`);
+              if (val !== undefined) {
+                sum += parseFloat(val) || 0;
+                hasCustom = true;
+              }
+            });
+            if (hasCustom) customCredit = sum;
+          } else {
+            customCredit = getDailyMatrixCell(selectedAccountId, monthKey, day, `credit_${p.id}`);
+          }
 
           if (customCredit !== undefined) {
             personCredits[p.id] = parseFloat(customCredit) || 0;
-          } else if (!isPastDate && !isLockedDay) {
+          } else if (!isLockedDay) {
             const isDepDay = isPersonDepositDay(p, year, month, day);
             personCredits[p.id] = isDepDay ? getPersonDepositAmountForAccount(p, selectedAccountId) : 0;
           } else {
@@ -635,13 +702,14 @@ function DailySpreadsheetMatrix() {
         let totalDayBills = 0;
 
         accountBills.forEach(b => {
-          const customBillVal = getDailyMatrixCell(selectedAccountId, monthKey, day, `bill_${b.id}`);
+          const billAccId = selectedAccountId === 'all' ? b.accountId : selectedAccountId;
+          const customBillVal = getDailyMatrixCell(billAccId, monthKey, day, `bill_${b.id}`);
           let amt = 0;
 
           if (customBillVal !== undefined) {
             // Tier 1: manual dailyMatrix override (drag-drop, inline edit, or actual transaction) wins outright
             amt = parseFloat(customBillVal) || 0;
-          } else if (!isPastDate && !isLockedDay) {
+          } else if (!isLockedDay) {
             // Tier 2: month-scoped actual amount from import reconciliation
             const actualAmt = getActualAmount(b.id, monthKey);
             if (actualAmt !== null && parseInt(b.dueDay) === day && isBillDueInMonth(b, month, true)) {
@@ -649,11 +717,11 @@ function DailySpreadsheetMatrix() {
             } else if (actualAmt !== null) {
               amt = 0;
             } else if (parseInt(b.dueDay) === day && isBillDueInMonth(b, month, true)) {
-              // Tier 3: standard projection for future scheduled bills
+              // Tier 3: standard projection for scheduled bills
               amt = parseFloat(b.amount) || 0;
             }
           } else {
-            // On past or historical locked dates with no recorded transaction, do not add phantom scheduled bills
+            // On historical locked dates with no recorded transaction, do not add phantom scheduled bills
             amt = 0;
           }
 
@@ -710,9 +778,19 @@ function DailySpreadsheetMatrix() {
         // 4. Determine Beginning and Ending Balances
         let dayExtraAdd = 0;
         accountPeople.forEach(p => {
-          const customExtra = getDailyMatrixCell(selectedAccountId, monthKey, day, `extra_credit_${p.id}`);
-          if (customExtra !== undefined) {
-            dayExtraAdd += parseFloat(customExtra) || 0;
+          let customExtra;
+          if (selectedAccountId === 'all') {
+            budget.accounts.forEach(a => {
+              const val = getDailyMatrixCell(a.id, monthKey, day, `extra_credit_${p.id}`);
+              if (val !== undefined) {
+                dayExtraAdd += parseFloat(val) || 0;
+              }
+            });
+          } else {
+            customExtra = getDailyMatrixCell(selectedAccountId, monthKey, day, `extra_credit_${p.id}`);
+            if (customExtra !== undefined) {
+              dayExtraAdd += parseFloat(customExtra) || 0;
+            }
           }
         });
 
@@ -803,11 +881,17 @@ function DailySpreadsheetMatrix() {
     selectedAccount,
     budget.accounts,
     accountBills,
+    accountPeople,
     people,
     getDailyMatrixCell,
     todayObj,
     startDateObj,
-    showExtraColumns
+    showExtraColumns,
+    initialRegBeg,
+    initialExtraBeg,
+    getActualAmount,
+    isPersonDepositDay,
+    getPersonDepositAmountForAccount
   ]);
 
   // Group matrix rows by month so each month gets its own tbody with a sticky month banner
@@ -1418,7 +1502,7 @@ function DailySpreadsheetMatrix() {
                             onCommit={handleCellCommit}
                             draggable={Boolean(row.billValues[b.id] && row.billValues[b.id] > 0)}
                             dragLabel={b.name}
-                            selectedAccountId={selectedAccountId}
+                            selectedAccountId={selectedAccountId === 'all' ? b.accountId : selectedAccountId}
                           />
                         </DroppableCellTd>
                       ))}

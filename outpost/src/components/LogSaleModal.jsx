@@ -73,9 +73,9 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
       return;
     }
 
-    if (preselectedItem) {
-      setSelectedItem(preselectedItem);
-      applyItemPlatformDefaults(preselectedItem, preselectedItem.platform || defaultPlatform.name);
+    if (targetItem) {
+      setSelectedItem(targetItem);
+      applyItemPlatformDefaults(targetItem, targetItem.platform || defaultPlatform.name);
       return;
     }
 
@@ -94,7 +94,7 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
     };
 
     fetchInventory();
-  }, [open, isEdit, saleToEdit, preselectedItem, defaultPlatform]);
+  }, [isModalOpen, isEdit, saleToEdit, targetItem, defaultPlatform]);
 
   const applyItemPlatformDefaults = (item, platName) => {
     setPlatform(platName);

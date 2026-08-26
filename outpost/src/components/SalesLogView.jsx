@@ -127,7 +127,7 @@ export function SalesLogView() {
         <div className="glass-card rounded-xl p-4 border border-slate-800">
           <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Gross Sales Volume</p>
           <p className="text-xl font-black text-amber-400 mt-1">
-            {fmtCurrency(summary.total_gross_volume)}
+            {fmtCurrency(summary.total_gross)}
           </p>
           <p className="text-[10px] text-slate-500 mt-0.5">Total buyer payment</p>
         </div>
@@ -143,7 +143,7 @@ export function SalesLogView() {
         <div className="glass-card rounded-xl p-4 border border-slate-800">
           <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Overall ROI</p>
           <p className="text-xl font-black text-emerald-400 mt-1">
-            {fmtPct(summary.overall_roi_pct)}
+            {fmtPct(summary.blended_roi)}
           </p>
           <p className="text-[10px] text-slate-500 mt-0.5">Completed orders</p>
         </div>

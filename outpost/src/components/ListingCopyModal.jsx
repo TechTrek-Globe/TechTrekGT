@@ -13,7 +13,7 @@ import {
 } from '../utils/listingCopyGenerator';
 import { getApiUrl } from '../utils/api';
 import { parseAmazonProductContent } from '../utils/amazonParser';
-import { fetchEbayItemDetail } from '../utils/auctionApi';
+import { fetchEbayItemDetail, fetchAmazonProduct } from '../utils/auctionApi';
 
 /**
  * Extracts Order ID or ASIN from an item's notes or invoice_ref.
@@ -138,14 +138,8 @@ export function ListingCopyModal({ isOpen, onClose, item }) {
     setFetchingAmazon(true);
     setAmazonMsg(null);
     try {
-      const res = await fetch(getApiUrl('/api/import/amazon-fetch'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ input: query })
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || data.error === 'AMAZON_BLOCKED' || data.success === false || data.error) {
+      const data = await fetchAmazonProduct(query);
+      if (data.error === 'AMAZON_BLOCKED' || data.success === false || data.error) {
         setShowSmartPaste(true);
         if (data.error === 'AMAZON_BLOCKED' || (data.message && data.message.toLowerCase().includes('bot protection'))) {
           setAmazonMsg({

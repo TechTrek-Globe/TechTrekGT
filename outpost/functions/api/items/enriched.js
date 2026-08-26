@@ -133,6 +133,7 @@ export async function onRequestGet(context) {
 
     const url = new URL(request.url);
     const status     = url.searchParams.get('status') || '';
+    const category   = url.searchParams.get('category') || '';
     const invoice_id = url.searchParams.get('invoice_id') || '';
     const q          = url.searchParams.get('q') || '';
     const page       = Math.max(1, parseInt(url.searchParams.get('page') || '1'));
@@ -150,6 +151,10 @@ export async function onRequestGet(context) {
         conditions.push('i.status = ?');
         bindings.push(status);
       }
+    }
+    if (category && category !== 'All') {
+      conditions.push('i.category = ?');
+      bindings.push(category);
     }
     if (invoice_id) { conditions.push('i.invoice_id = ?'); bindings.push(invoice_id); }
     if (q) {

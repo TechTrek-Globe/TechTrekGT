@@ -3,7 +3,7 @@ import {
   X, ShoppingCart, Link, DollarSign, Loader2, AlertCircle, CheckCircle2, Search, ExternalLink, PackageCheck,
   Sparkles, ClipboardPaste
 } from 'lucide-react';
-import { createInvoice, getApiUrl } from '../utils/auctionApi';
+import { createInvoice, fetchAmazonProduct } from '../utils/auctionApi';
 import { parseAmazonProductContent } from '../utils/amazonParser';
 
 const CATEGORIES = [
@@ -124,16 +124,9 @@ export function AmazonItemModal({ isOpen, platforms = [], onClose, onCreated }) 
     setFetchMsg('Fetching product metadata...');
 
     try {
-      const res = await fetch(getApiUrl('/api/import/amazon-fetch'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ input: asinInput.trim() })
-      });
+      const data = await fetchAmazonProduct(asinInput.trim());
 
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok || data.error === 'AMAZON_BLOCKED' || data.success === false) {
+      if (data.error === 'AMAZON_BLOCKED' || data.success === false) {
         if (data.asin && !asin) setAsin(data.asin);
         if (data.orderId && !orderId) setOrderId(data.orderId);
         setFetchMsg('');

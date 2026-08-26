@@ -142,7 +142,7 @@ export function AuthPage({ onAuthSuccess }) {
 
   const handleResetPassword = async (e) => {
     e.preventDefault();
-    if (!resetToken || !newPassword) { setError('Please enter the reset code and new password.'); return; }
+    if (!newPassword) { setError('Please enter a new password.'); return; }
     if (newPassword.length < 8 || !/[A-Z]/.test(newPassword) || !/[0-9]/.test(newPassword)) {
       setError('Password must be 8+ characters with at least one uppercase letter and one number.'); return;
     }

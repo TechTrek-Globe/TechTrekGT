@@ -1,4 +1,4 @@
-import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
+import { requireAuth, withAuth, ok, err } from '../utils/guard.js';
 import { cleanEbaySearchQuery } from './comps/index.js';
 
 /**
@@ -149,7 +149,7 @@ async function runMarketRefresh(userId, env, request) {
             }
           }
         } catch (e) {
-          console.error(\`Refresh failed for item \${item.id}: \${e.message}\`);
+          console.error(`Refresh failed for item ${item.id}: ${e.message}`);
         }
       })();
 

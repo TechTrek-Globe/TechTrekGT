@@ -25,6 +25,7 @@ import { onRequestGet as syncFinanceGetHandler, onRequestPost as syncFinancePost
 import { onRequestGet as suppliesListHandler, onRequestPost as suppliesCreateHandler } from '../functions/api/supplies/index.js';
 import { onRequestPut as supplyPutHandler, onRequestDelete as supplyDeleteHandler } from '../functions/api/supplies/[id].js';
 import { onRequestGet as taxReportGetHandler } from '../functions/api/reports/tax.js';
+import { onRequestGet as marketAlertsGetHandler, onRequestPut as marketAlertsPutHandler, onRequestPost as marketAlertsPostHandler } from '../functions/api/market-alerts.js';
 
 function addSecurityHeaders(response, isLocalhost = false, requestOrigin = '') {
   const newHeaders = new Headers(response.headers);
@@ -223,6 +224,13 @@ export default {
       // --- Year-End Tax & Schedule C Reports ---
       } else if (apiPath === '/api/reports/tax' && request.method === 'GET') {
         response = await taxReportGetHandler(context);
+      // --- Market Alerts ---
+      } else if (apiPath === '/api/market-alerts' && request.method === 'GET') {
+        response = await marketAlertsGetHandler(context);
+      } else if (apiPath === '/api/market-alerts/refresh-all' && request.method === 'POST') {
+        response = await marketAlertsPostHandler(context);
+      } else if (/^\/api\/market-alerts\/[^/]+$/.test(apiPath) && request.method === 'PUT') {
+        response = await marketAlertsPutHandler(context);
       } else if (apiPath.startsWith('/api/')) {
         response = new Response(JSON.stringify({ error: 'Endpoint not found' }), {
           status: 404,

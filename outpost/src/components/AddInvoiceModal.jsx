@@ -80,7 +80,7 @@ export function AddInvoiceModal({ open, isOpen, platforms = [], onClose, onCreat
       });
       return { ...it, _preview: { ...proration, ...pricing } };
     }));
-  }, [discount, shipping, tax, items.map(i => `${i._key}:${i.unit_price}:${i.platform}:${i.est_shipping_cost}:${i.boost_pct}:${i.target_margin_pct}`).join('|')]);
+  }, [discount, shipping, tax, platforms, items.map(i => `${i._key}:${i.unit_price}:${i.platform}:${i.est_shipping_cost}:${i.boost_pct}:${i.target_margin_pct}`).join('|')]);
 
   const addItem = () => setItems(prev => [...prev, { ...emptyItem(), platform: defaultPlatform.name }]);
   const removeItem = (key) => setItems(prev => prev.filter(i => i._key !== key));

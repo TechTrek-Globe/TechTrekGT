@@ -61,10 +61,10 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
   useEffect(() => {
     if (item) {
       setForm({
-        item_name: cleanItemDescription(item.item_name || '', item.athlete_person, item.authenticator),
+        item_name: item.item_name || '',
         category: item.category || '',
         sport_genre: item.sport_genre || '',
-        athlete_person: cleanAthleteName(item.athlete_person || ''),
+        athlete_person: item.athlete_person || '',
         authenticator: item.authenticator ? item.authenticator.replace(/#.*$/, '').trim() : '',
         cert_number: item.cert_number || '',
         status: item.status || 'Available',

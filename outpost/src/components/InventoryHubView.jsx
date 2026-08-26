@@ -52,10 +52,8 @@ export function InventoryHubView() {
   const [queryEditModal, setQueryEditModal] = useState(null);
   const [deleting, setDeleting] = useState(null);
 
-  // Filter sorted items by category if selected
-  const displayItems = categoryFilter === 'All'
-    ? sortedItems
-    : sortedItems.filter(i => i.category === categoryFilter);
+  // Items are category-filtered server-side via InventoryContext
+  const displayItems = sortedItems;
 
   // Quick summary numbers for header
   const activeCount = items.filter(it => it.status === 'Available' || it.status === 'Listed').length;

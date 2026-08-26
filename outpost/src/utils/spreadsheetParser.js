@@ -129,7 +129,7 @@ export function findTableHeaders(rows, targetKeys, minMatches = 1, maxScanRows =
     });
   }
 
-  return { headerIdx: bestIdx, headerMap, headers: bestHeaders };
+  return { headerIdx: bestIdx, headerMap, headers: bestHeaders, score: bestScore };
 }
 
 /**

@@ -92,6 +92,7 @@ export function InventoryProvider({ children }) {
       const params = { page, limit: 50 };
       if (search) params.q = search;
       if (statusFilter) params.status = statusFilter;
+      if (categoryFilter && categoryFilter !== 'All') params.category = categoryFilter;
       const data = await getEnrichedItems(params);
       setItems(data.items || []);
       setPagination(data.pagination || { total: 0, page: 1, pages: 1 });
@@ -100,7 +101,7 @@ export function InventoryProvider({ children }) {
     } finally {
       setLoading(false);
     }
-  }, [search, statusFilter]);
+  }, [search, statusFilter, categoryFilter]);
 
   const fetchPlatforms = useCallback(async () => {
     try {
@@ -114,7 +115,7 @@ export function InventoryProvider({ children }) {
 
   // Initial data load
   useEffect(() => { fetchPlatforms(); }, []);
-  useEffect(() => { fetchItems(1); }, [search, statusFilter]);
+  useEffect(() => { fetchItems(1); }, [search, statusFilter, categoryFilter]);
 
   // --- Optimistic Local Updates ---
   const updateItemLocal = useCallback((id, patch) => {

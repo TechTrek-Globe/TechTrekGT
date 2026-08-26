@@ -19,7 +19,10 @@ export function CatalogSearchDropdown({ onSelectProduct }) {
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
   }, []);
 
   const searchCatalog = async (searchTerm) => {

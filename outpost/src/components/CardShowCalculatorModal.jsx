@@ -91,7 +91,7 @@ export function CardShowCalculatorModal({ isOpen, onClose, onItemAdded }) {
             authenticator,
             cert_number: '',
             unit_price: parseFloat(askingPrice) || 0,
-            target_margin_pct: targetMarginPct,
+            target_margin_pct: (targetMarginPct || 0) / 100,
             current_list_price: calculations.targetListPrice,
             platform: selectedPlatform.name,
             platform_fee_pct: selectedPlatform.feePct,

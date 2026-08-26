@@ -54,6 +54,8 @@ export async function onRequestPut(context) {
       athlete_person:     body.athlete_person     ?? item.athlete_person,
       authenticator:      body.authenticator      ?? item.authenticator,
       cert_number:        body.cert_number        ?? item.cert_number,
+      unit_price:         body.unit_price != null ? parseFloat(body.unit_price) : item.unit_price,
+      true_total_cost:    body.true_total_cost != null ? parseFloat(body.true_total_cost) : (body.unit_price != null ? (parseFloat(body.unit_price) - (item.prorated_discount || 0) + (item.prorated_shipping || 0) + (item.prorated_tax || 0)) : item.true_total_cost),
       status:             body.status             ?? item.status,
       platform:           body.platform           ?? item.platform,
       platform_fee_pct:   body.platform_fee_pct   ?? item.platform_fee_pct,
@@ -63,6 +65,7 @@ export async function onRequestPut(context) {
       target_margin_pct:  body.target_margin_pct  ?? item.target_margin_pct,
       current_list_price: body.current_list_price ?? item.current_list_price,
       actual_sell_price:  body.actual_sell_price  ?? item.actual_sell_price,
+      date_acquired:      body.date_acquired      !== undefined ? body.date_acquired : item.date_acquired,
       date_listed:        body.date_listed        ?? item.date_listed,
       date_sold:          body.date_sold          ?? item.date_sold,
       notes:              body.notes              ?? item.notes,
@@ -82,7 +85,7 @@ export async function onRequestPut(context) {
 
     // Recompute pricing floors whenever fee or shipping changes
     const pricing = computePricingFloors({
-      true_total_cost:   item.true_total_cost,
+      true_total_cost:   updated.true_total_cost != null ? updated.true_total_cost : item.true_total_cost,
       est_shipping_cost: updated.est_shipping_cost,
       platform_flat_fee: updated.platform_flat_fee,
       platform_fee_pct:  updated.platform_fee_pct,
@@ -110,29 +113,31 @@ export async function onRequestPut(context) {
 
     // Determine actual_sell_price if marking as Sold and no actual_sell_price provided
     if (updated.status === 'Sold' && (updated.actual_sell_price == null || updated.actual_sell_price === 0)) {
-      updated.actual_sell_price = item.actual_sell_price || item.current_list_price || item.suggested_list_price || pricing.suggested_list_price || item.true_total_cost || 0;
+      updated.actual_sell_price = item.actual_sell_price || item.current_list_price || item.suggested_list_price || pricing.suggested_list_price || updated.true_total_cost || 0;
     }
 
     await env.DB.prepare(`
       UPDATE auction_items SET
         item_name = ?, category = ?, sport_genre = ?, athlete_person = ?,
         authenticator = ?, cert_number = ?,
+        unit_price = ?, true_total_cost = ?,
         status = ?, platform = ?, platform_fee_pct = ?, platform_flat_fee = ?,
         est_shipping_cost = ?, boost_pct = ?, target_margin_pct = ?,
         min_sell_price = ?, suggested_list_price = ?,
         current_list_price = ?, actual_sell_price = ?,
-        date_listed = ?, date_sold = ?, days_on_market = ?,
+        date_acquired = ?, date_listed = ?, date_sold = ?, days_on_market = ?,
         notes = ?, best_listing_window = ?,
         updated_at = datetime('now')
       WHERE id = ? AND user_id = ?
     `).bind(
       updated.item_name, updated.category, updated.sport_genre, updated.athlete_person,
       updated.authenticator, updated.cert_number,
+      updated.unit_price, updated.true_total_cost,
       updated.status, updated.platform, updated.platform_fee_pct, updated.platform_flat_fee,
       updated.est_shipping_cost, updated.boost_pct, updated.target_margin_pct,
       pricing.min_sell_price, pricing.suggested_list_price,
       updated.current_list_price, updated.actual_sell_price,
-      updated.date_listed, updated.date_sold, days_on_market,
+      updated.date_acquired, updated.date_listed, updated.date_sold, days_on_market,
       updated.notes, updated.best_listing_window,
       id, payload.userId
     ).run();
@@ -155,7 +160,7 @@ export async function onRequestPut(context) {
         platform_flat_fee: flatFee,
         payment_processing_amt: 0,
         promoted_listing_fee: 0,
-        true_total_cost: item.true_total_cost || 0
+        true_total_cost: updated.true_total_cost || item.true_total_cost || 0
       });
 
       const existingSale = await env.DB.prepare(

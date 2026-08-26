@@ -20,6 +20,13 @@ const PLATFORM_FEE_PRESETS = {
   'Private Sale': { fee_pct: 0.0,  flat_fee: 0.00 },
 };
 
+const STANDARD_CATEGORIES = [
+  'Electronics', 'Toys & Games', 'Books', 'Home & Kitchen', 'Sports', 'Health',
+  'Clothing', 'Tools', 'Office', 'Pet Supplies', 'Beauty', 'Automotive',
+  'Jersey', 'Photo', 'Card', 'Baseball', 'Bat', 'Football', 'Mask', 'Drum Stick',
+  'Helmet', 'Glove', 'Poster', 'Puck', 'Other'
+];
+
 export function EditItemModal({ isOpen, item, categoryOptions = [], platformOptions = [], onClose, onUpdated }) {
   const [activeTab, setActiveTab] = useState('details'); // 'details' | 'pricing' | 'financials' | 'status'
   const [saving, setSaving] = useState(false);
@@ -33,14 +40,18 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
     athlete_person: '',
     authenticator: '',
     cert_number: '',
+    unit_price: '',
+    true_total_cost: '',
     status: 'Available',
     platform: '',
     platform_fee_pct: '13.5',
     platform_flat_fee: '0.40',
     current_list_price: '',
-    target_margin_pct: '',
-    boost_pct: '',
-    est_shipping_cost: '',
+    actual_sell_price: '',
+    target_margin_pct: '20',
+    boost_pct: '0',
+    est_shipping_cost: '0',
+    date_acquired: '',
     date_listed: '',
     date_sold: '',
     best_listing_window: '',
@@ -67,14 +78,18 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
         athlete_person: item.athlete_person || '',
         authenticator: item.authenticator ? item.authenticator.replace(/#.*$/, '').trim() : '',
         cert_number: item.cert_number || '',
+        unit_price: item.unit_price != null ? String(item.unit_price) : '',
+        true_total_cost: item.true_total_cost != null ? String(item.true_total_cost) : '',
         status: item.status || 'Available',
         platform: item.platform || '',
         platform_fee_pct: item.platform_fee_pct != null ? String(parseFloat((item.platform_fee_pct * 100).toFixed(4))) : '13.5',
         platform_flat_fee: item.platform_flat_fee != null ? String(item.platform_flat_fee) : '0.40',
         current_list_price: item.current_list_price != null ? String(item.current_list_price) : '',
+        actual_sell_price: item.actual_sell_price != null ? String(item.actual_sell_price) : '',
         target_margin_pct: item.target_margin_pct != null ? String(item.target_margin_pct * 100) : '20',
         boost_pct: item.boost_pct != null ? String(item.boost_pct * 100) : '0',
         est_shipping_cost: item.est_shipping_cost != null ? String(item.est_shipping_cost) : '0',
+        date_acquired: item.date_acquired || '',
         date_listed: item.date_listed || '',
         date_sold: item.date_sold || '',
         best_listing_window: item.best_listing_window || '',
@@ -120,14 +135,18 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
         athlete_person: form.athlete_person.trim(),
         authenticator: form.authenticator,
         cert_number: form.cert_number.trim(),
+        unit_price: form.unit_price !== '' ? parseFloat(form.unit_price) : 0,
+        true_total_cost: form.true_total_cost !== '' ? parseFloat(form.true_total_cost) : undefined,
         status: form.status,
         platform: form.platform,
         platform_fee_pct: form.platform_fee_pct !== '' ? parseFloat(form.platform_fee_pct) / 100 : 0.135,
         platform_flat_fee: form.platform_flat_fee !== '' ? parseFloat(form.platform_flat_fee) : 0.40,
         current_list_price: form.current_list_price !== '' ? parseFloat(form.current_list_price) : null,
+        actual_sell_price: form.actual_sell_price !== '' ? parseFloat(form.actual_sell_price) : null,
         target_margin_pct: form.target_margin_pct !== '' ? parseFloat(form.target_margin_pct) / 100 : 0.20,
         boost_pct: form.boost_pct !== '' ? parseFloat(form.boost_pct) / 100 : 0,
         est_shipping_cost: form.est_shipping_cost !== '' ? parseFloat(form.est_shipping_cost) : 0,
+        date_acquired: form.date_acquired || null,
         date_listed: form.date_listed || null,
         date_sold: form.date_sold || null,
         best_listing_window: form.best_listing_window.trim() || null,
@@ -162,15 +181,29 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
     }
   };
 
+  // Merge full categories and platforms
+  const allCategories = Array.from(new Set([
+    ...STANDARD_CATEGORIES,
+    ...(categoryOptions || []),
+    form.category
+  ].filter(Boolean))).sort();
+
+  const allPlatforms = Array.from(new Set([
+    ...Object.keys(PLATFORM_FEE_PRESETS),
+    ...(platformOptions || []),
+    form.platform
+  ].filter(Boolean)));
+
   // Pricing calculations
   const parsedFeePct = (parseFloat(form.platform_fee_pct) || 0) / 100;
   const parsedFlatFee = parseFloat(form.platform_flat_fee) || 0;
   const parsedBoost = (parseFloat(form.boost_pct) || 0) / 100;
   const parsedMargin = (parseFloat(form.target_margin_pct) || 0) / 100;
   const parsedShip = parseFloat(form.est_shipping_cost) || 0;
+  const currentCost = form.true_total_cost !== '' ? (parseFloat(form.true_total_cost) || 0) : (form.unit_price !== '' ? (parseFloat(form.unit_price) || 0) : (item?.true_total_cost || 0));
 
   const { min_sell_price: liveMinSell, suggested_list_price: liveSuggestedList } = computePricingFloors({
-    true_total_cost: item.true_total_cost || 0,
+    true_total_cost: currentCost,
     platform_fee_pct: parsedFeePct,
     boost_pct: parsedBoost,
     platform_flat_fee: parsedFlatFee,
@@ -386,7 +419,7 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
                     className="input-field text-xs font-semibold"
                   >
                     <option value="">-- Select Category --</option>
-                    {categoryOptions.map(c => (
+                    {allCategories.map(c => (
                       <option key={c} value={c}>{c}</option>
                     ))}
                   </select>
@@ -448,8 +481,8 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
                       ))}
                     </select>
                     {form.authenticator && certMeta?.name && (
-                      <p className="text-[10px] text-slate-500 mt-1">
-                        Selected: <span className="text-slate-300 font-medium">{certMeta.name}</span>
+                      <p className="text-[10px] text-slate-400 mt-1">
+                        Recognized Authenticator: <span className="text-amber-400 font-semibold">{certMeta.name}</span>
                       </p>
                     )}
                   </div>
@@ -461,7 +494,7 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
                       value={form.cert_number}
                       onChange={e => setForm({ ...form, cert_number: e.target.value })}
                       className="input-field text-xs font-mono"
-                      placeholder="e.g. WIT384910 or 104928"
+                      placeholder="e.g. WIT384919, or 104928"
                     />
                   </div>
                 </div>
@@ -469,141 +502,147 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
             </div>
           )}
 
-          {/* TAB 2: PRICING INTELLIGENCE */}
+          {/* TAB 2: PRICING INTELLIGENCE & COMPS */}
           {activeTab === 'pricing' && (
             <div className="space-y-4">
-              {/* Auto Fetch Header Banner */}
-              <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 space-y-2.5">
-                <div className="flex items-center justify-between gap-3 flex-wrap">
-                  <div>
-                    <p className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
-                      <Zap className="w-4 h-4 text-amber-400" />
-                      Live eBay Sold Comps Scraper
-                    </p>
-                    <p className="text-[10px] text-slate-400 mt-0.5">
-                      Scan completed transactions to evaluate market value and calculate pricing floors.
-                    </p>
-                  </div>
-
+              {/* Live eBay Comps fetcher bar */}
+              <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <a
-                      href={buildEbaySearchUrl(form.item_name || item.item_name, form.athlete_person || item.athlete_person, form.authenticator || item.authenticator)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-blue-300 bg-blue-950/40 hover:bg-blue-900/50 border border-blue-500/30 flex items-center gap-1.5 transition-all"
-                    >
-                      <ExternalLink className="w-3 h-3" /> eBay Comps ↗
-                    </a>
-                    <button
-                      type="button"
-                      onClick={handleFetchLiveComps}
-                      disabled={compsDraft.fetchingLive}
-                      className="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-950 bg-amber-500 hover:bg-amber-400 transition-all flex items-center gap-1.5 disabled:opacity-50"
-                    >
-                      {compsDraft.fetchingLive ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
-                      <span>{compsDraft.fetchingLive ? 'Scanning...' : 'Auto-Fetch Comps'}</span>
-                    </button>
+                    <Zap className="w-4 h-4 text-amber-400" />
+                    <span className="text-xs font-bold text-slate-200">Live Sold Comps Intelligence</span>
                   </div>
+                  <a
+                    href={buildEbaySearchUrl(form.item_name || item.item_name, form.athlete_person || item.athlete_person, form.authenticator || item.authenticator)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[11px] font-bold text-blue-400 hover:text-blue-300 flex items-center gap-1 bg-blue-500/10 px-2.5 py-1 rounded-lg border border-blue-500/20 transition-colors"
+                  >
+                    <ExternalLink className="w-3 h-3" /> Search Sold on eBay ↗
+                  </a>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={compsDraft.fetchingLive}
+                    onClick={handleFetchLiveComps}
+                    className="px-3.5 py-2 text-xs rounded-xl font-bold bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 border border-amber-500/30 flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                  >
+                    {compsDraft.fetchingLive ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
+                    <span>{compsDraft.fetchingLive ? 'Fetching Live Comps...' : 'Auto-Fetch eBay Sold Comps'}</span>
+                  </button>
+                  <p className="text-[11px] text-slate-400">
+                    Queries sold marketplace data based on title and signer
+                  </p>
                 </div>
 
                 {compsDraft.fetchMsg && (
-                  <div className={`p-2 rounded-lg text-xs flex items-center gap-1.5 ${
+                  <div className={`p-2.5 rounded-lg text-xs flex items-center gap-2 ${
                     compsDraft.fetchMsg.type === 'success'
-                      ? 'bg-emerald-950/60 border border-emerald-500/40 text-emerald-300'
+                      ? 'bg-emerald-950/40 border border-emerald-500/30 text-emerald-300'
                       : compsDraft.fetchMsg.type === 'error'
-                        ? 'bg-red-950/60 border border-red-500/40 text-red-300'
-                        : 'bg-amber-950/60 border border-amber-500/40 text-amber-300'
+                      ? 'bg-red-950/40 border border-red-500/30 text-red-300'
+                      : 'bg-slate-900 border border-slate-800 text-slate-300'
                   }`}>
-                    <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
-                    <span>{compsDraft.fetchMsg.text}</span>
+                    {compsDraft.fetchMsg.text}
                   </div>
                 )}
               </div>
 
-              {/* 3 Manual Comp Inputs */}
-              <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
-                <p className="text-xs font-bold text-slate-200">Recent Sold Comps ($)</p>
-                <div className="grid grid-cols-3 gap-3">
-                  {['comp_1', 'comp_2', 'comp_3'].map((field, i) => (
-                    <div key={field}>
-                      <label className="block text-[10px] font-semibold text-slate-400 mb-1">Comp #{i + 1}</label>
-                      <div className="relative">
-                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-500">$</span>
-                        <input
-                          type="number"
-                          step="0.01"
-                          placeholder="0.00"
-                          value={compsDraft[field]}
-                          onChange={e => updateCompDraft(field, e.target.value)}
-                          className="input-field py-1.5 pl-6 pr-2 text-xs font-mono font-bold text-white text-center"
-                        />
-                      </div>
+              {/* 3 Comps manual entry inputs */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {[1, 2, 3].map(num => (
+                  <div key={num}>
+                    <label className="block text-xs font-bold text-slate-300 mb-1">
+                      Recent Comp #{num} ($)
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs">$</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={compsDraft[`comp_${num}`]}
+                        onChange={e => updateCompDraft(`comp_${num}`, e.target.value)}
+                        className="input-field text-xs pl-7 font-mono font-bold text-amber-300"
+                        placeholder="0.00"
+                      />
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
               </div>
 
-              {/* Intelligence Valuation Metrics */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-3.5 rounded-xl bg-slate-950/60 border border-slate-800">
+              {/* Valuation metrics */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 rounded-xl bg-slate-900/60 border border-slate-800">
                 <div>
                   <span className="text-[10px] uppercase font-bold text-slate-400">Comp Average</span>
-                  <p className="text-base font-black text-amber-400 mt-0.5">{liveCompAvg ? fmtCurrency(liveCompAvg) : '--'}</p>
+                  <p className="text-sm font-black text-amber-400 mt-0.5">
+                    {liveCompAvg ? fmtCurrency(liveCompAvg) : '--'}
+                  </p>
                 </div>
                 <div>
                   <span className="text-[10px] uppercase font-bold text-slate-400">Min Floor Price</span>
-                  <p className="text-base font-black text-emerald-400 mt-0.5">{fmtCurrency(item.min_sell_price || liveMinSell)}</p>
+                  <p className="text-sm font-black text-emerald-400 mt-0.5">
+                    {item.min_sell_price ? fmtCurrency(item.min_sell_price) : '--'}
+                  </p>
                 </div>
                 <div>
                   <span className="text-[10px] uppercase font-bold text-slate-400">Spread Over Floor</span>
-                  <p className={`text-base font-black mt-0.5 ${floorSpread !== null ? (floorSpread >= 0 ? 'text-emerald-400' : 'text-red-400') : 'text-slate-500'}`}>
-                    {floorSpread !== null ? `${floorSpread >= 0 ? '+' : ''}${fmtCurrency(floorSpread)}` : '--'}
+                  <p className={`text-sm font-black mt-0.5 ${
+                    floorSpread != null
+                      ? floorSpread >= 0 ? 'text-emerald-400' : 'text-red-400'
+                      : 'text-slate-500'
+                  }`}>
+                    {floorSpread != null ? fmtCurrency(floorSpread) : '--'}
                   </p>
                 </div>
                 <div>
                   <span className="text-[10px] uppercase font-bold text-slate-400">Target Profit Margin</span>
-                  <p className="text-base font-black text-cyan-400 mt-0.5">
-                    {compsDraft.recommended_list_price && item.true_total_cost > 0
-                      ? `${Math.round(((Number(compsDraft.recommended_list_price) - item.true_total_cost) / Number(compsDraft.recommended_list_price)) * 100)}%`
-                      : '--'}
+                  <p className="text-sm font-black text-blue-400 mt-0.5">
+                    {form.target_margin_pct || '20'}%
                   </p>
                 </div>
               </div>
 
-              {/* Target Recommended Price + Actions */}
-              <div className="p-3.5 rounded-xl bg-slate-900/80 border border-amber-500/20 flex items-center justify-between gap-4 flex-wrap">
-                <div className="flex-1 min-w-[200px]">
-                  <label className="block text-xs font-bold text-slate-200 mb-1">Target Recommended List Price ($)</label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-500">$</span>
+              {/* Recommended Target Price */}
+              <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-amber-400" />
+                    <span className="text-xs font-bold text-amber-300">Target Recommended List Price</span>
+                  </div>
+                  <span className="text-[11px] text-amber-400/80">Suggested asking price</span>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <div className="relative flex-1 max-w-xs">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-400 text-xs font-bold">$</span>
                     <input
                       type="number"
                       step="0.01"
-                      placeholder="0.00"
                       value={compsDraft.recommended_list_price}
                       onChange={e => updateCompDraft('recommended_list_price', e.target.value)}
-                      className="input-field text-sm font-bold pl-7 text-white"
+                      className="input-field text-sm pl-7 font-black text-amber-400 font-mono bg-slate-900 border-amber-500/40"
+                      placeholder="0.00"
                     />
                   </div>
-                </div>
 
-                <div className="flex items-center gap-2 pt-4 sm:pt-0">
                   <button
                     type="button"
+                    disabled={compsDraft.saving || !compsDraft.recommended_list_price}
                     onClick={() => handleSaveComps(false)}
-                    disabled={compsDraft.saving}
-                    className="px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all flex items-center gap-1.5 disabled:opacity-50"
+                    className="px-3.5 py-2 text-xs rounded-xl font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors disabled:opacity-50"
                   >
-                    {compsDraft.saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                    <span>Save Comps</span>
+                    {compsDraft.saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Save Comps'}
                   </button>
 
                   <button
                     type="button"
-                    onClick={() => handleSaveComps(true)}
                     disabled={compsDraft.saving || !compsDraft.recommended_list_price}
-                    className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    onClick={() => handleSaveComps(true)}
+                    className={`px-3.5 py-2 text-xs rounded-xl font-bold transition-all flex items-center gap-1.5 disabled:opacity-50 ${
                       compsDraft.applied
-                        ? 'bg-emerald-500 text-slate-950'
+                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                         : 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-md shadow-amber-500/20'
                     }`}
                   >
@@ -618,15 +657,58 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
           {/* TAB 3: COSTS & PRICING FLOORS */}
           {activeTab === 'financials' && (
             <div className="space-y-4">
-              {/* Landed cost summary callout */}
-              <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] uppercase font-bold text-slate-400">Total Landed Cost (True Cost)</p>
-                  <p className="text-xl font-black text-amber-400 mt-0.5">{fmtCurrency(item.true_total_cost)}</p>
+              {/* Landed & Unit Cost Breakdown (Fully Editable) */}
+              <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-bold text-amber-400">Acquisition & Landed Cost</span>
+                    <p className="text-[10px] text-slate-400">Edit unit purchase price or override total landed cost</p>
+                  </div>
+                  <div className="text-right text-[11px] text-slate-400">
+                    <p>Prorated Tax/Ship/Disc: <span className="font-mono text-slate-300">{fmtCurrency((item.prorated_tax || 0) + (item.prorated_shipping || 0) - (item.prorated_discount || 0))}</span></p>
+                  </div>
                 </div>
-                <div className="text-right text-[11px] text-slate-400">
-                  <p>Unit Price: {fmtCurrency(item.unit_price)}</p>
-                  <p>Tax & Shipping: {fmtCurrency((item.prorated_tax || 0) + (item.prorated_shipping || 0))}</p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1">
+                      Purchase / Unit Price ($)
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-bold">$</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={form.unit_price}
+                        onChange={e => {
+                          const val = e.target.value;
+                          const parsed = parseFloat(val);
+                          const proratedDiff = (item.prorated_tax || 0) + (item.prorated_shipping || 0) - (item.prorated_discount || 0);
+                          const autoLanded = !isNaN(parsed) ? (parsed + proratedDiff).toFixed(2) : '';
+                          setForm({ ...form, unit_price: val, true_total_cost: autoLanded });
+                        }}
+                        className="input-field text-xs pl-7 font-mono text-white font-bold"
+                        placeholder="0.00"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1">
+                      Total Landed Cost / True Cost ($)
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-500 text-xs font-bold">$</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={form.true_total_cost}
+                        onChange={e => setForm({ ...form, true_total_cost: e.target.value })}
+                        className="input-field text-xs pl-7 font-mono text-amber-400 font-bold"
+                        placeholder="0.00"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -639,7 +721,7 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
                     className="input-field text-xs font-semibold text-amber-300"
                   >
                     <option value="">-- Select Platform --</option>
-                    {platformOptions.map(p => (
+                    {allPlatforms.map(p => (
                       <option key={p} value={p}>{p}</option>
                     ))}
                   </select>
@@ -648,13 +730,13 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
                 <div>
                   <label className="block text-xs font-bold text-slate-300 mb-1">Current Active List Price ($)</label>
                   <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs">$</span>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-bold">$</span>
                     <input
                       type="number"
                       step="0.01"
                       value={form.current_list_price}
                       onChange={e => setForm({ ...form, current_list_price: e.target.value })}
-                      className="input-field text-xs pl-7"
+                      className="input-field text-xs pl-7 font-mono text-emerald-300 font-bold"
                       placeholder="0.00"
                     />
                   </div>
@@ -719,7 +801,7 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
                       step="1"
                       value={form.target_margin_pct}
                       onChange={e => setForm({ ...form, target_margin_pct: e.target.value })}
-                      className="input-field text-xs pr-6"
+                      className="input-field text-xs pr-6 font-mono"
                     />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs">%</span>
                   </div>
@@ -733,7 +815,7 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
                       step="0.5"
                       value={form.boost_pct}
                       onChange={e => setForm({ ...form, boost_pct: e.target.value })}
-                      className="input-field text-xs pr-6"
+                      className="input-field text-xs pr-6 font-mono"
                     />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs">%</span>
                   </div>
@@ -748,7 +830,7 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
                       step="0.5"
                       value={form.est_shipping_cost}
                       onChange={e => setForm({ ...form, est_shipping_cost: e.target.value })}
-                      className="input-field text-xs pl-7"
+                      className="input-field text-xs pl-7 font-mono"
                     />
                   </div>
                 </div>
@@ -770,7 +852,7 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
           {/* TAB 4: STATUS & NOTES */}
           {activeTab === 'status' && (
             <div className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-300 mb-1">Inventory Status</label>
                   <select
@@ -784,6 +866,16 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
                     <option value="Kept for Self">Kept for Self</option>
                     <option value="Returned">Returned</option>
                   </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">Date Acquired</label>
+                  <input
+                    type="date"
+                    value={form.date_acquired}
+                    onChange={e => setForm({ ...form, date_acquired: e.target.value })}
+                    className="input-field text-xs"
+                  />
                 </div>
 
                 <div>
@@ -806,6 +898,25 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
                   />
                 </div>
               </div>
+
+              {form.status === 'Sold' && (
+                <div className="p-3.5 rounded-xl bg-emerald-950/30 border border-emerald-500/30">
+                  <label className="block text-xs font-bold text-emerald-400 mb-1">
+                    Actual Realized Sale Price ($)
+                  </label>
+                  <div className="relative max-w-xs">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-bold">$</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={form.actual_sell_price}
+                      onChange={e => setForm({ ...form, actual_sell_price: e.target.value })}
+                      className="input-field text-xs pl-7 font-mono text-emerald-300 font-bold"
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="block text-xs font-bold text-slate-300 mb-1">Best Target Selling Window</label>

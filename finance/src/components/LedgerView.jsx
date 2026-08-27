@@ -306,6 +306,15 @@ function DailySpreadsheetMatrix() {
 
   const today = new Date();
   const [selectedAccountId, setSelectedAccountId] = useState(budget.accounts[0]?.id || 'all');
+  const hasUserSelectedAccountRef = useRef(false);
+
+  // Automatically select the primary account when accounts hydrate on a clean browser load
+  useEffect(() => {
+    if (!hasUserSelectedAccountRef.current && selectedAccountId === 'all' && budget.accounts?.length > 0) {
+      setSelectedAccountId(budget.accounts[0].id);
+    }
+  }, [budget.accounts, selectedAccountId]);
+
   const [selectedMonth, setSelectedMonth] = useState(today.getMonth());
   const [selectedYear, setSelectedYear] = useState(today.getFullYear());
   const [showArchivedBills, setShowArchivedBills] = useState(false);
@@ -1047,7 +1056,10 @@ function DailySpreadsheetMatrix() {
             <Filter className="w-3.5 h-3.5 text-blue-400" />
             <select
               value={selectedAccountId}
-              onChange={e => setSelectedAccountId(e.target.value)}
+              onChange={e => {
+                hasUserSelectedAccountRef.current = true;
+                setSelectedAccountId(e.target.value);
+              }}
               className="bg-transparent text-xs font-bold text-slate-100 focus:outline-none cursor-pointer"
             >
               <option value="all" className="bg-slate-900 text-slate-100 py-1">All Accounts Combined</option>

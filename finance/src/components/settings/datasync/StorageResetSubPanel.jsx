@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState, useEffect } from 'react';
-import { useBudgetMetadata, useLedgerDataDispatch } from '../../../context/BudgetContext';
+import { useBudget, useLedgerDataDispatch } from '../../../context/BudgetContext';
 import { 
   HardDrive, 
   RotateCcw, 
@@ -16,7 +16,7 @@ import {
 import { saveBudgetData } from '../../../utils/indexedDB';
 
 export function StorageResetSubPanel() {
-  const { budget } = useBudgetMetadata();
+  const { budget } = useBudget();
   const {
     resetToDefaults,
     clearAllData,

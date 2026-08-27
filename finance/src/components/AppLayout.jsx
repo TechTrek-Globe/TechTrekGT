@@ -143,9 +143,9 @@ export function AppLayout({ children, onNavigateHome, onNavigateView, activeView
   // Close mobile drawer on view change
   useEffect(() => { setMobileOpen(false); }, [activeView]);
 
-  const netIncome  = useMemo(() => getTotalMonthlyNetIncome(), [budget?.people]);
-  const expenses   = useMemo(() => getTotalMonthlyExpenses(), [budget?.bills]);
-  const cashOnHand = useMemo(() => getTotalCashOnHand(), [budget?.accounts]);
+  const netIncome  = useMemo(() => getTotalMonthlyNetIncome(budget?.people), [budget?.people, getTotalMonthlyNetIncome]);
+  const expenses   = useMemo(() => getTotalMonthlyExpenses(budget?.bills), [budget?.bills, getTotalMonthlyExpenses]);
+  const cashOnHand = useMemo(() => getTotalCashOnHand(budget?.accounts), [budget?.accounts, getTotalCashOnHand]);
   const netFlow    = useMemo(() => netIncome - expenses, [netIncome, expenses]);
 
   const isLight = theme === 'light';

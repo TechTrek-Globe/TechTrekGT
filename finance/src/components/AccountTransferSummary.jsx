@@ -135,7 +135,7 @@ export function AccountTransferSummary() {
   const totalRegBal = accountRows.reduce((sum, r) => sum + r.regBal, 0);
   const totalExtraBal = accountRows.reduce((sum, r) => sum + r.extraBal, 0);
   const grandTotalBal = accountRows.reduce((sum, r) => sum + r.totalBal, 0);
-  const totalExpenses = getTotalMonthlyExpenses();
+  const totalExpenses = getTotalMonthlyExpenses(budget?.bills);
   const isOverallOk = grandTotalBal >= totalExpenses;
 
   const earnerGrandTotals = {};

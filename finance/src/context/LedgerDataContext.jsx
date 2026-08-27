@@ -45,13 +45,13 @@ export function LedgerDataProvider({ children }) {
   const [matrixVersion, setMatrixVersion] = useState(0);
 
   const metadataStateRef = useRef(metadataState);
-  useEffect(() => { metadataStateRef.current = metadataState; }, [metadataState]);
+  metadataStateRef.current = metadataState;
 
   const transactionsRef = useRef(transactions);
-  useEffect(() => { transactionsRef.current = transactions; }, [transactions]);
+  transactionsRef.current = transactions;
 
   const lineItemsRef = useRef(lineItems);
-  useEffect(() => { lineItemsRef.current = lineItems; }, [lineItems]);
+  lineItemsRef.current = lineItems;
 
   const budgetRef = useRef(null);
 
@@ -188,6 +188,11 @@ export function LedgerDataProvider({ children }) {
 
     await clearAndRestoreBudgetData(fullMerged);
     dailyMatrixRef.current = newDailyMatrix;
+    metadataStateRef.current = mergedMetadata;
+    transactionsRef.current = newTransactions;
+    lineItemsRef.current = newLineItems;
+    budgetRef.current = fullMerged;
+
     setMetadataState(mergedMetadata);
     setDailyMatrix(newDailyMatrix);
     setMatrixVersion(v => v + 1);
@@ -520,25 +525,28 @@ export function LedgerDataProvider({ children }) {
     return li ? li.actualAmount : getBillMonthlyCost(bill);
   }, [getBillMonthlyCost]);
 
-  const getTotalActualExpenses = useCallback((monthKey) => {
-    return (metadataStateRef.current.bills || []).reduce((sum, b) => {
-      const li = lineItemsRef.current.find(item => item.billId === b.id && item.monthKey === monthKey);
+  const getTotalActualExpenses = useCallback((monthKey, billsOverride) => {
+    const bills = billsOverride || metadataState.bills || [];
+    return bills.reduce((sum, b) => {
+      const li = (lineItemsRef.current || []).find(item => item.billId === b.id && item.monthKey === monthKey);
       return sum + (li ? li.actualAmount : getBillMonthlyCost(b));
     }, 0);
-  }, [getBillMonthlyCost]);
+  }, [metadataState.bills, getBillMonthlyCost]);
 
-  const getAccountActualExpenses = useCallback((accountId, monthKey) => {
-    return (metadataStateRef.current.bills || [])
+  const getAccountActualExpenses = useCallback((accountId, monthKey, billsOverride) => {
+    const bills = billsOverride || metadataState.bills || [];
+    return bills
       .filter(b => b.accountId === accountId)
       .reduce((sum, b) => sum + getEffectiveAmount(b, monthKey), 0);
-  }, [getEffectiveAmount]);
+  }, [metadataState.bills, getEffectiveAmount]);
 
   // --- Derived Balance Helpers ---
 
 
   // Derives the latest known balance for an account from importedLedgerRows or transactions
-  const getAccountDerivedBalance = useCallback((accountId) => {
-    const acc = (metadataStateRef.current.accounts || []).find(a => a.id === accountId);
+  const getAccountDerivedBalance = useCallback((accountId, accountsOverride) => {
+    const accounts = accountsOverride || metadataState.accounts || [];
+    const acc = accounts.find(a => a.id === accountId);
     if (!acc) return 0;
 
     // Priority 1: importedLedgerRows (most recent date's total ending balance)
@@ -804,13 +812,14 @@ export function LedgerDataProvider({ children }) {
     };
   }, [getDailyMatrixCell, getActualAmount, isPersonDepositDay, getPersonDepositAmountForAccount]);
 
-  const getTotalCashOnHand = useCallback(() => {
+  const getTotalCashOnHand = useCallback((accountsOverride) => {
+    const accounts = accountsOverride || metadataState.accounts || [];
     const today = new Date();
-    return (metadataStateRef.current.accounts || []).reduce((sum, acc) => {
+    return accounts.reduce((sum, acc) => {
       const balObj = getCalculatedBalanceAsOf(acc.id, today);
       return sum + (balObj?.totalEnd ?? (parseFloat(acc.startingBalance) || 0));
     }, 0);
-  }, [getCalculatedBalanceAsOf]);
+  }, [metadataState.accounts, getCalculatedBalanceAsOf]);
 
   const stateValue = useMemo(() => ({
     budget: budgetForUI,

@@ -103,7 +103,7 @@ Every React project follows the same structural convention:
 
 | Project | Unique Directories | Notes |
 |---------|-------------------|-------|
-| `finance/` | `src/components/`, `src/components/settings/`, `src/context/`, `src/utils/`, `src/assets/` | 4 context providers, modular settings sub-panels (Accounts, Bills, Dashboard, DataSync, Security, Debug) |
+| `finance/` | `src/components/`, `src/components/settings/`, `src/components/settings/datasync/`, `src/context/`, `src/utils/`, `src/assets/` | 4 context providers, modular settings sub-panels (Accounts, Bills, Dashboard, DataSync with dedicated CloudSync, ImportExport, StorageReset, and SyncQueue sub-panels, Security, Debug) |
 | `wayfinder/` | `src/components/city/`, `src/data/`, `src/hooks/`, `functions/api/wayfinder/` | 10 city tab sub-components, `data/poland-2026.js` static dataset, `hooks/useExchangeRate.js`, D1 wayfinder APIs |
 | `outpost/` | `functions/api/` (largest) | invoices, items, sales, platforms, comps, supplies, reports, sync, import |
 | `bigworm/` | `guacamole-config/` | `guacamole.properties`, `user-mapping.xml` for Docker Guacamole |

@@ -5,7 +5,21 @@ import { useAuth } from './AuthContext';
 import { isPersonDepositDay, getPersonDepositAmountForAccount, getAccountSaveExtraPersonPortion, getNextBillDueDate } from '../utils/paydayUtils';
 import { getApiUrl } from '../utils/api';
 import { getBudgetData } from '../utils/indexedDB';
-import { getDebugEnabled, setDebugEnabled, subscribeToDebugLogs, logDebug, logInfo } from '../utils/debugLogger';
+import { 
+  getDebugEnabled, 
+  setDebugEnabled, 
+  getCategoryStates, 
+  setCategoryEnabled, 
+  setAllCategories, 
+  resetCategoryDefaults, 
+  subscribeToDebugLogs, 
+  logDebug, 
+  logInfo,
+  logLedger,
+  logMatrix,
+  logTransaction,
+  logState
+} from '../utils/logger';
 
 export const BudgetMetadataContext = createContext(null);
 export const BudgetMetadataStateContext = createContext(null);
@@ -44,12 +58,16 @@ export function BudgetMetadataProvider({ children }) {
 
   // Debug Logging State & Real-time Subscription
   const [isDebugMode, setIsDebugModeState] = useState(() => getDebugEnabled());
+  const [categoryStates, setCategoryStatesState] = useState(() => getCategoryStates());
   const [debugLogs, setDebugLogs] = useState([]);
 
   useEffect(() => {
     const unsubscribe = subscribeToDebugLogs((event) => {
       if (event.type === 'STATUS_CHANGE') {
         setIsDebugModeState(event.isDebugEnabled);
+        if (event.categoryStates) setCategoryStatesState(event.categoryStates);
+      } else if (event.type === 'CATEGORIES_CHANGE') {
+        if (event.categoryStates) setCategoryStatesState(event.categoryStates);
       } else if (event.type === 'LOG_ENTRY') {
         setDebugLogs(prev => [event.entry, ...prev].slice(0, 500));
       }
@@ -64,6 +82,22 @@ export function BudgetMetadataProvider({ children }) {
     if (boolVal) {
       logInfo('SYSTEM', 'Verbose debug mode activated');
     }
+  }, []);
+
+  const toggleCategory = useCallback((catKey, enabled) => {
+    setCategoryEnabled(catKey, enabled);
+  }, []);
+
+  const enableAllCategories = useCallback(() => {
+    setAllCategories(true);
+  }, []);
+
+  const disableAllCategories = useCallback(() => {
+    setAllCategories(false);
+  }, []);
+
+  const resetCategories = useCallback(() => {
+    resetCategoryDefaults();
   }, []);
 
   const clearDebugLogs = useCallback(() => {
@@ -202,6 +236,7 @@ export function BudgetMetadataProvider({ children }) {
       ledgerMode: accountData.ledgerMode || (accountData.importedLedgerRows && Object.keys(accountData.importedLedgerRows).length > 0 ? 'import' : 'manual'),
       importedLedgerRows: accountData.importedLedgerRows || {}
     };
+    logLedger('ADD_ACCOUNT', `Added new account: "${newAcc.name}" (${newAcc.type})`, { account: newAcc });
     setMetadataState(prev => ({
       ...prev,
       accounts: [...prev.accounts, newAcc]
@@ -210,6 +245,7 @@ export function BudgetMetadataProvider({ children }) {
   }, []);
 
   const updateAccount = useCallback((id, updatedData) => {
+    logLedger('UPDATE_ACCOUNT', `Updated account: ${id}`, { id, updatedData });
     setMetadataState(prev => ({
       ...prev,
       accounts: prev.accounts.map(acc => acc.id === id ? { ...acc, ...updatedData } : acc)
@@ -217,6 +253,7 @@ export function BudgetMetadataProvider({ children }) {
   }, []);
 
   const deleteAccount = useCallback((id) => {
+    logLedger('DELETE_ACCOUNT', `Deleted account: ${id}`, { id });
     setMetadataState(prev => ({
       ...prev,
       accounts: prev.accounts.filter(acc => acc.id !== id),
@@ -240,6 +277,7 @@ export function BudgetMetadataProvider({ children }) {
       netPerPay: parseFloat(personData.netPerPay) || 0,
       color: personData.color || 'purple'
     };
+    logMatrix('ADD_EARNER', `Added earner: "${newPerson.name}" (${newPerson.payFrequency})`, { person: newPerson });
     setMetadataState(prev => ({
       ...prev,
       people: [...prev.people, newPerson],
@@ -251,6 +289,7 @@ export function BudgetMetadataProvider({ children }) {
   }, []);
 
   const updatePerson = useCallback((id, updatedData) => {
+    logMatrix('UPDATE_EARNER', `Updated earner: ${id}`, { id, updatedData });
     setMetadataState(prev => ({
       ...prev,
       people: prev.people.map(p => p.id === id ? { ...p, ...updatedData } : p)
@@ -258,6 +297,7 @@ export function BudgetMetadataProvider({ children }) {
   }, []);
 
   const deletePerson = useCallback((id) => {
+    logMatrix('DELETE_EARNER', `Deleted earner: ${id}`, { id });
     setMetadataState(prev => ({
       ...prev,
       people: prev.people.filter(p => p.id !== id),
@@ -300,6 +340,8 @@ export function BudgetMetadataProvider({ children }) {
         splits: billData.splits || initialSplits
       };
 
+      logMatrix('ADD_BILL', `Added bill: "${newBill.name}" ($${newBill.amount}, Due: Day ${newBill.dueDay})`, { bill: newBill });
+
       return {
         ...prev,
         bills: [...prev.bills, newBill]
@@ -308,6 +350,13 @@ export function BudgetMetadataProvider({ children }) {
   }, []);
 
   const updateBill = useCallback((id, updatedData) => {
+    if (updatedData.accountId) {
+      logTransaction('REASSIGN_BILL_ACCOUNT', `Reassigned bill ${id} to account ${updatedData.accountId}`, { billId: id, newAccountId: updatedData.accountId });
+    }
+    if (updatedData.splits) {
+      logTransaction('REASSIGN_BILL_SPLITS', `Updated earner split allocation on bill ${id}`, { billId: id, splits: updatedData.splits });
+    }
+    logMatrix('UPDATE_BILL', `Updated bill schedule/details: ${id}`, { id, updatedData });
     setMetadataState(prev => ({
       ...prev,
       bills: prev.bills.map(b => b.id === id ? { ...b, ...updatedData } : b)
@@ -315,6 +364,7 @@ export function BudgetMetadataProvider({ children }) {
   }, []);
 
   const deleteBill = useCallback((id) => {
+    logMatrix('DELETE_BILL', `Deleted bill: ${id}`, { id });
     setMetadataState(prev => ({
       ...prev,
       bills: prev.bills.filter(b => b.id !== id)
@@ -322,6 +372,7 @@ export function BudgetMetadataProvider({ children }) {
   }, []);
 
   const updateBillSplits = useCallback((billId, splitsMap) => {
+    logTransaction('REASSIGN_BILL_SPLITS', `Direct splits update for bill ${billId}`, { billId, splitsMap });
     setMetadataState(prev => ({
       ...prev,
       bills: prev.bills.map(b => b.id === billId ? { ...b, splits: splitsMap } : b)
@@ -329,6 +380,7 @@ export function BudgetMetadataProvider({ children }) {
   }, []);
 
   const archiveBill = useCallback((id) => {
+    logMatrix('ARCHIVE_BILL', `Archived bill: ${id}`, { id });
     setMetadataState(prev => ({
       ...prev,
       bills: prev.bills.map(b => b.id === id ? { ...b, isArchived: true } : b)
@@ -336,6 +388,7 @@ export function BudgetMetadataProvider({ children }) {
   }, []);
 
   const unarchiveBill = useCallback((id) => {
+    logMatrix('UNARCHIVE_BILL', `Unarchived bill: ${id}`, { id });
     setMetadataState(prev => ({
       ...prev,
       bills: prev.bills.map(b => b.id === id ? { ...b, isArchived: false } : b)
@@ -400,6 +453,7 @@ export function BudgetMetadataProvider({ children }) {
   }, [metadataState.dashboardWidgets]);
 
   const updateDashboardWidgets = useCallback((newWidgets) => {
+    logState('DISPATCH_WIDGETS', 'Updated dashboard widgets configuration', { count: newWidgets?.length });
     setMetadataState(prev => ({
       ...prev,
       dashboardWidgets: newWidgets
@@ -465,6 +519,7 @@ export function BudgetMetadataProvider({ children }) {
   const theme = metadataState.theme || 'dark';
 
   const setTheme = useCallback((newTheme) => {
+    logState('DISPATCH_THEME', `Changed theme to: ${newTheme}`, { theme: newTheme });
     setMetadataState(prev => ({
       ...prev,
       theme: newTheme
@@ -619,6 +674,7 @@ export function BudgetMetadataProvider({ children }) {
     isSyncOnLoadEnabled,
     lastCloudSyncTime,
     isDebugMode,
+    categoryStates,
     debugLogs
   }), [
     metadataState,
@@ -634,6 +690,7 @@ export function BudgetMetadataProvider({ children }) {
     isSyncOnLoadEnabled,
     lastCloudSyncTime,
     isDebugMode,
+    categoryStates,
     debugLogs
   ]);
 
@@ -652,6 +709,10 @@ export function BudgetMetadataProvider({ children }) {
     setSettingsTab,
     setSaveError,
     setDebugMode,
+    toggleCategory,
+    enableAllCategories,
+    disableAllCategories,
+    resetCategories,
     clearDebugLogs,
     addDebugLog,
     // actions
@@ -719,6 +780,10 @@ export function BudgetMetadataProvider({ children }) {
     deleteLoan,
     toggleAutoCloudBackup,
     setDebugMode,
+    toggleCategory,
+    enableAllCategories,
+    disableAllCategories,
+    resetCategories,
     clearDebugLogs,
     addDebugLog,
     getMonthlyNetIncome,

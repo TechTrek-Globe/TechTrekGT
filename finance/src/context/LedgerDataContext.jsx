@@ -8,6 +8,7 @@ import { getApiUrl, pushCloudBackupOptimistic, flushPendingCloudSync } from '../
 import { getBudgetData, saveBudgetData, clearAndRestoreBudgetData, clearBudgetData } from '../utils/indexedDB';
 import { processSpreadsheetImport } from '../utils/spreadsheet';
 import { isBillDueInMonth } from '../utils/paydayUtils';
+import { logSync, logTransaction, logMatrix, logLedger, logState } from '../utils/logger';
 
 export const LedgerDataContext = createContext(null);
 export const LedgerDataStateContext = createContext(null);
@@ -61,7 +62,14 @@ export function LedgerDataProvider({ children }) {
     if (!isPendingSaveRef.current || !budgetRef.current) return;
     isPendingSaveRef.current = false;
     saveBudgetData(budgetRef.current)
-      .then(() => setSaveError(null))
+      .then(() => {
+        setSaveError(null);
+        logState('INDEXEDDB_FLUSH', 'Flushed pending budget state to IndexedDB', {
+          accountsCount: budgetRef.current?.accounts?.length,
+          billsCount: budgetRef.current?.bills?.length,
+          matrixEntriesCount: Object.keys(budgetRef.current?.dailyMatrix || {}).length
+        });
+      })
       .catch(err => {
         console.error('Failed to flush budget to IndexedDB:', err);
         setSaveError('Local storage save failed. Browser storage quota may be exceeded.');
@@ -109,7 +117,10 @@ export function LedgerDataProvider({ children }) {
       if (isPendingSaveRef.current && budgetRef.current) {
         isPendingSaveRef.current = false;
         saveBudgetData(budgetRef.current)
-          .then(() => setSaveError(null))
+          .then(() => {
+            setSaveError(null);
+            logState('INDEXEDDB_AUTO_SAVE', 'Debounced budget auto-save to IndexedDB complete');
+          })
           .catch(err => {
             console.error('Failed to save budget to IndexedDB:', err);
             setSaveError('Local storage save failed. Browser storage quota may be exceeded.');
@@ -144,6 +155,7 @@ export function LedgerDataProvider({ children }) {
 
   // Cloud Vault Push Backup (Optimistic + Fallback Queue)
   const pushCloudBackup = useCallback(async (passcode) => {
+    logSync('PUSH_DISPATCH', 'Executing pushCloudBackup from LedgerDataContext', { hasPasscode: Boolean(passcode) });
     const result = await pushCloudBackupOptimistic(passcode, budgetRef.current);
     if (result.success) {
       setLastCloudSyncTime(new Date().toLocaleTimeString());
@@ -186,6 +198,7 @@ export function LedgerDataProvider({ children }) {
 
   // Cloud Vault Pull Restore
   const pullCloudRestore = useCallback(async (passcode) => {
+    logSync('PULL_REQUEST', 'Requesting cloud restore from Cloudflare Worker API');
     const headers = { 'Content-Type': 'application/json' };
     const code = passcode || syncPasscode;
     if (code) {
@@ -198,8 +211,10 @@ export function LedgerDataProvider({ children }) {
     });
     const data = await res.json();
     if (!res.ok || !data.success || !data.budget) {
+      logSync('PULL_FAILED', `Cloud restore failed: ${data.error || res.statusText}`, { status: res.status }, 'error');
       throw new Error(data.error || 'Failed to restore data from Cloud Vault.');
     }
+    logSync('PULL_SUCCESS', 'Cloud restore payload received successfully', { updatedAt: data.updatedAt });
     await restoreFromBackup(data.budget);
     setLastCloudSyncTime(new Date().toLocaleTimeString());
     return data;
@@ -229,6 +244,7 @@ export function LedgerDataProvider({ children }) {
   // Silent background retry effect for pending sync queue on app load or network recovery
   useEffect(() => {
     const handleOnlineRetry = async () => {
+      logSync('ONLINE_RECOVER', 'Browser back online; flushing pending sync queue');
       const flushed = await flushPendingCloudSync(syncPasscode);
       if (flushed) {
         setLastCloudSyncTime(new Date().toLocaleTimeString());
@@ -273,6 +289,14 @@ export function LedgerDataProvider({ children }) {
           const localData = budgetRef.current;
           const isLocalEmpty = !localData || (!localData.accounts?.length && !localData.bills?.length);
 
+          logSync('CONFLICT_CHECK', 'Evaluated local vs cloud timestamps for 2-way sync', {
+            localTime,
+            cloudTime,
+            differenceMs: cloudTime - localTime,
+            isLocalEmpty,
+            action: (isLocalEmpty || cloudTime >= localTime) ? 'RESTORE_FROM_CLOUD' : (localTime > cloudTime ? 'PUSH_LOCAL_TO_CLOUD' : 'IDLE')
+          });
+
           // If local is empty OR cloud is newer/equal to local, restore from cloud
           if (isLocalEmpty || cloudTime >= localTime) {
             await restoreFromBackup(cloudData.budget);
@@ -286,6 +310,7 @@ export function LedgerDataProvider({ children }) {
           }
         }
       } catch (err) {
+        logSync('AUTO_SYNC_CHECK_ERROR', `Initial auto cloud sync check failed: ${err?.message || err}`, { error: String(err) }, 'warn');
         console.info('Initial auto cloud sync check:', err?.message || err);
       }
     })();
@@ -307,8 +332,10 @@ export function LedgerDataProvider({ children }) {
 
     const timer = setTimeout(async () => {
       try {
+        logSync('AUTO_BACKUP_TRIGGER', '5-second debounce expired; triggering auto cloud backup');
         await pushCloudBackup(syncPasscode);
       } catch (err) {
+        logSync('AUTO_BACKUP_ERROR', `Auto cloud backup failed: ${err.message}`, { error: err.message }, 'error');
         console.error('Auto cloud backup failed:', err);
       }
     }, 5000);
@@ -372,19 +399,30 @@ export function LedgerDataProvider({ children }) {
 
     // 1. Remove all transactions for this account
     const remainingTransactions = (transactionsRef.current || []).filter(t => t.accountId !== accountId);
+    const removedCount = (transactionsRef.current || []).length - remainingTransactions.length;
     transactionsRef.current = remainingTransactions;
     setTransactions(remainingTransactions);
 
     // 2. Clean out dailyMatrix cells for this account
     const cleanMatrix = {};
+    let cellsPurged = 0;
     Object.entries(dailyMatrixRef.current || {}).forEach(([k, v]) => {
       if (!k.startsWith(`${accountId}_`)) {
         cleanMatrix[k] = v;
+      } else {
+        cellsPurged++;
       }
     });
     dailyMatrixRef.current = cleanMatrix;
     setDailyMatrix(cleanMatrix);
     setMatrixVersion(v => v + 1);
+
+    logTransaction('BATCH_DELETE_TRANSACTIONS', `Cleared transactions & matrix cells for account ${accountId}`, {
+      accountId,
+      transactionsRemoved: removedCount,
+      matrixCellsPurged: cellsPurged,
+      remainingTxnCount: remainingTransactions.length
+    });
 
     // 3. Reset the account's ledger metadata (importedLedgerRows, ledgerMode, startingBalance, extraStartingBalance)
     setMetadataState(prev => {
@@ -458,6 +496,7 @@ export function LedgerDataProvider({ children }) {
   }, []);
 
   const upsertLineItem = useCallback((billId, monthKey, actualAmount) => {
+    logLedger('UPSERT_LINE_ITEM', `Recorded actual line item for bill ${billId} in ${monthKey}: $${actualAmount}`, { billId, monthKey, actualAmount });
     setLineItems(prev => {
       const existing = prev.findIndex(li => li.billId === billId && li.monthKey === monthKey);
       const updated = [...prev];
@@ -548,6 +587,18 @@ export function LedgerDataProvider({ children }) {
     if ((currentVal === undefined || currentVal === null || currentVal === '') && (value === undefined || value === null || value === '')) {
       return;
     }
+
+    const prevNum = parseFloat(currentVal) || 0;
+    const newNum = parseFloat(value) || 0;
+    logTransaction('UPDATE_CELL_AMOUNT', `Matrix cell amount updated: ${key} = ${value}`, {
+      accountId,
+      monthKey,
+      day,
+      field,
+      previousValue: currentVal,
+      newValue: value,
+      diff: Math.round((newNum - prevNum) * 100) / 100
+    });
     
     // Mutate ref and sync state for reactive components and persistence
     dailyMatrixRef.current[key] = value;
@@ -565,6 +616,10 @@ export function LedgerDataProvider({ children }) {
       }
     }
     if (hasChanges) {
+      logTransaction('BATCH_UPDATE_CELLS', `Batch update applied to ${Object.keys(updates).length} matrix cells`, {
+        updatedKeysCount: Object.keys(updates).length,
+        sampleKeys: Object.keys(updates).slice(0, 5)
+      });
       setDailyMatrix({ ...dailyMatrixRef.current });
       setMatrixVersion(v => v + 1);
     }
@@ -573,6 +628,15 @@ export function LedgerDataProvider({ children }) {
   const moveDailyMatrixCell = useCallback((accountId, sourceMonthKey, sourceDay, targetMonthKey, targetDay, field, value, extraData = {}) => {
     const sourceKey = `${accountId}_${sourceMonthKey}_${sourceDay}_${field}`;
     const targetKey = `${accountId}_${targetMonthKey}_${targetDay}_${field}`;
+
+    logTransaction('MOVE_CELL_DATE', `Relocated cell [${field}] from ${sourceMonthKey}-${sourceDay} to ${targetMonthKey}-${targetDay}`, {
+      accountId,
+      sourceDate: `${sourceMonthKey}-${sourceDay}`,
+      targetDate: `${targetMonthKey}-${targetDay}`,
+      field,
+      value,
+      extraData
+    });
 
     let hasChanges = false;
     if (dailyMatrixRef.current[sourceKey] !== 0) {

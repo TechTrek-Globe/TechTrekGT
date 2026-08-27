@@ -17,6 +17,7 @@ import {
 import * as XLSX from 'xlsx';
 import { parseSpreadsheet } from '../../utils/spreadsheetParser';
 import { detectFileType, parseGenericFlat, autoMatchColumns, applyTransactionMapping } from '../../utils/importer';
+import { logTransaction } from '../../utils/logger';
 
 export function AccountsPeoplePanel() {
   const {
@@ -103,6 +104,11 @@ export function AccountsPeoplePanel() {
           ...prev,
           name: prev.name || matchingAcc?.name || file.name.replace(/\.[^/.]+$/, ''),
         }));
+        logTransaction('PARSE_ACC_TXNS', `Parsed ${txns.length} transactions from "${file.name}" for account setup`, {
+          fileName: file.name,
+          txnCount: txns.length,
+          type: 'emory_parc'
+        });
         setAccImportStatus({
           fileName: file.name,
           count: txns.length,
@@ -120,6 +126,11 @@ export function AccountsPeoplePanel() {
           ...prev,
           name: prev.name || file.name.replace(/\.[^/.]+$/, ''),
         }));
+        logTransaction('PARSE_ACC_TXNS', `Parsed ${records.length} transactions from flat file "${file.name}"`, {
+          fileName: file.name,
+          txnCount: records.length,
+          type: 'generic_flat'
+        });
         setAccImportStatus({
           fileName: file.name,
           count: records.length,
@@ -135,6 +146,7 @@ export function AccountsPeoplePanel() {
 
   const handleClearAccountData = (accId) => {
     if (!accId) return;
+    logTransaction('USER_INITIATE_CLEAR_ACCOUNT', `User confirmed transaction purge for account ${accId}`, { accountId: accId });
     const ok = clearAccountTransactions(accId);
     if (ok) {
       setClearAccStatus({ type: 'success', message: 'Transactions cleared and account reset to initial starting balance.' });

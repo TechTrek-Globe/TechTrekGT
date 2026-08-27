@@ -163,6 +163,8 @@ function MainContent({ pathname, navigateTo, onNavigateHome }) {
   );
 }
 
+import { logState } from './utils/logger';
+
 function getRouteFromPathname(pathname) {
   const path = (pathname || '').toLowerCase().replace(/\/$/, '');
   if (path === '/finance' || path.startsWith('/finance/')) {
@@ -176,8 +178,14 @@ export default function App() {
   const route = getRouteFromPathname(pathname);
 
   useEffect(() => {
+    logState('APP_INIT', `Finance application initialized on route: ${route}`, { route, pathname });
+  }, []);
+
+  useEffect(() => {
     const handlePopState = () => {
-      setPathname(window.location.pathname);
+      const newPath = window.location.pathname;
+      logState('ROUTER_POPSTATE', `Browser popstate event navigated to: ${newPath}`, { pathname: newPath, view: getViewFromPathname(newPath) });
+      setPathname(newPath);
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
@@ -185,6 +193,11 @@ export default function App() {
 
   const navigateTo = useCallback((path) => {
     if (typeof window !== 'undefined') {
+      logState('ROUTER_PUSHSTATE', `SPA pushState navigation: ${window.location.pathname} -> ${path}`, {
+        from: window.location.pathname,
+        to: path,
+        targetView: getViewFromPathname(path)
+      });
       if (window.location.pathname !== path) {
         window.history.pushState({}, '', path);
       }

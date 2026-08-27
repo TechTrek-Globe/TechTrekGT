@@ -38,6 +38,8 @@ export function openDB() {
   });
 }
 
+import { logState } from './logger';
+
 /**
  * Loads the application budget state from IndexedDB.
  * @returns {Promise<object|null>}
@@ -50,10 +52,18 @@ export async function getBudgetData() {
     const request = store.get(BUDGET_KEY);
 
     request.onsuccess = () => {
-      resolve(request.result || null);
+      const res = request.result || null;
+      logState('INDEXEDDB_READ', 'Loaded budget state from IndexedDB', {
+        hasData: Boolean(res),
+        accountsCount: res?.accounts?.length || 0,
+        billsCount: res?.bills?.length || 0,
+        matrixEntriesCount: Object.keys(res?.dailyMatrix || {}).length
+      });
+      resolve(res);
     };
 
     request.onerror = (event) => {
+      logState('INDEXEDDB_READ_ERROR', 'Failed to read budget state from IndexedDB', { error: event.target.error }, 'error');
       reject(event.target.error);
     };
   });
@@ -72,10 +82,16 @@ export async function saveBudgetData(budgetData) {
     const request = store.put(budgetData, BUDGET_KEY);
 
     request.onsuccess = () => {
+      logState('INDEXEDDB_WRITE', 'Successfully committed budget snapshot to IndexedDB', {
+        accountsCount: budgetData?.accounts?.length || 0,
+        billsCount: budgetData?.bills?.length || 0,
+        matrixEntriesCount: Object.keys(budgetData?.dailyMatrix || {}).length
+      });
       resolve();
     };
 
     request.onerror = (event) => {
+      logState('INDEXEDDB_WRITE_ERROR', 'Failed to write budget state to IndexedDB', { error: event.target.error }, 'error');
       reject(event.target.error);
     };
   });
@@ -95,7 +111,13 @@ export async function clearAndRestoreBudgetData(newBudgetData) {
 
     clearRequest.onsuccess = () => {
       const putRequest = store.put(newBudgetData, BUDGET_KEY);
-      putRequest.onsuccess = () => resolve();
+      putRequest.onsuccess = () => {
+        logState('INDEXEDDB_RESTORE', 'Restored budget state into IndexedDB', {
+          accountsCount: newBudgetData?.accounts?.length || 0,
+          billsCount: newBudgetData?.bills?.length || 0
+        });
+        resolve();
+      };
       putRequest.onerror = (event) => reject(event.target.error);
     };
 
@@ -114,7 +136,10 @@ export async function clearBudgetData() {
     const store = tx.objectStore(STORE_NAME);
     const request = store.clear();
 
-    request.onsuccess = () => resolve();
+    request.onsuccess = () => {
+      logState('INDEXEDDB_CLEAR', 'Purged all records from IndexedDB app_state store');
+      resolve();
+    };
     request.onerror = (event) => reject(event.target.error);
   });
 }

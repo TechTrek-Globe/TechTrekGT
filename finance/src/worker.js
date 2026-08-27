@@ -140,6 +140,7 @@ async function handleSyncBackup(context) {
   try {
     const body = await request.json();
     const dataStr = JSON.stringify(body.budget || body);
+    console.log(`[SYNC:D1_PUSH] Storing backup for user ${userId} (size: ${dataStr.length} bytes)`);
 
     await env.DB.prepare(`
       INSERT INTO user_backups (id, data, updated_at)
@@ -147,11 +148,15 @@ async function handleSyncBackup(context) {
       ON CONFLICT(id) DO UPDATE SET data=excluded.data, updated_at=datetime('now')
     `).bind(userId, dataStr).run();
 
-    return new Response(JSON.stringify({ success: true, timestamp: new Date().toISOString() }), {
+    const timestamp = new Date().toISOString();
+    console.log(`[SYNC:D1_PUSH_SUCCESS] User ${userId} backup successfully saved at ${timestamp}`);
+
+    return new Response(JSON.stringify({ success: true, timestamp }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
     });
   } catch (err) {
+    console.error(`[SYNC:D1_PUSH_ERROR] Backup failed for user ${userId}:`, err);
     return new Response(JSON.stringify({ error: `Backup failed: ${err.message}` }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }
@@ -180,11 +185,13 @@ async function handleSyncRestore(context) {
   }
 
   try {
+    console.log(`[SYNC:D1_PULL] Querying cloud vault backup for user ${userId}`);
     const row = await env.DB.prepare(`
       SELECT data, updated_at FROM user_backups WHERE id = ? OR id = 'default_vault' ORDER BY (CASE WHEN id = ? THEN 0 ELSE 1 END) LIMIT 1
     `).bind(userId, userId).first();
 
     if (!row || !row.data) {
+      console.warn(`[SYNC:D1_PULL_NOT_FOUND] No cloud vault backup found for user ${userId}`);
       return new Response(JSON.stringify({ error: 'No cloud vault backup found' }), {
         status: 404,
         headers: { 'Content-Type': 'application/json' }
@@ -192,11 +199,13 @@ async function handleSyncRestore(context) {
     }
 
     const parsed = JSON.parse(row.data);
+    console.log(`[SYNC:D1_PULL_SUCCESS] Retrieved cloud backup for user ${userId} (last updated: ${row.updated_at})`);
     return new Response(JSON.stringify({ success: true, budget: parsed.budget || parsed, updatedAt: row.updated_at }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
     });
   } catch (err) {
+    console.error(`[SYNC:D1_PULL_ERROR] Restore failed for user ${userId}:`, err);
     return new Response(JSON.stringify({ error: `Restore failed: ${err.message}` }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }

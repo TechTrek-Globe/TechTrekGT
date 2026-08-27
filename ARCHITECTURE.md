@@ -555,10 +555,10 @@ Observability is minimal and relies on Cloudflare's built-in platform telemetry 
 | Capability | Status | Details |
 |-----------|--------|---------|
 | Worker request logs | Enabled | All workers set `"observability": { "enabled": true }` in `wrangler.jsonc`, which enables Cloudflare's Workers Logs (request/response, status codes, exceptions). |
-| D1 query logs | Partial | D1 queries appear in Cloudflare's Workers Logs when invoked from a worker, but there is no dedicated D1 dashboard or custom query logging. |
+| D1 query logs | Partial | D1 queries appear in Cloudflare's Workers Logs when invoked from a worker, formatted with category tags (e.g. `[SYNC:D1_PUSH]`, `[SYNC:D1_PULL]`). |
 | Error surfacing | Client-side only | `ErrorBoundary` components in finance and outpost display errors to the user; worker errors return JSON `{ error: message }` with a 500 status. |
-| Client-side debug logging | Enabled (`finance`) | In-app real-time debug console in Settings with toggle, filtering, export, and execution telemetry for spreadsheet/CSV parsing and reconciliation. |
-| Structured logging | Not implemented | No `console.log`/`console.error` instrumentation strategy, no log correlation IDs, no request tracing. |
+| Client-side categorized debugging | Enabled (`finance`) | Full-spectrum granular categorized debugging system (`src/utils/logger.js`, `DebugConsolePanel.jsx`) with 6 toggleable categories (Sync, Transactions, Matrix, Accounts & Ledgers, Navigation & State, Spreadsheet Import), master toggles, live stream console, and payload inspector. |
+| Structured logging | Implemented in Finance | Centralized categorized logger (`logSync`, `logTransaction`, `logMatrix`, `logLedger`, `logState`, `logImport`) with deep payload sanitization, pub/sub subscribers, and localStorage persistence (`trekledger_debug_categories`). |
 | Alerting | Not implemented | No automated alerts on worker failures, D1 errors, or elevated error rates. |
 | Metrics dashboards | Not implemented | No Grafana, Datadog, or Cloudflare Analytics custom dashboards configured. |
 

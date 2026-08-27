@@ -26,6 +26,7 @@ import { SpreadsheetImporter } from './SpreadsheetImporter';
 
 import { fmtMoney, fmtNum } from '../utils/formatters';
 import { isBillDueInMonth } from '../utils/paydayUtils';
+import { logTransaction, logMatrix, logLedger } from '../utils/logger';
 
 import {
   DndContext,
@@ -332,6 +333,10 @@ function DailySpreadsheetMatrix() {
 
     if (activeData && overData && overData.field === activeData.field) {
       if (activeData.sourceMonthKey !== overData.monthKey || activeData.sourceDay !== overData.day) {
+        logTransaction('UI_DRAG_MOVE', `User dragged ${activeData.label || activeData.field} from ${activeData.sourceMonthKey}-${activeData.sourceDay} to ${overData.monthKey}-${overData.day}`, {
+          activeData,
+          overData
+        });
         moveDailyMatrixCell(
           activeData.accountId || selectedAccountId,
           activeData.sourceMonthKey,
@@ -348,6 +353,7 @@ function DailySpreadsheetMatrix() {
 
   const handleCellCommit = useCallback((monthKey, day, field, val, cellAccountId) => {
     const targetAccId = (cellAccountId && cellAccountId !== 'all') ? cellAccountId : (selectedAccountId === 'all' ? (budget.accounts[0]?.id || 'all') : selectedAccountId);
+    logTransaction('UI_CELL_COMMIT', `User committed ${field} on ${monthKey}-${day}: ${val}`, { targetAccId, monthKey, day, field, val });
     updateDailyMatrixCell(targetAccId, monthKey, day, field, val);
   }, [updateDailyMatrixCell, selectedAccountId, budget.accounts]);
 

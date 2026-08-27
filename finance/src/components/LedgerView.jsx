@@ -113,7 +113,7 @@ const MatrixCell = React.memo(function MatrixCell({
       title={draggable ? 'Drag to move to a different date line, or click to edit' : undefined}
     >
       {draggable && (
-        <GripVertical className="w-2.5 h-2.5 text-slate-500 opacity-0 group-hover/matrix:opacity-70 transition-opacity absolute -left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+        <GripVertical className="w-2.5 h-2.5 text-slate-500 opacity-0 group-hover/matrix:opacity-70 transition-opacity absolute left-0.5 top-1/2 -translate-y-1/2 pointer-events-none" />
       )}
       <InlineEdit
         value={value || 0}
@@ -1226,8 +1226,10 @@ function DailySpreadsheetMatrix() {
           <thead>
             {/* Header Row 1: Category Banners & Spanning Headers */}
             <tr className="bg-slate-950 text-slate-300 uppercase font-extrabold text-[9px] tracking-wider h-6">
-              {/* Date, Day & Total Beg Banner Container */}
-              <th colSpan={3} className="p-0 h-6 bg-slate-950 border-r border-slate-700 sticky left-0 top-0 z-30 shadow-[2px_0_5px_rgba(0,0,0,0.5)]"></th>
+              {/* Date, Day & Total Beg Sticky Frozen Left Headers (Individually pinned to lock alignment when scrolling) */}
+              <th className="p-0 h-6 min-w-[80px] w-[80px] max-w-[80px] bg-slate-950 sticky left-0 top-0 z-30 shadow-[2px_0_5px_rgba(0,0,0,0.5)]"></th>
+              <th className="p-0 h-6 min-w-[46px] w-[46px] max-w-[46px] bg-slate-950 sticky left-[80px] top-0 z-30"></th>
+              <th className="p-0 h-6 min-w-[76px] w-[76px] max-w-[76px] bg-slate-950 border-r border-slate-700 sticky left-[126px] top-0 z-30 shadow-[4px_0_8px_rgba(0,0,0,0.5)]"></th>
 
               {/* Beg Balances Banner */}
               <th colSpan={showExtraColumns ? 2 : 1} className="px-2 h-6 text-center border-r-2 border-blue-600 bg-blue-950 text-blue-200 font-black sticky top-0 z-20 align-middle">Beg Balances</th>
@@ -1236,7 +1238,7 @@ function DailySpreadsheetMatrix() {
               <th colSpan={showExtraColumns ? 2 : 1} className="px-2 h-6 text-center border-r border-slate-800 bg-purple-950 text-purple-300 font-black sticky top-0 z-20 align-middle">Ending Balances</th>
               
               {/* Total End Banner Container */}
-              <th colSpan={1} className="p-0 h-6 min-w-[76px] w-[76px] max-w-[76px] bg-slate-950 border-l border-slate-700 sticky right-0 top-0 z-30 shadow-[-4px_0_8px_rgba(0,0,0,0.5)]"></th>
+              <th className="p-0 h-6 min-w-[76px] w-[76px] max-w-[76px] bg-slate-950 border-l border-slate-700 sticky right-0 top-0 z-30 shadow-[-4px_0_8px_rgba(0,0,0,0.5)]"></th>
             </tr>
 
             {/* Header Row 2: Individual Columns (2-Line Responsive Headers, Full Legibility) */}
@@ -1439,7 +1441,7 @@ function DailySpreadsheetMatrix() {
                       </td>
 
                       {/* Regular Beg Balance */}
-                      <td className={`p-1 text-right font-bold border-r border-blue-900/60 min-w-[66px] ${
+                      <td className={`p-1 text-right font-bold border-r border-blue-900/60 min-w-[72px] ${
                         row.isToday
                           ? 'bg-amber-950/90 text-amber-200 border-y border-y-amber-400/80'
                           : isSelected
@@ -1449,7 +1451,7 @@ function DailySpreadsheetMatrix() {
 
                       {/* Extra Beg Balance */}
                       {showExtraColumns && (
-                        <td className={`p-1 text-right font-bold border-r-2 border-blue-600/80 min-w-[66px] ${
+                        <td className={`p-1 text-right font-bold border-r-2 border-blue-600/80 min-w-[72px] ${
                           row.isToday
                             ? 'bg-amber-950/90 text-amber-200 border-y border-y-amber-400/80'
                             : isSelected
@@ -1464,7 +1466,7 @@ function DailySpreadsheetMatrix() {
                           key={`cred-${row.rowKey}-${p.id}`}
                           row={row}
                           field={`credit_${p.id}`}
-                          className={`p-1 text-right min-w-[65px] border-r border-slate-800/80 transition-colors relative ${
+                          className={`p-1 text-right min-w-[85px] border-r border-slate-800/80 transition-colors relative ${
                             isSelected && !row.isToday ? 'bg-blue-950/30' : ''
                           }`}
                         >
@@ -1488,7 +1490,7 @@ function DailySpreadsheetMatrix() {
                           key={`bill-${row.rowKey}-${b.id}`}
                           row={row}
                           field={`bill_${b.id}`}
-                          className={`p-1 text-right min-w-[70px] transition-colors relative ${
+                          className={`p-1 text-right min-w-[115px] transition-colors relative ${
                             isSelected && !row.isToday ? 'bg-blue-950/30' : ''
                           }`}
                           isBillField
@@ -1511,7 +1513,7 @@ function DailySpreadsheetMatrix() {
                       <DroppableCellTd
                         row={row}
                         field="other_amount"
-                        className={`p-1 text-right min-w-[55px] transition-colors relative ${
+                        className={`p-1 text-right min-w-[65px] transition-colors relative ${
                           isSelected && !row.isToday ? 'bg-blue-950/30' : ''
                         }`}
                         isBillField={row.otherAmt < 0}
@@ -1624,7 +1626,7 @@ function DailySpreadsheetMatrix() {
                       )}
 
                       {/* Total End Balance (Sticky Right) */}
-                      <td className={`p-1 min-w-[72px] w-[72px] max-w-[72px] text-right font-extrabold sticky right-0 z-20 border-l border-slate-700 shadow-[-4px_0_8px_rgba(0,0,0,0.5)] ${
+                      <td className={`p-1 min-w-[76px] w-[76px] max-w-[76px] text-right font-extrabold sticky right-0 z-20 border-l border-slate-700 shadow-[-4px_0_8px_rgba(0,0,0,0.5)] ${
                         row.isToday
                           ? 'bg-amber-950 text-amber-100 border-y border-y-amber-400/80'
                           : isSelected
@@ -1644,17 +1646,19 @@ function DailySpreadsheetMatrix() {
           {/* Matrix Footers (Sticky Totals) */}
           <tfoot className="sticky bottom-0 z-30 bg-slate-900 font-extrabold text-[10px] text-slate-100 border-t-2 border-slate-700 shadow-lg">
             <tr>
-              <td colSpan={3} className="p-1 text-slate-300 bg-slate-900 border-r border-slate-700 sticky left-0 z-40 shadow-[4px_0_8px_rgba(0,0,0,0.5)]">Monthly Subtotals</td>
-              <td className="p-1 text-right text-slate-400 bg-slate-900">&mdash;</td>
+              <td className="p-1 text-slate-300 bg-slate-900 sticky left-0 z-40 min-w-[80px] w-[80px] max-w-[80px] shadow-[2px_0_5px_rgba(0,0,0,0.5)]">Monthly</td>
+              <td className="p-1 text-slate-300 bg-slate-900 sticky left-[80px] z-40 min-w-[46px] w-[46px] max-w-[46px]">Totals</td>
+              <td className="p-1 text-slate-300 bg-slate-900 border-r border-slate-700 sticky left-[126px] z-40 min-w-[76px] w-[76px] max-w-[76px] shadow-[4px_0_8px_rgba(0,0,0,0.5)] text-right">&mdash;</td>
+              <td className="p-1 text-right text-slate-400 bg-slate-900 min-w-[72px]">&mdash;</td>
               {showExtraColumns && (
-                <td className="p-1 text-right text-slate-400 bg-slate-900 border-r border-slate-800">&mdash;</td>
+                <td className="p-1 text-right text-slate-400 bg-slate-900 border-r border-slate-800 min-w-[72px]">&mdash;</td>
               )}
 
               {/* Credit Subtotals */}
               {accountPeople.map(p => {
                 const tot = columnTotals.regCredits[p.id] || 0;
                 return (
-                  <td key={`tot-cred-${p.id}`} className={`p-1 text-right font-mono bg-slate-900 min-w-[72px] border-r border-slate-800 ${tot < 0 ? 'text-rose-400 font-bold' : 'text-emerald-400'}`}>
+                  <td key={`tot-cred-${p.id}`} className={`p-1 text-right font-mono bg-slate-900 min-w-[85px] border-r border-slate-800 ${tot < 0 ? 'text-rose-400 font-bold' : 'text-emerald-400'}`}>
                     {tot >= 0 ? `+${fmtMoney(tot)}` : fmtMoney(tot)}
                   </td>
                 );
@@ -1662,11 +1666,11 @@ function DailySpreadsheetMatrix() {
 
               {/* Bill Subtotals */}
               {accountBills.map(b => (
-                <td key={`tot-bill-${b.id}`} className="p-1 text-right text-rose-400 font-mono bg-slate-900 min-w-[82px]">
+                <td key={`tot-bill-${b.id}`} className="p-1 text-right text-rose-400 font-mono bg-slate-900 min-w-[115px]">
                   -{fmtMoney(columnTotals.bills[b.id])}
                 </td>
               ))}
-              <td className={`p-1 text-right font-mono bg-slate-900 min-w-[55px] ${
+              <td className={`p-1 text-right font-mono bg-slate-900 min-w-[65px] ${
                 columnTotals.other > 0 ? 'text-emerald-400' : columnTotals.other < 0 ? 'text-rose-300 font-semibold' : 'text-slate-400'
               }`}>
                 {columnTotals.other !== 0
@@ -1675,12 +1679,12 @@ function DailySpreadsheetMatrix() {
                     : fmtMoney(columnTotals.other)
                   : '$ -'}
               </td>
-              <td className="p-1 bg-slate-900 border-r border-slate-800">&mdash;</td>
+              <td className="p-1 bg-slate-900 border-r border-slate-800 min-w-[120px]">&mdash;</td>
 
               {/* Ending Balances Subtotals */}
-              <td className="p-1 text-right font-mono text-slate-200 bg-slate-900 min-w-[66px]">&mdash;</td>
+              <td className="p-1 text-right font-mono text-slate-200 bg-slate-900 min-w-[72px]">&mdash;</td>
               {showExtraColumns && (
-                <td className="p-1 text-right font-mono text-slate-200 bg-slate-900 border-r border-slate-800 min-w-[66px]">&mdash;</td>
+                <td className="p-1 text-right font-mono text-slate-200 bg-slate-900 border-r border-slate-800 min-w-[72px]">&mdash;</td>
               )}
               {/* Sticky Right Total End Footer */}
               <td className="p-1 text-right font-mono text-blue-400 font-black bg-slate-950 border-l border-slate-700 sticky right-0 z-40 shadow-[-4px_0_8px_rgba(0,0,0,0.5)] min-w-[76px] w-[76px] max-w-[76px]">

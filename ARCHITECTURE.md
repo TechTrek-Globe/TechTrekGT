@@ -420,7 +420,7 @@ The decision to run all four apps against a single Cloudflare D1 (SQLite) instan
 
 - The shared `users` table is the only true cross-app dependency; each app's domain tables are logically separate.
 - Finance uses IndexedDB as its primary local persistence, with D1 only for auth and cloud vault backup/restore, reducing its write pressure on the shared instance.
-- Finance auto-cloud backup is debounced to 45 seconds (45,000ms) with a financial data checksum guard to prevent rapid write locking on the shared D1 instance during continuous cell editing.
+- Finance auto-cloud backup is debounced to 5 seconds (5,000ms) on any metadata or ledger cell mutation, with automated bidirectional cloud sync on authenticated load and login to keep multiple devices synchronized seamlessly.
 - Bigworm's D1 usage is limited to auth; its operational state lives in Guacamole and KV.
 
 **Future roadmap (not yet implemented):**

@@ -15,9 +15,9 @@ import { DebugPayloadInspector } from '../DebugPayloadInspector';
 
 export function DebugConsolePanel() {
   const {
-    isDebugMode,
+    isDebugMode = false,
     setDebugMode,
-    debugLogs,
+    debugLogs = [],
     clearDebugLogs,
     addDebugLog
   } = useBudgetMetadata();
@@ -262,7 +262,7 @@ export function DebugConsolePanel() {
           <button
             type="button"
             onClick={handleCopyAllLogs}
-            disabled={debugLogs.length === 0}
+            disabled={!debugLogs || debugLogs.length === 0}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed text-slate-200 rounded-lg text-xs font-semibold border border-slate-700 transition-colors cursor-pointer"
             title="Copy all logs to clipboard"
           >
@@ -273,7 +273,7 @@ export function DebugConsolePanel() {
           <button
             type="button"
             onClick={handleExportLogsJson}
-            disabled={debugLogs.length === 0}
+            disabled={!debugLogs || debugLogs.length === 0}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed text-slate-200 rounded-lg text-xs font-semibold border border-slate-700 transition-colors cursor-pointer"
             title="Download logs as JSON file"
           >
@@ -284,7 +284,7 @@ export function DebugConsolePanel() {
           <button
             type="button"
             onClick={clearDebugLogs}
-            disabled={debugLogs.length === 0}
+            disabled={!debugLogs || debugLogs.length === 0}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-950/40 hover:bg-rose-900/60 disabled:opacity-50 disabled:cursor-not-allowed text-rose-300 rounded-lg text-xs font-semibold border border-rose-900/60 transition-colors cursor-pointer"
             title="Clear log console"
           >
@@ -302,7 +302,7 @@ export function DebugConsolePanel() {
             <Terminal className="w-4 h-4 text-indigo-400" />
             <span className="text-xs font-mono font-bold text-slate-300">Live Console Output</span>
             <span className="text-[10px] text-slate-500 font-mono">
-              ({filteredLogs.length} / {debugLogs.length} events)
+              ({filteredLogs.length} / {(debugLogs || []).length} events)
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -319,14 +319,14 @@ export function DebugConsolePanel() {
             <div className="py-12 px-4 text-center space-y-3">
               <Terminal className="w-8 h-8 text-slate-700 mx-auto" />
               <p className="text-xs text-slate-400 font-sans font-medium">
-                {debugLogs.length === 0
+                {(!debugLogs || debugLogs.length === 0)
                   ? 'No debug events captured yet.'
                   : 'No logs match your filter criteria.'}
               </p>
               <p className="text-[11px] text-slate-500 max-w-md mx-auto font-sans">
                 Enable Debug Mode, then perform an action (e.g. import a CSV/spreadsheet or create an account) to inspect real-time execution steps and data payloads.
               </p>
-              {debugLogs.length === 0 && isDebugMode && (
+              {(!debugLogs || debugLogs.length === 0) && isDebugMode && (
                 <button
                   type="button"
                   onClick={handleGenerateTestLogs}

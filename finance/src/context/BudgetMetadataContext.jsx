@@ -162,6 +162,17 @@ export function BudgetMetadataProvider({ children }) {
       return true;
     }
   });
+
+  // Sync on Load State & Control (defaults to true for authenticated users)
+  const [isSyncOnLoadEnabled, setIsSyncOnLoadEnabled] = useState(() => {
+    try {
+      const stored = localStorage.getItem('cf_sync_on_load_enabled');
+      return stored === null ? true : stored === 'true';
+    } catch {
+      return true;
+    }
+  });
+
   const [lastCloudSyncTime, setLastCloudSyncTime] = useState(null);
 
   const toggleAutoCloudBackup = useCallback((enableBool) => {
@@ -169,6 +180,13 @@ export function BudgetMetadataProvider({ children }) {
     try { localStorage.setItem('cf_auto_backup_enabled', String(val)); }
     catch {}
     setIsAutoCloudBackupEnabled(val);
+  }, []);
+
+  const toggleSyncOnLoad = useCallback((enableBool) => {
+    const val = Boolean(enableBool);
+    try { localStorage.setItem('cf_sync_on_load_enabled', String(val)); }
+    catch {}
+    setIsSyncOnLoadEnabled(val);
   }, []);
 
   // Account Operations
@@ -597,7 +615,11 @@ export function BudgetMetadataProvider({ children }) {
     saveError,
     initialLedgerSeed,
     isAutoCloudBackupEnabled,
-    lastCloudSyncTime
+    isSyncOnChangeEnabled: isAutoCloudBackupEnabled,
+    isSyncOnLoadEnabled,
+    lastCloudSyncTime,
+    isDebugMode,
+    debugLogs
   }), [
     metadataState,
     theme,
@@ -609,7 +631,10 @@ export function BudgetMetadataProvider({ children }) {
     saveError,
     initialLedgerSeed,
     isAutoCloudBackupEnabled,
-    lastCloudSyncTime
+    isSyncOnLoadEnabled,
+    lastCloudSyncTime,
+    isDebugMode,
+    debugLogs
   ]);
 
   const actionsValue = useMemo(() => ({
@@ -648,6 +673,8 @@ export function BudgetMetadataProvider({ children }) {
     unarchiveLoan,
     deleteLoan,
     toggleAutoCloudBackup,
+    toggleSyncOnChange: toggleAutoCloudBackup,
+    toggleSyncOnLoad,
     setLastCloudSyncTime,
     // calculations
     getMonthlyNetIncome,

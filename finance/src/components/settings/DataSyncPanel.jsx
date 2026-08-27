@@ -25,6 +25,8 @@ export function DataSyncPanel() {
     budget,
     isAutoCloudBackupEnabled,
     toggleAutoCloudBackup,
+    isSyncOnLoadEnabled,
+    toggleSyncOnLoad,
     lastCloudSyncTime,
   } = useBudgetMetadata();
 
@@ -388,14 +390,40 @@ export function DataSyncPanel() {
           </div>
         ) : (
           <div className="space-y-4 pt-1">
-            {/* Auto Backup Toggle Switch */}
+            {/* Sync on Load Toggle Switch */}
             <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-between">
-              <div className="space-y-0.5">
-                <div className="text-xs font-bold text-slate-200">Automatic Cloud Backup</div>
+              <div className="space-y-0.5 pr-3">
+                <div className="text-xs font-bold text-slate-200">Sync on App Load &amp; Sign-In</div>
+                <div className="text-[11px] text-slate-400">
+                  {isSyncOnLoadEnabled
+                    ? 'Enabled • Automatically pulls latest Cloud Vault data when signing in or opening the app'
+                    : 'Disabled • Will not pull Cloud Vault data on load (local IndexedDB only)'}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => toggleSyncOnLoad(!isSyncOnLoadEnabled)}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  isSyncOnLoadEnabled ? 'bg-purple-600' : 'bg-slate-700'
+                }`}
+                title={isSyncOnLoadEnabled ? 'Disable auto-sync on load' : 'Enable auto-sync on load'}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    isSyncOnLoadEnabled ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* Sync After Every Change Toggle Switch */}
+            <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-between">
+              <div className="space-y-0.5 pr-3">
+                <div className="text-xs font-bold text-slate-200">Sync After Every Change</div>
                 <div className="text-[11px] text-slate-400">
                   {isAutoCloudBackupEnabled
-                    ? (lastCloudSyncTime ? `Auto-sync active • Last backed up at ${lastCloudSyncTime}` : 'Auto-sync active • Debounced cloud sync on local edits')
-                    : 'Disabled • Local edits will not push to D1 automatically'}
+                    ? (lastCloudSyncTime ? `Enabled • Debounced cloud backup active (Last synced: ${lastCloudSyncTime})` : 'Enabled • Automatically pushes debounced backup to Cloud D1 after any edit')
+                    : 'Disabled • Local edits will not push to Cloud D1 automatically'}
                 </div>
               </div>
               <button
@@ -404,6 +432,7 @@ export function DataSyncPanel() {
                 className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
                   isAutoCloudBackupEnabled ? 'bg-purple-600' : 'bg-slate-700'
                 }`}
+                title={isAutoCloudBackupEnabled ? 'Disable auto-backup on change' : 'Enable auto-backup on change'}
               >
                 <span
                   className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${

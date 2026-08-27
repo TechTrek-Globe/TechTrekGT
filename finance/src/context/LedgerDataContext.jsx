@@ -25,6 +25,7 @@ export function LedgerDataProvider({ children }) {
     getBillMonthlyCost,
     getAccountMonthlyExpenses,
     isAutoCloudBackupEnabled,
+    isSyncOnLoadEnabled,
     setLastCloudSyncTime,
     isPersonDepositDay,
     getPersonDepositAmountForAccount
@@ -146,6 +147,7 @@ export function LedgerDataProvider({ children }) {
     const result = await pushCloudBackupOptimistic(passcode, budgetRef.current);
     if (result.success) {
       setLastCloudSyncTime(new Date().toLocaleTimeString());
+      try { localStorage.setItem('tt_budget_last_modified', String(Date.now())); } catch {}
     }
     return result;
   }, [setLastCloudSyncTime]);
@@ -173,8 +175,10 @@ export function LedgerDataProvider({ children }) {
     const fullMerged = { ...mergedMetadata, dailyMatrix: newDailyMatrix, lineItems: newLineItems, transactions: newTransactions };
 
     await clearAndRestoreBudgetData(fullMerged);
+    dailyMatrixRef.current = newDailyMatrix;
     setMetadataState(mergedMetadata);
     setDailyMatrix(newDailyMatrix);
+    setMatrixVersion(v => v + 1);
     setLineItems(newLineItems);
     setTransactions(newTransactions);
     return true;
@@ -222,9 +226,6 @@ export function LedgerDataProvider({ children }) {
     }
   }, []);
 
-  // Financial data checksum key to prevent UI-only updates (theme, widgets) from triggering cloud backups
-  const financialDataChecksum = `${(metadataState.accounts || []).length}_${(metadataState.bills || []).length}_${(metadataState.people || []).length}_${(metadataState.loans || []).length}_${(lineItems || []).length}_${Object.keys(dailyMatrix || {}).length}`;
-
   // Silent background retry effect for pending sync queue on app load or network recovery
   useEffect(() => {
     const handleOnlineRetry = async () => {
@@ -242,30 +243,67 @@ export function LedgerDataProvider({ children }) {
     return () => window.removeEventListener('online', handleOnlineRetry);
   }, [isAuthenticated, syncPasscode, setLastCloudSyncTime]);
 
-  // Initial auto cloud restore on authenticated load / fresh device
+  // Initial auto cloud restore / 2-way sync on authenticated load or fresh sign-in
   const hasAutoPulledRef = useRef(false);
+  const prevAuthRef = useRef(isAuthenticated);
   useEffect(() => {
-    if (!isAuthenticated || !isDbLoaded || hasAutoPulledRef.current) return;
+    if (!prevAuthRef.current && isAuthenticated) {
+      hasAutoPulledRef.current = false;
+    }
+    prevAuthRef.current = isAuthenticated;
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !isDbLoaded || hasAutoPulledRef.current || isSyncOnLoadEnabled === false) return;
 
     (async () => {
       try {
         hasAutoPulledRef.current = true;
-        const stored = await getBudgetData();
-        const localData = budgetRef.current;
-        const isLocalEmpty = !localData || (!localData.accounts?.length && !localData.bills?.length);
-        if (!stored || isLocalEmpty) {
-          await pullCloudRestore();
+        const res = await fetch(getApiUrl('/api/sync/restore'), {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        const cloudData = await res.json().catch(() => null);
+
+        if (res.ok && cloudData && cloudData.success && cloudData.budget) {
+          const localTimeStr = localStorage.getItem('tt_budget_last_modified');
+          const localTime = localTimeStr ? parseInt(localTimeStr, 10) : 0;
+          const cloudTime = cloudData.updatedAt ? new Date(cloudData.updatedAt).getTime() : 0;
+          const localData = budgetRef.current;
+          const isLocalEmpty = !localData || (!localData.accounts?.length && !localData.bills?.length);
+
+          // If local is empty OR cloud is newer/equal to local, restore from cloud
+          if (isLocalEmpty || cloudTime >= localTime) {
+            await restoreFromBackup(cloudData.budget);
+            setLastCloudSyncTime(new Date().toLocaleTimeString());
+            if (cloudTime > 0) {
+              try { localStorage.setItem('tt_budget_last_modified', String(cloudTime)); } catch {}
+            }
+          } else if (localTime > cloudTime && !isLocalEmpty) {
+            // Local has newer unpushed changes made offline -> push to cloud
+            await pushCloudBackup(syncPasscode);
+          }
         }
       } catch (err) {
-        console.info('Initial cloud vault sync check:', err?.message || err);
+        console.info('Initial auto cloud sync check:', err?.message || err);
       }
     })();
-  }, [isAuthenticated, isDbLoaded, pullCloudRestore]);
+  }, [isAuthenticated, isDbLoaded, isSyncOnLoadEnabled, restoreFromBackup, pushCloudBackup, syncPasscode, setLastCloudSyncTime]);
 
-  // Debounced Auto Cloud Backup effect (45-second debounce to mitigate Cloudflare D1 write lock contention)
+  // Debounced Auto Cloud Backup effect (5-second debounce on any data change)
+  const isInitialMountRef = useRef(true);
   useEffect(() => {
     if (!isDbLoaded || !isAuthenticated) return;
     if (isAutoCloudBackupEnabled === false) return;
+
+    // Skip the initial mount trigger before the first sync check completes
+    if (isInitialMountRef.current) {
+      isInitialMountRef.current = false;
+      return;
+    }
+
+    try { localStorage.setItem('tt_budget_last_modified', String(Date.now())); } catch {}
 
     const timer = setTimeout(async () => {
       try {
@@ -273,10 +311,10 @@ export function LedgerDataProvider({ children }) {
       } catch (err) {
         console.error('Auto cloud backup failed:', err);
       }
-    }, 45000);
+    }, 5000);
 
     return () => clearTimeout(timer);
-  }, [financialDataChecksum, isDbLoaded, isAutoCloudBackupEnabled, isAuthenticated, syncPasscode, pushCloudBackup]);
+  }, [budgetForUI, matrixVersion, isDbLoaded, isAutoCloudBackupEnabled, isAuthenticated, syncPasscode, pushCloudBackup]);
 
   // Load 100% Fake Demo Preset Data
   const loadDemoPreset = useCallback(() => {

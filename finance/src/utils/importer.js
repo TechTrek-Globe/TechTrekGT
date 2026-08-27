@@ -21,14 +21,14 @@ export const INTERNAL_TRANSACTION_FIELDS = [
 ];
 
 export const INTERNAL_BILL_FIELDS = [
-  { key: 'name',          label: 'Bill Name',          required: true  },
-  { key: 'amount',        label: 'Amount ($)',          required: true  },
-  { key: 'accountId',    label: 'Account',            required: false },
-  { key: 'period',        label: 'Period',             required: false },
-  { key: 'dueDay',        label: 'Due Day',            required: false },
-  { key: 'paymentSource', label: 'Payment Source',     required: false },
-  { key: 'matchingKey',   label: 'Bank Document Key',  required: false },
-  { key: 'notes',         label: 'Notes',              required: false },
+  { key: 'name',          label: 'Bill Name',                  required: true  },
+  { key: 'amount',        label: 'Amount ($)',                 required: true  },
+  { key: 'accountId',    label: 'Account',                    required: false },
+  { key: 'period',        label: 'Period',                     required: false },
+  { key: 'dueDay',        label: 'Due Day',                    required: false },
+  { key: 'paymentSource', label: 'Payment Source',             required: false },
+  { key: 'matchingKey',   label: 'Bank Match Names (Aliases)', required: false },
+  { key: 'notes',         label: 'Notes',                      required: false },
 ];
 
 // Synonym map for fuzzy column auto-match
@@ -49,7 +49,7 @@ const BILL_SYNONYMS = {
   period:        ['period', 'frequency', 'recurrence', 'cycle'],
   dueDay:        ['due day', 'day', 'due date', 'payment day'],
   paymentSource: ['payment source', 'source', 'method', 'pay method', 'paid by'],
-  matchingKey:   ['matching key', 'matching_key', 'match key', 'bank key', 'bank document key', 'bank desc', 'bank description', 'bank doc key', 'reconciliation key', 'statement descriptor', 'identifier', 'doc key'],
+  matchingKey:   ['matching key', 'matching_key', 'match key', 'bank key', 'bank match names', 'bank match', 'bank aliases', 'aliases', 'statement aliases', 'bank statement match', 'bank document key', 'bank desc', 'bank description', 'bank doc key', 'reconciliation key', 'statement descriptor', 'identifier', 'doc key'],
   notes:         ['notes', 'note', 'comment', 'remarks'],
 };
 
@@ -396,7 +396,7 @@ export function applyBillMapping(rows, columnMap, defaultAccountId = '') {
     const rawPeriod = mapped.period || 'Monthly';
     const validPeriods = ['Monthly', 'Quarterly', 'Semi-Annual', 'Annual', 'Weekly'];
     const period = validPeriods.find(p => p.toLowerCase() === rawPeriod.toLowerCase()) || 'Monthly';
-    const matchingKey = (mapped.matchingKey || '').trim();
+    const matchingKey = (mapped.matchingKey || mapped.bankMatchNames || '').trim();
 
     records.push({
       id: `bill-${Date.now()}-${billCounter++}`,
@@ -411,6 +411,7 @@ export function applyBillMapping(rows, columnMap, defaultAccountId = '') {
         : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
       paymentSource: mapped.paymentSource || 'Auto Pay',
       matchingKey,
+      bankMatchNames: matchingKey,
       notes: mapped.notes || '',
       splits: {},
     });
@@ -577,11 +578,11 @@ export function mergeBills(existing = [], incoming = []) {
 
   incoming.forEach(inc => {
     const incName = (inc.name || '').toLowerCase().trim();
-    const incKey = (inc.matchingKey || '').toLowerCase().trim();
+    const incKey = (inc.bankMatchNames || inc.matchingKey || '').toLowerCase().trim();
 
     const matchIdx = result.findIndex(ex => {
       const exName = (ex.name || '').toLowerCase().trim();
-      const exKey = (ex.matchingKey || '').toLowerCase().trim();
+      const exKey = (ex.bankMatchNames || ex.matchingKey || '').toLowerCase().trim();
 
       if (incName && exName && incName === exName) return true;
       if (incKey && exKey && (incKey.includes(exKey) || exKey.includes(incKey))) return true;
@@ -603,8 +604,10 @@ export function mergeBills(existing = [], incoming = []) {
         }
       }
 
-      // Merge matchingKey: retain existing if incoming is empty, or update if provided
-      const mergedKey = inc.matchingKey && inc.matchingKey.trim() ? inc.matchingKey.trim() : (ex.matchingKey || '');
+      // Merge matchingKey / bankMatchNames: retain existing if incoming is empty, or update if provided
+      const rawIncKey = inc.bankMatchNames || inc.matchingKey;
+      const rawExKey = ex.bankMatchNames || ex.matchingKey || '';
+      const mergedKey = rawIncKey && rawIncKey.trim() ? rawIncKey.trim() : rawExKey;
 
       result[matchIdx] = {
         ...ex,
@@ -617,13 +620,16 @@ export function mergeBills(existing = [], incoming = []) {
         paymentNotes: inc.paymentNotes || inc.paymentSource || ex.paymentNotes || ex.paymentSource,
         accountId: inc.accountId || ex.accountId,
         matchingKey: mergedKey,
+        bankMatchNames: mergedKey,
         notes: mergedNotes,
         splits: (inc.splits && Object.keys(inc.splits).length > 0) ? inc.splits : ex.splits
       };
     } else {
+      const newKey = inc.bankMatchNames || inc.matchingKey || '';
       result.push({
         ...inc,
-        matchingKey: inc.matchingKey || '',
+        matchingKey: newKey,
+        bankMatchNames: newKey,
         notes: inc.notes || ''
       });
     }

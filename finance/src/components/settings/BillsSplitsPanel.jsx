@@ -42,6 +42,7 @@ export function BillsSplitsPanel() {
     dueMonths: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
     paymentSource: 'Auto Pay',
     matchingKey: '',
+    bankMatchNames: '',
     notes: ''
   });
 
@@ -139,7 +140,7 @@ export function BillsSplitsPanel() {
               e.preventDefault();
               if (!newBillForm.name) return;
               addBill(newBillForm);
-              setNewBillForm({ name: '', amount: 0, period: 'Monthly', accountId: budget.accounts[0]?.id || '', dueDay: 1, dueMonths: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], paymentSource: 'Auto Pay', matchingKey: '', notes: '' });
+              setNewBillForm({ name: '', amount: 0, period: 'Monthly', accountId: budget.accounts[0]?.id || '', dueDay: 1, dueMonths: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], paymentSource: 'Auto Pay', matchingKey: '', bankMatchNames: '', notes: '' });
               setIsAddBillModalOpen(false);
             }} className="space-y-4 pb-4">
               <div>
@@ -268,14 +269,20 @@ export function BillsSplitsPanel() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">Bank Statement Document Matching Key</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-medium text-slate-300">Bank Match Names (Statement Aliases)</label>
+                  <span className="text-[10px] text-blue-400 font-mono">Statement auto-match</span>
+                </div>
                 <input
                   type="text"
-                  placeholder="e.g. COMCAST CABLE / FPL DIRECT DEBIT"
-                  value={newBillForm.matchingKey}
-                  onChange={e => setNewBillForm({ ...newBillForm, matchingKey: e.target.value })}
+                  placeholder="e.g. COMCAST, XFINITY, 800-COMCAST"
+                  value={newBillForm.bankMatchNames ?? newBillForm.matchingKey ?? ''}
+                  onChange={e => setNewBillForm({ ...newBillForm, matchingKey: e.target.value, bankMatchNames: e.target.value })}
                   className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-100 font-mono text-xs focus:outline-none focus:border-emerald-500"
                 />
+                <p className="text-[10px] text-slate-500 mt-1">
+                  Comma-separated keywords or statement descriptors. The importer matches these before using heuristics.
+                </p>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
@@ -326,7 +333,7 @@ export function BillsSplitsPanel() {
 
                 return (
                   <tr key={bill.id} className="hover:bg-slate-900/50 transition-colors">
-                    {/* Bill Name */}
+                    {/* Bill Name & Bank Match Names */}
                     <td className="px-3 py-1.5 font-bold text-slate-200">
                       <input
                         type="text"
@@ -335,6 +342,19 @@ export function BillsSplitsPanel() {
                         className="bg-transparent border-b border-transparent hover:border-slate-700 focus:border-blue-500 focus:outline-none w-full text-xs font-bold text-slate-100"
                         placeholder="Bill Name"
                       />
+                      <div className="flex items-center gap-1 mt-1">
+                        <span className="text-[9px] font-mono text-slate-500 uppercase shrink-0 font-semibold" title="Bank Statement Match Names">
+                          Aliases:
+                        </span>
+                        <input
+                          type="text"
+                          value={bill.bankMatchNames ?? bill.matchingKey ?? ''}
+                          onChange={e => updateBill(bill.id, { matchingKey: e.target.value, bankMatchNames: e.target.value })}
+                          className="w-full bg-slate-900/90 border border-slate-800 hover:border-slate-700 focus:border-blue-500 rounded px-1.5 py-0.5 text-[10px] font-mono text-blue-300 focus:outline-none placeholder:text-slate-600 placeholder:italic"
+                          placeholder="e.g. COMCAST, XFINITY"
+                          title="Bank statement match names/aliases (comma-separated)"
+                        />
+                      </div>
                     </td>
 
                     {/* Amount & Monthly Equiv */}

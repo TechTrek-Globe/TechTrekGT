@@ -24,9 +24,26 @@ import { logDebug, logWarn, logInfo } from './debugLogger.js';
  *   metadataState?: Object,
  *   lineItems?: Array,
  *   dailyMatrix?: Object,
- *   transactions?: Array
- * }}
+/**
+ * Extracts and normalizes bank match statement aliases for a bill.
+ * Supports bill.bankMatchNames, bill.matchingKey, or legacy bill.matching_key.
+ * @param {Object} bill
+ * @returns {string[]}
  */
+export function getBillMatchAliases(bill) {
+  if (!bill) return [];
+  const raw = (bill.bankMatchNames !== undefined && bill.bankMatchNames !== '')
+    ? bill.bankMatchNames
+    : (bill.matchingKey || bill.matching_key || '');
+  if (Array.isArray(raw)) {
+    return raw.map(k => String(k).trim().toLowerCase()).filter(Boolean);
+  }
+  return String(raw)
+    .split(/[,;\n\r|]+/)
+    .map(k => k.trim().toLowerCase())
+    .filter(Boolean);
+}
+
 export function processSpreadsheetImport({
   namespaces,
   strategies = {},
@@ -439,52 +456,102 @@ export function processSpreadsheetImport({
         let resolvedBillId = txn.billId;
         let matchStrategy = resolvedBillId ? 'explicit_bill_id' : null;
 
-        // 1. Match by Bank Document Matching Key (Highest priority)
+        // Tier 1: Match by Bank Match Names (Statement Aliases) - Highest priority
         if (!resolvedBillId && (descLower || notesLower)) {
-          const matchedByKey = nextBills.find(b => {
-            if (b.accountId && accountId && b.accountId !== accountId) return false;
-            if (!b.matchingKey || !b.matchingKey.trim()) return false;
-            const keys = String(b.matchingKey).split(/[,;/|]+/).map(k => k.trim().toLowerCase()).filter(Boolean);
-            return keys.some(k => (
-              (descLower && descLower.includes(k)) ||
-              (descLower && k.length >= 3 && k.includes(descLower)) ||
-              (notesLower && notesLower.includes(k))
-            ));
-          });
-          if (matchedByKey) {
-            resolvedBillId = matchedByKey.id;
-            matchStrategy = `bank_doc_key (${matchedByKey.matchingKey})`;
+          // Check bills assigned to target account first
+          const accountBills = nextBills.filter(b => !b.isArchived && (!b.accountId || b.accountId === accountId));
+          let bestMatch = null;
+          let longestMatchLen = 0;
+
+          for (const b of accountBills) {
+            const aliases = getBillMatchAliases(b);
+            for (const alias of aliases) {
+              if (alias.length < 2) continue;
+              const inDesc = descLower && descLower.includes(alias);
+              const inNotes = notesLower && notesLower.includes(alias);
+              if (inDesc || inNotes) {
+                if (alias.length > longestMatchLen) {
+                  bestMatch = { bill: b, alias };
+                  longestMatchLen = alias.length;
+                }
+              }
+            }
+          }
+
+          // If no match on target account, check other accounts
+          if (!bestMatch) {
+            const otherBills = nextBills.filter(b => !b.isArchived && b.accountId && b.accountId !== accountId);
+            for (const b of otherBills) {
+              const aliases = getBillMatchAliases(b);
+              for (const alias of aliases) {
+                if (alias.length < 2) continue;
+                const inDesc = descLower && descLower.includes(alias);
+                const inNotes = notesLower && notesLower.includes(alias);
+                if (inDesc || inNotes) {
+                  if (alias.length > longestMatchLen) {
+                    bestMatch = { bill: b, alias };
+                    longestMatchLen = alias.length;
+                  }
+                }
+              }
+            }
+          }
+
+          if (bestMatch) {
+            resolvedBillId = bestMatch.bill.id;
+            matchStrategy = `bank_match_alias ("${bestMatch.alias}" -> ${bestMatch.bill.name})`;
           }
         }
 
-        // 2. Secondary match: Heuristic name and synonym matches
+        // Tier 2 (Fallback): Heuristics (Bill Name similarity, domain synonyms, expected dollar amount)
         if (!resolvedBillId && descLower) {
-          const matched = nextBills.find(b => {
+          // 2A: Bill Name & Domain synonyms
+          const matchedHeuristic = nextBills.find(b => {
+            if (b.isArchived) return false;
             if (b.accountId && accountId && b.accountId !== accountId) return false;
-            const bName = (b.name || '').toLowerCase();
-            const pSource = (b.paymentSource || '').toLowerCase();
+            const bName = (b.name || '').toLowerCase().trim();
+            const pSource = (b.paymentSource || '').toLowerCase().trim();
+
             if (bName && (descLower.includes(bName) || bName.includes(descLower))) return true;
             if (pSource && (descLower.includes(pSource) || pSource.includes(descLower))) return true;
-            if ((descLower.includes('insurance') || descLower.includes('progressive') || descLower.includes('geico')) && (bName.includes('insurance') || bName.includes('vehicle') || bName.includes('auto'))) return true;
-            if (descLower.includes('cell') && (bName.includes('cell') || bName.includes('phone'))) return true;
-            if (descLower.includes('phone') && (bName.includes('cell') || bName.includes('phone'))) return true;
-            if (descLower.includes('gym') && (bName.includes('gym') || bName.includes('membership'))) return true;
+            if ((descLower.includes('insurance') || descLower.includes('progressive') || descLower.includes('geico') || descLower.includes('allstate')) &&
+                (bName.includes('insurance') || bName.includes('vehicle') || bName.includes('auto'))) return true;
+            if ((descLower.includes('cell') || descLower.includes('phone') || descLower.includes('verizon') || descLower.includes('t-mobile') || descLower.includes('att')) &&
+                (bName.includes('cell') || bName.includes('phone') || bName.includes('wireless'))) return true;
+            if ((descLower.includes('gym') || descLower.includes('planet fitness') || descLower.includes('la fitness')) &&
+                (bName.includes('gym') || bName.includes('fitness') || bName.includes('membership'))) return true;
             if (descLower.includes('wells fargo') && (bName.includes('cell') || pSource.includes('wells'))) return true;
             if (descLower.includes('bank of america') && (bName.includes('gym') || pSource.includes('america'))) return true;
-            if (descLower.includes('georgia power') && (bName.includes('power') || bName.includes('electric'))) return true;
-            if ((descLower.includes('power') || descLower.includes('electric')) && (bName.includes('power') || bName.includes('electric'))) return true;
+            if ((descLower.includes('power') || descLower.includes('electric') || descLower.includes('energy') || descLower.includes('georgia power')) &&
+                (bName.includes('power') || bName.includes('electric') || bName.includes('energy') || bName.includes('utility'))) return true;
             if (descLower.includes('water') && bName.includes('water')) return true;
             if (descLower.includes('gas') && bName.includes('gas')) return true;
             if (descLower.includes('hoa') && bName.includes('hoa')) return true;
             if (descLower.includes('mortgage') && bName.includes('mortgage')) return true;
-            if (descLower.includes('comcast') && (bName.includes('comcast') || bName.includes('internet') || bName.includes('xfinity'))) return true;
+            if ((descLower.includes('comcast') || descLower.includes('xfinity') || descLower.includes('spectrum')) &&
+                (bName.includes('comcast') || bName.includes('internet') || bName.includes('xfinity') || bName.includes('cable'))) return true;
             if (descLower.includes('youtube') && bName.includes('youtube')) return true;
-            if (Math.abs(parseFloat(b.amount || 0) - actualAmount) < 0.01 && (!b.accountId || b.accountId === accountId)) return true;
+            if (descLower.includes('netflix') && bName.includes('netflix')) return true;
+
             return false;
           });
-          if (matched) {
-            resolvedBillId = matched.id;
-            matchStrategy = `heuristic_name (${matched.name})`;
+
+          if (matchedHeuristic) {
+            resolvedBillId = matchedHeuristic.id;
+            matchStrategy = `heuristic_name (${matchedHeuristic.name})`;
+          } else {
+            // 2B: Expected Dollar Amount Match
+            const matchedByAmount = nextBills.find(b => {
+              if (b.isArchived) return false;
+              if (b.accountId && accountId && b.accountId !== accountId) return false;
+              const billAmt = Math.abs(parseFloat(b.amount || 0));
+              return Math.abs(billAmt - actualAmount) < 0.01;
+            });
+
+            if (matchedByAmount) {
+              resolvedBillId = matchedByAmount.id;
+              matchStrategy = `heuristic_amount ($${actualAmount} -> ${matchedByAmount.name})`;
+            }
           }
         }
 
@@ -551,6 +618,7 @@ export function processSpreadsheetImport({
             const billName = descLower.includes('insurance') ? 'Insurance (Vehicle)' : (txn.description || 'Discovered Bill');
             let autoBill = nextBills.find(b => b.name.toLowerCase() === billName.toLowerCase());
             if (!autoBill) {
+              const autoMatchKey = descLower.includes('insurance') ? 'PROGRESSIVE, AUTO INSURANCE, GEICO, INSURANCE, VEHICLE' : billName;
               autoBill = {
                 id: txn.billId || `bill-${Date.now()}-${nextBills.length}`,
                 name: billName,
@@ -559,7 +627,8 @@ export function processSpreadsheetImport({
                 dueDay: actualDay,
                 accountId: accountId,
                 paymentSource: 'Auto Pay',
-                matchingKey: descLower.includes('insurance') ? 'PROGRESSIVE, AUTO INSURANCE, GEICO, INSURANCE, VEHICLE' : billName,
+                matchingKey: autoMatchKey,
+                bankMatchNames: autoMatchKey,
                 splits: {}
               };
               nextBills.push(autoBill);

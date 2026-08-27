@@ -225,6 +225,7 @@ export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
                 dueMonths: defaultDueMonths,
                 paymentSource,
                 matchingKey: matchingKey || billName,
+                bankMatchNames: matchingKey || billName,
                 notes,
                 splits: {
                   [defaultJonId]: 50,
@@ -364,7 +365,7 @@ export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
                 if (!isFee) {
                   const matchedBill = existingBills.find(b => {
                     const bName = (b.name || '').toLowerCase();
-                    const bKey = (b.matchingKey || '').toLowerCase();
+                    const bKey = (b.bankMatchNames || b.matchingKey || '').toLowerCase();
                     return (
                       (bKey && (lowerDesc.includes(bKey) || bKey.includes(lowerDesc) || (lowerNotes && lowerNotes.includes(bKey)))) ||
                       bName.includes(lowerDesc) ||
@@ -518,8 +519,9 @@ export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
                 if (!isOtherCol && !lowerH.includes('credit') && !lowerH.includes('deposit') && !lowerH.includes('income')) {
                   // 1. Primary matchingKey check on billsList
                   const matchedByKey = billsList.find(b => {
-                    if (!b.matchingKey) return false;
-                    const keys = String(b.matchingKey).split(/[,;/|]+/).map(k => k.trim().toLowerCase()).filter(Boolean);
+                    const rawKey = b.bankMatchNames || b.matchingKey;
+                    if (!rawKey) return false;
+                    const keys = String(rawKey).split(/[,;/|]+/).map(k => k.trim().toLowerCase()).filter(Boolean);
                     return keys.some(k => lowerH.includes(k) || (k.length >= 3 && k.includes(lowerH)) || (otherDesc && otherDesc.toLowerCase().includes(k)));
                   });
 
@@ -546,8 +548,9 @@ export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
                     } else {
                       // Secondary match: cross-reference existing app bills by matchingKey first, then name
                       const existingKeyMatch = existingBills.find(b => {
-                        if (!b.matchingKey) return false;
-                        const keys = String(b.matchingKey).split(/[,;/|]+/).map(k => k.trim().toLowerCase()).filter(Boolean);
+                        const rawKey = b.bankMatchNames || b.matchingKey;
+                        if (!rawKey) return false;
+                        const keys = String(rawKey).split(/[,;/|]+/).map(k => k.trim().toLowerCase()).filter(Boolean);
                         return keys.some(k => lowerH.includes(k) || (k.length >= 3 && k.includes(lowerH)) || (otherDesc && otherDesc.toLowerCase().includes(k)));
                       });
 
@@ -896,7 +899,7 @@ export function parseSingleSheet({
         if (!isFee) {
           const matchedBill = existingBills.find(b => {
             const bName = (b.name || '').toLowerCase();
-            const bKey = (b.matchingKey || '').toLowerCase();
+            const bKey = (b.bankMatchNames || b.matchingKey || '').toLowerCase();
             return (
               (bKey && (lowerDesc.includes(bKey) || bKey.includes(lowerDesc) || (lowerNotes && lowerNotes.includes(bKey)))) ||
               bName.includes(lowerDesc) ||
@@ -1097,7 +1100,7 @@ export function parseSingleSheet({
         if (!isCredit && !isOtherCol) {
           const matchedBill = existingBills.find(b => {
             const bName = b.name.toLowerCase();
-            const bKey = (b.matchingKey || '').toLowerCase();
+            const bKey = (b.bankMatchNames || b.matchingKey || '').toLowerCase();
             return (
               (bKey && (lowerH.includes(bKey) || bKey.includes(lowerH))) ||
               bName.includes(lowerH) ||
@@ -1123,6 +1126,7 @@ export function parseSingleSheet({
             const targetBillName = lowerH.includes('insurance') ? 'Insurance (Vehicle)' : h;
             let disc = discoveredBills.find(db => db.name.toLowerCase() === targetBillName.toLowerCase());
             if (!disc) {
+              const discMatchKey = lowerH.includes('insurance') ? 'PROGRESSIVE, AUTO INSURANCE, GEICO, INSURANCE, VEHICLE' : h;
               disc = {
                 id: `bill-${Date.now()}-${discoveredBills.length}`,
                 name: targetBillName,
@@ -1131,7 +1135,8 @@ export function parseSingleSheet({
                 dueDay: 15,
                 accountId: targetAccountId,
                 paymentSource: 'Auto Pay',
-                matchingKey: lowerH.includes('insurance') ? 'PROGRESSIVE, AUTO INSURANCE, GEICO, INSURANCE, VEHICLE' : h
+                matchingKey: discMatchKey,
+                bankMatchNames: discMatchKey
               };
               discoveredBills.push(disc);
             }

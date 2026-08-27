@@ -130,7 +130,10 @@ export function BudgetMetadataProvider({ children }) {
           setMetadataState({
             accounts: Array.isArray(stored.accounts) ? stored.accounts : initialBudgetData.accounts,
             people: Array.isArray(stored.people) ? stored.people : initialBudgetData.people,
-            bills: Array.isArray(stored.bills) ? stored.bills : initialBudgetData.bills,
+            bills: Array.isArray(stored.bills) ? stored.bills.map(b => {
+              const raw = b.bankMatchNames !== undefined ? b.bankMatchNames : (b.matchingKey || b.matching_key || '');
+              return { ...b, matchingKey: b.matchingKey ?? raw, bankMatchNames: b.bankMatchNames ?? raw };
+            }) : initialBudgetData.bills,
             loans: Array.isArray(stored.loans) ? stored.loans : initialBudgetData.loans,
             dashboardWidgets: Array.isArray(stored.dashboardWidgets)
               ? (() => {
@@ -324,6 +327,8 @@ export function BudgetMetadataProvider({ children }) {
         [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
       );
 
+      const rawMatch = billData.bankMatchNames !== undefined ? billData.bankMatchNames : (billData.matchingKey || billData.matching_key || '');
+
       const newBill = {
         id: `bill-${Date.now()}`,
         name: billData.name || 'New Bill',
@@ -334,7 +339,8 @@ export function BudgetMetadataProvider({ children }) {
         dueMonths: defaultDueMonths,
         paymentSource: billData.paymentSource || 'Auto Pay',
         notes: billData.notes || '',
-        matchingKey: billData.matchingKey || billData.matching_key || '',
+        matchingKey: rawMatch,
+        bankMatchNames: rawMatch,
         splits: billData.splits || initialSplits
       };
 
@@ -354,10 +360,16 @@ export function BudgetMetadataProvider({ children }) {
     if (updatedData.splits) {
       logTransaction('REASSIGN_BILL_SPLITS', `Updated earner split allocation on bill ${id}`, { billId: id, splits: updatedData.splits });
     }
-    logMatrix('UPDATE_BILL', `Updated bill schedule/details: ${id}`, { id, updatedData });
+    const syncedData = { ...updatedData };
+    if (syncedData.bankMatchNames !== undefined && syncedData.matchingKey === undefined) {
+      syncedData.matchingKey = syncedData.bankMatchNames;
+    } else if (syncedData.matchingKey !== undefined && syncedData.bankMatchNames === undefined) {
+      syncedData.bankMatchNames = syncedData.matchingKey;
+    }
+    logMatrix('UPDATE_BILL', `Updated bill schedule/details: ${id}`, { id, updatedData: syncedData });
     setMetadataState(prev => ({
       ...prev,
-      bills: prev.bills.map(b => b.id === id ? { ...b, ...updatedData } : b)
+      bills: prev.bills.map(b => b.id === id ? { ...b, ...syncedData } : b)
     }));
   }, []);
 

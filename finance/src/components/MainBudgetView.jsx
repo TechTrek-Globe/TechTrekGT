@@ -105,9 +105,9 @@ export function MainBudgetView({ onNavigateView }) {
                     {accountPeople.map((/** @type {any} */ p) => (
                       <th key={p.id} className="p-3.5 sticky top-0 z-20 bg-slate-950 border-b border-slate-700 text-right text-emerald-300">{p.name.split(' ')[0]} Portion</th>
                     ))}
-                    <th className="p-3.5 sticky top-0 z-20 bg-slate-950 border-b border-slate-700 text-center text-slate-200">Due Day</th>
+                    <th className="p-3.5 sticky top-0 z-20 bg-slate-950 border-b border-slate-700 text-slate-200">Due Day</th>
                     <th className="p-3.5 sticky top-0 z-20 bg-slate-950 border-b border-slate-700 text-slate-200">Payment Notes</th>
-                    <th className="p-3.5 sticky top-0 z-20 bg-slate-950 border-b border-slate-700 text-slate-200">Bank Match Key</th>
+                    <th className="p-3.5 sticky top-0 z-20 bg-slate-950 border-b border-slate-700 text-slate-200">Bank Match Names</th>
                     <th className="p-3.5 sticky top-0 z-20 bg-slate-950 border-b border-slate-700 text-slate-200">Notes</th>
                   </tr>
                 </thead>
@@ -199,15 +199,15 @@ export function MainBudgetView({ onNavigateView }) {
                             />
                           </td>
 
-                          {/* Bank Match Key - inline editable */}
+                          {/* Bank Match Names - inline editable */}
                           <td className="p-3.5 text-slate-300 text-xs">
                             <InlineEdit
-                              value={bill.matchingKey || ''}
+                              value={bill.bankMatchNames || bill.matchingKey || ''}
                               type="text"
-                              onCommit={(/** @type {string} */ v) => updateBill(bill.id, { matchingKey: v })}
+                              onCommit={(/** @type {string} */ v) => updateBill(bill.id, { matchingKey: v, bankMatchNames: v })}
                               className="text-slate-300 text-xs"
                               placeholder="e.g. GA POWER, COMCAST"
-                              displayFn={(/** @type {string} */ v) => v ? <span className="px-1.5 py-0.5 rounded bg-blue-950/70 border border-blue-800/50 text-blue-300 font-mono text-[10px]">{v}</span> : <span className="text-slate-600 italic">—</span>}
+                              displayFn={(/** @type {string} */ v) => v ? <span className="px-1.5 py-0.5 rounded bg-blue-950/70 border border-blue-800/50 text-blue-300 font-mono text-[10px]">{v}</span> : <span className="text-slate-600 italic">-</span>}
                             />
                           </td>
 

@@ -1,5 +1,6 @@
 // @ts-nocheck
 import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Upload, FileSpreadsheet, CheckCircle2, AlertTriangle,
   ChevronDown, ChevronRight, ArrowRight, RotateCcw,
@@ -20,7 +21,7 @@ import {
   INTERNAL_BILL_FIELDS,
 } from '../utils/importer';
 import { getLedgerRunningBalanceAsOfDate } from '../utils/spreadsheet';
-import { useBudgetMetadataState, useLedgerDataDispatch } from '../context/BudgetContext';
+import { useBudgetMetadataState, useBudgetMetadataDispatch, useLedgerDataDispatch } from '../context/BudgetContext';
 import { logDebug, logInfo, logWarn, logError } from '../utils/debugLogger';
 
 // --- Stage constants ---
@@ -93,7 +94,9 @@ export function SpreadsheetImporter({
   onImportComplete = null,
 }) {
   const { budget } = useBudgetMetadataState();
+  const { updateBill } = useBudgetMetadataDispatch();
   const { importSpreadsheetSelective } = useLedgerDataDispatch();
+  const [savedAliases, setSavedAliases] = useState({});
 
   // Target Account selection (locked if targetAccountId prop is passed)
   const [selectedTargetAccountId, setSelectedTargetAccountId] = useState(targetAccountId || '');
@@ -164,13 +167,174 @@ export function SpreadsheetImporter({
     return parts.length ? parts.join(' / ') : '-';
   };
 
-  const renderCell = (rec, col) => {
+  const handleSaveAlias = useCallback((billId, rawDesc) => {
+    if (!billId || !rawDesc) return;
+    const cleanDesc = rawDesc.replace(/^Other\s*\$?\s*\(?(.*?)\)?$/i, '$1').trim();
+    if (!cleanDesc) return;
+    const targetBill = (budget?.bills || []).find(b => b.id === billId);
+    if (!targetBill) return;
+
+    const existingAliases = targetBill.bankMatchNames || targetBill.matchingKey || '';
+    const aliasesList = existingAliases
+      ? existingAliases.split(/[,;\n\r|]+/).map(a => a.trim().toLowerCase())
+      : [];
+
+    if (!aliasesList.includes(cleanDesc.toLowerCase())) {
+      const updatedAliases = existingAliases ? `${existingAliases}, ${cleanDesc}` : cleanDesc;
+      if (typeof updateBill === 'function') {
+        updateBill(billId, {
+          bankMatchNames: updatedAliases,
+          matchingKey: updatedAliases
+        });
+      }
+      setSavedAliases(prev => ({ ...prev, [`${billId}_${cleanDesc.toLowerCase()}`]: true }));
+    }
+  }, [budget?.bills, updateBill]);
+
+  const handleTransactionMappingChange = useCallback((txnId, newSelectVal) => {
+    setParsedPayload(prev => {
+      if (!prev || !prev.transactions) return prev;
+      const updatedTxns = prev.transactions.map(t => {
+        if (t.id !== txnId) return t;
+        if (!newSelectVal) {
+          return {
+            ...t,
+            billId: null,
+            personId: null,
+            isOther: true
+          };
+        }
+        if (newSelectVal.startsWith('bill:')) {
+          const bId = newSelectVal.replace('bill:', '');
+          const targetBill = (budget?.bills || []).find(b => b.id === bId);
+          return {
+            ...t,
+            billId: bId,
+            personId: null,
+            isOther: false,
+            category: targetBill?.category || t.category || 'Utilities'
+          };
+        }
+        if (newSelectVal.startsWith('person:')) {
+          const pId = newSelectVal.replace('person:', '');
+          return {
+            ...t,
+            personId: pId,
+            billId: null,
+            isOther: false,
+            category: 'Income / Transfer'
+          };
+        }
+        return t;
+      });
+      return { ...prev, transactions: updatedTxns };
+    });
+  }, [budget?.bills]);
+
+  const renderCell = (rec, col, nsKey = null) => {
     const val = rec[col];
     if (col === 'accountId') return resolveAccountName(val);
     if (col === 'splits') return renderSplitsText(val);
     if (col === 'amount' && val !== undefined) {
       const n = Number(val);
       if (!isNaN(n)) return n < 0 ? `-$${Math.abs(n).toFixed(2)}` : `$${n.toFixed(2)}`;
+    }
+    if (col === 'mapping') {
+      const isDebit = Number(rec.amount) < 0;
+      const mappedBill = (budget?.bills || []).find(b => b.id === rec.billId);
+      const mappedPerson = (budget?.people || []).find(p => p.id === rec.personId);
+      const selectValue = rec.billId ? `bill:${rec.billId}` : (rec.personId ? `person:${rec.personId}` : '');
+
+      let canSaveAlias = false;
+      if (mappedBill && rec.description) {
+        const cleanDesc = rec.description.trim().toLowerCase();
+        const existing = (mappedBill.bankMatchNames || mappedBill.matchingKey || '').toLowerCase();
+        const aliases = existing.split(/[,;\n\r|]+/).map(a => a.trim());
+        if (!aliases.includes(cleanDesc) && !mappedBill.name.toLowerCase().includes(cleanDesc)) {
+          canSaveAlias = true;
+        }
+      }
+
+      const aliasKey = mappedBill ? `${mappedBill.id}_${rec.description?.trim().toLowerCase()}` : '';
+      const isSaved = Boolean(savedAliases[aliasKey]);
+
+      const activeBills = (budget?.bills || []).filter(b => !b.isArchived);
+      const people = budget?.people || [];
+
+      return (
+        <div className="flex items-center gap-1.5 min-w-[200px] max-w-[280px]" onClick={e => e.stopPropagation()}>
+          <select
+            value={selectValue}
+            onChange={(e) => handleTransactionMappingChange(rec.id, e.target.value)}
+            className={`w-full text-[10px] font-sans rounded-lg px-2 py-1 border transition-all cursor-pointer truncate ${
+              mappedBill
+                ? 'bg-emerald-950/60 border-emerald-700/80 text-emerald-300 font-semibold focus:ring-1 focus:ring-emerald-500'
+                : mappedPerson
+                ? 'bg-purple-950/60 border-purple-700/80 text-purple-300 font-semibold focus:ring-1 focus:ring-purple-500'
+                : 'bg-slate-900 border-amber-800/60 text-amber-300/90 hover:border-slate-600 focus:ring-1 focus:ring-indigo-500'
+            }`}
+            title={mappedBill ? `Mapped to Bill: ${mappedBill.name}` : mappedPerson ? `Mapped to Earner: ${mappedPerson.name}` : 'Unmapped (Will route to Other Expenses)'}
+          >
+            <option value="" className="bg-slate-900 text-amber-300">
+              ⚠️ Unmapped (Other {isDebit ? 'Expense' : 'Income'})
+            </option>
+            {isDebit ? (
+              <>
+                <optgroup label="Bills (Matching Expense)" className="bg-slate-900 text-slate-200">
+                  {activeBills.map(b => (
+                    <option key={b.id} value={`bill:${b.id}`} className="bg-slate-900 text-slate-200">
+                      🧾 {b.name} (${Number(b.amount || 0).toFixed(2)})
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Household Earners (Transfer)" className="bg-slate-900 text-slate-200">
+                  {people.map(p => (
+                    <option key={p.id} value={`person:${p.id}`} className="bg-slate-900 text-slate-200">
+                      👤 Transfer: {p.name}
+                    </option>
+                  ))}
+                </optgroup>
+              </>
+            ) : (
+              <>
+                <optgroup label="Household Earners (Deposit)" className="bg-slate-900 text-slate-200">
+                  {people.map(p => (
+                    <option key={p.id} value={`person:${p.id}`} className="bg-slate-900 text-slate-200">
+                      👤 Deposit: {p.name}
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Bills (Refund / Credit)" className="bg-slate-900 text-slate-200">
+                  {activeBills.map(b => (
+                    <option key={b.id} value={`bill:${b.id}`} className="bg-slate-900 text-slate-200">
+                      🧾 Credit: {b.name}
+                    </option>
+                  ))}
+                </optgroup>
+              </>
+            )}
+          </select>
+
+          {mappedBill && canSaveAlias && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleSaveAlias(mappedBill.id, rec.description);
+              }}
+              disabled={isSaved}
+              className={`shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold border transition-all cursor-pointer ${
+                isSaved
+                  ? 'bg-emerald-950 text-emerald-300 border-emerald-800 cursor-default'
+                  : 'bg-indigo-950/80 text-indigo-300 border-indigo-700/80 hover:bg-indigo-900 hover:text-white shadow-sm'
+              }`}
+              title={isSaved ? 'Alias saved!' : `Save "${rec.description}" as alias for ${mappedBill.name}`}
+            >
+              {isSaved ? '✓ Saved' : '+ Alias'}
+            </button>
+          )}
+        </div>
+      );
     }
     if (val === undefined || val === '' || val === null) return <span className="text-slate-700 italic">-</span>;
     if (typeof val === 'object') return <span className="text-slate-500 italic">{JSON.stringify(val).slice(0, 30)}</span>;
@@ -599,7 +763,7 @@ export function SpreadsheetImporter({
       icon: CreditCard,
       color: 'emerald',
       records: parsedPayload?.transactions || [],
-      previewCols: ['date', 'description', 'amount', 'accountId', 'category'],
+      previewCols: ['date', 'description', 'amount', 'accountId', 'category', 'mapping'],
       description: 'Bank CSV transaction rows (date, description, amount, account).',
     },
   ];
@@ -1108,31 +1272,38 @@ export function SpreadsheetImporter({
 
                 {/* Preview table */}
                 {!collapsed && count > 0 && (
-                  <div className="border-t border-slate-800/60 overflow-x-auto matrix-scrollbar max-h-56 overflow-y-auto">
-                    <table className="w-full text-[10px] text-slate-400" style={{ minWidth: '480px' }}>
+                  <div className="border-t border-slate-800/60 overflow-x-auto matrix-scrollbar max-h-80 overflow-y-auto">
+                    <table className="w-full text-[10px] text-slate-400" style={{ minWidth: ns.key === 'transactions' ? '720px' : '480px' }}>
                       <thead className="bg-slate-900/80 sticky top-0 z-10">
                         <tr>
                           {ns.previewCols.map(col => (
-                            <th key={col} className="px-3 py-1 text-left text-slate-500 font-semibold uppercase tracking-wider whitespace-nowrap">
-                              {col === 'accountId' ? 'Account' : col === 'splits' ? 'Splits' : col}
+                            <th key={col} className={`px-3 py-1.5 text-left text-slate-500 font-semibold uppercase tracking-wider whitespace-nowrap ${col === 'mapping' ? 'min-w-[210px] text-slate-300' : ''}`}>
+                              {col === 'accountId' ? 'Account' : col === 'splits' ? 'Splits' : col === 'mapping' ? 'Mapped Target' : col}
                             </th>
                           ))}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-800/40">
-                        {ns.records.slice(0, 8).map((rec, i) => (
+                        {(ns.key === 'transactions' ? ns.records.slice(0, 50) : ns.records.slice(0, 8)).map((rec, i) => (
                           <tr key={i} className="hover:bg-slate-900/30">
                             {ns.previewCols.map(col => (
-                              <td key={col} className="px-3 py-1 font-mono text-slate-300 max-w-[160px] truncate">
-                                {renderCell(rec, col)}
+                              <td key={col} className={`px-3 py-1 font-mono text-slate-300 ${col === 'mapping' ? 'min-w-[210px]' : 'max-w-[160px] truncate'}`}>
+                                {renderCell(rec, col, ns.key)}
                               </td>
                             ))}
                           </tr>
                         ))}
-                        {count > 8 && (
+                        {ns.key !== 'transactions' && count > 8 && (
                           <tr>
                             <td colSpan={ns.previewCols.length} className="px-3 py-1 text-slate-600 italic">
                               ...and {count - 8} more rows
+                            </td>
+                          </tr>
+                        )}
+                        {ns.key === 'transactions' && count > 50 && (
+                          <tr>
+                            <td colSpan={ns.previewCols.length} className="px-3 py-1 text-slate-600 italic">
+                              ...and {count - 50} more rows
                             </td>
                           </tr>
                         )}
@@ -1392,80 +1563,85 @@ export function SpreadsheetImporter({
     </div>
 
       {/* ---- FULL PREVIEW MODAL ---- */}
-      {fullPreviewNs && parsedPayload && (() => {
-        const ns = nsConfig.find(n => n.key === fullPreviewNs);
-        if (!ns) return null;
-        const records = ns.records;
-        const cols = getFullCols(records);
-        const colLabel = (c) => c === 'accountId' ? 'Account' : c === 'splits' ? 'Splits' : c;
-        return (
-          <div
-            className="fixed inset-0 z-[200] flex items-center justify-center p-4"
-            style={{ background: 'rgba(0,0,0,0.85)' }}
-            onClick={e => { if (e.target === e.currentTarget) setFullPreviewNs(null); }}
-          >
-            <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-5xl max-h-[85vh] flex flex-col shadow-2xl">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 flex-shrink-0">
-                <div>
-                  <h3 className="text-xs font-bold text-slate-100">
-                    Full Preview: {ns.label} ({selectedSheetName})
-                  </h3>
-                  <p className="text-[10px] text-slate-400 mt-0.5">
-                    {records.length} records &mdash; {cols.length} fields each
-                  </p>
+      {fullPreviewNs && parsedPayload && typeof document !== 'undefined' && createPortal(
+        (() => {
+          const ns = nsConfig.find(n => n.key === fullPreviewNs);
+          if (!ns) return null;
+          const records = ns.records;
+          const rawCols = getFullCols(records);
+          const cols = ns.key === 'transactions'
+            ? ['date', 'description', 'amount', 'mapping', 'accountId', 'category', ...rawCols.filter(c => !['date', 'description', 'amount', 'mapping', 'accountId', 'category', 'billId', 'personId', 'isOther'].includes(c))]
+            : rawCols;
+          const colLabel = (c) => c === 'accountId' ? 'Account' : c === 'splits' ? 'Splits' : c === 'mapping' ? 'Mapped Target' : c;
+          return (
+            <div
+              className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in"
+              onClick={e => { if (e.target === e.currentTarget) setFullPreviewNs(null); }}
+            >
+              <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-5xl max-h-[85vh] flex flex-col shadow-2xl">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 flex-shrink-0">
+                  <div>
+                    <h3 className="text-xs font-bold text-slate-100">
+                      Full Preview: {ns.label} ({selectedSheetName})
+                    </h3>
+                    <p className="text-[10px] text-slate-400 mt-0.5">
+                      {records.length} records &mdash; {cols.length} fields each
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFullPreviewNs(null)}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-all cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setFullPreviewNs(null)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-all cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
 
-              <div className="overflow-auto matrix-scrollbar flex-1">
-                <table className="text-[10px] text-slate-300 border-collapse" style={{ minWidth: `${cols.length * 130}px` }}>
-                  <thead className="sticky top-0 z-10 bg-slate-950">
-                    <tr>
-                      <th className="px-2.5 py-2 text-left text-slate-500 font-semibold border-b border-r border-slate-800 whitespace-nowrap w-8">#</th>
-                      {cols.map(col => (
-                        <th key={col} className="px-2.5 py-2 text-left text-slate-400 font-semibold border-b border-r border-slate-800 whitespace-nowrap uppercase tracking-wide text-[9px]">
-                          {colLabel(col)}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {records.map((rec, i) => (
-                      <tr key={i} className={`hover:bg-slate-800/40 transition-colors ${i % 2 === 0 ? '' : 'bg-slate-900/30'}`}>
-                        <td className="px-2.5 py-1.5 text-slate-600 font-mono border-r border-slate-800/50 whitespace-nowrap">{i + 1}</td>
+                <div className="overflow-auto matrix-scrollbar flex-1">
+                  <table className="text-[10px] text-slate-300 border-collapse" style={{ minWidth: `${cols.length * 130}px` }}>
+                    <thead className="sticky top-0 z-10 bg-slate-950">
+                      <tr>
+                        <th className="px-2.5 py-2 text-left text-slate-500 font-semibold border-b border-r border-slate-800 whitespace-nowrap w-8">#</th>
                         {cols.map(col => (
-                          <td key={col} className="px-2.5 py-1.5 font-mono border-r border-slate-800/30 max-w-[180px]">
-                            <div className="truncate">{renderCell(rec, col)}</div>
-                          </td>
+                          <th key={col} className={`px-2.5 py-2 text-left font-semibold border-b border-r border-slate-800 whitespace-nowrap uppercase tracking-wide text-[9px] ${col === 'mapping' ? 'text-slate-300 min-w-[210px]' : 'text-slate-400'}`}>
+                            {colLabel(col)}
+                          </th>
                         ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {records.map((rec, i) => (
+                        <tr key={i} className={`hover:bg-slate-800/40 transition-colors ${i % 2 === 0 ? '' : 'bg-slate-900/30'}`}>
+                          <td className="px-2.5 py-1.5 text-slate-600 font-mono border-r border-slate-800/50 whitespace-nowrap">{i + 1}</td>
+                          {cols.map(col => (
+                            <td key={col} className={`px-2.5 py-1.5 font-mono border-r border-slate-800/30 ${col === 'mapping' ? 'min-w-[210px]' : 'max-w-[180px]'}`}>
+                              <div className={col === 'mapping' ? '' : 'truncate'}>{renderCell(rec, col, ns.key)}</div>
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
 
-              <div className="px-4 py-2.5 border-t border-slate-800 flex items-center justify-between flex-shrink-0">
-                <span className="text-[10px] text-slate-500">
-                  All {records.length} rows shown
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setFullPreviewNs(null)}
-                  className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold transition-all cursor-pointer"
-                >
-                  Close Preview
-                </button>
+                <div className="px-4 py-2.5 border-t border-slate-800 flex items-center justify-between flex-shrink-0">
+                  <span className="text-[10px] text-slate-500">
+                    All {records.length} rows shown
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setFullPreviewNs(null)}
+                    className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold transition-all cursor-pointer"
+                  >
+                    Close Preview
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        );
-      })()}
+          );
+        })(),
+        document.body
+      )}
     </>
   );
 }

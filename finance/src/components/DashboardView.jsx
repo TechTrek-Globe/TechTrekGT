@@ -795,7 +795,7 @@ export function DashboardView() {
       case 'split_pairings': {
         const splitGroups = {};
         const peopleList = budget?.people || [];
-        const wageEarners = peopleList.filter(p => !p.name.toLowerCase().includes('credit') && p.role !== 'Credit' && p.role !== 'Reimbursement');
+        const wageEarners = peopleList.filter(p => p.name.toLowerCase() !== 'credit' && p.role !== 'Credit' && p.role !== 'Reimbursement');
         const activePeople = wageEarners.length > 0 ? wageEarners : peopleList;
 
         // 1. Group Bills
@@ -886,7 +886,7 @@ export function DashboardView() {
               : (activePeople.length > 0 ? activePeople.map(p => p.id) : peopleList.map(p => p.id));
 
             const enabledPeople = peopleList.filter(p => rawEarners.includes(p.id));
-            const nonCreditEarners = enabledPeople.filter(p => !p.name.toLowerCase().includes('credit') && p.role !== 'Credit' && p.role !== 'Reimbursement');
+            const nonCreditEarners = enabledPeople.filter(p => p.name.toLowerCase() !== 'credit' && p.role !== 'Credit' && p.role !== 'Reimbursement');
             const targetEarners = nonCreditEarners.length > 0 ? nonCreditEarners : enabledPeople;
 
             if (targetEarners.length > 0) {
@@ -1055,7 +1055,7 @@ export function DashboardView() {
                   <div className="space-y-1 text-[11px]">
                     {Object.entries(group.participantPortions).map(([pName, portionAmt]) => {
                       const person = peopleList.find(p => p.name === pName || p.id === pName);
-                      const isCredit = person && (person.name.toLowerCase().includes('credit') || person.role === 'Credit' || person.role === 'Reimbursement');
+                      const isCredit = person && (person.name.toLowerCase() === 'credit' || person.role === 'Credit' || person.role === 'Reimbursement');
                       const isNonMonthly = person && !isCredit && (person.payFrequency === 'semi-monthly' || person.payFrequency === 'bi-weekly' || person.payFrequency === 'weekly');
                       const items = group.participantItems?.[pName] || [];
                       const tooltipKey = `${group.label}___${pName}`;

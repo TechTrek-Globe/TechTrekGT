@@ -199,7 +199,7 @@ export function getAccountSaveExtraPersonPortion(account, person, budget) {
 
   const people = budget?.people || [];
   const enabledPeople = people.filter(p => rawEnabledList.includes(p.id));
-  const nonCreditEarners = enabledPeople.filter(p => !p.name.toLowerCase().includes('credit') && p.role !== 'Credit' && p.role !== 'Reimbursement');
+  const nonCreditEarners = enabledPeople.filter(p => p.name.toLowerCase() !== 'credit' && p.role !== 'Credit' && p.role !== 'Reimbursement');
   const targetEarners = nonCreditEarners.length > 0 ? nonCreditEarners : enabledPeople;
 
   if (!targetEarners.some(p => p.id === person.id)) {
@@ -258,6 +258,10 @@ export function getBillDueMonths(bill) {
       return [m1, ((m1 + 2) % 12) + 1, ((m1 + 5) % 12) + 1, ((m1 + 8) % 12) + 1].sort((a, b) => a - b);
     }
     return [1, 4, 7, 10];
+  }
+
+  if (period === 'Custom' || period === 'Specific Months') {
+    return rawMonths.length > 0 ? rawMonths : [1];
   }
   
   return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
@@ -324,6 +328,8 @@ export function formatBillDueMonths(bill) {
   const period = bill?.period || 'Monthly';
   if (period === 'Monthly') return 'Every Month';
   const dueMonths = getBillDueMonths(bill);
+  if (dueMonths.length === 12) return 'Every Month';
+  if (dueMonths.length === 0) return 'None';
   return dueMonths.map(m => MONTH_SHORT_NAMES[m - 1]).join(', ');
 }
 

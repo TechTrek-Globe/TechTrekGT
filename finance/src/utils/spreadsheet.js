@@ -396,7 +396,9 @@ export function processSpreadsheetImport({
       if (isCredit) {
         // Check earner deposit match
         let matchedPerson = null;
-        if (descLower.includes('hp') || descLower.includes('gym')) {
+        if (txn.personId) {
+          matchedPerson = nextPeople.find(p => p.id === txn.personId);
+        } else if (descLower.includes('hp') || descLower.includes('gym')) {
           matchedPerson = nextPeople.find(p => (p.name || '').toLowerCase().includes('gym'));
         } else if (descLower.includes('jon') || descLower.includes('usaa') || descLower.includes('transfer')) {
           matchedPerson = nextPeople.find(p => (p.name || '').toLowerCase() === 'jon') || nextPeople[0];

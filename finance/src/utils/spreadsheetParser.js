@@ -898,12 +898,17 @@ export function parseSingleSheet({
         const isFee = lowerDesc.includes('fee') || lowerNotes.includes('fee');
         if (!isFee) {
           const matchedBill = existingBills.find(b => {
+            if (b.isArchived) return false;
             const bName = (b.name || '').toLowerCase();
             const bKey = (b.bankMatchNames || b.matchingKey || '').toLowerCase();
+            const aliases = bKey ? bKey.split(/[,;\n\r|]+/).map(k => k.trim()).filter(Boolean) : [];
+            const aliasMatch = aliases.some(alias =>
+              alias.length >= 2 && (lowerDesc.includes(alias) || (lowerNotes && lowerNotes.includes(alias)))
+            );
+            if (aliasMatch) return true;
             return (
-              (bKey && (lowerDesc.includes(bKey) || bKey.includes(lowerDesc) || (lowerNotes && lowerNotes.includes(bKey)))) ||
               bName.includes(lowerDesc) ||
-              lowerDesc.includes(bName) ||
+              (lowerDesc.length >= 3 && lowerDesc.includes(bName)) ||
               (lowerDesc.includes('hoa') && bName.includes('hoa')) ||
               (lowerDesc.includes('mortgage') && bName.includes('mortgage')) ||
               (lowerDesc.includes('water') && bName.includes('water')) ||
@@ -918,6 +923,16 @@ export function parseSingleSheet({
           if (matchedBill) {
             billId = matchedBill.id;
           }
+        }
+      }
+
+      // Match earner if deposit/credit
+      let personId = null;
+      if (amount > 0 && Array.isArray(existingPeople)) {
+        const lowerDesc = description.toLowerCase();
+        const matchedPerson = existingPeople.find(p => p.name && lowerDesc.includes(p.name.toLowerCase()));
+        if (matchedPerson) {
+          personId = matchedPerson.id;
         }
       }
 
@@ -956,8 +971,9 @@ export function parseSingleSheet({
         amount,
         accountId: targetAccountId,
         billId,
+        personId,
         category,
-        isOther: !billId,
+        isOther: !billId && !personId,
         notes: notes || `Imported from ${sheetName}`
       });
     }

@@ -584,6 +584,10 @@ export function BudgetMetadataProvider({ children }) {
     if (bill.period === 'Annual') return amt / 12;
     if (bill.period === 'Quarterly') return amt / 3;
     if (bill.period === 'Weekly') return (amt * 52) / 12;
+    if (bill.period === 'Custom' || bill.period === 'Specific Months') {
+      const count = Array.isArray(bill.dueMonths) && bill.dueMonths.length > 0 ? bill.dueMonths.length : 12;
+      return (amt * count) / 12;
+    }
     return amt;
   }, []);
 

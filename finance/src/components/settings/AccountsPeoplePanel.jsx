@@ -654,8 +654,8 @@ export function AccountsPeoplePanel() {
                       <div className="flex items-center gap-1.5 flex-nowrap overflow-x-auto py-0.5">
                         {budget.people.map(p => {
                           const isChecked = enabledList.includes(p.id);
-                          const isCredit = p.name.toLowerCase().includes('credit') || p.role === 'Credit';
-                          const activeNonCredits = budget.people.filter(pe => enabledList.includes(pe.id) && !pe.name.toLowerCase().includes('credit') && pe.role !== 'Credit');
+                          const isCredit = p.name.toLowerCase() === 'credit' || p.role === 'Credit';
+                          const activeNonCredits = budget.people.filter(pe => enabledList.includes(pe.id) && pe.name.toLowerCase() !== 'credit' && pe.role !== 'Credit');
                           const defaultSplit = isCredit ? 0 : (100 / Math.max(1, activeNonCredits.length));
                           const currentVal = acc.saveExtraSplits?.[p.id] !== undefined
                             ? parseFloat(acc.saveExtraSplits[p.id])
@@ -686,7 +686,7 @@ export function AccountsPeoplePanel() {
                                   // Propagate earner change to all bills assigned to this account
                                   const activePeopleIds = updated.filter(id => {
                                     const person = budget.people.find(pe => pe.id === id);
-                                    return person && !person.name.toLowerCase().includes('credit') && person.role !== 'Credit';
+                                    return person && person.name.toLowerCase() !== 'credit' && person.role !== 'Credit';
                                   });
                                   const billsForAccount = budget.bills.filter(b => b.accountId === acc.id && !b.isArchived);
                                   billsForAccount.forEach(b => {

@@ -812,11 +812,21 @@ export function LedgerDataProvider({ children }) {
     };
   }, [getDailyMatrixCell, getActualAmount, isPersonDepositDay, getPersonDepositAmountForAccount]);
 
-  const getTotalCashOnHand = useCallback((accountsOverride) => {
+  const getTotalCashOnHand = useCallback((accountsOverride, asOfDate) => {
     const accounts = accountsOverride || metadataState.accounts || [];
-    const today = new Date();
+    const targetDate = asOfDate || new Date();
     return accounts.reduce((sum, acc) => {
-      const balObj = getCalculatedBalanceAsOf(acc.id, today);
+      const balObj = getCalculatedBalanceAsOf(acc.id, targetDate);
+      return sum + (balObj?.totalEnd ?? (parseFloat(acc.startingBalance) || 0));
+    }, 0);
+  }, [metadataState.accounts, getCalculatedBalanceAsOf]);
+
+  const getTotalMonthEndCashOnHand = useCallback((accountsOverride, targetDate) => {
+    const accounts = accountsOverride || metadataState.accounts || [];
+    const baseDate = targetDate || new Date();
+    const endOfMonthDate = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 0);
+    return accounts.reduce((sum, acc) => {
+      const balObj = getCalculatedBalanceAsOf(acc.id, endOfMonthDate);
       return sum + (balObj?.totalEnd ?? (parseFloat(acc.startingBalance) || 0));
     }, 0);
   }, [metadataState.accounts, getCalculatedBalanceAsOf]);
@@ -845,6 +855,7 @@ export function LedgerDataProvider({ children }) {
     getAccountActualEndBalance,
     getCalculatedBalanceAsOf,
     getTotalCashOnHand,
+    getTotalMonthEndCashOnHand,
     loadDemoPreset,
     resetToDefaults,
     clearAllData,
@@ -872,6 +883,7 @@ export function LedgerDataProvider({ children }) {
     getAccountActualEndBalance,
     getCalculatedBalanceAsOf,
     getTotalCashOnHand,
+    getTotalMonthEndCashOnHand,
     loadDemoPreset,
     resetToDefaults,
     clearAllData,

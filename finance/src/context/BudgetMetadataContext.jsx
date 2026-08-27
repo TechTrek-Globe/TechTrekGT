@@ -638,6 +638,7 @@ export function BudgetMetadataProvider({ children }) {
     return mapped.sort((a, b) => a.daysUntilDue - b.daysUntilDue).slice(0, limit);
   }, [metadataState, getBillMonthlyCost]);
 
+  // Static / starting balance fallback when LedgerDataContext running simulation is unavailable
   const getTotalCashOnHand = useCallback((accountsOverride) => {
     const accounts = accountsOverride || metadataState.accounts || [];
     return accounts.reduce((sum, acc) => {

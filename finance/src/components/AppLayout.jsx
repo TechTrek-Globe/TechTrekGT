@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useBudgetMetadata } from '../context/BudgetContext';
+import { useBudget } from '../context/BudgetContext';
 import {
   LayoutDashboard,
   ReceiptText,
@@ -89,7 +89,7 @@ const SidebarContent = ({ collapsed, activeView = 'dashboard', cashOnHand, netIn
     {/* Quick KPIs at bottom */}
     {!collapsed && (
       <div className="mx-3 mb-4 p-3 rounded-xl bg-slate-900/60 border border-slate-800/60 space-y-2 animate-fade-in">
-        <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Quick Stats</p>
+        <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Month End Quick Stats (est)</p>
         <div className="space-y-1.5">
           <div className="flex justify-between items-center">
             <span className="text-[11px] text-slate-400">Cash On Hand</span>
@@ -126,8 +126,11 @@ export function AppLayout({ children, onNavigateHome, onNavigateView, activeView
     setIsSettingsOpen,
     getTotalMonthlyNetIncome,
     getTotalMonthlyExpenses,
+    getTotalActualExpenses,
     getTotalCashOnHand,
-  } = useBudgetMetadata();
+    getTotalMonthEndCashOnHand,
+    getCalculatedBalanceAsOf,
+  } = useBudget();
 
   const [collapsed, setCollapsed] = useState(() => {
     try { return localStorage.getItem(SIDEBAR_KEY) === 'true'; }
@@ -143,10 +146,36 @@ export function AppLayout({ children, onNavigateHome, onNavigateView, activeView
   // Close mobile drawer on view change
   useEffect(() => { setMobileOpen(false); }, [activeView]);
 
-  const netIncome  = useMemo(() => getTotalMonthlyNetIncome(budget?.people), [budget?.people, getTotalMonthlyNetIncome]);
-  const expenses   = useMemo(() => getTotalMonthlyExpenses(budget?.bills), [budget?.bills, getTotalMonthlyExpenses]);
-  const cashOnHand = useMemo(() => getTotalCashOnHand(budget?.accounts), [budget?.accounts, getTotalCashOnHand]);
-  const netFlow    = useMemo(() => netIncome - expenses, [netIncome, expenses]);
+  const today = useMemo(() => new Date(), []);
+  const endOfMonthDate = useMemo(() => new Date(today.getFullYear(), today.getMonth() + 1, 0), [today]);
+  const monthKey = useMemo(() => `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`, [today]);
+
+  const netIncome = useMemo(() => getTotalMonthlyNetIncome(budget?.people), [budget?.people, getTotalMonthlyNetIncome]);
+  
+  const expenses = useMemo(() => {
+    if (typeof getTotalActualExpenses === 'function') {
+      return getTotalActualExpenses(monthKey, budget?.bills);
+    }
+    return getTotalMonthlyExpenses(budget?.bills);
+  }, [budget?.bills, monthKey, getTotalActualExpenses, getTotalMonthlyExpenses]);
+
+  const cashOnHand = useMemo(() => {
+    if (typeof getTotalMonthEndCashOnHand === 'function') {
+      return getTotalMonthEndCashOnHand(budget?.accounts, today);
+    }
+    if (typeof getCalculatedBalanceAsOf === 'function') {
+      return (budget?.accounts || []).reduce((sum, acc) => {
+        const balObj = getCalculatedBalanceAsOf(acc.id, endOfMonthDate);
+        return sum + (balObj?.totalEnd ?? (parseFloat(acc.startingBalance) || 0));
+      }, 0);
+    }
+    if (typeof getTotalCashOnHand === 'function') {
+      return getTotalCashOnHand(budget?.accounts, endOfMonthDate);
+    }
+    return 0;
+  }, [budget?.accounts, today, endOfMonthDate, getTotalMonthEndCashOnHand, getCalculatedBalanceAsOf, getTotalCashOnHand]);
+
+  const netFlow = useMemo(() => netIncome - expenses, [netIncome, expenses]);
 
   const isLight = theme === 'light';
 

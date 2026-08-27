@@ -301,7 +301,8 @@ function DailySpreadsheetMatrix() {
     updateAccount,
     getActualAmount,
     isPersonDepositDay,
-    getPersonDepositAmountForAccount
+    getPersonDepositAmountForAccount,
+    getCalculatedBalanceAsOf
   } = useBudget();
 
   const today = new Date();
@@ -365,6 +366,107 @@ function DailySpreadsheetMatrix() {
     logTransaction('UI_CELL_COMMIT', `User committed ${field} on ${monthKey}-${day}: ${val}`, { targetAccId, monthKey, day, field, val });
     updateDailyMatrixCell(targetAccId, monthKey, day, field, val);
   }, [updateDailyMatrixCell, selectedAccountId, budget.accounts]);
+
+  const handleStartBalanceCommit = useCallback((field, val, row) => {
+    if (selectedAccountId === 'all') return;
+    const numVal = parseFloat(val) || 0;
+    const targetAcc = budget.accounts.find(a => a.id === selectedAccountId);
+    if (!targetAcc) return;
+
+    let newStartingBalance = parseFloat(targetAcc.startingBalance) || 0;
+    let newExtraStartingBalance = parseFloat(targetAcc.extraStartingBalance) || 0;
+
+    if (field === 'total') {
+      if (targetAcc.enableExtraSavings !== false && newExtraStartingBalance > 0) {
+        newStartingBalance = Math.round((numVal - newExtraStartingBalance) * 100) / 100;
+      } else {
+        newStartingBalance = numVal;
+      }
+    } else if (field === 'reg') {
+      newStartingBalance = numVal;
+    } else if (field === 'extra') {
+      newExtraStartingBalance = numVal;
+    }
+
+    logTransaction('UI_START_BALANCE_UPDATE', `User updated start balance for account "${targetAcc.name}" (${field}): reg=${newStartingBalance}, extra=${newExtraStartingBalance}`, {
+      accountId: selectedAccountId,
+      field,
+      val: numVal,
+      newStartingBalance,
+      newExtraStartingBalance,
+      rowKey: row.rowKey
+    });
+
+    const isoDate = `${row.year}-${String(row.month + 1).padStart(2, '0')}-${String(row.day).padStart(2, '0')}`;
+    const patches = {
+      startingBalance: newStartingBalance,
+      extraStartingBalance: newExtraStartingBalance,
+      startDate: isoDate,
+      balanceAsOfDate: isoDate
+    };
+
+    // If account has importedLedgerRows, synchronize all entries with the new baseline
+    if (targetAcc.importedLedgerRows && typeof targetAcc.importedLedgerRows === 'object') {
+      const dates = Object.keys(targetAcc.importedLedgerRows).sort();
+      const firstDate = dates[0];
+      const firstRow = firstDate ? targetAcc.importedLedgerRows[firstDate] : null;
+      // Calculate delta relative to what was originally in the imported sheet (or previous starting balance)
+      const currentReg = parseFloat(targetAcc.startingBalance) || 0;
+      const currentExtra = parseFloat(targetAcc.extraStartingBalance) || 0;
+      const deltaReg = Math.round((newStartingBalance - currentReg) * 100) / 100;
+      const deltaExtra = Math.round((newExtraStartingBalance - currentExtra) * 100) / 100;
+
+      const updatedImportRows = {};
+      for (const [dKey, rData] of Object.entries(targetAcc.importedLedgerRows)) {
+        if (!rData || typeof rData !== 'object') {
+          updatedImportRows[dKey] = rData;
+          continue;
+        }
+        if (dKey === firstDate) {
+          const updatedFirstRow = {
+            ...rData,
+            regBeg: newStartingBalance,
+            extraBeg: newExtraStartingBalance,
+            totalBeg: Math.round((newStartingBalance + newExtraStartingBalance) * 100) / 100,
+            regEnding: Math.round(((rData.regEnding ?? newStartingBalance) + deltaReg) * 100) / 100,
+            extraEnding: Math.round(((rData.extraEnding ?? newExtraStartingBalance) + deltaExtra) * 100) / 100,
+            totalEnding: Math.round((((rData.regEnding ?? newStartingBalance) + deltaReg) + (targetAcc.enableExtraSavings !== false ? ((rData.extraEnding ?? newExtraStartingBalance) + deltaExtra) : 0)) * 100) / 100
+          };
+          updatedImportRows[dKey] = updatedFirstRow;
+        } else {
+          // For all subsequent dates, shift by deltaReg and deltaExtra
+          const nextRegBeg = rData.regBeg !== undefined ? Math.round((rData.regBeg + deltaReg) * 100) / 100 : rData.regBeg;
+          const nextExtraBeg = rData.extraBeg !== undefined ? Math.round((rData.extraBeg + deltaExtra) * 100) / 100 : rData.extraBeg;
+          const nextRegEnd = rData.regEnding !== undefined ? Math.round((rData.regEnding + deltaReg) * 100) / 100 : rData.regEnding;
+          const nextExtraEnd = rData.extraEnding !== undefined ? Math.round((rData.extraEnding + deltaExtra) * 100) / 100 : rData.extraEnding;
+          updatedImportRows[dKey] = {
+            ...rData,
+            regBeg: nextRegBeg,
+            extraBeg: nextExtraBeg,
+            totalBeg: (nextRegBeg !== undefined && nextExtraBeg !== undefined) ? Math.round((nextRegBeg + nextExtraBeg) * 100) / 100 : rData.totalBeg,
+            regEnding: nextRegEnd,
+            extraEnding: nextExtraEnd,
+            totalEnding: (nextRegEnd !== undefined && nextExtraEnd !== undefined) ? Math.round((nextRegEnd + nextExtraEnd) * 100) / 100 : rData.totalEnding
+          };
+        }
+      }
+      patches.importedLedgerRows = updatedImportRows;
+    }
+
+    // Also synchronize reg_ending in dailyMatrix if custom ending exists on that start row
+    const existingCustomReg = getDailyMatrixCell(selectedAccountId, row.monthKey, row.day, 'reg_ending');
+    if (existingCustomReg !== undefined && existingCustomReg !== null && existingCustomReg !== '') {
+      const deltaReg = newStartingBalance - (parseFloat(targetAcc.startingBalance) || 0);
+      updateDailyMatrixCell(selectedAccountId, row.monthKey, row.day, 'reg_ending', Math.round((parseFloat(existingCustomReg) + deltaReg) * 100) / 100);
+    }
+    const existingCustomExtra = getDailyMatrixCell(selectedAccountId, row.monthKey, row.day, 'extra_ending');
+    if (existingCustomExtra !== undefined && existingCustomExtra !== null && existingCustomExtra !== '') {
+      const deltaExtra = newExtraStartingBalance - (parseFloat(targetAcc.extraStartingBalance) || 0);
+      updateDailyMatrixCell(selectedAccountId, row.monthKey, row.day, 'extra_ending', Math.round((parseFloat(existingCustomExtra) + deltaExtra) * 100) / 100);
+    }
+
+    updateAccount(selectedAccountId, patches);
+  }, [selectedAccountId, budget.accounts, updateAccount, getDailyMatrixCell, updateDailyMatrixCell]);
 
 
   const monthKey = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`;
@@ -440,12 +542,19 @@ function DailySpreadsheetMatrix() {
     if (selectedAccountId === 'all') {
       if (!budget.accounts || budget.accounts.length === 0) return '2024-01-01';
       const dates = budget.accounts
-        .map(a => a.balanceAsOfDate || a.startDate)
+        .flatMap(a => [
+          a.balanceAsOfDate,
+          a.startDate,
+          ...(a.importedLedgerRows && typeof a.importedLedgerRows === 'object' ? Object.keys(a.importedLedgerRows) : [])
+        ])
         .filter(Boolean)
         .sort();
       return dates[0] || '2024-01-01';
     }
-    return selectedAccount?.balanceAsOfDate || selectedAccount?.startDate || '2024-01-01';
+    const importedDates = (selectedAccount?.importedLedgerRows && typeof selectedAccount.importedLedgerRows === 'object')
+      ? Object.keys(selectedAccount.importedLedgerRows).sort()
+      : [];
+    return selectedAccount?.balanceAsOfDate || selectedAccount?.startDate || importedDates[0] || '2024-01-01';
   }, [selectedAccountId, selectedAccount, budget.accounts]);
 
   const startDateObj = useMemo(() => {
@@ -499,151 +608,44 @@ function DailySpreadsheetMatrix() {
     ? budget.accounts.some(a => a.enableExtraSavings !== false)
     : (selectedAccount?.enableExtraSavings !== false);
 
-  // Fast-Forward Math Loop to calculate initial beginning balances for the rolling window
+  // Delegate to the shared getCalculatedBalanceAsOf engine to get the initial beginning balances
+  // for the rolling window. This replaces the previous manual fast-forward while loop and ensures
+  // the Ledger's starting balance is always synchronized with the Dashboard calculation.
   const { initialRegBeg, initialExtraBeg } = useMemo(() => {
-    let regBeg = selectedAccountId === 'all'
-      ? budget.accounts.reduce((sum, a) => sum + (parseFloat(a.startingBalance) || 0), 0)
-      : (parseFloat(selectedAccount?.startingBalance) || 0);
+    if (monthList.length === 0) return { initialRegBeg: 0, initialExtraBeg: 0 };
 
-    let extraBeg = selectedAccountId === 'all'
-      ? budget.accounts.reduce((sum, a) => sum + (parseFloat(a.extraStartingBalance) || 0), 0)
-      : (parseFloat(selectedAccount?.extraStartingBalance) || 0);
+    // We need the balance at the END of the day before the first visible month starts.
+    // getCalculatedBalanceAsOf(id, date) returns the ending balance of that date.
+    const firstMonthStart = new Date(monthList[0].year, monthList[0].month, 1);
+    const dayBeforeFirstMonth = new Date(firstMonthStart);
+    dayBeforeFirstMonth.setDate(dayBeforeFirstMonth.getDate() - 1);
 
-    if (monthList.length > 0) {
-      const firstMonthStart = new Date(monthList[0].year, monthList[0].month, 1);
-      if (firstMonthStart > startDateObj) {
-        let cur = new Date(startDateObj);
-        while (cur < firstMonthStart) {
-          const y = cur.getFullYear();
-          const m = cur.getMonth();
-          const d = cur.getDate();
-          const mKey = `${y}-${String(m + 1).padStart(2, '0')}`;
-
-          let dayCredits = 0;
-          let dayExtraCredits = 0;
-          people.forEach(p => {
-            let customCredit;
-            let customExtra;
-            if (selectedAccountId === 'all') {
-              let creditSum = 0;
-              let hasCredit = false;
-              let extraSum = 0;
-              let hasExtra = false;
-              budget.accounts.forEach(a => {
-                const c = getDailyMatrixCell(a.id, mKey, d, `credit_${p.id}`);
-                if (c !== undefined) { creditSum += parseFloat(c) || 0; hasCredit = true; }
-                const ec = getDailyMatrixCell(a.id, mKey, d, `extra_credit_${p.id}`);
-                if (ec !== undefined) { extraSum += parseFloat(ec) || 0; hasExtra = true; }
-              });
-              if (hasCredit) customCredit = creditSum;
-              if (hasExtra) customExtra = extraSum;
-            } else {
-              customCredit = getDailyMatrixCell(selectedAccountId, mKey, d, `credit_${p.id}`);
-              customExtra = getDailyMatrixCell(selectedAccountId, mKey, d, `extra_credit_${p.id}`);
-            }
-
-            if (customCredit !== undefined) {
-              dayCredits += parseFloat(customCredit) || 0;
-            } else {
-              const isDepDay = isPersonDepositDay(p, y, m, d);
-              dayCredits += isDepDay ? getPersonDepositAmountForAccount(p, selectedAccountId) : 0;
-            }
-
-            if (customExtra !== undefined) dayExtraCredits += parseFloat(customExtra) || 0;
-          });
-
-          let dayBills = 0;
-          accountBills.forEach(b => {
-            const billAccId = selectedAccountId === 'all' ? b.accountId : selectedAccountId;
-            const customBill = getDailyMatrixCell(billAccId, mKey, d, `bill_${b.id}`);
-            let amt = 0;
-            if (customBill !== undefined) {
-              amt = parseFloat(customBill) || 0;
-            } else {
-              const actualAmt = getActualAmount(b.id, mKey);
-              if (actualAmt !== null && parseInt(b.dueDay) === d && isBillDueInMonth(b, m, true)) {
-                amt = actualAmt;
-              } else if (actualAmt !== null) {
-                amt = 0;
-              } else if (parseInt(b.dueDay) === d && isBillDueInMonth(b, m, true)) {
-                amt = parseFloat(b.amount) || 0;
-              }
-            }
-            dayBills += amt;
-          });
-
-          let otherAmt = 0;
-          if (selectedAccountId === 'all') {
-            budget.accounts.forEach(a => {
-              const accOther = getDailyMatrixCell(a.id, mKey, d, 'other_amount');
-              if (accOther !== undefined) otherAmt += parseFloat(accOther) || 0;
-              const accOtherCredit = getDailyMatrixCell(a.id, mKey, d, 'other_credit_amount');
-              if (accOtherCredit !== undefined) otherAmt += parseFloat(accOtherCredit) || 0;
-            });
-            const allOther = getDailyMatrixCell('all', mKey, d, 'other_amount');
-            if (allOther !== undefined) otherAmt += parseFloat(allOther) || 0;
-            const allOtherCredit = getDailyMatrixCell('all', mKey, d, 'other_credit_amount');
-            if (allOtherCredit !== undefined) otherAmt += parseFloat(allOtherCredit) || 0;
-          } else {
-            const customOther = getDailyMatrixCell(selectedAccountId, mKey, d, 'other_amount');
-            const customOtherCredit = getDailyMatrixCell(selectedAccountId, mKey, d, 'other_credit_amount');
-            if (customOther !== undefined) otherAmt += parseFloat(customOther) || 0;
-            if (customOtherCredit !== undefined) otherAmt += parseFloat(customOtherCredit) || 0;
-          }
-
-          const tentativeRegEnding = regBeg + dayCredits - dayBills;
-          const tentativeExtraEnding = extraBeg + dayExtraCredits + otherAmt;
-
-          let customRegEnd;
-          let customExtraEnd;
-          if (selectedAccountId === 'all') {
-            const allReg = getDailyMatrixCell('all', mKey, d, 'reg_ending');
-            const allExtra = getDailyMatrixCell('all', mKey, d, 'extra_ending');
-            if (allReg !== undefined && allReg !== null && allReg !== '') customRegEnd = parseFloat(allReg);
-            if (allExtra !== undefined && allExtra !== null && allExtra !== '') customExtraEnd = parseFloat(allExtra);
-          } else {
-            const accReg = getDailyMatrixCell(selectedAccountId, mKey, d, 'reg_ending');
-            const accExtra = getDailyMatrixCell(selectedAccountId, mKey, d, 'extra_ending');
-            if (accReg !== undefined && accReg !== null && accReg !== '') customRegEnd = parseFloat(accReg);
-            if (accExtra !== undefined && accExtra !== null && accExtra !== '') customExtraEnd = parseFloat(accExtra);
-          }
-
-          let reg = customRegEnd !== undefined && !isNaN(customRegEnd) ? customRegEnd : tentativeRegEnding;
-          let extra = customExtraEnd !== undefined && !isNaN(customExtraEnd) ? customExtraEnd : tentativeExtraEnding;
-
-          if (customRegEnd === undefined && customExtraEnd === undefined) {
-            if (reg < 0 && extra > 0) {
-              const transfer = Math.min(extra, -reg);
-              reg += transfer;
-              extra -= transfer;
-            } else if (extra < 0 && reg > 0) {
-              const transfer = Math.min(reg, -extra);
-              extra += transfer;
-              reg -= transfer;
-            }
-          }
-
-          regBeg = Math.round(reg * 100) / 100 || 0;
-          extraBeg = Math.round(extra * 100) / 100 || 0;
-
-          cur.setDate(cur.getDate() + 1);
-        }
-      }
+    if (selectedAccountId === 'all') {
+      let totalReg = 0;
+      let totalExtra = 0;
+      budget.accounts.forEach(a => {
+        const balObj = getCalculatedBalanceAsOf(a.id, dayBeforeFirstMonth);
+        totalReg += balObj.regEnding || 0;
+        totalExtra += balObj.extraEnding || 0;
+      });
+      return {
+        initialRegBeg: Math.round(totalReg * 100) / 100,
+        initialExtraBeg: Math.round(totalExtra * 100) / 100
+      };
+    } else {
+      if (!selectedAccount) return { initialRegBeg: 0, initialExtraBeg: 0 };
+      const balObj = getCalculatedBalanceAsOf(selectedAccountId, dayBeforeFirstMonth);
+      return {
+        initialRegBeg: balObj.regEnding || 0,
+        initialExtraBeg: balObj.extraEnding || 0
+      };
     }
-
-    return { initialRegBeg: regBeg, initialExtraBeg: extraBeg };
   }, [
     selectedAccountId,
-    budget.accounts,
     selectedAccount,
-    startDateObj,
+    budget.accounts,
     monthList,
-    people,
-    accountBills,
-    getDailyMatrixCell,
-    isPersonDepositDay,
-    getPersonDepositAmountForAccount,
-    getActualAmount
+    getCalculatedBalanceAsOf
   ]);
 
   // Generate continuous daily matrix rows across monthList (starting on startDateObj with no prior dates)
@@ -827,11 +829,32 @@ function DailySpreadsheetMatrix() {
           if (accExtra !== undefined && accExtra !== null && accExtra !== '') customExtraEnd = parseFloat(accExtra);
         }
 
-        if (customRegEnd === undefined && isImportMode && importedRows[isoDate]?.regEnding !== undefined) {
-          customRegEnd = importedRows[isoDate].regEnding;
+        if (customRegEnd === undefined && isImportMode && importedRows[isoDate] !== undefined) {
+          const rowData = importedRows[isoDate];
+          if (typeof rowData === 'number') {
+            customRegEnd = rowData;
+          } else if (rowData && typeof rowData === 'object' && rowData.regEnding !== undefined) {
+            if (rowData.regBeg !== undefined && rowData.regBeg !== null) {
+              const netChange = rowData.regEnding - rowData.regBeg;
+              customRegEnd = Math.round((runningRegBeg + netChange) * 100) / 100;
+            } else if (rowData.totalEnding !== undefined && rowData.totalBeg !== undefined) {
+              const netChange = rowData.totalEnding - rowData.totalBeg;
+              customRegEnd = Math.round((runningRegBeg + netChange) * 100) / 100;
+            } else {
+              customRegEnd = rowData.regEnding;
+            }
+          }
         }
-        if (customExtraEnd === undefined && isImportMode && importedRows[isoDate]?.extraEnding !== undefined) {
-          customExtraEnd = importedRows[isoDate].extraEnding;
+        if (customExtraEnd === undefined && isImportMode && importedRows[isoDate] !== undefined) {
+          const rowData = importedRows[isoDate];
+          if (rowData && typeof rowData === 'object' && rowData.extraEnding !== undefined) {
+            if (rowData.extraBeg !== undefined && rowData.extraBeg !== null) {
+              const netChangeExtra = rowData.extraEnding - rowData.extraBeg;
+              customExtraEnd = Math.round((runningExtraBeg + netChangeExtra) * 100) / 100;
+            } else {
+              customExtraEnd = rowData.extraEnding;
+            }
+          }
         }
 
         let reg = customRegEnd !== undefined && !isNaN(customRegEnd) ? customRegEnd : tentativeRegEnding;
@@ -856,6 +879,14 @@ function DailySpreadsheetMatrix() {
         const isHistoricalLock = isLockedDay;
         const totalBeg = Math.round((runningRegBeg + (showExtraColumns ? runningExtraBeg : 0)) * 100) / 100;
 
+        const isStartRow = (
+          dateObj.getFullYear() === startDateObj.getFullYear() &&
+          dateObj.getMonth() === startDateObj.getMonth() &&
+          dateObj.getDate() === startDateObj.getDate()
+        ) || (
+          rows.length === 0 && dateObj <= startDateObj
+        );
+
         rows.push({
           rowKey: `${monthKey}-${day}`,
           day,
@@ -863,6 +894,7 @@ function DailySpreadsheetMatrix() {
           year,
           monthKey,
           isFirstDayOfMonth: day === 1,
+          isStartRow,
           monthLabel: `${MONTHS[month]} ${year}`,
           dateFormatted: `${month + 1}/${day}/${year}`,
           dayOfWeekName,
@@ -1270,16 +1302,16 @@ function DailySpreadsheetMatrix() {
               </th>
 
               {/* Total Beg (Sticky Frozen Left) */}
-              <th className="px-1.5 h-10 min-w-[76px] w-[76px] max-w-[76px] bg-slate-950 text-blue-300 font-black text-right align-middle sticky left-[126px] top-[24px] z-30 border-b border-slate-700 border-r border-slate-700 shadow-[4px_0_8px_rgba(0,0,0,0.5)]">
+              <th className="px-1.5 h-10 min-w-[76px] w-[76px] max-w-[76px] bg-slate-950 text-blue-300 font-black text-right align-middle sticky left-[126px] top-[24px] z-30 border-b border-slate-700 border-r border-slate-700 shadow-[4px_0_8px_rgba(0,0,0,0.5)]" title="Total Beginning Balance. Click the first row (e.g. 12/31/2025) to edit starting balance.">
                 <span className="block text-[11px] leading-tight">Total<br/>Beg</span>
               </th>
 
               {/* Regular Beg Balance */}
-              <th className="px-1.5 h-10 text-right min-w-[72px] bg-slate-900 text-blue-300 font-bold border-r border-blue-900/80 align-middle sticky top-[24px] z-20 border-b border-slate-700">
+              <th className="px-1.5 h-10 text-right min-w-[72px] bg-slate-900 text-blue-300 font-bold border-r border-blue-900/80 align-middle sticky top-[24px] z-20 border-b border-slate-700" title="Regular Beginning Balance. Click the first row (e.g. 12/31/2025) to edit starting balance.">
                 <span className="block text-[11px] leading-tight">Reg<br/>Beg</span>
               </th>
               {showExtraColumns && (
-                <th className="px-1.5 h-10 text-right min-w-[72px] border-r-2 border-blue-600 bg-slate-900 text-blue-300 font-bold align-middle sticky top-[24px] z-20 border-b border-slate-700">
+                <th className="px-1.5 h-10 text-right min-w-[72px] border-r-2 border-blue-600 bg-slate-900 text-blue-300 font-bold align-middle sticky top-[24px] z-20 border-b border-slate-700" title="Extra Beginning Balance. Click the first row (e.g. 12/31/2025) to edit starting extra balance.">
                   <span className="block text-[11px] leading-tight">Extra<br/>Beg</span>
                 </th>
               )}
@@ -1437,13 +1469,17 @@ function DailySpreadsheetMatrix() {
                         <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
                           row.isToday
                             ? 'bg-amber-400 text-slate-950 font-black uppercase tracking-wider shadow-md animate-pulse'
-                            : isSelected
-                              ? 'bg-blue-500 text-white font-black shadow-md'
-                              : row.isPayday
-                                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                                : 'text-slate-400'
-                        }`}>
-                          {row.isToday ? 'NOW' : row.dayOfWeekName.substring(0, 3)}
+                            : row.isStartRow
+                              ? 'bg-blue-600/30 text-blue-300 border border-blue-500/50 font-bold'
+                              : isSelected
+                                ? 'bg-blue-500 text-white font-black shadow-md'
+                                : row.isPayday
+                                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                                  : 'text-slate-400'
+                        }`}
+                        title={row.isStartRow ? "Account Starting Balance Row" : undefined}
+                        >
+                          {row.isToday ? 'NOW' : row.isStartRow ? 'START' : row.dayOfWeekName.substring(0, 3)}
                         </span>
                       </td>
 
@@ -1455,7 +1491,29 @@ function DailySpreadsheetMatrix() {
                             ? 'bg-blue-950 text-blue-100 border-y border-y-blue-500'
                             : 'bg-slate-950 text-blue-300'
                       }`}>
-                        {fmtMoney(row.totalBeg)}
+                        {row.isStartRow && selectedAccountId !== 'all' ? (
+                          <InlineEdit
+                            value={row.totalBeg}
+                            type="currency"
+                            onCommit={(val) => handleStartBalanceCommit('total', val, row)}
+                            displayFn={() => (
+                              <span
+                                className="font-mono text-[10px] font-black text-blue-300 hover:text-white hover:underline cursor-pointer block text-right transition-colors"
+                                title="Click to edit Starting Total Balance"
+                              >
+                                {fmtMoney(row.totalBeg)}
+                              </span>
+                            )}
+                            className="justify-end w-full"
+                          />
+                        ) : (
+                          <span
+                            className="font-mono text-[10px] font-black text-blue-300 block text-right"
+                            title={row.isStartRow && selectedAccountId === 'all' ? "Select a specific account above to edit starting balance" : undefined}
+                          >
+                            {fmtMoney(row.totalBeg)}
+                          </span>
+                        )}
                       </td>
 
                       {/* Regular Beg Balance */}
@@ -1465,7 +1523,31 @@ function DailySpreadsheetMatrix() {
                           : isSelected
                             ? 'bg-blue-900/40 text-blue-100 border-y border-y-blue-500/80'
                             : 'bg-blue-950/40 text-blue-200'
-                      }`}>{fmtMoney(row.regBeg)}</td>
+                      }`}>
+                        {row.isStartRow && selectedAccountId !== 'all' ? (
+                          <InlineEdit
+                            value={row.regBeg}
+                            type="currency"
+                            onCommit={(val) => handleStartBalanceCommit('reg', val, row)}
+                            displayFn={() => (
+                              <span
+                                className="font-mono text-[10px] font-bold text-blue-200 hover:text-white hover:underline cursor-pointer block text-right transition-colors"
+                                title="Click to edit Starting Regular Balance"
+                              >
+                                {fmtMoney(row.regBeg)}
+                              </span>
+                            )}
+                            className="justify-end w-full"
+                          />
+                        ) : (
+                          <span
+                            className="font-mono text-[10px] font-bold text-blue-200 block text-right"
+                            title={row.isStartRow && selectedAccountId === 'all' ? "Select a specific account above to edit starting balance" : undefined}
+                          >
+                            {fmtMoney(row.regBeg)}
+                          </span>
+                        )}
+                      </td>
 
                       {/* Extra Beg Balance */}
                       {showExtraColumns && (
@@ -1475,7 +1557,31 @@ function DailySpreadsheetMatrix() {
                             : isSelected
                               ? 'bg-blue-900/40 text-blue-100 border-y border-y-blue-500/80'
                               : 'bg-blue-950/40 text-blue-200'
-                        }`}>{fmtMoney(row.extraBeg)}</td>
+                        }`}>
+                          {row.isStartRow && selectedAccountId !== 'all' ? (
+                            <InlineEdit
+                              value={row.extraBeg}
+                              type="currency"
+                              onCommit={(val) => handleStartBalanceCommit('extra', val, row)}
+                              displayFn={() => (
+                                <span
+                                  className="font-mono text-[10px] font-bold text-blue-200 hover:text-white hover:underline cursor-pointer block text-right transition-colors"
+                                  title="Click to edit Starting Extra Balance"
+                                >
+                                  {fmtMoney(row.extraBeg)}
+                                </span>
+                              )}
+                              className="justify-end w-full"
+                            />
+                          ) : (
+                            <span
+                              className="font-mono text-[10px] font-bold text-blue-200 block text-right"
+                              title={row.isStartRow && selectedAccountId === 'all' ? "Select a specific account above to edit starting balance" : undefined}
+                            >
+                              {fmtMoney(row.extraBeg)}
+                            </span>
+                          )}
+                        </td>
                       )}
 
                       {/* Earner Credits */}

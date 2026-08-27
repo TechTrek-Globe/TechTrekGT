@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useBudgetMetadata, useLedgerDataDispatch } from '../../context/BudgetContext';
 import { 
   Plus, 
@@ -27,7 +27,8 @@ export function AccountsPeoplePanel() {
     deleteAccount,
     addPerson,
     updatePerson,
-    deletePerson
+    deletePerson,
+    updateBill
   } = useBudgetMetadata();
 
   const {
@@ -45,11 +46,89 @@ export function AccountsPeoplePanel() {
   const [newAccForm, setNewAccForm] = useState({
     name: '',
     type: 'checking',
+    startingBalance: 0,
+    startDate: '2026-01-01',
     saveExtraMonthly: 0,
     enableExtraSavings: true,
     color: 'blue',
     notes: ''
   });
+
+  const getAccountEffectiveStartDate = useCallback((acc) => {
+    if (acc.startDate) return acc.startDate;
+    if (acc.balanceAsOfDate) return acc.balanceAsOfDate;
+    if (acc.importedLedgerRows && typeof acc.importedLedgerRows === 'object') {
+      const dates = Object.keys(acc.importedLedgerRows).sort();
+      if (dates.length > 0) return dates[0];
+    }
+    return '2026-01-01';
+  }, []);
+
+  const handleAccountDateChange = useCallback((accId, newDate) => {
+    if (!newDate) return;
+    const targetAcc = budget.accounts.find(a => a.id === accId);
+    if (!targetAcc) return;
+
+    updateAccount(accId, {
+      startDate: newDate,
+      balanceAsOfDate: newDate
+    });
+  }, [budget.accounts, updateAccount]);
+
+  const handleAccountTotalBalanceChange = useCallback((accId, newTotalVal) => {
+    const targetAcc = budget.accounts.find(a => a.id === accId);
+    if (!targetAcc) return;
+    const newTotal = parseFloat(newTotalVal) || 0;
+    const extraBal = targetAcc.enableExtraSavings !== false ? (parseFloat(targetAcc.extraStartingBalance) || 0) : 0;
+    let newStartingBalance = newTotal;
+    if (extraBal > 0) {
+      newStartingBalance = Math.round((newTotal - extraBal) * 100) / 100;
+    }
+
+    const patches = {
+      startingBalance: newStartingBalance
+    };
+
+    // If account has importedLedgerRows, synchronize all entries with the new baseline
+    if (targetAcc.importedLedgerRows && typeof targetAcc.importedLedgerRows === 'object') {
+      const dates = Object.keys(targetAcc.importedLedgerRows).sort();
+      const firstDate = dates[0];
+      const currentReg = parseFloat(targetAcc.startingBalance) || 0;
+      const deltaReg = Math.round((newStartingBalance - currentReg) * 100) / 100;
+
+      if (deltaReg !== 0) {
+        const updatedImportRows = {};
+        for (const [dKey, rData] of Object.entries(targetAcc.importedLedgerRows)) {
+          if (!rData || typeof rData !== 'object') {
+            updatedImportRows[dKey] = rData;
+            continue;
+          }
+          if (dKey === firstDate) {
+            updatedImportRows[dKey] = {
+              ...rData,
+              regBeg: newStartingBalance,
+              totalBeg: Math.round((newStartingBalance + extraBal) * 100) / 100,
+              regEnding: Math.round(((rData.regEnding ?? newStartingBalance) + deltaReg) * 100) / 100,
+              totalEnding: Math.round((((rData.regEnding ?? newStartingBalance) + deltaReg) + (rData.extraEnding ?? extraBal)) * 100) / 100
+            };
+          } else {
+            const nextRegBeg = rData.regBeg !== undefined ? Math.round((rData.regBeg + deltaReg) * 100) / 100 : rData.regBeg;
+            const nextRegEnd = rData.regEnding !== undefined ? Math.round((rData.regEnding + deltaReg) * 100) / 100 : rData.regEnding;
+            updatedImportRows[dKey] = {
+              ...rData,
+              regBeg: nextRegBeg,
+              totalBeg: (nextRegBeg !== undefined && rData.extraBeg !== undefined) ? Math.round((nextRegBeg + rData.extraBeg) * 100) / 100 : rData.totalBeg,
+              regEnding: nextRegEnd,
+              totalEnding: (nextRegEnd !== undefined && rData.extraEnding !== undefined) ? Math.round((nextRegEnd + rData.extraEnding) * 100) / 100 : rData.totalEnding
+            };
+          }
+        }
+        patches.importedLedgerRows = updatedImportRows;
+      }
+    }
+
+    updateAccount(accId, patches);
+  }, [budget.accounts, updateAccount]);
 
   const [newPersonForm, setNewPersonForm] = useState({
     name: '',
@@ -284,7 +363,7 @@ export function AccountsPeoplePanel() {
                 });
               }
 
-              setNewAccForm({ name: '', type: 'checking', saveExtraMonthly: 0, enableExtraSavings: true, color: 'blue', notes: '' });
+              setNewAccForm({ name: '', type: 'checking', startingBalance: 0, startDate: '2026-01-01', saveExtraMonthly: 0, enableExtraSavings: true, color: 'blue', notes: '' });
               setAccImportPayload(null);
               setAccImportStatus(null);
               setAccImportError('');
@@ -383,6 +462,26 @@ export function AccountsPeoplePanel() {
                     <option value="credit">Credit Card Account</option>
                   </select>
                 </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">Initial Start Date</label>
+                  <input
+                    type="date"
+                    value={newAccForm.startDate || '2026-01-01'}
+                    onChange={e => setNewAccForm({ ...newAccForm, startDate: e.target.value })}
+                    className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-blue-500 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">Total Starting Bal ($)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={newAccForm.startingBalance || ''}
+                    onChange={e => setNewAccForm({ ...newAccForm, startingBalance: parseFloat(e.target.value) || 0 })}
+                    className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-blue-500 font-mono"
+                  />
+                </div>
               </div>
 
               <div className="pt-2 border-t border-slate-800 space-y-3">
@@ -450,17 +549,19 @@ export function AccountsPeoplePanel() {
         <table className="w-full text-left text-xs text-slate-300">
           <thead className="bg-slate-900 text-slate-400 uppercase font-medium text-[9px] border-b border-slate-800">
             <tr>
-              <th className="px-3 py-2 w-[22%]">Account Name</th>
-              <th className="px-2 py-2 w-[13%]">Type</th>
-              <th className="px-2 py-2 w-[20%]">Extra Savings Goal</th>
-              <th className="px-2 py-2 w-[39%]">Active Earners &amp; Savings Split</th>
-              <th className="px-3 py-2 w-[6%] text-right">Actions</th>
+              <th className="px-3 py-2 w-[18%]">Account Name</th>
+              <th className="px-2 py-2 w-[10%]">Type</th>
+              <th className="px-2 py-2 w-[13%]">Start Date</th>
+              <th className="px-2 py-2 w-[14%]">Total Starting Bal</th>
+              <th className="px-2 py-2 w-[17%]">Extra Savings Goal</th>
+              <th className="px-2 py-2 w-[24%]">Active Earners &amp; Savings Split</th>
+              <th className="px-3 py-2 w-[4%] text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/80">
             {budget.accounts.length === 0 ? (
               <tr>
-                <td colSpan={5} className="p-4 text-center text-slate-500 italic text-xs">No accounts found.</td>
+                <td colSpan={7} className="p-4 text-center text-slate-500 italic text-xs">No accounts found.</td>
               </tr>
             ) : (
               budget.accounts.map(acc => {
@@ -489,6 +590,34 @@ export function AccountsPeoplePanel() {
                         <option value="savings">Savings</option>
                         <option value="credit">Credit Card</option>
                       </select>
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <div className="flex items-center bg-slate-900/90 border border-slate-800 rounded-lg px-2 py-0.5 text-xs">
+                        <input
+                          type="date"
+                          value={getAccountEffectiveStartDate(acc)}
+                          onChange={e => handleAccountDateChange(acc.id, e.target.value)}
+                          className="w-full bg-transparent text-slate-200 font-mono text-[11px] focus:outline-none cursor-pointer"
+                          title="Initial Setup Start Date"
+                        />
+                      </div>
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <div className="flex items-center gap-0.5 bg-slate-900/90 border border-slate-800 rounded-lg px-1.5 py-0.5 text-xs">
+                        <span className="text-[10px] text-slate-500 font-mono">$</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={Math.round(((parseFloat(acc.startingBalance) || 0) + (acc.enableExtraSavings !== false ? (parseFloat(acc.extraStartingBalance) || 0) : 0)) * 100) / 100}
+                          onChange={e => handleAccountTotalBalanceChange(acc.id, e.target.value)}
+                          className="w-20 bg-transparent text-blue-300 font-mono font-bold text-xs focus:outline-none text-right"
+                          title={
+                            acc.enableExtraSavings !== false && (parseFloat(acc.extraStartingBalance) || 0) > 0
+                              ? `Total Starting Balance: $${(((parseFloat(acc.startingBalance) || 0) + (parseFloat(acc.extraStartingBalance) || 0))).toFixed(2)} (Reg: $${(parseFloat(acc.startingBalance) || 0).toFixed(2)} + Extra: $${(parseFloat(acc.extraStartingBalance) || 0).toFixed(2)})`
+                              : "Total Starting Balance"
+                          }
+                        />
+                      </div>
                     </td>
                     <td className="px-2 py-1.5">
                       <div className="flex items-center gap-1.5">
@@ -553,6 +682,30 @@ export function AccountsPeoplePanel() {
                                     updated = [...enabledList, p.id];
                                   }
                                   updateAccount(acc.id, { enabledEarners: updated });
+
+                                  // Propagate earner change to all bills assigned to this account
+                                  const activePeopleIds = updated.filter(id => {
+                                    const person = budget.people.find(pe => pe.id === id);
+                                    return person && !person.name.toLowerCase().includes('credit') && person.role !== 'Credit';
+                                  });
+                                  const billsForAccount = budget.bills.filter(b => b.accountId === acc.id && !b.isArchived);
+                                  billsForAccount.forEach(b => {
+                                    const count = activePeopleIds.length;
+                                    if (count === 0) return;
+                                    const evenSplit = Math.round((100 / count) * 100) / 100;
+                                    const newSplits = {};
+                                    budget.people.forEach(pe => { newSplits[pe.id] = 0; });
+                                    activePeopleIds.forEach((id, idx) => {
+                                      // Last person gets remainder to ensure exact 100%
+                                      if (idx === count - 1) {
+                                        const soFar = activePeopleIds.slice(0, -1).reduce((s, pid) => s + (newSplits[pid] || 0), 0);
+                                        newSplits[id] = Math.round((100 - soFar) * 100) / 100;
+                                      } else {
+                                        newSplits[id] = evenSplit;
+                                      }
+                                    });
+                                    updateBill(b.id, { splits: newSplits });
+                                  });
                                 }}
                                 className="flex items-center gap-1 cursor-pointer hover:text-white"
                                 title={isChecked ? `Click to exclude ${p.name}` : `Click to include ${p.name}`}

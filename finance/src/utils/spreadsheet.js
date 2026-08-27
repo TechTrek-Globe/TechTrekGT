@@ -103,6 +103,7 @@ export function processSpreadsheetImport({
             if (strategies.transactions === 'override') {
               const dates = Object.keys(importedRows).sort();
               if (dates.length > 0) {
+                const earliestRow = importedRows[dates[0]];
                 const rawReg = earliestRow.regBeg ?? earliestRow.totalBeg ?? newStartingBalance;
                 const rawExtra = earliestRow.extraBeg ?? (newExtraStarting ?? 0);
                 let startReg = rawReg;
@@ -168,6 +169,7 @@ export function processSpreadsheetImport({
             if (strategies.transactions === 'override') {
               const dates = Object.keys(incomingAcc.importedLedgerRows).sort();
               if (dates.length > 0) {
+                const earliestRow = incomingAcc.importedLedgerRows[dates[0]];
                 const rawReg = earliestRow.regBeg ?? earliestRow.totalBeg ?? match.startingBalance;
                 const rawExtra = earliestRow.extraBeg ?? (match.extraStartingBalance || 0);
                 let startReg = rawReg;

@@ -395,41 +395,84 @@ export function BillsSplitsPanel() {
                       </select>
                     </td>
 
-                    {/* Split Sliders */}
+                    {/* Split Sliders - Active Earners Only */}
                     <td className="px-2 py-1.5">
-                      <div className="flex items-center gap-1.5 flex-nowrap overflow-x-auto py-0.5">
-                        {budget.people.map(person => {
-                          const splitPct = bill.splits?.[person.id] !== undefined
-                            ? bill.splits[person.id]
-                            : (100 / Math.max(1, budget.people.length));
+                      {(() => {
+                        const acc = budget.accounts.find(a => a.id === bill.accountId);
+                        const allEnabledIds = acc?.enabledEarners && Array.isArray(acc.enabledEarners) && acc.enabledEarners.length > 0
+                          ? acc.enabledEarners
+                          : budget.people.map(p => p.id);
 
-                          return (
-                            <div key={person.id} className="inline-flex items-center gap-1 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800 text-[11px]">
-                              <span className="text-slate-400 font-semibold">{person.name.split(' ')[0]}:</span>
-                              <input
-                                type="text"
-                                inputMode="numeric"
-                                value={splitPct}
-                                onChange={e => {
-                                  const val = e.target.value.replace(/[^0-9.]/g, '');
-                                  const num = Math.max(0, Math.min(100, parseFloat(val) || 0));
-                                  let nextSplits = { ...(bill.splits || {}) };
-                                  if (budget.people.length === 2) {
-                                    const other = budget.people.find(p => p.id !== person.id);
-                                    nextSplits[person.id] = num;
-                                    if (other) nextSplits[other.id] = Math.max(0, 100 - num);
-                                  } else {
-                                    nextSplits[person.id] = num;
-                                  }
-                                  updateBillSplits(bill.id, nextSplits);
-                                }}
-                                className="w-8 text-center font-mono font-bold text-blue-400 bg-slate-950 rounded px-1 py-0 border border-slate-700 focus:border-blue-500 focus:outline-none text-[11px]"
-                              />
-                              <span className="text-slate-500 text-[10px]">%</span>
+                        // Active earners = enabled, non-credit people for this account
+                        const activeEarners = budget.people.filter(p =>
+                          allEnabledIds.includes(p.id) &&
+                          !p.name.toLowerCase().includes('credit') &&
+                          p.role !== 'Credit'
+                        );
+                        const inactiveEarners = budget.people.filter(p => !activeEarners.some(a => a.id === p.id));
+
+                        // Get current splits, defaulting inactive to 0
+                        const currentSplits = {};
+                        budget.people.forEach(p => {
+                          currentSplits[p.id] = bill.splits?.[p.id] !== undefined
+                            ? parseFloat(bill.splits[p.id])
+                            : 0;
+                        });
+                        // Force inactive earners to 0
+                        inactiveEarners.forEach(p => { currentSplits[p.id] = 0; });
+
+                        const activeTotal = activeEarners.reduce((s, p) => s + (currentSplits[p.id] || 0), 0);
+                        const totalIsOff = Math.abs(activeTotal - 100) > 0.5;
+
+                        const handleSplitChange = (personId, rawVal) => {
+                          const num = Math.max(0, Math.min(100, parseFloat(rawVal.replace(/[^0-9.]/g, '')) || 0));
+                          const nextSplits = { ...currentSplits };
+                          nextSplits[personId] = num;
+                          // Force inactive to 0
+                          inactiveEarners.forEach(p => { nextSplits[p.id] = 0; });
+                          // Auto-balance second earner when only 2 active
+                          if (activeEarners.length === 2) {
+                            const other = activeEarners.find(p => p.id !== personId);
+                            if (other) nextSplits[other.id] = Math.round(Math.max(0, 100 - num) * 100) / 100;
+                          }
+                          updateBillSplits(bill.id, nextSplits);
+                        };
+
+                        return (
+                          <div className="flex items-center gap-1.5 flex-wrap py-0.5">
+                            {/* Active earners with editable split */}
+                            {activeEarners.map(person => (
+                              <div key={person.id} className="inline-flex items-center gap-1 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-700 text-[11px]">
+                                <span className="text-slate-300 font-semibold">{person.name.split(' ')[0]}:</span>
+                                <input
+                                  type="text"
+                                  inputMode="numeric"
+                                  value={currentSplits[person.id] ?? 0}
+                                  onChange={e => handleSplitChange(person.id, e.target.value)}
+                                  className="w-8 text-center font-mono font-bold text-blue-400 bg-slate-950 rounded px-1 py-0 border border-slate-700 focus:border-blue-500 focus:outline-none text-[11px]"
+                                />
+                                <span className="text-slate-500 text-[10px]">%</span>
+                              </div>
+                            ))}
+                            {/* Inactive/disabled earners shown at 0% greyed out */}
+                            {inactiveEarners.map(person => (
+                              <div key={person.id} className="inline-flex items-center gap-1 bg-slate-950 px-1.5 py-0.5 rounded border border-slate-800 text-[11px] opacity-40" title={`${person.name.split(' ')[0]} is not an active earner on this account`}>
+                                <span className="text-slate-600 font-semibold">{person.name.split(' ')[0]}:</span>
+                                <span className="font-mono font-bold text-slate-600 w-8 text-center">0</span>
+                                <span className="text-slate-600 text-[10px]">%</span>
+                              </div>
+                            ))}
+                            {/* Total badge */}
+                            <div className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border ml-0.5 ${
+                              totalIsOff
+                                ? 'bg-rose-950/60 border-rose-700 text-rose-300'
+                                : 'bg-emerald-950/60 border-emerald-800 text-emerald-400'
+                            }`}>
+                              {Math.round(activeTotal * 10) / 10}%
                             </div>
-                          );
-                        })}
-                      </div>
+                          </div>
+                        );
+                      })()}
                     </td>
 
                     {/* Actions */}

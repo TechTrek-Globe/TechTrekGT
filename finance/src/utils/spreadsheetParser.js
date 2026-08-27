@@ -7,9 +7,20 @@ import { logDebug, logWarn, logError } from './debugLogger.js';
 function cleanNum(val, defaultVal = 0) {
   if (val === undefined || val === null || val === '') return defaultVal;
   if (typeof val === 'number') return isNaN(val) ? defaultVal : Math.round(val * 100) / 100;
-  const cleaned = String(val).replace(/[^0-9.-]+/g, '');
+  const str = String(val).trim();
+  if (!str) return defaultVal;
+  // If the cell contains words or 2+ letters (e.g. "EMORY PARC HOMEO OnlinePay ***********7626", "USAA FUNDS TRANSFER CR", "Transfer")
+  // it is text, not a currency/numeric cell.
+  if (/[a-zA-Z]{2,}/.test(str)) {
+    return defaultVal;
+  }
+  const isParenNeg = /^\(.*\)$/.test(str);
+  const cleaned = str.replace(/[^0-9.-]+/g, '');
+  if (!cleaned || cleaned === '-' || cleaned === '.') return defaultVal;
   const num = parseFloat(cleaned);
-  return isNaN(num) ? defaultVal : Math.round(num * 100) / 100;
+  if (isNaN(num)) return defaultVal;
+  const signed = isParenNeg && num > 0 ? -num : num;
+  return Math.round(signed * 100) / 100;
 }
 
 /**
@@ -268,6 +279,143 @@ export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
             }
             return String(val).trim();
           };
+
+          const lowerHeaders = headers.map(h => cleanText(h).toLowerCase());
+          const isMatrixSheet = lowerHeaders.some(h =>
+            h.includes('reg beg') ||
+            h.includes('regular beg') ||
+            h.includes('extra beg') ||
+            h.includes('total beg') ||
+            h.includes('beginning balance') ||
+            h.includes('beg balance') ||
+            h.includes('jon credit') ||
+            h.includes('ronnie credit')
+          );
+          const amountColIdx = lowerHeaders.findIndex(h => h === 'amount' || h === 'amt' || h === 'transaction amount');
+          const debitColIdx = lowerHeaders.findIndex(h => h === 'debit' || h === 'withdrawal' || h === 'outflow' || h === 'payments' || h === 'paid out' || h === 'charge');
+          const creditColIdx = lowerHeaders.findIndex(h => (h === 'credit' || h === 'deposit' || h === 'inflow' || h === 'additions' || h === 'paid in') && !h.includes('card'));
+          const hasAmountOrDebitCredit = amountColIdx >= 0 || debitColIdx >= 0 || creditColIdx >= 0;
+
+          if (!isMatrixSheet && dateColIdx >= 0 && hasAmountOrDebitCredit) {
+            // Flat bank statement branch
+            const descColIdx = lowerHeaders.findIndex(h =>
+              h === 'description' || h === 'desc' || h === 'payee' || h === 'merchant' || h === 'name' || h === 'transaction description' || h === 'details'
+            );
+            const origDescColIdx = lowerHeaders.findIndex(h =>
+              (h.includes('orig') && h.includes('desc')) || h === 'memo' || h === 'notes' || h === 'note' || h === 'statement details'
+            );
+            const categoryColIdx = lowerHeaders.findIndex(h => h === 'category' || h === 'cat' || h === 'type' || h === 'transaction type');
+
+            for (let i = headerRowIdx + 1; i < rows.length; i++) {
+              const r = rows[i];
+              if (!r || r.length === 0) continue;
+
+              const rawDate = r[dateColIdx];
+              if (!rawDate) continue;
+              const dateStr = parseRowDate(rawDate);
+              if (!dateStr || dateStr.length < 8) continue;
+
+              let description = '';
+              if (descColIdx >= 0 && r[descColIdx] !== undefined && r[descColIdx] !== null && String(r[descColIdx]).trim() !== '') {
+                description = cleanText(r[descColIdx]);
+              } else if (origDescColIdx >= 0 && r[origDescColIdx] !== undefined && r[origDescColIdx] !== null && String(r[origDescColIdx]).trim() !== '') {
+                description = cleanText(r[origDescColIdx]);
+              }
+              if (!description) description = 'Transaction';
+
+              let notes = '';
+              if (origDescColIdx >= 0 && r[origDescColIdx] !== undefined && r[origDescColIdx] !== null) {
+                const orig = cleanText(r[origDescColIdx]);
+                if (orig && orig !== description) {
+                  notes = orig;
+                }
+              }
+
+              let category = 'Uncategorized';
+              if (categoryColIdx >= 0 && r[categoryColIdx] !== undefined && r[categoryColIdx] !== null && String(r[categoryColIdx]).trim() !== '') {
+                category = cleanText(r[categoryColIdx]);
+              }
+
+              let amount = 0;
+              if (amountColIdx >= 0 && r[amountColIdx] !== undefined && r[amountColIdx] !== null && r[amountColIdx] !== '') {
+                const rawAmtStr = String(r[amountColIdx]).trim();
+                const isParenNeg = /^\(.*\)$/.test(rawAmtStr);
+                const cleaned = rawAmtStr.replace(/[^0-9.-]+/g, '');
+                const parsed = parseFloat(cleaned);
+                if (!isNaN(parsed)) {
+                  amount = isParenNeg && parsed > 0 ? -parsed : parsed;
+                  amount = Math.round(amount * 100) / 100;
+                }
+              } else if (debitColIdx >= 0 || creditColIdx >= 0) {
+                const debitStr = debitColIdx >= 0 ? String(r[debitColIdx] || '').replace(/[^0-9.-]+/g, '') : '';
+                const creditStr = creditColIdx >= 0 ? String(r[creditColIdx] || '').replace(/[^0-9.-]+/g, '') : '';
+                const debit = debitStr ? Math.abs(parseFloat(debitStr) || 0) : 0;
+                const credit = creditStr ? Math.abs(parseFloat(creditStr) || 0) : 0;
+                amount = Math.round((credit - debit) * 100) / 100;
+              }
+
+              if (amount === 0 && (!description || description === 'Transaction')) continue;
+
+              let billId = null;
+              if (amount < 0) {
+                const lowerDesc = description.toLowerCase();
+                const lowerNotes = notes.toLowerCase();
+                const isFee = lowerDesc.includes('fee') || lowerNotes.includes('fee');
+                if (!isFee) {
+                  const matchedBill = existingBills.find(b => {
+                    const bName = (b.name || '').toLowerCase();
+                    const bKey = (b.matchingKey || '').toLowerCase();
+                    return (
+                      (bKey && (lowerDesc.includes(bKey) || bKey.includes(lowerDesc) || (lowerNotes && lowerNotes.includes(bKey)))) ||
+                      bName.includes(lowerDesc) ||
+                      lowerDesc.includes(bName) ||
+                      (lowerDesc.includes('hoa') && bName.includes('hoa')) ||
+                      (lowerDesc.includes('mortgage') && bName.includes('mortgage')) ||
+                      (lowerDesc.includes('water') && bName.includes('water')) ||
+                      (lowerDesc.includes('power') && bName.includes('power')) ||
+                      (lowerDesc.includes('gas') && bName.includes('gas')) ||
+                      (lowerDesc.includes('electric') && bName.includes('electric')) ||
+                      (lowerDesc.includes('insurance') && (bName.includes('insurance') || bName.includes('vehicle') || bName.includes('auto'))) ||
+                      (lowerDesc.includes('cell') && (bName.includes('cell') || bName.includes('phone'))) ||
+                      (lowerDesc.includes('gym') && bName.includes('gym'))
+                    );
+                  });
+                  if (matchedBill) {
+                    billId = matchedBill.id;
+                  }
+                }
+              }
+
+              if (!category || category === 'Uncategorized') {
+                const lowerDesc = description.toLowerCase();
+                if (amount > 0) {
+                  category = 'Income / Transfer';
+                } else if (lowerDesc.includes('hoa') || lowerDesc.includes('mortgage') || lowerDesc.includes('rent')) {
+                  category = 'Housing';
+                } else if (lowerDesc.includes('power') || lowerDesc.includes('gas') || lowerDesc.includes('water') || lowerDesc.includes('electric') || lowerDesc.includes('utility')) {
+                  category = 'Utilities';
+                } else if (lowerDesc.includes('insurance')) {
+                  category = 'Insurance (Vehicle)';
+                } else if (lowerDesc.includes('gym') || lowerDesc.includes('phone') || lowerDesc.includes('youtube') || lowerDesc.includes('cell')) {
+                  category = 'Subscriptions';
+                }
+              }
+
+              lineItemsList.push({
+                id: `txn-${Date.now()}-${txnIdCounter++}`,
+                date: dateStr,
+                description,
+                amount,
+                accountId: targetAccountId,
+                billId,
+                category,
+                isOther: !billId,
+                notes: notes || `Imported from ${sheetName}`
+              });
+            }
+
+            return;
+          }
 
           // Detect balance column indices
           const regBegIdx = headers.findIndex(h => h.toLowerCase().includes('regular beg') || h.toLowerCase().includes('reg beg'));
@@ -648,6 +796,182 @@ export function parseSingleSheet({
     }
     return str;
   };
+
+  const lowerHeaders = headers.map(h => cleanText(h).toLowerCase());
+
+  // Check for multi-column budget matrix markers (Emory Parc style):
+  const isMatrixSheet = lowerHeaders.some(h =>
+    h.includes('reg beg') ||
+    h.includes('regular beg') ||
+    h.includes('extra beg') ||
+    h.includes('total beg') ||
+    h.includes('beginning balance') ||
+    h.includes('beg balance') ||
+    h.includes('jon credit') ||
+    h.includes('ronnie credit')
+  );
+
+  // Check for flat bank statement markers:
+  const amountColIdx = lowerHeaders.findIndex(h => h === 'amount' || h === 'amt' || h === 'transaction amount');
+  const debitColIdx = lowerHeaders.findIndex(h => h === 'debit' || h === 'withdrawal' || h === 'outflow' || h === 'payments' || h === 'paid out' || h === 'charge');
+  const creditColIdx = lowerHeaders.findIndex(h => (h === 'credit' || h === 'deposit' || h === 'inflow' || h === 'additions' || h === 'paid in') && !h.includes('card'));
+  const hasAmountOrDebitCredit = amountColIdx >= 0 || debitColIdx >= 0 || creditColIdx >= 0;
+
+  if (!isMatrixSheet && dateColIdx >= 0 && hasAmountOrDebitCredit) {
+    // --- FLAT BANK STATEMENT PARSER ---
+    const descColIdx = lowerHeaders.findIndex(h =>
+      h === 'description' || h === 'desc' || h === 'payee' || h === 'merchant' || h === 'name' || h === 'transaction description' || h === 'details'
+    );
+    const origDescColIdx = lowerHeaders.findIndex(h =>
+      (h.includes('orig') && h.includes('desc')) || h === 'memo' || h === 'notes' || h === 'note' || h === 'statement details'
+    );
+    const categoryColIdx = lowerHeaders.findIndex(h => h === 'category' || h === 'cat' || h === 'type' || h === 'transaction type');
+    const balanceColIdx = lowerHeaders.findIndex(h => h === 'balance' || h === 'running balance' || h === 'ending balance' || h === 'total balance');
+
+    const importedLedgerRows = {};
+    const transactions = [];
+    const discoveredBills = [];
+    const discoveredPeople = [];
+
+    for (let i = headerRowIdx + 1; i < rawRows.length; i++) {
+      const r = rawRows[i];
+      if (!r || r.length === 0) continue;
+
+      const rawDate = r[dateColIdx];
+      if (!rawDate) continue;
+      const dateStr = parseRowDate(rawDate);
+      if (!dateStr || dateStr.length < 8) continue;
+
+      // 1. Description
+      let description = '';
+      if (descColIdx >= 0 && r[descColIdx] !== undefined && r[descColIdx] !== null && String(r[descColIdx]).trim() !== '') {
+        description = cleanText(r[descColIdx]);
+      } else if (origDescColIdx >= 0 && r[origDescColIdx] !== undefined && r[origDescColIdx] !== null && String(r[origDescColIdx]).trim() !== '') {
+        description = cleanText(r[origDescColIdx]);
+      }
+      if (!description) description = 'Transaction';
+
+      // 2. Notes / Original Description
+      let notes = '';
+      if (origDescColIdx >= 0 && r[origDescColIdx] !== undefined && r[origDescColIdx] !== null) {
+        const orig = cleanText(r[origDescColIdx]);
+        if (orig && orig !== description) {
+          notes = orig;
+        }
+      }
+
+      // 3. Category
+      let category = 'Uncategorized';
+      if (categoryColIdx >= 0 && r[categoryColIdx] !== undefined && r[categoryColIdx] !== null && String(r[categoryColIdx]).trim() !== '') {
+        category = cleanText(r[categoryColIdx]);
+      }
+
+      // 4. Amount
+      let amount = 0;
+      if (amountColIdx >= 0 && r[amountColIdx] !== undefined && r[amountColIdx] !== null && r[amountColIdx] !== '') {
+        const rawAmtStr = String(r[amountColIdx]).trim();
+        const isParenNeg = /^\(.*\)$/.test(rawAmtStr);
+        const cleaned = rawAmtStr.replace(/[^0-9.-]+/g, '');
+        const parsed = parseFloat(cleaned);
+        if (!isNaN(parsed)) {
+          amount = isParenNeg && parsed > 0 ? -parsed : parsed;
+          amount = Math.round(amount * 100) / 100;
+        }
+      } else if (debitColIdx >= 0 || creditColIdx >= 0) {
+        const debitStr = debitColIdx >= 0 ? String(r[debitColIdx] || '').replace(/[^0-9.-]+/g, '') : '';
+        const creditStr = creditColIdx >= 0 ? String(r[creditColIdx] || '').replace(/[^0-9.-]+/g, '') : '';
+        const debit = debitStr ? Math.abs(parseFloat(debitStr) || 0) : 0;
+        const credit = creditStr ? Math.abs(parseFloat(creditStr) || 0) : 0;
+        amount = Math.round((credit - debit) * 100) / 100;
+      }
+
+      if (amount === 0 && (!description || description === 'Transaction')) continue;
+
+      // 5. Match bill if debit
+      let billId = null;
+      if (amount < 0) {
+        const lowerDesc = description.toLowerCase();
+        const lowerNotes = notes.toLowerCase();
+        const isFee = lowerDesc.includes('fee') || lowerNotes.includes('fee');
+        if (!isFee) {
+          const matchedBill = existingBills.find(b => {
+            const bName = (b.name || '').toLowerCase();
+            const bKey = (b.matchingKey || '').toLowerCase();
+            return (
+              (bKey && (lowerDesc.includes(bKey) || bKey.includes(lowerDesc) || (lowerNotes && lowerNotes.includes(bKey)))) ||
+              bName.includes(lowerDesc) ||
+              lowerDesc.includes(bName) ||
+              (lowerDesc.includes('hoa') && bName.includes('hoa')) ||
+              (lowerDesc.includes('mortgage') && bName.includes('mortgage')) ||
+              (lowerDesc.includes('water') && bName.includes('water')) ||
+              (lowerDesc.includes('power') && bName.includes('power')) ||
+              (lowerDesc.includes('gas') && bName.includes('gas')) ||
+              (lowerDesc.includes('electric') && bName.includes('electric')) ||
+              (lowerDesc.includes('insurance') && (bName.includes('insurance') || bName.includes('vehicle') || bName.includes('auto'))) ||
+              (lowerDesc.includes('cell') && (bName.includes('cell') || bName.includes('phone'))) ||
+              (lowerDesc.includes('gym') && bName.includes('gym'))
+            );
+          });
+          if (matchedBill) {
+            billId = matchedBill.id;
+          }
+        }
+      }
+
+      // 6. Infer / normalize Category if missing or default
+      if (!category || category === 'Uncategorized') {
+        const lowerDesc = description.toLowerCase();
+        if (amount > 0) {
+          category = 'Income / Transfer';
+        } else if (lowerDesc.includes('hoa') || lowerDesc.includes('mortgage') || lowerDesc.includes('rent')) {
+          category = 'Housing';
+        } else if (lowerDesc.includes('power') || lowerDesc.includes('gas') || lowerDesc.includes('water') || lowerDesc.includes('electric') || lowerDesc.includes('utility')) {
+          category = 'Utilities';
+        } else if (lowerDesc.includes('insurance')) {
+          category = 'Insurance (Vehicle)';
+        } else if (lowerDesc.includes('gym') || lowerDesc.includes('phone') || lowerDesc.includes('youtube') || lowerDesc.includes('cell')) {
+          category = 'Subscriptions';
+        }
+      }
+
+      // 7. Optional running balance
+      if (balanceColIdx >= 0 && r[balanceColIdx] !== undefined && r[balanceColIdx] !== null && r[balanceColIdx] !== '') {
+        const parsedBal = parseFloat(String(r[balanceColIdx]).replace(/[^0-9.-]+/g, ''));
+        if (!isNaN(parsedBal)) {
+          importedLedgerRows[dateStr] = {
+            regEnding: Math.round(parsedBal * 100) / 100,
+            extraEnding: 0,
+            totalEnding: Math.round(parsedBal * 100) / 100
+          };
+        }
+      }
+
+      transactions.push({
+        id: `txn-${Date.now()}-${transactions.length}`,
+        date: dateStr,
+        description,
+        amount,
+        accountId: targetAccountId,
+        billId,
+        category,
+        isOther: !billId,
+        notes: notes || `Imported from ${sheetName}`
+      });
+    }
+
+    logDebug('PARSER', `Parsed flat bank statement "${sheetName}": ${transactions.length} txns`, {
+      targetAccountId,
+      headerRowIdx,
+      txnCount: transactions.length
+    });
+
+    return {
+      transactions,
+      importedLedgerRows,
+      discoveredBills,
+      discoveredPeople
+    };
+  }
 
   // Balance column indices
   const regBegIdx = headers.findIndex(h => h.toLowerCase().includes('regular beg') || h.toLowerCase().includes('reg beg'));

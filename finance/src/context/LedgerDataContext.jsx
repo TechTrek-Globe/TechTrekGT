@@ -685,7 +685,7 @@ export function LedgerDataProvider({ children }) {
     const acc = (metadataStateRef.current.accounts || []).find(a => a.id === accountId);
     if (!acc) return { regEnding: 0, extraEnding: 0, totalEnd: 0 };
 
-    const startDateStr = acc.startDate || acc.balanceAsOfDate || '2026-01-01';
+    const startDateStr = acc.balanceAsOfDate || acc.startDate || '2026-01-01';
     const [sy, sm, sd] = startDateStr.split('-');
     const startDateObj = new Date(parseInt(sy), parseInt(sm) - 1, parseInt(sd));
     
@@ -706,7 +706,10 @@ export function LedgerDataProvider({ children }) {
     let runningRegBeg = parseFloat(acc.startingBalance) || 0;
     let runningExtraBeg = parseFloat(acc.extraStartingBalance) || 0;
 
-    const people = metadataStateRef.current.people || [];
+    const allPeople = metadataStateRef.current.people || [];
+    const people = (acc.enabledEarners && Array.isArray(acc.enabledEarners))
+      ? allPeople.filter(p => acc.enabledEarners.includes(p.id))
+      : allPeople;
     const accountBills = (metadataStateRef.current.bills || []).filter(b => b.accountId === accountId);
     
     const today = new Date();
@@ -777,11 +780,32 @@ export function LedgerDataProvider({ children }) {
       if (accReg !== undefined && accReg !== null && accReg !== '') customRegEnd = parseFloat(accReg);
       if (accExtra !== undefined && accExtra !== null && accExtra !== '') customExtraEnd = parseFloat(accExtra);
 
-      if (customRegEnd === undefined && isImportMode && importedRows[isoDate]?.regEnding !== undefined) {
-        customRegEnd = importedRows[isoDate].regEnding;
+      if (customRegEnd === undefined && isImportMode && importedRows[isoDate] !== undefined) {
+        const rowData = importedRows[isoDate];
+        if (typeof rowData === 'number') {
+          customRegEnd = rowData;
+        } else if (rowData && typeof rowData === 'object' && rowData.regEnding !== undefined) {
+          if (rowData.regBeg !== undefined && rowData.regBeg !== null) {
+            const netChange = rowData.regEnding - rowData.regBeg;
+            customRegEnd = Math.round((runningRegBeg + netChange) * 100) / 100;
+          } else if (rowData.totalEnding !== undefined && rowData.totalBeg !== undefined) {
+            const netChange = rowData.totalEnding - rowData.totalBeg;
+            customRegEnd = Math.round((runningRegBeg + netChange) * 100) / 100;
+          } else {
+            customRegEnd = rowData.regEnding;
+          }
+        }
       }
-      if (customExtraEnd === undefined && isImportMode && importedRows[isoDate]?.extraEnding !== undefined) {
-        customExtraEnd = importedRows[isoDate].extraEnding;
+      if (customExtraEnd === undefined && isImportMode && importedRows[isoDate] !== undefined) {
+        const rowData = importedRows[isoDate];
+        if (rowData && typeof rowData === 'object' && rowData.extraEnding !== undefined) {
+          if (rowData.extraBeg !== undefined && rowData.extraBeg !== null) {
+            const netChangeExtra = rowData.extraEnding - rowData.extraBeg;
+            customExtraEnd = Math.round((runningExtraBeg + netChangeExtra) * 100) / 100;
+          } else {
+            customExtraEnd = rowData.extraEnding;
+          }
+        }
       }
 
       let reg = customRegEnd !== undefined && !isNaN(customRegEnd) ? customRegEnd : tentativeRegEnding;

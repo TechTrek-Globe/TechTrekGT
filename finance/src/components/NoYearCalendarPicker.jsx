@@ -10,7 +10,8 @@ import { MONTH_SHORT_NAMES, getBillDueMonths } from '../utils/paydayUtils';
  * @param {number} props.dueDay - Day of month (1-31)
  * @param {number[]} [props.dueMonths] - 1-based month numbers (1-12)
  * @param {string} [props.period] - 'Monthly' | 'Quarterly' | 'Semi-Annual' | 'Annual'
- * @param {function} props.onChange - Callback ({ dueDay, dueMonths })
+ * @param {function} props.onChange - Callback ({ dueDay, period, dueMonths })
+ * @param {function} [props.onClose] - Optional close callback
  * @param {string} [props.className] - Optional extra class names for trigger button
  */
 export function NoYearCalendarPicker({
@@ -18,6 +19,7 @@ export function NoYearCalendarPicker({
   dueMonths,
   period = 'Monthly',
   onChange,
+  onClose,
   className = ''
 }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -116,7 +118,21 @@ export function NoYearCalendarPicker({
     return `${monthNames} (${getOrdinal(safeDay)})`;
   };
 
+  // Handle period (frequency) change from within the popup
+  const handlePeriodChange = (newPeriod) => {
+    let newMonths;
+    switch (newPeriod) {
+      case 'Annual': newMonths = [currentMonths[0] || 1]; break;
+      case 'Semi-Annual': newMonths = [1, 7]; break;
+      case 'Quarterly': newMonths = [1, 4, 7, 10]; break;
+      default: newMonths = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+    }
+    if (onChange) onChange({ dueDay: safeDay, period: newPeriod, dueMonths: newMonths });
+  };
+
   const daysArray = Array.from({ length: 31 }, (_, i) => i + 1);
+
+  const PERIODS = ['Monthly', 'Quarterly', 'Semi-Annual', 'Annual'];
 
   return (
     <div className="inline-block">
@@ -147,17 +163,35 @@ export function NoYearCalendarPicker({
               <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-emerald-400" />
                 <span className="text-xs font-semibold text-slate-100">Due Schedule</span>
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800/60 font-medium">
-                  {period}
-                </span>
               </div>
               <button
                 type="button"
-                onClick={() => setIsOpen(false)}
+                onClick={() => { setIsOpen(false); if (onClose) onClose(); }}
                 className="p-1 rounded-md text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors cursor-pointer"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
+            </div>
+
+            {/* Frequency (Period) Selector */}
+            <div>
+              <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider block mb-1.5">Frequency</span>
+              <div className="grid grid-cols-4 gap-1">
+                {PERIODS.map(p => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => handlePeriodChange(p)}
+                    className={`py-1 rounded text-[10px] font-semibold transition-all text-center cursor-pointer ${
+                      period === p
+                        ? 'bg-blue-600 text-white shadow-sm'
+                        : 'bg-slate-950 text-slate-400 border border-slate-800 hover:border-blue-600 hover:text-slate-200'
+                    }`}
+                  >
+                    {p === 'Semi-Annual' ? 'Semi' : p === 'Quarterly' ? 'Qrtly' : p}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Month Section (Tailored by Period) */}
@@ -291,7 +325,7 @@ export function NoYearCalendarPicker({
               </span>
               <button
                 type="button"
-                onClick={() => setIsOpen(false)}
+                onClick={() => { setIsOpen(false); if (onClose) onClose(); }}
                 className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium transition-colors flex items-center gap-1 cursor-pointer flex-shrink-0"
               >
                 <Check className="w-3 h-3" /> Done

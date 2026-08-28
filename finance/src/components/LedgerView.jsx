@@ -719,6 +719,10 @@ function DailySpreadsheetMatrix() {
         // 2. Individual Bill Deductions
         const billValues = {};
         let totalDayBills = 0;
+        // Track whether any bill on this day has a manual dailyMatrix override.
+        // When true the importedRows ending-balance anchor must be bypassed so
+        // moved/edited bills are reflected in the running balance.
+        let hasDayBillOverride = false;
 
         accountBills.forEach(b => {
           const billAccId = selectedAccountId === 'all' ? b.accountId : selectedAccountId;
@@ -727,6 +731,7 @@ function DailySpreadsheetMatrix() {
 
           if (customBillVal !== undefined) {
             // Tier 1: manual dailyMatrix override (drag-drop, inline edit, or actual transaction) wins outright
+            hasDayBillOverride = true;
             amt = parseFloat(customBillVal) || 0;
           } else if (!isLockedDay) {
             // Tier 2: month-scoped actual amount from import reconciliation
@@ -819,19 +824,31 @@ function DailySpreadsheetMatrix() {
         let customRegEnd;
         let customExtraEnd;
 
+        // When a bill on this day has a manual dailyMatrix override (hasDayBillOverride)
+        // AND this day is anchored by an imported ledger row, the stored reg_ending in
+        // dailyMatrix was written by the "Ultimate Truth" import sync and is now stale
+        // (it pre-dates the bill move/edit). Bypass it so tentativeRegEnding is used instead.
+        // User-typed reg_ending overrides on non-import-locked rows are always respected.
+        const isImportAnchoredRow = isImportMode && importedRows[isoDate] !== undefined;
+        const skipImportPin = hasDayBillOverride && isImportAnchoredRow;
+
         if (selectedAccountId === 'all') {
           const allReg = getDailyMatrixCell('all', monthKey, day, 'reg_ending');
           const allExtra = getDailyMatrixCell('all', monthKey, day, 'extra_ending');
-          if (allReg !== undefined && allReg !== null && allReg !== '') customRegEnd = parseFloat(allReg);
-          if (allExtra !== undefined && allExtra !== null && allExtra !== '') customExtraEnd = parseFloat(allExtra);
+          if (!skipImportPin && allReg !== undefined && allReg !== null && allReg !== '') customRegEnd = parseFloat(allReg);
+          if (!skipImportPin && allExtra !== undefined && allExtra !== null && allExtra !== '') customExtraEnd = parseFloat(allExtra);
         } else {
           const accReg = getDailyMatrixCell(selectedAccountId, monthKey, day, 'reg_ending');
           const accExtra = getDailyMatrixCell(selectedAccountId, monthKey, day, 'extra_ending');
-          if (accReg !== undefined && accReg !== null && accReg !== '') customRegEnd = parseFloat(accReg);
-          if (accExtra !== undefined && accExtra !== null && accExtra !== '') customExtraEnd = parseFloat(accExtra);
+          if (!skipImportPin && accReg !== undefined && accReg !== null && accReg !== '') customRegEnd = parseFloat(accReg);
+          if (!skipImportPin && accExtra !== undefined && accExtra !== null && accExtra !== '') customExtraEnd = parseFloat(accExtra);
         }
 
-        if (customRegEnd === undefined && isImportMode && importedRows[isoDate] !== undefined) {
+        // Only anchor to the imported row's stated ending balance when no bill on
+        // this day has been manually overridden (moved/edited). A manual override
+        // means the import data is stale for this row and the computed tentative
+        // ending must be used instead so the running balance stays accurate.
+        if (customRegEnd === undefined && isImportMode && importedRows[isoDate] !== undefined && !hasDayBillOverride) {
           const rowData = importedRows[isoDate];
           if (typeof rowData === 'number') {
             customRegEnd = rowData;
@@ -842,7 +859,7 @@ function DailySpreadsheetMatrix() {
             }
           }
         }
-        if (customExtraEnd === undefined && isImportMode && importedRows[isoDate] !== undefined) {
+        if (customExtraEnd === undefined && isImportMode && importedRows[isoDate] !== undefined && !hasDayBillOverride) {
           const rowData = importedRows[isoDate];
           if (rowData && typeof rowData === 'object') {
             const statedExtra = rowData.extraEnding ?? null;

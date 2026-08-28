@@ -745,10 +745,14 @@ export function LedgerDataProvider({ children }) {
 
       // 2. Bills
       let dayBills = 0;
+      // Track whether any bill on this day has a manual dailyMatrix override so
+      // the importedRows ending-balance anchor can be bypassed when needed.
+      let hasDayBillOverride = false;
       accountBills.forEach(b => {
         const customBill = getDailyMatrixCell(accountId, monthKey, day, `bill_${b.id}`);
         let amt = 0;
         if (customBill !== undefined) {
+          hasDayBillOverride = true;
           amt = parseFloat(customBill) || 0;
         } else if (!isLockedDay) {
           const actualAmt = getActualAmount(b.id, monthKey);
@@ -775,12 +779,21 @@ export function LedgerDataProvider({ children }) {
 
       let customRegEnd;
       let customExtraEnd;
+      // When a bill has a manual dailyMatrix override on an import-anchored row,
+      // the stored reg_ending was written by the import sync and is now stale.
+      // Bypass it so tentativeRegEnding drives the rolling balance instead.
+      const isImportAnchoredRow = isImportMode && importedRows[isoDate] !== undefined;
+      const skipImportPin = hasDayBillOverride && isImportAnchoredRow;
       const accReg = getDailyMatrixCell(accountId, monthKey, day, 'reg_ending');
       const accExtra = getDailyMatrixCell(accountId, monthKey, day, 'extra_ending');
-      if (accReg !== undefined && accReg !== null && accReg !== '') customRegEnd = parseFloat(accReg);
-      if (accExtra !== undefined && accExtra !== null && accExtra !== '') customExtraEnd = parseFloat(accExtra);
+      if (!skipImportPin && accReg !== undefined && accReg !== null && accReg !== '') customRegEnd = parseFloat(accReg);
+      if (!skipImportPin && accExtra !== undefined && accExtra !== null && accExtra !== '') customExtraEnd = parseFloat(accExtra);
 
-      if (customRegEnd === undefined && isImportMode && importedRows[isoDate] !== undefined) {
+      // Only anchor to the imported row's stated ending balance when no bill on
+      // this day has a manual dailyMatrix override (moved/edited). If a manual
+      // override exists the import snapshot is stale and the computed tentative
+      // ending must be used to keep the running balance accurate.
+      if (customRegEnd === undefined && isImportMode && importedRows[isoDate] !== undefined && !hasDayBillOverride) {
         const rowData = importedRows[isoDate];
         if (typeof rowData === 'number') {
           customRegEnd = rowData;
@@ -791,7 +804,7 @@ export function LedgerDataProvider({ children }) {
           }
         }
       }
-      if (customExtraEnd === undefined && isImportMode && importedRows[isoDate] !== undefined) {
+      if (customExtraEnd === undefined && isImportMode && importedRows[isoDate] !== undefined && !hasDayBillOverride) {
         const rowData = importedRows[isoDate];
         if (rowData && typeof rowData === 'object') {
           const statedExtra = rowData.extraEnding ?? null;

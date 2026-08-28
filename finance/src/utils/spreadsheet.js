@@ -845,9 +845,14 @@ export function getLedgerRunningBalanceAsOfDate({
     });
 
     let dayBills = 0;
+    // Track whether any bill has a manual dailyMatrix override on this day.
+    let hasDayBillOverride = false;
     bills.forEach(b => {
       const bVal = dailyMatrix[`${targetAccountId}_${mKey}_${d}_bill_${b.id}`];
-      if (bVal !== undefined && bVal !== null && bVal !== '') dayBills += parseFloat(bVal) || 0;
+      if (bVal !== undefined && bVal !== null && bVal !== '') {
+        hasDayBillOverride = true;
+        dayBills += parseFloat(bVal) || 0;
+      }
     });
 
     const oVal = dailyMatrix[`${targetAccountId}_${mKey}_${d}_other_amount`];
@@ -862,11 +867,14 @@ export function getLedgerRunningBalanceAsOfDate({
     const customReg = dailyMatrix[`${targetAccountId}_${mKey}_${d}_reg_ending`];
     const customExtra = dailyMatrix[`${targetAccountId}_${mKey}_${d}_extra_ending`];
 
-    let reg = customReg !== undefined && customReg !== null && customReg !== '' ? parseFloat(customReg) : undefined;
-    let extra = customExtra !== undefined && customExtra !== null && customExtra !== '' ? parseFloat(customExtra) : undefined;
-
     const isoDate = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    if (reg === undefined && targetAcc.importedLedgerRows && targetAcc.importedLedgerRows[isoDate] !== undefined) {
+    const isImportAnchoredRow = targetAcc.importedLedgerRows && targetAcc.importedLedgerRows[isoDate] !== undefined;
+    const skipImportPin = hasDayBillOverride && isImportAnchoredRow;
+
+    let reg = (!skipImportPin && customReg !== undefined && customReg !== null && customReg !== '') ? parseFloat(customReg) : undefined;
+    let extra = (!skipImportPin && customExtra !== undefined && customExtra !== null && customExtra !== '') ? parseFloat(customExtra) : undefined;
+
+    if (reg === undefined && !skipImportPin && targetAcc.importedLedgerRows && targetAcc.importedLedgerRows[isoDate] !== undefined) {
       const rowData = targetAcc.importedLedgerRows[isoDate];
       if (typeof rowData === 'number') {
         reg = rowData;

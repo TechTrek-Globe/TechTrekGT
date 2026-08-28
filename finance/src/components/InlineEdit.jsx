@@ -1,5 +1,5 @@
-import React, { useState, useRef, useCallback } from 'react';
-import { Pencil, Check, X } from 'lucide-react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { Pencil, Check, X, Trash2 } from 'lucide-react';
 
 /**
  * InlineEdit - universal click-to-edit primitive.
@@ -75,30 +75,50 @@ export function InlineEdit({
     setEditing(true);
   }, [value, type]);
 
-  const commit = useCallback(() => {
-    let parsed;
-    if (type === 'currency' || type === 'percent') {
-      parsed = parseFloat(draft);
-      if (isNaN(parsed)) { cancel(); return; }
-      if (min !== undefined) parsed = Math.max(min, parsed);
-      if (max !== undefined) parsed = Math.min(max, parsed);
-    } else if (type === 'integer') {
-      parsed = parseInt(draft, 10);
-      if (isNaN(parsed)) { cancel(); return; }
-      if (min !== undefined) parsed = Math.max(min, parsed);
-      if (max !== undefined) parsed = Math.min(max, parsed);
-    } else {
-      parsed = draft.trim();
-      if (!parsed) { cancel(); return; }
+  useEffect(() => {
+    if (editing && inputRef.current) {
+      inputRef.current.select();
     }
-    onCommit(parsed);
-    setEditing(false);
-  }, [draft, type, min, max, onCommit]);
+  }, [editing]);
 
   const cancel = useCallback(() => {
     setEditing(false);
     setDraft('');
   }, []);
+
+  const commit = useCallback(() => {
+    let parsed;
+    const str = String(draft ?? '').trim();
+    if (type === 'currency' || type === 'percent') {
+      if (str === '') {
+        parsed = 0;
+      } else {
+        parsed = parseFloat(str);
+        if (isNaN(parsed)) { cancel(); return; }
+      }
+      if (min !== undefined) parsed = Math.max(min, parsed);
+      if (max !== undefined) parsed = Math.min(max, parsed);
+    } else if (type === 'integer') {
+      if (str === '') {
+        parsed = 0;
+      } else {
+        parsed = parseInt(str, 10);
+        if (isNaN(parsed)) { cancel(); return; }
+      }
+      if (min !== undefined) parsed = Math.max(min, parsed);
+      if (max !== undefined) parsed = Math.min(max, parsed);
+    } else {
+      parsed = str;
+    }
+    onCommit(parsed);
+    setEditing(false);
+  }, [draft, type, min, max, onCommit, cancel]);
+
+  const handleClear = useCallback(() => {
+    const clearVal = (type === 'currency' || type === 'percent' || type === 'integer') ? 0 : '';
+    onCommit(clearVal);
+    setEditing(false);
+  }, [type, onCommit]);
 
   const onKeyDown = useCallback((e) => {
     if (e.key === 'Enter')  { e.preventDefault(); commit(); }
@@ -131,6 +151,14 @@ export function InlineEdit({
           title="Commit (Enter)"
         >
           <Check className="w-3 h-3" />
+        </button>
+        <button
+          onMouseDown={e => { e.preventDefault(); handleClear(); }}
+          aria-label="Clear value ($0)"
+          className="p-0.5 text-slate-400 hover:text-rose-400 transition-colors"
+          title="Clear value ($0)"
+        >
+          <Trash2 className="w-3 h-3" />
         </button>
         <button
           onMouseDown={e => { e.preventDefault(); cancel(); }}

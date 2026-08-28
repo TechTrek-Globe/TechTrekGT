@@ -17,6 +17,7 @@ import {
   Info,
   Archive,
   RotateCcw,
+  Trash2,
   GripVertical,
   Upload,
   FileSpreadsheet
@@ -115,6 +116,21 @@ const MatrixCell = React.memo(function MatrixCell({
     >
       {draggable && (
         <GripVertical className="w-2.5 h-2.5 text-slate-500 opacity-0 group-hover/matrix:opacity-70 transition-opacity absolute left-0.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+      )}
+      {Boolean(value && value !== 0) && !isTotal && (
+        <button
+          type="button"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            commitHandler(0);
+          }}
+          className="opacity-0 group-hover/matrix:opacity-100 p-0.5 text-slate-500 hover:text-rose-400 transition-all absolute left-3 top-1/2 -translate-y-1/2 z-10 cursor-pointer"
+          title="Clear amount ($0)"
+          aria-label="Clear amount"
+        >
+          <Trash2 className="w-2.5 h-2.5" />
+        </button>
       )}
       <InlineEdit
         value={value || 0}
@@ -366,8 +382,15 @@ function DailySpreadsheetMatrix() {
 
   const handleCellCommit = useCallback((monthKey, day, field, val, cellAccountId) => {
     const targetAccId = (cellAccountId && cellAccountId !== 'all') ? cellAccountId : (selectedAccountId === 'all' ? (budget.accounts[0]?.id || 'all') : selectedAccountId);
+    const numVal = typeof val === 'number' ? val : (parseFloat(val) || 0);
     logTransaction('UI_CELL_COMMIT', `User committed ${field} on ${monthKey}-${day}: ${val}`, { targetAccId, monthKey, day, field, val });
     updateDailyMatrixCell(targetAccId, monthKey, day, field, val);
+
+    // If clearing out an other amount (val === 0 or ''), automatically clear associated other description
+    if ((field === 'other_amount' || field === 'other_credit_amount') && (!val || numVal === 0)) {
+      updateDailyMatrixCell(targetAccId, monthKey, day, 'other_desc', '');
+      updateDailyMatrixCell(targetAccId, monthKey, day, 'other_credit_desc', '');
+    }
   }, [updateDailyMatrixCell, selectedAccountId, budget.accounts]);
 
   const handleStartBalanceCommit = useCallback((field, val, row) => {

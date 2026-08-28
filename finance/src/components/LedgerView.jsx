@@ -599,36 +599,22 @@ function DailySpreadsheetMatrix() {
   const isProgrammaticScrollRef = useRef(false);
   const firstSelectedMonthRowRef = useRef(null);
 
-  // Rolling window: previous, current, and next month for smooth scrolling
+  // Full 12-month stream for the selected year for a completely stable, smooth-scrolling ledger
   const monthList = useMemo(() => {
     const list = [];
-    
-    // Start window 1 month before selected, but don't go before account start date
-    let cur = new Date(selectedYear, selectedMonth - 1, 1);
-    const startMonthDate = new Date(startDateObj.getFullYear(), startDateObj.getMonth(), 1);
-    
-    if (cur < startMonthDate) {
-      cur = new Date(startMonthDate);
-    }
-
-    let offset = 0;
-    // Generate exactly 3 months (e.g. previous, current, next)
-    for (let i = 0; i < 3; i++) {
-      const mYear = cur.getFullYear();
-      const mMonth = cur.getMonth();
-      const mKey = `${mYear}-${String(mMonth + 1).padStart(2, '0')}`;
-      const mDays = new Date(mYear, mMonth + 1, 0).getDate();
+    for (let m = 0; m < 12; m++) {
+      const mKey = `${selectedYear}-${String(m + 1).padStart(2, '0')}`;
+      const mDays = new Date(selectedYear, m + 1, 0).getDate();
       list.push({
-        year: mYear,
-        month: mMonth,
+        year: selectedYear,
+        month: m,
         monthKey: mKey,
         daysInMonth: mDays,
-        offset: offset++
+        offset: m
       });
-      cur.setMonth(cur.getMonth() + 1);
     }
     return list;
-  }, [startDateObj, selectedYear, selectedMonth]);
+  }, [selectedYear]);
 
   const showExtraColumns = selectedAccountId === 'all'
     ? budget.accounts.some(a => a.enableExtraSavings !== false)
@@ -965,9 +951,11 @@ function DailySpreadsheetMatrix() {
               const [yStr, mStr] = raw.split('-');
               const y = parseInt(yStr, 10);
               const m = parseInt(mStr, 10);
-              if (!isNaN(y) && !isNaN(m)) {
-                setSelectedMonth(m);
-                setSelectedYear(y);
+              if (!isNaN(m)) {
+                setSelectedMonth(prev => prev !== m ? m : prev);
+              }
+              if (!isNaN(y)) {
+                setSelectedYear(prev => prev !== y ? y : prev);
               }
             }
           }

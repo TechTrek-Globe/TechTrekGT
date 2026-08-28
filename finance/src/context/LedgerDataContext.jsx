@@ -716,6 +716,9 @@ export function LedgerDataProvider({ children }) {
     const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
 
     let cur = new Date(startDateObj);
+    // Once a bill override diverges the running balance from import pins,
+    // all subsequent import-anchored rows must also be bypassed.
+    let hasRunningDivergence = false;
     while (cur <= target) {
       const year = cur.getFullYear();
       const month = cur.getMonth();
@@ -783,7 +786,7 @@ export function LedgerDataProvider({ children }) {
       // the stored reg_ending was written by the import sync and is now stale.
       // Bypass it so tentativeRegEnding drives the rolling balance instead.
       const isImportAnchoredRow = isImportMode && importedRows[isoDate] !== undefined;
-      const skipImportPin = hasDayBillOverride && isImportAnchoredRow;
+      const skipImportPin = (hasDayBillOverride || hasRunningDivergence) && isImportAnchoredRow;
       const accReg = getDailyMatrixCell(accountId, monthKey, day, 'reg_ending');
       const accExtra = getDailyMatrixCell(accountId, monthKey, day, 'extra_ending');
       if (!skipImportPin && accReg !== undefined && accReg !== null && accReg !== '') customRegEnd = parseFloat(accReg);
@@ -793,7 +796,7 @@ export function LedgerDataProvider({ children }) {
       // this day has a manual dailyMatrix override (moved/edited). If a manual
       // override exists the import snapshot is stale and the computed tentative
       // ending must be used to keep the running balance accurate.
-      if (customRegEnd === undefined && isImportMode && importedRows[isoDate] !== undefined && !hasDayBillOverride) {
+      if (customRegEnd === undefined && isImportMode && importedRows[isoDate] !== undefined && !hasDayBillOverride && !hasRunningDivergence) {
         const rowData = importedRows[isoDate];
         if (typeof rowData === 'number') {
           customRegEnd = rowData;
@@ -804,7 +807,7 @@ export function LedgerDataProvider({ children }) {
           }
         }
       }
-      if (customExtraEnd === undefined && isImportMode && importedRows[isoDate] !== undefined && !hasDayBillOverride) {
+      if (customExtraEnd === undefined && isImportMode && importedRows[isoDate] !== undefined && !hasDayBillOverride && !hasRunningDivergence) {
         const rowData = importedRows[isoDate];
         if (rowData && typeof rowData === 'object') {
           const statedExtra = rowData.extraEnding ?? null;
@@ -829,6 +832,7 @@ export function LedgerDataProvider({ children }) {
         }
       }
 
+      if (skipImportPin) hasRunningDivergence = true;
       runningRegBeg = Math.round(reg * 100) / 100 || 0;
       runningExtraBeg = Math.round(extra * 100) / 100 || 0;
 

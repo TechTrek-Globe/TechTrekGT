@@ -829,6 +829,9 @@ export function getLedgerRunningBalanceAsOfDate({
   let runningExtra = startExtra;
 
   let cur = new Date(simulationStartDate);
+  // Once a bill override diverges the running balance from import pins,
+  // all subsequent import-anchored rows must also be bypassed.
+  let hasRunningDivergence = false;
   while (cur <= targetDateObj) {
     const y = cur.getFullYear();
     const m = cur.getMonth();
@@ -869,7 +872,7 @@ export function getLedgerRunningBalanceAsOfDate({
 
     const isoDate = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
     const isImportAnchoredRow = targetAcc.importedLedgerRows && targetAcc.importedLedgerRows[isoDate] !== undefined;
-    const skipImportPin = hasDayBillOverride && isImportAnchoredRow;
+    const skipImportPin = (hasDayBillOverride || hasRunningDivergence) && isImportAnchoredRow;
 
     let reg = (!skipImportPin && customReg !== undefined && customReg !== null && customReg !== '') ? parseFloat(customReg) : undefined;
     let extra = (!skipImportPin && customExtra !== undefined && customExtra !== null && customExtra !== '') ? parseFloat(customExtra) : undefined;
@@ -900,6 +903,7 @@ export function getLedgerRunningBalanceAsOfDate({
       }
     }
 
+    if (skipImportPin) hasRunningDivergence = true;
     runningReg = Math.round(reg * 100) / 100 || 0;
     runningExtra = Math.round(extra * 100) / 100 || 0;
 

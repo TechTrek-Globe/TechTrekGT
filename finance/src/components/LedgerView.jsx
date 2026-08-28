@@ -665,6 +665,9 @@ function DailySpreadsheetMatrix() {
 
     let runningRegBeg = initialRegBeg;
     let runningExtraBeg = initialExtraBeg;
+    // Once a bill override causes the running balance to diverge from import pins,
+    // all subsequent import-anchored rows carry stale snapshots and must also be bypassed.
+    let hasRunningDivergence = false;
 
     monthList.forEach(mItem => {
       const { year, month, monthKey, daysInMonth } = mItem;
@@ -830,7 +833,9 @@ function DailySpreadsheetMatrix() {
         // (it pre-dates the bill move/edit). Bypass it so tentativeRegEnding is used instead.
         // User-typed reg_ending overrides on non-import-locked rows are always respected.
         const isImportAnchoredRow = isImportMode && importedRows[isoDate] !== undefined;
-        const skipImportPin = hasDayBillOverride && isImportAnchoredRow;
+        // Bypass the import pin if this day has a bill override OR if a prior day already
+        // caused divergence (making all downstream import snapshots stale).
+        const skipImportPin = (hasDayBillOverride || hasRunningDivergence) && isImportAnchoredRow;
 
         if (selectedAccountId === 'all') {
           const allReg = getDailyMatrixCell('all', monthKey, day, 'reg_ending');
@@ -928,6 +933,9 @@ function DailySpreadsheetMatrix() {
         });
 
         // Carry ending balances forward as the next day's opening
+        // If an import pin was bypassed this day, mark divergence so all subsequent
+        // import anchors are also treated as stale.
+        if (skipImportPin) hasRunningDivergence = true;
         runningRegBeg = regEnding;
         runningExtraBeg = extraEnding;
       }

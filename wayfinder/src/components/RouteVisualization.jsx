@@ -32,10 +32,10 @@ export function RouteVisualization() {
         </a>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
         {/* Left Column: Abstract Map */}
         <div className="lg:col-span-5 relative">
-          <div className="sticky top-24 glass-card rounded-3xl p-8 h-[600px] flex items-center justify-center">
+          <div className="sticky top-24 glass-card rounded-3xl p-6 sm:p-8 h-[500px] sm:h-[560px] lg:h-[600px] flex items-center justify-center">
             {/* Vertical line map representing South to North progression with stay dates */}
             <div className="relative h-full w-full max-w-[240px] mx-auto flex flex-col justify-between py-12">
               <div className="absolute top-12 bottom-12 left-1/2 -ml-1 w-2 bg-wf-navy-lt rounded-full" />

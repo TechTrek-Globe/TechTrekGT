@@ -11,7 +11,7 @@ function CityRouteCard({ city, idx, totalCount, pushRoute }) {
       onClick={(e) => pushRoute(e, `/wayfinder/poland-christmas-2026/cities/${city.id}`)}
     >
       {idx < totalCount - 1 && (
-        <div className="hidden md:block absolute top-1/2 -right-4 w-4 h-px bg-white/20 z-10" />
+        <div className="hidden lg:block absolute top-1/2 -right-4 w-4 h-px bg-white/20 z-10" />
       )}
       <div className="h-48 sm:h-52 w-full relative overflow-hidden bg-slate-950">
         <img 
@@ -116,7 +116,7 @@ export function PolandLanding() {
           </div>
 
           {/* Right Compact 3D Route Map Panel (100% Precise City, Track & Flight Paths) */}
-          <div className="w-full lg:w-7/12 h-64 sm:h-80 rounded-2xl overflow-hidden relative bg-slate-950 border border-amber-500/30 shadow-inner group shrink-0">
+          <div className="w-full lg:w-7/12 h-64 sm:h-80 md:h-96 lg:h-80 rounded-2xl overflow-hidden relative bg-slate-950 border border-amber-500/30 shadow-inner group shrink-0">
             <img 
               src={polandMapRouteClean} 
               alt="3D Poland Route Map" 
@@ -239,7 +239,7 @@ export function PolandLanding() {
             </a>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4 lg:gap-5">
             {polandJourney.route.map((city, idx) => (
               <CityRouteCard
                 key={city.id}
@@ -253,7 +253,7 @@ export function PolandLanding() {
         </section>
 
         {/* The Strategy */}
-        <section className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <section className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
           <div className="lg:col-span-1">
             <h2 className="text-2xl font-bold text-white mb-4">The Strategy</h2>
             <p className="text-wf-muted mb-6">
@@ -274,7 +274,7 @@ export function PolandLanding() {
             </div>
           </div>
           
-          <div className="lg:col-span-2 glass-card p-8 rounded-3xl">
+          <div className="lg:col-span-2 glass-card p-6 sm:p-8 rounded-3xl">
             <h3 className="text-lg font-semibold text-white mb-4">Key Principles</h3>
             <div className="space-y-6">
               <div className="flex items-start space-x-4">

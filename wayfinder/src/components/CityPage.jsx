@@ -240,7 +240,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
       : "https://www.openstreetmap.org/export/embed.html?bbox=16.9000%2C51.1000%2C17.1000%2C51.1300&amp;layer=mapnik";
 
   return (
-    <div ref={cityHeaderRef} className="w-full max-w-6xl min-w-0 mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <div ref={cityHeaderRef} className="w-full max-w-7xl min-w-0 mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-8">
       {/* Navigation Header with Horizontal Trail Track Chart */}
       <div className="space-y-4">
         <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
@@ -336,7 +336,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
           <a
             href={baseUrl}
             onClick={(e) => handleSubPageTabClick(e, baseUrl)}
-            className={`px-3 py-3 sm:py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center space-x-1.5 shrink-0 min-h-[44px] sm:min-h-0 ${
+            className={`px-3 py-2.5 sm:py-2 md:py-2.5 rounded-lg text-xs md:text-sm font-semibold transition-all whitespace-nowrap flex items-center space-x-1.5 shrink-0 min-h-[40px] md:min-h-[42px] ${
               activeSubPage === 'overview'
                 ? 'bg-amber-500 text-slate-950 shadow-sm font-bold'
                 : 'text-wf-cream hover:text-white hover:bg-white/10'
@@ -350,7 +350,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
             <a
               href={`${baseUrl}/history`}
               onClick={(e) => handleSubPageTabClick(e, `${baseUrl}/history`)}
-              className={`px-3 py-3 sm:py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center space-x-1.5 shrink-0 min-h-[44px] sm:min-h-0 ${
+              className={`px-3 py-2.5 sm:py-2 md:py-2.5 rounded-lg text-xs md:text-sm font-semibold transition-all whitespace-nowrap flex items-center space-x-1.5 shrink-0 min-h-[40px] md:min-h-[42px] ${
                 activeSubPage === 'history'
                   ? 'bg-amber-500 text-slate-950 shadow-sm font-bold'
                   : 'text-amber-300 hover:text-amber-100 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30'
@@ -365,7 +365,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
             <a
               href={`${baseUrl}/markets`}
               onClick={(e) => handleSubPageTabClick(e, `${baseUrl}/markets`)}
-              className={`px-3 py-3 sm:py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center space-x-1.5 shrink-0 min-h-[44px] sm:min-h-0 ${
+              className={`px-3 py-2.5 sm:py-2 md:py-2.5 rounded-lg text-xs md:text-sm font-semibold transition-all whitespace-nowrap flex items-center space-x-1.5 shrink-0 min-h-[40px] md:min-h-[42px] ${
                 activeSubPage === 'markets'
                   ? 'bg-amber-500 text-slate-950 shadow-sm font-bold'
                   : 'text-amber-300 hover:text-amber-100 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30'
@@ -380,7 +380,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
             <a
               href={`${baseUrl}/attractions`}
               onClick={(e) => handleSubPageTabClick(e, `${baseUrl}/attractions`)}
-              className={`px-3 py-3 sm:py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center space-x-1.5 shrink-0 min-h-[44px] sm:min-h-0 ${
+              className={`px-3 py-2.5 sm:py-2 md:py-2.5 rounded-lg text-xs md:text-sm font-semibold transition-all whitespace-nowrap flex items-center space-x-1.5 shrink-0 min-h-[40px] md:min-h-[42px] ${
                 activeSubPage === 'attractions'
                   ? 'bg-amber-500 text-slate-950 shadow-sm font-bold'
                   : 'text-wf-cream hover:text-white hover:bg-white/10'
@@ -395,7 +395,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
             <a
               href={`${baseUrl}/restaurants`}
               onClick={(e) => handleSubPageTabClick(e, `${baseUrl}/restaurants`)}
-              className={`px-3 py-3 sm:py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center space-x-1.5 shrink-0 min-h-[44px] sm:min-h-0 ${
+              className={`px-3 py-2.5 sm:py-2 md:py-2.5 rounded-lg text-xs md:text-sm font-semibold transition-all whitespace-nowrap flex items-center space-x-1.5 shrink-0 min-h-[40px] md:min-h-[42px] ${
                 activeSubPage === 'restaurants'
                   ? 'bg-amber-500 text-slate-950 shadow-sm font-bold'
                   : 'text-wf-cream hover:text-white hover:bg-white/10'
@@ -410,7 +410,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
             <a
               href={`${baseUrl}/hotels`}
               onClick={(e) => handleSubPageTabClick(e, `${baseUrl}/hotels`)}
-              className={`px-3 py-3 sm:py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center space-x-1.5 shrink-0 min-h-[44px] sm:min-h-0 ${
+              className={`px-3 py-2.5 sm:py-2 md:py-2.5 rounded-lg text-xs md:text-sm font-semibold transition-all whitespace-nowrap flex items-center space-x-1.5 shrink-0 min-h-[40px] md:min-h-[42px] ${
                 activeSubPage === 'hotels'
                   ? 'bg-amber-500 text-slate-950 shadow-sm font-bold'
                   : 'text-wf-cream hover:text-white hover:bg-white/10'
@@ -425,7 +425,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
             <a
               href={`${baseUrl}/lgbtq`}
               onClick={(e) => handleSubPageTabClick(e, `${baseUrl}/lgbtq`)}
-              className={`px-3 py-3 sm:py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center space-x-1.5 shrink-0 min-h-[44px] sm:min-h-0 ${
+              className={`px-3 py-2.5 sm:py-2 md:py-2.5 rounded-lg text-xs md:text-sm font-semibold transition-all whitespace-nowrap flex items-center space-x-1.5 shrink-0 min-h-[40px] md:min-h-[42px] ${
                 activeSubPage === 'lgbtq'
                   ? 'bg-purple-600 text-white shadow-sm font-bold ring-2 ring-purple-400/50'
                   : 'text-purple-300 hover:text-purple-100 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30'

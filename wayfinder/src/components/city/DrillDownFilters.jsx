@@ -48,7 +48,7 @@ export function DrillDownFilters({ activeFilter, onFilterChange, items = [] }) {
           <button
             type="button"
             onClick={() => onFilterChange('all')}
-            className={`px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-black transition-all shrink-0 cursor-pointer min-h-[36px] ${
+            className={`px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-black transition-all shrink-0 cursor-pointer min-h-[40px] ${
               activeFilter === 'all'
                 ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 ring-1 ring-amber-400'
                 : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10'
@@ -62,7 +62,7 @@ export function DrillDownFilters({ activeFilter, onFilterChange, items = [] }) {
               setActiveTier('eat');
               onFilterChange('food-all');
             }}
-            className={`px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-black transition-all flex items-center space-x-2 shrink-0 cursor-pointer min-h-[36px] ${
+            className={`px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-black transition-all flex items-center space-x-2 shrink-0 cursor-pointer min-h-[40px] ${
               isEatCategory(activeFilter)
                 ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 ring-1 ring-amber-400'
                 : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30'
@@ -77,7 +77,7 @@ export function DrillDownFilters({ activeFilter, onFilterChange, items = [] }) {
               setActiveTier('drink');
               onFilterChange('drink-all');
             }}
-            className={`px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-black transition-all flex items-center space-x-2 shrink-0 cursor-pointer min-h-[36px] ${
+            className={`px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-black transition-all flex items-center space-x-2 shrink-0 cursor-pointer min-h-[40px] ${
               isDrinkCategory(activeFilter)
                 ? 'bg-purple-500 text-white shadow-md shadow-purple-500/20 ring-1 ring-purple-400'
                 : 'bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30'
@@ -95,7 +95,7 @@ export function DrillDownFilters({ activeFilter, onFilterChange, items = [] }) {
               setActiveTier('main');
               onFilterChange('all');
             }}
-            className="px-3 py-1.5 rounded-xl text-xs font-black transition-all shrink-0 cursor-pointer bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/10 flex items-center space-x-1.5 min-h-[36px]"
+            className="px-3 py-1.5 rounded-xl text-xs font-black transition-all shrink-0 cursor-pointer bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/10 flex items-center space-x-1.5 min-h-[40px]"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             <span>Back</span>
@@ -112,7 +112,7 @@ export function DrillDownFilters({ activeFilter, onFilterChange, items = [] }) {
                 key={catId}
                 type="button"
                 onClick={() => onFilterChange(catId)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 shrink-0 cursor-pointer min-h-[36px] ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 shrink-0 cursor-pointer min-h-[40px] ${
                   isActive ? catDef.activeClass : catDef.inactiveClass
                 }`}
               >

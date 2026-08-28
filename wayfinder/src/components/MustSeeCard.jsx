@@ -262,7 +262,7 @@ export function MustSeeCard(props) {
               href={sight?.gygUrl || `https://www.getyourguide.com/s/?q=Krakow+${encodeURIComponent(cardTitle)}+walking+tour`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex-1 py-1.5 px-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/25 text-amber-300 hover:text-amber-200 border border-amber-500/30 text-[10px] sm:text-[11px] font-black transition-all flex items-center justify-center space-x-1 shadow-sm"
+              className="flex-1 py-2 px-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/25 text-amber-300 hover:text-amber-200 border border-amber-500/30 text-[10px] sm:text-[11px] font-black transition-all flex items-center justify-center space-x-1 shadow-sm min-h-[38px] sm:min-h-[40px]"
               title={`Book ${cardTitle} tour on GetYourGuide`}
             >
               <span>🎟️</span>
@@ -272,7 +272,7 @@ export function MustSeeCard(props) {
               href={sight?.viatorUrl || `https://www.viator.com/searchResults/all?text=Krakow+${encodeURIComponent(cardTitle)}+walking+tour`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex-1 py-1.5 px-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/25 text-emerald-300 hover:text-emerald-200 border border-emerald-500/30 text-[10px] sm:text-[11px] font-black transition-all flex items-center justify-center space-x-1 shadow-sm"
+              className="flex-1 py-2 px-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/25 text-emerald-300 hover:text-emerald-200 border border-emerald-500/30 text-[10px] sm:text-[11px] font-black transition-all flex items-center justify-center space-x-1 shadow-sm min-h-[38px] sm:min-h-[40px]"
               title={`Book ${cardTitle} tour on Viator`}
             >
               <span>🗺️</span>
@@ -288,7 +288,7 @@ export function MustSeeCard(props) {
           href={sight?.websiteUrl || sight?.url || `https://www.google.com/search?q=${searchQuery}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex-1 py-2 px-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:border-emerald-500/50 text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn"
+          className="flex-1 py-2 px-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:border-emerald-500/50 text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn min-h-[38px] sm:min-h-[40px]"
           title={`Visit ${cardTitle} website`}
         >
           <ExternalLink className="w-3.5 h-3.5 text-emerald-400 group-hover/btn:text-emerald-300 transition-colors shrink-0" />
@@ -299,7 +299,7 @@ export function MustSeeCard(props) {
           href={directionsUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex-1 py-2 px-2.5 rounded-xl bg-white/5 hover:bg-amber-500/20 text-slate-300 hover:text-amber-300 border border-white/10 hover:border-amber-500/40 text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn"
+          className="flex-1 py-2 px-2.5 rounded-xl bg-white/5 hover:bg-amber-500/20 text-slate-300 hover:text-amber-300 border border-white/10 hover:border-amber-500/40 text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn min-h-[38px] sm:min-h-[40px]"
           title={`Get directions to ${cardTitle}`}
         >
           <Navigation className="w-3.5 h-3.5 text-sky-400 group-hover/btn:text-amber-300 transition-colors" />
@@ -310,7 +310,7 @@ export function MustSeeCard(props) {
           href={mapSearchUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex-1 py-2 px-2.5 rounded-xl bg-white/5 hover:bg-amber-500/20 text-slate-300 hover:text-amber-300 border border-white/10 hover:border-amber-500/40 text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn"
+          className="flex-1 py-2 px-2.5 rounded-xl bg-white/5 hover:bg-amber-500/20 text-slate-300 hover:text-amber-300 border border-white/10 hover:border-amber-500/40 text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn min-h-[38px] sm:min-h-[40px]"
           title={`View ${cardTitle} on Google Maps`}
         >
           <Compass className="w-3.5 h-3.5 text-amber-400 group-hover/btn:text-amber-300 transition-colors" />
@@ -321,7 +321,7 @@ export function MustSeeCard(props) {
           <button
             type="button"
             onClick={handleToggleItinerary}
-            className={`flex-1 py-2 px-2.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 border ${
+            className={`flex-1 py-2 px-2.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 border min-h-[38px] sm:min-h-[40px] cursor-pointer ${
               isSaved
                 ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
                 : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30 hover:border-amber-500/50'

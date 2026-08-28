@@ -63,7 +63,7 @@ export function ItineraryView() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 w-full space-y-8 animate-fade-in">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 w-full space-y-8 animate-fade-in">
       {/* Top Header & Breadcrumb */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-white/10 pb-6">
         <div>
@@ -255,7 +255,7 @@ export function ItineraryView() {
 
                 <div className="flex flex-wrap items-center gap-1.5 text-xs">
                   {dayItem.base && (
-                    <span className="px-2.5 py-1 rounded-lg bg-slate-900 border border-white/10 text-slate-300 flex items-center space-x-1">
+                    <span className="px-2.5 py-1.5 rounded-lg bg-slate-900 border border-white/10 text-slate-300 flex items-center space-x-1 min-h-[36px] sm:min-h-[38px]">
                       <Building className="w-3 h-3 text-emerald-400" />
                       <span className="truncate max-w-[220px]">{dayItem.base}</span>
                     </span>
@@ -263,21 +263,21 @@ export function ItineraryView() {
                   <a
                     href={`/wayfinder/poland-christmas-2026/cities/${dayItem.cityId}/attractions`}
                     onClick={(e) => pushRoute(e, `/wayfinder/poland-christmas-2026/cities/${dayItem.cityId}/attractions`)}
-                    className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 font-medium transition-colors"
+                    className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 font-medium transition-colors min-h-[36px] sm:min-h-[38px] flex items-center"
                   >
                     Sights
                   </a>
                   <a
                     href={`/wayfinder/poland-christmas-2026/cities/${dayItem.cityId}/restaurants`}
                     onClick={(e) => pushRoute(e, `/wayfinder/poland-christmas-2026/cities/${dayItem.cityId}/restaurants`)}
-                    className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 font-medium transition-colors"
+                    className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 font-medium transition-colors min-h-[36px] sm:min-h-[38px] flex items-center"
                   >
                     Dining
                   </a>
                   <a
                     href={`/wayfinder/poland-christmas-2026/cities/${dayItem.cityId}`}
                     onClick={(e) => pushRoute(e, `/wayfinder/poland-christmas-2026/cities/${dayItem.cityId}`)}
-                    className="px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold transition-colors shrink-0"
+                    className="px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold transition-colors shrink-0 min-h-[36px] sm:min-h-[38px] flex items-center"
                   >
                     City Guide
                   </a>

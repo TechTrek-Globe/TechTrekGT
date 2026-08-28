@@ -15,10 +15,7 @@ export function CityAttractionsTab({ city }) {
         <span className="text-xs text-wf-muted font-medium">Curated Golden Component template</span>
       </div>
 
-      <div 
-        className="grid gap-6 items-stretch"
-        style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}
-      >
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
         {city.mustSee.map((sight, idx) => (
           <MustSeeCard
             key={idx}

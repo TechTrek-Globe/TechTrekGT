@@ -76,36 +76,39 @@ export function Layout({ children }) {
             </a>
           </div>
 
-          <div className="hidden md:flex items-center space-x-3">
+          <div className="hidden md:flex items-center space-x-1.5 lg:space-x-3">
             {/* TechTrekGT Launch Pad Return Link */}
             <a
               href="https://techtrekgt.com"
-              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-700/60 hover:border-wf-blue/50 text-slate-200 hover:text-white text-sm font-semibold transition-all shadow-sm group"
+              className="flex items-center space-x-1.5 px-2.5 lg:px-3 py-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-700/60 hover:border-wf-blue/50 text-slate-200 hover:text-white text-xs lg:text-sm font-semibold transition-all shadow-sm group min-h-[40px]"
               title="Return to TechTrekGT Main Launch Pad"
             >
-              <Globe className="w-4 h-4 text-wf-blue-lt group-hover:scale-110 transition-transform" />
-              <span>Launch Pad</span>
+              <Globe className="w-3.5 h-3.5 lg:w-4 lg:h-4 text-wf-blue-lt group-hover:scale-110 transition-transform" />
+              <span className="hidden lg:inline">Launch Pad</span>
+              <span className="lg:hidden">Hub</span>
             </a>
 
-            {/* Quick Itinerary & Currency Converter Trigger (Desktop) - Only show when trip is selected */}
+            {/* Quick Itinerary & Currency Converter Trigger (Desktop/Tablet) - Only show when trip is selected */}
             {showCurrencyConverter && (
               <>
                 <a
                   href="/wayfinder/poland-christmas-2026/itinerary"
                   onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026/itinerary')}
-                  className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-slate-200 text-sm font-bold hover:text-white hover:bg-white/10 transition-all shadow-sm"
+                  className="flex items-center space-x-1.5 px-2.5 lg:px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-slate-200 text-xs lg:text-sm font-bold hover:text-white hover:bg-white/10 transition-all shadow-sm min-h-[40px]"
                 >
-                  <Calendar className="w-4 h-4 text-amber-400" />
+                  <Calendar className="w-3.5 h-3.5 lg:w-4 lg:h-4 text-amber-400" />
                   <span>Itinerary</span>
                 </a>
                 <button
                   onClick={() => setIsConverterOpen(!isConverterOpen)}
-                  className="flex items-center space-x-2 px-3 py-1.5 rounded-xl bg-wf-amber/10 border border-wf-amber/30 text-wf-amber text-sm font-bold hover:bg-wf-amber/20 transition-all shadow-sm active:scale-95 group"
+                  className="flex items-center space-x-1.5 lg:space-x-2 px-2.5 lg:px-3 py-2 rounded-xl bg-wf-amber/10 border border-wf-amber/30 text-wf-amber text-xs lg:text-sm font-bold hover:bg-wf-amber/20 transition-all shadow-sm active:scale-95 group min-h-[40px]"
                   title="Open Currency Converter"
                 >
-                  <Coins className="w-4 h-4 text-wf-amber group-hover:rotate-12 transition-transform" />
-                  <span>Currency Converter</span>
-                  <span className="text-xs bg-wf-amber/20 px-1.5 py-0.5 rounded-md font-semibold text-wf-cream">
+                  <Coins className="w-3.5 h-3.5 lg:w-4 lg:h-4 text-wf-amber group-hover:rotate-12 transition-transform" />
+                  <span>
+                    <span className="hidden xl:inline">Currency </span>Converter
+                  </span>
+                  <span className="text-[11px] lg:text-xs bg-wf-amber/20 px-1.5 py-0.5 rounded-md font-semibold text-wf-cream">
                     {symbol} {rate.toFixed(2)}
                   </span>
                 </button>
@@ -113,47 +116,48 @@ export function Layout({ children }) {
             )}
 
             {isAuthenticated ? (
-              <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-1.5 lg:space-x-2.5">
                 <a
                   href="/wayfinder/poland-christmas-2026/private"
                   onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026/private')}
-                  className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-wf-navy border border-wf-blue/30 text-wf-blue-lt text-sm font-medium hover:bg-wf-navy-lt transition-colors"
+                  className="flex items-center space-x-1.5 px-2.5 lg:px-3 py-2 rounded-lg bg-wf-navy border border-wf-blue/30 text-wf-blue-lt text-xs lg:text-sm font-medium hover:bg-wf-navy-lt transition-colors min-h-[40px]"
                 >
-                  <ShieldCheck className="w-4 h-4" />
-                  <span>Private Hub</span>
+                  <ShieldCheck className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
+                  <span className="hidden lg:inline">Private Hub</span>
+                  <span className="lg:hidden">Private</span>
                 </a>
-                <div className="h-6 w-px bg-white/10 mx-1" />
+                <div className="h-5 lg:h-6 w-px bg-white/10 mx-0.5" />
                 <button
                   onClick={() => setIsSettingsOpen(true)}
-                  className="flex items-center space-x-1.5 px-3 py-1.5 text-sm font-medium text-wf-muted hover:text-white transition-colors"
+                  className="flex items-center space-x-1 px-2 lg:px-3 py-2 text-xs lg:text-sm font-medium text-wf-muted hover:text-white transition-colors min-h-[40px]"
                   title="Settings"
                 >
-                  <Settings className="w-4 h-4" />
-                  <span>Settings</span>
+                  <Settings className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
+                  <span className="hidden lg:inline">Settings</span>
                 </button>
                 <button
                   onClick={logout}
-                  className="flex items-center space-x-1.5 px-3 py-1.5 text-sm font-medium text-wf-muted hover:text-white transition-colors"
+                  className="flex items-center space-x-1 px-2 lg:px-3 py-2 text-xs lg:text-sm font-medium text-wf-muted hover:text-white transition-colors min-h-[40px]"
                 >
-                  <LogOut className="w-4 h-4" />
-                  <span>Sign Out</span>
+                  <LogOut className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
+                  <span className="hidden lg:inline">Sign Out</span>
                 </button>
               </div>
             ) : (
-              <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-1.5 lg:space-x-2.5">
                 <button
                   onClick={() => setIsSettingsOpen(true)}
-                  className="flex items-center space-x-1.5 px-3 py-1.5 text-sm font-medium text-wf-muted hover:text-white transition-colors"
+                  className="flex items-center space-x-1 px-2 lg:px-3 py-2 text-xs lg:text-sm font-medium text-wf-muted hover:text-white transition-colors min-h-[40px]"
                   title="Settings"
                 >
-                  <Settings className="w-4 h-4" />
-                  <span>Settings</span>
+                  <Settings className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
+                  <span className="hidden lg:inline">Settings</span>
                 </button>
                 <button
                   onClick={() => setIsAuthModalOpen(true)}
-                  className="flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-sm font-medium transition-colors"
+                  className="flex items-center space-x-1.5 px-3 lg:px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs lg:text-sm font-medium transition-colors min-h-[40px]"
                 >
-                  <User className="w-4 h-4 text-wf-blue-lt" />
+                  <User className="w-3.5 h-3.5 lg:w-4 lg:h-4 text-wf-blue-lt" />
                   <span>Sign In</span>
                 </button>
               </div>

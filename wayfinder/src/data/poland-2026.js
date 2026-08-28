@@ -68,7 +68,7 @@ export const polandJourney = {
       "dates": "Nov 28, 2026 - Jan 1, 2027",
       "openingHours": "Open 10am-8pm. Early close on Dec 24 (~2pm).",
       "hours": "Open 10am-8pm. Early close on Dec 24 (~2pm).",
-      "kaucja": "20-30 PLN (~$5.35–$8.00 USD)",
+      "kaucja": "20-30 PLN (~$5.35-$8.00 USD)",
       "foodTargets": [
         "Morskie Oko",
         "Pod Wawelem",
@@ -79,7 +79,7 @@ export const polandJourney = {
         "dates": "Nov 28, 2026 - Jan 1, 2027",
         "daylight": "Sunrise ~7:30 AM | Sunset ~3:30 PM (~8 hrs daylight)",
         "peakHours": "5:30 PM - 8:00 PM (Dusk illuminations & caroling)",
-        "kaucja": "20-30 PLN (~$5.35–$8.00 USD) (Ceramic Mug Deposit, Cash Only)"
+        "kaucja": "20-30 PLN (~$5.35-$8.00 USD) (Ceramic Mug Deposit, Cash Only)"
       },
       "holidayClosures": {
         "title": "Critical Holiday Operating Hours (Dec 24 - 25)",
@@ -89,9 +89,9 @@ export const polandJourney = {
       },
       "kaucjaCallout": {
         "title": "Kaucja (Ceramic Mug Deposit)",
-        "deposit": "20-30 PLN (~$5.35–$8.00 USD) per mug",
-        "cashWarning": "CASH MANDATORY: Card payments are accepted for food and drinks, but vendors strictly require exact CASH in PLN (~$5.35–$8.00 USD) for mug deposits.",
-        "details": "Pay 20-30 PLN (~$5.35–$8.00 USD) cash per ceramic mug when ordering Grzaniec Galicyjski or hot spiced mead. Return your mug to any drink chalet for a full cash refund in PLN, or keep it as an authentic souvenir!"
+        "deposit": "20-30 PLN (~$5.35-$8.00 USD) per mug",
+        "cashWarning": "CASH MANDATORY: Card payments are accepted for food and drinks, but vendors strictly require exact CASH in PLN (~$5.35-$8.00 USD) for mug deposits.",
+        "details": "Pay 20-30 PLN (~$5.35-$8.00 USD) cash per ceramic mug when ordering Grzaniec Galicyjski or hot spiced mead. Return your mug to any drink chalet for a full cash refund in PLN, or keep it as an authentic souvenir!"
       },
       "culinaryHighlights": [
         {
@@ -137,7 +137,7 @@ export const polandJourney = {
           "tip": "Visit the Mały Rynek craft corner for small-batch artisanal mead tastings."
         }
       ],
-      "history": "Kraków was the royal capital of Poland for over 500 years (1038–1596) and stands as the nation’s cultural soul. Miraculously preserved through the devastation of WWII, its entire Old Town (Stare Miasto) was among the first 12 sites ever inscribed on the UNESCO World Heritage List in 1978. From the mythical dragon caves of Wawel Hill to Europe’s largest medieval market square (Rynek Główny), the historic Jewish Quarter of Kazimierz, and the university where Copernicus studied, Kraków offers an unbroken living bridge across a thousand years of Central European history.",
+      "history": "Kraków was the royal capital of Poland for over 500 years (1038-1596) and stands as the nation’s cultural soul. Miraculously preserved through the devastation of WWII, its entire Old Town (Stare Miasto) was among the first 12 sites ever inscribed on the UNESCO World Heritage List in 1978. From the mythical dragon caves of Wawel Hill to Europe’s largest medieval market square (Rynek Główny), the historic Jewish Quarter of Kazimierz, and the university where Copernicus studied, Kraków offers an unbroken living bridge across a thousand years of Central European history.",
       "historyStats": [
         {
           "label": "Founded",
@@ -146,7 +146,7 @@ export const polandJourney = {
         },
         {
           "label": "Royal Capital",
-          "value": "558 Years (1038–1596)",
+          "value": "558 Years (1038-1596)",
           "icon": "Crown"
         },
         {
@@ -162,34 +162,34 @@ export const polandJourney = {
       ],
       "historyEpochs": [
         {
-          "era": "7th – 10th Century",
+          "era": "7th - 10th Century",
           "title": "Mythical Origins & The Wawel Dragon",
           "subtitle": "The legend of Prince Krakus and Slavic tribal stronghold",
           "description": "According to Slavic chronicle lore, the city was founded on limestone Wawel Hill by Prince Krakus after the cunning shoemaker Skuba defeated Smok Wawelski (the fire-breathing Wawel dragon) using a sulfur-stuffed sheep. Emerging as a fortified trade settlement along the historic Amber and Silk routes, Kraków quickly became the dominant hub of Lesser Poland (Małopolska)."
         },
         {
-          "era": "1038 – 1596",
+          "era": "1038 - 1596",
           "title": "The Royal Golden Age & Jagiellonian Renaissance",
           "subtitle": "Five centuries as Poland’s imperial capital and academic beacon",
-          "description": "In 1038, King Casimir I made Kraków Poland’s royal capital. Following devastating 13th-century Tatar sieges, the city was rebuilt in 1257 on a grand geometric grid around Rynek Główny. King Casimir III the Great founded Jagiellonian University in 1364—the second-oldest university in Central Europe, where Nicolaus Copernicus studied. Italian Renaissance architects transformed Wawel Castle into one of Europe’s most breathtaking royal courts before King Sigismund III moved the royal court to Warsaw in 1596."
+          "description": "In 1038, King Casimir I made Kraków Poland’s royal capital. Following devastating 13th-century Tatar sieges, the city was rebuilt in 1257 on a grand geometric grid around Rynek Główny. King Casimir III the Great founded Jagiellonian University in 1364 - the second-oldest university in Central Europe, where Nicolaus Copernicus studied. Italian Renaissance architects transformed Wawel Castle into one of Europe’s most breathtaking royal courts before King Sigismund III moved the royal court to Warsaw in 1596."
         },
         {
-          "era": "1335 – 1939",
+          "era": "1335 - 1939",
           "title": "Kazimierz & Jewish Golden Age",
           "subtitle": "Center of European Jewish scholarship and culture",
           "description": "Founded as a separate royal town in 1335, Kazimierz became a flourishing sanctuary of Jewish commerce, theology, and philosophy under royal protection. Renowned as the home of Rabbi Moses Isserles (the Remuh), Kazimierz evolved into one of the world’s preeminent centers of Ashkenazi Jewish culture, boasting seven historic synagogues, bustling market squares, and a vibrant community that thrived for over six centuries."
         },
         {
-          "era": "1939 – 1945",
+          "era": "1939 - 1945",
           "title": "WWII & The Miraculous Architectural Survival",
           "subtitle": "Occupied capital, the Podgórze Ghetto, and Oskar Schindler",
           "description": "During WWII, the Nazi regime designated Kraków as the headquarters of the General Government under Hans Frank, who occupied Wawel Castle. Because the occupiers intended Kraków to serve as an administrative showcase, the historic city was spared the wholesale physical demolition that obliterated Warsaw. Across the river in Podgórze, the Jewish community was forced into a walled ghetto, where Oskar Schindler famously saved over 1,200 Jewish workers at his enamel factory (Emalia)."
         },
         {
-          "era": "1978 – Present",
+          "era": "1978 - Present",
           "title": "UNESCO World Heritage & Papal Legacy",
           "subtitle": "First global heritage list and intellectual renaissance",
-          "description": "In 1978, UNESCO inscribed Kraków’s Historic Centre on its inaugural World Heritage List—one of the first 12 cultural monuments in the world. That same year, Kraków’s Archbishop Cardinal Karol Wojtyła was elected Pope John Paul II, providing moral momentum for Poland’s Solidarity movement and the eventual peaceful collapse of the Iron Curtain. Today, Kraków stands as Central Europe’s crown jewel of preserved architecture, arts, and winter festivities."
+          "description": "In 1978, UNESCO inscribed Kraków’s Historic Centre on its inaugural World Heritage List - one of the first 12 cultural monuments in the world. That same year, Kraków’s Archbishop Cardinal Karol Wojtyła was elected Pope John Paul II, providing moral momentum for Poland’s Solidarity movement and the eventual peaceful collapse of the Iron Curtain. Today, Kraków stands as Central Europe’s crown jewel of preserved architecture, arts, and winter festivities."
         }
       ],
       "historyLegends": [
@@ -215,9 +215,9 @@ export const polandJourney = {
         "station": "Kraków Główny train station is directly attached to Galeria Krakowska and is a flat 5-minute walk to the Barbican and Planty Park entry to Old Town."
       },
       "practical": {
-        "weather": "December in Kraków averages -2°C to 4°C (28°F–39°F) with brisk evening winds off the Vistula. Thermal base layers, fleece-lined waterproof boots for wet cobblestones, a windproof coat, gloves, and a beanie are recommended for evening strolls.",
-        "currency": "Poland uses the Polish Złoty (PLN). Contactless card payment (Apple/Google Pay) is accepted at ~90% of stalls, but keep 20–50 PLN (~$5.35–$13.35 USD) cash for mug deposits and small craft vendors. Always select \"Pay in PLN\" on card readers to avoid 5-10% DCC markups.",
-        "restrooms": "Underground public WC is located beneath Sukiennice (Cloth Hall) on Main Square, and at Galeria Krakowska central station (2–4 PLN (~$0.50–$1.05 USD) fee, contactless card accepted)."
+        "weather": "December in Kraków averages -2°C to 4°C (28°F-39°F) with brisk evening winds off the Vistula. Thermal base layers, fleece-lined waterproof boots for wet cobblestones, a windproof coat, gloves, and a beanie are recommended for evening strolls.",
+        "currency": "Poland uses the Polish Złoty (PLN). Contactless card payment (Apple/Google Pay) is accepted at ~90% of stalls, but keep 20-50 PLN (~$5.35-$13.35 USD) cash for mug deposits and small craft vendors. Always select \"Pay in PLN\" on card readers to avoid 5-10% DCC markups.",
+        "restrooms": "Underground public WC is located beneath Sukiennice (Cloth Hall) on Main Square, and at Galeria Krakowska central station (2-4 PLN (~$0.50-$1.05 USD) fee, contactless card accepted)."
       },
       "markets": [
         {
@@ -229,10 +229,10 @@ export const polandJourney = {
           "lng": 19.9364255,
           "imageSrc": "/wayfinder/Poland-2026/images/krakow/markets/krakow-rynek-glowny.png",
           "imageUrl": "/wayfinder/Poland-2026/images/krakow/markets/krakow-rynek-glowny.png",
-          "hours": "Nov 28, 2026 – Jan 1, 2027 | Open 10am-8pm. Early close on Dec 24 (~2pm).",
+          "hours": "Nov 28, 2026 - Jan 1, 2027 | Open 10am-8pm. Early close on Dec 24 (~2pm).",
           "address": "Rynek Główny 1, 31-042 Kraków (Tram: Teatr Bagatela or Dworzec Główny)",
           "vibe": "Bustling, Grand & Iconic",
-          "bestTime": "5:00 PM – 7:30 PM (Dusk illuminations & stage caroling)",
+          "bestTime": "5:00 PM - 7:30 PM (Dusk illuminations & stage caroling)",
           "highlights": [
             "Over 100 illuminated wooden chalets surrounding the Renaissance Cloth Hall",
             "SZOPKI Krakowskie Christmas Crib Competition (First Thursday of Dec)",
@@ -266,10 +266,10 @@ export const polandJourney = {
           "lng": 19.9401271,
           "imageSrc": "/wayfinder/Poland-2026/images/krakow/markets/krakow-maly-rynek.png",
           "imageUrl": "/wayfinder/Poland-2026/images/krakow/markets/krakow-maly-rynek.png",
-          "hours": "Late Nov – Dec 26 | Daily 11:00 AM – 9:00 PM",
+          "hours": "Late Nov - Dec 26 | Daily 11:00 AM - 9:00 PM",
           "address": "Mały Rynek, 31-041 Kraków (2-min walk from Main Square)",
           "vibe": "Cozy, Artisanal & Intimate",
-          "bestTime": "4:00 PM – 6:30 PM (Sip hot mead away from Main Square crowds)",
+          "bestTime": "4:00 PM - 6:30 PM (Sip hot mead away from Main Square crowds)",
           "highlights": [
             "Specialist regional honey producers & spiced mead (Miód Pitny)",
             "Master woodcarvers and handmade wooden toys",
@@ -303,7 +303,7 @@ export const polandJourney = {
           "imageSrc": "/wayfinder/Poland-2026/images/krakow/markets/krakow-plac-wolnica.png",
           "imageUrl": "/wayfinder/Poland-2026/images/krakow/markets/krakow-plac-wolnica.png",
           "vibe": "Bohemian, Vintage & Eclectic",
-          "bestTime": "6:00 PM – 9:00 PM (Combine with Kazimierz nightlife & Zapiekanki)",
+          "bestTime": "6:00 PM - 9:00 PM (Combine with Kazimierz nightlife & Zapiekanki)",
           "highlights": [
             "Bohemian, vintage vinyl & antique collector chalets",
             "Local craft mulled cider and winter craft beers on tap",
@@ -400,8 +400,8 @@ export const polandJourney = {
           "location": "Kazimierz",
           "locationData": "Kazimierz",
           "howToGetThere": "Trams 1, 3, 8 to Plac Wolnica or 15-min walk south of Old Town.",
-          "pricing": "Free to explore; Synagogue entries ~10–15 PLN (~$2.60–$4.00 USD)",
-          "costData": "Free to explore; Synagogue entries ~10–15 PLN (~$2.60–$4.00 USD)",
+          "pricing": "Free to explore; Synagogue entries ~10-15 PLN (~$2.60-$4.00 USD)",
+          "costData": "Free to explore; Synagogue entries ~10-15 PLN (~$2.60-$4.00 USD)",
           "openTimes": "24/7 (Synagogues usually 10:00 AM - 4:00 PM)",
           "hoursData": "24/7 (Synagogues usually 10:00 AM - 4:00 PM)",
           "daysClosed": "Synagogues closed on Saturdays (Shabbat) and Jewish holidays"
@@ -498,8 +498,8 @@ export const polandJourney = {
           "location": "Chochołów (Podhale)",
           "locationData": "Chochołów (Podhale)",
           "howToGetThere": "Direct shuttle bus from Kraków Główny bus station (approx 1.5 hrs) or private day tour.",
-          "pricing": "89–119 PLN (~$23.00–$31.00 USD) for 3-hour / all-day bath pass",
-          "costData": "89–119 PLN (~$23.00–$31.00 USD) for 3-hour / all-day bath pass",
+          "pricing": "89-119 PLN (~$23.00-$31.00 USD) for 3-hour / all-day bath pass",
+          "costData": "89-119 PLN (~$23.00-$31.00 USD) for 3-hour / all-day bath pass",
           "openTimes": "9:00 AM - 10:00 PM (open daily)",
           "hoursData": "9:00 AM - 10:00 PM (open daily)",
           "daysClosed": "Open 365 days a year (special holiday hours apply)"
@@ -516,8 +516,8 @@ export const polandJourney = {
           "location": "Old Town (Stare Miasto)",
           "locationData": "Old Town (Stare Miasto)",
           "howToGetThere": "Starts at St. Florian's Gate / Barbican (north end of Planty Park).",
-          "pricing": "75–95 PLN (~$19.00–$25.00 USD) per person",
-          "costData": "75–95 PLN (~$19.00–$25.00 USD) per person",
+          "pricing": "75-95 PLN (~$19.00-$25.00 USD) per person",
+          "costData": "75-95 PLN (~$19.00-$25.00 USD) per person",
           "openTimes": "Departs 10:00 AM, 2:00 PM, & 5:00 PM (2 hrs)",
           "hoursData": "Departs 10:00 AM, 2:00 PM, & 5:00 PM (2 hrs)",
           "daysClosed": "Runs daily through December",
@@ -536,8 +536,8 @@ export const polandJourney = {
           "location": "Kazimierz & Zabłocie",
           "locationData": "Kazimierz & Zabłocie",
           "howToGetThere": "Starts at Szeroka Street in Kazimierz (tram 3, 8, or 24).",
-          "pricing": "95–125 PLN (~$25.00–$33.00 USD) incl. Museum Ticket",
-          "costData": "95–125 PLN (~$25.00–$33.00 USD) incl. Museum Ticket",
+          "pricing": "95-125 PLN (~$25.00-$33.00 USD) incl. Museum Ticket",
+          "costData": "95-125 PLN (~$25.00-$33.00 USD) incl. Museum Ticket",
           "openTimes": "Departs 10:30 AM & 2:30 PM daily (3 hrs)",
           "hoursData": "Departs 10:30 AM & 2:30 PM daily (3 hrs)",
           "daysClosed": "Mondays (reduced museum hours apply)",
@@ -1340,19 +1340,19 @@ export const polandJourney = {
             "name": "Spółdzielnia Ogniwo (Ogniwo Cooperative)",
             "type": "Queer Activist Social Center & Bookshop",
             "description": "Independent social cooperative and progressive bookshop in Podgórze hosting queer reading clubs, feminist discussions, film screenings, and activist solidarity gatherings.",
-            "highlight": "ul. Smolki 11a — community library, vegan coffee & open meetings"
+            "highlight": "ul. Smolki 11a  -  community library, vegan coffee & open meetings"
           },
           {
             "name": "MOCAK (Museum of Contemporary Art)",
             "type": "Queer Contemporary Art Exhibitions",
             "description": "World-class contemporary art museum in Zabłocie frequently featuring groundbreaking Polish LGBTQ+ artists exploring gender identity, post-communist expression, and human rights.",
-            "highlight": "ul. Lipowa 4 — temporary exhibitions & progressive art bookstore"
+            "highlight": "ul. Lipowa 4  -  temporary exhibitions & progressive art bookstore"
           },
           {
             "name": "Sauna Kazimierz",
             "type": "Gay Men's Sauna & Relaxation Club",
             "description": "Long-running men's wellness and social venue located in Kazimierz on Dietla street, featuring dry Finnish sauna, steam baths, relaxation cabins, and a bar.",
-            "highlight": "ul. Dietla 75 (Kazimierz) — open daily from late afternoon"
+            "highlight": "ul. Dietla 75 (Kazimierz)  -  open daily from late afternoon"
           }
         ],
         "winterExperiences": [
@@ -1490,37 +1490,37 @@ export const polandJourney = {
       ],
       "historyEpochs": [
         {
-          "era": "10th – 13th Century",
+          "era": "10th - 13th Century",
           "title": "Piast Foundation on the Oder",
           "subtitle": "From Slavic trading outpost to Silesian capital",
           "description": "First chronicled in 985 by Ibrahim ibn Yaqub as a prosperous trade settlement, Wrocław grew around Ostrów Tumski (Cathedral Island). In 1000, Emperor Otto III established a bishopric here, cementing its religious importance. After Mongol raids devastated the city in 1241, it was rebuilt on a grand grid plan around today's Rynek, one of the largest medieval market squares in Europe."
         },
         {
-          "era": "1335 – 1526",
+          "era": "1335 - 1526",
           "title": "The Kingdom of Bohemia & Merchant Golden Age",
           "subtitle": "A crossroads of Central European commerce and Gothic splendor",
           "description": "Wrocław passed to the Kingdom of Bohemia in 1335, becoming a major Hanseatic and overland trade hub. The magnificent Gothic Ratusz (Old Town Hall) - one of the finest secular medieval buildings in Central Europe - was completed in this era, alongside the city's soaring churches. Merchants from Flanders, Italy, and the Baltic met in the vast Rynek to trade cloth, grain, and silver."
         },
         {
-          "era": "1526 – 1741",
+          "era": "1526 - 1741",
           "title": "Habsburg Rule & Religious Pluralism",
           "subtitle": "A multiconfessional city of Catholics, Lutherans, and Jews",
           "description": "After 1526, Wrocław fell under Habsburg sovereignty. The city became a remarkable religious melting pot: Catholic, Lutheran, and Jewish communities coexisted with relative tolerance. The White Stork Synagogue (1792), still standing in the Four Denominations District, testifies to this rich pluralism. Baroque churches and palaces reshaped the skyline alongside the Gothic core."
         },
         {
-          "era": "1741 – 1918",
+          "era": "1741 - 1918",
           "title": "Prussian Era & the Golden Age of Breslau",
           "subtitle": "Industrial powerhouse and center of German-Jewish culture",
           "description": "Following the Silesian Wars, Wrocław (then Breslau) became a vibrant Prussian city. The 19th century brought explosive industrial growth, an outstanding university and opera, and a flourishing German-Jewish community that produced philosophers, philanthropists, and architects. The century culminated in 1913 with the revolutionary Centennial Hall (Hala Stulecia), Max Berg's pioneering reinforced-concrete dome, now a UNESCO World Heritage site."
         },
         {
-          "era": "1939 – 1989",
+          "era": "1939 - 1989",
           "title": "Twilight, Destruction & Rebirth",
           "subtitle": "Festung Breslau, expulsion, and postwar Polish resurrection",
           "description": "Declared a fortress city (Festung Breslau) by the Nazis, the city endured a brutal three-month siege at the end of WWII that devastated up to 70% of its buildings. Post-1945, the German population was expelled and replaced by Polish settlers from the East. The Communist era saw slow reconstruction, while student protests and the Orange Alternative movement - known for its absurdist dwarf graffiti protests - kept Wrocław's rebellious spirit alive."
         },
         {
-          "era": "1989 – Present",
+          "era": "1989 - Present",
           "title": "The Dwarf City & European Cultural Capital",
           "subtitle": "From Solidarity transition to a beloved modern European metropolis",
           "description": "After 1989, Wrocław underwent astonishing transformation and rebirth. The first bronze dwarf (Krasnal) appeared on Świdnicka in 2001, spawning a beloved citywide scavenger hunt now spanning 600+ statues. In 2006, Centennial Hall was inscribed on UNESCO's World Heritage List, and in 2016 Wrocław served as a European Capital of Culture, welcoming millions to festivals, light shows, and its reimagined Oder waterfront."
@@ -1549,9 +1549,9 @@ export const polandJourney = {
         "station": "Wrocław Główny is a stunning 1857 neo-Gothic palace station. Located 1.2 km south of Rynek (15-min walk along Świdnicka Street or a 5-min ride on Trams 6, 7, 11, or 17)."
       },
       "practical": {
-        "weather": "December in Wrocław averages -1°C to 5°C (30°F–41°F). The microclimate is slightly milder than eastern Poland, but river breezes off the Oder feel chilly. Layer warm clothing, windproof jacket, gloves, beanie, and sturdy waterproof footwear.",
+        "weather": "December in Wrocław averages -1°C to 5°C (30°F-41°F). The microclimate is slightly milder than eastern Poland, but river breezes off the Oder feel chilly. Layer warm clothing, windproof jacket, gloves, beanie, and sturdy waterproof footwear.",
         "currency": "Poland uses the Polish Złoty (PLN). Contactless card/mobile payments are accepted everywhere, but exact cash (30 PLN (~$8.00 USD)) is required for market mug deposits (Kaucja). Always choose \"Pay in PLN\" on card terminals to avoid DCC markups.",
-        "restrooms": "Clean public WCs are available underneath Ratusz (Town Hall) at Rynek, at Plac Solny, and inside Wroclavia shopping mall at Central Station (2–4 PLN (~$0.50–$1.05 USD))."
+        "restrooms": "Clean public WCs are available underneath Ratusz (Town Hall) at Rynek, at Plac Solny, and inside Wroclavia shopping mall at Central Station (2-4 PLN (~$0.50-$1.05 USD))."
       },
       "markets": [
         {
@@ -1757,7 +1757,7 @@ export const polandJourney = {
           "imageSrc": "/wayfinder/Poland-2026/images/wroclaw/attractions/wroclaw-walking-tour.jpg",
           "location": "Rynek (Old Town)",
           "howToGetThere": "Departs from the Aleksander Fredro Statue in Rynek.",
-          "pricing": "70–90 PLN (~$18.00–$24.00 USD) per person",
+          "pricing": "70-90 PLN (~$18.00-$24.00 USD) per person",
           "openTimes": "Departs 11:00 AM & 4:00 PM daily (2 hrs)",
           "gygUrl": "https://www.getyourguide.com/s/?q=Wroclaw+Christmas+Market+walking+tour",
           "viatorUrl": "https://www.viator.com/searchResults/all?text=Wroclaw+Christmas+Market+walking+tour"
@@ -1853,7 +1853,7 @@ export const polandJourney = {
           "cuisine": "Anti-Communist Resistance & Polish Comfort Food",
           "signature": "Solidarność Ribs, Giant Pierogi Platter, Bigos in Bread Bowl",
           "description": "Immersive restaurant themed around the 1980s Polish anti-communist Solidarity movement. Hidden passageways behind secret bookcases, vintage radio broadcasts, and hearty traditional Polish cooking.",
-          "hours": "Mon-Thu 1:00 PM–11:00 PM, Fri-Sat 12:00 PM–11:45 PM, Sun 12:00 PM–11:00 PM",
+          "hours": "Mon-Thu 1:00 PM-11:00 PM, Fri-Sat 12:00 PM-11:45 PM, Sun 12:00 PM-11:00 PM",
           "websiteUrl": "https://restauracjakonspira.pl/",
           "imageSrc": "/wayfinder/Poland-2026/images/wroclaw/food/konspira.jpg"
         },
@@ -1873,7 +1873,7 @@ export const polandJourney = {
           "cuisine": "Michelin-Selected Modern Polish & Live Piano",
           "signature": "Beef Tartare with Smoked Egg Yolk, Pork Schnitzel (Schabowy) with Anchovies, Craft Spirits",
           "description": "Founded by celebrity chef Beata Śniechowska. Featured in the Michelin Guide for its modern take on Polish comfort food, vibrant cocktail program, and live piano music.",
-          "hours": "Mon-Thu 4 PM–9 PM, Fri 4 PM–11 PM, Sat 12 PM–11 PM, Sun 12 PM–8 PM",
+          "hours": "Mon-Thu 4 PM-9 PM, Fri 4 PM-11 PM, Sat 12 PM-11 PM, Sun 12 PM-8 PM",
           "websiteUrl": "https://mlodapolskabistro.pl/",
           "imageSrc": "/wayfinder/Poland-2026/images/wroclaw/food/mloda-polska.jpg"
         },
@@ -1953,7 +1953,7 @@ export const polandJourney = {
           "cuisine": "Argentine Ribeye & Prime South American Steaks",
           "signature": "Black Angus Argentine Ribeye, Tenderloin Skewers, Chimichurri & Charred Vegetables",
           "description": "Premier steakhouse housed in the sleek OVO building. Winner of global restaurant design awards, specializing in prime Argentine cuts cooked over charcoal flames.",
-          "hours": "Mon-Thu 2 PM–10 PM, Fri-Sat 12 PM–11 PM, Sun 12 PM–9 PM",
+          "hours": "Mon-Thu 2 PM-10 PM, Fri-Sat 12 PM-11 PM, Sun 12 PM-9 PM",
           "websiteUrl": "https://campomoderngrill.pl/",
           "imageSrc": "/wayfinder/Poland-2026/images/wroclaw/food/campo-steakhouse.jpg"
         },
@@ -1993,7 +1993,7 @@ export const polandJourney = {
           "cuisine": "Baked & Boiled Traditional Pierogi",
           "signature": "Opiekane (Crispy Baked Pierogi in Clay Ovens), Ruskie with Crispy Onions, Sweet Cottage Cheese Dumplings",
           "description": "Famous pierogi bakery where dumplings are rolled by hand and either boiled or baked in clay ovens until golden and bubbling.",
-          "hours": "Mon 8:00 AM–10:00 PM, Tue-Sun 8:00 AM–11:00 PM",
+          "hours": "Mon 8:00 AM-10:00 PM, Tue-Sun 8:00 AM-11:00 PM",
           "websiteUrl": "https://www.pierogarnie.com/restauracje/stary-mlyn-wroclaw/",
           "imageSrc": "/wayfinder/Poland-2026/images/wroclaw/food/pierogarnia-stary-mlyn.jpg"
         },
@@ -2053,7 +2053,7 @@ export const polandJourney = {
           "cuisine": "Michelin Bib Gourmand Contemporary Polish",
           "signature": "Seasonal Tasting Menu, Confit Silesian Duck, Pergola Terrace Cocktail Pairings",
           "description": "Awarded Michelin Bib Gourmand status. Set inside the UNESCO Centennial Hall complex overlooking the Pergola fountain, serving exquisite modern Silesian gastronomy.",
-          "hours": "Tue-Fri 4 PM–10 PM, Sat-Sun 12 PM–10 PM (Closed Mon)",
+          "hours": "Tue-Fri 4 PM-10 PM, Sat-Sun 12 PM-10 PM (Closed Mon)",
           "websiteUrl": "https://restauracjatarasowa.pl/",
           "imageSrc": "/wayfinder/Poland-2026/images/wroclaw/food/restauracja-tarasowa.jpg"
         }
@@ -2095,7 +2095,7 @@ export const polandJourney = {
           "drinkType": "Artisanal Craft Beers & Food Pairing",
           "signature": "WRCLW Imperial Stout, Salamander IPA, Spent Grain Pretzel Burgers",
           "description": "Poland’s premier craft brewery combining a glass-walled production brewhouse with an industrial-chic taproom, famous for creative barrel-aged beers and food pairings.",
-          "hours": "Mon-Wed 12 PM–12 AM, Thu-Fri 12 PM–1 AM, Sat 2 PM–1 AM, Sun 2 PM–12 AM",
+          "hours": "Mon-Wed 12 PM-12 AM, Thu-Fri 12 PM-1 AM, Sat 2 PM-1 AM, Sun 2 PM-12 AM",
           "websiteUrl": "https://100mostow.pl/",
           "imageSrc": "/wayfinder/Poland-2026/images/wroclaw/food/browar-stu-mostow.jpg"
         },
@@ -2135,7 +2135,7 @@ export const polandJourney = {
           "drinkType": "Chilled Polish Vodkas & Vintage Tapas",
           "signature": "Soplica Hazelnut Vodka Shots, Beef Tartare (Tatar), Herring in Oil (Śledź), Gzik Cheese",
           "description": "24/7 pre-war retro bistro with nostalgic Art Deco decor, serving flat-rate chilled Polish vodkas and classic drinking bites like beef tartare and Gzik cheese.",
-          "hours": "Mon-Thu 3 PM–2 AM, Fri 3 PM–5 AM, Sat 1 PM–6 AM, Sun 1 PM–1 AM",
+          "hours": "Mon-Thu 3 PM-2 AM, Fri 3 PM-5 AM, Sat 1 PM-6 AM, Sun 1 PM-1 AM",
           "websiteUrl": "https://przedwojenna.pl/",
           "imageSrc": "/wayfinder/Poland-2026/images/wroclaw/food/przedwojenna.jpg"
         },
@@ -2195,7 +2195,7 @@ export const polandJourney = {
           "drinkType": "Craft Cocktails & Local Draft Beers",
           "signature": "Smoked Bourbon Sour, Polish Craft IPAs, Ruska Neon Courtyard Terrace Seats",
           "description": "Bohemian craft cocktail bar set inside the iconic Ruska 46 neon courtyard. Atmospheric industrial space with alternative music and illuminated neon signage.",
-          "hours": "Mon-Thu 4 PM–1 AM, Fri-Sat 4 PM–4 AM, Sun 4 PM–12 AM",
+          "hours": "Mon-Thu 4 PM-1 AM, Fri-Sat 4 PM-4 AM, Sun 4 PM-12 AM",
           "websiteUrl": "https://www.facebook.com/SzajbaBar/",
           "imageSrc": "/wayfinder/Poland-2026/images/wroclaw/food/szajba.jpg"
         }
@@ -2402,7 +2402,7 @@ export const polandJourney = {
         ],
         "communityAndCulture": [
           {
-            "name": "Równe Miejsce — Centrum LGBT+ Wrocław",
+            "name": "Równe Miejsce  -  Centrum LGBT+ Wrocław",
             "type": "Official LGBTQ+ Community Center & Safe Space",
             "description": "Run by association Kultura Równości at ul. Kniaziewicza 28. Wrocław's dedicated queer community center featuring a queer library, cultural evenings, support groups, and integration events.",
             "highlight": "Kultura Równości community hub, workshops & library"
@@ -2538,7 +2538,7 @@ export const polandJourney = {
       "lgbtq": {
         "title": "LGBTQ+ Traveler's Guide to Poznań",
         "subtitle": "Poland's Rainbow Capital, Grupa Stonewall, Lokomotywa Club, and bohemian Jeżyce",
-        "overview": "Poznań is widely recognized as Poland's most progressive, open-minded, and LGBTQ+-friendly city. Home to Grupa Stonewall—one of Central Europe's most active and impactful queer organizations—Poznań features queer-owned cafés (Lokum Stonewall), LGBTQ+ health services, the legendary Lokomotywa nightclub, and Poland's most celebrated Poznań Pride Week. Queer travelers will find unmatched visibility, rainbow flags in storefronts, and a relaxed, welcoming metropolitan energy.",
+        "overview": "Poznań is widely recognized as Poland's most progressive, open-minded, and LGBTQ+-friendly city. Home to Grupa Stonewall - one of Central Europe's most active and impactful queer organizations - Poznań features queer-owned cafés (Lokum Stonewall), LGBTQ+ health services, the legendary Lokomotywa nightclub, and Poland's most celebrated Poznań Pride Week. Queer travelers will find unmatched visibility, rainbow flags in storefronts, and a relaxed, welcoming metropolitan energy.",
         "primaryArea": "Jeżyce District & Stare Miasto (Old Town)",
         "landmark": "Lokum Stonewall & Plac Wolności",
         "landmarkDescription": "Queer-owned community café and activist hub in Jeżyce, minutes from the lively Christmas market on Plac Wolności.",
@@ -2554,7 +2554,7 @@ export const polandJourney = {
             },
             {
               "name": "Nowe Lokum Stonewall",
-              "contact": "Fredry 7 — queer community café and event space"
+              "contact": "Fredry 7  -  queer community café and event space"
             }
           ]
         },
@@ -2692,9 +2692,9 @@ export const polandJourney = {
         "station": "Poznań Główny is integrated with the Avenida shopping mall. Walk 15 mins northeast to Stary Rynek, or catch Tram 5 or 9 for a quick 5-min transit."
       },
       "practical": {
-        "weather": "December in Poznań averages 0°C to 4°C (32°F–39°F) with brisk westerly winds. Pack thermal underlayers, a windproof winter coat, warm gloves, a fleece beanie, and comfortable waterproof walking shoes for historic cobblestones.",
-        "currency": "Poland uses the Polish Złoty (PLN). Contactless card/mobile payments are accepted at ~95% of market stalls, but keep 30–50 PLN (~$8.00–$13.35 USD) cash for ceramic mug deposits and small souvenir chalets.",
-        "restrooms": "Public WCs are located beneath Stary Rynek near the Town Hall, at Plac Wolności underground lot, and inside the Stary Browar and Avenida shopping centers (2–4 PLN (~$0.50–$1.05 USD))."
+        "weather": "December in Poznań averages 0°C to 4°C (32°F-39°F) with brisk westerly winds. Pack thermal underlayers, a windproof winter coat, warm gloves, a fleece beanie, and comfortable waterproof walking shoes for historic cobblestones.",
+        "currency": "Poland uses the Polish Złoty (PLN). Contactless card/mobile payments are accepted at ~95% of market stalls, but keep 30-50 PLN (~$8.00-$13.35 USD) cash for ceramic mug deposits and small souvenir chalets.",
+        "restrooms": "Public WCs are located beneath Stary Rynek near the Town Hall, at Plac Wolności underground lot, and inside the Stary Browar and Avenida shopping centers (2-4 PLN (~$0.50-$1.05 USD))."
       },
       "markets": [
         {
@@ -2838,7 +2838,7 @@ export const polandJourney = {
           "lng": 16.9191652,
           "description": "The last imperial palace built in Europe (1910) for German Emperor Wilhelm II, later redesigned during WWII and now thriving as Poznań's vibrant cultural center with galleries, cinema, and winter courtyards.",
           "howToGetThere": "10-min walk west of Plac Wolności or Tram 2, 5, 13 to Zamek stop.",
-          "pricing": "Castle courtyards free; Exhibitions ~15–20 PLN (~$4.00–$5.35 USD)",
+          "pricing": "Castle courtyards free; Exhibitions ~15-20 PLN (~$4.00-$5.35 USD)",
           "openTimes": "Daily 10:00 AM - 9:00 PM",
           "imageUrl": "/wayfinder/Poland-2026/images/poznan/attractions/poznan-zamek-cesarski.jpg",
           "imageSrc": "/wayfinder/Poland-2026/images/poznan/attractions/poznan-zamek-cesarski.jpg",
@@ -2854,7 +2854,7 @@ export const polandJourney = {
           "lng": 16.9348606,
           "description": "An interactive comedy and culinary show housed in a Renaissance townhouse overlooking the Town Hall. Learn the secret recipe and legend of St. Martin’s croissants and earn an apprentice baker certificate.",
           "howToGetThere": "Located on Stary Rynek directly opposite the Town Hall.",
-          "pricing": "32–38 PLN (~$8.50–$10.00 USD) incl. fresh croissant tasting",
+          "pricing": "32-38 PLN (~$8.50-$10.00 USD) incl. fresh croissant tasting",
           "openTimes": "Shows run daily (English sessions available at 2:00 PM; reserve online)",
           "imageUrl": "/wayfinder/Poland-2026/images/poznan/attractions/poznan-rogalowe-muzeum.jpg",
           "imageSrc": "/wayfinder/Poland-2026/images/poznan/attractions/poznan-rogalowe-muzeum.jpg",
@@ -2902,7 +2902,7 @@ export const polandJourney = {
           "lng": 16.9337029,
           "description": "Immersive 2.5-hour walking tour covering the Renaissance Stary Rynek, goat legends, Baroque Fara, Ostrów Tumski birthplace of Poland, and a warm St. Martin croissant and coffee tasting.",
           "howToGetThere": "Departs from the Bamberka Fountain on Stary Rynek.",
-          "pricing": "70–90 PLN (~$18.50–$24.00 USD) per person",
+          "pricing": "70-90 PLN (~$18.50-$24.00 USD) per person",
           "openTimes": "Departs 10:30 AM & 2:00 PM daily",
           "imageUrl": "/wayfinder/Poland-2026/images/poznan/attractions/poznan-walking-tour.jpg",
           "imageSrc": "/wayfinder/Poland-2026/images/poznan/attractions/poznan-walking-tour.jpg"
@@ -3232,7 +3232,7 @@ export const polandJourney = {
         "station": "URGENT TRANSIT NOTE: Station luggage lockers at Toruń Główny experience extremely high demand during December day trips. Arrive early or utilize the left luggage service desk to secure locker storage during your 4-6 hour stopover. Toruń Główny station is located south of the Vistula River. Secure luggage storage lockers are available in the main station waiting room (approx. 15 PLN/day, card accepted). After storing bags, take Bus 22 across the bridge to Plac Rapackiego (5-min ride) to enter the medieval pedestrian core."
       },
       "practical": {
-        "weather": "December in Toruń averages -1°C to 4°C (30°F–39°F) with brisk river winds off the Vistula.",
+        "weather": "December in Toruń averages -1°C to 4°C (30°F-39°F) with brisk river winds off the Vistula.",
         "currency": "Poland uses the Polish Złoty (PLN). Cards and contactless mobile pay are widely accepted.",
         "restrooms": "Public WCs are available in the Town Hall (Ratusz Staromiejski) basement."
       },
@@ -3733,14 +3733,14 @@ export const polandJourney = {
         }
       ],
       "transit": {
-        "airport": "Gdańsk Lech Wałęsa Airport (GDN) is 12 km west of the center. Take the direct PKM train to Gdańsk Wrzeszcz / Gdańsk Główny (~25 mins, 5.40 PLN (~$1.45 USD)) or Bus 210 directly to Gdańsk Główny station (~40 mins, 4.80 PLN (~$1.28 USD)). Taxi/Bolt is ~45–65 PLN (~$12–17 USD).",
+        "airport": "Gdańsk Lech Wałęsa Airport (GDN) is 12 km west of the center. Take the direct PKM train to Gdańsk Wrzeszcz / Gdańsk Główny (~25 mins, 5.40 PLN (~$1.45 USD)) or Bus 210 directly to Gdańsk Główny station (~40 mins, 4.80 PLN (~$1.28 USD)). Taxi/Bolt is ~45-65 PLN (~$12-17 USD).",
         "cityTransit": "Operated by ZTM Gdańsk. Single tickets cost 4.80 PLN (~$1.28 USD); 24-hr passes cost 18.00 PLN (~$4.80 USD). Purchase via contactless card on board or through the Jakdojade app. Trams 2, 3, 6, and 8 connect Gdańsk Główny directly with Główne Miasto (Brama Wyżynna) and the Motława waterfront.",
         "station": "Gdańsk Główny is the newly renovated 1900 brick Dutch Renaissance central station. It is a level 8-minute walk to Targ Węglowy (Christmas Market) and the Golden Gate entry to the Royal Way (Ulica Długa)."
       },
       "practical": {
-        "weather": "December in Gdańsk averages 0°C to 5°C (32°F–41°F) with strong damp maritime breezes off the Baltic Sea and Gulf of Gdańsk. Windchill can make temperatures feel below freezing. Waterproof insulated winter boots, windproof coat, fleece layers, thermal gloves, and a beanie are strongly advised.",
+        "weather": "December in Gdańsk averages 0°C to 5°C (32°F-41°F) with strong damp maritime breezes off the Baltic Sea and Gulf of Gdańsk. Windchill can make temperatures feel below freezing. Waterproof insulated winter boots, windproof coat, fleece layers, thermal gloves, and a beanie are strongly advised.",
         "currency": "Poland uses the Polish Złoty (PLN). Contactless card/mobile payments are universally accepted at ~95% of stalls, but exact cash (30 PLN (~$8.00 USD)) is required for market mug deposits (Kaucja). Always choose \"Pay in PLN\" on card terminals to avoid dynamic currency conversion fees.",
-        "restrooms": "Public WCs are located at Targ Węglowy (near Prison Tower), underneath Długi Targ near Green Gate, at the Great Mill (Amber Museum), and inside Forum Gdańsk shopping center (2–4 PLN (~$0.50–$1.05 USD))."
+        "restrooms": "Public WCs are located at Targ Węglowy (near Prison Tower), underneath Długi Targ near Green Gate, at the Great Mill (Amber Museum), and inside Forum Gdańsk shopping center (2-4 PLN (~$0.50-$1.05 USD))."
       },
       "markets": [
         {
@@ -3964,7 +3964,7 @@ export const polandJourney = {
           "lng": 18.6548426,
           "description": "Top-rated 2.5-hour tour covering the Royal Way, Neptune’s Fountain, St. Mary’s Basilica, amber workshops on picturesque Mariacka Street, and the Motława waterfront crane.",
           "howToGetThere": "Departs from Neptune’s Fountain on Długi Targ.",
-          "pricing": "75–95 PLN (~$20.00–$25.50 USD) per person",
+          "pricing": "75-95 PLN (~$20.00-$25.50 USD) per person",
           "openTimes": "Departs 10:30 AM & 2:30 PM daily",
           "imageUrl": "/wayfinder/Poland-2026/images/gdansk/attractions/gdansk-walking-tour.jpg",
           "imageSrc": "/wayfinder/Poland-2026/images/gdansk/attractions/gdansk-walking-tour.jpg"

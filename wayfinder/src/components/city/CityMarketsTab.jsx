@@ -85,7 +85,7 @@ export function CityMarketsTab({
             <button
               type="button"
               onClick={() => setActiveMarketTab('all')}
-              className={`px-2.5 py-1 rounded-xl font-black text-[11px] sm:text-xs transition-all duration-200 flex items-center space-x-1 whitespace-nowrap shrink-0 border cursor-pointer ${
+              className={`px-3 py-2 rounded-xl font-black text-[11px] sm:text-xs transition-all duration-200 flex items-center space-x-1 whitespace-nowrap shrink-0 border cursor-pointer min-h-[40px] ${
                 activeMarketTab === 'all'
                   ? 'bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 border-amber-300 shadow-md shadow-amber-500/30'
                   : 'bg-white/5 hover:bg-white/10 text-slate-200 border-white/10'
@@ -103,7 +103,7 @@ export function CityMarketsTab({
                   key={market.id}
                   type="button"
                   onClick={() => setActiveMarketTab(idx)}
-                  className={`px-2.5 py-1 rounded-xl font-bold text-[11px] sm:text-xs transition-all duration-200 flex items-center space-x-1 whitespace-nowrap shrink-0 border cursor-pointer ${
+                  className={`px-3 py-2 rounded-xl font-bold text-[11px] sm:text-xs transition-all duration-200 flex items-center space-x-1 whitespace-nowrap shrink-0 border cursor-pointer min-h-[40px] ${
                     isActive
                       ? 'bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 border-amber-300 shadow-md shadow-amber-500/30 font-black'
                       : 'bg-emerald-950/70 hover:bg-emerald-900/90 text-emerald-100 border-emerald-500/40 hover:border-amber-400/60 shadow-sm'
@@ -237,7 +237,7 @@ export function CityMarketsTab({
                         e.preventDefault();
                         toggleItinerary(market.id);
                       }}
-                      className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-1.5 border cursor-pointer ${
+                      className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-1.5 border cursor-pointer min-h-[38px] sm:min-h-[40px] ${
                         isSaved
                           ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
                           : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30 hover:border-amber-500/50'
@@ -262,7 +262,7 @@ export function CityMarketsTab({
                     href={directionsUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex-1 py-2 px-2.5 rounded-xl bg-white/5 hover:bg-sky-500/20 text-slate-300 hover:text-sky-300 border border-white/10 hover:border-sky-500/40 text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn"
+                    className="flex-1 py-2 px-2.5 rounded-xl bg-white/5 hover:bg-sky-500/20 text-slate-300 hover:text-sky-300 border border-white/10 hover:border-sky-500/40 text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn min-h-[38px] sm:min-h-[40px]"
                     title={`Get Directions to ${market.name}`}
                   >
                     <Navigation className="w-3.5 h-3.5 text-sky-400 group-hover/btn:text-sky-300 shrink-0" />
@@ -273,7 +273,7 @@ export function CityMarketsTab({
                     href={mapSearchUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex-1 py-2 px-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:border-amber-500/50 text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn"
+                    className="flex-1 py-2 px-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:border-amber-500/50 text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn min-h-[38px] sm:min-h-[40px]"
                     title={`View ${market.name} on Map`}
                   >
                     <Compass className="w-3.5 h-3.5 text-amber-400 group-hover/btn:text-amber-300 shrink-0" />

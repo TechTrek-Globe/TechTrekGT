@@ -48,9 +48,9 @@ export function CityOverviewTab({ city, baseUrl, handleSubPageTabClick, mapUrl, 
       )}
 
       {/* Quick-Jump Highlights Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 lg:gap-6">
         {city.historyEpochs && city.historyEpochs.length > 0 && (
-          <div className="glass-panel p-6 sm:p-7 rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-wf-navy-mid to-slate-950 shadow-xl flex flex-col justify-between group hover:border-amber-400/50 transition-all">
+          <div className="glass-panel p-5 sm:p-7 rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-wf-navy-mid to-slate-950 shadow-xl flex flex-col justify-between group hover:border-amber-400/50 transition-all">
             <div className="space-y-2 mb-4">
               <div className="flex items-center space-x-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
                 <BookOpen className="w-4 h-4" />
@@ -66,7 +66,7 @@ export function CityOverviewTab({ city, baseUrl, handleSubPageTabClick, mapUrl, 
             <a
               href={`${baseUrl}/history`}
               onClick={(e) => handleSubPageTabClick(e, `${baseUrl}/history`)}
-              className="inline-flex items-center justify-center space-x-2 px-5 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm transition-all transform hover:scale-[1.02] shadow-lg shadow-amber-500/20 cursor-pointer self-start"
+              className="inline-flex items-center justify-center space-x-2 px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm transition-all transform hover:scale-[1.02] shadow-lg shadow-amber-500/20 cursor-pointer self-start min-h-[40px]"
             >
               <BookOpen className="w-4 h-4" />
               <span>View Timeline Tab</span>
@@ -76,7 +76,7 @@ export function CityOverviewTab({ city, baseUrl, handleSubPageTabClick, mapUrl, 
         )}
 
         {city.mustSee && city.mustSee.length > 0 && (
-          <div className="glass-panel p-6 sm:p-7 rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-wf-navy-mid to-slate-950 shadow-xl flex flex-col justify-between group hover:border-amber-400/50 transition-all">
+          <div className="glass-panel p-5 sm:p-7 rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-wf-navy-mid to-slate-950 shadow-xl flex flex-col justify-between group hover:border-amber-400/50 transition-all">
             <div className="space-y-2 mb-4">
               <div className="flex items-center space-x-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
                 <Sparkles className="w-4 h-4" />
@@ -92,7 +92,7 @@ export function CityOverviewTab({ city, baseUrl, handleSubPageTabClick, mapUrl, 
             <a
               href={`${baseUrl}/attractions`}
               onClick={(e) => handleSubPageTabClick(e, `${baseUrl}/attractions`)}
-              className="inline-flex items-center justify-center space-x-2 px-5 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm transition-all transform hover:scale-[1.02] shadow-lg shadow-amber-500/20 cursor-pointer self-start"
+              className="inline-flex items-center justify-center space-x-2 px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm transition-all transform hover:scale-[1.02] shadow-lg shadow-amber-500/20 cursor-pointer self-start min-h-[40px]"
             >
               <Sparkles className="w-4 h-4" />
               <span>View All Sights</span>
@@ -102,7 +102,7 @@ export function CityOverviewTab({ city, baseUrl, handleSubPageTabClick, mapUrl, 
         )}
 
         {city.restaurants && city.restaurants.length > 0 && (
-          <div className="glass-panel p-6 sm:p-7 rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-wf-navy-mid to-slate-950 shadow-xl flex flex-col justify-between group hover:border-amber-400/50 transition-all">
+          <div className="glass-panel p-5 sm:p-7 rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-wf-navy-mid to-slate-950 shadow-xl flex flex-col justify-between group hover:border-amber-400/50 transition-all md:col-span-2 lg:col-span-1">
             <div className="space-y-2 mb-4">
               <div className="flex items-center space-x-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
                 <Utensils className="w-4 h-4" />
@@ -118,7 +118,7 @@ export function CityOverviewTab({ city, baseUrl, handleSubPageTabClick, mapUrl, 
             <a
               href={`${baseUrl}/restaurants`}
               onClick={(e) => handleSubPageTabClick(e, `${baseUrl}/restaurants`)}
-              className="inline-flex items-center justify-center space-x-2 px-5 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm transition-all transform hover:scale-[1.02] shadow-lg shadow-amber-500/20 cursor-pointer self-start"
+              className="inline-flex items-center justify-center space-x-2 px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm transition-all transform hover:scale-[1.02] shadow-lg shadow-amber-500/20 cursor-pointer self-start min-h-[40px]"
             >
               <Utensils className="w-4 h-4" />
               <span>View Food & Drink</span>
@@ -225,7 +225,7 @@ export function CityOverviewTab({ city, baseUrl, handleSubPageTabClick, mapUrl, 
             <Info className="w-6 h-6 text-amber-400" />
             <span>Practical Visitor Guide ({city.name})</span>
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 lg:gap-6">
             <div className="glass-panel p-5 rounded-2xl border border-sky-500/30 bg-sky-500/5 space-y-2">
               <div className="flex items-center space-x-2 text-sky-400 font-bold text-sm">
                 <Thermometer className="w-5 h-5" />
@@ -234,7 +234,7 @@ export function CityOverviewTab({ city, baseUrl, handleSubPageTabClick, mapUrl, 
               <p className="text-xs sm:text-sm text-wf-cream leading-relaxed"><FormatText text={city.practical.weather} /></p>
             </div>
 
-            <div className="glass-panel p-5 rounded-2xl border border-amber-500/30 bg-amber-500/5 space-y-3">
+            <div className="glass-panel p-5 rounded-2xl border border-amber-500/30 bg-amber-500/5 space-y-3 md:col-span-2 lg:col-span-1">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2 text-amber-400 font-bold text-sm">
                   <CreditCard className="w-5 h-5" />
@@ -268,7 +268,7 @@ export function CityOverviewTab({ city, baseUrl, handleSubPageTabClick, mapUrl, 
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-400">☕ Mug Deposit (Kaucja):</span>
-                    <span className="font-bold text-amber-200">20-30 PLN (~<FormatCurrency pln={20} />–<FormatCurrency pln={30} />)</span>
+                    <span className="font-bold text-amber-200">20-30 PLN (~<FormatCurrency pln={20} />-<FormatCurrency pln={30} />)</span>
                   </div>
                 </div>
               </div>

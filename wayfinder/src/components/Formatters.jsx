@@ -50,11 +50,11 @@ export function FormatText({ text }) {
   // 1. Process Temperatures
   const wantCelsius = settings?.temperature === 'C';
   if (wantCelsius) {
-    // Remove the fahrenheit part: " -2°C to 4°C (28°F–39°F)" -> "-2°C to 4°C"
-    formatted = formatted.replace(/\s*\([\d]+°F[–-][\d]+°F\)/g, '');
+    // Remove the fahrenheit part: " -2°C to 4°C (28°F-39°F)" -> "-2°C to 4°C"
+    formatted = formatted.replace(/\s*\([\d]+°F[\u2013-][\d]+°F\)/g, '');
   } else {
     // Replace the whole chunk with just Fahrenheit
-    formatted = formatted.replace(/-2°C to 4°C \((28°F[–-]39°F)\)/g, '$1');
+    formatted = formatted.replace(/-2°C to 4°C \((28°F[\u2013-]39°F)\)/g, '$1');
   }
 
   // 2. Process Mixed Currencies e.g., "25-35 PLN (~$6.70-$9.40)", "15 PLN", "450-650 PLN/night"

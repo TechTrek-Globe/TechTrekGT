@@ -202,7 +202,7 @@ export function CityLgbtqTab({
           </div>
           <h3 className="text-2xl font-black text-white">Neighborhoods & Iconic Hubs</h3>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {city.lgbtq.neighborhoods.map((area, idx) => {
               const mapSearchQuery = encodeURIComponent(`${area.name}, ${city.name}, Poland`);
               const areaId = area.id || `lgbtq-neighborhood-${idx}`;
@@ -228,7 +228,7 @@ export function CityLgbtqTab({
                         e.preventDefault();
                         toggleItinerary(areaId);
                       }}
-                      className={`py-2 px-2.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 border cursor-pointer ${
+                      className={`py-2 px-2.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 border cursor-pointer min-h-[38px] ${
                         isSaved
                           ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
                           : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30 hover:border-amber-500/50'
@@ -252,7 +252,7 @@ export function CityLgbtqTab({
                     href={area.websiteUrl || `https://www.google.com/search?q=${mapSearchQuery}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="py-2 px-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:border-emerald-500/50 text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn"
+                    className="py-2 px-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:border-emerald-500/50 text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn min-h-[38px]"
                   >
                     <ExternalLink className="w-3.5 h-3.5 text-emerald-400 group-hover/btn:text-emerald-300 shrink-0" />
                     <span className="truncate">Visit Website</span>
@@ -274,7 +274,7 @@ export function CityLgbtqTab({
           </div>
           <h3 className="text-2xl font-black text-white">Gay Clubs & Queer-Friendly Bars</h3>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {city.lgbtq.barsAndClubs.map((venue, idx) => {
               const mapSearchQuery = encodeURIComponent(`${venue.name}, ${venue.address || ''}, ${city.name}, Poland`);
               const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${mapSearchQuery}`;
@@ -379,7 +379,7 @@ export function CityLgbtqTab({
           </div>
           <h3 className="text-2xl font-black text-white">LGBTQ+-Friendly Cafés, Bakeries & Dining</h3>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {city.lgbtq.cafesAndDining.map((rest, idx) => {
               const mapSearchQuery = encodeURIComponent(`${rest.name}, ${rest.address || ''}, ${city.name}, Poland`);
               const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${mapSearchQuery}`;
@@ -418,7 +418,7 @@ export function CityLgbtqTab({
                         e.preventDefault();
                         toggleItinerary(restId);
                       }}
-                      className={`py-2 px-2.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 border cursor-pointer ${
+                      className={`py-2 px-2.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 border cursor-pointer min-h-[38px] ${
                         isSaved
                           ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
                           : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30 hover:border-amber-500/50'
@@ -442,7 +442,7 @@ export function CityLgbtqTab({
                     href={rest.websiteUrl || `https://www.google.com/search?q=${mapSearchQuery}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="py-2 px-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:border-emerald-500/50 text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn"
+                    className="py-2 px-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:border-emerald-500/50 text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn min-h-[38px]"
                   >
                     <ExternalLink className="w-3.5 h-3.5 text-emerald-400 group-hover/btn:text-emerald-300 shrink-0" />
                     <span className="truncate">Visit Website</span>
@@ -452,7 +452,7 @@ export function CityLgbtqTab({
                     href={directionsUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="py-2 px-2.5 rounded-xl bg-white/5 hover:bg-sky-500/20 text-slate-300 hover:text-sky-300 border border-white/10 hover:border-sky-500/40 text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn"
+                    className="py-2 px-2.5 rounded-xl bg-white/5 hover:bg-sky-500/20 text-slate-300 hover:text-sky-300 border border-white/10 hover:border-sky-500/40 text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn min-h-[38px]"
                   >
                     <Navigation className="w-3.5 h-3.5 text-sky-400 group-hover/btn:text-sky-300 shrink-0" />
                     <span className="truncate">Directions</span>
@@ -462,7 +462,7 @@ export function CityLgbtqTab({
                     href={mapSearchUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="py-2 px-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:border-amber-500/50 text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn"
+                    className="py-2 px-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:border-amber-500/50 text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn min-h-[38px]"
                   >
                     <Compass className="w-3.5 h-3.5 text-amber-400 group-hover/btn:text-amber-300 shrink-0" />
                     <span className="truncate">View Map</span>
@@ -566,7 +566,7 @@ export function CityLgbtqTab({
           </div>
           <h3 className="text-2xl font-black text-white">Queer-Welcoming Winter Experiences</h3>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {city.lgbtq.winterExperiences.map((item, idx) => {
               const mapSearchQuery = encodeURIComponent(`${item.title}, ${city.name}, Poland`);
               const itemId = item.id || `lgbtq-winter-${idx}`;
@@ -592,7 +592,7 @@ export function CityLgbtqTab({
                         e.preventDefault();
                         toggleItinerary(itemId);
                       }}
-                      className={`py-2 px-2.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 border cursor-pointer ${
+                      className={`py-2 px-2.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 border cursor-pointer min-h-[38px] ${
                         isSaved
                           ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
                           : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30 hover:border-amber-500/50'
@@ -616,7 +616,7 @@ export function CityLgbtqTab({
                     href={item.websiteUrl || `https://www.google.com/search?q=${mapSearchQuery}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="py-2 px-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:border-emerald-500/50 text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn"
+                    className="py-2 px-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:border-emerald-500/50 text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn min-h-[38px]"
                   >
                     <ExternalLink className="w-3.5 h-3.5 text-emerald-400 group-hover/btn:text-emerald-300 shrink-0" />
                     <span className="truncate">Visit Website</span>

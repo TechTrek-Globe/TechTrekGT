@@ -793,10 +793,8 @@ export function LedgerDataProvider({ children }) {
       if (!skipImportPin && accExtra !== undefined && accExtra !== null && accExtra !== '') customExtraEnd = parseFloat(accExtra);
 
       // Only anchor to the imported row's stated ending balance when no bill on
-      // this day has a manual dailyMatrix override (moved/edited). If a manual
-      // override exists the import snapshot is stale and the computed tentative
-      // ending must be used to keep the running balance accurate.
-      if (customRegEnd === undefined && isImportMode && importedRows[isoDate] !== undefined && !hasDayBillOverride && !hasRunningDivergence) {
+      // this day has a manual dailyMatrix override (moved/edited) and no prior divergence occurred.
+      if (customRegEnd === undefined && isImportMode && importedRows[isoDate] !== undefined && !skipImportPin) {
         const rowData = importedRows[isoDate];
         if (typeof rowData === 'number') {
           customRegEnd = rowData;
@@ -807,7 +805,7 @@ export function LedgerDataProvider({ children }) {
           }
         }
       }
-      if (customExtraEnd === undefined && isImportMode && importedRows[isoDate] !== undefined && !hasDayBillOverride && !hasRunningDivergence) {
+      if (customExtraEnd === undefined && isImportMode && importedRows[isoDate] !== undefined && !skipImportPin) {
         const rowData = importedRows[isoDate];
         if (rowData && typeof rowData === 'object') {
           const statedExtra = rowData.extraEnding ?? null;

@@ -850,10 +850,8 @@ function DailySpreadsheetMatrix() {
         }
 
         // Only anchor to the imported row's stated ending balance when no bill on
-        // this day has been manually overridden (moved/edited). A manual override
-        // means the import data is stale for this row and the computed tentative
-        // ending must be used instead so the running balance stays accurate.
-        if (customRegEnd === undefined && isImportMode && importedRows[isoDate] !== undefined && !hasDayBillOverride) {
+        // this day has been manually overridden (moved/edited) and no prior divergence occurred.
+        if (customRegEnd === undefined && isImportMode && importedRows[isoDate] !== undefined && !skipImportPin) {
           const rowData = importedRows[isoDate];
           if (typeof rowData === 'number') {
             customRegEnd = rowData;
@@ -864,7 +862,7 @@ function DailySpreadsheetMatrix() {
             }
           }
         }
-        if (customExtraEnd === undefined && isImportMode && importedRows[isoDate] !== undefined && !hasDayBillOverride) {
+        if (customExtraEnd === undefined && isImportMode && importedRows[isoDate] !== undefined && !skipImportPin) {
           const rowData = importedRows[isoDate];
           if (rowData && typeof rowData === 'object') {
             const statedExtra = rowData.extraEnding ?? null;

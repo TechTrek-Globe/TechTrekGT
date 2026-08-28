@@ -251,9 +251,10 @@ export function getPersonDepositAmountForAccount(person, selectedAccountId = 'al
  * @returns {number}
  */
 export function getAccountSaveExtraPersonPortion(account, person, budget) {
-  if (!account || !account.saveExtraMonthly || account.enableExtraSavings === false) return 0;
+  if (!account || !person) return 0;
+  if (account.enableExtraSavings === false || account.enableExtraSavings === 0 || account.enableExtraSavings === 'false') return 0;
   const totalExtra = parseFloat(account.saveExtraMonthly) || 0;
-  if (totalExtra <= 0 || !person) return 0;
+  if (totalExtra <= 0) return 0;
 
   // If the account has an explicit list of enabled split earners, check if this person is included
   if (account.enabledEarners && Array.isArray(account.enabledEarners) && account.enabledEarners.length > 0) {
@@ -265,7 +266,7 @@ export function getAccountSaveExtraPersonPortion(account, person, budget) {
   const splits = account.saveExtraSplits;
   const splitType = account.saveExtraSplitType || 'percentage';
 
-  if (splits && typeof splits === 'object' && splits[person.id] !== undefined) {
+  if (splits && typeof splits === 'object' && splits[person.id] !== undefined && splits[person.id] !== null && splits[person.id] !== '') {
     const val = parseFloat(splits[person.id]) || 0;
     if (splitType === 'amount') {
       return val;
@@ -287,7 +288,53 @@ export function getAccountSaveExtraPersonPortion(account, person, budget) {
     return 0;
   }
 
-  return totalExtra / targetEarners.length;
+  return totalExtra / Math.max(1, targetEarners.length);
+}
+
+/**
+ * Calculates the per-paycheck extra savings deposit amount for a given person and account.
+ * Converts the monthly extra savings portion into per-paycheck frequency (semi-monthly, bi-weekly, weekly).
+ *
+ * @param {object} person
+ * @param {string} selectedAccountId - 'all' or specific account ID
+ * @param {object} budget
+ * @returns {number}
+ */
+export function getPersonExtraSavingsDepositAmountForAccount(person, selectedAccountId = 'all', budget = null) {
+  if (!person || !budget) return 0;
+
+  if (!selectedAccountId || selectedAccountId === 'all') {
+    const accounts = budget.accounts || [];
+    return accounts.reduce((sum, acc) => {
+      if (acc.enableExtraSavings === false || acc.enableExtraSavings === 0 || acc.enableExtraSavings === 'false') return sum;
+      const monthlyExtra = getAccountSaveExtraPersonPortion(acc, person, budget);
+      if (monthlyExtra <= 0) return sum;
+      let perPay = monthlyExtra;
+      const freq = (person.payFrequency || 'bi-weekly').toLowerCase();
+      if (freq === 'semi-monthly' || freq === 'bi-weekly') {
+        perPay = monthlyExtra / 2;
+      } else if (freq === 'weekly') {
+        perPay = (monthlyExtra * 12) / 52;
+      }
+      return sum + perPay;
+    }, 0);
+  }
+
+  const targetAcc = (budget.accounts || []).find(a => a.id === selectedAccountId);
+  if (!targetAcc || targetAcc.enableExtraSavings === false || targetAcc.enableExtraSavings === 0 || targetAcc.enableExtraSavings === 'false') return 0;
+
+  const monthlyExtra = getAccountSaveExtraPersonPortion(targetAcc, person, budget);
+  if (monthlyExtra <= 0) return 0;
+
+  let perPay = monthlyExtra;
+  const freq = (person.payFrequency || 'bi-weekly').toLowerCase();
+  if (freq === 'semi-monthly' || freq === 'bi-weekly') {
+    perPay = monthlyExtra / 2;
+  } else if (freq === 'weekly') {
+    perPay = (monthlyExtra * 12) / 52;
+  }
+
+  return Math.round(perPay * 100) / 100;
 }
 
 export const MONTH_NAMES = [

@@ -29,7 +29,8 @@ export function LedgerDataProvider({ children }) {
     isSyncOnLoadEnabled,
     setLastCloudSyncTime,
     isPersonDepositDay,
-    getPersonDepositAmountForAccount
+    getPersonDepositAmountForAccount,
+    getPersonExtraSavingsDepositAmountForAccount
   } = metadata;
 
   const [dailyMatrix, setDailyMatrix] = useState({});
@@ -702,6 +703,8 @@ export function LedgerDataProvider({ children }) {
 
     const isImportMode = acc.ledgerMode === 'import' || (acc.importedLedgerRows && Object.keys(acc.importedLedgerRows).length > 0);
     const importedRows = isImportMode ? (acc.importedLedgerRows || {}) : {};
+    const importedDatesList = Object.keys(importedRows);
+    const maxImportDateStr = importedDatesList.length > 0 ? importedDatesList.reduce((a, b) => a > b ? a : b) : null;
 
     let runningRegBeg = parseFloat(acc.startingBalance) || 0;
     let runningExtraBeg = parseFloat(acc.extraStartingBalance) || 0;
@@ -716,9 +719,6 @@ export function LedgerDataProvider({ children }) {
     const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
 
     let cur = new Date(startDateObj);
-    // Once a bill override diverges the running balance from import pins,
-    // all subsequent import-anchored rows must also be bypassed.
-    let hasRunningDivergence = false;
     while (cur <= target) {
       const year = cur.getFullYear();
       const month = cur.getMonth();
@@ -726,24 +726,35 @@ export function LedgerDataProvider({ children }) {
       const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`;
       const isoDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       
-      const isLockedDay = isImportMode && importedRows[isoDate] !== undefined;
+      const isLockedDay = isImportMode && maxImportDateStr && isoDate <= maxImportDateStr;
 
       // 1. Credits
       let dayCredits = 0;
       let dayExtraAdd = 0;
       people.forEach(p => {
+        const isDepDay = isPersonDepositDay(p, year, month, day);
         const customCredit = getDailyMatrixCell(accountId, monthKey, day, `credit_${p.id}`);
+        const customExtra = getDailyMatrixCell(accountId, monthKey, day, `extra_credit_${p.id}`);
+
+        let earnerDeposit = 0;
         if (customCredit !== undefined) {
-          dayCredits += parseFloat(customCredit) || 0;
-        } else if (!isLockedDay) {
-          const isDepDay = isPersonDepositDay(p, year, month, day);
-          dayCredits += isDepDay ? getPersonDepositAmountForAccount(p, accountId, metadataStateRef.current) : 0;
+          earnerDeposit = parseFloat(customCredit) || 0;
+        } else if (!isLockedDay && isDepDay) {
+          earnerDeposit = getPersonDepositAmountForAccount(p, accountId, metadataStateRef.current);
         }
 
-        const customExtra = getDailyMatrixCell(accountId, monthKey, day, `extra_credit_${p.id}`);
+        let earnerExtra = 0;
         if (customExtra !== undefined) {
-          dayExtraAdd += parseFloat(customExtra) || 0;
+          earnerExtra = parseFloat(customExtra) || 0;
+        } else if (earnerDeposit > 0) {
+          earnerExtra = getPersonExtraSavingsDepositAmountForAccount(p, accountId, metadataStateRef.current);
         }
+
+        earnerExtra = Math.min(earnerExtra, earnerDeposit);
+        const earnerReg = Math.max(0, earnerDeposit - earnerExtra);
+
+        dayCredits += earnerReg;
+        dayExtraAdd += earnerExtra;
       });
 
       // 2. Bills
@@ -780,57 +791,19 @@ export function LedgerDataProvider({ children }) {
       const tentativeRegEnding = runningRegBeg + dayCredits - dayBills;
       const tentativeExtraEnding = runningExtraBeg + dayExtraAdd + otherAmt;
 
-      let customRegEnd;
-      let customExtraEnd;
-      // When a bill has a manual dailyMatrix override on an import-anchored row,
-      // the stored reg_ending was written by the import sync and is now stale.
-      // Bypass it so tentativeRegEnding drives the rolling balance instead.
-      const isImportAnchoredRow = isImportMode && importedRows[isoDate] !== undefined;
-      const skipImportPin = (hasDayBillOverride || hasRunningDivergence) && isImportAnchoredRow;
-      const accReg = getDailyMatrixCell(accountId, monthKey, day, 'reg_ending');
-      const accExtra = getDailyMatrixCell(accountId, monthKey, day, 'extra_ending');
-      if (!skipImportPin && accReg !== undefined && accReg !== null && accReg !== '') customRegEnd = parseFloat(accReg);
-      if (!skipImportPin && accExtra !== undefined && accExtra !== null && accExtra !== '') customExtraEnd = parseFloat(accExtra);
+      let reg = tentativeRegEnding;
+      let extra = tentativeExtraEnding;
 
-      // Only anchor to the imported row's stated ending balance when no bill on
-      // this day has a manual dailyMatrix override (moved/edited) and no prior divergence occurred.
-      if (customRegEnd === undefined && isImportMode && importedRows[isoDate] !== undefined && !skipImportPin) {
-        const rowData = importedRows[isoDate];
-        if (typeof rowData === 'number') {
-          customRegEnd = rowData;
-        } else if (rowData && typeof rowData === 'object') {
-          const statedEnd = rowData.regEnding ?? rowData.totalEnding ?? null;
-          if (statedEnd !== null && statedEnd !== undefined && !isNaN(statedEnd)) {
-            customRegEnd = statedEnd;
-          }
-        }
-      }
-      if (customExtraEnd === undefined && isImportMode && importedRows[isoDate] !== undefined && !skipImportPin) {
-        const rowData = importedRows[isoDate];
-        if (rowData && typeof rowData === 'object') {
-          const statedExtra = rowData.extraEnding ?? null;
-          if (statedExtra !== null && statedExtra !== undefined && !isNaN(statedExtra)) {
-            customExtraEnd = statedExtra;
-          }
-        }
+      if (reg < 0 && extra > 0) {
+        const transfer = Math.min(extra, -reg);
+        reg += transfer;
+        extra -= transfer;
+      } else if (extra < 0 && reg > 0) {
+        const transfer = Math.min(reg, -extra);
+        extra += transfer;
+        reg -= transfer;
       }
 
-      let reg = customRegEnd !== undefined && !isNaN(customRegEnd) ? customRegEnd : tentativeRegEnding;
-      let extra = customExtraEnd !== undefined && !isNaN(customExtraEnd) ? customExtraEnd : tentativeExtraEnding;
-
-      if (customRegEnd === undefined && customExtraEnd === undefined) {
-        if (reg < 0 && extra > 0) {
-          const transfer = Math.min(extra, -reg);
-          reg += transfer;
-          extra -= transfer;
-        } else if (extra < 0 && reg > 0) {
-          const transfer = Math.min(reg, -extra);
-          extra += transfer;
-          reg -= transfer;
-        }
-      }
-
-      if (skipImportPin) hasRunningDivergence = true;
       runningRegBeg = Math.round(reg * 100) / 100 || 0;
       runningExtraBeg = Math.round(extra * 100) / 100 || 0;
 
@@ -842,7 +815,7 @@ export function LedgerDataProvider({ children }) {
       extraEnding: runningExtraBeg,
       totalEnd: Math.round((runningRegBeg + runningExtraBeg) * 100) / 100
     };
-  }, [getDailyMatrixCell, getActualAmount, isPersonDepositDay, getPersonDepositAmountForAccount]);
+  }, [getDailyMatrixCell, getActualAmount, isPersonDepositDay, getPersonDepositAmountForAccount, getPersonExtraSavingsDepositAmountForAccount]);
 
   const getTotalCashOnHand = useCallback((accountsOverride, asOfDate) => {
     const accounts = accountsOverride || metadataState.accounts || [];

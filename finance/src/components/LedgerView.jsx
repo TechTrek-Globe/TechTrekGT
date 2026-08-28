@@ -304,6 +304,7 @@ function DailySpreadsheetMatrix() {
     getActualAmount,
     isPersonDepositDay,
     getPersonDepositAmountForAccount,
+    getPersonExtraSavingsDepositAmountForAccount,
     getCalculatedBalanceAsOf
   } = useBudget();
 
@@ -663,11 +664,11 @@ function DailySpreadsheetMatrix() {
       ? (selectedAccount?.importedLedgerRows || {})
       : {};
 
+    const importedDatesList = Object.keys(importedRows);
+    const maxImportDateStr = importedDatesList.length > 0 ? importedDatesList.reduce((a,b) => a > b ? a : b) : null;
+
     let runningRegBeg = initialRegBeg;
     let runningExtraBeg = initialExtraBeg;
-    // Once a bill override causes the running balance to diverge from import pins,
-    // all subsequent import-anchored rows carry stale snapshots and must also be bypassed.
-    let hasRunningDivergence = false;
 
     monthList.forEach(mItem => {
       const { year, month, monthKey, daysInMonth } = mItem;
@@ -685,39 +686,64 @@ function DailySpreadsheetMatrix() {
         const isToday = todayObj.getFullYear() === year && todayObj.getMonth() === month && todayObj.getDate() === day;
 
         const isoDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        const isLockedDay = isImportMode && importedRows[isoDate] !== undefined;
+        const isLockedDay = isImportMode && maxImportDateStr && isoDate <= maxImportDateStr;
 
         // 1. Credits (Deposits) for enabled account earners
         const personCredits = {};
+        let totalRegCredits = 0;
+        let dayExtraAdd = 0;
 
         accountPeople.forEach(p => {
           let customCredit;
+          let customExtra;
           if (selectedAccountId === 'all') {
             let sum = 0;
             let hasCustom = false;
+            let sumExtra = 0;
+            let hasCustomExtra = false;
             budget.accounts.forEach(a => {
               const val = getDailyMatrixCell(a.id, monthKey, day, `credit_${p.id}`);
               if (val !== undefined) {
                 sum += parseFloat(val) || 0;
                 hasCustom = true;
               }
+              const valEx = getDailyMatrixCell(a.id, monthKey, day, `extra_credit_${p.id}`);
+              if (valEx !== undefined) {
+                sumExtra += parseFloat(valEx) || 0;
+                hasCustomExtra = true;
+              }
             });
             if (hasCustom) customCredit = sum;
+            if (hasCustomExtra) customExtra = sumExtra;
           } else {
             customCredit = getDailyMatrixCell(selectedAccountId, monthKey, day, `credit_${p.id}`);
+            customExtra = getDailyMatrixCell(selectedAccountId, monthKey, day, `extra_credit_${p.id}`);
           }
 
+          const isDepDay = isPersonDepositDay(p, year, month, day);
+
+          let earnerDeposit = 0;
           if (customCredit !== undefined) {
-            personCredits[p.id] = parseFloat(customCredit) || 0;
-          } else if (!isLockedDay) {
-            const isDepDay = isPersonDepositDay(p, year, month, day);
-            personCredits[p.id] = isDepDay ? getPersonDepositAmountForAccount(p, selectedAccountId, budget) : 0;
-          } else {
-            personCredits[p.id] = 0;
+            earnerDeposit = parseFloat(customCredit) || 0;
+          } else if (!isLockedDay && isDepDay) {
+            earnerDeposit = getPersonDepositAmountForAccount(p, selectedAccountId, budget);
           }
-        });
 
-        const totalRegCredits = Object.values(personCredits).reduce((s, v) => s + v, 0);
+          personCredits[p.id] = earnerDeposit;
+
+          let earnerExtra = 0;
+          if (customExtra !== undefined) {
+            earnerExtra = parseFloat(customExtra) || 0;
+          } else if (earnerDeposit > 0) {
+            earnerExtra = getPersonExtraSavingsDepositAmountForAccount(p, selectedAccountId, budget);
+          }
+
+          earnerExtra = Math.min(earnerExtra, earnerDeposit);
+          const earnerReg = Math.max(0, earnerDeposit - earnerExtra);
+
+          dayExtraAdd += earnerExtra;
+          totalRegCredits += earnerReg;
+        });
 
         // 2. Individual Bill Deductions
         const billValues = {};
@@ -762,33 +788,18 @@ function DailySpreadsheetMatrix() {
 
         if (selectedAccountId === 'all') {
           budget.accounts.forEach(a => {
-            const accOther = getDailyMatrixCell(a.id, monthKey, day, 'other_amount');
-            if (accOther !== undefined) otherAmt += parseFloat(accOther) || 0;
-            const accOtherCredit = getDailyMatrixCell(a.id, monthKey, day, 'other_credit_amount');
-            if (accOtherCredit !== undefined) otherAmt += parseFloat(accOtherCredit) || 0;
+            const customOther = getDailyMatrixCell(a.id, monthKey, day, 'other_amount');
+            const customOtherCredit = getDailyMatrixCell(a.id, monthKey, day, 'other_credit_amount');
+            if (customOther !== undefined) otherAmt += parseFloat(customOther) || 0;
+            if (customOtherCredit !== undefined) otherAmt += parseFloat(customOtherCredit) || 0;
 
-            const accDesc = getDailyMatrixCell(a.id, monthKey, day, 'other_desc');
-            if (accDesc) {
-              rawOtherDesc = rawOtherDesc ? `${rawOtherDesc} | ${accDesc}` : accDesc;
-            }
-            const accCreditDesc = getDailyMatrixCell(a.id, monthKey, day, 'other_credit_desc');
-            if (accCreditDesc) {
-              rawOtherDesc = rawOtherDesc ? `${rawOtherDesc} | ${accCreditDesc}` : accCreditDesc;
+            const d1 = getDailyMatrixCell(a.id, monthKey, day, 'other_desc') || '';
+            const d2 = getDailyMatrixCell(a.id, monthKey, day, 'other_credit_desc') || '';
+            const desc = d1 && d2 ? `${d1} | ${d2}` : (d1 || d2);
+            if (desc) {
+              rawOtherDesc = rawOtherDesc ? `${rawOtherDesc} | ${desc}` : desc;
             }
           });
-          const allOther = getDailyMatrixCell('all', monthKey, day, 'other_amount');
-          if (allOther !== undefined) otherAmt += parseFloat(allOther) || 0;
-          const allOtherCredit = getDailyMatrixCell('all', monthKey, day, 'other_credit_amount');
-          if (allOtherCredit !== undefined) otherAmt += parseFloat(allOtherCredit) || 0;
-
-          const allDesc = getDailyMatrixCell('all', monthKey, day, 'other_desc');
-          if (allDesc) {
-            rawOtherDesc = rawOtherDesc ? `${rawOtherDesc} | ${allDesc}` : allDesc;
-          }
-          const allCreditDesc = getDailyMatrixCell('all', monthKey, day, 'other_credit_desc');
-          if (allCreditDesc) {
-            rawOtherDesc = rawOtherDesc ? `${rawOtherDesc} | ${allCreditDesc}` : allCreditDesc;
-          }
         } else {
           const customOther = getDailyMatrixCell(selectedAccountId, monthKey, day, 'other_amount');
           const customOtherCredit = getDailyMatrixCell(selectedAccountId, monthKey, day, 'other_credit_amount');
@@ -803,88 +814,20 @@ function DailySpreadsheetMatrix() {
         const customOtherDesc = rawOtherDesc.replace(/^Other\s*\$?\s*\(?(.*?)\)?$/i, '$1').trim();
 
         // 4. Determine Beginning and Ending Balances
-        let dayExtraAdd = 0;
-        accountPeople.forEach(p => {
-          let customExtra;
-          if (selectedAccountId === 'all') {
-            budget.accounts.forEach(a => {
-              const val = getDailyMatrixCell(a.id, monthKey, day, `extra_credit_${p.id}`);
-              if (val !== undefined) {
-                dayExtraAdd += parseFloat(val) || 0;
-              }
-            });
-          } else {
-            customExtra = getDailyMatrixCell(selectedAccountId, monthKey, day, `extra_credit_${p.id}`);
-            if (customExtra !== undefined) {
-              dayExtraAdd += parseFloat(customExtra) || 0;
-            }
-          }
-        });
-
         const tentativeRegEnding = runningRegBeg + totalRegCredits - totalDayBills;
         const tentativeExtraEnding = runningExtraBeg + dayExtraAdd + otherAmt;
 
-        let customRegEnd;
-        let customExtraEnd;
+        let reg = tentativeRegEnding;
+        let extra = tentativeExtraEnding;
 
-        // When a bill on this day has a manual dailyMatrix override (hasDayBillOverride)
-        // AND this day is anchored by an imported ledger row, the stored reg_ending in
-        // dailyMatrix was written by the "Ultimate Truth" import sync and is now stale
-        // (it pre-dates the bill move/edit). Bypass it so tentativeRegEnding is used instead.
-        // User-typed reg_ending overrides on non-import-locked rows are always respected.
-        const isImportAnchoredRow = isImportMode && importedRows[isoDate] !== undefined;
-        // Bypass the import pin if this day has a bill override OR if a prior day already
-        // caused divergence (making all downstream import snapshots stale).
-        const skipImportPin = (hasDayBillOverride || hasRunningDivergence) && isImportAnchoredRow;
-
-        if (selectedAccountId === 'all') {
-          const allReg = getDailyMatrixCell('all', monthKey, day, 'reg_ending');
-          const allExtra = getDailyMatrixCell('all', monthKey, day, 'extra_ending');
-          if (!skipImportPin && allReg !== undefined && allReg !== null && allReg !== '') customRegEnd = parseFloat(allReg);
-          if (!skipImportPin && allExtra !== undefined && allExtra !== null && allExtra !== '') customExtraEnd = parseFloat(allExtra);
-        } else {
-          const accReg = getDailyMatrixCell(selectedAccountId, monthKey, day, 'reg_ending');
-          const accExtra = getDailyMatrixCell(selectedAccountId, monthKey, day, 'extra_ending');
-          if (!skipImportPin && accReg !== undefined && accReg !== null && accReg !== '') customRegEnd = parseFloat(accReg);
-          if (!skipImportPin && accExtra !== undefined && accExtra !== null && accExtra !== '') customExtraEnd = parseFloat(accExtra);
-        }
-
-        // Only anchor to the imported row's stated ending balance when no bill on
-        // this day has been manually overridden (moved/edited) and no prior divergence occurred.
-        if (customRegEnd === undefined && isImportMode && importedRows[isoDate] !== undefined && !skipImportPin) {
-          const rowData = importedRows[isoDate];
-          if (typeof rowData === 'number') {
-            customRegEnd = rowData;
-          } else if (rowData && typeof rowData === 'object') {
-            const statedEnd = rowData.regEnding ?? rowData.totalEnding ?? null;
-            if (statedEnd !== null && statedEnd !== undefined && !isNaN(statedEnd)) {
-              customRegEnd = statedEnd;
-            }
-          }
-        }
-        if (customExtraEnd === undefined && isImportMode && importedRows[isoDate] !== undefined && !skipImportPin) {
-          const rowData = importedRows[isoDate];
-          if (rowData && typeof rowData === 'object') {
-            const statedExtra = rowData.extraEnding ?? null;
-            if (statedExtra !== null && statedExtra !== undefined && !isNaN(statedExtra)) {
-              customExtraEnd = statedExtra;
-            }
-          }
-        }
-
-        let reg = customRegEnd !== undefined && !isNaN(customRegEnd) ? customRegEnd : tentativeRegEnding;
-        let extra = customExtraEnd !== undefined && !isNaN(customExtraEnd) ? customExtraEnd : tentativeExtraEnding;
-
-        if (customRegEnd === undefined && customExtraEnd === undefined) {
-          if (reg < 0 && extra > 0) {
-            const transfer = Math.min(extra, -reg);
-            reg += transfer;
-            extra -= transfer;
-          } else if (extra < 0 && reg > 0) {
-            const transfer = Math.min(reg, -extra);
-            extra += transfer;
-            reg -= transfer;
-          }
+        if (reg < 0 && extra > 0) {
+          const transfer = Math.min(extra, -reg);
+          reg += transfer;
+          extra -= transfer;
+        } else if (extra < 0 && reg > 0) {
+          const transfer = Math.min(reg, -extra);
+          extra += transfer;
+          reg -= transfer;
         }
 
         const regEnding = Math.round(reg * 100) / 100 || 0;
@@ -931,9 +874,6 @@ function DailySpreadsheetMatrix() {
         });
 
         // Carry ending balances forward as the next day's opening
-        // If an import pin was bypassed this day, mark divergence so all subsequent
-        // import anchors are also treated as stale.
-        if (skipImportPin) hasRunningDivergence = true;
         runningRegBeg = regEnding;
         runningExtraBeg = extraEnding;
       }
@@ -957,6 +897,7 @@ function DailySpreadsheetMatrix() {
     getActualAmount,
     isPersonDepositDay,
     getPersonDepositAmountForAccount,
+    getPersonExtraSavingsDepositAmountForAccount,
     matrixVersion,
     lineItems
   ]);
@@ -1691,81 +1632,39 @@ function DailySpreadsheetMatrix() {
                         />
                       </td>
 
-                      {/* Regular Ending Balance (Editable per account, read-only on combined 'all') */}
+                      {/* Regular Ending Balance (Pure calculated value) */}
                       <td className={`p-1 text-right font-bold min-w-[72px] ${
                         isSelected && !row.isToday ? 'text-blue-100 bg-blue-950/40' : (row.regEnding < 0 ? 'text-rose-400' : 'text-slate-200')
                       }`}>
-                        {selectedAccountId === 'all' ? (
-                          <span
-                            className={`font-mono text-[10px] font-bold block ${
-                              isSelected && !row.isToday
-                                ? 'text-blue-100'
-                                : row.regEnding < 0
-                                  ? 'text-rose-400'
-                                  : 'text-slate-200'
-                            }`}
-                            title="Combined balance calculated across all accounts. Select a specific account above to edit ending balance."
-                          >
-                            {fmtMoney(row.regEnding)}
-                          </span>
-                        ) : (
-                          <InlineEdit
-                            value={row.regEnding}
-                            type="currency"
-                            onCommit={(val) => handleCellCommit(row.monthKey, row.day, 'reg_ending', val, selectedAccountId)}
-                            displayFn={() => (
-                              <span className={`font-mono text-[10px] font-bold ${
-                                isSelected && !row.isToday
-                                  ? 'text-blue-100'
-                                  : row.regEnding < 0
-                                    ? 'text-rose-400'
-                                    : 'text-slate-200'
-                              }`}>
-                                {fmtMoney(row.regEnding)}
-                              </span>
-                            )}
-                            className="justify-end w-full"
-                          />
-                        )}
+                        <span
+                          className={`font-mono text-[10px] font-bold block ${
+                            isSelected && !row.isToday
+                              ? 'text-blue-100'
+                              : row.regEnding < 0
+                                ? 'text-rose-400'
+                                : 'text-slate-200'
+                          }`}
+                        >
+                          {fmtMoney(row.regEnding)}
+                        </span>
                       </td>
 
-                      {/* Extra Ending Balance (Editable per account, read-only on combined 'all') */}
+                      {/* Extra Ending Balance (Pure calculated value) */}
                       {showExtraColumns && (
                         <td className={`p-1 text-right border-r border-slate-800/80 min-w-[72px] ${
                           isSelected && !row.isToday ? 'bg-blue-950/40 text-blue-100' : (row.extraEnding < 0 ? 'text-rose-400' : 'text-slate-300')
                         }`}>
-                          {selectedAccountId === 'all' ? (
-                            <span
-                              className={`font-mono text-[10px] block ${
-                                isSelected && !row.isToday
-                                  ? 'text-blue-100'
-                                  : row.extraEnding < 0
-                                    ? 'text-rose-400'
-                                    : 'text-slate-300'
-                              }`}
-                              title="Combined extra savings calculated across all accounts. Select a specific account above to edit extra ending balance."
-                            >
-                              {fmtMoney(row.extraEnding)}
-                            </span>
-                          ) : (
-                            <InlineEdit
-                              value={row.extraEnding}
-                              type="currency"
-                              onCommit={(val) => handleCellCommit(row.monthKey, row.day, 'extra_ending', val, selectedAccountId)}
-                              displayFn={() => (
-                                <span className={`font-mono text-[10px] ${
-                                  isSelected && !row.isToday
-                                    ? 'text-blue-100'
-                                    : row.extraEnding < 0
-                                      ? 'text-rose-400'
-                                      : 'text-slate-300'
-                                }`}>
-                                  {fmtMoney(row.extraEnding)}
-                                </span>
-                              )}
-                              className="justify-end w-full"
-                            />
-                          )}
+                          <span
+                            className={`font-mono text-[10px] block ${
+                              isSelected && !row.isToday
+                                ? 'text-blue-100'
+                                : row.extraEnding < 0
+                                  ? 'text-rose-400'
+                                  : 'text-slate-300'
+                            }`}
+                          >
+                            {fmtMoney(row.extraEnding)}
+                          </span>
                         </td>
                       )}
 

@@ -829,9 +829,6 @@ export function getLedgerRunningBalanceAsOfDate({
   let runningExtra = startExtra;
 
   let cur = new Date(simulationStartDate);
-  // Once a bill override diverges the running balance from import pins,
-  // all subsequent import-anchored rows must also be bypassed.
-  let hasRunningDivergence = false;
   while (cur <= targetDateObj) {
     const y = cur.getFullYear();
     const m = cur.getMonth();
@@ -842,9 +839,13 @@ export function getLedgerRunningBalanceAsOfDate({
     let dayExtraCredits = 0;
     people.forEach(p => {
       const c = dailyMatrix[`${targetAccountId}_${mKey}_${d}_credit_${p.id}`];
-      if (c !== undefined && c !== null && c !== '') dayCredits += parseFloat(c) || 0;
       const ec = dailyMatrix[`${targetAccountId}_${mKey}_${d}_extra_credit_${p.id}`];
-      if (ec !== undefined && ec !== null && ec !== '') dayExtraCredits += parseFloat(ec) || 0;
+      const earnerDeposit = (c !== undefined && c !== null && c !== '') ? (parseFloat(c) || 0) : 0;
+      const earnerExtra = (ec !== undefined && ec !== null && ec !== '') ? (parseFloat(ec) || 0) : 0;
+      const clampedExtra = Math.min(earnerExtra, earnerDeposit);
+      const earnerReg = Math.max(0, earnerDeposit - clampedExtra);
+      dayCredits += earnerReg;
+      dayExtraCredits += (earnerDeposit > 0 ? clampedExtra : earnerExtra);
     });
 
     let dayBills = 0;
@@ -867,43 +868,19 @@ export function getLedgerRunningBalanceAsOfDate({
     const tentativeReg = runningReg + dayCredits - dayBills;
     const tentativeExtra = runningExtra + dayExtraCredits + dayOtherCredit + dayOther;
 
-    const customReg = dailyMatrix[`${targetAccountId}_${mKey}_${d}_reg_ending`];
-    const customExtra = dailyMatrix[`${targetAccountId}_${mKey}_${d}_extra_ending`];
+    let reg = tentativeReg;
+    let extra = tentativeExtra;
 
-    const isoDate = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    const isImportAnchoredRow = targetAcc.importedLedgerRows && targetAcc.importedLedgerRows[isoDate] !== undefined;
-    const skipImportPin = (hasDayBillOverride || hasRunningDivergence) && isImportAnchoredRow;
-
-    let reg = (!skipImportPin && customReg !== undefined && customReg !== null && customReg !== '') ? parseFloat(customReg) : undefined;
-    let extra = (!skipImportPin && customExtra !== undefined && customExtra !== null && customExtra !== '') ? parseFloat(customExtra) : undefined;
-
-    if (reg === undefined && !skipImportPin && targetAcc.importedLedgerRows && targetAcc.importedLedgerRows[isoDate] !== undefined) {
-      const rowData = targetAcc.importedLedgerRows[isoDate];
-      if (typeof rowData === 'number') {
-        reg = rowData;
-      } else if (rowData && typeof rowData === 'object') {
-        const statedEnd = rowData.regEnding ?? rowData.totalEnding ?? null;
-        if (statedEnd !== null && !isNaN(statedEnd)) reg = statedEnd;
-      }
+    if (reg < 0 && extra > 0) {
+      const transfer = Math.min(extra, -reg);
+      reg += transfer;
+      extra -= transfer;
+    } else if (extra < 0 && reg > 0) {
+      const transfer = Math.min(reg, -extra);
+      extra += transfer;
+      reg -= transfer;
     }
 
-    if (reg === undefined) reg = tentativeReg;
-    if (extra === undefined) extra = tentativeExtra;
-
-    if ((customReg === undefined || customReg === null || customReg === '') &&
-        (customExtra === undefined || customExtra === null || customExtra === '')) {
-      if (reg < 0 && extra > 0) {
-        const transfer = Math.min(extra, -reg);
-        reg += transfer;
-        extra -= transfer;
-      } else if (extra < 0 && reg > 0) {
-        const transfer = Math.min(reg, -extra);
-        extra += transfer;
-        reg -= transfer;
-      }
-    }
-
-    if (skipImportPin) hasRunningDivergence = true;
     runningReg = Math.round(reg * 100) / 100 || 0;
     runningExtra = Math.round(extra * 100) / 100 || 0;
 

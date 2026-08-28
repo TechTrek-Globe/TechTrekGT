@@ -2,7 +2,7 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { initialBudgetData, DEFAULT_DASHBOARD_WIDGETS } from '../initialData';
 import { useAuth } from './AuthContext';
-import { isPersonDepositDay, getPersonDepositAmountForAccount, getAccountSaveExtraPersonPortion, getNextBillDueDate } from '../utils/paydayUtils';
+import { isPersonDepositDay, getPersonDepositAmountForAccount, getPersonExtraSavingsDepositAmountForAccount, getAccountSaveExtraPersonPortion, getNextBillDueDate } from '../utils/paydayUtils';
 import { getApiUrl } from '../utils/api';
 import { getBudgetData } from '../utils/indexedDB';
 import { 
@@ -772,7 +772,8 @@ export function BudgetMetadataProvider({ children }) {
     getUpcomingBills,
     getTotalCashOnHand,
     isPersonDepositDay,
-    getPersonDepositAmountForAccount
+    getPersonDepositAmountForAccount,
+    getPersonExtraSavingsDepositAmountForAccount
   }), [
     setTheme,
     toggleHideDashboardHeader,

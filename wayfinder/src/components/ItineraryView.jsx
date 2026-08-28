@@ -3,8 +3,81 @@ import { useWayfinder } from '../context/WayfinderContext';
 import { polandJourney } from '../data/poland-2026';
 import { 
   ArrowLeft, Calendar, Clock, MapPin, Train, Plane, Building, 
-  Sparkles, Utensils, Landmark, Compass, Coffee, FileText, ChevronRight, Filter
+  Sparkles, Utensils, Landmark, Compass, Coffee, FileText, ChevronRight, Filter, Lock
 } from 'lucide-react';
+
+function PrivateFlightCard({ item }) {
+  return (
+    <div className="relative group">
+      {/* Sky-blue node on vertical track */}
+      <div className="absolute -left-[23px] sm:-left-[31px] top-4 w-4 h-4 rounded-full border-2 border-slate-950 bg-sky-400 group-hover:scale-125 transition-transform shadow-[0_0_8px_rgba(56,189,248,0.8)]" />
+
+      <div className="glass-panel p-4 sm:p-5 rounded-2xl border border-sky-500/40 group-hover:border-sky-400/70 transition-all shadow-md bg-sky-950/25 space-y-3">
+        {/* Top bar */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center space-x-2.5">
+            <div className="p-2 rounded-xl border bg-sky-500/15 text-sky-300 border-sky-500/30 shrink-0">
+              <Plane className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+                <h3 className="font-bold text-white text-base sm:text-lg leading-tight">
+                  {item.title || 'Private Flight Booking'}
+                </h3>
+                <span className="px-1.5 py-0.5 rounded bg-sky-500/20 border border-sky-400/40 text-sky-300 text-[10px] font-bold flex items-center space-x-1">
+                  <Lock className="w-2.5 h-2.5" />
+                  <span>Private</span>
+                </span>
+              </div>
+              {item.location && (
+                <div className="text-xs text-slate-400 flex items-center space-x-1 mt-0.5">
+                  <MapPin className="w-3 h-3 text-sky-400 shrink-0" />
+                  <span>{item.location}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-2 shrink-0 self-start sm:self-center">
+            {item.badge && (
+              <span className="px-2.5 py-0.5 rounded-full border text-[10px] font-black uppercase tracking-wider bg-sky-500/20 text-sky-300 border-sky-400/40">
+                {item.badge}
+              </span>
+            )}
+            {item.time && (
+              <span className="px-2.5 py-1 rounded-xl bg-slate-950 border border-white/10 font-mono font-bold text-xs text-sky-300">
+                {item.time}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Description */}
+        {item.description && (
+          <p className="text-xs sm:text-sm text-slate-200 leading-relaxed font-medium">{item.description}</p>
+        )}
+
+        {/* Metadata footer */}
+        {(item.confirmation_number || item.passengers) && (
+          <div className="pt-2 border-t border-sky-500/20 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px]">
+            {item.confirmation_number && (
+              <span className="flex items-center space-x-1">
+                <span className="text-wf-muted">Conf:</span>
+                <span className="text-sky-300 font-mono font-semibold">{item.confirmation_number}</span>
+              </span>
+            )}
+            {item.passengers && (
+              <span className="flex items-center space-x-1">
+                <span className="text-wf-muted">Pax:</span>
+                <span className="text-slate-300">{item.passengers}</span>
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export function ItineraryView() {
   const { itinerary: privateItems = [], isLoading } = useWayfinder();
@@ -60,6 +133,15 @@ export function ItineraryView() {
       case 'food': return 'bg-amber-400/20 text-amber-200 border-amber-400/40';
       default: return 'bg-white/10 text-white border-white/20';
     }
+  };
+
+  // Match private D1 itinerary items to a given date string (YYYY-MM-DD)
+  const getPrivateItemsForDay = (dayDate) => {
+    if (!privateItems || privateItems.length === 0) return [];
+    return privateItems.filter(item => {
+      const d = item.item_date || item.start_date || item.date || item.booking_date || '';
+      return d && d.toString().startsWith(dayDate);
+    });
   };
 
   return (
@@ -286,6 +368,10 @@ export function ItineraryView() {
 
               {/* Day Schedule Event Cards */}
               <div className="space-y-4 pl-4 sm:pl-6 border-l-2 border-amber-500/30 ml-3 sm:ml-4">
+                {/* Private D1-synced booking cards for this day */}
+                {getPrivateItemsForDay(dayItem.date).map((pItem, pIdx) => (
+                  <PrivateFlightCard key={`priv-${dayItem.day}-${pIdx}`} item={pItem} />
+                ))}
                 {dayItem.schedule.map((event, idx) => (
                   <div key={idx} className="relative group">
                     {/* Node on Vertical Track */}

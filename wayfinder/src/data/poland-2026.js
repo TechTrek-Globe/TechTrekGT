@@ -4256,12 +4256,12 @@ export const polandJourney = {
       "highlights": ["Target Flight Arrival (KRK)", "SKA1 Direct Airport Train", "Rynek Główny Christmas Market", "Mulled Wine & Oscypek"],
       "schedule": [
         {
-          "time": "14:15",
+          "time": "13:30",
           "itemType": "flight",
-          "title": "Target Flight Arrival Window: Kraków Airport (KRK)",
-          "description": "Land at Kraków John Paul II International Airport (KRK) via transatlantic connection. Clear border control and collect baggage.",
-          "location": "Kraków Airport (KRK)",
-          "badge": "Transit Arrival"
+          "title": "Confirmed Arrival: DL9208 Amsterdam (AMS) -> Krakow (KRK)",
+          "description": "Delta flight DL9208 arrives KRK at 13:30 local time. Departed AMS at 11:35. Inbound operated via DL0074 (ATL -> AMS, dep 20:10 Dec 3) with 55-min AMS layover. Confirmation: GUDI3J. Passengers: Ronald Milton Few and Jonathan Kemp. Clear border control (non-Schengen) and collect checked baggage.",
+          "location": "Krakow John Paul II International Airport (KRK)",
+          "badge": "Confirmed Arrival"
         },
         {
           "time": "15:00",
@@ -4764,11 +4764,35 @@ export const polandJourney = {
           "badge": "Airport Transfer"
         },
         {
-          "time": "14:00",
+          "time": "04:30",
+          "itemType": "hotel",
+          "title": "Early Check-out and GDN Airport Transfer",
+          "description": "Final bag pack and 35-40 minute taxi or pre-booked private transfer to Gdansk Lech Walesa Airport (GDN). Allow ample time for international check-in, bag drop, and security ahead of DL9528 departure at 06:45.",
+          "location": "Gdansk Lech Walesa Airport (GDN)",
+          "badge": "Airport Transfer"
+        },
+        {
+          "time": "06:45",
           "itemType": "flight",
-          "title": "Target Departure Flight Home",
-          "description": "Board international flight connecting from GDN to transatlantic destination. End of an unforgettable Poland Christmas expedition!",
-          "location": "Gdańsk Lech Wałęsa Airport (GDN)",
+          "title": "Confirmed Departure: DL9528 Gdansk (GDN) -> Amsterdam (AMS)",
+          "description": "Delta flight DL9528 departs GDN at 06:45, arrives Amsterdam Schiphol (AMS) at 08:40. Confirmation: GUDI3J. Passengers: Ronald Milton Few and Jonathan Kemp.",
+          "location": "Gdansk Lech Walesa Airport (GDN) -> Amsterdam Schiphol (AMS)",
+          "badge": "Confirmed Flight"
+        },
+        {
+          "time": "08:40",
+          "itemType": "rail",
+          "title": "AMS Transit: 1h 20min Amsterdam Schiphol Layover",
+          "description": "1 hour 20 minute layover at Amsterdam Schiphol Airport (AMS). Remain in the international transit zone - no customs exit required. Proceed directly to the KLM/Delta transatlantic departure gates (Schengen D/E pier). DL9227 boards at 09:30.",
+          "location": "Amsterdam Schiphol Airport (AMS) - International Transit",
+          "badge": "1h 20m Layover"
+        },
+        {
+          "time": "10:00",
+          "itemType": "flight",
+          "title": "Confirmed Departure: DL9227 Amsterdam (AMS) -> Atlanta (ATL)",
+          "description": "Delta flight DL9227 departs AMS at 10:00, arrives Atlanta Hartsfield-Jackson (ATL) at 13:35 local time. Confirmation: GUDI3J. End of an unforgettable Poland Christmas expedition!",
+          "location": "Amsterdam Schiphol (AMS) -> Atlanta Hartsfield-Jackson (ATL)",
           "badge": "Homeward Flight"
         }
       ]

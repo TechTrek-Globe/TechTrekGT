@@ -45,17 +45,26 @@ function simulateExtraction(file) {
 
   if (filename.includes('flight') || filename.includes('delta') || filename.includes('lot') || filename.includes('airline')) {
     return {
-      provider: 'Delta Airlines / LOT',
+      provider: 'Delta Air Lines',
       docType: 'flight',
       fields: [
-        { field_name: 'airline', extracted_value: 'Delta Airlines', confidence: 'high' },
-        { field_name: 'origin_airport', extracted_value: 'ATL', confidence: 'high' },
-        { field_name: 'destination_airport', extracted_value: 'KRK', confidence: 'high' },
-        { field_name: 'departure_date', extracted_value: '2026-12-03', confidence: 'high' },
-        { field_name: 'departure_time', extracted_value: '20:10', confidence: 'high' },
-        { field_name: 'arrival_date', extracted_value: '2026-12-04', confidence: 'high' },
-        { field_name: 'arrival_time', extracted_value: '13:45', confidence: 'medium' },
-        { field_name: 'confirmation_number', extracted_value: `DL-${Math.floor(100000 + Math.random() * 900000)}`, confidence: 'high' }
+        { field_name: 'confirmation_number', extracted_value: 'GUDI3J', confidence: 'high' },
+        { field_name: 'airline', extracted_value: 'Delta Air Lines', confidence: 'high' },
+        { field_name: 'passengers', extracted_value: 'Ronald Milton Few, Jonathan Kemp', confidence: 'high' },
+        { field_name: 'inbound_leg1_flight', extracted_value: 'DL0074 ATL -> AMS', confidence: 'high' },
+        { field_name: 'inbound_leg1_departs', extracted_value: '2026-12-03 20:10 ATL', confidence: 'high' },
+        { field_name: 'inbound_leg1_arrives', extracted_value: '2026-12-04 10:40 AMS', confidence: 'high' },
+        { field_name: 'inbound_layover_ams', extracted_value: '55 minutes (AMS)', confidence: 'high' },
+        { field_name: 'inbound_leg2_flight', extracted_value: 'DL9208 AMS -> KRK', confidence: 'high' },
+        { field_name: 'inbound_leg2_departs', extracted_value: '2026-12-04 11:35 AMS', confidence: 'high' },
+        { field_name: 'inbound_leg2_arrives', extracted_value: '2026-12-04 13:30 KRK', confidence: 'high' },
+        { field_name: 'return_leg1_flight', extracted_value: 'DL9528 GDN -> AMS', confidence: 'high' },
+        { field_name: 'return_leg1_departs', extracted_value: '2026-12-13 06:45 GDN', confidence: 'high' },
+        { field_name: 'return_leg1_arrives', extracted_value: '2026-12-13 08:40 AMS', confidence: 'high' },
+        { field_name: 'return_layover_ams', extracted_value: '1 hour 20 minutes (AMS)', confidence: 'high' },
+        { field_name: 'return_leg2_flight', extracted_value: 'DL9227 AMS -> ATL', confidence: 'high' },
+        { field_name: 'return_leg2_departs', extracted_value: '2026-12-13 10:00 AMS', confidence: 'high' },
+        { field_name: 'return_leg2_arrives', extracted_value: '2026-12-13 13:35 ATL', confidence: 'high' }
       ]
     };
   }
@@ -96,7 +105,10 @@ export function DocumentCenter() {
   const [fieldOverrides, setFieldOverrides] = useState({});
   const [isProcessingJob, setIsProcessingJob] = useState(false);
   const [actionSuccessMessage, setActionSuccessMessage] = useState(null);
-  
+  const [pdfPreviewDoc, setPdfPreviewDoc] = useState(null);
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState(null);
+  const [iframeError, setIframeError] = useState(false);
+
   const fileInputRef = useRef(null);
 
   // Check URL query for selected doc
@@ -108,6 +120,19 @@ export function DocumentCenter() {
       if (doc) setSelectedDoc(doc);
     }
   }, [documents]);
+
+  // ESC key closes PDF preview modal
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        setPdfPreviewDoc(null);
+        setPdfPreviewUrl(null);
+        setIframeError(false);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   const handleFileChange = async (e) => {
     const file = e.target.files?.[0];
@@ -192,6 +217,19 @@ export function DocumentCenter() {
     setSelectedDoc(null);
     window.history.pushState({}, '', window.location.pathname);
     window.dispatchEvent(new PopStateEvent('popstate'));
+  };
+
+  const closePdfPreview = () => {
+    setPdfPreviewDoc(null);
+    setPdfPreviewUrl(null);
+    setIframeError(false);
+  };
+
+  const openPdfPreview = (doc) => {
+    setIframeError(false);
+    const url = doc.file_url || `/wayfinder/Poland-2026/docs/${doc.filename || doc.safe_display_name || ''}`;
+    setPdfPreviewUrl(url);
+    setPdfPreviewDoc(doc);
   };
 
   const getDocStatusBadge = (status) => {
@@ -375,6 +413,86 @@ export function DocumentCenter() {
         </div>
       )}
 
+      {/* PDF Preview Modal */}
+      {pdfPreviewDoc && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-6 bg-black/90 backdrop-blur-md animate-fade-in"
+          onClick={(e) => { if (e.target === e.currentTarget) closePdfPreview(); }}
+        >
+          <div className="w-full max-w-5xl bg-wf-navy-mid border border-white/15 rounded-3xl shadow-2xl flex flex-col overflow-hidden glass-card" style={{ height: 'min(90vh, 900px)' }}>
+            {/* Header */}
+            <div className="p-4 border-b border-white/10 flex items-center justify-between bg-wf-navy shrink-0">
+              <div className="flex items-center space-x-3 min-w-0">
+                <div className="p-2 bg-sky-500/20 rounded-xl text-sky-300 shrink-0">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-white font-semibold truncate text-sm">
+                    {pdfPreviewDoc.safe_display_name || pdfPreviewDoc.filename}
+                  </h3>
+                  <p className="text-[11px] text-wf-muted">PDF Document Preview</p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2 shrink-0">
+                {pdfPreviewUrl && (
+                  <a
+                    href={pdfPreviewUrl}
+                    download={pdfPreviewDoc.safe_display_name || pdfPreviewDoc.filename}
+                    className="px-3 py-1.5 rounded-lg bg-wf-blue/20 hover:bg-wf-blue/30 border border-wf-blue/40 text-wf-blue-lt text-xs font-medium flex items-center space-x-1.5 transition-colors"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Download</span>
+                  </a>
+                )}
+                <button
+                  onClick={closePdfPreview}
+                  className="p-2 text-wf-muted hover:text-white hover:bg-white/10 rounded-xl transition-colors"
+                  title="Close (ESC)"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* PDF Viewer */}
+            <div className="flex-1 bg-slate-950 overflow-hidden relative">
+              {iframeError ? (
+                <div className="flex flex-col items-center justify-center h-full text-center p-8 space-y-4">
+                  <FileText className="w-16 h-16 text-wf-muted opacity-40" />
+                  <div>
+                    <h4 className="text-white font-semibold mb-1">PDF Preview Unavailable</h4>
+                    <p className="text-xs text-wf-muted max-w-sm">
+                      This document is stored as metadata only. Download the file to view it locally.
+                    </p>
+                  </div>
+                  <a
+                    href={pdfPreviewUrl}
+                    download={pdfPreviewDoc.safe_display_name || pdfPreviewDoc.filename}
+                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-wf-blue to-wf-blue-lt text-white text-sm font-semibold flex items-center space-x-2 shadow-lg hover:opacity-90 transition-opacity"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Download PDF</span>
+                  </a>
+                </div>
+              ) : (
+                <iframe
+                  src={pdfPreviewUrl}
+                  title={pdfPreviewDoc.safe_display_name || pdfPreviewDoc.filename}
+                  className="w-full h-full border-0"
+                  onError={() => setIframeError(true)}
+                />
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-3 border-t border-white/10 bg-wf-navy shrink-0 flex items-center justify-between text-[11px] text-wf-muted">
+              <span>Uploaded: {new Date(pdfPreviewDoc.upload_date || pdfPreviewDoc.uploaded_at || Date.now()).toLocaleString()}</span>
+              <span>Size: {(((pdfPreviewDoc.file_size_bytes || pdfPreviewDoc.file_size || 0)) / 1024).toFixed(1)} KB</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Document Grid */}
       <div>
         <div className="flex items-center justify-between mb-4">
@@ -401,7 +519,7 @@ export function DocumentCenter() {
               <div key={doc.id} className="glass-panel p-4 rounded-2xl flex flex-col hover-lift group">
                 <div 
                   className="w-full h-32 bg-wf-navy rounded-xl border border-white/5 flex items-center justify-center mb-4 relative overflow-hidden group-hover:border-wf-blue-lt/50 transition-colors cursor-pointer" 
-                  onClick={() => setSelectedDoc(doc)}
+                  onClick={() => openPdfPreview(doc)}
                 >
                   <FileText className="w-10 h-10 text-wf-muted group-hover:text-wf-blue-lt transition-colors" />
                   <div className="absolute inset-0 bg-wf-blue/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">

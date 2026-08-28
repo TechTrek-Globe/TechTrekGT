@@ -859,11 +859,13 @@ export function LedgerDataProvider({ children }) {
     budget: budgetForUI,
     lineItems,
     transactions,
+    matrixVersion,
     syncPasscode,
     isSyncUnlocked
-  }), [budgetForUI, lineItems, transactions, syncPasscode, isSyncUnlocked]);
+  }), [budgetForUI, lineItems, transactions, matrixVersion, syncPasscode, isSyncUnlocked]);
 
   const actionsValue = useMemo(() => ({
+    matrixVersion,
     getDailyMatrixCell,
     updateDailyMatrixCell,
     updateDailyMatrixCells,
@@ -918,7 +920,8 @@ export function LedgerDataProvider({ children }) {
     pushCloudBackup,
     pullCloudRestore,
     setSyncPasscode,
-    setIsSyncUnlocked
+    setIsSyncUnlocked,
+    matrixVersion
   ]);
 
   const contextValue = useMemo(() => ({

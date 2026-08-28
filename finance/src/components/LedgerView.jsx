@@ -291,6 +291,8 @@ const IsolatedTextInput = React.memo(function IsolatedTextInput({
 function DailySpreadsheetMatrix() {
   const {
     budget,
+    matrixVersion,
+    lineItems,
     getBillMonthlyCost,
     getDailyMatrixCell,
     updateDailyMatrixCell,
@@ -938,7 +940,9 @@ function DailySpreadsheetMatrix() {
     initialExtraBeg,
     getActualAmount,
     isPersonDepositDay,
-    getPersonDepositAmountForAccount
+    getPersonDepositAmountForAccount,
+    matrixVersion,
+    lineItems
   ]);
 
   // Group matrix rows by month so each month gets its own tbody with a sticky month banner

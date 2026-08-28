@@ -915,7 +915,8 @@ export function parseSingleSheet({
               (lowerDesc.includes('mortgage') && bName.includes('mortgage')) ||
               (lowerDesc.includes('water') && bName.includes('water')) ||
               (lowerDesc.includes('power') && bName.includes('power')) ||
-              (lowerDesc.includes('gas') && bName.includes('gas')) ||
+              ((lowerDesc.includes('gas') || lowerDesc.includes('energy') || lowerDesc.includes('geo')) && bName.includes('gas')) ||
+              (lowerDesc.includes('energy inc') && (bName.includes('gas') || bName.includes('energy'))) ||
               (lowerDesc.includes('electric') && bName.includes('electric')) ||
               (lowerDesc.includes('insurance') && (bName.includes('insurance') || bName.includes('vehicle') || bName.includes('auto'))) ||
               (lowerDesc.includes('cell') && (bName.includes('cell') || bName.includes('phone'))) ||

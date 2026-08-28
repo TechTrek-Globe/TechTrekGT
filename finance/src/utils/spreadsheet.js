@@ -335,7 +335,10 @@ export function processSpreadsheetImport({
       if (dryRun) {
         const conflicts = detectTransactionConflicts(nextTransactions, stampedTransactions);
         // Only return conflicts if there are any that haven't been resolved yet
-        const unresolvedConflicts = conflicts.filter(c => !resolutions[c.incoming.id]);
+        const unresolvedConflicts = conflicts.filter(c => {
+          const r = resolutions[c.incoming.id];
+          return !r || !r.action;
+        });
         if (unresolvedConflicts.length > 0) {
           logDebug('RECONCILE', `Dry run detected ${unresolvedConflicts.length} unresolved transaction conflicts`);
           return { success: true, requiresResolution: true, conflicts: unresolvedConflicts };
@@ -377,6 +380,9 @@ export function processSpreadsheetImport({
 
     data.transactions.forEach((txn, txnIdx) => {
       if (!txn.date || txn.amount === undefined) return;
+      // If transaction was explicitly resolved to skip/ignore, do not process into matrix
+      if (resolutions[txn.id]?.action === 'skip') return;
+
       const normDate = normalizeIsoDate(txn.date);
       if (!normDate) return;
       const parts = normDate.split('-');
@@ -394,6 +400,7 @@ export function processSpreadsheetImport({
         accountId = data.targetAccountId;
       }
       if (!accountId) accountId = nextAccounts[0]?.id || '';
+
       const descLower = (txn.description || '').toLowerCase();
       const notesLower = (txn.notes || '').toLowerCase();
 
@@ -520,10 +527,12 @@ export function processSpreadsheetImport({
 
         // Tier 2 (Fallback): Heuristics (Bill Name similarity, domain synonyms, expected dollar amount)
         if (!resolvedBillId && descLower) {
-          // 2A: Bill Name & Domain synonyms
-          const matchedHeuristic = nextBills.find(b => {
-            if (b.isArchived) return false;
-            if (b.accountId && accountId && b.accountId !== accountId) return false;
+          // 2A: Bill Name & Domain synonyms - Check target account bills first, then other accounts
+          const candidateBills = [
+            ...nextBills.filter(b => !b.isArchived && (!b.accountId || b.accountId === accountId)),
+            ...nextBills.filter(b => !b.isArchived && b.accountId && b.accountId !== accountId)
+          ];
+          const matchedHeuristic = candidateBills.find(b => {
             const bName = (b.name || '').toLowerCase().trim();
             const pSource = (b.paymentSource || '').toLowerCase().trim();
 
@@ -537,10 +546,11 @@ export function processSpreadsheetImport({
                 (bName.includes('gym') || bName.includes('fitness') || bName.includes('membership'))) return true;
             if (descLower.includes('wells fargo') && (bName.includes('cell') || pSource.includes('wells'))) return true;
             if (descLower.includes('bank of america') && (bName.includes('gym') || pSource.includes('america'))) return true;
-            if ((descLower.includes('power') || descLower.includes('electric') || descLower.includes('energy') || descLower.includes('georgia power')) &&
-                (bName.includes('power') || bName.includes('electric') || bName.includes('energy') || bName.includes('utility'))) return true;
+            if ((descLower.includes('power') || descLower.includes('electric') || descLower.includes('georgia power')) &&
+                (bName.includes('power') || bName.includes('electric') || bName.includes('utility'))) return true;
             if (descLower.includes('water') && bName.includes('water')) return true;
-            if (descLower.includes('gas') && bName.includes('gas')) return true;
+            if ((descLower.includes('gas') || descLower.includes('energy') || descLower.includes('geo')) && bName.includes('gas')) return true;
+            if (descLower.includes('energy inc') && (bName.includes('gas') || bName.includes('energy'))) return true;
             if (descLower.includes('hoa') && bName.includes('hoa')) return true;
             if (descLower.includes('mortgage') && bName.includes('mortgage')) return true;
             if ((descLower.includes('comcast') || descLower.includes('xfinity') || descLower.includes('spectrum')) &&
@@ -556,9 +566,7 @@ export function processSpreadsheetImport({
             matchStrategy = `heuristic_name (${matchedHeuristic.name})`;
           } else {
             // 2B: Expected Dollar Amount Match
-            const matchedByAmount = nextBills.find(b => {
-              if (b.isArchived) return false;
-              if (b.accountId && accountId && b.accountId !== accountId) return false;
+            const matchedByAmount = candidateBills.find(b => {
               const billAmt = Math.abs(parseFloat(b.amount || 0));
               return Math.abs(billAmt - actualAmount) < 0.01;
             });
@@ -573,7 +581,8 @@ export function processSpreadsheetImport({
         if (resolvedBillId) {
           lineItemUpdates.push({ billId: resolvedBillId, monthKey, actualAmount });
           const bill = nextBills.find(b => b.id === resolvedBillId);
-          const actualKey = `${accountId}_${monthKey}_${actualDay}_bill_${resolvedBillId}`;
+          const billTargetAccId = bill?.accountId || accountId;
+          const actualKey = `${billTargetAccId}_${monthKey}_${actualDay}_bill_${resolvedBillId}`;
           const existingBillAmt = matrixUpdates[actualKey] ?? 0;
           matrixUpdates[actualKey] = Math.round((existingBillAmt + actualAmount) * 100) / 100;
 
@@ -582,13 +591,14 @@ export function processSpreadsheetImport({
             desc: txn.description,
             amount: actualAmount,
             billId: resolvedBillId,
+            billTargetAccId,
             actualKey
           });
 
           // If this bill previously had a recorded day in this month in nextDailyMatrix that differs from actualDay, zero it out so it cleanly moves to the new day
           Object.keys(nextDailyMatrix).forEach(k => {
-            if (k.startsWith(`${accountId}_${monthKey}_`) && k.endsWith(`_bill_${resolvedBillId}`)) {
-              const dayStr = k.replace(`${accountId}_${monthKey}_`, '').replace(`_bill_${resolvedBillId}`, '');
+            if (k.startsWith(`${billTargetAccId}_${monthKey}_`) && k.endsWith(`_bill_${resolvedBillId}`)) {
+              const dayStr = k.replace(`${billTargetAccId}_${monthKey}_`, '').replace(`_bill_${resolvedBillId}`, '');
               const oldDay = parseInt(dayStr, 10);
               if (oldDay !== actualDay && matrixUpdates[k] === undefined) {
                 matrixUpdates[k] = 0;
@@ -597,10 +607,10 @@ export function processSpreadsheetImport({
           });
 
           if (bill && bill.dueDay !== actualDay) {
-            const projKey = `${accountId}_${monthKey}_${bill.dueDay}_bill_${resolvedBillId}`;
+            const projKey = `${billTargetAccId}_${monthKey}_${bill.dueDay}_bill_${resolvedBillId}`;
             if (matrixUpdates[projKey] === undefined) matrixUpdates[projKey] = 0;
-            const projNoteKey = `${accountId}_${monthKey}_${bill.dueDay}_other_desc`;
-            const actualNoteKey = `${accountId}_${monthKey}_${actualDay}_other_desc`;
+            const projNoteKey = `${billTargetAccId}_${monthKey}_${bill.dueDay}_other_desc`;
+            const actualNoteKey = `${billTargetAccId}_${monthKey}_${actualDay}_other_desc`;
             matrixNoteShifts.push({ projNoteKey, actualNoteKey });
           }
         } else {

@@ -440,8 +440,23 @@ export function detectTransactionConflicts(existing = [], incoming = []) {
     const incDate = normalizeIsoDate(inc.date);
     const incDesc = (inc.description || '').toLowerCase().trim();
     const incAmt = parseFloat(inc.amount) || 0;
-    const incMonth = incDate ? incDate.slice(0, 7) : '';
 
+    // If an incoming transaction already matches an existing entry (same account, same date, same amount),
+    // it matches what is there in the ledger and should be automatically ignored / deduplicated - not a conflict.
+    const alreadyMatches = existing.some(ex => {
+      if (ex.accountId && inc.accountId && ex.accountId !== inc.accountId) return false;
+      const exDate = normalizeIsoDate(ex.date);
+      const exAmt = parseFloat(ex.amount) || 0;
+      const dateMatch = incDate && exDate && incDate === exDate;
+      const amtMatch = Math.abs(incAmt - exAmt) < 0.01;
+      return dateMatch && amtMatch;
+    });
+
+    if (alreadyMatches) {
+      return;
+    }
+
+    // Only flag true ambiguities as conflicts (e.g. same date and payee with a mismatched amount, or close date within 2 days with same amount)
     const matches = existing.filter(ex => {
       if (ex.id && inc.id && ex.id === inc.id) return true;
       if (ex.accountId && inc.accountId && ex.accountId !== inc.accountId) return false;
@@ -449,25 +464,17 @@ export function detectTransactionConflicts(existing = [], incoming = []) {
       const exDate = normalizeIsoDate(ex.date);
       const exDesc = (ex.description || '').toLowerCase().trim();
       const exAmt = parseFloat(ex.amount) || 0;
-      const exMonth = exDate ? exDate.slice(0, 7) : '';
 
       const descMatch = incDesc === exDesc || (incDesc.length >= 3 && exDesc.includes(incDesc)) || (exDesc.length >= 3 && incDesc.includes(exDesc));
       const dateMatch = incDate && exDate && incDate === exDate;
       const amtMatch = Math.abs(incAmt - exAmt) < 0.01;
-      
       const dateDiff = (incDate && exDate) ? Math.abs(new Date(incDate) - new Date(exDate)) / 86400000 : 999;
 
-      // Case A: exact date + matching description
-      if (dateMatch && descMatch) return true;
+      // Case 1: Same date and matching description, but mismatched amount
+      if (dateMatch && descMatch && !amtMatch) return true;
 
-      // Case B: same month + matching description
-      if (incMonth && exMonth && incMonth === exMonth && descMatch) return true;
-
-      // Case C: exact date + exact amount
-      if (dateMatch && amtMatch) return true;
-      
-      // Doubt/Duplicate (close date + exact amount)
-      if (dateDiff <= 3 && amtMatch) return true;
+      // Case 2: Close date (1-2 days diff, e.g. pending vs posted date) with matching amount and description
+      if (dateDiff > 0 && dateDiff <= 2 && amtMatch && descMatch) return true;
 
       return false;
     });
@@ -505,13 +512,12 @@ export function mergeTransactions(existing = [], incoming = [], resolutions = {}
     const incDate = normalizeIsoDate(inc.date);
     const incDesc = (inc.description || '').toLowerCase().trim();
     const incAmt = parseFloat(inc.amount) || 0;
-    const incMonth = incDate ? incDate.slice(0, 7) : '';
 
     let matchIdx = -1;
     if (res && res.action === 'merge' && res.targetId) {
       matchIdx = result.findIndex(ex => ex.id === res.targetId);
     } else if (!res) {
-      // Fallback heuristic if no explicit resolution provided
+      // Fallback heuristic: check if transaction matches an existing ledger record
       matchIdx = result.findIndex(ex => {
         if (ex.id && inc.id && ex.id === inc.id) return true;
         if (ex.accountId && inc.accountId && ex.accountId !== inc.accountId) return false;
@@ -519,17 +525,20 @@ export function mergeTransactions(existing = [], incoming = [], resolutions = {}
         const exDate = normalizeIsoDate(ex.date);
         const exDesc = (ex.description || '').toLowerCase().trim();
         const exAmt = parseFloat(ex.amount) || 0;
-        const exMonth = exDate ? exDate.slice(0, 7) : '';
 
         const descMatch = incDesc === exDesc || (incDesc.length >= 3 && exDesc.includes(incDesc)) || (exDesc.length >= 3 && incDesc.includes(exDesc));
         const dateMatch = incDate && exDate && incDate === exDate;
         const amtMatch = Math.abs(incAmt - exAmt) < 0.01;
         const dateDiff = (incDate && exDate) ? Math.abs(new Date(incDate) - new Date(exDate)) / 86400000 : 999;
 
-        if (dateMatch && descMatch) return true;
-        if (incMonth && exMonth && incMonth === exMonth && descMatch) return true;
+        // Exact match on date and amount (already in ledger)
         if (dateMatch && amtMatch) return true;
-        if (dateDiff <= 3 && amtMatch) return true;
+
+        // Same date and matching description
+        if (dateMatch && descMatch) return true;
+
+        // Pending vs posted within 2 days with exact amount and matching description
+        if (dateDiff <= 2 && amtMatch && descMatch) return true;
 
         return false;
       });

@@ -674,6 +674,14 @@ export function SpreadsheetImporter({
       sheetName: selectedSheetName
     });
 
+    // Ensure all detected conflicts have at least the default resolution ('skip') populated
+    const effectiveResolutions = { ...resolutions };
+    (conflicts || []).forEach(c => {
+      if (!effectiveResolutions[c.incoming.id]) {
+        effectiveResolutions[c.incoming.id] = { action: 'skip', targetId: null };
+      }
+    });
+
     if (stage === STAGE.SELECTING || stage === STAGE.RECONCILIATION) {
       logDebug('IMPORT', 'Running dry-run reconciliation check');
       const dryResult = importSpreadsheetSelective({
@@ -681,10 +689,15 @@ export function SpreadsheetImporter({
         strategies: nsStrategy,
         data: parsedPayload,
         dryRun: true,
-        resolutions
+        resolutions: effectiveResolutions
       });
 
       if (dryResult.requiresResolution) {
+        const initialResolutions = {};
+        (dryResult.conflicts || []).forEach(c => {
+          initialResolutions[c.incoming.id] = { action: 'skip', targetId: null };
+        });
+        setResolutions(prev => ({ ...initialResolutions, ...prev }));
         setConflicts(dryResult.conflicts);
         setStage(STAGE.RECONCILIATION);
         return;
@@ -775,7 +788,7 @@ export function SpreadsheetImporter({
       namespaces: nsEnabled,
       strategies: nsStrategy,
       data: parsedPayload,
-      resolutions
+      resolutions: effectiveResolutions
     });
 
     if (result.success) {

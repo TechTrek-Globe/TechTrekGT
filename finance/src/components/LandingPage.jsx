@@ -86,17 +86,17 @@ export function LandingPage({ onNavigate }) {
       {/* Navigation Header */}
       <header className="sticky top-0 z-40 glass-panel border-b border-slate-800/80">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-500 to-purple-600 p-0.5 shadow-lg shadow-blue-500/20">
+          <a href="https://techtrekgt.com" className="flex items-center space-x-3 group" title="Go to TechTrekGT Main Launch Pad">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-500 to-purple-600 p-0.5 shadow-lg shadow-blue-500/20 group-hover:scale-105 transition-transform">
               <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
                 <Globe className="w-5 h-5 text-blue-400" />
               </div>
             </div>
             <div>
               <span className="text-lg font-black tracking-tight text-white">TechTrek<span className="text-blue-400">GT</span></span>
-              <span className="hidden sm:inline-block ml-2 px-2 py-0.5 text-[10px] font-semibold bg-slate-800 text-slate-300 rounded-full border border-slate-700">Platform Portal</span>
+              <span className="hidden sm:inline-block ml-2 px-2 py-0.5 text-[10px] font-semibold bg-slate-800 text-slate-300 rounded-full border border-slate-700">Launch Pad</span>
             </div>
-          </div>
+          </a>
 
           <div className="flex items-center space-x-4">
             <a

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Compass, Map, User, LogOut, ShieldCheck, ChevronRight, Menu, X, Coins, ArrowLeftRight, Settings, Calendar } from 'lucide-react';
+import { Compass, Map, User, LogOut, ShieldCheck, ChevronRight, Menu, X, Coins, ArrowLeftRight, Settings, Calendar, Globe } from 'lucide-react';
 import { CurrencyConverterModal } from './CurrencyConverterModal';
 import { SettingsModal } from './SettingsModal';
 import { useExchangeRate } from '../hooks/useExchangeRate';
@@ -77,6 +77,16 @@ export function Layout({ children }) {
           </div>
 
           <div className="hidden md:flex items-center space-x-3">
+            {/* TechTrekGT Launch Pad Return Link */}
+            <a
+              href="https://techtrekgt.com"
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-700/60 hover:border-wf-blue/50 text-slate-200 hover:text-white text-sm font-semibold transition-all shadow-sm group"
+              title="Return to TechTrekGT Main Launch Pad"
+            >
+              <Globe className="w-4 h-4 text-wf-blue-lt group-hover:scale-110 transition-transform" />
+              <span>Launch Pad</span>
+            </a>
+
             {/* Quick Itinerary & Currency Converter Trigger (Desktop) - Only show when trip is selected */}
             {showCurrencyConverter && (
               <>
@@ -176,6 +186,14 @@ export function Layout({ children }) {
         {/* Mobile menu */}
         {mobileMenuOpen && (
           <div className="md:hidden glass-panel border-t border-white/5 py-2 px-4 space-y-1">
+            <a
+              href="https://techtrekgt.com"
+              className="px-3 py-3 sm:py-2 rounded-lg text-base font-semibold text-wf-blue-lt hover:text-white hover:bg-white/5 min-h-[44px] flex items-center space-x-2 border border-wf-blue/20 bg-wf-blue/5 mb-2"
+            >
+              <Globe className="w-5 h-5 text-wf-blue-lt" />
+              <span>TechTrekGT Launch Pad</span>
+            </a>
+
             {navLinks.map((link) => (
               <a
                 key={link.href}
@@ -258,11 +276,21 @@ export function Layout({ children }) {
         onClose={() => setIsSettingsOpen(false)}
       />
 
-      <footer className="border-t border-white/5 pt-8 bg-wf-navy/80 backdrop-blur-md relative z-10 mt-auto safe-pb">
+      <footer className="border-t border-white/5 pt-8 pb-6 bg-wf-navy/80 backdrop-blur-md relative z-10 mt-auto safe-pb">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center space-x-2">
-            <Compass className="w-5 h-5 text-wf-blue-lt" />
-            <span className="text-sm font-semibold text-white tracking-wide">TechTrek Wayfinder</span>
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <Compass className="w-5 h-5 text-wf-blue-lt" />
+              <span className="text-sm font-semibold text-white tracking-wide">TechTrek Wayfinder</span>
+            </div>
+            <span className="text-white/20">|</span>
+            <a
+              href="https://techtrekgt.com"
+              className="text-xs text-wf-blue-lt hover:text-white flex items-center gap-1 transition-colors"
+            >
+              <Globe className="w-3.5 h-3.5" />
+              <span>TechTrekGT Launch Pad</span>
+            </a>
           </div>
           <div className="text-xs text-wf-muted">
             &copy; {new Date().getFullYear()} TechTrekGT. Smart routes. Memorable places.

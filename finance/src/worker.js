@@ -293,6 +293,15 @@ export default {
         } else {
           response = await fetch(new Request(assetUrl.toString(), request));
         }
+      } else if (url.pathname.startsWith('/finance/') && /\.[a-zA-Z0-9]+$/.test(url.pathname)) {
+        // Direct static asset request under /finance/ (e.g. /finance/favicon.svg, /finance/manifest.webmanifest)
+        const assetUrl = new URL(request.url);
+        assetUrl.pathname = assetUrl.pathname.slice('/finance'.length);
+        if (env?.ASSETS?.fetch) {
+          response = await env.ASSETS.fetch(new Request(assetUrl.toString(), request));
+        } else {
+          response = await fetch(new Request(assetUrl.toString(), request));
+        }
       } else if (url.pathname === '/finance' || url.pathname.startsWith('/finance/')) {
         // SPA entry fallback for /finance subpath
         const spaUrl = new URL(request.url);

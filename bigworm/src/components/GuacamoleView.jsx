@@ -11,7 +11,8 @@ import {
   Terminal,
   AlertTriangle,
   Loader2,
-  ChevronDown
+  ChevronDown,
+  Globe
 } from 'lucide-react';
 
 // Connection state machine
@@ -230,6 +231,15 @@ export function GuacamoleView() {
 
         {/* Right: Controls */}
         <div className="flex items-center gap-2">
+          <a
+            href="https://techtrekgt.com"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-cyan-400 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 transition-all shadow-sm"
+            title="Return to TechTrekGT Main Launch Pad"
+          >
+            <Globe className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="hidden sm:inline">Launch Pad</span>
+          </a>
+
           <button
             id="bw-reconnect-btn"
             onClick={connect}

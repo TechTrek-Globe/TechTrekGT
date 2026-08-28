@@ -178,14 +178,14 @@ export function AuthPage({ onNavigateHome, onAuthSuccess }) {
             </span>
           </div>
 
-          <button
-            type="button"
-            onClick={onNavigateHome}
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold border border-slate-800 transition-colors cursor-pointer"
+          <a
+            href="https://techtrekgt.com"
+            className="flex items-center space-x-2 px-3.5 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-white text-xs font-semibold border border-slate-800 hover:border-slate-700 transition-all shadow-sm"
+            title="Return to TechTrekGT Main Launch Pad"
           >
-            <ChevronLeft className="w-4 h-4" />
-            <span>Platform Portal</span>
-          </button>
+            <Globe className="w-4 h-4 text-blue-400" />
+            <span>TechTrekGT Launch Pad</span>
+          </a>
         </div>
       </header>
 

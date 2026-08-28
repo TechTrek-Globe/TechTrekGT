@@ -16,7 +16,8 @@ import {
   ShieldCheck,
   Zap,
   BarChart3,
-  Sparkles
+  Sparkles,
+  Globe
 } from 'lucide-react';
 
 export const PRESET_SECURITY_QUESTIONS = [
@@ -177,6 +178,14 @@ export function AuthPage({ onAuthSuccess }) {
 
       {/* --- Full-width Top Bar Header --- */}
       <header className="w-full bg-black shadow-2xl relative z-20 flex justify-center items-center overflow-hidden" style={{ height: '280px', borderBottom: '1px solid rgba(180,130,20,0.3)' }}>
+        <a
+          href="https://techtrekgt.com"
+          className="absolute top-4 left-4 z-30 flex items-center space-x-2 px-3.5 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-white text-xs font-semibold border border-slate-700/80 hover:border-amber-500/50 shadow-lg backdrop-blur-md transition-all"
+          title="Return to TechTrekGT Main Launch Pad"
+        >
+          <Globe className="w-4 h-4 text-amber-400" />
+          <span>TechTrekGT Launch Pad</span>
+        </a>
         <img 
           src={outpostHeaderBanner} 
           alt="TechTrek Outpost Top Bar" 

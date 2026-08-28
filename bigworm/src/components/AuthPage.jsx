@@ -59,6 +59,16 @@ export function AuthPage() {
   return (
     <div className="min-h-screen bg-slate-950 bg-grid-cyber flex items-center justify-center p-4 relative overflow-hidden font-sans">
 
+      {/* Launch Pad return link */}
+      <a
+        href="https://techtrekgt.com"
+        className="absolute top-4 left-4 z-30 flex items-center space-x-2 px-3.5 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-white text-xs font-semibold border border-slate-700/80 hover:border-cyan-500/50 shadow-lg backdrop-blur-md transition-all"
+        title="Return to TechTrekGT Main Launch Pad"
+      >
+        <Globe className="w-4 h-4 text-cyan-400" />
+        <span>TechTrekGT Launch Pad</span>
+      </a>
+
       {/* Ambient glow blobs */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute -top-60 -left-60 w-[700px] h-[700px] bg-cyan-500/6 rounded-full blur-[160px]" />

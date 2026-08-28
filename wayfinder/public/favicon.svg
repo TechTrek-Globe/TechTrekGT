@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="100%" height="100%">
+  <defs>
+    <linearGradient id="wf-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a192f" />
+      <stop offset="50%" stop-color="#061224" />
+      <stop offset="100%" stop-color="#020813" />
+    </linearGradient>
+    <linearGradient id="wf-glow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="50%" stop-color="#3b82f6" />
+      <stop offset="100%" stop-color="#f59e0b" />
+    </linearGradient>
+    <linearGradient id="north-needle" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24" />
+      <stop offset="100%" stop-color="#d97706" />
+    </linearGradient>
+    <linearGradient id="south-needle" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#0284c7" />
+    </linearGradient>
+  </defs>
+
+  <!-- Base background tile with glowing border -->
+  <rect x="4" y="4" width="120" height="120" rx="28" fill="url(#wf-bg)" stroke="url(#wf-glow)" stroke-width="4.5" />
+
+  <!-- Outer compass dial ring -->
+  <circle cx="64" cy="64" r="40" fill="#0f172a" fill-opacity="0.6" stroke="#38bdf8" stroke-width="2.5" stroke-dasharray="2 6" />
+  <circle cx="64" cy="64" r="34" fill="none" stroke="#60a5fa" stroke-width="1.5" opacity="0.6" />
+
+  <!-- 4 Cardinal points: North (Gold), South (Cyan), East, West -->
+  <!-- North point -->
+  <polygon points="64,24 69,64 64,60" fill="url(#north-needle)" />
+  <polygon points="64,24 59,64 64,60" fill="#fef3c7" />
+
+  <!-- South point -->
+  <polygon points="64,104 69,64 64,68" fill="url(#south-needle)" />
+  <polygon points="64,104 59,64 64,68" fill="#e0f2fe" />
+
+  <!-- East point -->
+  <polygon points="104,64 64,69 68,64" fill="#60a5fa" />
+  <polygon points="104,64 64,59 68,64" fill="#93c5fd" />
+
+  <!-- West point -->
+  <polygon points="24,64 64,69 60,64" fill="#60a5fa" />
+  <polygon points="24,64 64,59 60,64" fill="#93c5fd" />
+
+  <!-- Center brass rivet -->
+  <circle cx="64" cy="64" r="6" fill="#f59e0b" stroke="#78350f" stroke-width="1.5" />
+  <circle cx="64" cy="64" r="2.5" fill="#fef3c7" />
+</svg>

@@ -176,8 +176,8 @@ Each Cloudflare Worker routes requests before serving assets:
 Request -> URL normalization -> OPTIONS preflight -> API route matching -> SPA fallback
 ```
 
-- `finance/src/worker.js`: strips `/finance` prefix, routes `/api/auth/*` + sync endpoints, rewrites `/finance/assets/*`, SPA-falls-back all other `/finance/*` to `/`.
-- `outpost/src/worker.js`: same pattern plus case-insensitive redirect of `/Outpost` and `/auction` to lowercase `/outpost`.
+- `finance/src/worker.js`: strips `/finance` prefix, routes `/api/auth/*` + sync endpoints, rewrites `/finance/assets/*` and subpath static files (`favicon.svg`, `manifest.webmanifest`), SPA-falls-back all other `/finance/*` to `/`.
+- `outpost/src/worker.js`: same pattern with subpath static asset support plus case-insensitive redirect of `/Outpost` and `/auction` to lowercase `/outpost`.
 - `wayfinder/src/worker.js`: routes `/api/auth/*` and `/api/wayfinder/*` (journeys, itinerary, documents, import-jobs, budget, exchange-rate).
 - `bigworm/src/worker.js`: routes `/api/auth/*`, exchanges JWT for a Guacamole token at `/api/guac-token`, and reverse-proxies `/tunnel/*` to Guacamole after JWT validation.
 

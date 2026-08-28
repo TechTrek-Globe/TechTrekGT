@@ -112,6 +112,23 @@ const SidebarContent = ({ collapsed, activeView = 'dashboard', cashOnHand, netIn
         </div>
       </div>
     )}
+
+    {/* Launch Pad Navigation Link */}
+    <div className={`mx-3 mb-3 pt-2 border-t ${isLight ? 'border-slate-200' : 'border-slate-800/60'}`}>
+      <a
+        href="https://techtrekgt.com"
+        className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all ${
+          isLight
+            ? 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+            : 'bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800/60'
+        } ${collapsed ? 'justify-center px-2' : ''}`}
+        title="Return to TechTrekGT Main Launch Pad"
+      >
+        <Globe className="w-4 h-4 text-blue-400 flex-shrink-0" />
+        {!collapsed && <span className="font-semibold">Launch Pad</span>}
+        {!collapsed && <span className="ml-auto text-[10px] text-slate-500">↗</span>}
+      </a>
+    </div>
   </div>
   );
 };
@@ -266,24 +283,18 @@ export function AppLayout({ children, onNavigateHome, onNavigateView, activeView
             <Menu className="w-5 h-5" />
           </button>
 
-          {/* Platform Portal Home Link */}
+          {/* TechTrekGT Launch Pad Home Link */}
           <a
-            href="/"
-            onClick={(e) => {
-              if (onNavigateHome) {
-                e.preventDefault();
-                onNavigateHome();
-              }
-            }}
+            href="https://techtrekgt.com"
             className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all ${
               isLight
-                ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
-                : 'bg-slate-900/80 hover:bg-slate-800 text-slate-300 border-slate-800 hover:text-white'
+                ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300 shadow-sm'
+                : 'bg-slate-900/80 hover:bg-slate-800 text-slate-300 border-slate-800 hover:text-white shadow-sm'
             }`}
-            title="Return to TechTrekGT Portal"
+            title="Return to TechTrekGT Main Launch Pad"
           >
             <Globe className="w-3.5 h-3.5 text-blue-400" />
-            <span className="font-semibold text-slate-200">TechTrekGT</span>
+            <span className="font-semibold text-slate-200">TechTrekGT Launch Pad</span>
             <span className="text-slate-500">/</span>
             <span className="text-blue-400 font-semibold">Finance</span>
           </a>

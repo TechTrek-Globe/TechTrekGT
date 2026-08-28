@@ -243,6 +243,13 @@ export default {
         response = env?.ASSETS?.fetch
           ? await env.ASSETS.fetch(new Request(assetUrl.toString(), request))
           : await fetch(new Request(assetUrl.toString(), request));
+      } else if (url.pathname.startsWith('/outpost/') && /\.[a-zA-Z0-9]+$/.test(url.pathname)) {
+        // Direct static asset requests: /outpost/favicon.svg -> /favicon.svg
+        const assetUrl = new URL(request.url);
+        assetUrl.pathname = assetUrl.pathname.slice('/outpost'.length);
+        response = env?.ASSETS?.fetch
+          ? await env.ASSETS.fetch(new Request(assetUrl.toString(), request))
+          : await fetch(new Request(assetUrl.toString(), request));
       } else if (url.pathname === '/outpost' || url.pathname.startsWith('/outpost/')) {
         // SPA fallback - serve index.html for all /outpost/* routes
         const spaUrl = new URL(request.url);

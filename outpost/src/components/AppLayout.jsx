@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   LayoutDashboard, Package, ShoppingCart,
   Settings, LogOut, ChevronRight, Calculator, ArrowRightLeft,
-  Boxes, FileSpreadsheet, PanelLeftClose, PanelLeftOpen
+  Boxes, FileSpreadsheet, PanelLeftClose, PanelLeftOpen, Globe
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { FinanceSyncModal } from './FinanceSyncModal';
@@ -212,25 +212,29 @@ export function AppLayout({ activeView, onNavigate, children }) {
           )}
         </nav>
 
-        {/* Back to Finance Portal Link */}
+        {/* Back to TechTrekGT Launch Pad Link */}
         {!isCollapsed ? (
           <div className="px-3 py-2 border-t border-slate-800/40">
             <a
               href="https://techtrekgt.com"
-              className="w-full flex items-center justify-between px-3 py-1.5 rounded-xl text-xs font-medium text-slate-400 hover:text-amber-400 hover:bg-slate-800/40 transition-colors group"
+              className="w-full flex items-center justify-between px-3 py-1.5 rounded-xl text-xs font-medium text-slate-300 hover:text-amber-400 hover:bg-slate-800/60 transition-colors group border border-slate-800/40"
+              title="Return to TechTrekGT Main Launch Pad"
             >
-              <span>TechTrek Finance</span>
-              <span className="text-[10px] text-slate-600 group-hover:text-amber-400">↗</span>
+              <div className="flex items-center gap-2">
+                <Globe className="w-3.5 h-3.5 text-amber-400" />
+                <span className="font-semibold">Launch Pad</span>
+              </div>
+              <span className="text-[10px] text-slate-500 group-hover:text-amber-400">↗</span>
             </a>
           </div>
         ) : (
           <div className="p-2 border-t border-slate-800/40 flex justify-center">
             <a
               href="https://techtrekgt.com"
-              title="TechTrek Finance Portal"
+              title="Return to TechTrekGT Main Launch Pad"
               className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-slate-400 hover:text-amber-400 hover:bg-slate-800/60 transition-colors"
             >
-              TT↗
+              <Globe className="w-4 h-4 text-amber-400" />
             </a>
           </div>
         )}
@@ -289,7 +293,16 @@ export function AppLayout({ activeView, onNavigate, children }) {
             <img src={outpostLogo} alt="TechTrek Outpost" className="h-8 w-auto max-w-[220px] object-contain filter drop-shadow-md" />
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            <a
+              href="https://techtrekgt.com"
+              title="Return to TechTrekGT Main Launch Pad"
+              className="p-1.5 rounded-lg bg-slate-800/80 text-slate-300 hover:text-amber-400 border border-slate-700/60 text-xs font-semibold flex items-center gap-1"
+            >
+              <Globe className="w-3.5 h-3.5 text-amber-400" />
+              <span className="hidden sm:inline">Launch Pad</span>
+            </a>
+
             <button
               onClick={() => setCalcOpen(true)}
               className="p-1.5 rounded-lg bg-amber-500/15 text-amber-400 border border-amber-500/30 text-xs font-bold flex items-center gap-1"

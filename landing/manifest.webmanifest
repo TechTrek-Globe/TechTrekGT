@@ -1,0 +1,18 @@
+{
+  "name": "TechTrekGT",
+  "short_name": "TechTrekGT",
+  "description": "TechTrekGT centralized launch pad for Finance, Outpost, Wayfinder, and Vine Scout.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#020617",
+  "theme_color": "#020617",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -132,7 +132,7 @@ export function SpreadsheetImporter({
   const [columnMap, setColumnMap] = useState({});
 
   // Namespace selection
-  const [nsEnabled, setNsEnabled] = useState({ people: true, accounts: true, bills: true, transactions: true, loans: true });
+  const [nsEnabled, setNsEnabled] = useState({ people: false, accounts: false, bills: false, transactions: true, loans: false });
   const [nsStrategy, setNsStrategy] = useState({ people: 'merge', accounts: 'merge', bills: 'merge', transactions: 'merge', loans: 'merge' });
   const [nsCollapsed, setNsCollapsed] = useState({ people: false, accounts: false, bills: false, transactions: false, loans: false });
 
@@ -464,7 +464,7 @@ export function SpreadsheetImporter({
     setFlatRows([]);
     setColumnMap({});
     setParsedPayload(null);
-    setNsEnabled({ people: true, accounts: true, bills: true, transactions: true, loans: true });
+    setNsEnabled({ people: false, accounts: false, bills: false, transactions: true, loans: false });
     setNsStrategy({ people: 'merge', accounts: 'merge', bills: 'merge', transactions: 'merge', loans: 'merge' });
     setConflicts([]);
     setResolutions({});
@@ -546,25 +546,49 @@ export function SpreadsheetImporter({
         existingAccounts: budget.accounts || []
       });
 
-      // Construct accounts map
-      const accountsMap = new Map();
-      (budget.accounts || []).forEach(a => accountsMap.set(a.id, { ...a }));
+      // Detect if there are newly discovered accounts or genuine updates to existing accounts
+      const existingAcc = (budget.accounts || []).find(a => a.id === targetAccId);
+      const isNewAccount = !existingAcc && Boolean(targetAccId);
 
-      if (targetAccId && Object.keys(parsedSheet.importedLedgerRows || {}).length > 0) {
-        const acc = accountsMap.get(targetAccId) || {
+      const newLedgerRows = parsedSheet.importedLedgerRows || {};
+      const existingLedgerRows = existingAcc?.importedLedgerRows || {};
+      const hasNewLedgerData = Object.keys(newLedgerRows).length > 0 && Object.entries(newLedgerRows).some(([date, val]) => {
+        const ex = existingLedgerRows[date];
+        if (!ex) return true;
+        const incVal = typeof val === 'object' ? (val.totalEnding ?? val.regEnding) : val;
+        const exVal = typeof ex === 'object' ? (ex.totalEnding ?? ex.regEnding) : ex;
+        return Math.abs((Number(incVal) || 0) - (Number(exVal) || 0)) > 0.001;
+      });
+
+      const changedAccounts = [];
+      if (isNewAccount) {
+        changedAccounts.push({
           id: targetAccId,
           name: targetAcc?.name || selectedSheetName,
           type: 'checking',
           enableExtraSavings: true,
-          saveExtraMonthly: 0
-        };
-        acc.importedLedgerRows = {
-          ...(acc.importedLedgerRows || {}),
-          ...parsedSheet.importedLedgerRows
-        };
-        acc.ledgerMode = 'import';
-        accountsMap.set(targetAccId, acc);
+          saveExtraMonthly: 0,
+          importedLedgerRows: newLedgerRows,
+          ledgerMode: Object.keys(newLedgerRows).length > 0 ? 'import' : 'manual'
+        });
+      } else if (hasNewLedgerData && existingAcc) {
+        changedAccounts.push({
+          ...existingAcc,
+          importedLedgerRows: {
+            ...existingLedgerRows,
+            ...newLedgerRows
+          },
+          ledgerMode: 'import'
+        });
       }
+
+      // Check for any additional accounts discovered in the sheet
+      const discoveredAccs = Array.isArray(parsedSheet.discoveredAccounts) ? parsedSheet.discoveredAccounts : [];
+      discoveredAccs.forEach(da => {
+        if (!changedAccounts.some(a => a.id === da.id) && !(budget.accounts || []).some(a => a.id === da.id)) {
+          changedAccounts.push(da);
+        }
+      });
 
       const rawTransactions = parsedSheet.transactions || [];
       const resolvedTransactions = rawTransactions.map(t => {
@@ -593,7 +617,7 @@ export function SpreadsheetImporter({
 
       const payload = {
         people: parsedSheet.discoveredPeople || [],
-        accounts: Array.from(accountsMap.values()),
+        accounts: changedAccounts,
         bills: parsedSheet.discoveredBills || [],
         loans: [],
         transactions: resolvedTransactions,

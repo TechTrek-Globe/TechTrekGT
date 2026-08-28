@@ -103,6 +103,10 @@ export function processSpreadsheetImport({
 
   // 2. Process Accounts
   const accountIdMap = new Map();
+  nextAccounts.forEach(a => accountIdMap.set(a.id, a.id));
+  if (data.targetAccountId) {
+    accountIdMap.set(data.targetAccountId, data.targetAccountId);
+  }
   if (namespaces.accounts && Array.isArray(data.accounts)) {
     logDebug('RECONCILE', 'Reconciling accounts namespace', { strategy: strategies.accounts, incomingCount: data.accounts.length, existingCount: nextAccounts.length });
     if (strategies.accounts === 'override') {

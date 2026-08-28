@@ -3,7 +3,7 @@ export const polandJourney = {
   "title": "Poland: A Christmas Journey",
   "tagline": "Winter Markets, Historic Cities, and Scenic Rails",
   "description": "A curated winter expedition traversing Poland from south to north. Experience the medieval grandeur of Kraków, the fairytale bridges of Wrocław, the vibrant squares of Poznań, a daytime stop in gingerbread-famed Toruń, and a coastal finale in the Hanseatic city of Gdańsk.",
-  "dates": "Dec 4 - Dec 13, 2026",
+  "dates": "Dec 3 - Dec 13, 2026",
   "startDate": "2026-12-03",
   "endDate": "2026-12-13",
   "outboundFlightDate": "2026-12-03",

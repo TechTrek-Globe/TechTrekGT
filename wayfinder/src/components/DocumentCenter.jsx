@@ -1,27 +1,30 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useWayfinder } from '../context/WayfinderContext';
 import { saveLocalDocumentFile, getLocalDocumentFile } from '../utils/documentStorage';
-import { 
-  UploadCloud, File, FileText, Download, Eye, ShieldCheck, Loader2, 
-  CheckCircle2, AlertTriangle, X, Check, RefreshCw, ArrowRight, Upload
+import {
+  UploadCloud, File, FileText, Download, Eye, ShieldCheck, Loader2,
+  CheckCircle2, AlertTriangle, X, Check, RefreshCw, ArrowRight, Upload,
+  Plane, Train, Building2, Utensils, Ticket, Compass
 } from 'lucide-react';
 
 function simulateExtraction(file) {
   const filename = (file.name || '').toLowerCase();
   
-  if (filename.includes('hotel') || filename.includes('stary') || filename.includes('bridge') || filename.includes('accor')) {
+  if (filename.includes('hotel') || filename.includes('stary') || filename.includes('bridge') || filename.includes('accor') || filename.includes('accommodation')) {
     const isWroclaw = filename.includes('bridge') || filename.includes('wroclaw');
     return {
-      provider: isWroclaw ? 'Accor / The Bridge' : 'Hotel Stary Kraków',
+      provider: isWroclaw ? 'Accor / The Bridge MGallery' : 'Hotel Stary Krakow',
       docType: 'hotel',
       fields: [
-        { field_name: 'hotel_name', extracted_value: isWroclaw ? 'The Bridge Wrocław MGallery' : 'Hotel Stary (Kraków)', confidence: 'high' },
-        { field_name: 'hotel_address', extracted_value: isWroclaw ? 'Plac Katedralny 8, Wrocław' : 'ul. Szczepańska 5, Kraków', confidence: 'high' },
+        { field_name: 'hotel_name', extracted_value: isWroclaw ? 'The Bridge Wroclaw MGallery' : 'Hotel Stary (Krakow)', confidence: 'high' },
+        { field_name: 'hotel_address', extracted_value: isWroclaw ? 'Plac Katedralny 8, Wroclaw' : 'ul. Szczepanska 5, Krakow', confidence: 'high' },
         { field_name: 'check_in_date', extracted_value: isWroclaw ? '2026-12-07' : '2026-12-04', confidence: 'high' },
         { field_name: 'check_in_time', extracted_value: '15:00', confidence: 'medium' },
         { field_name: 'check_out_date', extracted_value: isWroclaw ? '2026-12-09' : '2026-12-07', confidence: 'high' },
-        { field_name: 'check_out_time', extracted_value: '11:00', confidence: 'low' },
-        { field_name: 'confirmation_number', extracted_value: `HTL-${Math.floor(100000 + Math.random() * 900000)}`, confidence: 'high' },
+        { field_name: 'check_out_time', extracted_value: '11:00', confidence: 'medium' },
+        { field_name: 'room_type', extracted_value: 'Deluxe Double Room', confidence: 'medium' },
+        { field_name: 'guests', extracted_value: '2 Adults', confidence: 'high' },
+        { field_name: 'confirmation_number', extracted_value: isWroclaw ? 'ACCOR-WR9281' : 'STARY-KR4410', confidence: 'high' },
         { field_name: 'total_cost', extracted_value: isWroclaw ? '1850 PLN' : '2400 PLN', confidence: 'medium' }
       ]
     };
@@ -33,13 +36,15 @@ function simulateExtraction(file) {
       docType: 'rail',
       fields: [
         { field_name: 'carrier', extracted_value: 'PKP Intercity', confidence: 'high' },
-        { field_name: 'origin_station', extracted_value: 'Kraków Główny', confidence: 'high' },
-        { field_name: 'destination_station', extracted_value: 'Wrocław Główny', confidence: 'high' },
+        { field_name: 'origin_station', extracted_value: 'Krakow Glowny', confidence: 'high' },
+        { field_name: 'destination_station', extracted_value: 'Wroclaw Glowny', confidence: 'high' },
         { field_name: 'departure_date', extracted_value: '2026-12-07', confidence: 'high' },
         { field_name: 'departure_time', extracted_value: '11:30', confidence: 'high' },
         { field_name: 'arrival_date', extracted_value: '2026-12-07', confidence: 'high' },
         { field_name: 'arrival_time', extracted_value: '14:15', confidence: 'medium' },
-        { field_name: 'confirmation_number', extracted_value: `PKP-${Math.floor(100000 + Math.random() * 900000)}`, confidence: 'high' }
+        { field_name: 'train_number', extracted_value: 'IC 1305 "Slask"', confidence: 'high' },
+        { field_name: 'seat', extracted_value: 'Car 3, Seats 24/25 (1st class)', confidence: 'medium' },
+        { field_name: 'confirmation_number', extracted_value: 'PKP-772910', confidence: 'high' }
       ]
     };
   }
@@ -70,16 +75,55 @@ function simulateExtraction(file) {
     };
   }
 
+  if (filename.includes('restaurant') || filename.includes('reserv') || filename.includes('dining') || filename.includes('table') || filename.includes('resto')) {
+    return {
+      provider: 'Restaurant Reservation',
+      docType: 'restaurant',
+      fields: [
+        { field_name: 'restaurant_name', extracted_value: 'Wierzynek Historic Restaurant', confidence: 'high' },
+        { field_name: 'address', extracted_value: 'Rynek Glowny 15, 31-008 Krakow', confidence: 'high' },
+        { field_name: 'reservation_date', extracted_value: '2026-12-05', confidence: 'high' },
+        { field_name: 'reservation_time', extracted_value: '19:30', confidence: 'high' },
+        { field_name: 'party_size', extracted_value: '2 Guests', confidence: 'high' },
+        { field_name: 'table_type', extracted_value: 'Window table (street view)', confidence: 'medium' },
+        { field_name: 'dietary_notes', extracted_value: 'No restrictions noted', confidence: 'low' },
+        { field_name: 'confirmation_number', extracted_value: 'RSV-WZK-0512', confidence: 'high' },
+        { field_name: 'deposit_paid', extracted_value: '0 PLN (card held on file)', confidence: 'medium' }
+      ]
+    };
+  }
+
+  if (filename.includes('tour') || filename.includes('excursion') || filename.includes('ticket') || filename.includes('auschwitz') || filename.includes('wieliczka') || filename.includes('activity')) {
+    const isWieliczka = filename.includes('wieliczka') || filename.includes('salt');
+    const isAuschwitz = filename.includes('auschwitz') || filename.includes('birkenau');
+    return {
+      provider: isAuschwitz ? 'Auschwitz-Birkenau Memorial Tours' : isWieliczka ? 'Wieliczka Salt Mine' : 'Poland Experience Tours',
+      docType: 'excursion',
+      fields: [
+        { field_name: 'tour_name', extracted_value: isAuschwitz ? 'Auschwitz-Birkenau Memorial Guided Tour' : isWieliczka ? 'Wieliczka Salt Mine UNESCO Tour' : 'Krakow Old Town Walking Tour', confidence: 'high' },
+        { field_name: 'tour_date', extracted_value: isAuschwitz ? '2026-12-06' : '2026-12-06', confidence: 'high' },
+        { field_name: 'start_time', extracted_value: isAuschwitz ? '08:30' : '10:00', confidence: 'high' },
+        { field_name: 'duration', extracted_value: isAuschwitz ? '5 hours' : isWieliczka ? '3 hours' : '2 hours', confidence: 'medium' },
+        { field_name: 'meeting_point', extracted_value: isAuschwitz ? 'Krakow Bus Pickup - Pawia St' : isWieliczka ? 'Wieliczka Salt Mine Entrance, ul. Daniłowicza 10' : 'Rynek Glowny - Main Market Square', confidence: 'high' },
+        { field_name: 'guide_language', extracted_value: 'English (dedicated guide)', confidence: 'high' },
+        { field_name: 'tickets', extracted_value: '2 Adults (General Admission)', confidence: 'high' },
+        { field_name: 'included', extracted_value: isAuschwitz ? 'Guided tour, transport from Krakow, entrance fee' : 'Guided tour, entrance fee', confidence: 'medium' },
+        { field_name: 'confirmation_number', extracted_value: isAuschwitz ? 'AUS-2026-4817' : isWieliczka ? 'WLZ-2026-9032' : `EXC-${Math.floor(100000 + Math.random() * 900000)}`, confidence: 'high' }
+      ]
+    };
+  }
+
   // Default booking extraction
   return {
     provider: 'Poland Travel Booking',
-    docType: 'tour',
+    docType: 'excursion',
     fields: [
       { field_name: 'activity_title', extracted_value: file.name.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' '), confidence: 'high' },
       { field_name: 'supplier', extracted_value: 'Poland Travel Services', confidence: 'medium' },
-      { field_name: 'start_date', extracted_value: '2026-12-06', confidence: 'high' },
+      { field_name: 'tour_date', extracted_value: '2026-12-06', confidence: 'medium' },
       { field_name: 'start_time', extracted_value: '10:00', confidence: 'medium' },
-      { field_name: 'meeting_point', extracted_value: 'Kraków Main Market Square', confidence: 'medium' },
+      { field_name: 'meeting_point', extracted_value: 'Krakow Main Market Square', confidence: 'medium' },
+      { field_name: 'tickets', extracted_value: '2 Adults', confidence: 'medium' },
       { field_name: 'confirmation_number', extracted_value: `BK-${Math.floor(100000 + Math.random() * 900000)}`, confidence: 'high' }
     ]
   };
@@ -110,7 +154,7 @@ export function DocumentCenter() {
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState(null);
   const [iframeError, setIframeError] = useState(false);
 
-    const fileInputRef = useRef(null);
+  const fileInputRef = useRef(null);
   const reattachInputRef = useRef(null);
   const localDocBlobs = useRef(new Map());
 
@@ -631,11 +675,25 @@ export function DocumentCenter() {
             {documents.map(doc => (
               <div key={doc.id} className="glass-panel p-4 rounded-2xl flex flex-col hover-lift group">
                 <div 
-                  className="w-full h-32 bg-wf-navy rounded-xl border border-white/5 flex items-center justify-center mb-4 relative overflow-hidden group-hover:border-wf-blue-lt/50 transition-colors cursor-pointer" 
+                  className={`w-full h-32 rounded-xl border flex items-center justify-center mb-4 relative overflow-hidden transition-colors cursor-pointer ${
+                    doc.detected_doc_type === 'flight' ? 'bg-sky-950/40 border-sky-500/20 group-hover:border-sky-400/60' :
+                    doc.detected_doc_type === 'hotel' ? 'bg-emerald-950/40 border-emerald-500/20 group-hover:border-emerald-400/60' :
+                    doc.detected_doc_type === 'restaurant' ? 'bg-orange-950/40 border-orange-500/20 group-hover:border-orange-400/60' :
+                    doc.detected_doc_type === 'excursion' ? 'bg-violet-950/40 border-violet-500/20 group-hover:border-violet-400/60' :
+                    doc.detected_doc_type === 'rail' ? 'bg-amber-950/40 border-amber-500/20 group-hover:border-amber-400/60' :
+                    'bg-wf-navy border-white/5 group-hover:border-wf-blue-lt/50'
+                  }`}
                   onClick={() => openPdfPreview(doc)}
                 >
-                  <FileText className="w-10 h-10 text-wf-muted group-hover:text-wf-blue-lt transition-colors" />
-                  <div className="absolute inset-0 bg-wf-blue/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  {
+                    doc.detected_doc_type === 'flight' ? <Plane className="w-10 h-10 text-sky-400/60 group-hover:text-sky-300 transition-colors" /> :
+                    doc.detected_doc_type === 'hotel' ? <Building2 className="w-10 h-10 text-emerald-400/60 group-hover:text-emerald-300 transition-colors" /> :
+                    doc.detected_doc_type === 'restaurant' ? <Utensils className="w-10 h-10 text-orange-400/60 group-hover:text-orange-300 transition-colors" /> :
+                    doc.detected_doc_type === 'excursion' ? <Ticket className="w-10 h-10 text-violet-400/60 group-hover:text-violet-300 transition-colors" /> :
+                    doc.detected_doc_type === 'rail' ? <Train className="w-10 h-10 text-amber-400/60 group-hover:text-amber-300 transition-colors" /> :
+                    <FileText className="w-10 h-10 text-wf-muted group-hover:text-wf-blue-lt transition-colors" />
+                  }
+                  <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                     <Eye className="w-6 h-6 text-white" />
                   </div>
                 </div>

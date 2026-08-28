@@ -111,7 +111,9 @@ export async function onRequestPost(context) {
       platform_fee_pct,
       platform_flat_fee,
       payment_processing_amt,
-      promoted_listing_fee
+      promoted_listing_fee,
+      net_proceeds,
+      net_earnings
     } = body;
 
     if (!item_id) return err('item_id is required');
@@ -143,6 +145,7 @@ export async function onRequestPost(context) {
     const aShippingCost = actual_shipping_cost || 0;
     const pProcessingAmt = payment_processing_amt || 0;
     const pListingFee = promoted_listing_fee || 0;
+    const directNetProceeds = typeof net_proceeds === 'number' ? net_proceeds : (typeof net_earnings === 'number' ? net_earnings : undefined);
 
     const metrics = computeSaleMetrics({
       gross_sale_price,
@@ -152,6 +155,7 @@ export async function onRequestPost(context) {
       platform_flat_fee: flatFee,
       payment_processing_amt: pProcessingAmt,
       promoted_listing_fee: pListingFee,
+      net_proceeds: directNetProceeds,
       true_total_cost: item.true_total_cost
     });
 

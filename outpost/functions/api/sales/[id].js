@@ -76,6 +76,9 @@ export async function onRequestPut(context) {
     const platform_flat_fee = typeof body.platform_flat_fee === 'number' ? body.platform_flat_fee : existing.platform_flat_fee;
     const payment_processing_amt = typeof body.payment_processing_amt === 'number' ? body.payment_processing_amt : existing.payment_processing_amt;
     const promoted_listing_fee = typeof body.promoted_listing_fee === 'number' ? body.promoted_listing_fee : existing.promoted_listing_fee;
+    const directNetProceeds = typeof body.net_proceeds === 'number'
+      ? body.net_proceeds
+      : (typeof body.net_earnings === 'number' ? body.net_earnings : (body.net_proceeds === undefined ? undefined : existing.net_proceeds));
 
     const metrics = computeSaleMetrics({
       gross_sale_price,
@@ -85,6 +88,7 @@ export async function onRequestPut(context) {
       platform_flat_fee,
       payment_processing_amt,
       promoted_listing_fee,
+      net_proceeds: directNetProceeds,
       true_total_cost: item.true_total_cost
     });
 

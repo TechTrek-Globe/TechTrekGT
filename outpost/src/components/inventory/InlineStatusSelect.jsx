@@ -4,7 +4,7 @@ import { updateItem } from '../../utils/auctionApi';
 import { StatusBadge } from './StatusBadge';
 import { ALL_STATUSES } from '../../utils/constants';
 
-export function InlineStatusSelect({ itemId, current, onUpdated }) {
+export function InlineStatusSelect({ itemId, current, item, onUpdated, onMarkSold }) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const dropdownRef = useRef(null);
@@ -24,10 +24,22 @@ export function InlineStatusSelect({ itemId, current, onUpdated }) {
     if (status === current) { setOpen(false); return; }
     setSaving(true);
     try {
+      const payload = { status };
+      if (status === 'Sold') {
+        payload.date_sold = new Date().toISOString().split('T')[0];
+      }
+      const res = await updateItem(itemId, payload);
+      const patch = { ...payload };
+      if (res?.min_sell_price !== undefined) patch.min_sell_price = res.min_sell_price;
+      if (res?.suggested_list_price !== undefined) patch.suggested_list_price = res.suggested_list_price;
+      if (res?.days_on_market !== undefined) patch.days_on_market = res.days_on_market;
+
       if (onUpdated) {
-        await onUpdated(itemId, { status });
-      } else {
-        await updateItem(itemId, { status });
+        onUpdated(itemId, patch);
+      }
+
+      if (status === 'Sold' && onMarkSold) {
+        onMarkSold(item ? { ...item, ...patch } : { id: itemId, ...patch });
       }
     } catch (e) {
       console.error('Status update error:', e);

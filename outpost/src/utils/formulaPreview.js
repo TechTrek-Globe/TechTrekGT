@@ -23,18 +23,20 @@ export function computePricingFloors(item) {
 }
 
 export function computeSaleMetrics(sale) {
-  const platform_fees_amt = (sale.gross_sale_price * sale.platform_fee_pct)
-                          + sale.platform_flat_fee;
+  const platform_fees_amt = ((sale.gross_sale_price || 0) * (sale.platform_fee_pct || 0))
+                          + (sale.platform_flat_fee || 0);
 
-  const net_proceeds = sale.gross_sale_price
-                     + sale.buyer_shipping_paid
-                     - sale.actual_shipping_cost
-                     - platform_fees_amt
-                     - sale.payment_processing_amt
-                     - sale.promoted_listing_fee;
+  const net_proceeds = sale.net_proceeds !== undefined && sale.net_proceeds !== null && !isNaN(Number(sale.net_proceeds))
+                     ? Number(sale.net_proceeds)
+                     : ((sale.gross_sale_price || 0)
+                        + (sale.buyer_shipping_paid || 0)
+                        - (sale.actual_shipping_cost || 0)
+                        - platform_fees_amt
+                        - (sale.payment_processing_amt || 0)
+                        - (sale.promoted_listing_fee || 0));
 
-  const net_profit = net_proceeds - sale.true_total_cost;
-  const roi_pct    = sale.true_total_cost > 0
+  const net_profit = net_proceeds - (sale.true_total_cost || 0);
+  const roi_pct    = (sale.true_total_cost || 0) > 0
                    ? net_profit / sale.true_total_cost
                    : 0;
 

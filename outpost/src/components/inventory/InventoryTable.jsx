@@ -33,6 +33,7 @@ export function InventoryTable({
   onOpenCopyModal,
   onOpenSaleModal,
   onOpenQueryEdit,
+  onMarkSold,
   userSettings,
   setUserSettings
 }) {
@@ -40,6 +41,22 @@ export function InventoryTable({
   const columnWidths = userSettings?.columnWidths || {};
   const [resizingCol, setResizingCol] = useState(null);
   const tableRef = useRef(null);
+
+  const visibleColCount = DEFAULT_COLUMNS.filter(c => columnVisibility[c.key] !== false).length;
+
+  // Separate active items and sold items so sold items are grouped at the bottom
+  const { activeItems, soldItems } = useMemo(() => {
+    const active = [];
+    const sold = [];
+    (items || []).forEach(it => {
+      if (it.status === 'Sold') {
+        sold.push(it);
+      } else {
+        active.push(it);
+      }
+    });
+    return { activeItems: active, soldItems: sold };
+  }, [items]);
 
   // Column resizing logic
   const handleResizeStart = useCallback((e, colKey) => {
@@ -109,30 +126,79 @@ export function InventoryTable({
           <tbody className="divide-y divide-slate-800/40 text-slate-300">
             {items.length === 0 ? (
               <tr>
-                <td colSpan={13} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={visibleColCount} className="px-4 py-8 text-center text-slate-500">
                   No inventory items match your filters.
                 </td>
               </tr>
             ) : (
-              items.map((item, i) => (
-                <InventoryTableRow
-                  key={item.id}
-                  item={item}
-                  index={i}
-                  columnVisibility={columnVisibility}
-                  columnWidths={columnWidths}
-                  DEFAULT_COLUMNS={DEFAULT_COLUMNS}
-                  categoryOptions={categoryOptions}
-                  platformOptions={platformOptions}
-                  deleting={deleting}
-                  onUpdateItem={onUpdateItem}
-                  onDelete={onDelete}
-                  onOpenEditModal={onOpenEditModal}
-                  onOpenCopyModal={onOpenCopyModal}
-                  onOpenSaleModal={onOpenSaleModal}
-                  onOpenQueryEdit={onOpenQueryEdit}
-                />
-              ))
+              <>
+                {/* Active Items */}
+                {activeItems.map((item, i) => (
+                  <InventoryTableRow
+                    key={item.id}
+                    item={item}
+                    index={i}
+                    columnVisibility={columnVisibility}
+                    columnWidths={columnWidths}
+                    DEFAULT_COLUMNS={DEFAULT_COLUMNS}
+                    categoryOptions={categoryOptions}
+                    platformOptions={platformOptions}
+                    deleting={deleting}
+                    onUpdateItem={onUpdateItem}
+                    onDelete={onDelete}
+                    onOpenEditModal={onOpenEditModal}
+                    onOpenCopyModal={onOpenCopyModal}
+                    onOpenSaleModal={onOpenSaleModal}
+                    onOpenQueryEdit={onOpenQueryEdit}
+                    onMarkSold={onMarkSold}
+                  />
+                ))}
+
+                {/* Sold Items Section (Positioned at Bottom) */}
+                {soldItems.length > 0 && (
+                  <>
+                    {activeItems.length > 0 && (
+                      <tr className="bg-slate-950/90 border-t-2 border-b border-slate-700/80 sticky z-10">
+                        <td
+                          colSpan={visibleColCount}
+                          className="px-3 py-1.5 bg-slate-950/90 text-xs font-bold text-slate-400 uppercase tracking-wider"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                              <span className="text-slate-200">Sold Items</span>
+                              <span className="px-1.5 py-0.5 rounded text-[10px] bg-slate-800 text-emerald-400 font-semibold border border-emerald-500/20">
+                                {soldItems.length}
+                              </span>
+                            </div>
+                            <span className="text-[10px] text-slate-500 font-normal">Completed Transactions</span>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    {soldItems.map((item, i) => (
+                      <InventoryTableRow
+                        key={item.id}
+                        item={item}
+                        index={activeItems.length + i}
+                        columnVisibility={columnVisibility}
+                        columnWidths={columnWidths}
+                        DEFAULT_COLUMNS={DEFAULT_COLUMNS}
+                        categoryOptions={categoryOptions}
+                        platformOptions={platformOptions}
+                        deleting={deleting}
+                        onUpdateItem={onUpdateItem}
+                        onDelete={onDelete}
+                        onOpenEditModal={onOpenEditModal}
+                        onOpenCopyModal={onOpenCopyModal}
+                        onOpenSaleModal={onOpenSaleModal}
+                        onOpenQueryEdit={onOpenQueryEdit}
+                        onMarkSold={onMarkSold}
+                      />
+                    ))}
+                  </>
+                )}
+              </>
             )}
           </tbody>
         </table>

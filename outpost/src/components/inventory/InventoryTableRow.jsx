@@ -21,6 +21,7 @@ export function InventoryTableRow({
   onOpenCopyModal,
   onOpenSaleModal,
   onOpenQueryEdit,
+  onMarkSold,
 }) {
   const [pricingOpen, setPricingOpen] = useState(false);
   const colSpan = Object.values(columnVisibility).filter(v => v !== false).length;
@@ -91,7 +92,9 @@ export function InventoryTableRow({
             <InlineStatusSelect
               itemId={item.id}
               current={item.status}
+              item={item}
               onUpdated={onUpdateItem}
+              onMarkSold={onMarkSold}
             />
           </td>
         )}

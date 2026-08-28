@@ -31,6 +31,10 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
   const [platform, setPlatform] = useState('eBay');
   const [buyerHandle, setBuyerHandle] = useState('');
   const [grossSalePrice, setGrossSalePrice] = useState('');
+  const [netEarnings, setNetEarnings] = useState('');
+  const [isManualNetEarnings, setIsManualNetEarnings] = useState(false);
+  const [showDetailedFees, setShowDetailedFees] = useState(false);
+
   const [buyerShippingPaid, setBuyerShippingPaid] = useState('0');
   const [actualShippingCost, setActualShippingCost] = useState('0');
   const [platformFeePct, setPlatformFeePct] = useState('13.6');
@@ -45,6 +49,19 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
   const defaultPlatform = useMemo(() => {
     return (platforms || []).find(p => p.is_default) || (platforms || [])[0] || { name: 'eBay', fee_pct: 0.136, flat_fee: 0.40 };
   }, [platforms]);
+
+  const calculateAutoNetEarnings = (grossVal, bShipVal, aShipVal, fPctVal, fFlatVal, pProcVal, pListVal) => {
+    const gross = parseFloat(grossVal) || 0;
+    const bShip = parseFloat(bShipVal) || 0;
+    const aShip = parseFloat(aShipVal) || 0;
+    const fPct  = (parseFloat(fPctVal) || 0) / 100;
+    const fFlat = parseFloat(fFlatVal) || 0;
+    const pProc = parseFloat(pProcVal) || 0;
+    const pList = parseFloat(pListVal) || 0;
+    const feeAmt = (gross * fPct) + fFlat;
+    const net = gross + bShip - aShip - feeAmt - pProc - pList;
+    return net > 0 ? net.toFixed(2) : (net === 0 ? '0.00' : net.toFixed(2));
+  };
 
   // Load available items if creating a new sale without a pre-selected item
   useEffect(() => {
@@ -64,6 +81,8 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
       setPlatform(saleToEdit.platform || 'eBay');
       setBuyerHandle(saleToEdit.buyer_handle || '');
       setGrossSalePrice(String(saleToEdit.gross_sale_price || ''));
+      setNetEarnings(String(saleToEdit.net_proceeds != null ? saleToEdit.net_proceeds : ''));
+      setIsManualNetEarnings(saleToEdit.net_proceeds != null);
       setBuyerShippingPaid(String(saleToEdit.buyer_shipping_paid ?? '0'));
       setActualShippingCost(String(saleToEdit.actual_shipping_cost ?? '0'));
       setPlatformFeePct(String((saleToEdit.platform_fee_pct * 100).toFixed(2)));
@@ -84,7 +103,6 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
       setLoadingItems(true);
       try {
         const data = await getItems({ limit: 100 });
-        // Filter to Available or Listed items primarily
         setAvailableItems(data.items || []);
       } catch (err) {
         console.error(err);
@@ -99,12 +117,22 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
   const applyItemPlatformDefaults = (item, platName) => {
     setPlatform(platName);
     const plat = (platforms || []).find(p => p.name === platName) || defaultPlatform;
+    let feePct = '13.6';
+    let flatFee = '0.40';
+    let estShip = '0';
     if (plat) {
-      setPlatformFeePct(String(parseFloat((plat.fee_pct * 100).toFixed(4))));
-      setPlatformFlatFee(plat.flat_fee.toString());
+      feePct = String(parseFloat((plat.fee_pct * 100).toFixed(4)));
+      flatFee = plat.flat_fee.toString();
+      setPlatformFeePct(feePct);
+      setPlatformFlatFee(flatFee);
     }
     if (item && item.est_shipping_cost) {
-      setActualShippingCost(String(item.est_shipping_cost));
+      estShip = String(item.est_shipping_cost);
+      setActualShippingCost(estShip);
+    }
+    if (!isManualNetEarnings && grossSalePrice) {
+      const net = calculateAutoNetEarnings(grossSalePrice, buyerShippingPaid, estShip, feePct, flatFee, paymentProcessingAmt, promotedListingFee);
+      setNetEarnings(net);
     }
   };
 
@@ -112,8 +140,39 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
     setPlatform(newPlat);
     const plat = (platforms || []).find(p => p.name === newPlat);
     if (plat) {
-      setPlatformFeePct(String(parseFloat((plat.fee_pct * 100).toFixed(4))));
-      setPlatformFlatFee(plat.flat_fee.toString());
+      const feePct = String(parseFloat((plat.fee_pct * 100).toFixed(4)));
+      const flatFee = plat.flat_fee.toString();
+      setPlatformFeePct(feePct);
+      setPlatformFlatFee(flatFee);
+      if (!isManualNetEarnings && grossSalePrice) {
+        const net = calculateAutoNetEarnings(grossSalePrice, buyerShippingPaid, actualShippingCost, feePct, flatFee, paymentProcessingAmt, promotedListingFee);
+        setNetEarnings(net);
+      }
+    }
+  };
+
+  const handleGrossChange = (val) => {
+    setGrossSalePrice(val);
+    if (!isManualNetEarnings) {
+      if (val === '') {
+        setNetEarnings('');
+      } else {
+        const net = calculateAutoNetEarnings(val, buyerShippingPaid, actualShippingCost, platformFeePct, platformFlatFee, paymentProcessingAmt, promotedListingFee);
+        setNetEarnings(net);
+      }
+    }
+  };
+
+  const handleNetEarningsChange = (val) => {
+    setNetEarnings(val);
+    setIsManualNetEarnings(true);
+  };
+
+  const handleResetToAutoCalc = () => {
+    setIsManualNetEarnings(false);
+    if (grossSalePrice) {
+      const net = calculateAutoNetEarnings(grossSalePrice, buyerShippingPaid, actualShippingCost, platformFeePct, platformFlatFee, paymentProcessingAmt, promotedListingFee);
+      setNetEarnings(net);
     }
   };
 
@@ -126,36 +185,25 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
   const previewMetrics = useMemo(() => {
     if (!selectedItem) return null;
     const gross = parseFloat(grossSalePrice) || 0;
-    const bShip = parseFloat(buyerShippingPaid) || 0;
-    const aShip = parseFloat(actualShippingCost) || 0;
-    const fPct  = (parseFloat(platformFeePct) || 0) / 100;
-    const fFlat = parseFloat(platformFlatFee) || 0;
-    const pProc = parseFloat(paymentProcessingAmt) || 0;
-    const pList = parseFloat(promotedListingFee) || 0;
-    const cost  = selectedItem.true_total_cost || 0;
-
-    const metrics = computeSaleMetrics({
-      gross_sale_price: gross,
-      buyer_shipping_paid: bShip,
-      actual_shipping_cost: aShip,
-      platform_fee_pct: fPct,
-      platform_flat_fee: fFlat,
-      payment_processing_amt: pProc,
-      promoted_listing_fee: pList,
-      true_total_cost: cost
-    });
+    const net = parseFloat(netEarnings) || 0;
+    const cost = selectedItem.true_total_cost || 0;
+    const netProfit = net - cost;
+    const roiPct = cost > 0 ? netProfit / cost : 0;
+    const deductions = Math.max(0, gross - net);
 
     const startDate = selectedItem.date_listed || selectedItem.date_acquired;
     const days = daysBetween(startDate, saleDate) ?? 0;
 
     return {
-      ...metrics,
+      gross_sale_price: gross,
+      net_proceeds: net,
+      net_profit: netProfit,
+      roi_pct: roiPct,
+      total_deductions: deductions,
+      true_total_cost: cost,
       days_to_sell: days >= 0 ? days : 0
     };
-  }, [
-    selectedItem, grossSalePrice, buyerShippingPaid, actualShippingCost,
-    platformFeePct, platformFlatFee, paymentProcessingAmt, promotedListingFee, saleDate
-  ]);
+  }, [selectedItem, grossSalePrice, netEarnings, saleDate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -166,6 +214,11 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
     const gross = parseFloat(grossSalePrice);
     if (isNaN(gross) || gross < 0) {
       setError('Please enter a valid gross sale price.');
+      return;
+    }
+    const net = parseFloat(netEarnings);
+    if (isNaN(net)) {
+      setError('Please enter a valid net earnings amount.');
       return;
     }
     if (!saleDate) {
@@ -183,6 +236,8 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
         platform,
         buyer_handle: buyerHandle.trim() || undefined,
         gross_sale_price: gross,
+        net_proceeds: net,
+        net_earnings: net,
         buyer_shipping_paid: parseFloat(buyerShippingPaid) || 0,
         actual_shipping_cost: parseFloat(actualShippingCost) || 0,
         platform_fee_pct: (parseFloat(platformFeePct) || 0) / 100,
@@ -221,20 +276,20 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/75 backdrop-blur-sm pt-6 pb-6 overflow-y-auto">
       <div className="w-full max-w-2xl mx-4 glass-card rounded-2xl shadow-2xl border border-slate-700/60 overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-5 border-b border-slate-800/60 bg-slate-950/40">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800/60 bg-slate-950/40">
           <div>
-            <h2 className="text-lg font-black text-white flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-amber-400" />
+            <h2 className="text-base font-black text-white flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-amber-400" />
               {isEdit ? 'Edit Recorded Sale' : 'Log Completed Sale'}
             </h2>
             <p className="text-xs text-slate-400 mt-0.5">
-              {isEdit ? 'Update transaction details and recalculate net profit' : 'Record sale price, platform fees, and calculate instant net ROI'}
+              Record gross sale price, net earnings, and track instant realized profit.
             </p>
           </div>
           <button
             id="close-log-sale-modal"
             onClick={onClose}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-slate-200 hover:bg-slate-800 transition-all"
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 hover:text-slate-200 hover:bg-slate-800 transition-all"
           >
             <X className="w-4 h-4" />
           </button>
@@ -242,21 +297,21 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
 
         {/* Error */}
         {error && (
-          <div className="mx-6 mt-4 p-3 rounded-xl bg-red-950/40 border border-red-800/40 text-red-400 text-xs flex gap-2">
-            <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+          <div className="mx-6 mt-3 p-2.5 rounded-xl bg-red-950/40 border border-red-800/40 text-red-400 text-xs flex gap-2">
+            <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {/* Item Selector */}
           <div>
-            <label className="block text-xs font-semibold text-slate-400 mb-1.5">Memorabilia Item *</label>
+            <label className="block text-xs font-semibold text-slate-400 mb-1">Memorabilia Item *</label>
             {selectedItem ? (
-              <div className="glass-card-light rounded-xl p-3 border border-amber-500/30 flex items-center justify-between">
+              <div className="glass-card-light rounded-xl p-2.5 border border-amber-500/30 flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-bold text-slate-100">{selectedItem.item_name}</p>
-                  <div className="flex items-center gap-3 text-xs text-slate-400 mt-1">
+                  <p className="text-xs font-bold text-slate-100">{selectedItem.item_name}</p>
+                  <div className="flex items-center gap-2.5 text-[11px] text-slate-400 mt-0.5">
                     <span>Category: <strong className="text-slate-300">{selectedItem.category || 'Memorabilia'}</strong></span>
                     {selectedItem.athlete_person && <span>Athlete: <strong className="text-slate-300">{selectedItem.athlete_person}</strong></span>}
                     <span>True Cost: <strong className="text-amber-400">{fmtCurrency(selectedItem.true_total_cost)}</strong></span>
@@ -266,31 +321,31 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
                   <button
                     type="button"
                     onClick={() => setSelectedItem(null)}
-                    className="text-xs text-slate-400 hover:text-amber-400 transition-colors underline ml-3"
+                    className="text-xs text-slate-400 hover:text-amber-400 transition-colors underline ml-3 flex-shrink-0"
                   >
                     Change
                   </button>
                 )}
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <div className="relative">
-                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 z-10 pointer-events-none" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500 z-10 pointer-events-none" />
                   <input
                     type="text"
-                    className="input-field !pl-10 text-xs"
+                    className="w-full bg-slate-900 border border-slate-700/80 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 outline-none focus:border-amber-500"
                     placeholder="Search inventory items..."
                     value={itemSearch}
                     onChange={e => setItemSearch(e.target.value)}
                   />
                 </div>
-                <div className="max-h-40 overflow-y-auto glass-card-light rounded-xl divide-y divide-slate-800/50 border border-slate-800">
+                <div className="max-h-36 overflow-y-auto glass-card-light rounded-xl divide-y divide-slate-800/50 border border-slate-800">
                   {loadingItems ? (
-                    <div className="p-4 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
+                    <div className="p-3 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
                       <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" /> Loading items...
                     </div>
                   ) : filteredItems.length === 0 ? (
-                    <div className="p-4 text-center text-xs text-slate-500">
+                    <div className="p-3 text-center text-xs text-slate-500">
                       No matching items found
                     </div>
                   ) : (
@@ -299,7 +354,7 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
                         key={it.id}
                         type="button"
                         onClick={() => handleSelectItem(it)}
-                        className="w-full text-left p-2.5 text-xs hover:bg-slate-800/50 flex items-center justify-between transition-colors group"
+                        className="w-full text-left p-2 text-xs hover:bg-slate-800/50 flex items-center justify-between transition-colors group"
                       >
                         <div>
                           <p className="font-medium text-slate-200 group-hover:text-amber-300">{it.item_name}</p>
@@ -317,27 +372,25 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
             )}
           </div>
 
-          {/* Sale details grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          {/* Sale Details Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-400 mb-1.5">Sale Date *</label>
-              <div className="relative">
-                <input
-                  id="sale-date-input"
-                  type="date"
-                  className="input-field text-xs"
-                  value={saleDate}
-                  onChange={e => setSaleDate(e.target.value)}
-                  required
-                />
-              </div>
+              <label className="block text-xs font-semibold text-slate-400 mb-1">Sale Date *</label>
+              <input
+                id="sale-date-input"
+                type="date"
+                className="w-full bg-slate-900 border border-slate-700/80 rounded-lg px-3 py-1.5 text-xs text-slate-100 outline-none focus:border-amber-500"
+                value={saleDate}
+                onChange={e => setSaleDate(e.target.value)}
+                required
+              />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-400 mb-1.5">Selling Platform *</label>
+              <label className="block text-xs font-semibold text-slate-400 mb-1">Selling Platform *</label>
               <select
                 id="sale-platform-select"
-                className="input-field text-xs"
+                className="w-full bg-slate-900 border border-slate-700/80 rounded-lg px-3 py-1.5 text-xs text-slate-100 outline-none focus:border-amber-500"
                 value={platform}
                 onChange={e => handlePlatformChange(e.target.value)}
               >
@@ -348,11 +401,11 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-400 mb-1.5">Buyer Handle / Name</label>
+              <label className="block text-xs font-semibold text-slate-400 mb-1">Buyer Handle / Name</label>
               <input
                 id="sale-buyer-input"
                 type="text"
-                className="input-field text-xs"
+                className="w-full bg-slate-900 border border-slate-700/80 rounded-lg px-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 outline-none focus:border-amber-500"
                 placeholder="e.g. collector99"
                 value={buyerHandle}
                 onChange={e => setBuyerHandle(e.target.value)}
@@ -360,153 +413,200 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
             </div>
           </div>
 
-          {/* Financial inputs */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {/* Core Financial Inputs: Gross Sale & Net Earnings */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl bg-slate-950/40 border border-slate-800/80">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">Gross Sale ($) *</label>
+              <label className="block text-xs font-bold text-amber-300 mb-1">Gross Sale ($) *</label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs">$</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-bold">$</span>
                 <input
                   id="sale-gross-input"
                   type="number"
                   step="0.01"
                   min="0"
-                  className="input-field text-xs pl-7 font-bold text-amber-300 border-amber-500/40"
+                  className="w-full bg-slate-900 border border-amber-500/40 rounded-lg pl-7 pr-3 py-2 text-sm font-bold text-amber-300 placeholder-slate-500 outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-500/20"
                   placeholder="0.00"
                   value={grossSalePrice}
-                  onChange={e => setGrossSalePrice(e.target.value)}
+                  onChange={e => handleGrossChange(e.target.value)}
                   required
                 />
               </div>
+              <p className="text-[10px] text-slate-400 mt-1">Total buyer purchase price</p>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-400 mb-1.5">Buyer Shipping ($)</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-bold text-emerald-300">Net Earnings ($) *</label>
+                {isManualNetEarnings && (
+                  <button
+                    type="button"
+                    onClick={handleResetToAutoCalc}
+                    className="text-[10px] text-amber-400 hover:underline"
+                  >
+                    Reset to auto-calc
+                  </button>
+                )}
+              </div>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs">$</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-bold">$</span>
                 <input
-                  id="sale-buyer-shipping"
+                  id="sale-net-earnings-input"
                   type="number"
                   step="0.01"
-                  min="0"
-                  className="input-field text-xs pl-7"
+                  className="w-full bg-slate-900 border border-emerald-500/40 rounded-lg pl-7 pr-3 py-2 text-sm font-bold text-emerald-300 placeholder-slate-500 outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-500/20"
                   placeholder="0.00"
-                  value={buyerShippingPaid}
-                  onChange={e => setBuyerShippingPaid(e.target.value)}
+                  value={netEarnings}
+                  onChange={e => handleNetEarningsChange(e.target.value)}
+                  required
                 />
               </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 mb-1.5">Actual Ship Cost ($)</label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs">$</span>
-                <input
-                  id="sale-actual-shipping"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  className="input-field text-xs pl-7"
-                  placeholder="0.00"
-                  value={actualShippingCost}
-                  onChange={e => setActualShippingCost(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 mb-1.5">Payment Proc ($)</label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs">$</span>
-                <input
-                  id="sale-payment-proc"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  className="input-field text-xs pl-7"
-                  placeholder="0.00"
-                  value={paymentProcessingAmt}
-                  onChange={e => setPaymentProcessingAmt(e.target.value)}
-                />
-              </div>
+              <p className="text-[10px] text-slate-400 mt-1">
+                {isManualNetEarnings ? 'Manual payout entry' : 'Bank deposit payout after fees & shipping'}
+              </p>
             </div>
           </div>
 
-          {/* Fee fine-tuning */}
-          <div className="grid grid-cols-3 gap-3 bg-slate-950/40 p-3 rounded-xl border border-slate-800/40">
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-400 mb-1">Platform Fee %</label>
-              <div className="relative">
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  className="input-field text-xs pr-7"
-                  value={platformFeePct}
-                  onChange={e => setPlatformFeePct(e.target.value)}
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs">%</span>
-              </div>
-            </div>
+          {/* Optional Detailed Fee Breakdown Accordion */}
+          <div className="border border-slate-800/80 rounded-xl overflow-hidden bg-slate-950/20">
+            <button
+              type="button"
+              onClick={() => setShowDetailedFees(v => !v)}
+              className="w-full flex items-center justify-between px-3.5 py-2 text-xs font-semibold text-slate-400 hover:text-slate-200 transition-colors"
+            >
+              <span>Optional: Detailed Fee & Shipping Breakdown</span>
+              <span className="text-[11px] text-amber-400">{showDetailedFees ? 'Hide ▲' : 'Show ▼'}</span>
+            </button>
+            {showDetailedFees && (
+              <div className="p-3 border-t border-slate-800/60 grid grid-cols-2 sm:grid-cols-3 gap-2.5 bg-slate-950/40">
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-400 mb-0.5">Buyer Shipping ($)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    className="w-full bg-slate-900 border border-slate-700/80 rounded px-2 py-1 text-xs text-slate-200"
+                    value={buyerShippingPaid}
+                    onChange={e => {
+                      setBuyerShippingPaid(e.target.value);
+                      if (!isManualNetEarnings) {
+                        setNetEarnings(calculateAutoNetEarnings(grossSalePrice, e.target.value, actualShippingCost, platformFeePct, platformFlatFee, paymentProcessingAmt, promotedListingFee));
+                      }
+                    }}
+                  />
+                </div>
 
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-400 mb-1">Platform Flat Fee</label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs">$</span>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  className="input-field text-xs pl-7"
-                  value={platformFlatFee}
-                  onChange={e => setPlatformFlatFee(e.target.value)}
-                />
-              </div>
-            </div>
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-400 mb-0.5">Actual Ship Cost ($)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    className="w-full bg-slate-900 border border-slate-700/80 rounded px-2 py-1 text-xs text-slate-200"
+                    value={actualShippingCost}
+                    onChange={e => {
+                      setActualShippingCost(e.target.value);
+                      if (!isManualNetEarnings) {
+                        setNetEarnings(calculateAutoNetEarnings(grossSalePrice, buyerShippingPaid, e.target.value, platformFeePct, platformFlatFee, paymentProcessingAmt, promotedListingFee));
+                      }
+                    }}
+                  />
+                </div>
 
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-400 mb-1">Ad / Boost Fee ($)</label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs">$</span>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  className="input-field text-xs pl-7"
-                  placeholder="0.00"
-                  value={promotedListingFee}
-                  onChange={e => setPromotedListingFee(e.target.value)}
-                />
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-400 mb-0.5">Platform Fee %</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    className="w-full bg-slate-900 border border-slate-700/80 rounded px-2 py-1 text-xs text-slate-200"
+                    value={platformFeePct}
+                    onChange={e => {
+                      setPlatformFeePct(e.target.value);
+                      if (!isManualNetEarnings) {
+                        setNetEarnings(calculateAutoNetEarnings(grossSalePrice, buyerShippingPaid, actualShippingCost, e.target.value, platformFlatFee, paymentProcessingAmt, promotedListingFee));
+                      }
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-400 mb-0.5">Platform Flat Fee ($)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    className="w-full bg-slate-900 border border-slate-700/80 rounded px-2 py-1 text-xs text-slate-200"
+                    value={platformFlatFee}
+                    onChange={e => {
+                      setPlatformFlatFee(e.target.value);
+                      if (!isManualNetEarnings) {
+                        setNetEarnings(calculateAutoNetEarnings(grossSalePrice, buyerShippingPaid, actualShippingCost, platformFeePct, e.target.value, paymentProcessingAmt, promotedListingFee));
+                      }
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-400 mb-0.5">Payment Proc ($)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    className="w-full bg-slate-900 border border-slate-700/80 rounded px-2 py-1 text-xs text-slate-200"
+                    value={paymentProcessingAmt}
+                    onChange={e => {
+                      setPaymentProcessingAmt(e.target.value);
+                      if (!isManualNetEarnings) {
+                        setNetEarnings(calculateAutoNetEarnings(grossSalePrice, buyerShippingPaid, actualShippingCost, platformFeePct, platformFlatFee, e.target.value, promotedListingFee));
+                      }
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-400 mb-0.5">Ad / Boost Fee ($)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    className="w-full bg-slate-900 border border-slate-700/80 rounded px-2 py-1 text-xs text-slate-200"
+                    value={promotedListingFee}
+                    onChange={e => {
+                      setPromotedListingFee(e.target.value);
+                      if (!isManualNetEarnings) {
+                        setNetEarnings(calculateAutoNetEarnings(grossSalePrice, buyerShippingPaid, actualShippingCost, platformFeePct, platformFlatFee, paymentProcessingAmt, e.target.value));
+                      }
+                    }}
+                  />
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Live Outcome Summary Panel */}
           {previewMetrics && (
-            <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30">
-              <div className="flex items-center justify-between mb-3 border-b border-amber-500/20 pb-2">
-                <span className="text-xs font-bold text-amber-300 uppercase tracking-wide">Live Transaction Breakdown</span>
-                <span className="text-xs text-slate-400">{previewMetrics.days_to_sell} days on market</span>
+            <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-800">
+              <div className="flex items-center justify-between mb-2 pb-1 border-b border-slate-800/80">
+                <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">Live Profit Breakdown</span>
+                <span className="text-[11px] text-slate-400">{previewMetrics.days_to_sell} days on market</span>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                <div>
-                  <span className="text-slate-400 block text-[10px]">Platform Fees:</span>
-                  <span className="text-slate-200 font-semibold">{fmtCurrency(previewMetrics.platform_fees_amt)}</span>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div className="bg-slate-950/40 p-2 rounded-lg border border-slate-800/60">
+                  <span className="text-slate-500 block text-[9px] uppercase font-semibold">Gross Sale</span>
+                  <span className="text-slate-200 font-bold text-xs">{fmtCurrency(previewMetrics.gross_sale_price)}</span>
                 </div>
-                <div>
-                  <span className="text-slate-400 block text-[10px]">Net Proceeds:</span>
-                  <span className="text-slate-200 font-semibold">{fmtCurrency(previewMetrics.net_proceeds)}</span>
+                <div className="bg-slate-950/40 p-2 rounded-lg border border-slate-800/60">
+                  <span className="text-slate-500 block text-[9px] uppercase font-semibold">Net Earnings</span>
+                  <span className="text-emerald-400 font-bold text-xs">{fmtCurrency(previewMetrics.net_proceeds)}</span>
                 </div>
-                <div>
-                  <span className="text-slate-400 block text-[10px]">Net Profit:</span>
-                  <span className={`font-bold text-sm ${previewMetrics.net_profit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                    {fmtCurrency(previewMetrics.net_profit)}
-                  </span>
+                <div className="bg-slate-950/40 p-2 rounded-lg border border-slate-800/60">
+                  <span className="text-slate-500 block text-[9px] uppercase font-semibold">Landed Cost</span>
+                  <span className="text-slate-300 font-bold text-xs">{fmtCurrency(previewMetrics.true_total_cost)}</span>
                 </div>
-                <div>
-                  <span className="text-slate-400 block text-[10px]">Return on Investment:</span>
-                  <span className={`font-bold text-sm ${previewMetrics.roi_pct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                    {fmtPct(previewMetrics.roi_pct)}
+                <div className="bg-slate-950/40 p-2 rounded-lg border border-slate-800/60">
+                  <span className="text-slate-500 block text-[9px] uppercase font-semibold">Net Profit</span>
+                  <span className={`font-bold text-xs ${previewMetrics.net_profit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {fmtCurrency(previewMetrics.net_profit)} <span className="text-[10px] font-normal">({fmtPct(previewMetrics.roi_pct)})</span>
                   </span>
                 </div>
               </div>
@@ -514,12 +614,12 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
           )}
 
           {/* Action buttons */}
-          <div className="flex items-center justify-end gap-3 pt-2">
+          <div className="flex items-center justify-end gap-2 pt-1">
             <button
               id="cancel-log-sale-btn"
               type="button"
               onClick={onClose}
-              className="px-4 py-2.5 rounded-xl text-xs text-slate-400 hover:text-slate-200 border border-slate-700 hover:border-slate-600 transition-all"
+              className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-slate-200 border border-slate-700 hover:border-slate-600 transition-all"
             >
               Cancel
             </button>
@@ -527,10 +627,10 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
               id="submit-log-sale-btn"
               type="submit"
               disabled={submitting || !selectedItem}
-              className="btn-primary w-auto px-6 py-2.5 text-xs font-semibold"
+              className="px-4 py-1.5 rounded-lg text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 flex items-center gap-1.5 shadow-sm transition-all disabled:opacity-50"
             >
               {submitting ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
               ) : isEdit ? (
                 'Save Changes'
               ) : (

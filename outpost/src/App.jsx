@@ -115,8 +115,8 @@ function MainContent({ pathname, navigateTo }) {
             </div>
           }>
             {activeView === 'dashboard' && <DashboardView onNavigate={handleNavigate} />}
-            {activeView === 'inventory' && <InventoryHubView />}
-            {activeView === 'sales' && <SalesLogView />}
+            {activeView === 'inventory' && <InventoryHubView onNavigate={handleNavigate} />}
+            {activeView === 'sales' && <SalesLogView onNavigate={handleNavigate} />}
             {activeView === 'settings' && <SettingsView />}
           </React.Suspense>
         </ErrorBoundary>

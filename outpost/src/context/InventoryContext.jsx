@@ -27,6 +27,7 @@ export function InventoryProvider({ children }) {
   // --- UI State ---
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [pendingSaleItem, setPendingSaleItem] = useState(null);
 
   // --- User Settings (column visibility, widths, category order) ---
   const [userSettings, setUserSettings] = useState(getStoredUserSettings);
@@ -165,6 +166,7 @@ export function InventoryProvider({ children }) {
     sortConfig, handleSort,
     // UI
     loading, error,
+    pendingSaleItem, setPendingSaleItem,
     // Settings
     userSettings, setUserSettings,
     // Actions
@@ -177,7 +179,7 @@ export function InventoryProvider({ children }) {
     items, sortedItems, platforms, platformOptions, categoryOptions,
     pagination, statusCounts,
     search, statusFilter, categoryFilter, sortConfig,
-    loading, error,
+    loading, error, pendingSaleItem,
     userSettings,
     fetchItems, fetchPlatforms, refreshAll, updateItemLocal, handleFieldSave, handleSort,
   ]);

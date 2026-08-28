@@ -18,7 +18,7 @@ import { LogSaleModal } from './LogSaleModal';
 import { ListingCopyModal } from './ListingCopyModal';
 import { EditItemModal } from './EditItemModal';
 
-export function InventoryHubView() {
+export function InventoryHubView({ onNavigate }) {
   const {
     items,
     sortedItems,
@@ -32,6 +32,7 @@ export function InventoryHubView() {
     categoryFilter, setCategoryFilter,
     sortConfig, handleSort,
     loading, error,
+    pendingSaleItem, setPendingSaleItem,
     userSettings, setUserSettings,
     fetchItems, refreshAll,
     updateItemLocal, handleFieldSave
@@ -69,6 +70,16 @@ export function InventoryHubView() {
     } catch (e) {
       alert(`Delete failed: ${e.message}`);
       setDeleting(null);
+    }
+  };
+
+  const handleMarkSold = (item) => {
+    setPendingSaleItem(item);
+    if (onNavigate) {
+      onNavigate('sales');
+    } else {
+      window.history.pushState({}, '', '/outpost/sales');
+      window.dispatchEvent(new PopStateEvent('popstate'));
     }
   };
 
@@ -179,8 +190,9 @@ export function InventoryHubView() {
               onDelete={handleDelete}
               onOpenEditModal={setEditModalItem}
               onOpenCopyModal={setCopyModalItem}
-              onOpenSaleModal={(it) => { setItemToSell(it); setSaleModalOpen(true); }}
+              onOpenSaleModal={handleMarkSold}
               onOpenQueryEdit={handleOpenQueryEdit}
+              onMarkSold={handleMarkSold}
               userSettings={userSettings}
               setUserSettings={setUserSettings}
             />
@@ -232,7 +244,13 @@ export function InventoryHubView() {
         categoryOptions={categoryOptions}
         platformOptions={platformOptions}
         onClose={() => setEditModalItem(null)}
-        onUpdated={(id, patch) => updateItemLocal(id, patch)}
+        onUpdated={(id, patch) => {
+          updateItemLocal(id, patch);
+          if (patch?.status === 'Sold') {
+            const fullItem = items.find(it => it.id === id);
+            handleMarkSold(fullItem ? { ...fullItem, ...patch } : { id, ...patch });
+          }
+        }}
       />
       <QueryEditModal
         queryEditModal={queryEditModal}

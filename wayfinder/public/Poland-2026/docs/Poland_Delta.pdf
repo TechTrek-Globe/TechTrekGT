@@ -1,0 +1,209 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+6 0 obj
+<< /Length 3505 >>
+stream
+BT
+/F1 18 Tf
+40 750 Td
+0.8 0 0 rg
+(DELTA AIR LINES) Tj
+0 0 0 rg
+/F2 10 Tf
+250 0 Td
+(ELECTRONIC TICKET RECEIPT & ITINERARY) Tj
+ET
+
+0.8 0.8 0.8 rg
+40 735 532 1 re
+f
+
+BT
+/F1 11 Tf
+0 0 0 rg
+40 715 Td
+(CONFIRMATION CODE:) Tj
+/F1 14 Tf
+0.1 0.3 0.8 rg
+150 0 Td
+(GUDI3J) Tj
+0 0 0 rg
+/F2 9 Tf
+160 0 Td
+(Issue Date: 28 AUG 2026 | E-Ticket: 0062398410294) Tj
+ET
+
+0.95 0.96 0.98 rg
+40 645 532 50 re
+f
+0.8 0.85 0.9 rg
+40 645 532 50 re
+S
+
+BT
+/F1 10 Tf
+0 0 0 rg
+50 678 Td
+(PASSENGERS (2)) Tj
+/F2 9 Tf
+0 -16 Td
+(1. FEW / RONALD MILTON  (Primary Passenger)) Tj
+260 0 Td
+(2. KEMP / JONATHAN  (Companion)) Tj
+ET
+
+BT
+/F1 12 Tf
+0.1 0.3 0.8 rg
+40 620 Td
+(FLIGHT 1 OF 2 - INBOUND DEPARTURE: THU, DEC 3 - FRI, DEC 4, 2026) Tj
+ET
+
+0.98 0.98 0.98 rg
+40 500 532 110 re
+f
+0.85 0.85 0.85 rg
+40 500 532 110 re
+S
+
+BT
+/F1 10 Tf
+0 0 0 rg
+50 592 Td
+(LEG 1: DL 0074  |  Non-Stop  |  Airbus A330-300  |  Main Cabin) Tj
+/F2 9 Tf
+0 -15 Td
+(Departs: 08:10 PM (20:10) - Thu, Dec 3, 2026  |  Atlanta, GA (ATL) - Terminal I, Gate E14) Tj
+0 -13 Td
+(Arrives: 10:40 AM (10:40) - Fri, Dec 4, 2026  |  Amsterdam Schiphol, Netherlands (AMS)) Tj
+0 -13 Td
+(Duration: 8h 30m  |  Meals: Dinner, Breakfast  |  Seats: 24A, 24B) Tj
+
+0 -20 Td
+/F1 9 Tf
+0.8 0.5 0 rg
+(>> TRANSIT LAYOVER: Amsterdam (AMS) - 55 min (Direct International Transit) <<) Tj
+0 0 0 rg
+
+0 -20 Td
+/F1 10 Tf
+(LEG 2: DL 9208 (Operated by KLM KL 1995)  |  Boeing 737-800) Tj
+/F2 9 Tf
+0 -15 Td
+(Departs: 11:35 AM (11:35) - Fri, Dec 4, 2026  |  Amsterdam Schiphol (AMS) - Gate D42) Tj
+0 -13 Td
+(Arrives: 01:30 PM (13:30) - Fri, Dec 4, 2026  |  Krakow John Paul II Intl, Poland (KRK)) Tj
+0 -13 Td
+(Duration: 1h 55m  |  Status: Confirmed  |  Seats: 12C, 12D) Tj
+ET
+
+BT
+/F1 12 Tf
+0.1 0.3 0.8 rg
+40 470 Td
+(FLIGHT 2 OF 2 - RETURN DEPARTURE: SUN, DEC 13, 2026) Tj
+ET
+
+0.98 0.98 0.98 rg
+40 350 532 110 re
+f
+0.85 0.85 0.85 rg
+40 350 532 110 re
+S
+
+BT
+/F1 10 Tf
+0 0 0 rg
+50 442 Td
+(LEG 1: DL 9528 (Operated by KLM KL 1918)  |  Embraer 195  |  Main Cabin) Tj
+/F2 9 Tf
+0 -15 Td
+(Departs: 06:45 AM (06:45) - Sun, Dec 13, 2026  |  Gdansk Lech Walesa, Poland (GDN)) Tj
+0 -13 Td
+(Arrives: 08:40 AM (08:40) - Sun, Dec 13, 2026  |  Amsterdam Schiphol, Netherlands (AMS)) Tj
+0 -13 Td
+(Duration: 1h 55m  |  Status: Confirmed  |  Seats: 14A, 14B) Tj
+
+0 -20 Td
+/F1 9 Tf
+0.8 0.5 0 rg
+(>> TRANSIT LAYOVER: Amsterdam (AMS) - 1h 20m (Transatlantic Departure Pier E) <<) Tj
+0 0 0 rg
+
+0 -20 Td
+/F1 10 Tf
+(LEG 2: DL 9227 (Operated by KLM KL 0621)  |  Boeing 777-200ER) Tj
+/F2 9 Tf
+0 -15 Td
+(Departs: 10:00 AM (10:00) - Sun, Dec 13, 2026  |  Amsterdam Schiphol (AMS) - Gate E22) Tj
+0 -13 Td
+(Arrives: 01:35 PM (13:35) - Sun, Dec 13, 2026  |  Atlanta, GA (ATL) - Terminal I) Tj
+0 -13 Td
+(Duration: 9h 35m  |  Meals: Lunch, Snack  |  Seats: 26J, 26K) Tj
+ET
+
+0.92 0.95 0.98 rg
+40 250 532 80 re
+f
+0.7 0.8 0.9 rg
+40 250 532 80 re
+S
+
+BT
+/F1 10 Tf
+0.1 0.3 0.8 rg
+50 315 Td
+(CRITICAL TRAVEL & BAGGAGE NOTES) Tj
+/F2 8.5 Tf
+0 0 0 rg
+0 -14 Td
+(* Checked Baggage: 1 Checked Bag (50 lbs / 23 kg) included per passenger.) Tj
+0 -12 Td
+(* Carry-on: 1 Personal item + 1 standard rollaboard carry-on included.) Tj
+0 -12 Td
+(* Check-in Window: Online check-in opens 24 hours prior to departure via Delta.com / Fly Delta app.) Tj
+0 -12 Td
+(* Passport Validity: Passports must be valid for at least 3 months beyond intended departure date from Schengen zone.) Tj
+ET
+
+0.8 0.8 0.8 rg
+40 230 532 0.5 re
+f
+
+BT
+/F2 8 Tf
+0.5 0.5 0.5 rg
+40 215 Td
+(Delta Air Lines, Inc. | Confirmation GUDI3J | TechTrek Wayfinder Travel Hub Integration Verified) Tj
+ET
+
+endstream
+endobj
+xref
+0 7
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000244 00000 n 
+0000000323 00000 n 
+0000000397 00000 n 
+trailer
+<< /Size 7 /Root 1 0 R >>
+startxref
+4022
+%%EOF

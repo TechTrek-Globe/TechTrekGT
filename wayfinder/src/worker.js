@@ -46,15 +46,15 @@ function addSecurityHeaders(response, isLocal = false) {
       "connect-src 'self' https://techtrekgt.com https://challenges.cloudflare.com",
       "img-src 'self' data: blob: https://fonts.gstatic.com https://www.transparenttextures.com https://challenges.cloudflare.com",
       "font-src 'self' data: https://fonts.gstatic.com",
-      "frame-src 'self' https://challenges.cloudflare.com https://www.youtube-nocookie.com https://www.youtube.com https://www.openstreetmap.org blob:",
-      "child-src 'self' https://challenges.cloudflare.com blob:",
-      "frame-ancestors 'none'",
+      "frame-src 'self' https://challenges.cloudflare.com https://www.youtube-nocookie.com https://www.youtube.com https://www.openstreetmap.org blob: data:",
+      "child-src 'self' https://challenges.cloudflare.com blob: data:",
+      "frame-ancestors 'self'",
       "form-action 'self'",
       "base-uri 'self'",
     ].join('; '));
   }
   h.set('X-Content-Type-Options', 'nosniff');
-  h.set('X-Frame-Options', 'DENY');
+  h.set('X-Frame-Options', 'SAMEORIGIN');
   h.set('X-XSS-Protection', '0');
   h.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   h.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');

@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useWayfinder } from '../context/WayfinderContext';
+import { saveLocalDocumentFile, getLocalDocumentFile } from '../utils/documentStorage';
 import { 
   UploadCloud, File, FileText, Download, Eye, ShieldCheck, Loader2, 
-  CheckCircle2, AlertTriangle, X, Check, RefreshCw, ArrowRight
+  CheckCircle2, AlertTriangle, X, Check, RefreshCw, ArrowRight, Upload
 } from 'lucide-react';
 
 function simulateExtraction(file) {
@@ -109,7 +110,9 @@ export function DocumentCenter() {
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState(null);
   const [iframeError, setIframeError] = useState(false);
 
-  const fileInputRef = useRef(null);
+    const fileInputRef = useRef(null);
+  const reattachInputRef = useRef(null);
+  const localDocBlobs = useRef(new Map());
 
   // Check URL query for selected doc
   useEffect(() => {
@@ -138,6 +141,15 @@ export function DocumentCenter() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Cache local blob URL immediately for fast, reliable client-side preview
+    const blobUrl = URL.createObjectURL(file);
+    localDocBlobs.current.set(file.name, blobUrl);
+    localDocBlobs.current.set(file.name.toLowerCase(), blobUrl);
+
+    // Save to browser IndexedDB
+    await saveLocalDocumentFile(file.name, file);
+    await saveLocalDocumentFile(file.name.toLowerCase(), file);
+
     setIsUploading(true);
     setUploadError(null);
     setActionSuccessMessage(null);
@@ -145,6 +157,10 @@ export function DocumentCenter() {
       // 1. Upload document metadata to backend
       const uploadRes = await uploadDocument('poland-christmas-2026', file, 'booking_pdf');
       const docId = uploadRes.document_id;
+      if (docId) {
+        localDocBlobs.current.set(docId, blobUrl);
+        await saveLocalDocumentFile(docId, file);
+      }
       
       // 2. Perform intelligent client-side OCR extraction
       const extraction = simulateExtraction(file);
@@ -160,6 +176,32 @@ export function DocumentCenter() {
     } finally {
       setIsUploading(false);
     }
+  };
+
+  const handleReattachFile = async (e, docId, docName) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const blobUrl = URL.createObjectURL(file);
+    localDocBlobs.current.set(file.name, blobUrl);
+    localDocBlobs.current.set(file.name.toLowerCase(), blobUrl);
+    if (docName) {
+      localDocBlobs.current.set(docName, blobUrl);
+      localDocBlobs.current.set(docName.toLowerCase(), blobUrl);
+    }
+    if (docId) localDocBlobs.current.set(docId, blobUrl);
+
+    await saveLocalDocumentFile(file.name, file);
+    await saveLocalDocumentFile(file.name.toLowerCase(), file);
+    if (docName) {
+      await saveLocalDocumentFile(docName, file);
+      await saveLocalDocumentFile(docName.toLowerCase(), file);
+    }
+    if (docId) await saveLocalDocumentFile(docId, file);
+
+    setPdfPreviewUrl(blobUrl);
+    setIframeError(false);
+    setActionSuccessMessage('Original document file attached and stored locally in browser storage.');
   };
 
   const openReviewModal = async (docId) => {
@@ -225,9 +267,34 @@ export function DocumentCenter() {
     setIframeError(false);
   };
 
-  const openPdfPreview = (doc) => {
+  const openPdfPreview = async (doc) => {
     setIframeError(false);
-    const url = doc.file_url || `/wayfinder/Poland-2026/docs/${doc.filename || doc.safe_display_name || ''}`;
+    const fname = doc.filename || doc.safe_display_name || doc.original_filename || '';
+    
+    // 1. Check in-memory map
+    let cachedBlob = localDocBlobs.current.get(doc.id) ||
+                     localDocBlobs.current.get(fname) ||
+                     localDocBlobs.current.get(fname.toLowerCase()) ||
+                     (doc.original_filename ? localDocBlobs.current.get(doc.original_filename) : null);
+    
+    // 2. Check IndexedDB persistent store
+    if (!cachedBlob) {
+      try {
+        const dbFile = (await getLocalDocumentFile(doc.id)) ||
+                       (await getLocalDocumentFile(fname)) ||
+                       (doc.original_filename ? await getLocalDocumentFile(doc.original_filename) : null) ||
+                       (doc.safe_display_name ? await getLocalDocumentFile(doc.safe_display_name) : null);
+        if (dbFile) {
+          cachedBlob = URL.createObjectURL(dbFile);
+          localDocBlobs.current.set(doc.id, cachedBlob);
+          localDocBlobs.current.set(fname, cachedBlob);
+        }
+      } catch (err) {
+        console.warn('Could not read from IndexedDB:', err);
+      }
+    }
+
+    const url = cachedBlob || doc.file_url || `/wayfinder/Poland-2026/docs/${fname}`;
     setPdfPreviewUrl(url);
     setPdfPreviewDoc(doc);
   };
@@ -434,6 +501,33 @@ export function DocumentCenter() {
                 </div>
               </div>
               <div className="flex items-center space-x-2 shrink-0">
+                <input
+                  type="file"
+                  ref={reattachInputRef}
+                  onChange={(e) => handleReattachFile(e, pdfPreviewDoc.id, pdfPreviewDoc.safe_display_name || pdfPreviewDoc.filename)}
+                  className="hidden"
+                  accept="application/pdf,image/*"
+                />
+                <button
+                  onClick={() => reattachInputRef.current?.click()}
+                  className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-medium flex items-center space-x-1.5 transition-colors"
+                  title="Re-attach or replace local PDF file"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Attach Original PDF</span>
+                </button>
+                <button
+                  onClick={() => {
+                    const docId = pdfPreviewDoc.id;
+                    closePdfPreview();
+                    openReviewModal(docId);
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 text-xs font-medium flex items-center space-x-1.5 transition-colors"
+                  title="Inspect OCR fields and itinerary data"
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Review Extracted Fields</span>
+                </button>
                 {pdfPreviewUrl && (
                   <a
                     href={pdfPreviewUrl}
@@ -462,25 +556,44 @@ export function DocumentCenter() {
                   <div>
                     <h4 className="text-white font-semibold mb-1">PDF Preview Unavailable</h4>
                     <p className="text-xs text-wf-muted max-w-sm">
-                      This document is stored as metadata only. Download the file to view it locally.
+                      This document is stored as metadata only or browser embedding is restricted. Download the file or inspect the extracted fields.
                     </p>
                   </div>
-                  <a
-                    href={pdfPreviewUrl}
-                    download={pdfPreviewDoc.safe_display_name || pdfPreviewDoc.filename}
-                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-wf-blue to-wf-blue-lt text-white text-sm font-semibold flex items-center space-x-2 shadow-lg hover:opacity-90 transition-opacity"
-                  >
-                    <Download className="w-4 h-4" />
-                    <span>Download PDF</span>
-                  </a>
+                  <div className="flex items-center space-x-3">
+                    <button
+                      onClick={() => {
+                        const docId = pdfPreviewDoc.id;
+                        closePdfPreview();
+                        openReviewModal(docId);
+                      }}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-xl shadow transition-colors"
+                    >
+                      Review Extracted Fields
+                    </button>
+                    <a
+                      href={pdfPreviewUrl}
+                      download={pdfPreviewDoc.safe_display_name || pdfPreviewDoc.filename}
+                      className="px-4 py-2 bg-wf-blue hover:bg-wf-blue-lt text-white text-xs font-semibold rounded-xl shadow transition-colors flex items-center space-x-1.5"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Download PDF</span>
+                    </a>
+                  </div>
                 </div>
               ) : (
-                <iframe
-                  src={pdfPreviewUrl}
-                  title={pdfPreviewDoc.safe_display_name || pdfPreviewDoc.filename}
+                <object
+                  data={pdfPreviewUrl}
+                  type="application/pdf"
                   className="w-full h-full border-0"
                   onError={() => setIframeError(true)}
-                />
+                >
+                  <iframe
+                    src={pdfPreviewUrl}
+                    title={pdfPreviewDoc.safe_display_name || pdfPreviewDoc.filename}
+                    className="w-full h-full border-0"
+                    onError={() => setIframeError(true)}
+                  />
+                </object>
               )}
             </div>
 

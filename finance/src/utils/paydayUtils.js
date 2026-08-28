@@ -116,16 +116,53 @@ export function isPersonDepositDay(person, year, month, day) {
 
 /**
  * Resolves the deposit amount for a person for a specific account selection.
+ * Supports explicit accountAllocations, unallocated paycheck remainders, and dynamic bill/savings split fallbacks.
  * @param {object} person
  * @param {string} selectedAccountId - 'all' or specific account ID
+ * @param {object} [budget] - optional budget context containing accounts and bills
  * @returns {number}
  */
-export function getPersonDepositAmountForAccount(person, selectedAccountId = 'all') {
+export function getPersonDepositAmountForAccount(person, selectedAccountId = 'all', budget = null) {
   if (!person) return 0;
   const netPay = parseFloat(person.netPerPay) || 0;
   if (!selectedAccountId || selectedAccountId === 'all') {
     return netPay;
   }
+
+  // Helper to calculate this person's obligation for the account based on bills & extra savings
+  const getCalculatedPortionForAccount = () => {
+    if (!budget) return 0;
+    const accountBills = (budget.bills || []).filter(b => !b.isArchived && b.accountId === selectedAccountId);
+    const monthlyBillPortion = accountBills.reduce((sum, b) => {
+      const amt = Math.abs(parseFloat(b.amount) || 0);
+      const period = b.period || 'Monthly';
+      let monthlyCost = amt;
+      if (period === 'Semi-Annual') monthlyCost = amt / 6;
+      else if (period === 'Annual') monthlyCost = amt / 12;
+      else if (period === 'Quarterly') monthlyCost = amt / 3;
+      else if (period === 'Weekly') monthlyCost = (amt * 52) / 12;
+      else if (period === 'Custom' || period === 'Specific Months') {
+        const count = Array.isArray(b.dueMonths) && b.dueMonths.length > 0 ? b.dueMonths.length : 12;
+        monthlyCost = (amt * count) / 12;
+      }
+      const pct = parseFloat(b.splits?.[person.id]) || 0;
+      return sum + (monthlyCost * pct) / 100;
+    }, 0);
+
+    const targetAcc = (budget.accounts || []).find(a => a.id === selectedAccountId);
+    const extraPortion = targetAcc ? getAccountSaveExtraPersonPortion(targetAcc, person, budget) : 0;
+    const totalMonthly = monthlyBillPortion + extraPortion;
+
+    if (totalMonthly > 0) {
+      if (person.payFrequency === 'semi-monthly' || person.payFrequency === 'bi-weekly') {
+        return Math.round((totalMonthly / 2) * 100) / 100;
+      } else if (person.payFrequency === 'weekly') {
+        return Math.round(((totalMonthly * 12) / 52) * 100) / 100;
+      }
+      return Math.round(totalMonthly * 100) / 100;
+    }
+    return 0;
+  };
 
   const allocations = person.accountAllocations;
   if (allocations && typeof allocations === 'object' && Object.keys(allocations).length > 0) {
@@ -150,10 +187,54 @@ export function getPersonDepositAmountForAccount(person, selectedAccountId = 'al
       return allocatedNum;
     }
 
+    // If targetVal is undefined or 0 for this account, check if there's an unallocated remainder
+    const hasExplicitRemaining = Object.values(allocations).some(v => v === 'remaining');
+    if (!hasExplicitRemaining) {
+      let fixedSum = 0;
+      Object.entries(allocations).forEach(([accId, val]) => {
+        const amt = parseFloat(val);
+        if (!isNaN(amt) && amt > 0) fixedSum += amt;
+      });
+      const unallocatedRemainder = Math.max(0, netPay - fixedSum);
+
+      if (unallocatedRemainder > 0) {
+        const calculatedPortion = getCalculatedPortionForAccount();
+        if (calculatedPortion > 0) {
+          return Math.min(calculatedPortion, unallocatedRemainder);
+        }
+
+        const accounts = budget?.accounts || [];
+        const isPrimaryChecking = accounts.length > 0 && (
+          accounts[0]?.id === selectedAccountId ||
+          accounts.find(a => a.type === 'checking')?.id === selectedAccountId
+        );
+        const targetAcc = accounts.find(a => a.id === selectedAccountId);
+        const isEnabledOnAcc = targetAcc?.enabledEarners
+          ? targetAcc.enabledEarners.includes(person.id)
+          : true;
+
+        if (isPrimaryChecking || isEnabledOnAcc) {
+          return Math.round(unallocatedRemainder * 100) / 100;
+        }
+      }
+    }
+
+    // Fall back to bill/savings split calculation if available
+    const calculatedPortion = getCalculatedPortionForAccount();
+    if (calculatedPortion > 0) {
+      return calculatedPortion;
+    }
+
     return 0;
   }
 
-  // If no explicit accountAllocations exist, only primary earners deposit full netPay into the primary checking account; other accounts get 0 unless allocated.
+  // If no explicit accountAllocations exist, check bill/savings splits
+  const calculatedPortion = getCalculatedPortionForAccount();
+  if (calculatedPortion > 0) {
+    return calculatedPortion;
+  }
+
+  // If no explicit accountAllocations exist and no bills split, primary earners deposit full netPay into the primary checking account; other accounts get 0 unless allocated.
   if (person.role === 'Primary' || person.isPrimary) {
     return netPay;
   }

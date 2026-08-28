@@ -78,7 +78,7 @@ export function AccountTransferSummary() {
   
         let rawPortion = 0;
         if (basisMode === 'direct_deposit' || (basisMode === 'auto' && hasAllocations)) {
-          const perPaycheckDeposit = getPersonDepositAmountForAccount(p, acc.id);
+          const perPaycheckDeposit = getPersonDepositAmountForAccount(p, acc.id, budget);
           if (mode === 'paycheck') {
             rawPortion = perPaycheckDeposit;
           } else {

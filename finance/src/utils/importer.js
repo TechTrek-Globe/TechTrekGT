@@ -696,7 +696,7 @@ export function matchCreditToEarner({
     const MONTHLY_DOUBLE_PENALTY = 0.50;
     let aliasHolderBestDelta = Infinity;
     for (const accId of allAccountIds) {
-      const allocAmt = getPersonDepositAmountForAccount(tier1AliasMatch.person, accId);
+      const allocAmt = getPersonDepositAmountForAccount(tier1AliasMatch.person, accId, { accounts, bills, people });
       if (allocAmt >= MIN_EARNER_AMOUNT) {
         const d = Math.abs(allocAmt - rawAmt);
         if (d < aliasHolderBestDelta) aliasHolderBestDelta = d;
@@ -716,7 +716,7 @@ export function matchCreditToEarner({
     for (const p of people) {
       if (p.id === aliasPersonId) continue;
       for (const accId of allAccountIds) {
-        const allocAmt = getPersonDepositAmountForAccount(p, accId);
+        const allocAmt = getPersonDepositAmountForAccount(p, accId, { accounts, bills, people });
         if (allocAmt >= MIN_EARNER_AMOUNT) {
           const d = Math.abs(allocAmt - rawAmt);
           if (d < rivalBestDelta) { rivalBestDelta = d; rivalPerson = p; }
@@ -774,7 +774,7 @@ export function matchCreditToEarner({
       ].filter(Boolean);
 
       for (const accId of allAccountIds) {
-        const allocAmt = getPersonDepositAmountForAccount(p, accId);
+        const allocAmt = getPersonDepositAmountForAccount(p, accId, { accounts, bills, people });
         if (allocAmt < MIN_EARNER_AMOUNT) continue;
 
         // Secondary accounts get a slight confidence penalty: require delta to beat

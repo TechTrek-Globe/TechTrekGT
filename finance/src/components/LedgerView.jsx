@@ -711,7 +711,7 @@ function DailySpreadsheetMatrix() {
             personCredits[p.id] = parseFloat(customCredit) || 0;
           } else if (!isLockedDay) {
             const isDepDay = isPersonDepositDay(p, year, month, day);
-            personCredits[p.id] = isDepDay ? getPersonDepositAmountForAccount(p, selectedAccountId) : 0;
+            personCredits[p.id] = isDepDay ? getPersonDepositAmountForAccount(p, selectedAccountId, budget) : 0;
           } else {
             personCredits[p.id] = 0;
           }

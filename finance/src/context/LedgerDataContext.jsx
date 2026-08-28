@@ -737,7 +737,7 @@ export function LedgerDataProvider({ children }) {
           dayCredits += parseFloat(customCredit) || 0;
         } else if (!isLockedDay) {
           const isDepDay = isPersonDepositDay(p, year, month, day);
-          dayCredits += isDepDay ? getPersonDepositAmountForAccount(p, accountId) : 0;
+          dayCredits += isDepDay ? getPersonDepositAmountForAccount(p, accountId, metadataStateRef.current) : 0;
         }
 
         const customExtra = getDailyMatrixCell(accountId, monthKey, day, `extra_credit_${p.id}`);

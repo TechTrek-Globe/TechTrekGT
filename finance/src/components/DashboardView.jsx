@@ -706,7 +706,7 @@ export function DashboardView() {
                 const pctOfNet = monthlyInc > 0 ? (billPortionSum / monthlyInc) * 100 : 0;
 
                 const totalPerPaycheckDeposit = (budget?.accounts || []).reduce((sum, acc) => {
-                  return sum + getPersonDepositAmountForAccount(p, acc.id);
+                  return sum + getPersonDepositAmountForAccount(p, acc.id, budget);
                 }, 0);
                 let totalMonthlyDeposit = totalPerPaycheckDeposit;
                 if (p.payFrequency === 'semi-monthly') totalMonthlyDeposit = totalPerPaycheckDeposit * 2;
@@ -749,7 +749,7 @@ export function DashboardView() {
                           {(budget?.accounts || []).map(acc => {
                             const rawVal = p.accountAllocations?.[acc.id];
                             if (!rawVal && rawVal !== 0 && rawVal !== 'remaining') return null;
-                            const depositAmt = getPersonDepositAmountForAccount(p, acc.id);
+                            const depositAmt = getPersonDepositAmountForAccount(p, acc.id, budget);
                             if (depositAmt <= 0 && rawVal !== 'remaining') return null;
                             const isRemaining = rawVal === 'remaining';
 

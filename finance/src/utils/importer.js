@@ -7,6 +7,7 @@
  */
 import * as XLSX from 'xlsx';
 import { logDebug, logWarn, logInfo } from './debugLogger.js';
+import { getPersonDepositAmountForAccount } from './paydayUtils.js';
 
 // --- Internal Field Definitions ---
 
@@ -556,7 +557,8 @@ export function mergeTransactions(existing = [], incoming = [], resolutions = {}
         notes: mergedNotes,
         accountId: inc.accountId || ex.accountId,
         category: inc.category || ex.category || '',
-        billId: inc.billId || ex.billId || null
+        billId: inc.billId || ex.billId || null,
+        personId: inc.personId || ex.personId || null
       };
     } else {
       result.push({ ...inc });
@@ -564,6 +566,253 @@ export function mergeTransactions(existing = [], incoming = [], resolutions = {}
   });
 
   return result;
+}
+
+/**
+ * Intelligently matches an incoming credit (deposit or transfer) to an earner profile.
+ *
+ * Matching priority:
+ *   Tier 1 - Text: earner name / alias in description or notes
+ *   Tier 2 - Account Allocation: per-paycheck amount defined in person.accountAllocations
+ *   Tier 3 - Bill Splits: each earner's calculated monthly obligation for the target account
+ *   Tier 4 - Net Pay: earner's net paycheck amount (payroll direct deposit)
+ *
+ * Guard rails:
+ *   - Minimum match amount: $5.00 (prevents interest cents / tiny credits from matching)
+ *   - Known non-earner categories are excluded before calling this function
+ *   - Near-match tolerance scales with amount: ±0.5% with max cap of $2.00
+ *   - A candidate with totalMonthly === 0 is NEVER matched by amount (prevents false $0.01 match)
+ *
+ * @param {object} params
+ * @param {number|string} params.amount
+ * @param {string} [params.description]
+ * @param {string} [params.notes]
+ * @param {string} [params.category]
+ * @param {string} [params.targetAccountId]
+ * @param {Array} [params.people]
+ * @param {Array} [params.bills]
+ * @param {Array} [params.accounts]
+ * @returns {{ person: object, reason: string }|null}
+ */
+export function matchCreditToEarner({
+  amount,
+  description = '',
+  notes = '',
+  category = '',
+  targetAccountId = '',
+  people = [],
+  bills = [],
+  accounts = []
+}) {
+  if (!amount || !Array.isArray(people) || people.length === 0) return null;
+
+  const rawAmt = Math.abs(parseFloat(amount));
+  if (isNaN(rawAmt) || rawAmt <= 0) return null;
+
+  // Guard: minimum meaningful earner deposit - ignore tiny bank credits
+  // Interest payments, fee reversals, dividend cents, etc. are never earner deposits
+  const MIN_EARNER_AMOUNT = 5.00;
+  if (rawAmt < MIN_EARNER_AMOUNT) return null;
+
+  // Guard: exclude categories that are definitively NOT earner deposits
+  const categoryLower = (category || '').toLowerCase();
+  const NON_EARNER_CATEGORIES = [
+    'interest income', 'interest paid', 'interest',
+    'dividend', 'fee reversal', 'refund', 'cashback', 'cash back',
+    'atm', 'tax refund', 'escrow'
+  ];
+  if (NON_EARNER_CATEGORIES.some(c => categoryLower.includes(c))) return null;
+
+  // Guard: exclude descriptions that are definitively NOT earner deposits
+  const descLower = (description || '').toLowerCase();
+  const notesLower = (notes || '').toLowerCase();
+  const NON_EARNER_DESC_PATTERNS = [
+    'interest paid', 'interest earned', 'interest credit',
+    'dividend', 'atm', 'cash deposit', 'check deposit',
+    'tax refund', 'escrow refund'
+  ];
+  if (NON_EARNER_DESC_PATTERNS.some(p => descLower.includes(p) || notesLower.includes(p))) return null;
+
+  // Tier 1: Direct Name or Alias text match
+  for (const p of people) {
+    const pName = (p.name || '').toLowerCase().trim();
+    const pAliases = (p.bankMatchNames || p.matchingKey || '')
+      .toLowerCase()
+      .split(/[,;\n\r|]+/)
+      .map(s => s.trim())
+      .filter(s => s.length >= 2);
+
+    if (pName && pName.length >= 2 && (descLower.includes(pName) || notesLower.includes(pName))) {
+      return { person: p, reason: `name_match ("${p.name}")` };
+    }
+
+    for (const alias of pAliases) {
+      if (descLower.includes(alias) || notesLower.includes(alias)) {
+        return { person: p, reason: `alias_match ("${alias}")` };
+      }
+    }
+  }
+
+  // Build helper: monthly bill cost for a bill
+  const getBillCost = (b) => {
+    if (!b) return 0;
+    const period = b.period || 'Monthly';
+    const bAmt = parseFloat(b.amount) || 0;
+    if (period === 'Quarterly') return bAmt / 3;
+    if (period === 'Semi-Annual') return bAmt / 6;
+    if (period === 'Annual') return bAmt / 12;
+    return bAmt;
+  };
+
+  // Scaled near-match tolerance: 0.5% of amount, minimum $0.02, maximum $2.00
+  const tolerance = Math.min(2.00, Math.max(0.02, rawAmt * 0.005));
+
+  let bestCandidate = null;
+  let minDelta = Infinity;
+
+  for (const p of people) {
+    // --- Tier 2: Account Allocation scan across ALL configured accounts ---
+    // The incoming credit amount is matched against what each person is expected to deposit
+    // into ANY of their configured accounts - not just the target import account.
+    //
+    // Rationale: A credit of $689.42 into "Bills Checking" should match Jon because $689.00
+    // is his per-paycheck allocation to "Mortgage Checking". The bank may consolidate transfers
+    // across accounts, or the CSV may not precisely reflect which sub-account received the money.
+    //
+    // Priority: target account is tested first (score boost via lower delta floor),
+    //           then all other accounts as secondary candidates.
+    {
+      // Collect all account IDs to check: target first, then all others
+      const allAccountIds = [
+        targetAccountId,
+        ...accounts.map(a => a.id).filter(id => id !== targetAccountId)
+      ].filter(Boolean);
+
+      for (const accId of allAccountIds) {
+        const allocAmt = getPersonDepositAmountForAccount(p, accId);
+        if (allocAmt < MIN_EARNER_AMOUNT) continue;
+
+        // Secondary accounts get a slight confidence penalty: require delta to beat
+        // target-account matches by at least $0.01 (natural from minDelta tracking)
+        const deltaAlloc = Math.abs(allocAmt - rawAmt);
+        if (deltaAlloc <= tolerance && deltaAlloc < minDelta) {
+          const accName = accounts.find(a => a.id === accId)?.name || accId;
+          const label = accId === targetAccountId
+            ? `${p.name} Paycheck Allocation ($${allocAmt.toFixed(2)})`
+            : `${p.name} Paycheck Allocation via ${accName} ($${allocAmt.toFixed(2)})`;
+          minDelta = deltaAlloc;
+          bestCandidate = { person: p, label, delta: deltaAlloc };
+        }
+
+        // Monthly equivalent (two paychecks for semi-monthly / bi-weekly)
+        const isBiOrSemi = p.payFrequency === 'semi-monthly' || p.payFrequency === 'bi-weekly';
+        if (isBiOrSemi) {
+          const monthlyAlloc = Math.round(allocAmt * 2 * 100) / 100;
+          const deltaMonthly = Math.abs(monthlyAlloc - rawAmt);
+          if (deltaMonthly <= tolerance && deltaMonthly < minDelta) {
+            const accName = accounts.find(a => a.id === accId)?.name || accId;
+            const label = accId === targetAccountId
+              ? `${p.name} Monthly Allocation ($${monthlyAlloc.toFixed(2)})`
+              : `${p.name} Monthly Allocation via ${accName} ($${monthlyAlloc.toFixed(2)})`;
+            minDelta = deltaMonthly;
+            bestCandidate = { person: p, label, delta: deltaMonthly };
+          }
+        }
+      }
+    }
+
+    // --- Tier 3: Bill Splits ---
+    // A credit into a bills-paying account = person depositing their monthly obligation.
+    // Try two scopes and pick whichever one produces a candidate:
+    //   Scope A: bills scoped to this specific account (exact account match)
+    //   Scope B: ALL active bills (person's total monthly obligation across all accounts)
+    // This handles the common case where the account IDs in bills don't exactly match
+    // the account ID of the import target, but the transfer amount equals the person's
+    // total monthly responsibility.
+    const activeBills = bills.filter(b => !b.isArchived);
+    const accountBills = targetAccountId
+      ? activeBills.filter(b => b.accountId === targetAccountId)
+      : activeBills;
+
+    const calcMonthlyPortion = (billSet) =>
+      billSet.reduce((sum, b) => {
+        const cost = getBillCost(b);
+        const splitPct = parseFloat(b.splits?.[p.id]) || 0;
+        return sum + (cost * splitPct) / 100;
+      }, 0);
+
+    const targetAcc = accounts.find(a => a.id === targetAccountId);
+    const extraPortion = (() => {
+      if (targetAcc && targetAcc.enableExtraSavings !== false && parseFloat(targetAcc.saveExtraMonthly) > 0) {
+        const totalExtra = parseFloat(targetAcc.saveExtraMonthly) || 0;
+        if (!targetAcc.enabledEarners || targetAcc.enabledEarners.includes(p.id)) {
+          const count = targetAcc.enabledEarners?.length || people.length || 2;
+          return totalExtra / count;
+        }
+      }
+      return 0;
+    })();
+
+    // Scope A: account-specific bills only
+    const monthlyA = Math.round((calcMonthlyPortion(accountBills) + extraPortion) * 100) / 100;
+    // Scope B: ALL bills (person's full monthly obligation - what they deposit into the bills account)
+    const monthlyB = Math.round((calcMonthlyPortion(activeBills) + extraPortion) * 100) / 100;
+
+    // Try both scopes; use the one that produces the better (smaller delta) match
+    for (const [totalMonthly, scopeLabel] of [[monthlyA, 'Account'], [monthlyB, 'Total']]) {
+      // CRITICAL GUARD: only attempt matching if calculated amount is meaningful
+      if (totalMonthly < MIN_EARNER_AMOUNT) continue;
+
+      const isBiOrSemi = p.payFrequency === 'semi-monthly' || p.payFrequency === 'bi-weekly';
+      const perPaycheck = isBiOrSemi
+        ? Math.round((totalMonthly / 2) * 100) / 100
+        : p.payFrequency === 'weekly'
+        ? Math.round(((totalMonthly * 12) / 52) * 100) / 100
+        : totalMonthly;
+
+      const deltaMonthly = Math.abs(totalMonthly - rawAmt);
+      const deltaPaycheck = Math.abs(perPaycheck - rawAmt);
+
+      // Use a wider tolerance for bill payments: 1% of amount, capped at $15
+      // (bill splits can accumulate rounding from many line items)
+      const billTolerance = Math.min(15.00, Math.max(0.02, rawAmt * 0.01));
+
+      if (deltaMonthly <= billTolerance && deltaMonthly < minDelta) {
+        minDelta = deltaMonthly;
+        bestCandidate = { person: p, label: `${p.name} Monthly Payment - ${scopeLabel} ($${totalMonthly.toFixed(2)})`, delta: deltaMonthly };
+      }
+      if (perPaycheck >= MIN_EARNER_AMOUNT && deltaPaycheck <= billTolerance && deltaPaycheck < minDelta) {
+        minDelta = deltaPaycheck;
+        bestCandidate = { person: p, label: `${p.name} Semi-Monthly Payment - ${scopeLabel} ($${perPaycheck.toFixed(2)})`, delta: deltaPaycheck };
+      }
+    }
+
+    // --- Tier 4: Net Pay (payroll direct deposit) ---
+    const netPay = parseFloat(p.netPerPay) || 0;
+    if (netPay >= MIN_EARNER_AMOUNT) {
+      const deltaNet = Math.abs(netPay - rawAmt);
+      if (deltaNet <= tolerance && deltaNet < minDelta) {
+        minDelta = deltaNet;
+        bestCandidate = { person: p, label: `${p.name} Net Paycheck ($${netPay.toFixed(2)})`, delta: deltaNet };
+      }
+      // Monthly net (two paychecks for semi-monthly / bi-weekly)
+      const isBiOrSemi = p.payFrequency === 'semi-monthly' || p.payFrequency === 'bi-weekly';
+      if (isBiOrSemi) {
+        const netMonthly = Math.round(netPay * 2 * 100) / 100;
+        const deltaNetMonthly = Math.abs(netMonthly - rawAmt);
+        if (deltaNetMonthly <= tolerance && deltaNetMonthly < minDelta) {
+          minDelta = deltaNetMonthly;
+          bestCandidate = { person: p, label: `${p.name} Monthly Net ($${netMonthly.toFixed(2)})`, delta: deltaNetMonthly };
+        }
+      }
+    }
+  }
+
+  if (bestCandidate) {
+    return { person: bestCandidate.person, reason: bestCandidate.label };
+  }
+
+  return null;
 }
 
 /**

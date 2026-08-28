@@ -1,4 +1,4 @@
-import { normalizeIsoDate, mergeBills, mergeTransactions, detectTransactionConflicts } from './importer.js';
+import { normalizeIsoDate, mergeBills, mergeTransactions, detectTransactionConflicts, matchCreditToEarner } from './importer.js';
 import { logDebug, logWarn, logInfo } from './debugLogger.js';
 
 /**
@@ -398,14 +398,23 @@ export function processSpreadsheetImport({
         let matchedPerson = null;
         if (txn.personId) {
           matchedPerson = nextPeople.find(p => p.id === txn.personId);
-        } else if (descLower.includes('hp') || descLower.includes('gym')) {
-          matchedPerson = nextPeople.find(p => (p.name || '').toLowerCase().includes('gym'));
-        } else if (descLower.includes('jon') || descLower.includes('usaa') || descLower.includes('transfer')) {
-          matchedPerson = nextPeople.find(p => (p.name || '').toLowerCase() === 'jon') || nextPeople[0];
-        } else if (descLower.includes('ronnie')) {
-          matchedPerson = nextPeople.find(p => (p.name || '').toLowerCase() === 'ronnie');
         } else {
-          matchedPerson = nextPeople.find(p => p.name && descLower.includes(p.name.toLowerCase()));
+          const match = matchCreditToEarner({
+            amount: actualAmount,
+            description: txn.description,
+            notes: txn.notes,
+            category: txn.category,
+            targetAccountId: accountId,
+            people: nextPeople,
+            bills: nextBills,
+            accounts: nextAccounts
+          });
+          if (match) {
+            matchedPerson = match.person;
+          } else {
+            // Last-resort literal name scan (only fires if matchCreditToEarner returned null)
+            matchedPerson = nextPeople.find(p => p.name && descLower.includes(p.name.toLowerCase()));
+          }
         }
 
         if (matchedPerson) {

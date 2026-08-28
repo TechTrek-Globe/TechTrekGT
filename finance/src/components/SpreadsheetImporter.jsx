@@ -17,6 +17,7 @@ import {
   applyBillMapping,
   inspectWorkbookSheets,
   detectExtraHeaderRow,
+  matchCreditToEarner,
   INTERNAL_TRANSACTION_FIELDS,
   INTERNAL_BILL_FIELDS,
 } from '../utils/importer';
@@ -94,7 +95,7 @@ export function SpreadsheetImporter({
   onImportComplete = null,
 }) {
   const { budget } = useBudgetMetadataState();
-  const { updateBill } = useBudgetMetadataDispatch();
+  const { updateBill, updatePerson } = useBudgetMetadataDispatch();
   const { importSpreadsheetSelective } = useLedgerDataDispatch();
   const [savedAliases, setSavedAliases] = useState({});
 
@@ -167,29 +168,51 @@ export function SpreadsheetImporter({
     return parts.length ? parts.join(' / ') : '-';
   };
 
-  const handleSaveAlias = useCallback((billId, rawDesc) => {
-    if (!billId || !rawDesc) return;
+  const handleSaveAlias = useCallback((targetType, targetId, rawDesc) => {
+    if (!targetId || !rawDesc) return;
     const cleanDesc = rawDesc.replace(/^Other\s*\$?\s*\(?(.*?)\)?$/i, '$1').trim();
     if (!cleanDesc) return;
-    const targetBill = (budget?.bills || []).find(b => b.id === billId);
-    if (!targetBill) return;
 
-    const existingAliases = targetBill.bankMatchNames || targetBill.matchingKey || '';
-    const aliasesList = existingAliases
-      ? existingAliases.split(/[,;\n\r|]+/).map(a => a.trim().toLowerCase())
-      : [];
+    if (targetType === 'bill') {
+      const targetBill = (budget?.bills || []).find(b => b.id === targetId);
+      if (!targetBill) return;
 
-    if (!aliasesList.includes(cleanDesc.toLowerCase())) {
-      const updatedAliases = existingAliases ? `${existingAliases}, ${cleanDesc}` : cleanDesc;
-      if (typeof updateBill === 'function') {
-        updateBill(billId, {
-          bankMatchNames: updatedAliases,
-          matchingKey: updatedAliases
-        });
+      const existingAliases = targetBill.bankMatchNames || targetBill.matchingKey || '';
+      const aliasesList = existingAliases
+        ? existingAliases.split(/[,;\n\r|]+/).map(a => a.trim().toLowerCase())
+        : [];
+
+      if (!aliasesList.includes(cleanDesc.toLowerCase())) {
+        const updatedAliases = existingAliases ? `${existingAliases}, ${cleanDesc}` : cleanDesc;
+        if (typeof updateBill === 'function') {
+          updateBill(targetId, {
+            bankMatchNames: updatedAliases,
+            matchingKey: updatedAliases
+          });
+        }
+        setSavedAliases(prev => ({ ...prev, [`bill_${targetId}_${cleanDesc.toLowerCase()}`]: true }));
       }
-      setSavedAliases(prev => ({ ...prev, [`${billId}_${cleanDesc.toLowerCase()}`]: true }));
+    } else if (targetType === 'person') {
+      const targetPerson = (budget?.people || []).find(p => p.id === targetId);
+      if (!targetPerson) return;
+
+      const existingAliases = targetPerson.bankMatchNames || targetPerson.matchingKey || '';
+      const aliasesList = existingAliases
+        ? existingAliases.split(/[,;\n\r|]+/).map(a => a.trim().toLowerCase())
+        : [];
+
+      if (!aliasesList.includes(cleanDesc.toLowerCase())) {
+        const updatedAliases = existingAliases ? `${existingAliases}, ${cleanDesc}` : cleanDesc;
+        if (typeof updatePerson === 'function') {
+          updatePerson(targetId, {
+            bankMatchNames: updatedAliases,
+            matchingKey: updatedAliases
+          });
+        }
+        setSavedAliases(prev => ({ ...prev, [`person_${targetId}_${cleanDesc.toLowerCase()}`]: true }));
+      }
     }
-  }, [budget?.bills, updateBill]);
+  }, [budget?.bills, budget?.people, updateBill, updatePerson]);
 
   const handleTransactionMappingChange = useCallback((txnId, newSelectVal) => {
     setParsedPayload(prev => {
@@ -246,16 +269,30 @@ export function SpreadsheetImporter({
       const selectValue = rec.billId ? `bill:${rec.billId}` : (rec.personId ? `person:${rec.personId}` : '');
 
       let canSaveAlias = false;
+      let targetType = null;
+      let targetId = null;
+
       if (mappedBill && rec.description) {
         const cleanDesc = rec.description.trim().toLowerCase();
         const existing = (mappedBill.bankMatchNames || mappedBill.matchingKey || '').toLowerCase();
         const aliases = existing.split(/[,;\n\r|]+/).map(a => a.trim());
         if (!aliases.includes(cleanDesc) && !mappedBill.name.toLowerCase().includes(cleanDesc)) {
           canSaveAlias = true;
+          targetType = 'bill';
+          targetId = mappedBill.id;
+        }
+      } else if (mappedPerson && rec.description) {
+        const cleanDesc = rec.description.trim().toLowerCase();
+        const existing = (mappedPerson.bankMatchNames || mappedPerson.matchingKey || '').toLowerCase();
+        const aliases = existing.split(/[,;\n\r|]+/).map(a => a.trim());
+        if (!aliases.includes(cleanDesc) && !mappedPerson.name.toLowerCase().includes(cleanDesc)) {
+          canSaveAlias = true;
+          targetType = 'person';
+          targetId = mappedPerson.id;
         }
       }
 
-      const aliasKey = mappedBill ? `${mappedBill.id}_${rec.description?.trim().toLowerCase()}` : '';
+      const aliasKey = targetId ? `${targetType}_${targetId}_${rec.description?.trim().toLowerCase()}` : '';
       const isSaved = Boolean(savedAliases[aliasKey]);
 
       const activeBills = (budget?.bills || []).filter(b => !b.isArchived);
@@ -315,12 +352,12 @@ export function SpreadsheetImporter({
             )}
           </select>
 
-          {mappedBill && canSaveAlias && (
+          {canSaveAlias && (
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                handleSaveAlias(mappedBill.id, rec.description);
+                handleSaveAlias(targetType, targetId, rec.description);
               }}
               disabled={isSaved}
               className={`shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold border transition-all cursor-pointer ${
@@ -328,7 +365,7 @@ export function SpreadsheetImporter({
                   ? 'bg-emerald-950 text-emerald-300 border-emerald-800 cursor-default'
                   : 'bg-indigo-950/80 text-indigo-300 border-indigo-700/80 hover:bg-indigo-900 hover:text-white shadow-sm'
               }`}
-              title={isSaved ? 'Alias saved!' : `Save "${rec.description}" as alias for ${mappedBill.name}`}
+              title={isSaved ? 'Alias saved!' : `Save "${rec.description}" as alias for ${targetType === 'bill' ? mappedBill?.name : mappedPerson?.name}`}
             >
               {isSaved ? '✓ Saved' : '+ Alias'}
             </button>
@@ -505,7 +542,8 @@ export function SpreadsheetImporter({
         targetAccountId: targetAccId,
         targetAccountName: targetAcc?.name || selectedSheetName,
         existingBills: budget.bills || [],
-        existingPeople: budget.people || []
+        existingPeople: budget.people || [],
+        existingAccounts: budget.accounts || []
       });
 
       // Construct accounts map
@@ -528,12 +566,37 @@ export function SpreadsheetImporter({
         accountsMap.set(targetAccId, acc);
       }
 
+      const rawTransactions = parsedSheet.transactions || [];
+      const resolvedTransactions = rawTransactions.map(t => {
+        if (Number(t.amount) > 0 && !t.personId) {
+          const match = matchCreditToEarner({
+            amount: t.amount,
+            description: t.description,
+            notes: t.notes,
+            category: t.category,
+            targetAccountId: targetAccId,
+            people: budget.people || [],
+            bills: budget.bills || [],
+            accounts: budget.accounts || []
+          });
+          if (match) {
+            return {
+              ...t,
+              personId: match.person.id,
+              isOther: false,
+              category: 'Income / Transfer'
+            };
+          }
+        }
+        return t;
+      });
+
       const payload = {
         people: parsedSheet.discoveredPeople || [],
         accounts: Array.from(accountsMap.values()),
         bills: parsedSheet.discoveredBills || [],
         loans: [],
-        transactions: parsedSheet.transactions || [],
+        transactions: resolvedTransactions,
         targetAccountId: targetAccId,
         sheetName: selectedSheetName,
         importedLedgerRows: parsedSheet.importedLedgerRows || {}

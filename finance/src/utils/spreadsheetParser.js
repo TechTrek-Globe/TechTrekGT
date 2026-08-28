@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import { logDebug, logWarn, logError } from './debugLogger.js';
+import { matchCreditToEarner } from './importer.js';
 
 /**
  * Clean currency/number values from Excel strings or cells
@@ -754,7 +755,8 @@ export function parseSingleSheet({
   targetAccountId = '',
   targetAccountName = '',
   existingBills = [],
-  existingPeople = []
+  existingPeople = [],
+  existingAccounts = []
 }) {
   if (!rawRows || rawRows.length <= headerRowIdx) {
     return { transactions: [], importedLedgerRows: {}, discoveredBills: [], discoveredPeople: [] };
@@ -928,11 +930,25 @@ export function parseSingleSheet({
 
       // Match earner if deposit/credit
       let personId = null;
-      if (amount > 0 && Array.isArray(existingPeople)) {
-        const lowerDesc = description.toLowerCase();
-        const matchedPerson = existingPeople.find(p => p.name && lowerDesc.includes(p.name.toLowerCase()));
-        if (matchedPerson) {
-          personId = matchedPerson.id;
+      if (amount > 0) {
+        const match = matchCreditToEarner({
+          amount,
+          description,
+          notes,
+          category,
+          targetAccountId,
+          people: existingPeople,
+          bills: existingBills,
+          accounts: existingAccounts
+        });
+        if (match) {
+          personId = match.person.id;
+          category = 'Income / Transfer';
+          logDebug('PARSER', `Matched credit transaction #${transactions.length + 1} to earner "${match.person.name}" via ${match.reason}`, {
+            amount,
+            description,
+            personId
+          });
         }
       }
 

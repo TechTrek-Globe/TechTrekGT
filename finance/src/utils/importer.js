@@ -465,7 +465,11 @@ export function detectTransactionConflicts(existing = [], incoming = []) {
       const exDesc = (ex.description || '').toLowerCase().trim();
       const exAmt = parseFloat(ex.amount) || 0;
 
-      const descMatch = incDesc === exDesc || (incDesc.length >= 3 && exDesc.includes(incDesc)) || (exDesc.length >= 3 && incDesc.includes(exDesc));
+      const cleanInc = incDesc.replace(/\b(usaa|zelle|ach|deposit|transfer|payment|funds)\b/gi, '').trim();
+      const cleanEx = exDesc.replace(/\b(usaa|zelle|ach|deposit|transfer|payment|funds)\b/gi, '').trim();
+      const descMatch = incDesc === exDesc || 
+        (cleanInc.length >= 3 && cleanEx.length >= 3 && (cleanInc.includes(cleanEx) || cleanEx.includes(cleanInc))) ||
+        (incDesc.length >= 5 && exDesc.length >= 5 && (incDesc.includes(exDesc) || exDesc.includes(incDesc)));
       const dateMatch = incDate && exDate && incDate === exDate;
       const amtMatch = Math.abs(incAmt - exAmt) < 0.01;
       const dateDiff = (incDate && exDate) ? Math.abs(new Date(incDate) - new Date(exDate)) / 86400000 : 999;

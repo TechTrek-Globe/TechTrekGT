@@ -478,11 +478,6 @@ export function processSpreadsheetImport({
         let resolvedBillId = txn.billId;
         let matchStrategy = resolvedBillId ? 'explicit_bill_id' : null;
 
-        // If explicitly set as isOther, do NOT match to any bill
-        if (txn.isOther) {
-          resolvedBillId = null;
-        }
-
         // Tier 1: Match by Bank Match Names (Statement Aliases) - Highest priority
         if (!resolvedBillId && !txn.isOther && (descLower || notesLower)) {
           // Check bills assigned to target account first
@@ -539,16 +534,18 @@ export function processSpreadsheetImport({
           ];
           const matchedHeuristic = candidateBills.find(b => {
             const bName = (b.name || '').toLowerCase().trim();
+            const pSource = (b.paymentSource || '').toLowerCase().trim();
 
             if (bName && (descLower.includes(bName) || bName.includes(descLower))) return true;
+            // removed pSource match
             if ((descLower.includes('insurance') || descLower.includes('progressive') || descLower.includes('geico') || descLower.includes('allstate')) &&
                 (bName.includes('insurance') || bName.includes('vehicle') || bName.includes('auto'))) return true;
             if ((descLower.includes('cell') || descLower.includes('phone') || descLower.includes('verizon') || descLower.includes('t-mobile') || descLower.includes('att')) &&
                 (bName.includes('cell') || bName.includes('phone') || bName.includes('wireless'))) return true;
             if ((descLower.includes('gym') || descLower.includes('planet fitness') || descLower.includes('la fitness')) &&
                 (bName.includes('gym') || bName.includes('fitness') || bName.includes('membership'))) return true;
-            if (descLower.includes('wells fargo') && (bName.includes('cell') || bName.includes('wells'))) return true;
-            if (descLower.includes('bank of america') && (bName.includes('gym') || bName.includes('america'))) return true;
+            if (descLower.includes('wells fargo') && (bName.includes('cell') || pSource.includes('wells'))) return true;
+            if (descLower.includes('bank of america') && (bName.includes('gym') || pSource.includes('america'))) return true;
             if ((descLower.includes('power') || descLower.includes('electric') || descLower.includes('georgia power')) &&
                 (bName.includes('power') || bName.includes('electric') || bName.includes('utility'))) return true;
             if (descLower.includes('water') && bName.includes('water')) return true;
@@ -617,27 +614,65 @@ export function processSpreadsheetImport({
             matrixNoteShifts.push({ projNoteKey, actualNoteKey });
           }
         } else {
-          // Unmatched debit -> Other expense (negative in consolidated other_amount)
-          const otherKey = `${accountId}_${monthKey}_${actualDay}_other_amount`;
-          const otherDescKey = `${accountId}_${monthKey}_${actualDay}_other_desc`;
-          const existingOther = matrixUpdates[otherKey] ?? nextDailyMatrix[otherKey] ?? 0;
-          matrixUpdates[otherKey] = Math.round((parseFloat(existingOther) - Math.abs(actualAmount)) * 100) / 100;
+          const isOther = txn.isOther || descLower === 'other' || descLower.startsWith('other ') || descLower.startsWith('other$') || descLower === 'other expense' || descLower === 'other $' || (/^other\b/i.test(descLower) && !descLower.includes('desc'));
 
-          const cleanDesc = (txn.description || '').replace(/^Other\s*\$?\s*\(?(.*?)\)?$/i, '$1').trim() || txn.description;
-          const existingOtherDesc = (matrixUpdates[otherDescKey] ?? nextDailyMatrix[otherDescKey] ?? '').replace(/^Other\s*\$?\s*\(?(.*?)\)?$/i, '$1').trim();
-          if (existingOtherDesc && cleanDesc && !existingOtherDesc.includes(cleanDesc)) {
-            matrixUpdates[otherDescKey] = `${existingOtherDesc} | ${cleanDesc}`;
+          if (isOther) {
+            // Unmatched debit from explicit Other column -> Other expense (negative in consolidated other_amount)
+            const otherKey = `${accountId}_${monthKey}_${actualDay}_other_amount`;
+            const otherDescKey = `${accountId}_${monthKey}_${actualDay}_other_desc`;
+            const existingOther = matrixUpdates[otherKey] ?? nextDailyMatrix[otherKey] ?? 0;
+            matrixUpdates[otherKey] = Math.round((parseFloat(existingOther) - Math.abs(actualAmount)) * 100) / 100;
+
+            const cleanDesc = (txn.description || '').replace(/^Other\s*\$?\s*\(?(.*?)\)?$/i, '$1').trim() || txn.description;
+            const existingOtherDesc = (matrixUpdates[otherDescKey] ?? nextDailyMatrix[otherDescKey] ?? '').replace(/^Other\s*\$?\s*\(?(.*?)\)?$/i, '$1').trim();
+            if (existingOtherDesc && cleanDesc && !existingOtherDesc.includes(cleanDesc)) {
+              matrixUpdates[otherDescKey] = `${existingOtherDesc} | ${cleanDesc}`;
+            } else {
+              matrixUpdates[otherDescKey] = existingOtherDesc || cleanDesc;
+            }
+
+            logWarn('MATCH', `Debit transaction #${txnIdx + 1} from Other column routed to Other Expense`, {
+              date: normDate,
+              desc: txn.description,
+              amount: actualAmount,
+              otherKey,
+              otherDescKey
+            });
           } else {
-            matrixUpdates[otherDescKey] = existingOtherDesc || cleanDesc;
-          }
+            // Named column that had no matching bill: create a bill dynamically so it never routes to Other
+            const billName = descLower.includes('insurance') ? 'Insurance (Vehicle)' : (txn.description || 'Discovered Bill');
+            let autoBill = nextBills.find(b => b.name.toLowerCase() === billName.toLowerCase());
+            if (!autoBill) {
+              const autoMatchKey = descLower.includes('insurance') ? 'PROGRESSIVE, AUTO INSURANCE, GEICO, INSURANCE, VEHICLE' : billName;
+              autoBill = {
+                id: txn.billId || `bill-${Date.now()}-${nextBills.length}`,
+                name: billName,
+                amount: Math.abs(actualAmount),
+                period: 'Monthly',
+                dueDay: actualDay,
+                accountId: accountId,
+                paymentSource: 'Auto Pay',
+                matchingKey: autoMatchKey,
+                bankMatchNames: autoMatchKey,
+                splits: {}
+              };
+              nextBills.push(autoBill);
+              metadataChanged = true;
+            }
+            resolvedBillId = autoBill.id;
+            lineItemUpdates.push({ billId: resolvedBillId, monthKey, actualAmount });
+            const actualKey = `${accountId}_${monthKey}_${actualDay}_bill_${resolvedBillId}`;
+            const existingBillAmt = matrixUpdates[actualKey] ?? 0;
+            matrixUpdates[actualKey] = Math.round((existingBillAmt + actualAmount) * 100) / 100;
 
-          logWarn('MATCH', `Debit transaction #${txnIdx + 1} routed to Other Expense`, {
-            date: normDate,
-            desc: txn.description,
-            amount: actualAmount,
-            otherKey,
-            otherDescKey
-          });
+            logDebug('MATCH', `Debit transaction #${txnIdx + 1} created new bill "${billName}" and routed to bill column`, {
+              date: normDate,
+              desc: txn.description,
+              amount: actualAmount,
+              billId: resolvedBillId,
+              actualKey
+            });
+          }
         }
       }
     });
@@ -655,59 +690,6 @@ export function processSpreadsheetImport({
       });
       nextLineItems = updated;
       lineItemsChanged = true;
-    }
-
-    // Ultimate Truth: Sync stated imported ledger balances and transaction balances directly into dailyMatrix as reg_ending
-    if (data.importedLedgerRows && typeof data.importedLedgerRows === 'object') {
-      const accId = data.targetAccountId || (nextAccounts[0]?.id);
-      Object.entries(data.importedLedgerRows).forEach(([dateStr, rowData]) => {
-        const parts = dateStr.split('-');
-        if (parts.length === 3 && accId) {
-          const y = parts[0];
-          const m = parts[1];
-          const d = parseInt(parts[2], 10);
-          const mKey = `${y}-${m}`;
-          let stated = null;
-          if (typeof rowData === 'number') {
-            stated = rowData;
-          } else if (rowData && typeof rowData === 'object') {
-            stated = rowData.regEnding ?? rowData.totalEnding ?? null;
-          }
-          if (stated !== null && !isNaN(stated)) {
-            const regEndKey = `${accId}_${mKey}_${d}_reg_ending`;
-            matrixUpdates[regEndKey] = Math.round(stated * 100) / 100;
-          }
-        }
-      });
-    }
-
-    if (Array.isArray(data.transactions)) {
-      const dateBalances = {};
-      data.transactions.forEach(t => {
-        if (t.date && t.balance !== undefined && t.balance !== null && !isNaN(parseFloat(t.balance))) {
-          const accId = t.accountId || data.targetAccountId || (nextAccounts[0]?.id);
-          const key = `${accId}_${t.date}`;
-          dateBalances[key] = {
-            accId,
-            date: t.date,
-            balance: Math.round(parseFloat(t.balance) * 100) / 100
-          };
-        }
-      });
-
-      Object.values(dateBalances).forEach(({ accId, date, balance }) => {
-        const parts = date.split('-');
-        if (parts.length === 3) {
-          const y = parts[0];
-          const m = parts[1];
-          const d = parseInt(parts[2], 10);
-          const mKey = `${y}-${m}`;
-          const regEndKey = `${accId}_${mKey}_${d}_reg_ending`;
-          if (matrixUpdates[regEndKey] === undefined) {
-            matrixUpdates[regEndKey] = balance;
-          }
-        }
-      });
     }
 
     if (Object.keys(matrixUpdates).length > 0 || matrixNoteShifts.length > 0) {
@@ -862,22 +844,8 @@ export function getLedgerRunningBalanceAsOfDate({
     const customReg = dailyMatrix[`${targetAccountId}_${mKey}_${d}_reg_ending`];
     const customExtra = dailyMatrix[`${targetAccountId}_${mKey}_${d}_extra_ending`];
 
-    let reg = customReg !== undefined && customReg !== null && customReg !== '' ? parseFloat(customReg) : undefined;
-    let extra = customExtra !== undefined && customExtra !== null && customExtra !== '' ? parseFloat(customExtra) : undefined;
-
-    const isoDate = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    if (reg === undefined && targetAcc.importedLedgerRows && targetAcc.importedLedgerRows[isoDate] !== undefined) {
-      const rowData = targetAcc.importedLedgerRows[isoDate];
-      if (typeof rowData === 'number') {
-        reg = rowData;
-      } else if (rowData && typeof rowData === 'object') {
-        const statedEnd = rowData.regEnding ?? rowData.totalEnding ?? null;
-        if (statedEnd !== null && !isNaN(statedEnd)) reg = statedEnd;
-      }
-    }
-
-    if (reg === undefined) reg = tentativeReg;
-    if (extra === undefined) extra = tentativeExtra;
+    let reg = customReg !== undefined && customReg !== null && customReg !== '' ? parseFloat(customReg) : tentativeReg;
+    let extra = customExtra !== undefined && customExtra !== null && customExtra !== '' ? parseFloat(customExtra) : tentativeExtra;
 
     if ((customReg === undefined || customReg === null || customReg === '') &&
         (customExtra === undefined || customExtra === null || customExtra === '')) {

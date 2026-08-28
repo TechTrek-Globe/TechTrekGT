@@ -742,6 +742,14 @@ export function SpreadsheetImporter({
 
         if (stated !== null && stated !== undefined && !isNaN(stated)) {
           stated = Math.round(stated * 100) / 100;
+          if (!parsedPayload.importedLedgerRows) parsedPayload.importedLedgerRows = {};
+          if (maxImportDate) {
+            parsedPayload.importedLedgerRows[maxImportDate] = {
+              regEnding: stated,
+              extraEnding: 0,
+              totalEnding: stated
+            };
+          }
         } else {
           stated = null;
         }

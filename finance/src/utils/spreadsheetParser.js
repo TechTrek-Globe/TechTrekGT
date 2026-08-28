@@ -838,6 +838,15 @@ export function parseSingleSheet({
     const discoveredBills = [];
     const discoveredPeople = [];
 
+    let isOldestFirst = false;
+    if (rawRows.length > headerRowIdx + 2 && dateColIdx >= 0) {
+      const dFirst = parseRowDate(rawRows[headerRowIdx + 1][dateColIdx]);
+      const dLast = parseRowDate(rawRows[rawRows.length - 1][dateColIdx]);
+      if (dFirst && dLast && dFirst < dLast) {
+        isOldestFirst = true;
+      }
+    }
+
     for (let i = headerRowIdx + 1; i < rawRows.length; i++) {
       const r = rawRows[i];
       if (!r || r.length === 0) continue;
@@ -970,14 +979,18 @@ export function parseSingleSheet({
       }
 
       // 7. Optional running balance
+      let parsedBalance = undefined;
       if (balanceColIdx >= 0 && r[balanceColIdx] !== undefined && r[balanceColIdx] !== null && r[balanceColIdx] !== '') {
         const parsedBal = parseFloat(String(r[balanceColIdx]).replace(/[^0-9.-]+/g, ''));
         if (!isNaN(parsedBal)) {
-          importedLedgerRows[dateStr] = {
-            regEnding: Math.round(parsedBal * 100) / 100,
-            extraEnding: 0,
-            totalEnding: Math.round(parsedBal * 100) / 100
-          };
+          parsedBalance = Math.round(parsedBal * 100) / 100;
+          if (importedLedgerRows[dateStr] === undefined || isOldestFirst) {
+            importedLedgerRows[dateStr] = {
+              regEnding: parsedBalance,
+              extraEnding: 0,
+              totalEnding: parsedBalance
+            };
+          }
         }
       }
 
@@ -986,6 +999,7 @@ export function parseSingleSheet({
         date: dateStr,
         description,
         amount,
+        balance: parsedBalance !== undefined ? parsedBalance : undefined,
         accountId: targetAccountId,
         billId,
         personId,

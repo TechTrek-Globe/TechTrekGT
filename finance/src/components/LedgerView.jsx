@@ -657,7 +657,7 @@ function DailySpreadsheetMatrix() {
 
     // Rule A: single-account import mode only - 'all' view always projects
     const isImportMode = selectedAccountId !== 'all'
-      && selectedAccount?.ledgerMode === 'import';
+      && (selectedAccount?.ledgerMode === 'import' || (selectedAccount?.importedLedgerRows && Object.keys(selectedAccount.importedLedgerRows).length > 0));
 
     const importedRows = isImportMode
       ? (selectedAccount?.importedLedgerRows || {})
@@ -835,26 +835,19 @@ function DailySpreadsheetMatrix() {
           const rowData = importedRows[isoDate];
           if (typeof rowData === 'number') {
             customRegEnd = rowData;
-          } else if (rowData && typeof rowData === 'object' && rowData.regEnding !== undefined) {
-            if (rowData.regBeg !== undefined && rowData.regBeg !== null) {
-              const netChange = rowData.regEnding - rowData.regBeg;
-              customRegEnd = Math.round((runningRegBeg + netChange) * 100) / 100;
-            } else if (rowData.totalEnding !== undefined && rowData.totalBeg !== undefined) {
-              const netChange = rowData.totalEnding - rowData.totalBeg;
-              customRegEnd = Math.round((runningRegBeg + netChange) * 100) / 100;
-            } else {
-              customRegEnd = rowData.regEnding;
+          } else if (rowData && typeof rowData === 'object') {
+            const statedEnd = rowData.regEnding ?? rowData.totalEnding ?? null;
+            if (statedEnd !== null && statedEnd !== undefined && !isNaN(statedEnd)) {
+              customRegEnd = statedEnd;
             }
           }
         }
         if (customExtraEnd === undefined && isImportMode && importedRows[isoDate] !== undefined) {
           const rowData = importedRows[isoDate];
-          if (rowData && typeof rowData === 'object' && rowData.extraEnding !== undefined) {
-            if (rowData.extraBeg !== undefined && rowData.extraBeg !== null) {
-              const netChangeExtra = rowData.extraEnding - rowData.extraBeg;
-              customExtraEnd = Math.round((runningExtraBeg + netChangeExtra) * 100) / 100;
-            } else {
-              customExtraEnd = rowData.extraEnding;
+          if (rowData && typeof rowData === 'object') {
+            const statedExtra = rowData.extraEnding ?? null;
+            if (statedExtra !== null && statedExtra !== undefined && !isNaN(statedExtra)) {
+              customExtraEnd = statedExtra;
             }
           }
         }

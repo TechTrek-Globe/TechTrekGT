@@ -634,6 +634,13 @@ export function matchCreditToEarner({
   if (NON_EARNER_DESC_PATTERNS.some(p => descLower.includes(p) || notesLower.includes(p))) return null;
 
   // Tier 1: Direct Name or Alias text match
+  // Strategy: A direct earner NAME in the description (e.g. "Ronnie Payroll") is
+  // unambiguous and returns immediately. However, ALIAS matches (e.g. "usaa transfer")
+  // can be generic descriptors shared across multiple earners' bank transfers.
+  // When an alias matches, we validate it against known per-paycheck allocation amounts.
+  // If another earner has a direct allocation that closely matches the transaction amount,
+  // that earner wins - because amount evidence is stronger than a generic alias.
+  let tier1AliasMatch = null;
   for (const p of people) {
     const pName = (p.name || '').toLowerCase().trim();
     const pAliases = (p.bankMatchNames || p.matchingKey || '')
@@ -642,14 +649,79 @@ export function matchCreditToEarner({
       .map(s => s.trim())
       .filter(s => s.length >= 2);
 
+    // Direct name match is unambiguous - return immediately
     if (pName && pName.length >= 2 && (descLower.includes(pName) || notesLower.includes(pName))) {
       return { person: p, reason: `name_match ("${p.name}")` };
     }
 
-    for (const alias of pAliases) {
-      if (descLower.includes(alias) || notesLower.includes(alias)) {
-        return { person: p, reason: `alias_match ("${alias}")` };
+    // Alias match: hold as candidate, validate against amount evidence below
+    if (!tier1AliasMatch) {
+      for (const alias of pAliases) {
+        if (descLower.includes(alias) || notesLower.includes(alias)) {
+          tier1AliasMatch = { person: p, alias };
+          break;
+        }
       }
+    }
+  }
+
+  // If Tier 1 found an alias match, cross-validate: does another earner have a
+  // per-paycheck allocation that is a much closer amount match than the alias holder?
+  // This prevents "USAA Transfer" aliased to Jon from stealing Ronnie's $1,378 deposit.
+  if (tier1AliasMatch) {
+    const aliasPersonId = tier1AliasMatch.person.id;
+
+    // Collect all account IDs to check
+    const allAccountIds = [
+      targetAccountId,
+      ...accounts.map(a => a.id).filter(id => id !== targetAccountId)
+    ].filter(Boolean);
+
+    // Find the best direct allocation match for the alias holder.
+    // Monthly-doubled values receive a confidence penalty (same as Tier 2) since they
+    // are derived computations, not declared per-paycheck amounts.
+    const MONTHLY_DOUBLE_PENALTY = 0.50;
+    let aliasHolderBestDelta = Infinity;
+    for (const accId of allAccountIds) {
+      const allocAmt = getPersonDepositAmountForAccount(tier1AliasMatch.person, accId);
+      if (allocAmt >= MIN_EARNER_AMOUNT) {
+        const d = Math.abs(allocAmt - rawAmt);
+        if (d < aliasHolderBestDelta) aliasHolderBestDelta = d;
+        // Monthly equivalent for semi-monthly/bi-weekly earners (penalized)
+        const freq = (tier1AliasMatch.person.payFrequency || '').toLowerCase();
+        if (freq === 'semi-monthly' || freq === 'bi-weekly') {
+          const monthlyD = Math.abs(Math.round(allocAmt * 2 * 100) / 100 - rawAmt) + MONTHLY_DOUBLE_PENALTY;
+          if (monthlyD < aliasHolderBestDelta) aliasHolderBestDelta = monthlyD;
+        }
+      }
+    }
+
+    // Find the best direct allocation match across ALL other earners.
+    // Same penalty logic applies for consistency.
+    let rivalBestDelta = Infinity;
+    let rivalPerson = null;
+    for (const p of people) {
+      if (p.id === aliasPersonId) continue;
+      for (const accId of allAccountIds) {
+        const allocAmt = getPersonDepositAmountForAccount(p, accId);
+        if (allocAmt >= MIN_EARNER_AMOUNT) {
+          const d = Math.abs(allocAmt - rawAmt);
+          if (d < rivalBestDelta) { rivalBestDelta = d; rivalPerson = p; }
+          const freq = (p.payFrequency || '').toLowerCase();
+          if (freq === 'semi-monthly' || freq === 'bi-weekly') {
+            const monthlyD = Math.abs(Math.round(allocAmt * 2 * 100) / 100 - rawAmt) + MONTHLY_DOUBLE_PENALTY;
+            if (monthlyD < rivalBestDelta) { rivalBestDelta = monthlyD; rivalPerson = p; }
+          }
+        }
+      }
+    }
+
+    // If a rival earner has a strictly better amount-based match, override the alias.
+    // No threshold needed: any rival who beats the penalized alias holder wins.
+    if (rivalPerson && rivalBestDelta < aliasHolderBestDelta) {
+      // Don't return the alias match - fall through to Tier 2+ amount-based matching
+    } else {
+      return { person: tier1AliasMatch.person, reason: `alias_match ("${tier1AliasMatch.alias}")` };
     }
   }
 
@@ -704,17 +776,26 @@ export function matchCreditToEarner({
           bestCandidate = { person: p, label, delta: deltaAlloc };
         }
 
-        // Monthly equivalent (two paychecks for semi-monthly / bi-weekly)
+        // Monthly equivalent (two paychecks for semi-monthly / bi-weekly).
+        // IMPORTANT: A monthly-doubled value is a derived/computed match, not a direct
+        // per-paycheck allocation. Apply a synthetic confidence penalty of $0.50 so that
+        // a direct per-paycheck allocation for any earner (even processed later in the loop)
+        // always beats a monthly-double tie. This prevents Jon's $689*2=$1,378 monthly
+        // computation from displacing Ronnie's direct $1,378 per-paycheck allocation.
         const isBiOrSemi = p.payFrequency === 'semi-monthly' || p.payFrequency === 'bi-weekly';
         if (isBiOrSemi) {
           const monthlyAlloc = Math.round(allocAmt * 2 * 100) / 100;
           const deltaMonthly = Math.abs(monthlyAlloc - rawAmt);
-          if (deltaMonthly <= tolerance && deltaMonthly < minDelta) {
+          // Penalize the effective delta for a derived monthly-double to preserve ranking
+          // priority for direct per-paycheck matches from any earner processed later.
+          const MONTHLY_DOUBLE_PENALTY = 0.50;
+          const effectiveDeltaMonthly = deltaMonthly + MONTHLY_DOUBLE_PENALTY;
+          if (deltaMonthly <= tolerance && effectiveDeltaMonthly < minDelta) {
             const accName = accounts.find(a => a.id === accId)?.name || accId;
             const label = accId === targetAccountId
               ? `${p.name} Monthly Allocation ($${monthlyAlloc.toFixed(2)})`
               : `${p.name} Monthly Allocation via ${accName} ($${monthlyAlloc.toFixed(2)})`;
-            minDelta = deltaMonthly;
+            minDelta = effectiveDeltaMonthly;
             bestCandidate = { person: p, label, delta: deltaMonthly };
           }
         }

@@ -17,6 +17,8 @@ import { SpreadsheetImporterModal } from './SpreadsheetImporterModal';
 import { LogSaleModal } from './LogSaleModal';
 import { ListingCopyModal } from './ListingCopyModal';
 import { EditItemModal } from './EditItemModal';
+import { DelistPendingAlert } from './DelistPendingAlert';
+import { EbayListingIdModal } from './EbayListingIdModal';
 
 export function InventoryHubView({ onNavigate }) {
   const {
@@ -52,6 +54,8 @@ export function InventoryHubView({ onNavigate }) {
   const [copyModalItem, setCopyModalItem] = useState(null);
   const [queryEditModal, setQueryEditModal] = useState(null);
   const [deleting, setDeleting] = useState(null);
+  const [listingIdModalItem, setListingIdModalItem] = useState(null);
+  const [delistDismissed, setDelistDismissed] = useState(false);
 
   // Items are category-filtered server-side via InventoryContext
   const displayItems = sortedItems;
@@ -59,6 +63,7 @@ export function InventoryHubView({ onNavigate }) {
   // Quick summary numbers for header
   const activeCount = items.filter(it => it.status === 'Available' || it.status === 'Listed').length;
   const totalCost = items.filter(it => it.status === 'Available' || it.status === 'Listed').reduce((s, it) => s + (it.true_total_cost || 0), 0);
+  const delistPendingItems = items.filter(it => it.status === 'delist_pending');
 
   // --- Actions ---
   const handleDelete = async (id) => {
@@ -147,6 +152,15 @@ export function InventoryHubView({ onNavigate }) {
       </div>
 
       {showMetrics && <InventoryMetrics items={items} />}
+
+      {/* Delist Pending Alert - shown when eBay webhook fires ITEM_SOLD */}
+      {!delistDismissed && delistPendingItems.length > 0 && (
+        <DelistPendingAlert
+          items={delistPendingItems}
+          onResolved={(itemId) => updateItemLocal(itemId, { status: 'Sold' })}
+          onDismiss={() => setDelistDismissed(true)}
+        />
+      )}
 
       {error && (
         <div className="p-2 bg-red-950/40 border border-red-500/30 rounded-lg text-red-400 text-xs flex items-center gap-2 flex-shrink-0">
@@ -256,6 +270,12 @@ export function InventoryHubView({ onNavigate }) {
         queryEditModal={queryEditModal}
         setQueryEditModal={setQueryEditModal}
         onConfirmSearch={handleConfirmSearch}
+      />
+      <EbayListingIdModal
+        isOpen={!!listingIdModalItem}
+        item={listingIdModalItem}
+        onClose={() => setListingIdModalItem(null)}
+        onSaved={(id, patch) => { updateItemLocal(id, patch); setListingIdModalItem(null); }}
       />
     </div>
   );

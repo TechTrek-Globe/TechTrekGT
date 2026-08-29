@@ -6,6 +6,18 @@ import { onRequestGet as ebayItemGet }
   from './gateway/ebayItem.js';
 import { onRequestPost as amazonFetchPost }
   from './gateway/amazon.js';
+import {
+  onRequestGetStart as ebayOAuthStart,
+  onRequestGetCallback as ebayOAuthCallback,
+  onRequestGetStatus as ebayOAuthStatus,
+  onRequestDelete as ebayOAuthDisconnect
+} from './gateway/ebayOAuth.js';
+import {
+  onRequestGet as ebayWebhookGet,
+  onRequestPost as ebayWebhookPost
+} from './gateway/ebayWebhook.js';
+import { onRequestGet as ebayFinancesGet } from './gateway/ebayFinances.js';
+import { onRequestGet as ebayListingsGet } from './gateway/ebayListings.js';
 
 /**
  * techtrek-landing API Gateway Worker
@@ -89,6 +101,30 @@ export default {
         // --- eBay Item Detail Gateway ---
         } else if (pathname.startsWith('/api/ebay/item/') && request.method === 'GET') {
           response = await ebayItemGet(context);
+
+        // --- eBay OAuth ACG Flow ---
+        } else if (pathname === '/api/ebay/oauth/start' && request.method === 'GET') {
+          response = await ebayOAuthStart(context);
+        } else if (pathname === '/api/ebay/oauth/callback' && request.method === 'GET') {
+          response = await ebayOAuthCallback(context);
+        } else if (pathname === '/api/ebay/oauth/status' && request.method === 'GET') {
+          response = await ebayOAuthStatus(context);
+        } else if (pathname === '/api/ebay/oauth/disconnect' && request.method === 'DELETE') {
+          response = await ebayOAuthDisconnect(context);
+
+        // --- eBay Webhook Listener ---
+        } else if (pathname === '/api/ebay/webhook' && request.method === 'GET') {
+          response = await ebayWebhookGet(context);
+        } else if (pathname === '/api/ebay/webhook' && request.method === 'POST') {
+          response = await ebayWebhookPost(context);
+
+        // --- eBay Finances API Proxy ---
+        } else if (pathname === '/api/ebay/finances' && request.method === 'GET') {
+          response = await ebayFinancesGet(context);
+
+        // --- eBay Listings API Proxy ---
+        } else if ((pathname === '/api/ebay/listings' || pathname.startsWith('/api/ebay/listings/')) && request.method === 'GET') {
+          response = await ebayListingsGet(context);
 
         // --- Amazon Fetch Gateway ---
         } else if (pathname === '/api/amazon/fetch' && request.method === 'POST') {

@@ -13,6 +13,13 @@
       "id": "cc72165de3434d898877572d1135df13"
     }
   ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "personal-budget-db",
+      "database_id": "10f220d4-1c10-49e9-b63e-5d4cb08d599f"
+    }
+  ],
   "assets": {
     "directory": "./",
     "binding": "ASSETS",

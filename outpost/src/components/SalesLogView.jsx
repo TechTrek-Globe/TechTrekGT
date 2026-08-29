@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { getSales, deleteSale, getPlatforms } from '../utils/auctionApi';
 import { LogSaleModal } from './LogSaleModal';
+import { FeeReconciliationPanel } from './FeeReconciliationPanel';
 import { fmtCurrency, fmtPct } from '../utils/formulaPreview';
 import { useInventory } from '../context/InventoryContext';
 
@@ -31,6 +32,7 @@ export function SalesLogView() {
   const [modalOpen, setModalOpen] = useState(false);
   const [saleToEdit, setSaleToEdit] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
+  const [expandedFeeRow, setExpandedFeeRow] = useState(null);
 
   const fetchSales = useCallback(async (page = 1) => {
     setLoading(true);
@@ -310,106 +312,131 @@ export function SalesLogView() {
               {sales.map((sale, i) => {
                 const totalDeductions = (sale.platform_fees_amt || 0) + (sale.actual_shipping_cost || 0) + (sale.payment_processing_amt || 0) + (sale.promoted_listing_fee || 0);
                 return (
-                  <tr
-                    key={sale.id}
-                    className={`border-b border-slate-800/30 hover:bg-slate-800/20 transition-colors group ${i % 2 === 0 ? 'bg-transparent' : 'bg-slate-950/20'}`}
-                  >
-                    {/* Sale Date */}
-                    <td className="py-2 px-3 text-slate-300 font-medium whitespace-nowrap">
-                      {sale.sale_date}
-                    </td>
+                  <React.Fragment key={sale.id}>
+                    <tr
+                      className={`border-b border-slate-800/30 hover:bg-slate-800/20 transition-colors group ${i % 2 === 0 ? 'bg-transparent' : 'bg-slate-950/20'}`}
+                    >
+                      {/* Sale Date */}
+                      <td className="py-2 px-3 text-slate-300 font-medium whitespace-nowrap">
+                        {sale.sale_date}
+                      </td>
 
-                    {/* Item & Details */}
-                    <td className="py-2 px-3 max-w-[200px]">
-                      <p className="text-slate-200 font-semibold text-xs leading-snug line-clamp-2" title={sale.item_name}>
-                        {sale.item_name}
-                      </p>
-                      <div className="flex items-center gap-1.5 text-[10px] text-slate-500 mt-0.5">
-                        <span>{sale.category}</span>
-                        {sale.athlete_person && <span>· {sale.athlete_person}</span>}
-                        {sale.invoice_ref && <span>· Inv: {sale.invoice_ref}</span>}
-                      </div>
-                    </td>
-
-                    {/* Platform / Buyer */}
-                    <td className="py-2 px-3 whitespace-nowrap">
-                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold text-amber-400 bg-amber-500/10 border border-amber-500/20">
-                        {sale.platform}
-                      </span>
-                      {sale.buyer_handle && (
-                        <p className="text-[10px] text-slate-500 mt-0.5">@{sale.buyer_handle}</p>
-                      )}
-                    </td>
-
-                    {/* Gross Sale */}
-                    <td className="py-2 px-3 font-bold text-slate-100 whitespace-nowrap">
-                      {fmtCurrency(sale.gross_sale_price)}
-                    </td>
-
-                    {/* Landed Cost */}
-                    <td className="py-2 px-3 text-slate-400 whitespace-nowrap">
-                      {fmtCurrency(sale.true_total_cost)}
-                    </td>
-
-                    {/* Platform Fee */}
-                    <td className="py-2 px-3 whitespace-nowrap">
-                      <span className="text-slate-300">{fmtCurrency(sale.platform_fees_amt)}</span>
-                      {totalDeductions > (sale.platform_fees_amt || 0) && (
-                        <p className="text-[10px] text-slate-600" title="Total fees & shipping deductions">
-                          All: -{fmtCurrency(totalDeductions)}
+                      {/* Item & Details */}
+                      <td className="py-2 px-3 max-w-[200px]">
+                        <p className="text-slate-200 font-semibold text-xs leading-snug line-clamp-2" title={sale.item_name}>
+                          {sale.item_name}
                         </p>
-                      )}
-                    </td>
+                        <div className="flex items-center gap-1.5 text-[10px] text-slate-500 mt-0.5">
+                          <span>{sale.category}</span>
+                          {sale.athlete_person && <span>· {sale.athlete_person}</span>}
+                          {sale.invoice_ref && <span>· Inv: {sale.invoice_ref}</span>}
+                        </div>
+                      </td>
 
-                    {/* Net Proceeds */}
-                    <td className="py-2 px-3 font-medium text-slate-200 whitespace-nowrap">
-                      {fmtCurrency(sale.net_proceeds)}
-                    </td>
+                      {/* Platform / Buyer */}
+                      <td className="py-2 px-3 whitespace-nowrap">
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold text-amber-400 bg-amber-500/10 border border-amber-500/20">
+                          {sale.platform}
+                        </span>
+                        {sale.buyer_handle && (
+                          <p className="text-[10px] text-slate-500 mt-0.5">@{sale.buyer_handle}</p>
+                        )}
+                      </td>
 
-                    {/* Net Profit */}
-                    <td className="py-2 px-3 font-bold whitespace-nowrap">
-                      <span className={sale.net_profit >= 0 ? 'text-emerald-400' : 'text-red-400'}>
-                        {fmtCurrency(sale.net_profit)}
-                      </span>
-                    </td>
+                      {/* Gross Sale */}
+                      <td className="py-2 px-3 font-bold text-slate-100 whitespace-nowrap">
+                        {fmtCurrency(sale.gross_sale_price)}
+                      </td>
 
-                    {/* ROI % */}
-                    <td className="py-2 px-3 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${sale.roi_pct >= 0 ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20' : 'text-red-400 bg-red-500/10 border border-red-500/20'}`}>
-                        {fmtPct(sale.roi_pct)}
-                      </span>
-                    </td>
+                      {/* Landed Cost */}
+                      <td className="py-2 px-3 text-slate-400 whitespace-nowrap">
+                        {fmtCurrency(sale.true_total_cost)}
+                      </td>
 
-                    {/* Days to Sell */}
-                    <td className="py-2 px-3 text-slate-400 whitespace-nowrap">
-                      {sale.days_to_sell != null ? `${sale.days_to_sell}d` : '--'}
-                    </td>
+                      {/* Platform Fee */}
+                      <td className="py-2 px-3 whitespace-nowrap">
+                        <span className="text-slate-300">{fmtCurrency(sale.platform_fees_amt)}</span>
+                        {totalDeductions > (sale.platform_fees_amt || 0) && (
+                          <p className="text-[10px] text-slate-600" title="Total fees & shipping deductions">
+                            All: -{fmtCurrency(totalDeductions)}
+                          </p>
+                        )}
+                      </td>
 
-                    {/* Actions */}
-                    <td className="py-2 px-3 whitespace-nowrap">
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={() => handleEditSale(sale)}
-                          className="w-6 h-6 rounded flex items-center justify-center text-slate-500 hover:text-amber-400 hover:bg-amber-900/20 transition-all"
-                          title="Edit transaction"
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteSale(sale.id)}
-                          disabled={deletingId === sale.id}
-                          className="w-6 h-6 rounded flex items-center justify-center text-slate-500 hover:text-red-400 hover:bg-red-900/20 transition-all"
-                          title="Delete sale and restore item"
-                        >
-                          {deletingId === sale.id ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          ) : (
-                            <Trash2 className="w-3.5 h-3.5" />
+                      {/* Net Proceeds */}
+                      <td className="py-2 px-3 font-medium text-slate-200 whitespace-nowrap">
+                        {fmtCurrency(sale.net_proceeds)}
+                      </td>
+
+                      {/* Net Profit */}
+                      <td className="py-2 px-3 font-bold whitespace-nowrap">
+                        <span className={sale.net_profit >= 0 ? 'text-emerald-400' : 'text-red-400'}>
+                          {fmtCurrency(sale.net_profit)}
+                        </span>
+                      </td>
+
+                      {/* ROI % */}
+                      <td className="py-2 px-3 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${sale.roi_pct >= 0 ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20' : 'text-red-400 bg-red-500/10 border border-red-500/20'}`}>
+                          {fmtPct(sale.roi_pct)}
+                        </span>
+                      </td>
+
+                      {/* Days to Sell */}
+                      <td className="py-2 px-3 text-slate-400 whitespace-nowrap">
+                        {sale.days_to_sell != null ? `${sale.days_to_sell}d` : '--'}
+                      </td>
+
+                      {/* Actions */}
+                      <td className="py-2 px-3 whitespace-nowrap">
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {(sale.platform || '').toLowerCase().includes('ebay') && (
+                            <button
+                              onClick={() => setExpandedFeeRow(prev => prev === sale.id ? null : sale.id)}
+                              className={`w-6 h-6 rounded flex items-center justify-center transition-all ${
+                                expandedFeeRow === sale.id
+                                  ? 'text-amber-400 bg-amber-900/20'
+                                  : 'text-slate-500 hover:text-amber-400 hover:bg-amber-900/20'
+                              }`}
+                              title="Reconcile eBay fees"
+                            >
+                              <DollarSign className="w-3.5 h-3.5" />
+                            </button>
                           )}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
+                          <button
+                            onClick={() => handleEditSale(sale)}
+                            className="w-6 h-6 rounded flex items-center justify-center text-slate-500 hover:text-amber-400 hover:bg-amber-900/20 transition-all"
+                            title="Edit transaction"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteSale(sale.id)}
+                            disabled={deletingId === sale.id}
+                            className="w-6 h-6 rounded flex items-center justify-center text-slate-500 hover:text-red-400 hover:bg-red-900/20 transition-all"
+                            title="Delete sale and restore item"
+                          >
+                            {deletingId === sale.id ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                    {/* Fee Reconciliation sub-row (eBay only) */}
+                    {expandedFeeRow === sale.id && (
+                      <tr key={`recon-${sale.id}`} className="bg-slate-950/60">
+                        <td colSpan={11} className="px-6 pb-3 pt-0">
+                          <FeeReconciliationPanel
+                            sale={sale}
+                            onReconciled={(updated) => setSales(prev => prev.map(s => s.id === updated.id ? { ...s, ...updated } : s))}
+                          />
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
                 );
               })}
             </tbody>

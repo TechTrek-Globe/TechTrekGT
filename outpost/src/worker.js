@@ -26,6 +26,9 @@ import { onRequestGet as suppliesListHandler, onRequestPost as suppliesCreateHan
 import { onRequestPut as supplyPutHandler, onRequestDelete as supplyDeleteHandler } from '../functions/api/supplies/[id].js';
 import { onRequestGet as taxReportGetHandler } from '../functions/api/reports/tax.js';
 import { onRequestGet as marketAlertsGetHandler, onRequestPut as marketAlertsPutHandler, onRequestPost as marketAlertsPostHandler } from '../functions/api/market-alerts.js';
+import { onRequestGet as ebayOAuthStatusHandler } from '../functions/api/ebay/oauth-status.js';
+import { onRequestGet as ebayFindListingsHandler } from '../functions/api/ebay/find-listings.js';
+import { onRequestPost as ebayReconcileHandler } from '../functions/api/ebay/reconcile.js';
 
 function addSecurityHeaders(response, isLocalhost = false, requestOrigin = '') {
   const newHeaders = new Headers(response.headers);
@@ -231,6 +234,13 @@ export default {
         response = await marketAlertsPostHandler(context);
       } else if (/^\/api\/market-alerts\/[^/]+$/.test(apiPath) && request.method === 'PUT') {
         response = await marketAlertsPutHandler(context);
+      // --- eBay Phase 3: OAuth, Listing Discovery, Fee Reconciliation ---
+      } else if (apiPath === '/api/ebay/oauth-status' && request.method === 'GET') {
+        response = await ebayOAuthStatusHandler(context);
+      } else if (apiPath === '/api/ebay/find-listings' && request.method === 'GET') {
+        response = await ebayFindListingsHandler(context);
+      } else if (apiPath === '/api/ebay/reconcile' && request.method === 'POST') {
+        response = await ebayReconcileHandler(context);
       } else if (apiPath.startsWith('/api/')) {
         response = new Response(JSON.stringify({ error: 'Endpoint not found' }), {
           status: 404,

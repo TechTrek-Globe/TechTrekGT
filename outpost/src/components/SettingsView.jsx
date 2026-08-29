@@ -9,6 +9,8 @@ import { SpreadsheetImporterModal } from './SpreadsheetImporterModal';
 import { FinanceSyncModal } from './FinanceSyncModal';
 import { SuppliesTrackerModal } from './SuppliesTrackerModal';
 import { TaxReportModal } from './TaxReportModal';
+import { EbayConnectBanner } from './EbayConnectBanner';
+import { ListingMatchReviewModal } from './ListingMatchReviewModal';
 import { useAuth } from '../context/AuthContext';
 import {
   getPlatforms, createPlatform, updatePlatform, deletePlatform, resetPlatforms,
@@ -34,6 +36,10 @@ export function SettingsView() {
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [importerOpen, setImporterOpen] = useState(false);
   const [newPlatform, setNewPlatform] = useState({ name: '', fee_pct: '', flat_fee: '', notes: '', is_default: false });
+
+  // eBay listing discovery state
+  const [listingMatches, setListingMatches] = useState([]);
+  const [listingMatchOpen, setListingMatchOpen] = useState(false);
 
   // User Preferences (Column Visibility & Category Ordering)
   const [userSettings, setUserSettingsState] = useState(getStoredUserSettings);
@@ -719,6 +725,25 @@ export function SettingsView() {
         </div>
       </div>
 
+      {/* Section 2.4: eBay Integration */}
+      <div className="rounded-2xl p-6 border border-slate-800 bg-slate-950/40 space-y-4">
+        <div className="border-b border-slate-800/60 pb-4">
+          <h2 className="text-base font-bold text-slate-100 flex items-center gap-2">
+            <ShoppingCart className="w-4 h-4 text-amber-400" />
+            eBay Integration
+          </h2>
+          <p className="text-xs text-slate-400 mt-0.5">
+            Connect your eBay seller account for real-time webhook notifications and Finances API fee reconciliation
+          </p>
+        </div>
+        <EbayConnectBanner
+          onFindListings={(matches) => {
+            setListingMatches(matches);
+            setListingMatchOpen(true);
+          }}
+        />
+      </div>
+
       {/* Section 2.5: Inventory View Columns & Category Customization */}
       <div className="glass-card rounded-2xl p-6 border border-slate-800 space-y-6">
         <div className="border-b border-slate-800/60 pb-4">
@@ -1021,6 +1046,14 @@ export function SettingsView() {
       <TaxReportModal
         isOpen={taxReportOpen}
         onClose={() => setTaxReportOpen(false)}
+      />
+
+      {/* eBay Listing Match Review Modal */}
+      <ListingMatchReviewModal
+        isOpen={listingMatchOpen}
+        matches={listingMatches}
+        onClose={() => setListingMatchOpen(false)}
+        onSaved={() => {}}
       />
     </div>
   );

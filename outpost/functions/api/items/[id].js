@@ -70,6 +70,11 @@ export async function onRequestPut(context) {
       date_sold:          body.date_sold          ?? item.date_sold,
       notes:              body.notes              ?? item.notes,
       best_listing_window: body.best_listing_window ?? item.best_listing_window,
+      // Phase 3: eBay cross-listing fields
+      ebay_listing_id:            body.ebay_listing_id            !== undefined ? (body.ebay_listing_id || null) : item.ebay_listing_id,
+      cert_verification_url:      body.cert_verification_url      !== undefined ? (body.cert_verification_url || null) : item.cert_verification_url,
+      other_platform_listing_ids: body.other_platform_listing_ids !== undefined ? (body.other_platform_listing_ids || null) : item.other_platform_listing_ids,
+      ebay_promoted_rate:         body.ebay_promoted_rate         != null ? parseFloat(body.ebay_promoted_rate) : item.ebay_promoted_rate
     };
 
     // If platform changed, auto-lookup fees from auction_platforms
@@ -127,6 +132,8 @@ export async function onRequestPut(context) {
         current_list_price = ?, actual_sell_price = ?,
         date_acquired = ?, date_listed = ?, date_sold = ?, days_on_market = ?,
         notes = ?, best_listing_window = ?,
+        ebay_listing_id = ?, cert_verification_url = ?,
+        other_platform_listing_ids = ?, ebay_promoted_rate = ?,
         updated_at = datetime('now')
       WHERE id = ? AND user_id = ?
     `).bind(
@@ -139,6 +146,8 @@ export async function onRequestPut(context) {
       updated.current_list_price, updated.actual_sell_price,
       updated.date_acquired, updated.date_listed, updated.date_sold, days_on_market,
       updated.notes, updated.best_listing_window,
+      updated.ebay_listing_id, updated.cert_verification_url,
+      updated.other_platform_listing_ids, updated.ebay_promoted_rate,
       id, payload.userId
     ).run();
 

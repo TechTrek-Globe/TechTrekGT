@@ -197,3 +197,82 @@ CREATE TABLE IF NOT EXISTS auction_market_alerts (
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (item_id) REFERENCES auction_items(id) ON DELETE CASCADE
 );
+
+-- ============================================================
+-- PHASE 3 MIGRATIONS - eBay Real-Time Sync Engine
+-- Added: 2026-08-29
+-- All migrations are additive (CREATE IF NOT EXISTS + ALTER ADD COLUMN).
+-- Run: npm run db:migrate:local (local) | npm run db:migrate (production)
+-- ============================================================
+
+-- P3-1: eBay User OAuth Tokens (Authorization Code Grant)
+CREATE TABLE IF NOT EXISTS ebay_oauth_tokens (
+  id                 TEXT PRIMARY KEY,
+  user_id            TEXT NOT NULL UNIQUE,
+  access_token       TEXT NOT NULL,
+  refresh_token      TEXT NOT NULL,
+  access_token_exp   TEXT NOT NULL,
+  refresh_token_exp  TEXT NOT NULL,
+  scopes             TEXT NOT NULL,
+  ebay_user_id       TEXT,
+  connected_at       TEXT NOT NULL DEFAULT (datetime('now')),
+  last_refreshed_at  TEXT,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ebay_oauth_user ON ebay_oauth_tokens(user_id);
+
+-- P3-2: eBay Webhook Event Log
+CREATE TABLE IF NOT EXISTS ebay_webhook_events (
+  id              TEXT PRIMARY KEY,
+  event_type      TEXT NOT NULL,
+  ebay_item_id    TEXT,
+  ebay_order_id   TEXT,
+  raw_payload     TEXT NOT NULL,
+  processed       INTEGER NOT NULL DEFAULT 0,
+  processed_at    TEXT,
+  error_message   TEXT,
+  received_at     TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_webhook_events_processed ON ebay_webhook_events(processed, received_at);
+CREATE INDEX IF NOT EXISTS idx_webhook_events_item ON ebay_webhook_events(ebay_item_id);
+CREATE INDEX IF NOT EXISTS idx_webhook_events_order ON ebay_webhook_events(ebay_order_id);
+
+-- P3-3: eBay Fee Reconciliations (Finances API actual charges per sale)
+CREATE TABLE IF NOT EXISTS ebay_fee_reconciliations (
+  id                      TEXT PRIMARY KEY,
+  sale_id                 TEXT NOT NULL,
+  user_id                 TEXT NOT NULL,
+  ebay_order_id           TEXT NOT NULL,
+  ebay_transaction_id     TEXT,
+  final_value_fee         REAL NOT NULL DEFAULT 0.0,
+  promoted_listing_fee    REAL NOT NULL DEFAULT 0.0,
+  shipping_label_cost     REAL NOT NULL DEFAULT 0.0,
+  payment_processing_fee  REAL NOT NULL DEFAULT 0.0,
+  regulatory_fee          REAL NOT NULL DEFAULT 0.0,
+  total_ebay_fees         REAL NOT NULL DEFAULT 0.0,
+  estimated_fees          REAL NOT NULL DEFAULT 0.0,
+  fee_delta               REAL NOT NULL DEFAULT 0.0,
+  reconciled_net_profit   REAL NOT NULL DEFAULT 0.0,
+  promoted_listing_rate   REAL,
+  promoted_listing_active INTEGER DEFAULT 0,
+  finances_api_raw        TEXT,
+  reconciled_at           TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (sale_id) REFERENCES auction_sales(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_fee_recon_sale ON ebay_fee_reconciliations(sale_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_fee_recon_order ON ebay_fee_reconciliations(ebay_order_id);
+CREATE INDEX IF NOT EXISTS idx_fee_recon_user ON ebay_fee_reconciliations(user_id);
+
+-- P3-4: auction_items column additions (cross-listing defense + cert mapping)
+ALTER TABLE auction_items ADD COLUMN ebay_listing_id TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_items_ebay_listing
+  ON auction_items(ebay_listing_id) WHERE ebay_listing_id IS NOT NULL;
+ALTER TABLE auction_items ADD COLUMN cert_verification_url TEXT;
+ALTER TABLE auction_items ADD COLUMN other_platform_listing_ids TEXT;
+ALTER TABLE auction_items ADD COLUMN ebay_promoted_rate REAL;
+
+-- P3-5: auction_sales column additions (eBay order tracking + reconciliation flag)
+ALTER TABLE auction_sales ADD COLUMN ebay_order_id TEXT;
+ALTER TABLE auction_sales ADD COLUMN fee_reconciled_at TEXT;
+

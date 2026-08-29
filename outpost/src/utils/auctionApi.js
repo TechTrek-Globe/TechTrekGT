@@ -245,3 +245,44 @@ export const deleteSupply = (id) =>
 export const getTaxReport = (year = '') =>
   apiFetch(`/api/reports/tax${year ? `?year=${encodeURIComponent(year)}` : ''}`);
 
+// ============================================================
+// PHASE 3 - eBay Real-Time Sync Engine API Utilities
+// ============================================================
+
+// --- eBay OAuth Status ---
+export const getEbayOAuthStatus = () =>
+  apiFetch('/api/ebay/oauth-status');
+
+// --- eBay Listing ID (PATCH item) ---
+export const saveEbayListingId = (itemId, ebayListingId, certVerificationUrl = null, ebayPromotedRate = null) =>
+  apiFetch(`/api/items/${itemId}`, {
+    method: 'PUT',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({
+      ebay_listing_id: ebayListingId || null,
+      cert_verification_url: certVerificationUrl || null,
+      ebay_promoted_rate: ebayPromotedRate != null ? parseFloat(ebayPromotedRate) : null
+    })
+  });
+
+// --- eBay Delist Pending: mark item Sold from the delist alert ---
+export const resolveDelistPending = (itemId) =>
+  apiFetch(`/api/items/${itemId}`, {
+    method: 'PUT',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ status: 'Sold' })
+  });
+
+// --- eBay Active Listing Discovery ---
+export const findEbayListings = () =>
+  apiFetch('/api/ebay/find-listings');
+
+// --- eBay Fee Reconciliation ---
+export const reconcileSaleFees = (saleId, ebayOrderId) =>
+  apiFetch('/api/ebay/reconcile', {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ sale_id: saleId, ebay_order_id: ebayOrderId })
+  });
+
+

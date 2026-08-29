@@ -63,10 +63,16 @@ export async function onRequestGet(context) {
         i.cert_number,
         i.date_acquired,
         i.date_listed,
-        inv.invoice_ref
+        inv.invoice_ref,
+        fr.total_ebay_fees,
+        fr.reconciled_net_profit,
+        fr.fee_delta,
+        fr.promoted_listing_active,
+        fr.reconciled_at AS fee_reconciled_at
       FROM auction_sales s
       JOIN auction_items i ON i.id = s.item_id
       LEFT JOIN auction_invoices inv ON inv.id = i.invoice_id
+      LEFT JOIN ebay_fee_reconciliations fr ON fr.sale_id = s.id
       WHERE ${whereClause}
       ORDER BY s.sale_date DESC, s.created_at DESC
       LIMIT ? OFFSET ?
@@ -113,7 +119,8 @@ export async function onRequestPost(context) {
       payment_processing_amt,
       promoted_listing_fee,
       net_proceeds,
-      net_earnings
+      net_earnings,
+      ebay_order_id
     } = body;
 
     if (!item_id) return err('item_id is required');
@@ -171,14 +178,14 @@ export async function onRequestPost(context) {
         platform_fee_pct, platform_flat_fee, platform_fees_amt,
         payment_processing_amt, promoted_listing_fee,
         net_proceeds, true_total_cost, net_profit, roi_pct,
-        days_to_sell
+        days_to_sell, ebay_order_id
       ) VALUES (
         ?, ?, ?, ?, ?, ?,
         ?, ?, ?,
         ?, ?, ?,
         ?, ?,
         ?, ?, ?, ?,
-        ?
+        ?, ?
       )
     `).bind(
       saleId, payload.userId, item_id, sale_date, platform, buyer_handle || null,
@@ -186,7 +193,8 @@ export async function onRequestPost(context) {
       feePct, flatFee, metrics.platform_fees_amt,
       pProcessingAmt, pListingFee,
       metrics.net_proceeds, item.true_total_cost, metrics.net_profit, metrics.roi_pct,
-      daysToSell >= 0 ? daysToSell : 0
+      daysToSell >= 0 ? daysToSell : 0,
+      ebay_order_id || null
     ).run();
 
     // Update item status to Sold with sale metadata

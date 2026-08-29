@@ -1,35 +1,40 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="100%" height="100%">
   <defs>
     <linearGradient id="bw-bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#02141f" />
-      <stop offset="50%" stop-color="#010d14" />
-      <stop offset="100%" stop-color="#020617" />
+      <stop offset="0%" stop-color="#032330" />
+      <stop offset="50%" stop-color="#02141c" />
+      <stop offset="100%" stop-color="#000609" />
     </linearGradient>
     <linearGradient id="bw-glow" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#06b6d4" />
-      <stop offset="50%" stop-color="#22d3ee" />
-      <stop offset="100%" stop-color="#10b981" />
+      <stop offset="0%" stop-color="#67e8f9" />
+      <stop offset="35%" stop-color="#06b6d4" />
+      <stop offset="70%" stop-color="#0891b2" />
+      <stop offset="100%" stop-color="#0e7490" />
     </linearGradient>
-    <linearGradient id="screen-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#082f49" />
-      <stop offset="100%" stop-color="#020617" />
+    <linearGradient id="cyan-b1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ecfeff" />
+      <stop offset="35%" stop-color="#22d3ee" />
+      <stop offset="100%" stop-color="#0891b2" />
     </linearGradient>
+    <radialGradient id="bw-ambient" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#06b6d4" stop-opacity="0.36" />
+      <stop offset="100%" stop-color="#06b6d4" stop-opacity="0" />
+    </radialGradient>
   </defs>
 
-  <!-- Base background tile with glowing border -->
-  <rect x="4" y="4" width="120" height="120" rx="28" fill="url(#bw-bg)" stroke="url(#bw-glow)" stroke-width="4.5" />
+  <!-- Background rounded squircle tile with glowing cyan border -->
+  <rect x="4" y="4" width="120" height="120" rx="28" fill="url(#bw-bg)" stroke="url(#bw-glow)" stroke-width="5" />
+  <circle cx="64" cy="64" r="46" fill="url(#bw-ambient)" />
 
-  <!-- Remote Monitor screen frame -->
-  <rect x="22" y="26" width="84" height="60" rx="10" fill="url(#screen-grad)" stroke="#22d3ee" stroke-width="2.5" />
+  <!-- Inner subtle geometric frame -->
+  <rect x="14" y="14" width="100" height="100" rx="20" fill="none" stroke="#06b6d4" stroke-width="1.2" opacity="0.3" />
 
-  <!-- Monitor stand -->
-  <rect x="58" y="86" width="12" height="14" fill="#0f172a" stroke="#0ea5e9" stroke-width="1.5" />
-  <rect x="44" y="98" width="40" height="6" rx="3" fill="#0f172a" stroke="#0ea5e9" stroke-width="1.5" />
+  <!-- Geometric 'B' Monogram -->
+  <path d="M 30 34 H 80 Q 94 34 94 48 Q 94 58 84 60 Q 98 62 98 78 Q 98 94 80 94 H 30 Z M 46 44 H 76 Q 82 44 82 48 Q 82 52 76 52 H 46 Z M 46 66 H 80 Q 86 66 86 76 Q 86 84 80 84 H 46 Z" fill="url(#cyan-b1)" fill-rule="evenodd" stroke="#0e7490" stroke-width="1.5" stroke-linejoin="round" />
+  <polygon points="30,34 80,34 76,38 34,38 34,94 30,94" fill="#ffffff" opacity="0.45" />
 
-  <!-- Terminal command prompt >_ inside screen -->
-  <path d="M 36 46 L 48 56 L 36 66" fill="none" stroke="#22d3ee" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
-  <line x1="56" y1="66" x2="72" y2="66" stroke="#10b981" stroke-width="4" stroke-linecap="round" />
-
-  <!-- Signal / Wi-Fi dot -->
-  <circle cx="92" cy="38" r="3.5" fill="#10b981" />
+  <!-- Gateway Terminal Tech Diamond Nodes -->
+  <polygon points="98,44 101,51 98,58 95,51" fill="#67e8f9" />
+  <polygon points="20,64 23,60 26,64 23,68" fill="#34d399" />
+  <polygon points="104,64 107,60 110,64 107,68" fill="#67e8f9" />
 </svg>

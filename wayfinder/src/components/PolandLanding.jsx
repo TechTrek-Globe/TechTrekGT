@@ -95,23 +95,20 @@ export function PolandLanding() {
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-2.5 pt-2">
-              <a
-                href="/wayfinder/poland-christmas-2026/route"
-                onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026/route')}
-                className="px-4 py-3 sm:py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center space-x-1.5 transition-all shadow-md shadow-amber-500/20 min-h-[44px] sm:min-h-0"
-              >
-                <Map className="w-4 h-4" />
-                <span>View Full Route</span>
-              </a>
-              <a
-                href="/wayfinder/poland-christmas-2026/itinerary"
-                onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026/itinerary')}
-                className="px-4 py-3 sm:py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-xs flex items-center space-x-1.5 transition-colors min-h-[44px] sm:min-h-0"
-              >
-                <Calendar className="w-4 h-4" />
-                <span>Trip Itinerary</span>
-              </a>
+            {/* Expedition Quick-Facts Strip */}
+            <div className="pt-2 border-t border-white/10 flex flex-wrap items-center gap-2 text-xs text-slate-300">
+              <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-white/5 border border-white/10">
+                <MapPin className="w-3.5 h-3.5 text-amber-400" />
+                <span className="font-semibold text-white">5 Destinations</span>
+              </div>
+              <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-white/5 border border-white/10">
+                <Calendar className="w-3.5 h-3.5 text-amber-400" />
+                <span className="font-semibold text-white">{polandJourney.totalNights} Nights • {polandJourney.totalDays} Days</span>
+              </div>
+              <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-white/5 border border-white/10">
+                <Train className="w-3.5 h-3.5 text-amber-400" />
+                <span className="font-semibold text-white">1st-Class PKP Rail</span>
+              </div>
             </div>
           </div>
 
@@ -225,18 +222,29 @@ export function PolandLanding() {
 
         {/* Journey Sequence Grid */}
         <section id="journey-sequence" className="space-y-6">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <h2 className="text-2xl font-bold text-white flex items-center space-x-3">
               <Map className="w-6 h-6 text-wf-blue-lt" />
               <span>Journey Sequence</span>
             </h2>
-            <a 
-              href="/wayfinder/poland-christmas-2026/route"
-              onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026/route')}
-              className="text-sm font-medium text-wf-blue-lt hover:text-white flex items-center transition-colors"
-            >
-              See details <ArrowRight className="w-4 h-4 ml-1" />
-            </a>
+            <div className="flex items-center space-x-2">
+              <a
+                href="/wayfinder/poland-christmas-2026/itinerary"
+                onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026/itinerary')}
+                className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 hover:text-white text-xs font-semibold flex items-center space-x-1.5 transition-colors min-h-[36px]"
+              >
+                <Calendar className="w-3.5 h-3.5 text-amber-400" />
+                <span>10-Day Itinerary</span>
+              </a>
+              <a 
+                href="/wayfinder/poland-christmas-2026/route"
+                onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026/route')}
+                className="px-3 py-1.5 rounded-xl bg-wf-blue/10 hover:bg-wf-blue/20 border border-wf-blue/30 text-wf-blue-lt hover:text-white text-xs font-semibold flex items-center space-x-1 transition-colors min-h-[36px]"
+              >
+                <span>Route Details</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </a>
+            </div>
           </div>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4 lg:gap-5">

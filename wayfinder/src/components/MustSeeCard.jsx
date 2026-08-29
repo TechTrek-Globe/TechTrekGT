@@ -282,13 +282,13 @@ export function MustSeeCard(props) {
         </div>
       </div>
 
-      {/* 4. Action Footer (Bottom): Darker background with flexbox evenly spaced buttons */}
-      <div className="bg-slate-950/80 border-t border-white/10 p-3.5 sm:p-4 flex flex-wrap items-center justify-between gap-2 shrink-0">
+      {/* 4. Action Footer (Bottom): Darker background with responsive grid layout */}
+      <div className={`bg-slate-950/80 border-t border-white/10 p-3 sm:p-4 grid ${isAuthenticated ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'} gap-2 shrink-0 w-full`}>
         <a
           href={sight?.websiteUrl || sight?.url || `https://www.google.com/search?q=${searchQuery}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex-1 py-2 px-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:border-emerald-500/50 text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn min-h-[38px] sm:min-h-[40px]"
+          className="py-2 px-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:border-emerald-500/50 text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn min-h-[38px] sm:min-h-[40px] min-w-0"
           title={`Visit ${cardTitle} website`}
         >
           <ExternalLink className="w-3.5 h-3.5 text-emerald-400 group-hover/btn:text-emerald-300 transition-colors shrink-0" />
@@ -299,29 +299,29 @@ export function MustSeeCard(props) {
           href={directionsUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex-1 py-2 px-2.5 rounded-xl bg-white/5 hover:bg-amber-500/20 text-slate-300 hover:text-amber-300 border border-white/10 hover:border-amber-500/40 text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn min-h-[38px] sm:min-h-[40px]"
+          className="py-2 px-2 rounded-xl bg-white/5 hover:bg-amber-500/20 text-slate-300 hover:text-amber-300 border border-white/10 hover:border-amber-500/40 text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn min-h-[38px] sm:min-h-[40px] min-w-0"
           title={`Get directions to ${cardTitle}`}
         >
-          <Navigation className="w-3.5 h-3.5 text-sky-400 group-hover/btn:text-amber-300 transition-colors" />
-          <span>Directions</span>
+          <Navigation className="w-3.5 h-3.5 text-sky-400 group-hover/btn:text-amber-300 transition-colors shrink-0" />
+          <span className="truncate">Directions</span>
         </a>
 
         <a
           href={mapSearchUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex-1 py-2 px-2.5 rounded-xl bg-white/5 hover:bg-amber-500/20 text-slate-300 hover:text-amber-300 border border-white/10 hover:border-amber-500/40 text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn min-h-[38px] sm:min-h-[40px]"
+          className="py-2 px-2 rounded-xl bg-white/5 hover:bg-amber-500/20 text-slate-300 hover:text-amber-300 border border-white/10 hover:border-amber-500/40 text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn min-h-[38px] sm:min-h-[40px] min-w-0"
           title={`View ${cardTitle} on Google Maps`}
         >
-          <Compass className="w-3.5 h-3.5 text-amber-400 group-hover/btn:text-amber-300 transition-colors" />
-          <span>View Map</span>
+          <Compass className="w-3.5 h-3.5 text-amber-400 group-hover/btn:text-amber-300 transition-colors shrink-0" />
+          <span className="truncate">View Map</span>
         </a>
 
         {isAuthenticated && (
           <button
             type="button"
             onClick={handleToggleItinerary}
-            className={`flex-1 py-2 px-2.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 border min-h-[38px] sm:min-h-[40px] cursor-pointer ${
+            className={`py-2 px-2 rounded-xl text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 border min-h-[38px] sm:min-h-[40px] min-w-0 cursor-pointer ${
               isSaved
                 ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
                 : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30 hover:border-amber-500/50'
@@ -331,12 +331,12 @@ export function MustSeeCard(props) {
             {isSaved ? (
               <>
                 <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                <span>Saved</span>
+                <span className="truncate">Saved</span>
               </>
             ) : (
               <>
                 <Plus className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                <span>Itinerary</span>
+                <span className="truncate">Itinerary</span>
               </>
             )}
           </button>

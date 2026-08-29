@@ -40,7 +40,7 @@ export function Layout({ children }) {
   };
 
   return (
-    <div className="min-h-screen flex flex-col font-sans bg-slate-950 w-full max-w-full">
+    <div className="min-h-screen flex flex-col font-sans bg-slate-950 w-full max-w-full overflow-x-hidden">
       {/* --- Full-Width Top Header Banner --- */}
       <header className="w-full flex-shrink-0 bg-black relative z-[60] border-b border-[#b48214]/30 flex justify-center items-center pb-1 px-4 overflow-hidden safe-pt">
         <img
@@ -58,34 +58,34 @@ export function Layout({ children }) {
       </div>
 
       <header className="sticky top-0 z-40 glass-panel border-b border-white/5 w-full max-w-full">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between min-w-0">
-          <div className="flex items-center space-x-4">
-            <a href="/wayfinder" onClick={(e) => pushRoute(e, '/wayfinder')} className="flex items-center space-x-2 group">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-14 flex items-center justify-between min-w-0">
+          <div className="flex items-center space-x-3 sm:space-x-4 shrink-0 min-w-0">
+            <a href="/wayfinder" onClick={(e) => pushRoute(e, '/wayfinder')} className="flex items-center space-x-2 group shrink-0">
               <div className="p-1.5 rounded-xl bg-gradient-to-br from-wf-blue to-wf-navy-mid border border-wf-blue-lt/30 shadow-lg group-hover:shadow-wf-blue/20 transition-all">
                 <Compass className="w-4 h-4 text-wf-cream" />
               </div>
-              <div>
-                <div className="text-base font-black tracking-tight text-white flex items-center space-x-1">
+              <div className="min-w-0">
+                <div className="text-sm sm:text-base font-black tracking-tight text-white flex items-center space-x-1">
                   <span>TechTrek</span>
                   <span className="gradient-amber">Wayfinder</span>
                 </div>
-                <div className="text-[8px] font-semibold text-wf-muted uppercase tracking-widest -mt-1">
+                <div className="text-[8px] font-semibold text-wf-muted uppercase tracking-widest -mt-1 hidden sm:block">
                   Travel Operations
                 </div>
               </div>
             </a>
           </div>
 
-          <div className="hidden md:flex items-center space-x-1.5 lg:space-x-3">
+          <div className="hidden md:flex items-center space-x-1 lg:space-x-2.5 shrink-0">
             {/* TechTrekGT Launch Pad Return Link */}
             <a
               href="https://techtrekgt.com"
-              className="flex items-center space-x-1.5 px-2.5 lg:px-3 py-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-700/60 hover:border-wf-blue/50 text-slate-200 hover:text-white text-xs lg:text-sm font-semibold transition-all shadow-sm group min-h-[40px]"
+              className="flex items-center space-x-1.5 px-2 lg:px-3 py-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-700/60 hover:border-wf-blue/50 text-slate-200 hover:text-white text-xs lg:text-sm font-semibold transition-all shadow-sm group min-h-[40px]"
               title="Return to TechTrekGT Main Launch Pad"
             >
               <Globe className="w-3.5 h-3.5 lg:w-4 lg:h-4 text-wf-blue-lt group-hover:scale-110 transition-transform" />
-              <span className="hidden lg:inline">Launch Pad</span>
-              <span className="lg:hidden">Hub</span>
+              <span className="hidden xl:inline">Launch Pad</span>
+              <span className="hidden lg:inline xl:hidden">Hub</span>
             </a>
 
             {/* Quick Itinerary & Currency Converter Trigger (Desktop/Tablet) - Only show when trip is selected */}
@@ -94,21 +94,20 @@ export function Layout({ children }) {
                 <a
                   href="/wayfinder/poland-christmas-2026/itinerary"
                   onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026/itinerary')}
-                  className="flex items-center space-x-1.5 px-2.5 lg:px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-slate-200 text-xs lg:text-sm font-bold hover:text-white hover:bg-white/10 transition-all shadow-sm min-h-[40px]"
+                  className="flex items-center space-x-1.5 px-2 lg:px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-slate-200 text-xs lg:text-sm font-bold hover:text-white hover:bg-white/10 transition-all shadow-sm min-h-[40px]"
+                  title="Itinerary & Timeline"
                 >
                   <Calendar className="w-3.5 h-3.5 lg:w-4 lg:h-4 text-amber-400" />
-                  <span>Itinerary</span>
+                  <span className="hidden lg:inline">Itinerary</span>
                 </a>
                 <button
                   onClick={() => setIsConverterOpen(!isConverterOpen)}
-                  className="flex items-center space-x-1.5 lg:space-x-2 px-2.5 lg:px-3 py-2 rounded-xl bg-wf-amber/10 border border-wf-amber/30 text-wf-amber text-xs lg:text-sm font-bold hover:bg-wf-amber/20 transition-all shadow-sm active:scale-95 group min-h-[40px]"
+                  className="flex items-center space-x-1.5 px-2 lg:px-2.5 py-2 rounded-xl bg-wf-amber/10 border border-wf-amber/30 text-wf-amber text-xs lg:text-sm font-bold hover:bg-wf-amber/20 transition-all shadow-sm active:scale-95 group min-h-[40px]"
                   title="Open Currency Converter"
                 >
                   <Coins className="w-3.5 h-3.5 lg:w-4 lg:h-4 text-wf-amber group-hover:rotate-12 transition-transform" />
-                  <span>
-                    <span className="hidden xl:inline">Currency </span>Converter
-                  </span>
-                  <span className="text-[11px] lg:text-xs bg-wf-amber/20 px-1.5 py-0.5 rounded-md font-semibold text-wf-cream">
+                  <span className="hidden xl:inline">Converter</span>
+                  <span className="text-[10px] lg:text-xs bg-wf-amber/20 px-1.5 py-0.5 rounded-md font-semibold text-wf-cream">
                     {symbol} {rate.toFixed(2)}
                   </span>
                 </button>
@@ -116,49 +115,52 @@ export function Layout({ children }) {
             )}
 
             {isAuthenticated ? (
-              <div className="flex items-center space-x-1.5 lg:space-x-2.5">
+              <div className="flex items-center space-x-1 lg:space-x-2">
                 <a
                   href="/wayfinder/poland-christmas-2026/private"
                   onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026/private')}
-                  className="flex items-center space-x-1.5 px-2.5 lg:px-3 py-2 rounded-lg bg-wf-navy border border-wf-blue/30 text-wf-blue-lt text-xs lg:text-sm font-medium hover:bg-wf-navy-lt transition-colors min-h-[40px]"
+                  className="flex items-center space-x-1.5 px-2 lg:px-2.5 py-2 rounded-lg bg-wf-navy border border-wf-blue/30 text-wf-blue-lt text-xs lg:text-sm font-medium hover:bg-wf-navy-lt transition-colors min-h-[40px]"
+                  title="Private Hub"
                 >
                   <ShieldCheck className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
-                  <span className="hidden lg:inline">Private Hub</span>
-                  <span className="lg:hidden">Private</span>
+                  <span className="hidden xl:inline">Private Hub</span>
+                  <span className="hidden lg:inline xl:hidden">Private</span>
                 </a>
                 <div className="h-5 lg:h-6 w-px bg-white/10 mx-0.5" />
                 <button
                   onClick={() => setIsSettingsOpen(true)}
-                  className="flex items-center space-x-1 px-2 lg:px-3 py-2 text-xs lg:text-sm font-medium text-wf-muted hover:text-white transition-colors min-h-[40px]"
+                  className="flex items-center space-x-1 px-1.5 lg:px-2.5 py-2 text-xs lg:text-sm font-medium text-wf-muted hover:text-white transition-colors min-h-[40px]"
                   title="Settings"
                 >
                   <Settings className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
-                  <span className="hidden lg:inline">Settings</span>
+                  <span className="hidden xl:inline">Settings</span>
                 </button>
                 <button
                   onClick={logout}
-                  className="flex items-center space-x-1 px-2 lg:px-3 py-2 text-xs lg:text-sm font-medium text-wf-muted hover:text-white transition-colors min-h-[40px]"
+                  className="flex items-center space-x-1 px-1.5 lg:px-2.5 py-2 text-xs lg:text-sm font-medium text-wf-muted hover:text-white transition-colors min-h-[40px]"
+                  title="Sign Out"
                 >
                   <LogOut className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
                   <span className="hidden lg:inline">Sign Out</span>
                 </button>
               </div>
             ) : (
-              <div className="flex items-center space-x-1.5 lg:space-x-2.5">
+              <div className="flex items-center space-x-1 lg:space-x-2">
                 <button
                   onClick={() => setIsSettingsOpen(true)}
-                  className="flex items-center space-x-1 px-2 lg:px-3 py-2 text-xs lg:text-sm font-medium text-wf-muted hover:text-white transition-colors min-h-[40px]"
+                  className="flex items-center space-x-1 px-1.5 lg:px-2.5 py-2 text-xs lg:text-sm font-medium text-wf-muted hover:text-white transition-colors min-h-[40px]"
                   title="Settings"
                 >
                   <Settings className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
-                  <span className="hidden lg:inline">Settings</span>
+                  <span className="hidden xl:inline">Settings</span>
                 </button>
                 <button
                   onClick={() => setIsAuthModalOpen(true)}
-                  className="flex items-center space-x-1.5 px-3 lg:px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs lg:text-sm font-medium transition-colors min-h-[40px]"
+                  className="flex items-center space-x-1.5 px-2.5 lg:px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs lg:text-sm font-medium transition-colors min-h-[40px]"
+                  title="Sign In"
                 >
                   <User className="w-3.5 h-3.5 lg:w-4 lg:h-4 text-wf-blue-lt" />
-                  <span>Sign In</span>
+                  <span className="hidden sm:inline">Sign In</span>
                 </button>
               </div>
             )}
@@ -264,7 +266,7 @@ export function Layout({ children }) {
         )}
       </header>
 
-      <main className="flex-1 relative z-10 w-full flex flex-col">
+      <main className="flex-1 relative z-10 w-full max-w-full flex flex-col overflow-x-hidden">
         {children}
       </main>
 

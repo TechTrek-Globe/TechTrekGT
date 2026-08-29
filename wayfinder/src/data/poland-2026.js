@@ -4213,30 +4213,497 @@ export const polandJourney = {
   ],
   "railConnections": [
     {
+      "id": "leg-1-krakow-wroclaw",
+      "legNumber": 1,
       "from": "Kraków Główny",
+      "fromCode": "KRK",
+      "fromCity": "Kraków",
+      "fromStationFull": "Dworzec PKP Kraków Główny",
       "to": "Wrocław Główny",
-      "timing": "Depart 11:00 AM to 1:00 PM",
-      "class": "Direct IC, 1st Class preferred"
+      "toCode": "WRO",
+      "toCity": "Wrocław",
+      "toStationFull": "Dworzec PKP Wrocław Główny",
+      "distanceKm": 270,
+      "distanceMiles": 168,
+      "duration": "~3h 05m",
+      "timing": "Depart 11:00 AM - 1:00 PM",
+      "arrivalTiming": "Arrive ~2:05 PM - 4:05 PM",
+      "trainType": "PKP Intercity (IC / EIC Direct)",
+      "class": "Direct IC, 1st Class strongly recommended",
+      "seatStrategy": "1st Class (2+1 seating layout, extra legroom & wide luggage racks)",
+      "onboardAmenities": "WARS dining car / mobile trolley service, 230V power sockets at every seat, complimentary tea/coffee, free PKP Wi-Fi",
+      "originNav": "5-8 min walk northeast from Rynek Główny through Planty Park and Galeria Krakowska shopping mall, or Tram lines 2, 4, 14, 20 to Dworzec Główny.",
+      "destNav": "Exit north towards ul. Piłsudskiego. Take Tram lines 8, 9, 11, or 70 (5 mins) or a direct 15-minute walk along Świdnicka Street to Rynek.",
+      "transitTip": "Board from under Galeria Krakowska concourse. Check electronic monitors for your specific platform (Peron) and track (Tor)."
     },
     {
+      "id": "leg-2-wroclaw-poznan",
+      "legNumber": 2,
       "from": "Wrocław Główny",
+      "fromCode": "WRO",
+      "fromCity": "Wrocław",
+      "fromStationFull": "Dworzec PKP Wrocław Główny",
       "to": "Poznań Główny",
-      "timing": "Depart 10:00 AM to noon",
-      "class": "Direct IC, 1st Class preferred"
+      "toCode": "POZ",
+      "toCity": "Poznań",
+      "toStationFull": "Dworzec PKP Poznań Główny",
+      "distanceKm": 165,
+      "distanceMiles": 103,
+      "duration": "~1h 25m - 1h 45m",
+      "timing": "Depart 10:00 AM - 12:00 PM",
+      "arrivalTiming": "Arrive ~11:35 AM - 1:45 PM",
+      "trainType": "PKP Intercity (IC / EIC Direct)",
+      "class": "Direct IC, 1st Class preferred",
+      "seatStrategy": "1st Class open-saloon or 6-seat compartment",
+      "onboardAmenities": "WARS bistro service, smooth high-speed electrified mainline track, quiet zone options, device charging ports",
+      "originNav": "Take Tram lines 6, 7, 8, 9, 11, or 17 from Rynek to Dworzec Główny, or walk 15 mins down Świdnicka/Kołłątaja.",
+      "destNav": "Take Tram lines 5, 6, 12, or 18 from Most Dworcowy/Poznań Główny stop directly to Plac Wolności or Stary Rynek (7 mins).",
+      "transitTip": "Poznań Główny's main entrance is inside Avenida Shopping Mall. Tracks 1-3 are in the elevated mall hall; tracks 4-6 are via the Western Tunnel."
     },
     {
+      "id": "leg-3-poznan-torun",
+      "legNumber": 3,
       "from": "Poznań Główny",
+      "fromCode": "POZ",
+      "fromCity": "Poznań",
+      "fromStationFull": "Dworzec PKP Poznań Główny",
       "to": "Toruń Główny",
-      "timing": "Depart 8:30 AM to 10:00 AM",
-      "class": "Direct preferred, 2nd Class OK"
+      "toCode": "TOR",
+      "toCity": "Toruń",
+      "toStationFull": "Dworzec PKP Toruń Główny",
+      "distanceKm": 140,
+      "distanceMiles": 87,
+      "duration": "~1h 30m - 1h 45m",
+      "timing": "Depart 8:30 AM - 10:00 AM",
+      "arrivalTiming": "Arrive ~10:05 AM - 11:45 AM (Day Stop)",
+      "trainType": "PKP Intercity (IC) or Polregio",
+      "class": "Direct preferred, 1st or 2nd Class OK",
+      "seatStrategy": "1st Class for guaranteed luggage storage during boarding",
+      "onboardAmenities": "Comfortable intercity regional service through Greater Poland and Kuyavia countryside",
+      "originNav": "Head to Poznań Główny via Tram 5 or 9 to Most Dworcowy, enter concourse through Avenida Mall.",
+      "destNav": "CRITICAL DAY-STOP STEP: Store bags in Toruń Główny luggage lockers (Skrytki bagażowe) in the waiting hall. Then take MZK Bus 22 or 27 across Piłsudski Bridge to Plac Rapackiego / Old Town (7 mins, 3.80 PLN).",
+      "transitTip": "High locker demand in Toruń on winter weekends; store bags immediately upon morning arrival before exploring."
     },
     {
+      "id": "leg-4-torun-gdansk",
+      "legNumber": 4,
       "from": "Toruń Główny",
+      "fromCode": "TOR",
+      "fromCity": "Toruń",
+      "fromStationFull": "Dworzec PKP Toruń Główny",
       "to": "Gdańsk Główny",
-      "timing": "Arrive Gdańsk 5:30 PM to 7:30 PM",
-      "class": "Direct preferred, 2nd Class OK"
+      "toCode": "GDN",
+      "toCity": "Gdańsk",
+      "toStationFull": "Dworzec PKP Gdańsk Główny",
+      "distanceKm": 170,
+      "distanceMiles": 106,
+      "duration": "~1h 40m - 2h 00m",
+      "timing": "Depart 3:45 PM - 5:30 PM",
+      "arrivalTiming": "Arrive ~5:30 PM - 7:30 PM (Coastal Finale)",
+      "trainType": "PKP Intercity (IC / TLK / EIP Direct)",
+      "class": "Direct preferred, 1st or 2nd Class OK",
+      "seatStrategy": "1st Class for relaxed evening transit to Baltic coast",
+      "onboardAmenities": "WARS dining car / trolley service, scenic northern passage following the lower Vistula Valley toward the Baltic Sea",
+      "originNav": "Take MZK Bus 22 or 27 from Plac Rapackiego back across the river to Toruń Główny station, retrieve stored bags from lockers.",
+      "destNav": "Walk 8-10 mins south along Podwale Grodzkie and Wały Jagiellońskie directly to Targ Węglowy (Christmas Market) and Długa Street lodging, or take Trams 2, 3, 6, or 8 to Brama Wyżynna (2 stops).",
+      "transitTip": "Gdańsk Główny is a restored 1900 Flemish Renaissance brick palace. The pedestrian underpass leads straight into the Old Town gateway."
     }
   ],
+  "stationDossiers": {
+    "krakow": {
+      "id": "krakow",
+      "code": "KRK",
+      "abbreviation": "Kraków Gł.",
+      "name": "Kraków Główny",
+      "officialName": "Dworzec PKP Kraków Główny",
+      "city": "Kraków",
+      "address": "Plac Jana Nowaka-Jeziorańskiego 3, 31-154 Kraków",
+      "coordinates": { "lat": 50.0664, "lng": 19.9482 },
+      "mapsUrl": "https://www.google.com/maps/search/?api=1&query=Krakow+Glowny+Train+Station",
+      "badge": "Origin Hub",
+      "platforms": "5 covered island platforms (Peron 1-5), 10 tracks",
+      "walkingFromCenter": "5-8 min walk northeast from Rynek Główny through St. Florian's Gate and Planty Park",
+      "transitLines": "Trams 2, 4, 14, 20 (stop: Teatr Słowackiego / Dworzec Główny); Fast Tram (KST) stops 50, 52 (underground tunnel Dworzec Główny Tunel)",
+      "airportConnection": "Direct SKA1 commuter rail from airport terminal footbridge to Kraków Główny (runs every 30 mins, 17-min ride, ~17 PLN)",
+      "luggageLockers": "Automated electronic lockers (Skrytki bagażowe) in the lower corridor connecting with Galeria Krakowska. Available 24/7, contactless card payment (15-25 PLN/24h).",
+      "amenities": [
+        "Direct indoor access to Galeria Krakowska shopping mall (250+ stores)",
+        "Biedronka & Carrefour Express supermarkets for train snacks",
+        "24/7 ticket counters (Kasy biletowe) and multilingual ticket machines (Biletomaty)",
+        "Costa Coffee, Starbucks, bakeries, and pharmacies",
+        "Paid modern restrooms (WC - card accepted, ~4 PLN)"
+      ],
+      "navigationTip": "Enter via Galeria Krakowska level -1 or the historic station square. Look for your train's platform (Peron) on the large central departure displays."
+    },
+    "wroclaw": {
+      "id": "wroclaw",
+      "code": "WRO",
+      "abbreviation": "Wrocław Gł.",
+      "name": "Wrocław Główny",
+      "officialName": "Dworzec PKP Wrocław Główny",
+      "city": "Wrocław",
+      "address": "ul. Marszałka Józefa Piłsudskiego 105, 50-085 Wrocław",
+      "coordinates": { "lat": 51.0989, "lng": 17.0366 },
+      "mapsUrl": "https://www.google.com/maps/search/?api=1&query=Wroclaw+Glowny+Train+Station",
+      "badge": "Stop 02",
+      "platforms": "6 platforms (Peron 1-6) beneath massive historic 1857 neo-Gothic train hall",
+      "walkingFromCenter": "15-min straight walk (1.2 km) south along Świdnicka Street and Kołłątaja",
+      "transitLines": "Trams 8, 9, 11, 70 (direct to Rynek in 5 mins); Trams 2, 3, 4, 10 stop right in front of the north entrance",
+      "airportConnection": "Express Bus 106 from Wrocław Copernicus Airport directly to Dworzec Główny (~35 mins, 4.60 PLN)",
+      "luggageLockers": "Automated lockers in the main northern concourse corridor and on level -1 in the adjoining Wroclavia Shopping Center (approx. 16-24 PLN/24h, card payment accepted).",
+      "amenities": [
+        "Architectural landmark neo-Gothic palace hall with illuminated turrets",
+        "Direct connection to Wroclavia Mall & Central Bus Terminal (Dworzec Autobusowy)",
+        "Biedronka supermarket, Gorąco Polecam bakeries, Relay newsstands",
+        "McDonald's, Starbucks, and sit-down cafés in the historic waiting hall",
+        "Clean accessible restrooms with shower facilities (WC - ~4 PLN)"
+      ],
+      "navigationTip": "The main historic facade faces north toward ul. Piłsudskiego (for Old Town trams). The south exit leads directly into Wroclavia Mall."
+    },
+    "poznan": {
+      "id": "poznan",
+      "code": "POZ",
+      "abbreviation": "Poznań Gł.",
+      "name": "Poznań Główny",
+      "officialName": "Dworzec PKP Poznań Główny",
+      "city": "Poznań",
+      "address": "ul. Dworcowa 2 / Most Dworcowy, 61-801 Poznań",
+      "coordinates": { "lat": 52.4026, "lng": 16.9126 },
+      "mapsUrl": "https://www.google.com/maps/search/?api=1&query=Poznan+Glowny+Train+Station",
+      "badge": "Stop 03",
+      "platforms": "6 platforms divided across elevated modern concourse and western tunnel",
+      "walkingFromCenter": "15-20 min walk (1.8 km) southwest along Święty Marcin street",
+      "transitLines": "Trams 5, 6, 12, 18 from Most Dworcowy or Poznań Główny stops directly to Plac Wolności and Stary Rynek (7 mins)",
+      "airportConnection": "Express Bus 159 directly from Poznań-Ławica Airport to Poznań Główny (~20 mins, 4.00 PLN)",
+      "luggageLockers": "Lockers available on the elevated main concourse level near the ticket hall and inside Avenida Mall (approx. 15-25 PLN/day, card accepted).",
+      "amenities": [
+        "Integrated directly with Avenida Shopping Mall (200+ shops and restaurants)",
+        "Direct indoor walkway to Poznań Bus Terminal (PKS)",
+        "Biedronka, Carrefour Express, Costa Coffee, Grycan café",
+        "Multiple ATM machines, currency exchange desks (Kantor), and pharmacies",
+        "Modern paid restrooms on concourse level (card accepted, ~4 PLN)"
+      ],
+      "navigationTip": "Tracks 1-3 are accessed from the new elevated concourse inside Avenida Mall. Tracks 4-6 are accessed through the historic Western Tunnel (Dworzec Zachodni)."
+    },
+    "torun": {
+      "id": "torun",
+      "code": "TOR",
+      "abbreviation": "Toruń Gł.",
+      "name": "Toruń Główny",
+      "officialName": "Dworzec PKP Toruń Główny",
+      "city": "Toruń",
+      "address": "ul. Kujawska 1, 87-100 Toruń",
+      "coordinates": { "lat": 52.9995, "lng": 18.6186 },
+      "mapsUrl": "https://www.google.com/maps/search/?api=1&query=Torun+Glowny+Train+Station",
+      "badge": "Stop 04 (Day Stop)",
+      "platforms": "4 platforms connected by subterranean pedestrian tunnel with elevators",
+      "walkingFromCenter": "Station is south of the Vistula River; walking across the bridge is ~25 mins (taking the bus is strongly recommended)",
+      "transitLines": "MZK Bus lines 22 and 27 run every 10-15 mins from the station forecourt across Piłsudski Bridge to Plac Rapackiego / Old Town (7 mins, 3.80 PLN ticket)",
+      "airportConnection": "Regional rail connection to Bydgoszcz (BZG, 45 mins) or direct PKP train north to Gdańsk (GDN, 1h 45m)",
+      "luggageLockers": "SECURE LUGGAGE LOCKERS (Skrytki bagażowe) located in the main station waiting room and underpass. Approx. 15-20 PLN/day (contactless card accepted). Store bags immediately upon morning arrival!",
+      "amenities": [
+        "Gingerbread bakery stall selling fresh authentic Toruńskie Pierniki",
+        "Heated waiting room with charging ports and ticket counters",
+        "Grab-and-go café and newsstand for road snacks",
+        "Direct bus stop loop right outside the main station doors",
+        "Paid clean restrooms in the station hall"
+      ],
+      "navigationTip": "Toruń Główny is on the opposite riverbank from Old Town. After storing bags in the station lockers, hop on Bus 22 or 27 to Plac Rapackiego to step right into the Gothic Old Town."
+    },
+    "gdansk": {
+      "id": "gdansk",
+      "code": "GDN",
+      "abbreviation": "Gdańsk Gł.",
+      "name": "Gdańsk Główny",
+      "officialName": "Dworzec PKP Gdańsk Główny",
+      "city": "Gdańsk",
+      "address": "ul. Podwale Grodzkie 2, 80-895 Gdańsk",
+      "coordinates": { "lat": 54.3562, "lng": 18.6444 },
+      "mapsUrl": "https://www.google.com/maps/search/?api=1&query=Gdansk+Glowny+Train+Station",
+      "badge": "Coastal Finale",
+      "platforms": "5 platforms (Peron 1-2 for regional SKM commuter trains, Peron 3-5 for PKP Intercity)",
+      "walkingFromCenter": "8-10 min level walk south along Podwale Grodzkie and Wały Jagiellońskie to Targ Węglowy and the Golden Gate",
+      "transitLines": "Trams 2, 3, 6, 8 connect Dworzec Główny with Brama Wyżynna (2 stops, 3 mins) and the Motława waterfront",
+      "airportConnection": "Direct PKM commuter train to Gdańsk Lech Wałęsa Airport (~25 mins, 5.40 PLN) or Bus 210 from station front (~40 mins, 4.80 PLN)",
+      "luggageLockers": "Automated electronic storage lockers located in the pedestrian underpass connecting the main hall with SKM platforms (approx. 16-24 PLN/24h, card payment accepted).",
+      "amenities": [
+        "Newly renovated 1900 Flemish Renaissance architectural masterpiece with historic clock tower",
+        "Direct underpass to SKM commuter network connecting Sopot and Gdynia",
+        "Biedronka Express, Costa Coffee, McDonald's, Relay press shop",
+        "Full-service PKP Intercity ticket hall and automated kiosks",
+        "Accessible restrooms and elevators to all platform sectors"
+      ],
+      "navigationTip": "The pedestrian underpass connects directly from the platforms to Podwale Grodzkie. Head toward 'Stare Miasto / Długa' signs to walk into the historic center."
+    },
+    "airport-krk": {
+      "id": "airport-krk",
+      "code": "KRK-AIR",
+      "abbreviation": "Kraków Lotnisko",
+      "name": "Kraków Airport (Balice)",
+      "officialName": "Stacja Kolejowa Kraków Lotnisko / Airport",
+      "city": "Kraków",
+      "address": "ul. Medweckiego 1, 32-083 Balice",
+      "coordinates": { "lat": 50.0722, "lng": 19.7997 },
+      "mapsUrl": "https://www.google.com/maps/search/?api=1&query=Krakow+Airport+Train+Station",
+      "badge": "Airport Link (Inbound)",
+      "platforms": "Covered terminal platform connected directly via covered glass footbridge",
+      "walkingFromCenter": "Directly connected to Terminal 1 via escalator/elevator walkway",
+      "transitLines": "SKA1 commuter train (Koleje Małopolskie) directly to Kraków Główny central station (17-min journey, ~17 PLN, departures every 30 mins from 5 AM to midnight)",
+      "airportConnection": "Direct terminal integration",
+      "luggageLockers": "Luggage lockers and wrapping stations inside airport terminal main floor.",
+      "amenities": [
+        "Direct covered walkway into check-in and security hall",
+        "Automated ticket machines on the train platform (cards accepted)",
+        "Cafés, duty-free stores, currency exchange in terminal",
+        "Fast 17-minute direct rail link bypassing all city highway traffic"
+      ],
+      "navigationTip": "Follow the train icon ('Pociąg / Train') signs from the arrivals exit. Take the escalator up to the glass bridge that leads straight to the train platform."
+    },
+    "airport-gdn": {
+      "id": "airport-gdn",
+      "code": "GDN-AIR",
+      "abbreviation": "Gdańsk Lotnisko",
+      "name": "Gdańsk Airport (Lech Wałęsa)",
+      "officialName": "Stacja PKM Gdańsk Port Lotniczy",
+      "city": "Gdańsk",
+      "address": "ul. Juliusza Słowackiego 200, 80-298 Gdańsk",
+      "coordinates": { "lat": 54.3822, "lng": 18.4681 },
+      "mapsUrl": "https://www.google.com/maps/search/?api=1&query=Gdansk+Airport+Train+Station",
+      "badge": "Airport Link (Outbound)",
+      "platforms": "Elevated PKM (Pomeranian Metropolitan Railway) platform right beside Terminal T2",
+      "walkingFromCenter": "Connected to departures terminal via covered walkway",
+      "transitLines": "Direct PKM rail to Gdańsk Wrzeszcz / Gdańsk Główny (~25 mins, 5.40 PLN) or direct ZTM Bus 210 from terminal forecourt to Gdańsk Główny (~40 mins, 4.80 PLN)",
+      "airportConnection": "Direct terminal integration",
+      "luggageLockers": "Luggage storage and oversized check-in desks in Terminal T2.",
+      "amenities": [
+        "Elevated modern rail station directly linked to departure hall",
+        "Automated ticket machines on platform and bus stops (cards accepted)",
+        "Duty-free amber jewelry boutiques, cafés, bakeries in terminal",
+        "Fast transfer back to Gdańsk Główny or direct to Sopot"
+      ],
+      "navigationTip": "When departing Poland, take PKM rail or Bus 210 from Gdańsk Główny. Bus 210 drops off right in front of the departure check-in doors."
+    }
+  },
+  "cityTransitDirectory": {
+    "krakow": {
+      "cityId": "krakow",
+      "cityName": "Kraków",
+      "cityCode": "KRK",
+      "badge": "Stop 01 • Origin Hub",
+      "operator": "ZTP / MPK Kraków (Zarząd Transportu Publicznego)",
+      "summary": "Kraków features a fast, dense electric tram network circling the Old Town (Planty) and running through an underground station tunnel (KST), complemented by city buses and SKA airport commuter rail. The historic core is completely pedestrianized and best explored on foot.",
+      "transitTypes": [
+        {
+          "name": "Trams (Tramwaje)",
+          "available": true,
+          "networkScale": "24 daytime lines + 3 night lines",
+          "details": "The primary public transit mode. Modern low-floor trams with contactless card ticket validators. Trams 1, 3, 8, 13, and 24 connect Old Town directly with Kazimierz in 5-8 minutes. Fast Tram (KST) runs through the subterranean tunnel under Kraków Główny."
+        },
+        {
+          "name": "Kraków Fast Tram Tunnel (KST)",
+          "available": true,
+          "networkScale": "Underground lines 50 & 52",
+          "details": "Subterranean fast tram tunnel with underground stations directly beneath Kraków Główny central railway station (stop: Dworzec Główny Tunel) providing rapid north-south connections."
+        },
+        {
+          "name": "City Buses (Autobusy)",
+          "available": true,
+          "networkScale": "Over 160 urban & suburban routes",
+          "details": "Serves outer districts, the Wieliczka Salt Mine (Bus line 304), and provides 24-hour night transit. Daytime bus lines use designated bus lanes."
+        },
+        {
+          "name": "Airport Commuter Rail (SKA1)",
+          "available": true,
+          "networkScale": "Kraków Airport to Kraków Główny to Wieliczka",
+          "details": "Fast 17-minute direct electric train link running every 30 minutes from the airport terminal footbridge directly into Kraków Główny central station (~17 PLN)."
+        },
+        {
+          "name": "Subway / Underground Metro",
+          "available": false,
+          "networkScale": "None (Fast Tram Tunnel serves equivalent role)",
+          "details": "Kraków does not have a heavy underground metro system. The electric tram network and walkable historic center serve all visitor destinations."
+        }
+      ],
+      "tickets": {
+        "single20Min": "4.00 PLN (~$1.07 USD) - Great for short 3 to 5-stop hops",
+        "single60Min": "6.00 PLN (~$1.60 USD) - Allows unlimited transfers within 60 mins",
+        "single90Min": "8.00 PLN (~$2.13 USD) - Multi-zone transfer ticket",
+        "pass24H": "17.00 PLN (~$4.53 USD) - Best value for full sightseeing days",
+        "pass72H": "50.00 PLN (~$13.35 USD) - Recommended for 3-day stay"
+      },
+      "paymentMethods": "Contactless card tap directly on ticket validators inside all trams and buses (Visa / Mastercard / Apple Pay). Multilingual ticket machines (Biletomaty) at all major stops accept cash and cards. Mobile app: Jakdojade.",
+      "keyRoutesForVisitors": "Tram 1 & 8: Rynek to Wawel & Kazimierz; Tram 20: Galeria Krakowska to Schindler's Factory (Plac Bohaterów Getta); Bus 304: Dworzec Główny to Wieliczka Salt Mine."
+    },
+    "wroclaw": {
+      "cityId": "wroclaw",
+      "cityName": "Wrocław",
+      "cityCode": "WRO",
+      "badge": "Stop 02 • Lower Silesia",
+      "operator": "MPK Wrocław (Miejskie Przedsiębiorstwo Komunikacyjne)",
+      "summary": "Wrocław boasts an extensive tram network (23 lines) traversing the Odra River bridges and circling the medieval Market Square (Rynek). Wrocław uses an ultra-convenient card-only payment system on all vehicles.",
+      "transitTypes": [
+        {
+          "name": "Trams (Tramwaje)",
+          "available": true,
+          "networkScale": "23 daytime tram lines",
+          "details": "The backbone of city travel. Trams 6, 7, 8, 9, 11, and 17 connect Wrocław Główny central station with Rynek and Ostrów Tumski (Cathedral Island) in 5-8 minutes."
+        },
+        {
+          "name": "City Buses (Autobusy)",
+          "available": true,
+          "networkScale": "50+ daytime lines + 13 night routes",
+          "details": "Complements the tram network. Express Bus 106 connects Wrocław Copernicus Airport directly to Central Railway Station (~35 mins, 4.60 PLN)."
+        },
+        {
+          "name": "Regional Rail (Koleje Dolnośląskie)",
+          "available": true,
+          "networkScale": "Lower Silesian regional network",
+          "details": "High-quality regional train service from Wrocław Główny to Lower Silesia castles (Książ), Sudetes mountains, and Bolesławiec pottery centers."
+        },
+        {
+          "name": "Subway / Underground Metro",
+          "available": false,
+          "networkScale": "None",
+          "details": "No underground subway. Wrocław's dense tram lines provide rapid access across all 12 islands and historic districts."
+        }
+      ],
+      "tickets": {
+        "singleRide": "4.60 PLN (~$1.23 USD) - Standard single ride without transfers",
+        "timed15Min": "3.20 PLN (~$0.85 USD) - Quick hop ticket",
+        "timed30Min": "4.00 PLN (~$1.07 USD) - Short transfer ticket",
+        "pass24H": "15.00 PLN (~$4.00 USD) - Unlimited 24-hour access",
+        "pass72H": "32.00 PLN (~$8.53 USD) - Full 3-day tourist pass"
+      },
+      "paymentMethods": "CARD TAP ONBOARD: Every tram and bus has yellow electronic contactless validators. Simply tap your credit/debit card (or phone) on the screen to purchase. No paper ticket is printed: your electronic ticket is stored securely on your bank card for inspection! Outdoor kiosks accept cash.",
+      "keyRoutesForVisitors": "Trams 8, 9, 11, 70: Wrocław Główny to Rynek (Świdnicka stop); Trams 2, 10: Rynek to Centennial Hall (Hala Stulecia & Zoo); Bus 106: Airport to Central Station."
+    },
+    "poznan": {
+      "cityId": "poznan",
+      "cityName": "Poznań",
+      "cityCode": "POZ",
+      "badge": "Stop 03 • Greater Poland",
+      "operator": "ZTM / MPK Poznań (Zarząd Transportu Miejskiego)",
+      "summary": "Poznań features the famous PESTKA (Poznański Szybki Tramwaj) high-speed tram corridor, a grade-separated light rail route running north-south, along with 18 standard tram lines and express airport bus connections.",
+      "transitTypes": [
+        {
+          "name": "Fast Tram (PESTKA / PST)",
+          "available": true,
+          "networkScale": "Grade-separated northern light rail corridor (Lines 12, 14, 15, 16)",
+          "details": "High-speed light rail running on dedicated elevated overpasses and cuts with zero traffic interference, functioning like an above-ground subway."
+        },
+        {
+          "name": "Standard Trams (Tramwaje)",
+          "available": true,
+          "networkScale": "18 lines across all districts",
+          "details": "Connects Poznań Główny, Most Dworcowy, Plac Wolności, Stary Rynek perimeter, Ostrów Tumski, and Lake Malta."
+        },
+        {
+          "name": "City & Express Buses (Autobusy)",
+          "available": true,
+          "networkScale": "Dense urban and suburban network",
+          "details": "Express Bus 159 connects Poznań-Ławica Airport directly to Poznań Główny central station in 20 minutes (4.00 PLN)."
+        },
+        {
+          "name": "Subway / Underground Metro",
+          "available": false,
+          "networkScale": "None (PESTKA serves light-rail metro function)",
+          "details": "No underground subway; the PESTKA rapid tram system provides high-speed grade-separated metro transit."
+        }
+      ],
+      "tickets": {
+        "timed15Min": "4.00 PLN (~$1.07 USD) - Short single-trip ticket",
+        "timed45Min": "6.00 PLN (~$1.60 USD) - Standard transfer ticket",
+        "timed90Min": "8.00 PLN (~$2.13 USD) - Extended transfer ticket",
+        "pass24H": "15.00 PLN (~$4.00 USD) - Full 24-hour unlimited pass",
+        "pass7Day": "50.00 PLN (~$13.35 USD) - 7-day visitor pass"
+      },
+      "paymentMethods": "Contactless card payment at ticket machines inside every tram and bus. Paper tickets available at platform kiosks (must validate immediately upon boarding in stampers). Mobile app: Jakdojade.",
+      "keyRoutesForVisitors": "Trams 5, 6, 9, 12, 18: Poznań Główny / Most Dworcowy to Plac Wolności & Stary Rynek (5-7 mins); Tram 8 & 17: Center to Ostrów Tumski (Cathedral Island); Bus 159: Airport to Central Station."
+    },
+    "torun": {
+      "cityId": "torun",
+      "cityName": "Toruń",
+      "cityCode": "TOR",
+      "badge": "Stop 04 • UNESCO Gothic Stop",
+      "operator": "MZK Toruń (Miejski Zakład Komunikacji)",
+      "summary": "Toruń has a compact, charming network of 5 tram lines and city buses. Most importantly for day trips, direct bus lines 22 and 27 connect the southern railway station (Toruń Główny) across the Vistula River bridge into the medieval Old Town in 7 minutes.",
+      "transitTypes": [
+        {
+          "name": "Trams (Tramwaje)",
+          "available": true,
+          "networkScale": "5 lines on the north bank",
+          "details": "Modern and classic trams linking the Old Town with the university campus (UMK), Motoarena, and residential quarters."
+        },
+        {
+          "name": "City Buses (Autobusy & Bridge Links)",
+          "available": true,
+          "networkScale": "Urban bus network with river crossings",
+          "details": "CRITICAL DAY-STOP LINK: Bus lines 22 and 27 run every 10-15 minutes from Toruń Główny station across the Józef Piłsudski Bridge to Plac Rapackiego / Old Town (7 mins, 3.80 PLN)."
+        },
+        {
+          "name": "Subway / Underground Metro",
+          "available": false,
+          "networkScale": "None",
+          "details": "No subway. Toruń's entire UNESCO Gothic core is pedestrian-only and best enjoyed on foot."
+        }
+      ],
+      "tickets": {
+        "singleRide": "3.80 PLN (~$1.01 USD) - Single ride without transfers",
+        "timed60Min": "5.20 PLN (~$1.39 USD) - Transfer ticket within 60 mins",
+        "pass24H": "13.00 PLN (~$3.47 USD) - Unlimited 24-hour pass"
+      },
+      "paymentMethods": "Contactless card tap on validators inside all MZK buses and trams (Visa / Mastercard / mobile pay). Ticket machines at major stops and via the Jakdojade app.",
+      "keyRoutesForVisitors": "Bus 22 & 27: Toruń Główny Railway Station to Plac Rapackiego (Old Town entry); Tram 1: Plac Rapackiego to Copernicus University."
+    },
+    "gdansk": {
+      "cityId": "gdansk",
+      "cityName": "Gdańsk (Tri-City)",
+      "cityCode": "GDN",
+      "badge": "Stop 05 • Baltic Finale",
+      "operator": "ZTM Gdańsk & PKP SKM Trójmiasto",
+      "summary": "Gdańsk has a premier transit ecosystem combining city trams, buses, PKM airport trains, and the famous SKM (Szybka Kolej Miejska) above-ground rapid rail network connecting Gdańsk, Sopot, and Gdynia into a single metropolitan corridor.",
+      "transitTypes": [
+        {
+          "name": "Trams (Tramwaje)",
+          "available": true,
+          "networkScale": "11 lines across Gdańsk",
+          "details": "Connects Gdańsk Główny station, Główne Miasto (Brama Wyżynna), the shipyards, Oliwa Cathedral, and Baltic seaside beaches (Brzeźno & Jelitkowo)."
+        },
+        {
+          "name": "SKM Rapid Rail (Suburban Metro)",
+          "available": true,
+          "networkScale": "Tri-City rapid transit spine (Gdańsk - Sopot - Gdynia)",
+          "details": "Acts as an above-ground subway running high-frequency electric commuter trains every 7-15 minutes between Gdańsk Główny, Sopot Pier (20 mins), and Gdynia (35 mins). Dedicated platforms 1-2 at Gdańsk Główny."
+        },
+        {
+          "name": "PKM Airport Commuter Rail",
+          "available": true,
+          "networkScale": "Gdańsk Wrzeszcz to Gdańsk Airport (GDN)",
+          "details": "Pomeranian Metropolitan Railway linking the airport directly with Wrzeszcz and central Gdańsk in 25 minutes (5.40 PLN)."
+        },
+        {
+          "name": "City Buses (Autobusy)",
+          "available": true,
+          "networkScale": "Comprehensive urban and night network",
+          "details": "Direct Bus 210 connects Gdańsk Lech Wałęsa Airport to Gdańsk Główny central station (~40 mins, 4.80 PLN)."
+        },
+        {
+          "name": "Subway / Underground Metro",
+          "available": false,
+          "networkScale": "None (SKM serves high-speed metropolitan role)",
+          "details": "No underground subway. The SKM rapid rail system runs continuously along the central Tri-City spine."
+        }
+      ],
+      "tickets": {
+        "singleTramBus": "4.80 PLN (~$1.28 USD) - Single ride on city tram or bus",
+        "timed75Min": "6.00 PLN (~$1.60 USD) - 75-min transfer ticket",
+        "pass24H": "18.00 PLN (~$4.80 USD) - 24-hour unlimited city tram/bus pass",
+        "skmTicket": "Gdańsk to Sopot SKM: ~6.00 PLN (~$1.60 USD, distance-based ticket)"
+      },
+      "paymentMethods": "Contactless card tap onboard all ZTM trams and buses. For SKM trains, purchase tickets at yellow platform kiosks before boarding (and validate in platform stamper gates if paper!), or buy digitally via Jakdojade / Koleo app.",
+      "keyRoutesForVisitors": "Trams 2, 3, 6, 8: Gdańsk Główny to Brama Wyżynna (2 stops, Targ Węglowy Christmas Market); SKM Trains: Gdańsk Główny to Sopot (20 mins); Bus 210: Airport to Central Station."
+    }
+  },
   "marketStrategy": "Treat the Christmas markets as evening anchors rather than all-day activities. The best rhythm is sightseeing in daylight, a warm break in the late afternoon, then markets from roughly 5 PM to 7 PM when the lights are on and dinner snacks are easy.",
   "practicalTools": {
     "currency": "Use PLN divided by 3.75 for exact USD conversion. Keep 50 to 100 PLN (~$13.35 to $26.70 USD) in small notes for market snacks, facilities, and small vendors.",

@@ -82,7 +82,7 @@ export function CityHotelsTab({
               <button
                 type="button"
                 onClick={() => toggleItinerary(stayId)}
-                className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-1.5 border cursor-pointer min-h-[38px] sm:min-h-[40px] ${
+                className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-1.5 border cursor-pointer min-h-[38px] sm:min-h-[40px] flex-1 sm:flex-initial min-w-0 ${
                   isSaved
                     ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
                     : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30 hover:border-amber-500/50'
@@ -91,12 +91,12 @@ export function CityHotelsTab({
                 {isSaved ? (
                   <>
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                    <span>Saved Base</span>
+                    <span className="truncate">Saved Base</span>
                   </>
                 ) : (
                   <>
                     <Plus className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                    <span>Save to Itinerary</span>
+                    <span className="truncate">Save to Itinerary</span>
                   </>
                 )}
               </button>
@@ -106,10 +106,10 @@ export function CityHotelsTab({
               href={mapSearchUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="py-2 px-3 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold transition-all flex items-center space-x-1.5 min-h-[38px] sm:min-h-[40px]"
+              className="py-2 px-3 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold transition-all flex items-center justify-center space-x-1.5 min-h-[38px] sm:min-h-[40px] flex-1 sm:flex-initial min-w-0"
             >
-              <Compass className="w-3.5 h-3.5 text-amber-400" />
-              <span>Search Hotels on Maps</span>
+              <Compass className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span className="truncate">Search Hotels on Maps</span>
             </a>
           </div>
         </div>

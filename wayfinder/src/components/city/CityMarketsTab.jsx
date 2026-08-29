@@ -229,7 +229,7 @@ export function CityMarketsTab({
                 </div>
 
                 {/* Action Footer */}
-                <div className="bg-slate-950/80 border-t border-white/10 p-3.5 sm:p-4 flex items-center justify-between gap-2 shrink-0">
+                <div className={`bg-slate-950/80 border-t border-white/10 p-3 sm:p-4 grid ${isAuthenticated ? 'grid-cols-3' : 'grid-cols-2'} gap-2 shrink-0 w-full`}>
                   {isAuthenticated && (
                     <button
                       type="button"
@@ -237,7 +237,7 @@ export function CityMarketsTab({
                         e.preventDefault();
                         toggleItinerary(market.id);
                       }}
-                      className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-1.5 border cursor-pointer min-h-[38px] sm:min-h-[40px] ${
+                      className={`py-2 px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-1.5 border cursor-pointer min-h-[38px] sm:min-h-[40px] min-w-0 ${
                         isSaved
                           ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
                           : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30 hover:border-amber-500/50'
@@ -262,7 +262,7 @@ export function CityMarketsTab({
                     href={directionsUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex-1 py-2 px-2.5 rounded-xl bg-white/5 hover:bg-sky-500/20 text-slate-300 hover:text-sky-300 border border-white/10 hover:border-sky-500/40 text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn min-h-[38px] sm:min-h-[40px]"
+                    className="py-2 px-2 rounded-xl bg-white/5 hover:bg-sky-500/20 text-slate-300 hover:text-sky-300 border border-white/10 hover:border-sky-500/40 text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn min-h-[38px] sm:min-h-[40px] min-w-0"
                     title={`Get Directions to ${market.name}`}
                   >
                     <Navigation className="w-3.5 h-3.5 text-sky-400 group-hover/btn:text-sky-300 shrink-0" />
@@ -273,7 +273,7 @@ export function CityMarketsTab({
                     href={mapSearchUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex-1 py-2 px-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:border-amber-500/50 text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn min-h-[38px] sm:min-h-[40px]"
+                    className="py-2 px-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:border-amber-500/50 text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn min-h-[38px] sm:min-h-[40px] min-w-0"
                     title={`View ${market.name} on Map`}
                   >
                     <Compass className="w-3.5 h-3.5 text-amber-400 group-hover/btn:text-amber-300 shrink-0" />
@@ -450,12 +450,12 @@ export function CityMarketsTab({
             </div>
 
             {/* Market Card Action Bar (Directions, Add to Itinerary, View Map) */}
-            <div className="bg-slate-950/90 border-t border-white/10 p-4 sm:p-6 flex flex-wrap items-center justify-between gap-3">
+            <div className={`bg-slate-950/90 border-t border-white/10 p-3.5 sm:p-5 grid ${isAuthenticated ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2'} gap-2.5 sm:gap-3 w-full`}>
               {isAuthenticated && (
                 <button
                   type="button"
                   onClick={() => toggleItinerary(currentMarket.id)}
-                  className={`flex-1 min-w-[150px] py-3 px-4 rounded-2xl text-xs sm:text-sm font-black transition-all flex items-center justify-center space-x-2 border cursor-pointer ${
+                  className={`w-full py-2.5 sm:py-3 px-3 sm:px-4 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-black transition-all flex items-center justify-center space-x-2 border cursor-pointer min-h-[40px] min-w-0 ${
                     isSaved
                       ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30 shadow-lg shadow-emerald-950/30'
                       : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30 hover:border-amber-500/50 shadow-lg'
@@ -465,12 +465,12 @@ export function CityMarketsTab({
                   {isSaved ? (
                     <>
                       <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                      <span>Saved in Itinerary</span>
+                      <span className="truncate">Saved in Itinerary</span>
                     </>
                   ) : (
                     <>
                       <Plus className="w-4 h-4 text-amber-400 shrink-0" />
-                      <span>Add to Itinerary</span>
+                      <span className="truncate">Add to Itinerary</span>
                     </>
                   )}
                 </button>
@@ -480,22 +480,22 @@ export function CityMarketsTab({
                 href={directionsUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex-1 min-w-[150px] py-3 px-4 rounded-2xl bg-white/5 hover:bg-sky-500/20 text-slate-200 hover:text-sky-300 border border-white/10 hover:border-sky-500/40 text-xs sm:text-sm font-black transition-all flex items-center justify-center space-x-2 group/btn shadow-lg"
+                className="w-full py-2.5 sm:py-3 px-3 sm:px-4 rounded-xl sm:rounded-2xl bg-white/5 hover:bg-sky-500/20 text-slate-200 hover:text-sky-300 border border-white/10 hover:border-sky-500/40 text-xs sm:text-sm font-black transition-all flex items-center justify-center space-x-2 group/btn shadow-lg min-h-[40px] min-w-0"
                 title={`Get Google Maps Directions to ${currentMarket.name}`}
               >
                 <Navigation className="w-4 h-4 text-sky-400 group-hover/btn:text-sky-300 shrink-0" />
-                <span>Directions</span>
+                <span className="truncate">Directions</span>
               </a>
 
               <a
                 href={mapSearchUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex-1 min-w-[150px] py-3 px-4 rounded-2xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:border-amber-500/50 text-xs sm:text-sm font-black transition-all flex items-center justify-center space-x-2 group/btn shadow-lg"
+                className="w-full py-2.5 sm:py-3 px-3 sm:px-4 rounded-xl sm:rounded-2xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:border-amber-500/50 text-xs sm:text-sm font-black transition-all flex items-center justify-center space-x-2 group/btn shadow-lg min-h-[40px] min-w-0"
                 title={`View ${currentMarket.name} on Map`}
               >
                 <Compass className="w-4 h-4 text-amber-400 group-hover/btn:text-amber-300 shrink-0" />
-                <span>View Map</span>
+                <span className="truncate">View Map</span>
               </a>
             </div>
           </div>

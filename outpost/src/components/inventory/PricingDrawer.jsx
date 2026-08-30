@@ -87,7 +87,7 @@ export function PricingDrawer({ item, colSpan, isOpen, onClose, onItemUpdated, o
           live_avg: res.live_avg !== null && res.live_avg !== undefined ? roundPrice(res.live_avg) : prev.live_avg,
           recommended_list_price: roundPrice(res.live_avg || res.median || prev.recommended_list_price),
           fetchingLive: false,
-          fetchMsg: { type: 'success', text: `Found ${res.count} sold comps on eBay! Avg: $${res.live_avg}` },
+          fetchMsg: { type: 'success', text: `Found ${res.count} sold comps on eBay! Avg: ${fmtCurrency(res.live_avg)}` },
           applied: false,
         }));
       } else {
@@ -216,14 +216,14 @@ export function PricingDrawer({ item, colSpan, isOpen, onClose, onItemUpdated, o
                 <div className="flex-1">
                   <label className="block text-[10px] font-semibold text-slate-300 mb-0.5">Target Price</label>
                   <div className="relative">
-                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-slate-500">$</span>
+                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-bold pointer-events-none">$</span>
                     <input
                       type="number"
                       step="0.01"
                       placeholder="0.00"
                       value={draft.recommended_list_price}
                       onChange={e => updateDraft('recommended_list_price', e.target.value)}
-                      className="input-field py-1 pl-5 pr-2 text-xs font-bold text-white w-full"
+                      className="input-field py-1 pl-6 pr-2 text-xs font-bold text-white w-full"
                     />
                   </div>
                   {floorDiff !== null && (

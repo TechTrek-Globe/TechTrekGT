@@ -50,21 +50,40 @@ export function daysBetween(fromDate, toDate) {
 }
 
 export function fmt(n, decimals = 2) {
-  if (n == null || isNaN(n)) return '--';
+  if (n === null || n === undefined || n === '' || isNaN(Number(n))) return '--';
   return Number(n).toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 }
 
-export function fmtPct(n) {
-  if (n == null || isNaN(n)) return '--';
-  return `${(n * 100).toFixed(1)}%`;
+export function fmtPct(n, decimals = 1) {
+  if (n === null || n === undefined || n === '' || isNaN(Number(n))) return '--';
+  const val = Number(n) * 100;
+  const fixed = val.toFixed(decimals);
+  return `${parseFloat(fixed)}%`;
+}
+
+export function formatPercent(n, maxDecimals = 2) {
+  if (n === null || n === undefined || n === '' || isNaN(Number(n))) return '--';
+  const val = Number(n) * 100;
+  const fixed = val.toFixed(maxDecimals);
+  return `${parseFloat(fixed)}%`;
 }
 
 export function fmtCurrency(n) {
-  if (n == null || isNaN(n)) return '--';
-  return `$${fmt(n)}`;
+  if (n === null || n === undefined || n === '' || isNaN(Number(n))) return '--';
+  return `$${fmt(n, 2)}`;
+}
+
+export function formatCurrency(n) {
+  return fmtCurrency(n);
 }
 
 export function roundPrice(val) {
   if (val === null || val === undefined || val === '' || isNaN(Number(val))) return '';
   return Math.round(Number(val) * 100) / 100;
+}
+
+export function roundToDecimals(val, decimals = 2) {
+  if (val === null || val === undefined || val === '' || isNaN(Number(val))) return '';
+  const factor = Math.pow(10, decimals);
+  return Math.round(Number(val) * factor) / factor;
 }

@@ -78,17 +78,17 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
         athlete_person: item.athlete_person || '',
         authenticator: item.authenticator ? item.authenticator.replace(/#.*$/, '').trim() : '',
         cert_number: item.cert_number || '',
-        unit_price: item.unit_price != null ? String(item.unit_price) : '',
-        true_total_cost: item.true_total_cost != null ? String(item.true_total_cost) : '',
+        unit_price: item.unit_price != null ? Number(item.unit_price).toFixed(2) : '',
+        true_total_cost: item.true_total_cost != null ? Number(item.true_total_cost).toFixed(2) : '',
         status: item.status || 'Available',
         platform: item.platform || '',
-        platform_fee_pct: item.platform_fee_pct != null ? String(parseFloat((item.platform_fee_pct * 100).toFixed(4))) : '13.5',
-        platform_flat_fee: item.platform_flat_fee != null ? String(item.platform_flat_fee) : '0.40',
-        current_list_price: item.current_list_price != null ? String(item.current_list_price) : '',
-        actual_sell_price: item.actual_sell_price != null ? String(item.actual_sell_price) : '',
-        target_margin_pct: item.target_margin_pct != null ? String(item.target_margin_pct * 100) : '20',
-        boost_pct: item.boost_pct != null ? String(item.boost_pct * 100) : '0',
-        est_shipping_cost: item.est_shipping_cost != null ? String(item.est_shipping_cost) : '0',
+        platform_fee_pct: item.platform_fee_pct != null ? String(parseFloat((item.platform_fee_pct * 100).toFixed(2))) : '13.5',
+        platform_flat_fee: item.platform_flat_fee != null ? Number(item.platform_flat_fee).toFixed(2) : '0.40',
+        current_list_price: item.current_list_price != null ? Number(item.current_list_price).toFixed(2) : '',
+        actual_sell_price: item.actual_sell_price != null ? Number(item.actual_sell_price).toFixed(2) : '',
+        target_margin_pct: item.target_margin_pct != null ? String(parseFloat((item.target_margin_pct * 100).toFixed(2))) : '20',
+        boost_pct: item.boost_pct != null ? String(parseFloat((item.boost_pct * 100).toFixed(2))) : '0',
+        est_shipping_cost: item.est_shipping_cost != null ? Number(item.est_shipping_cost).toFixed(2) : '0.00',
         date_acquired: item.date_acquired || '',
         date_listed: item.date_listed || '',
         date_sold: item.date_sold || '',
@@ -97,10 +97,10 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
       });
 
       setCompsDraft({
-        comp_1: item.comp_1 !== null && item.comp_1 !== undefined ? roundPrice(item.comp_1) : '',
-        comp_2: item.comp_2 !== null && item.comp_2 !== undefined ? roundPrice(item.comp_2) : '',
-        comp_3: item.comp_3 !== null && item.comp_3 !== undefined ? roundPrice(item.comp_3) : '',
-        recommended_list_price: roundPrice(item.recommended_list_price || item.current_list_price || item.suggested_list_price || ''),
+        comp_1: item.comp_1 !== null && item.comp_1 !== undefined && item.comp_1 !== '' ? Number(item.comp_1).toFixed(2) : '',
+        comp_2: item.comp_2 !== null && item.comp_2 !== undefined && item.comp_2 !== '' ? Number(item.comp_2).toFixed(2) : '',
+        comp_3: item.comp_3 !== null && item.comp_3 !== undefined && item.comp_3 !== '' ? Number(item.comp_3).toFixed(2) : '',
+        recommended_list_price: (item.recommended_list_price || item.current_list_price || item.suggested_list_price) ? Number(item.recommended_list_price || item.current_list_price || item.suggested_list_price).toFixed(2) : '',
         saving: false,
         applied: false,
         fetchingLive: false,
@@ -174,7 +174,7 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
         ...prev,
         platform: p,
         platform_fee_pct: String(preset.fee_pct),
-        platform_flat_fee: String(preset.flat_fee)
+        platform_flat_fee: Number(preset.flat_fee).toFixed(2)
       }));
     } else {
       setForm(prev => ({ ...prev, platform: p }));
@@ -558,13 +558,13 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
                       Recent Comp #{num} ($)
                     </label>
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs">$</span>
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-bold pointer-events-none">$</span>
                       <input
                         type="number"
                         step="0.01"
                         value={compsDraft[`comp_${num}`]}
                         onChange={e => updateCompDraft(`comp_${num}`, e.target.value)}
-                        className="input-field text-xs pl-7 font-mono font-bold text-amber-300"
+                        className="input-field text-xs pl-8 font-mono font-bold text-amber-300"
                         placeholder="0.00"
                       />
                     </div>
@@ -599,7 +599,7 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
                 <div>
                   <span className="text-[10px] uppercase font-bold text-slate-400">Target Profit Margin</span>
                   <p className="text-sm font-black text-blue-400 mt-0.5">
-                    {form.target_margin_pct || '20'}%
+                    {form.target_margin_pct ? parseFloat(Number(form.target_margin_pct).toFixed(2)) : '20'}%
                   </p>
                 </div>
               </div>
@@ -616,13 +616,13 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
 
                 <div className="flex items-center gap-3">
                   <div className="relative flex-1 max-w-xs">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-400 text-xs font-bold">$</span>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-400 text-xs font-bold pointer-events-none">$</span>
                     <input
                       type="number"
                       step="0.01"
                       value={compsDraft.recommended_list_price}
                       onChange={e => updateCompDraft('recommended_list_price', e.target.value)}
-                      className="input-field text-sm pl-7 font-black text-amber-400 font-mono bg-slate-900 border-amber-500/40"
+                      className="input-field text-sm pl-8 font-black text-amber-400 font-mono bg-slate-900 border-amber-500/40"
                       placeholder="0.00"
                     />
                   </div>
@@ -675,7 +675,7 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
                       Purchase / Unit Price ($)
                     </label>
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-bold">$</span>
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-bold pointer-events-none">$</span>
                       <input
                         type="number"
                         step="0.01"
@@ -687,7 +687,7 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
                           const autoLanded = !isNaN(parsed) ? (parsed + proratedDiff).toFixed(2) : '';
                           setForm({ ...form, unit_price: val, true_total_cost: autoLanded });
                         }}
-                        className="input-field text-xs pl-7 font-mono text-white font-bold"
+                        className="input-field text-xs pl-8 font-mono text-white font-bold"
                         placeholder="0.00"
                       />
                     </div>
@@ -698,13 +698,13 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
                       Total Landed Cost / True Cost ($)
                     </label>
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-500 text-xs font-bold">$</span>
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-500 text-xs font-bold pointer-events-none">$</span>
                       <input
                         type="number"
                         step="0.01"
                         value={form.true_total_cost}
                         onChange={e => setForm({ ...form, true_total_cost: e.target.value })}
-                        className="input-field text-xs pl-7 font-mono text-amber-400 font-bold"
+                        className="input-field text-xs pl-8 font-mono text-amber-400 font-bold"
                         placeholder="0.00"
                       />
                     </div>
@@ -730,13 +730,13 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
                 <div>
                   <label className="block text-xs font-bold text-slate-300 mb-1">Current Active List Price ($)</label>
                   <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-bold">$</span>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-bold pointer-events-none">$</span>
                     <input
                       type="number"
                       step="0.01"
                       value={form.current_list_price}
                       onChange={e => setForm({ ...form, current_list_price: e.target.value })}
-                      className="input-field text-xs pl-7 font-mono text-emerald-300 font-bold"
+                      className="input-field text-xs pl-8 font-mono text-emerald-300 font-bold"
                       placeholder="0.00"
                     />
                   </div>
@@ -751,7 +751,7 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
                     <span className="text-[10px] font-mono font-normal text-slate-400">({form.platform || 'Custom'})</span>
                   </p>
                   <span className="text-[11px] text-slate-300 font-mono">
-                    {form.platform_fee_pct || 0}% + ${form.platform_flat_fee || '0.00'} per order
+                    {form.platform_fee_pct || 0}% + ${Number(form.platform_flat_fee || 0).toFixed(2)} per order
                   </span>
                 </div>
 
@@ -766,10 +766,10 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
                         step="0.05"
                         value={form.platform_fee_pct}
                         onChange={e => setForm({ ...form, platform_fee_pct: e.target.value })}
-                        className="input-field text-xs pr-7 font-mono text-amber-300 font-bold"
+                        className="input-field text-xs pr-8 font-mono text-amber-300 font-bold"
                         placeholder="13.5"
                       />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs">%</span>
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-bold pointer-events-none">%</span>
                     </div>
                   </div>
 
@@ -778,13 +778,13 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
                       Per-Order Flat Fee ($) <span className="text-slate-500 font-normal">(eBay $0.40)</span>
                     </label>
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs">$</span>
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-bold pointer-events-none">$</span>
                       <input
                         type="number"
                         step="0.05"
                         value={form.platform_flat_fee}
                         onChange={e => setForm({ ...form, platform_flat_fee: e.target.value })}
-                        className="input-field text-xs pl-7 font-mono text-amber-300 font-bold"
+                        className="input-field text-xs pl-8 font-mono text-amber-300 font-bold"
                         placeholder="0.40"
                       />
                     </div>
@@ -801,9 +801,9 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
                       step="1"
                       value={form.target_margin_pct}
                       onChange={e => setForm({ ...form, target_margin_pct: e.target.value })}
-                      className="input-field text-xs pr-6 font-mono"
+                      className="input-field text-xs pr-8 font-mono"
                     />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs">%</span>
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-bold pointer-events-none">%</span>
                   </div>
                 </div>
 
@@ -815,22 +815,22 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
                       step="0.5"
                       value={form.boost_pct}
                       onChange={e => setForm({ ...form, boost_pct: e.target.value })}
-                      className="input-field text-xs pr-6 font-mono"
+                      className="input-field text-xs pr-8 font-mono"
                     />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs">%</span>
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-bold pointer-events-none">%</span>
                   </div>
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold text-slate-300 mb-1">Est. Outbound Shipping ($)</label>
                   <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs">$</span>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-bold pointer-events-none">$</span>
                     <input
                       type="number"
                       step="0.5"
                       value={form.est_shipping_cost}
                       onChange={e => setForm({ ...form, est_shipping_cost: e.target.value })}
-                      className="input-field text-xs pl-7 font-mono"
+                      className="input-field text-xs pl-8 font-mono"
                     />
                   </div>
                 </div>
@@ -905,13 +905,13 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
                     Actual Realized Sale Price ($)
                   </label>
                   <div className="relative max-w-xs">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-bold">$</span>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-bold pointer-events-none">$</span>
                     <input
                       type="number"
                       step="0.01"
                       value={form.actual_sell_price}
                       onChange={e => setForm({ ...form, actual_sell_price: e.target.value })}
-                      className="input-field text-xs pl-7 font-mono text-emerald-300 font-bold"
+                      className="input-field text-xs pl-8 font-mono text-emerald-300 font-bold"
                       placeholder="0.00"
                     />
                   </div>

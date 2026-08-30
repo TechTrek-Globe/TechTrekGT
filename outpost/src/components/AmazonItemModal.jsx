@@ -374,7 +374,7 @@ export function AmazonItemModal({ isOpen, platforms = [], onClose, onCreated }) 
               <img src={imageUrl} alt="Product" className="w-12 h-12 object-contain rounded-lg bg-white p-1 flex-shrink-0" />
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-semibold text-slate-200 truncate">{itemName || 'Fetched Product'}</p>
-                <p className="text-[10px] text-emerald-400 font-mono mt-0.5">{unitPrice ? `$${unitPrice}` : 'Price extracted'}</p>
+                <p className="text-[10px] text-emerald-400 font-mono mt-0.5">{unitPrice ? `$${Number(unitPrice).toFixed(2)}` : 'Price extracted'}</p>
               </div>
             </div>
           )}
@@ -419,7 +419,7 @@ export function AmazonItemModal({ isOpen, platforms = [], onClose, onCreated }) 
                   type="number"
                   step="0.01"
                   min="0"
-                  className="input-field !pl-9 text-sm"
+                  className="input-field pl-9 text-sm"
                   placeholder="0.00"
                   value={unitPrice}
                   onChange={e => setUnitPrice(e.target.value)}

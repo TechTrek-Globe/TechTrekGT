@@ -149,14 +149,14 @@ export function CardShowCalculatorModal({ isOpen, onClose, onItemAdded }) {
                 Sticker / Asking Price ($)
               </label>
               <div className="relative">
-                <span className="absolute left-3 top-2.5 text-slate-500 font-bold">$</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold pointer-events-none">$</span>
                 <input
                   type="number"
                   step="any"
                   placeholder="0.00"
                   value={askingPrice}
                   onChange={e => setAskingPrice(e.target.value)}
-                  className="input-field pl-7 font-mono text-sm font-black text-amber-400 w-full"
+                  className="input-field pl-8 font-mono text-sm font-black text-amber-400 w-full"
                   autoFocus
                 />
               </div>
@@ -167,14 +167,14 @@ export function CardShowCalculatorModal({ isOpen, onClose, onItemAdded }) {
                 Est. Shipping ($)
               </label>
               <div className="relative">
-                <span className="absolute left-3 top-2.5 text-slate-500 font-bold">$</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold pointer-events-none">$</span>
                 <input
                   type="number"
                   step="any"
                   placeholder="0.00"
                   value={shippingCost}
                   onChange={e => setShippingCost(e.target.value)}
-                  className="input-field pl-7 font-mono text-sm w-full"
+                  className="input-field pl-8 font-mono text-sm w-full"
                 />
               </div>
             </div>

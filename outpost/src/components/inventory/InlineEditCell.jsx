@@ -9,7 +9,7 @@ export function InlineEditCell({ value, itemId, field, type = 'text', prefix, su
   const inputRef = useRef(null);
 
   const startEdit = () => {
-    setDraft(value != null ? String(value) : '');
+    setDraft(value != null ? (type === 'number' && !isNaN(Number(value)) ? Number(value).toFixed(2) : String(value)) : '');
     setEditing(true);
     setTimeout(() => inputRef.current?.select(), 50);
   };

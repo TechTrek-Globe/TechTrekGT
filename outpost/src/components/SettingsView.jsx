@@ -158,8 +158,8 @@ export function SettingsView() {
     setEditingId(p.id);
     setEditForm({
       name: p.name,
-      fee_pct: String(Math.round(p.fee_pct * 1000) / 10),
-      flat_fee: String(p.flat_fee),
+      fee_pct: String(parseFloat((p.fee_pct * 100).toFixed(2))),
+      flat_fee: Number(p.flat_fee || 0).toFixed(2),
       notes: p.notes || '',
       is_default: Boolean(p.is_default)
     });
@@ -532,9 +532,9 @@ export function SettingsView() {
                                     step="0.1"
                                     value={editForm.fee_pct}
                                     onChange={e => setEditForm(prev => ({ ...prev, fee_pct: e.target.value }))}
-                                    className="input-field py-1 pl-2 pr-6 text-xs font-mono"
+                                    className="input-field py-1 pl-2 pr-7 text-xs font-mono"
                                   />
-                                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-bold">%</span>
+                                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-bold pointer-events-none">%</span>
                                 </div>
                               ) : (
                                 <span className="font-mono text-amber-400 font-semibold">{fmtPct(p.fee_pct)}</span>
@@ -545,13 +545,13 @@ export function SettingsView() {
                             <td className="py-3 px-4">
                               {isEditing ? (
                                 <div className="relative w-24">
-                                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-bold">$</span>
+                                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-bold pointer-events-none">$</span>
                                   <input
                                     type="number"
                                     step="0.05"
                                     value={editForm.flat_fee}
                                     onChange={e => setEditForm(prev => ({ ...prev, flat_fee: e.target.value }))}
-                                    className="input-field py-1 pl-6 pr-2 text-xs font-mono"
+                                    className="input-field py-1 pl-7 pr-2 text-xs font-mono"
                                   />
                                 </div>
                               ) : (
@@ -1093,16 +1093,16 @@ export function SettingsView() {
                       placeholder="12.5"
                       value={newPlatform.fee_pct}
                       onChange={e => setNewPlatform(prev => ({ ...prev, fee_pct: e.target.value }))}
-                      className="input-field pr-6"
+                      className="input-field pr-7"
                     />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-bold">%</span>
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-bold pointer-events-none">%</span>
                   </div>
                 </div>
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 mb-1">Flat Fee ($)</label>
                   <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-bold">$</span>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-bold pointer-events-none">$</span>
                     <input
                       type="number"
                       step="0.05"

@@ -239,7 +239,7 @@ export function AddInvoiceModal({ open, isOpen, platforms = [], onClose, onCreat
                 <div key={id}>
                   <label className="block text-xs font-semibold text-slate-400 mb-1.5">{label}</label>
                   <div className="relative">
-                    <Icon className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
+                    <Icon className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500 pointer-events-none" />
                     <input id={id} type="number" step="0.01" min="0" className="input-field pl-9 text-sm" placeholder={hint} value={val} onChange={e => set(e.target.value)} />
                   </div>
                 </div>
@@ -322,11 +322,11 @@ export function AddInvoiceModal({ open, isOpen, platforms = [], onClose, onCreat
                     {/* Unit Price */}
                     <div className="col-span-4">
                       <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">$</span>
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm font-bold pointer-events-none">$</span>
                         <input
                           id={`item-price-${idx}`}
                           type="number" step="0.01" min="0"
-                          className="input-field text-sm pl-7"
+                          className="input-field text-sm pl-8"
                           placeholder="Unit price"
                           value={it.unit_price}
                           onChange={e => updateItem(it._key, 'unit_price', e.target.value)}
@@ -354,16 +354,16 @@ export function AddInvoiceModal({ open, isOpen, platforms = [], onClose, onCreat
                     {/* Est Shipping */}
                     <div className="col-span-4">
                       <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">$</span>
-                        <input id={`item-ship-${idx}`} type="number" step="0.01" min="0" className="input-field text-sm pl-7" placeholder="Est. shipping" value={it.est_shipping_cost} onChange={e => updateItem(it._key, 'est_shipping_cost', e.target.value)} />
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm font-bold pointer-events-none">$</span>
+                        <input id={`item-ship-${idx}`} type="number" step="0.01" min="0" className="input-field text-sm pl-8" placeholder="Est. shipping" value={it.est_shipping_cost} onChange={e => updateItem(it._key, 'est_shipping_cost', e.target.value)} />
                       </div>
                     </div>
 
                     {/* Target Margin % */}
                     <div className="col-span-4">
                       <div className="relative">
-                        <input id={`item-margin-${idx}`} type="number" step="1" min="0" max="999" className="input-field text-sm pr-7" placeholder="Margin %" value={Math.round((parseFloat(it.target_margin_pct) || 0) * 100)} onChange={e => updateItem(it._key, 'target_margin_pct', (parseFloat(e.target.value) || 0) / 100)} />
-                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">%</span>
+                        <input id={`item-margin-${idx}`} type="number" step="1" min="0" max="999" className="input-field text-sm pr-8" placeholder="Margin %" value={Math.round((parseFloat(it.target_margin_pct) || 0) * 100)} onChange={e => updateItem(it._key, 'target_margin_pct', (parseFloat(e.target.value) || 0) / 100)} />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm font-bold pointer-events-none">%</span>
                       </div>
                     </div>
 

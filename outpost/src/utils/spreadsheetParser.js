@@ -438,7 +438,7 @@ export async function parseAuctionWorkbook(buffer) {
         suggested_list_price: parseCleanNumber(getRowValue(row, invHeaderMap, ['suggestedlistprice']), 0),
         current_list_price: parseCleanNumber(getRowValue(row, invHeaderMap, ['currentlistprice']), null),
         actual_sell_price: parseCleanNumber(getRowValue(row, invHeaderMap, ['actualsellprice']), null),
-        target_margin_pct: parseCleanNumber(getRowValue(row, invHeaderMap, ['marginpcttarget', 'targetmargin']), 0.30),
+        target_margin_pct: Math.round(parseCleanNumber(getRowValue(row, invHeaderMap, ['marginpcttarget', 'targetmargin']), 0.30) * 10000) / 10000,
         date_acquired: dateAcquired,
         date_listed: dateListed,
         date_sold: dateSold,
@@ -475,9 +475,9 @@ export async function parseAuctionWorkbook(buffer) {
     if (item.min_sell_price === 0 && item.true_total_cost > 0) {
       const divisor = 1 - item.platform_fee_pct - item.boost_pct;
       item.min_sell_price = divisor > 0
-        ? (item.true_total_cost + item.est_shipping_cost + item.platform_flat_fee) / divisor
+        ? Math.round(((item.true_total_cost + item.est_shipping_cost + item.platform_flat_fee) / divisor) * 100) / 100
         : 0;
-      item.suggested_list_price = item.min_sell_price * (1 + item.target_margin_pct);
+      item.suggested_list_price = Math.round((item.min_sell_price * (1 + item.target_margin_pct)) * 100) / 100;
     }
   });
 

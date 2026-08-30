@@ -73,7 +73,7 @@ export function PricingCard({ item, onOpenCopyModal, onOpenQueryEdit, onItemUpda
           comp_3: res.comp_3 !== null && res.comp_3 !== undefined ? roundPrice(res.comp_3) : prev.comp_3,
           recommended_list_price: roundPrice(res.live_avg || res.median || prev.recommended_list_price),
           fetchingLive: false,
-          fetchMsg: { type: 'success', text: `Found ${res.count} sold comps on eBay! Avg: $${res.live_avg}` },
+          fetchMsg: { type: 'success', text: `Found ${res.count} sold comps on eBay! Avg: ${fmtCurrency(res.live_avg)}` },
           applied: false,
         }));
       } else {
@@ -209,14 +209,14 @@ export function PricingCard({ item, onOpenCopyModal, onOpenQueryEdit, onItemUpda
           <div className="w-28 relative group">
             <label className="block text-[10px] font-bold text-slate-300 mb-0.5 cursor-help">Target Price</label>
             <div className="relative">
-              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-slate-500">$</span>
+              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-bold pointer-events-none">$</span>
               <input
                 type="number"
                 step="0.01"
                 placeholder="0.00"
                 value={draft.recommended_list_price}
                 onChange={e => updateDraft('recommended_list_price', e.target.value)}
-                className="input-field py-1 pl-5 pr-2 text-xs font-bold text-white"
+                className="input-field py-1 pl-6 pr-2 text-xs font-bold text-white"
               />
             </div>
           </div>

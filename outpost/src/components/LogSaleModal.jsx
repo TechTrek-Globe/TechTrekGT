@@ -80,15 +80,15 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
       setSaleDate(saleToEdit.sale_date || new Date().toISOString().split('T')[0]);
       setPlatform(saleToEdit.platform || 'eBay');
       setBuyerHandle(saleToEdit.buyer_handle || '');
-      setGrossSalePrice(String(saleToEdit.gross_sale_price || ''));
-      setNetEarnings(String(saleToEdit.net_proceeds != null ? saleToEdit.net_proceeds : ''));
+      setGrossSalePrice(saleToEdit.gross_sale_price != null ? Number(saleToEdit.gross_sale_price).toFixed(2) : '');
+      setNetEarnings(saleToEdit.net_proceeds != null ? Number(saleToEdit.net_proceeds).toFixed(2) : '');
       setIsManualNetEarnings(saleToEdit.net_proceeds != null);
-      setBuyerShippingPaid(String(saleToEdit.buyer_shipping_paid ?? '0'));
-      setActualShippingCost(String(saleToEdit.actual_shipping_cost ?? '0'));
-      setPlatformFeePct(String((saleToEdit.platform_fee_pct * 100).toFixed(2)));
-      setPlatformFlatFee(String(saleToEdit.platform_flat_fee ?? '0.40'));
-      setPaymentProcessingAmt(String(saleToEdit.payment_processing_amt ?? '0'));
-      setPromotedListingFee(String(saleToEdit.promoted_listing_fee ?? '0'));
+      setBuyerShippingPaid(String(saleToEdit.buyer_shipping_paid != null ? Number(saleToEdit.buyer_shipping_paid).toFixed(2) : '0.00'));
+      setActualShippingCost(String(saleToEdit.actual_shipping_cost != null ? Number(saleToEdit.actual_shipping_cost).toFixed(2) : '0.00'));
+      setPlatformFeePct(String(parseFloat(((saleToEdit.platform_fee_pct || 0.136) * 100).toFixed(2))));
+      setPlatformFlatFee(String(saleToEdit.platform_flat_fee != null ? Number(saleToEdit.platform_flat_fee).toFixed(2) : '0.40'));
+      setPaymentProcessingAmt(String(saleToEdit.payment_processing_amt != null ? Number(saleToEdit.payment_processing_amt).toFixed(2) : '0.00'));
+      setPromotedListingFee(String(saleToEdit.promoted_listing_fee != null ? Number(saleToEdit.promoted_listing_fee).toFixed(2) : '0.00'));
       return;
     }
 
@@ -418,13 +418,13 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
             <div>
               <label className="block text-xs font-bold text-amber-300 mb-1">Gross Sale ($) *</label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-bold">$</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-bold pointer-events-none">$</span>
                 <input
                   id="sale-gross-input"
                   type="number"
                   step="0.01"
                   min="0"
-                  className="w-full bg-slate-900 border border-amber-500/40 rounded-lg pl-7 pr-3 py-2 text-sm font-bold text-amber-300 placeholder-slate-500 outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-500/20"
+                  className="w-full bg-slate-900 border border-amber-500/40 rounded-lg pl-8 pr-3 py-2 text-sm font-bold text-amber-300 placeholder-slate-500 outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-500/20"
                   placeholder="0.00"
                   value={grossSalePrice}
                   onChange={e => handleGrossChange(e.target.value)}
@@ -448,12 +448,12 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
                 )}
               </div>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-bold">$</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-bold pointer-events-none">$</span>
                 <input
                   id="sale-net-earnings-input"
                   type="number"
                   step="0.01"
-                  className="w-full bg-slate-900 border border-emerald-500/40 rounded-lg pl-7 pr-3 py-2 text-sm font-bold text-emerald-300 placeholder-slate-500 outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-500/20"
+                  className="w-full bg-slate-900 border border-emerald-500/40 rounded-lg pl-8 pr-3 py-2 text-sm font-bold text-emerald-300 placeholder-slate-500 outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-500/20"
                   placeholder="0.00"
                   value={netEarnings}
                   onChange={e => handleNetEarningsChange(e.target.value)}

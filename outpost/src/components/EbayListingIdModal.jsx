@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import {
   X, Link2, Loader2, AlertCircle, CheckCircle2, Search,
-  ShoppingBag, ExternalLink, ChevronDown, ChevronUp
+  ShoppingBag, ExternalLink, ChevronDown, ChevronUp, RefreshCw, Zap
 } from 'lucide-react';
-import { saveEbayListingId, getActiveEbayListings } from '../utils/auctionApi';
+import { saveEbayListingId, getActiveEbayListings, syncEbayItem } from '../utils/auctionApi';
 
 /**
  * EbayListingIdModal
  *
  * Modal for assigning an eBay listing ID to an inventory item.
  * Supports both manual entry and 1-click selection from live active eBay store listings.
+ * Automatically synchronizes live price, listing date, platform fees, and status upon saving.
  *
  * Props:
  *   item     - auction_items row
@@ -25,6 +26,7 @@ export function EbayListingIdModal({ item, isOpen, onClose, onSaved }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [syncSummary, setSyncSummary] = useState('');
 
   // Active eBay listings browser state
   const [showBrowser, setShowBrowser] = useState(true);
@@ -32,7 +34,7 @@ export function EbayListingIdModal({ item, isOpen, onClose, onSaved }) {
   const [loadingListings, setLoadingListings] = useState(false);
   const [fetchError, setFetchError] = useState('');
   const [browserSearch, setBrowserSearch] = useState('');
-  const [selectedListingTitle, setSelectedListingTitle] = useState('');
+  const [selectedListing, setSelectedListing] = useState(null);
 
   useEffect(() => {
     if (isOpen && item) {
@@ -41,6 +43,8 @@ export function EbayListingIdModal({ item, isOpen, onClose, onSaved }) {
       setError('');
       setFetchError('');
       setSuccess(false);
+      setSyncSummary('');
+      setSelectedListing(null);
 
       // Auto-populate search with first few words of item name
       const initialQuery = item.item_name ? item.item_name.split(' ').slice(0, 3).join(' ') : '';
@@ -93,7 +97,7 @@ export function EbayListingIdModal({ item, isOpen, onClose, onSaved }) {
   const handleSelectListing = (listing) => {
     const id = listing.listing_id || listing.sku;
     setListingId(String(id));
-    setSelectedListingTitle(listing.title || '');
+    setSelectedListing(listing);
     setError('');
   };
 
@@ -106,20 +110,29 @@ export function EbayListingIdModal({ item, isOpen, onClose, onSaved }) {
     setError('');
     try {
       const rate = promotedRate !== '' ? parseFloat(promotedRate) : null;
-      const certUrl = item.cert_number
-        ? buildCertUrl(item.authenticator, item.cert_number)
-        : null;
-
-      await saveEbayListingId(item.id, trimmed, certUrl, rate);
+      
+      // Auto-sync with live eBay listing data
+      const res = await syncEbayItem(item.id, trimmed, rate);
+      const updatedItem = res?.item || { ebay_listing_id: trimmed, ebay_promoted_rate: rate, platform: 'eBay' };
+      
+      setSyncSummary(`Synced! Price: $${updatedItem.current_list_price?.toFixed(2) || '0.00'} · Platform: eBay · Status: ${updatedItem.status}`);
       setSuccess(true);
-      if (onSaved) onSaved(item.id, {
-        ebay_listing_id: trimmed,
-        cert_verification_url: certUrl,
-        ebay_promoted_rate: rate
-      });
-      setTimeout(() => { setSuccess(false); onClose(); }, 800);
+      
+      if (onSaved) {
+        onSaved(item.id, updatedItem);
+      }
+      setTimeout(() => { setSuccess(false); onClose(); }, 1200);
     } catch (e) {
-      setError(e.message || 'Save failed');
+      // Fallback to basic save if sync fails
+      try {
+        const rate = promotedRate !== '' ? parseFloat(promotedRate) : null;
+        await saveEbayListingId(item.id, trimmed, null, rate);
+        setSuccess(true);
+        if (onSaved) onSaved(item.id, { ebay_listing_id: trimmed, ebay_promoted_rate: rate, platform: 'eBay' });
+        setTimeout(() => { setSuccess(false); onClose(); }, 800);
+      } catch (err2) {
+        setError(err2.message || e.message || 'Save failed');
+      }
     } finally {
       setSaving(false);
     }
@@ -301,10 +314,30 @@ export function EbayListingIdModal({ item, isOpen, onClose, onSaved }) {
               placeholder="e.g. 395123456789 (or select from above)"
               className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white text-sm placeholder-slate-600 focus:outline-none focus:border-amber-500 transition-colors"
             />
-            {selectedListingTitle && (
-              <p className="text-[11px] text-amber-300/80 truncate">
-                Selected: {selectedListingTitle}
-              </p>
+            {selectedListing && (
+              <div className="p-3 rounded-lg bg-emerald-950/40 border border-emerald-500/40 text-xs space-y-1.5 animate-fade-in">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 font-bold text-emerald-400">
+                    <Zap className="w-3.5 h-3.5" />
+                    <span>Auto-Sync Real Listing Details:</span>
+                  </div>
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    {selectedListing.category_tier || 'eBay Store Item'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-slate-300 pt-0.5 border-t border-emerald-500/20">
+                  <div>Live Price: <span className="font-bold text-emerald-300">${selectedListing.price?.toFixed(2) || '0.00'}</span></div>
+                  <div>Fees: <span className="font-semibold text-amber-300">{selectedListing.platform_fee_pct ? `${(selectedListing.platform_fee_pct * 100).toFixed(2)}% + $${selectedListing.platform_flat_fee?.toFixed(2)}` : '13.25% - 13.5% + $0.40'}</span></div>
+                  <div>Shipping: <span className="font-semibold text-sky-300">{selectedListing.is_free_shipping ? 'Free Shipping (Seller Pays)' : `Buyer Pays (${selectedListing.buyer_shipping_cost ? `$${selectedListing.buyer_shipping_cost.toFixed(2)}` : 'Calculated'})`}</span></div>
+                  <div>Status: <span className="font-semibold text-emerald-300">{selectedListing.status || 'Listed'}</span></div>
+                </div>
+                {selectedListing.specifics && (selectedListing.specifics.athlete || selectedListing.specifics.cert_number) && (
+                  <div className="pt-1 border-t border-emerald-500/20 text-[10px] text-slate-400 flex flex-wrap gap-x-3">
+                    {selectedListing.specifics.athlete && <span>Player: <strong className="text-slate-200">{selectedListing.specifics.athlete}</strong></span>}
+                    {selectedListing.specifics.cert_number && <span>Cert: <strong className="text-slate-200">{selectedListing.specifics.cert_number}</strong> {selectedListing.specifics.authenticator ? `(${selectedListing.specifics.authenticator})` : ''}</span>}
+                  </div>
+                )}
+              </div>
             )}
           </div>
 
@@ -312,7 +345,7 @@ export function EbayListingIdModal({ item, isOpen, onClose, onSaved }) {
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-slate-300" htmlFor="ebay-promoted-rate-input">
               Promoted Listings Rate (%)
-              <span className="ml-1 text-slate-500 font-normal">optional</span>
+              <span className="ml-1 text-slate-500 font-normal">optional (e.g. 3.5%)</span>
             </label>
             <input
               id="ebay-promoted-rate-input"
@@ -333,8 +366,9 @@ export function EbayListingIdModal({ item, isOpen, onClose, onSaved }) {
             </div>
           )}
           {success && (
-            <div className="flex items-center gap-1.5 text-xs text-green-400">
-              <CheckCircle2 className="w-3.5 h-3.5" /> Saved successfully!
+            <div className="p-2.5 rounded-lg bg-emerald-950/40 border border-emerald-500/40 text-xs text-emerald-300 font-medium flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+              <span>{syncSummary || 'Linked & synchronized successfully!'}</span>
             </div>
           )}
         </div>

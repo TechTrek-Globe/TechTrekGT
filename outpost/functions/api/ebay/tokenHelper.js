@@ -293,3 +293,232 @@ export async function fetchEbayActiveSellerListings(env, accessToken) {
 
   return Array.from(listingsMap.values());
 }
+
+/**
+ * Calculates eBay category-specific final value fee rate and flat fee.
+ * 
+ * Rules:
+ * - Sports Trading Cards (Singles & Boxes / Lots): 13.25% + $0.30 (if total <= $10) or $0.40 (if total > $10)
+ * - Books, Movies, Music: 14.95% + $0.40
+ * - Select Consumer Electronics: 13.25% + $0.40 (or 9.35% for select subcategories)
+ * - Sports Memorabilia / Standard Default: 13.50% + $0.40
+ *
+ * @param {string|null} categoryId
+ * @param {string|null} categoryName
+ * @param {number} currentPrice
+ * @returns {{ fee_pct: number, flat_fee: number, category_tier: string }}
+ */
+export function calculateEbayCategoryFees(categoryId, categoryName, currentPrice = 0) {
+  const catLower = (categoryName || '').toLowerCase();
+  const idStr = String(categoryId || '');
+
+  // 1. Sports Trading Cards & Collectible Card Games (IDs: 213, 214, 215, 216, 261328, 183454, 183050, etc.)
+  if (
+    catLower.includes('trading card') ||
+    catLower.includes('baseball card') ||
+    catLower.includes('football card') ||
+    catLower.includes('basketball card') ||
+    catLower.includes('hockey card') ||
+    catLower.includes('soccer card') ||
+    catLower.includes('pokemon') ||
+    catLower.includes('magic: the gathering') ||
+    ['213', '214', '215', '216', '261328', '183454', '183050', '261068'].includes(idStr)
+  ) {
+    return {
+      fee_pct: 0.1325, // 13.25%
+      flat_fee: currentPrice > 0 && currentPrice <= 10.0 ? 0.30 : 0.40,
+      category_tier: 'Trading Cards (13.25%)'
+    };
+  }
+
+  // 2. Books, Movies & Music (IDs: 267, 11232, 11233, etc.)
+  if (
+    catLower.includes('books & magazines') ||
+    catLower.includes('dvds & movies') ||
+    catLower.includes('music') ||
+    ['267', '11232', '11233', '176984'].includes(idStr)
+  ) {
+    return {
+      fee_pct: 0.1495, // 14.95%
+      flat_fee: 0.40,
+      category_tier: 'Media / Books (14.95%)'
+    };
+  }
+
+  // 3. Select Consumer Electronics (IDs: 9355, 175672, 177, etc.)
+  if (
+    catLower.includes('computers/tablets') ||
+    catLower.includes('cell phones & smartphones') ||
+    ['9355', '175672', '177'].includes(idStr)
+  ) {
+    return {
+      fee_pct: 0.1325,
+      flat_fee: 0.40,
+      category_tier: 'Electronics (13.25%)'
+    };
+  }
+
+  // 4. Default: Sports Memorabilia, Fan Apparel, Antiques & General Merchandise
+  return {
+    fee_pct: 0.1350, // 13.50%
+    flat_fee: 0.40,
+    category_tier: 'Standard / Sports Mem (13.50%)'
+  };
+}
+
+/**
+ * Fetches expanded details for a single eBay listing by its 12-digit ItemID.
+ * Queries the eBay Trading API (GetItem) with ReturnAll detail level.
+ *
+ * @param {object} env
+ * @param {string} accessToken
+ * @param {string} listingId - 12-digit eBay ItemID
+ * @returns {Promise<object|null>} Expanded listing details object
+ */
+export async function fetchSingleEbayListing(env, accessToken, listingId) {
+  if (!listingId) return null;
+  const cleanId = String(listingId).trim();
+  const isSandbox = isEbaySandbox(env);
+  const tradingBase = isSandbox
+    ? 'https://api.sandbox.ebay.com/ws/api.dll'
+    : 'https://api.ebay.com/ws/api.dll';
+
+  try {
+    const xmlReq = `<?xml version="1.0" encoding="utf-8"?>
+<GetItemRequest xmlns="urn:ebay:apis:eBLBaseComponents">
+  <ItemID>${cleanId}</ItemID>
+  <DetailLevel>ReturnAll</DetailLevel>
+</GetItemRequest>`;
+
+    const res = await fetch(tradingBase, {
+      method: 'POST',
+      headers: {
+        'X-EBAY-API-SITEID': '0',
+        'X-EBAY-API-COMPATIBILITY-LEVEL': '967',
+        'X-EBAY-API-CALL-NAME': 'GetItem',
+        'X-EBAY-API-IAF-TOKEN': accessToken,
+        'Content-Type': 'text/xml'
+      },
+      body: xmlReq
+    });
+
+    if (res.ok) {
+      const xmlText = await res.text();
+      const getTag = (tag, src = xmlText) => {
+        const m = src.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`));
+        if (!m) return null;
+        let val = m[1].trim();
+        const cdata = val.match(/<!\[CDATA\[([\s\S]*?)\]\]>/);
+        return cdata ? cdata[1].trim() : val;
+      };
+
+      const itemId = getTag('ItemID');
+      const title = getTag('Title');
+      const currentPriceStr = getTag('CurrentPrice') || getTag('BuyItNowPrice') || '0';
+      const price = parseFloat(currentPriceStr) || 0;
+      const startTime = getTag('StartTime');
+      const listingStatus = getTag('ListingStatus') || 'Active';
+      const qtyStr = getTag('QuantityAvailable') || getTag('Quantity') || '1';
+      const qtySoldStr = getTag('QuantitySold') || '0';
+      const sku = getTag('SKU') || null;
+      const listingType = getTag('ListingType') || 'FixedPriceItem';
+
+      // Category details
+      const categoryId = getTag('CategoryID');
+      const categoryName = getTag('CategoryName');
+      const feeStructure = calculateEbayCategoryFees(categoryId, categoryName, price);
+
+      // Shipping details (Free shipping vs Buyer pays)
+      const freeShippingTag = getTag('FreeShipping');
+      const shippingCostStr = getTag('ShippingServiceCost');
+      const isFreeShipping = freeShippingTag === 'true' || (shippingCostStr != null && parseFloat(shippingCostStr) === 0);
+      const buyerShippingCost = !isFreeShipping && shippingCostStr != null ? parseFloat(shippingCostStr) : 0;
+      const shippingService = getTag('ShippingService') || (isFreeShipping ? 'Free Shipping' : 'Calculated / Flat Shipping');
+
+      // Item Specifics (Athlete, Cert Number, Grader/Authenticator, Sport)
+      const specifics = {};
+      const nvRegex = /<NameValueList>([\s\S]*?)<\/NameValueList>/g;
+      let nvMatch;
+      while ((nvMatch = nvRegex.exec(xmlText)) !== null) {
+        const block = nvMatch[1];
+        const n = getTag('Name', block);
+        const v = getTag('Value', block);
+        if (n && v) {
+          specifics[n.toLowerCase().trim()] = v.trim();
+        }
+      }
+
+      const athlete = specifics['athlete'] || specifics['player'] || specifics['player/athlete'] || specifics['signer'] || null;
+      const certNumber = specifics['certification number'] || specifics['cert number'] || specifics['certificate number'] || null;
+      const authenticator = specifics['professional grader'] || specifics['graded by'] || specifics['authentication'] || specifics['authenticator'] || null;
+      const sport = specifics['sport'] || specifics['league'] || null;
+
+      if (itemId || title) {
+        return {
+          listing_id: itemId || cleanId,
+          title: title || '',
+          price: price,
+          date_listed: startTime ? startTime.slice(0, 10) : new Date().toISOString().split('T')[0],
+          status: listingStatus === 'Completed' ? 'Sold' : 'Listed',
+          raw_status: listingStatus,
+          quantity: parseInt(qtyStr, 10) || 1,
+          quantity_sold: parseInt(qtySoldStr, 10) || 0,
+          sku: sku,
+          listing_type: listingType,
+          // Expanded Category & Fees
+          category_id: categoryId,
+          category_name: categoryName,
+          platform_fee_pct: feeStructure.fee_pct,
+          platform_flat_fee: feeStructure.flat_fee,
+          category_tier: feeStructure.category_tier,
+          // Expanded Shipping
+          is_free_shipping: isFreeShipping,
+          buyer_shipping_cost: buyerShippingCost,
+          shipping_service: shippingService,
+          // Expanded Specifics
+          specifics: {
+            athlete,
+            cert_number: certNumber,
+            authenticator,
+            sport
+          },
+          listing_url: `https://www.ebay.com/itm/${itemId || cleanId}`
+        };
+      }
+    }
+  } catch (e) {
+    console.warn(`[tokenHelper] GetItem for ${cleanId} failed:`, e);
+  }
+
+  // Fallback: Check if item is in the active listings collection
+  const allListings = await fetchEbayActiveSellerListings(env, accessToken);
+  const found = allListings.find(l => String(l.listing_id) === cleanId || String(l.sku) === cleanId);
+  if (found) {
+    const feeStructure = calculateEbayCategoryFees(null, found.title, found.price || 0);
+    return {
+      listing_id: found.listing_id || cleanId,
+      title: found.title || '',
+      price: found.price || 0,
+      date_listed: new Date().toISOString().split('T')[0],
+      status: found.status === 'Completed' ? 'Sold' : 'Listed',
+      quantity: found.quantity || 1,
+      quantity_sold: 0,
+      sku: found.sku,
+      listing_type: 'FixedPriceItem',
+      category_id: null,
+      category_name: null,
+      platform_fee_pct: feeStructure.fee_pct,
+      platform_flat_fee: feeStructure.flat_fee,
+      category_tier: feeStructure.category_tier,
+      is_free_shipping: true,
+      buyer_shipping_cost: 0,
+      shipping_service: 'Standard',
+      specifics: {},
+      listing_url: found.listing_url || `https://www.ebay.com/itm/${cleanId}`
+    };
+  }
+
+  return null;
+}
+
+

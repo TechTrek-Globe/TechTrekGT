@@ -291,4 +291,23 @@ export const reconcileSaleFees = (saleId, ebayOrderId) =>
     body: JSON.stringify({ sale_id: saleId, ebay_order_id: ebayOrderId })
   });
 
+// --- eBay Auto-Sync Single Item ---
+export const syncEbayItem = (itemId, ebayListingId = null, ebayPromotedRate = null) =>
+  apiFetch('/api/ebay/sync-item', {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({
+      item_id: itemId,
+      ebay_listing_id: ebayListingId,
+      ebay_promoted_rate: ebayPromotedRate != null ? parseFloat(ebayPromotedRate) : null
+    })
+  });
+
+// --- eBay Batch Sync All Linked Items ---
+export const syncAllEbayItems = () =>
+  apiFetch('/api/ebay/sync-all', {
+    method: 'POST',
+    headers: JSON_HEADERS
+  });
+
 

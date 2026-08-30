@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import {
   Package, X, Save, Loader2, ExternalLink, ShieldCheck, Tag,
   DollarSign, Calendar, CheckCircle2, AlertCircle, TrendingUp, Zap,
-  ArrowUpRight, ShoppingBag, Search, Link2, ChevronDown, ChevronUp
+  ArrowUpRight, ShoppingBag, Search, Link2, ChevronDown, ChevronUp, RefreshCw
 } from 'lucide-react';
-import { updateItem, saveComp, fetchLiveComps, getActiveEbayListings } from '../utils/auctionApi';
+import { updateItem, saveComp, fetchLiveComps, getActiveEbayListings, syncEbayItem } from '../utils/auctionApi';
 import { getCertVerificationUrl, getAuthenticatorMeta } from '../utils/certLookup';
 import { fmtCurrency, roundPrice, computePricingFloors } from '../utils/formulaPreview';
 import { cleanAthleteName, cleanItemDescription } from '../utils/spreadsheetParser';
@@ -36,6 +36,7 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
   // Active eBay listings browser state
   const [ebayListings, setEbayListings] = useState([]);
   const [loadingEbayListings, setLoadingEbayListings] = useState(false);
+  const [syncingEbay, setSyncingEbay] = useState(false);
   const [ebaySearch, setEbaySearch] = useState('');
 
   const [form, setForm] = useState({
@@ -134,6 +135,35 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
       setEbayListings([]);
     } finally {
       setLoadingEbayListings(false);
+    }
+  };
+
+  const handleSyncWithEbay = async () => {
+    if (!form.ebay_listing_id) return;
+    setSyncingEbay(true);
+    setError('');
+    setSuccess('');
+    try {
+      const res = await syncEbayItem(item.id, form.ebay_listing_id, form.ebay_promoted_rate);
+      if (res?.item) {
+        const it = res.item;
+        setForm(prev => ({
+          ...prev,
+          current_list_price: it.current_list_price != null ? Number(it.current_list_price).toFixed(2) : prev.current_list_price,
+          status: it.status || prev.status,
+          platform: 'eBay',
+          platform_fee_pct: '13.5',
+          platform_flat_fee: '0.40',
+          date_listed: it.date_listed || prev.date_listed,
+          ebay_promoted_rate: it.ebay_promoted_rate != null ? String(it.ebay_promoted_rate) : prev.ebay_promoted_rate
+        }));
+        setSuccess(`Successfully synchronized with live eBay listing #${form.ebay_listing_id}!`);
+        if (onUpdated) onUpdated(item.id, it);
+      }
+    } catch (e) {
+      setError(e.message || 'Sync with eBay failed');
+    } finally {
+      setSyncingEbay(false);
     }
   };
 
@@ -1006,13 +1036,24 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
                       <ExternalLink className="w-3 h-3" /> View live on eBay.com
                     </a>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setForm(prev => ({ ...prev, ebay_listing_id: '' }))}
-                    className="px-2.5 py-1 rounded-lg text-[11px] font-semibold text-slate-400 hover:text-red-400 hover:bg-red-500/10 border border-slate-700 hover:border-red-500/20 transition-all flex-shrink-0"
-                  >
-                    Disconnect Listing
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={syncingEbay}
+                      onClick={handleSyncWithEbay}
+                      className="px-2.5 py-1 rounded-lg text-[11px] font-semibold text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 border border-emerald-500/30 transition-all flex items-center gap-1"
+                    >
+                      {syncingEbay ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                      <span>Sync Live Data</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setForm(prev => ({ ...prev, ebay_listing_id: '' }))}
+                      className="px-2.5 py-1 rounded-lg text-[11px] font-semibold text-slate-400 hover:text-red-400 hover:bg-red-500/10 border border-slate-700 hover:border-red-500/20 transition-all flex-shrink-0"
+                    >
+                      Disconnect Listing
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 flex items-center justify-between text-xs text-slate-400">
@@ -1081,7 +1122,15 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
                         <button
                           key={idx}
                           type="button"
-                          onClick={() => setForm(prev => ({ ...prev, ebay_listing_id: id }))}
+                          onClick={() => setForm(prev => ({
+                            ...prev,
+                            ebay_listing_id: id,
+                            current_list_price: listing.price ? String(listing.price.toFixed(2)) : prev.current_list_price,
+                            platform: 'eBay',
+                            platform_fee_pct: '13.5',
+                            platform_flat_fee: '0.40',
+                            status: 'Listed'
+                          }))}
                           className={`w-full text-left p-2 rounded-lg border transition-all flex items-center justify-between text-xs ${
                             isSelected
                               ? 'bg-amber-500/20 border-amber-500/50 text-white'

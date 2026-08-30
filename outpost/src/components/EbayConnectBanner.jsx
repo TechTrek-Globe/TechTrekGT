@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   ShoppingBag, CheckCircle2, XCircle, AlertTriangle, ExternalLink,
-  RefreshCw, Search, Loader2, Unlink
+  RefreshCw, Search, Loader2, Unlink, Zap
 } from 'lucide-react';
-import { getEbayOAuthStatus, findEbayListings } from '../utils/auctionApi';
+import { getEbayOAuthStatus, findEbayListings, syncAllEbayItems } from '../utils/auctionApi';
 
 const GATEWAY_BASE =
   typeof window !== 'undefined' && window.location.hostname === 'localhost'
@@ -15,7 +15,7 @@ const GATEWAY_BASE =
  *
  * Displays in Settings > eBay Integration section.
  * Shows OAuth connection status, connect/disconnect controls,
- * and the "Find Active Listings" discovery trigger.
+ * "Find Active Listings" discovery trigger, and "Sync All Linked Listings".
  *
  * Props:
  *   onFindListings(matches) - called with fuzzy match results for ListingMatchReviewModal
@@ -24,6 +24,8 @@ export function EbayConnectBanner({ onFindListings }) {
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [finding, setFinding] = useState(false);
+  const [syncingAll, setSyncingAll] = useState(false);
+  const [syncMsg, setSyncMsg] = useState('');
   const [error, setError] = useState('');
 
   const fetchStatus = useCallback(async () => {
@@ -91,6 +93,22 @@ export function EbayConnectBanner({ onFindListings }) {
     }
   };
 
+  const handleSyncAll = async () => {
+    setSyncingAll(true);
+    setSyncMsg('');
+    setError('');
+    try {
+      const res = await syncAllEbayItems();
+      setSyncMsg(res.message || `Successfully synced ${res.updated_count || 0} linked listings!`);
+      setStatus(prev => prev ? { ...prev, last_refreshed_at: new Date().toISOString() } : prev);
+      setTimeout(() => setSyncMsg(''), 5000);
+    } catch (e) {
+      setError(e.message || 'Batch sync failed');
+    } finally {
+      setSyncingAll(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center gap-2 text-slate-500 text-xs py-2">
@@ -139,7 +157,17 @@ export function EbayConnectBanner({ onFindListings }) {
           <span className="text-sm font-bold text-white">eBay Integration</span>
           <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-green-500/10 text-green-400 border border-green-500/20">CONNECTED</span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            id="ebay-sync-all-btn"
+            onClick={handleSyncAll}
+            disabled={syncingAll}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/20 transition-all disabled:opacity-50"
+            title="Update prices, dates, and status for all linked inventory items"
+          >
+            {syncingAll ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3" />}
+            {syncingAll ? 'Syncing All...' : 'Sync All Linked Listings'}
+          </button>
           <button
             id="ebay-find-listings-btn"
             onClick={handleFindListings}
@@ -166,6 +194,13 @@ export function EbayConnectBanner({ onFindListings }) {
           </button>
         </div>
       </div>
+
+      {syncMsg && (
+        <div className="flex items-center gap-2 p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-300">
+          <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
+          {syncMsg}
+        </div>
+      )}
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
         <InfoCell label="eBay Account" value={status.ebay_user_id || 'Connected'} icon={<CheckCircle2 className="w-3 h-3 text-green-400" />} />

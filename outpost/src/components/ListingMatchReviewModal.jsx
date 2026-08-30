@@ -1,9 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import {
   X, Search, CheckCircle2, AlertTriangle, Loader2,
-  ExternalLink, Link2, ShoppingBag, Layers, Filter, Check, ArrowRight
+  ExternalLink, Link2, ShoppingBag, Layers, Filter, Check, ArrowRight, Zap
 } from 'lucide-react';
-import { saveEbayListingId } from '../utils/auctionApi';
+import { saveEbayListingId, syncEbayItem } from '../utils/auctionApi';
 
 /**
  * ListingMatchReviewModal
@@ -35,12 +35,22 @@ export function ListingMatchReviewModal({ matches = [], matchData = null, isOpen
   // Filtered eBay listings for the picker
   const filteredEbayListings = allEbayListings.filter(l => {
     if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      (l.title && l.title.toLowerCase().includes(q)) ||
-      (l.sku && l.sku.toLowerCase().includes(q)) ||
-      (l.listing_id && String(l.listing_id).includes(q))
-    );
+    const q = searchQuery.trim().toLowerCase();
+    const cleanQ = q.replace(/[^a-z0-9]/g, '');
+
+    if (l.title && l.title.toLowerCase().includes(q)) return true;
+    if (l.sku && l.sku.toLowerCase().includes(q)) return true;
+    if (l.listing_id && String(l.listing_id).includes(q)) return true;
+
+    const cleanTitle = (l.title || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (cleanTitle && cleanQ && cleanTitle.includes(cleanQ)) return true;
+
+    const tokens = q.split(/\s+/).filter(t => t.length > 1);
+    if (tokens.length > 0 && tokens.every(token => (l.title || '').toLowerCase().includes(token))) {
+      return true;
+    }
+
+    return false;
   });
 
   const handleConfirmSuggested = async (match, idx) => {
@@ -49,11 +59,18 @@ export function ListingMatchReviewModal({ matches = [], matchData = null, isOpen
     setStates(prev => ({ ...prev, [`suggested_${idx}`]: { saving: true, error: '' } }));
 
     try {
-      await saveEbayListingId(itemId, String(listingId), null, null);
+      const res = await syncEbayItem(itemId, String(listingId), null);
+      const updatedItem = res?.item || { ebay_listing_id: String(listingId), platform: 'eBay', current_list_price: match.ebay_listing.price };
       setStates(prev => ({ ...prev, [`suggested_${idx}`]: { saving: false, saved: true } }));
-      if (onSaved) onSaved(itemId, { ebay_listing_id: String(listingId) });
+      if (onSaved) onSaved(itemId, updatedItem);
     } catch (e) {
-      setStates(prev => ({ ...prev, [`suggested_${idx}`]: { saving: false, error: e.message } }));
+      try {
+        await saveEbayListingId(itemId, String(listingId), null, null);
+        setStates(prev => ({ ...prev, [`suggested_${idx}`]: { saving: false, saved: true } }));
+        if (onSaved) onSaved(itemId, { ebay_listing_id: String(listingId), platform: 'eBay' });
+      } catch (err2) {
+        setStates(prev => ({ ...prev, [`suggested_${idx}`]: { saving: false, error: err2.message || e.message } }));
+      }
     }
   };
 
@@ -62,12 +79,20 @@ export function ListingMatchReviewModal({ matches = [], matchData = null, isOpen
     setStates(prev => ({ ...prev, [`${keyPrefix}_${item.id}`]: { saving: true, error: '' } }));
 
     try {
-      await saveEbayListingId(item.id, String(listingId), null, null);
+      const res = await syncEbayItem(item.id, String(listingId), null);
+      const updatedItem = res?.item || { ebay_listing_id: String(listingId), platform: 'eBay', current_list_price: selectedListing.price };
       setStates(prev => ({ ...prev, [`${keyPrefix}_${item.id}`]: { saving: false, saved: true } }));
       setSelectingForItemId(null);
-      if (onSaved) onSaved(item.id, { ebay_listing_id: String(listingId) });
+      if (onSaved) onSaved(item.id, updatedItem);
     } catch (e) {
-      setStates(prev => ({ ...prev, [`${keyPrefix}_${item.id}`]: { saving: false, error: e.message } }));
+      try {
+        await saveEbayListingId(item.id, String(listingId), null, null);
+        setStates(prev => ({ ...prev, [`${keyPrefix}_${item.id}`]: { saving: false, saved: true } }));
+        setSelectingForItemId(null);
+        if (onSaved) onSaved(item.id, { ebay_listing_id: String(listingId), platform: 'eBay' });
+      } catch (err2) {
+        setStates(prev => ({ ...prev, [`${keyPrefix}_${item.id}`]: { saving: false, error: err2.message || e.message } }));
+      }
     }
   };
 

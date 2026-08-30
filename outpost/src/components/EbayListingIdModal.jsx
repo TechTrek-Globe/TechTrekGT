@@ -30,6 +30,7 @@ export function EbayListingIdModal({ item, isOpen, onClose, onSaved }) {
   const [showBrowser, setShowBrowser] = useState(true);
   const [activeListings, setActiveListings] = useState([]);
   const [loadingListings, setLoadingListings] = useState(false);
+  const [fetchError, setFetchError] = useState('');
   const [browserSearch, setBrowserSearch] = useState('');
   const [selectedListingTitle, setSelectedListingTitle] = useState('');
 
@@ -38,6 +39,7 @@ export function EbayListingIdModal({ item, isOpen, onClose, onSaved }) {
       setListingId(item.ebay_listing_id || '');
       setPromotedRate(item.ebay_promoted_rate != null ? String(item.ebay_promoted_rate) : '');
       setError('');
+      setFetchError('');
       setSuccess(false);
 
       // Auto-populate search with first few words of item name
@@ -51,11 +53,12 @@ export function EbayListingIdModal({ item, isOpen, onClose, onSaved }) {
 
   const fetchActiveListings = async () => {
     setLoadingListings(true);
+    setFetchError('');
     try {
       const data = await getActiveEbayListings({ limit: 100 });
       setActiveListings(data.listings || []);
-    } catch (_) {
-      // Non-fatal if offline or not connected
+    } catch (err) {
+      setFetchError(err.message || 'Failed to load eBay store listings.');
       setActiveListings([]);
     } finally {
       setLoadingListings(false);
@@ -66,12 +69,25 @@ export function EbayListingIdModal({ item, isOpen, onClose, onSaved }) {
 
   const filteredListings = activeListings.filter(l => {
     if (!browserSearch.trim()) return true;
-    const q = browserSearch.toLowerCase();
-    return (
-      (l.title && l.title.toLowerCase().includes(q)) ||
-      (l.sku && l.sku.toLowerCase().includes(q)) ||
-      (l.listing_id && String(l.listing_id).includes(q))
-    );
+    const q = browserSearch.trim().toLowerCase();
+    const cleanQ = q.replace(/[^a-z0-9]/g, '');
+
+    // 1. Direct substring in title, sku, or listing_id
+    if (l.title && l.title.toLowerCase().includes(q)) return true;
+    if (l.sku && l.sku.toLowerCase().includes(q)) return true;
+    if (l.listing_id && String(l.listing_id).includes(q)) return true;
+
+    // 2. Normalized alphanumeric match (handles "Superbox" vs "Super Box")
+    const cleanTitle = (l.title || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (cleanTitle && cleanQ && cleanTitle.includes(cleanQ)) return true;
+
+    // 3. Token-based word match (all search words present in title)
+    const tokens = q.split(/\s+/).filter(t => t.length > 1);
+    if (tokens.length > 0 && tokens.every(token => (l.title || '').toLowerCase().includes(token))) {
+      return true;
+    }
+
+    return false;
   });
 
   const handleSelectListing = (listing) => {
@@ -155,8 +171,8 @@ export function EbayListingIdModal({ item, isOpen, onClose, onSaved }) {
             </div>
           </div>
 
-          {/* Interactive Active Listings Browser Section */}
-          <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3.5 space-y-2.5">
+          {/* Active eBay Listings Browser */}
+          <div className="p-3.5 rounded-xl bg-amber-500/5 border border-amber-500/25 space-y-2.5">
             <div className="flex items-center justify-between">
               <button
                 type="button"
@@ -165,9 +181,24 @@ export function EbayListingIdModal({ item, isOpen, onClose, onSaved }) {
               >
                 <ShoppingBag className="w-3.5 h-3.5" />
                 Select from Active eBay Store Listings
+                {activeListings.length > 0 && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    {activeListings.length}
+                  </span>
+                )}
                 {showBrowser ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
               </button>
-              {loadingListings && <Loader2 className="w-3.5 h-3.5 text-amber-400 animate-spin" />}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={fetchActiveListings}
+                  disabled={loadingListings}
+                  className="text-[10px] text-slate-400 hover:text-amber-400 underline transition-colors"
+                >
+                  Refresh
+                </button>
+                {loadingListings && <Loader2 className="w-3.5 h-3.5 text-amber-400 animate-spin" />}
+              </div>
             </div>
 
             {showBrowser && (
@@ -179,8 +210,18 @@ export function EbayListingIdModal({ item, isOpen, onClose, onSaved }) {
                     value={browserSearch}
                     onChange={e => setBrowserSearch(e.target.value)}
                     placeholder="Search your store listings by title, SKU, or ID..."
-                    className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                    className="w-full pl-8 pr-7 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
                   />
+                  {browserSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setBrowserSearch('')}
+                      className="absolute right-2 top-2 text-slate-500 hover:text-slate-300 text-xs p-0.5"
+                      title="Clear search filter"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
                 </div>
 
                 <div className="max-h-44 overflow-y-auto space-y-1.5 pr-1">
@@ -212,10 +253,32 @@ export function EbayListingIdModal({ item, isOpen, onClose, onSaved }) {
                   })}
 
                   {!loadingListings && filteredListings.length === 0 && (
-                    <div className="text-center py-4 text-slate-500 text-xs">
-                      {activeListings.length === 0
-                        ? 'No active store listings found. Connect your account or enter ID manually below.'
-                        : `No listings match "${browserSearch}"`}
+                    <div className="text-center py-4 text-slate-400 text-xs space-y-2">
+                      {fetchError ? (
+                        <div className="p-2.5 rounded-lg bg-red-950/40 border border-red-500/30 text-red-300 text-left">
+                          <div className="font-bold flex items-center gap-1.5 mb-1">
+                            <AlertCircle className="w-3.5 h-3.5 text-red-400" />
+                            <span>eBay Listing Discovery Notice</span>
+                          </div>
+                          <p className="text-[11px]">{fetchError}</p>
+                        </div>
+                      ) : activeListings.length === 0 ? (
+                        <div>
+                          <p>No active store listings found on your connected eBay account.</p>
+                          <p className="text-[10px] text-slate-500 mt-1">You can enter your 12-digit eBay Listing ID manually below.</p>
+                        </div>
+                      ) : (
+                        <div>
+                          <p>No listings match <span className="text-amber-400 font-semibold">"{browserSearch}"</span>.</p>
+                          <button
+                            type="button"
+                            onClick={() => setBrowserSearch('')}
+                            className="mt-1 text-[11px] text-amber-400 hover:underline"
+                          >
+                            Clear filter to view all {activeListings.length} listings
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

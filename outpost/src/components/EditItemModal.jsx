@@ -1038,20 +1038,40 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
                     value={ebaySearch}
                     onChange={e => setEbaySearch(e.target.value)}
                     placeholder="Filter your active eBay listings by title, SKU, or ID..."
-                    className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                    className="w-full pl-8 pr-7 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
                   />
+                  {ebaySearch && (
+                    <button
+                      type="button"
+                      onClick={() => setEbaySearch('')}
+                      className="absolute right-2 top-2 text-slate-500 hover:text-slate-300 text-xs p-0.5"
+                      title="Clear search filter"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
                 </div>
 
                 <div className="max-h-44 overflow-y-auto space-y-1.5 pr-1">
                   {ebayListings
                     .filter(l => {
                       if (!ebaySearch.trim()) return true;
-                      const q = ebaySearch.toLowerCase();
-                      return (
-                        (l.title && l.title.toLowerCase().includes(q)) ||
-                        (l.sku && l.sku.toLowerCase().includes(q)) ||
-                        (l.listing_id && String(l.listing_id).includes(q))
-                      );
+                      const q = ebaySearch.trim().toLowerCase();
+                      const cleanQ = q.replace(/[^a-z0-9]/g, '');
+
+                      if (l.title && l.title.toLowerCase().includes(q)) return true;
+                      if (l.sku && l.sku.toLowerCase().includes(q)) return true;
+                      if (l.listing_id && String(l.listing_id).includes(q)) return true;
+
+                      const cleanTitle = (l.title || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                      if (cleanTitle && cleanQ && cleanTitle.includes(cleanQ)) return true;
+
+                      const tokens = q.split(/\s+/).filter(t => t.length > 1);
+                      if (tokens.length > 0 && tokens.every(token => (l.title || '').toLowerCase().includes(token))) {
+                        return true;
+                      }
+
+                      return false;
                     })
                     .slice(0, 30)
                     .map((listing, idx) => {
@@ -1085,6 +1105,26 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
                   {!loadingEbayListings && ebayListings.length === 0 && (
                     <div className="text-center py-4 text-slate-500 text-xs">
                       No active listings found on your connected eBay account.
+                    </div>
+                  )}
+
+                  {!loadingEbayListings && ebayListings.length > 0 && ebayListings.filter(l => {
+                    if (!ebaySearch.trim()) return true;
+                    const q = ebaySearch.trim().toLowerCase();
+                    const cleanQ = q.replace(/[^a-z0-9]/g, '');
+                    if (l.title && l.title.toLowerCase().includes(q)) return true;
+                    const cleanTitle = (l.title || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                    return cleanTitle && cleanQ && cleanTitle.includes(cleanQ);
+                  }).length === 0 && (
+                    <div className="text-center py-4 text-slate-400 text-xs">
+                      <p>No listings match <span className="text-amber-400 font-semibold">"{ebaySearch}"</span>.</p>
+                      <button
+                        type="button"
+                        onClick={() => setEbaySearch('')}
+                        className="mt-1 text-[11px] text-amber-400 hover:underline"
+                      >
+                        Clear filter to view all {ebayListings.length} listings
+                      </button>
                     </div>
                   )}
                 </div>

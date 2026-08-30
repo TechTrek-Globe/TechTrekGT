@@ -1,13 +1,11 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
-import { getEbayUserToken, getEbayApiBase } from './tokenHelper.js';
+import { getEbayUserToken, fetchEbayActiveSellerListings } from './tokenHelper.js';
 
 /**
  * GET /api/ebay/find-listings
  *
- * Fetches active eBay seller listings directly from eBay's Sell Inventory API,
- * then fuzzy-matches them against internal auction_items in D1 that:
- *   - Have status = 'Listed' or 'Available'
- *   - Have ebay_listing_id IS NULL or empty
+ * Fetches active eBay seller listings supporting both traditional web/app listings
+ * and REST inventory listings, then fuzzy-matches them against internal auction_items in D1.
  *
  * Returns a list of { ebay_listing, matched_item, confidence } for user review.
  */
@@ -32,52 +30,7 @@ export async function onRequestGet(context) {
     let ebayListings = [];
     try {
       const accessToken = await getEbayUserToken(env, payload.userId);
-      const base = getEbayApiBase(env);
-
-      // Fetch all inventory items from eBay Sell Inventory API
-      const invRes = await fetch(`${base}/sell/inventory/v1/inventory_item?limit=100&offset=0`, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!invRes.ok) {
-        const text = await invRes.text().catch(() => '');
-        if (invRes.status === 401) return err('eBay token rejected. Disconnect and reconnect your eBay account in Settings.', 401);
-        if (invRes.status === 403) return err('eBay Sell Inventory API requires sell.inventory.readonly scope approval at developer.ebay.com.', 403);
-        return err(`eBay Inventory API error (${invRes.status}): ${text.slice(0, 200)}`, invRes.status);
-      }
-
-      const invData = await invRes.json();
-      const inventoryItems = invData.inventoryItems || [];
-
-      // Fetch active offer price for each SKU
-      for (const inv of inventoryItems) {
-        try {
-          const offerRes = await fetch(
-            `${base}/sell/inventory/v1/offer?sku=${encodeURIComponent(inv.sku)}&limit=1`,
-            { headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' } }
-          );
-          if (offerRes.ok) {
-            const offerData = await offerRes.json();
-            const offer = offerData.offers?.[0];
-            ebayListings.push({
-              sku: inv.sku,
-              listing_id: offer?.listingId || null,
-              title: inv.product?.title || '',
-              condition: inv.condition,
-              price: parseFloat(offer?.pricingSummary?.price?.value || '0'),
-              status: offer?.status || 'UNKNOWN',
-              listing_url: offer?.listingId ? `https://www.ebay.com/itm/${offer.listingId}` : null
-            });
-          } else {
-            ebayListings.push({ sku: inv.sku, listing_id: null, title: inv.product?.title || '', condition: inv.condition });
-          }
-        } catch (_) {
-          ebayListings.push({ sku: inv.sku, listing_id: null, title: inv.product?.title || '' });
-        }
-      }
+      ebayListings = await fetchEbayActiveSellerListings(env, accessToken);
 
       // Stamp last_refreshed_at on success
       await env.DB.prepare(

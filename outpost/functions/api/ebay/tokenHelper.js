@@ -164,3 +164,132 @@ export async function getEbayUserToken(env, userId) {
 
   return newAccessToken;
 }
+
+/**
+ * Fetches all active eBay listings for a seller.
+ * Uses a dual-strategy approach:
+ * 1. eBay Trading API (GetMyeBaySelling): Fetches all active items listed on eBay
+ *    (created via web, app, or third-party tools), including 12-digit ItemID, Title, Price, SKU, Quantity.
+ * 2. eBay Sell Inventory API (/sell/inventory/v1/inventory_item + offer): Fetches items created via Inventory API.
+ * 3. Merges and deduplicates listings by listing_id and sku.
+ */
+export async function fetchEbayActiveSellerListings(env, accessToken) {
+  const isSandbox = isEbaySandbox(env);
+  const tradingBase = isSandbox
+    ? 'https://api.sandbox.ebay.com/ws/api.dll'
+    : 'https://api.ebay.com/ws/api.dll';
+  const restBase = isSandbox
+    ? 'https://api.sandbox.ebay.com'
+    : 'https://api.ebay.com';
+
+  const listingsMap = new Map();
+
+  // 1. Try eBay Trading API (GetMyeBaySelling) - captures all active web & app listings
+  try {
+    const xmlReq = `<?xml version="1.0" encoding="utf-8"?>
+<GetMyeBaySellingRequest xmlns="urn:ebay:apis:eBLBaseComponents">
+  <ActiveList>
+    <Include>true</Include>
+    <Pagination>
+      <EntriesPerPage>100</EntriesPerPage>
+      <PageNumber>1</PageNumber>
+    </Pagination>
+  </ActiveList>
+</GetMyeBaySellingRequest>`;
+
+    const tradingRes = await fetch(tradingBase, {
+      method: 'POST',
+      headers: {
+        'X-EBAY-API-SITEID': '0',
+        'X-EBAY-API-COMPATIBILITY-LEVEL': '967',
+        'X-EBAY-API-CALL-NAME': 'GetMyeBaySelling',
+        'X-EBAY-API-IAF-TOKEN': accessToken,
+        'Content-Type': 'text/xml'
+      },
+      body: xmlReq
+    });
+
+    if (tradingRes.ok) {
+      const xmlText = await tradingRes.text();
+      const itemBlocks = xmlText.match(/<Item[\s>][\s\S]*?<\/Item>/g) || [];
+
+      for (const block of itemBlocks) {
+        const getTag = (tag) => {
+          const m = block.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`));
+          if (!m) return null;
+          let val = m[1].trim();
+          const cdata = val.match(/<!\[CDATA\[([\s\S]*?)\]\]>/);
+          return cdata ? cdata[1].trim() : val;
+        };
+
+        const listingId = getTag('ItemID');
+        const title = getTag('Title');
+        const currentPriceStr = getTag('CurrentPrice') || getTag('BuyItNowPrice') || '0';
+        const qtyStr = getTag('QuantityAvailable') || getTag('Quantity') || '1';
+        const sku = getTag('SKU') || null;
+
+        if (listingId || title) {
+          const key = listingId || sku || title;
+          listingsMap.set(key, {
+            sku: sku || null,
+            listing_id: listingId || null,
+            title: title || '',
+            price: parseFloat(currentPriceStr) || 0,
+            quantity: parseInt(qtyStr, 10) || 1,
+            condition: 'Active',
+            status: 'Active',
+            listing_url: listingId ? `https://www.ebay.com/itm/${listingId}` : null
+          });
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[tokenHelper] Trading API GetMyeBaySelling exception:', e);
+  }
+
+  // 2. Also try Sell Inventory API to capture inventory-model listings
+  try {
+    const invRes = await fetch(`${restBase}/sell/inventory/v1/inventory_item?limit=100&offset=0`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (invRes.ok) {
+      const invData = await invRes.json();
+      const inventoryItems = invData.inventoryItems || [];
+
+      for (const inv of inventoryItems) {
+        try {
+          const offerRes = await fetch(
+            `${restBase}/sell/inventory/v1/offer?sku=${encodeURIComponent(inv.sku)}&limit=1`,
+            { headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' } }
+          );
+          if (offerRes.ok) {
+            const offerData = await offerRes.json();
+            const offer = offerData.offers?.[0];
+            const listingId = offer?.listingId || null;
+            const key = listingId || inv.sku;
+            if (!listingsMap.has(key)) {
+              listingsMap.set(key, {
+                sku: inv.sku,
+                listing_id: listingId,
+                title: inv.product?.title || '',
+                condition: inv.condition || 'Active',
+                price: parseFloat(offer?.pricingSummary?.price?.value || '0'),
+                quantity: inv.availability?.shipToLocationAvailability?.quantity || 1,
+                status: offer?.status || 'Active',
+                listing_url: listingId ? `https://www.ebay.com/itm/${listingId}` : null
+              });
+            }
+          }
+        } catch (_) {}
+      }
+    }
+  } catch (e) {
+    console.warn('[tokenHelper] Sell Inventory API exception:', e);
+  }
+
+  return Array.from(listingsMap.values());
+}

@@ -155,8 +155,18 @@ export async function onRequestGet(context) {
 
     matches.sort((a, b) => b.confidence - a.confidence);
 
+    const matchedItemIds = new Set(matches.map(m => m.matched_item.id));
+    const matchedListingIds = new Set(matches.map(m => m.ebay_listing.listing_id || m.ebay_listing.sku));
+
+    const unmatchedItems = internalItems.filter(item => !matchedItemIds.has(item.id));
+    const unmatchedEbayListings = ebayListings.filter(l => !matchedListingIds.has(l.listing_id || l.sku));
+
     return ok({
       matches,
+      ebay_listings: ebayListings,
+      unmatched_items: unmatchedItems,
+      unmatched_ebay_listings: unmatchedEbayListings,
+      all_internal_items: internalItems,
       ebay_listing_count: ebayListings.length,
       internal_item_count: internalItems.length,
       match_count: matches.length

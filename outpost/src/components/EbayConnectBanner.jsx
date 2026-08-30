@@ -72,7 +72,7 @@ export function EbayConnectBanner({ onFindListings }) {
     setError('');
     try {
       const data = await findEbayListings();
-      if (onFindListings) onFindListings(data.matches || []);
+      if (onFindListings) onFindListings(data.matches || [], data);
       // Reflect the refreshed timestamp in local state without a full refetch
       setStatus(prev => prev ? { ...prev, last_refreshed_at: new Date().toISOString() } : prev);
     } catch (e) {

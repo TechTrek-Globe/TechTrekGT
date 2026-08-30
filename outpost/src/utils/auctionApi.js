@@ -277,6 +277,12 @@ export const resolveDelistPending = (itemId) =>
 export const findEbayListings = () =>
   apiFetch('/api/ebay/find-listings');
 
+// --- eBay Active Listings (On-Demand Picker) ---
+export const getActiveEbayListings = (params = {}) => {
+  const qs = new URLSearchParams(params).toString();
+  return apiFetch(`/api/ebay/active-listings${qs ? `?${qs}` : ''}`);
+};
+
 // --- eBay Fee Reconciliation ---
 export const reconcileSaleFees = (saleId, ebayOrderId) =>
   apiFetch('/api/ebay/reconcile', {

@@ -28,6 +28,7 @@ import { onRequestGet as taxReportGetHandler } from '../functions/api/reports/ta
 import { onRequestGet as marketAlertsGetHandler, onRequestPut as marketAlertsPutHandler, onRequestPost as marketAlertsPostHandler } from '../functions/api/market-alerts.js';
 import { onRequestGet as ebayOAuthStatusHandler } from '../functions/api/ebay/oauth-status.js';
 import { onRequestGet as ebayFindListingsHandler } from '../functions/api/ebay/find-listings.js';
+import { onRequestGet as ebayActiveListingsHandler } from '../functions/api/ebay/active-listings.js';
 import { onRequestPost as ebayReconcileHandler } from '../functions/api/ebay/reconcile.js';
 
 function addSecurityHeaders(response, isLocalhost = false, requestOrigin = '') {
@@ -239,6 +240,8 @@ export default {
         response = await ebayOAuthStatusHandler(context);
       } else if (apiPath === '/api/ebay/find-listings' && request.method === 'GET') {
         response = await ebayFindListingsHandler(context);
+      } else if (apiPath === '/api/ebay/active-listings' && request.method === 'GET') {
+        response = await ebayActiveListingsHandler(context);
       } else if (apiPath === '/api/ebay/reconcile' && request.method === 'POST') {
         response = await ebayReconcileHandler(context);
       } else if (apiPath.startsWith('/api/')) {

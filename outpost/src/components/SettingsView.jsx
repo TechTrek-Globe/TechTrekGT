@@ -59,6 +59,7 @@ export function SettingsView() {
 
   // eBay listing discovery state
   const [listingMatches, setListingMatches] = useState([]);
+  const [listingMatchData, setListingMatchData] = useState(null);
   const [listingMatchOpen, setListingMatchOpen] = useState(false);
 
   // User Preferences (Column Visibility & Category Ordering)
@@ -665,8 +666,9 @@ export function SettingsView() {
                 </p>
               </div>
               <EbayConnectBanner
-                onFindListings={(matches) => {
+                onFindListings={(matches, rawData) => {
                   setListingMatches(matches);
+                  setListingMatchData(rawData || { matches });
                   setListingMatchOpen(true);
                 }}
               />
@@ -1184,6 +1186,7 @@ export function SettingsView() {
       <ListingMatchReviewModal
         isOpen={listingMatchOpen}
         matches={listingMatches}
+        matchData={listingMatchData}
         onClose={() => setListingMatchOpen(false)}
         onSaved={() => {}}
       />

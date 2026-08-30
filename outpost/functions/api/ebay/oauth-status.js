@@ -4,29 +4,34 @@ import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
  * GET /api/ebay/oauth-status
  *
  * Returns the eBay OAuth connection status for the authenticated user
- * by forwarding to the landing gateway and returning the result.
- *
- * The landing gateway owns the token storage; this outpost endpoint
- * is a lightweight proxy that the frontend calls using the standard
- * outpost cookie session.
+ * directly from D1 (personal-budget-db).
  */
 export async function onRequestGet(context) {
   const { request, env } = context;
   return withAuth(async () => {
-    await requireAuth(request, env);
+    const auth = await requireAuth(request, env);
+    if (!env.DB) return err('Database not available', 500);
 
-    const gatewayBase = env.GATEWAY_URL || 'https://techtrekgt.com';
+    const row = await env.DB.prepare(
+      'SELECT ebay_user_id, scopes, access_token_exp, refresh_token_exp, connected_at, last_refreshed_at FROM ebay_oauth_tokens WHERE user_id = ?'
+    ).bind(auth.userId).first();
 
-    const res = await fetch(`${gatewayBase}/api/ebay/oauth/status`, {
-      headers: {
-        // Forward the session cookie so gateway can auth the user
-        Cookie: request.headers.get('Cookie') || '',
-        Origin: 'https://techtrekgt.com'
-      }
+    if (!row) return ok({ connected: false });
+
+    const now = Date.now();
+    const refreshExpMs = row.refresh_token_exp ? new Date(row.refresh_token_exp).getTime() : 0;
+    const daysUntilExpiry = refreshExpMs ? Math.floor((refreshExpMs - now) / (1000 * 60 * 60 * 24)) : 0;
+
+    return ok({
+      connected: true,
+      ebay_user_id: row.ebay_user_id,
+      scopes: row.scopes,
+      access_token_exp: row.access_token_exp,
+      refresh_token_exp: row.refresh_token_exp,
+      connected_at: row.connected_at,
+      last_refreshed_at: row.last_refreshed_at,
+      days_until_expiry: daysUntilExpiry,
+      expiry_warning: daysUntilExpiry < 30
     });
-
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) return err(data.error || 'Gateway error', res.status);
-    return ok(data.data || data);
   });
 }

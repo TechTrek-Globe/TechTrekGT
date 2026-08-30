@@ -50,7 +50,7 @@ function getClientSecret(env) {
   return String(env.EBAY_CLIENT_SECRET || '').trim().replace(/^['"]+|['"]+$/g, '');
 }
 function getRedirectUri(env) {
-  return String(env.EBAY_REDIRECT_URI || 'https://techtrekgt.com/api/ebay/oauth/callback').trim();
+  return String(env.EBAY_RUNAME || env.EBAY_REDIRECT_URI || 'Jon_Kemp-JonKemp-TechTre-isiair').trim();
 }
 
 /**
@@ -93,7 +93,7 @@ export async function getEbayUserToken(env, userId) {
       'Content-Type': 'application/x-www-form-urlencoded',
       'Authorization': `Basic ${credentials}`
     },
-    body: `grant_type=refresh_token&refresh_token=${encodeURIComponent(refreshToken)}&scope=${encodeURIComponent(EBAY_ACG_SCOPES)}`
+    body: `grant_type=refresh_token&refresh_token=${encodeURIComponent(refreshToken)}&scope=${encodeURIComponent(env.EBAY_SCOPES || EBAY_ACG_SCOPES)}`
   });
 
   if (!res.ok) {
@@ -123,21 +123,24 @@ export async function getEbayUserToken(env, userId) {
 
 /**
  * GET /api/ebay/oauth/start
- * Builds eBay auth URL with PKCE, stores state in KV, redirects user.
+ * Builds eBay auth URL with standard Confidential Client parameters, stores state in KV, redirects user.
  */
 export async function onRequestGetStart(context) {
   const { request, env } = context;
   return withGatewayAuth(async () => {
     const { userId } = await requireGatewayAuth(request, env);
 
+    const redirectUri = getRedirectUri(env);
+    if (!redirectUri) {
+      return err('EBAY_RUNAME or EBAY_REDIRECT_URI secret is not configured in Cloudflare environment', 500);
+    }
+
     const state = randomBase64Url(24);
-    const codeVerifier = randomBase64Url(48);
-    const codeChallenge = await sha256B64(codeVerifier);
 
     if (env.GATEWAY_KV) {
       await env.GATEWAY_KV.put(
         `${KV_STATE_PREFIX}${state}`,
-        JSON.stringify({ codeVerifier, userId }),
+        JSON.stringify({ userId }),
         { expirationTtl: KV_STATE_TTL }
       );
     }
@@ -145,12 +148,9 @@ export async function onRequestGetStart(context) {
     const params = new URLSearchParams({
       client_id: getClientId(env),
       response_type: 'code',
-      redirect_uri: getRedirectUri(env),
-      scope: EBAY_ACG_SCOPES,
-      state,
-      code_challenge: codeChallenge,
-      code_challenge_method: 'S256',
-      prompt: 'login'
+      redirect_uri: redirectUri,
+      scope: env.EBAY_SCOPES || EBAY_ACG_SCOPES,
+      state
     });
 
     const authUrl = `${getAuthBaseUrl(env)}?${params}`;
@@ -189,7 +189,8 @@ export async function onRequestGetCallback(context) {
     }
     await env.GATEWAY_KV.delete(`${KV_STATE_PREFIX}${state}`);
 
-    const { codeVerifier, userId } = stateData;
+    const { userId } = stateData;
+    const redirectUri = getRedirectUri(env);
 
     const { oauthUrl } = getEbayEndpoints(env);
     const credentials = btoa(`${getClientId(env)}:${getClientSecret(env)}`);
@@ -203,8 +204,7 @@ export async function onRequestGetCallback(context) {
       body: [
         `grant_type=authorization_code`,
         `code=${encodeURIComponent(code)}`,
-        `redirect_uri=${encodeURIComponent(getRedirectUri(env))}`,
-        `code_verifier=${encodeURIComponent(codeVerifier)}`
+        `redirect_uri=${encodeURIComponent(redirectUri)}`
       ].join('&')
     });
 
@@ -212,6 +212,7 @@ export async function onRequestGetCallback(context) {
       console.error('[ebayOAuth callback] token exchange failed:', tokenRes.status);
       return Response.redirect(`${redirectBase}?ebay=error&reason=token_exchange`, 302);
     }
+
 
     const tokenData = await tokenRes.json();
     const accessToken = tokenData.access_token;

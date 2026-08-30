@@ -7,6 +7,9 @@
   "observability": {
     "enabled": true
   },
+  "vars": {
+    "EBAY_RUNAME": "Jon_Kemp-JonKemp-TechTre-isiair"
+  },
   "kv_namespaces": [
     {
       "binding": "GATEWAY_KV",

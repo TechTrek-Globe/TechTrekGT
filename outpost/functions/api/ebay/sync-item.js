@@ -65,14 +65,11 @@ export async function onRequestPost(context) {
     const platformFlatFee = liveListing.platform_flat_fee != null ? liveListing.platform_flat_fee : 0.40;
 
     // Shipping cost logic:
-    // If Free Shipping: seller covers shipping (use item est_shipping_cost or default $4.50 standard label)
-    // If Buyer Pays Shipping: buyer covers shipping (seller net shipping liability is 0)
-    let estShippingCost = item.est_shipping_cost || 0;
-    if (liveListing.is_free_shipping === false) {
-      estShippingCost = 0.00;
-    } else if (liveListing.is_free_shipping === true && (!estShippingCost || estShippingCost === 0)) {
-      estShippingCost = 4.50; // Standard domestic shipping floor
-    }
+    // If listing has a shipping charge to the buyer (e.g. $5.99), populate est_shipping_cost with that shipping charge.
+    // If listing has Free Shipping, use existing item shipping cost or default standard shipping ($4.50).
+    let estShippingCost = liveListing.buyer_shipping_cost > 0
+      ? liveListing.buyer_shipping_cost
+      : (item.est_shipping_cost && item.est_shipping_cost > 0 ? item.est_shipping_cost : (liveListing.is_free_shipping ? 4.50 : 0.00));
 
     const pricing = computePricingFloors({
       true_total_cost: targetCost,

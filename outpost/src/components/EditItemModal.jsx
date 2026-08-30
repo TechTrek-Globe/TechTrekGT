@@ -152,10 +152,12 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
           current_list_price: it.current_list_price != null ? Number(it.current_list_price).toFixed(2) : prev.current_list_price,
           status: it.status || prev.status,
           platform: 'eBay',
-          platform_fee_pct: '13.5',
-          platform_flat_fee: '0.40',
+          platform_fee_pct: it.platform_fee_pct != null ? String((it.platform_fee_pct * 100).toFixed(2)) : '13.25',
+          platform_flat_fee: it.platform_flat_fee != null ? String(Number(it.platform_flat_fee).toFixed(2)) : '0.40',
           date_listed: it.date_listed || prev.date_listed,
-          ebay_promoted_rate: it.ebay_promoted_rate != null ? String(it.ebay_promoted_rate) : prev.ebay_promoted_rate
+          est_shipping_cost: it.est_shipping_cost != null ? String(Number(it.est_shipping_cost).toFixed(2)) : prev.est_shipping_cost,
+          ebay_promoted_rate: it.ebay_promoted_rate != null ? String(it.ebay_promoted_rate) : prev.ebay_promoted_rate,
+          boost_pct: it.ebay_promoted_rate != null ? String(it.ebay_promoted_rate) : (it.boost_pct != null ? String(it.boost_pct * 100) : prev.boost_pct)
         }));
         setSuccess(`Successfully synchronized with live eBay listing #${form.ebay_listing_id}!`);
         if (onUpdated) onUpdated(item.id, it);
@@ -199,7 +201,7 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
         current_list_price: form.current_list_price !== '' ? parseFloat(form.current_list_price) : null,
         actual_sell_price: form.actual_sell_price !== '' ? parseFloat(form.actual_sell_price) : null,
         target_margin_pct: form.target_margin_pct !== '' ? parseFloat(form.target_margin_pct) / 100 : 0.20,
-        boost_pct: form.boost_pct !== '' ? parseFloat(form.boost_pct) / 100 : 0,
+        boost_pct: form.ebay_promoted_rate !== '' ? (parseFloat(form.ebay_promoted_rate) / 100) : (form.boost_pct !== '' ? parseFloat(form.boost_pct) / 100 : 0),
         est_shipping_cost: form.est_shipping_cost !== '' ? parseFloat(form.est_shipping_cost) : 0,
         date_acquired: form.date_acquired || null,
         date_listed: form.date_listed || null,
@@ -1208,15 +1210,61 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
                       min="0"
                       max="20"
                       value={form.ebay_promoted_rate}
-                      onChange={e => setForm({ ...form, ebay_promoted_rate: e.target.value })}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setForm(prev => ({
+                          ...prev,
+                          ebay_promoted_rate: val,
+                          boost_pct: val
+                        }));
+                      }}
                       className="input-field text-xs pr-8 font-mono text-amber-300 font-bold"
                       placeholder="e.g. 3.5"
                     />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-bold pointer-events-none">%</span>
                   </div>
                   <p className="text-[10px] text-slate-500 mt-1">
-                    Used to calculate ad fee estimates in pricing floors.
+                    Incorporated into ad boost (%) and minimum break-even pricing floor.
                   </p>
+                </div>
+              </div>
+
+              {/* Real-time eBay Pricing Floor Calculation Breakdown */}
+              <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-200">
+                    <TrendingUp className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Live eBay Break-Even & Profit Floor Calculation</span>
+                  </div>
+                  <span className="text-[11px] font-mono text-emerald-400 font-bold">
+                    Floor: ${liveMinSell?.toFixed(2) || '0.00'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] text-slate-400 pt-1 border-t border-slate-800">
+                  <div>
+                    <span className="block text-[10px] text-slate-500">True Acquisition Cost:</span>
+                    <span className="font-semibold text-white">${currentCost.toFixed(2)}</span>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] text-slate-500">Est. Shipping Charge:</span>
+                    <span className="font-semibold text-sky-400">${parsedShip.toFixed(2)}</span>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] text-slate-500">eBay Fee Rate:</span>
+                    <span className="font-semibold text-amber-300">{(parsedFeePct * 100).toFixed(2)}% + ${parsedFlatFee.toFixed(2)}</span>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] text-slate-500">Promoted Ad Rate:</span>
+                    <span className="font-semibold text-purple-400">{(parsedBoost * 100).toFixed(1)}%</span>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between text-xs pt-1.5 border-t border-slate-800/80">
+                  <span className="text-slate-400 text-[11px]">
+                    Min Break-Even Floor: <strong className="text-emerald-400">${liveMinSell?.toFixed(2) || '0.00'}</strong>
+                  </span>
+                  <span className="text-slate-400 text-[11px]">
+                    Suggested List (+{((parseFloat(form.target_margin_pct) || 20)).toFixed(0)}% Margin): <strong className="text-amber-300">${liveSuggestedList?.toFixed(2) || '0.00'}</strong>
+                  </span>
                 </div>
               </div>
             </div>

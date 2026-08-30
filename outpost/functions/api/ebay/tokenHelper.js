@@ -429,11 +429,30 @@ export async function fetchSingleEbayListing(env, accessToken, listingId) {
       const feeStructure = calculateEbayCategoryFees(categoryId, categoryName, price);
 
       // Shipping details (Free shipping vs Buyer pays)
-      const freeShippingTag = getTag('FreeShipping');
-      const shippingCostStr = getTag('ShippingServiceCost');
-      const isFreeShipping = freeShippingTag === 'true' || (shippingCostStr != null && parseFloat(shippingCostStr) === 0);
-      const buyerShippingCost = !isFreeShipping && shippingCostStr != null ? parseFloat(shippingCostStr) : 0;
-      const shippingService = getTag('ShippingService') || (isFreeShipping ? 'Free Shipping' : 'Calculated / Flat Shipping');
+      let isFreeShipping = false;
+      let buyerShippingCost = 0;
+      let shippingService = 'Standard Shipping';
+
+      const freeShippingMatch = xmlText.match(/<FreeShipping[^>]*>(.*?)<\/FreeShipping>/i);
+      if (freeShippingMatch && freeShippingMatch[1].trim().toLowerCase() === 'true') {
+        isFreeShipping = true;
+      }
+
+      const shippingCostMatch = xmlText.match(/<ShippingServiceCost[^>]*>([0-9.]+)<\/ShippingServiceCost>/i);
+      if (shippingCostMatch) {
+        const parsedCost = parseFloat(shippingCostMatch[1]);
+        if (parsedCost > 0) {
+          buyerShippingCost = parsedCost;
+          isFreeShipping = false;
+        } else if (parsedCost === 0) {
+          isFreeShipping = true;
+        }
+      }
+
+      const serviceMatch = xmlText.match(/<ShippingService[^>]*>(.*?)<\/ShippingService>/i);
+      if (serviceMatch) {
+        shippingService = serviceMatch[1].trim();
+      }
 
       // Item Specifics (Athlete, Cert Number, Grader/Authenticator, Sport)
       const specifics = {};

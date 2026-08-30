@@ -88,6 +88,13 @@ export async function onRequestPut(context) {
       }
     }
 
+    // Ensure boost_pct mirrors ebay_promoted_rate if set
+    if (updated.ebay_promoted_rate != null && updated.ebay_promoted_rate > 0) {
+      updated.boost_pct = updated.ebay_promoted_rate / 100;
+    } else if (body.ebay_promoted_rate === 0 || body.ebay_promoted_rate === '0') {
+      updated.boost_pct = 0;
+    }
+
     // Recompute pricing floors whenever fee or shipping changes
     const pricing = computePricingFloors({
       true_total_cost:   updated.true_total_cost != null ? updated.true_total_cost : item.true_total_cost,

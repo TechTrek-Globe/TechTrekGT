@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import {
   Package, X, Save, Loader2, ExternalLink, ShieldCheck, Tag,
   DollarSign, Calendar, CheckCircle2, AlertCircle, TrendingUp, Zap,
-  ArrowUpRight
+  ArrowUpRight, ShoppingBag, Search, Link2, ChevronDown, ChevronUp
 } from 'lucide-react';
-import { updateItem, saveComp, fetchLiveComps } from '../utils/auctionApi';
+import { updateItem, saveComp, fetchLiveComps, getActiveEbayListings } from '../utils/auctionApi';
 import { getCertVerificationUrl, getAuthenticatorMeta } from '../utils/certLookup';
 import { fmtCurrency, roundPrice, computePricingFloors } from '../utils/formulaPreview';
 import { cleanAthleteName, cleanItemDescription } from '../utils/spreadsheetParser';
@@ -28,10 +28,15 @@ const STANDARD_CATEGORIES = [
 ];
 
 export function EditItemModal({ isOpen, item, categoryOptions = [], platformOptions = [], onClose, onUpdated }) {
-  const [activeTab, setActiveTab] = useState('details'); // 'details' | 'pricing' | 'financials' | 'status'
+  const [activeTab, setActiveTab] = useState('details'); // 'details' | 'pricing' | 'financials' | 'status' | 'ebay'
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  // Active eBay listings browser state
+  const [ebayListings, setEbayListings] = useState([]);
+  const [loadingEbayListings, setLoadingEbayListings] = useState(false);
+  const [ebaySearch, setEbaySearch] = useState('');
 
   const [form, setForm] = useState({
     item_name: '',
@@ -55,7 +60,9 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
     date_listed: '',
     date_sold: '',
     best_listing_window: '',
-    notes: ''
+    notes: '',
+    ebay_listing_id: '',
+    ebay_promoted_rate: ''
   });
 
   const [compsDraft, setCompsDraft] = useState({
@@ -93,8 +100,14 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
         date_listed: item.date_listed || '',
         date_sold: item.date_sold || '',
         best_listing_window: item.best_listing_window || '',
-        notes: item.notes || ''
+        notes: item.notes || '',
+        ebay_listing_id: item.ebay_listing_id || '',
+        ebay_promoted_rate: item.ebay_promoted_rate != null ? String(item.ebay_promoted_rate) : ''
       });
+
+      const initialQuery = item.item_name ? item.item_name.split(' ').slice(0, 3).join(' ') : '';
+      setEbaySearch(initialQuery);
+      fetchActiveListings();
 
       setCompsDraft({
         comp_1: item.comp_1 !== null && item.comp_1 !== undefined && item.comp_1 !== '' ? Number(item.comp_1).toFixed(2) : '',
@@ -111,6 +124,18 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
       setSuccess('');
     }
   }, [item]);
+
+  const fetchActiveListings = async () => {
+    setLoadingEbayListings(true);
+    try {
+      const data = await getActiveEbayListings({ limit: 100 });
+      setEbayListings(data.listings || []);
+    } catch (_) {
+      setEbayListings([]);
+    } finally {
+      setLoadingEbayListings(false);
+    }
+  };
 
   if (!isOpen || !item) return null;
 
@@ -150,7 +175,9 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
         date_listed: form.date_listed || null,
         date_sold: form.date_sold || null,
         best_listing_window: form.best_listing_window.trim() || null,
-        notes: form.notes.trim() || null
+        notes: form.notes.trim() || null,
+        ebay_listing_id: form.ebay_listing_id ? form.ebay_listing_id.trim() : null,
+        ebay_promoted_rate: form.ebay_promoted_rate !== '' ? parseFloat(form.ebay_promoted_rate) : null
       };
 
       const res = await updateItem(item.id, payload);
@@ -373,7 +400,23 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
-            <Calendar className="w-3.5 h-3.5" /> Status & Notes
+            <Tag className="w-3.5 h-3.5" /> Lifecycle & Notes
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('ebay')}
+            className={`py-3 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 ${
+              activeTab === 'ebay'
+                ? 'border-amber-400 text-amber-400'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <ShoppingBag className="w-3.5 h-3.5" />
+            eBay Listing
+            {form.ebay_listing_id && (
+              <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-sm" title={`Linked to eBay #${form.ebay_listing_id}`} />
+            )}
           </button>
         </div>
 
@@ -938,6 +981,154 @@ export function EditItemModal({ isOpen, item, categoryOptions = [], platformOpti
                   className="input-field text-xs"
                   placeholder="Condition notes, inscription details, framing dimensions..."
                 />
+              </div>
+            </div>
+          )}
+
+          {/* TAB 5: EBAY LISTING */}
+          {activeTab === 'ebay' && (
+            <div className="space-y-4">
+              {/* Linked Status Banner */}
+              {form.ebay_listing_id ? (
+                <div className="p-4 rounded-xl bg-emerald-950/30 border border-emerald-500/40 flex items-start justify-between gap-3">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                      <span className="text-xs font-bold text-emerald-300">Linked to Active eBay Listing</span>
+                    </div>
+                    <p className="text-xs text-slate-300 font-mono">Listing ID: #{form.ebay_listing_id}</p>
+                    <a
+                      href={`https://www.ebay.com/itm/${form.ebay_listing_id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-[11px] text-amber-400 hover:underline pt-0.5"
+                    >
+                      <ExternalLink className="w-3 h-3" /> View live on eBay.com
+                    </a>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setForm(prev => ({ ...prev, ebay_listing_id: '' }))}
+                    className="px-2.5 py-1 rounded-lg text-[11px] font-semibold text-slate-400 hover:text-red-400 hover:bg-red-500/10 border border-slate-700 hover:border-red-500/20 transition-all flex-shrink-0"
+                  >
+                    Disconnect Listing
+                  </button>
+                </div>
+              ) : (
+                <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 flex items-center justify-between text-xs text-slate-400">
+                  <span>Not currently linked to an active eBay store listing.</span>
+                  <span className="text-[11px] text-amber-400 font-semibold">Select a listing below to pair</span>
+                </div>
+              )}
+
+              {/* Active eBay Listings Browser */}
+              <div className="p-3.5 rounded-xl bg-amber-500/5 border border-amber-500/25 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-xs font-bold text-amber-300">
+                    <ShoppingBag className="w-4 h-4" />
+                    <span>Select from Active eBay Store Listings</span>
+                  </div>
+                  {loadingEbayListings && <Loader2 className="w-3.5 h-3.5 text-amber-400 animate-spin" />}
+                </div>
+
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-2.5" />
+                  <input
+                    type="text"
+                    value={ebaySearch}
+                    onChange={e => setEbaySearch(e.target.value)}
+                    placeholder="Filter your active eBay listings by title, SKU, or ID..."
+                    className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div className="max-h-44 overflow-y-auto space-y-1.5 pr-1">
+                  {ebayListings
+                    .filter(l => {
+                      if (!ebaySearch.trim()) return true;
+                      const q = ebaySearch.toLowerCase();
+                      return (
+                        (l.title && l.title.toLowerCase().includes(q)) ||
+                        (l.sku && l.sku.toLowerCase().includes(q)) ||
+                        (l.listing_id && String(l.listing_id).includes(q))
+                      );
+                    })
+                    .slice(0, 30)
+                    .map((listing, idx) => {
+                      const id = String(listing.listing_id || listing.sku);
+                      const isSelected = form.ebay_listing_id === id;
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => setForm(prev => ({ ...prev, ebay_listing_id: id }))}
+                          className={`w-full text-left p-2 rounded-lg border transition-all flex items-center justify-between text-xs ${
+                            isSelected
+                              ? 'bg-amber-500/20 border-amber-500/50 text-white'
+                              : 'bg-slate-900/90 hover:bg-amber-500/10 border-slate-800 hover:border-amber-500/30'
+                          }`}
+                        >
+                          <div className="min-w-0 pr-2">
+                            <div className="font-semibold text-slate-200 truncate">{listing.title}</div>
+                            <div className="text-[10px] text-slate-400">
+                              ID: {listing.listing_id || 'N/A'} {listing.sku ? `· SKU: ${listing.sku}` : ''}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <span className="font-bold text-emerald-400">${listing.price?.toFixed(2)}</span>
+                            {isSelected && <CheckCircle2 className="w-4 h-4 text-amber-400" />}
+                          </div>
+                        </button>
+                      );
+                    })}
+
+                  {!loadingEbayListings && ebayListings.length === 0 && (
+                    <div className="text-center py-4 text-slate-500 text-xs">
+                      No active listings found on your connected eBay account.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Manual Input Fields */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">
+                    eBay Listing ID <span className="text-slate-500 font-normal">(12-digit numeric)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={form.ebay_listing_id}
+                    onChange={e => setForm({ ...form, ebay_listing_id: e.target.value })}
+                    className="input-field text-xs font-mono text-amber-300 font-bold"
+                    placeholder="e.g. 395123456789"
+                  />
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    From URL: ebay.com/itm/<strong>123456789012</strong>
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">
+                    Promoted Listings Rate (%) <span className="text-slate-500 font-normal">(optional)</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="0.5"
+                      min="0"
+                      max="20"
+                      value={form.ebay_promoted_rate}
+                      onChange={e => setForm({ ...form, ebay_promoted_rate: e.target.value })}
+                      className="input-field text-xs pr-8 font-mono text-amber-300 font-bold"
+                      placeholder="e.g. 3.5"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-bold pointer-events-none">%</span>
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    Used to calculate ad fee estimates in pricing floors.
+                  </p>
+                </div>
               </div>
             </div>
           )}

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Copy, DollarSign, Trash2, Pencil, Loader2, TrendingUp } from 'lucide-react';
+import { Copy, DollarSign, Trash2, Pencil, Loader2, TrendingUp, ShoppingBag } from 'lucide-react';
 import { InlineEditCell } from './InlineEditCell';
 import { InlineStatusSelect } from './InlineStatusSelect';
 import { InlineSelectCell } from './InlineSelectCell';
@@ -21,6 +21,7 @@ export function InventoryTableRow({
   onOpenCopyModal,
   onOpenSaleModal,
   onOpenQueryEdit,
+  onOpenListingIdModal,
   onMarkSold,
 }) {
   const [pricingOpen, setPricingOpen] = useState(false);
@@ -34,6 +35,69 @@ export function InventoryTableRow({
   return (
     <>
       <tr className={`border-b border-slate-800/70 transition-colors group ${rowBg} hover:bg-amber-500/[0.08]`}>
+        {/* Actions (Far Left) */}
+        {columnVisibility.actions !== false && (
+          <td
+            style={{
+              width: `${columnWidths.actions || 110}px`,
+              minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'actions')?.minWidth || 90}px`,
+              maxWidth: `${columnWidths.actions || 110}px`
+            }}
+            className={`px-3 py-1.5 whitespace-nowrap overflow-hidden sticky left-0 z-10 border-r border-slate-800/80 shadow-r transition-colors ${stickyBg} group-hover:bg-[#1a263d]`}
+          >
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setPricingOpen(v => !v)}
+                title={pricingOpen ? "Hide pricing & comps drawer" : "Open pricing & comps drawer"}
+                className={`w-6 h-6 rounded flex items-center justify-center transition-all ${
+                  pricingOpen
+                    ? 'text-amber-400 bg-amber-500/20 border border-amber-500/30'
+                    : hasComps
+                      ? 'text-emerald-400 hover:bg-emerald-950/40 hover:text-emerald-300'
+                      : 'text-slate-500 hover:text-amber-400 hover:bg-slate-800/80'
+                }`}
+              >
+                <TrendingUp className="w-3 h-3" />
+              </button>
+              <button
+                onClick={() => onOpenListingIdModal && onOpenListingIdModal(item)}
+                title={item.ebay_listing_id ? `Linked to eBay #${item.ebay_listing_id} (click to view / edit)` : "Link to active eBay listing"}
+                className={`w-6 h-6 rounded flex items-center justify-center transition-all ${
+                  item.ebay_listing_id
+                    ? 'text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 shadow-sm'
+                    : 'text-slate-500 hover:text-amber-400 hover:bg-slate-800/80'
+                }`}
+              >
+                <ShoppingBag className="w-3 h-3" />
+              </button>
+              <button
+                onClick={() => onOpenCopyModal(item)}
+                title="Generate listing copy"
+                className="w-6 h-6 rounded flex items-center justify-center text-slate-500 hover:text-amber-400 hover:bg-slate-800/80 transition-all"
+              >
+                <Copy className="w-3 h-3" />
+              </button>
+              {item.status !== 'Sold' && (
+                <button
+                  onClick={() => onOpenSaleModal(item)}
+                  title="Record sale"
+                  className="w-6 h-6 rounded flex items-center justify-center text-slate-500 hover:text-emerald-400 hover:bg-slate-800/80 transition-all"
+                >
+                  <DollarSign className="w-3 h-3" />
+                </button>
+              )}
+              <button
+                onClick={() => onDelete(item.id)}
+                disabled={deleting === item.id || item.status === 'Sold'}
+                title={item.status === 'Sold' ? 'Cannot delete a sold item' : 'Delete item'}
+                className="w-6 h-6 rounded flex items-center justify-center text-slate-600 hover:text-red-400 hover:bg-slate-800/80 transition-all disabled:opacity-20 disabled:cursor-not-allowed"
+              >
+                {deleting === item.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+              </button>
+            </div>
+          </td>
+        )}
+
         {/* Item Name */}
         {columnVisibility.item_name !== false && (
           <td
@@ -42,7 +106,7 @@ export function InventoryTableRow({
               minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'item_name')?.minWidth || 150}px`,
               maxWidth: `${columnWidths.item_name || 220}px`
             }}
-            className={`px-3 py-1.5 sticky left-0 z-10 border-r border-slate-800/80 shadow-r transition-colors overflow-hidden ${stickyBg} group-hover:bg-[#1a263d]`}
+            className="px-3 py-1.5 border-r border-slate-800/60 transition-colors overflow-hidden text-xs"
           >
             <div
               onClick={() => onOpenEditModal(item)}
@@ -286,56 +350,6 @@ export function InventoryTableRow({
         )}
 
         {/* Actions */}
-        {columnVisibility.actions !== false && (
-          <td
-            style={{
-              width: `${columnWidths.actions || 110}px`,
-              minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'actions')?.minWidth || 90}px`,
-              maxWidth: `${columnWidths.actions || 110}px`
-            }}
-            className="px-3 py-1.5 whitespace-nowrap overflow-hidden"
-          >
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setPricingOpen(v => !v)}
-                title={pricingOpen ? "Hide pricing & comps drawer" : "Open pricing & comps drawer"}
-                className={`w-6 h-6 rounded flex items-center justify-center transition-all ${
-                  pricingOpen
-                    ? 'text-amber-400 bg-amber-500/20 border border-amber-500/30'
-                    : hasComps
-                      ? 'text-emerald-400 hover:bg-emerald-950/40 hover:text-emerald-300'
-                      : 'text-slate-500 hover:text-amber-400 hover:bg-slate-800/80'
-                }`}
-              >
-                <TrendingUp className="w-3 h-3" />
-              </button>
-              <button
-                onClick={() => onOpenCopyModal(item)}
-                title="Generate listing copy"
-                className="w-6 h-6 rounded flex items-center justify-center text-slate-500 hover:text-amber-400 hover:bg-slate-800/80 transition-all opacity-0 group-hover:opacity-100"
-              >
-                <Copy className="w-3 h-3" />
-              </button>
-              {item.status !== 'Sold' && (
-                <button
-                  onClick={() => onOpenSaleModal(item)}
-                  title="Record sale"
-                  className="w-6 h-6 rounded flex items-center justify-center text-slate-500 hover:text-emerald-400 hover:bg-slate-800/80 transition-all opacity-0 group-hover:opacity-100"
-                >
-                  <DollarSign className="w-3 h-3" />
-                </button>
-              )}
-              <button
-                onClick={() => onDelete(item.id)}
-                disabled={deleting === item.id || item.status === 'Sold'}
-                title={item.status === 'Sold' ? 'Cannot delete a sold item' : 'Delete item'}
-                className="w-6 h-6 rounded flex items-center justify-center text-slate-600 hover:text-red-400 hover:bg-slate-800/80 transition-all opacity-0 group-hover:opacity-100 disabled:opacity-20 disabled:cursor-not-allowed"
-              >
-                {deleting === item.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
-              </button>
-            </div>
-          </td>
-        )}
       </tr>
 
       {/* Pricing Drawer - renders only when expanded */}

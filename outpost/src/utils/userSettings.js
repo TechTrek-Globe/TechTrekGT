@@ -5,6 +5,7 @@
  */
 
 export const DEFAULT_COLUMNS = [
+  { key: 'actions',              label: 'Actions',         defaultVisible: true, minWidth: 90,  defaultWidth: 110 },
   { key: 'item_name',            label: 'Item Description', defaultVisible: true, minWidth: 150, defaultWidth: 220 },
   { key: 'athlete_person',        label: 'Athlete / Signer', defaultVisible: true, minWidth: 120, defaultWidth: 150 },
   { key: 'status',               label: 'Status',          defaultVisible: true, minWidth: 100, defaultWidth: 130 },
@@ -17,7 +18,6 @@ export const DEFAULT_COLUMNS = [
   { key: 'current_list_price',   label: 'Current List',    defaultVisible: true, minWidth: 110, defaultWidth: 130 },
   { key: 'platform',             label: 'Platform',        defaultVisible: true, minWidth: 100, defaultWidth: 120 },
   { key: 'invoice_ref',          label: 'Invoice',         defaultVisible: true, minWidth: 90,  defaultWidth: 110 },
-  { key: 'actions',              label: 'Actions',         defaultVisible: true, minWidth: 80,  defaultWidth: 100 },
 ];
 
 export const DEFAULT_CATEGORIES = [

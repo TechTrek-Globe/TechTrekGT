@@ -206,6 +206,7 @@ export function InventoryHubView({ onNavigate }) {
               onOpenCopyModal={setCopyModalItem}
               onOpenSaleModal={handleMarkSold}
               onOpenQueryEdit={handleOpenQueryEdit}
+              onOpenListingIdModal={setListingIdModalItem}
               onMarkSold={handleMarkSold}
               userSettings={userSettings}
               setUserSettings={setUserSettings}

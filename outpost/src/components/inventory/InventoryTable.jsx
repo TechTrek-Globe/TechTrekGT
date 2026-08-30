@@ -3,6 +3,7 @@ import { ArrowUpDown } from 'lucide-react';
 import { InventoryTableRow } from './InventoryTableRow';
 
 const DEFAULT_COLUMNS = [
+  { key: 'actions', label: 'Actions', minWidth: 100 },
   { key: 'item_name', label: 'Item / Description', minWidth: 150 },
   { key: 'athlete_person', label: 'Athlete / Signer', minWidth: 120 },
   { key: 'status', label: 'Status', minWidth: 100 },
@@ -14,8 +15,7 @@ const DEFAULT_COLUMNS = [
   { key: 'suggested_list_price', label: 'Suggested List', minWidth: 110 },
   { key: 'current_list_price', label: 'Current List', minWidth: 110 },
   { key: 'platform', label: 'Platform', minWidth: 100 },
-  { key: 'invoice_ref', label: 'Invoice Ref', minWidth: 90 },
-  { key: 'actions', label: '', minWidth: 80 }
+  { key: 'invoice_ref', label: 'Invoice Ref', minWidth: 90 }
 ];
 
 export function InventoryTable({
@@ -33,6 +33,7 @@ export function InventoryTable({
   onOpenCopyModal,
   onOpenSaleModal,
   onOpenQueryEdit,
+  onOpenListingIdModal,
   onMarkSold,
   userSettings,
   setUserSettings
@@ -100,7 +101,7 @@ export function InventoryTable({
                     key={key}
                     style={{ width: `${width}px`, minWidth: `${minWidth}px`, maxWidth: `${width}px` }}
                     className={`font-semibold py-2 px-3 border-b border-slate-800 relative select-none text-[11px] ${
-                      key === 'item_name' ? 'sticky left-0 bg-slate-900/90 shadow-r z-30' : ''
+                      key === 'actions' ? 'sticky left-0 bg-slate-900/95 shadow-r z-30' : ''
                     }`}
                   >
                     <div
@@ -150,6 +151,7 @@ export function InventoryTable({
                     onOpenCopyModal={onOpenCopyModal}
                     onOpenSaleModal={onOpenSaleModal}
                     onOpenQueryEdit={onOpenQueryEdit}
+                    onOpenListingIdModal={onOpenListingIdModal}
                     onMarkSold={onMarkSold}
                   />
                 ))}
@@ -193,6 +195,7 @@ export function InventoryTable({
                         onOpenCopyModal={onOpenCopyModal}
                         onOpenSaleModal={onOpenSaleModal}
                         onOpenQueryEdit={onOpenQueryEdit}
+                        onOpenListingIdModal={onOpenListingIdModal}
                         onMarkSold={onMarkSold}
                       />
                     ))}

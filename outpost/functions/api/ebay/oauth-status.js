@@ -31,7 +31,12 @@ export async function onRequestGet(context) {
       connected_at: row.connected_at,
       last_refreshed_at: row.last_refreshed_at,
       days_until_expiry: daysUntilExpiry,
-      expiry_warning: daysUntilExpiry < 30
+      expiry_warning: daysUntilExpiry < 30,
+      scope_flags: {
+        has_sell_inventory: (row.scopes || '').includes('sell.inventory.readonly'),
+        has_sell_finances: (row.scopes || '').includes('sell.finances'),
+        has_sell_fulfillment: (row.scopes || '').includes('sell.fulfillment.readonly')
+      }
     });
   });
 }

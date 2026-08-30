@@ -2,3 +2,11 @@
 # so the shared auth cookie works across both Finance and Auction apps.
 JWT_SECRET=your_jwt_secret_here
 SYNC_UNLOCK_CODE=your_sync_code_here
+
+# eBay OAuth credentials (required for find-listings access token refresh)
+# Copy values from landing/.dev.vars - these MUST match the landing gateway secrets.
+EBAY_CLIENT_ID=your_ebay_client_id_here
+EBAY_CLIENT_SECRET=your_ebay_client_secret_here
+EBAY_RUNAME=your_ebay_runame_here
+# Optional: set to 'sandbox' to target eBay sandbox API endpoints
+# EBAY_ENV=sandbox

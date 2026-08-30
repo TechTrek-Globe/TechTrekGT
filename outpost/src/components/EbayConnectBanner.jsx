@@ -73,8 +73,19 @@ export function EbayConnectBanner({ onFindListings }) {
     try {
       const data = await findEbayListings();
       if (onFindListings) onFindListings(data.matches || []);
+      // Reflect the refreshed timestamp in local state without a full refetch
+      setStatus(prev => prev ? { ...prev, last_refreshed_at: new Date().toISOString() } : prev);
     } catch (e) {
-      setError(`Listing discovery failed: ${e.message}`);
+      const msg = e.message || '';
+      if (msg.includes('sell.inventory') || msg.includes('scope approval')) {
+        setError('eBay Sell Inventory scope not approved. Apply for sell.inventory.readonly at developer.ebay.com.');
+      } else if (msg.includes('not connected') || msg.includes('refresh token has expired')) {
+        setError('eBay token expired or disconnected. Please disconnect and reconnect your account.');
+      } else if (msg.includes('Endpoint not found') || msg.includes('gateway')) {
+        setError('Backend routing error. Please contact support.');
+      } else {
+        setError(`Listing discovery failed: ${msg}`);
+      }
     } finally {
       setFinding(false);
     }
@@ -179,6 +190,14 @@ export function EbayConnectBanner({ onFindListings }) {
           </span>
         )}
       </div>
+
+      {status.scope_flags && !status.scope_flags.has_sell_inventory && (
+        <div className="flex items-center gap-2 p-2.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-xs text-blue-300">
+          <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+          Listing discovery requires <strong>sell.inventory.readonly</strong> scope approval at
+          {' '}<a href="https://developer.ebay.com" target="_blank" rel="noopener noreferrer" className="underline">developer.ebay.com</a>.
+        </div>
+      )}
 
       {error && (
         <div className="flex items-center gap-1.5 text-xs text-red-400">

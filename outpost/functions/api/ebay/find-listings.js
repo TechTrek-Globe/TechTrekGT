@@ -1,4 +1,5 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
+import { getEbayUserToken, getEbayApiBase } from './tokenHelper.js';
 
 /**
  * GET /api/ebay/find-listings
@@ -28,44 +29,68 @@ export async function onRequestGet(context) {
     const payload = await requireAuth(request, env);
     if (!env.DB) return err('Database not available', 500);
 
-    // Call Central API Gateway on landing worker (holds eBay credentials & handles token refresh)
-    const origin = new URL(request.url).origin;
-    const isLocal = origin.includes('localhost') || origin.includes('127.0.0.1');
-    const gatewayUrl = isLocal ? 'http://localhost:8787/api/ebay/listings' : 'https://techtrekgt.com/api/ebay/listings';
-
-    const cookie = request.headers.get('Cookie') || '';
-    const authHeader = request.headers.get('Authorization') || '';
-
     let ebayListings = [];
     try {
-      const gatewayRes = await fetch(gatewayUrl, {
+      const accessToken = await getEbayUserToken(env, payload.userId);
+      const base = getEbayApiBase(env);
+
+      // Fetch all inventory items from eBay Sell Inventory API
+      const invRes = await fetch(`${base}/sell/inventory/v1/inventory_item?limit=100&offset=0`, {
         headers: {
-          'Cookie': cookie,
-          ...(authHeader ? { 'Authorization': authHeader } : {})
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
         }
       });
 
-      if (!gatewayRes.ok) {
-        const errData = await gatewayRes.json().catch(() => ({}));
-        const errMsg = errData.error || `eBay Gateway error (${gatewayRes.status})`;
-        return err(`eBay connection required: ${errMsg}`, gatewayRes.status === 401 ? 401 : gatewayRes.status);
+      if (!invRes.ok) {
+        const text = await invRes.text().catch(() => '');
+        if (invRes.status === 401) return err('eBay token rejected. Disconnect and reconnect your eBay account in Settings.', 401);
+        if (invRes.status === 403) return err('eBay Sell Inventory API requires sell.inventory.readonly scope approval at developer.ebay.com.', 403);
+        return err(`eBay Inventory API error (${invRes.status}): ${text.slice(0, 200)}`, invRes.status);
       }
 
-      const gatewayData = await gatewayRes.json();
-      ebayListings = (gatewayData.listings || []).map(item => ({
-        listing_id: item.listing_id || item.sku,
-        sku: item.sku,
-        title: item.title,
-        price: item.price || 0,
-        condition: item.condition || 'USED',
-        status: item.status || 'Active',
-        listing_url: item.listing_url || (item.listing_id ? `https://www.ebay.com/itm/${item.listing_id}` : null)
-      }));
+      const invData = await invRes.json();
+      const inventoryItems = invData.inventoryItems || [];
+
+      // Fetch active offer price for each SKU
+      for (const inv of inventoryItems) {
+        try {
+          const offerRes = await fetch(
+            `${base}/sell/inventory/v1/offer?sku=${encodeURIComponent(inv.sku)}&limit=1`,
+            { headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' } }
+          );
+          if (offerRes.ok) {
+            const offerData = await offerRes.json();
+            const offer = offerData.offers?.[0];
+            ebayListings.push({
+              sku: inv.sku,
+              listing_id: offer?.listingId || null,
+              title: inv.product?.title || '',
+              condition: inv.condition,
+              price: parseFloat(offer?.pricingSummary?.price?.value || '0'),
+              status: offer?.status || 'UNKNOWN',
+              listing_url: offer?.listingId ? `https://www.ebay.com/itm/${offer.listingId}` : null
+            });
+          } else {
+            ebayListings.push({ sku: inv.sku, listing_id: null, title: inv.product?.title || '', condition: inv.condition });
+          }
+        } catch (_) {
+          ebayListings.push({ sku: inv.sku, listing_id: null, title: inv.product?.title || '' });
+        }
+      }
+
+      // Stamp last_refreshed_at on success
+      await env.DB.prepare(
+        `UPDATE ebay_oauth_tokens SET last_refreshed_at = datetime('now') WHERE user_id = ?`
+      ).bind(payload.userId).run().catch(() => {});
+
     } catch (e) {
-      return err(`eBay gateway fetch failed: ${e.message}`, 502);
+      const msg = e.message || 'Unknown error';
+      if (msg.includes('not connected') || msg.includes('refresh token has expired')) return err(msg, 401);
+      if (msg.includes('EBAY_CLIENT_ID') || msg.includes('Cannot refresh token')) return err(msg, 500);
+      return err(`eBay sync failed: ${msg}`, 502);
     }
 
-    // Fetch unmapped 'Listed' or 'Available' items for this user from D1
     const rows = await env.DB.prepare(`
       SELECT id, item_name, athlete_person, authenticator, cert_number, category, ebay_listing_id
       FROM auction_items
@@ -78,7 +103,6 @@ export async function onRequestGet(context) {
 
     const internalItems = rows.results || [];
 
-    // If no eBay listings found on Inventory API, return gracefully
     if (ebayListings.length === 0) {
       return ok({
         matches: [],
@@ -88,7 +112,6 @@ export async function onRequestGet(context) {
       });
     }
 
-    // Build match candidates
     const matches = [];
     for (const listing of ebayListings) {
       const candidates = internalItems.map(item => ({

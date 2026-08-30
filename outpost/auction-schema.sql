@@ -299,4 +299,50 @@ ALTER TABLE auction_comps ADD COLUMN active_comp_3 REAL;
 ALTER TABLE auction_comps ADD COLUMN active_avg REAL;
 ALTER TABLE auction_comps ADD COLUMN sold_count INTEGER DEFAULT 0;
 
+-- ============================================================
+-- PHASE 5 MIGRATIONS - eBay Sell Analytics & Performance Engine
+-- Added: 2026-08-30
+-- Listing performance traffic data (impressions, page views, CTR, conversion)
+-- ============================================================
+
+-- P5-1: Listing performance analytics (eBay Sell Analytics API traffic data)
+CREATE TABLE IF NOT EXISTS auction_item_analytics (
+  id                        TEXT PRIMARY KEY,
+  item_id                   TEXT NOT NULL,
+  user_id                   TEXT NOT NULL,
+  ebay_listing_id           TEXT NOT NULL,
+  period_start              TEXT NOT NULL,
+  period_end                TEXT NOT NULL,
+  granularity               TEXT NOT NULL DEFAULT 'DAY',
+  range_days                INTEGER NOT NULL DEFAULT 30,
+  total_impressions         INTEGER DEFAULT 0,
+  promoted_impressions      INTEGER DEFAULT 0,
+  organic_impressions       INTEGER DEFAULT 0,
+  total_page_views          INTEGER DEFAULT 0,
+  click_through_rate        REAL DEFAULT 0.0,
+  sales_conversion_rate     REAL DEFAULT 0.0,
+  dates_json                TEXT,
+  impressions_json          TEXT,
+  promoted_impressions_json TEXT,
+  page_views_json           TEXT,
+  ctr_json                  TEXT,
+  conversion_json           TEXT,
+  raw_response              TEXT,
+  fetched_at                TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (item_id) REFERENCES auction_items(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_analytics_item ON auction_item_analytics(item_id, range_days);
+CREATE INDEX IF NOT EXISTS idx_analytics_ebay ON auction_item_analytics(ebay_listing_id);
+CREATE INDEX IF NOT EXISTS idx_analytics_user ON auction_item_analytics(user_id);
+
+-- P5-2: auction_items column additions (snapshot KPI columns for quick access)
+ALTER TABLE auction_items ADD COLUMN analytics_fetched_at TEXT;
+ALTER TABLE auction_items ADD COLUMN total_impressions_30d INTEGER DEFAULT 0;
+ALTER TABLE auction_items ADD COLUMN total_page_views_30d INTEGER DEFAULT 0;
+ALTER TABLE auction_items ADD COLUMN avg_ctr_30d REAL DEFAULT 0.0;
+ALTER TABLE auction_items ADD COLUMN avg_conversion_30d REAL DEFAULT 0.0;
+
+
 

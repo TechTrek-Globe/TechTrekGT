@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { updateItem, saveComp, fetchLiveComps, getActiveEbayListings, syncEbayItem } from '../utils/auctionApi';
+import { updateItem, saveComp, fetchLiveComps, getActiveEbayListings, syncEbayItem, fetchEbayItemAnalytics } from '../utils/auctionApi';
 import { computeFeeBreakdown } from '../utils/feeEngine';
 import { roundPrice } from '../utils/formulaPreview';
 import { cleanEbaySearchQuery } from '../utils/ebaySearch';
@@ -11,6 +11,7 @@ import { EditTabNav } from './edit/EditTabNav';
 import { EditTabDetails } from './edit/EditTabDetails';
 import { EditTabListingPricing } from './edit/EditTabListingPricing';
 import { EditTabComps } from './edit/EditTabComps';
+import { EditTabPerformance } from './edit/EditTabPerformance';
 
 const PLATFORM_FEE_PRESETS = {
   'eBay':         { fee_pct: 13.5, flat_fee: 0.40 },
@@ -108,6 +109,12 @@ export function EditItemModal({
     fetchMsg: null,
   });
 
+  // eBay Listing Performance Analytics state
+  const [analytics, setAnalytics] = useState(null);
+  const [loadingAnalytics, setLoadingAnalytics] = useState(false);
+  const [analyticsError, setAnalyticsError] = useState('');
+  const [analyticsRange, setAnalyticsRange] = useState(30);
+
   // Populate form on item change
   useEffect(() => {
     if (item) {
@@ -182,6 +189,12 @@ export function EditItemModal({
         fetchingLive: false,
         fetchMsg: null,
       });
+
+      // Reset Analytics on item change
+      setAnalytics(null);
+      setLoadingAnalytics(false);
+      setAnalyticsError('');
+      setAnalyticsRange(30);
 
       const initialQuery = item.item_name ? item.item_name.split(' ').slice(0, 3).join(' ') : '';
       setEbaySearch(initialQuery);
@@ -335,6 +348,34 @@ export function EditItemModal({
       setCompsDraft(prev => ({ ...prev, saving: false }));
     }
   };
+
+  // eBay Listing Performance Analytics fetch handler
+  const handleFetchAnalytics = useCallback(async (range = 30, force = false) => {
+    if (!item?.id || !form.ebay_listing_id) return;
+    setLoadingAnalytics(true);
+    setAnalyticsError('');
+    try {
+      const data = await fetchEbayItemAnalytics(item.id, range, force);
+      if (data?.needsReauth) {
+        setAnalytics(data);
+        setAnalyticsError(data.error || 'eBay Analytics scope approval required.');
+      } else {
+        setAnalytics(data);
+      }
+    } catch (e) {
+      setAnalyticsError(e.message || 'Failed to fetch listing performance data');
+    } finally {
+      setLoadingAnalytics(false);
+    }
+  }, [item?.id, form.ebay_listing_id]);
+
+  // Auto-fetch analytics when navigating to the Performance tab
+  useEffect(() => {
+    if (activeTab === 'performance' && !analytics && !loadingAnalytics && form.ebay_listing_id) {
+      handleFetchAnalytics(analyticsRange, false);
+    }
+  }, [activeTab, analytics, loadingAnalytics, form.ebay_listing_id, analyticsRange, handleFetchAnalytics]);
+
 
   const handleFetchLiveComps = async () => {
     setCompsDraft(prev => ({ ...prev, fetchingLive: true, fetchMsg: null }));
@@ -543,6 +584,19 @@ export function EditItemModal({
               handleFetchLiveComps={handleFetchLiveComps}
               handleSaveComps={handleSaveComps}
               minSellPrice={item.min_sell_price}
+            />
+          )}
+
+          {activeTab === 'performance' && (
+            <EditTabPerformance
+              item={item}
+              form={form}
+              analytics={analytics}
+              loadingAnalytics={loadingAnalytics}
+              analyticsError={analyticsError}
+              analyticsRange={analyticsRange}
+              setAnalyticsRange={setAnalyticsRange}
+              onFetchAnalytics={handleFetchAnalytics}
             />
           )}
         </form>

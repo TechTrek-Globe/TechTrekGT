@@ -310,4 +310,9 @@ export const syncAllEbayItems = () =>
     headers: JSON_HEADERS
   });
 
+// --- eBay Sell Analytics (Traffic & Performance Report) ---
+export const fetchEbayItemAnalytics = (itemId, range = 30, force = false) =>
+  apiFetch(`/api/ebay/analytics?item_id=${encodeURIComponent(itemId)}&range=${range}${force ? '&force=true' : ''}`);
+
+
 

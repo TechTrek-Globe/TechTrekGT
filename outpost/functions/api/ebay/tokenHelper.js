@@ -609,16 +609,20 @@ export async function fetchSingleEbayListing(env, accessToken, listingId) {
 
       // Auto-detect active Promoted Listings ad rate (Trading API XML + Marketing API)
       let autoPromotedRate = null;
+      let promotedRateSource = null;
 
       // 1. Check Trading API response XML for any embedded ad rate / promoted rate tags
       const xmlRateMatch = xmlText.match(/<(?:BidPercentage|AdRate|PromotedRate|AdPercentage)[^>]*>([0-9.]+)<\/(?:BidPercentage|AdRate|PromotedRate|AdPercentage)>/i) ||
                            xmlText.match(/<PromotedListing[^>]*>[\s\S]*?<BidPercentage[^>]*>([0-9.]+)<\/BidPercentage>/i);
       if (xmlRateMatch) {
         const r = parseFloat(xmlRateMatch[1]);
-        if (r > 0) autoPromotedRate = r;
+        if (r > 0) {
+          autoPromotedRate = r;
+          promotedRateSource = 'trading_xml';
+        }
       }
 
-      // 2. Query eBay Marketing API
+      // 2. Query eBay Marketing API (Promoted Listings Standard)
       if (autoPromotedRate == null) {
         try {
           const mktBase = isSandbox ? 'https://api.sandbox.ebay.com' : 'https://api.ebay.com';
@@ -637,9 +641,9 @@ export async function fetchSingleEbayListing(env, accessToken, listingId) {
             for (const camp of campaigns) {
               if (!camp.campaignId) continue;
 
-              // Query campaign ads for this specific listing ID
+              // Query campaign ads specifically for this listing ID (using singular listing_id query parameter)
               try {
-                const adRes = await fetch(`${mktBase}/sell/marketing/v1/ad_campaign/${camp.campaignId}/ad?listing_ids=${cleanId}`, {
+                const adRes = await fetch(`${mktBase}/sell/marketing/v1/ad_campaign/${camp.campaignId}/ad?listing_id=${cleanId}`, {
                   headers: {
                     Authorization: `Bearer ${accessToken}`,
                     Accept: 'application/json',
@@ -649,18 +653,22 @@ export async function fetchSingleEbayListing(env, accessToken, listingId) {
                 if (adRes.ok) {
                   const adData = await adRes.json();
                   const ads = adData.ads || [];
-                  const matchedAd = ads.find(a => String(a.listingId) === cleanId) || ads[0];
+                  const matchedAd = ads.find(a => String(a.listingId) === cleanId || String(a.listingId).includes(cleanId)) || ads[0];
                   if (matchedAd?.bidPercentage) {
                     const r = parseFloat(matchedAd.bidPercentage);
-                    if (r > 0) { autoPromotedRate = r; break; }
+                    if (r > 0) {
+                      autoPromotedRate = r;
+                      promotedRateSource = 'ad_level';
+                      break;
+                    }
                   }
                 }
               } catch (_) {}
 
-              // Also check campaign ads collection or funding strategy
+              // Also check campaign ads collection up to limit 200
               if (autoPromotedRate == null) {
                 try {
-                  const checkAds = await fetch(`${mktBase}/sell/marketing/v1/ad_campaign/${camp.campaignId}/ad?limit=100`, {
+                  const checkAds = await fetch(`${mktBase}/sell/marketing/v1/ad_campaign/${camp.campaignId}/ad?limit=200`, {
                     headers: {
                       Authorization: `Bearer ${accessToken}`,
                       Accept: 'application/json',
@@ -669,10 +677,14 @@ export async function fetchSingleEbayListing(env, accessToken, listingId) {
                   });
                   if (checkAds.ok) {
                     const checkData = await checkAds.json();
-                    const specificAd = (checkData.ads || []).find(a => String(a.listingId) === cleanId);
+                    const specificAd = (checkData.ads || []).find(a => String(a.listingId) === cleanId || String(a.listingId).includes(cleanId));
                     if (specificAd?.bidPercentage) {
                       const r = parseFloat(specificAd.bidPercentage);
-                      if (r > 0) { autoPromotedRate = r; break; }
+                      if (r > 0) {
+                        autoPromotedRate = r;
+                        promotedRateSource = 'ad_level';
+                        break;
+                      }
                     }
                   }
                 } catch (_) {}
@@ -683,6 +695,7 @@ export async function fetchSingleEbayListing(env, accessToken, listingId) {
                 const r = parseFloat(camp.fundingStrategy.bidPercentage);
                 if (r > 0) {
                   autoPromotedRate = r;
+                  promotedRateSource = 'campaign_default';
                   break;
                 }
               }
@@ -693,6 +706,7 @@ export async function fetchSingleEbayListing(env, accessToken, listingId) {
               const candidate = campaigns.find(c => c.fundingStrategy?.bidPercentage && parseFloat(c.fundingStrategy.bidPercentage) > 0);
               if (candidate) {
                 autoPromotedRate = parseFloat(candidate.fundingStrategy.bidPercentage);
+                promotedRateSource = 'campaign_default';
               }
             }
           }
@@ -714,6 +728,7 @@ export async function fetchSingleEbayListing(env, accessToken, listingId) {
           sku: sku,
           listing_type: listingType,
           promoted_rate: autoPromotedRate,
+          promoted_rate_source: promotedRateSource,
           // Expanded Category & Fees
           category_id: categoryId,
           category_name: categoryName,

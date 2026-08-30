@@ -1,10 +1,11 @@
 import React from 'react';
-import { Tag, DollarSign, TrendingUp } from 'lucide-react';
+import { Tag, DollarSign, TrendingUp, BarChart2 } from 'lucide-react';
 
 export const TABS = [
   { id: 'details',         label: 'Item Details',            icon: Tag },
   { id: 'listing_pricing', label: 'Listing, Pricing & Fees', icon: DollarSign },
   { id: 'comps',           label: 'Market Comps',            icon: TrendingUp },
+  { id: 'performance',     label: 'Performance & Traffic',   icon: BarChart2 },
 ];
 
 export function EditTabNav({ activeTab, setActiveTab, form }) {
@@ -18,6 +19,7 @@ export function EditTabNav({ activeTab, setActiveTab, form }) {
         const showDetailsDot = tab.id === 'details' && Boolean(form.cert_number || form.authenticator || form.true_total_cost);
         const showListingDot = tab.id === 'listing_pricing' && Boolean(form.ebay_listing_id);
         const showCompsDot = tab.id === 'comps' && Boolean(form.comp_1 || form.active_comp_1);
+        const showPerfDot = tab.id === 'performance' && Boolean(form.analytics_fetched_at || form.ebay_listing_id);
 
         return (
           <button
@@ -49,6 +51,12 @@ export function EditTabNav({ activeTab, setActiveTab, form }) {
               <span
                 className="w-2 h-2 rounded-full bg-blue-400 shadow-sm"
                 title="Market comps entered"
+              />
+            )}
+            {showPerfDot && (
+              <span
+                className="w-2 h-2 rounded-full bg-purple-400 shadow-sm"
+                title="Performance analytics active"
               />
             )}
           </button>

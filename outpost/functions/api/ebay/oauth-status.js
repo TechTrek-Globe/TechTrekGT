@@ -35,7 +35,9 @@ export async function onRequestGet(context) {
       scope_flags: {
         has_sell_inventory: (row.scopes || '').includes('sell.inventory.readonly'),
         has_sell_finances: (row.scopes || '').includes('sell.finances'),
-        has_sell_fulfillment: (row.scopes || '').includes('sell.fulfillment.readonly')
+        has_sell_fulfillment: (row.scopes || '').includes('sell.fulfillment.readonly'),
+        has_sell_marketing: (row.scopes || '').includes('sell.marketing.readonly'),
+        has_sell_analytics: (row.scopes || '').includes('sell.analytics.readonly')
       }
     });
   });

@@ -234,6 +234,23 @@ export function EbayConnectBanner({ onFindListings }) {
         </div>
       )}
 
+      {status.scope_flags && !status.scope_flags.has_sell_analytics && (
+        <div className="flex items-center justify-between gap-3 p-3 rounded-lg bg-purple-500/10 border border-purple-500/30 text-xs text-purple-300 flex-wrap">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-purple-400 flex-shrink-0" />
+            <span>Listing traffic and conversion analytics requires the <strong>sell.analytics.readonly</strong> permission.</span>
+          </div>
+          <button
+            type="button"
+            onClick={handleConnect}
+            className="px-2.5 py-1 rounded bg-purple-500 hover:bg-purple-400 text-slate-950 font-bold text-[11px] transition-all flex items-center gap-1 flex-shrink-0"
+          >
+            <span>Upgrade Permissions</span>
+            <ExternalLink className="w-3 h-3" />
+          </button>
+        </div>
+      )}
+
       {error && (
         <div className="flex items-center gap-1.5 text-xs text-red-400">
           <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" /> {error}

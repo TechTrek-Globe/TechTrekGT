@@ -32,6 +32,7 @@ import { onRequestGet as ebayActiveListingsHandler } from '../functions/api/ebay
 import { onRequestPost as ebayReconcileHandler } from '../functions/api/ebay/reconcile.js';
 import { onRequestPost as ebaySyncItemHandler } from '../functions/api/ebay/sync-item.js';
 import { onRequestPost as ebaySyncAllHandler } from '../functions/api/ebay/sync-all.js';
+import { onRequestGet as ebayAnalyticsHandler } from '../functions/api/ebay/analytics.js';
 
 function addSecurityHeaders(response, isLocalhost = false, requestOrigin = '') {
   const newHeaders = new Headers(response.headers);
@@ -248,6 +249,8 @@ export default {
         response = await ebaySyncItemHandler(context);
       } else if (apiPath === '/api/ebay/sync-all' && request.method === 'POST') {
         response = await ebaySyncAllHandler(context);
+      } else if (apiPath === '/api/ebay/analytics' && request.method === 'GET') {
+        response = await ebayAnalyticsHandler(context);
       } else if (apiPath === '/api/ebay/reconcile' && request.method === 'POST') {
         response = await ebayReconcileHandler(context);
       } else if (apiPath.startsWith('/api/')) {

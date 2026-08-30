@@ -1,12 +1,12 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
-import { getEbayUserToken, fetchEbayActiveSellerListings, calculateEbayCategoryFees } from './tokenHelper.js';
+import { getEbayUserToken, fetchEbayActiveSellerListings, fetchSingleEbayListing, calculateEbayCategoryFees } from './tokenHelper.js';
 import { computePricingFloors } from '../../utils/auction.js';
 
 /**
  * POST /api/ebay/sync-all
  *
  * Batch synchronizes all inventory items mapped to an eBay listing.
- * Pulls all active seller listings and updates prices, dates, category fees, shipping, and statuses across the catalog.
+ * Pulls all active seller listings and updates prices, dates, category fees, shipping, ad rates, and statuses across the catalog.
  */
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -44,12 +44,29 @@ export async function onRequestPost(context) {
     });
 
     let updatedCount = 0;
+    let singleEnrichCount = 0;
+    const MAX_SINGLE_ENRICH = 30;
 
     for (const item of items) {
       const match = listingMap.get(String(item.ebay_listing_id));
       if (match) {
+        let promotedRate = item.ebay_promoted_rate != null && item.ebay_promoted_rate !== ''
+          ? parseFloat(item.ebay_promoted_rate)
+          : 0;
+
+        // If promoted rate is 0 or missing, enrich via fetchSingleEbayListing (capped at 30 to respect rate limits)
+        if ((promotedRate === 0 || isNaN(promotedRate)) && singleEnrichCount < MAX_SINGLE_ENRICH) {
+          try {
+            const singleDetail = await fetchSingleEbayListing(env, accessToken, item.ebay_listing_id);
+            if (singleDetail?.promoted_rate != null && singleDetail.promoted_rate > 0) {
+              promotedRate = singleDetail.promoted_rate;
+            }
+            singleEnrichCount++;
+          } catch (_) {}
+        }
+
         const targetCost = item.true_total_cost != null ? item.true_total_cost : (item.unit_price || 0);
-        const boostPct = item.ebay_promoted_rate > 0 ? item.ebay_promoted_rate / 100 : (item.boost_pct || 0);
+        const boostPct = promotedRate > 0 ? promotedRate / 100 : 0;
 
         const feeStructure = calculateEbayCategoryFees(match.category_id, match.category_name || match.title, match.price || 0);
         const platformFeePct = feeStructure.fee_pct;
@@ -81,6 +98,8 @@ export async function onRequestPost(context) {
             platform = 'eBay',
             platform_fee_pct = ?,
             platform_flat_fee = ?,
+            ebay_promoted_rate = ?,
+            boost_pct = ?,
             est_shipping_cost = ?,
             min_sell_price = ?,
             suggested_list_price = ?,
@@ -91,6 +110,8 @@ export async function onRequestPost(context) {
           newStatus,
           platformFeePct,
           platformFlatFee,
+          promotedRate,
+          boostPct,
           estShippingCost,
           pricing.min_sell_price,
           pricing.suggested_list_price,

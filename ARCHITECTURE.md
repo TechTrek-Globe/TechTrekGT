@@ -301,7 +301,7 @@ The codebase follows a pragmatic split:
 |-----|-----------|
 | finance | `AccountLedgerView`, `AccountTransferSummary`, `InlineEdit`, `NoYearCalendarPicker`, `SpreadsheetImporter` |
 | wayfinder | `AttractionCard`, `MustSeeCard`, `UrgentBookingAlert`, `WinterExclusive`, `Formatters`, `CurrencyConverterModal` |
-| outpost | `AddInvoiceModal`, `LogSaleModal`, `ListingCopyModal`, `TaxReportModal`, `SuppliesTrackerModal`, `FinanceSyncModal`, `CardShowCalculatorModal` |
+| outpost | `EditItemModal`, `AddInvoiceModal`, `LogSaleModal`, `ListingCopyModal`, `TaxReportModal`, `SuppliesTrackerModal`, `FinanceSyncModal`, `CardShowCalculatorModal` |
 
 **Shared layout components:**
 

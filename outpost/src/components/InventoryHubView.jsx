@@ -266,6 +266,7 @@ export function InventoryHubView({ onNavigate }) {
         categoryOptions={categoryOptions}
         platformOptions={platformOptions}
         onClose={() => setEditModalItem(null)}
+        onOpenCopyModal={() => setCopyModalItem(editModalItem)}
         onUpdated={(id, patch) => {
           updateItemLocal(id, patch);
           if (patch?.status === 'Sold') {

@@ -8,12 +8,9 @@ import { cleanEbaySearchQuery } from '../utils/ebaySearch';
 import { EditModalHeader } from './edit/EditModalHeader';
 import { EditModalFooter } from './edit/EditModalFooter';
 import { EditTabNav } from './edit/EditTabNav';
-import { EditTabIdentity } from './edit/EditTabIdentity';
-import { EditTabListing } from './edit/EditTabListing';
-import { EditTabPricing } from './edit/EditTabPricing';
+import { EditTabDetails } from './edit/EditTabDetails';
+import { EditTabListingPricing } from './edit/EditTabListingPricing';
 import { EditTabComps } from './edit/EditTabComps';
-import { EditTabConsignment } from './edit/EditTabConsignment';
-import { EditTabCondition } from './edit/EditTabCondition';
 
 const PLATFORM_FEE_PRESETS = {
   'eBay':         { fee_pct: 13.5, flat_fee: 0.40 },
@@ -52,6 +49,7 @@ const EMPTY_FORM = {
   platform_fee_pct: '13.5',
   platform_flat_fee: '0.40',
   est_shipping_cost: '0.00',
+  buyer_shipping_cost: '0.00',
   // Pricing
   current_list_price: '',
   buy_it_now_price: '',
@@ -80,7 +78,7 @@ export function EditItemModal({
   onUpdated,
   onOpenCopyModal
 }) {
-  const [activeTab, setActiveTab] = useState('identity');
+  const [activeTab, setActiveTab] = useState('details');
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [error, setError] = useState('');
@@ -139,6 +137,9 @@ export function EditItemModal({
         est_shipping_cost: item.est_shipping_cost != null
           ? Number(item.est_shipping_cost).toFixed(2)
           : '0.00',
+        buyer_shipping_cost: item.buyer_shipping_cost != null
+          ? Number(item.buyer_shipping_cost).toFixed(2)
+          : (item.shipping_charged != null ? Number(item.shipping_charged).toFixed(2) : '0.00'),
 
         current_list_price: item.current_list_price != null ? Number(item.current_list_price).toFixed(2) : '',
         buy_it_now_price: item.buy_it_now_price != null ? Number(item.buy_it_now_price).toFixed(2) : '',
@@ -255,6 +256,17 @@ export function EditItemModal({
       const res = await syncEbayItem(item.id, form.ebay_listing_id, form.ebay_promoted_rate);
       if (res?.item) {
         const it = res.item;
+        const liveListing = res.liveListing || {};
+        const syncPromotedRate = (it.ebay_promoted_rate != null && Number(it.ebay_promoted_rate) > 0)
+          ? String(it.ebay_promoted_rate)
+          : (liveListing.promoted_rate != null && Number(liveListing.promoted_rate) > 0
+              ? String(liveListing.promoted_rate)
+              : form.ebay_promoted_rate || '');
+
+        const syncBuyerShipping = liveListing.buyer_shipping_cost != null && liveListing.buyer_shipping_cost > 0
+          ? String(Number(liveListing.buyer_shipping_cost).toFixed(2))
+          : (liveListing.is_free_shipping ? '0.00' : form.buyer_shipping_cost || '0.00');
+
         setForm(prev => ({
           ...prev,
           current_list_price: it.current_list_price != null ? Number(it.current_list_price).toFixed(2) : prev.current_list_price,
@@ -264,9 +276,10 @@ export function EditItemModal({
           platform_flat_fee: it.platform_flat_fee != null ? String(Number(it.platform_flat_fee).toFixed(2)) : '0.40',
           date_listed: it.date_listed || prev.date_listed,
           est_shipping_cost: it.est_shipping_cost != null ? String(Number(it.est_shipping_cost).toFixed(2)) : prev.est_shipping_cost,
-          ebay_promoted_rate: it.ebay_promoted_rate != null ? String(it.ebay_promoted_rate) : prev.ebay_promoted_rate
+          buyer_shipping_cost: syncBuyerShipping,
+          ebay_promoted_rate: syncPromotedRate
         }));
-        setSuccess(`Successfully synchronized with live eBay listing #${form.ebay_listing_id}!`);
+        setSuccess(`Synchronized with live eBay listing #${form.ebay_listing_id} (Price: $${it.current_list_price || '--'}, Ad Rate: ${syncPromotedRate || '0'}%)`);
         if (onUpdated) onUpdated(item.id, it);
       }
     } catch (e) {
@@ -359,6 +372,7 @@ export function EditItemModal({
   const liveFees = useMemo(() => {
     return computeFeeBreakdown({
       sellPrice: parseFloat(form.current_list_price) || 0,
+      buyer_shipping_cost: parseFloat(form.buyer_shipping_cost) || 0,
       cogs: parseFloat(form.true_total_cost) || parseFloat(form.unit_price) || 0,
       platform_fee_pct: (parseFloat(form.platform_fee_pct) || 13.5) / 100,
       platform_flat_fee: parseFloat(form.platform_flat_fee) || 0.40,
@@ -368,6 +382,7 @@ export function EditItemModal({
     });
   }, [
     form.current_list_price,
+    form.buyer_shipping_cost,
     form.true_total_cost,
     form.unit_price,
     form.platform_fee_pct,
@@ -382,7 +397,7 @@ export function EditItemModal({
     e.preventDefault();
     if (!form.item_name.trim()) {
       setError('Item title & description is required.');
-      setActiveTab('identity');
+      setActiveTab('details');
       return;
     }
     setSaving(true);
@@ -410,6 +425,7 @@ export function EditItemModal({
         platform_fee_pct: form.platform_fee_pct !== '' ? parseFloat(form.platform_fee_pct) / 100 : 0.135,
         platform_flat_fee: form.platform_flat_fee !== '' ? parseFloat(form.platform_flat_fee) : 0.40,
         est_shipping_cost: form.est_shipping_cost !== '' ? parseFloat(form.est_shipping_cost) : 0,
+        buyer_shipping_cost: form.buyer_shipping_cost !== '' ? parseFloat(form.buyer_shipping_cost) : 0,
 
         current_list_price: form.current_list_price !== '' ? parseFloat(form.current_list_price) : null,
         buy_it_now_price: form.buy_it_now_price !== '' ? parseFloat(form.buy_it_now_price) : null,
@@ -494,16 +510,17 @@ export function EditItemModal({
           onSubmit={handleSubmit}
           className="p-5 sm:p-6 overflow-y-auto flex-1 space-y-4 scrollbar-thin scrollbar-thumb-slate-800"
         >
-          {activeTab === 'identity' && (
-            <EditTabIdentity
+          {activeTab === 'details' && (
+            <EditTabDetails
               form={form}
               updateField={updateField}
               allCategories={allCategories}
+              item={item}
             />
           )}
 
-          {activeTab === 'listing' && (
-            <EditTabListing
+          {activeTab === 'listing_pricing' && (
+            <EditTabListingPricing
               form={form}
               updateField={updateField}
               allPlatforms={allPlatforms}
@@ -514,13 +531,6 @@ export function EditItemModal({
               loadingEbayListings={loadingEbayListings}
               ebaySearch={ebaySearch}
               setEbaySearch={setEbaySearch}
-            />
-          )}
-
-          {activeTab === 'pricing' && (
-            <EditTabPricing
-              form={form}
-              updateField={updateField}
               liveFees={liveFees}
             />
           )}
@@ -533,21 +543,6 @@ export function EditItemModal({
               handleFetchLiveComps={handleFetchLiveComps}
               handleSaveComps={handleSaveComps}
               minSellPrice={item.min_sell_price}
-            />
-          )}
-
-          {activeTab === 'consignment' && (
-            <EditTabConsignment
-              form={form}
-              updateField={updateField}
-              item={item}
-            />
-          )}
-
-          {activeTab === 'condition' && (
-            <EditTabCondition
-              form={form}
-              updateField={updateField}
             />
           )}
         </form>

@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS auction_items (
   platform_fee_pct      REAL NOT NULL DEFAULT 0.0,
   platform_flat_fee     REAL NOT NULL DEFAULT 0.0,
   est_shipping_cost     REAL NOT NULL DEFAULT 0.0,
+  buyer_shipping_cost   REAL DEFAULT 0.0,
   boost_pct             REAL NOT NULL DEFAULT 0.0,
   min_sell_price        REAL NOT NULL DEFAULT 0.0,
   suggested_list_price  REAL NOT NULL DEFAULT 0.0,

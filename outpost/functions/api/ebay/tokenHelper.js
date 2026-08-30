@@ -228,6 +228,21 @@ export async function fetchEbayActiveSellerListings(env, accessToken) {
         const qtyStr = getTag('QuantityAvailable') || getTag('Quantity') || '1';
         const sku = getTag('SKU') || null;
 
+        // Extract shipping from block
+        const freeShip = block.includes('<FreeShipping>true</FreeShipping>');
+        let shipCost = 0;
+        const scm = block.match(/<ShippingServiceCost[^>]*>([0-9.]+)<\/ShippingServiceCost>/i) ||
+                    block.match(/<ShippingCost[^>]*>([0-9.]+)<\/ShippingCost>/i);
+        if (scm) {
+          shipCost = parseFloat(scm[1]) || 0;
+        } else {
+          const spm = block.match(/<ShippingProfileName[^>]*>(.*?)<\/ShippingProfileName>/i);
+          if (spm) {
+            const dm = spm[1].match(/\$([0-9]+(?:\.[0-9]{2})?)/);
+            if (dm) shipCost = parseFloat(dm[1]) || 0;
+          }
+        }
+
         if (listingId || title) {
           const key = listingId || sku || title;
           listingsMap.set(key, {
@@ -236,6 +251,8 @@ export async function fetchEbayActiveSellerListings(env, accessToken) {
             title: title || '',
             price: parseFloat(currentPriceStr) || 0,
             quantity: parseInt(qtyStr, 10) || 1,
+            buyer_shipping_cost: shipCost,
+            is_free_shipping: freeShip || (shipCost === 0),
             condition: 'Active',
             status: 'Active',
             listing_url: listingId ? `https://www.ebay.com/itm/${listingId}` : null
@@ -428,17 +445,21 @@ export async function fetchSingleEbayListing(env, accessToken, listingId) {
       const categoryName = getTag('CategoryName');
       const feeStructure = calculateEbayCategoryFees(categoryId, categoryName, price);
 
-      // Shipping details (Free shipping vs Buyer pays)
+      // Shipping details (Free shipping vs Buyer pays flat/calculated)
       let isFreeShipping = false;
       let buyerShippingCost = 0;
       let shippingService = 'Standard Shipping';
 
+      // 1. Direct FreeShipping boolean tag
       const freeShippingMatch = xmlText.match(/<FreeShipping[^>]*>(.*?)<\/FreeShipping>/i);
       if (freeShippingMatch && freeShippingMatch[1].trim().toLowerCase() === 'true') {
         isFreeShipping = true;
       }
 
-      const shippingCostMatch = xmlText.match(/<ShippingServiceCost[^>]*>([0-9.]+)<\/ShippingServiceCost>/i);
+      // 2. Direct ShippingServiceCost tags (e.g. <ShippingServiceCost currencyID="USD">15.95</ShippingServiceCost>)
+      const shippingCostMatch = xmlText.match(/<ShippingServiceCost[^>]*>([0-9.]+)<\/ShippingServiceCost>/i) ||
+                                xmlText.match(/<ShippingCost[^>]*>([0-9.]+)<\/ShippingCost>/i) ||
+                                xmlText.match(/<FlatShippingRate[^>]*>([0-9.]+)<\/FlatShippingRate>/i);
       if (shippingCostMatch) {
         const parsedCost = parseFloat(shippingCostMatch[1]);
         if (parsedCost > 0) {
@@ -449,6 +470,114 @@ export async function fetchSingleEbayListing(env, accessToken, listingId) {
         }
       }
 
+      // 3. Business Policies Shipping Profile Name (e.g. "Flat Rate $15.95 (2 listings)" or "$15.95 Flat")
+      const profileNameMatch = xmlText.match(/<ShippingProfileName[^>]*>(.*?)<\/ShippingProfileName>/i) ||
+                               xmlText.match(/<SellerShippingProfile[^>]*>[\s\S]*?<ShippingProfileName[^>]*>(.*?)<\/ShippingProfileName>/i);
+      if (profileNameMatch) {
+        const pName = profileNameMatch[1].trim();
+        if (pName.toLowerCase().includes('free')) {
+          isFreeShipping = true;
+          buyerShippingCost = 0;
+        } else {
+          const dollarMatch = pName.match(/\$([0-9]+(?:\.[0-9]{2})?)/) || pName.match(/(?:^|\s)([0-9]+(?:\.[0-9]{2}))(?:\s|$)/);
+          if (dollarMatch) {
+            const val = parseFloat(dollarMatch[1]);
+            if (val > 0) {
+              buyerShippingCost = val;
+              isFreeShipping = false;
+            }
+          }
+        }
+      }
+
+      // 4. Any ShippingDetails block containing currency/price
+      if (buyerShippingCost === 0 && !isFreeShipping) {
+        const shipBlockMatch = xmlText.match(/<ShippingDetails[\s>][\s\S]*?<\/ShippingDetails>/i);
+        if (shipBlockMatch) {
+          const block = shipBlockMatch[0];
+          const costInBlock = block.match(/<ShippingServiceCost[^>]*>([0-9.]+)<\/ShippingServiceCost>/i) ||
+                              block.match(/>\$?([0-9]+\.[0-9]{2})</);
+          if (costInBlock) {
+            const val = parseFloat(costInBlock[1]);
+            if (val > 0) {
+              buyerShippingCost = val;
+              isFreeShipping = false;
+            }
+          }
+        }
+      }
+
+      // 5. Try Browse API for exact buyer-facing shipping cost if not yet found
+      if (buyerShippingCost === 0 && !isFreeShipping) {
+        try {
+          const browseUrl = isSandbox
+            ? `https://api.sandbox.ebay.com/buy/browse/v1/item/v1|${cleanId}|0`
+            : `https://api.ebay.com/buy/browse/v1/item/v1|${cleanId}|0`;
+          const browseRes = await fetch(browseUrl, {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
+              'Content-Type': 'application/json'
+            }
+          });
+          if (browseRes.ok) {
+            const bData = await browseRes.json();
+            if (bData.shippingOptions && bData.shippingOptions.length > 0) {
+              const shipOpt = bData.shippingOptions[0];
+              if (shipOpt.shippingCost?.value) {
+                const sc = parseFloat(shipOpt.shippingCost.value);
+                if (sc > 0) {
+                  buyerShippingCost = sc;
+                  isFreeShipping = false;
+                } else if (sc === 0 || shipOpt.shippingCostType === 'FREE') {
+                  isFreeShipping = true;
+                }
+              }
+            }
+          }
+        } catch (_) {}
+      }
+
+      // 6. Try Sell Account Fulfillment Policy API if buyer shipping cost still 0
+      if (buyerShippingCost === 0 && !isFreeShipping) {
+        try {
+          const policyUrl = isSandbox
+            ? `https://api.sandbox.ebay.com/sell/account/v1/fulfillment_policy?marketplace_id=EBAY_US`
+            : `https://api.ebay.com/sell/account/v1/fulfillment_policy?marketplace_id=EBAY_US`;
+          const polRes = await fetch(policyUrl, {
+            headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' }
+          });
+          if (polRes.ok) {
+            const polData = await polRes.json();
+            const policies = polData.fulfillmentPolicies || [];
+            const profileIdMatch = xmlText.match(/<ShippingProfileID[^>]*>([0-9]+)<\/ShippingProfileID>/i);
+            const profileId = profileIdMatch ? profileIdMatch[1] : null;
+
+            for (const pol of policies) {
+              if (profileId && pol.fulfillmentPolicyId === profileId) {
+                const costVal = pol.shippingOptions?.[0]?.shippingServices?.[0]?.shippingCost?.value;
+                if (costVal && parseFloat(costVal) > 0) {
+                  buyerShippingCost = parseFloat(costVal);
+                  isFreeShipping = false;
+                  break;
+                }
+              }
+              if (pol.name && (pol.name.includes('Flat Rate') || pol.name.includes('$'))) {
+                const dm = pol.name.match(/\$([0-9]+(?:\.[0-9]{2})?)/);
+                if (dm && parseFloat(dm[1]) > 0) {
+                  const costVal = pol.shippingOptions?.[0]?.shippingServices?.[0]?.shippingCost?.value || dm[1];
+                  if (costVal && parseFloat(costVal) > 0) {
+                    buyerShippingCost = parseFloat(costVal);
+                    isFreeShipping = false;
+                    break;
+                  }
+                }
+              }
+            }
+          }
+        } catch (_) {}
+      }
+
       const serviceMatch = xmlText.match(/<ShippingService[^>]*>(.*?)<\/ShippingService>/i);
       if (serviceMatch) {
         shippingService = serviceMatch[1].trim();
@@ -456,6 +585,11 @@ export async function fetchSingleEbayListing(env, accessToken, listingId) {
 
       // Item Specifics (Athlete, Cert Number, Grader/Authenticator, Sport)
       const specifics = {};
+      let athlete = null;
+      let certNumber = null;
+      let authenticator = null;
+      let sport = null;
+
       const nvRegex = /<NameValueList>([\s\S]*?)<\/NameValueList>/g;
       let nvMatch;
       while ((nvMatch = nvRegex.exec(xmlText)) !== null) {
@@ -463,26 +597,109 @@ export async function fetchSingleEbayListing(env, accessToken, listingId) {
         const n = getTag('Name', block);
         const v = getTag('Value', block);
         if (n && v) {
-          specifics[n.toLowerCase().trim()] = v.trim();
+          const key = n.toLowerCase().trim();
+          specifics[key] = v.trim();
+          
+          if (key === 'athlete' || key.includes('player')) athlete = v.trim();
+          if (key.includes('cert') || key.includes('certification number')) certNumber = v.trim();
+          if (key.includes('authenticator') || key.includes('professional grader')) authenticator = v.trim();
+          if (key === 'sport') sport = v.trim();
         }
       }
 
-      // Try auto-detecting active Promoted Listings ad rate from Marketing API
+      // Auto-detect active Promoted Listings ad rate (Trading API XML + Marketing API)
       let autoPromotedRate = null;
-      try {
-        const mktRes = await fetch(`${isSandbox ? 'https://api.sandbox.ebay.com' : 'https://api.ebay.com'}/sell/marketing/v1/ad_campaign?campaign_status=RUNNING&limit=10`, {
-          headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' }
-        });
-        if (mktRes.ok) {
-          const mktData = await mktRes.json();
-          for (const camp of (mktData.campaigns || [])) {
-            if (camp.fundingStrategy?.bidPercentage) {
-              const r = parseFloat(camp.fundingStrategy.bidPercentage);
-              if (r > 0) { autoPromotedRate = r; break; }
+
+      // 1. Check Trading API response XML for any embedded ad rate / promoted rate tags
+      const xmlRateMatch = xmlText.match(/<(?:BidPercentage|AdRate|PromotedRate|AdPercentage)[^>]*>([0-9.]+)<\/(?:BidPercentage|AdRate|PromotedRate|AdPercentage)>/i) ||
+                           xmlText.match(/<PromotedListing[^>]*>[\s\S]*?<BidPercentage[^>]*>([0-9.]+)<\/BidPercentage>/i);
+      if (xmlRateMatch) {
+        const r = parseFloat(xmlRateMatch[1]);
+        if (r > 0) autoPromotedRate = r;
+      }
+
+      // 2. Query eBay Marketing API
+      if (autoPromotedRate == null) {
+        try {
+          const mktBase = isSandbox ? 'https://api.sandbox.ebay.com' : 'https://api.ebay.com';
+          const campRes = await fetch(`${mktBase}/sell/marketing/v1/ad_campaign?limit=50`, {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              Accept: 'application/json',
+              'Content-Type': 'application/json'
+            }
+          });
+
+          if (campRes.ok) {
+            const campData = await campRes.json();
+            const campaigns = campData.campaigns || [];
+
+            for (const camp of campaigns) {
+              if (!camp.campaignId) continue;
+
+              // Query campaign ads for this specific listing ID
+              try {
+                const adRes = await fetch(`${mktBase}/sell/marketing/v1/ad_campaign/${camp.campaignId}/ad?listing_ids=${cleanId}`, {
+                  headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json'
+                  }
+                });
+                if (adRes.ok) {
+                  const adData = await adRes.json();
+                  const ads = adData.ads || [];
+                  const matchedAd = ads.find(a => String(a.listingId) === cleanId) || ads[0];
+                  if (matchedAd?.bidPercentage) {
+                    const r = parseFloat(matchedAd.bidPercentage);
+                    if (r > 0) { autoPromotedRate = r; break; }
+                  }
+                }
+              } catch (_) {}
+
+              // Also check campaign ads collection or funding strategy
+              if (autoPromotedRate == null) {
+                try {
+                  const checkAds = await fetch(`${mktBase}/sell/marketing/v1/ad_campaign/${camp.campaignId}/ad?limit=100`, {
+                    headers: {
+                      Authorization: `Bearer ${accessToken}`,
+                      Accept: 'application/json',
+                      'Content-Type': 'application/json'
+                    }
+                  });
+                  if (checkAds.ok) {
+                    const checkData = await checkAds.json();
+                    const specificAd = (checkData.ads || []).find(a => String(a.listingId) === cleanId);
+                    if (specificAd?.bidPercentage) {
+                      const r = parseFloat(specificAd.bidPercentage);
+                      if (r > 0) { autoPromotedRate = r; break; }
+                    }
+                  }
+                } catch (_) {}
+              }
+
+              // Fallback to campaign funding strategy bidPercentage (e.g. campaign-level 7.0%)
+              if (autoPromotedRate == null && camp.fundingStrategy?.bidPercentage) {
+                const r = parseFloat(camp.fundingStrategy.bidPercentage);
+                if (r > 0) {
+                  autoPromotedRate = r;
+                  break;
+                }
+              }
+            }
+
+            // If still null and there's exactly 1 campaign with a valid fundingStrategy rate, use it
+            if (autoPromotedRate == null && campaigns.length > 0) {
+              const candidate = campaigns.find(c => c.fundingStrategy?.bidPercentage && parseFloat(c.fundingStrategy.bidPercentage) > 0);
+              if (candidate) {
+                autoPromotedRate = parseFloat(candidate.fundingStrategy.bidPercentage);
+              }
             }
           }
+        } catch (mktErr) {
+          console.warn('[tokenHelper] Marketing API query exception:', mktErr);
         }
-      } catch (_) {}
+      }
 
       if (itemId || title) {
         return {

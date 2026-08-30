@@ -82,7 +82,8 @@ export async function onRequestPut(context) {
       quantity:                   body.quantity                   != null ? parseInt(body.quantity, 10) : (item.quantity ?? 1),
       purchase_date:              body.purchase_date              !== undefined ? (body.purchase_date || null) : item.purchase_date,
       floor_price:                body.floor_price                !== undefined ? (body.floor_price !== '' && body.floor_price != null ? parseFloat(body.floor_price) : null) : item.floor_price,
-      buy_it_now_price:           body.buy_it_now_price           !== undefined ? (body.buy_it_now_price !== '' && body.buy_it_now_price != null ? parseFloat(body.buy_it_now_price) : null) : item.buy_it_now_price
+      buy_it_now_price:           body.buy_it_now_price           !== undefined ? (body.buy_it_now_price !== '' && body.buy_it_now_price != null ? parseFloat(body.buy_it_now_price) : null) : item.buy_it_now_price,
+      buyer_shipping_cost:        body.buyer_shipping_cost        !== undefined ? (body.buyer_shipping_cost !== '' && body.buyer_shipping_cost != null ? parseFloat(body.buyer_shipping_cost) : 0) : (item.buyer_shipping_cost ?? 0)
     };
 
     // If platform changed, auto-lookup fees from auction_platforms
@@ -151,6 +152,7 @@ export async function onRequestPut(context) {
         other_platform_listing_ids = ?, ebay_promoted_rate = ?,
         sku = ?, listing_format = ?, listing_status = ?,
         quantity = ?, purchase_date = ?, floor_price = ?, buy_it_now_price = ?,
+        buyer_shipping_cost = ?,
         updated_at = datetime('now')
       WHERE id = ? AND user_id = ?
     `).bind(
@@ -167,6 +169,7 @@ export async function onRequestPut(context) {
       updated.other_platform_listing_ids, updated.ebay_promoted_rate,
       updated.sku, updated.listing_format, updated.listing_status,
       updated.quantity, updated.purchase_date, updated.floor_price, updated.buy_it_now_price,
+      updated.buyer_shipping_cost,
       id, payload.userId
     ).run();
 

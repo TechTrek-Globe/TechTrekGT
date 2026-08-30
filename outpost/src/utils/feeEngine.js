@@ -1,7 +1,8 @@
 /**
  * Fee & Margin Calculation Engine for Outpost Resale Tracker
  * Pure functions with zero side effects - instant client-side calculation of eBay fees,
- * promoted listing ad rates, shipping, net proceeds, net profit, ROI, and margin health tiers.
+ * buyer-paid shipping, outbound shipping costs, promoted listing ad rates, net proceeds,
+ * net profit, ROI, and margin health tiers.
  */
 
 export function round(val, decimals = 2) {
@@ -79,7 +80,8 @@ export const MARGIN_HEALTH_CONFIG = {
 };
 
 /**
- * Computes complete fee & margin breakdown for an item at a specific price point.
+ * Computes complete fee & margin breakdown for an item at a specific price point,
+ * accurately incorporating shipping charged to buyer vs actual outbound shipping cost.
  */
 export function computeFeeBreakdown(params = {}) {
   const sellPrice = Math.max(0, Number(params.sellPrice ?? params.current_list_price ?? params.suggested_list_price ?? params.unit_price ?? 0) || 0);
@@ -95,38 +97,59 @@ export function computeFeeBreakdown(params = {}) {
   const rawPromoted = params.ebay_promoted_rate ?? params.boost_pct ?? 0;
   const promotedDecimal = normalizeRateDecimal(rawPromoted);
 
-  // Shipping & processing
+  // Shipping details:
+  // shippingCharged: amount paid by the buyer (e.g. $0 for free shipping, or $5.50 if charged)
+  // shippingCost: actual label cost incurred by the seller (e.g. $4.50)
+  const shippingCharged = Math.max(0, Number(params.buyer_shipping_cost ?? params.shipping_charged ?? params.buyer_shipping_paid ?? params.shippingCharged ?? 0) || 0);
   const shippingCost = Math.max(0, Number(params.est_shipping_cost ?? params.shippingCost ?? 0) || 0);
+  const isFreeShipping = params.is_free_shipping ?? (shippingCharged === 0);
+
   const paymentProcessingPct = normalizeRateDecimal(params.paymentProcessingPct ?? 0);
 
-  // Calculated fees
-  const finalValueFee = round(sellPrice * platformFeePct);
+  // Gross collection from buyer
+  const grossRevenue = round(sellPrice + shippingCharged);
+
+  // eBay Final Value Fee applies to the TOTAL amount collected from buyer (item price + shipping charged)
+  const finalValueFee = round(grossRevenue * platformFeePct);
+
+  // Promoted Listings Ad Fee applies to the Item Sale Price
   const promotedFee = round(sellPrice * promotedDecimal);
-  const paymentFee = round(sellPrice * paymentProcessingPct);
+
+  // Optional payment processing fee (if on non-standard processing)
+  const paymentFee = round(grossRevenue * paymentProcessingPct);
+
   const totalFees = round(finalValueFee + promotedFee + paymentFee + platformFlatFee);
 
-  // Net calculations
-  const netProceeds = round(sellPrice - totalFees - shippingCost);
+  // Net Proceeds = Total Collected - Marketplace Fees - Seller Outbound Shipping Cost
+  const netProceeds = round(grossRevenue - totalFees - shippingCost);
   const netProfit = round(netProceeds - cogs);
   const roiPct = cogs > 0 ? round(netProfit / cogs, 4) : 0;
-  const marginPct = sellPrice > 0 ? round(netProfit / sellPrice, 4) : 0;
-  const marginHealth = sellPrice > 0 ? computeMarginHealth(marginPct) : 'unknown';
+  const marginPct = grossRevenue > 0 ? round(netProfit / grossRevenue, 4) : (sellPrice > 0 ? round(netProfit / sellPrice, 4) : 0);
+  const marginHealth = (grossRevenue > 0 || sellPrice > 0) ? computeMarginHealth(marginPct) : 'unknown';
+
+  // Shipping net margin (profit/loss on shipping charge vs label cost)
+  const shippingNet = round(shippingCharged - shippingCost);
 
   // Break-even floor price calculation
   const totalFeeRate = platformFeePct + promotedDecimal + paymentProcessingPct;
   const divisor = 1 - totalFeeRate;
+  const netShippingBurden = Math.max(0, shippingCost - shippingCharged);
   const breakEvenFloor = divisor > 0
-    ? round((cogs + shippingCost + platformFlatFee) / divisor)
+    ? round((cogs + netShippingBurden + platformFlatFee) / divisor)
     : 0;
 
   return {
     sellPrice,
+    shippingCharged,
+    shippingCost,
+    grossRevenue,
+    isFreeShipping,
+    shippingNet,
     cogs,
     platformFeePct,
     platformFlatFee,
     promotedRate: rawPromoted,
     promotedDecimal,
-    shippingCost,
     finalValueFee,
     promotedFee,
     paymentFee,
@@ -143,7 +166,15 @@ export function computeFeeBreakdown(params = {}) {
 /**
  * Calculates suggested listing price from COGS, target margin, and fee assumptions.
  */
-export function computeTargetPriceFromMargin(cogs, targetMarginPct = 0.30, platformFeePct = 0.1325, promotedRate = 0, shippingCost = 0, flatFee = 0.40) {
+export function computeTargetPriceFromMargin(
+  cogs,
+  targetMarginPct = 0.30,
+  platformFeePct = 0.1325,
+  promotedRate = 0,
+  shippingCost = 0,
+  flatFee = 0.40,
+  shippingCharged = 0
+) {
   const promDec = normalizeRateDecimal(promotedRate);
   const feePct = normalizeRateDecimal(platformFeePct);
   const targetMargin = normalizeRateDecimal(targetMarginPct);
@@ -151,6 +182,7 @@ export function computeTargetPriceFromMargin(cogs, targetMarginPct = 0.30, platf
   const divisor = 1 - feePct - promDec - targetMargin;
   if (divisor <= 0) return 0;
 
-  const costBase = Number(cogs || 0) + Number(shippingCost || 0) + Number(flatFee || 0);
+  const netShippingBurden = Math.max(0, Number(shippingCost || 0) - Number(shippingCharged || 0));
+  const costBase = Number(cogs || 0) + netShippingBurden + Number(flatFee || 0);
   return round(costBase / divisor);
 }

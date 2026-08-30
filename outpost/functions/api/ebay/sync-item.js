@@ -52,10 +52,10 @@ export async function onRequestPost(context) {
       return err(`Could not find active listing details on eBay for Item ID: ${targetListingId}`, 404);
     }
 
-    const promotedRate = body.ebay_promoted_rate != null && body.ebay_promoted_rate !== ''
-      ? parseFloat(body.ebay_promoted_rate)
-      : (liveListing.promoted_rate != null && liveListing.promoted_rate > 0
-          ? liveListing.promoted_rate
+    const promotedRate = (liveListing.promoted_rate != null && liveListing.promoted_rate > 0)
+      ? liveListing.promoted_rate
+      : (body.ebay_promoted_rate != null && body.ebay_promoted_rate !== ''
+          ? parseFloat(body.ebay_promoted_rate)
           : (item.ebay_promoted_rate != null ? parseFloat(item.ebay_promoted_rate) : 0));
 
     const boostPct = promotedRate > 0 ? promotedRate / 100 : 0;
@@ -65,11 +65,15 @@ export async function onRequestPost(context) {
     const platformFlatFee = liveListing.platform_flat_fee != null ? liveListing.platform_flat_fee : 0.40;
 
     // Shipping cost logic:
-    // If listing has a shipping charge to the buyer (e.g. $5.99), populate est_shipping_cost with that shipping charge.
-    // If listing has Free Shipping, use existing item shipping cost or default standard shipping ($4.50).
-    let estShippingCost = liveListing.buyer_shipping_cost > 0
+    // 1. buyer_shipping_cost: Marketplace revenue charge to buyer (e.g. $15.95)
+    // 2. est_shipping_cost: Seller's outbound label expense (e.g. $4.50 or $8.50)
+    const buyerShipping = (liveListing.buyer_shipping_cost != null && liveListing.buyer_shipping_cost > 0)
       ? liveListing.buyer_shipping_cost
-      : (item.est_shipping_cost && item.est_shipping_cost > 0 ? item.est_shipping_cost : (liveListing.is_free_shipping ? 4.50 : 0.00));
+      : (liveListing.is_free_shipping ? 0.00 : (item.buyer_shipping_cost || 0.00));
+
+    const estShippingCost = (item.est_shipping_cost != null && Number(item.est_shipping_cost) > 0)
+      ? Number(item.est_shipping_cost)
+      : (liveListing.buyer_shipping_cost > 0 ? liveListing.buyer_shipping_cost : (liveListing.is_free_shipping ? 4.50 : 0.00));
 
     const pricing = computePricingFloors({
       true_total_cost: targetCost,
@@ -114,6 +118,7 @@ export async function onRequestPost(context) {
         ebay_promoted_rate = ?,
         boost_pct = ?,
         est_shipping_cost = ?,
+        buyer_shipping_cost = ?,
         athlete_person = COALESCE(?, athlete_person),
         cert_number = COALESCE(?, cert_number),
         authenticator = COALESCE(?, authenticator),
@@ -133,6 +138,7 @@ export async function onRequestPost(context) {
       promotedRate,
       boostPct,
       estShippingCost,
+      buyerShipping,
       athlete,
       certNumber,
       authenticator,

@@ -93,7 +93,7 @@ export async function getEbayUserToken(env, userId) {
       'Content-Type': 'application/x-www-form-urlencoded',
       'Authorization': `Basic ${credentials}`
     },
-    body: `grant_type=refresh_token&refresh_token=${encodeURIComponent(refreshToken)}&scope=${encodeURIComponent(env.EBAY_SCOPES || EBAY_ACG_SCOPES)}`
+    body: `grant_type=refresh_token&refresh_token=${encodeURIComponent(refreshToken)}`
   });
 
   if (!res.ok) {

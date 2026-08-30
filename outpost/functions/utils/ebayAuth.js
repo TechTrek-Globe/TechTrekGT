@@ -32,9 +32,12 @@ export async function getEbayUserToken(env, userId) {
   }
 
   // Need to refresh
-  const refreshToken = await decryptToken(row.refresh_token, env.JWT_SECRET);
   const clientId = String(env.EBAY_CLIENT_ID || '').trim().replace(/^['"]+|['"]+$/g, '');
   const clientSecret = String(env.EBAY_CLIENT_SECRET || '').trim().replace(/^['"]+|['"]+$/g, '');
+  if (!clientId || !clientSecret) {
+    throw new Error('eBay client credentials (EBAY_CLIENT_ID/EBAY_CLIENT_SECRET) not configured in worker environment. Route requests via Central Gateway (techtrekgt.com/api/ebay/*).');
+  }
+  const refreshToken = await decryptToken(row.refresh_token, env.JWT_SECRET);
   const credentials = btoa(`${clientId}:${clientSecret}`);
 
   const res = await fetch('https://api.ebay.com/identity/v1/oauth2/token', {

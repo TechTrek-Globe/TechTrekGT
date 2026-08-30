@@ -58,6 +58,7 @@ TechTrekGT is a multi-application platform hosted on `techtrekgt.com`. The repos
 | Service | Gateway / App | Endpoint | Purpose |
 |---------|-------------|----------|---------|
 | **eBay REST API** | `landing` (gateway) | `GET/POST /api/ebay/comps` | Fetches recently sold comp listings via eBay OAuth CCF + Marketplace Insights API (Browse API fallback). Replaces anonymous HTML scraper in outpost. |
+| **eBay OAuth & Sync** | `landing` (gateway) | `GET /api/ebay/oauth/*`, `GET /api/ebay/listings`, `GET /api/ebay/finances`, `POST /api/ebay/webhook` | Phase 3 eBay OAuth ACG authorization, active listing discovery, Finances API fee extraction, and webhook notification proxy. |
 | **Amazon Scraper** | `landing` (gateway) | `POST /api/amazon/fetch` | Multi-tier Amazon product detail extraction: external scraper proxy (`SCRAPER_API_KEY`) + direct Worker cascade. Replaces `outpost/functions/api/import/amazon-fetch.js`. |
 | **Google Places & Maps API** | `wayfinder` | (wayfinder-local) | Live venue details, ratings, photography, neighborhood & hotel lookup queries, coordinate navigation links, and mandatory dual verification. *(Phase 2: migrate to gateway `/api/places/search`)* |
 | **Geoapify API** | `wayfinder` | (wayfinder-local) | Primary POI generation, geocoding, and venue coordinate dual verification. *(Phase 2: migrate to gateway `/api/geo/places`)* |

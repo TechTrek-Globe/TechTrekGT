@@ -448,10 +448,22 @@ export async function fetchSingleEbayListing(env, accessToken, listingId) {
         }
       }
 
-      const athlete = specifics['athlete'] || specifics['player'] || specifics['player/athlete'] || specifics['signer'] || null;
-      const certNumber = specifics['certification number'] || specifics['cert number'] || specifics['certificate number'] || null;
-      const authenticator = specifics['professional grader'] || specifics['graded by'] || specifics['authentication'] || specifics['authenticator'] || null;
-      const sport = specifics['sport'] || specifics['league'] || null;
+      // Try auto-detecting active Promoted Listings ad rate from Marketing API
+      let autoPromotedRate = null;
+      try {
+        const mktRes = await fetch(`${isSandbox ? 'https://api.sandbox.ebay.com' : 'https://api.ebay.com'}/sell/marketing/v1/ad_campaign?campaign_status=RUNNING&limit=10`, {
+          headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' }
+        });
+        if (mktRes.ok) {
+          const mktData = await mktRes.json();
+          for (const camp of (mktData.campaigns || [])) {
+            if (camp.fundingStrategy?.bidPercentage) {
+              const r = parseFloat(camp.fundingStrategy.bidPercentage);
+              if (r > 0) { autoPromotedRate = r; break; }
+            }
+          }
+        }
+      } catch (_) {}
 
       if (itemId || title) {
         return {
@@ -465,6 +477,7 @@ export async function fetchSingleEbayListing(env, accessToken, listingId) {
           quantity_sold: parseInt(qtySoldStr, 10) || 0,
           sku: sku,
           listing_type: listingType,
+          promoted_rate: autoPromotedRate,
           // Expanded Category & Fees
           category_id: categoryId,
           category_name: categoryName,

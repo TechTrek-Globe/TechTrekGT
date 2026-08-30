@@ -74,7 +74,15 @@ export async function onRequestPut(context) {
       ebay_listing_id:            body.ebay_listing_id            !== undefined ? (body.ebay_listing_id || null) : item.ebay_listing_id,
       cert_verification_url:      body.cert_verification_url      !== undefined ? (body.cert_verification_url || null) : item.cert_verification_url,
       other_platform_listing_ids: body.other_platform_listing_ids !== undefined ? (body.other_platform_listing_ids || null) : item.other_platform_listing_ids,
-      ebay_promoted_rate:         body.ebay_promoted_rate         != null ? parseFloat(body.ebay_promoted_rate) : item.ebay_promoted_rate
+      ebay_promoted_rate:         body.ebay_promoted_rate         != null ? parseFloat(body.ebay_promoted_rate) : item.ebay_promoted_rate,
+      // Phase 4: Inventory & Pricing Rebuild fields
+      sku:                        body.sku                        !== undefined ? (body.sku || null) : item.sku,
+      listing_format:             body.listing_format             !== undefined ? (body.listing_format || null) : item.listing_format,
+      listing_status:             body.listing_status             !== undefined ? (body.listing_status || null) : item.listing_status,
+      quantity:                   body.quantity                   != null ? parseInt(body.quantity, 10) : (item.quantity ?? 1),
+      purchase_date:              body.purchase_date              !== undefined ? (body.purchase_date || null) : item.purchase_date,
+      floor_price:                body.floor_price                !== undefined ? (body.floor_price !== '' && body.floor_price != null ? parseFloat(body.floor_price) : null) : item.floor_price,
+      buy_it_now_price:           body.buy_it_now_price           !== undefined ? (body.buy_it_now_price !== '' && body.buy_it_now_price != null ? parseFloat(body.buy_it_now_price) : null) : item.buy_it_now_price
     };
 
     // If platform changed, auto-lookup fees from auction_platforms
@@ -141,6 +149,8 @@ export async function onRequestPut(context) {
         notes = ?, best_listing_window = ?,
         ebay_listing_id = ?, cert_verification_url = ?,
         other_platform_listing_ids = ?, ebay_promoted_rate = ?,
+        sku = ?, listing_format = ?, listing_status = ?,
+        quantity = ?, purchase_date = ?, floor_price = ?, buy_it_now_price = ?,
         updated_at = datetime('now')
       WHERE id = ? AND user_id = ?
     `).bind(
@@ -155,6 +165,8 @@ export async function onRequestPut(context) {
       updated.notes, updated.best_listing_window,
       updated.ebay_listing_id, updated.cert_verification_url,
       updated.other_platform_listing_ids, updated.ebay_promoted_rate,
+      updated.sku, updated.listing_format, updated.listing_status,
+      updated.quantity, updated.purchase_date, updated.floor_price, updated.buy_it_now_price,
       id, payload.userId
     ).run();
 

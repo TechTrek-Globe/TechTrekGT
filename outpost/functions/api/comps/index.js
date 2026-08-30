@@ -222,6 +222,11 @@ export async function onRequestPost(context) {
       comp_2,
       comp_3,
       live_avg,
+      active_comp_1,
+      active_comp_2,
+      active_comp_3,
+      active_avg,
+      sold_count,
       ebay_search_url,
       recommended_list_price,
       apply_to_item = false
@@ -236,6 +241,10 @@ export async function onRequestPost(context) {
     if (!item) return err('Item not found', 404);
 
     const manualAvg = computeManualAvg(comp_1, comp_2, comp_3);
+    const computedActiveAvg = active_avg !== undefined && active_avg !== null && active_avg !== ''
+      ? Number(active_avg)
+      : computeManualAvg(active_comp_1, active_comp_2, active_comp_3);
+
     const recPrice = recommended_list_price !== undefined && recommended_list_price !== null && !isNaN(Number(recommended_list_price))
       ? Number(recommended_list_price)
       : (manualAvg || item.suggested_list_price);
@@ -252,7 +261,10 @@ export async function onRequestPost(context) {
     if (existingComp) {
       await env.DB.prepare(`
         UPDATE auction_comps
-        SET comp_1 = ?, comp_2 = ?, comp_3 = ?, live_avg = ?, manual_avg = ?, recommended_list_price = ?, ebay_search_url = ?, updated_at = datetime('now')
+        SET comp_1 = ?, comp_2 = ?, comp_3 = ?, live_avg = ?, manual_avg = ?,
+            active_comp_1 = ?, active_comp_2 = ?, active_comp_3 = ?, active_avg = ?,
+            sold_count = ?,
+            recommended_list_price = ?, ebay_search_url = ?, updated_at = datetime('now')
         WHERE id = ? AND user_id = ?
       `).bind(
         comp_1 !== undefined ? (comp_1 === '' ? null : Number(comp_1)) : null,
@@ -260,6 +272,11 @@ export async function onRequestPost(context) {
         comp_3 !== undefined ? (comp_3 === '' ? null : Number(comp_3)) : null,
         live_avg !== undefined ? (live_avg === '' ? null : Number(live_avg)) : null,
         manualAvg,
+        active_comp_1 !== undefined ? (active_comp_1 === '' ? null : Number(active_comp_1)) : null,
+        active_comp_2 !== undefined ? (active_comp_2 === '' ? null : Number(active_comp_2)) : null,
+        active_comp_3 !== undefined ? (active_comp_3 === '' ? null : Number(active_comp_3)) : null,
+        computedActiveAvg,
+        sold_count !== undefined ? (sold_count === '' ? 0 : Number(sold_count)) : 0,
         recPrice,
         searchUrl,
         compId,
@@ -268,8 +285,12 @@ export async function onRequestPost(context) {
     } else {
       compId = crypto.randomUUID();
       await env.DB.prepare(`
-        INSERT INTO auction_comps (id, item_id, user_id, comp_1, comp_2, comp_3, live_avg, manual_avg, recommended_list_price, ebay_search_url, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+        INSERT INTO auction_comps (
+          id, item_id, user_id, comp_1, comp_2, comp_3, live_avg, manual_avg,
+          active_comp_1, active_comp_2, active_comp_3, active_avg, sold_count,
+          recommended_list_price, ebay_search_url, updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
       `).bind(
         compId,
         item_id,
@@ -279,6 +300,11 @@ export async function onRequestPost(context) {
         comp_3 !== undefined ? (comp_3 === '' ? null : Number(comp_3)) : null,
         live_avg !== undefined ? (live_avg === '' ? null : Number(live_avg)) : null,
         manualAvg,
+        active_comp_1 !== undefined ? (active_comp_1 === '' ? null : Number(active_comp_1)) : null,
+        active_comp_2 !== undefined ? (active_comp_2 === '' ? null : Number(active_comp_2)) : null,
+        active_comp_3 !== undefined ? (active_comp_3 === '' ? null : Number(active_comp_3)) : null,
+        computedActiveAvg,
+        sold_count !== undefined ? (sold_count === '' ? 0 : Number(sold_count)) : 0,
         recPrice,
         searchUrl
       ).run();

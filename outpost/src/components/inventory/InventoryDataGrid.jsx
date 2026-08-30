@@ -1,25 +1,29 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { ArrowUpDown } from 'lucide-react';
-import { InventoryTableRow } from './InventoryTableRow';
+import { InventoryGridRow } from './InventoryGridRow';
 
-const DEFAULT_COLUMNS = [
+export const DEFAULT_COLUMNS = [
   { key: 'actions', label: 'Actions', minWidth: 100 },
-  { key: 'item_name', label: 'Item / Description', minWidth: 150 },
-  { key: 'athlete_person', label: 'Athlete / Signer', minWidth: 120 },
+  { key: 'item_name', label: 'Item / Description', minWidth: 160 },
+  { key: 'sku', label: 'SKU / Label', minWidth: 80 },
+  { key: 'margin_health', label: 'Margin', minWidth: 95 },
   { key: 'status', label: 'Status', minWidth: 100 },
+  { key: 'listing_format', label: 'Format', minWidth: 90 },
+  { key: 'current_list_price', label: 'List Price', minWidth: 95 },
+  { key: 'true_total_cost', label: 'Landed COGS', minWidth: 95 },
+  { key: 'floor_price', label: 'Floor Price', minWidth: 85 },
+  { key: 'suggested_list_price', label: 'Suggested', minWidth: 95 },
+  { key: 'athlete_person', label: 'Athlete / Signer', minWidth: 110 },
   { key: 'category', label: 'Category', minWidth: 100 },
-  { key: 'authenticator', label: 'Authenticator', minWidth: 110 },
-  { key: 'cert_number', label: 'Cert #', minWidth: 100 },
-  { key: 'true_total_cost', label: 'True Cost', minWidth: 100 },
-  { key: 'min_sell_price', label: 'Min Sell (Floor)', minWidth: 90 },
-  { key: 'suggested_list_price', label: 'Suggested List', minWidth: 110 },
-  { key: 'current_list_price', label: 'Current List', minWidth: 110 },
-  { key: 'platform', label: 'Platform', minWidth: 100 },
-  { key: 'invoice_ref', label: 'Invoice Ref', minWidth: 90 }
+  { key: 'authenticator', label: 'Authenticator', minWidth: 100 },
+  { key: 'cert_number', label: 'Cert #', minWidth: 90 },
+  { key: 'platform', label: 'Platform', minWidth: 90 },
+  { key: 'quantity', label: 'Qty', minWidth: 60 },
+  { key: 'invoice_ref', label: 'Invoice Ref', minWidth: 80 }
 ];
 
-export function InventoryTable({
-  items,
+export function InventoryDataGrid({
+  items = [],
   pagination,
   onPageChange,
   sortConfig,
@@ -30,9 +34,9 @@ export function InventoryTable({
   onUpdateItem,
   onDelete,
   onOpenEditModal,
+  onOpenQuickEdit,
   onOpenCopyModal,
   onOpenSaleModal,
-  onOpenQueryEdit,
   onOpenListingIdModal,
   onMarkSold,
   userSettings,
@@ -91,7 +95,7 @@ export function InventoryTable({
     <div className="flex-1 min-h-0 flex flex-col glass-panel rounded-2xl overflow-hidden border border-slate-800">
       <div className="flex-1 overflow-auto" ref={tableRef}>
         <table className="w-full text-left border-collapse text-sm whitespace-nowrap">
-          <thead className="bg-slate-900/90 text-slate-400 text-xs uppercase tracking-wider sticky top-0 z-20 shadow-sm backdrop-blur-md">
+          <thead className="bg-slate-900/95 text-slate-400 text-xs uppercase tracking-wider sticky top-0 z-20 shadow-sm backdrop-blur-md">
             <tr>
               {DEFAULT_COLUMNS.map(({ key, label, minWidth }) => {
                 if (columnVisibility[key] === false) return null;
@@ -101,12 +105,12 @@ export function InventoryTable({
                     key={key}
                     style={{ width: `${width}px`, minWidth: `${minWidth}px`, maxWidth: `${width}px` }}
                     className={`font-semibold py-2 px-3 border-b border-slate-800 relative select-none text-[11px] ${
-                      key === 'actions' ? 'sticky left-0 bg-slate-900/95 shadow-r z-30' : ''
+                      key === 'actions' ? 'sticky left-0 bg-slate-900 shadow-r z-30' : ''
                     }`}
                   >
                     <div
                       className="flex items-center gap-1.5 cursor-pointer hover:text-slate-200 transition-colors"
-                      onClick={() => onSort(key)}
+                      onClick={() => onSort && onSort(key)}
                     >
                       {label}
                       {key !== 'actions' && (
@@ -127,15 +131,16 @@ export function InventoryTable({
           <tbody className="divide-y divide-slate-800/40 text-slate-300">
             {items.length === 0 ? (
               <tr>
-                <td colSpan={visibleColCount} className="px-4 py-8 text-center text-slate-500">
-                  No inventory items match your filters.
+                <td colSpan={visibleColCount} className="px-4 py-12 text-center text-slate-500">
+                  <p className="text-sm font-semibold">No inventory items match your current filter criteria.</p>
+                  <p className="text-xs text-slate-600 mt-1">Try resetting filters or adjusting search terms.</p>
                 </td>
               </tr>
             ) : (
               <>
                 {/* Active Items */}
                 {activeItems.map((item, i) => (
-                  <InventoryTableRow
+                  <InventoryGridRow
                     key={item.id}
                     item={item}
                     index={i}
@@ -148,15 +153,15 @@ export function InventoryTable({
                     onUpdateItem={onUpdateItem}
                     onDelete={onDelete}
                     onOpenEditModal={onOpenEditModal}
+                    onOpenQuickEdit={onOpenQuickEdit}
                     onOpenCopyModal={onOpenCopyModal}
                     onOpenSaleModal={onOpenSaleModal}
-                    onOpenQueryEdit={onOpenQueryEdit}
                     onOpenListingIdModal={onOpenListingIdModal}
                     onMarkSold={onMarkSold}
                   />
                 ))}
 
-                {/* Sold Items Section (Positioned at Bottom) */}
+                {/* Sold Items Section Divider */}
                 {soldItems.length > 0 && (
                   <>
                     {activeItems.length > 0 && (
@@ -167,8 +172,8 @@ export function InventoryTable({
                         >
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                              <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-                              <span className="text-slate-200">Sold Items</span>
+                              <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                              <span className="text-slate-200 font-bold">Sold Items</span>
                               <span className="px-1.5 py-0.5 rounded text-[10px] bg-slate-800 text-emerald-400 font-semibold border border-emerald-500/20">
                                 {soldItems.length}
                               </span>
@@ -179,7 +184,7 @@ export function InventoryTable({
                       </tr>
                     )}
                     {soldItems.map((item, i) => (
-                      <InventoryTableRow
+                      <InventoryGridRow
                         key={item.id}
                         item={item}
                         index={activeItems.length + i}
@@ -192,9 +197,9 @@ export function InventoryTable({
                         onUpdateItem={onUpdateItem}
                         onDelete={onDelete}
                         onOpenEditModal={onOpenEditModal}
+                        onOpenQuickEdit={onOpenQuickEdit}
                         onOpenCopyModal={onOpenCopyModal}
                         onOpenSaleModal={onOpenSaleModal}
-                        onOpenQueryEdit={onOpenQueryEdit}
                         onOpenListingIdModal={onOpenListingIdModal}
                         onMarkSold={onMarkSold}
                       />
@@ -207,7 +212,7 @@ export function InventoryTable({
         </table>
       </div>
 
-      {/* Pagination */}
+      {/* Pagination Footer */}
       {pagination && pagination.pages > 1 && (
         <div className="flex items-center justify-between px-3 py-1.5 border-t border-slate-800/40 bg-slate-950/40">
           <span className="text-[11px] text-slate-500">
@@ -217,14 +222,14 @@ export function InventoryTable({
             <button
               onClick={() => onPageChange(pagination.page - 1)}
               disabled={pagination.page <= 1}
-              className="px-2.5 py-1 rounded-md text-[11px] border border-slate-700 text-slate-400 hover:text-slate-200 disabled:opacity-40 transition-all"
+              className="px-2.5 py-1 rounded-md text-[11px] border border-slate-700 text-slate-400 hover:text-slate-200 disabled:opacity-40 transition-all cursor-pointer"
             >
               ← Prev
             </button>
             <button
               onClick={() => onPageChange(pagination.page + 1)}
               disabled={pagination.page >= pagination.pages}
-              className="px-2.5 py-1 rounded-md text-[11px] border border-slate-700 text-slate-400 hover:text-slate-200 disabled:opacity-40 transition-all"
+              className="px-2.5 py-1 rounded-md text-[11px] border border-slate-700 text-slate-400 hover:text-slate-200 disabled:opacity-40 transition-all cursor-pointer"
             >
               Next →
             </button>

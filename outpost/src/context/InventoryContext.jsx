@@ -1,16 +1,14 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { getEnrichedItems, getPlatforms, updateItem } from '../utils/auctionApi';
 import { getApiUrl } from '../utils/api';
-import { getStoredUserSettings, saveUserSettings, DEFAULT_CATEGORIES } from '../utils/userSettings';
+import { getStoredUserSettings, DEFAULT_CATEGORIES } from '../utils/userSettings';
+import { computeFeeBreakdown } from '../utils/feeEngine';
 
 const InventoryContext = createContext();
 
 /**
  * InventoryProvider - unified state owner for items, comps, platforms,
  * filters, pagination, sorting, and user settings.
- *
- * Replaces the independent useState/useEffect data fetching that previously
- * lived inside both InventoryView and PricingIntelligenceView.
  */
 export function InventoryProvider({ children }) {
   // --- Core Data ---
@@ -20,9 +18,16 @@ export function InventoryProvider({ children }) {
 
   // --- Filters ---
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
-  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+  const [listingFormatFilter, setListingFormatFilter] = useState('All');
+  const [listingStatusFilter, setListingStatusFilter] = useState('All');
+
+  // --- Sort & Sort Presets ---
+  // sortPreset: 'default' | 'margin-desc' | 'margin-asc' | 'price-desc' | 'price-asc' | 'date-newest' | 'date-oldest' | 'custom'
+  const [sortPreset, setSortPreset] = useState('default');
+  const [sortConfig, setSortConfig] = useState({ key: 'created_at', direction: 'desc' });
 
   // --- UI State ---
   const [loading, setLoading] = useState(true);
@@ -31,6 +36,18 @@ export function InventoryProvider({ children }) {
 
   // --- User Settings (column visibility, widths, category order) ---
   const [userSettings, setUserSettings] = useState(getStoredUserSettings);
+
+  // Debounce search input (300ms)
+  const debounceTimerRef = useRef(null);
+  useEffect(() => {
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 300);
+    return () => {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    };
+  }, [search]);
 
   // Listen for settings changes dispatched from SettingsView
   useEffect(() => {
@@ -55,12 +72,39 @@ export function InventoryProvider({ children }) {
     return Array.from(new Set([...configured, ...itemCats]));
   }, [userSettings?.categoryOrder, items]);
 
-  // --- Sorted items ---
+  // --- Computed item metrics & sorting ---
+  const enrichedItemsWithMetrics = useMemo(() => {
+    return items.map(it => {
+      const breakdown = computeFeeBreakdown(it);
+      return {
+        ...it,
+        _computedMargin: breakdown.marginPct,
+        _computedNetProfit: breakdown.netProfit,
+        _computedMarginHealth: breakdown.marginHealth,
+        _computedFloor: breakdown.breakEvenFloor,
+      };
+    });
+  }, [items]);
+
+  // Client-side quick sort for instant visual responsiveness
   const sortedItems = useMemo(() => {
-    if (!sortConfig.key) return items;
-    return [...items].sort((a, b) => {
-      let valA = a[sortConfig.key];
-      let valB = b[sortConfig.key];
+    if (!sortConfig.key) return enrichedItemsWithMetrics;
+
+    return [...enrichedItemsWithMetrics].sort((a, b) => {
+      let valA;
+      let valB;
+
+      if (sortConfig.key === 'margin') {
+        valA = a._computedMargin;
+        valB = b._computedMargin;
+      } else if (sortConfig.key === 'net_profit') {
+        valA = a._computedNetProfit;
+        valB = b._computedNetProfit;
+      } else {
+        valA = a[sortConfig.key];
+        valB = b[sortConfig.key];
+      }
+
       if (valA == null) valA = '';
       if (valB == null) valB = '';
 
@@ -74,13 +118,14 @@ export function InventoryProvider({ children }) {
       if (strA > strB) return sortConfig.direction === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [items, sortConfig]);
+  }, [enrichedItemsWithMetrics, sortConfig]);
 
   // --- Status counts ---
   const statusCounts = useMemo(() => {
     const counts = {};
     items.forEach(it => {
-      counts[it.status] = (counts[it.status] || 0) + 1;
+      const s = it.status || 'Available';
+      counts[s] = (counts[s] || 0) + 1;
     });
     return counts;
   }, [items]);
@@ -91,9 +136,18 @@ export function InventoryProvider({ children }) {
     setError('');
     try {
       const params = { page, limit: 50 };
-      if (search) params.q = search;
+      if (debouncedSearch) params.q = debouncedSearch;
       if (statusFilter) params.status = statusFilter;
       if (categoryFilter && categoryFilter !== 'All') params.category = categoryFilter;
+      if (listingFormatFilter && listingFormatFilter !== 'All') params.listing_format = listingFormatFilter;
+      if (listingStatusFilter && listingStatusFilter !== 'All') params.listing_status = listingStatusFilter;
+
+      // Server sort mapping
+      if (sortConfig.key && sortConfig.key !== 'margin' && sortConfig.key !== 'net_profit') {
+        params.sort_by = sortConfig.key;
+        params.sort_dir = sortConfig.direction;
+      }
+
       const data = await getEnrichedItems(params);
       setItems(data.items || []);
       setPagination(data.pagination || { total: 0, page: 1, pages: 1 });
@@ -102,7 +156,7 @@ export function InventoryProvider({ children }) {
     } finally {
       setLoading(false);
     }
-  }, [search, statusFilter, categoryFilter]);
+  }, [debouncedSearch, statusFilter, categoryFilter, listingFormatFilter, listingStatusFilter, sortConfig]);
 
   const fetchPlatforms = useCallback(async () => {
     try {
@@ -116,7 +170,9 @@ export function InventoryProvider({ children }) {
 
   // Initial data load
   useEffect(() => { fetchPlatforms(); }, []);
-  useEffect(() => { fetchItems(1); }, [search, statusFilter, categoryFilter]);
+  useEffect(() => {
+    fetchItems(1);
+  }, [debouncedSearch, statusFilter, categoryFilter, listingFormatFilter, listingStatusFilter, sortConfig.key, sortConfig.direction]);
 
   // --- Optimistic Local Updates ---
   const updateItemLocal = useCallback((id, patch) => {
@@ -125,7 +181,6 @@ export function InventoryProvider({ children }) {
 
   /**
    * Save a field update to the server and merge the response
-   * (which includes recalculated min_sell_price, suggested_list_price, days_on_market).
    */
   const handleFieldSave = useCallback(async (id, patch) => {
     const res = await updateItem(id, patch);
@@ -138,15 +193,45 @@ export function InventoryProvider({ children }) {
     fetchItems(pagination.page);
   }, [fetchItems, pagination.page]);
 
-  // --- Sort handler ---
+  // --- Sort handler from table column click ---
   const handleSort = useCallback((key) => {
     if (key === 'actions') return;
+    setSortPreset('custom');
     setSortConfig(prev => {
       if (prev.key === key) {
         return { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
       }
       return { key, direction: 'asc' };
     });
+  }, []);
+
+  // --- Sort preset selector handler ---
+  const applySortPreset = useCallback((preset) => {
+    setSortPreset(preset);
+    switch (preset) {
+      case 'margin-desc':
+        setSortConfig({ key: 'margin', direction: 'desc' });
+        break;
+      case 'margin-asc':
+        setSortConfig({ key: 'margin', direction: 'asc' });
+        break;
+      case 'price-desc':
+        setSortConfig({ key: 'current_list_price', direction: 'desc' });
+        break;
+      case 'price-asc':
+        setSortConfig({ key: 'current_list_price', direction: 'asc' });
+        break;
+      case 'date-newest':
+        setSortConfig({ key: 'created_at', direction: 'desc' });
+        break;
+      case 'date-oldest':
+        setSortConfig({ key: 'created_at', direction: 'asc' });
+        break;
+      case 'default':
+      default:
+        setSortConfig({ key: 'created_at', direction: 'desc' });
+        break;
+    }
   }, []);
 
   const value = useMemo(() => ({
@@ -163,7 +248,11 @@ export function InventoryProvider({ children }) {
     search, setSearch,
     statusFilter, setStatusFilter,
     categoryFilter, setCategoryFilter,
+    listingFormatFilter, setListingFormatFilter,
+    listingStatusFilter, setListingStatusFilter,
+    // Sorting
     sortConfig, handleSort,
+    sortPreset, applySortPreset,
     // UI
     loading, error,
     pendingSaleItem, setPendingSaleItem,
@@ -178,7 +267,8 @@ export function InventoryProvider({ children }) {
   }), [
     items, sortedItems, platforms, platformOptions, categoryOptions,
     pagination, statusCounts,
-    search, statusFilter, categoryFilter, sortConfig,
+    search, statusFilter, categoryFilter, listingFormatFilter, listingStatusFilter,
+    sortConfig, sortPreset, applySortPreset,
     loading, error, pendingSaleItem,
     userSettings,
     fetchItems, fetchPlatforms, refreshAll, updateItemLocal, handleFieldSave, handleSort,
@@ -196,3 +286,4 @@ export function useInventory() {
   if (!ctx) throw new Error('useInventory must be used within an InventoryProvider');
   return ctx;
 }
+

@@ -1,16 +1,29 @@
 import React, { useState } from 'react';
-import { ExternalLink, Copy, AlertCircle, Loader2, Save, CheckCircle2, ArrowUpRight, Zap } from 'lucide-react';
+import { ExternalLink, Copy, AlertCircle, Loader2, Save, CheckCircle2, ArrowUpRight, Zap, Edit3, ShoppingBag } from 'lucide-react';
 import { StatusBadge } from './StatusBadge';
+import { MarginHealthBadge } from './MarginHealthBadge';
 import { cleanItemDescription, cleanAthleteName } from '../../utils/spreadsheetParser';
 import { fmtCurrency, roundPrice } from '../../utils/formulaPreview';
 import { buildEbaySearchUrl } from '../../utils/ebaySearch';
 import { saveComp, fetchLiveComps } from '../../utils/auctionApi';
+import { FeeBreakdownPanel } from './FeeBreakdownPanel';
+import { computeFeeBreakdown } from '../../utils/feeEngine';
 
-export function PricingCard({ item, onOpenCopyModal, onOpenQueryEdit, onItemUpdated }) {
+export function PricingCard({
+  item,
+  onOpenCopyModal,
+  onOpenQueryEdit,
+  onItemUpdated,
+  onOpenQuickEdit,
+  onOpenListingIdModal
+}) {
   const initDraft = () => ({
     comp_1: item.comp_1 !== null && item.comp_1 !== undefined ? roundPrice(item.comp_1) : '',
     comp_2: item.comp_2 !== null && item.comp_2 !== undefined ? roundPrice(item.comp_2) : '',
     comp_3: item.comp_3 !== null && item.comp_3 !== undefined ? roundPrice(item.comp_3) : '',
+    active_comp_1: item.active_comp_1 !== null && item.active_comp_1 !== undefined ? roundPrice(item.active_comp_1) : '',
+    active_comp_2: item.active_comp_2 !== null && item.active_comp_2 !== undefined ? roundPrice(item.active_comp_2) : '',
+    active_comp_3: item.active_comp_3 !== null && item.active_comp_3 !== undefined ? roundPrice(item.active_comp_3) : '',
     recommended_list_price: roundPrice(item.recommended_list_price || item.current_list_price || item.suggested_list_price || ''),
     saving: false,
     applied: false,
@@ -44,12 +57,27 @@ export function PricingCard({ item, onOpenCopyModal, onOpenQueryEdit, onItemUpda
         comp_1: draft.comp_1 === '' ? null : Number(draft.comp_1),
         comp_2: draft.comp_2 === '' ? null : Number(draft.comp_2),
         comp_3: draft.comp_3 === '' ? null : Number(draft.comp_3),
+        active_comp_1: draft.active_comp_1 === '' ? null : Number(draft.active_comp_1),
+        active_comp_2: draft.active_comp_2 === '' ? null : Number(draft.active_comp_2),
+        active_comp_3: draft.active_comp_3 === '' ? null : Number(draft.active_comp_3),
         recommended_list_price: draft.recommended_list_price === '' ? null : Number(draft.recommended_list_price),
         apply_to_item: applyToItem
       });
       setDraft(prev => ({ ...prev, saving: false, applied: applyToItem }));
-      if (applyToItem && draft.recommended_list_price) {
-        onItemUpdated(item.id, { current_list_price: Number(draft.recommended_list_price) });
+      if (onItemUpdated) {
+        const patch = {
+          comp_1: draft.comp_1,
+          comp_2: draft.comp_2,
+          comp_3: draft.comp_3,
+          active_comp_1: draft.active_comp_1,
+          active_comp_2: draft.active_comp_2,
+          active_comp_3: draft.active_comp_3,
+          recommended_list_price: draft.recommended_list_price
+        };
+        if (applyToItem && draft.recommended_list_price) {
+          patch.current_list_price = Number(draft.recommended_list_price);
+        }
+        onItemUpdated(item.id, patch);
       }
     } catch (err) {
       alert(`Save failed: ${err.message}`);
@@ -58,7 +86,9 @@ export function PricingCard({ item, onOpenCopyModal, onOpenQueryEdit, onItemUpda
   };
 
   const handlePrepareSearch = () => {
-    onOpenQueryEdit(item, (confirmedQuery) => handleConfirmSearch(confirmedQuery));
+    if (onOpenQueryEdit) {
+      onOpenQueryEdit(item, (confirmedQuery) => handleConfirmSearch(confirmedQuery));
+    }
   };
 
   const handleConfirmSearch = async (query) => {
@@ -73,55 +103,65 @@ export function PricingCard({ item, onOpenCopyModal, onOpenQueryEdit, onItemUpda
           comp_3: res.comp_3 !== null && res.comp_3 !== undefined ? roundPrice(res.comp_3) : prev.comp_3,
           recommended_list_price: roundPrice(res.live_avg || res.median || prev.recommended_list_price),
           fetchingLive: false,
-          fetchMsg: { type: 'success', text: `Found ${res.count} sold comps on eBay! Avg: ${fmtCurrency(res.live_avg)}` },
+          fetchMsg: { type: 'success', text: `Found ${res.count} sold comps! Avg: ${fmtCurrency(res.live_avg)}` },
           applied: false,
         }));
       } else {
         setDraft(prev => ({
           ...prev,
           fetchingLive: false,
-          fetchMsg: { type: 'info', text: 'No comps found. Try editing the search term or click eBay Comps.' }
+          fetchMsg: { type: 'info', text: 'No comps found. Try clicking eBay Comps directly.' }
         }));
       }
     } catch (err) {
       setDraft(prev => ({
         ...prev,
         fetchingLive: false,
-        fetchMsg: { type: 'error', text: err.message || 'Auto-fetch error. Click eBay Comps to view sold listings.' }
+        fetchMsg: { type: 'error', text: err.message || 'Auto-fetch error.' }
       }));
     }
   };
 
-  const vals = [draft.comp_1, draft.comp_2, draft.comp_3].filter(v => v !== '' && !isNaN(Number(v)) && Number(v) > 0).map(Number);
-  const liveAvg = vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
-  const floorDiff = draft.recommended_list_price && item.min_sell_price
-    ? (Number(draft.recommended_list_price) - item.min_sell_price)
-    : null;
+  const soldVals = [draft.comp_1, draft.comp_2, draft.comp_3].filter(v => v !== '' && !isNaN(Number(v)) && Number(v) > 0).map(Number);
+  const soldAvg = soldVals.length > 0 ? soldVals.reduce((a, b) => a + b, 0) / soldVals.length : null;
+
+  const activeVals = [draft.active_comp_1, draft.active_comp_2, draft.active_comp_3].filter(v => v !== '' && !isNaN(Number(v)) && Number(v) > 0).map(Number);
+  const activeAvg = activeVals.length > 0 ? activeVals.reduce((a, b) => a + b, 0) / activeVals.length : null;
+
+  const breakdown = computeFeeBreakdown({
+    ...item,
+    sellPrice: draft.recommended_list_price || item.current_list_price
+  });
 
   return (
-    <div className="glass-card rounded-2xl border border-slate-800 overflow-hidden flex flex-col transition-all hover:border-slate-700">
+    <div className="glass-card rounded-2xl border border-slate-800 overflow-hidden flex flex-col transition-all hover:border-slate-700 bg-slate-900/60">
       {/* Header */}
-      <div className="p-3 border-b border-slate-800/60 bg-slate-900/40 relative">
+      <div className="p-3 border-b border-slate-800/80 bg-slate-950/40 relative">
         <div className="flex gap-3">
           {/* Image */}
-          <div className="w-16 h-16 rounded-xl bg-slate-950 border border-slate-800 flex-shrink-0 overflow-hidden flex items-center justify-center">
+          <div className="w-14 h-14 rounded-xl bg-slate-950 border border-slate-800 flex-shrink-0 overflow-hidden flex items-center justify-center">
             {item.image_url ? (
               <img src={item.image_url} alt="Item" className="w-full h-full object-cover" loading="lazy" />
             ) : (
-              <span className="text-[10px] text-slate-600 font-medium">No Img</span>
+              <span className="text-[9px] text-slate-600 font-medium">No Img</span>
             )}
           </div>
           <div className="flex-1 min-w-0 flex flex-col justify-center">
-            <h3 className="text-sm font-bold text-white leading-tight truncate">
+            <h3 className="text-xs font-bold text-white leading-tight truncate">
               {cleanItemDescription(item.item_name, item.athlete_person, item.authenticator)}
             </h3>
             {item.athlete_person && (
-              <p className="text-xs text-amber-400 mt-0.5 truncate font-medium">
+              <p className="text-[11px] text-amber-400 mt-0.5 truncate font-medium">
                 {cleanAthleteName(item.athlete_person)}
               </p>
             )}
-            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
               <StatusBadge status={item.status} />
+              {item.sku && (
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-slate-800 text-slate-400 border border-slate-700/60">
+                  {item.sku}
+                </span>
+              )}
               {item.authenticator && (
                 <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-800 text-slate-300">
                   {item.authenticator} {item.cert_number}
@@ -129,47 +169,49 @@ export function PricingCard({ item, onOpenCopyModal, onOpenQueryEdit, onItemUpda
               )}
             </div>
           </div>
+
+          {/* Quick Drawer trigger */}
+          <button
+            onClick={() => onOpenQuickEdit && onOpenQuickEdit(item)}
+            className="w-7 h-7 rounded-lg bg-slate-800/80 hover:bg-amber-500/20 text-slate-400 hover:text-amber-400 flex items-center justify-center transition-colors flex-shrink-0"
+            title="Open Quick Edit Drawer"
+          >
+            <Edit3 className="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
 
       {/* Body */}
       <div className="p-3 flex-1 flex flex-col gap-3">
-        {/* eBay auto-fetch & Links */}
+        {/* eBay Quick Actions */}
         <div className="flex flex-col gap-1.5">
-          {!draft.fetchingLive ? (
-            <button
-              type="button"
-              onClick={handlePrepareSearch}
-              className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-amber-300 bg-amber-950/40 hover:bg-amber-900/50 border border-amber-500/40 transition-all"
-            >
-              <Zap className="w-3.5 h-3.5 text-amber-400" />
-              Auto-Fetch Sold Comps
-            </button>
-          ) : (
-            <div className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-amber-300 bg-amber-950/40 border border-amber-500/40">
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" />
-              Scanning eBay...
-            </div>
-          )}
           <div className="grid grid-cols-2 gap-1.5">
+            {!draft.fetchingLive ? (
+              <button
+                type="button"
+                onClick={handlePrepareSearch}
+                className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-amber-300 bg-amber-950/40 hover:bg-amber-900/50 border border-amber-500/40 transition-all truncate"
+              >
+                <Zap className="w-3 h-3 text-amber-400" /> Auto-Fetch Comps
+              </button>
+            ) : (
+              <div className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-amber-300 bg-amber-950/40 border border-amber-500/40 truncate">
+                <Loader2 className="w-3 h-3 animate-spin text-amber-400" /> Scanning...
+              </div>
+            )}
+
             <a
               href={buildEbaySearchUrl(item.item_name, item.athlete_person, item.authenticator)}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[10px] font-medium text-blue-300/80 hover:text-blue-200 bg-blue-950/20 hover:bg-blue-900/30 border border-blue-500/20 transition-all truncate"
+              className="flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-[11px] font-medium text-blue-300/90 hover:text-blue-200 bg-blue-950/30 hover:bg-blue-900/40 border border-blue-500/30 transition-all truncate"
             >
-              <ExternalLink className="w-2.5 h-2.5" /> eBay Comps
+              <ExternalLink className="w-3 h-3" /> eBay Comps
             </a>
-            <button
-              type="button"
-              onClick={() => onOpenCopyModal(item)}
-              className="flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold text-amber-300/90 hover:text-amber-200 bg-amber-950/20 hover:bg-amber-900/30 border border-amber-500/20 transition-all"
-            >
-              <Copy className="w-2.5 h-2.5" /> Listing Copy
-            </button>
           </div>
+
           {draft.fetchMsg && (
-            <div className={`p-2 rounded-lg text-[10px] leading-tight flex items-start gap-1 ${
+            <div className={`p-1.5 rounded-lg text-[10px] leading-tight flex items-start gap-1 ${
               draft.fetchMsg.type === 'success' ? 'bg-emerald-950/60 border border-emerald-500/40 text-emerald-300'
                 : draft.fetchMsg.type === 'error' ? 'bg-red-950/60 border border-red-500/40 text-red-300'
                   : 'bg-amber-950/60 border border-amber-500/40 text-amber-300'
@@ -180,85 +222,93 @@ export function PricingCard({ item, onOpenCopyModal, onOpenQueryEdit, onItemUpda
           )}
         </div>
 
-        {/* 3 Comp Inputs */}
-        <div className="grid grid-cols-3 gap-2 mt-auto">
-          {['comp_1', 'comp_2', 'comp_3'].map((field, i) => (
-            <div key={field}>
-              <label className="block text-[10px] font-semibold text-slate-400 mb-1">Comp #{i + 1} ($)</label>
+        {/* Historical Sold Comps (1-3) */}
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[10px] font-semibold text-slate-400">Sold Comps</span>
+            <span className="text-[10px] font-bold text-amber-400">Avg: {soldAvg ? fmtCurrency(soldAvg) : '--'}</span>
+          </div>
+          <div className="grid grid-cols-3 gap-1.5">
+            {['comp_1', 'comp_2', 'comp_3'].map((field, i) => (
               <input
+                key={field}
                 type="number"
                 step="0.01"
-                placeholder="0.00"
+                placeholder={`Sold #${i + 1}`}
                 value={draft[field]}
                 onChange={e => updateDraft(field, e.target.value)}
-                className="input-field py-1 px-2 text-xs font-mono text-center"
+                className="bg-slate-950/80 border border-slate-700/80 rounded-lg p-1 text-xs font-mono text-center text-white focus:border-amber-500 outline-none"
               />
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
 
-        {/* Average & Target Price */}
-        <div className="flex items-center justify-between gap-3 bg-slate-900/40 rounded-xl p-2.5 border border-slate-800">
-          <div className="relative group">
-            <span className="text-[10px] text-slate-400 cursor-help">Comp Avg:</span>
-            <p className="text-sm font-black text-amber-400">
-              {liveAvg ? fmtCurrency(liveAvg) : '--'}
-            </p>
+        {/* Active Comps (1-3) */}
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[10px] font-semibold text-slate-400">Active Comps</span>
+            <span className="text-[10px] font-bold text-blue-400">Avg: {activeAvg ? fmtCurrency(activeAvg) : '--'}</span>
           </div>
+          <div className="grid grid-cols-3 gap-1.5">
+            {['active_comp_1', 'active_comp_2', 'active_comp_3'].map((field, i) => (
+              <input
+                key={field}
+                type="number"
+                step="0.01"
+                placeholder={`Active #${i + 1}`}
+                value={draft[field]}
+                onChange={e => updateDraft(field, e.target.value)}
+                className="bg-slate-950/80 border border-slate-700/80 rounded-lg p-1 text-xs font-mono text-center text-white focus:border-blue-500 outline-none"
+              />
+            ))}
+          </div>
+        </div>
 
-          <div className="w-28 relative group">
-            <label className="block text-[10px] font-bold text-slate-300 mb-0.5 cursor-help">Target Price</label>
+        {/* Fee & Margin Mini Summary */}
+        <FeeBreakdownPanel item={item} customPrice={draft.recommended_list_price} compact={true} />
+
+        {/* Target Price & Action Row */}
+        <div className="flex items-center justify-between gap-2 bg-slate-950/80 rounded-xl p-2 border border-slate-800 mt-auto">
+          <div className="flex-1 min-w-0">
+            <label className="block text-[9px] font-bold text-slate-400 uppercase mb-0.5">Target Price</label>
             <div className="relative">
-              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-bold pointer-events-none">$</span>
+              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-bold pointer-events-none">$</span>
               <input
                 type="number"
                 step="0.01"
                 placeholder="0.00"
                 value={draft.recommended_list_price}
                 onChange={e => updateDraft('recommended_list_price', e.target.value)}
-                className="input-field py-1 pl-6 pr-2 text-xs font-bold text-white"
+                className="w-full bg-slate-900 border border-amber-500/60 rounded-lg pl-5 pr-1.5 py-0.5 text-xs font-bold text-amber-300 outline-none font-mono"
               />
             </div>
           </div>
 
-          <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-1 self-end">
             <button
               onClick={() => handleSave(false)}
               disabled={draft.saving}
-              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all text-xs font-semibold flex items-center justify-center gap-1"
-              title="Save Comps to DB"
+              className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all text-xs font-semibold flex items-center justify-center"
+              title="Save comps to DB"
             >
               {draft.saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
             </button>
+
             <button
               onClick={() => handleSave(true)}
               disabled={draft.saving || !draft.recommended_list_price}
-              className={`p-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 transition-all ${
+              className={`p-2 rounded-lg text-xs font-semibold flex items-center justify-center transition-all ${
                 draft.applied
                   ? 'bg-emerald-500 text-slate-950 font-bold'
                   : 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/30'
               }`}
-              title="Apply Target Price to Item List Price"
+              title="Apply target price to item list price"
             >
               {draft.applied ? <CheckCircle2 className="w-3.5 h-3.5" /> : <ArrowUpRight className="w-3.5 h-3.5" />}
             </button>
           </div>
         </div>
       </div>
-
-      {/* Floor Indicator */}
-      {floorDiff !== null && (
-        <div className="flex items-center justify-between text-[11px] px-3 py-1.5 bg-slate-900/30 border-t border-slate-800/40 text-slate-400">
-          <span>
-            Spread over Floor: <strong className={floorDiff >= 0 ? 'text-emerald-400' : 'text-red-400'}>{floorDiff >= 0 ? '+' : ''}{fmtCurrency(floorDiff)}</strong>
-          </span>
-          {draft.recommended_list_price && item.true_total_cost > 0 && (
-            <span>
-              Margin: <strong className="text-amber-400">{Math.round(((Number(draft.recommended_list_price) - item.true_total_cost) / Number(draft.recommended_list_price)) * 100)}%</strong>
-            </span>
-          )}
-        </div>
-      )}
     </div>
   );
 }

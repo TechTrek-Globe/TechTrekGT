@@ -56,25 +56,44 @@ export async function onRequestPut(context) {
       comp_1 = existing.comp_1,
       comp_2 = existing.comp_2,
       comp_3 = existing.comp_3,
+      live_avg = existing.live_avg,
+      active_comp_1 = existing.active_comp_1,
+      active_comp_2 = existing.active_comp_2,
+      active_comp_3 = existing.active_comp_3,
+      active_avg = existing.active_avg,
+      sold_count = existing.sold_count,
       recommended_list_price,
       ebay_search_url = existing.ebay_search_url,
       apply_to_item = false
     } = body;
 
     const manualAvg = computeManualAvg(comp_1, comp_2, comp_3);
+    const computedActiveAvg = active_avg !== undefined && active_avg !== null && active_avg !== ''
+      ? Number(active_avg)
+      : computeManualAvg(active_comp_1, active_comp_2, active_comp_3);
+
     const recPrice = recommended_list_price !== undefined && recommended_list_price !== null && !isNaN(Number(recommended_list_price))
       ? Number(recommended_list_price)
       : (manualAvg || existing.recommended_list_price);
 
     await env.DB.prepare(`
       UPDATE auction_comps
-      SET comp_1 = ?, comp_2 = ?, comp_3 = ?, manual_avg = ?, recommended_list_price = ?, ebay_search_url = ?, updated_at = datetime('now')
+      SET comp_1 = ?, comp_2 = ?, comp_3 = ?, live_avg = ?, manual_avg = ?,
+          active_comp_1 = ?, active_comp_2 = ?, active_comp_3 = ?, active_avg = ?,
+          sold_count = ?,
+          recommended_list_price = ?, ebay_search_url = ?, updated_at = datetime('now')
       WHERE id = ? AND user_id = ?
     `).bind(
       comp_1 !== undefined ? (comp_1 === '' ? null : Number(comp_1)) : null,
       comp_2 !== undefined ? (comp_2 === '' ? null : Number(comp_2)) : null,
       comp_3 !== undefined ? (comp_3 === '' ? null : Number(comp_3)) : null,
+      live_avg !== undefined ? (live_avg === '' ? null : Number(live_avg)) : null,
       manualAvg,
+      active_comp_1 !== undefined ? (active_comp_1 === '' ? null : Number(active_comp_1)) : null,
+      active_comp_2 !== undefined ? (active_comp_2 === '' ? null : Number(active_comp_2)) : null,
+      active_comp_3 !== undefined ? (active_comp_3 === '' ? null : Number(active_comp_3)) : null,
+      computedActiveAvg,
+      sold_count !== undefined ? (sold_count === '' ? 0 : Number(sold_count)) : (existing.sold_count || 0),
       recPrice,
       ebay_search_url,
       id,

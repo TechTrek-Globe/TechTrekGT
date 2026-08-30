@@ -276,3 +276,26 @@ ALTER TABLE auction_items ADD COLUMN ebay_promoted_rate REAL;
 ALTER TABLE auction_sales ADD COLUMN ebay_order_id TEXT;
 ALTER TABLE auction_sales ADD COLUMN fee_reconciled_at TEXT;
 
+-- ============================================================
+-- PHASE 4 MIGRATIONS - Inventory & Pricing Engine Rebuild
+-- Added: 2026-08-30
+-- Additive columns for eBay listing details, comps, and pricing
+-- ============================================================
+
+-- P4-1: auction_items column additions (SKU, listing metadata, quantity, custom floor/BIN)
+ALTER TABLE auction_items ADD COLUMN sku TEXT;
+ALTER TABLE auction_items ADD COLUMN listing_format TEXT;
+ALTER TABLE auction_items ADD COLUMN listing_status TEXT;
+ALTER TABLE auction_items ADD COLUMN quantity INTEGER DEFAULT 1;
+ALTER TABLE auction_items ADD COLUMN purchase_date TEXT;
+ALTER TABLE auction_items ADD COLUMN floor_price REAL;
+ALTER TABLE auction_items ADD COLUMN buy_it_now_price REAL;
+
+-- P4-2: auction_comps column additions (Active comps and sold count)
+ALTER TABLE auction_comps ADD COLUMN active_comp_1 REAL;
+ALTER TABLE auction_comps ADD COLUMN active_comp_2 REAL;
+ALTER TABLE auction_comps ADD COLUMN active_comp_3 REAL;
+ALTER TABLE auction_comps ADD COLUMN active_avg REAL;
+ALTER TABLE auction_comps ADD COLUMN sold_count INTEGER DEFAULT 0;
+
+

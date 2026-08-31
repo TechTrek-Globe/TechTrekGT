@@ -1,10 +1,11 @@
 import React from 'react';
-import { Package, X, ShieldCheck, Tag, ExternalLink } from 'lucide-react';
+import { Package, X, ShieldCheck, Tag, ExternalLink, Check, Loader2 } from 'lucide-react';
 import { STATUS_META } from '../../utils/constants';
 
-export function EditModalHeader({ form, item, isDirty, onClose }) {
+export function EditModalHeader({ form, item, isDirty, autoSaving, autoSavedTime, onClose }) {
   const statusMeta = STATUS_META[form.status] || STATUS_META['Available'];
   const title = form.item_name || item?.item_name || 'Untitled Inventory Item';
+  const isRecentlySaved = autoSavedTime && (Date.now() - autoSavedTime < 4000);
 
   return (
     <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-950/90 backdrop-blur-md flex-shrink-0">
@@ -17,12 +18,22 @@ export function EditModalHeader({ form, item, isDirty, onClose }) {
             <h2 className="text-base font-bold text-white leading-tight truncate max-w-md sm:max-w-lg" title={title}>
               {title}
             </h2>
-            {isDirty && (
+            {autoSaving ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-300 border border-amber-500/30 animate-pulse">
+                <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                Saving...
+              </span>
+            ) : isRecentlySaved ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                <Check className="w-3 h-3" />
+                Auto-saved
+              </span>
+            ) : isDirty ? (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30 animate-pulse">
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
                 Unsaved Changes
               </span>
-            )}
+            ) : null}
           </div>
           <div className="flex items-center gap-2 mt-1 text-xs text-slate-400 flex-wrap">
             <span className="font-mono text-slate-400">

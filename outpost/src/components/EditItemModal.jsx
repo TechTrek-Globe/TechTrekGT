@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { updateItem, saveComp, fetchLiveComps, getActiveEbayListings, syncEbayItem, fetchEbayItemAnalytics } from '../utils/auctionApi';
 import { computeFeeBreakdown } from '../utils/feeEngine';
 import { roundPrice } from '../utils/formulaPreview';
@@ -115,6 +115,49 @@ export function EditItemModal({
   const [analyticsError, setAnalyticsError] = useState('');
   const [analyticsRange, setAnalyticsRange] = useState(30);
 
+  // Auto-saving state for immediate seller assumption synchronization
+  const [autoSaving, setAutoSaving] = useState(false);
+  const [autoSavedTime, setAutoSavedTime] = useState(null);
+  const autoSaveTimerRef = useRef(null);
+
+  const autoSaveField = useCallback(async (fieldName, value) => {
+    if (!item?.id) return;
+    try {
+      setAutoSaving(true);
+      const parsedVal = value === '' ? 0 : parseFloat(value);
+      const payload = {
+        [fieldName]: fieldName === 'target_margin_pct' ? (parsedVal / 100) : parsedVal
+      };
+      const res = await updateItem(item.id, payload);
+      if (res?.item || res) {
+        const merged = { ...item, ...payload, ...(res.item || res) };
+        if (onUpdated) onUpdated(item.id, merged);
+        setInitialForm(prev => ({ ...prev, [fieldName]: value }));
+        setAutoSavedTime(Date.now());
+      }
+    } catch (e) {
+      console.warn('[EditItemModal] Auto-save error:', e);
+    } finally {
+      setAutoSaving(false);
+    }
+  }, [item, onUpdated]);
+
+  const updateField = (key, value, immediate = false) => {
+    setForm(prev => ({ ...prev, [key]: value }));
+
+    // Real-time auto-persistence for seller assumptions (est_shipping_cost, target_margin_pct)
+    if (key === 'est_shipping_cost' || key === 'target_margin_pct') {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+      if (immediate) {
+        autoSaveField(key, value);
+      } else {
+        autoSaveTimerRef.current = setTimeout(() => {
+          autoSaveField(key, value);
+        }, 500);
+      }
+    }
+  };
+
   // Populate form on item change
   useEffect(() => {
     if (item) {
@@ -229,10 +272,6 @@ export function EditItemModal({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, handleClose]);
-
-  const updateField = (key, value) => {
-    setForm(prev => ({ ...prev, [key]: value }));
-  };
 
   const fetchActiveListings = async () => {
     setLoadingEbayListings(true);
@@ -535,6 +574,8 @@ export function EditItemModal({
           form={form}
           item={item}
           isDirty={isDirty}
+          autoSaving={autoSaving}
+          autoSavedTime={autoSavedTime}
           onClose={handleClose}
         />
 

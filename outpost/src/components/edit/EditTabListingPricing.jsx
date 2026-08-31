@@ -325,7 +325,7 @@ export function EditTabListingPricing({
                         <button
                           key={p.val}
                           type="button"
-                          onClick={() => updateField('est_shipping_cost', p.val)}
+                          onClick={() => updateField('est_shipping_cost', p.val, true)}
                           className={`px-2 py-1 text-[10px] font-bold rounded border transition-all ${
                             parseFloat(form.est_shipping_cost) === parseFloat(p.val)
                               ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
@@ -568,7 +568,7 @@ export function EditTabListingPricing({
                     <button
                       key={val}
                       type="button"
-                      onClick={() => updateField('est_shipping_cost', val)}
+                      onClick={() => updateField('est_shipping_cost', val, true)}
                       className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border transition-all ${
                         shippingCost === parseFloat(val)
                           ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'

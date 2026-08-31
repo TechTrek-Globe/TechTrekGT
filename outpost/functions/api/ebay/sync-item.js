@@ -78,9 +78,9 @@ export async function onRequestPost(context) {
       ? liveListing.buyer_shipping_cost
       : (liveListing.is_free_shipping ? 0.00 : (item.buyer_shipping_cost || 0.00));
 
-    const estShippingCost = (item.est_shipping_cost != null && Number(item.est_shipping_cost) > 0)
+    const estShippingCost = (item.est_shipping_cost != null && !isNaN(Number(item.est_shipping_cost)))
       ? Number(item.est_shipping_cost)
-      : (liveListing.buyer_shipping_cost > 0 ? liveListing.buyer_shipping_cost : (liveListing.is_free_shipping ? 4.50 : 0.00));
+      : (liveListing.is_free_shipping ? 4.50 : 0.00);
 
     const pricing = computePricingFloors({
       true_total_cost: targetCost,

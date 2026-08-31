@@ -653,7 +653,7 @@ export async function fetchSingleEbayListing(env, accessToken, listingId) {
                 if (adRes.ok) {
                   const adData = await adRes.json();
                   const ads = adData.ads || [];
-                  const matchedAd = ads.find(a => String(a.listingId) === cleanId || String(a.listingId).includes(cleanId)) || ads[0];
+                  const matchedAd = ads.find(a => String(a.listingId) === cleanId || String(a.listingId).includes(cleanId));
                   if (matchedAd?.bidPercentage) {
                     const r = parseFloat(matchedAd.bidPercentage);
                     if (r > 0) {

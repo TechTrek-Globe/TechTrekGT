@@ -155,7 +155,7 @@ export function EditItemModal({
         target_margin_pct: item.target_margin_pct != null
           ? String(parseFloat((Number(item.target_margin_pct) * 100).toFixed(2)))
           : '30',
-        ebay_promoted_rate: item.ebay_promoted_rate != null
+        ebay_promoted_rate: (item.ebay_promoted_rate != null && Number(item.ebay_promoted_rate) > 0)
           ? String(item.ebay_promoted_rate)
           : (item.boost_pct != null && Number(item.boost_pct) > 0 ? String(parseFloat((Number(item.boost_pct) * 100).toFixed(2))) : ''),
 
@@ -274,7 +274,7 @@ export function EditItemModal({
           ? String(it.ebay_promoted_rate)
           : (liveListing.promoted_rate != null && Number(liveListing.promoted_rate) > 0
               ? String(liveListing.promoted_rate)
-              : form.ebay_promoted_rate || '');
+              : (Number(form.ebay_promoted_rate) > 0 ? form.ebay_promoted_rate : ''));
 
         const syncBuyerShipping = liveListing.buyer_shipping_cost != null && liveListing.buyer_shipping_cost > 0
           ? String(Number(liveListing.buyer_shipping_cost).toFixed(2))

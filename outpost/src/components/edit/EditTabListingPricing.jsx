@@ -72,7 +72,7 @@ export function EditTabListingPricing({
               </div>
               <p className="text-xs text-slate-300 font-mono">
                 Item Number: <strong className="text-white font-bold">{form.ebay_listing_id}</strong>
-                {form.ebay_promoted_rate && (
+                {Number(form.ebay_promoted_rate) > 0 && (
                   <span className="text-amber-300 font-bold ml-2">• {form.ebay_promoted_rate}% Promoted Ad</span>
                 )}
               </p>

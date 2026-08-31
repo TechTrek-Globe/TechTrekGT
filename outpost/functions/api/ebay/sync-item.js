@@ -52,12 +52,19 @@ export async function onRequestPost(context) {
       return err(`Could not find active listing details on eBay for Item ID: ${targetListingId}`, 404);
     }
 
-    const promotedRate = (liveListing.promoted_rate != null && liveListing.promoted_rate > 0)
-      ? liveListing.promoted_rate
-      : (body.ebay_promoted_rate != null && body.ebay_promoted_rate !== ''
-          ? parseFloat(body.ebay_promoted_rate)
-          : (item.ebay_promoted_rate != null ? parseFloat(item.ebay_promoted_rate) : 0));
+    const liveRate = (liveListing.promoted_rate != null && Number(liveListing.promoted_rate) > 0)
+      ? Number(liveListing.promoted_rate)
+      : null;
 
+    const userRate = (body.ebay_promoted_rate != null && body.ebay_promoted_rate !== '' && Number(body.ebay_promoted_rate) > 0)
+      ? parseFloat(body.ebay_promoted_rate)
+      : null;
+
+    const dbRate = (item.ebay_promoted_rate != null && Number(item.ebay_promoted_rate) > 0)
+      ? parseFloat(item.ebay_promoted_rate)
+      : (item.boost_pct != null && Number(item.boost_pct) > 0 ? parseFloat(item.boost_pct) * 100 : null);
+
+    const promotedRate = liveRate ?? userRate ?? dbRate ?? 0;
     const boostPct = promotedRate > 0 ? promotedRate / 100 : 0;
 
     const targetCost = item.true_total_cost != null ? item.true_total_cost : (item.unit_price || 0);

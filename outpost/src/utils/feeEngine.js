@@ -131,11 +131,17 @@ export function computeFeeBreakdown(params = {}) {
   const shippingNet = round(shippingCharged - shippingCost);
 
   // Break-even floor price calculation
-  const totalFeeRate = platformFeePct + promotedDecimal + paymentProcessingPct;
-  const divisor = 1 - totalFeeRate;
-  const netShippingBurden = Math.max(0, shippingCost - shippingCharged);
-  const breakEvenFloor = divisor > 0
-    ? round((cogs + netShippingBurden + platformFlatFee) / divisor)
+  const totalVariableRate = platformFeePct + promotedDecimal + paymentProcessingPct;
+  const retentionDivisor = 1 - totalVariableRate;
+  
+  // Shipping revenue kept after platform fees are applied to the buyer's shipping charge
+  const shippingRevenueKept = shippingCharged * (1 - (platformFeePct + paymentProcessingPct));
+  
+  // Total fixed costs to cover minus the shipping revenue we keep
+  const fixedCostNumerator = cogs + shippingCost + platformFlatFee - shippingRevenueKept;
+  
+  const breakEvenFloor = retentionDivisor > 0
+    ? Math.max(0, round(fixedCostNumerator / retentionDivisor))
     : 0;
 
   return {

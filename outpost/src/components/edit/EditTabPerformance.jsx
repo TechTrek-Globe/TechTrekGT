@@ -481,9 +481,22 @@ export function EditTabPerformance({
 
       {/* 3. Error Banner */}
       {analyticsError && !needsReauth && (
-        <div className="p-3.5 rounded-xl bg-red-950/40 border border-red-500/30 flex items-center gap-2 text-xs text-red-300">
-          <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0" />
-          <span>{analyticsError}</span>
+        <div className="p-4 rounded-xl bg-red-950/40 border border-red-500/30 space-y-2">
+          <div className="flex items-center gap-2 text-xs text-red-300">
+            <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0" />
+            <span className="font-semibold">{analyticsError}</span>
+          </div>
+          {(analyticsError.toLowerCase().includes('unauthorized') || analyticsError.toLowerCase().includes('token')) && (
+            <div className="text-xs text-slate-300 pt-1 space-y-1.5 border-t border-red-500/20">
+              <p>Your TechTrek Outpost login session has expired. Please log in again to refresh your credentials.</p>
+              <a
+                href="/outpost/login"
+                className="inline-flex items-center gap-1 text-xs font-bold text-amber-400 hover:text-amber-300 underline"
+              >
+                Log In to Outpost ↗
+              </a>
+            </div>
+          )}
         </div>
       )}
 

@@ -152,6 +152,7 @@ export async function onRequestGetStart(context) {
       response_type: 'code',
       redirect_uri: redirectUri,
       scope: env.EBAY_SCOPES || EBAY_ACG_SCOPES,
+      prompt: 'consent',
       state
     });
 

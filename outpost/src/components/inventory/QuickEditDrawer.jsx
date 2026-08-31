@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, CheckCircle2, Loader2, Zap, ExternalLink, Copy, AlertCircle, TrendingUp, Layers } from 'lucide-react';
+import { X, Save, CheckCircle2, Loader2, Zap, ExternalLink, Copy, AlertCircle, TrendingUp, Layers, Lock } from 'lucide-react';
 import { updateItem, saveComp, fetchLiveComps } from '../../utils/auctionApi';
 import { ALL_STATUSES, LISTING_FORMATS } from '../../utils/constants';
 import { FeeBreakdownPanel } from './FeeBreakdownPanel';
@@ -421,14 +421,23 @@ export function QuickEditDrawer({
               </div>
 
               <div>
-                <label className="block text-[10px] text-slate-400 mb-1 font-semibold">Promoted Rate (%)</label>
+                <label className="block text-[10px] text-slate-400 mb-1 font-semibold flex items-center justify-between">
+                  <span className="flex items-center gap-1">
+                    <span>Promoted Rate (%)</span>
+                    {draft.ebay_listing_id && <Lock className="w-2.5 h-2.5 text-amber-400" title="Locked - Synced from eBay" />}
+                  </span>
+                  {draft.ebay_listing_id && <span className="text-[9px] text-slate-500 font-normal">Synced from eBay</span>}
+                </label>
                 <input
                   type="number"
                   step="0.1"
                   placeholder="e.g. 5.0"
                   value={draft.ebay_promoted_rate}
                   onChange={e => updateField('ebay_promoted_rate', e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:border-amber-500 outline-none font-mono"
+                  disabled={Boolean(draft.ebay_listing_id)}
+                  className={`w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:border-amber-500 outline-none font-mono ${
+                    draft.ebay_listing_id ? 'bg-slate-900/60 text-slate-400 cursor-not-allowed opacity-80' : ''
+                  }`}
                 />
               </div>
             </div>

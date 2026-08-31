@@ -74,3 +74,16 @@ Atomic Execution Mandate: Never end a turn or present findings after npm run bui
     2. Categories to query: `tourism.sights`, `catering.restaurant`, `leisure`.
     3. Cross-verify coordinates and address metadata against Google Places API results (calculating delta threshold < 250 meters).
     4. Save the dual-verified venue names, addresses, star ratings, and coordinates directly into the central data file (`wayfinder/src/data/poland-2026.js`).
+
+---
+
+## 7. eBay Sell API Protocol & Reference Mandate
+* **Mandatory Reference First:** Whenever investigating, implementing, modifying, or troubleshooting any eBay API integration or issue in Outpost or Landing, you MUST ALWAYS consult `outpost/docs/ebay-apis-reference.md` FIRST before proposing or writing code.
+* **Core 6 eBay Sell API Areas:**
+  1. **Inventory API:** Listings and stock. Pull current stock levels, create item records, push custom HTML listing templates, and publish items as live fixed-price or auction offers.
+  2. **Fulfillment API:** Post-sale logistics. Pull detailed buyer order information, process shipments, and upload tracking numbers.
+  3. **Finances API:** Revenue and costs. Pull seller payout statuses, detailed breakdowns of order earnings, listing fees, buyer refunds, and shipping label costs.
+  4. **Analytics API:** Performance metrics. Pull traffic reports on how often buyers view listings (`filter=marketplace_ids:{EBAY_US},listing_ids:{...},date_range:[YYYYMMDD..YYYYMMDD]` in Pacific Time T-1), track customer service metrics, and monitor seller standard profiles.
+  5. **Account API:** Store foundation. Pull and configure overarching business policies for payments, returns, and fulfillment rules.
+  6. **Marketing API:** Promoted listings. Pull data on ad campaigns and manage promotions/ad fees to increase item visibility.
+* **OAuth Scopes & Validation:** Cross-reference requested endpoints with user permissions in `ebay_oauth_tokens` to ensure the required scope (e.g. `sell.analytics.readonly`, `sell.inventory`, `sell.finances`, `sell.fulfillment`) is granted.

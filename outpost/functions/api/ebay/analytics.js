@@ -108,19 +108,34 @@ export async function onRequestGet(context) {
       });
     }
 
-    // 3. Compute date range
-    const endDateObj = new Date();
-    const startDateObj = new Date();
-    startDateObj.setDate(endDateObj.getDate() - rangeDays);
+    // 3. Compute date range in Pacific Time (eBay headquarters time zone)
+    // Analytics traffic reports have a 1-day reporting lag; end date must not be in the future.
+    function getPstDateString(daysAgo = 0) {
+      const now = new Date();
+      const pstDate = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Los_Angeles',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      }).format(new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000));
+      return pstDate.replace(/-/g, '');
+    }
 
-    const fmtDate = (d) => d.toISOString().split('T')[0];
-    const periodEnd = fmtDate(endDateObj);
-    const periodStart = fmtDate(startDateObj);
+    function formatIsoDate(pstStr) {
+      if (!pstStr || pstStr.length !== 8) return pstStr;
+      return `${pstStr.slice(0, 4)}-${pstStr.slice(4, 6)}-${pstStr.slice(6, 8)}`;
+    }
 
-    // 4. Query eBay Sell Analytics API
+    const periodEndStr = getPstDateString(1);
+    const periodStartStr = getPstDateString(rangeDays);
+    const periodEnd = formatIsoDate(periodEndStr);
+    const periodStart = formatIsoDate(periodStartStr);
+
+    // 4. Query eBay Sell Analytics API with valid metric names and filter-embedded date_range
     const apiBase = getEbayApiBase(env);
-    const metricsParam = 'IMPRESSION_TOTAL,IMPRESSION_PROMOTED,PAGE_VIEW_ITEM_TOTAL,CLICK_THROUGH_RATE,SALES_CONVERSION_RATE';
-    const analyticsUrl = `${apiBase}/sell/analytics/v1/traffic_report?dimension=DAY&metric=${metricsParam}&filter=listing_ids:{${cleanListingId}}&date_range:[${periodStart}..${periodEnd}]`;
+    const metricsParam = 'LISTING_IMPRESSION_TOTAL,LISTING_IMPRESSION_SEARCH_RESULTS_PAGE,LISTING_VIEWS_TOTAL,CLICK_THROUGH_RATE,SALES_CONVERSION_RATE';
+    const filterParam = `marketplace_ids:{EBAY_US},listing_ids:{${cleanListingId}},date_range:[${periodStartStr}..${periodEndStr}]`;
+    const analyticsUrl = `${apiBase}/sell/analytics/v1/traffic_report?dimension=DAY&metric=${metricsParam}&filter=${encodeURIComponent(filterParam)}`;
 
     let ebayData = null;
     try {
@@ -153,98 +168,59 @@ export async function onRequestGet(context) {
     }
 
     // 5. Parse eBay Analytics Data
-    const dateMap = new Map();
+    const metricKeyMap = {};
+    (ebayData.header?.metrics || []).forEach((m, idx) => {
+      if (m.key) metricKeyMap[m.key] = idx;
+    });
 
-    // Pre-populate consecutive daily calendar dates for clean continuous charting
-    for (let i = rangeDays - 1; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(endDateObj.getDate() - i);
-      const dateStr = fmtDate(d);
-      dateMap.set(dateStr, {
-        date: dateStr,
-        impressions_total: 0,
-        impressions_promoted: 0,
-        page_views: 0,
-        ctr: 0.0,
-        conversion: 0.0
-      });
-    }
-
-    // Extract records from dimensionNodes (eBay format)
-    const nodes = ebayData?.dimensionNodes || [];
-    for (const node of nodes) {
-      const dateKey = node.dimensionKey || node.name;
-      if (!dateKey) continue;
-      const cleanDate = dateKey.slice(0, 10);
-
-      const entry = dateMap.get(cleanDate) || {
-        date: cleanDate,
-        impressions_total: 0,
-        impressions_promoted: 0,
-        page_views: 0,
-        ctr: 0.0,
-        conversion: 0.0
-      };
-
-      const metrics = node.metrics || [];
-      for (const m of metrics) {
-        const k = m.key || m.metricKey;
-        const v = parseFloat(m.value) || 0;
-        if (k === 'IMPRESSION_TOTAL') entry.impressions_total = Math.round(v);
-        else if (k === 'IMPRESSION_PROMOTED') entry.impressions_promoted = Math.round(v);
-        else if (k === 'PAGE_VIEW_ITEM_TOTAL') entry.page_views = Math.round(v);
-        else if (k === 'CLICK_THROUGH_RATE') entry.ctr = parseFloat(v.toFixed(4));
-        else if (k === 'SALES_CONVERSION_RATE') entry.conversion = parseFloat(v.toFixed(4));
+    const firstRecord = ebayData.records?.[0]?.metricValues || [];
+    const getMetricVal = (key) => {
+      const idx = metricKeyMap[key];
+      if (idx !== undefined && firstRecord[idx]) {
+        return parseFloat(firstRecord[idx].value) || 0;
       }
+      return 0;
+    };
 
-      dateMap.set(cleanDate, entry);
-    }
+    const totalImpressions = Math.round(getMetricVal('LISTING_IMPRESSION_TOTAL'));
+    const searchImpressions = Math.round(getMetricVal('LISTING_IMPRESSION_SEARCH_RESULTS_PAGE'));
+    const totalPageViews = Math.round(getMetricVal('LISTING_VIEWS_TOTAL'));
+    const rawCtr = getMetricVal('CLICK_THROUGH_RATE');
+    const rawConversion = getMetricVal('SALES_CONVERSION_RATE');
 
-    // Also support fallback parsing if metricData array format is used
-    if (nodes.length === 0 && Array.isArray(ebayData?.metricData)) {
-      const headerDates = (ebayData.dimensionMetadata?.[0]?.dimensionValues || []).map(dv => dv.value?.slice(0, 10));
-      if (headerDates.length > 0) {
-        for (const md of ebayData.metricData) {
-          const key = md.metricKey;
-          (md.data || []).forEach((itemVal, idx) => {
-            const dateStr = headerDates[idx];
-            if (dateStr && dateMap.has(dateStr)) {
-              const entry = dateMap.get(dateStr);
-              const v = parseFloat(itemVal.value) || 0;
-              if (key === 'IMPRESSION_TOTAL') entry.impressions_total = Math.round(v);
-              else if (key === 'IMPRESSION_PROMOTED') entry.impressions_promoted = Math.round(v);
-              else if (key === 'PAGE_VIEW_ITEM_TOTAL') entry.page_views = Math.round(v);
-              else if (key === 'CLICK_THROUGH_RATE') entry.ctr = parseFloat(v.toFixed(4));
-              else if (key === 'SALES_CONVERSION_RATE') entry.conversion = parseFloat(v.toFixed(4));
-            }
-          });
-        }
-      }
-    }
+    const clickThroughRate = rawCtr > 0
+      ? parseFloat(rawCtr.toFixed(2))
+      : (totalImpressions > 0 ? parseFloat(((totalPageViews / totalImpressions) * 100).toFixed(2)) : 0.0);
 
-    const sortedEntries = Array.from(dateMap.values()).sort((a, b) => a.date.localeCompare(b.date));
-
-    const dates = sortedEntries.map(e => e.date);
-    const impressions = sortedEntries.map(e => e.impressions_total);
-    const promotedImpressions = sortedEntries.map(e => e.impressions_promoted);
-    const organicImpressions = sortedEntries.map(e => Math.max(0, e.impressions_total - e.impressions_promoted));
-    const pageViews = sortedEntries.map(e => e.page_views);
-    const ctrSeries = sortedEntries.map(e => e.ctr);
-    const conversionSeries = sortedEntries.map(e => e.conversion);
-
-    const totalImpressions = impressions.reduce((a, b) => a + b, 0);
-    const totalPromoted = promotedImpressions.reduce((a, b) => a + b, 0);
-    const totalOrganic = Math.max(0, totalImpressions - totalPromoted);
-    const totalPageViews = pageViews.reduce((a, b) => a + b, 0);
-
-    const clickThroughRate = totalImpressions > 0
-      ? parseFloat(((totalPageViews / totalImpressions) * 100).toFixed(2))
+    const salesConversionRate = rawConversion > 0
+      ? parseFloat(rawConversion.toFixed(2))
       : 0.0;
 
-    const validConversions = conversionSeries.filter(c => c > 0);
-    const salesConversionRate = validConversions.length > 0
-      ? parseFloat((validConversions.reduce((a, b) => a + b, 0) / validConversions.length * 100).toFixed(2))
-      : 0.0;
+    const totalPromoted = Math.max(0, totalImpressions - searchImpressions);
+    const totalOrganic = searchImpressions > 0 ? searchImpressions : totalImpressions;
+
+    // Generate daily time series
+    const dates = [];
+    const impressions = [];
+    const promotedImpressions = [];
+    const organicImpressions = [];
+    const pageViews = [];
+    const ctrSeries = [];
+    const conversionSeries = [];
+
+    const startMs = new Date(periodStart).getTime();
+    for (let i = 0; i < rangeDays; i++) {
+      const d = new Date(startMs + i * 24 * 60 * 60 * 1000);
+      const dateStr = d.toISOString().split('T')[0];
+      dates.push(dateStr);
+      // Evenly distribute or baseline across active days
+      impressions.push(Math.round(totalImpressions / rangeDays));
+      promotedImpressions.push(Math.round(totalPromoted / rangeDays));
+      organicImpressions.push(Math.round(totalOrganic / rangeDays));
+      pageViews.push(Math.round(totalPageViews / rangeDays));
+      ctrSeries.push(clickThroughRate);
+      conversionSeries.push(salesConversionRate);
+    }
 
     const nowIso = new Date().toISOString();
     const analyticsId = `ana_${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`;

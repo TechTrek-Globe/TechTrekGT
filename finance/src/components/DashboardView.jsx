@@ -677,7 +677,21 @@ export function DashboardView() {
       case 'earner_splits': {
         const peopleList = budget?.people || [];
         const totalNetMonthly = peopleList.reduce((sum, p) => sum + getMonthlyNetIncome(p), 0);
-        const totalTargetMonthly = peopleList.reduce((sum, p) => sum + getPersonMonthlyTotal(p.id), 0);
+        const totalTargetMonthly = peopleList.reduce((sum, p) => {
+          const hasAllocations = p.accountAllocations &&
+            typeof p.accountAllocations === 'object' &&
+            Object.values(p.accountAllocations).some(v => parseFloat(v) > 0 || v === 'remaining');
+          if (hasAllocations) {
+            const perPaycheck = (budget?.accounts || []).reduce(
+              (s, acc) => s + getPersonDepositAmountForAccount(p, acc.id, budget), 0
+            );
+            if (p.payFrequency === 'semi-monthly') return sum + perPaycheck * 2;
+            if (p.payFrequency === 'bi-weekly') return sum + (perPaycheck * 26) / 12;
+            if (p.payFrequency === 'weekly') return sum + (perPaycheck * 52) / 12;
+            return sum + perPaycheck;
+          }
+          return sum + getPersonMonthlyTotal(p.id);
+        }, 0);
         const totalSurplusMonthly = totalNetMonthly - totalTargetMonthly;
 
         return (
@@ -1062,8 +1076,10 @@ export function DashboardView() {
                       const isPinned = pinnedSplitTooltip === tooltipKey;
                       
                       let perPaycheckAmt = portionAmt;
-                      if (person?.payFrequency === 'semi-monthly' || person?.payFrequency === 'bi-weekly') {
+                      if (person?.payFrequency === 'semi-monthly') {
                         perPaycheckAmt = portionAmt / 2;
+                      } else if (person?.payFrequency === 'bi-weekly') {
+                        perPaycheckAmt = (portionAmt * 12) / 26;
                       } else if (person?.payFrequency === 'weekly') {
                         perPaycheckAmt = (portionAmt * 12) / 52;
                       }

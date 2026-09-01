@@ -96,7 +96,11 @@ export function AccountTransferSummary() {
           const extraPortion = getAccountSaveExtraPersonPortion(acc, p, budget);
           const monthlyPortion = accountBills.reduce((sum, b) => sum + getBillPersonMonthlyPortion(b, p.id), 0) + extraPortion;
           rawPortion = mode === 'paycheck'
-            ? (p.payFrequency === 'weekly' ? (monthlyPortion * 12) / 52 : monthlyPortion / 2)
+            ? (p.payFrequency === 'weekly'
+                ? (monthlyPortion * 12) / 52
+                : p.payFrequency === 'bi-weekly'
+                  ? (monthlyPortion * 12) / 26
+                  : monthlyPortion / 2)
             : monthlyPortion;
         }
   

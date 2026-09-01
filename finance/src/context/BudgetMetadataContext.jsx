@@ -626,8 +626,10 @@ export function BudgetMetadataProvider({ children }) {
     const person = (state.people || []).find(p => p.id === personId);
     if (!person) return 0;
     const monthlyTotal = getPersonMonthlyTotal(personId, state);
-    if (person.payFrequency === 'semi-monthly' || person.payFrequency === 'bi-weekly') {
+    if (person.payFrequency === 'semi-monthly') {
       return monthlyTotal / 2;
+    } else if (person.payFrequency === 'bi-weekly') {
+      return (monthlyTotal * 12) / 26;
     } else if (person.payFrequency === 'weekly') {
       return (monthlyTotal * 12) / 52;
     }

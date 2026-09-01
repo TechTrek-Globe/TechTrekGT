@@ -857,9 +857,10 @@ export function matchCreditToEarner({
       // CRITICAL GUARD: only attempt matching if calculated amount is meaningful
       if (totalMonthly < MIN_EARNER_AMOUNT) continue;
 
-      const isBiOrSemi = p.payFrequency === 'semi-monthly' || p.payFrequency === 'bi-weekly';
-      const perPaycheck = isBiOrSemi
+      const perPaycheck = p.payFrequency === 'semi-monthly'
         ? Math.round((totalMonthly / 2) * 100) / 100
+        : p.payFrequency === 'bi-weekly'
+        ? Math.round(((totalMonthly * 12) / 26) * 100) / 100
         : p.payFrequency === 'weekly'
         ? Math.round(((totalMonthly * 12) / 52) * 100) / 100
         : totalMonthly;

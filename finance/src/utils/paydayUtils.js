@@ -154,8 +154,10 @@ export function getPersonDepositAmountForAccount(person, selectedAccountId = 'al
     const totalMonthly = monthlyBillPortion + extraPortion;
 
     if (totalMonthly > 0) {
-      if (person.payFrequency === 'semi-monthly' || person.payFrequency === 'bi-weekly') {
+      if (person.payFrequency === 'semi-monthly') {
         return Math.round((totalMonthly / 2) * 100) / 100;
+      } else if (person.payFrequency === 'bi-weekly') {
+        return Math.round(((totalMonthly * 12) / 26) * 100) / 100;
       } else if (person.payFrequency === 'weekly') {
         return Math.round(((totalMonthly * 12) / 52) * 100) / 100;
       }
@@ -311,8 +313,10 @@ export function getPersonExtraSavingsDepositAmountForAccount(person, selectedAcc
       if (monthlyExtra <= 0) return sum;
       let perPay = monthlyExtra;
       const freq = (person.payFrequency || 'bi-weekly').toLowerCase();
-      if (freq === 'semi-monthly' || freq === 'bi-weekly') {
+      if (freq === 'semi-monthly') {
         perPay = monthlyExtra / 2;
+      } else if (freq === 'bi-weekly') {
+        perPay = (monthlyExtra * 12) / 26;
       } else if (freq === 'weekly') {
         perPay = (monthlyExtra * 12) / 52;
       }
@@ -328,8 +332,10 @@ export function getPersonExtraSavingsDepositAmountForAccount(person, selectedAcc
 
   let perPay = monthlyExtra;
   const freq = (person.payFrequency || 'bi-weekly').toLowerCase();
-  if (freq === 'semi-monthly' || freq === 'bi-weekly') {
+  if (freq === 'semi-monthly') {
     perPay = monthlyExtra / 2;
+  } else if (freq === 'bi-weekly') {
+    perPay = (monthlyExtra * 12) / 26;
   } else if (freq === 'weekly') {
     perPay = (monthlyExtra * 12) / 52;
   }

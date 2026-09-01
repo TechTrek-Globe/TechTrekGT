@@ -75,6 +75,18 @@ export function SettingsView() {
   const [tokenCopied, setTokenCopied] = useState(false);
   const [skuActionLoading, setSkuActionLoading] = useState(false);
 
+  // Auto-fetch API token when visiting the integrations tab
+  useEffect(() => {
+    if (activeTab === 'integrations' && !amazonToken && !tokenLoading) {
+      setTokenLoading(true);
+      fetch(getApiUrl('/api/import/amazon-token'), { credentials: 'include' })
+        .then(r => r.json())
+        .then(d => { if (d.token) setAmazonToken(d.token); })
+        .catch(err => console.error('Failed to auto-fetch API token:', err))
+        .finally(() => setTokenLoading(false));
+    }
+  }, [activeTab]);
+
   const showSuccess = (msg) => {
     setSuccessMsg(msg);
     setTimeout(() => setSuccessMsg(''), 4000);
@@ -1244,55 +1256,97 @@ export function SettingsView() {
 // ---------------------------------------------------------------------------
 function VineScoutSection({ token, loading, rotating, copied, onLoad, onRotate, onCopy }) {
   const [revealed, setRevealed] = React.useState(false);
+  const [urlCopied, setUrlCopied] = React.useState(false);
+
+  // Auto-detect current instance base URL (falls back to production domain)
+  const baseUrl = React.useMemo(() => {
+    if (typeof window !== 'undefined' && window.location.origin) {
+      const path = window.location.pathname.startsWith('/outpost') ? '/outpost' : '';
+      return `${window.location.origin}${path}`;
+    }
+    return 'https://techtrekgt.com/outpost';
+  }, []);
 
   const displayToken = token
     ? (revealed ? token : token.slice(0, 6) + '••••••••••••••••••••••••••••••••••')
     : null;
 
+  const handleCopyUrl = () => {
+    navigator.clipboard.writeText(baseUrl);
+    setUrlCopied(true);
+    setTimeout(() => setUrlCopied(false), 2000);
+  };
+
   return (
-    <div className="glass-card rounded-2xl p-6 border border-orange-900/30 bg-orange-950/10 space-y-5">
+    <div className="glass-card rounded-2xl p-6 border border-teal-500/30 bg-teal-950/10 space-y-5">
       <div className="flex items-center justify-between border-b border-slate-800/60 pb-4">
         <div>
           <h2 className="text-base font-bold text-slate-100 flex items-center gap-2">
-            <ShoppingCart className="w-4 h-4 text-orange-400" />
-            VineScout / Amazon Integration
+            <ShoppingCart className="w-4 h-4 text-teal-400" />
+            VScout Extension Integration
           </h2>
           <p className="text-xs text-slate-400 mt-0.5">
-            Push Amazon Vine items directly into Outpost from your VineScout Chrome extension
+            Connect your VScout Chrome extension for real-time item sync and automated sold reconciliation
           </p>
         </div>
         {!token && (
           <button
             onClick={onLoad}
             disabled={loading}
-            className="px-3.5 py-2 rounded-xl text-xs font-semibold text-orange-300 bg-orange-950/60 hover:bg-orange-900/60 border border-orange-500/40 transition-all flex items-center gap-1.5 disabled:opacity-50"
+            className="px-3.5 py-2 rounded-xl text-xs font-semibold text-teal-300 bg-teal-950/60 hover:bg-teal-900/60 border border-teal-500/40 transition-all flex items-center gap-1.5 disabled:opacity-50 shadow-sm"
           >
             {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShoppingCart className="w-3.5 h-3.5" />}
-            {loading ? 'Loading...' : 'Show API Token'}
+            {loading ? 'Loading...' : 'Show Credentials'}
           </button>
         )}
       </div>
 
-      {/* How it works */}
+      {/* Pairing Steps */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
         {[
-          { step: '1', text: 'Copy your API token below' },
-          { step: '2', text: 'Paste it in VineScout → Outpost Settings' },
-          { step: '3', text: 'Click "Send to Outpost" on any Vine item page' }
+          { step: '1', text: 'Copy the Outpost Tracker URL and API Secret Key below' },
+          { step: '2', text: 'In VScout Settings, unlock "Outpost Sync" with password Outpost' },
+          { step: '3', text: 'Paste both credentials and VScout will sync items and sales automatically' }
         ].map(({ step, text }) => (
-          <div key={step} className="p-3 rounded-xl bg-slate-800/40 border border-slate-700/40">
-            <div className="w-6 h-6 rounded-full bg-orange-500/20 border border-orange-500/30 text-orange-400 text-xs font-bold flex items-center justify-center mx-auto mb-1.5">{step}</div>
-            <p className="text-[11px] text-slate-400">{text}</p>
+          <div key={step} className="p-3 rounded-xl bg-slate-900/80 border border-slate-800/80">
+            <div className="w-6 h-6 rounded-full bg-teal-500/20 border border-teal-500/30 text-teal-400 text-xs font-bold flex items-center justify-center mx-auto mb-1.5">{step}</div>
+            <p className="text-[11px] text-slate-300 leading-snug">{text}</p>
           </div>
         ))}
       </div>
 
-      {/* API Token */}
-      {token ? (
-        <div className="space-y-3">
+      {/* Credentials */}
+      <div className="space-y-4 pt-1">
+        {/* Outpost Tracker URL */}
+        <div>
+          <label className="block text-[11px] font-bold text-slate-300 mb-1.5 uppercase tracking-wide">
+            Outpost Tracker URL (Paste into VScout)
+          </label>
+          <div className="flex items-center gap-2">
+            <div className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 font-mono text-xs text-teal-300 overflow-hidden whitespace-nowrap">
+              {baseUrl}
+            </div>
+            <button
+              type="button"
+              onClick={handleCopyUrl}
+              className={`px-3.5 py-2.5 rounded-xl text-xs font-semibold border transition-all flex items-center gap-1.5 ${
+                urlCopied
+                  ? 'text-teal-300 border-teal-500/50 bg-teal-950/40'
+                  : 'text-slate-300 border-slate-700 hover:text-white hover:bg-slate-800'
+              }`}
+              title="Copy Outpost Tracker URL"
+            >
+              {urlCopied ? <CheckCircle2 className="w-3.5 h-3.5 text-teal-400" /> : <Copy className="w-3.5 h-3.5" />}
+              {urlCopied ? 'Copied!' : 'Copy URL'}
+            </button>
+          </div>
+        </div>
+
+        {/* API Secret Key */}
+        {token ? (
           <div>
-            <label className="block text-[11px] font-semibold text-slate-400 mb-1.5 uppercase tracking-wide">
-              Your API Token
+            <label className="block text-[11px] font-bold text-slate-300 mb-1.5 uppercase tracking-wide">
+              API Secret Key (Paste into VScout)
             </label>
             <div className="flex items-center gap-2">
               <div className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 font-mono text-xs text-amber-300 overflow-hidden whitespace-nowrap overflow-ellipsis">
@@ -1301,62 +1355,52 @@ function VineScoutSection({ token, loading, rotating, copied, onLoad, onRotate, 
               <button
                 type="button"
                 onClick={() => setRevealed(r => !r)}
-                className="px-3 py-2.5 rounded-xl text-xs border border-slate-700 text-slate-400 hover:text-slate-200 transition-all"
-                title={revealed ? 'Hide token' : 'Reveal token'}
+                className="px-3 py-2.5 rounded-xl text-xs border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 transition-all"
+                title={revealed ? 'Hide secret key' : 'Reveal secret key'}
               >
                 {revealed ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
               </button>
               <button
                 type="button"
                 onClick={onCopy}
-                className={`px-3 py-2.5 rounded-xl text-xs border transition-all flex items-center gap-1.5 ${
+                className={`px-3.5 py-2.5 rounded-xl text-xs font-semibold border transition-all flex items-center gap-1.5 ${
                   copied
-                    ? 'text-emerald-400 border-emerald-500/40 bg-emerald-950/30'
-                    : 'text-slate-400 border-slate-700 hover:text-slate-200'
+                    ? 'text-emerald-300 border-emerald-500/50 bg-emerald-950/40'
+                    : 'text-slate-300 border-slate-700 hover:text-white hover:bg-slate-800'
                 }`}
-                title="Copy token"
+                title="Copy API Secret Key"
               >
-                {copied ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                {copied ? 'Copied!' : 'Copy'}
+                {copied ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                {copied ? 'Copied!' : 'Copy Key'}
               </button>
             </div>
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-semibold text-slate-400 mb-1.5 uppercase tracking-wide">
-              Endpoint URL
-            </label>
-            <div className="flex items-center gap-2">
-              <div className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 font-mono text-xs text-blue-300 overflow-hidden whitespace-nowrap">
-                https://techtrekgt.com/outpost/api/import/amazon
-              </div>
+            <div className="flex items-center justify-between pt-3 mt-3 border-t border-slate-800/60">
+              <p className="text-[11px] text-slate-400">Key is user-scoped and never expires unless rotated.</p>
               <button
                 type="button"
-                onClick={() => navigator.clipboard.writeText('https://techtrekgt.com/outpost/api/import/amazon')}
-                className="px-3 py-2.5 rounded-xl text-xs border border-slate-700 text-slate-400 hover:text-slate-200 transition-all"
-                title="Copy endpoint URL"
+                onClick={onRotate}
+                disabled={rotating}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-red-400 hover:text-red-300 bg-red-950/30 hover:bg-red-950/60 border border-red-900/40 transition-all flex items-center gap-1.5 disabled:opacity-50"
               >
-                <Copy className="w-3.5 h-3.5" />
+                {rotating ? <Loader2 className="w-3 h-3 animate-spin" /> : <RotateCcw className="w-3 h-3" />}
+                <span>Rotate Key</span>
               </button>
             </div>
           </div>
-
-          <div className="flex items-center justify-between pt-2 border-t border-slate-800/40">
-            <p className="text-[11px] text-slate-500">Token is user-scoped and never expires unless rotated.</p>
+        ) : (
+          <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 text-center">
+            <p className="text-xs text-slate-400 mb-2">Click "Show Credentials" above to generate and reveal your API Secret Key.</p>
             <button
-              type="button"
-              onClick={onRotate}
-              disabled={rotating}
-              className="px-3.5 py-2 rounded-xl text-xs font-semibold text-red-400 bg-red-950/40 hover:bg-red-900/40 border border-red-800/40 transition-all flex items-center gap-1.5 disabled:opacity-50"
+              onClick={onLoad}
+              disabled={loading}
+              className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-teal-300 bg-teal-950/60 hover:bg-teal-900/60 border border-teal-500/40 transition-all inline-flex items-center gap-1.5 disabled:opacity-50"
             >
-              {rotating ? <Loader2 className="w-3 h-3 animate-spin" /> : <RotateCcw className="w-3 h-3" />}
-              Rotate Token
+              {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
+              <span>Generate / Reveal API Key</span>
             </button>
           </div>
-        </div>
-      ) : (
-        <p className="text-xs text-slate-500 text-center py-2">Click "Show API Token" above to reveal your integration credentials.</p>
-      )}
+        )}
+      </div>
     </div>
   );
 }

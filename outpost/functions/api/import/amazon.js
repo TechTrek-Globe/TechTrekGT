@@ -58,10 +58,10 @@ export async function onRequestPost(context) {
   // --- Parse body ---
   const body = await request.json().catch(() => ({}));
   const {
-    asin, title, category = 'Other',
-    vine_value, tax_value,
+    asin, title, category, sellingCategory, amazonCategory,
+    vine_value, etv, tax_value,
     order_id,
-    image_urls, image_url,
+    image_urls, images, image_url, imageUrl,
     page_url,
     specs,
     condition = 'New',
@@ -72,15 +72,18 @@ export async function onRequestPost(context) {
   if (!title || !title.trim()) return err('title is required');
 
   const cleanAsin   = asin.toUpperCase().trim();
-  const unitPrice   = Number(vine_value) || 0;
+  const unitPrice   = Number(etv !== undefined ? etv : vine_value) || 0;
   const taxAmt      = Number(tax_value)  || 0;
+  const resolvedCat = sellingCategory || amazonCategory || category || 'Other';
   const today       = new Date().toISOString().split('T')[0];
   const invoiceRef  = `AMAZON-${cleanAsin}-${today}`;
 
-  // Resolve image URL array - prefer image_urls array, fall back to legacy image_url string
-  const resolvedImageUrls = Array.isArray(image_urls) && image_urls.length > 0
-    ? image_urls
-    : (image_url ? [image_url] : []);
+  // Resolve image URL array - prefer arrays, fall back to single strings
+  const resolvedImageUrls = Array.isArray(images) && images.length > 0
+    ? images
+    : (Array.isArray(image_urls) && image_urls.length > 0
+        ? image_urls
+        : (image_url ? [image_url] : (imageUrl ? [imageUrl] : [])));
 
   // Build structured attributes JSON blob
   const attributes = JSON.stringify({
@@ -159,7 +162,7 @@ export async function onRequestPost(context) {
     )
   `).bind(
     itemId, userId, invoiceId,
-    title.trim(), category, null,
+    title.trim(), resolvedCat, null,
     null, null, unitPrice, unitPrice,
     proration.proration_weight, proration.prorated_discount,
     proration.prorated_shipping, proration.prorated_tax,

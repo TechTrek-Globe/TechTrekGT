@@ -353,7 +353,7 @@ export function AppLayout({ children, onNavigateHome, onNavigateView, activeView
         </header>
 
         {/* Page Content */}
-        <main className={`flex-1 min-h-0 flex flex-col ${activeView === 'ledger' ? 'p-2 sm:p-3 overflow-hidden' : 'overflow-y-auto px-4 sm:px-6 lg:px-8 py-6'}`}>
+        <main className={`flex-1 min-h-0 flex flex-col matrix-scrollbar ${activeView === 'ledger' ? 'p-2 sm:p-3 overflow-hidden' : 'overflow-y-auto px-4 sm:px-6 lg:px-8 py-6'}`}>
           {!isDbLoaded ? (
             <div className="flex flex-col items-center justify-center h-64 gap-3 text-slate-400">
               <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />

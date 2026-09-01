@@ -261,18 +261,37 @@ export function getPersonDepositAmountForAccount(person, selectedAccountId = 'al
     return parseFloat(person.netPerPay) || 0;
   }
   
+  const targetAcc = (budget?.accounts || []).find(a => a.id === selectedAccountId);
+  const targetAccName = (targetAcc?.name || '').toLowerCase();
+
   // 1. Explicit Funding Goals (New standard)
-  const goals = (budget?.fundingGoals || []).filter(
-    g => g.contributorId === person.id && g.accountId === selectedAccountId
-  );
+  const goals = (budget?.fundingGoals || []).filter(g => {
+    if (g.contributorId !== person.id) return false;
+    if (g.accountId === selectedAccountId) return true;
+    if (targetAcc && g.accountId) {
+      const goalAcc = (budget?.accounts || []).find(a => a.id === g.accountId);
+      if (goalAcc && goalAcc.name && goalAcc.name.toLowerCase() === targetAccName) return true;
+      if ((g.accountId === 'acc-mortgage-checking' || g.accountId.includes('mortgage')) && targetAccName.includes('mortgage')) return true;
+      if ((g.accountId === 'acc-hoa-savings' || g.accountId.includes('hoa')) && targetAccName.includes('hoa')) return true;
+      if ((g.accountId === 'acc-bills-checking' || g.accountId.includes('bills')) && targetAccName.includes('bills')) return true;
+    }
+    return false;
+  });
   if (goals.length > 0) {
     return Math.round(goals.reduce((sum, g) => sum + goalPerPay(g), 0) * 100) / 100;
   }
 
   // 2. Legacy Account Allocations
-  if (person.accountAllocations && person.accountAllocations[selectedAccountId]) {
-    const val = person.accountAllocations[selectedAccountId];
-    if (val !== 'remaining') return parseFloat(val);
+  if (person.accountAllocations) {
+    if (person.accountAllocations[selectedAccountId] !== undefined && person.accountAllocations[selectedAccountId] !== 'remaining') {
+      return parseFloat(person.accountAllocations[selectedAccountId]);
+    }
+    for (const [accKey, val] of Object.entries(person.accountAllocations)) {
+      if (val === 'remaining') continue;
+      if ((accKey.includes('mortgage') || accKey === 'acc-mortgage-checking') && targetAccName.includes('mortgage')) return parseFloat(val);
+      if ((accKey.includes('hoa') || accKey === 'acc-hoa-savings') && targetAccName.includes('hoa')) return parseFloat(val);
+      if ((accKey.includes('bills') || accKey === 'acc-bills-checking') && targetAccName.includes('bills')) return parseFloat(val);
+    }
   }
 
   // 3. Fallback to Dynamic Bill Splitting

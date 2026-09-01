@@ -111,14 +111,36 @@
 .animate-count-up       { animation: countUp 0.4s ease both; }
 
 /* Custom Scrollbar */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: #050811; }
-::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: #334155; }
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #f59e0b #050811;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #050811;
+  border-radius: 9999px;
+  border: 1px solid #1e293b;
+}
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, #d97706 0%, #f59e0b 50%, #fbbf24 100%);
+  border-radius: 9999px;
+  border: 2px solid #050811;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.35);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 50%, #fef08a 100%);
+}
 
 /* Sidebar scrollbar - thinner */
-.sidebar-scroll::-webkit-scrollbar { width: 3px; }
-.sidebar-scroll::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 2px; }
+.sidebar-scroll::-webkit-scrollbar { width: 4px; }
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #d97706 0%, #f59e0b 100%);
+  border-radius: 9999px;
+}
 
 /* Custom High-Contrast Matrix Scrollbar */
 .matrix-scrollbar {
@@ -126,7 +148,7 @@
   scrollbar-color: #f59e0b #050811;
 }
 .matrix-scrollbar::-webkit-scrollbar {
-  height: 14px;
+  height: 10px;
   width: 10px;
 }
 .matrix-scrollbar::-webkit-scrollbar-track {
@@ -135,13 +157,13 @@
   border: 1px solid #1e293b;
 }
 .matrix-scrollbar::-webkit-scrollbar-thumb {
-  background: linear-gradient(90deg, #d97706 0%, #f59e0b 50%, #fbbf24 100%);
+  background: linear-gradient(135deg, #d97706 0%, #f59e0b 50%, #fbbf24 100%);
   border-radius: 9999px;
   border: 2px solid #050811;
   box-shadow: 0 0 10px rgba(245, 158, 11, 0.4);
 }
 .matrix-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(90deg, #f59e0b 0%, #fbbf24 50%, #fef08a 100%);
+  background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 50%, #fef08a 100%);
 }
 
 html.light .gradient-text {

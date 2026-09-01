@@ -566,16 +566,16 @@ export function AccountsPeoplePanel() {
 
       {/* High-Density Accounts Table */}
       <div className="overflow-x-auto matrix-scrollbar rounded-xl border border-slate-800 bg-slate-950/60 shadow-md">
-        <table className="w-full text-left text-xs text-slate-300">
+        <table className="w-full min-w-[1040px] text-left text-xs text-slate-300">
           <thead className="bg-slate-900 text-slate-400 uppercase font-medium text-[9px] border-b border-slate-800">
             <tr>
-              <th className="px-3 py-2 w-[18%]">Account Name</th>
-              <th className="px-2 py-2 w-[10%]">Type</th>
-              <th className="px-2 py-2 w-[13%]">Start Date</th>
-              <th className="px-2 py-2 w-[14%]">Total Starting Bal</th>
-              <th className="px-2 py-2 w-[17%]">Extra Savings Goal</th>
-              <th className="px-2 py-2 w-[24%]">Active Earners &amp; Overflow Split</th>
-              <th className="px-3 py-2 w-[4%] text-right">Actions</th>
+              <th className="px-3 py-2 min-w-[240px] w-[26%]">Account Name</th>
+              <th className="px-2 py-2 min-w-[95px] w-[9%]">Type</th>
+              <th className="px-2 py-2 min-w-[115px] w-[11%]">Start Date</th>
+              <th className="px-2 py-2 min-w-[130px] w-[13%]">Total Starting Bal</th>
+              <th className="px-2 py-2 min-w-[145px] w-[15%]">Extra Savings Goal</th>
+              <th className="px-2 py-2 min-w-[230px] w-[22%]">Active Earners &amp; Overflow Split</th>
+              <th className="px-3 py-2 min-w-[50px] w-[4%] text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/80">
@@ -591,13 +591,14 @@ export function AccountsPeoplePanel() {
 
                 return (
                   <tr key={acc.id} className="hover:bg-slate-900/50 transition-colors">
-                    <td className="px-3 py-1.5 font-bold text-slate-200">
+                    <td className="px-3 py-1.5 font-bold text-slate-200 min-w-[240px]">
                       <input
                         type="text"
                         value={acc.name}
                         onChange={e => updateAccount(acc.id, { name: e.target.value })}
-                        className="bg-transparent border-b border-transparent hover:border-slate-700 focus:border-blue-500 focus:outline-none w-full text-xs font-bold text-slate-100"
+                        className="bg-transparent border-b border-transparent hover:border-slate-700 focus:border-blue-500 focus:outline-none w-full min-w-[220px] text-xs font-bold text-slate-100"
                         placeholder="Account Name"
+                        title={acc.name}
                       />
                     </td>
                     <td className="px-2 py-1.5">
@@ -938,15 +939,15 @@ export function AccountsPeoplePanel() {
 
         {/* High-Density Earners Table */}
         <div className="overflow-x-auto matrix-scrollbar rounded-xl border border-slate-800 bg-slate-950/60 shadow-md">
-          <table className="w-full text-left text-xs text-slate-300">
+          <table className="w-full min-w-[880px] text-left text-xs text-slate-300">
             <thead className="bg-slate-900 text-slate-400 uppercase font-medium text-[9px] border-b border-slate-800">
               <tr>
-                <th className="px-3 py-2 w-[24%]">Member Name</th>
-                <th className="px-3 py-2 w-[18%]">Pay Frequency</th>
-                <th className="px-3 py-2 w-[15%]">Gross / Pay ($)</th>
-                <th className="px-3 py-2 w-[15%]">Net / Pay ($)</th>
-                <th className="px-3 py-2 w-[22%]">Account Goals / Allocations</th>
-                <th className="px-3 py-2 w-[6%] text-right">Actions</th>
+                <th className="px-3 py-2 min-w-[200px] w-[24%]">Member Name</th>
+                <th className="px-3 py-2 min-w-[160px] w-[18%]">Pay Frequency</th>
+                <th className="px-3 py-2 min-w-[120px] w-[15%]">Gross / Pay ($)</th>
+                <th className="px-3 py-2 min-w-[120px] w-[15%]">Net / Pay ($)</th>
+                <th className="px-3 py-2 min-w-[200px] w-[22%]">Account Goals / Allocations</th>
+                <th className="px-3 py-2 min-w-[50px] w-[6%] text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/80">
@@ -961,13 +962,14 @@ export function AccountsPeoplePanel() {
 
                   return (
                     <tr key={person.id} className="hover:bg-slate-900/50 transition-colors">
-                      <td className="px-3 py-1.5 font-bold text-slate-200">
+                      <td className="px-3 py-1.5 font-bold text-slate-200 min-w-[200px]">
                         <input
                           type="text"
                           value={person.name}
                           onChange={e => updatePerson(person.id, { name: e.target.value })}
-                          className="bg-transparent border-b border-transparent hover:border-slate-700 focus:border-purple-500 focus:outline-none w-full text-xs font-bold text-slate-100"
+                          className="bg-transparent border-b border-transparent hover:border-slate-700 focus:border-purple-500 focus:outline-none w-full min-w-[180px] text-xs font-bold text-slate-100"
                           placeholder="Member Name"
+                          title={person.name}
                         />
                       </td>
                       <td className="px-3 py-1.5">

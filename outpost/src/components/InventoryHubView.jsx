@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
-import { Package, AlertCircle, Loader2 } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Package, AlertCircle, Loader2, UploadCloud, Tag, RefreshCw, TableProperties, LayoutGrid } from 'lucide-react';
 import { useInventory } from '../context/InventoryContext';
 import { deleteItem } from '../utils/auctionApi';
 import { cleanEbaySearchQuery } from '../utils/ebaySearch';
+import { fmtCurrency, formatPercent } from '../utils/formulaPreview';
+import { computeFeeBreakdown } from '../utils/feeEngine';
 
 // Sub-components
 import { InventoryCommandBar } from './inventory/InventoryCommandBar';
 import { InventoryMetricsStrip } from './inventory/InventoryMetricsStrip';
-import { StatusFilterBar } from './inventory/StatusFilterBar';
 import { InventoryDataGrid } from './inventory/InventoryDataGrid';
 import { PricingCardGrid } from './inventory/PricingCardGrid';
 import { QuickEditDrawer } from './inventory/QuickEditDrawer';
@@ -47,7 +48,7 @@ export function InventoryHubView({ onNavigate }) {
 
   // --- View State ---
   const [viewMode, setViewMode] = useState('table'); // 'table' or 'pricing'
-  const [showMetrics, setShowMetrics] = useState(true);
+  const [showMetrics, setShowMetrics] = useState(false);
 
   // --- Drawer & Modal States ---
   const [drawerItem, setDrawerItem] = useState(null);
@@ -65,11 +66,41 @@ export function InventoryHubView({ onNavigate }) {
 
   const displayItems = sortedItems;
 
-  // Header totals
-  const activeCount = items.filter(it => it.status === 'Available' || it.status === 'Listed' || it.status === 'Draft').length;
-  const totalCost = items
-    .filter(it => it.status === 'Available' || it.status === 'Listed' || it.status === 'Draft')
-    .reduce((s, it) => s + (Number(it.true_total_cost) || 0), 0);
+  // Header totals & summary calculations
+  const activeItems = useMemo(() =>
+    items.filter(it => it.status === 'Available' || it.status === 'Listed' || it.status === 'Draft'),
+    [items]
+  );
+
+  const totalCost = useMemo(() =>
+    activeItems.reduce((s, it) => s + (Number(it.true_total_cost) || 0), 0),
+    [activeItems]
+  );
+
+  const totalListValue = useMemo(() =>
+    activeItems.reduce((s, it) => s + (Number(it.current_list_price) || Number(it.suggested_list_price) || 0), 0),
+    [activeItems]
+  );
+
+  const { totalPotentialProfit, overallMargin, itemsWithComps } = useMemo(() => {
+    let profit = 0;
+    activeItems.forEach(it => {
+      const feeData = computeFeeBreakdown(it);
+      profit += feeData.netProfit;
+    });
+    const margin = totalListValue > 0 ? (profit / totalListValue) : 0;
+    const compsCount = activeItems.filter(it =>
+      it.comp_1 > 0 || it.comp_2 > 0 || it.comp_3 > 0 || it.manual_avg > 0 ||
+      it.active_comp_1 > 0 || it.active_comp_2 > 0 || it.active_comp_3 > 0 || it.active_avg > 0
+    ).length;
+
+    return {
+      totalPotentialProfit: profit,
+      overallMargin: margin,
+      itemsWithComps: compsCount
+    };
+  }, [activeItems, totalListValue]);
+
   const delistPendingItems = items.filter(it => it.status === 'delist_pending');
 
   // --- Actions ---
@@ -108,42 +139,8 @@ export function InventoryHubView({ onNavigate }) {
   };
 
   return (
-    <div className="w-full flex-1 flex flex-col min-h-0 space-y-2">
-      {/* Header Info */}
-      <div className="flex items-center justify-between gap-3 flex-wrap flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <h1 className="text-lg font-black text-white flex items-center gap-1.5">
-            <Package className="w-5 h-5 text-amber-400" />
-            Inventory &amp; Pricing
-          </h1>
-          <span className="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] bg-slate-900 border border-slate-800 text-slate-400">
-            <span className="text-slate-200 font-semibold">{activeCount} active items</span>
-            <span>•</span>
-            <span className="text-amber-400 font-semibold">${totalCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} landed</span>
-          </span>
-        </div>
-      </div>
-
-      {/* Top Metric Strip */}
-      {showMetrics && <InventoryMetricsStrip items={items} />}
-
-      {/* Delist Pending Alert - shown when eBay webhook fires ITEM_SOLD */}
-      {!delistDismissed && delistPendingItems.length > 0 && (
-        <DelistPendingAlert
-          items={delistPendingItems}
-          onResolved={(itemId) => updateItemLocal(itemId, { status: 'Sold' })}
-          onDismiss={() => setDelistDismissed(true)}
-        />
-      )}
-
-      {error && (
-        <div className="p-2.5 bg-red-950/40 border border-red-500/30 rounded-xl text-red-400 text-xs flex items-center gap-2 flex-shrink-0">
-          <AlertCircle className="w-4 h-4 flex-shrink-0" />
-          <span>{error}</span>
-        </div>
-      )}
-
-      {/* Command & Filter Bar */}
+    <div className="w-full flex-1 flex flex-col min-h-0 space-y-1.5">
+      {/* Unified Command & Filter Bar */}
       <InventoryCommandBar
         viewMode={viewMode}
         setViewMode={setViewMode}
@@ -156,6 +153,10 @@ export function InventoryHubView({ onNavigate }) {
         setListingFormatFilter={setListingFormatFilter}
         sortPreset={sortPreset}
         applySortPreset={applySortPreset}
+        statusFilter={statusFilter}
+        setStatusFilter={setStatusFilter}
+        statusCounts={statusCounts}
+        totalCount={pagination.total}
         showMetrics={showMetrics}
         setShowMetrics={setShowMetrics}
         loading={loading}
@@ -163,15 +164,31 @@ export function InventoryHubView({ onNavigate }) {
         onOpenAddInvoice={() => setModalOpen(true)}
         onOpenAmazonModal={() => setAmazonModalOpen(true)}
         onOpenImporter={() => setImporterOpen(true)}
+        activeCount={activeItems.length}
+        totalCost={totalCost}
+        totalListValue={totalListValue}
+        totalPotentialProfit={totalPotentialProfit}
+        overallMargin={overallMargin}
       />
 
-      {/* Status Filter Pills */}
-      <StatusFilterBar
-        statusFilter={statusFilter}
-        setStatusFilter={setStatusFilter}
-        statusCounts={statusCounts}
-        totalCount={pagination.total}
-      />
+      {/* Expanded Metrics Strip (Collapsible) */}
+      {showMetrics && <InventoryMetricsStrip items={items} />}
+
+      {/* Delist Pending Alert - shown when eBay webhook fires ITEM_SOLD */}
+      {!delistDismissed && delistPendingItems.length > 0 && (
+        <DelistPendingAlert
+          items={delistPendingItems}
+          onResolved={(itemId) => updateItemLocal(itemId, { status: 'Sold' })}
+          onDismiss={() => setDelistDismissed(true)}
+        />
+      )}
+
+      {error && (
+        <div className="p-2 bg-red-950/40 border border-red-500/30 rounded-xl text-red-400 text-xs flex items-center gap-2 flex-shrink-0">
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
 
       {/* Main Grid / Cards Container */}
       <div className="flex-1 flex flex-col min-h-0 relative">
@@ -267,9 +284,9 @@ export function InventoryHubView({ onNavigate }) {
         platformOptions={platformOptions}
         onClose={() => setEditModalItem(null)}
         onOpenCopyModal={() => setCopyModalItem(editModalItem)}
-        onUpdated={(id, patch) => {
+        onUpdated={(id, patch, meta) => {
           updateItemLocal(id, patch);
-          if (patch?.status === 'Sold') {
+          if (patch?.status === 'Sold' && !meta?.fromEbaySync && !meta?.sale) {
             const fullItem = items.find(it => it.id === id);
             handleMarkSold(fullItem ? { ...fullItem, ...patch } : { id, ...patch });
           }

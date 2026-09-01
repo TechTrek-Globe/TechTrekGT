@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   X, DollarSign, Calendar, Tag, Truck, Percent, CreditCard,
-  TrendingUp, Loader2, AlertCircle, CheckCircle2, Search, Package
+  TrendingUp, Loader2, AlertCircle, CheckCircle2, Search, Package, Zap
 } from 'lucide-react';
-import { createSale, updateSale, getItems } from '../utils/auctionApi';
+import { createSale, updateSale, getItems, syncEbayItem } from '../utils/auctionApi';
 import { computeSaleMetrics, daysBetween, fmtCurrency, fmtPct } from '../utils/formulaPreview';
 
 /**
@@ -42,6 +42,10 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
   const [paymentProcessingAmt, setPaymentProcessingAmt] = useState('0');
   const [promotedListingFee, setPromotedListingFee] = useState('0');
 
+  const [syncingEbay, setSyncingEbay] = useState(false);
+  const [autoFillNotice, setAutoFillNotice] = useState(null);
+  const [ebayOrderId, setEbayOrderId] = useState(null);
+
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -62,6 +66,61 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
     const net = gross + bShip - aShip - feeAmt - pProc - pList;
     return net > 0 ? net.toFixed(2) : (net === 0 ? '0.00' : net.toFixed(2));
   };
+
+  const handleAutoFillFromEbay = useCallback(async (target = selectedItem || targetItem) => {
+    if (!target) return;
+    setSyncingEbay(true);
+    setAutoFillNotice(null);
+    setError('');
+    try {
+      const res = await syncEbayItem(target.id, target.ebay_listing_id, target.ebay_promoted_rate);
+      if (res?.sale || res?.is_sold) {
+        const s = res.sale || {};
+        const it = res.item || target;
+        if (s.sale_date) setSaleDate(s.sale_date);
+        if (s.buyer_handle) setBuyerHandle(s.buyer_handle);
+        if (s.ebay_order_id) setEbayOrderId(s.ebay_order_id);
+        if (s.gross_sale_price != null) setGrossSalePrice(Number(s.gross_sale_price).toFixed(2));
+        if (s.net_proceeds != null) {
+          setNetEarnings(Number(s.net_proceeds).toFixed(2));
+          setIsManualNetEarnings(true);
+        }
+        if (s.buyer_shipping_paid != null) setBuyerShippingPaid(String(Number(s.buyer_shipping_paid).toFixed(2)));
+        if (s.actual_shipping_cost != null) setActualShippingCost(String(Number(s.actual_shipping_cost).toFixed(2)));
+        if (s.platform_fee_pct != null) setPlatformFeePct(String(parseFloat((s.platform_fee_pct * 100).toFixed(2))));
+        if (s.platform_flat_fee != null) setPlatformFlatFee(String(Number(s.platform_flat_fee).toFixed(2)));
+        if (s.promoted_listing_fee != null) setPromotedListingFee(String(Number(s.promoted_listing_fee).toFixed(2)));
+        if (s.payment_processing_amt != null) setPaymentProcessingAmt(String(Number(s.payment_processing_amt).toFixed(2)));
+
+        setAutoFillNotice({
+          type: 'success',
+          text: `🎉 Synced live from eBay Order #${s.ebay_order_id || it.ebay_listing_id || 'Live'} (Buyer: ${s.buyer_handle || 'Verified'}, Net: $${Number(s.net_proceeds || 0).toFixed(2)})`
+        });
+      } else if (res?.item) {
+        const it = res.item;
+        const defaultGross = it.current_list_price || it.suggested_list_price || '';
+        if (defaultGross && !grossSalePrice) {
+          setGrossSalePrice(Number(defaultGross).toFixed(2));
+        }
+        if (it.buyer_shipping_cost != null) setBuyerShippingPaid(String(Number(it.buyer_shipping_cost).toFixed(2)));
+        if (it.est_shipping_cost != null) setActualShippingCost(String(Number(it.est_shipping_cost).toFixed(2)));
+        if (it.platform_fee_pct != null) setPlatformFeePct(String(parseFloat((it.platform_fee_pct * 100).toFixed(2))));
+        if (it.platform_flat_fee != null) setPlatformFlatFee(String(Number(it.platform_flat_fee).toFixed(2)));
+        
+        setAutoFillNotice({
+          type: 'info',
+          text: `Synced active listing info for #${it.ebay_listing_id || target.ebay_listing_id || 'Item'}. Pre-populated listed price & fee rates.`
+        });
+      }
+    } catch (e) {
+      setAutoFillNotice({
+        type: 'warning',
+        text: `eBay auto-fill: ${e.message || 'Unable to fetch from eBay'}. You can still log manually.`
+      });
+    } finally {
+      setSyncingEbay(false);
+    }
+  }, [selectedItem, targetItem, grossSalePrice]);
 
   // Load available items if creating a new sale without a pre-selected item
   useEffect(() => {
@@ -95,6 +154,9 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
     if (targetItem) {
       setSelectedItem(targetItem);
       applyItemPlatformDefaults(targetItem, targetItem.platform || defaultPlatform.name);
+      if (targetItem.platform === 'eBay' || targetItem.ebay_listing_id) {
+        handleAutoFillFromEbay(targetItem);
+      }
       return;
     }
 
@@ -112,7 +174,7 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
     };
 
     fetchInventory();
-  }, [isModalOpen, isEdit, saleToEdit, targetItem, defaultPlatform]);
+  }, [isModalOpen, isEdit, saleToEdit, targetItem, defaultPlatform, handleAutoFillFromEbay]);
 
   const applyItemPlatformDefaults = (item, platName) => {
     setPlatform(platName);
@@ -130,8 +192,11 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
       estShip = String(item.est_shipping_cost);
       setActualShippingCost(estShip);
     }
-    if (!isManualNetEarnings && grossSalePrice) {
-      const net = calculateAutoNetEarnings(grossSalePrice, buyerShippingPaid, estShip, feePct, flatFee, paymentProcessingAmt, promotedListingFee);
+    if (item && item.current_list_price && !grossSalePrice) {
+      setGrossSalePrice(String(Number(item.current_list_price).toFixed(2)));
+    }
+    if (!isManualNetEarnings && (grossSalePrice || item?.current_list_price)) {
+      const net = calculateAutoNetEarnings(grossSalePrice || item?.current_list_price, buyerShippingPaid, estShip, feePct, flatFee, paymentProcessingAmt, promotedListingFee);
       setNetEarnings(net);
     }
   };
@@ -211,16 +276,22 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
       setError('Please select an inventory item.');
       return;
     }
+
     const gross = parseFloat(grossSalePrice);
     if (isNaN(gross) || gross < 0) {
       setError('Please enter a valid gross sale price.');
       return;
     }
-    const net = parseFloat(netEarnings);
+
+    const net = isManualNetEarnings
+      ? parseFloat(netEarnings)
+      : parseFloat(calculateAutoNetEarnings(grossSalePrice, buyerShippingPaid, actualShippingCost, platformFeePct, platformFlatFee, paymentProcessingAmt, promotedListingFee));
+
     if (isNaN(net)) {
-      setError('Please enter a valid net earnings amount.');
+      setError('Please provide a valid net earnings amount.');
       return;
     }
+
     if (!saleDate) {
       setError('Please select a sale date.');
       return;
@@ -243,7 +314,8 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
         platform_fee_pct: (parseFloat(platformFeePct) || 0) / 100,
         platform_flat_fee: parseFloat(platformFlatFee) || 0,
         payment_processing_amt: parseFloat(paymentProcessingAmt) || 0,
-        promoted_listing_fee: parseFloat(promotedListingFee) || 0
+        promoted_listing_fee: parseFloat(promotedListingFee) || 0,
+        ebay_order_id: ebayOrderId || undefined
       };
 
       if (isEdit && saleToEdit) {
@@ -306,7 +378,21 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {/* Item Selector */}
           <div>
-            <label className="block text-xs font-semibold text-slate-400 mb-1">Memorabilia Item *</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-semibold text-slate-400">Memorabilia Item *</label>
+              {selectedItem && (selectedItem.platform === 'eBay' || selectedItem.ebay_listing_id || platform === 'eBay') && (
+                <button
+                  type="button"
+                  disabled={syncingEbay}
+                  onClick={() => handleAutoFillFromEbay(selectedItem)}
+                  className="flex items-center gap-1 text-[11px] font-bold text-amber-400 hover:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 px-2 py-0.5 rounded-lg border border-amber-500/30 transition-all cursor-pointer disabled:opacity-50"
+                  title="Auto-fetch buyer name, gross sale, and fee deductions directly from eBay"
+                >
+                  {syncingEbay ? <Loader2 className="w-3 h-3 animate-spin text-amber-400" /> : <Zap className="w-3 h-3 text-amber-400" />}
+                  <span>{syncingEbay ? 'Syncing eBay...' : 'Auto-Fill from eBay'}</span>
+                </button>
+              )}
+            </div>
             {selectedItem ? (
               <div className="glass-card-light rounded-xl p-2.5 border border-amber-500/30 flex items-center justify-between">
                 <div>
@@ -320,7 +406,7 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
                 {!isEdit && !preselectedItem && (
                   <button
                     type="button"
-                    onClick={() => setSelectedItem(null)}
+                    onClick={() => { setSelectedItem(null); setAutoFillNotice(null); }}
                     className="text-xs text-slate-400 hover:text-amber-400 transition-colors underline ml-3 flex-shrink-0"
                   >
                     Change
@@ -368,6 +454,13 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
                     ))
                   )}
                 </div>
+              </div>
+            )}
+
+            {autoFillNotice && (
+              <div className={`mt-2 p-2 rounded-xl text-xs flex items-center gap-2 ${autoFillNotice.type === 'success' ? 'bg-emerald-950/40 border border-emerald-800/40 text-emerald-300' : (autoFillNotice.type === 'info' ? 'bg-blue-950/40 border border-blue-800/40 text-blue-300' : 'bg-amber-950/40 border border-amber-800/40 text-amber-300')}`}>
+                {autoFillNotice.type === 'success' ? <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0 text-emerald-400" /> : <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />}
+                <span className="flex-1">{autoFillNotice.text}</span>
               </div>
             )}
           </div>

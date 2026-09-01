@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { updateItem, saveComp, fetchLiveComps, getActiveEbayListings, syncEbayItem, fetchEbayItemAnalytics } from '../utils/auctionApi';
 import { computeFeeBreakdown } from '../utils/feeEngine';
 import { roundPrice } from '../utils/formulaPreview';
-import { cleanEbaySearchQuery } from '../utils/ebaySearch';
+import { cleanEbaySearchQuery, buildStructuredCompQuery } from '../utils/ebaySearch';
 
 // Subcomponents
 import { EditModalHeader } from './edit/EditModalHeader';
@@ -331,8 +331,15 @@ export function EditItemModal({
           buyer_shipping_cost: syncBuyerShipping,
           ebay_promoted_rate: syncPromotedRate
         }));
-        setSuccess(`Synchronized with live eBay listing #${form.ebay_listing_id} (Price: $${it.current_list_price || '--'}, Ad Rate: ${syncPromotedRate || '0'}%)`);
-        if (onUpdated) onUpdated(item.id, it);
+        if (res.is_sold || res.sale) {
+          const grossStr = res.sale?.gross_sale_price != null ? `$${Number(res.sale.gross_sale_price).toFixed(2)}` : `$${it.current_list_price || '--'}`;
+          const netStr = res.sale?.net_proceeds != null ? `$${Number(res.sale.net_proceeds).toFixed(2)}` : '--';
+          const profitStr = res.sale?.net_profit != null ? `${res.sale.net_profit >= 0 ? '+' : ''}$${Number(res.sale.net_profit).toFixed(2)}` : '--';
+          setSuccess(`🎉 Item Sold on eBay! Auto-recorded Sale: ${grossStr} (Net: ${netStr}, Profit: ${profitStr})`);
+        } else {
+          setSuccess(`Synchronized with live eBay listing #${form.ebay_listing_id} (Price: $${it.current_list_price || '--'}, Ad Rate: ${syncPromotedRate || '0'}%)`);
+        }
+        if (onUpdated) onUpdated(item.id, it, { fromEbaySync: true, is_sold: res.is_sold, sale: res.sale });
       }
     } catch (e) {
       setError(e.message || 'Sync with eBay failed');
@@ -419,7 +426,12 @@ export function EditItemModal({
   const handleFetchLiveComps = async () => {
     setCompsDraft(prev => ({ ...prev, fetchingLive: true, fetchMsg: null }));
     try {
-      const q = cleanEbaySearchQuery(form.item_name || item.item_name, form.athlete_person || item.athlete_person, form.authenticator || item.authenticator);
+      const q = buildStructuredCompQuery(
+        form.item_name || item.item_name,
+        form.athlete_person || item.athlete_person,
+        form.category || item.category,
+        form.authenticator || item.authenticator
+      );
       const res = await fetchLiveComps(q, item.id);
       if (res && res.success && res.count > 0) {
         setCompsDraft(prev => ({
@@ -427,16 +439,33 @@ export function EditItemModal({
           comp_1: res.comp_1 != null ? roundPrice(res.comp_1) : prev.comp_1,
           comp_2: res.comp_2 != null ? roundPrice(res.comp_2) : prev.comp_2,
           comp_3: res.comp_3 != null ? roundPrice(res.comp_3) : prev.comp_3,
-          recommended_list_price: roundPrice(res.live_avg || res.median || prev.recommended_list_price),
+          comp_1_item: res.comp_1_item || null,
+          comp_2_item: res.comp_2_item || null,
+          comp_3_item: res.comp_3_item || null,
+          active_comp_1: res.active_comp_1 != null ? roundPrice(res.active_comp_1) : prev.active_comp_1,
+          active_comp_2: res.active_comp_2 != null ? roundPrice(res.active_comp_2) : prev.active_comp_2,
+          active_comp_3: res.active_comp_3 != null ? roundPrice(res.active_comp_3) : prev.active_comp_3,
+          active_comp_1_item: res.active_comp_1_item || null,
+          active_comp_2_item: res.active_comp_2_item || null,
+          active_comp_3_item: res.active_comp_3_item || null,
+          sold_comps: res.sold_comps || [],
+          active_comps: res.active_comps || [],
+          query_used: res.query || q,
+          recommended_list_price: roundPrice(res.recommended_list_price || res.live_avg || res.median || prev.recommended_list_price),
           fetchingLive: false,
-          fetchMsg: { type: 'success', text: `Found ${res.count} sold comps on eBay! Live Avg: $${res.live_avg}` },
+          fetchMsg: {
+            type: 'success',
+            text: res.sold_count > 0
+              ? `Found ${res.sold_count} sold comps & ${res.active_count} active listings on eBay! (Sold Avg: $${res.sold_avg || '0.00'})`
+              : `Found ${res.active_count} live eBay market comps! (Market Avg: $${res.active_avg || '0.00'})`
+          },
           applied: false,
         }));
       } else {
         setCompsDraft(prev => ({
           ...prev,
           fetchingLive: false,
-          fetchMsg: { type: 'info', text: 'No sold comps found. Click eBay link to inspect query.' }
+          fetchMsg: { type: 'info', text: 'No live comps found on eBay. Click the eBay link to test your search.' }
         }));
       }
     } catch (err) {

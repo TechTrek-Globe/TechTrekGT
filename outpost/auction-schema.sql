@@ -344,5 +344,115 @@ ALTER TABLE auction_items ADD COLUMN total_page_views_30d INTEGER DEFAULT 0;
 ALTER TABLE auction_items ADD COLUMN avg_ctr_30d REAL DEFAULT 0.0;
 ALTER TABLE auction_items ADD COLUMN avg_conversion_30d REAL DEFAULT 0.0;
 
+-- ============================================================
+-- PHASE 6 MIGRATIONS - Amazon Ingestion, Market Comps & Traffic
+-- Added: 2026-09-01
+-- All migrations are additive (CREATE IF NOT EXISTS + ALTER ADD COLUMN).
+-- Run: npm run db:migrate:local (local) | npm run db:migrate (production)
+-- NOTE: Execute ALTER TABLE statements individually; SQLite D1 does not
+--       support transactional DDL mixing ALTER TABLE + CREATE TABLE in one batch.
+-- ============================================================
+
+-- P6-1: Structured attributes JSON column on auction_items.
+-- Stores Amazon-specific identifiers (ASIN, image_urls, specs, ETV, order_id, condition)
+-- as a JSON TEXT blob. Query individual keys via json_extract(attributes, '$.asin').
+ALTER TABLE auction_items ADD COLUMN attributes TEXT;
+
+-- P6-2: Net profit audit columns on auction_sales.
+-- net_profit_formula stores the full calculation breakdown as a JSON TEXT blob.
+-- cogs_source tags the origin of the COGS value for ledger reconciliation.
+ALTER TABLE auction_sales ADD COLUMN net_profit_formula TEXT;
+ALTER TABLE auction_sales ADD COLUMN cogs_source TEXT DEFAULT 'manual';
+-- cogs_source values: 'amazon_vine' | 'amazon_url' | 'manual' | 'invoice'
+
+-- ============================================================
+-- P6-3: Market Comps Engine
+-- Normalized comp observations table. One row per comparable item.
+-- Replaces the scalar comp_1/comp_2/comp_3 slot system in auction_comps
+-- (auction_comps is retained as a read fallback; no DROP).
+-- ============================================================
+CREATE TABLE IF NOT EXISTS market_comps (
+  id              TEXT PRIMARY KEY,
+  item_id         TEXT NOT NULL,
+  user_id         TEXT NOT NULL,
+
+  -- Source of this comp row
+  source          TEXT NOT NULL DEFAULT 'manual',
+  -- 'ebay_browse' = active eBay listing from Browse API
+  -- 'ebay_sold'   = completed/sold eBay listing
+  -- 'manual'      = user-entered via UI
+
+  -- Pricing data
+  comp_title      TEXT,
+  list_price      REAL,
+  shipping_fee    REAL NOT NULL DEFAULT 0.0,
+  landed_cost     REAL,
+  -- landed_cost = list_price + shipping_fee (computed on insert in Worker)
+
+  -- eBay condition classification
+  condition_id    TEXT,
+  -- Known IDs: 1000=New, 1500=New other, 2500=Seller refurb, 3000=Used, 7000=For Parts
+  -- Rows with condition_id = '7000' are auto-set is_valid = 0
+  condition_label TEXT,
+
+  -- Comp metadata
+  ebay_item_id    TEXT,
+  comp_url        TEXT,
+  observed_at     TEXT NOT NULL DEFAULT (datetime('now')),
+
+  -- Validity flag - 0 excluded from median benchmark calculations
+  -- Invalid when: condition_id='7000', list_price<=0, extreme outlier, or user-flagged
+  is_valid        INTEGER NOT NULL DEFAULT 1,
+
+  notes           TEXT,
+  created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+
+  FOREIGN KEY (item_id) REFERENCES auction_items(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_market_comps_item   ON market_comps(item_id, is_valid);
+CREATE INDEX IF NOT EXISTS idx_market_comps_user   ON market_comps(user_id);
+CREATE INDEX IF NOT EXISTS idx_market_comps_source ON market_comps(item_id, source, observed_at);
+
+-- ============================================================
+-- P6-4: Per-day listing traffic time-series
+-- One row per ebay_listing_id per day (UNIQUE constraint enforces deduplication).
+-- Coexists with auction_item_analytics (aggregate 30-day windows).
+-- This table is the append-only store for per-day trend charts and drill-downs.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS listing_traffic (
+  id                    TEXT PRIMARY KEY,
+  item_id               TEXT NOT NULL,
+  user_id               TEXT NOT NULL,
+  ebay_listing_id       TEXT NOT NULL,
+
+  -- Date of the datapoint in Pacific Time (YYYYMMDD format, e.g. '20260901')
+  traffic_date          TEXT NOT NULL,
+
+  -- eBay Sell Analytics API metric values
+  impressions_total     INTEGER DEFAULT 0,
+  -- Maps to: LISTING_IMPRESSION_TOTAL (all search + non-search impressions)
+  impressions_search    INTEGER DEFAULT 0,
+  -- Maps to: LISTING_IMPRESSION_SEARCH_RESULTS_PAGE (search results page only)
+  page_views_total      INTEGER DEFAULT 0,
+  -- Maps to: LISTING_VIEWS_TOTAL (listing page views / clicks into item)
+  click_through_rate    REAL DEFAULT 0.0,
+  -- Maps to: CLICK_THROUGH_RATE (page_views / impressions as decimal)
+  sales_conversion_rate REAL DEFAULT 0.0,
+  -- Maps to: SALES_CONVERSION_RATE (units_sold / page_views as decimal)
+
+  fetched_at            TEXT NOT NULL DEFAULT (datetime('now')),
+
+  FOREIGN KEY (item_id) REFERENCES auction_items(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+
+  -- Deduplication: one row per listing per calendar day
+  UNIQUE(ebay_listing_id, traffic_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_traffic_item_date ON listing_traffic(item_id, traffic_date);
+CREATE INDEX IF NOT EXISTS idx_traffic_ebay_date ON listing_traffic(ebay_listing_id, traffic_date);
+CREATE INDEX IF NOT EXISTS idx_traffic_user      ON listing_traffic(user_id);
 
 

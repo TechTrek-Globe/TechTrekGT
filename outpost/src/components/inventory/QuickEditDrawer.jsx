@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, CheckCircle2, Loader2, Zap, ExternalLink, Copy, AlertCircle, TrendingUp, Layers, Lock } from 'lucide-react';
-import { updateItem, saveComp, fetchLiveComps } from '../../utils/auctionApi';
+import { X, Save, CheckCircle2, Loader2, Zap, ExternalLink, Copy, AlertCircle, TrendingUp, Layers, Lock, Sparkles, Upload } from 'lucide-react';
+import { updateItem, saveComp, fetchLiveComps, pushSkuToEbay } from '../../utils/auctionApi';
 import { ALL_STATUSES, LISTING_FORMATS } from '../../utils/constants';
 import { FeeBreakdownPanel } from './FeeBreakdownPanel';
 import { buildEbaySearchUrl } from '../../utils/ebaySearch';
 import { fmtCurrency, roundPrice } from '../../utils/formulaPreview';
+import { generateSku } from '../../utils/skuGenerator';
 
 export function QuickEditDrawer({
   item,
@@ -18,6 +19,7 @@ export function QuickEditDrawer({
 }) {
   const [draft, setDraft] = useState({});
   const [saving, setSaving] = useState(false);
+  const [pushingSku, setPushingSku] = useState(false);
   const [fetchingLive, setFetchingLive] = useState(false);
   const [fetchMsg, setFetchMsg] = useState(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -241,10 +243,46 @@ export function QuickEditDrawer({
 
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="block text-[10px] text-slate-400 mb-1 font-semibold">Custom SKU / Label</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[10px] text-slate-400 font-semibold">Custom SKU / Label</label>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => updateField('sku', generateSku())}
+                      className="text-[9px] font-bold text-amber-400 hover:text-amber-300 flex items-center gap-0.5 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20"
+                      title="Auto-generate structured SKU"
+                    >
+                      <Sparkles className="w-2.5 h-2.5" />
+                      <span>Auto</span>
+                    </button>
+                    {(draft.ebay_listing_id || item?.ebay_listing_id) && (
+                      <button
+                        type="button"
+                        disabled={pushingSku || !draft.sku}
+                        onClick={async () => {
+                          if (!draft.sku) return;
+                          setPushingSku(true);
+                          try {
+                            const res = await pushSkuToEbay(item.id, draft.sku);
+                            setFetchMsg({ type: 'success', text: res.message || 'Pushed SKU to eBay!' });
+                          } catch (e) {
+                            setFetchMsg({ type: 'error', text: `eBay push failed: ${e.message}` });
+                          } finally {
+                            setPushingSku(false);
+                          }
+                        }}
+                        className="text-[9px] font-bold text-blue-400 hover:text-blue-300 flex items-center gap-0.5 bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20 disabled:opacity-50"
+                        title="Push this SKU to the linked eBay listing"
+                      >
+                        {pushingSku ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Upload className="w-2.5 h-2.5" />}
+                        <span>eBay</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
                 <input
                   type="text"
-                  placeholder="e.g. BIN-04-A"
+                  placeholder="e.g. OP-260901-0001"
                   value={draft.sku}
                   onChange={e => updateField('sku', e.target.value)}
                   className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:border-amber-500 outline-none font-mono"

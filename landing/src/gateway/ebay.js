@@ -136,16 +136,95 @@ function relaxQuery(q) {
 }
 
 /**
- * Searches eBay Marketplace Insights for recently sold listings.
- * Falls back to the Browse API (active listings) if Insights returns no results.
+ * Direct eBay completed & sold search scraper for real sold comps.
+ */
+async function fetchEbaySoldHtmlScrape(query) {
+  const url = `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(query)}&LH_Sold=1&LH_Complete=1&_sop=13&_ipg=60`;
+  const res = await fetch(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Cache-Control': 'no-cache',
+      'Pragma': 'no-cache'
+    }
+  });
+
+  if (!res.ok) {
+    console.warn(`[ebay gateway] HTML scrape HTTP ${res.status}`);
+    return [];
+  }
+
+  const html = await res.text();
+  const items = [];
+
+  // Match each s-item block
+  const itemBlocks = html.split(/class="s-item\s/);
+  for (let i = 1; i < itemBlocks.length; i++) {
+    const block = itemBlocks[i];
+
+    // Extract title
+    const titleMatch = block.match(/class="s-item__title"[^>]*>(?:<span[^>]*>)?([^<]+)/i);
+    const title = titleMatch ? titleMatch[1].replace(/^(?:New Listing|Shop on eBay)\s*/i, '').trim() : '';
+    if (!title || /Shop on eBay/i.test(title)) continue;
+
+    // Extract price
+    const priceMatch = block.match(/class="s-item__price"[^>]*>(?:<span[^>]*>)?\$([0-9.,]+)/i);
+    const priceVal = priceMatch ? parseFloat(priceMatch[1].replace(/,/g, '')) : 0;
+    if (!priceVal || priceVal <= 0 || priceVal > 100000) continue;
+
+    // Extract sold date (e.g. "Sold Aug 3, 2026")
+    const dateMatch = block.match(/class="s-item__caption"[^>]*>(?:<span[^>]*>)?(?:Sold\s+)?([^<]+)/i) ||
+                      block.match(/class="s-item__ended-date"[^>]*>([^<]+)/i);
+    const soldDate = dateMatch ? dateMatch[1].trim() : null;
+
+    // Extract link
+    const linkMatch = block.match(/href="(https:\/\/www\.ebay\.com\/itm\/[^\s"?]+)/i);
+    const itemUrl = linkMatch ? linkMatch[1] : null;
+
+    // Extract eBay item ID
+    const idMatch = itemUrl ? itemUrl.match(/\/itm\/(\d+)/) : null;
+    const ebayItemId = idMatch ? idMatch[1] : null;
+
+    // Extract image
+    const imgMatch = block.match(/src="(https:\/\/i\.ebayimg\.com\/[^\s"]+)"/i) ||
+                     block.match(/data-src="(https:\/\/i\.ebayimg\.com\/[^\s"]+)"/i);
+    const imageUrl = imgMatch ? imgMatch[1] : null;
+
+    // Condition
+    const condMatch = block.match(/class="SECONDARY_INFO"[^>]*>([^<]+)/i);
+    const condition = condMatch ? condMatch[1].trim() : 'Pre-Owned';
+
+    items.push({
+      type: 'sold',
+      title,
+      price: priceVal,
+      price_formatted: `$${priceVal.toFixed(2)}`,
+      condition,
+      ebay_item_id: ebayItemId,
+      sold_date: soldDate,
+      image_url: imageUrl,
+      item_url: itemUrl || (ebayItemId ? `https://www.ebay.com/itm/${ebayItemId}` : null)
+    });
+  }
+
+  return items;
+}
+
+/**
+ * Searches eBay Marketplace Insights for recently sold listings AND Browse API for active listings.
+ * Returns structured sold comps and active comps with attached listing details (image, title, date, url).
  */
 async function fetchEbaySoldComps(query, env) {
   const accessToken = await getCachedEbayToken(env);
   const endpoints = getEbayEndpoints(env);
   const ebaySearchUrl = `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(query)}&LH_Complete=1&LH_Sold=1&_sop=13`;
 
-  let items = [];
-  let prices = [];
+  let soldItems = [];
+  let soldPrices = [];
+
+  let activeItems = [];
+  let activePrices = [];
 
   const executeInsightsQuery = async (searchQ) => {
     const insightsParams = new URLSearchParams({
@@ -167,16 +246,17 @@ async function fetchEbaySoldComps(query, env) {
         const priceObj = item.lastSoldPrice || item.price || {};
         const priceVal = parseFloat(priceObj.value || '0');
         if (!isNaN(priceVal) && priceVal > 0 && priceVal < 100000) {
-          prices.push(priceVal);
-          items.push({
+          soldPrices.push(priceVal);
+          soldItems.push({
+            type: 'sold',
             title: item.title || searchQ,
             price: priceVal,
             price_formatted: `$${priceVal.toFixed(2)}`,
-            condition: item.condition || null,
+            condition: item.condition || 'Pre-Owned',
             ebay_item_id: item.itemId || null,
             sold_date: item.lastSoldDate || null,
-            image_url: item.image?.imageUrl || null,
-            item_url: item.itemWebUrl || null
+            image_url: item.image?.imageUrl || item.thumbnailImages?.[0]?.imageUrl || null,
+            item_url: item.itemWebUrl || (item.itemId ? `https://www.ebay.com/itm/${item.itemId}` : null)
           });
         }
       }
@@ -204,97 +284,158 @@ async function fetchEbaySoldComps(query, env) {
         const priceObj = item.price || {};
         const priceVal = parseFloat(priceObj.value || '0');
         if (!isNaN(priceVal) && priceVal > 0 && priceVal < 100000) {
-          prices.push(priceVal);
-          items.push({
+          activePrices.push(priceVal);
+          activeItems.push({
+            type: 'active',
             title: item.title || searchQ,
             price: priceVal,
             price_formatted: `$${priceVal.toFixed(2)}`,
-            condition: item.condition || null,
+            condition: item.condition || 'Active Listing',
             ebay_item_id: item.itemId || null,
             sold_date: null,
-            image_url: item.image?.imageUrl || null,
-            item_url: item.itemWebUrl || null
+            image_url: item.image?.imageUrl || item.thumbnailImages?.[0]?.imageUrl || null,
+            item_url: item.itemWebUrl || (item.itemId ? `https://www.ebay.com/itm/${item.itemId}` : null)
           });
         }
       }
     }
   };
 
-  // --- Pass 1: Insights API (Exact cleaned query) ---
-  try {
-    await executeInsightsQuery(query);
-  } catch (e) {
-    console.warn('[ebay gateway] Insights API pass 1 error:', e.message);
-  }
-
-  // --- Pass 2: Insights API (Relaxed query if 0 results) ---
   const relaxed = relaxQuery(query);
-  if (prices.length === 0 && relaxed) {
+
+  // Run Sold (Insights) and Active (Browse) searches in parallel
+  await Promise.all([
+    (async () => {
+      try {
+        await executeInsightsQuery(query);
+      } catch (e) {
+        console.warn('[ebay gateway] Insights pass 1 error:', e.message);
+      }
+      if (soldPrices.length === 0 && relaxed) {
+        try {
+          await executeInsightsQuery(relaxed);
+        } catch (e) {
+          console.warn('[ebay gateway] Insights pass 2 error:', e.message);
+        }
+      }
+    })(),
+    (async () => {
+      try {
+        await executeBrowseQuery(query);
+      } catch (e) {
+        console.warn('[ebay gateway] Browse pass 1 error:', e.message);
+      }
+      if (activePrices.length === 0 && relaxed) {
+        try {
+          await executeBrowseQuery(relaxed);
+        } catch (e) {
+          console.warn('[ebay gateway] Browse pass 2 error:', e.message);
+        }
+      }
+    })()
+  ]);
+
+  // If Insights API returned 0 sold items, execute direct eBay completed/sold search
+  if (soldItems.length === 0) {
     try {
-      await executeInsightsQuery(relaxed);
+      const scrapedSold = await fetchEbaySoldHtmlScrape(query);
+      for (const item of scrapedSold) {
+        soldPrices.push(item.price);
+        soldItems.push(item);
+      }
+      if (soldItems.length === 0 && relaxed) {
+        const scrapedRelaxed = await fetchEbaySoldHtmlScrape(relaxed);
+        for (const item of scrapedRelaxed) {
+          soldPrices.push(item.price);
+          soldItems.push(item);
+        }
+      }
     } catch (e) {
-      console.warn('[ebay gateway] Insights API pass 2 error:', e.message);
+      console.warn('[ebay gateway] Sold HTML scrape error:', e.message);
     }
   }
 
-  // --- Pass 3: Fallback Browse API (Active listings) ---
-  if (prices.length === 0) {
-    try {
-      await executeBrowseQuery(query);
-    } catch (e) {
-      console.warn('[ebay gateway] Browse API pass 3 error:', e.message);
-    }
+  // Sort sold items and active items by price
+  soldItems.sort((a, b) => a.price - b.price);
+  activeItems.sort((a, b) => a.price - b.price);
+
+  // Calculate sold statistics (STRICTLY from real sold transactions)
+  let comp_1 = null, comp_2 = null, comp_3 = null;
+  let comp_1_item = null, comp_2_item = null, comp_3_item = null;
+  let sold_avg = null, median = null;
+
+  if (soldItems.length > 0) {
+    comp_1_item = soldItems[0];
+    comp_1 = comp_1_item.price;
+
+    const midIdx = Math.floor(soldItems.length / 2);
+    comp_2_item = soldItems[midIdx];
+    comp_2 = comp_2_item.price;
+
+    comp_3_item = soldItems[soldItems.length - 1];
+    comp_3 = comp_3_item.price;
+
+    const sum = soldPrices.reduce((a, b) => a + b, 0);
+    sold_avg = parseFloat((sum / soldPrices.length).toFixed(2));
+    median = comp_2;
   }
 
-  // --- Pass 4: Fallback Browse API (Relaxed query) ---
-  if (prices.length === 0 && relaxed) {
-    try {
-      await executeBrowseQuery(relaxed);
-    } catch (e) {
-      console.warn('[ebay gateway] Browse API pass 4 error:', e.message);
-    }
+  // Calculate active statistics (STRICTLY from live competitor listings)
+  let active_comp_1 = null, active_comp_2 = null, active_comp_3 = null;
+  let active_comp_1_item = null, active_comp_2_item = null, active_comp_3_item = null;
+  let active_avg = null;
+
+  if (activeItems.length > 0) {
+    active_comp_1_item = activeItems[0];
+    active_comp_1 = active_comp_1_item.price;
+
+    const midIdx = Math.floor(activeItems.length / 2);
+    active_comp_2_item = activeItems[midIdx];
+    active_comp_2 = active_comp_2_item.price;
+
+    active_comp_3_item = activeItems[activeItems.length - 1];
+    active_comp_3 = active_comp_3_item.price;
+
+    const sum = activePrices.reduce((a, b) => a + b, 0);
+    active_avg = parseFloat((sum / activePrices.length).toFixed(2));
   }
 
-  // --- Build response ---
-  if (prices.length > 0) {
-    const sorted = [...prices].sort((a, b) => a - b);
-    const sum = prices.reduce((acc, p) => acc + p, 0);
-    const live_avg = parseFloat((sum / prices.length).toFixed(2));
-    const mid = Math.floor(sorted.length / 2);
-    const median = sorted.length % 2 !== 0
-      ? sorted[mid]
-      : parseFloat(((sorted[mid - 1] + sorted[mid]) / 2).toFixed(2));
-
-    return {
-      success: true,
-      query,
-      count: prices.length,
-      source: 'ebay_api',
-      comp_1: sorted[0] || null,
-      comp_2: sorted[Math.floor(sorted.length / 2)] || null,
-      comp_3: sorted[sorted.length - 1] || null,
-      live_avg,
-      median,
-      min_comp: sorted[0],
-      max_comp: sorted[sorted.length - 1],
-      ebay_search_url: ebaySearchUrl,
-      items
-    };
-  }
+  // Determine recommended asking price (prioritizes sold average, falls back to active average)
+  const recommended_list_price = sold_avg || active_avg || comp_2 || active_comp_2 || null;
 
   return {
     success: true,
     query,
-    count: 0,
+    count: soldItems.length + activeItems.length,
+    sold_count: soldItems.length,
+    active_count: activeItems.length,
     source: 'ebay_api',
-    comp_1: null,
-    comp_2: null,
-    comp_3: null,
-    live_avg: null,
-    median: null,
+    comp_1,
+    comp_2,
+    comp_3,
+    comp_1_item,
+    comp_2_item,
+    comp_3_item,
+    active_comp_1,
+    active_comp_2,
+    active_comp_3,
+    active_comp_1_item,
+    active_comp_2_item,
+    active_comp_3_item,
+    sold_comps: soldItems,
+    active_comps: activeItems,
+    items: [...soldItems, ...activeItems],
+    live_avg: sold_avg || active_avg,
+    sold_avg,
+    active_avg,
+    median,
+    recommended_list_price,
+    min_comp: comp_1 || active_comp_1,
+    max_comp: comp_3 || active_comp_3,
     ebay_search_url: ebaySearchUrl,
-    items: [],
-    notice: 'No recent sold listings found for this query. Try refining your search terms or click the eBay link to browse manually.'
+    notice: (soldItems.length === 0 && activeItems.length === 0)
+      ? 'No live listings found on eBay for this query. Try adjusting item type or click the eBay link.'
+      : undefined
   };
 }
 

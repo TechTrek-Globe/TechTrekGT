@@ -58,12 +58,15 @@ TechTrekGT is a multi-application platform hosted on `techtrekgt.com`. The repos
 | Service | Gateway / App | Endpoint | Purpose |
 |---------|-------------|----------|---------|
 | **eBay REST API** | `landing` (gateway) | `GET/POST /api/ebay/comps` | Fetches recently sold comp listings via eBay OAuth CCF + Marketplace Insights API (Browse API fallback). Replaces anonymous HTML scraper in outpost. |
-| **eBay OAuth, Sync & Analytics** | `landing` (gateway) + `outpost` (direct) | `GET/POST /api/ebay/oauth/*`, `GET /api/ebay/listings`, `GET /api/ebay/finances`, `GET /api/ebay/analytics`, `POST /api/ebay/webhook` | Phase 3/5 eBay OAuth ACG authorization, active listing discovery, Finances API fee extraction, Sell Analytics API traffic reporting (`auction_item_analytics`), and webhook notification proxy. **Note:** Active listing discovery (`GET /outpost/api/ebay/find-listings`) and traffic analytics (`GET /api/ebay/analytics`) call eBay APIs directly from the Outpost Worker via `tokenHelper.js` with D1 caching. Fee reconciliation (`/api/ebay/reconcile`) proxies through the Landing Gateway for `/api/ebay/finances`. |
+| **eBay OAuth, Sync, Automated Sales & Analytics** | `landing` (gateway) + `outpost` (direct) | `GET/POST /api/ebay/oauth/*`, `GET /api/ebay/listings`, `GET /api/ebay/finances`, `GET /api/ebay/analytics`, `POST /api/ebay/webhook`, `POST /api/ebay/sync-item`, `POST /api/ebay/sync-all` | Phase 3/5/6 eBay OAuth ACG authorization, active listing discovery, automated sales data entry (orchestrating Fulfillment API `/sell/fulfillment/v1/order` for buyer/order status and Finances API `/sell/finances/v1/transaction` for exact gross/net/fees with atomic D1 persistence), Sell Analytics API traffic reporting (`auction_item_analytics`), and webhook notification proxy. **Note:** Active listing discovery (`GET /outpost/api/ebay/find-listings`), item resync (`POST /api/ebay/sync-item`), batch sync (`POST /api/ebay/sync-all`), and traffic analytics (`GET /api/ebay/analytics`) call eBay APIs directly from the Outpost Worker via `tokenHelper.js` with D1 caching. Fee reconciliation (`/api/ebay/reconcile`) proxies through the Landing Gateway for `/api/ebay/finances`. |
 | **Amazon Scraper** | `landing` (gateway) | `POST /api/amazon/fetch` | Multi-tier Amazon product detail extraction: external scraper proxy (`SCRAPER_API_KEY`) + direct Worker cascade. Replaces `outpost/functions/api/import/amazon-fetch.js`. |
 | **Google Places & Maps API** | `wayfinder` | (wayfinder-local) | Live venue details, ratings, photography, neighborhood & hotel lookup queries, coordinate navigation links, and mandatory dual verification. *(Phase 2: migrate to gateway `/api/places/search`)* |
 | **Geoapify API** | `wayfinder` | (wayfinder-local) | Primary POI generation, geocoding, and venue coordinate dual verification. *(Phase 2: migrate to gateway `/api/geo/places`)* |
 | **National Bank of Poland (NBP) API** | `wayfinder` | (wayfinder-local) | Real-time PLN/USD and PLN/EUR exchange rates via worker proxy. |
 | **Amazon VineScout Import** | `outpost` | `POST /api/import/amazon` | Chrome Extension Bearer-token endpoint; writes to D1 only - no external API call. Stays in outpost permanently. |
+| **Amazon URL Ingestion** | `outpost` | `POST /api/import/amazon-url` | Takes an Amazon ASIN/URL and routes through the Landing Gateway (`/api/amazon/fetch`) for hydrated data, authenticated via the standard SSO JWT cookie. |
+| **Market Comps Engine** | `outpost` | `GET/POST /api/comps/market` | Stores and calculates median/benchmark metrics against verified market comparables (`market_comps`). Replaces legacy pricing models. |
+| **SKU & Custom Label Engine** | `outpost` | `POST /api/items/auto-sku`, `POST /api/ebay/push-sku` | Generates unique structured SKUs (`OP-YYMMDD-XXXX`) on creation/backfill and pushes custom labels directly to live eBay store listings via Trading API (`ReviseFixedPriceItem` / `ReviseItem`). |
 
 > **Dual-Verification Standard:** All external API POI coordinates, venue geocoding, and address metadata MUST be dual-verified across both Google Places API and Geoapify API (delta distance threshold < 250m) prior to dataset ingestion in `wayfinder/src/data/poland-2026.js`.
 
@@ -106,7 +109,7 @@ Every React project follows the same structural convention:
 |---------|-------------------|-------|
 | `finance/` | `src/components/`, `src/components/settings/`, `src/components/settings/datasync/`, `src/context/`, `src/utils/`, `src/assets/` | 4 context providers, modular settings sub-panels (Accounts, Bills, Dashboard, DataSync with dedicated CloudSync, ImportExport, StorageReset, and SyncQueue sub-panels, Security, Debug) |
 | `wayfinder/` | `src/components/city/`, `src/data/`, `src/hooks/`, `functions/api/wayfinder/` | 10 city tab sub-components, `data/poland-2026.js` static dataset, `hooks/useExchangeRate.js`, D1 wayfinder APIs |
-| `outpost/` | `functions/api/` (largest) | invoices, items, sales, platforms, comps, supplies, reports, sync, import |
+| `outpost/` | `functions/api/` (largest) | invoices, items, sales, platforms, comps, reports, sync, import |
 | `bigworm/` | `guacamole-config/` | `guacamole.properties`, `user-mapping.xml` for Docker Guacamole |
 
 ---
@@ -308,7 +311,7 @@ The codebase follows a pragmatic split:
 |-----|-----------|
 | finance | `AccountLedgerView`, `AccountTransferSummary`, `InlineEdit`, `NoYearCalendarPicker`, `SpreadsheetImporter` |
 | wayfinder | `AttractionCard`, `MustSeeCard`, `UrgentBookingAlert`, `WinterExclusive`, `Formatters`, `CurrencyConverterModal` |
-| outpost | `EditItemModal`, `AddInvoiceModal`, `LogSaleModal`, `ListingCopyModal`, `TaxReportModal`, `SuppliesTrackerModal`, `FinanceSyncModal`, `CardShowCalculatorModal` |
+| outpost | `EditItemModal`, `AddInvoiceModal`, `LogSaleModal`, `ListingCopyModal`, `TaxReportModal`, `FinanceSyncModal` |
 
 **Shared layout components:**
 
@@ -401,7 +404,7 @@ All apps (finance, outpost, wayfinder, bigworm) point at the same `personal-budg
 | Schema File | App | Tables |
 |------------|-----|--------|
 | `finance/schema.sql` | finance + shared | `users`, `households`, `household_members`, `accounts`, `people`, `bills`, `bill_splits`, `line_items`, `loans`, `household_settings`, `user_backups` |
-| `outpost/auction-schema.sql` | outpost | invoices, items, sales, platforms, comps, supplies, etc. |
+| `outpost/auction-schema.sql` | outpost | invoices, items, sales, platforms, comps, `market_comps`, supplies, `listing_traffic`, `auction_item_analytics` |
 | `wayfinder/schema-wayfinder.sql` | wayfinder | journeys, itinerary items, documents, import jobs, budgets |
 
 ### 8.3 Key Design Points

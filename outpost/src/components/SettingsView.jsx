@@ -2,20 +2,20 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Settings, Download, RefreshCw, Plus, Edit2, Trash2,
   CheckCircle2, AlertCircle, Loader2, Save, FileText, Database, ShieldCheck,
-  FileSpreadsheet, Upload, ArrowRightLeft, Sparkles, Boxes, Calculator, LayoutGrid,
+  FileSpreadsheet, Upload, ArrowRightLeft, Sparkles, Calculator, LayoutGrid,
   ArrowUp, ArrowDown, Eye, EyeOff, ShoppingCart, Copy, RotateCcw, Plug, User,
   DollarSign, Package, Layers, Sliders, HardDrive
 } from 'lucide-react';
 import { SpreadsheetImporterModal } from './SpreadsheetImporterModal';
 import { FinanceSyncModal } from './FinanceSyncModal';
-import { SuppliesTrackerModal } from './SuppliesTrackerModal';
 import { TaxReportModal } from './TaxReportModal';
 import { EbayConnectBanner } from './EbayConnectBanner';
 import { ListingMatchReviewModal } from './ListingMatchReviewModal';
 import { useAuth } from '../context/AuthContext';
 import {
   getPlatforms, createPlatform, updatePlatform, deletePlatform, resetPlatforms,
-  getItems, getSales, getInvoices, getComps, getApiUrl
+  getItems, getSales, getInvoices, getComps, getApiUrl,
+  autoAssignSkus, pushAllSkusToEbay
 } from '../utils/auctionApi';
 import { fmtCurrency, fmtPct } from '../utils/formulaPreview';
 import { DEFAULT_COLUMNS, DEFAULT_CATEGORIES, getStoredUserSettings, saveUserSettings, resetColumnWidths } from '../utils/userSettings';
@@ -49,7 +49,6 @@ export function SettingsView() {
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({ name: '', fee_pct: '', flat_fee: '', notes: '', is_default: false });
   const [financeSyncOpen, setFinanceSyncOpen] = useState(false);
-  const [suppliesOpen, setSuppliesOpen] = useState(false);
   const [taxReportOpen, setTaxReportOpen] = useState(false);
 
   // Add platform modal state
@@ -74,10 +73,37 @@ export function SettingsView() {
   const [tokenLoading, setTokenLoading] = useState(false);
   const [tokenRotating, setTokenRotating] = useState(false);
   const [tokenCopied, setTokenCopied] = useState(false);
+  const [skuActionLoading, setSkuActionLoading] = useState(false);
 
   const showSuccess = (msg) => {
     setSuccessMsg(msg);
     setTimeout(() => setSuccessMsg(''), 4000);
+  };
+
+  const handleAutoAssignSkus = async () => {
+    if (!window.confirm('Auto-assign unique, structured SKUs (OP-YYMMDD-XXXX) to all inventory items currently missing one?')) return;
+    setSkuActionLoading(true);
+    try {
+      const res = await autoAssignSkus();
+      showSuccess(res.message || `Auto-assigned SKUs to ${res.count} items.`);
+    } catch (e) {
+      setError(`Failed to auto-assign SKUs: ${e.message}`);
+    } finally {
+      setSkuActionLoading(false);
+    }
+  };
+
+  const handlePushAllSkusToEbay = async () => {
+    if (!window.confirm('Push all Outpost SKUs/Custom Labels to your active linked eBay listings?')) return;
+    setSkuActionLoading(true);
+    try {
+      const res = await pushAllSkusToEbay();
+      showSuccess(res.message || `Pushed ${res.synced} SKUs to eBay.`);
+    } catch (e) {
+      setError(`Failed to push SKUs to eBay: ${e.message}`);
+    } finally {
+      setSkuActionLoading(false);
+    }
   };
 
   const fetchPlatformsList = useCallback(async () => {
@@ -672,6 +698,51 @@ export function SettingsView() {
                   setListingMatchOpen(true);
                 }}
               />
+
+              {/* SKU & Custom Label Synchronization Sub-Card */}
+              <div className="mt-4 pt-4 border-t border-slate-800/80 grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="bg-slate-900/80 rounded-xl p-3.5 border border-slate-800 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-slate-200 mb-1">
+                      <Package className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Auto-Assign Missing SKUs</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      Scans your database and generates unique, timestamped SKUs (<code className="text-amber-300/80">OP-YYMMDD-XXXX</code>) for any items currently missing an identifier.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={skuActionLoading}
+                    onClick={handleAutoAssignSkus}
+                    className="mt-3 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 flex items-center justify-center gap-1.5 transition-all disabled:opacity-50"
+                  >
+                    {skuActionLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                    <span>Auto-Assign Blank SKUs</span>
+                  </button>
+                </div>
+
+                <div className="bg-slate-900/80 rounded-xl p-3.5 border border-slate-800 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-slate-200 mb-1">
+                      <ShoppingCart className="w-3.5 h-3.5 text-blue-400" />
+                      <span>Push All SKUs to eBay</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      Transmits your Outpost SKUs directly to eBay, updating the <strong>Custom Label (SKU)</strong> on all active linked store listings.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={skuActionLoading}
+                    onClick={handlePushAllSkusToEbay}
+                    className="mt-3 px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 flex items-center justify-center gap-1.5 shadow-sm transition-all disabled:opacity-50"
+                  >
+                    {skuActionLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-950" /> : <Upload className="w-3.5 h-3.5" />}
+                    <span>Push SKUs to eBay</span>
+                  </button>
+                </div>
+              </div>
             </div>
 
             {/* 2. VineScout / Amazon Integration */}
@@ -740,7 +811,7 @@ export function SettingsView() {
         {activeTab === 'data' && (
           <div className="space-y-6 animate-fade-in">
             {/* Quick Action Tools Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Spreadsheet Importer */}
               <div className="glass-card rounded-2xl p-5 border border-amber-500/30 bg-amber-500/5 flex flex-col justify-between space-y-4">
                 <div>
@@ -759,27 +830,6 @@ export function SettingsView() {
                 >
                   <Upload className="w-3.5 h-3.5" />
                   <span>Launch Importer</span>
-                </button>
-              </div>
-
-              {/* Supplies Tracker */}
-              <div className="glass-card rounded-2xl p-5 border border-blue-500/30 bg-blue-500/5 flex flex-col justify-between space-y-4">
-                <div>
-                  <div className="w-9 h-9 rounded-xl bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-blue-400 mb-3">
-                    <Boxes className="w-5 h-5" />
-                  </div>
-                  <h3 className="text-sm font-bold text-white">Supplies & Packaging Overhead</h3>
-                  <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                    Track recurring shipping supplies (bubble mailers, PSA graded sleeves, top-loaders) and deduct them against gross profits.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setSuppliesOpen(true)}
-                  className="w-full py-2 rounded-xl text-xs font-bold text-slate-950 bg-gradient-to-r from-blue-400 to-indigo-400 hover:from-blue-300 hover:to-indigo-300 transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20"
-                >
-                  <Boxes className="w-3.5 h-3.5" />
-                  <span>Open Supplies Center</span>
                 </button>
               </div>
 
@@ -1171,11 +1221,6 @@ export function SettingsView() {
       <FinanceSyncModal
         isOpen={financeSyncOpen}
         onClose={() => setFinanceSyncOpen(false)}
-      />
-
-      <SuppliesTrackerModal
-        isOpen={suppliesOpen}
-        onClose={() => setSuppliesOpen(false)}
       />
 
       <TaxReportModal

@@ -24,10 +24,13 @@ export function InventoryGridRow({
   onOpenSaleModal,
   onOpenListingIdModal,
   onMarkSold,
+  onShowTooltip,
+  onHideTooltip
 }) {
   const isEven = index % 2 === 0;
   const rowBg = isEven ? 'bg-[#0b101d]' : 'bg-[#141d30]';
   const stickyBg = isEven ? 'bg-[#0b101d]' : 'bg-[#141d30]';
+  const actionsWidth = columnWidths.actions || 120;
 
   return (
     <tr className={`border-b border-slate-800/70 transition-colors group ${rowBg} hover:bg-amber-500/[0.08]`}>
@@ -35,9 +38,9 @@ export function InventoryGridRow({
       {columnVisibility.actions !== false && (
         <td
           style={{
-            width: `${columnWidths.actions || 120}px`,
+            width: `${actionsWidth}px`,
             minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'actions')?.minWidth || 100}px`,
-            maxWidth: `${columnWidths.actions || 120}px`
+            maxWidth: `${actionsWidth}px`
           }}
           className={`px-2 py-1.5 whitespace-nowrap overflow-hidden sticky left-0 z-10 border-r border-slate-800/80 shadow-r transition-colors ${stickyBg} group-hover:bg-[#1a263d]`}
         >
@@ -97,15 +100,16 @@ export function InventoryGridRow({
         </td>
       )}
 
-      {/* 2. Item Name & Thumbnail */}
+      {/* 2. Item Name & Thumbnail (Sticky Left next to Actions) */}
       {columnVisibility.item_name !== false && (
         <td
           style={{
             width: `${columnWidths.item_name || 220}px`,
             minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'item_name')?.minWidth || 160}px`,
-            maxWidth: `${columnWidths.item_name || 220}px`
+            maxWidth: `${columnWidths.item_name || 220}px`,
+            left: `${actionsWidth}px`
           }}
-          className="px-3 py-1.5 border-r border-slate-800/60 transition-colors overflow-hidden text-xs"
+          className={`px-3 py-1.5 border-r border-slate-800/60 transition-colors overflow-hidden text-xs sticky z-10 ${stickyBg} group-hover:bg-[#1a263d] shadow-r`}
         >
           <div
             onClick={() => onOpenEditModal && onOpenEditModal(item)}
@@ -117,8 +121,8 @@ export function InventoryGridRow({
             </span>
             <Pencil className="w-2.5 h-2.5 text-slate-500 group-hover/name:text-amber-400 transition-colors opacity-0 group-hover/name:opacity-100 flex-shrink-0" />
           </div>
-          {item.athlete_person && !item.item_name?.toLowerCase().includes(item.athlete_person.toLowerCase()) && (
-            <p className="text-slate-500 text-[10px] pointer-events-none truncate leading-none">{cleanAthleteName(item.athlete_person)}</p>
+          {item.athlete_person && (
+            <p className="text-slate-400 text-[10px] pointer-events-none truncate leading-none mt-0.5 font-medium">{cleanAthleteName(item.athlete_person)}</p>
           )}
         </td>
       )}
@@ -143,7 +147,7 @@ export function InventoryGridRow({
         </td>
       )}
 
-      {/* 4. Margin Health */}
+      {/* 4. Margin Health (with Hover Calculation) */}
       {columnVisibility.margin_health !== false && (
         <td
           style={{
@@ -151,7 +155,9 @@ export function InventoryGridRow({
             minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'margin_health')?.minWidth || 95}px`,
             maxWidth: `${columnWidths.margin_health || 110}px`
           }}
-          className="px-3 py-1.5 whitespace-nowrap overflow-hidden text-xs"
+          onMouseEnter={(e) => onShowTooltip && onShowTooltip('margin', item, e)}
+          onMouseLeave={onHideTooltip}
+          className="px-3 py-1.5 whitespace-nowrap overflow-hidden text-xs cursor-help"
         >
           <MarginHealthBadge marginPct={item._computedMargin} netProfit={item._computedNetProfit} showLabel={false} />
         </td>
@@ -198,7 +204,7 @@ export function InventoryGridRow({
         </td>
       )}
 
-      {/* 7. Current List Price */}
+      {/* 7. Current List Price (with Hover Calculation) */}
       {columnVisibility.current_list_price !== false && (
         <td
           style={{
@@ -206,7 +212,9 @@ export function InventoryGridRow({
             minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'current_list_price')?.minWidth || 95}px`,
             maxWidth: `${columnWidths.current_list_price || 110}px`
           }}
-          className="px-3 py-1.5 whitespace-nowrap overflow-hidden text-xs font-mono font-bold"
+          onMouseEnter={(e) => onShowTooltip && onShowTooltip('list', item, e)}
+          onMouseLeave={onHideTooltip}
+          className="px-3 py-1.5 whitespace-nowrap overflow-hidden text-xs font-mono font-bold cursor-help"
         >
           <InlineEditCell
             value={item.current_list_price}
@@ -220,7 +228,7 @@ export function InventoryGridRow({
         </td>
       )}
 
-      {/* 8. True Landed Cost (COGS) */}
+      {/* 8. True Landed Cost (COGS - with Hover Calculation) */}
       {columnVisibility.true_total_cost !== false && (
         <td
           style={{
@@ -228,7 +236,9 @@ export function InventoryGridRow({
             minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'true_total_cost')?.minWidth || 95}px`,
             maxWidth: `${columnWidths.true_total_cost || 110}px`
           }}
-          className="px-3 py-1.5 whitespace-nowrap overflow-hidden text-xs font-mono"
+          onMouseEnter={(e) => onShowTooltip && onShowTooltip('cost', item, e)}
+          onMouseLeave={onHideTooltip}
+          className="px-3 py-1.5 whitespace-nowrap overflow-hidden text-xs font-mono cursor-help"
         >
           <InlineEditCell
             value={item.true_total_cost}
@@ -242,7 +252,7 @@ export function InventoryGridRow({
         </td>
       )}
 
-      {/* 9. Floor Price */}
+      {/* 9. Floor Price (with Hover Calculation) */}
       {columnVisibility.floor_price !== false && (
         <td
           style={{
@@ -250,7 +260,9 @@ export function InventoryGridRow({
             minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'floor_price')?.minWidth || 85}px`,
             maxWidth: `${columnWidths.floor_price || 100}px`
           }}
-          className="px-3 py-1.5 whitespace-nowrap overflow-hidden text-xs font-mono"
+          onMouseEnter={(e) => onShowTooltip && onShowTooltip('floor', item, e)}
+          onMouseLeave={onHideTooltip}
+          className="px-3 py-1.5 whitespace-nowrap overflow-hidden text-xs font-mono cursor-help"
         >
           <InlineEditCell
             value={item.floor_price || item._computedFloor || item.min_sell_price}
@@ -264,7 +276,7 @@ export function InventoryGridRow({
         </td>
       )}
 
-      {/* 10. Suggested List Price */}
+      {/* 10. Suggested List Price (with Hover Calculation) */}
       {columnVisibility.suggested_list_price !== false && (
         <td
           style={{
@@ -272,7 +284,9 @@ export function InventoryGridRow({
             minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'suggested_list_price')?.minWidth || 95}px`,
             maxWidth: `${columnWidths.suggested_list_price || 110}px`
           }}
-          className="px-3 py-1.5 whitespace-nowrap overflow-hidden text-xs font-mono"
+          onMouseEnter={(e) => onShowTooltip && onShowTooltip('suggested', item, e)}
+          onMouseLeave={onHideTooltip}
+          className="px-3 py-1.5 whitespace-nowrap overflow-hidden text-xs font-mono cursor-help"
         >
           <InlineEditCell
             value={item.suggested_list_price}

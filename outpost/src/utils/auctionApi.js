@@ -220,27 +220,6 @@ export const syncToFinance = (options = {}) =>
     body: JSON.stringify(options)
   });
 
-// --- Supplies & Packaging Expense Tracker ---
-export const getSupplies = () =>
-  apiFetch('/api/supplies');
-
-export const createSupply = (body) =>
-  apiFetch('/api/supplies', {
-    method: 'POST',
-    headers: JSON_HEADERS,
-    body: JSON.stringify(body)
-  });
-
-export const updateSupply = (id, body) =>
-  apiFetch(`/api/supplies/${id}`, {
-    method: 'PUT',
-    headers: JSON_HEADERS,
-    body: JSON.stringify(body)
-  });
-
-export const deleteSupply = (id) =>
-  apiFetch(`/api/supplies/${id}`, { method: 'DELETE' });
-
 // --- Year-End Tax & Schedule C Reports ---
 export const getTaxReport = (year = '') =>
   apiFetch(`/api/reports/tax${year ? `?year=${encodeURIComponent(year)}` : ''}`);
@@ -314,5 +293,23 @@ export const syncAllEbayItems = () =>
 export const fetchEbayItemAnalytics = (itemId, range = 30, force = false) =>
   apiFetch(`/api/ebay/analytics?item_id=${encodeURIComponent(itemId)}&range=${range}${force ? '&force=true' : ''}`);
 
+// --- SKU Auto-Assignment & eBay Push Engine ---
+export const autoAssignSkus = () =>
+  apiFetch('/api/items/auto-sku', {
+    method: 'POST',
+    headers: JSON_HEADERS
+  });
 
+export const pushSkuToEbay = (itemId, sku = null) =>
+  apiFetch('/api/ebay/push-sku', {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ item_id: itemId, sku })
+  });
 
+export const pushAllSkusToEbay = () =>
+  apiFetch('/api/ebay/push-sku', {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ all: true })
+  });

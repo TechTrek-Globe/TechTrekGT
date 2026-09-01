@@ -10,6 +10,7 @@ import { onRequestGet as invoicesListHandler, onRequestPost as invoicesCreateHan
 import { onRequestGet as invoiceGetHandler, onRequestPut as invoicePutHandler, onRequestDelete as invoiceDeleteHandler } from '../functions/api/invoices/[id].js';
 import { onRequestGet as itemsListHandler } from '../functions/api/items/index.js';
 import { onRequestGet as itemsEnrichedHandler } from '../functions/api/items/enriched.js';
+import { onRequestPost as itemsAutoSkuHandler } from '../functions/api/items/auto-sku.js';
 import { onRequestGet as itemGetHandler, onRequestPut as itemPutHandler, onRequestDelete as itemDeleteHandler } from '../functions/api/items/[id].js';
 import { onRequestGet as salesListHandler, onRequestPost as salesCreateHandler } from '../functions/api/sales/index.js';
 import { onRequestGet as saleGetHandler, onRequestPut as salePutHandler, onRequestDelete as saleDeleteHandler } from '../functions/api/sales/[id].js';
@@ -17,13 +18,13 @@ import { onRequestGet as platformsListHandler, onRequestPost as platformsCreateH
 import { onRequestPut as platformPutHandler, onRequestDelete as platformDeleteHandler } from '../functions/api/platforms/[id].js';
 import { onRequestGet as compsListHandler, onRequestPost as compsCreateHandler } from '../functions/api/comps/index.js';
 import { onRequestGet as compGetHandler, onRequestPut as compPutHandler, onRequestDelete as compDeleteHandler } from '../functions/api/comps/[id].js';
+import { onRequestGet as marketCompsGetHandler, onRequestPost as marketCompsPostHandler, onRequestPut as marketCompsPutHandler, onRequestDelete as marketCompsDeleteHandler } from '../functions/api/comps/market.js';
 import { onRequestGet as dashboardHandler } from '../functions/api/dashboard.js';
 import { onRequestPost as batchImportHandler } from '../functions/api/import/batch.js';
 import { onRequestPost as amazonImportHandler } from '../functions/api/import/amazon.js';
+import { onRequestPost as amazonUrlImportHandler } from '../functions/api/import/amazon-url.js';
 import { onRequestGet as amazonTokenGetHandler, onRequestPost as amazonTokenPostHandler } from '../functions/api/import/amazon-token.js';
 import { onRequestGet as syncFinanceGetHandler, onRequestPost as syncFinancePostHandler } from '../functions/api/sync/finance.js';
-import { onRequestGet as suppliesListHandler, onRequestPost as suppliesCreateHandler } from '../functions/api/supplies/index.js';
-import { onRequestPut as supplyPutHandler, onRequestDelete as supplyDeleteHandler } from '../functions/api/supplies/[id].js';
 import { onRequestGet as taxReportGetHandler } from '../functions/api/reports/tax.js';
 import { onRequestGet as marketAlertsGetHandler, onRequestPut as marketAlertsPutHandler, onRequestPost as marketAlertsPostHandler } from '../functions/api/market-alerts.js';
 import { onRequestGet as ebayOAuthStatusHandler } from '../functions/api/ebay/oauth-status.js';
@@ -32,7 +33,8 @@ import { onRequestGet as ebayActiveListingsHandler } from '../functions/api/ebay
 import { onRequestPost as ebayReconcileHandler } from '../functions/api/ebay/reconcile.js';
 import { onRequestPost as ebaySyncItemHandler } from '../functions/api/ebay/sync-item.js';
 import { onRequestPost as ebaySyncAllHandler } from '../functions/api/ebay/sync-all.js';
-import { onRequestGet as ebayAnalyticsHandler } from '../functions/api/ebay/analytics.js';
+import { onRequestPost as ebayPushSkuHandler } from '../functions/api/ebay/push-sku.js';
+import { onRequestGet as ebayAnalyticsHandler, onRequestPost as ebayAnalyticsIngestHandler } from '../functions/api/ebay/analytics.js';
 
 function addSecurityHeaders(response, isLocalhost = false, requestOrigin = '') {
   const newHeaders = new Headers(response.headers);
@@ -158,6 +160,8 @@ export default {
       // --- Items ---
       } else if (apiPath === '/api/items/enriched' && request.method === 'GET') {
         response = await itemsEnrichedHandler(context);
+      } else if (apiPath === '/api/items/auto-sku' && request.method === 'POST') {
+        response = await itemsAutoSkuHandler(context);
       } else if (apiPath === '/api/items' && request.method === 'GET') {
         response = await itemsListHandler(context);
       } else if (/^\/api\/items\/[^/]+$/.test(apiPath) && request.method === 'GET') {
@@ -198,6 +202,15 @@ export default {
         response = await compPutHandler(context);
       } else if (/^\/api\/comps\/[^/]+$/.test(apiPath) && request.method === 'DELETE') {
         response = await compDeleteHandler(context);
+      // --- Market Comps Engine (normalized market_comps table) ---
+      } else if (apiPath === '/api/comps/market' && request.method === 'GET') {
+        response = await marketCompsGetHandler(context);
+      } else if (apiPath === '/api/comps/market' && request.method === 'POST') {
+        response = await marketCompsPostHandler(context);
+      } else if (/^\/api\/comps\/market\/[^/]+$/.test(apiPath) && request.method === 'PUT') {
+        response = await marketCompsPutHandler(context);
+      } else if (/^\/api\/comps\/market\/[^/]+$/.test(apiPath) && request.method === 'DELETE') {
+        response = await marketCompsDeleteHandler(context);
       // --- Dashboard ---
       } else if (apiPath === '/api/dashboard' && request.method === 'GET') {
         response = await dashboardHandler(context);
@@ -208,6 +221,9 @@ export default {
       // Note: Amazon product fetch now served by landing gateway at /api/amazon/fetch
       } else if (apiPath === '/api/import/amazon' && request.method === 'POST') {
         response = await amazonImportHandler(context);
+      // --- Amazon URL Import (SSO JWT cookie auth - UI-driven) ---
+      } else if (apiPath === '/api/import/amazon-url' && request.method === 'POST') {
+        response = await amazonUrlImportHandler(context);
       } else if (apiPath === '/api/import/amazon-token' && request.method === 'GET') {
         response = await amazonTokenGetHandler(context);
       } else if (apiPath === '/api/import/amazon-token' && request.method === 'POST') {
@@ -217,17 +233,6 @@ export default {
         response = await syncFinanceGetHandler(context);
       } else if (apiPath === '/api/sync/finance' && request.method === 'POST') {
         response = await syncFinancePostHandler(context);
-      // --- Supplies Expense Tracker ---
-      } else if (apiPath === '/api/supplies' && request.method === 'GET') {
-        response = await suppliesListHandler(context);
-      } else if (apiPath === '/api/supplies' && request.method === 'POST') {
-        response = await suppliesCreateHandler(context);
-      } else if (apiPath.match(/^\/api\/supplies\/[^/]+$/) && request.method === 'PUT') {
-        const id = apiPath.split('/')[3];
-        response = await supplyPutHandler({ ...context, params: { id } });
-      } else if (apiPath.match(/^\/api\/supplies\/[^/]+$/) && request.method === 'DELETE') {
-        const id = apiPath.split('/')[3];
-        response = await supplyDeleteHandler({ ...context, params: { id } });
       // --- Year-End Tax & Schedule C Reports ---
       } else if (apiPath === '/api/reports/tax' && request.method === 'GET') {
         response = await taxReportGetHandler(context);
@@ -249,8 +254,12 @@ export default {
         response = await ebaySyncItemHandler(context);
       } else if (apiPath === '/api/ebay/sync-all' && request.method === 'POST') {
         response = await ebaySyncAllHandler(context);
+      } else if (apiPath === '/api/ebay/push-sku' && request.method === 'POST') {
+        response = await ebayPushSkuHandler(context);
       } else if (apiPath === '/api/ebay/analytics' && request.method === 'GET') {
         response = await ebayAnalyticsHandler(context);
+      } else if (apiPath === '/api/ebay/analytics/ingest-traffic' && request.method === 'POST') {
+        response = await ebayAnalyticsIngestHandler(context);
       } else if (apiPath === '/api/ebay/reconcile' && request.method === 'POST') {
         response = await ebayReconcileHandler(context);
       } else if (apiPath.startsWith('/api/')) {

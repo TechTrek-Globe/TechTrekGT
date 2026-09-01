@@ -1,5 +1,6 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
 import { computeItemProration, computePricingFloors } from '../../utils/auction.js';
+import { generateSku } from '../utils/sku.js';
 
 // ============================================================
 // GET /api/invoices  - list all invoices for authenticated user
@@ -101,6 +102,8 @@ export async function onRequestPost(context) {
         target_margin_pct: targetMarginPct
       });
 
+      const itemSku = (it.sku && String(it.sku).trim()) ? String(it.sku).trim() : generateSku(date_acquired || new Date());
+
       await env.DB.prepare(`
         INSERT INTO auction_items (
           id, user_id, invoice_id, item_name, category, sport_genre, athlete_person,
@@ -109,7 +112,7 @@ export async function onRequestPost(context) {
           status, platform, platform_fee_pct, platform_flat_fee,
           est_shipping_cost, boost_pct, min_sell_price, suggested_list_price,
           current_list_price, target_margin_pct,
-          date_acquired, date_listed, notes, best_listing_window
+          date_acquired, date_listed, notes, best_listing_window, sku
         ) VALUES (
           ?,?,?,?,?,?,?,
           ?,?,?,?,
@@ -117,7 +120,7 @@ export async function onRequestPost(context) {
           ?,?,?,?,
           ?,?,?,?,
           ?,?,
-          ?,?,?,?
+          ?,?,?,?,?
         )
       `).bind(
         itemId, payload.userId, invoiceId,
@@ -132,12 +135,14 @@ export async function onRequestPost(context) {
         estShipping, boostPct, pricing.min_sell_price, pricing.suggested_list_price,
         it.current_list_price || null, targetMarginPct,
         date_acquired || null, it.date_listed || null,
-        it.notes || null, it.best_listing_window || null
+        it.notes || null, it.best_listing_window || null,
+        itemSku
       ).run();
 
       insertedItems.push({
         id: itemId,
         item_name: it.item_name.trim(),
+        sku: itemSku,
         unit_price: it.unit_price,
         ...proration,
         min_sell_price: pricing.min_sell_price,

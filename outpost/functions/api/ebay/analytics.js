@@ -309,3 +309,197 @@ export async function onRequestGet(context) {
     });
   });
 }
+
+/**
+ * POST /api/ebay/analytics/ingest-traffic
+ *
+ * Fetches daily-granularity eBay Analytics data for one item and upserts
+ * individual day rows into the listing_traffic table.
+ *
+ * Unlike the GET handler (aggregate 30-day windows in auction_item_analytics),
+ * this endpoint stores one row per ebay_listing_id per calendar day (Pacific Time),
+ * enabling per-day trend charts and drill-down views.
+ *
+ * Protocol rules enforced (from ebay-apis-reference.md Section 4):
+ *   - Filter nesting: date_range inside the filter param
+ *   - Pacific Time (America/Los_Angeles) boundaries
+ *   - T-1 lag: end date is always yesterday PT to prevent error 50018
+ *
+ * Body: { item_id: string, range?: number (days, default 30, max 90) }
+ */
+export async function onRequestPost(context) {
+  const { request, env } = context;
+  return withAuth(async () => {
+    const payload = await requireAuth(request, env);
+    if (!env.DB) return err('Database not available', 500);
+
+    const body = await request.json().catch(() => ({}));
+    const { item_id: itemId, range: rangeParam = 30 } = body;
+
+    if (!itemId) return err('item_id is required', 400);
+
+    const rangeDays = Number.isInteger(Number(rangeParam)) && Number(rangeParam) > 0
+      ? Math.min(Number(rangeParam), 90)
+      : 30;
+
+    const item = await env.DB.prepare(
+      'SELECT id, item_name, ebay_listing_id, status FROM auction_items WHERE id = ? AND user_id = ?'
+    ).bind(itemId, payload.userId).first();
+
+    if (!item) return err('Item not found', 404);
+    if (!item.ebay_listing_id) {
+      return err('Item is not linked to an active eBay listing ID', 400);
+    }
+
+    const cleanListingId = String(item.ebay_listing_id).trim();
+
+    // --- Check scope ---
+    const tokenRow = await env.DB.prepare(
+      'SELECT scopes FROM ebay_oauth_tokens WHERE user_id = ?'
+    ).bind(payload.userId).first();
+    const scopes = tokenRow?.scopes || '';
+    if (!scopes.includes('sell.analytics.readonly')) {
+      return ok({
+        success: false,
+        needsReauth: true,
+        error: 'sell.analytics.readonly scope not granted. Re-authorize eBay account.'
+      });
+    }
+
+    let accessToken;
+    try {
+      accessToken = await getEbayUserToken(env, payload.userId);
+    } catch (e) {
+      return err(`eBay authentication failed: ${e.message}`, 401);
+    }
+
+    // --- Pacific Time date boundaries with mandatory T-1 lag ---
+    // Builds YYYYMMDD strings in Pacific Time to avoid eBay error 50018.
+    function getPacificYMD(daysAgo = 0) {
+      const target = new Date(Date.now() - daysAgo * 86400000);
+      const parts  = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Los_Angeles',
+        year:     'numeric',
+        month:    '2-digit',
+        day:      '2-digit'
+      }).formatToParts(target);
+      const y = parts.find(p => p.type === 'year').value;
+      const m = parts.find(p => p.type === 'month').value;
+      const d = parts.find(p => p.type === 'day').value;
+      return `${y}${m}${d}`;
+    }
+
+    // End = yesterday Pacific (T-1) - never today to avoid error 50018
+    const endYMD   = getPacificYMD(1);
+    const startYMD = getPacificYMD(rangeDays);
+
+    // Guard: reject if endYMD >= today Pacific (defensive T-1 validation)
+    const todayYMD = getPacificYMD(0);
+    if (endYMD >= todayYMD) {
+      return err(
+        `end_date ${endYMD} must be before today Pacific ${todayYMD}. ` +
+        'eBay Analytics requires a 1-day reporting lag (error 50018 prevention).', 400
+      );
+    }
+
+    // --- Fetch from eBay Analytics API with DAY granularity ---
+    const apiBase      = getEbayApiBase(env);
+    const metricsParam = 'LISTING_IMPRESSION_TOTAL,LISTING_IMPRESSION_SEARCH_RESULTS_PAGE,LISTING_VIEWS_TOTAL,CLICK_THROUGH_RATE,SALES_CONVERSION_RATE';
+    const filterParam  = `marketplace_ids:{EBAY_US},listing_ids:{${cleanListingId}},date_range:[${startYMD}..${endYMD}]`;
+    const analyticsUrl = `${apiBase}/sell/analytics/v1/traffic_report?dimension=DAY&metric=${metricsParam}&filter=${encodeURIComponent(filterParam)}`;
+
+    let ebayData;
+    try {
+      const res = await fetch(analyticsUrl, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          Accept:         'application/json'
+        }
+      });
+      if (!res.ok) {
+        const errText = await res.text().catch(() => '');
+        return err(`eBay Analytics API error (${res.status}): ${errText.slice(0, 200)}`, res.status);
+      }
+      ebayData = await res.json();
+    } catch (e) {
+      return err(`Failed to fetch daily traffic from eBay: ${e.message}`, 500);
+    }
+
+    // --- Parse metric key index map ---
+    const metricKeyMap = {};
+    (ebayData.header?.metrics || []).forEach((m, idx) => {
+      if (m.key) metricKeyMap[m.key] = idx;
+    });
+
+    // --- Parse dimensionalDataPoints (one entry per day) ---
+    // eBay returns daily data in records[0].dimensionalDataPoints when dimension=DAY
+    const dataPoints = ebayData.records?.[0]?.dimensionalDataPoints || [];
+
+    if (!dataPoints.length) {
+      return ok({
+        success:       true,
+        rows_upserted: 0,
+        message:       'No daily data points returned from eBay for this listing and date range.',
+        listing_id:    cleanListingId,
+        range:         `${startYMD}..${endYMD}`
+      });
+    }
+
+    const nowIso = new Date().toISOString();
+    const statements = [];
+    let rowsUpserted = 0;
+
+    for (const dp of dataPoints) {
+      // dimension value is the date string (YYYYMMDD) when dimension=DAY
+      const trafficDate = dp.dimensionValue?.value || dp.value;
+      if (!trafficDate || !/^\d{8}$/.test(String(trafficDate))) continue;
+
+      const metricValues = dp.metricValues || [];
+      const getVal = (key) => {
+        const idx = metricKeyMap[key];
+        if (idx !== undefined && metricValues[idx]) {
+          return parseFloat(metricValues[idx].value) || 0;
+        }
+        return 0;
+      };
+
+      const impressionsTotal  = Math.round(getVal('LISTING_IMPRESSION_TOTAL'));
+      const impressionsSearch = Math.round(getVal('LISTING_IMPRESSION_SEARCH_RESULTS_PAGE'));
+      const pageViewsTotal    = Math.round(getVal('LISTING_VIEWS_TOTAL'));
+      const rawCtr            = getVal('CLICK_THROUGH_RATE');
+      const rawConv           = getVal('SALES_CONVERSION_RATE');
+
+      const ctr  = rawCtr  > 0 ? parseFloat(rawCtr.toFixed(4))  : 0.0;
+      const conv = rawConv > 0 ? parseFloat(rawConv.toFixed(4)) : 0.0;
+
+      const rowId = `lt-${crypto.randomUUID()}`;
+
+      // INSERT OR REPLACE deduplicates on (ebay_listing_id, traffic_date) UNIQUE constraint
+      statements.push(env.DB.prepare(`
+        INSERT OR REPLACE INTO listing_traffic (
+          id, item_id, user_id, ebay_listing_id, traffic_date,
+          impressions_total, impressions_search, page_views_total,
+          click_through_rate, sales_conversion_rate, fetched_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        rowId, itemId, payload.userId, cleanListingId, String(trafficDate),
+        impressionsTotal, impressionsSearch, pageViewsTotal,
+        ctr, conv, nowIso
+      ));
+
+      rowsUpserted++;
+    }
+
+    if (statements.length > 0) {
+      await env.DB.batch(statements);
+    }
+
+    return ok({
+      success:       true,
+      rows_upserted: rowsUpserted,
+      listing_id:    cleanListingId,
+      range:         `${startYMD}..${endYMD}`,
+      fetched_at:    nowIso
+    });
+  });
+}

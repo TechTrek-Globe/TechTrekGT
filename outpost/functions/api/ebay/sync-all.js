@@ -1,5 +1,13 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
-import { getEbayUserToken, fetchEbayActiveSellerListings, fetchSingleEbayListing, calculateEbayCategoryFees } from './tokenHelper.js';
+import {
+  getEbayUserToken,
+  fetchEbayActiveSellerListings,
+  fetchSingleEbayListing,
+  calculateEbayCategoryFees,
+  fetchEbayOrderForListing,
+  fetchEbayOrderFinances,
+  reconcileAndSaveEbaySale
+} from './tokenHelper.js';
 import { computePricingFloors } from '../../utils/auction.js';
 
 /**
@@ -7,6 +15,7 @@ import { computePricingFloors } from '../../utils/auction.js';
  *
  * Batch synchronizes all inventory items mapped to an eBay listing.
  * Pulls all active seller listings and updates prices, dates, category fees, shipping, ad rates, and statuses across the catalog.
+ * For any completed/sold listings, automatically pulls Fulfillment + Finances data and records the sale in D1.
  */
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -25,7 +34,8 @@ export async function onRequestPost(context) {
         success: true,
         message: 'No linked eBay items found in inventory.',
         total_linked: 0,
-        updated_count: 0
+        updated_count: 0,
+        sold_recorded_count: 0
       });
     }
 
@@ -44,6 +54,7 @@ export async function onRequestPost(context) {
     });
 
     let updatedCount = 0;
+    let soldRecordedCount = 0;
     let singleEnrichCount = 0;
     const MAX_SINGLE_ENRICH = 30;
 
@@ -88,8 +99,9 @@ export async function onRequestPost(context) {
           target_margin_pct: item.target_margin_pct || 0.20
         });
 
+        const isSold = match.status === 'Completed' || match.status === 'Sold' || (match.quantity_sold != null && match.quantity_sold > 0);
         const newPrice = match.price > 0 ? match.price : item.current_list_price;
-        const newStatus = match.status === 'Completed' ? 'Sold' : 'Listed';
+        const newStatus = isSold ? 'Sold' : 'Listed';
 
         await env.DB.prepare(`
           UPDATE auction_items SET
@@ -120,6 +132,25 @@ export async function onRequestPost(context) {
         ).run();
 
         updatedCount++;
+
+        // If item sold, auto-record the sale
+        if (isSold) {
+          try {
+            const updatedRow = await env.DB.prepare(
+              'SELECT * FROM auction_items WHERE id = ? AND user_id = ?'
+            ).bind(item.id, payload.userId).first();
+
+            const orderData = await fetchEbayOrderForListing(env, accessToken, item.ebay_listing_id, item.sku || match.sku);
+            let financeData = null;
+            if (orderData?.orderId) {
+              financeData = await fetchEbayOrderFinances(env, accessToken, orderData.orderId);
+            }
+            await reconcileAndSaveEbaySale(env, payload.userId, updatedRow || item, orderData, financeData);
+            soldRecordedCount++;
+          } catch (soldErr) {
+            console.warn(`[sync-all] Auto-sale record exception for item ${item.id}:`, soldErr);
+          }
+        }
       }
     }
 
@@ -130,9 +161,10 @@ export async function onRequestPost(context) {
 
     return ok({
       success: true,
-      message: `Successfully synchronized ${updatedCount} of ${items.length} linked items with eBay.`,
+      message: `Successfully synchronized ${updatedCount} of ${items.length} linked items with eBay${soldRecordedCount > 0 ? ` (${soldRecordedCount} sales automatically recorded)` : ''}.`,
       total_linked: items.length,
-      updated_count: updatedCount
+      updated_count: updatedCount,
+      sold_recorded_count: soldRecordedCount
     });
   });
 }

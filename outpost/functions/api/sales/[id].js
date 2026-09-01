@@ -29,9 +29,19 @@ export async function onRequestGet(context) {
         i.athlete_person,
         i.authenticator,
         i.cert_number,
+        i.unit_price,
+        i.proration_weight,
+        i.prorated_shipping,
+        i.prorated_tax,
+        i.prorated_discount,
+        i.item_base_total,
         i.date_acquired,
         i.date_listed,
-        inv.invoice_ref
+        inv.invoice_ref,
+        inv.base_total AS invoice_subtotal,
+        inv.shipping AS invoice_shipping,
+        inv.tax AS invoice_tax,
+        inv.discount AS invoice_discount
       FROM auction_sales s
       JOIN auction_items i ON i.id = s.item_id
       LEFT JOIN auction_invoices inv ON inv.id = i.invoice_id

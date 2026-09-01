@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Loader2, ChevronDown, Check } from 'lucide-react';
-import { updateItem } from '../../utils/auctionApi';
+import { updateItem, syncEbayItem } from '../../utils/auctionApi';
 import { StatusBadge } from './StatusBadge';
 import { ALL_STATUSES } from '../../utils/constants';
 
@@ -27,6 +27,20 @@ export function InlineStatusSelect({ itemId, current, item, onUpdated, onMarkSol
     }
     setSaving(true);
     try {
+      if (status === 'Sold' && (item?.ebay_listing_id || item?.platform === 'eBay')) {
+        try {
+          const syncRes = await syncEbayItem(itemId, item?.ebay_listing_id);
+          if (syncRes?.is_sold || syncRes?.sale) {
+            if (onUpdated) {
+              onUpdated(itemId, { status: 'Sold', ...(syncRes.item || {}) }, { fromEbaySync: true, sale: syncRes.sale });
+            }
+            return;
+          }
+        } catch (syncErr) {
+          console.warn('[InlineStatusSelect] eBay sync check exception:', syncErr);
+        }
+      }
+
       const payload = { status };
       if (status === 'Sold') {
         payload.date_sold = new Date().toISOString().split('T')[0];

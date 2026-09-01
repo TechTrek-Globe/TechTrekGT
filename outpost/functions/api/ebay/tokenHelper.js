@@ -11,6 +11,8 @@
  * Optional: EBAY_ENV (set to 'sandbox' to use sandbox API URLs)
  */
 
+import { daysBetween } from '../../utils/auction.js';
+
 // --- Token Crypto (AES-GCM, matches landing/src/gateway/tokenCrypto.js) ---
 
 const SALT = new TextEncoder().encode('techtrekgt-ebay-token-v1');
@@ -784,5 +786,677 @@ export async function fetchSingleEbayListing(env, accessToken, listingId) {
 
   return null;
 }
+
+/**
+ * Updates the Custom Label (SKU) on an existing eBay listing using Trading API ReviseFixedPriceItem / ReviseItem.
+ *
+ * @param {object} env - Cloudflare Worker env
+ * @param {string} accessToken - eBay user OAuth access token
+ * @param {string} listingId - eBay Item ID (12 digits)
+ * @param {string} sku - Custom Label / SKU string (max 50 chars)
+ * @returns {Promise<{ success: boolean, message?: string, ack?: string }>}
+ */
+export async function updateEbayListingSku(env, accessToken, listingId, sku) {
+  const cleanId = String(listingId).replace(/[^0-9]/g, '');
+  if (!cleanId) throw new Error('Invalid eBay Listing ID');
+  const cleanSku = String(sku || '').trim().slice(0, 50);
+  if (!cleanSku) throw new Error('SKU cannot be empty');
+
+  const isSandbox = isEbaySandbox(env);
+  const tradingEndpoint = isSandbox
+    ? 'https://api.sandbox.ebay.com/ws/api.dll'
+    : 'https://api.ebay.com/ws/api.dll';
+
+  const makeXml = (callName) => `<?xml version="1.0" encoding="utf-8"?>
+<${callName}Request xmlns="urn:ebay:apis:eBLBaseComponents">
+  <RequesterCredentials>
+    <eBayAuthToken>${accessToken}</eBayAuthToken>
+  </RequesterCredentials>
+  <ErrorLanguage>en_US</ErrorLanguage>
+  <WarningLevel>High</WarningLevel>
+  <Item>
+    <ItemID>${cleanId}</ItemID>
+    <SKU>${cleanSku.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</SKU>
+  </Item>
+</${callName}Request>`;
+
+  // 1. Try ReviseFixedPriceItem first
+  let res = await fetch(tradingEndpoint, {
+    method: 'POST',
+    headers: {
+      'X-EBAY-API-SITEID': '0',
+      'X-EBAY-API-COMPATIBILITY-LEVEL': '967',
+      'X-EBAY-API-CALL-NAME': 'ReviseFixedPriceItem',
+      'X-EBAY-API-IAF-TOKEN': accessToken,
+      'Content-Type': 'text/xml'
+    },
+    body: makeXml('ReviseFixedPriceItem')
+  });
+
+  let text = await res.text();
+  let ackMatch = text.match(/<Ack[^>]*>(.*?)<\/Ack>/i);
+  let ack = ackMatch ? ackMatch[1] : 'Failure';
+
+  // 2. If item is an Auction format, try ReviseItem
+  if (ack !== 'Success' && ack !== 'Warning') {
+    res = await fetch(tradingEndpoint, {
+      method: 'POST',
+      headers: {
+        'X-EBAY-API-SITEID': '0',
+        'X-EBAY-API-COMPATIBILITY-LEVEL': '967',
+        'X-EBAY-API-CALL-NAME': 'ReviseItem',
+        'X-EBAY-API-IAF-TOKEN': accessToken,
+        'Content-Type': 'text/xml'
+      },
+      body: makeXml('ReviseItem')
+    });
+    text = await res.text();
+    ackMatch = text.match(/<Ack[^>]*>(.*?)<\/Ack>/i);
+    ack = ackMatch ? ackMatch[1] : 'Failure';
+  }
+
+  const errMsgMatch = text.match(/<LongMessage[^>]*>(.*?)<\/LongMessage>/i) ||
+                      text.match(/<ShortMessage[^>]*>(.*?)<\/ShortMessage>/i);
+  const errMsg = errMsgMatch ? errMsgMatch[1] : null;
+
+  if (ack === 'Success' || ack === 'Warning') {
+    return { success: true, message: `SKU '${cleanSku}' successfully pushed to eBay listing #${cleanId}`, ack };
+  } else {
+    throw new Error(errMsg || `eBay returned Ack=${ack} when updating SKU`);
+  }
+}
+
+/**
+ * Fetches the eBay order corresponding to an eBay listing ID, SKU, or Title.
+ * Uses a multi-tiered strategy:
+ * 1. eBay Fulfillment API (/sell/fulfillment/v1/order)
+ * 2. eBay Trading API GetItemTransactions (exact listing transaction fallback)
+ * 3. eBay Trading API GetOrders (30-day completed seller orders fallback)
+ *
+ * @param {object} env
+ * @param {string} accessToken
+ * @param {string|null} listingId - eBay 12-digit ItemID
+ * @param {string|null} [sku] - Item SKU if available
+ * @param {string|null} [title] - Item name / title if available
+ * @returns {Promise<object|null>} Order metadata or null
+ */
+export async function fetchEbayOrderForListing(env, accessToken, listingId, sku = null, title = null) {
+  const cleanId = listingId ? String(listingId).trim() : null;
+  const cleanSku = sku ? String(sku).trim() : null;
+  const cleanTitle = title ? String(title).trim().toLowerCase() : null;
+  const isSandbox = isEbaySandbox(env);
+  const restBase = isSandbox
+    ? 'https://api.sandbox.ebay.com'
+    : 'https://api.ebay.com';
+  const tradingBase = isSandbox
+    ? 'https://api.sandbox.ebay.com/ws/api.dll'
+    : 'https://api.ebay.com/ws/api.dll';
+
+  // 1. Try eBay Fulfillment API (/sell/fulfillment/v1/order)
+  try {
+    const res = await fetch(`${restBase}/sell/fulfillment/v1/order?limit=100`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US'
+      }
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      const orders = data.orders || [];
+
+      for (const order of orders) {
+        const lineItems = order.lineItems || [];
+        const matchedLine = lineItems.find(li => {
+          const lineItemIdMatch = cleanId && (
+            String(li.legacyItemId) === cleanId ||
+            String(li.lineItemId || '').includes(cleanId) ||
+            String(li.itemId || '') === cleanId
+          );
+          const lineSkuMatch = cleanSku && (String(li.sku || '').toLowerCase() === cleanSku.toLowerCase());
+          const lineTitle = String(li.title || '').toLowerCase();
+          const titleMatch = cleanTitle && (
+            lineTitle.includes(cleanTitle) ||
+            cleanTitle.includes(lineTitle) ||
+            (cleanTitle.length > 15 && lineTitle.slice(0, 25) === cleanTitle.slice(0, 25))
+          );
+          return lineItemIdMatch || lineSkuMatch || titleMatch;
+        });
+
+        if (matchedLine) {
+          const orderId = order.orderId;
+          const creationDate = order.creationDate || null;
+          const saleDate = creationDate ? creationDate.split('T')[0] : new Date().toISOString().split('T')[0];
+          const buyerHandle = order.buyer?.username || '';
+          const orderStatus = order.orderPaymentStatus || order.orderFulfillmentStatus || 'PAID';
+          const lineItemCost = parseFloat(matchedLine.lineItemCost?.value || '0');
+          const deliveryCost = parseFloat(matchedLine.deliveryCost?.shippingCost?.value || order.pricingSummary?.deliveryCost?.value || '0');
+
+          return {
+            orderId,
+            legacyOrderId: order.legacyOrderId || null,
+            creationDate,
+            saleDate,
+            buyerHandle,
+            orderStatus,
+            lineItemCost,
+            deliveryCost,
+            matchedLine,
+            rawOrder: order,
+            source: 'fulfillment_api'
+          };
+        }
+      }
+    } else {
+      const errText = await res.text().catch(() => '');
+      console.warn(`[tokenHelper] Fulfillment API status ${res.status}:`, errText.slice(0, 200));
+    }
+  } catch (e) {
+    console.warn('[tokenHelper] Fulfillment API fetch order exception:', e);
+  }
+
+  // 2. Fallback: eBay Trading API (GetItemTransactions) if listingId is present
+  if (cleanId && /^\d+$/.test(cleanId)) {
+    try {
+      const xmlReq = `<?xml version="1.0" encoding="utf-8"?>
+<GetItemTransactionsRequest xmlns="urn:ebay:apis:eBLBaseComponents">
+  <ItemID>${cleanId}</ItemID>
+  <DetailLevel>ReturnAll</DetailLevel>
+</GetItemTransactionsRequest>`;
+
+      const tRes = await fetch(tradingBase, {
+        method: 'POST',
+        headers: {
+          'X-EBAY-API-SITEID': '0',
+          'X-EBAY-API-COMPATIBILITY-LEVEL': '967',
+          'X-EBAY-API-CALL-NAME': 'GetItemTransactions',
+          'X-EBAY-API-IAF-TOKEN': accessToken,
+          'Content-Type': 'text/xml'
+        },
+        body: xmlReq
+      });
+
+      if (tRes.ok) {
+        const xml = await tRes.text();
+        const txnBlockMatch = xml.match(/<Transaction[\s>][\s\S]*?<\/Transaction>/i);
+        if (txnBlockMatch) {
+          const block = txnBlockMatch[0];
+          const getTag = (tag, src = block) => {
+            const m = src.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`));
+            if (!m) return null;
+            let val = m[1].trim();
+            const cdata = val.match(/<!\[CDATA\[([\s\S]*?)\]\]>/);
+            return cdata ? cdata[1].trim() : val;
+          };
+
+          const buyerHandle = getTag('UserID') || getTag('Email') || '';
+          const createdDate = getTag('CreatedDate') || getTag('PaidTime');
+          const saleDate = createdDate ? createdDate.split('T')[0] : new Date().toISOString().split('T')[0];
+          const amountPaid = parseFloat(getTag('AmountPaid') || getTag('TransactionPrice') || '0');
+          const fvf = parseFloat(getTag('FinalValueFee') || '0');
+          const orderId = getTag('OrderID') || getTag('OrderLineItemID') || `${cleanId}-sale`;
+          const shipCostMatch = block.match(/<ShippingServiceCost[^>]*>([0-9.]+)<\/ShippingServiceCost>/i) ||
+                                block.match(/<ShippingCost[^>]*>([0-9.]+)<\/ShippingCost>/i);
+          const shipCost = shipCostMatch ? parseFloat(shipCostMatch[1]) : 0;
+
+          if (amountPaid > 0 || buyerHandle) {
+            return {
+              orderId,
+              legacyOrderId: orderId,
+              creationDate: createdDate,
+              saleDate,
+              buyerHandle,
+              orderStatus: 'PAID',
+              lineItemCost: amountPaid,
+              deliveryCost: shipCost,
+              finalValueFee: fvf,
+              source: 'trading_transactions'
+            };
+          }
+        }
+      }
+    } catch (tErr) {
+      console.warn('[tokenHelper] GetItemTransactions fallback exception:', tErr);
+    }
+  }
+
+  // 3. Fallback: eBay Trading API (GetOrders) for recent completed seller orders
+  try {
+    const xmlOrdersReq = `<?xml version="1.0" encoding="utf-8"?>
+<GetOrdersRequest xmlns="urn:ebay:apis:eBLBaseComponents">
+  <OrderRole>Seller</OrderRole>
+  <OrderStatus>Completed</OrderStatus>
+  <NumberOfDays>30</NumberOfDays>
+  <DetailLevel>ReturnAll</DetailLevel>
+</GetOrdersRequest>`;
+
+    const oRes = await fetch(tradingBase, {
+      method: 'POST',
+      headers: {
+        'X-EBAY-API-SITEID': '0',
+        'X-EBAY-API-COMPATIBILITY-LEVEL': '967',
+        'X-EBAY-API-CALL-NAME': 'GetOrders',
+        'X-EBAY-API-IAF-TOKEN': accessToken,
+        'Content-Type': 'text/xml'
+      },
+      body: xmlOrdersReq
+    });
+
+    if (oRes.ok) {
+      const xml = await oRes.text();
+      const orderBlocks = xml.match(/<Order[\s>][\s\S]*?<\/Order>/g) || [];
+
+      for (const block of orderBlocks) {
+        const getTag = (tag, src = block) => {
+          const m = src.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`));
+          if (!m) return null;
+          let val = m[1].trim();
+          const cdata = val.match(/<!\[CDATA\[([\s\S]*?)\]\]>/);
+          return cdata ? cdata[1].trim() : val;
+        };
+
+        const itemIdInOrder = getTag('ItemID');
+        const skuInOrder = getTag('SKU');
+        const titleInOrder = (getTag('Title') || '').toLowerCase();
+
+        const matchId = cleanId && (itemIdInOrder === cleanId || block.includes(`<ItemID>${cleanId}</ItemID>`));
+        const matchSku = cleanSku && (skuInOrder?.toLowerCase() === cleanSku.toLowerCase());
+        const matchTitle = cleanTitle && (
+          titleInOrder.includes(cleanTitle) ||
+          cleanTitle.includes(titleInOrder) ||
+          (cleanTitle.length > 15 && titleInOrder.slice(0, 25) === cleanTitle.slice(0, 25))
+        );
+
+        if (matchId || matchSku || matchTitle) {
+          const orderId = getTag('OrderID') || getTag('ExtendedOrderID') || `${cleanId || 'order'}-sale`;
+          const buyerHandle = getTag('BuyerUserID') || getTag('UserID') || '';
+          const createdDate = getTag('CreatedTime') || getTag('PaidTime');
+          const saleDate = createdDate ? createdDate.split('T')[0] : new Date().toISOString().split('T')[0];
+          const totalPaid = parseFloat(getTag('AmountPaid') || getTag('Total') || '0');
+          const subtotal = parseFloat(getTag('Subtotal') || getTag('TransactionPrice') || String(totalPaid));
+          const shipCost = parseFloat(getTag('ShippingServiceCost') || getTag('ShippingCost') || '0');
+          const fvf = parseFloat(getTag('FinalValueFee') || '0');
+
+          return {
+            orderId,
+            legacyOrderId: orderId,
+            creationDate: createdDate,
+            saleDate,
+            buyerHandle,
+            orderStatus: 'PAID',
+            lineItemCost: subtotal > 0 ? subtotal : totalPaid,
+            deliveryCost: shipCost,
+            finalValueFee: fvf,
+            source: 'trading_orders'
+          };
+        }
+      }
+    }
+  } catch (oErr) {
+    console.warn('[tokenHelper] GetOrders fallback exception:', oErr);
+  }
+
+  return null;
+}
+
+/**
+ * Fetches transaction and fee breakdown details for an eBay order from the Finances API.
+ * Endpoint: GET /sell/finances/v1/transaction?orderId={orderId}&limit=100
+ *
+ * @param {object} env
+ * @param {string} accessToken
+ * @param {string} orderId
+ * @returns {Promise<object>} Financial fee breakdown
+ */
+export async function fetchEbayOrderFinances(env, accessToken, orderId) {
+  if (!orderId) return { finances_available: false };
+  const cleanOrderId = String(orderId).trim();
+  const isSandbox = isEbaySandbox(env);
+  const restBase = isSandbox
+    ? 'https://api.sandbox.ebay.com'
+    : 'https://api.ebay.com';
+
+  try {
+    const res = await fetch(`${restBase}/sell/finances/v1/transaction?orderId=${encodeURIComponent(cleanOrderId)}&limit=100`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US'
+      }
+    });
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      if (res.status === 403) {
+        console.warn('[tokenHelper] Finances API 403 - scope pending approval');
+        return {
+          finances_available: false,
+          pending_scope_approval: true,
+          message: 'eBay Finances API access requires sell.finances scope approval.'
+        };
+      }
+      console.warn(`[tokenHelper] Finances API error (${res.status}):`, text.slice(0, 200));
+      return { finances_available: false, error: text.slice(0, 200) };
+    }
+
+    const data = await res.json();
+    const transactions = data.transactions || [];
+
+    let finalValueFee = 0;
+    let promotedListingFee = 0;
+    let shippingLabelCost = 0;
+    let paymentProcessingFee = 0;
+    let regulatoryFee = 0;
+    let promotedListingRate = null;
+    let promotedListingActive = false;
+    let grossSaleAmount = 0;
+
+    for (const txn of transactions) {
+      const type = (txn.transactionType || '').toUpperCase();
+      const amount = Math.abs(parseFloat(txn.amount?.value || '0'));
+      const feeType = (txn.feeType || txn.orderLineItems?.[0]?.feeType || '').toUpperCase();
+
+      if (type === 'SALE') {
+        grossSaleAmount = amount;
+      } else if (type === 'NON_SALE_CHARGE') {
+        if (feeType.includes('FINAL_VALUE')) {
+          finalValueFee += amount;
+        } else if (feeType.includes('AD_FEE') || feeType.includes('PROMOTED')) {
+          promotedListingFee += amount;
+          promotedListingActive = true;
+          if (txn.orderLineItems?.[0]?.promotedListingRate) {
+            promotedListingRate = parseFloat(txn.orderLineItems[0].promotedListingRate);
+          }
+        } else if (feeType.includes('REGULATORY')) {
+          regulatoryFee += amount;
+        } else {
+          paymentProcessingFee += amount;
+        }
+      } else if (type === 'SHIPPING_LABEL') {
+        shippingLabelCost += amount;
+      }
+    }
+
+    const totalEbayFees = finalValueFee + promotedListingFee + shippingLabelCost + paymentProcessingFee + regulatoryFee;
+
+    return {
+      finances_available: true,
+      order_id: cleanOrderId,
+      gross_sale_amount: parseFloat(grossSaleAmount.toFixed(2)),
+      final_value_fee: parseFloat(finalValueFee.toFixed(2)),
+      promoted_listing_fee: parseFloat(promotedListingFee.toFixed(2)),
+      shipping_label_cost: parseFloat(shippingLabelCost.toFixed(2)),
+      payment_processing_fee: parseFloat(paymentProcessingFee.toFixed(2)),
+      regulatory_fee: parseFloat(regulatoryFee.toFixed(2)),
+      total_ebay_fees: parseFloat(totalEbayFees.toFixed(2)),
+      promoted_listing_rate: promotedListingRate,
+      promoted_listing_active: promotedListingActive,
+      transaction_count: transactions.length,
+      raw: transactions
+    };
+  } catch (e) {
+    console.warn('[tokenHelper] Finances API exception:', e);
+    return { finances_available: false, error: e.message };
+  }
+}
+
+/**
+ * Reconciles and atomically saves a completed eBay sale into Cloudflare D1.
+ * Upserts auction_sales, ebay_fee_reconciliations, and updates auction_items.
+ *
+ * @param {object} env
+ * @param {string} userId
+ * @param {object} item - auction_items row
+ * @param {object|null} orderData - Result from fetchEbayOrderForListing
+ * @param {object|null} financeData - Result from fetchEbayOrderFinances
+ * @returns {Promise<{ sale: object, reconciliation: object, item: object }>}
+ */
+export async function reconcileAndSaveEbaySale(env, userId, item, orderData = null, financeData = null) {
+  const saleDate = orderData?.saleDate || item.date_sold || new Date().toISOString().split('T')[0];
+  const buyerHandle = orderData?.buyerHandle || '';
+  const ebayOrderId = orderData?.orderId || financeData?.order_id || null;
+
+  let grossSalePrice = 0;
+  if (financeData?.gross_sale_amount && financeData.gross_sale_amount > 0) {
+    grossSalePrice = financeData.gross_sale_amount;
+  } else if (orderData?.lineItemCost && orderData.lineItemCost > 0) {
+    grossSalePrice = orderData.lineItemCost;
+  } else if (item.current_list_price && item.current_list_price > 0) {
+    grossSalePrice = item.current_list_price;
+  } else if (item.actual_sell_price && item.actual_sell_price > 0) {
+    grossSalePrice = item.actual_sell_price;
+  }
+
+  const buyerShippingPaid = orderData?.deliveryCost != null
+    ? orderData.deliveryCost
+    : (item.buyer_shipping_cost || 0);
+
+  let finalValueFee = 0;
+  let promotedListingFee = 0;
+  let shippingLabelCost = 0;
+  let paymentProcessingFee = 0;
+  let regulatoryFee = 0;
+  let totalEbayFees = 0;
+  let promotedRate = item.ebay_promoted_rate || (item.boost_pct ? item.boost_pct * 100 : 0);
+  let promotedActive = false;
+
+  if (financeData?.finances_available) {
+    finalValueFee = financeData.final_value_fee || 0;
+    promotedListingFee = financeData.promoted_listing_fee || 0;
+    shippingLabelCost = financeData.shipping_label_cost || (item.est_shipping_cost || 0);
+    paymentProcessingFee = financeData.payment_processing_fee || 0;
+    regulatoryFee = financeData.regulatory_fee || 0;
+    totalEbayFees = financeData.total_ebay_fees || (finalValueFee + promotedListingFee + shippingLabelCost + paymentProcessingFee + regulatoryFee);
+    promotedRate = financeData.promoted_listing_rate ?? promotedRate;
+    promotedActive = Boolean(financeData.promoted_listing_active || promotedListingFee > 0);
+  } else {
+    const feePct = item.platform_fee_pct || 0.135;
+    const flatFee = item.platform_flat_fee || 0.40;
+    finalValueFee = parseFloat((grossSalePrice * feePct + flatFee).toFixed(2));
+    promotedListingFee = promotedRate > 0 ? parseFloat((grossSalePrice * (promotedRate / 100)).toFixed(2)) : 0;
+    shippingLabelCost = item.est_shipping_cost || 0;
+    totalEbayFees = parseFloat((finalValueFee + promotedListingFee + shippingLabelCost).toFixed(2));
+    promotedActive = promotedListingFee > 0;
+  }
+
+  const platformFeesAmt = parseFloat((finalValueFee + promotedListingFee + paymentProcessingFee + regulatoryFee).toFixed(2));
+  const actualShippingCost = shippingLabelCost;
+  const netProceeds = parseFloat((grossSalePrice + buyerShippingPaid - platformFeesAmt - actualShippingCost).toFixed(2));
+  const trueCost = item.true_total_cost || (item.unit_price || 0);
+  const netProfit = parseFloat((netProceeds - trueCost).toFixed(2));
+  const roiPct = trueCost > 0 ? parseFloat((netProfit / trueCost).toFixed(4)) : 0;
+
+  const startDate = item.date_listed || item.date_acquired;
+  const rawDays = daysBetween(startDate, saleDate) ?? 0;
+  const daysToSell = rawDays >= 0 ? rawDays : 0;
+
+  // Check existing sale
+  const existingSale = await env.DB.prepare(
+    'SELECT * FROM auction_sales WHERE item_id = ? AND user_id = ?'
+  ).bind(item.id, userId).first();
+
+  let saleId;
+  if (existingSale) {
+    saleId = existingSale.id;
+    await env.DB.prepare(`
+      UPDATE auction_sales SET
+        sale_date = ?,
+        platform = 'eBay',
+        buyer_handle = COALESCE(?, buyer_handle),
+        gross_sale_price = ?,
+        buyer_shipping_paid = ?,
+        actual_shipping_cost = ?,
+        platform_fee_pct = ?,
+        platform_flat_fee = ?,
+        platform_fees_amt = ?,
+        payment_processing_amt = ?,
+        promoted_listing_fee = ?,
+        net_proceeds = ?,
+        true_total_cost = ?,
+        net_profit = ?,
+        roi_pct = ?,
+        days_to_sell = ?,
+        ebay_order_id = COALESCE(?, ebay_order_id),
+        fee_reconciled_at = datetime('now')
+      WHERE id = ? AND user_id = ?
+    `).bind(
+      saleDate,
+      buyerHandle || null,
+      grossSalePrice,
+      buyerShippingPaid,
+      actualShippingCost,
+      item.platform_fee_pct || 0.135,
+      item.platform_flat_fee || 0.40,
+      platformFeesAmt,
+      paymentProcessingFee,
+      promotedListingFee,
+      netProceeds,
+      trueCost,
+      netProfit,
+      roiPct,
+      daysToSell,
+      ebayOrderId || null,
+      saleId,
+      userId
+    ).run();
+  } else {
+    saleId = `sale-${crypto.randomUUID()}`;
+    await env.DB.prepare(`
+      INSERT INTO auction_sales (
+        id, user_id, item_id, sale_date, platform, buyer_handle,
+        gross_sale_price, buyer_shipping_paid, actual_shipping_cost,
+        platform_fee_pct, platform_flat_fee, platform_fees_amt,
+        payment_processing_amt, promoted_listing_fee,
+        net_proceeds, true_total_cost, net_profit, roi_pct,
+        days_to_sell, ebay_order_id, fee_reconciled_at
+      ) VALUES (
+        ?, ?, ?, ?, 'eBay', ?,
+        ?, ?, ?,
+        ?, ?, ?,
+        ?, ?,
+        ?, ?, ?, ?,
+        ?, ?, datetime('now')
+      )
+    `).bind(
+      saleId,
+      userId,
+      item.id,
+      saleDate,
+      buyerHandle || null,
+      grossSalePrice,
+      buyerShippingPaid,
+      actualShippingCost,
+      item.platform_fee_pct || 0.135,
+      item.platform_flat_fee || 0.40,
+      platformFeesAmt,
+      paymentProcessingFee,
+      promotedListingFee,
+      netProceeds,
+      trueCost,
+      netProfit,
+      roiPct,
+      daysToSell,
+      ebayOrderId || null
+    ).run();
+  }
+
+  // Upsert ebay_fee_reconciliations if ebayOrderId is known
+  let reconRow = null;
+  if (ebayOrderId) {
+    const reconId = `recon-${crypto.randomUUID()}`;
+    const estimatedFees = parseFloat((item.platform_fees_amt || (grossSalePrice * (item.platform_fee_pct || 0.135) + 0.40)).toFixed(2));
+    const feeDelta = parseFloat((totalEbayFees - estimatedFees).toFixed(4));
+
+    await env.DB.prepare(`
+      INSERT INTO ebay_fee_reconciliations (
+        id, sale_id, user_id, ebay_order_id,
+        final_value_fee, promoted_listing_fee, shipping_label_cost,
+        payment_processing_fee, regulatory_fee,
+        total_ebay_fees, estimated_fees, fee_delta, reconciled_net_profit,
+        promoted_listing_rate, promoted_listing_active, finances_api_raw,
+        reconciled_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      ON CONFLICT(sale_id) DO UPDATE SET
+        ebay_order_id           = excluded.ebay_order_id,
+        final_value_fee         = excluded.final_value_fee,
+        promoted_listing_fee    = excluded.promoted_listing_fee,
+        shipping_label_cost     = excluded.shipping_label_cost,
+        payment_processing_fee  = excluded.payment_processing_fee,
+        regulatory_fee          = excluded.regulatory_fee,
+        total_ebay_fees         = excluded.total_ebay_fees,
+        estimated_fees          = excluded.estimated_fees,
+        fee_delta               = excluded.fee_delta,
+        reconciled_net_profit   = excluded.reconciled_net_profit,
+        promoted_listing_rate   = excluded.promoted_listing_rate,
+        promoted_listing_active = excluded.promoted_listing_active,
+        finances_api_raw        = excluded.finances_api_raw,
+        reconciled_at           = datetime('now')
+    `).bind(
+      reconId,
+      saleId,
+      userId,
+      ebayOrderId,
+      finalValueFee,
+      promotedListingFee,
+      shippingLabelCost,
+      paymentProcessingFee,
+      regulatoryFee,
+      totalEbayFees,
+      estimatedFees,
+      feeDelta,
+      netProfit,
+      promotedRate,
+      promotedActive ? 1 : 0,
+      JSON.stringify(financeData?.raw || []).slice(0, 65535)
+    ).run();
+
+    reconRow = {
+      id: reconId,
+      sale_id: saleId,
+      ebay_order_id: ebayOrderId,
+      final_value_fee: finalValueFee,
+      promoted_listing_fee: promotedListingFee,
+      shipping_label_cost: shippingLabelCost,
+      payment_processing_fee: paymentProcessingFee,
+      regulatory_fee: regulatoryFee,
+      total_ebay_fees: totalEbayFees,
+      reconciled_net_profit: netProfit,
+      fee_delta: feeDelta
+    };
+  }
+
+  // Update auction_items status & pricing
+  await env.DB.prepare(`
+    UPDATE auction_items SET
+      status = 'Sold',
+      actual_sell_price = ?,
+      date_sold = ?,
+      days_on_market = ?,
+      updated_at = datetime('now')
+    WHERE id = ? AND user_id = ?
+  `).bind(
+    grossSalePrice,
+    saleDate,
+    daysToSell,
+    item.id,
+    userId
+  ).run();
+
+  const updatedItem = await env.DB.prepare(
+    'SELECT * FROM auction_items WHERE id = ? AND user_id = ?'
+  ).bind(item.id, userId).first();
+
+  const savedSale = await env.DB.prepare(
+    'SELECT * FROM auction_sales WHERE id = ? AND user_id = ?'
+  ).bind(saleId, userId).first();
+
+  return {
+    item: updatedItem,
+    sale: savedSale,
+    reconciliation: reconRow
+  };
+}
+
 
 

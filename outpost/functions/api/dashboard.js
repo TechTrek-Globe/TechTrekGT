@@ -53,9 +53,11 @@ export async function onRequestGet(context) {
         WHERE user_id = ?
       `).bind(userId),
 
-      // 3. Landed cost of items that were sold (for accurate blended ROI)
+      // 3. Landed cost of items that were sold (for accurate blended ROI and avg COGS)
       db.prepare(`
-        SELECT COALESCE(SUM(i.true_total_cost), 0) as total_sold_cost
+        SELECT
+          COALESCE(SUM(i.true_total_cost), 0) as total_sold_cost,
+          COALESCE(AVG(i.true_total_cost), 0) as avg_cogs
         FROM auction_sales s
         JOIN auction_items i ON s.item_id = i.id
         WHERE s.user_id = ?
@@ -161,6 +163,7 @@ export async function onRequestGet(context) {
     const soldCostRow = soldCostRes?.results?.[0];
 
     const totalSoldCost = soldCostRow?.total_sold_cost || 0;
+    const avgCogs        = soldCostRow?.avg_cogs       || 0;
     const totalNetProfit = salesStats?.total_net_profit || 0;
     const blendedRoi = totalSoldCost > 0 ? (totalNetProfit / totalSoldCost) : 0;
 
@@ -183,6 +186,7 @@ export async function onRequestGet(context) {
         total_shipping_costs: salesStats?.total_shipping_costs || 0,
         total_net_profit: totalNetProfit,
         total_sold_cost: totalSoldCost,
+        avg_cogs: Math.round(avgCogs * 100) / 100,
         blended_roi: blendedRoi,
         avg_days_to_sell: Math.round((salesStats?.avg_days_to_sell || 0) * 10) / 10
       },

@@ -115,13 +115,19 @@ export function EbayListingIdModal({ item, isOpen, onClose, onSaved }) {
       const res = await syncEbayItem(item.id, trimmed, rate);
       const updatedItem = res?.item || { ebay_listing_id: trimmed, ebay_promoted_rate: rate, platform: 'eBay' };
       
-      setSyncSummary(`Synced! Price: $${updatedItem.current_list_price?.toFixed(2) || '0.00'} · Platform: eBay · Status: ${updatedItem.status}`);
+      if (res?.is_sold || res?.sale) {
+        const grossVal = res.sale?.gross_sale_price != null ? `$${Number(res.sale.gross_sale_price).toFixed(2)}` : `$${updatedItem.current_list_price?.toFixed(2) || '0.00'}`;
+        const netVal = res.sale?.net_proceeds != null ? `$${Number(res.sale.net_proceeds).toFixed(2)}` : '--';
+        setSyncSummary(`🎉 Item Sold on eBay! Auto-recorded Sale: ${grossVal} (Net: ${netVal}) · Status: Sold`);
+      } else {
+        setSyncSummary(`Synced! Price: $${updatedItem.current_list_price?.toFixed(2) || '0.00'} · Platform: eBay · Status: ${updatedItem.status}`);
+      }
       setSuccess(true);
       
       if (onSaved) {
         onSaved(item.id, updatedItem);
       }
-      setTimeout(() => { setSuccess(false); onClose(); }, 1200);
+      setTimeout(() => { setSuccess(false); onClose(); }, 1400);
     } catch (e) {
       // Fallback to basic save if sync fails
       try {

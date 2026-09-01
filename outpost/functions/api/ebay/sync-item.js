@@ -1,5 +1,11 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
-import { getEbayUserToken, fetchSingleEbayListing } from './tokenHelper.js';
+import {
+  getEbayUserToken,
+  fetchSingleEbayListing,
+  fetchEbayOrderForListing,
+  fetchEbayOrderFinances,
+  reconcileAndSaveEbaySale
+} from './tokenHelper.js';
 import { computePricingFloors } from '../../utils/auction.js';
 
 /**
@@ -11,10 +17,15 @@ import { computePricingFloors } from '../../utils/auction.js';
  *   - date_listed: eBay listing start date
  *   - status: 'Listed' (if active) or 'Sold' (if completed on eBay)
  *   - platform: 'eBay'
- *   - platform_fee_pct: 0.135 (13.5% standard fee)
- *   - platform_flat_fee: 0.40 ($0.40 flat order fee)
+ *   - platform_fee_pct: category-specific standard fee
+ *   - platform_flat_fee: flat order fee
  *   - ebay_promoted_rate & boost_pct
  *   - min_sell_price & suggested_list_price (recalculated break-even floor)
+ *
+ * If the item has sold on eBay (status === 'Sold' or Completed):
+ *   - Automatically queries eBay Fulfillment API (/sell/fulfillment/v1/order) for buyer & order data
+ *   - Automatically queries eBay Finances API (/sell/finances/v1/transaction) for exact gross & fees
+ *   - Automatically saves the sale into auction_sales and ebay_fee_reconciliations in D1
  *
  * Body:
  *   - item_id: string (required)
@@ -37,9 +48,8 @@ export async function onRequestPost(context) {
 
     if (!item) return err('Item not found', 404);
 
-    const targetListingId = body.ebay_listing_id || item.ebay_listing_id;
-    if (!targetListingId) return err('No eBay Listing ID provided or linked to this item', 400);
-
+    let targetListingId = body.ebay_listing_id || item.ebay_listing_id;
+    
     let accessToken;
     try {
       accessToken = await getEbayUserToken(env, payload.userId);
@@ -47,12 +57,54 @@ export async function onRequestPost(context) {
       return err(`eBay authentication failed: ${e.message}`, 401);
     }
 
-    const liveListing = await fetchSingleEbayListing(env, accessToken, targetListingId);
-    if (!liveListing) {
-      return err(`Could not find active listing details on eBay for Item ID: ${targetListingId}`, 404);
+    // If no eBay listing ID is linked, attempt to discover order or active listing by SKU or Title
+    let orderData = null;
+    let financeData = null;
+
+    if (!targetListingId) {
+      try {
+        orderData = await fetchEbayOrderForListing(env, accessToken, null, item.sku, item.item_name);
+        if (orderData) {
+          targetListingId = orderData.matchedLine?.legacyItemId || orderData.matchedLine?.itemId || null;
+        }
+      } catch (_) {}
     }
 
-    const liveRate = (liveListing.promoted_rate != null && Number(liveListing.promoted_rate) > 0)
+    let liveListing = null;
+    if (targetListingId) {
+      liveListing = await fetchSingleEbayListing(env, accessToken, targetListingId);
+    }
+
+    // If order was not yet fetched, query using targetListingId / sku / title
+    if (!orderData) {
+      try {
+        orderData = await fetchEbayOrderForListing(
+          env,
+          accessToken,
+          targetListingId,
+          item.sku || liveListing?.sku,
+          item.item_name || liveListing?.title
+        );
+      } catch (fetchErr) {
+        console.warn('[sync-item] Auto-sale lookup exception:', fetchErr);
+      }
+    }
+
+    if (orderData?.orderId) {
+      try {
+        financeData = await fetchEbayOrderFinances(env, accessToken, orderData.orderId);
+      } catch (finErr) {
+        console.warn('[sync-item] Finances lookup exception:', finErr);
+      }
+    }
+
+    const hasOrder = Boolean(orderData?.orderId || orderData?.buyerHandle || (orderData?.lineItemCost && orderData.lineItemCost > 0));
+    const isSold = hasOrder ||
+                   liveListing?.status === 'Sold' ||
+                   liveListing?.raw_status === 'Completed' ||
+                   (liveListing?.quantity_sold != null && liveListing.quantity_sold > 0);
+
+    const liveRate = (liveListing?.promoted_rate != null && Number(liveListing.promoted_rate) > 0)
       ? Number(liveListing.promoted_rate)
       : null;
 
@@ -68,19 +120,16 @@ export async function onRequestPost(context) {
     const boostPct = promotedRate > 0 ? promotedRate / 100 : 0;
 
     const targetCost = item.true_total_cost != null ? item.true_total_cost : (item.unit_price || 0);
-    const platformFeePct = liveListing.platform_fee_pct || 0.135;
-    const platformFlatFee = liveListing.platform_flat_fee != null ? liveListing.platform_flat_fee : 0.40;
+    const platformFeePct = liveListing?.platform_fee_pct || 0.135;
+    const platformFlatFee = liveListing?.platform_flat_fee != null ? liveListing.platform_flat_fee : 0.40;
 
-    // Shipping cost logic:
-    // 1. buyer_shipping_cost: Marketplace revenue charge to buyer (e.g. $15.95)
-    // 2. est_shipping_cost: Seller's outbound label expense (e.g. $4.50 or $8.50)
-    const buyerShipping = (liveListing.buyer_shipping_cost != null && liveListing.buyer_shipping_cost > 0)
+    const buyerShipping = (liveListing?.buyer_shipping_cost != null && liveListing.buyer_shipping_cost > 0)
       ? liveListing.buyer_shipping_cost
-      : (liveListing.is_free_shipping ? 0.00 : (item.buyer_shipping_cost || 0.00));
+      : (liveListing?.is_free_shipping ? 0.00 : (item.buyer_shipping_cost || 0.00));
 
     const estShippingCost = (item.est_shipping_cost != null && !isNaN(Number(item.est_shipping_cost)))
       ? Number(item.est_shipping_cost)
-      : (liveListing.is_free_shipping ? 4.50 : 0.00);
+      : (liveListing?.is_free_shipping ? 4.50 : 0.00);
 
     const pricing = computePricingFloors({
       true_total_cost: targetCost,
@@ -91,19 +140,18 @@ export async function onRequestPost(context) {
       target_margin_pct: item.target_margin_pct || 0.20
     });
 
-    const newStatus = liveListing.status || 'Listed';
-    const newPrice = liveListing.price > 0 ? liveListing.price : item.current_list_price;
-    const newDateListed = liveListing.date_listed || item.date_listed || new Date().toISOString().split('T')[0];
+    const newStatus = isSold ? 'Sold' : (liveListing?.status || 'Listed');
+    const newPrice = (liveListing?.price && liveListing.price > 0) ? liveListing.price : item.current_list_price;
+    const newDateListed = liveListing?.date_listed || item.date_listed || new Date().toISOString().split('T')[0];
 
-    // Auto-enrich item specifics if blank
-    const athlete = item.athlete_person || liveListing.specifics?.athlete || null;
-    const certNumber = item.cert_number || liveListing.specifics?.cert_number || null;
-    const authenticator = item.authenticator || liveListing.specifics?.authenticator || null;
-    const sportGenre = item.sport_genre || liveListing.specifics?.sport || null;
+    const athlete = item.athlete_person || liveListing?.specifics?.athlete || null;
+    const certNumber = item.cert_number || liveListing?.specifics?.cert_number || null;
+    const authenticator = item.authenticator || liveListing?.specifics?.authenticator || null;
+    const sportGenre = item.sport_genre || liveListing?.specifics?.sport || null;
 
     let category = item.category;
     if (!category || category === 'Other') {
-      const titleOrCat = (liveListing.title + ' ' + (liveListing.category_name || '')).toLowerCase();
+      const titleOrCat = (item.item_name + ' ' + (liveListing?.title || '') + ' ' + (liveListing?.category_name || '')).toLowerCase();
       if (titleOrCat.includes('card')) category = 'Card';
       else if (titleOrCat.includes('jersey')) category = 'Jersey';
       else if (titleOrCat.includes('box') || titleOrCat.includes('super box')) category = 'Baseball';
@@ -115,8 +163,8 @@ export async function onRequestPost(context) {
 
     await env.DB.prepare(`
       UPDATE auction_items SET
-        ebay_listing_id = ?,
-        current_list_price = ?,
+        ebay_listing_id = COALESCE(?, ebay_listing_id),
+        current_list_price = COALESCE(?, current_list_price),
         date_listed = ?,
         status = ?,
         platform = 'eBay',
@@ -136,8 +184,8 @@ export async function onRequestPost(context) {
         updated_at = datetime('now')
       WHERE id = ? AND user_id = ?
     `).bind(
-      liveListing.listing_id,
-      newPrice,
+      targetListingId || null,
+      newPrice || null,
       newDateListed,
       newStatus,
       platformFeePct,
@@ -161,9 +209,27 @@ export async function onRequestPost(context) {
       'SELECT * FROM auction_items WHERE id = ? AND user_id = ?'
     ).bind(itemId, payload.userId).first();
 
+    // If item is sold, automatically reconcile and save sale
+    if (isSold) {
+      const saleResult = await reconcileAndSaveEbaySale(env, payload.userId, updatedItem, orderData, financeData);
+
+      return ok({
+        success: true,
+        is_sold: true,
+        auto_saved: true,
+        message: `Item sold on eBay! Automatically recorded sale${orderData?.orderId ? ` (Order #${orderData.orderId})` : ''} and reconciled net earnings.`,
+        item: saleResult.item,
+        sale: saleResult.sale,
+        reconciliation: saleResult.reconciliation,
+        liveListing
+      });
+    }
+
     return ok({
       success: true,
-      message: `Item synced with eBay listing #${liveListing.listing_id}`,
+      is_sold: false,
+      auto_saved: false,
+      message: `Item synced with eBay listing #${targetListingId || 'active'}`,
       item: updatedItem,
       liveListing
     });

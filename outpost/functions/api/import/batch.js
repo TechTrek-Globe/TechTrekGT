@@ -1,5 +1,6 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
 import { computeSaleMetrics, computePricingFloors } from '../../utils/auction.js';
+import { generateSku } from '../utils/sku.js';
 
 /**
  * Handles batch import of spreadsheet data for the authenticated user.
@@ -104,6 +105,8 @@ export async function onRequestPost(context) {
       const minSell = Number(itm.min_sell_price) || floors.min_sell_price;
       const suggestedList = Number(itm.suggested_list_price) || floors.suggested_list_price;
 
+      const itemSku = (itm.sku && String(itm.sku).trim()) ? String(itm.sku).trim() : generateSku(itm.date_acquired || new Date());
+
       statements.push(
         env.DB.prepare(`
           INSERT INTO auction_items (
@@ -113,7 +116,7 @@ export async function onRequestPost(context) {
             platform, platform_fee_pct, platform_flat_fee, est_shipping_cost, boost_pct,
             min_sell_price, suggested_list_price, current_list_price, actual_sell_price,
             target_margin_pct, date_acquired, date_listed, date_sold, days_on_market,
-            notes, best_listing_window, created_at, updated_at
+            notes, best_listing_window, sku, created_at, updated_at
           ) VALUES (
             ?, ?, ?, ?, ?, ?, ?,
             ?, ?, ?, ?, ?,
@@ -121,7 +124,7 @@ export async function onRequestPost(context) {
             ?, ?, ?, ?, ?,
             ?, ?, ?, ?,
             ?, ?, ?, ?, ?,
-            ?, ?, datetime('now'), datetime('now')
+            ?, ?, ?, datetime('now'), datetime('now')
           )
           ON CONFLICT(id) DO UPDATE SET
             item_name = excluded.item_name,
@@ -134,6 +137,7 @@ export async function onRequestPost(context) {
             true_total_cost = excluded.true_total_cost,
             status = excluded.status,
             current_list_price = excluded.current_list_price,
+            sku = COALESCE(excluded.sku, auction_items.sku),
             updated_at = datetime('now')
         `).bind(
           itemId,
@@ -168,7 +172,8 @@ export async function onRequestPost(context) {
           itm.date_sold || null,
           itm.days_on_market !== undefined ? Number(itm.days_on_market) : null,
           itm.notes || null,
-          itm.best_listing_window || null
+          itm.best_listing_window || null,
+          itemSku
         )
       );
     }

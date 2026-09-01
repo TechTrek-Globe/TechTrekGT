@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   TrendingUp, Zap, ExternalLink, Loader2, CheckCircle2,
-  ArrowUpRight, DollarSign, Layers
+  ArrowUpRight, DollarSign, Layers, Tag, Eye, ShoppingCart,
+  Clock, ShieldCheck, ChevronDown, ChevronUp, Sparkles, Check
 } from 'lucide-react';
-import { buildEbaySearchUrl } from '../../utils/ebaySearch';
+import { buildEbaySearchUrl, buildStructuredCompQuery } from '../../utils/ebaySearch';
 import { fmtCurrency } from '../../utils/formulaPreview';
 
 export function EditTabComps({
@@ -14,6 +15,11 @@ export function EditTabComps({
   handleSaveComps,
   minSellPrice
 }) {
+  const [hoveredListing, setHoveredListing] = useState(null);
+  const [tooltipPos, setTooltipPos] = useState({ top: 0, left: 0 });
+  const [activeListingTab, setActiveListingTab] = useState('sold');
+  const [showAllListings, setShowAllListings] = useState(true);
+
   const soldVals = [compsDraft.comp_1, compsDraft.comp_2, compsDraft.comp_3]
     .filter(v => v !== '' && !isNaN(Number(v)) && Number(v) > 0)
     .map(Number);
@@ -29,20 +35,63 @@ export function EditTabComps({
     ? Number(compsDraft.recommended_list_price) - effectiveFloor
     : null;
 
+  const structuredQuery = buildStructuredCompQuery(
+    form.item_name,
+    form.athlete_person,
+    form.category,
+    form.authenticator
+  );
+
   const ebaySearchUrl = buildEbaySearchUrl(
     form.item_name,
     form.athlete_person,
+    form.category,
     form.authenticator
   );
+
+  const handleMouseEnter = (listing, e) => {
+    if (!listing) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const tooltipWidth = 320;
+    const tooltipHeight = 220;
+    let left = rect.left + rect.width / 2 - tooltipWidth / 2;
+    let top = rect.top - tooltipHeight - 10;
+
+    // Viewport bounds checking
+    if (left < 10) left = 10;
+    if (left + tooltipWidth > window.innerWidth - 10) {
+      left = window.innerWidth - tooltipWidth - 10;
+    }
+    if (top < 10) {
+      top = rect.bottom + 10;
+    }
+
+    setTooltipPos({ top, left });
+    setHoveredListing(listing);
+  };
+
+  const handleMouseLeave = () => {
+    setHoveredListing(null);
+  };
+
+  const assignListingToComp = (listing, compKey, itemKey) => {
+    if (!listing) return;
+    updateCompDraft(compKey, Number(listing.price).toFixed(2));
+    if (itemKey) {
+      updateCompDraft(itemKey, listing);
+    }
+  };
 
   return (
     <div className="space-y-4">
       {/* Live Comps Intelligence Auto-Fetch Header */}
-      <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-3">
+      <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 space-y-3 shadow-lg">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2">
             <Zap className="w-4 h-4 text-amber-400" />
-            <span className="text-xs font-bold text-white uppercase tracking-wider">Live Sold Comps Intelligence</span>
+            <span className="text-xs font-bold text-white uppercase tracking-wider">
+              Live eBay Market Comps Intelligence
+            </span>
           </div>
           <a
             href={ebaySearchUrl}
@@ -54,18 +103,35 @@ export function EditTabComps({
           </a>
         </div>
 
+        {/* Structured Search Query Summary */}
+        <div className="p-2.5 rounded-lg bg-slate-950/60 border border-slate-800/80 text-[11px] flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-slate-400 font-semibold flex items-center gap-1">
+              <Tag className="w-3 h-3 text-amber-400" /> Structured Search:
+            </span>
+            <span className="font-mono text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 font-bold">
+              {compsDraft.query_used || structuredQuery}
+            </span>
+          </div>
+          <div className="flex items-center gap-2 text-[10.5px] text-slate-400">
+            {form.athlete_person && <span className="text-slate-300">👤 {form.athlete_person}</span>}
+            {form.category && <span className="text-slate-300">🏷️ {form.category}</span>}
+            {form.authenticator && <span className="text-slate-300">🛡️ {form.authenticator}</span>}
+          </div>
+        </div>
+
         <div className="flex items-center gap-3 flex-wrap">
           <button
             type="button"
             disabled={compsDraft.fetchingLive}
             onClick={handleFetchLiveComps}
-            className="px-3.5 py-2 text-xs rounded-xl font-bold bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 border border-amber-500/30 flex items-center gap-2 transition-all disabled:opacity-50"
+            className="px-4 py-2 text-xs rounded-xl font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 flex items-center gap-2 transition-all disabled:opacity-50 shadow-md shadow-amber-500/20 cursor-pointer"
           >
-            {compsDraft.fetchingLive ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
-            <span>{compsDraft.fetchingLive ? 'Fetching eBay Marketplace Comps...' : 'Auto-Fetch eBay Sold Comps'}</span>
+            {compsDraft.fetchingLive ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5 fill-current" />}
+            <span>{compsDraft.fetchingLive ? 'Fetching eBay Marketplace Comps...' : 'Auto-Fetch eBay Sold & Active Comps'}</span>
           </button>
           <span className="text-[11px] text-slate-400">
-            Queries recent completed sold transactions matching title, signer & cert
+            Pulls verified sold comps and active listings matching signer, item type, inscription & authenticator
           </span>
         </div>
 
@@ -84,55 +150,157 @@ export function EditTabComps({
 
       {/* 3 Sold Comps */}
       <div className="space-y-2">
-        <span className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
-          Recent Sold Comps ($)
-        </span>
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+            Recent Sold Comps ($)
+          </span>
+          <span className="text-[10px] text-slate-400 italic">Hover comp badge for listing details & link</span>
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {[1, 2, 3].map(num => (
-            <div key={`comp_${num}`}>
-              <label className="block text-[11px] font-semibold text-slate-400 mb-1">
-                Sold Comp #{num}
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-bold pointer-events-none">$</span>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={compsDraft[`comp_${num}`] ?? ''}
-                  onChange={e => updateCompDraft(`comp_${num}`, e.target.value)}
-                  className="input-field text-xs pl-8 font-mono font-bold text-amber-300"
-                  placeholder="0.00"
-                />
+          {[1, 2, 3].map(num => {
+            const item = compsDraft[`comp_${num}_item`];
+            return (
+              <div key={`comp_${num}`} className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[11px] font-semibold text-slate-400">
+                    Sold Comp #{num}
+                  </label>
+                  {item && item.sold_date && (
+                    <span className="text-[9.5px] text-slate-500 font-mono">
+                      {item.sold_date.slice(0, 10)}
+                    </span>
+                  )}
+                </div>
+
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-bold pointer-events-none">$</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={compsDraft[`comp_${num}`] ?? ''}
+                    onChange={e => updateCompDraft(`comp_${num}`, e.target.value)}
+                    className="input-field text-xs pl-8 font-mono font-bold text-amber-300"
+                    placeholder="0.00"
+                  />
+                </div>
+
+                {/* Attached Listing Preview & Tooltip Trigger */}
+                {item ? (
+                  <div
+                    onMouseEnter={(e) => handleMouseEnter(item, e)}
+                    onMouseLeave={handleMouseLeave}
+                    className="p-1.5 rounded-lg bg-slate-950/80 border border-amber-500/20 hover:border-amber-500/40 flex items-center justify-between gap-2 transition-colors cursor-help group/comp"
+                  >
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      {item.image_url ? (
+                        <img
+                          src={item.image_url}
+                          alt="Comp Thumbnail"
+                          className="w-5 h-5 rounded object-cover border border-slate-700 flex-shrink-0"
+                        />
+                      ) : (
+                        <Eye className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+                      )}
+                      <span className="text-[10px] text-slate-300 truncate group-hover/comp:text-amber-300 font-medium">
+                        {item.title}
+                      </span>
+                    </div>
+                    {item.item_url && (
+                      <a
+                        href={item.item_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-amber-400 hover:text-amber-300 flex-shrink-0 p-0.5 rounded hover:bg-amber-500/10"
+                        title="Open eBay listing in new tab"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-[9.5px] text-slate-600 italic px-1">Manual entry or auto-fetch above</p>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
       {/* 3 Active Comps */}
       <div className="space-y-2">
-        <span className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
-          Active Listing Comps ($)
-        </span>
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
+            Active Listing Comps ($)
+          </span>
+          <span className="text-[10px] text-slate-400 italic">Live competitor asking prices</span>
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {[1, 2, 3].map(num => (
-            <div key={`active_comp_${num}`}>
-              <label className="block text-[11px] font-semibold text-slate-400 mb-1">
-                Active Comp #{num}
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-bold pointer-events-none">$</span>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={compsDraft[`active_comp_${num}`] ?? ''}
-                  onChange={e => updateCompDraft(`active_comp_${num}`, e.target.value)}
-                  className="input-field text-xs pl-8 font-mono font-semibold text-cyan-300"
-                  placeholder="0.00"
-                />
+          {[1, 2, 3].map(num => {
+            const item = compsDraft[`active_comp_${num}_item`];
+            return (
+              <div key={`active_comp_${num}`} className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[11px] font-semibold text-slate-400">
+                    Active Comp #{num}
+                  </label>
+                  <span className="text-[9.5px] text-cyan-500/80 font-mono">Buy It Now</span>
+                </div>
+
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-bold pointer-events-none">$</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={compsDraft[`active_comp_${num}`] ?? ''}
+                    onChange={e => updateCompDraft(`active_comp_${num}`, e.target.value)}
+                    className="input-field text-xs pl-8 font-mono font-semibold text-cyan-300"
+                    placeholder="0.00"
+                  />
+                </div>
+
+                {/* Attached Listing Preview & Tooltip Trigger */}
+                {item ? (
+                  <div
+                    onMouseEnter={(e) => handleMouseEnter(item, e)}
+                    onMouseLeave={handleMouseLeave}
+                    className="p-1.5 rounded-lg bg-slate-950/80 border border-cyan-500/20 hover:border-cyan-500/40 flex items-center justify-between gap-2 transition-colors cursor-help group/comp"
+                  >
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      {item.image_url ? (
+                        <img
+                          src={item.image_url}
+                          alt="Active Comp Thumbnail"
+                          className="w-5 h-5 rounded object-cover border border-slate-700 flex-shrink-0"
+                        />
+                      ) : (
+                        <Eye className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
+                      )}
+                      <span className="text-[10px] text-slate-300 truncate group-hover/comp:text-cyan-300 font-medium">
+                        {item.title}
+                      </span>
+                    </div>
+                    {item.item_url && (
+                      <a
+                        href={item.item_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-cyan-400 hover:text-cyan-300 flex-shrink-0 p-0.5 rounded hover:bg-cyan-500/10"
+                        title="Open active eBay listing in new tab"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-[9.5px] text-slate-600 italic px-1">Manual entry or auto-fetch above</p>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
@@ -175,7 +343,7 @@ export function EditTabComps({
             <TrendingUp className="w-4 h-4 text-amber-400" />
             <span className="text-xs font-bold text-amber-300">Recommended List Price (Comps Target)</span>
           </div>
-          <span className="text-[11px] text-amber-400/80">Suggested asking price based on research</span>
+          <span className="text-[11px] text-amber-400/80">Suggested asking price based on live marketplace comps</span>
         </div>
 
         <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap">
@@ -195,7 +363,7 @@ export function EditTabComps({
             type="button"
             disabled={compsDraft.saving || !compsDraft.recommended_list_price}
             onClick={() => handleSaveComps(false)}
-            className="px-3.5 py-2 text-xs rounded-xl font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors disabled:opacity-50 flex-shrink-0"
+            className="px-3.5 py-2 text-xs rounded-xl font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors disabled:opacity-50 flex-shrink-0 cursor-pointer"
           >
             {compsDraft.saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Save Comps'}
           </button>
@@ -204,7 +372,7 @@ export function EditTabComps({
             type="button"
             disabled={compsDraft.saving || !compsDraft.recommended_list_price}
             onClick={() => handleSaveComps(true)}
-            className={`px-3.5 py-2 text-xs rounded-xl font-bold transition-all flex items-center gap-1.5 disabled:opacity-50 flex-shrink-0 ${
+            className={`px-3.5 py-2 text-xs rounded-xl font-bold transition-all flex items-center gap-1.5 disabled:opacity-50 flex-shrink-0 cursor-pointer ${
               compsDraft.applied
                 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                 : 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-md shadow-amber-500/20'
@@ -215,6 +383,226 @@ export function EditTabComps({
           </button>
         </div>
       </div>
+
+      {/* Live Listings Browser / Selector Accordion */}
+      {((compsDraft.sold_comps && compsDraft.sold_comps.length > 0) || (compsDraft.active_comps && compsDraft.active_comps.length > 0)) && (
+        <div className="rounded-xl bg-slate-900/80 border border-slate-800 overflow-hidden shadow-md">
+          <div className="p-3 bg-slate-950/60 border-b border-slate-800 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" /> All Fetched eBay Listings
+              </span>
+              <div className="flex rounded-lg bg-slate-900 border border-slate-800 p-0.5 ml-2">
+                <button
+                  type="button"
+                  onClick={() => setActiveListingTab('sold')}
+                  className={`px-2.5 py-0.5 rounded text-[10.5px] font-bold transition-colors ${
+                    activeListingTab === 'sold'
+                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Sold ({compsDraft.sold_comps?.length || 0})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveListingTab('active')}
+                  className={`px-2.5 py-0.5 rounded text-[10.5px] font-bold transition-colors ${
+                    activeListingTab === 'active'
+                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Active ({compsDraft.active_comps?.length || 0})
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowAllListings(!showAllListings)}
+              className="text-slate-400 hover:text-slate-200 text-xs flex items-center gap-1 cursor-pointer"
+            >
+              {showAllListings ? (
+                <><span>Collapse</span> <ChevronUp className="w-3.5 h-3.5" /></>
+              ) : (
+                <><span>Expand</span> <ChevronDown className="w-3.5 h-3.5" /></>
+              )}
+            </button>
+          </div>
+
+          {showAllListings && (
+            <div className="p-3 divide-y divide-slate-800/60 max-h-[300px] overflow-y-auto space-y-2">
+              {(activeListingTab === 'sold' ? (compsDraft.sold_comps || []) : (compsDraft.active_comps || [])).map((listing, idx) => (
+                <div
+                  key={listing.ebay_item_id || idx}
+                  className="pt-2 first:pt-0 flex items-center justify-between gap-3 text-xs group/item hover:bg-slate-800/30 p-1.5 rounded-lg transition-colors"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    {listing.image_url ? (
+                      <img
+                        src={listing.image_url}
+                        alt="Thumbnail"
+                        className="w-8 h-8 rounded object-cover border border-slate-700 flex-shrink-0"
+                      />
+                    ) : (
+                      <div className="w-8 h-8 rounded bg-slate-800 border border-slate-700 flex items-center justify-center flex-shrink-0 text-[10px] text-slate-500">
+                        eBay
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <a
+                        href={listing.item_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-slate-200 font-semibold text-[11px] hover:text-amber-400 truncate block transition-colors flex items-center gap-1"
+                        title={listing.title}
+                      >
+                        <span className="truncate">{listing.title}</span>
+                        <ExternalLink className="w-2.5 h-2.5 text-slate-500 flex-shrink-0 opacity-0 group-hover/item:opacity-100" />
+                      </a>
+                      <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-0.5">
+                        <span className="font-bold text-amber-400 font-mono">{fmtCurrency(listing.price)}</span>
+                        {listing.sold_date && <span>· Sold {listing.sold_date.slice(0, 10)}</span>}
+                        {listing.condition && <span>· {listing.condition}</span>}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Assign Buttons */}
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    {activeListingTab === 'sold' ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => assignListingToComp(listing, 'comp_1', 'comp_1_item')}
+                          className="px-2 py-0.5 rounded bg-slate-800 hover:bg-amber-500/20 text-slate-300 hover:text-amber-300 text-[10px] border border-slate-700 transition-colors"
+                          title="Assign as Sold Comp #1"
+                        >
+                          Comp 1
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => assignListingToComp(listing, 'comp_2', 'comp_2_item')}
+                          className="px-2 py-0.5 rounded bg-slate-800 hover:bg-amber-500/20 text-slate-300 hover:text-amber-300 text-[10px] border border-slate-700 transition-colors"
+                          title="Assign as Sold Comp #2"
+                        >
+                          Comp 2
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => assignListingToComp(listing, 'comp_3', 'comp_3_item')}
+                          className="px-2 py-0.5 rounded bg-slate-800 hover:bg-amber-500/20 text-slate-300 hover:text-amber-300 text-[10px] border border-slate-700 transition-colors"
+                          title="Assign as Sold Comp #3"
+                        >
+                          Comp 3
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => assignListingToComp(listing, 'active_comp_1', 'active_comp_1_item')}
+                          className="px-2 py-0.5 rounded bg-slate-800 hover:bg-cyan-500/20 text-slate-300 hover:text-cyan-300 text-[10px] border border-slate-700 transition-colors"
+                          title="Assign as Active Comp #1"
+                        >
+                          Active 1
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => assignListingToComp(listing, 'active_comp_2', 'active_comp_2_item')}
+                          className="px-2 py-0.5 rounded bg-slate-800 hover:bg-cyan-500/20 text-slate-300 hover:text-cyan-300 text-[10px] border border-slate-700 transition-colors"
+                          title="Assign as Active Comp #2"
+                        >
+                          Active 2
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => assignListingToComp(listing, 'active_comp_3', 'active_comp_3_item')}
+                          className="px-2 py-0.5 rounded bg-slate-800 hover:bg-cyan-500/20 text-slate-300 hover:text-cyan-300 text-[10px] border border-slate-700 transition-colors"
+                          title="Assign as Active Comp #3"
+                        >
+                          Active 3
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Floating Hover Tooltip for Listing Details */}
+      {hoveredListing && (
+        <div
+          style={{
+            position: 'fixed',
+            top: tooltipPos.top,
+            left: tooltipPos.left,
+            width: 320,
+            zIndex: 99999,
+          }}
+          className="bg-slate-900/98 border border-amber-500/40 rounded-xl p-3 shadow-2xl backdrop-blur-md pointer-events-auto space-y-2 animate-in fade-in zoom-in-95 duration-100"
+        >
+          <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1">
+              🏷️ Real eBay Listing Comp
+            </span>
+            <span className={`text-[9.5px] font-bold px-1.5 py-0.2 rounded border ${
+              hoveredListing.type === 'sold'
+                ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+                : 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20'
+            }`}>
+              {hoveredListing.type === 'sold' ? 'Sold' : 'Active'}
+            </span>
+          </div>
+
+          <div className="flex items-start gap-2.5">
+            {hoveredListing.image_url ? (
+              <img
+                src={hoveredListing.image_url}
+                alt="Listing"
+                className="w-14 h-14 rounded-lg object-cover border border-slate-700 flex-shrink-0 shadow"
+              />
+            ) : (
+              <div className="w-14 h-14 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center flex-shrink-0 text-slate-500 text-xs">
+                No Img
+              </div>
+            )}
+            <div className="min-w-0 space-y-1 flex-1">
+              <p className="text-slate-100 font-bold text-[11px] leading-snug line-clamp-2">
+                {hoveredListing.title}
+              </p>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black font-mono text-amber-400">
+                  {fmtCurrency(hoveredListing.price)}
+                </span>
+                {hoveredListing.sold_date && (
+                  <span className="text-[9.5px] text-slate-400 font-mono">
+                    {hoveredListing.sold_date.slice(0, 10)}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-1.5 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-slate-400">
+            <span>{hoveredListing.condition || 'Pre-Owned'}</span>
+            {hoveredListing.item_url && (
+              <a
+                href={hoveredListing.item_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-400 hover:text-blue-300 font-bold flex items-center gap-1 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20 hover:bg-blue-500/20 transition-colors"
+              >
+                View on eBay <ExternalLink className="w-2.5 h-2.5" />
+              </a>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -2,7 +2,20 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { initialBudgetData, DEFAULT_DASHBOARD_WIDGETS } from '../initialData';
 import { useAuth } from './AuthContext';
-import { isPersonDepositDay, getPersonDepositAmountForAccount, getPersonExtraSavingsDepositAmountForAccount, getAccountSaveExtraPersonPortion, getNextBillDueDate, getPersonBillMonthlyPortionForAccount, getPersonBillPerPaycheckPortionForAccount } from '../utils/paydayUtils';
+import { 
+  isPersonDepositDay, 
+  getPersonDepositAmountForAccount, 
+  getPersonExtraSavingsDepositAmountForAccount, 
+  getAccountSaveExtraPersonPortion, 
+  getNextBillDueDate, 
+  getPersonBillMonthlyPortionForAccount, 
+  getPersonBillPerPaycheckPortionForAccount,
+  getAnnualAmount,
+  getMonthlyAmount,
+  getAmountPerPaycheck,
+  calculateDashboardTotalsForContributor,
+  generatePaycheckTransactions
+} from '../utils/paydayUtils';
 import { getApiUrl } from '../utils/api';
 import { getBudgetData } from '../utils/indexedDB';
 import { 
@@ -39,6 +52,7 @@ export function BudgetMetadataProvider({ children }) {
     people: initialBudgetData.people || [],
     bills: initialBudgetData.bills || [],
     loans: initialBudgetData.loans || [],
+    fundingGoals: initialBudgetData.fundingGoals || [],
     dashboardWidgets: initialBudgetData.dashboardWidgets || DEFAULT_DASHBOARD_WIDGETS,
     theme: initialBudgetData.theme || 'dark',
     hideDashboardHeader: Boolean(initialBudgetData.hideDashboardHeader)
@@ -135,6 +149,7 @@ export function BudgetMetadataProvider({ children }) {
               return { ...b, matchingKey: b.matchingKey ?? raw, bankMatchNames: b.bankMatchNames ?? raw };
             }) : initialBudgetData.bills,
             loans: Array.isArray(stored.loans) ? stored.loans : initialBudgetData.loans,
+            fundingGoals: Array.isArray(stored.fundingGoals) ? stored.fundingGoals : (initialBudgetData.fundingGoals || []),
             dashboardWidgets: Array.isArray(stored.dashboardWidgets)
               ? (() => {
                   const existingIds = new Set(stored.dashboardWidgets.map(w => w.id));
@@ -162,6 +177,7 @@ export function BudgetMetadataProvider({ children }) {
                 people: Array.isArray(parsed.people) ? parsed.people : initialBudgetData.people,
                 bills: Array.isArray(parsed.bills) ? parsed.bills : initialBudgetData.bills,
                 loans: Array.isArray(parsed.loans) ? parsed.loans : initialBudgetData.loans,
+                fundingGoals: Array.isArray(parsed.fundingGoals) ? parsed.fundingGoals : (initialBudgetData.fundingGoals || []),
                 dashboardWidgets: Array.isArray(parsed.dashboardWidgets)
                   ? parsed.dashboardWidgets
                   : DEFAULT_DASHBOARD_WIDGETS,
@@ -454,6 +470,48 @@ export function BudgetMetadataProvider({ children }) {
     }));
   }, []);
 
+  // Funding Goals Operations
+  const addFundingGoal = useCallback((goalData) => {
+    const newGoal = {
+      id: goalData?.id || `goal-${Date.now()}`,
+      contributorId: goalData?.contributorId || '',
+      accountId: goalData?.accountId || '',
+      name: goalData?.name || 'Funding Goal',
+      amount: parseFloat(goalData?.amount) || 0,
+      frequency: goalData?.frequency || 'monthly'
+    };
+    logMatrix('ADD_FUNDING_GOAL', `Added funding goal for contributor ${newGoal.contributorId} on account ${newGoal.accountId}`, { goal: newGoal });
+    setMetadataState(prev => ({
+      ...prev,
+      fundingGoals: [...(prev.fundingGoals || []), newGoal]
+    }));
+    return newGoal;
+  }, []);
+
+  const updateFundingGoal = useCallback((id, updatedData) => {
+    logMatrix('UPDATE_FUNDING_GOAL', `Updated funding goal ${id}`, { id, updatedData });
+    setMetadataState(prev => ({
+      ...prev,
+      fundingGoals: (prev.fundingGoals || []).map(g => g.id === id ? { ...g, ...updatedData } : g)
+    }));
+  }, []);
+
+  const deleteFundingGoal = useCallback((id) => {
+    logMatrix('DELETE_FUNDING_GOAL', `Deleted funding goal ${id}`, { id });
+    setMetadataState(prev => ({
+      ...prev,
+      fundingGoals: (prev.fundingGoals || []).filter(g => g.id !== id)
+    }));
+  }, []);
+
+  const setFundingGoals = useCallback((newGoals) => {
+    logMatrix('SET_FUNDING_GOALS', `Bulk set ${newGoals?.length || 0} funding goals`, { count: newGoals?.length });
+    setMetadataState(prev => ({
+      ...prev,
+      fundingGoals: Array.isArray(newGoals) ? newGoals : []
+    }));
+  }, []);
+
   // Dashboard Widgets & Theme
   const getDashboardWidgets = useCallback(() => {
     if (metadataState.dashboardWidgets && Array.isArray(metadataState.dashboardWidgets) && metadataState.dashboardWidgets.length > 0) {
@@ -683,6 +741,7 @@ export function BudgetMetadataProvider({ children }) {
     people: metadataState.people,
     bills: metadataState.bills,
     loans: metadataState.loans,
+    fundingGoals: metadataState.fundingGoals || [],
     theme,
     hideDashboardHeader: Boolean(metadataState.hideDashboardHeader),
     dashboardWidgets: getDashboardWidgets(),
@@ -756,6 +815,10 @@ export function BudgetMetadataProvider({ children }) {
     archiveLoan,
     unarchiveLoan,
     deleteLoan,
+    addFundingGoal,
+    updateFundingGoal,
+    deleteFundingGoal,
+    setFundingGoals,
     toggleAutoCloudBackup,
     toggleSyncOnChange: toggleAutoCloudBackup,
     toggleSyncOnLoad,
@@ -777,7 +840,12 @@ export function BudgetMetadataProvider({ children }) {
     getPersonDepositAmountForAccount,
     getPersonExtraSavingsDepositAmountForAccount,
     getPersonBillMonthlyPortionForAccount,
-    getPersonBillPerPaycheckPortionForAccount
+    getPersonBillPerPaycheckPortionForAccount,
+    getAnnualAmount,
+    getMonthlyAmount,
+    getAmountPerPaycheck,
+    calculateDashboardTotalsForContributor,
+    generatePaycheckTransactions
   }), [
     setTheme,
     toggleHideDashboardHeader,
@@ -804,6 +872,10 @@ export function BudgetMetadataProvider({ children }) {
     archiveLoan,
     unarchiveLoan,
     deleteLoan,
+    addFundingGoal,
+    updateFundingGoal,
+    deleteFundingGoal,
+    setFundingGoals,
     toggleAutoCloudBackup,
     setDebugMode,
     toggleCategory,

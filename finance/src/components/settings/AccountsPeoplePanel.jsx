@@ -26,7 +26,12 @@ import {
   getPersonBillMonthlyPortionForAccount, 
   getPersonBillPerPaycheckPortionForAccount, 
   getPersonDepositAmountForAccount, 
-  getPersonExtraSavingsDepositAmountForAccount 
+  getPersonExtraSavingsDepositAmountForAccount,
+  getAnnualAmount,
+  getMonthlyAmount,
+  getAmountPerPaycheck,
+  calculateDashboardTotalsForContributor,
+  generatePaycheckTransactions
 } from '../../utils/paydayUtils';
 import { logTransaction } from '../../utils/logger';
 
@@ -39,7 +44,11 @@ export function AccountsPeoplePanel() {
     addPerson,
     updatePerson,
     deletePerson,
-    updateBill
+    updateBill,
+    addFundingGoal,
+    updateFundingGoal,
+    deleteFundingGoal,
+    setFundingGoals
   } = useBudgetMetadata();
 
   const {
@@ -566,7 +575,7 @@ export function AccountsPeoplePanel() {
               <th className="px-2 py-2 w-[13%]">Start Date</th>
               <th className="px-2 py-2 w-[14%]">Total Starting Bal</th>
               <th className="px-2 py-2 w-[17%]">Extra Savings Goal</th>
-              <th className="px-2 py-2 w-[24%]">Active Earners &amp; Savings Split</th>
+              <th className="px-2 py-2 w-[24%]">Active Earners &amp; Overflow Split</th>
               <th className="px-3 py-2 w-[4%] text-right">Actions</th>
             </tr>
           </thead>
@@ -669,10 +678,12 @@ export function AccountsPeoplePanel() {
                           const isCredit = p.name.toLowerCase() === 'credit' || p.role === 'Credit';
                           const activeNonCredits = budget.people.filter(pe => enabledList.includes(pe.id) && pe.name.toLowerCase() !== 'credit' && pe.role !== 'Credit');
                           const defaultSplit = isCredit ? 0 : (100 / Math.max(1, activeNonCredits.length));
-                          const currentVal = acc.saveExtraSplits?.[p.id] !== undefined
-                            ? parseFloat(acc.saveExtraSplits[p.id])
-                            : Math.round(defaultSplit * 10) / 10;
-                          const showSplitInput = isChecked && acc.enableExtraSavings !== false && parseFloat(acc.saveExtraMonthly) > 0;
+                          const currentVal = (acc.overflowSplits?.[p.id] !== undefined)
+                            ? parseFloat(acc.overflowSplits[p.id])
+                            : (acc.saveExtraSplits?.[p.id] !== undefined
+                                ? parseFloat(acc.saveExtraSplits[p.id])
+                                : Math.round(defaultSplit * 10) / 10);
+                          const showSplitInput = isChecked && activeNonCredits.length > 0;
 
                           return (
                             <div
@@ -708,7 +719,6 @@ export function AccountsPeoplePanel() {
                                     const newSplits = {};
                                     budget.people.forEach(pe => { newSplits[pe.id] = 0; });
                                     activePeopleIds.forEach((id, idx) => {
-                                      // Last person gets remainder to ensure exact 100%
                                       if (idx === count - 1) {
                                         const soFar = activePeopleIds.slice(0, -1).reduce((s, pid) => s + (newSplits[pid] || 0), 0);
                                         newSplits[id] = Math.round((100 - soFar) * 100) / 100;
@@ -737,7 +747,7 @@ export function AccountsPeoplePanel() {
                                       const val = e.target.value.replace(/[^0-9.]/g, '');
                                       const num = Math.max(0, Math.min(100, parseFloat(val) || 0));
                                       const activeEarners = budget.people.filter(pe => enabledList.includes(pe.id));
-                                      let nextSplits = { ...(acc.saveExtraSplits || {}) };
+                                      let nextSplits = { ...(acc.overflowSplits || acc.saveExtraSplits || {}) };
                                       if (activeEarners.length === 2) {
                                         const other = activeEarners.find(pe => pe.id !== p.id);
                                         nextSplits[p.id] = num;
@@ -745,7 +755,7 @@ export function AccountsPeoplePanel() {
                                       } else {
                                         nextSplits[p.id] = num;
                                       }
-                                      updateAccount(acc.id, { saveExtraSplits: nextSplits });
+                                      updateAccount(acc.id, { overflowSplits: nextSplits, saveExtraSplits: nextSplits });
                                     }}
                                     className="w-8 text-center font-mono font-bold text-emerald-400 bg-slate-900/90 rounded px-1 py-0 border border-purple-500/40 focus:border-emerald-400 focus:outline-none text-xs"
                                   />
@@ -925,9 +935,7 @@ export function AccountsPeoplePanel() {
               </form>
             </div>
           </div>
-        )}
-
-        {/* High-Density Earners Table */}
+              {/* High-Density Earners Table */}
         <div className="overflow-x-auto matrix-scrollbar rounded-xl border border-slate-800 bg-slate-950/60 shadow-md">
           <table className="w-full text-left text-xs text-slate-300">
             <thead className="bg-slate-900 text-slate-400 uppercase font-medium text-[9px] border-b border-slate-800">
@@ -947,9 +955,8 @@ export function AccountsPeoplePanel() {
                 </tr>
               ) : (
                 budget.people.map(person => {
-                  const allocCount = person.accountAllocations && typeof person.accountAllocations === 'object'
-                    ? Object.values(person.accountAllocations).filter(v => parseFloat(v) > 0 || v === 'remaining').length
-                    : 0;
+                  const goalsCount = (budget.fundingGoals || []).filter(g => g.contributorId === person.id).length;
+                  const personTotals = calculateDashboardTotalsForContributor(person.id, budget.fundingGoals || [], budget);
 
                   return (
                     <tr key={person.id} className="hover:bg-slate-900/50 transition-colors">
@@ -966,7 +973,7 @@ export function AccountsPeoplePanel() {
                         <select
                           value={person.payFrequency}
                           onChange={e => updatePerson(person.id, { payFrequency: e.target.value })}
-                          className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-slate-200 text-xs focus:border-purple-500 focus:outline-none cursor-pointer"
+                          className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-slate-200 text-xs focus:border-purple-500 focus:outline-none cursor-pointer capitalize"
                         >
                           <option value="bi-weekly">Bi-weekly (26/yr)</option>
                           <option value="semi-monthly">Semi-Monthly (24/yr)</option>
@@ -1006,7 +1013,11 @@ export function AccountsPeoplePanel() {
                           title="Configure Direct Deposit Allocations & Funding Goals"
                         >
                           <Target className="w-3.5 h-3.5 text-purple-400" />
-                          <span>{allocCount > 0 ? `${allocCount} Goal${allocCount > 1 ? 's' : ''} Set` : 'Set Goals / Allocations'}</span>
+                          <span>
+                            {goalsCount > 0 
+                              ? `${goalsCount} Goal${goalsCount > 1 ? 's' : ''} (${fmtMoney(personTotals.monthlyTotal)}/mo)` 
+                              : 'Set Goals / Allocations'}
+                          </span>
                         </button>
                       </td>
                       <td className="px-3 py-1.5 text-right">
@@ -1028,197 +1039,260 @@ export function AccountsPeoplePanel() {
         </div>
 
         {/* Direct Deposit & Goal Allocation Modal */}
-        {allocEditingPerson && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-4 overflow-y-auto">
-            <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-2xl shadow-2xl p-5 space-y-4 max-h-[90vh] flex flex-col">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-purple-600/20 flex items-center justify-center text-purple-400">
-                    <Target className="w-4 h-4" />
+        {allocEditingPerson && (() => {
+          const personTotals = calculateDashboardTotalsForContributor(
+            allocEditingPerson.id,
+            budget.fundingGoals || [],
+            budget
+          );
+          const payFreq = allocEditingPerson.payFrequency || 'semi-monthly';
+          const goalsForPerson = (budget.fundingGoals || []).filter(g => g.contributorId === allocEditingPerson.id);
+
+          // Verification for Mortgage & HOA ($1,600/mo check)
+          const mortgageGoals = goalsForPerson.filter(g => {
+            const acc = budget.accounts.find(a => a.id === g.accountId);
+            return acc && (acc.id === 'acc-mortgage-checking' || acc.name.toLowerCase().includes('mortgage'));
+          });
+          const hoaGoals = goalsForPerson.filter(g => {
+            const acc = budget.accounts.find(a => a.id === g.accountId);
+            return acc && (acc.id === 'acc-hoa-savings' || acc.name.toLowerCase().includes('hoa'));
+          });
+          const mortgageMonthly = mortgageGoals.reduce((sum, g) => sum + getMonthlyAmount(g.amount, g.frequency), 0);
+          const hoaMonthly = hoaGoals.reduce((sum, g) => sum + getMonthlyAmount(g.amount, g.frequency), 0);
+          const isMortgageHoaVerified = Math.round((mortgageMonthly + hoaMonthly) * 100) / 100 === 1600;
+
+          return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-4 overflow-y-auto">
+              <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-2xl shadow-2xl p-5 space-y-4 max-h-[90vh] flex flex-col">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-purple-600/20 flex items-center justify-center text-purple-400">
+                      <Target className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
+                        <span>Account Funding Goals &amp; Allocations</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-purple-950 border border-purple-800 text-purple-300 font-normal font-mono capitalize">
+                          {allocEditingPerson.name} ({allocEditingPerson.payFrequency})
+                        </span>
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Set target deposit goals per account. Projected bills are covered first, and surplus automatically overflows to Extra Savings.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setAllocEditingPerson(null)}
+                    className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Net Pay & Goals Overview Bar */}
+                <div className="grid grid-cols-3 gap-2 p-3 rounded-xl bg-slate-950/80 border border-slate-800 font-mono text-xs">
+                  <div>
+                    <span className="text-slate-400 block text-[10px] font-sans uppercase">Net Pay / Paycheck</span>
+                    <span className="text-emerald-400 font-bold text-sm">{fmtMoney(allocEditingPerson.netPerPay)}</span>
                   </div>
                   <div>
-                    <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
-                      <span>Account Funding Goals & Allocations</span>
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-purple-950 border border-purple-800 text-purple-300 font-normal font-mono">
-                        {allocEditingPerson.name} ({allocEditingPerson.payFrequency})
-                      </span>
-                    </h3>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      Set target deposit goals per account. Projected bills are paid first, and any extra automatically flows to savings.
-                    </p>
+                    <span className="text-slate-400 block text-[10px] font-sans uppercase">Total Monthly Goals</span>
+                    <span className="text-purple-300 font-bold text-sm">
+                      {fmtMoney(personTotals.monthlyTotal)}
+                      <span className="text-[10px] text-slate-400 font-normal"> / mo</span>
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-slate-400 block text-[10px] font-sans uppercase">Deposit / Paycheck</span>
+                    <span className="text-slate-200 font-bold text-sm">
+                      {fmtMoney(personTotals.perPaycheckTotal)}
+                      <span className="text-[10px] text-slate-400 font-normal"> / pay</span>
+                    </span>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setAllocEditingPerson(null)}
-                  className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
 
-              {/* Net Pay Overview Bar */}
-              <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center justify-between font-mono text-xs">
-                <div>
-                  <span className="text-slate-400 block text-[10px] font-sans uppercase">Net Pay / Paycheck</span>
-                  <span className="text-emerald-400 font-bold text-sm">{fmtMoney(allocEditingPerson.netPerPay)}</span>
-                </div>
-                <div className="text-right">
-                  <span className="text-slate-400 block text-[10px] font-sans uppercase">Total Monthly Net</span>
-                  <span className="text-slate-200 font-bold text-sm">
-                    {fmtMoney(
-                      allocEditingPerson.payFrequency === 'semi-monthly' ? allocEditingPerson.netPerPay * 2 :
-                      allocEditingPerson.payFrequency === 'bi-weekly' ? (allocEditingPerson.netPerPay * 26) / 12 :
-                      allocEditingPerson.payFrequency === 'weekly' ? (allocEditingPerson.netPerPay * 52) / 12 :
-                      allocEditingPerson.netPerPay
-                    )}
-                    <span className="text-[10px] text-slate-400 font-normal"> / mo</span>
-                  </span>
-                </div>
-              </div>
+                {/* Verification Check for Mortgage & HOA */}
+                {isMortgageHoaVerified && (
+                  <div className="p-2.5 rounded-xl bg-emerald-950/50 border border-emerald-800/60 flex items-center justify-between text-xs font-mono text-emerald-200">
+                    <span className="flex items-center gap-1.5 font-sans font-semibold">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                      Mortgage &amp; HOA Goals Verified:
+                    </span>
+                    <span className="font-bold text-emerald-300">
+                      $1,600.00 / mo (${(payFreq === 'semi-monthly' ? 800 : payFreq === 'bi-weekly' ? (1600*12/26).toFixed(2) : 1600)} / pay)
+                    </span>
+                  </div>
+                )}
 
-              {/* Account Allocation Rows */}
-              <div className="space-y-2.5 overflow-y-auto pr-1 flex-1">
-                {(budget.accounts || []).map(acc => {
-                  const currentAllocations = allocEditingPerson.accountAllocations || {};
-                  const rawVal = currentAllocations[acc.id];
-                  const billPortionMonthly = getPersonBillMonthlyPortionForAccount(allocEditingPerson, acc.id, budget);
-                  const billPortionPerPay = getPersonBillPerPaycheckPortionForAccount(allocEditingPerson, acc.id, budget);
-                  const depositAmt = getPersonDepositAmountForAccount(allocEditingPerson, acc.id, budget);
-                  const extraBufferAmt = getPersonExtraSavingsDepositAmountForAccount(allocEditingPerson, acc.id, budget);
-                  const isRemaining = rawVal === 'remaining';
-                  const hasExplicitNumber = !isRemaining && rawVal !== undefined && rawVal !== null && rawVal !== '' && parseFloat(rawVal) > 0;
+                {/* Account Funding Goals List */}
+                <div className="space-y-3 overflow-y-auto pr-1 flex-1">
+                  {(budget.accounts || []).map(acc => {
+                    const accGoals = (budget.fundingGoals || []).filter(
+                      g => g.contributorId === allocEditingPerson.id && g.accountId === acc.id
+                    );
+                    const billPortionMonthly = getPersonBillMonthlyPortionForAccount(allocEditingPerson, acc.id, budget);
+                    const billPortionPerPay = getPersonBillPerPaycheckPortionForAccount(allocEditingPerson, acc.id, budget);
+                    const depositAmt = getPersonDepositAmountForAccount(allocEditingPerson, acc.id, budget);
+                    const extraBufferAmt = getPersonExtraSavingsDepositAmountForAccount(allocEditingPerson, acc.id, budget);
 
-                  const handleValueChange = (newVal) => {
-                    const updated = { ...currentAllocations };
-                    if (newVal === '' || newVal === undefined || newVal === null) {
-                      delete updated[acc.id];
-                    } else if (newVal === 'remaining') {
-                      updated[acc.id] = 'remaining';
-                    } else {
-                      const num = parseFloat(newVal);
-                      if (isNaN(num) || num < 0) {
-                        delete updated[acc.id];
-                      } else {
-                        updated[acc.id] = num;
-                      }
-                    }
-                    updatePerson(allocEditingPerson.id, { accountAllocations: updated });
-                    setAllocEditingPerson(prev => prev ? { ...prev, accountAllocations: updated } : prev);
-                  };
-
-                  return (
-                    <div key={acc.id} className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 hover:border-slate-700/80 transition-all space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className={`w-3 h-3 rounded-full bg-${acc.color || 'blue'}-500`} />
-                          <span className="font-bold text-slate-100 text-xs">{acc.name}</span>
-                          <span className="text-[10px] px-1.5 py-0.2 bg-slate-800 text-slate-400 rounded uppercase">{acc.type}</span>
-                        </div>
-                        <div className="text-right font-mono text-[11px]">
-                          <span className="text-slate-400">Projected Bills: </span>
-                          <span className="text-slate-200 font-semibold">{fmtMoney(billPortionPerPay)}</span>
-                          <span className="text-[10px] text-slate-500"> / pay ({fmtMoney(billPortionMonthly)}/mo)</span>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-850">
-                        <div className="flex items-center gap-1.5 flex-1 min-w-[200px]">
-                          <label className="text-[11px] font-medium text-slate-300 shrink-0">Goal / Allocation:</label>
-                          <div className="relative flex-1">
-                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-mono">$</span>
-                            <input
-                              type="number"
-                              step="0.01"
-                              disabled={isRemaining}
-                              placeholder={billPortionPerPay > 0 ? `${billPortionPerPay.toFixed(2)} (dynamic)` : '0.00'}
-                              value={isRemaining ? '' : (rawVal ?? '')}
-                              onChange={e => handleValueChange(e.target.value)}
-                              className="w-full pl-6 pr-2 py-1 bg-slate-900 border border-slate-700/70 rounded-lg text-slate-100 font-mono text-xs focus:outline-none focus:border-purple-500 disabled:opacity-50"
-                            />
+                    return (
+                      <div key={acc.id} className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 hover:border-slate-700/80 transition-all space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className={`w-3 h-3 rounded-full bg-${acc.color || 'blue'}-500`} />
+                            <span className="font-bold text-slate-100 text-xs">{acc.name}</span>
+                            <span className="text-[10px] px-1.5 py-0.2 bg-slate-800 text-slate-400 rounded uppercase">{acc.type}</span>
+                          </div>
+                          <div className="text-right font-mono text-[11px]">
+                            <span className="text-slate-400">Projected Bills: </span>
+                            <span className="text-slate-200 font-semibold">{fmtMoney(billPortionPerPay)}</span>
+                            <span className="text-[10px] text-slate-500"> / pay ({fmtMoney(billPortionMonthly)}/mo)</span>
                           </div>
                         </div>
 
-                        {/* Quick Presets */}
-                        <div className="flex items-center gap-1 shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => handleValueChange(billPortionPerPay > 0 ? billPortionPerPay : '')}
-                            className="px-2 py-1 rounded text-[10px] font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors cursor-pointer"
-                            title="Set allocation exactly equal to current projected bills"
-                          >
-                            Exact Bills
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleValueChange(isRemaining ? '' : 'remaining')}
-                            className={`px-2 py-1 rounded text-[10px] font-medium transition-colors cursor-pointer border ${
-                              isRemaining 
-                                ? 'bg-purple-600 text-white border-purple-500' 
-                                : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
-                            }`}
-                            title="Assign all remaining unallocated net pay to this account"
-                          >
-                            Remaining
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleValueChange('')}
-                            className="px-2 py-1 rounded text-[10px] font-medium bg-slate-850 hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
-                            title="Clear custom allocation and dynamically track bill splits"
-                          >
-                            Clear (Auto)
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Live Auto-Buffer Savings Badge */}
-                      <div className="flex items-center justify-between text-[11px] font-mono pt-1">
-                        <div className="flex items-center gap-1.5">
-                          {extraBufferAmt > 0 ? (
-                            <span className="inline-flex items-center gap-1 text-emerald-400 bg-emerald-950/60 border border-emerald-800/50 px-2 py-0.5 rounded-md text-[10px] font-semibold">
-                              <PiggyBank className="w-3 h-3 text-emerald-400" />
-                              <span>+{fmtMoney(extraBufferAmt)} / pay ({fmtMoney(allocEditingPerson.payFrequency === 'semi-monthly' ? extraBufferAmt * 2 : (extraBufferAmt * 26) / 12)}/mo) → Auto Extra Savings</span>
-                            </span>
-                          ) : hasExplicitNumber && depositAmt < billPortionPerPay ? (
-                            <span className="inline-flex items-center gap-1 text-amber-400 bg-amber-950/50 border border-amber-800/40 px-2 py-0.5 rounded-md text-[10px]">
-                              <AlertTriangle className="w-3 h-3 text-amber-400" />
-                              <span>Funding Shortfall: -{fmtMoney(billPortionPerPay - depositAmt)} / pay</span>
-                            </span>
+                        {/* Existing Goals for this Account */}
+                        <div className="space-y-2 pt-1 border-t border-slate-800">
+                          {accGoals.length === 0 ? (
+                            <div className="text-[11px] text-slate-500 italic py-1 flex items-center justify-between">
+                              <span>No custom funding goals set (dynamically pays exact bills: {fmtMoney(billPortionPerPay)}/pay).</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  addFundingGoal({
+                                    contributorId: allocEditingPerson.id,
+                                    accountId: acc.id,
+                                    name: `${acc.name.split(' ')[0]} Goal`,
+                                    amount: billPortionMonthly > 0 ? billPortionMonthly : 100,
+                                    frequency: 'monthly'
+                                  });
+                                }}
+                                className="px-2 py-0.5 rounded text-[10px] font-semibold bg-purple-950 hover:bg-purple-900 text-purple-300 border border-purple-800/60 transition-colors cursor-pointer"
+                              >
+                                + Add Goal
+                              </button>
+                            </div>
                           ) : (
-                            <span className="inline-flex items-center gap-1 text-slate-400 text-[10px]">
-                              <Check className="w-3 h-3 text-slate-500" />
-                              <span>100% covers projected bills</span>
-                            </span>
+                            accGoals.map(goal => {
+                              const monthly = getMonthlyAmount(goal.amount, goal.frequency);
+                              const perPay = getAmountPerPaycheck(goal.amount, goal.frequency, payFreq);
+
+                              return (
+                                <div key={goal.id} className="flex flex-wrap items-center gap-2 p-2 rounded-lg bg-slate-900 border border-slate-800 text-xs">
+                                  <input
+                                    type="text"
+                                    value={goal.name}
+                                    onChange={e => updateFundingGoal(goal.id, { name: e.target.value })}
+                                    placeholder="Goal Name"
+                                    className="flex-1 min-w-[130px] bg-slate-950 border border-slate-700/60 rounded px-2 py-1 text-slate-200 text-xs focus:outline-none focus:border-purple-500"
+                                  />
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-slate-500 font-mono">$</span>
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      value={goal.amount}
+                                      onChange={e => updateFundingGoal(goal.id, { amount: parseFloat(e.target.value) || 0 })}
+                                      className="w-20 bg-slate-950 border border-slate-700/60 rounded px-2 py-1 text-slate-100 font-mono font-bold text-xs focus:outline-none focus:border-purple-500"
+                                    />
+                                  </div>
+                                  <select
+                                    value={goal.frequency}
+                                    onChange={e => updateFundingGoal(goal.id, { frequency: e.target.value })}
+                                    className="bg-slate-950 border border-slate-700/60 rounded px-2 py-1 text-slate-300 text-xs focus:outline-none focus:border-purple-500 cursor-pointer"
+                                  >
+                                    <option value="semi-monthly">Semi-Monthly (24/yr)</option>
+                                    <option value="monthly">Monthly (12/yr)</option>
+                                    <option value="bi-weekly">Bi-Weekly (26/yr)</option>
+                                    <option value="weekly">Weekly (52/yr)</option>
+                                    <option value="annual">Annual (1/yr)</option>
+                                  </select>
+                                  <div className="text-right font-mono text-[10px] text-slate-400 min-w-[110px]">
+                                    <span className="text-purple-300 font-bold">{fmtMoney(monthly)}/mo</span>
+                                    <span className="block text-[9px] text-slate-500">({fmtMoney(perPay)}/pay)</span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => deleteFundingGoal(goal.id)}
+                                    className="p-1 text-slate-500 hover:text-rose-400 transition-colors cursor-pointer"
+                                    title="Delete Goal"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              );
+                            })
+                          )}
+
+                          {accGoals.length > 0 && (
+                            <div className="flex items-center justify-between pt-1">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  addFundingGoal({
+                                    contributorId: allocEditingPerson.id,
+                                    accountId: acc.id,
+                                    name: 'Additional Goal',
+                                    amount: 50,
+                                    frequency: 'monthly'
+                                  });
+                                }}
+                                className="text-[10px] text-purple-400 hover:text-purple-300 font-semibold cursor-pointer"
+                              >
+                                + Add another goal to this account
+                              </button>
+                              <div className="text-right font-mono text-[11px]">
+                                <span className="text-slate-400 text-[10px]">Account Deposit: </span>
+                                <span className="text-emerald-400 font-bold">{fmtMoney(depositAmt)}</span>
+                                <span className="text-[10px] text-slate-500"> / pay ({fmtMoney(accGoals.reduce((s, g) => s + getMonthlyAmount(g.amount, g.frequency), 0))}/mo)</span>
+                              </div>
+                            </div>
                           )}
                         </div>
-                        <div className="text-right">
-                          <span className="text-slate-400 text-[10px]">Total Deposit: </span>
-                          <span className="text-purple-300 font-bold">{fmtMoney(depositAmt)}</span>
-                          <span className="text-[10px] text-slate-500"> / pay</span>
+
+                        {/* Live Auto-Buffer Savings Badge */}
+                        <div className="flex items-center justify-between text-[11px] font-mono pt-1">
+                          <div className="flex items-center gap-1.5">
+                            {extraBufferAmt > 0 ? (
+                              <span className="inline-flex items-center gap-1 text-emerald-400 bg-emerald-950/60 border border-emerald-800/50 px-2 py-0.5 rounded-md text-[10px] font-semibold">
+                                <PiggyBank className="w-3 h-3 text-emerald-400" />
+                                <span>+{fmtMoney(extraBufferAmt)} / pay ({fmtMoney(payFreq === 'semi-monthly' ? extraBufferAmt * 2 : (extraBufferAmt * 26) / 12)}/mo) → Extra Savings Overflow</span>
+                              </span>
+                            ) : depositAmt < billPortionPerPay && accGoals.length > 0 ? (
+                              <span className="inline-flex items-center gap-1 text-amber-400 bg-amber-950/50 border border-amber-800/40 px-2 py-0.5 rounded-md text-[10px]">
+                                <AlertTriangle className="w-3 h-3 text-amber-400" />
+                                <span>Funding Shortfall: -{fmtMoney(billPortionPerPay - depositAmt)} / pay</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-slate-400 text-[10px]">
+                                <Check className="w-3 h-3 text-slate-500" />
+                                <span>100% covers projected bills</span>
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
 
-              {/* Modal Footer */}
-              <div className="flex items-center justify-between pt-3 border-t border-slate-800">
-                <p className="text-[11px] text-slate-400">
-                  Changes save automatically and update all Dashboard & Transaction projections.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setAllocEditingPerson(null)}
-                  className="px-5 py-2 rounded-xl text-xs font-semibold bg-purple-600 hover:bg-purple-500 text-white shadow-md shadow-purple-600/20 transition-all cursor-pointer"
-                >
-                  Done
-                </button>
+                {/* Modal Footer */}
+                <div className="flex items-center justify-between pt-3 border-t border-slate-800">
+                  <p className="text-[11px] text-slate-400">
+                    Changes save automatically and synchronize with Dashboard and Transactions.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setAllocEditingPerson(null)}
+                    className="px-5 py-2 rounded-xl text-xs font-semibold bg-purple-600 hover:bg-purple-500 text-white shadow-md shadow-purple-600/20 transition-all cursor-pointer"
+                  >
+                    Done
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
     </div>
   );

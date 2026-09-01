@@ -114,12 +114,119 @@ export function isPersonDepositDay(person, year, month, day) {
   return depositDates.some(d => d.getDate() === day);
 }
 
+export const FREQUENCY_ANNUAL_PERIODS = {
+  weekly: 52,
+  'bi-weekly': 26,
+  biweekly: 26,
+  'semi-monthly': 24,
+  semimonthly: 24,
+  monthly: 12,
+  annual: 1,
+  annually: 1
+};
+
+/**
+ * Converts any amount and frequency into an annualized total.
+ * @param {number|string} amount
+ * @param {string} frequency - weekly | bi-weekly | semi-monthly | monthly | annual
+ * @returns {number}
+ */
+export function getAnnualAmount(amount, frequency) {
+  const norm = String(frequency || 'monthly').toLowerCase().replace(/_/g, '-');
+  const periods = FREQUENCY_ANNUAL_PERIODS[norm] ?? 12;
+  return (parseFloat(amount) || 0) * periods;
+}
+
+/**
+ * Normalizes any goal or recurring amount to a standard monthly figure.
+ * @param {number|string} amount
+ * @param {string} frequency
+ * @returns {number}
+ */
+export function getMonthlyAmount(amount, frequency) {
+  return getAnnualAmount(amount, frequency) / 12;
+}
+
+/**
+ * Converts a goal amount to match the exact paycheck frequency of a contributor.
+ * @param {number|string} goalAmount
+ * @param {string} goalFrequency
+ * @param {string} contributorPayFrequency
+ * @returns {number}
+ */
+export function getAmountPerPaycheck(goalAmount, goalFrequency, contributorPayFrequency) {
+  const annual = getAnnualAmount(goalAmount, goalFrequency);
+  const normPayFreq = String(contributorPayFrequency || 'semi-monthly').toLowerCase().replace(/_/g, '-');
+  const payPeriods = FREQUENCY_ANNUAL_PERIODS[normPayFreq] ?? 24;
+  return Math.round((annual / payPeriods) * 100) / 100;
+}
+
+/**
+ * Calculates total expected contributions (monthly, annual, per-paycheck) across all accounts and goals for a contributor.
+ * @param {string} contributorId
+ * @param {Array} fundingGoals
+ * @param {object} budget
+ * @returns {object}
+ */
+export function calculateDashboardTotalsForContributor(contributorId, fundingGoals = [], budget = null) {
+  const people = budget?.people || [];
+  const contributor = people.find(p => p.id === contributorId);
+  const payFreq = contributor?.payFrequency || 'semi-monthly';
+  const personGoals = (fundingGoals || []).filter(g => g.contributorId === contributorId);
+
+  const monthlyTotal = personGoals.reduce((sum, g) => sum + getMonthlyAmount(g.amount, g.frequency), 0);
+  const annualTotal = personGoals.reduce((sum, g) => sum + getAnnualAmount(g.amount, g.frequency), 0);
+  const perPaycheckTotal = personGoals.reduce((sum, g) => sum + getAmountPerPaycheck(g.amount, g.frequency, payFreq), 0);
+
+  return {
+    contributorId,
+    monthlyTotal: Math.round(monthlyTotal * 100) / 100,
+    annualTotal: Math.round(annualTotal * 100) / 100,
+    perPaycheckTotal: Math.round(perPaycheckTotal * 100) / 100,
+    goals: personGoals
+  };
+}
+
+/**
+ * Generates the specific transaction breakdown per account on deposit days.
+ * @param {object} contributor
+ * @param {Date|string} depositDate
+ * @param {Array} fundingGoals
+ * @param {object} budget
+ * @returns {object}
+ */
+export function generatePaycheckTransactions(contributor, depositDate, fundingGoals = [], budget = null) {
+  if (!contributor) return {};
+  const payFreq = contributor.payFrequency || 'semi-monthly';
+  const personGoals = (fundingGoals || []).filter(g => g.contributorId === contributor.id);
+  const accounts = budget?.accounts || [];
+
+  const accountBreakdown = {};
+  accounts.forEach(acc => {
+    const accGoals = personGoals.filter(g => g.accountId === acc.id);
+    const totalDeposit = accGoals.reduce((sum, g) => sum + getAmountPerPaycheck(g.amount, g.frequency, payFreq), 0);
+    const billPortionPerPay = getPersonBillPerPaycheckPortionForAccount(contributor, acc.id, budget);
+    const surplus = Math.max(0, totalDeposit - billPortionPerPay);
+
+    accountBreakdown[acc.id] = {
+      accountId: acc.id,
+      accountName: acc.name,
+      totalDeposit: Math.round(totalDeposit * 100) / 100,
+      billPortion: Math.round(billPortionPerPay * 100) / 100,
+      extraSavingsSurplus: Math.round(surplus * 100) / 100,
+      goals: accGoals
+    };
+  });
+
+  return accountBreakdown;
+}
+
 /**
  * Resolves the deposit amount for a person for a specific account selection.
- * Supports explicit accountAllocations, unallocated paycheck remainders, and dynamic bill/savings split fallbacks.
+ * Supports explicit fundingGoals, explicit accountAllocations, unallocated paycheck remainders, and dynamic bill/savings split fallbacks.
  * @param {object} person
  * @param {string} selectedAccountId - 'all' or specific account ID
- * @param {object} [budget] - optional budget context containing accounts and bills
+ * @param {object} [budget] - optional budget context containing accounts, bills, and fundingGoals
  * @returns {number}
  */
 export function getPersonDepositAmountForAccount(person, selectedAccountId = 'all', budget = null) {
@@ -127,6 +234,19 @@ export function getPersonDepositAmountForAccount(person, selectedAccountId = 'al
   const netPay = parseFloat(person.netPerPay) || 0;
   if (!selectedAccountId || selectedAccountId === 'all') {
     return netPay;
+  }
+
+  // 1. Check if explicit fundingGoals exist in budget for this person and account
+  if (budget?.fundingGoals && Array.isArray(budget.fundingGoals)) {
+    const matchingGoals = budget.fundingGoals.filter(
+      g => g.contributorId === person.id && g.accountId === selectedAccountId
+    );
+    if (matchingGoals.length > 0) {
+      const totalFromGoals = matchingGoals.reduce((sum, g) => {
+        return sum + getAmountPerPaycheck(g.amount, g.frequency, person.payFrequency);
+      }, 0);
+      return Math.round(totalFromGoals * 100) / 100;
+    }
   }
 
   // Helper to calculate this person's obligation for the account based on bills & extra savings
@@ -324,7 +444,7 @@ export function getAccountSaveExtraPersonPortion(account, person, budget) {
     // If the account has an explicit list of enabled split earners, check if this person is included
     const isEnabled = !account.enabledEarners || !Array.isArray(account.enabledEarners) || account.enabledEarners.length === 0 || account.enabledEarners.includes(person.id);
     if (isEnabled) {
-      const splits = account.saveExtraSplits;
+      const splits = account.overflowSplits || account.saveExtraSplits;
       const splitType = account.saveExtraSplitType || 'percentage';
 
       if (splits && typeof splits === 'object' && splits[person.id] !== undefined && splits[person.id] !== null && splits[person.id] !== '') {
@@ -351,10 +471,9 @@ export function getAccountSaveExtraPersonPortion(account, person, budget) {
     }
   }
 
-  // Check for auto-buffer savings from goal-based account allocations
+  // Check for auto-buffer savings from goal-based account allocations or funding goals
   let autoBufferExtra = 0;
-  const rawAlloc = person.accountAllocations?.[account.id];
-  if (rawAlloc !== undefined && rawAlloc !== null && rawAlloc !== '' && budget) {
+  if (budget) {
     const depositPerPay = getPersonDepositAmountForAccount(person, account.id, budget);
     const billPerPay = getPersonBillPerPaycheckPortionForAccount(person, account.id, budget);
     if (depositPerPay > billPerPay) {
@@ -415,10 +534,9 @@ export function getPersonExtraSavingsDepositAmountForAccount(person, selectedAcc
     }
   }
 
-  // Check auto-buffer surplus from direct deposit allocation vs. projected bills
+  // Check auto-buffer surplus from direct deposit / funding goal allocation vs. projected bills
   let autoBufferPerPay = 0;
-  const rawAlloc = person.accountAllocations?.[selectedAccountId];
-  if (rawAlloc !== undefined && rawAlloc !== null && rawAlloc !== '') {
+  if (budget) {
     const totalDepositPerPay = getPersonDepositAmountForAccount(person, selectedAccountId, budget);
     const billPerPay = getPersonBillPerPaycheckPortionForAccount(person, selectedAccountId, budget);
     if (totalDepositPerPay > billPerPay) {

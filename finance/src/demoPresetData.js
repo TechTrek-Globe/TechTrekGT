@@ -14,86 +14,190 @@ export const fakeDemoBudgetData = {
 
   accounts: [
     {
-      id: 'acc-demo-1',
-      name: 'Apex Main Checking - 4092',
+      id: 'acc-bills-checking',
+      name: 'Bills Checking',
       type: 'checking',
-      saveExtraMonthly: 150.00,
-      enableExtraSavings: true,
-      color: 'blue',
-      notes: 'Primary household operational checking account'
-    },
-    {
-      id: 'acc-demo-2',
-      name: 'High-Yield Emergency Savings',
-      type: 'savings',
-      saveExtraMonthly: 500.00,
-      enableExtraSavings: true,
-      color: 'emerald',
-      notes: '6-month reserve buffer at 4.75% APY'
-    },
-    {
-      id: 'acc-demo-3',
-      name: 'Sapphire Rewards Credit Card',
-      type: 'credit',
+      startingBalance: 1250.00,
       saveExtraMonthly: 0,
-      enableExtraSavings: false,
+      enableExtraSavings: true,
+      overflowSplits: {
+        'person-jon': 100
+      },
+      saveExtraSplits: {
+        'person-jon': 100
+      },
+      color: 'blue',
+      notes: 'Primary household operating and recurring bills account'
+    },
+    {
+      id: 'acc-mortgage-checking',
+      name: 'Mortgage Checking',
+      type: 'checking',
+      startingBalance: 3500.00,
+      saveExtraMonthly: 0,
+      enableExtraSavings: true,
+      overflowSplits: {
+        'person-jon': 50,
+        'person-ronnie': 50
+      },
+      saveExtraSplits: {
+        'person-jon': 50,
+        'person-ronnie': 50
+      },
+      color: 'emerald',
+      notes: 'Dedicated mortgage escrow and P&I payment account'
+    },
+    {
+      id: 'acc-hoa-savings',
+      name: 'HOA Savings',
+      type: 'savings',
+      startingBalance: 1000.00,
+      saveExtraMonthly: 0,
+      enableExtraSavings: true,
+      overflowSplits: {
+        'person-jon': 50,
+        'person-ronnie': 50
+      },
+      saveExtraSplits: {
+        'person-jon': 50,
+        'person-ronnie': 50
+      },
       color: 'purple',
-      notes: 'Automated recurring bills and daily points card'
+      notes: 'HOA reserve and community dues savings account'
     }
   ],
 
   people: [
     {
-      id: 'person-demo-1',
-      name: 'Alex Rivera',
-      role: 'Lead UX Designer',
-      payFrequency: 'bi-weekly',
-      payDay1: 15,
-      payDay2: 'last',
-      grossPerPay: 3600.00,
-      netPerPay: 2750.00,
-      accountAllocations: {
-        'acc-demo-1': 'remaining',
-        'acc-demo-2': 500.00
-      },
-      color: 'purple'
-    },
-    {
-      id: 'person-demo-2',
-      name: 'Taylor Morgan',
-      role: 'Software Architect',
-      payFrequency: 'bi-weekly',
+      id: 'person-jon',
+      name: 'Jon',
+      role: 'Primary Earner',
+      payFrequency: 'semi-monthly',
       payDay1: 15,
       payDay2: 'last',
       grossPerPay: 4200.00,
       netPerPay: 3150.00,
-      accountAllocations: {
-        'acc-demo-1': 'remaining',
-        'acc-demo-2': 750.00
-      },
+      accountAllocations: {},
+      color: 'purple'
+    },
+    {
+      id: 'person-ronnie',
+      name: 'Ronnie',
+      role: 'Partner / Earner',
+      payFrequency: 'monthly',
+      payDay1: 1,
+      grossPerPay: 3800.00,
+      netPerPay: 2850.00,
+      accountAllocations: {},
       color: 'emerald'
+    },
+    {
+      id: 'person-gym',
+      name: 'Gym',
+      role: 'Secondary Earner',
+      payFrequency: 'bi-weekly',
+      payDay1: 15,
+      payDay2: 'last',
+      grossPerPay: 2500.00,
+      netPerPay: 1900.00,
+      accountAllocations: {},
+      color: 'blue'
+    }
+  ],
+
+  fundingGoals: [
+    {
+      id: 'goal-bills-jon-1',
+      contributorId: 'person-jon',
+      accountId: 'acc-bills-checking',
+      name: 'Bills Checking Base (Semi-Monthly)',
+      amount: 85.00,
+      frequency: 'semi-monthly'
+    },
+    {
+      id: 'goal-bills-jon-2',
+      contributorId: 'person-jon',
+      accountId: 'acc-bills-checking',
+      name: 'Bills Checking Buffer (Monthly)',
+      amount: 156.16,
+      frequency: 'monthly'
+    },
+    {
+      id: 'goal-bills-gym-1',
+      contributorId: 'person-gym',
+      accountId: 'acc-bills-checking',
+      name: 'Gym Membership Share (Monthly)',
+      amount: 22.50,
+      frequency: 'monthly'
+    },
+    {
+      id: 'goal-mortgage-jon',
+      contributorId: 'person-jon',
+      accountId: 'acc-mortgage-checking',
+      name: 'Mortgage Contribution',
+      amount: 1378.00,
+      frequency: 'monthly'
+    },
+    {
+      id: 'goal-mortgage-ronnie',
+      contributorId: 'person-ronnie',
+      accountId: 'acc-mortgage-checking',
+      name: 'Mortgage Contribution',
+      amount: 1378.00,
+      frequency: 'monthly'
+    },
+    {
+      id: 'goal-hoa-jon',
+      contributorId: 'person-jon',
+      accountId: 'acc-hoa-savings',
+      name: 'HOA Reserve Contribution',
+      amount: 222.00,
+      frequency: 'monthly'
+    },
+    {
+      id: 'goal-hoa-ronnie',
+      contributorId: 'person-ronnie',
+      accountId: 'acc-hoa-savings',
+      name: 'HOA Reserve Contribution',
+      amount: 222.00,
+      frequency: 'monthly'
     }
   ],
 
   bills: [
     {
-      id: 'bill-demo-1',
-      accountId: 'acc-demo-1',
-      name: 'Luxury Apartment Rent',
-      amount: 2100.00,
+      id: 'bill-mortgage',
+      accountId: 'acc-mortgage-checking',
+      name: 'Primary Mortgage P&I and Escrow',
+      amount: 2756.00,
       period: 'Monthly',
       dueDay: 1,
       paymentSource: 'Auto Pay',
-      notes: 'Downtown loft 2BR lease',
-      matchingKey: 'APARTMENT RENT, LOFT 2BR, RENT PAYMENT',
+      notes: 'Suburban home mortgage auto-debit',
+      matchingKey: 'MORTGAGE, ESCROW, CHASE MORTGAGE',
       splits: {
-        'person-demo-1': 50,
-        'person-demo-2': 50
+        'person-jon': 50,
+        'person-ronnie': 50
       }
     },
     {
-      id: 'bill-demo-2',
-      accountId: 'acc-demo-1',
+      id: 'bill-hoa',
+      accountId: 'acc-hoa-savings',
+      name: 'HOA Monthly Assessment',
+      amount: 444.00,
+      period: 'Monthly',
+      dueDay: 1,
+      paymentSource: 'Auto Pay',
+      notes: 'Community dues and master maintenance',
+      matchingKey: 'HOA DUES, HOA ASSESSMENT',
+      splits: {
+        'person-jon': 50,
+        'person-ronnie': 50
+      }
+    },
+    {
+      id: 'bill-power',
+      accountId: 'acc-bills-checking',
       name: 'Metro Electric & Energy',
       amount: 165.00,
       period: 'Monthly',
@@ -102,100 +206,41 @@ export const fakeDemoBudgetData = {
       notes: 'City power grid utility bill',
       matchingKey: 'METRO ELECTRIC, GA POWER, POWER BILL',
       splits: {
-        'person-demo-1': 50,
-        'person-demo-2': 50
+        'person-jon': 100,
+        'person-ronnie': 0,
+        'person-gym': 0
       }
     },
     {
-      id: 'bill-demo-3',
-      accountId: 'acc-demo-3',
+      id: 'bill-internet',
+      accountId: 'acc-bills-checking',
       name: 'Fiber Gigabit Internet',
       amount: 85.00,
       period: 'Monthly',
       dueDay: 18,
-      paymentSource: 'Credit Card',
+      paymentSource: 'Auto Pay',
       notes: 'High-speed 1Gbps fiber broadband',
       matchingKey: 'FIBER GIGABIT, COMCAST, XFINITY',
       splits: {
-        'person-demo-1': 50,
-        'person-demo-2': 50
+        'person-jon': 100,
+        'person-ronnie': 0,
+        'person-gym': 0
       }
     },
     {
-      id: 'bill-demo-4',
-      accountId: 'acc-demo-3',
-      name: 'Whole Foods Grocery Fund',
-      amount: 650.00,
+      id: 'bill-gym-dues',
+      accountId: 'acc-bills-checking',
+      name: 'Gym Club Assessment',
+      amount: 22.50,
       period: 'Monthly',
       dueDay: 5,
-      paymentSource: 'Credit Card',
-      notes: 'Estimated monthly shared food budget',
-      matchingKey: 'WHOLE FOODS, GROCERY',
-      splits: {
-        'person-demo-1': 50,
-        'person-demo-2': 50
-      }
-    },
-    {
-      id: 'bill-demo-5',
-      accountId: 'acc-demo-3',
-      name: 'StreamMax & Music Subscriptions',
-      amount: 45.00,
-      period: 'Monthly',
-      dueDay: 22,
-      paymentSource: 'Credit Card',
-      notes: 'Shared family entertainment pass',
-      matchingKey: 'STREAMMAX, YOUTUBE, SPOTIFY',
-      splits: {
-        'person-demo-1': 50,
-        'person-demo-2': 50
-      }
-    },
-    {
-      id: 'bill-demo-6',
-      accountId: 'acc-demo-1',
-      name: 'Tesla EV Lease Payment',
-      amount: 480.00,
-      period: 'Monthly',
-      dueDay: 15,
       paymentSource: 'Auto Pay',
-      notes: 'Taylor direct vehicle financing',
-      matchingKey: 'TESLA LEASE, TESLA FINANCE',
+      notes: 'Shared athletic facility monthly fee',
+      matchingKey: 'GYM CLUB, FITNESS, DUES',
       splits: {
-        'person-demo-1': 0,
-        'person-demo-2': 100
-      }
-    },
-    {
-      id: 'bill-demo-7',
-      accountId: 'acc-demo-1',
-      name: 'Auto Insurance Premium',
-      amount: 750.00,
-      period: 'Semi-Annual',
-      dueDay: 10,
-      dueMonths: [3, 9],
-      paymentSource: 'Auto Pay',
-      notes: 'Bi-annual vehicle coverage (March & September)',
-      matchingKey: 'PROGRESSIVE, AUTO INSURANCE, GEICO',
-      splits: {
-        'person-demo-1': 50,
-        'person-demo-2': 50
-      }
-    },
-    {
-      id: 'bill-demo-8',
-      accountId: 'acc-demo-1',
-      name: 'Amazon Prime & Cloud Vault',
-      amount: 179.00,
-      period: 'Annual',
-      dueDay: 20,
-      dueMonths: [11],
-      paymentSource: 'Credit Card',
-      notes: 'Annual membership renewal (November)',
-      matchingKey: 'AMAZON PRIME, CLOUD VAULT',
-      splits: {
-        'person-demo-1': 50,
-        'person-demo-2': 50
+        'person-jon': 0,
+        'person-ronnie': 0,
+        'person-gym': 100
       }
     }
   ],
@@ -205,8 +250,8 @@ export const fakeDemoBudgetData = {
     principal: 320000.00,
     annualInterestRate: 5.75,
     termMonths: 360,
-    monthlyPayment: 1867.45,
-    extraPayment: 250.00,
+    monthlyPayment: 2756.00,
+    extraPayment: 0,
     startDate: '2024-03-01'
   }
 };

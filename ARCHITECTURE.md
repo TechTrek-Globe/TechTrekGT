@@ -235,7 +235,7 @@ All four React apps share the same auth design:
 ```
 <App>
   └── <AuthProvider>
-      └── <BudgetMetadataProvider>        # accounts, people, bills, loans, widgets, theme
+      └── <BudgetMetadataProvider>        # accounts, people, bills, loans, fundingGoals, widgets, theme
           └── <LedgerDataProvider>        # dailyMatrix, lineItems, transactions
               └── <MainContent>           # view routing based on activeView
 ```
@@ -249,6 +249,13 @@ export function useBudget() {
   return useMemo(() => ({ ...metadata, ...ledger }), [metadata, ledger]);
 }
 ```
+
+**Multi-Account, Multi-Earner Distribution & Mathematical Reconciliation Engine:**
+
+The finance platform supports flexible earner frequencies (`semi-monthly: 24/yr`, `monthly: 12/yr`, `bi-weekly: 26/yr`, `weekly: 52/yr`, `annual: 1/yr`) with normalized mathematical reconciliation across accounts:
+- **`fundingGoals` Collection:** Explicit funding goals per contributor and account with custom frequencies (`getAnnualAmount`, `getMonthlyAmount`, `getAmountPerPaycheck`).
+- **Surplus Auto-Overflow:** Unspent funding exceeding projected bill shares automatically flows to Extra Savings using account `overflowSplits` (e.g. 50/50 splits between partners or 100% single earner).
+- **Mathematical Reconciliation:** Dashboard and transfer matrices calculate normalized per-paycheck and monthly amounts across different pay schedules (e.g. Semi-Monthly Jon + Monthly Ronnie each funding $1,600/mo across Mortgage & HOA accounts).
 
 **Persistence layers (finance):**
 

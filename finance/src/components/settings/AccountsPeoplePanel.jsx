@@ -935,7 +935,9 @@ export function AccountsPeoplePanel() {
               </form>
             </div>
           </div>
-              {/* High-Density Earners Table */}
+        )}
+
+        {/* High-Density Earners Table */}
         <div className="overflow-x-auto matrix-scrollbar rounded-xl border border-slate-800 bg-slate-950/60 shadow-md">
           <table className="w-full text-left text-xs text-slate-300">
             <thead className="bg-slate-900 text-slate-400 uppercase font-medium text-[9px] border-b border-slate-800">

@@ -21,7 +21,7 @@ export function MainBudgetView({ onNavigateView }) {
     : budget.accounts.filter((/** @type {any} */ a) => a.id === selectedAccountId);
 
   return (
-    <div className="space-y-6 animate-fade-in pb-16">
+    <div className="space-y-6 animate-fade-in pb-16 pt-3">
 
       {/* Header with Account Filter & Add Bill Button */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-slate-950/80 p-4 rounded-2xl border border-slate-800 shadow-lg backdrop-blur">
@@ -94,21 +94,21 @@ export function MainBudgetView({ onNavigateView }) {
               </span>
             </div>
 
-            <div className="overflow-x-auto matrix-scrollbar rounded-2xl border border-slate-800 glass-panel relative shadow-xl">
-              <table className="w-full text-left text-xs text-slate-300 border-separate border-spacing-0">
+            <div className="rounded-2xl border border-slate-800 glass-panel relative shadow-xl">
+              <table className="w-full min-w-[920px] text-left text-xs text-slate-300 border-separate border-spacing-0">
                 {/* Sticky Header Row */}
-                <thead className="sticky top-0 z-20 bg-slate-950 text-slate-300 uppercase font-bold text-[10px] tracking-wider border-b border-slate-700 shadow-md">
+                <thead className="sticky top-0 z-30 bg-slate-950 text-slate-200 uppercase font-bold text-[10px] tracking-wider shadow-md">
                   <tr>
-                    <th className="p-3.5 sticky top-0 z-20 bg-slate-950 border-b border-slate-700 text-slate-200">Bill Name</th>
-                    <th className="p-3.5 sticky top-0 z-20 bg-slate-950 border-b border-slate-700 text-right text-slate-200">Monthly Amount</th>
-                    <th className="p-3.5 sticky top-0 z-20 bg-slate-950 border-b border-slate-700 text-right text-slate-200">Bi-Weekly (Per Pay)</th>
+                    <th className="p-3.5 sticky top-0 z-30 bg-slate-950 border-t-2 border-b-2 border-l-2 border-amber-400 rounded-l-lg text-slate-200">Bill Name</th>
+                    <th className="p-3.5 sticky top-0 z-30 bg-slate-950 border-t-2 border-b-2 border-amber-400 text-right text-slate-200">Monthly Amount</th>
+                    <th className="p-3.5 sticky top-0 z-30 bg-slate-950 border-t-2 border-b-2 border-amber-400 text-right text-slate-200">Bi-Weekly (Per Pay)</th>
                     {accountPeople.map((/** @type {any} */ p) => (
-                      <th key={p.id} className="p-3.5 sticky top-0 z-20 bg-slate-950 border-b border-slate-700 text-right text-emerald-300">{p.name.split(' ')[0]} Portion</th>
+                      <th key={p.id} className="p-3.5 sticky top-0 z-30 bg-slate-950 border-t-2 border-b-2 border-amber-400 text-right text-emerald-300">{p.name.split(' ')[0]} Portion</th>
                     ))}
-                    <th className="p-3.5 sticky top-0 z-20 bg-slate-950 border-b border-slate-700 text-slate-200">Due Day</th>
-                    <th className="p-3.5 sticky top-0 z-20 bg-slate-950 border-b border-slate-700 text-slate-200">Payment Notes</th>
-                    <th className="p-3.5 sticky top-0 z-20 bg-slate-950 border-b border-slate-700 text-slate-200">Bank Match Names</th>
-                    <th className="p-3.5 sticky top-0 z-20 bg-slate-950 border-b border-slate-700 text-slate-200">Notes</th>
+                    <th className="p-3.5 sticky top-0 z-30 bg-slate-950 border-t-2 border-b-2 border-amber-400 text-slate-200">Due Day</th>
+                    <th className="p-3.5 sticky top-0 z-30 bg-slate-950 border-t-2 border-b-2 border-amber-400 text-slate-200">Payment Notes</th>
+                    <th className="p-3.5 sticky top-0 z-30 bg-slate-950 border-t-2 border-b-2 border-amber-400 text-slate-200">Bank Match Names</th>
+                    <th className="p-3.5 sticky top-0 z-30 bg-slate-950 border-t-2 border-b-2 border-r-2 border-amber-400 rounded-r-lg text-slate-200">Notes</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">

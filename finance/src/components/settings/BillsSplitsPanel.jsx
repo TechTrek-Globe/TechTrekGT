@@ -189,7 +189,7 @@ export function BillsSplitsPanel() {
   ];
 
   return (
-    <div className="space-y-2.5 animate-fade-in text-slate-100">
+    <div className="space-y-3 animate-fade-in text-slate-100">
       
       {/* 1. KPI Vitals & Metric Strip (Compact) */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -335,18 +335,18 @@ export function BillsSplitsPanel() {
         </button>
       </div>
 
-      {/* 3. Scannable Read-Optimized Data Table with Sticky Header & Always Visible Scrollbar */}
-      <div className="overflow-auto matrix-scrollbar max-h-[calc(100vh-270px)] rounded-xl border border-slate-800 bg-slate-950/60 shadow-md">
-        <table className="w-full min-w-[920px] text-left text-[11px] text-slate-300">
-          <thead className="sticky top-0 z-10 bg-slate-900 text-slate-400 uppercase font-semibold text-[9px] tracking-wider border-b border-slate-800 shadow-sm">
+      {/* 3. Scannable Read-Optimized Data Table with Frozen/Sticky Column Headers */}
+      <div className="rounded-xl border border-slate-800 bg-slate-950/60 shadow-md">
+        <table className="w-full min-w-[920px] text-left text-[11px] text-slate-300 border-separate border-spacing-0">
+          <thead className="sticky top-0 z-30 bg-slate-900 text-slate-200 uppercase font-semibold text-[9px] tracking-wider shadow-md">
             <tr>
-              <th className="px-2.5 py-1.5 min-w-[180px] w-[22%]">Bill Name &amp; Details</th>
-              <th className="px-2 py-1.5 min-w-[140px] w-[16%]">Statement Aliases</th>
-              <th className="px-2 py-1.5 min-w-[100px] w-[12%]">Scheduled Amount</th>
-              <th className="px-2 py-1.5 min-w-[120px] w-[13%]">Due Date &amp; Recurrence</th>
-              <th className="px-2 py-1.5 min-w-[170px] w-[18%]">Funding Account</th>
-              <th className="px-2 py-1.5 min-w-[150px] w-[14%]">Earner Split (%)</th>
-              <th className="px-2.5 py-1.5 min-w-[60px] w-[5%] text-right">Actions</th>
+              <th className="sticky top-0 z-30 bg-slate-900 px-2.5 py-2 min-w-[180px] w-[22%] border-t-2 border-b-2 border-l-2 border-amber-400 rounded-l-lg shadow-sm">Bill Name &amp; Details</th>
+              <th className="sticky top-0 z-30 bg-slate-900 px-2 py-2 min-w-[140px] w-[16%] border-t-2 border-b-2 border-amber-400 shadow-sm">Statement Aliases</th>
+              <th className="sticky top-0 z-30 bg-slate-900 px-2 py-2 min-w-[100px] w-[12%] border-t-2 border-b-2 border-amber-400 shadow-sm">Scheduled Amount</th>
+              <th className="sticky top-0 z-30 bg-slate-900 px-2 py-2 min-w-[120px] w-[13%] border-t-2 border-b-2 border-amber-400 shadow-sm">Due Date &amp; Recurrence</th>
+              <th className="sticky top-0 z-30 bg-slate-900 px-2 py-2 min-w-[170px] w-[18%] border-t-2 border-b-2 border-amber-400 shadow-sm">Funding Account</th>
+              <th className="sticky top-0 z-30 bg-slate-900 px-2 py-2 min-w-[150px] w-[14%] border-t-2 border-b-2 border-amber-400 shadow-sm">Earner Split (%)</th>
+              <th className="sticky top-0 z-30 bg-slate-900 px-2.5 py-2 min-w-[60px] w-[5%] text-right border-t-2 border-b-2 border-r-2 border-amber-400 rounded-r-lg shadow-sm">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/70">

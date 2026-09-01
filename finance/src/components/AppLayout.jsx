@@ -86,32 +86,6 @@ const SidebarContent = ({ collapsed, activeView = 'dashboard', cashOnHand, netIn
       })}
     </nav>
 
-    {/* Quick KPIs at bottom */}
-    {!collapsed && (
-      <div className="mx-3 mb-4 p-3 rounded-xl bg-slate-900/60 border border-slate-800/60 space-y-2 animate-fade-in">
-        <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Month End Quick Stats (est)</p>
-        <div className="space-y-1.5">
-          <div className="flex justify-between items-center">
-            <span className="text-[11px] text-slate-400">Cash On Hand</span>
-            <span className="text-[11px] font-bold text-slate-200 font-mono">
-              ${cashOnHand.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-            </span>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="text-[11px] text-slate-400">Net Income/Mo</span>
-            <span className="text-[11px] font-bold text-emerald-400 font-mono">
-              ${netIncome.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-            </span>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="text-[11px] text-slate-400">Monthly Flow</span>
-            <span className={`text-[11px] font-bold font-mono ${netFlow >= 0 ? 'text-blue-400' : 'text-rose-400'}`}>
-              {netFlow >= 0 ? '+' : ''}{netFlow.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-            </span>
-          </div>
-        </div>
-      </div>
-    )}
 
     {/* Launch Pad Navigation Link */}
     <div className={`mx-3 mb-3 pt-2 border-t ${isLight ? 'border-slate-200' : 'border-slate-800/60'}`}>
@@ -353,7 +327,7 @@ export function AppLayout({ children, onNavigateHome, onNavigateView, activeView
         </header>
 
         {/* Page Content */}
-        <main className={`flex-1 min-h-0 flex flex-col matrix-scrollbar ${activeView === 'ledger' ? 'p-2 sm:p-3 overflow-hidden' : 'overflow-y-auto px-4 sm:px-6 lg:px-8 py-6'}`}>
+        <main className={`flex-1 min-h-0 flex flex-col matrix-scrollbar ${activeView === 'ledger' ? 'p-2 sm:p-3 overflow-hidden' : 'overflow-auto px-3 sm:px-4 pt-0 pb-4'}`}>
           {!isDbLoaded ? (
             <div className="flex flex-col items-center justify-center h-64 gap-3 text-slate-400">
               <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />

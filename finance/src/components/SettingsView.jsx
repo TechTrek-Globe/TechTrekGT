@@ -84,19 +84,19 @@ export function SettingsView({ onNavigateView }) {
   };
 
   return (
-    <div className="space-y-4 animate-fade-in pb-8 text-slate-100">
+    <div className="space-y-3 animate-fade-in text-slate-100 pt-3">
       
       {/* Sleek Compact Header */}
-      <div className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 shadow-md backdrop-blur-md">
-        <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-lg bg-gradient-to-tr from-amber-500 to-orange-600 text-slate-950 shadow-sm">
-            <Settings className="w-4 h-4" />
+      <div className="flex items-center justify-between gap-3 px-3.5 py-2 rounded-xl bg-slate-900/90 border border-slate-800 shadow-md backdrop-blur-md">
+        <div className="flex items-center gap-2">
+          <div className="p-1.5 rounded-lg bg-gradient-to-tr from-amber-500 to-orange-600 text-slate-950 shadow-sm">
+            <Settings className="w-3.5 h-3.5" />
           </div>
           <div>
-            <h2 className="text-sm font-bold text-slate-100">
+            <h2 className="text-xs font-bold text-slate-100">
               Settings &amp; Setup
             </h2>
-            <p className="text-[11px] text-slate-400">
+            <p className="text-[10px] text-slate-400">
               Accounts, earners, bills, split rules, and preferences.
             </p>
           </div>
@@ -112,7 +112,7 @@ export function SettingsView({ onNavigateView }) {
               window.dispatchEvent(new PopStateEvent('popstate'));
             }
           }}
-          className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold border border-slate-700 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+          className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-[11px] font-semibold border border-slate-700 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
         >
           <ArrowLeft className="w-3.5 h-3.5 text-blue-400" />
           <span>Dashboard</span>
@@ -120,18 +120,18 @@ export function SettingsView({ onNavigateView }) {
       </div>
 
       {/* Main View Layout: Top Horizontal Nav Bar + Content Panel */}
-      <div className="flex flex-col gap-3.5">
+      <div className="flex flex-col gap-3">
 
         {/* Top Section Navigation */}
-        <aside className="w-full bg-slate-900/50 backdrop-blur-xl border border-slate-800/80 rounded-xl p-1.5 flex flex-col gap-1 shadow-md">
+        <aside className="w-full bg-slate-900/50 backdrop-blur-xl border border-slate-800/80 rounded-xl p-1 flex flex-col gap-0.5 shadow-md">
           <div className="flex items-center justify-between px-2 py-0.5">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
               <span>Sections</span>
               <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse block" />
             </p>
-            <div className="text-[10px] text-slate-500 flex items-center gap-1">
+            <div className="text-[9px] text-slate-500 flex items-center gap-1">
               <span>Auto-saved</span>
-              <CheckCircle2 className="w-3 h-3 text-emerald-500/70" />
+              <CheckCircle2 className="w-2.5 h-2.5 text-emerald-500/70" />
             </div>
           </div>
           
@@ -144,16 +144,16 @@ export function SettingsView({ onNavigateView }) {
                   key={section.id}
                   type="button"
                   onClick={() => handleSidebarNav(section.id)}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-all cursor-pointer font-medium whitespace-nowrap shrink-0 ${
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] transition-all cursor-pointer font-medium whitespace-nowrap shrink-0 ${
                     isActive
                       ? 'bg-blue-600 text-white font-bold shadow-sm'
                       : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
                   }`}
                 >
-                  <Icon className="w-3.5 h-3.5" />
+                  <Icon className="w-3 h-3" />
                   <span>{section.label}</span>
                   {section.badge !== null && (
-                    <span className={`text-[9px] font-mono font-bold px-1.5 py-0.2 rounded ${
+                    <span className={`text-[9px] font-mono font-bold px-1 py-0.2 rounded ${
                       isActive ? 'bg-blue-800 text-blue-100' : 'bg-slate-800 text-slate-400'
                     }`}>
                       {section.badge}
@@ -166,7 +166,7 @@ export function SettingsView({ onNavigateView }) {
 
           {/* Setup Sub-Items */}
           {activeSection === 'setup' && (
-            <div className="flex items-center gap-1.5 pt-1 px-1 border-t border-slate-800/60 overflow-x-auto">
+            <div className="flex items-center gap-1.5 pt-0.5 px-1 border-t border-slate-800/60 overflow-x-auto">
               {setupSubNavItems.map(sub => {
                 const SubIcon = sub.icon;
                 const isSubActive = (sub.id === 'accounts' && (settingsTab === 'accounts' || settingsTab === 'people')) ||
@@ -176,16 +176,16 @@ export function SettingsView({ onNavigateView }) {
                     key={sub.id}
                     type="button"
                     onClick={() => setSettingsTab(sub.id)}
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-all cursor-pointer font-medium ${
+                    className={`flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-[11px] transition-all cursor-pointer font-medium ${
                       isSubActive
                         ? 'bg-blue-600/30 text-blue-200 border border-blue-500/40 font-bold shadow-sm'
                         : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
                     }`}
                   >
-                    <SubIcon className="w-3.5 h-3.5 text-blue-400" />
+                    <SubIcon className="w-3 h-3 text-blue-400" />
                     <span>{sub.label}</span>
                     {sub.count !== null && (
-                      <span className={`ml-1 text-[9px] font-mono font-bold px-1.5 py-0.2 rounded ${isSubActive ? 'bg-blue-800/80 text-blue-100' : 'text-slate-500 bg-slate-900'}`}>
+                      <span className={`ml-1 text-[9px] font-mono font-bold px-1 py-0.2 rounded ${isSubActive ? 'bg-blue-800/80 text-blue-100' : 'text-slate-500 bg-slate-900'}`}>
                         {sub.count}
                       </span>
                     )}
@@ -197,7 +197,7 @@ export function SettingsView({ onNavigateView }) {
         </aside>
 
         {/* Content Panel Area */}
-        <div className="flex-1 min-w-0 bg-slate-900/60 border border-slate-800/80 rounded-xl p-3.5 sm:p-5 shadow-md">
+        <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-3 sm:p-4 shadow-md">
           {activeSection === 'setup' && (settingsTab === 'accounts' || settingsTab === 'people') && (
             <AccountsPeoplePanel />
           )}

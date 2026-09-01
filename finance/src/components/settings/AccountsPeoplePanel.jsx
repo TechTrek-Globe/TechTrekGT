@@ -565,17 +565,17 @@ export function AccountsPeoplePanel() {
       )}
 
       {/* High-Density Accounts Table */}
-      <div className="overflow-x-auto matrix-scrollbar rounded-xl border border-slate-800 bg-slate-950/60 shadow-md">
-        <table className="w-full min-w-[1040px] text-left text-xs text-slate-300">
-          <thead className="bg-slate-900 text-slate-400 uppercase font-medium text-[9px] border-b border-slate-800">
+      <div className="rounded-xl border border-slate-800 bg-slate-950/60 shadow-md">
+        <table className="w-full min-w-[1040px] text-left text-xs text-slate-300 border-separate border-spacing-0">
+          <thead className="sticky top-0 z-30 bg-slate-900 text-slate-200 uppercase font-medium text-[9px] shadow-md">
             <tr>
-              <th className="px-3 py-2 min-w-[240px] w-[26%]">Account Name</th>
-              <th className="px-2 py-2 min-w-[95px] w-[9%]">Type</th>
-              <th className="px-2 py-2 min-w-[115px] w-[11%]">Start Date</th>
-              <th className="px-2 py-2 min-w-[130px] w-[13%]">Total Starting Bal</th>
-              <th className="px-2 py-2 min-w-[145px] w-[15%]">Extra Savings Goal</th>
-              <th className="px-2 py-2 min-w-[230px] w-[22%]">Active Earners &amp; Overflow Split</th>
-              <th className="px-3 py-2 min-w-[50px] w-[4%] text-right">Actions</th>
+              <th className="sticky top-0 z-20 bg-slate-900 px-3 py-2 min-w-[240px] w-[26%] border-t-2 border-b-2 border-l-2 border-amber-400 rounded-l-lg">Account Name</th>
+              <th className="sticky top-0 z-20 bg-slate-900 px-2 py-2 min-w-[95px] w-[9%] border-t-2 border-b-2 border-amber-400">Type</th>
+              <th className="sticky top-0 z-20 bg-slate-900 px-2 py-2 min-w-[115px] w-[11%] border-t-2 border-b-2 border-amber-400">Start Date</th>
+              <th className="sticky top-0 z-20 bg-slate-900 px-2 py-2 min-w-[130px] w-[13%] border-t-2 border-b-2 border-amber-400">Total Starting Bal</th>
+              <th className="sticky top-0 z-20 bg-slate-900 px-2 py-2 min-w-[145px] w-[15%] border-t-2 border-b-2 border-amber-400">Extra Savings Goal</th>
+              <th className="sticky top-0 z-20 bg-slate-900 px-2 py-2 min-w-[230px] w-[22%] border-t-2 border-b-2 border-amber-400">Active Earners &amp; Overflow Split</th>
+              <th className="sticky top-0 z-20 bg-slate-900 px-3 py-2 min-w-[50px] w-[4%] text-right border-t-2 border-b-2 border-r-2 border-amber-400 rounded-r-lg">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/80">
@@ -938,16 +938,16 @@ export function AccountsPeoplePanel() {
         )}
 
         {/* High-Density Earners Table */}
-        <div className="overflow-x-auto matrix-scrollbar rounded-xl border border-slate-800 bg-slate-950/60 shadow-md">
-          <table className="w-full min-w-[880px] text-left text-xs text-slate-300">
-            <thead className="bg-slate-900 text-slate-400 uppercase font-medium text-[9px] border-b border-slate-800">
+        <div className="rounded-xl border border-slate-800 bg-slate-950/60 shadow-md">
+          <table className="w-full min-w-[880px] text-left text-xs text-slate-300 border-separate border-spacing-0">
+            <thead className="sticky top-0 z-30 bg-slate-900 text-slate-200 uppercase font-medium text-[9px] shadow-md">
               <tr>
-                <th className="px-3 py-2 min-w-[200px] w-[24%]">Member Name</th>
-                <th className="px-3 py-2 min-w-[160px] w-[18%]">Pay Frequency</th>
-                <th className="px-3 py-2 min-w-[120px] w-[15%]">Gross / Pay ($)</th>
-                <th className="px-3 py-2 min-w-[120px] w-[15%]">Net / Pay ($)</th>
-                <th className="px-3 py-2 min-w-[200px] w-[22%]">Account Goals / Allocations</th>
-                <th className="px-3 py-2 min-w-[50px] w-[6%] text-right">Actions</th>
+                <th className="sticky top-0 z-20 bg-slate-900 px-3 py-2 min-w-[200px] w-[24%] border-t-2 border-b-2 border-l-2 border-amber-400 rounded-l-lg">Member Name</th>
+                <th className="sticky top-0 z-20 bg-slate-900 px-3 py-2 min-w-[160px] w-[18%] border-t-2 border-b-2 border-amber-400">Pay Frequency</th>
+                <th className="sticky top-0 z-20 bg-slate-900 px-3 py-2 min-w-[120px] w-[15%] border-t-2 border-b-2 border-amber-400">Gross / Pay ($)</th>
+                <th className="sticky top-0 z-20 bg-slate-900 px-3 py-2 min-w-[120px] w-[15%] border-t-2 border-b-2 border-amber-400">Net / Pay ($)</th>
+                <th className="sticky top-0 z-20 bg-slate-900 px-3 py-2 min-w-[200px] w-[22%] border-t-2 border-b-2 border-amber-400">Account Goals / Allocations</th>
+                <th className="sticky top-0 z-20 bg-slate-900 px-3 py-2 min-w-[50px] w-[6%] text-right border-t-2 border-b-2 border-r-2 border-amber-400 rounded-r-lg">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/80">

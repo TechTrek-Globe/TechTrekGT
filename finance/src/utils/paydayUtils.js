@@ -252,50 +252,133 @@ export function getPersonDepositAmountForAccount(person, selectedAccountId = 'al
  * @param {object} budget
  * @returns {number}
  */
+/**
+ * Calculates the monthly bill obligation for a given person and account based on active bill splits.
+ *
+ * @param {object} person
+ * @param {string} accountId
+ * @param {object} budget
+ * @returns {number}
+ */
+export function getPersonBillMonthlyPortionForAccount(person, accountId, budget) {
+  if (!person || !accountId || !budget) return 0;
+  const accountBills = (budget.bills || []).filter(b => !b.isArchived && b.accountId === accountId);
+  return accountBills.reduce((sum, b) => {
+    const amt = Math.abs(parseFloat(b.amount) || 0);
+    const period = b.period || 'Monthly';
+    let monthlyCost = amt;
+    if (period === 'Semi-Annual') monthlyCost = amt / 6;
+    else if (period === 'Annual') monthlyCost = amt / 12;
+    else if (period === 'Quarterly') monthlyCost = amt / 3;
+    else if (period === 'Weekly') monthlyCost = (amt * 52) / 12;
+    else if (period === 'Custom' || period === 'Specific Months') {
+      const count = Array.isArray(b.dueMonths) && b.dueMonths.length > 0 ? b.dueMonths.length : 12;
+      monthlyCost = (amt * count) / 12;
+    }
+    const pct = parseFloat(b.splits?.[person.id]) || 0;
+    return sum + (monthlyCost * pct) / 100;
+  }, 0);
+}
+
+/**
+ * Calculates the per-paycheck bill obligation for a given person and account based on pay frequency.
+ *
+ * @param {object} person
+ * @param {string} accountId
+ * @param {object} budget
+ * @returns {number}
+ */
+export function getPersonBillPerPaycheckPortionForAccount(person, accountId, budget) {
+  if (!person || !accountId || !budget) return 0;
+  const monthlyBills = getPersonBillMonthlyPortionForAccount(person, accountId, budget);
+  if (monthlyBills <= 0) return 0;
+
+  const freq = (person.payFrequency || 'bi-weekly').toLowerCase();
+  if (freq === 'semi-monthly') {
+    return Math.round((monthlyBills / 2) * 100) / 100;
+  } else if (freq === 'bi-weekly') {
+    return Math.round(((monthlyBills * 12) / 26) * 100) / 100;
+  } else if (freq === 'weekly') {
+    return Math.round(((monthlyBills * 12) / 52) * 100) / 100;
+  }
+  return Math.round(monthlyBills * 100) / 100;
+}
+
+/**
+ * Calculates the monthly extra savings portion for a given person and account based on split percentages,
+ * income ratio, or automatic buffer from goal allocations exceeding projected bills.
+ *
+ * @param {object} account
+ * @param {object} person
+ * @param {object} budget
+ * @returns {number}
+ */
 export function getAccountSaveExtraPersonPortion(account, person, budget) {
   if (!account || !person) return 0;
   if (account.enableExtraSavings === false || account.enableExtraSavings === 0 || account.enableExtraSavings === 'false') return 0;
+
+  let explicitExtra = 0;
   const totalExtra = parseFloat(account.saveExtraMonthly) || 0;
-  if (totalExtra <= 0) return 0;
 
-  // If the account has an explicit list of enabled split earners, check if this person is included
-  if (account.enabledEarners && Array.isArray(account.enabledEarners) && account.enabledEarners.length > 0) {
-    if (!account.enabledEarners.includes(person.id)) {
-      return 0;
+  if (totalExtra > 0) {
+    // If the account has an explicit list of enabled split earners, check if this person is included
+    const isEnabled = !account.enabledEarners || !Array.isArray(account.enabledEarners) || account.enabledEarners.length === 0 || account.enabledEarners.includes(person.id);
+    if (isEnabled) {
+      const splits = account.saveExtraSplits;
+      const splitType = account.saveExtraSplitType || 'percentage';
+
+      if (splits && typeof splits === 'object' && splits[person.id] !== undefined && splits[person.id] !== null && splits[person.id] !== '') {
+        const val = parseFloat(splits[person.id]) || 0;
+        if (splitType === 'amount') {
+          explicitExtra = val;
+        } else {
+          explicitExtra = (totalExtra * val) / 100;
+        }
+      } else {
+        const rawEnabledList = (account.enabledEarners && Array.isArray(account.enabledEarners) && account.enabledEarners.length > 0)
+          ? account.enabledEarners
+          : (budget?.people || []).map(p => p.id);
+
+        const people = budget?.people || [];
+        const enabledPeople = people.filter(p => rawEnabledList.includes(p.id));
+        const nonCreditEarners = enabledPeople.filter(p => p.name.toLowerCase() !== 'credit' && p.role !== 'Credit' && p.role !== 'Reimbursement');
+        const targetEarners = nonCreditEarners.length > 0 ? nonCreditEarners : enabledPeople;
+
+        if (targetEarners.some(p => p.id === person.id)) {
+          explicitExtra = totalExtra / Math.max(1, targetEarners.length);
+        }
+      }
     }
   }
 
-  const splits = account.saveExtraSplits;
-  const splitType = account.saveExtraSplitType || 'percentage';
-
-  if (splits && typeof splits === 'object' && splits[person.id] !== undefined && splits[person.id] !== null && splits[person.id] !== '') {
-    const val = parseFloat(splits[person.id]) || 0;
-    if (splitType === 'amount') {
-      return val;
-    } else {
-      return (totalExtra * val) / 100;
+  // Check for auto-buffer savings from goal-based account allocations
+  let autoBufferExtra = 0;
+  const rawAlloc = person.accountAllocations?.[account.id];
+  if (rawAlloc !== undefined && rawAlloc !== null && rawAlloc !== '' && budget) {
+    const depositPerPay = getPersonDepositAmountForAccount(person, account.id, budget);
+    const billPerPay = getPersonBillPerPaycheckPortionForAccount(person, account.id, budget);
+    if (depositPerPay > billPerPay) {
+      const bufferPerPay = depositPerPay - billPerPay;
+      const freq = (person.payFrequency || 'bi-weekly').toLowerCase();
+      if (freq === 'semi-monthly') {
+        autoBufferExtra = bufferPerPay * 2;
+      } else if (freq === 'bi-weekly') {
+        autoBufferExtra = (bufferPerPay * 26) / 12;
+      } else if (freq === 'weekly') {
+        autoBufferExtra = (bufferPerPay * 52) / 12;
+      } else {
+        autoBufferExtra = bufferPerPay;
+      }
     }
   }
 
-  const rawEnabledList = (account.enabledEarners && Array.isArray(account.enabledEarners) && account.enabledEarners.length > 0)
-    ? account.enabledEarners
-    : (budget?.people || []).map(p => p.id);
-
-  const people = budget?.people || [];
-  const enabledPeople = people.filter(p => rawEnabledList.includes(p.id));
-  const nonCreditEarners = enabledPeople.filter(p => p.name.toLowerCase() !== 'credit' && p.role !== 'Credit' && p.role !== 'Reimbursement');
-  const targetEarners = nonCreditEarners.length > 0 ? nonCreditEarners : enabledPeople;
-
-  if (!targetEarners.some(p => p.id === person.id)) {
-    return 0;
-  }
-
-  return totalExtra / Math.max(1, targetEarners.length);
+  return Math.round(Math.max(explicitExtra, autoBufferExtra) * 100) / 100;
 }
 
 /**
  * Calculates the per-paycheck extra savings deposit amount for a given person and account.
- * Converts the monthly extra savings portion into per-paycheck frequency (semi-monthly, bi-weekly, weekly).
+ * Converts the monthly extra savings portion into per-paycheck frequency (semi-monthly, bi-weekly, weekly)
+ * and accurately routes surplus paycheck goal allocations over projected bills into extra savings.
  *
  * @param {object} person
  * @param {string} selectedAccountId - 'all' or specific account ID
@@ -309,38 +392,42 @@ export function getPersonExtraSavingsDepositAmountForAccount(person, selectedAcc
     const accounts = budget.accounts || [];
     return accounts.reduce((sum, acc) => {
       if (acc.enableExtraSavings === false || acc.enableExtraSavings === 0 || acc.enableExtraSavings === 'false') return sum;
-      const monthlyExtra = getAccountSaveExtraPersonPortion(acc, person, budget);
-      if (monthlyExtra <= 0) return sum;
-      let perPay = monthlyExtra;
-      const freq = (person.payFrequency || 'bi-weekly').toLowerCase();
-      if (freq === 'semi-monthly') {
-        perPay = monthlyExtra / 2;
-      } else if (freq === 'bi-weekly') {
-        perPay = (monthlyExtra * 12) / 26;
-      } else if (freq === 'weekly') {
-        perPay = (monthlyExtra * 12) / 52;
-      }
-      return sum + perPay;
+      return sum + getPersonExtraSavingsDepositAmountForAccount(person, acc.id, budget);
     }, 0);
   }
 
   const targetAcc = (budget.accounts || []).find(a => a.id === selectedAccountId);
   if (!targetAcc || targetAcc.enableExtraSavings === false || targetAcc.enableExtraSavings === 0 || targetAcc.enableExtraSavings === 'false') return 0;
 
+  // Check explicit extra savings configured on account
   const monthlyExtra = getAccountSaveExtraPersonPortion(targetAcc, person, budget);
-  if (monthlyExtra <= 0) return 0;
-
-  let perPay = monthlyExtra;
-  const freq = (person.payFrequency || 'bi-weekly').toLowerCase();
-  if (freq === 'semi-monthly') {
-    perPay = monthlyExtra / 2;
-  } else if (freq === 'bi-weekly') {
-    perPay = (monthlyExtra * 12) / 26;
-  } else if (freq === 'weekly') {
-    perPay = (monthlyExtra * 12) / 52;
+  let perPayFromMonthly = 0;
+  if (monthlyExtra > 0) {
+    const freq = (person.payFrequency || 'bi-weekly').toLowerCase();
+    if (freq === 'semi-monthly') {
+      perPayFromMonthly = monthlyExtra / 2;
+    } else if (freq === 'bi-weekly') {
+      perPayFromMonthly = (monthlyExtra * 12) / 26;
+    } else if (freq === 'weekly') {
+      perPayFromMonthly = (monthlyExtra * 12) / 52;
+    } else {
+      perPayFromMonthly = monthlyExtra;
+    }
   }
 
-  return Math.round(perPay * 100) / 100;
+  // Check auto-buffer surplus from direct deposit allocation vs. projected bills
+  let autoBufferPerPay = 0;
+  const rawAlloc = person.accountAllocations?.[selectedAccountId];
+  if (rawAlloc !== undefined && rawAlloc !== null && rawAlloc !== '') {
+    const totalDepositPerPay = getPersonDepositAmountForAccount(person, selectedAccountId, budget);
+    const billPerPay = getPersonBillPerPaycheckPortionForAccount(person, selectedAccountId, budget);
+    if (totalDepositPerPay > billPerPay) {
+      autoBufferPerPay = Math.round((totalDepositPerPay - billPerPay) * 100) / 100;
+    }
+  }
+
+  const finalPerPay = Math.max(perPayFromMonthly, autoBufferPerPay);
+  return Math.round(finalPerPay * 100) / 100;
 }
 
 export const MONTH_NAMES = [

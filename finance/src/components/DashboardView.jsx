@@ -279,7 +279,8 @@ export function DashboardView() {
     getCalculatedBalanceAsOf,
     updateAccount,
     updateBillSplits,
-    getPersonDepositAmountForAccount
+    getPersonDepositAmountForAccount,
+    getPersonExtraSavingsDepositAmountForAccount
   } = useBudget();
 
   const [resizingSizes, setResizingSizes] = useState({});
@@ -756,15 +757,15 @@ export function DashboardView() {
                       <span className="text-blue-300 font-bold">{fmtMoney(perPaycheckBill)}</span>
                     </div>
 
-                    {p.accountAllocations && typeof p.accountAllocations === 'object' && Object.values(p.accountAllocations).some(v => parseFloat(v) > 0 || v === 'remaining') && (
+                    {((p.accountAllocations && typeof p.accountAllocations === 'object' && Object.values(p.accountAllocations).some(v => parseFloat(v) > 0 || v === 'remaining')) || totalPerPaycheckDeposit > 0) && (
                       <div className="pt-2 border-t border-slate-800 space-y-1">
-                        <span className="text-[10px] text-purple-300 font-semibold block font-sans">Direct Deposit Allocations (Per Paycheck):</span>
+                        <span className="text-[10px] text-purple-300 font-semibold block font-sans">Account Allocations & Funding (Per Paycheck):</span>
                         <div className="space-y-0.5 font-mono text-[10px]">
                           {(budget?.accounts || []).map(acc => {
                             const rawVal = p.accountAllocations?.[acc.id];
-                            if (!rawVal && rawVal !== 0 && rawVal !== 'remaining') return null;
                             const depositAmt = getPersonDepositAmountForAccount(p, acc.id, budget);
                             if (depositAmt <= 0 && rawVal !== 'remaining') return null;
+                            const extraBufferAmt = getPersonExtraSavingsDepositAmountForAccount(p, acc.id, budget);
                             const isRemaining = rawVal === 'remaining';
 
                             let monthlyAccDeposit = depositAmt;
@@ -774,7 +775,14 @@ export function DashboardView() {
 
                             return (
                               <div key={acc.id} className="flex items-center justify-between text-slate-300">
-                                <span className="font-sans text-slate-400 truncate max-w-[140px]">{acc.name}:</span>
+                                <div className="flex items-center gap-1 truncate max-w-[170px]">
+                                  <span className="font-sans text-slate-400 truncate">{acc.name}:</span>
+                                  {extraBufferAmt > 0 && (
+                                    <span className="text-[9px] px-1 py-0.2 rounded bg-emerald-950 text-emerald-400 border border-emerald-800/60 shrink-0" title={`Includes +$${extraBufferAmt.toFixed(2)}/pay auto-savings buffer`}>
+                                      +${extraBufferAmt.toFixed(2)} savings
+                                    </span>
+                                  )}
+                                </div>
                                 <div className="text-right">
                                   <span className="font-bold text-emerald-400">{fmtMoney(depositAmt)}</span>
                                   {isRemaining && <span className="text-xs text-emerald-300/80 font-normal ml-1">(Remaining)</span>}

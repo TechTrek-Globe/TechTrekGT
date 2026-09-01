@@ -12,11 +12,22 @@ import {
   Upload, 
   FileSpreadsheet, 
   Loader2, 
-  X 
+  X,
+  Target,
+  PiggyBank,
+  Sparkles,
+  Check
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { parseSpreadsheet } from '../../utils/spreadsheetParser';
 import { detectFileType, parseGenericFlat, autoMatchColumns, applyTransactionMapping } from '../../utils/importer';
+import { fmtMoney } from '../../utils/formatters';
+import { 
+  getPersonBillMonthlyPortionForAccount, 
+  getPersonBillPerPaycheckPortionForAccount, 
+  getPersonDepositAmountForAccount, 
+  getPersonExtraSavingsDepositAmountForAccount 
+} from '../../utils/paydayUtils';
 import { logTransaction } from '../../utils/logger';
 
 export function AccountsPeoplePanel() {
@@ -39,6 +50,7 @@ export function AccountsPeoplePanel() {
   // Modals & form state
   const [isAddAccountModalOpen, setIsAddAccountModalOpen] = useState(false);
   const [isAddPersonModalOpen, setIsAddPersonModalOpen] = useState(false);
+  const [allocEditingPerson, setAllocEditingPerson] = useState(null);
   const [clearAccId, setClearAccId] = useState('');
   const [isClearAccConfirmOpen, setIsClearAccConfirmOpen] = useState(false);
   const [clearAccStatus, setClearAccStatus] = useState(null);
@@ -920,82 +932,293 @@ export function AccountsPeoplePanel() {
           <table className="w-full text-left text-xs text-slate-300">
             <thead className="bg-slate-900 text-slate-400 uppercase font-medium text-[9px] border-b border-slate-800">
               <tr>
-                <th className="px-3 py-2 w-[30%]">Member Name</th>
-                <th className="px-3 py-2 w-[24%]">Pay Frequency</th>
-                <th className="px-3 py-2 w-[20%]">Gross Per Pay ($)</th>
-                <th className="px-3 py-2 w-[20%]">Net Per Pay ($)</th>
+                <th className="px-3 py-2 w-[24%]">Member Name</th>
+                <th className="px-3 py-2 w-[18%]">Pay Frequency</th>
+                <th className="px-3 py-2 w-[15%]">Gross / Pay ($)</th>
+                <th className="px-3 py-2 w-[15%]">Net / Pay ($)</th>
+                <th className="px-3 py-2 w-[22%]">Account Goals / Allocations</th>
                 <th className="px-3 py-2 w-[6%] text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/80">
               {budget.people.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="p-4 text-center text-slate-500 italic text-xs">No earners found.</td>
+                  <td colSpan={6} className="p-4 text-center text-slate-500 italic text-xs">No earners found.</td>
                 </tr>
               ) : (
-                budget.people.map(person => (
-                  <tr key={person.id} className="hover:bg-slate-900/50 transition-colors">
-                    <td className="px-3 py-1.5 font-bold text-slate-200">
-                      <input
-                        type="text"
-                        value={person.name}
-                        onChange={e => updatePerson(person.id, { name: e.target.value })}
-                        className="bg-transparent border-b border-transparent hover:border-slate-700 focus:border-purple-500 focus:outline-none w-full text-xs font-bold text-slate-100"
-                        placeholder="Member Name"
-                      />
-                    </td>
-                    <td className="px-3 py-1.5">
-                      <select
-                        value={person.payFrequency}
-                        onChange={e => updatePerson(person.id, { payFrequency: e.target.value })}
-                        className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-slate-200 text-xs focus:border-purple-500 focus:outline-none cursor-pointer"
-                      >
-                        <option value="bi-weekly">Bi-weekly (26/yr)</option>
-                        <option value="semi-monthly">Semi-Monthly (24/yr)</option>
-                        <option value="monthly">Monthly (12/yr)</option>
-                        <option value="weekly">Weekly (52/yr)</option>
-                      </select>
-                    </td>
-                    <td className="px-3 py-1.5 font-mono">
-                      <div className="flex items-center gap-1">
-                        <span className="text-[11px] text-slate-500">$</span>
+                budget.people.map(person => {
+                  const allocCount = person.accountAllocations && typeof person.accountAllocations === 'object'
+                    ? Object.values(person.accountAllocations).filter(v => parseFloat(v) > 0 || v === 'remaining').length
+                    : 0;
+
+                  return (
+                    <tr key={person.id} className="hover:bg-slate-900/50 transition-colors">
+                      <td className="px-3 py-1.5 font-bold text-slate-200">
                         <input
-                          type="number"
-                          step="0.01"
-                          value={person.grossPerPay}
-                          onChange={e => updatePerson(person.id, { grossPerPay: parseFloat(e.target.value) || 0 })}
-                          className="w-24 bg-slate-900 border border-slate-800 rounded px-2 py-1 text-slate-200 font-mono text-xs focus:border-purple-500 focus:outline-none"
+                          type="text"
+                          value={person.name}
+                          onChange={e => updatePerson(person.id, { name: e.target.value })}
+                          className="bg-transparent border-b border-transparent hover:border-slate-700 focus:border-purple-500 focus:outline-none w-full text-xs font-bold text-slate-100"
+                          placeholder="Member Name"
                         />
-                      </div>
-                    </td>
-                    <td className="px-3 py-1.5 font-mono">
-                      <div className="flex items-center gap-1">
-                        <span className="text-[11px] text-emerald-500 font-bold">$</span>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={person.netPerPay}
-                          onChange={e => updatePerson(person.id, { netPerPay: parseFloat(e.target.value) || 0 })}
-                          className="w-24 bg-slate-900 border border-slate-800 rounded px-2 py-1 text-emerald-400 font-bold font-mono text-xs focus:border-purple-500 focus:outline-none"
-                        />
-                      </div>
-                    </td>
-                    <td className="px-3 py-1.5 text-right">
-                      <button
-                        type="button"
-                        onClick={() => deletePerson(person.id)}
-                        className="p-1 text-slate-500 hover:text-rose-400 rounded transition-colors cursor-pointer"
-                        title="Delete Member"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                      <td className="px-3 py-1.5">
+                        <select
+                          value={person.payFrequency}
+                          onChange={e => updatePerson(person.id, { payFrequency: e.target.value })}
+                          className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-slate-200 text-xs focus:border-purple-500 focus:outline-none cursor-pointer"
+                        >
+                          <option value="bi-weekly">Bi-weekly (26/yr)</option>
+                          <option value="semi-monthly">Semi-Monthly (24/yr)</option>
+                          <option value="monthly">Monthly (12/yr)</option>
+                          <option value="weekly">Weekly (52/yr)</option>
+                        </select>
+                      </td>
+                      <td className="px-3 py-1.5 font-mono">
+                        <div className="flex items-center gap-1">
+                          <span className="text-[11px] text-slate-500">$</span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={person.grossPerPay}
+                            onChange={e => updatePerson(person.id, { grossPerPay: parseFloat(e.target.value) || 0 })}
+                            className="w-20 bg-slate-900 border border-slate-800 rounded px-2 py-1 text-slate-200 font-mono text-xs focus:border-purple-500 focus:outline-none"
+                          />
+                        </div>
+                      </td>
+                      <td className="px-3 py-1.5 font-mono">
+                        <div className="flex items-center gap-1">
+                          <span className="text-[11px] text-emerald-500 font-bold">$</span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={person.netPerPay}
+                            onChange={e => updatePerson(person.id, { netPerPay: parseFloat(e.target.value) || 0 })}
+                            className="w-20 bg-slate-900 border border-slate-800 rounded px-2 py-1 text-emerald-400 font-bold font-mono text-xs focus:border-purple-500 focus:outline-none"
+                          />
+                        </div>
+                      </td>
+                      <td className="px-3 py-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setAllocEditingPerson(person)}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-purple-950/40 hover:bg-purple-900/60 text-purple-300 border border-purple-800/50 hover:border-purple-700 transition-all cursor-pointer"
+                          title="Configure Direct Deposit Allocations & Funding Goals"
+                        >
+                          <Target className="w-3.5 h-3.5 text-purple-400" />
+                          <span>{allocCount > 0 ? `${allocCount} Goal${allocCount > 1 ? 's' : ''} Set` : 'Set Goals / Allocations'}</span>
+                        </button>
+                      </td>
+                      <td className="px-3 py-1.5 text-right">
+                        <button
+                          type="button"
+                          onClick={() => deletePerson(person.id)}
+                          className="p-1 text-slate-500 hover:text-rose-400 rounded transition-colors cursor-pointer"
+                          title="Delete Member"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
+
+        {/* Direct Deposit & Goal Allocation Modal */}
+        {allocEditingPerson && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-4 overflow-y-auto">
+            <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-2xl shadow-2xl p-5 space-y-4 max-h-[90vh] flex flex-col">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-purple-600/20 flex items-center justify-center text-purple-400">
+                    <Target className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
+                      <span>Account Funding Goals & Allocations</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-purple-950 border border-purple-800 text-purple-300 font-normal font-mono">
+                        {allocEditingPerson.name} ({allocEditingPerson.payFrequency})
+                      </span>
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Set target deposit goals per account. Projected bills are paid first, and any extra automatically flows to savings.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAllocEditingPerson(null)}
+                  className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Net Pay Overview Bar */}
+              <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center justify-between font-mono text-xs">
+                <div>
+                  <span className="text-slate-400 block text-[10px] font-sans uppercase">Net Pay / Paycheck</span>
+                  <span className="text-emerald-400 font-bold text-sm">{fmtMoney(allocEditingPerson.netPerPay)}</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-slate-400 block text-[10px] font-sans uppercase">Total Monthly Net</span>
+                  <span className="text-slate-200 font-bold text-sm">
+                    {fmtMoney(
+                      allocEditingPerson.payFrequency === 'semi-monthly' ? allocEditingPerson.netPerPay * 2 :
+                      allocEditingPerson.payFrequency === 'bi-weekly' ? (allocEditingPerson.netPerPay * 26) / 12 :
+                      allocEditingPerson.payFrequency === 'weekly' ? (allocEditingPerson.netPerPay * 52) / 12 :
+                      allocEditingPerson.netPerPay
+                    )}
+                    <span className="text-[10px] text-slate-400 font-normal"> / mo</span>
+                  </span>
+                </div>
+              </div>
+
+              {/* Account Allocation Rows */}
+              <div className="space-y-2.5 overflow-y-auto pr-1 flex-1">
+                {(budget.accounts || []).map(acc => {
+                  const currentAllocations = allocEditingPerson.accountAllocations || {};
+                  const rawVal = currentAllocations[acc.id];
+                  const billPortionMonthly = getPersonBillMonthlyPortionForAccount(allocEditingPerson, acc.id, budget);
+                  const billPortionPerPay = getPersonBillPerPaycheckPortionForAccount(allocEditingPerson, acc.id, budget);
+                  const depositAmt = getPersonDepositAmountForAccount(allocEditingPerson, acc.id, budget);
+                  const extraBufferAmt = getPersonExtraSavingsDepositAmountForAccount(allocEditingPerson, acc.id, budget);
+                  const isRemaining = rawVal === 'remaining';
+                  const hasExplicitNumber = !isRemaining && rawVal !== undefined && rawVal !== null && rawVal !== '' && parseFloat(rawVal) > 0;
+
+                  const handleValueChange = (newVal) => {
+                    const updated = { ...currentAllocations };
+                    if (newVal === '' || newVal === undefined || newVal === null) {
+                      delete updated[acc.id];
+                    } else if (newVal === 'remaining') {
+                      updated[acc.id] = 'remaining';
+                    } else {
+                      const num = parseFloat(newVal);
+                      if (isNaN(num) || num < 0) {
+                        delete updated[acc.id];
+                      } else {
+                        updated[acc.id] = num;
+                      }
+                    }
+                    updatePerson(allocEditingPerson.id, { accountAllocations: updated });
+                    setAllocEditingPerson(prev => prev ? { ...prev, accountAllocations: updated } : prev);
+                  };
+
+                  return (
+                    <div key={acc.id} className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 hover:border-slate-700/80 transition-all space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-3 h-3 rounded-full bg-${acc.color || 'blue'}-500`} />
+                          <span className="font-bold text-slate-100 text-xs">{acc.name}</span>
+                          <span className="text-[10px] px-1.5 py-0.2 bg-slate-800 text-slate-400 rounded uppercase">{acc.type}</span>
+                        </div>
+                        <div className="text-right font-mono text-[11px]">
+                          <span className="text-slate-400">Projected Bills: </span>
+                          <span className="text-slate-200 font-semibold">{fmtMoney(billPortionPerPay)}</span>
+                          <span className="text-[10px] text-slate-500"> / pay ({fmtMoney(billPortionMonthly)}/mo)</span>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-850">
+                        <div className="flex items-center gap-1.5 flex-1 min-w-[200px]">
+                          <label className="text-[11px] font-medium text-slate-300 shrink-0">Goal / Allocation:</label>
+                          <div className="relative flex-1">
+                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-mono">$</span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              disabled={isRemaining}
+                              placeholder={billPortionPerPay > 0 ? `${billPortionPerPay.toFixed(2)} (dynamic)` : '0.00'}
+                              value={isRemaining ? '' : (rawVal ?? '')}
+                              onChange={e => handleValueChange(e.target.value)}
+                              className="w-full pl-6 pr-2 py-1 bg-slate-900 border border-slate-700/70 rounded-lg text-slate-100 font-mono text-xs focus:outline-none focus:border-purple-500 disabled:opacity-50"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Quick Presets */}
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleValueChange(billPortionPerPay > 0 ? billPortionPerPay : '')}
+                            className="px-2 py-1 rounded text-[10px] font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors cursor-pointer"
+                            title="Set allocation exactly equal to current projected bills"
+                          >
+                            Exact Bills
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleValueChange(isRemaining ? '' : 'remaining')}
+                            className={`px-2 py-1 rounded text-[10px] font-medium transition-colors cursor-pointer border ${
+                              isRemaining 
+                                ? 'bg-purple-600 text-white border-purple-500' 
+                                : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                            }`}
+                            title="Assign all remaining unallocated net pay to this account"
+                          >
+                            Remaining
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleValueChange('')}
+                            className="px-2 py-1 rounded text-[10px] font-medium bg-slate-850 hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+                            title="Clear custom allocation and dynamically track bill splits"
+                          >
+                            Clear (Auto)
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Live Auto-Buffer Savings Badge */}
+                      <div className="flex items-center justify-between text-[11px] font-mono pt-1">
+                        <div className="flex items-center gap-1.5">
+                          {extraBufferAmt > 0 ? (
+                            <span className="inline-flex items-center gap-1 text-emerald-400 bg-emerald-950/60 border border-emerald-800/50 px-2 py-0.5 rounded-md text-[10px] font-semibold">
+                              <PiggyBank className="w-3 h-3 text-emerald-400" />
+                              <span>+{fmtMoney(extraBufferAmt)} / pay ({fmtMoney(allocEditingPerson.payFrequency === 'semi-monthly' ? extraBufferAmt * 2 : (extraBufferAmt * 26) / 12)}/mo) → Auto Extra Savings</span>
+                            </span>
+                          ) : hasExplicitNumber && depositAmt < billPortionPerPay ? (
+                            <span className="inline-flex items-center gap-1 text-amber-400 bg-amber-950/50 border border-amber-800/40 px-2 py-0.5 rounded-md text-[10px]">
+                              <AlertTriangle className="w-3 h-3 text-amber-400" />
+                              <span>Funding Shortfall: -{fmtMoney(billPortionPerPay - depositAmt)} / pay</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-slate-400 text-[10px]">
+                              <Check className="w-3 h-3 text-slate-500" />
+                              <span>100% covers projected bills</span>
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-right">
+                          <span className="text-slate-400 text-[10px]">Total Deposit: </span>
+                          <span className="text-purple-300 font-bold">{fmtMoney(depositAmt)}</span>
+                          <span className="text-[10px] text-slate-500"> / pay</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Modal Footer */}
+              <div className="flex items-center justify-between pt-3 border-t border-slate-800">
+                <p className="text-[11px] text-slate-400">
+                  Changes save automatically and update all Dashboard & Transaction projections.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setAllocEditingPerson(null)}
+                  className="px-5 py-2 rounded-xl text-xs font-semibold bg-purple-600 hover:bg-purple-500 text-white shadow-md shadow-purple-600/20 transition-all cursor-pointer"
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -74,10 +74,12 @@ export function AccountTransferSummary() {
       visiblePeople.forEach(p => {
         const defaultMode = (p.payFrequency === 'bi-weekly' || p.payFrequency === 'semi-monthly' || p.payFrequency === 'weekly') ? 'paycheck' : 'monthly';
         const mode = personPortionModes[p.id] || defaultMode;
-        const hasAllocations = p.accountAllocations && typeof p.accountAllocations === 'object' && Object.values(p.accountAllocations).some(v => parseFloat(v) > 0 || v === 'remaining');
+        const hasLegacyAllocations = p.accountAllocations && typeof p.accountAllocations === 'object' && Object.values(p.accountAllocations).some(v => parseFloat(v) > 0 || v === 'remaining');
+        const hasFundingGoals = (budget?.fundingGoals || []).some(g => g.contributorId === p.id);
+        const isExplicit = hasLegacyAllocations || hasFundingGoals;
   
         let rawPortion = 0;
-        if (basisMode === 'direct_deposit' || (basisMode === 'auto' && hasAllocations)) {
+        if (basisMode === 'direct_deposit' || (basisMode === 'auto' && isExplicit)) {
           const perPaycheckDeposit = getPersonDepositAmountForAccount(p, acc.id, budget);
           if (mode === 'paycheck') {
             rawPortion = perPaycheckDeposit;
@@ -99,7 +101,7 @@ export function AccountTransferSummary() {
             ? (p.payFrequency === 'weekly'
                 ? (monthlyPortion * 12) / 52
                 : p.payFrequency === 'bi-weekly'
-                  ? (monthlyPortion * 12) / 26
+                  ? monthlyPortion / 2
                   : monthlyPortion / 2)
             : monthlyPortion;
         }

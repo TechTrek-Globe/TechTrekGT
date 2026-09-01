@@ -679,9 +679,12 @@ export function DashboardView() {
         const peopleList = budget?.people || [];
         const totalNetMonthly = peopleList.reduce((sum, p) => sum + getMonthlyNetIncome(p), 0);
         const totalTargetMonthly = peopleList.reduce((sum, p) => {
-          const hasAllocations = p.accountAllocations &&
+          const hasLegacyAllocations = p.accountAllocations &&
             typeof p.accountAllocations === 'object' &&
             Object.values(p.accountAllocations).some(v => parseFloat(v) > 0 || v === 'remaining');
+          const hasFundingGoals = (budget?.fundingGoals || []).some(g => g.contributorId === p.id);
+          const hasAllocations = hasLegacyAllocations || hasFundingGoals;
+
           if (hasAllocations) {
             const perPaycheck = (budget?.accounts || []).reduce(
               (s, acc) => s + getPersonDepositAmountForAccount(p, acc.id, budget), 0

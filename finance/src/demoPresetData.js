@@ -76,7 +76,7 @@ export const fakeDemoBudgetData = {
       payDay1: 15,
       payDay2: 'last',
       grossPerPay: 4200.00,
-      netPerPay: 3150.00,
+      netPerPay: 963.08,
       accountAllocations: {},
       color: 'purple'
     },
@@ -111,56 +111,49 @@ export const fakeDemoBudgetData = {
       contributorId: 'person-jon',
       accountId: 'acc-bills-checking',
       name: 'Bills Checking Base (Semi-Monthly)',
-      amount: 85.00,
-      frequency: 'semi-monthly'
+      amountPerPay: 85.00
     },
     {
       id: 'goal-bills-jon-2',
       contributorId: 'person-jon',
       accountId: 'acc-bills-checking',
       name: 'Bills Checking Buffer (Monthly)',
-      amount: 156.16,
-      frequency: 'monthly'
+      amountPerPay: 78.08
     },
     {
       id: 'goal-bills-gym-1',
       contributorId: 'person-gym',
       accountId: 'acc-bills-checking',
-      name: 'Gym Membership Share (Monthly)',
-      amount: 22.50,
-      frequency: 'monthly'
+      name: 'Gym Membership Share',
+      amountPerPay: 11.25
     },
     {
       id: 'goal-mortgage-jon',
       contributorId: 'person-jon',
       accountId: 'acc-mortgage-checking',
       name: 'Mortgage Contribution',
-      amount: 1378.00,
-      frequency: 'monthly'
+      amountPerPay: 689.00
     },
     {
       id: 'goal-mortgage-ronnie',
       contributorId: 'person-ronnie',
       accountId: 'acc-mortgage-checking',
       name: 'Mortgage Contribution',
-      amount: 1378.00,
-      frequency: 'monthly'
+      amountPerPay: 1378.00
     },
     {
       id: 'goal-hoa-jon',
       contributorId: 'person-jon',
       accountId: 'acc-hoa-savings',
       name: 'HOA Reserve Contribution',
-      amount: 222.00,
-      frequency: 'monthly'
+      amountPerPay: 111.00
     },
     {
       id: 'goal-hoa-ronnie',
       contributorId: 'person-ronnie',
       accountId: 'acc-hoa-savings',
       name: 'HOA Reserve Contribution',
-      amount: 222.00,
-      frequency: 'monthly'
+      amountPerPay: 222.00
     }
   ],
 

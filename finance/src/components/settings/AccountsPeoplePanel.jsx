@@ -27,9 +27,8 @@ import {
   getPersonBillPerPaycheckPortionForAccount, 
   getPersonDepositAmountForAccount, 
   getPersonExtraSavingsDepositAmountForAccount,
-  getAnnualAmount,
-  getMonthlyAmount,
-  getAmountPerPaycheck,
+  goalPerPay,
+  goalMonthlyDisplay,
   calculateDashboardTotalsForContributor,
   generatePaycheckTransactions
 } from '../../utils/paydayUtils';
@@ -1059,8 +1058,8 @@ export function AccountsPeoplePanel() {
             const acc = budget.accounts.find(a => a.id === g.accountId);
             return acc && (acc.id === 'acc-hoa-savings' || acc.name.toLowerCase().includes('hoa'));
           });
-          const mortgageMonthly = mortgageGoals.reduce((sum, g) => sum + getMonthlyAmount(g.amount, g.frequency), 0);
-          const hoaMonthly = hoaGoals.reduce((sum, g) => sum + getMonthlyAmount(g.amount, g.frequency), 0);
+          const mortgageMonthly = mortgageGoals.reduce((sum, g) => sum + goalMonthlyDisplay(g, payFreq), 0);
+          const hoaMonthly = hoaGoals.reduce((sum, g) => sum + goalMonthlyDisplay(g, payFreq), 0);
           const isMortgageHoaVerified = Math.round((mortgageMonthly + hoaMonthly) * 100) / 100 === 1600;
 
           return (
@@ -1165,8 +1164,7 @@ export function AccountsPeoplePanel() {
                                     contributorId: allocEditingPerson.id,
                                     accountId: acc.id,
                                     name: `${acc.name.split(' ')[0]} Goal`,
-                                    amount: billPortionMonthly > 0 ? billPortionMonthly : 100,
-                                    frequency: 'monthly'
+                                    amountPerPay: billPortionPerPay > 0 ? billPortionPerPay : 50
                                   });
                                 }}
                                 className="px-2 py-0.5 rounded text-[10px] font-semibold bg-purple-950 hover:bg-purple-900 text-purple-300 border border-purple-800/60 transition-colors cursor-pointer"
@@ -1176,8 +1174,8 @@ export function AccountsPeoplePanel() {
                             </div>
                           ) : (
                             accGoals.map(goal => {
-                              const monthly = getMonthlyAmount(goal.amount, goal.frequency);
-                              const perPay = getAmountPerPaycheck(goal.amount, goal.frequency, payFreq);
+                              const monthly = goalMonthlyDisplay(goal, payFreq);
+                              const perPay = goalPerPay(goal);
 
                               return (
                                 <div key={goal.id} className="flex flex-wrap items-center gap-2 p-2 rounded-lg bg-slate-900 border border-slate-800 text-xs">
@@ -1193,25 +1191,15 @@ export function AccountsPeoplePanel() {
                                     <input
                                       type="number"
                                       step="0.01"
-                                      value={goal.amount}
-                                      onChange={e => updateFundingGoal(goal.id, { amount: parseFloat(e.target.value) || 0 })}
-                                      className="w-20 bg-slate-950 border border-slate-700/60 rounded px-2 py-1 text-slate-100 font-mono font-bold text-xs focus:outline-none focus:border-purple-500"
+                                      value={goal.amountPerPay || 0}
+                                      onChange={e => updateFundingGoal(goal.id, { amountPerPay: parseFloat(e.target.value) || 0 })}
+                                      className="w-24 bg-slate-950 border border-slate-700/60 rounded px-2 py-1 text-slate-100 font-mono font-bold text-xs focus:outline-none focus:border-purple-500"
                                     />
+                                    <span className="text-[10px] text-slate-500">/ pay</span>
                                   </div>
-                                  <select
-                                    value={goal.frequency}
-                                    onChange={e => updateFundingGoal(goal.id, { frequency: e.target.value })}
-                                    className="bg-slate-950 border border-slate-700/60 rounded px-2 py-1 text-slate-300 text-xs focus:outline-none focus:border-purple-500 cursor-pointer"
-                                  >
-                                    <option value="semi-monthly">Semi-Monthly (24/yr)</option>
-                                    <option value="monthly">Monthly (12/yr)</option>
-                                    <option value="bi-weekly">Bi-Weekly (26/yr)</option>
-                                    <option value="weekly">Weekly (52/yr)</option>
-                                    <option value="annual">Annual (1/yr)</option>
-                                  </select>
                                   <div className="text-right font-mono text-[10px] text-slate-400 min-w-[110px]">
-                                    <span className="text-purple-300 font-bold">{fmtMoney(monthly)}/mo</span>
-                                    <span className="block text-[9px] text-slate-500">({fmtMoney(perPay)}/pay)</span>
+                                    <span className="text-purple-300 font-bold">{fmtMoney(monthly)}</span>
+                                    <span className="block text-[9px] text-slate-500">/ mo baseline</span>
                                   </div>
                                   <button
                                     type="button"
@@ -1235,8 +1223,7 @@ export function AccountsPeoplePanel() {
                                     contributorId: allocEditingPerson.id,
                                     accountId: acc.id,
                                     name: 'Additional Goal',
-                                    amount: 50,
-                                    frequency: 'monthly'
+                                    amountPerPay: 25
                                   });
                                 }}
                                 className="text-[10px] text-purple-400 hover:text-purple-300 font-semibold cursor-pointer"
@@ -1246,7 +1233,7 @@ export function AccountsPeoplePanel() {
                               <div className="text-right font-mono text-[11px]">
                                 <span className="text-slate-400 text-[10px]">Account Deposit: </span>
                                 <span className="text-emerald-400 font-bold">{fmtMoney(depositAmt)}</span>
-                                <span className="text-[10px] text-slate-500"> / pay ({fmtMoney(accGoals.reduce((s, g) => s + getMonthlyAmount(g.amount, g.frequency), 0))}/mo)</span>
+                                <span className="text-[10px] text-slate-500"> / pay ({fmtMoney(accGoals.reduce((s, g) => s + goalMonthlyDisplay(g, payFreq), 0))}/mo)</span>
                               </div>
                             </div>
                           )}

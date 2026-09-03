@@ -6,6 +6,8 @@ import { InlineSelectCell } from './InlineSelectCell';
 import { MarginHealthBadge } from './MarginHealthBadge';
 import { cleanItemDescription, cleanAthleteName } from '../../utils/spreadsheetParser';
 import { LISTING_FORMATS } from '../../utils/constants';
+import { fmtCurrency } from '../../utils/formulaPreview';
+import { computeFeeBreakdown } from '../../utils/feeEngine';
 
 export function InventoryGridRow({
   item,
@@ -31,6 +33,13 @@ export function InventoryGridRow({
   const rowBg = isEven ? 'bg-[#0b101d]' : 'bg-[#141d30]';
   const stickyBg = isEven ? 'bg-[#0b101d]' : 'bg-[#141d30]';
   const actionsWidth = columnWidths.actions || 120;
+
+  // Detect if item was imported via VScout / Amazon Vine
+  const isVineItem = Boolean(
+    (item.invoice_ref && item.invoice_ref.startsWith('AMAZON-')) ||
+    (item.notes && item.notes.includes('ASIN:')) ||
+    (item.attributes && (typeof item.attributes === 'string' ? item.attributes.includes('amazon_vinescout') : item.attributes?.source === 'amazon_vinescout'))
+  );
 
   return (
     <tr className={`border-b border-slate-800/70 transition-colors group ${rowBg} hover:bg-amber-500/[0.08]`}>
@@ -116,9 +125,16 @@ export function InventoryGridRow({
             className="group/name cursor-pointer flex items-center justify-between gap-1.5 hover:bg-slate-800/60 rounded px-1 -mx-1 py-0.5 transition-colors"
             title="Click to view & edit full item details"
           >
-            <span className="text-slate-200 font-medium group-hover/name:text-amber-400 group-hover/name:underline transition-colors truncate text-xs">
-              {cleanItemDescription(item.item_name, item.athlete_person, item.authenticator)}
-            </span>
+            <div className="flex items-center gap-1.5 truncate">
+              {isVineItem && (
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-teal-500/20 text-teal-300 border border-teal-500/40 flex-shrink-0 tracking-wide" title="Imported from VScout">
+                  VScout
+                </span>
+              )}
+              <span className="text-slate-200 font-medium group-hover/name:text-amber-400 group-hover/name:underline transition-colors truncate text-xs">
+                {cleanItemDescription(item.item_name, item.athlete_person, item.authenticator)}
+              </span>
+            </div>
             <Pencil className="w-2.5 h-2.5 text-slate-500 group-hover/name:text-amber-400 transition-colors opacity-0 group-hover/name:opacity-100 flex-shrink-0" />
           </div>
           {item.athlete_person && (
@@ -147,23 +163,7 @@ export function InventoryGridRow({
         </td>
       )}
 
-      {/* 4. Margin Health (with Hover Calculation) */}
-      {columnVisibility.margin_health !== false && (
-        <td
-          style={{
-            width: `${columnWidths.margin_health || 110}px`,
-            minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'margin_health')?.minWidth || 95}px`,
-            maxWidth: `${columnWidths.margin_health || 110}px`
-          }}
-          onMouseEnter={(e) => onShowTooltip && onShowTooltip('margin', item, e)}
-          onMouseLeave={onHideTooltip}
-          className="px-3 py-1.5 whitespace-nowrap overflow-hidden text-xs cursor-help"
-        >
-          <MarginHealthBadge marginPct={item._computedMargin} netProfit={item._computedNetProfit} showLabel={false} />
-        </td>
-      )}
-
-      {/* 5. Status */}
+      {/* 4. Status */}
       {columnVisibility.status !== false && (
         <td
           style={{
@@ -183,28 +183,7 @@ export function InventoryGridRow({
         </td>
       )}
 
-      {/* 6. Listing Format */}
-      {columnVisibility.listing_format !== false && (
-        <td
-          style={{
-            width: `${columnWidths.listing_format || 110}px`,
-            minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'listing_format')?.minWidth || 90}px`,
-            maxWidth: `${columnWidths.listing_format || 110}px`
-          }}
-          className="px-3 py-1.5 whitespace-nowrap overflow-hidden text-xs"
-        >
-          <InlineSelectCell
-            value={item.listing_format}
-            itemId={item.id}
-            field="listing_format"
-            options={LISTING_FORMATS}
-            placeholder="-- Format --"
-            onUpdated={onUpdateItem}
-          />
-        </td>
-      )}
-
-      {/* 7. Current List Price (with Hover Calculation) */}
+      {/* 5. Current List Price (with Hover Calculation) */}
       {columnVisibility.current_list_price !== false && (
         <td
           style={{
@@ -225,6 +204,54 @@ export function InventoryGridRow({
             className="text-amber-300 font-bold"
             onUpdated={onUpdateItem}
           />
+        </td>
+      )}
+
+      {/* 6. Net Profit (with Hover Calculation) */}
+      {columnVisibility.net_profit !== false && (
+        <td
+          style={{
+            width: `${columnWidths.net_profit || 110}px`,
+            minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'net_profit')?.minWidth || 95}px`,
+            maxWidth: `${columnWidths.net_profit || 110}px`
+          }}
+          onMouseEnter={(e) => onShowTooltip && onShowTooltip('net_profit', item, e)}
+          onMouseLeave={onHideTooltip}
+          className="px-3 py-1.5 whitespace-nowrap overflow-hidden text-xs font-mono font-bold cursor-help"
+        >
+          {(() => {
+            const hasListPrice = Number(item.current_list_price) > 0 || Number(item.suggested_list_price) > 0;
+            if (!hasListPrice) {
+              return <span className="text-slate-600 font-normal">--</span>;
+            }
+            const netProfitVal = item._computedNetProfit != null
+              ? Number(item._computedNetProfit)
+              : computeFeeBreakdown(item).netProfit;
+            const isPositive = netProfitVal > 0;
+            const isZero = Math.abs(netProfitVal) < 0.01;
+            const textColor = isPositive ? 'text-emerald-400' : isZero ? 'text-slate-400' : 'text-red-400';
+            return (
+              <span className={`${textColor} font-mono font-bold`}>
+                {isPositive ? '+' : ''}{fmtCurrency(netProfitVal)}
+              </span>
+            );
+          })()}
+        </td>
+      )}
+
+      {/* 7. Margin Health (with Hover Calculation) */}
+      {columnVisibility.margin_health !== false && (
+        <td
+          style={{
+            width: `${columnWidths.margin_health || 110}px`,
+            minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'margin_health')?.minWidth || 95}px`,
+            maxWidth: `${columnWidths.margin_health || 110}px`
+          }}
+          onMouseEnter={(e) => onShowTooltip && onShowTooltip('margin', item, e)}
+          onMouseLeave={onHideTooltip}
+          className="px-3 py-1.5 whitespace-nowrap overflow-hidden text-xs cursor-help"
+        >
+          <MarginHealthBadge marginPct={item._computedMargin} netProfit={item._computedNetProfit} showLabel={false} />
         </td>
       )}
 
@@ -300,7 +327,28 @@ export function InventoryGridRow({
         </td>
       )}
 
-      {/* 11. Athlete / Signer */}
+      {/* 11. Listing Format */}
+      {columnVisibility.listing_format !== false && (
+        <td
+          style={{
+            width: `${columnWidths.listing_format || 110}px`,
+            minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'listing_format')?.minWidth || 90}px`,
+            maxWidth: `${columnWidths.listing_format || 110}px`
+          }}
+          className="px-3 py-1.5 whitespace-nowrap overflow-hidden text-xs"
+        >
+          <InlineSelectCell
+            value={item.listing_format}
+            itemId={item.id}
+            field="listing_format"
+            options={LISTING_FORMATS}
+            placeholder="-- Format --"
+            onUpdated={onUpdateItem}
+          />
+        </td>
+      )}
+
+      {/* 12. Athlete / Signer */}
       {columnVisibility.athlete_person !== false && (
         <td
           style={{

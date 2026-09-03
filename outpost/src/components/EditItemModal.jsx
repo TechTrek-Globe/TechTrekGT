@@ -12,6 +12,7 @@ import { EditTabDetails } from './edit/EditTabDetails';
 import { EditTabListingPricing } from './edit/EditTabListingPricing';
 import { EditTabComps } from './edit/EditTabComps';
 import { EditTabPerformance } from './edit/EditTabPerformance';
+import { EditTabVineScout } from './edit/EditTabVineScout';
 
 const PLATFORM_FEE_PRESETS = {
   'eBay':         { fee_pct: 13.5, flat_fee: 0.40 },
@@ -56,7 +57,7 @@ const EMPTY_FORM = {
   buy_it_now_price: '',
   floor_price: '',
   actual_sell_price: '',
-  target_margin_pct: '30',
+  target_margin_pct: '15',
   ebay_promoted_rate: '',
   // Dates
   purchase_date: '',
@@ -67,7 +68,13 @@ const EMPTY_FORM = {
   authenticator: '',
   cert_number: '',
   cert_verification_url: '',
-  ebay_listing_id: ''
+  ebay_listing_id: '',
+  // VineScout / Amazon Vine Link
+  is_vinescout: false,
+  asin: '',
+  order_id: '',
+  etv: '',
+  tax_cost: ''
 };
 
 export function EditItemModal({
@@ -210,7 +217,14 @@ export function EditItemModal({
         authenticator: item.authenticator ? item.authenticator.replace(/#.*$/, '').trim() : '',
         cert_number: item.cert_number || '',
         cert_verification_url: item.cert_verification_url || '',
-        ebay_listing_id: item.ebay_listing_id || ''
+        ebay_listing_id: item.ebay_listing_id || '',
+
+        // VineScout / Amazon Vine
+        is_vinescout: Boolean(item.is_vinescout || item.is_amazon || (item.invoice_ref && item.invoice_ref.startsWith('AMAZON-')) || item.asin),
+        asin: item.asin || '',
+        order_id: item.order_id || '',
+        etv: item.etv != null ? String(item.etv) : '',
+        tax_cost: item.tax_cost != null ? String(item.tax_cost) : ''
       };
 
       setForm(populated);
@@ -487,7 +501,7 @@ export function EditItemModal({
       platform_flat_fee: parseFloat(form.platform_flat_fee) || 0.40,
       ebay_promoted_rate: parseFloat(form.ebay_promoted_rate) || 0,
       est_shipping_cost: parseFloat(form.est_shipping_cost) || 0,
-      target_margin_pct: (parseFloat(form.target_margin_pct) || 30) / 100
+      target_margin_pct: (parseFloat(form.target_margin_pct) || 15) / 100
     });
   }, [
     form.current_list_price,
@@ -540,7 +554,7 @@ export function EditItemModal({
         buy_it_now_price: form.buy_it_now_price !== '' ? parseFloat(form.buy_it_now_price) : null,
         floor_price: form.floor_price !== '' ? parseFloat(form.floor_price) : null,
         actual_sell_price: form.actual_sell_price !== '' ? parseFloat(form.actual_sell_price) : null,
-        target_margin_pct: form.target_margin_pct !== '' ? parseFloat(form.target_margin_pct) / 100 : 0.30,
+        target_margin_pct: form.target_margin_pct !== '' ? parseFloat(form.target_margin_pct) / 100 : 0.15,
 
         ebay_promoted_rate: form.ebay_promoted_rate !== '' ? parseFloat(form.ebay_promoted_rate) : null,
         boost_pct: form.ebay_promoted_rate !== '' ? (parseFloat(form.ebay_promoted_rate) / 100) : 0,
@@ -553,7 +567,14 @@ export function EditItemModal({
         authenticator: form.authenticator || null,
         cert_number: form.cert_number?.trim() || null,
         cert_verification_url: form.cert_verification_url || null,
-        ebay_listing_id: form.ebay_listing_id?.trim() || null
+        ebay_listing_id: form.ebay_listing_id?.trim() || null,
+
+        // VineScout / Amazon Vine fields
+        is_vinescout: Boolean(form.is_vinescout),
+        asin: form.asin?.trim() || null,
+        order_id: form.order_id?.trim() || null,
+        etv: form.etv !== '' && form.etv != null ? parseFloat(form.etv) : null,
+        tax_cost: form.tax_cost !== '' && form.tax_cost != null ? parseFloat(form.tax_cost) : null
       };
 
       const res = await updateItem(item.id, payload);
@@ -667,6 +688,14 @@ export function EditItemModal({
               analyticsRange={analyticsRange}
               setAnalyticsRange={setAnalyticsRange}
               onFetchAnalytics={handleFetchAnalytics}
+            />
+          )}
+
+          {activeTab === 'vinescout' && (
+            <EditTabVineScout
+              form={form}
+              updateField={updateField}
+              item={item}
             />
           )}
         </form>

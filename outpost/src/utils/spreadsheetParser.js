@@ -438,7 +438,7 @@ export async function parseAuctionWorkbook(buffer) {
         suggested_list_price: parseCleanNumber(getRowValue(row, invHeaderMap, ['suggestedlistprice']), 0),
         current_list_price: parseCleanNumber(getRowValue(row, invHeaderMap, ['currentlistprice']), null),
         actual_sell_price: parseCleanNumber(getRowValue(row, invHeaderMap, ['actualsellprice']), null),
-        target_margin_pct: Math.round(parseCleanNumber(getRowValue(row, invHeaderMap, ['marginpcttarget', 'targetmargin']), 0.30) * 10000) / 10000,
+        target_margin_pct: Math.round(parseCleanNumber(getRowValue(row, invHeaderMap, ['marginpcttarget', 'targetmargin']), 0.15) * 10000) / 10000,
         date_acquired: dateAcquired,
         date_listed: dateListed,
         date_sold: dateSold,

@@ -5,19 +5,24 @@
  */
 
 export const DEFAULT_COLUMNS = [
-  { key: 'actions',              label: 'Actions',         defaultVisible: true, minWidth: 90,  defaultWidth: 110 },
-  { key: 'item_name',            label: 'Item Description', defaultVisible: true, minWidth: 150, defaultWidth: 220 },
-  { key: 'athlete_person',        label: 'Athlete / Signer', defaultVisible: true, minWidth: 120, defaultWidth: 150 },
-  { key: 'status',               label: 'Status',          defaultVisible: true, minWidth: 100, defaultWidth: 130 },
-  { key: 'category',             label: 'Category',        defaultVisible: true, minWidth: 100, defaultWidth: 120 },
-  { key: 'authenticator',        label: 'Authenticator',   defaultVisible: true, minWidth: 110, defaultWidth: 130 },
-  { key: 'cert_number',          label: 'Cert #',          defaultVisible: true, minWidth: 100, defaultWidth: 120 },
-  { key: 'true_total_cost',      label: 'True Cost',       defaultVisible: true, minWidth: 100, defaultWidth: 120 },
-  { key: 'min_sell_price',       label: 'Min Sell',        defaultVisible: true, minWidth: 90,  defaultWidth: 110 },
-  { key: 'suggested_list_price', label: 'Suggested List',  defaultVisible: true, minWidth: 110, defaultWidth: 130 },
-  { key: 'current_list_price',   label: 'Current List',    defaultVisible: true, minWidth: 110, defaultWidth: 130 },
-  { key: 'platform',             label: 'Platform',        defaultVisible: true, minWidth: 100, defaultWidth: 120 },
-  { key: 'invoice_ref',          label: 'Invoice',         defaultVisible: true, minWidth: 90,  defaultWidth: 110 },
+  { key: 'actions',              label: 'Actions',          defaultVisible: true, minWidth: 100, defaultWidth: 110 },
+  { key: 'item_name',            label: 'Item / Description', defaultVisible: true, minWidth: 160, defaultWidth: 220 },
+  { key: 'sku',                  label: 'SKU / Label',      defaultVisible: true, minWidth: 80,  defaultWidth: 100 },
+  { key: 'status',               label: 'Status',           defaultVisible: true, minWidth: 100, defaultWidth: 120 },
+  { key: 'current_list_price',   label: 'List Price',       defaultVisible: true, minWidth: 95,  defaultWidth: 110 },
+  { key: 'net_profit',           label: 'Net Profit',       defaultVisible: true, minWidth: 95,  defaultWidth: 110 },
+  { key: 'margin_health',        label: 'Margin %',         defaultVisible: true, minWidth: 95,  defaultWidth: 110 },
+  { key: 'true_total_cost',      label: 'Landed COGS',      defaultVisible: true, minWidth: 95,  defaultWidth: 110 },
+  { key: 'floor_price',          label: 'Floor Price',      defaultVisible: true, minWidth: 85,  defaultWidth: 100 },
+  { key: 'suggested_list_price', label: 'Suggested List',   defaultVisible: true, minWidth: 95,  defaultWidth: 110 },
+  { key: 'listing_format',       label: 'Format',           defaultVisible: true, minWidth: 90,  defaultWidth: 110 },
+  { key: 'athlete_person',       label: 'Athlete / Signer', defaultVisible: true, minWidth: 110, defaultWidth: 140 },
+  { key: 'category',             label: 'Category',         defaultVisible: true, minWidth: 100, defaultWidth: 120 },
+  { key: 'authenticator',        label: 'Authenticator',    defaultVisible: true, minWidth: 100, defaultWidth: 120 },
+  { key: 'cert_number',          label: 'Cert #',           defaultVisible: true, minWidth: 90,  defaultWidth: 110 },
+  { key: 'platform',             label: 'Platform',         defaultVisible: true, minWidth: 90,  defaultWidth: 110 },
+  { key: 'quantity',             label: 'Qty',              defaultVisible: true, minWidth: 60,  defaultWidth: 80 },
+  { key: 'invoice_ref',          label: 'Invoice Ref',      defaultVisible: true, minWidth: 80,  defaultWidth: 100 },
 ];
 
 export const DEFAULT_CATEGORIES = [

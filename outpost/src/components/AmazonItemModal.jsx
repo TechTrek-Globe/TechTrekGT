@@ -210,7 +210,7 @@ export function AmazonItemModal({ isOpen, platforms = [], onClose, onCreated }) 
           platform_flat_fee: defaultPlatform.flat_fee || 0,
           est_shipping_cost: 0,
           boost_pct: 0,
-          target_margin_pct: 0.20,
+          target_margin_pct: 0.15,
           status: 'Available',
           notes: noteParts.join(' | ') || 'Imported from Amazon',
           best_listing_window: ''

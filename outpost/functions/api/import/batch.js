@@ -93,7 +93,7 @@ export async function onRequestPost(context) {
       const flatFee = Number(itm.platform_flat_fee) || 0.40;
       const estShip = Number(itm.est_shipping_cost) || 6.50;
       const boostPct = Number(itm.boost_pct) || 0;
-      const targetMargin = Number(itm.target_margin_pct) || 0.30;
+      const targetMargin = Number(itm.target_margin_pct) || 0.15;
       const floors = computePricingFloors({
         true_total_cost: trueCost,
         est_shipping_cost: estShip,

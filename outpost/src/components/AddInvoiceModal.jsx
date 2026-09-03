@@ -17,7 +17,7 @@ const emptyItem = () => ({
   item_name: '', category: 'Jersey', sport_genre: '', athlete_person: '',
   authenticator: 'JSA', cert_number: '', unit_price: '',
   platform: 'eBay', boost_pct: 0, est_shipping_cost: 6.5,
-  target_margin_pct: 0.30, status: 'Available',
+  target_margin_pct: 0.15, status: 'Available',
   notes: '', best_listing_window: '',
   // preview-only (computed client-side)
   _preview: null

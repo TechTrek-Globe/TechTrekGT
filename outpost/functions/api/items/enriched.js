@@ -239,6 +239,42 @@ export async function onRequestGet(context) {
       const userNote = parseUserNote(row.notes);
       const searchUrl = buildEbaySearchUrl(row.item_name, row.athlete_person, row.authenticator);
 
+      let asin = null;
+      let orderId = null;
+      let isVineScout = false;
+      let etv = null;
+      let taxCost = null;
+
+      if (row.attributes) {
+        try {
+          const parsed = typeof row.attributes === 'string' ? JSON.parse(row.attributes) : row.attributes;
+          if (parsed && typeof parsed === 'object') {
+            if (parsed.asin) asin = String(parsed.asin).trim().toUpperCase();
+            if (parsed.order_id) orderId = String(parsed.order_id).trim();
+            if (parsed.source === 'amazon_vinescout' || parsed.is_vinescout) isVineScout = true;
+            if (parsed.etv != null) etv = Number(parsed.etv);
+            if (parsed.tax_cost != null) taxCost = Number(parsed.tax_cost);
+          }
+        } catch (_) {}
+      }
+
+      if (!asin && row.notes) {
+        const mAsin = row.notes.match(/\b(B0[A-Z0-9]{8})\b/i);
+        if (mAsin) asin = mAsin[1].toUpperCase();
+      }
+      if (!orderId && row.notes) {
+        const mOrder = row.notes.match(/\b(\d{3}-\d{7}-\d{7})\b/);
+        if (mOrder) orderId = mOrder[1];
+      }
+      if (!asin && row.invoice_ref) {
+        const mInv = row.invoice_ref.match(/AMAZON-(B0[A-Z0-9]{8})/i);
+        if (mInv) asin = mInv[1].toUpperCase();
+      }
+
+      if (asin || orderId || isAmazon) {
+        isVineScout = true;
+      }
+
       return {
         ...row,
         item_name: cleanItemName(row.item_name),
@@ -246,7 +282,12 @@ export async function onRequestGet(context) {
         ebay_search_url: searchUrl,
         image_url: imageUrl,
         user_note: userNote,
-        is_amazon: isAmazon
+        is_amazon: isAmazon,
+        is_vinescout: isVineScout,
+        asin: asin,
+        order_id: orderId,
+        etv: etv,
+        tax_cost: taxCost
       };
     });
 

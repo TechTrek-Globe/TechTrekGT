@@ -332,7 +332,7 @@ export function parsePristineAuctionInvoiceText(rawText, fallbackDate = null) {
       platform_fee_pct: defaultPlatform.fee_pct,
       platform_flat_fee: defaultPlatform.flat_fee,
       boost_pct: 0,
-      target_margin_pct: 0.30
+      target_margin_pct: 0.15
     });
 
     const notesParts = [];
@@ -364,7 +364,7 @@ export function parsePristineAuctionInvoiceText(rawText, fallbackDate = null) {
       suggested_list_price: floors.suggested_list_price,
       current_list_price: null,
       actual_sell_price: null,
-      target_margin_pct: 0.30,
+      target_margin_pct: 0.15,
       date_acquired: dateAcquired,
       date_listed: null,
       date_sold: null,

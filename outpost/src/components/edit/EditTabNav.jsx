@@ -1,11 +1,12 @@
 import React from 'react';
-import { Tag, DollarSign, TrendingUp, BarChart2 } from 'lucide-react';
+import { Tag, DollarSign, TrendingUp, BarChart2, ShoppingBag } from 'lucide-react';
 
 export const TABS = [
   { id: 'details',         label: 'Item Details',            icon: Tag },
   { id: 'listing_pricing', label: 'Listing, Pricing & Fees', icon: DollarSign },
   { id: 'comps',           label: 'Market Comps',            icon: TrendingUp },
   { id: 'performance',     label: 'Performance & Traffic',   icon: BarChart2 },
+  { id: 'vinescout',       label: '🔗 VineScout / Vine',      icon: ShoppingBag },
 ];
 
 export function EditTabNav({ activeTab, setActiveTab, form }) {
@@ -20,6 +21,7 @@ export function EditTabNav({ activeTab, setActiveTab, form }) {
         const showListingDot = tab.id === 'listing_pricing' && Boolean(form.ebay_listing_id);
         const showCompsDot = tab.id === 'comps' && Boolean(form.comp_1 || form.active_comp_1);
         const showPerfDot = tab.id === 'performance' && Boolean(form.analytics_fetched_at || form.ebay_listing_id);
+        const showVineDot = tab.id === 'vinescout' && Boolean(form.is_vinescout || form.asin || form.order_id);
 
         return (
           <button
@@ -57,6 +59,12 @@ export function EditTabNav({ activeTab, setActiveTab, form }) {
               <span
                 className="w-2 h-2 rounded-full bg-purple-400 shadow-sm"
                 title="Performance analytics active"
+              />
+            )}
+            {showVineDot && (
+              <span
+                className="w-2 h-2 rounded-full bg-teal-400 shadow-sm"
+                title="Linked to VineScout / Vine"
               />
             )}
           </button>

@@ -31,7 +31,7 @@ export function EditTabListingPricing({
 
   // Compute suggested target price from target margin
   const cogs = parseFloat(form.true_total_cost) || parseFloat(form.unit_price) || 0;
-  const targetMarginPct = (parseFloat(form.target_margin_pct) || 30) / 100;
+  const targetMarginPct = (parseFloat(form.target_margin_pct) || 15) / 100;
   const platformFeePct = (parseFloat(form.platform_fee_pct) || 13.5) / 100;
   const promotedRate = parseFloat(form.ebay_promoted_rate) || 0;
   const shippingCost = parseFloat(form.est_shipping_cost) || 0;
@@ -599,7 +599,7 @@ export function EditTabListingPricing({
               <div>
                 <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center justify-between">
                   <span>Target Profit Margin (%)</span>
-                  <span className="text-[10px] text-slate-400 font-mono">{form.target_margin_pct || '30'}%</span>
+                  <span className="text-[10px] text-slate-400 font-mono">{form.target_margin_pct || '15'}%</span>
                 </label>
                 <div className="relative">
                   <input
@@ -609,7 +609,7 @@ export function EditTabListingPricing({
                     value={form.target_margin_pct ?? ''}
                     onChange={e => updateField('target_margin_pct', e.target.value)}
                     className="input-field text-xs pr-8 font-mono text-blue-300 font-bold"
-                    placeholder="30"
+                    placeholder="15"
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-bold pointer-events-none">%</span>
                 </div>

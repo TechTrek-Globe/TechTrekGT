@@ -157,7 +157,9 @@ export function computeFeeBreakdown(params = {}) {
     promotedRate: rawPromoted,
     promotedDecimal,
     finalValueFee,
+    platformFeeAmt: finalValueFee,
     promotedFee,
+    promotedListingFee: promotedFee,
     paymentFee,
     totalFees,
     netProceeds,
@@ -174,7 +176,7 @@ export function computeFeeBreakdown(params = {}) {
  */
 export function computeTargetPriceFromMargin(
   cogs,
-  targetMarginPct = 0.30,
+  targetMarginPct = 0.15,
   platformFeePct = 0.1325,
   promotedRate = 0,
   shippingCost = 0,

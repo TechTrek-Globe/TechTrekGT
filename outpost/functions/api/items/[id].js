@@ -137,6 +137,39 @@ export async function onRequestPut(context) {
       updated.actual_sell_price = item.actual_sell_price || item.current_list_price || item.suggested_list_price || pricing.suggested_list_price || updated.true_total_cost || 0;
     }
 
+    // Extract & merge attributes JSON for VineScout / Amazon Vine integration
+    let existingAttrs = {};
+    if (item.attributes) {
+      try {
+        existingAttrs = typeof item.attributes === 'string' ? JSON.parse(item.attributes) : (item.attributes || {});
+      } catch (_) {}
+    }
+
+    let nextAttrs = { ...existingAttrs };
+    if (body.asin !== undefined) {
+      nextAttrs.asin = body.asin ? String(body.asin).trim().toUpperCase() : null;
+    }
+    if (body.order_id !== undefined) {
+      nextAttrs.order_id = body.order_id ? String(body.order_id).trim() : null;
+    }
+    if (body.is_vinescout !== undefined) {
+      nextAttrs.is_vinescout = Boolean(body.is_vinescout);
+      if (body.is_vinescout) {
+        nextAttrs.source = 'amazon_vinescout';
+      }
+    }
+    if (body.etv !== undefined) {
+      nextAttrs.etv = body.etv !== '' && body.etv != null ? parseFloat(body.etv) : null;
+    }
+    if (body.tax_cost !== undefined) {
+      nextAttrs.tax_cost = body.tax_cost !== '' && body.tax_cost != null ? parseFloat(body.tax_cost) : null;
+    }
+    if (body.attributes && typeof body.attributes === 'object') {
+      nextAttrs = { ...nextAttrs, ...body.attributes };
+    }
+
+    const attributesJson = JSON.stringify(nextAttrs);
+
     await env.DB.prepare(`
       UPDATE auction_items SET
         item_name = ?, category = ?, sport_genre = ?, athlete_person = ?,
@@ -152,7 +185,7 @@ export async function onRequestPut(context) {
         other_platform_listing_ids = ?, ebay_promoted_rate = ?,
         sku = ?, listing_format = ?, listing_status = ?,
         quantity = ?, purchase_date = ?, floor_price = ?, buy_it_now_price = ?,
-        buyer_shipping_cost = ?,
+        buyer_shipping_cost = ?, attributes = ?,
         updated_at = datetime('now')
       WHERE id = ? AND user_id = ?
     `).bind(
@@ -169,7 +202,7 @@ export async function onRequestPut(context) {
       updated.other_platform_listing_ids, updated.ebay_promoted_rate,
       updated.sku, updated.listing_format, updated.listing_status,
       updated.quantity, updated.purchase_date, updated.floor_price, updated.buy_it_now_price,
-      updated.buyer_shipping_cost,
+      updated.buyer_shipping_cost, attributesJson,
       id, payload.userId
     ).run();
 

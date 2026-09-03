@@ -36,6 +36,8 @@ import { onRequestPost as ebaySyncAllHandler } from '../functions/api/ebay/sync-
 import { onRequestPost as ebayPushSkuHandler } from '../functions/api/ebay/push-sku.js';
 import { onRequestGet as ebayAnalyticsHandler, onRequestPost as ebayAnalyticsIngestHandler } from '../functions/api/ebay/analytics.js';
 import { onRequestGet as vinescoutSalesExportHandler } from '../functions/api/export/vinescout-sales.js';
+import { onRequestGet as vinescoutInventoryExportHandler } from '../functions/api/export/vinescout-inventory.js';
+import { onRequestGet as vinescoutCatalogHandler } from '../functions/api/sync/vinescout-catalog.js';
 
 function addSecurityHeaders(response, isLocalhost = false, requestOrigin = '') {
   const newHeaders = new Headers(response.headers);
@@ -265,6 +267,12 @@ export default {
         response = await ebayReconcileHandler(context);
       } else if (apiPath === '/api/export/vinescout-sales' && request.method === 'GET') {
         response = await vinescoutSalesExportHandler(context);
+      } else if (apiPath === '/api/export/vinescout-inventory' && request.method === 'GET') {
+        response = await vinescoutInventoryExportHandler(context);
+      } else if (apiPath === '/api/sync/vinescout-catalog' && request.method === 'GET') {
+        response = await vinescoutCatalogHandler(context);
+      } else if (apiPath === '/api/sync/item' && request.method === 'POST') {
+        response = await amazonImportHandler(context);
       } else if (apiPath.startsWith('/api/')) {
         response = new Response(JSON.stringify({ error: 'Endpoint not found' }), {
           status: 404,

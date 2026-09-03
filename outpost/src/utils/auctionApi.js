@@ -313,3 +313,7 @@ export const pushAllSkusToEbay = () =>
     headers: JSON_HEADERS,
     body: JSON.stringify({ all: true })
   });
+
+// --- VineScout Sync Catalog ---
+export const getVineScoutCatalog = () =>
+  apiFetch('/api/sync/vinescout-catalog');

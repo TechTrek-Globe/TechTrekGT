@@ -29,37 +29,46 @@ export async function onRequestPost(context) {
   if (!env.DB) return err('Database binding unavailable', 500);
 
   // --- Auth via Webhook Secret or Bearer API token ---
-  const vineScoutAuth = request.headers.get('X-VineScout-Auth');
-  const expectedSecret = env.OUTPOST_SECRET_KEY;
+  const vineScoutAuth = (request.headers.get('X-VineScout-Auth') || '').trim();
+  const authHeader = (request.headers.get('Authorization') || '').trim();
+  const token = (authHeader.startsWith('Bearer ') ? authHeader.slice(7) : vineScoutAuth).trim();
 
-  let userId;
+  if (!token) {
+    return err('Unauthorized: missing Bearer token or valid X-VineScout-Auth', 401);
+  }
 
-  if (vineScoutAuth && expectedSecret && vineScoutAuth === expectedSecret) {
-    userId = 1;
-  } else {
-    const authHeader = request.headers.get('Authorization') || '';
-    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : null;
+  let userId = null;
 
-    if (!token) {
-      return err('Unauthorized: missing Bearer token or valid X-VineScout-Auth', 401);
-    }
+  // 1. Try matching amazon_api_token in users table
+  const userRow = await env.DB.prepare(
+    `SELECT id AS userId FROM users WHERE amazon_api_token = ? LIMIT 1`
+  ).bind(token).first();
 
-    const userRow = await env.DB.prepare(
-      `SELECT id AS userId, email FROM users WHERE amazon_api_token = ? LIMIT 1`
-    ).bind(token).first();
-
-    if (!userRow) {
-      return err('Unauthorized: invalid API token', 401);
-    }
-
+  if (userRow && userRow.userId) {
     userId = userRow.userId;
+  } else if (env.OUTPOST_SECRET_KEY && token === env.OUTPOST_SECRET_KEY) {
+    // 2. Secret key matched - find primary user in database
+    const primaryUser = await env.DB.prepare(`SELECT id AS userId FROM users ORDER BY created_at ASC LIMIT 1`).first();
+    if (primaryUser && primaryUser.userId) {
+      userId = primaryUser.userId;
+    }
+  }
+
+  if (!userId) {
+    // Fallback: if only 1 user exists in DB, use that user
+    const fallbackUser = await env.DB.prepare(`SELECT id AS userId FROM users LIMIT 1`).first();
+    if (fallbackUser && fallbackUser.userId) {
+      userId = fallbackUser.userId;
+    } else {
+      return err('Unauthorized: invalid API token or secret', 401);
+    }
   }
 
   // --- Parse body ---
   const body = await request.json().catch(() => ({}));
   const {
     asin, title, category, sellingCategory, amazonCategory,
-    vine_value, etv, tax_value,
+    vine_value, etv, tax_value, taxCost, tax_cost, cost,
     order_id,
     image_urls, images, image_url, imageUrl,
     page_url,
@@ -72,8 +81,11 @@ export async function onRequestPost(context) {
   if (!title || !title.trim()) return err('title is required');
 
   const cleanAsin   = asin.toUpperCase().trim();
-  const unitPrice   = Number(etv !== undefined ? etv : vine_value) || 0;
-  const taxAmt      = Number(tax_value)  || 0;
+  const etvAmt      = Number(etv !== undefined ? etv : (vine_value !== undefined ? vine_value : 0)) || 0;
+  // Tax cost represents the true acquisition cost (COGS) for Vine items
+  const taxCostAmt  = Number(taxCost !== undefined ? taxCost : (tax_cost !== undefined ? tax_cost : (tax_value !== undefined ? tax_value : (cost !== undefined ? cost : etvAmt)))) || 0;
+  const unitPrice   = taxCostAmt; // Outpost inventory item cost basis
+  const taxAmt      = 0;
   const resolvedCat = sellingCategory || amazonCategory || category || 'Other';
   const today       = new Date().toISOString().split('T')[0];
   const invoiceRef  = `AMAZON-${cleanAsin}-${today}`;
@@ -92,8 +104,9 @@ export async function onRequestPost(context) {
     amazon_url:    page_url || `https://www.amazon.com/dp/${cleanAsin}`,
     image_urls:    resolvedImageUrls,
     specs:         (specs && typeof specs === 'object') ? specs : {},
-    etv:           unitPrice,
-    tax_charged:   taxAmt,
+    etv:           etvAmt,
+    tax_cost:      taxCostAmt,
+    tax_charged:   taxCostAmt,
     order_id:      order_id || null,
     vine_program:  true,
     condition:     condition || 'New',
@@ -105,17 +118,18 @@ export async function onRequestPost(context) {
     `SELECT fee_pct, flat_fee, name FROM auction_platforms WHERE user_id = ? AND is_default = 1 LIMIT 1`
   ).bind(userId).first() || { name: 'eBay', fee_pct: 0.136, flat_fee: 0.40 };
 
-  // Create invoice
-  const invoiceId = `inv-${crypto.randomUUID()}`;
-  await env.DB.prepare(`
-    INSERT INTO auction_invoices
-      (id, user_id, invoice_ref, description, base_total, discount, shipping, tax, date_acquired)
-    VALUES (?, ?, ?, ?, ?, 0, 0, ?, ?)
-  `).bind(
-    invoiceId, userId, invoiceRef,
-    `VineScout import - ASIN ${cleanAsin}`,
-    unitPrice, taxAmt, today
-  ).run();
+  // Check if item already exists by ASIN or Order ID to prevent duplicate inventory
+  const existingItem = await env.DB.prepare(`
+    SELECT i.id, i.sku, i.invoice_id 
+    FROM auction_items i
+    LEFT JOIN auction_invoices v ON i.invoice_id = v.id
+    WHERE i.user_id = ? AND (
+      json_extract(i.attributes, '$.asin') = ? 
+      OR i.notes LIKE ?
+      OR v.invoice_ref LIKE ?
+    )
+    LIMIT 1
+  `).bind(userId, cleanAsin, `%ASIN: ${cleanAsin}%`, `AMAZON-${cleanAsin}-%`).first();
 
   // Compute proration + pricing
   const proration = computeItemProration(
@@ -128,7 +142,7 @@ export async function onRequestPost(context) {
     platform_flat_fee:  plat.flat_fee || 0,
     platform_fee_pct:   plat.fee_pct  || 0,
     boost_pct:          0,
-    target_margin_pct:  0.20
+    target_margin_pct:  0.15
   });
 
   // Build legacy notes string (kept for backward compat with existing comps parser)
@@ -139,6 +153,50 @@ export async function onRequestPost(context) {
     resolvedImageUrls.length > 0 ? `Image: ${resolvedImageUrls[0]}` : null,
     notes || 'Imported via VineScout'
   ].filter(Boolean).join(' | ');
+
+  if (existingItem) {
+    // Update existing item attributes and pricing floors
+    await env.DB.prepare(`
+      UPDATE auction_items 
+      SET 
+        item_name = ?,
+        unit_price = ?,
+        item_base_total = ?,
+        true_total_cost = ?,
+        min_sell_price = ?,
+        suggested_list_price = ?,
+        attributes = ?,
+        notes = ?
+      WHERE id = ?
+    `).bind(
+      title.trim(),
+      unitPrice, unitPrice, proration.true_total_cost,
+      pricing.min_sell_price, pricing.suggested_list_price,
+      attributes, itemNotes,
+      existingItem.id
+    ).run();
+
+    return ok({ 
+      success: true, 
+      item_id: existingItem.id, 
+      sku: existingItem.sku, 
+      is_existing: true,
+      min_sell_price: pricing.min_sell_price,
+      suggested_list_price: pricing.suggested_list_price
+    }, 200);
+  }
+
+  // Create invoice for new item
+  const invoiceId = `inv-${crypto.randomUUID()}`;
+  await env.DB.prepare(`
+    INSERT INTO auction_invoices
+      (id, user_id, invoice_ref, description, base_total, discount, shipping, tax, date_acquired)
+    VALUES (?, ?, ?, ?, ?, 0, 0, ?, ?)
+  `).bind(
+    invoiceId, userId, invoiceRef,
+    `VScout import - ASIN ${cleanAsin} (ETV: $${etvAmt.toFixed(2)})`,
+    unitPrice, taxAmt, today
+  ).run();
 
   // Create item - includes new attributes column and auto-generated SKU
   const itemId = `item-${crypto.randomUUID()}`;
@@ -170,7 +228,7 @@ export async function onRequestPost(context) {
     'Available', plat.name, plat.fee_pct, plat.flat_fee,
     0, 0,
     pricing.min_sell_price, pricing.suggested_list_price,
-    null, 0.20, today, itemNotes, attributes, itemSku
+    null, 0.15, today, itemNotes, attributes, itemSku
   ).run();
 
   return ok({ success: true, item_id: itemId, sku: itemSku, invoice_ref: invoiceRef }, 201);

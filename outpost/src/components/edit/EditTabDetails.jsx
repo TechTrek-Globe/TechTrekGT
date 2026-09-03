@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   Tag, Hash, Trophy, User, Layers, Calendar, FileText,
-  ShieldCheck, ExternalLink, Award, CheckCircle2, Receipt, Calculator
+  ShieldCheck, ExternalLink, Award, CheckCircle2, Receipt, Calculator, ShoppingBag
 } from 'lucide-react';
 import { AUTHENTICATORS, getCertVerificationUrl, getAuthenticatorMeta } from '../../utils/certLookup';
 import { fmtCurrency } from '../../utils/formulaPreview';
@@ -287,7 +287,145 @@ export function EditTabDetails({ form, updateField, allCategories = [], item }) 
         </div>
       </div>
 
-      {/* 6. Best Listing Window */}
+      {/* 6. VineScout & Amazon Vine Link Card */}
+      <div className="p-4 rounded-xl bg-slate-900/80 border border-teal-800/40 space-y-4">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <ShoppingBag className="w-4 h-4 text-teal-400" />
+            <span className="text-xs font-bold text-white uppercase tracking-wider">VineScout &amp; Amazon Vine Link</span>
+            {form.is_vinescout && (
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-teal-500/20 text-teal-300 border border-teal-500/40">
+                Linked to VScout
+              </span>
+            )}
+          </div>
+
+          <label className="flex items-center gap-2 cursor-pointer bg-slate-800/60 hover:bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-700 transition-colors">
+            <input
+              type="checkbox"
+              checked={Boolean(form.is_vinescout)}
+              onChange={e => updateField('is_vinescout', e.target.checked)}
+              className="rounded border-slate-700 text-teal-500 focus:ring-teal-400 h-3.5 w-3.5"
+            />
+            <span className="text-[11px] font-semibold text-slate-200">Assign as VScout Item</span>
+          </label>
+        </div>
+
+        <p className="text-[11px] text-slate-400">
+          Assign an Amazon ASIN or Order ID to synchronize this item with the VScout extension (live eBay pricing, ETV tax cost basis, and automated sold reconciliation).
+        </p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center justify-between">
+              <span>Amazon ASIN (Product ID)</span>
+              {form.asin && (
+                <a
+                  href={`https://www.amazon.com/dp/${form.asin.trim().toUpperCase()}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[10px] text-teal-400 hover:text-teal-300 flex items-center gap-1"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  <span>Open Product ↗</span>
+                </a>
+              )}
+            </label>
+            <input
+              type="text"
+              value={form.asin || ''}
+              onChange={e => {
+                const val = e.target.value.trim().toUpperCase();
+                updateField('asin', val);
+                if (val && !form.is_vinescout) updateField('is_vinescout', true);
+              }}
+              className="input-field text-xs font-mono text-teal-300 font-bold"
+              placeholder="e.g. B0GQ4KD8C5"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center justify-between">
+              <span>Amazon Vine Order ID</span>
+              {form.order_id && (
+                <a
+                  href={`https://www.amazon.com/gp/your-account/order-details?orderID=${form.order_id.trim()}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[10px] text-teal-400 hover:text-teal-300 flex items-center gap-1"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  <span>Order Details ↗</span>
+                </a>
+              )}
+            </label>
+            <input
+              type="text"
+              value={form.order_id || ''}
+              onChange={e => {
+                const val = e.target.value.trim();
+                updateField('order_id', val);
+                if (val && !form.is_vinescout) updateField('is_vinescout', true);
+              }}
+              className="input-field text-xs font-mono text-slate-300 font-medium"
+              placeholder="e.g. 111-2345678-9876543"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1 border-t border-slate-800/60">
+          <div>
+            <label className="block text-xs font-bold text-slate-300 mb-1.5">
+              Vine Estimated Tax Value (ETV)
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">$</span>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.etv || ''}
+                onChange={e => updateField('etv', e.target.value)}
+                className="input-field pl-6 text-xs font-mono text-slate-200 font-semibold"
+                placeholder="0.00"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center justify-between">
+              <span>Vine Acquisition Tax Cost</span>
+              {form.tax_cost && Number(form.tax_cost) > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    updateField('unit_price', String(Number(form.tax_cost).toFixed(2)));
+                    updateField('true_total_cost', String(Number(form.tax_cost).toFixed(2)));
+                  }}
+                  className="text-[10px] text-amber-400 hover:text-amber-300 underline font-semibold"
+                  title="Apply tax cost as item base unit price"
+                >
+                  Set as Item Cost Basis
+                </button>
+              )}
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">$</span>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.tax_cost || ''}
+                onChange={e => updateField('tax_cost', e.target.value)}
+                className="input-field pl-6 text-xs font-mono text-emerald-400 font-semibold"
+                placeholder="0.00"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 7. Best Listing Window */}
       <div>
         <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center justify-between">
           <span className="flex items-center gap-1.5">

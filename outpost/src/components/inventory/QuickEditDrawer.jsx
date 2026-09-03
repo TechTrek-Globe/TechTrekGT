@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, CheckCircle2, Loader2, Zap, ExternalLink, Copy, AlertCircle, TrendingUp, Layers, Lock, Sparkles, Upload } from 'lucide-react';
+import { X, Save, CheckCircle2, Loader2, Zap, ExternalLink, Copy, AlertCircle, TrendingUp, Layers, Lock, Sparkles, Upload, ShoppingBag } from 'lucide-react';
 import { updateItem, saveComp, fetchLiveComps, pushSkuToEbay } from '../../utils/auctionApi';
 import { ALL_STATUSES, LISTING_FORMATS } from '../../utils/constants';
 import { FeeBreakdownPanel } from './FeeBreakdownPanel';
@@ -26,6 +26,37 @@ export function QuickEditDrawer({
 
   useEffect(() => {
     if (item) {
+      let itemAsin = item.asin || '';
+      let itemOrderId = item.order_id || '';
+      let isVine = Boolean(item.is_vinescout || item.is_amazon || (item.invoice_ref && item.invoice_ref.startsWith('AMAZON-')));
+      let itemEtv = item.etv != null ? String(item.etv) : '';
+      let itemTaxCost = item.tax_cost != null ? String(item.tax_cost) : '';
+
+      if (item.attributes) {
+        try {
+          const parsed = typeof item.attributes === 'string' ? JSON.parse(item.attributes) : item.attributes;
+          if (parsed && typeof parsed === 'object') {
+            if (parsed.asin) itemAsin = parsed.asin;
+            if (parsed.order_id) itemOrderId = parsed.order_id;
+            if (parsed.source === 'amazon_vinescout' || parsed.is_vinescout) isVine = true;
+            if (parsed.etv != null) itemEtv = String(parsed.etv);
+            if (parsed.tax_cost != null) itemTaxCost = String(parsed.tax_cost);
+          }
+        } catch (_) {}
+      }
+
+      if (!itemAsin && item.notes) {
+        const m = item.notes.match(/\b(B0[A-Z0-9]{8})\b/i);
+        if (m) itemAsin = m[1].toUpperCase();
+      }
+      if (!itemOrderId && item.notes) {
+        const m = item.notes.match(/\b(\d{3}-\d{7}-\d{7})\b/);
+        if (m) itemOrderId = m[1];
+      }
+      if (itemAsin || itemOrderId) {
+        isVine = true;
+      }
+
       setDraft({
         item_name: item.item_name || '',
         sku: item.sku || '',
@@ -44,9 +75,17 @@ export function QuickEditDrawer({
         buy_it_now_price: item.buy_it_now_price ?? '',
         floor_price: item.floor_price ?? '',
         ebay_promoted_rate: item.ebay_promoted_rate ?? '',
-        target_margin_pct: item.target_margin_pct != null ? (Number(item.target_margin_pct) * 100).toFixed(0) : '30',
+        target_margin_pct: item.target_margin_pct != null ? (Number(item.target_margin_pct) * 100).toFixed(0) : '15',
         ebay_listing_id: item.ebay_listing_id || '',
         notes: item.notes || '',
+
+        // VineScout / Amazon Vine Link
+        is_vinescout: isVine,
+        asin: itemAsin,
+        order_id: itemOrderId,
+        etv: itemEtv,
+        tax_cost: itemTaxCost,
+
         // Comps
         comp_1: item.comp_1 ?? '',
         comp_2: item.comp_2 ?? '',
@@ -114,9 +153,16 @@ export function QuickEditDrawer({
         buy_it_now_price: draft.buy_it_now_price !== '' ? parseFloat(draft.buy_it_now_price) : null,
         floor_price: draft.floor_price !== '' ? parseFloat(draft.floor_price) : null,
         ebay_promoted_rate: draft.ebay_promoted_rate !== '' ? parseFloat(draft.ebay_promoted_rate) : null,
-        target_margin_pct: draft.target_margin_pct !== '' ? parseFloat(draft.target_margin_pct) / 100 : 0.30,
+        target_margin_pct: draft.target_margin_pct !== '' ? parseFloat(draft.target_margin_pct) / 100 : 0.15,
         ebay_listing_id: draft.ebay_listing_id ? draft.ebay_listing_id.trim() : null,
-        notes: draft.notes || null
+        notes: draft.notes || null,
+
+        // VineScout / Amazon Vine Link
+        is_vinescout: Boolean(draft.is_vinescout),
+        asin: draft.asin ? draft.asin.trim().toUpperCase() : null,
+        order_id: draft.order_id ? draft.order_id.trim() : null,
+        etv: draft.etv !== '' && draft.etv != null ? parseFloat(draft.etv) : null,
+        tax_cost: draft.tax_cost !== '' && draft.tax_cost != null ? parseFloat(draft.tax_cost) : null
       };
 
       const res = await updateItem(item.id, itemPatch);
@@ -354,6 +400,107 @@ export function QuickEditDrawer({
                   value={draft.purchase_date}
                   onChange={e => updateField('purchase_date', e.target.value)}
                   className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:border-amber-500 outline-none"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Section: VineScout & Amazon Vine Link */}
+          <div className="p-3 bg-slate-950/50 border border-teal-800/40 rounded-xl space-y-2.5">
+            <div className="flex items-center justify-between border-b border-slate-800/80 pb-1.5">
+              <h3 className="text-xs font-bold text-teal-300 flex items-center gap-1.5">
+                <ShoppingBag className="w-3.5 h-3.5 text-teal-400" /> VineScout Link
+              </h3>
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={Boolean(draft.is_vinescout)}
+                  onChange={e => updateField('is_vinescout', e.target.checked)}
+                  className="rounded border-slate-700 text-teal-500 focus:ring-teal-400 h-3 w-3"
+                />
+                <span className="text-[10px] font-semibold text-slate-300">VScout Item</span>
+              </label>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-[10px] text-slate-400 mb-1 font-semibold flex items-center justify-between">
+                  <span>ASIN</span>
+                  {draft.asin && (
+                    <a
+                      href={`https://www.amazon.com/dp/${draft.asin.trim().toUpperCase()}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[9px] text-teal-400 hover:text-teal-300"
+                    >
+                      Open ↗
+                    </a>
+                  )}
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. B0GQ4KD8C5"
+                  value={draft.asin || ''}
+                  onChange={e => {
+                    const val = e.target.value.trim().toUpperCase();
+                    updateField('asin', val);
+                    if (val && !draft.is_vinescout) updateField('is_vinescout', true);
+                  }}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-teal-300 focus:border-teal-500 outline-none font-mono font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] text-slate-400 mb-1 font-semibold">Order ID</label>
+                <input
+                  type="text"
+                  placeholder="e.g. 111-2345678-9876543"
+                  value={draft.order_id || ''}
+                  onChange={e => {
+                    const val = e.target.value.trim();
+                    updateField('order_id', val);
+                    if (val && !draft.is_vinescout) updateField('is_vinescout', true);
+                  }}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 focus:border-teal-500 outline-none font-mono"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-[10px] text-slate-400 mb-1 font-semibold">ETV ($)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                  value={draft.etv || ''}
+                  onChange={e => updateField('etv', e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 focus:border-teal-500 outline-none font-mono"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] text-slate-400 mb-1 font-semibold flex items-center justify-between">
+                  <span>Tax Cost ($)</span>
+                  {draft.tax_cost && Number(draft.tax_cost) > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => updateField('true_total_cost', String(Number(draft.tax_cost).toFixed(2)))}
+                      className="text-[9px] text-amber-400 hover:text-amber-300 underline"
+                      title="Set as Cost Basis"
+                    >
+                      Use as Cost
+                    </button>
+                  )}
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                  value={draft.tax_cost || ''}
+                  onChange={e => updateField('tax_cost', e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-emerald-400 focus:border-teal-500 outline-none font-mono font-semibold"
                 />
               </div>
             </div>

@@ -8,13 +8,14 @@ export const DEFAULT_COLUMNS = [
   { key: 'actions', label: 'Actions', minWidth: 100 },
   { key: 'item_name', label: 'Item / Description', minWidth: 160 },
   { key: 'sku', label: 'SKU / Label', minWidth: 80 },
-  { key: 'margin_health', label: 'Margin', minWidth: 95 },
   { key: 'status', label: 'Status', minWidth: 100 },
-  { key: 'listing_format', label: 'Format', minWidth: 90 },
   { key: 'current_list_price', label: 'List Price', minWidth: 95 },
+  { key: 'net_profit', label: 'Net Profit', minWidth: 95 },
+  { key: 'margin_health', label: 'Margin %', minWidth: 95 },
   { key: 'true_total_cost', label: 'Landed COGS', minWidth: 95 },
   { key: 'floor_price', label: 'Floor Price', minWidth: 85 },
   { key: 'suggested_list_price', label: 'Suggested', minWidth: 95 },
+  { key: 'listing_format', label: 'Format', minWidth: 90 },
   { key: 'athlete_person', label: 'Athlete / Signer', minWidth: 110 },
   { key: 'category', label: 'Category', minWidth: 100 },
   { key: 'authenticator', label: 'Authenticator', minWidth: 100 },
@@ -386,7 +387,7 @@ export function InventoryDataGrid({
           {hoverTooltip.type === 'suggested' && (() => {
             const item = hoverTooltip.item;
             const feeData = computeFeeBreakdown(item);
-            const targetMargin = Number(item.target_margin_pct) || 0.25;
+            const targetMargin = Number(item.target_margin_pct) || 0.15;
             const suggested = Number(item.suggested_list_price) || 0;
             return (
               <div className="space-y-1.5 text-[11px]">
@@ -428,21 +429,33 @@ export function InventoryDataGrid({
               <div className="space-y-1.5 text-[11px]">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-1">
                   <span className="font-bold text-amber-300 flex items-center gap-1">
-                    🏷️ List Price & Projected Economics
+                    🏷️ List Price & Financial Breakdown
                   </span>
                   <span className="text-[10px] text-slate-400 font-mono">
-                    {item.status}
+                    {item.status || 'Active'}
                   </span>
                 </div>
                 <div className="space-y-1 text-slate-300 font-mono text-[10.5px]">
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Current Asking Price:</span>
+                    <span className="text-slate-400">Current List Price:</span>
                     <span className="text-slate-100 font-bold">{fmtCurrency(feeData.sellPrice)}</span>
                   </div>
                   <div className="flex justify-between text-red-300">
-                    <span>Est. Platform Fee ({(feeData.platformFeePct * 100).toFixed(1)}%):</span>
-                    <span>-{fmtCurrency(feeData.platformFeeAmt)}</span>
+                    <span>Platform Fee ({(feeData.platformFeePct * 100).toFixed(2)}%):</span>
+                    <span>-{fmtCurrency(feeData.finalValueFee || feeData.platformFeeAmt)}</span>
                   </div>
+                  {feeData.promotedFee > 0 && (
+                    <div className="flex justify-between text-red-300">
+                      <span>Promoted Ad Fee ({(feeData.promotedDecimal * 100).toFixed(1)}%):</span>
+                      <span>-{fmtCurrency(feeData.promotedFee)}</span>
+                    </div>
+                  )}
+                  {feeData.platformFlatFee > 0 && (
+                    <div className="flex justify-between text-red-300">
+                      <span>Platform Flat Fee:</span>
+                      <span>-{fmtCurrency(feeData.platformFlatFee)}</span>
+                    </div>
+                  )}
                   {feeData.estShippingCost > 0 && (
                     <div className="flex justify-between text-red-300">
                       <span>Est. Outbound Shipping:</span>
@@ -450,7 +463,7 @@ export function InventoryDataGrid({
                     </div>
                   )}
                   <div className="flex justify-between text-slate-400">
-                    <span>True Landed COGS:</span>
+                    <span>Landed Cost (COGS):</span>
                     <span>-{fmtCurrency(feeData.cogs)}</span>
                   </div>
                   <div className="flex justify-between border-t border-slate-800/80 pt-1 font-bold">
@@ -458,19 +471,97 @@ export function InventoryDataGrid({
                       Projected Net Profit:
                     </span>
                     <span className={feeData.netProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}>
-                      {fmtCurrency(feeData.netProfit)}
+                      {feeData.netProfit >= 0 ? '+' : ''}{fmtCurrency(feeData.netProfit)}
                     </span>
                   </div>
                   <div className="flex justify-between text-[10px] text-slate-400">
-                    <span>Projected Margin:</span>
-                    <span className="font-bold text-slate-200">{(feeData.marginPct * 100).toFixed(1)}%</span>
+                    <span>Profit Margin:</span>
+                    <span className={`font-bold ${feeData.marginPct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {(feeData.marginPct * 100).toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-[10px] text-slate-400">
+                    <span>Return on Investment (ROI):</span>
+                    <span className={`font-bold ${feeData.roiPct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {(feeData.roiPct * 100).toFixed(1)}%
+                    </span>
                   </div>
                 </div>
               </div>
             );
           })()}
 
-          {/* 5. Margin Health Breakdown */}
+          {/* 5. Net Profit Full Calculation Tooltip */}
+          {hoverTooltip.type === 'net_profit' && (() => {
+            const item = hoverTooltip.item;
+            const feeData = computeFeeBreakdown(item);
+            return (
+              <div className="space-y-1.5 text-[11px]">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-1">
+                  <span className="font-bold text-emerald-400 flex items-center gap-1">
+                    💵 Net Profit Full Calculation
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    {item.platform || 'eBay'}
+                  </span>
+                </div>
+                <div className="space-y-1 text-slate-300 font-mono text-[10.5px]">
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Gross Asking Price:</span>
+                    <span className="text-slate-100 font-bold">{fmtCurrency(feeData.sellPrice)}</span>
+                  </div>
+                  <div className="flex justify-between text-red-300">
+                    <span>Less Platform Fee ({(feeData.platformFeePct * 100).toFixed(2)}%):</span>
+                    <span>-{fmtCurrency(feeData.finalValueFee || feeData.platformFeeAmt)}</span>
+                  </div>
+                  {feeData.promotedFee > 0 && (
+                    <div className="flex justify-between text-red-300">
+                      <span>Less Promoted Ad Fee ({(feeData.promotedDecimal * 100).toFixed(1)}%):</span>
+                      <span>-{fmtCurrency(feeData.promotedFee)}</span>
+                    </div>
+                  )}
+                  {feeData.platformFlatFee > 0 && (
+                    <div className="flex justify-between text-red-300">
+                      <span>Less Order Flat Fee:</span>
+                      <span>-{fmtCurrency(feeData.platformFlatFee)}</span>
+                    </div>
+                  )}
+                  {feeData.estShippingCost > 0 && (
+                    <div className="flex justify-between text-red-300">
+                      <span>Less Outbound Shipping:</span>
+                      <span>-{fmtCurrency(feeData.estShippingCost)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-slate-400">
+                    <span>Less True Landed COGS:</span>
+                    <span>-{fmtCurrency(feeData.cogs)}</span>
+                  </div>
+                  <div className="flex justify-between border-t border-slate-800/80 pt-1 font-bold text-base">
+                    <span className={feeData.netProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}>
+                      True Net Profit:
+                    </span>
+                    <span className={feeData.netProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}>
+                      {feeData.netProfit >= 0 ? '+' : ''}{fmtCurrency(feeData.netProfit)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-[10.5px] border-t border-slate-900 pt-0.5 font-semibold">
+                    <span className="text-slate-400">Net Profit Margin:</span>
+                    <span className={feeData.marginPct >= 0 ? 'text-emerald-400' : 'text-red-400'}>
+                      {(feeData.marginPct * 100).toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-[10.5px] font-semibold">
+                    <span className="text-slate-400">Return on Investment (ROI):</span>
+                    <span className={feeData.roiPct >= 0 ? 'text-emerald-400' : 'text-red-400'}>
+                      {(feeData.roiPct * 100).toFixed(1)}%
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* 6. Margin Health Breakdown */}
           {hoverTooltip.type === 'margin' && (() => {
             const item = hoverTooltip.item;
             const feeData = computeFeeBreakdown(item);
@@ -486,13 +577,25 @@ export function InventoryDataGrid({
                     <span className="text-slate-400">List Price:</span>
                     <span className="text-slate-200">{fmtCurrency(feeData.sellPrice)}</span>
                   </div>
+                  <div className="flex justify-between text-red-300">
+                    <span>Platform Fee ({(feeData.platformFeePct * 100).toFixed(2)}%):</span>
+                    <span>-{fmtCurrency(feeData.finalValueFee || feeData.platformFeeAmt)}</span>
+                  </div>
+                  {feeData.promotedFee > 0 && (
+                    <div className="flex justify-between text-red-300">
+                      <span>Promoted Ad Fee ({(feeData.promotedDecimal * 100).toFixed(1)}%):</span>
+                      <span>-{fmtCurrency(feeData.promotedFee)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between">
                     <span className="text-slate-400">Landed COGS:</span>
                     <span className="text-slate-200">{fmtCurrency(feeData.cogs)}</span>
                   </div>
                   <div className="flex justify-between border-t border-slate-800/80 pt-1 font-bold">
                     <span className={feeData.netProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}>Net Profit:</span>
-                    <span className={feeData.netProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}>{fmtCurrency(feeData.netProfit)}</span>
+                    <span className={feeData.netProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}>
+                      {feeData.netProfit >= 0 ? '+' : ''}{fmtCurrency(feeData.netProfit)}
+                    </span>
                   </div>
                   <div className="flex justify-between font-bold">
                     <span className="text-slate-300">Net Margin %:</span>

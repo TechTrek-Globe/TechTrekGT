@@ -455,4 +455,25 @@ CREATE INDEX IF NOT EXISTS idx_traffic_item_date ON listing_traffic(item_id, tra
 CREATE INDEX IF NOT EXISTS idx_traffic_ebay_date ON listing_traffic(ebay_listing_id, traffic_date);
 CREATE INDEX IF NOT EXISTS idx_traffic_user      ON listing_traffic(user_id);
 
+-- ============================================================
+-- PHASE 7 MIGRATIONS - Bi-Directional Sync Engine
+-- Added: 2026-09-02
+-- Additive only (CREATE TABLE IF NOT EXISTS). No DROP or ALTER.
+-- Run: npm run db:migrate:local (local) | npm run db:migrate (production)
+-- ============================================================
+
+-- P7-1: Per-user sync automation preferences (eBay auto-sync + VScout auto-sync)
+CREATE TABLE IF NOT EXISTS outpost_sync_settings (
+  user_id                TEXT PRIMARY KEY,
+  ebay_auto_sync         INTEGER NOT NULL DEFAULT 0,
+  ebay_sync_interval_m   INTEGER NOT NULL DEFAULT 30,
+  vscout_auto_sync       INTEGER NOT NULL DEFAULT 0,
+  vscout_sync_interval_m INTEGER NOT NULL DEFAULT 60,
+  last_ebay_sync_at      TEXT,
+  last_vscout_sync_at    TEXT,
+  updated_at             TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_sync_settings_user ON outpost_sync_settings(user_id);
+
 

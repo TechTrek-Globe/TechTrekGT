@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Package, AlertCircle, Loader2, UploadCloud, Tag, RefreshCw, TableProperties, LayoutGrid } from 'lucide-react';
+import { Package, AlertCircle, CheckCircle2, Loader2, UploadCloud, Tag, RefreshCw, TableProperties, LayoutGrid } from 'lucide-react';
 import { useInventory } from '../context/InventoryContext';
 import { deleteItem } from '../utils/auctionApi';
 import { cleanEbaySearchQuery } from '../utils/ebaySearch';
@@ -23,6 +23,7 @@ import { ListingCopyModal } from './ListingCopyModal';
 import { EditItemModal } from './EditItemModal';
 import { DelistPendingAlert } from './DelistPendingAlert';
 import { EbayListingIdModal } from './EbayListingIdModal';
+import { SoldEbayVineMatcherModal } from './inventory/SoldEbayVineMatcherModal';
 
 export function InventoryHubView({ onNavigate }) {
   const {
@@ -43,8 +44,26 @@ export function InventoryHubView({ onNavigate }) {
     setPendingSaleItem,
     userSettings, setUserSettings,
     fetchItems, refreshAll,
-    updateItemLocal
+    updateItemLocal,
+    ebaySyncing, handleSyncEbay
   } = useInventory();
+
+  // --- Sync toast state ---
+  const [syncResult, setSyncResult] = useState(null);
+  const [soldMatcherOpen, setSoldMatcherOpen] = useState(false);
+
+  // Wrap context handler to add local toast feedback
+  const handleSyncEbayWithToast = async () => {
+    setSyncResult(null);
+    try {
+      await handleSyncEbay();
+      setSyncResult({ ok: true, msg: 'eBay sync complete.' });
+    } catch (e) {
+      setSyncResult({ ok: false, msg: e?.message || 'eBay sync failed.' });
+    } finally {
+      setTimeout(() => setSyncResult(null), 5000);
+    }
+  };
 
   // --- View State ---
   const [viewMode, setViewMode] = useState('table'); // 'table' or 'pricing'
@@ -169,7 +188,24 @@ export function InventoryHubView({ onNavigate }) {
         totalListValue={totalListValue}
         totalPotentialProfit={totalPotentialProfit}
         overallMargin={overallMargin}
+        onSyncEbay={handleSyncEbayWithToast}
+        syncing={ebaySyncing}
+        onOpenSoldMatcher={() => setSoldMatcherOpen(true)}
       />
+
+      {/* eBay Sync result toast */}
+      {syncResult && (
+        <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs border flex-shrink-0 ${
+          syncResult.ok
+            ? 'bg-emerald-950/50 border-emerald-500/40 text-emerald-300'
+            : 'bg-red-950/40 border-red-500/30 text-red-400'
+        }`}>
+          {syncResult.ok
+            ? <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0 text-emerald-400" />
+            : <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 text-red-400" />}
+          <span>{syncResult.msg}</span>
+        </div>
+      )}
 
       {/* Expanded Metrics Strip (Collapsible) */}
       {showMetrics && <InventoryMetricsStrip items={items} />}
@@ -305,6 +341,11 @@ export function InventoryHubView({ onNavigate }) {
           updateItemLocal(id, patch);
           setListingIdModalItem(null);
         }}
+      />
+      <SoldEbayVineMatcherModal
+        isOpen={soldMatcherOpen}
+        onClose={() => setSoldMatcherOpen(false)}
+        onMatched={refreshAll}
       />
     </div>
   );

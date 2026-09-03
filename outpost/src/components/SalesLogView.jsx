@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   TrendingUp, Plus, Search, X, RefreshCw, Loader2, AlertCircle,
-  Pencil, Trash2, DollarSign, Calendar, Tag, Package, Percent, Clock, ArrowUpRight, ChevronDown, ChevronUp, ExternalLink
+  Pencil, Trash2, DollarSign, Calendar, Tag, Package, Percent, Clock, ArrowUpRight, ChevronDown, ChevronUp, ExternalLink, Sparkles
 } from 'lucide-react';
 import { getSales, deleteSale, getPlatforms } from '../utils/auctionApi';
 import { getApiUrl } from '../utils/api';
@@ -10,10 +10,55 @@ import { EditItemModal } from './EditItemModal';
 import { FeeReconciliationPanel } from './FeeReconciliationPanel';
 import { fmtCurrency, fmtPct } from '../utils/formulaPreview';
 import { useInventory } from '../context/InventoryContext';
+import { DEFAULT_SALES_COLUMNS, saveUserSettings } from '../utils/userSettings';
+import { ItemImageHoverTooltip } from './inventory/ItemImageHoverTooltip';
+import { SoldEbayVineMatcherModal } from './inventory/SoldEbayVineMatcherModal';
 
 export function SalesLogView() {
-  const { items, categoryOptions, platformOptions, updateItemLocal, pendingSaleItem, setPendingSaleItem } = useInventory();
+  const {
+    items, categoryOptions, platformOptions, updateItemLocal,
+    pendingSaleItem, setPendingSaleItem, ebaySyncing, handleSyncEbay,
+    userSettings, setUserSettings
+  } = useInventory();
   const searchInputRef = useRef(null);
+
+  const salesColumnWidths = userSettings?.salesColumnWidths || {};
+  const [resizingCol, setResizingCol] = useState(null);
+
+  const handleResizeStart = useCallback((e, colKey) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX;
+    const startWidth = salesColumnWidths[colKey] || DEFAULT_SALES_COLUMNS.find(c => c.key === colKey)?.defaultWidth || 80;
+    setResizingCol({ key: colKey, startX, startWidth });
+  }, [salesColumnWidths]);
+
+  useEffect(() => {
+    if (!resizingCol) return;
+    const handleMouseMove = (e) => {
+      const diff = e.clientX - resizingCol.startX;
+      const minW = DEFAULT_SALES_COLUMNS.find(c => c.key === resizingCol.key)?.minWidth || 40;
+      const newWidth = Math.max(minW, resizingCol.startWidth + diff);
+      const updated = {
+        ...userSettings,
+        salesColumnWidths: { ...(userSettings?.salesColumnWidths || {}), [resizingCol.key]: newWidth }
+      };
+      if (setUserSettings) setUserSettings(updated);
+      saveUserSettings(updated);
+    };
+    const handleMouseUp = () => setResizingCol(null);
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [resizingCol, userSettings, setUserSettings]);
+
+  const getColWidth = useCallback((colKey) => {
+    const colDef = DEFAULT_SALES_COLUMNS.find(c => c.key === colKey);
+    return salesColumnWidths[colKey] || colDef?.defaultWidth || 80;
+  }, [salesColumnWidths]);
 
   const [sales, setSales] = useState([]);
   const [summary, setSummary] = useState({
@@ -38,8 +83,19 @@ export function SalesLogView() {
   const [deletingId, setDeletingId] = useState(null);
   const [expandedFeeRow, setExpandedFeeRow] = useState(null);
   const [selectedDetailItem, setSelectedDetailItem] = useState(null);
+  const [soldMatcherOpen, setSoldMatcherOpen] = useState(false);
 
   const [hoverTooltip, setHoverTooltip] = useState(null);
+  const [imageHoverTarget, setImageHoverTarget] = useState(null);
+
+  const handleItemNameMouseEnter = (sale, e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setImageHoverTarget({ target: sale, rect });
+  };
+
+  const handleItemNameMouseLeave = () => {
+    setImageHoverTarget(null);
+  };
 
   const showTooltip = (type, sale, e) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -260,6 +316,30 @@ export function SalesLogView() {
             </div>
           )}
 
+          {/* Sync eBay Sales Button */}
+          <button
+            id="sales-sync-ebay-btn"
+            onClick={handleSyncEbay}
+            disabled={ebaySyncing || loading}
+            className="px-2 py-0.5 rounded-lg text-[11px] font-semibold bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 border border-blue-500/20 flex items-center gap-1 transition-all disabled:opacity-50 flex-shrink-0 h-7"
+            title="Pull latest eBay orders and reconcile sold items"
+          >
+            <RefreshCw className={`w-3 h-3 ${ebaySyncing ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">Sync eBay</span>
+          </button>
+
+          {/* Match Sold eBay to VScout Button */}
+          <button
+            id="btn-match-sold-vscout"
+            onClick={() => setSoldMatcherOpen(true)}
+            className="px-2 py-0.5 rounded-lg text-[11px] font-bold bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40 flex items-center gap-1 shadow-sm transition-all flex-shrink-0 h-7"
+            title="Match completed eBay orders to Vine Scout items"
+          >
+            <Sparkles className="w-3 h-3 text-amber-400" />
+            <span className="hidden md:inline">Match eBay to VScout</span>
+            <span className="md:hidden">Match</span>
+          </button>
+
           {/* Stats Expand Toggle */}
           <button
             onClick={() => setShowMetrics(v => !v)}
@@ -371,20 +451,36 @@ export function SalesLogView() {
       {/* Sales Data Table Container - Compact & Fits like Inventory Tracker */}
       <div className="w-full glass-card rounded-xl overflow-hidden border border-slate-800 shadow-xl flex-1 flex flex-col min-h-0">
         <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0 relative">
-          <table className="w-full text-xs border-collapse">
+          <table className="w-full text-xs border-collapse table-fixed">
             <thead className="sticky top-0 z-30 bg-slate-900/95 backdrop-blur-md shadow-sm">
               <tr className="border-b border-slate-800 text-[9.5px] font-bold text-slate-400 uppercase tracking-wider">
-                <th className="py-1 px-2 text-left w-[85px] whitespace-nowrap">Sale Date</th>
-                <th className="py-1 px-2.5 text-left min-w-[200px]">Item & Details (Click for info)</th>
-                <th className="py-1 px-2 text-left w-[110px] whitespace-nowrap">Platform / Buyer</th>
-                <th className="py-1 px-2 text-right w-[85px] whitespace-nowrap">Gross (Hover)</th>
-                <th className="py-1 px-2 text-right w-[80px] whitespace-nowrap">Cost (Hover)</th>
-                <th className="py-1 px-2 text-right w-[85px] whitespace-nowrap">Fees & Ship (Hover)</th>
-                <th className="py-1 px-2 text-right w-[85px] whitespace-nowrap">Net Proceeds (Hover)</th>
-                <th className="py-1 px-2 text-right w-[85px] whitespace-nowrap">Net Profit (Hover)</th>
-                <th className="py-1 px-2 text-right w-[70px] whitespace-nowrap">ROI %</th>
-                <th className="py-1 px-2 text-right w-[50px] whitespace-nowrap">Days</th>
-                <th className="py-1 px-2 text-center w-[75px] whitespace-nowrap">Actions</th>
+                {DEFAULT_SALES_COLUMNS.map(col => {
+                  const width = getColWidth(col.key);
+                  return (
+                    <th
+                      key={col.key}
+                      style={{
+                        width: `${width}px`,
+                        minWidth: `${col.minWidth}px`,
+                        maxWidth: `${width}px`
+                      }}
+                      className={`py-1.5 px-2 relative select-none whitespace-nowrap overflow-hidden ${
+                        col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'
+                      }`}
+                    >
+                      <div className={`flex items-center gap-1 ${
+                        col.align === 'right' ? 'justify-end' : col.align === 'center' ? 'justify-center' : 'justify-start'
+                      }`}>
+                        <span className="truncate">{col.label}</span>
+                      </div>
+                      <div
+                        className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-amber-500/50 z-40 transition-colors"
+                        onMouseDown={e => handleResizeStart(e, col.key)}
+                        title="Drag to resize column"
+                      />
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/40 text-slate-300">
@@ -416,26 +512,45 @@ export function SalesLogView() {
                       }`}
                     >
                       {/* Sale Date */}
-                      <td className="py-1 px-2 font-mono text-slate-400 whitespace-nowrap text-[11px]">
+                      <td
+                        style={{
+                          width: `${getColWidth('sale_date')}px`,
+                          minWidth: '75px',
+                          maxWidth: `${getColWidth('sale_date')}px`
+                        }}
+                        className="py-1 px-2 font-mono text-slate-400 whitespace-nowrap text-[11px] overflow-hidden truncate"
+                      >
                         {sale.sale_date}
                       </td>
 
                       {/* Item & Details - Click to open full details */}
-                      <td className="py-1 px-2.5 min-w-[200px]">
+                      <td
+                        style={{
+                          width: `${getColWidth('item_name')}px`,
+                          minWidth: '150px',
+                          maxWidth: `${getColWidth('item_name')}px`
+                        }}
+                        className="py-1 px-2.5 overflow-hidden"
+                      >
                         <button
                           type="button"
                           onClick={() => handleViewItemDetails(sale)}
-                          className="text-left group/item focus:outline-none w-full cursor-pointer"
+                          onMouseEnter={(e) => handleItemNameMouseEnter(sale, e)}
+                          onMouseLeave={handleItemNameMouseLeave}
+                          className="text-left group/item focus:outline-none w-full block cursor-pointer overflow-hidden"
                         >
-                          <p className="text-slate-100 font-semibold text-xs leading-tight line-clamp-1 group-hover/item:text-amber-400 transition-colors flex items-center gap-1" title={`${sale.item_name} - Click for full item details`}>
-                            <span className="truncate">{sale.item_name}</span>
+                          <p
+                            className="text-slate-100 font-semibold text-xs leading-tight truncate group-hover/item:text-amber-400 transition-colors flex items-center gap-1 min-w-0"
+                            title={`${sale.item_name} - Click for full item details`}
+                          >
+                            <span className="truncate flex-1 min-w-0">{sale.item_name}</span>
                             <ExternalLink className="w-2.5 h-2.5 text-slate-500 opacity-0 group-hover/item:opacity-100 transition-opacity flex-shrink-0" />
                           </p>
-                          <div className="flex items-center gap-1 text-[10px] text-slate-500 mt-0.5 flex-wrap">
-                            {sale.category && <span className="text-slate-400">{sale.category}</span>}
-                            {sale.athlete_person && <span>· {sale.athlete_person}</span>}
+                          <div className="flex items-center gap-1 text-[10px] text-slate-500 mt-0.5 truncate min-w-0">
+                            {sale.category && <span className="text-slate-400 flex-shrink-0">{sale.category}</span>}
+                            {sale.athlete_person && <span className="truncate flex-shrink-0">· {sale.athlete_person}</span>}
                             {sale.invoice_ref && (
-                              <span className="text-slate-600 truncate max-w-[120px]" title={sale.invoice_ref}>
+                              <span className="text-slate-600 truncate flex-shrink min-w-0" title={sale.invoice_ref}>
                                 · {sale.invoice_ref}
                               </span>
                             )}
@@ -444,12 +559,21 @@ export function SalesLogView() {
                       </td>
 
                       {/* Platform / Buyer */}
-                      <td className="py-1 px-2 whitespace-nowrap">
-                        <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9.5px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20">
+                      <td
+                        style={{
+                          width: `${getColWidth('platform')}px`,
+                          minWidth: '90px',
+                          maxWidth: `${getColWidth('platform')}px`
+                        }}
+                        className="py-1 px-2 whitespace-nowrap overflow-hidden text-left"
+                      >
+                        <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9.5px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 truncate max-w-full">
                           {sale.platform || 'Direct'}
                         </span>
                         {sale.buyer_handle && (
-                          <p className="text-[9.5px] text-slate-400 font-mono mt-0.5">@{sale.buyer_handle}</p>
+                          <p className="text-[9.5px] text-slate-400 font-mono mt-0.5 truncate" title={`@${sale.buyer_handle}`}>
+                            @{sale.buyer_handle}
+                          </p>
                         )}
                       </td>
 
@@ -457,7 +581,12 @@ export function SalesLogView() {
                       <td
                         onMouseEnter={(e) => showTooltip('gross', sale, e)}
                         onMouseLeave={hideTooltip}
-                        className="py-1 px-2 font-mono font-bold text-slate-100 text-right whitespace-nowrap text-xs cursor-help hover:text-amber-300 transition-colors"
+                        style={{
+                          width: `${getColWidth('gross_sale_price')}px`,
+                          minWidth: '70px',
+                          maxWidth: `${getColWidth('gross_sale_price')}px`
+                        }}
+                        className="py-1 px-2 font-mono font-bold text-slate-100 text-right whitespace-nowrap text-xs cursor-help hover:text-amber-300 transition-colors overflow-hidden truncate"
                       >
                         <span className="underline decoration-dotted decoration-slate-700 hover:decoration-amber-400">
                           {fmtCurrency(sale.gross_sale_price)}
@@ -468,7 +597,12 @@ export function SalesLogView() {
                       <td
                         onMouseEnter={(e) => showTooltip('cost', sale, e)}
                         onMouseLeave={hideTooltip}
-                        className="py-1 px-2 font-mono text-slate-400 text-right whitespace-nowrap text-xs cursor-help hover:text-amber-300 transition-colors"
+                        style={{
+                          width: `${getColWidth('true_total_cost')}px`,
+                          minWidth: '65px',
+                          maxWidth: `${getColWidth('true_total_cost')}px`
+                        }}
+                        className="py-1 px-2 font-mono text-slate-400 text-right whitespace-nowrap text-xs cursor-help hover:text-amber-300 transition-colors overflow-hidden truncate"
                       >
                         <span className="underline decoration-dotted decoration-slate-700 hover:decoration-amber-400">
                           {fmtCurrency(sale.true_total_cost)}
@@ -479,13 +613,18 @@ export function SalesLogView() {
                       <td
                         onMouseEnter={(e) => showTooltip('fees', sale, e)}
                         onMouseLeave={hideTooltip}
-                        className="py-1 px-2 font-mono text-right whitespace-nowrap text-xs cursor-help hover:text-red-300 transition-colors"
+                        style={{
+                          width: `${getColWidth('fees_shipping')}px`,
+                          minWidth: '75px',
+                          maxWidth: `${getColWidth('fees_shipping')}px`
+                        }}
+                        className="py-1 px-2 font-mono text-right whitespace-nowrap text-xs cursor-help hover:text-red-300 transition-colors overflow-hidden truncate"
                       >
                         <span className="underline decoration-dotted decoration-slate-700 hover:decoration-red-400 text-slate-300">
                           {fmtCurrency(sale.platform_fees_amt)}
                         </span>
                         {totalDeductions > (sale.platform_fees_amt || 0) && (
-                          <p className="text-[8.5px] text-slate-500 font-mono" title="Total fees & shipping deductions">
+                          <p className="text-[8.5px] text-slate-500 font-mono truncate" title="Total fees & shipping deductions">
                             All: -{fmtCurrency(totalDeductions)}
                           </p>
                         )}
@@ -495,7 +634,12 @@ export function SalesLogView() {
                       <td
                         onMouseEnter={(e) => showTooltip('proceeds', sale, e)}
                         onMouseLeave={hideTooltip}
-                        className="py-1 px-2 font-mono font-semibold text-blue-300 text-right whitespace-nowrap text-xs cursor-help hover:text-blue-200 transition-colors"
+                        style={{
+                          width: `${getColWidth('net_proceeds')}px`,
+                          minWidth: '75px',
+                          maxWidth: `${getColWidth('net_proceeds')}px`
+                        }}
+                        className="py-1 px-2 font-mono font-semibold text-blue-300 text-right whitespace-nowrap text-xs cursor-help hover:text-blue-200 transition-colors overflow-hidden truncate"
                       >
                         <span className="underline decoration-dotted decoration-slate-700 hover:decoration-blue-400">
                           {fmtCurrency(sale.net_proceeds)}
@@ -506,7 +650,12 @@ export function SalesLogView() {
                       <td
                         onMouseEnter={(e) => showTooltip('profit', sale, e)}
                         onMouseLeave={hideTooltip}
-                        className="py-1 px-2 font-mono font-black text-right whitespace-nowrap text-xs cursor-help hover:opacity-80 transition-opacity"
+                        style={{
+                          width: `${getColWidth('net_profit')}px`,
+                          minWidth: '75px',
+                          maxWidth: `${getColWidth('net_profit')}px`
+                        }}
+                        className="py-1 px-2 font-mono font-black text-right whitespace-nowrap text-xs cursor-help hover:opacity-80 transition-opacity overflow-hidden truncate"
                       >
                         <span className={`underline decoration-dotted decoration-slate-700 hover:decoration-amber-400 ${sale.net_profit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                           {fmtCurrency(sale.net_profit)}
@@ -514,7 +663,14 @@ export function SalesLogView() {
                       </td>
 
                       {/* ROI % */}
-                      <td className="py-1 px-2 font-mono text-right whitespace-nowrap">
+                      <td
+                        style={{
+                          width: `${getColWidth('roi_pct')}px`,
+                          minWidth: '60px',
+                          maxWidth: `${getColWidth('roi_pct')}px`
+                        }}
+                        className="py-1 px-2 font-mono text-right whitespace-nowrap overflow-hidden"
+                      >
                         <span className={`inline-flex items-center px-1 py-0.2 rounded text-[9.5px] font-bold ${
                           sale.roi_pct >= 0
                             ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20'
@@ -525,12 +681,26 @@ export function SalesLogView() {
                       </td>
 
                       {/* Days to Sell */}
-                      <td className="py-1 px-2 font-mono text-slate-400 text-right whitespace-nowrap text-[11px]">
+                      <td
+                        style={{
+                          width: `${getColWidth('days_to_sell')}px`,
+                          minWidth: '45px',
+                          maxWidth: `${getColWidth('days_to_sell')}px`
+                        }}
+                        className="py-1 px-2 font-mono text-slate-400 text-right whitespace-nowrap text-[11px] overflow-hidden truncate"
+                      >
                         {sale.days_to_sell != null ? `${sale.days_to_sell}d` : '--'}
                       </td>
 
                       {/* Actions */}
-                      <td className="py-1 px-2 whitespace-nowrap text-center">
+                      <td
+                        style={{
+                          width: `${getColWidth('actions')}px`,
+                          minWidth: '65px',
+                          maxWidth: `${getColWidth('actions')}px`
+                        }}
+                        className="py-1 px-2 whitespace-nowrap text-center overflow-hidden"
+                      >
                         <div className="flex items-center justify-center gap-0.5">
                           {isEbay && (
                             <button
@@ -985,6 +1155,23 @@ export function SalesLogView() {
         onClose={() => setSelectedDetailItem(null)}
         onUpdated={(id, patch) => {
           updateItemLocal(id, patch);
+          fetchSales(pagination.page);
+        }}
+      />
+
+      {/* Floating Product Photo Tooltip (eBay or Amazon) */}
+      {imageHoverTarget && (
+        <ItemImageHoverTooltip
+          target={imageHoverTarget.target}
+          rect={imageHoverTarget.rect}
+        />
+      )}
+
+      {/* Match Sold eBay to Vine Scout Modal */}
+      <SoldEbayVineMatcherModal
+        isOpen={soldMatcherOpen}
+        onClose={() => setSoldMatcherOpen(false)}
+        onMatched={() => {
           fetchSales(pagination.page);
         }}
       />

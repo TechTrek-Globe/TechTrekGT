@@ -99,3 +99,53 @@ export async function onRequestGet(context) {
     return ok({ items: catalog });
   });
 }
+
+/**
+ * POST /api/sync/vinescout-catalog
+ * Body: { item_id, sale_price, sale_date, ebay_order_id }
+ * Writes eBay sale metadata back into auction_items.attributes for VScout-sourced items.
+ * Called server-side by sync-all.js and optionally by the browser after a manual sale log.
+ */
+export async function onRequestPost(context) {
+  const { request, env } = context;
+  return withAuth(async () => {
+    const { userId } = await requireAuth(request, env);
+    if (!env.DB) return err('Database binding unavailable', 500);
+
+    let body = {};
+    try { body = await request.json(); } catch (_) {}
+
+    const { item_id, sale_price, sale_date, ebay_order_id } = body;
+    if (!item_id) return err('item_id is required', 400);
+
+    const row = await env.DB.prepare(
+      'SELECT id, attributes, user_id FROM auction_items WHERE id = ? AND user_id = ?'
+    ).bind(item_id, userId).first();
+
+    if (!row) return err('Item not found or does not belong to this account', 404);
+
+    let attrs = {};
+    if (row.attributes) {
+      try {
+        attrs = typeof row.attributes === 'string' ? JSON.parse(row.attributes) : row.attributes;
+      } catch (_) {}
+    }
+
+    // Verify item is VScout-sourced before writing back
+    if (!attrs.asin && !attrs.order_id) {
+      return err('Item does not appear to be VScout-sourced (no ASIN or order_id in attributes)', 400);
+    }
+
+    // Merge sale metadata
+    attrs.outpost_liquidated = 1;
+    if (sale_price != null) attrs.sale_price = Number(sale_price);
+    if (sale_date) attrs.sold_at = String(sale_date);
+    if (ebay_order_id) attrs.ebay_order_id = String(ebay_order_id);
+
+    await env.DB.prepare(
+      `UPDATE auction_items SET attributes = ?, updated_at = datetime('now') WHERE id = ? AND user_id = ?`
+    ).bind(JSON.stringify(attrs), item_id, userId).run();
+
+    return ok({ success: true, item_id });
+  });
+}

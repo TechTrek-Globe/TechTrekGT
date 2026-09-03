@@ -1,7 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import {
   Search, X, UploadCloud, Tag, Package,
-  RefreshCw, TableProperties, LayoutGrid
+  RefreshCw, TableProperties, LayoutGrid, Sparkles
 } from 'lucide-react';
 import { SortPresetDropdown } from './SortPresetDropdown';
 import { ALL_STATUSES, LISTING_FORMATS } from '../../utils/constants';
@@ -34,7 +34,10 @@ export function InventoryCommandBar({
   totalCost,
   totalListValue,
   totalPotentialProfit,
-  overallMargin
+  overallMargin,
+  onSyncEbay,
+  syncing = false,
+  onOpenSoldMatcher
 }) {
   const searchInputRef = useRef(null);
 
@@ -216,6 +219,29 @@ export function InventoryCommandBar({
           <Tag className="w-3.5 h-3.5 text-[#ff9900]" />
           <span className="hidden sm:inline">Amazon</span>
         </button>
+
+        <button
+          id="sync-ebay-sales-btn"
+          onClick={onSyncEbay}
+          disabled={syncing || loading}
+          className="px-2 py-0.5 rounded-lg text-xs font-semibold bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 border border-blue-500/20 flex items-center gap-1 transition-all disabled:opacity-50"
+          title="Pull latest eBay sales and reconcile inventory"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
+          <span className="hidden sm:inline">Sync eBay</span>
+        </button>
+
+        {onOpenSoldMatcher && (
+          <button
+            id="match-sold-ebay-btn"
+            onClick={onOpenSoldMatcher}
+            className="px-2 py-0.5 rounded-lg text-xs font-semibold bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1 transition-all"
+            title="Match sold eBay orders to Vine Scout items"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+            <span className="hidden lg:inline">Match Sold</span>
+          </button>
+        )}
 
         <button
           onClick={onOpenAddInvoice}

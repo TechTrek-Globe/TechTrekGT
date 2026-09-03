@@ -11,6 +11,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
       - "TechTrek:host-gateway"
+    restart: unless-stopped
     networks:
       - guacnet
 

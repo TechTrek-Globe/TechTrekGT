@@ -67,6 +67,7 @@ TechTrekGT is a multi-application platform hosted on `techtrekgt.com`. The repos
 | **Amazon URL Ingestion** | `outpost` | `POST /api/import/amazon-url` | Takes an Amazon ASIN/URL and routes through the Landing Gateway (`/api/amazon/fetch`) for hydrated data, authenticated via the standard SSO JWT cookie. |
 | **Market Comps Engine** | `outpost` | `GET/POST /api/comps/market` | Stores and calculates median/benchmark metrics against verified market comparables (`market_comps`). Replaces legacy pricing models. |
 | **SKU & Custom Label Engine** | `outpost` | `POST /api/items/auto-sku`, `POST /api/ebay/push-sku` | Generates unique structured SKUs (`OP-YYMMDD-XXXX`) on creation/backfill and pushes custom labels directly to live eBay store listings via Trading API (`ReviseFixedPriceItem` / `ReviseItem`). |
+| **Bi-Directional Sync Engine & VScout Write-Back** | `outpost` | `GET/PUT /api/sync/settings`, `GET/POST /api/sync/vinescout-catalog`, `POST /api/ebay/sync-all` | Phase 7 automated & manual bi-directional sync engine. Reconciles eBay sales via Fulfillment API, stamps sold metadata back to VScout items (`outpost_liquidated`, `sold_at`, `sale_price`, `ebay_order_id`) in `auction_items.attributes`, manages per-user automation preferences in `outpost_sync_settings`, and runs context-level background polling via `InventoryContext` (Option K). |
 
 > **Dual-Verification Standard:** All external API POI coordinates, venue geocoding, and address metadata MUST be dual-verified across both Google Places API and Geoapify API (delta distance threshold < 250m) prior to dataset ingestion in `wayfinder/src/data/poland-2026.js`.
 
@@ -288,6 +289,15 @@ The `dailyMatrix` is a normalized dictionary mapping composite string keys to nu
 - **Batch import** (outpost): `/api/import/batch` for Excel/CSV payloads.
 - **Spreadsheet reconciliation** (finance): Row-by-row merge engine with comment matching and automated account reconciliation via `matching_key` / bank document matching keys on `bills`.
 
+### 5.5 Outpost Bi-Directional Synchronization Architecture (Phase 7)
+
+The resale platform implements a bi-directional sync engine across eBay sales reconciliation and Vine Scout (VScout) inventory ingestion:
+- **Application-Wide Polling Engine (Option K):** Sync settings and background polling loops are promoted to `InventoryContext.jsx`. The client-side polling interval runs app-wide regardless of active view (Inventory Hub, Sales Log, Dashboard, Settings), keeping the Cloudflare Worker purely stateless.
+- **eBay Sales Reconciliation:** On-demand ("Sync eBay" in Command Bar and Sales Log) and background auto-sync trigger `POST /api/ebay/sync-all`. The Worker calls the eBay Fulfillment API (`/sell/fulfillment/v1/order`) and Finances API (`/sell/finances/v1/transaction`) with active OAuth tokens (`sell.fulfillment` / `sell.finances`). When completed/sold, items are marked `Sold`, sales records are created/updated in `auction_sales`, fees are reconciled, and `last_ebay_sync_at` is stamped in `outpost_sync_settings`.
+- **VScout Ingestion & Outbound Sale Write-Back:** Amazon Vine items ingested via `POST /api/import/amazon` store ASIN, order ID, ETV, and metadata in `auction_items.attributes` (JSON blob). When an eBay sale is reconciled, the engine stamps sold details (`outpost_liquidated: 1`, `sale_price`, `sold_at`, `ebay_order_id`) directly into the item's attributes via `POST /api/sync/vinescout-catalog`.
+- **Sync Configuration & Persistence:** Per-user automation preferences (`ebay_auto_sync`, `ebay_sync_interval_m`, `vscout_auto_sync`, `vscout_sync_interval_m`) are stored in D1 table `outpost_sync_settings` and configured via the Settings View Integrations tab (`GET/PUT /api/sync/settings`).
+
+
 ---
 
 ## 6. Component Architecture
@@ -404,7 +414,7 @@ All apps (finance, outpost, wayfinder, bigworm) point at the same `personal-budg
 | Schema File | App | Tables |
 |------------|-----|--------|
 | `finance/schema.sql` | finance + shared | `users`, `households`, `household_members`, `accounts`, `people`, `bills`, `bill_splits`, `line_items`, `loans`, `household_settings`, `user_backups` |
-| `outpost/auction-schema.sql` | outpost | invoices, items, sales, platforms, comps, `market_comps`, supplies, `listing_traffic`, `auction_item_analytics` |
+| `outpost/auction-schema.sql` | outpost | invoices, items, sales, platforms, comps, `market_comps`, supplies, `listing_traffic`, `auction_item_analytics`, `outpost_sync_settings` |
 | `wayfinder/schema-wayfinder.sql` | wayfinder | journeys, itinerary items, documents, import jobs, budgets |
 
 ### 8.3 Key Design Points

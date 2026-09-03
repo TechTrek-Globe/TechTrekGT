@@ -11,6 +11,7 @@ import { onRequestGet as invoiceGetHandler, onRequestPut as invoicePutHandler, o
 import { onRequestGet as itemsListHandler } from '../functions/api/items/index.js';
 import { onRequestGet as itemsEnrichedHandler } from '../functions/api/items/enriched.js';
 import { onRequestPost as itemsAutoSkuHandler } from '../functions/api/items/auto-sku.js';
+import { onRequestGet as itemImagePreviewHandler } from '../functions/api/items/image-preview.js';
 import { onRequestGet as itemGetHandler, onRequestPut as itemPutHandler, onRequestDelete as itemDeleteHandler } from '../functions/api/items/[id].js';
 import { onRequestGet as salesListHandler, onRequestPost as salesCreateHandler } from '../functions/api/sales/index.js';
 import { onRequestGet as saleGetHandler, onRequestPut as salePutHandler, onRequestDelete as saleDeleteHandler } from '../functions/api/sales/[id].js';
@@ -33,11 +34,14 @@ import { onRequestGet as ebayActiveListingsHandler } from '../functions/api/ebay
 import { onRequestPost as ebayReconcileHandler } from '../functions/api/ebay/reconcile.js';
 import { onRequestPost as ebaySyncItemHandler } from '../functions/api/ebay/sync-item.js';
 import { onRequestPost as ebaySyncAllHandler } from '../functions/api/ebay/sync-all.js';
+import { onRequestGet as matchSoldVinescoutGetHandler, onRequestPost as matchSoldVinescoutPostHandler } from '../functions/api/ebay/match-sold-vinescout.js';
 import { onRequestPost as ebayPushSkuHandler } from '../functions/api/ebay/push-sku.js';
 import { onRequestGet as ebayAnalyticsHandler, onRequestPost as ebayAnalyticsIngestHandler } from '../functions/api/ebay/analytics.js';
 import { onRequestGet as vinescoutSalesExportHandler } from '../functions/api/export/vinescout-sales.js';
 import { onRequestGet as vinescoutInventoryExportHandler } from '../functions/api/export/vinescout-inventory.js';
 import { onRequestGet as vinescoutCatalogHandler } from '../functions/api/sync/vinescout-catalog.js';
+import { onRequestPost as vinescoutCatalogPostHandler } from '../functions/api/sync/vinescout-catalog.js';
+import { onRequestGet as syncSettingsGetHandler, onRequestPut as syncSettingsPutHandler } from '../functions/api/sync/settings.js';
 
 function addSecurityHeaders(response, isLocalhost = false, requestOrigin = '') {
   const newHeaders = new Headers(response.headers);
@@ -161,6 +165,8 @@ export default {
       } else if (/^\/api\/invoices\/[^/]+$/.test(apiPath) && request.method === 'DELETE') {
         response = await invoiceDeleteHandler(context);
       // --- Items ---
+      } else if (apiPath === '/api/items/image-preview' && request.method === 'GET') {
+        response = await itemImagePreviewHandler(context);
       } else if (apiPath === '/api/items/enriched' && request.method === 'GET') {
         response = await itemsEnrichedHandler(context);
       } else if (apiPath === '/api/items/auto-sku' && request.method === 'POST') {
@@ -257,6 +263,10 @@ export default {
         response = await ebaySyncItemHandler(context);
       } else if (apiPath === '/api/ebay/sync-all' && request.method === 'POST') {
         response = await ebaySyncAllHandler(context);
+      } else if (apiPath === '/api/ebay/match-sold-vinescout' && request.method === 'GET') {
+        response = await matchSoldVinescoutGetHandler(context);
+      } else if (apiPath === '/api/ebay/match-sold-vinescout' && request.method === 'POST') {
+        response = await matchSoldVinescoutPostHandler(context);
       } else if (apiPath === '/api/ebay/push-sku' && request.method === 'POST') {
         response = await ebayPushSkuHandler(context);
       } else if (apiPath === '/api/ebay/analytics' && request.method === 'GET') {
@@ -271,6 +281,12 @@ export default {
         response = await vinescoutInventoryExportHandler(context);
       } else if (apiPath === '/api/sync/vinescout-catalog' && request.method === 'GET') {
         response = await vinescoutCatalogHandler(context);
+      } else if (apiPath === '/api/sync/vinescout-catalog' && request.method === 'POST') {
+        response = await vinescoutCatalogPostHandler(context);
+      } else if (apiPath === '/api/sync/settings' && request.method === 'GET') {
+        response = await syncSettingsGetHandler(context);
+      } else if (apiPath === '/api/sync/settings' && request.method === 'PUT') {
+        response = await syncSettingsPutHandler(context);
       } else if (apiPath === '/api/sync/item' && request.method === 'POST') {
         response = await amazonImportHandler(context);
       } else if (apiPath.startsWith('/api/')) {

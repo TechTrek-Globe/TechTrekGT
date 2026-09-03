@@ -12,10 +12,12 @@ import { TaxReportModal } from './TaxReportModal';
 import { EbayConnectBanner } from './EbayConnectBanner';
 import { ListingMatchReviewModal } from './ListingMatchReviewModal';
 import { useAuth } from '../context/AuthContext';
+import { useInventory } from '../context/InventoryContext';
 import {
   getPlatforms, createPlatform, updatePlatform, deletePlatform, resetPlatforms,
   getItems, getSales, getInvoices, getComps, getApiUrl,
-  autoAssignSkus, pushAllSkusToEbay
+  autoAssignSkus, pushAllSkusToEbay,
+  getSyncSettings, updateSyncSettings, syncAllEbayItems, getVineScoutCatalog
 } from '../utils/auctionApi';
 import { fmtCurrency, fmtPct } from '../utils/formulaPreview';
 import { DEFAULT_COLUMNS, DEFAULT_CATEGORIES, getStoredUserSettings, saveUserSettings, resetColumnWidths } from '../utils/userSettings';
@@ -75,6 +77,17 @@ export function SettingsView() {
   const [tokenCopied, setTokenCopied] = useState(false);
   const [skuActionLoading, setSkuActionLoading] = useState(false);
 
+  // Pull sync engine state from InventoryContext (context owns the polling loop)
+  const {
+    syncSettings, setSyncSettings,
+    ebaySyncing, vscoutSyncing,
+    handleSyncEbay, handleSyncVScout
+  } = useInventory();
+
+  // Track local syncing states for Settings-triggered manual syncs with success feedback
+  const [ebaySyncMsg, setEbaySyncMsg] = useState(null);
+  const [vscoutSyncMsg, setVscoutSyncMsg] = useState(null);
+
   // Auto-fetch API token when visiting the integrations tab
   useEffect(() => {
     if (activeTab === 'integrations' && !amazonToken && !tokenLoading) {
@@ -117,6 +130,52 @@ export function SettingsView() {
       setSkuActionLoading(false);
     }
   };
+
+  // P7: Sync engine handlers (delegate to InventoryContext, show local toast feedback)
+  const handleManualEbaySync = async () => {
+    setEbaySyncMsg(null);
+    try {
+      await handleSyncEbay();
+      setEbaySyncMsg({ ok: true, msg: 'eBay sync complete. Inventory updated.' });
+    } catch (e) {
+      setEbaySyncMsg({ ok: false, msg: e?.message || 'eBay sync failed.' });
+    } finally {
+      setTimeout(() => setEbaySyncMsg(null), 5000);
+    }
+  };
+
+  const handleManualVScoutSync = async () => {
+    setVscoutSyncMsg(null);
+    try {
+      await handleSyncVScout();
+      setVscoutSyncMsg({ ok: true, msg: 'VScout catalog refreshed.' });
+    } catch (e) {
+      setVscoutSyncMsg({ ok: false, msg: e?.message || 'VScout sync failed.' });
+    } finally {
+      setTimeout(() => setVscoutSyncMsg(null), 5000);
+    }
+  };
+
+  const handleToggleSyncPref = async (key, val) => {
+    const updated = { ...(syncSettings || {}), [key]: val ? 1 : 0 };
+    try {
+      const res = await updateSyncSettings({ [key]: val ? 1 : 0 });
+      setSyncSettings(res.settings || res);
+    } catch (e) {
+      setError(`Failed to save sync setting: ${e.message}`);
+    }
+  };
+
+  const handleSyncIntervalChange = async (key, rawVal) => {
+    const val = Math.max(5, parseInt(rawVal, 10) || 30);
+    try {
+      const res = await updateSyncSettings({ [key]: val });
+      setSyncSettings(res.settings || res);
+    } catch (e) {
+      setError(`Failed to save interval: ${e.message}`);
+    }
+  };
+
 
   const fetchPlatformsList = useCallback(async () => {
     setLoading(true);
@@ -789,7 +848,149 @@ export function SettingsView() {
               }}
             />
 
-            {/* 3. TechTrek Finance Integration Card */}
+            {/* 3. eBay Auto-Sync Card */}
+            <div className="glass-card rounded-2xl p-6 border border-blue-500/20 space-y-4">
+              <div className="border-b border-slate-800/60 pb-4 flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
+                    <RefreshCw className="w-4 h-4 text-blue-400" />
+                    eBay Sales Auto-Sync
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Automatically polls eBay Fulfillment API on a schedule to mark sold items and reconcile fees.
+                  </p>
+                </div>
+                {/* Toggle */}
+                <button
+                  type="button"
+                  onClick={() => handleToggleSyncPref('ebay_auto_sync', !syncSettings?.ebay_auto_sync)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0 ${
+                    syncSettings?.ebay_auto_sync ? 'bg-blue-500' : 'bg-slate-700'
+                  }`}
+                  role="switch"
+                  aria-checked={!!syncSettings?.ebay_auto_sync}
+                  id="toggle-ebay-auto-sync"
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${syncSettings?.ebay_auto_sync ? 'translate-x-6' : 'translate-x-1'}`} />
+                </button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-2 bg-slate-900/80 rounded-xl p-3.5 border border-slate-800">
+                  <p className="text-[11px] text-slate-400 mb-2 font-semibold uppercase tracking-wider">Poll Interval</p>
+                  <div className="flex items-center gap-2">
+                    <input
+                      id="ebay-sync-interval-input"
+                      type="number"
+                      min="5"
+                      max="1440"
+                      step="5"
+                      value={syncSettings?.ebay_sync_interval_m ?? 30}
+                      onChange={e => handleSyncIntervalChange('ebay_sync_interval_m', e.target.value)}
+                      disabled={!syncSettings?.ebay_auto_sync}
+                      className="w-24 bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-100 font-mono outline-none focus:border-blue-500 disabled:opacity-40"
+                    />
+                    <span className="text-xs text-slate-400">minutes</span>
+                  </div>
+                  {syncSettings?.last_ebay_sync_at && (
+                    <p className="text-[10px] text-slate-500 mt-1.5 flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                      Last sync: {new Date(syncSettings.last_ebay_sync_at).toLocaleString()}
+                    </p>
+                  )}
+                </div>
+                <div className="flex flex-col gap-2">
+                  <button
+                    id="btn-manual-ebay-sync"
+                    type="button"
+                    onClick={handleManualEbaySync}
+                    disabled={ebaySyncing}
+                    className="w-full h-full min-h-[64px] rounded-xl text-xs font-bold bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 border border-blue-500/20 flex flex-col items-center justify-center gap-1.5 transition-all disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${ebaySyncing ? 'animate-spin' : ''}`} />
+                    <span>{ebaySyncing ? 'Syncing...' : 'Sync Now'}</span>
+                  </button>
+                  {ebaySyncMsg && (
+                    <div className={`text-[10px] flex items-center gap-1 px-2 py-1 rounded-lg border ${ebaySyncMsg.ok ? 'text-emerald-400 border-emerald-500/20 bg-emerald-950/40' : 'text-red-400 border-red-500/20 bg-red-950/30'}`}>
+                      {ebaySyncMsg.ok ? <CheckCircle2 className="w-3 h-3 flex-shrink-0" /> : <AlertCircle className="w-3 h-3 flex-shrink-0" />}
+                      {ebaySyncMsg.msg}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* 4. VScout Auto-Sync Card */}
+            <div className="glass-card rounded-2xl p-6 border border-purple-500/20 space-y-4">
+              <div className="border-b border-slate-800/60 pb-4 flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
+                    <RefreshCw className="w-4 h-4 text-purple-400" />
+                    VScout Catalog Auto-Sync
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Periodically refreshes VScout-sourced Amazon Vine items in your local catalog and updates sold status write-backs.
+                  </p>
+                </div>
+                {/* Toggle */}
+                <button
+                  type="button"
+                  onClick={() => handleToggleSyncPref('vscout_auto_sync', !syncSettings?.vscout_auto_sync)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0 ${
+                    syncSettings?.vscout_auto_sync ? 'bg-purple-500' : 'bg-slate-700'
+                  }`}
+                  role="switch"
+                  aria-checked={!!syncSettings?.vscout_auto_sync}
+                  id="toggle-vscout-auto-sync"
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${syncSettings?.vscout_auto_sync ? 'translate-x-6' : 'translate-x-1'}`} />
+                </button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-2 bg-slate-900/80 rounded-xl p-3.5 border border-slate-800">
+                  <p className="text-[11px] text-slate-400 mb-2 font-semibold uppercase tracking-wider">Poll Interval</p>
+                  <div className="flex items-center gap-2">
+                    <input
+                      id="vscout-sync-interval-input"
+                      type="number"
+                      min="5"
+                      max="1440"
+                      step="5"
+                      value={syncSettings?.vscout_sync_interval_m ?? 60}
+                      onChange={e => handleSyncIntervalChange('vscout_sync_interval_m', e.target.value)}
+                      disabled={!syncSettings?.vscout_auto_sync}
+                      className="w-24 bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-100 font-mono outline-none focus:border-purple-500 disabled:opacity-40"
+                    />
+                    <span className="text-xs text-slate-400">minutes</span>
+                  </div>
+                  {syncSettings?.last_vscout_sync_at && (
+                    <p className="text-[10px] text-slate-500 mt-1.5 flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                      Last sync: {new Date(syncSettings.last_vscout_sync_at).toLocaleString()}
+                    </p>
+                  )}
+                </div>
+                <div className="flex flex-col gap-2">
+                  <button
+                    id="btn-manual-vscout-sync"
+                    type="button"
+                    onClick={handleManualVScoutSync}
+                    disabled={vscoutSyncing}
+                    className="w-full h-full min-h-[64px] rounded-xl text-xs font-bold bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/20 flex flex-col items-center justify-center gap-1.5 transition-all disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${vscoutSyncing ? 'animate-spin' : ''}`} />
+                    <span>{vscoutSyncing ? 'Syncing...' : 'Sync Now'}</span>
+                  </button>
+                  {vscoutSyncMsg && (
+                    <div className={`text-[10px] flex items-center gap-1 px-2 py-1 rounded-lg border ${vscoutSyncMsg.ok ? 'text-emerald-400 border-emerald-500/20 bg-emerald-950/40' : 'text-red-400 border-red-500/20 bg-red-950/30'}`}>
+                      {vscoutSyncMsg.ok ? <CheckCircle2 className="w-3 h-3 flex-shrink-0" /> : <AlertCircle className="w-3 h-3 flex-shrink-0" />}
+                      {vscoutSyncMsg.msg}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* 5. TechTrek Finance Integration Card */}
             <div className="glass-card rounded-2xl p-6 border border-emerald-500/30 bg-emerald-950/10 space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/60 pb-4">
                 <div>

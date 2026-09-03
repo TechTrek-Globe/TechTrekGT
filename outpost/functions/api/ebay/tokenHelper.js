@@ -244,6 +244,10 @@ export async function fetchEbayActiveSellerListings(env, accessToken) {
             if (dm) shipCost = parseFloat(dm[1]) || 0;
           }
         }
+        // Extract gallery image if present
+        const galleryMatch = block.match(/<GalleryURL[^>]*>(.*?)<\/GalleryURL>/i) ||
+                             block.match(/<PictureURL[^>]*>(.*?)<\/PictureURL>/i);
+        const galleryUrl = galleryMatch ? galleryMatch[1].trim() : null;
 
         if (listingId || title) {
           const key = listingId || sku || title;
@@ -257,6 +261,7 @@ export async function fetchEbayActiveSellerListings(env, accessToken) {
             is_free_shipping: freeShip || (shipCost === 0),
             condition: 'Active',
             status: 'Active',
+            image_url: galleryUrl,
             listing_url: listingId ? `https://www.ebay.com/itm/${listingId}` : null
           });
         }
@@ -441,6 +446,18 @@ export async function fetchSingleEbayListing(env, accessToken, listingId) {
       const qtySoldStr = getTag('QuantitySold') || '0';
       const sku = getTag('SKU') || null;
       const listingType = getTag('ListingType') || 'FixedPriceItem';
+
+      // Picture / Image details
+      const galleryUrl = getTag('GalleryURL');
+      const pictureUrls = [];
+      const picRegex = /<PictureURL[^>]*>(.*?)<\/PictureURL>/g;
+      let pMatch;
+      while ((pMatch = picRegex.exec(xmlText)) !== null) {
+        if (pMatch[1] && pMatch[1].trim()) {
+          pictureUrls.push(pMatch[1].trim());
+        }
+      }
+      const imageUrl = pictureUrls[0] || galleryUrl || null;
 
       // Category details
       const categoryId = getTag('CategoryID');
@@ -748,6 +765,8 @@ export async function fetchSingleEbayListing(env, accessToken, listingId) {
             authenticator,
             sport
           },
+          image_url: imageUrl,
+          picture_urls: pictureUrls,
           listing_url: `https://www.ebay.com/itm/${itemId || cleanId}`
         };
       }
@@ -867,6 +886,43 @@ export async function updateEbayListingSku(env, accessToken, listingId, sku) {
 }
 
 /**
+ * Fetches recent seller orders from the eBay Fulfillment API (/sell/fulfillment/v1/order).
+ * Returns an array of up to limit order objects.
+ *
+ * @param {object} env
+ * @param {string} accessToken
+ * @param {number} [limit=100]
+ * @returns {Promise<Array<object>>}
+ */
+export async function fetchEbayRecentOrders(env, accessToken, limit = 100) {
+  const isSandbox = isEbaySandbox(env);
+  const restBase = isSandbox
+    ? 'https://api.sandbox.ebay.com'
+    : 'https://api.ebay.com';
+
+  try {
+    const res = await fetch(`${restBase}/sell/fulfillment/v1/order?limit=${limit}`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US'
+      }
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      return data.orders || [];
+    } else {
+      const errText = await res.text().catch(() => '');
+      console.warn(`[tokenHelper] fetchEbayRecentOrders status ${res.status}:`, errText.slice(0, 200));
+    }
+  } catch (e) {
+    console.warn('[tokenHelper] fetchEbayRecentOrders exception:', e);
+  }
+  return [];
+}
+
+/**
  * Fetches the eBay order corresponding to an eBay listing ID, SKU, or Title.
  * Uses a multi-tiered strategy:
  * 1. eBay Fulfillment API (/sell/fulfillment/v1/order)
@@ -894,20 +950,9 @@ export async function fetchEbayOrderForListing(env, accessToken, listingId, sku 
 
   // 1. Try eBay Fulfillment API (/sell/fulfillment/v1/order)
   try {
-    const res = await fetch(`${restBase}/sell/fulfillment/v1/order?limit=100`, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-        'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US'
-      }
-    });
-
-    if (res.ok) {
-      const data = await res.json();
-      const orders = data.orders || [];
-
-      for (const order of orders) {
-        const lineItems = order.lineItems || [];
+    const orders = await fetchEbayRecentOrders(env, accessToken, 100);
+    for (const order of orders) {
+      const lineItems = order.lineItems || [];
         const matchedLine = lineItems.find(li => {
           const lineItemIdMatch = cleanId && (
             String(li.legacyItemId) === cleanId ||
@@ -948,10 +993,6 @@ export async function fetchEbayOrderForListing(env, accessToken, listingId, sku 
           };
         }
       }
-    } else {
-      const errText = await res.text().catch(() => '');
-      console.warn(`[tokenHelper] Fulfillment API status ${res.status}:`, errText.slice(0, 200));
-    }
   } catch (e) {
     console.warn('[tokenHelper] Fulfillment API fetch order exception:', e);
   }

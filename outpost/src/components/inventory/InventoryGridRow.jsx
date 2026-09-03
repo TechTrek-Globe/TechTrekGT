@@ -122,6 +122,8 @@ export function InventoryGridRow({
         >
           <div
             onClick={() => onOpenEditModal && onOpenEditModal(item)}
+            onMouseEnter={(e) => onShowTooltip && onShowTooltip('item_image', item, e)}
+            onMouseLeave={() => onHideTooltip && onHideTooltip()}
             className="group/name cursor-pointer flex items-center justify-between gap-1.5 hover:bg-slate-800/60 rounded px-1 -mx-1 py-0.5 transition-colors"
             title="Click to view & edit full item details"
           >

@@ -317,3 +317,42 @@ export const pushAllSkusToEbay = () =>
 // --- VineScout Sync Catalog ---
 export const getVineScoutCatalog = () =>
   apiFetch('/api/sync/vinescout-catalog');
+
+// --- Sync Engine Settings ---
+export const getSyncSettings = () =>
+  apiFetch('/api/sync/settings');
+
+export const updateSyncSettings = (body) =>
+  apiFetch('/api/sync/settings', {
+    method: 'PUT',
+    headers: JSON_HEADERS,
+    body: JSON.stringify(body)
+  });
+
+// --- VScout Sale Write-Back ---
+export const writeBackVScoutSale = (itemId, saleData) =>
+  apiFetch('/api/sync/vinescout-catalog', {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ item_id: itemId, ...saleData })
+  });
+
+// --- Image Preview Resolver ---
+export const getItemImagePreview = ({ id, ebay_listing_id, asin }) => {
+  const params = new URLSearchParams();
+  if (id) params.set('id', id);
+  if (ebay_listing_id) params.set('ebay_listing_id', ebay_listing_id);
+  if (asin) params.set('asin', asin);
+  return apiFetch(`/api/items/image-preview?${params.toString()}`);
+};
+
+// --- Match Sold eBay to Vine Scout ---
+export const getSoldEbayVineMatches = () =>
+  apiFetch('/api/ebay/match-sold-vinescout');
+
+export const confirmSoldEbayVineMatch = (payload) =>
+  apiFetch('/api/ebay/match-sold-vinescout', {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify(payload)
+  });

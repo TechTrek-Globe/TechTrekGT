@@ -3,6 +3,7 @@ import { ArrowUpDown } from 'lucide-react';
 import { InventoryGridRow } from './InventoryGridRow';
 import { fmtCurrency } from '../../utils/formulaPreview';
 import { computeFeeBreakdown } from '../../utils/feeEngine';
+import { ItemImageHoverTooltip } from './ItemImageHoverTooltip';
 
 export const DEFAULT_COLUMNS = [
   { key: 'actions', label: 'Actions', minWidth: 100 },
@@ -259,8 +260,16 @@ export function InventoryDataGrid({
         </div>
       )}
 
+      {/* Floating Product Photo Tooltip (eBay or Amazon) */}
+      {hoverTooltip && hoverTooltip.type === 'item_image' && (
+        <ItemImageHoverTooltip
+          target={hoverTooltip.item}
+          rect={hoverTooltip.rect}
+        />
+      )}
+
       {/* Floating Calculation Tooltip for Inventory Prices */}
-      {hoverTooltip && (
+      {hoverTooltip && hoverTooltip.type !== 'item_image' && (
         <div
           className="fixed z-50 w-72 p-3 rounded-xl bg-slate-950/95 border border-slate-700/80 shadow-2xl backdrop-blur-md pointer-events-none animate-in fade-in zoom-in-95 duration-100"
           style={{

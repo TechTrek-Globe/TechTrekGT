@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { getEnrichedItems, getPlatforms, updateItem } from '../utils/auctionApi';
+import { getEnrichedItems, getPlatforms, updateItem, getSyncSettings, updateSyncSettings, syncAllEbayItems, getVineScoutCatalog } from '../utils/auctionApi';
 import { getApiUrl } from '../utils/api';
 import { getStoredUserSettings, DEFAULT_CATEGORIES } from '../utils/userSettings';
 import { computeFeeBreakdown } from '../utils/feeEngine';
@@ -36,6 +36,11 @@ export function InventoryProvider({ children }) {
 
   // --- User Settings (column visibility, widths, category order) ---
   const [userSettings, setUserSettings] = useState(getStoredUserSettings);
+
+  // --- Sync Engine State ---
+  const [syncSettings, setSyncSettings] = useState(null);
+  const [ebaySyncing, setEbaySyncing] = useState(false);
+  const [vscoutSyncing, setVscoutSyncing] = useState(false);
 
   // Debounce search input (300ms)
   const debounceTimerRef = useRef(null);
@@ -174,6 +179,69 @@ export function InventoryProvider({ children }) {
     fetchItems(1);
   }, [debouncedSearch, statusFilter, categoryFilter, listingFormatFilter, listingStatusFilter, sortConfig.key, sortConfig.direction]);
 
+  // Load sync settings once on mount
+  useEffect(() => {
+    getSyncSettings()
+      .then(d => setSyncSettings(d.settings || d))
+      .catch(() => {});
+  }, []);
+
+  // --- Sync Engine Handlers ---
+  const handleSyncEbay = useCallback(async () => {
+    if (ebaySyncing) return;
+    setEbaySyncing(true);
+    try {
+      await syncAllEbayItems();
+      // Refresh last_ebay_sync_at after successful sync
+      const updated = await getSyncSettings();
+      setSyncSettings(updated.settings || updated);
+      fetchItems(1);
+    } catch (e) {
+      console.warn('[InventoryContext] eBay auto-sync error:', e);
+    } finally {
+      setEbaySyncing(false);
+    }
+  }, [ebaySyncing, fetchItems]);
+
+  const handleSyncVScout = useCallback(async () => {
+    if (vscoutSyncing) return;
+    setVscoutSyncing(true);
+    try {
+      await getVineScoutCatalog();
+      const updated = await getSyncSettings();
+      setSyncSettings(updated.settings || updated);
+    } catch (e) {
+      console.warn('[InventoryContext] VScout auto-sync error:', e);
+    } finally {
+      setVscoutSyncing(false);
+    }
+  }, [vscoutSyncing]);
+
+  // Auto-polling loop - runs app-wide while InventoryProvider is mounted
+  const syncIntervalRef = useRef([]);
+  useEffect(() => {
+    // Clear any previous intervals
+    syncIntervalRef.current.forEach(clearInterval);
+    syncIntervalRef.current = [];
+
+    if (!syncSettings) return;
+
+    if (syncSettings.ebay_auto_sync) {
+      const ms = (syncSettings.ebay_sync_interval_m || 30) * 60 * 1000;
+      syncIntervalRef.current.push(setInterval(handleSyncEbay, ms));
+    }
+    if (syncSettings.vscout_auto_sync) {
+      const ms = (syncSettings.vscout_sync_interval_m || 60) * 60 * 1000;
+      syncIntervalRef.current.push(setInterval(handleSyncVScout, ms));
+    }
+
+    return () => {
+      syncIntervalRef.current.forEach(clearInterval);
+      syncIntervalRef.current = [];
+    };
+  }, [syncSettings?.ebay_auto_sync, syncSettings?.ebay_sync_interval_m,
+      syncSettings?.vscout_auto_sync, syncSettings?.vscout_sync_interval_m]);
+
   // --- Optimistic Local Updates ---
   const updateItemLocal = useCallback((id, patch) => {
     setItems(prev => prev.map(it => it.id === id ? { ...it, ...patch } : it));
@@ -258,6 +326,10 @@ export function InventoryProvider({ children }) {
     pendingSaleItem, setPendingSaleItem,
     // Settings
     userSettings, setUserSettings,
+    // Sync Engine
+    syncSettings, setSyncSettings,
+    ebaySyncing, vscoutSyncing,
+    handleSyncEbay, handleSyncVScout,
     // Actions
     fetchItems,
     fetchPlatforms,
@@ -271,6 +343,7 @@ export function InventoryProvider({ children }) {
     sortConfig, sortPreset, applySortPreset,
     loading, error, pendingSaleItem,
     userSettings,
+    syncSettings, ebaySyncing, vscoutSyncing, handleSyncEbay, handleSyncVScout,
     fetchItems, fetchPlatforms, refreshAll, updateItemLocal, handleFieldSave, handleSort,
   ]);
 

@@ -39,7 +39,27 @@ export const DEFAULT_CATEGORIES = [
   'Other'
 ];
 
+export const DEFAULT_SALES_COLUMNS = [
+  { key: 'sale_date',        label: 'Sale Date',            defaultVisible: true, minWidth: 75,  defaultWidth: 85,  align: 'left' },
+  { key: 'item_name',        label: 'Item & Details',       defaultVisible: true, minWidth: 150, defaultWidth: 260, align: 'left' },
+  { key: 'platform',         label: 'Platform / Buyer',     defaultVisible: true, minWidth: 90,  defaultWidth: 120, align: 'left' },
+  { key: 'gross_sale_price', label: 'Gross',                defaultVisible: true, minWidth: 70,  defaultWidth: 85,  align: 'right' },
+  { key: 'true_total_cost',  label: 'Cost',                 defaultVisible: true, minWidth: 65,  defaultWidth: 80,  align: 'right' },
+  { key: 'fees_shipping',    label: 'Fees & Ship',          defaultVisible: true, minWidth: 75,  defaultWidth: 95,  align: 'right' },
+  { key: 'net_proceeds',     label: 'Net Proceeds',         defaultVisible: true, minWidth: 75,  defaultWidth: 95,  align: 'right' },
+  { key: 'net_profit',       label: 'Net Profit',           defaultVisible: true, minWidth: 75,  defaultWidth: 95,  align: 'right' },
+  { key: 'roi_pct',          label: 'ROI %',                defaultVisible: true, minWidth: 60,  defaultWidth: 70,  align: 'right' },
+  { key: 'days_to_sell',     label: 'Days',                 defaultVisible: true, minWidth: 45,  defaultWidth: 55,  align: 'right' },
+  { key: 'actions',          label: 'Actions',              defaultVisible: true, minWidth: 65,  defaultWidth: 75,  align: 'center' },
+];
+
 const STORAGE_KEY = 'outpost_user_settings_v1';
+
+export function getDefaultSalesWidths() {
+  const widths = {};
+  DEFAULT_SALES_COLUMNS.forEach(col => { widths[col.key] = col.defaultWidth; });
+  return widths;
+}
 
 export function getStoredUserSettings() {
   try {
@@ -49,6 +69,7 @@ export function getStoredUserSettings() {
     return {
       columnVisibility: { ...getDefaultVisibility(), ...(parsed.columnVisibility || {}) },
       columnWidths: { ...getDefaultWidths(), ...(parsed.columnWidths || {}) },
+      salesColumnWidths: { ...getDefaultSalesWidths(), ...(parsed.salesColumnWidths || {}) },
       categoryOrder: Array.isArray(parsed.categoryOrder) && parsed.categoryOrder.length > 0
         ? parsed.categoryOrder
         : DEFAULT_CATEGORIES
@@ -74,6 +95,7 @@ export function getDefaultUserSettings() {
   return {
     columnVisibility: getDefaultVisibility(),
     columnWidths: getDefaultWidths(),
+    salesColumnWidths: getDefaultSalesWidths(),
     categoryOrder: [...DEFAULT_CATEGORIES]
   };
 }
@@ -84,6 +106,7 @@ export function saveUserSettings(settings) {
     const updated = {
       columnVisibility: settings.columnVisibility || current.columnVisibility,
       columnWidths: settings.columnWidths || current.columnWidths,
+      salesColumnWidths: settings.salesColumnWidths || current.salesColumnWidths,
       categoryOrder: settings.categoryOrder || current.categoryOrder
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
@@ -101,7 +124,8 @@ export function saveUserSettings(settings) {
 export function resetColumnWidths() {
   const current = getStoredUserSettings();
   const resetWidths = getDefaultWidths();
-  return saveUserSettings({ ...current, columnWidths: resetWidths });
+  const resetSalesWidths = getDefaultSalesWidths();
+  return saveUserSettings({ ...current, columnWidths: resetWidths, salesColumnWidths: resetSalesWidths });
 }
 
 

@@ -24,10 +24,10 @@
       <protocol>rdp</protocol>
       <param name="hostname">TechTrek</param>
       <param name="port">3389</param>
-      <param name="domain">TechTrek</param>
-      <param name="username">jonke</param>
+      <param name="domain">MicrosoftAccount</param>
+      <param name="username">jonkempato@gmail.com</param>
       <param name="password">%TMeU2V^6XJT4s</param>
-      <param name="security">nla</param>
+      <param name="security">any</param>
       <param name="ignore-cert">true</param>
       <param name="width">1920</param>
       <param name="height">1080</param>

@@ -54,8 +54,12 @@ export async function onRequestGet(context) {
         if (attrs.image_url) {
           return ok({ success: true, imageUrl: attrs.image_url, source: 'Amazon' });
         }
-        if (Array.isArray(attrs.image_urls) && attrs.image_urls.length > 0 && attrs.image_urls[0]) {
-          return ok({ success: true, imageUrl: attrs.image_urls[0], source: 'Amazon' });
+        // Handle image_urls as a JS array or as a double-serialized JSON string
+        const resolvedImageUrls = Array.isArray(attrs.image_urls)
+          ? attrs.image_urls
+          : (typeof attrs.image_urls === 'string' ? (() => { try { return JSON.parse(attrs.image_urls); } catch (_) { return []; } })() : []);
+        if (resolvedImageUrls.length > 0 && resolvedImageUrls[0]) {
+          return ok({ success: true, imageUrl: resolvedImageUrls[0], source: 'Amazon' });
         }
 
         // Fast path 3: check notes for embedded image URL

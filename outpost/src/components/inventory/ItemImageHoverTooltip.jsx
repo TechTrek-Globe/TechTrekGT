@@ -44,8 +44,19 @@ export function ItemImageHoverTooltip({ target, rect }) {
       PREVIEW_CACHE.set(cacheKey, data);
       return data;
     }
-    if (Array.isArray(attrs.image_urls) && attrs.image_urls.length > 0 && attrs.image_urls[0]) {
-      const data = { imageUrl: attrs.image_urls[0], source: 'Amazon', loading: false, notFound: false };
+    // Handle image_urls as a JS array or as a double-serialized JSON string
+    const resolvedImageUrls = Array.isArray(attrs.image_urls)
+      ? attrs.image_urls
+      : (typeof attrs.image_urls === 'string' ? (() => { try { return JSON.parse(attrs.image_urls); } catch (_) { return []; } })() : []);
+    if (resolvedImageUrls.length > 0 && resolvedImageUrls[0]) {
+      const data = { imageUrl: resolvedImageUrls[0], source: 'Amazon', loading: false, notFound: false };
+      PREVIEW_CACHE.set(cacheKey, data);
+      return data;
+    }
+    // Check top-level image_url pre-parsed by enriched.js from notes (Image: https://...)
+    if (target.image_url) {
+      const isEbay = String(target.image_url).includes('ebayimg');
+      const data = { imageUrl: target.image_url, source: isEbay ? 'eBay' : 'Amazon', loading: false, notFound: false };
       PREVIEW_CACHE.set(cacheKey, data);
       return data;
     }

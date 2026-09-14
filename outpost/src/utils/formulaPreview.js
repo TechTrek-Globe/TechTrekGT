@@ -6,10 +6,10 @@
 export function computeItemProration(item, invoice) {
   const base   = invoice.base_total;
   const weight = base > 0 ? item.unit_price / base : 0;
-  const prorated_discount = weight * invoice.discount;
-  const prorated_shipping = weight * invoice.shipping;
-  const prorated_tax      = weight * invoice.tax;
-  const true_total_cost   = item.unit_price - prorated_discount + prorated_shipping + prorated_tax;
+  const prorated_discount = Math.round((weight * invoice.discount) * 100) / 100;
+  const prorated_shipping = Math.round((weight * invoice.shipping) * 100) / 100;
+  const prorated_tax      = Math.round((weight * invoice.tax) * 100) / 100;
+  const true_total_cost   = Math.round((item.unit_price - prorated_discount + prorated_shipping + prorated_tax) * 100) / 100;
   return { proration_weight: weight, prorated_discount, prorated_shipping, prorated_tax, true_total_cost };
 }
 

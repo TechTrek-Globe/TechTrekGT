@@ -46,6 +46,8 @@ export async function onRequestPut(context) {
 
     const body = await request.json();
 
+    const round2 = (val) => (val != null && val !== '' && !isNaN(Number(val))) ? Math.round(Number(val) * 100) / 100 : null;
+
     // Merge only provided fields
     const updated = {
       item_name:          body.item_name         ?? item.item_name,
@@ -54,17 +56,17 @@ export async function onRequestPut(context) {
       athlete_person:     body.athlete_person     ?? item.athlete_person,
       authenticator:      body.authenticator      ?? item.authenticator,
       cert_number:        body.cert_number        ?? item.cert_number,
-      unit_price:         body.unit_price != null ? parseFloat(body.unit_price) : item.unit_price,
-      true_total_cost:    body.true_total_cost != null ? parseFloat(body.true_total_cost) : (body.unit_price != null ? (parseFloat(body.unit_price) - (item.prorated_discount || 0) + (item.prorated_shipping || 0) + (item.prorated_tax || 0)) : item.true_total_cost),
+      unit_price:         body.unit_price != null ? round2(body.unit_price) : round2(item.unit_price),
+      true_total_cost:    body.true_total_cost != null ? round2(body.true_total_cost) : (body.unit_price != null ? round2(parseFloat(body.unit_price) - (item.prorated_discount || 0) + (item.prorated_shipping || 0) + (item.prorated_tax || 0)) : round2(item.true_total_cost)),
       status:             body.status             ?? item.status,
       platform:           body.platform           ?? item.platform,
       platform_fee_pct:   body.platform_fee_pct   ?? item.platform_fee_pct,
       platform_flat_fee:  body.platform_flat_fee  ?? item.platform_flat_fee,
-      est_shipping_cost:  body.est_shipping_cost  ?? item.est_shipping_cost,
+      est_shipping_cost:  body.est_shipping_cost != null ? round2(body.est_shipping_cost) : round2(item.est_shipping_cost),
       boost_pct:          body.boost_pct          ?? item.boost_pct,
       target_margin_pct:  body.target_margin_pct  ?? item.target_margin_pct,
-      current_list_price: body.current_list_price ?? item.current_list_price,
-      actual_sell_price:  body.actual_sell_price  ?? item.actual_sell_price,
+      current_list_price: body.current_list_price != null ? round2(body.current_list_price) : round2(item.current_list_price),
+      actual_sell_price:  body.actual_sell_price  != null ? round2(body.actual_sell_price) : round2(item.actual_sell_price),
       date_acquired:      body.date_acquired      !== undefined ? body.date_acquired : item.date_acquired,
       date_listed:        body.date_listed        ?? item.date_listed,
       date_sold:          body.date_sold          ?? item.date_sold,
@@ -81,9 +83,9 @@ export async function onRequestPut(context) {
       listing_status:             body.listing_status             !== undefined ? (body.listing_status || null) : item.listing_status,
       quantity:                   body.quantity                   != null ? parseInt(body.quantity, 10) : (item.quantity ?? 1),
       purchase_date:              body.purchase_date              !== undefined ? (body.purchase_date || null) : item.purchase_date,
-      floor_price:                body.floor_price                !== undefined ? (body.floor_price !== '' && body.floor_price != null ? parseFloat(body.floor_price) : null) : item.floor_price,
-      buy_it_now_price:           body.buy_it_now_price           !== undefined ? (body.buy_it_now_price !== '' && body.buy_it_now_price != null ? parseFloat(body.buy_it_now_price) : null) : item.buy_it_now_price,
-      buyer_shipping_cost:        body.buyer_shipping_cost        !== undefined ? (body.buyer_shipping_cost !== '' && body.buyer_shipping_cost != null ? parseFloat(body.buyer_shipping_cost) : 0) : (item.buyer_shipping_cost ?? 0)
+      floor_price:                body.floor_price                !== undefined ? (body.floor_price !== '' && body.floor_price != null ? round2(body.floor_price) : null) : round2(item.floor_price),
+      buy_it_now_price:           body.buy_it_now_price           !== undefined ? (body.buy_it_now_price !== '' && body.buy_it_now_price != null ? round2(body.buy_it_now_price) : null) : round2(item.buy_it_now_price),
+      buyer_shipping_cost:        body.buyer_shipping_cost        !== undefined ? (body.buyer_shipping_cost !== '' && body.buyer_shipping_cost != null ? round2(body.buyer_shipping_cost) : 0) : (round2(item.buyer_shipping_cost) ?? 0)
     };
 
     // If platform changed, auto-lookup fees from auction_platforms

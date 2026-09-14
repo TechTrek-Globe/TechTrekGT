@@ -19,7 +19,15 @@ export function InlineEditCell({
   const inputRef = useRef(null);
 
   const startEdit = () => {
-    setDraft(value != null ? (type === 'number' && !isNaN(Number(value)) ? String(value) : String(value)) : '');
+    let initialDraft = '';
+    if (value != null && value !== '') {
+      if (type === 'number' && !isNaN(Number(value))) {
+        initialDraft = (Math.round(Number(value) * 100) / 100).toFixed(2);
+      } else {
+        initialDraft = String(value);
+      }
+    }
+    setDraft(initialDraft);
     setEditing(true);
     setTimeout(() => inputRef.current?.select(), 50);
   };
@@ -29,7 +37,7 @@ export function InlineEditCell({
   const save = async () => {
     let parsed;
     if (type === 'number') {
-      parsed = draft.trim() === '' ? null : parseFloat(draft);
+      parsed = draft.trim() === '' ? null : Math.round(parseFloat(draft) * 100) / 100;
       if (parsed !== null && isNaN(parsed)) parsed = null;
     } else {
       parsed = draft.trim() === '' ? null : draft.trim();
@@ -81,7 +89,7 @@ export function InlineEditCell({
 
   const isNumeric = type === 'number';
   const display = value != null && value !== ''
-    ? `${prefix || ''}${isNumeric && !isNaN(Number(value)) ? Number(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : value}${suffix || ''}`
+    ? `${prefix || ''}${isNumeric && !isNaN(Number(value)) ? (Math.round(Number(value) * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : value}${suffix || ''}`
     : placeholder;
 
   return (

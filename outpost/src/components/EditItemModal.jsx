@@ -538,8 +538,8 @@ export function EditItemModal({
         best_listing_window: form.best_listing_window?.trim() || null,
         notes: form.notes?.trim() || null,
 
-        unit_price: form.unit_price !== '' ? parseFloat(form.unit_price) : 0,
-        true_total_cost: form.true_total_cost !== '' ? parseFloat(form.true_total_cost) : undefined,
+        unit_price: form.unit_price !== '' ? Math.round(parseFloat(form.unit_price) * 100) / 100 : 0,
+        true_total_cost: form.true_total_cost !== '' && form.true_total_cost != null ? Math.round(parseFloat(form.true_total_cost) * 100) / 100 : undefined,
 
         status: form.status,
         listing_format: form.listing_format || null,
@@ -547,13 +547,13 @@ export function EditItemModal({
         platform: form.platform || null,
         platform_fee_pct: form.platform_fee_pct !== '' ? parseFloat(form.platform_fee_pct) / 100 : 0.135,
         platform_flat_fee: form.platform_flat_fee !== '' ? parseFloat(form.platform_flat_fee) : 0.40,
-        est_shipping_cost: form.est_shipping_cost !== '' ? parseFloat(form.est_shipping_cost) : 0,
-        buyer_shipping_cost: form.buyer_shipping_cost !== '' ? parseFloat(form.buyer_shipping_cost) : 0,
+        est_shipping_cost: form.est_shipping_cost !== '' ? Math.round(parseFloat(form.est_shipping_cost) * 100) / 100 : 0,
+        buyer_shipping_cost: form.buyer_shipping_cost !== '' ? Math.round(parseFloat(form.buyer_shipping_cost) * 100) / 100 : 0,
 
-        current_list_price: form.current_list_price !== '' ? parseFloat(form.current_list_price) : null,
-        buy_it_now_price: form.buy_it_now_price !== '' ? parseFloat(form.buy_it_now_price) : null,
-        floor_price: form.floor_price !== '' ? parseFloat(form.floor_price) : null,
-        actual_sell_price: form.actual_sell_price !== '' ? parseFloat(form.actual_sell_price) : null,
+        current_list_price: form.current_list_price !== '' ? Math.round(parseFloat(form.current_list_price) * 100) / 100 : null,
+        buy_it_now_price: form.buy_it_now_price !== '' ? Math.round(parseFloat(form.buy_it_now_price) * 100) / 100 : null,
+        floor_price: form.floor_price !== '' ? Math.round(parseFloat(form.floor_price) * 100) / 100 : null,
+        actual_sell_price: form.actual_sell_price !== '' ? Math.round(parseFloat(form.actual_sell_price) * 100) / 100 : null,
         target_margin_pct: form.target_margin_pct !== '' ? parseFloat(form.target_margin_pct) / 100 : 0.15,
 
         ebay_promoted_rate: form.ebay_promoted_rate !== '' ? parseFloat(form.ebay_promoted_rate) : null,

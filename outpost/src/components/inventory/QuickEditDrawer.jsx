@@ -7,6 +7,11 @@ import { buildEbaySearchUrl } from '../../utils/ebaySearch';
 import { fmtCurrency, roundPrice } from '../../utils/formulaPreview';
 import { generateSku } from '../../utils/skuGenerator';
 
+const formatDec2 = (val) => {
+  if (val == null || val === '' || isNaN(Number(val))) return '';
+  return (Math.round(Number(val) * 100) / 100).toFixed(2);
+};
+
 export function QuickEditDrawer({
   item,
   isOpen,
@@ -69,11 +74,11 @@ export function QuickEditDrawer({
         status: item.status || 'Available',
         platform: item.platform || 'eBay',
         listing_format: item.listing_format || 'Fixed Price',
-        true_total_cost: item.true_total_cost ?? '',
-        est_shipping_cost: item.est_shipping_cost ?? '',
-        current_list_price: item.current_list_price ?? '',
-        buy_it_now_price: item.buy_it_now_price ?? '',
-        floor_price: item.floor_price ?? '',
+        true_total_cost: formatDec2(item.true_total_cost),
+        est_shipping_cost: formatDec2(item.est_shipping_cost),
+        current_list_price: formatDec2(item.current_list_price),
+        buy_it_now_price: formatDec2(item.buy_it_now_price),
+        floor_price: formatDec2(item.floor_price),
         ebay_promoted_rate: item.ebay_promoted_rate ?? '',
         target_margin_pct: item.target_margin_pct != null ? (Number(item.target_margin_pct) * 100).toFixed(0) : '15',
         ebay_listing_id: item.ebay_listing_id || '',
@@ -83,17 +88,17 @@ export function QuickEditDrawer({
         is_vinescout: isVine,
         asin: itemAsin,
         order_id: itemOrderId,
-        etv: itemEtv,
-        tax_cost: itemTaxCost,
+        etv: formatDec2(itemEtv),
+        tax_cost: formatDec2(itemTaxCost),
 
         // Comps
-        comp_1: item.comp_1 ?? '',
-        comp_2: item.comp_2 ?? '',
-        comp_3: item.comp_3 ?? '',
-        active_comp_1: item.active_comp_1 ?? '',
-        active_comp_2: item.active_comp_2 ?? '',
-        active_comp_3: item.active_comp_3 ?? '',
-        recommended_list_price: item.recommended_list_price ?? item.current_list_price ?? ''
+        comp_1: formatDec2(item.comp_1),
+        comp_2: formatDec2(item.comp_2),
+        comp_3: formatDec2(item.comp_3),
+        active_comp_1: formatDec2(item.active_comp_1),
+        active_comp_2: formatDec2(item.active_comp_2),
+        active_comp_3: formatDec2(item.active_comp_3),
+        recommended_list_price: formatDec2(item.recommended_list_price ?? item.current_list_price)
       });
       setFetchMsg(null);
       setSaveSuccess(false);
@@ -147,11 +152,11 @@ export function QuickEditDrawer({
         status: draft.status,
         platform: draft.platform,
         listing_format: draft.listing_format,
-        true_total_cost: draft.true_total_cost !== '' ? parseFloat(draft.true_total_cost) : null,
-        est_shipping_cost: draft.est_shipping_cost !== '' ? parseFloat(draft.est_shipping_cost) : 0,
-        current_list_price: draft.current_list_price !== '' ? parseFloat(draft.current_list_price) : null,
-        buy_it_now_price: draft.buy_it_now_price !== '' ? parseFloat(draft.buy_it_now_price) : null,
-        floor_price: draft.floor_price !== '' ? parseFloat(draft.floor_price) : null,
+        true_total_cost: draft.true_total_cost !== '' && draft.true_total_cost != null ? Math.round(parseFloat(draft.true_total_cost) * 100) / 100 : null,
+        est_shipping_cost: draft.est_shipping_cost !== '' && draft.est_shipping_cost != null ? Math.round(parseFloat(draft.est_shipping_cost) * 100) / 100 : 0,
+        current_list_price: draft.current_list_price !== '' && draft.current_list_price != null ? Math.round(parseFloat(draft.current_list_price) * 100) / 100 : null,
+        buy_it_now_price: draft.buy_it_now_price !== '' && draft.buy_it_now_price != null ? Math.round(parseFloat(draft.buy_it_now_price) * 100) / 100 : null,
+        floor_price: draft.floor_price !== '' && draft.floor_price != null ? Math.round(parseFloat(draft.floor_price) * 100) / 100 : null,
         ebay_promoted_rate: draft.ebay_promoted_rate !== '' ? parseFloat(draft.ebay_promoted_rate) : null,
         target_margin_pct: draft.target_margin_pct !== '' ? parseFloat(draft.target_margin_pct) / 100 : 0.15,
         ebay_listing_id: draft.ebay_listing_id ? draft.ebay_listing_id.trim() : null,
@@ -161,8 +166,8 @@ export function QuickEditDrawer({
         is_vinescout: Boolean(draft.is_vinescout),
         asin: draft.asin ? draft.asin.trim().toUpperCase() : null,
         order_id: draft.order_id ? draft.order_id.trim() : null,
-        etv: draft.etv !== '' && draft.etv != null ? parseFloat(draft.etv) : null,
-        tax_cost: draft.tax_cost !== '' && draft.tax_cost != null ? parseFloat(draft.tax_cost) : null
+        etv: draft.etv !== '' && draft.etv != null ? Math.round(parseFloat(draft.etv) * 100) / 100 : null,
+        tax_cost: draft.tax_cost !== '' && draft.tax_cost != null ? Math.round(parseFloat(draft.tax_cost) * 100) / 100 : null
       };
 
       const res = await updateItem(item.id, itemPatch);
@@ -174,13 +179,13 @@ export function QuickEditDrawer({
       if (hasComps) {
         await saveComp({
           item_id: item.id,
-          comp_1: draft.comp_1 !== '' ? Number(draft.comp_1) : null,
-          comp_2: draft.comp_2 !== '' ? Number(draft.comp_2) : null,
-          comp_3: draft.comp_3 !== '' ? Number(draft.comp_3) : null,
-          active_comp_1: draft.active_comp_1 !== '' ? Number(draft.active_comp_1) : null,
-          active_comp_2: draft.active_comp_2 !== '' ? Number(draft.active_comp_2) : null,
-          active_comp_3: draft.active_comp_3 !== '' ? Number(draft.active_comp_3) : null,
-          recommended_list_price: draft.recommended_list_price !== '' ? Number(draft.recommended_list_price) : null,
+          comp_1: draft.comp_1 !== '' ? Math.round(Number(draft.comp_1) * 100) / 100 : null,
+          comp_2: draft.comp_2 !== '' ? Math.round(Number(draft.comp_2) * 100) / 100 : null,
+          comp_3: draft.comp_3 !== '' ? Math.round(Number(draft.comp_3) * 100) / 100 : null,
+          active_comp_1: draft.active_comp_1 !== '' ? Math.round(Number(draft.active_comp_1) * 100) / 100 : null,
+          active_comp_2: draft.active_comp_2 !== '' ? Math.round(Number(draft.active_comp_2) * 100) / 100 : null,
+          active_comp_3: draft.active_comp_3 !== '' ? Math.round(Number(draft.active_comp_3) * 100) / 100 : null,
+          recommended_list_price: draft.recommended_list_price !== '' ? Math.round(Number(draft.recommended_list_price) * 100) / 100 : null,
           apply_to_item: false
         });
       }
@@ -476,6 +481,7 @@ export function QuickEditDrawer({
                   placeholder="0.00"
                   value={draft.etv || ''}
                   onChange={e => updateField('etv', e.target.value)}
+                  onBlur={() => updateField('etv', formatDec2(draft.etv))}
                   className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 focus:border-teal-500 outline-none font-mono"
                 />
               </div>
@@ -485,7 +491,7 @@ export function QuickEditDrawer({
                   {draft.tax_cost && Number(draft.tax_cost) > 0 && (
                     <button
                       type="button"
-                      onClick={() => updateField('true_total_cost', String(Number(draft.tax_cost).toFixed(2)))}
+                      onClick={() => updateField('true_total_cost', formatDec2(draft.tax_cost))}
                       className="text-[9px] text-amber-400 hover:text-amber-300 underline"
                       title="Set as Cost Basis"
                     >
@@ -500,6 +506,7 @@ export function QuickEditDrawer({
                   placeholder="0.00"
                   value={draft.tax_cost || ''}
                   onChange={e => updateField('tax_cost', e.target.value)}
+                  onBlur={() => updateField('tax_cost', formatDec2(draft.tax_cost))}
                   className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-emerald-400 focus:border-teal-500 outline-none font-mono font-semibold"
                 />
               </div>
@@ -555,6 +562,7 @@ export function QuickEditDrawer({
                   step="0.01"
                   value={draft.current_list_price}
                   onChange={e => updateField('current_list_price', e.target.value)}
+                  onBlur={() => updateField('current_list_price', formatDec2(draft.current_list_price))}
                   className="w-full bg-slate-900 border border-amber-500/60 rounded-lg p-2 text-xs text-amber-300 font-bold focus:border-amber-500 outline-none font-mono"
                 />
               </div>
@@ -566,6 +574,7 @@ export function QuickEditDrawer({
                   step="0.01"
                   value={draft.buy_it_now_price}
                   onChange={e => updateField('buy_it_now_price', e.target.value)}
+                  onBlur={() => updateField('buy_it_now_price', formatDec2(draft.buy_it_now_price))}
                   className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:border-amber-500 outline-none font-mono"
                 />
               </div>
@@ -577,6 +586,7 @@ export function QuickEditDrawer({
                   step="0.01"
                   value={draft.floor_price}
                   onChange={e => updateField('floor_price', e.target.value)}
+                  onBlur={() => updateField('floor_price', formatDec2(draft.floor_price))}
                   className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-cyan-400 focus:border-amber-500 outline-none font-mono"
                 />
               </div>
@@ -590,6 +600,7 @@ export function QuickEditDrawer({
                   step="0.01"
                   value={draft.true_total_cost}
                   onChange={e => updateField('true_total_cost', e.target.value)}
+                  onBlur={() => updateField('true_total_cost', formatDec2(draft.true_total_cost))}
                   className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:border-amber-500 outline-none font-mono"
                 />
               </div>
@@ -601,6 +612,7 @@ export function QuickEditDrawer({
                   step="0.01"
                   value={draft.est_shipping_cost}
                   onChange={e => updateField('est_shipping_cost', e.target.value)}
+                  onBlur={() => updateField('est_shipping_cost', formatDec2(draft.est_shipping_cost))}
                   className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:border-amber-500 outline-none font-mono"
                 />
               </div>
@@ -691,6 +703,7 @@ export function QuickEditDrawer({
                     placeholder={`Sold #${i + 1}`}
                     value={draft[c]}
                     onChange={e => updateField(c, e.target.value)}
+                    onBlur={() => updateField(c, formatDec2(draft[c]))}
                     className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:border-amber-500 outline-none font-mono text-center"
                   />
                 ))}
@@ -711,6 +724,7 @@ export function QuickEditDrawer({
                     placeholder={`Active #${i + 1}`}
                     value={draft[c]}
                     onChange={e => updateField(c, e.target.value)}
+                    onBlur={() => updateField(c, formatDec2(draft[c]))}
                     className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:border-blue-500 outline-none font-mono text-center"
                   />
                 ))}
@@ -727,6 +741,7 @@ export function QuickEditDrawer({
                   placeholder="0.00"
                   value={draft.recommended_list_price}
                   onChange={e => updateField('recommended_list_price', e.target.value)}
+                  onBlur={() => updateField('recommended_list_price', formatDec2(draft.recommended_list_price))}
                   className="flex-1 bg-slate-900 border border-amber-500/60 rounded-lg p-2 text-xs text-amber-300 font-bold focus:border-amber-500 outline-none font-mono"
                 />
                 <button

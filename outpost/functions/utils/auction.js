@@ -3,6 +3,8 @@
  * All formulas are direct translations of the Excel spreadsheet logic.
  */
 
+const round2 = (val) => Math.round((Number(val) || 0) * 100) / 100;
+
 /**
  * Computes all proration fields for a single item given its invoice totals.
  * - Spreadsheet: Proration Weight = Item Base Total / Invoice Base Total
@@ -15,15 +17,15 @@ export function computeItemProration(item, invoice) {
   const base = invoice.base_total;
   const weight = base > 0 ? item.unit_price / base : 0;
 
-  const prorated_discount = weight * invoice.discount;
-  const prorated_shipping = weight * invoice.shipping;
-  const prorated_tax      = weight * invoice.tax;
+  const prorated_discount = round2(weight * invoice.discount);
+  const prorated_shipping = round2(weight * invoice.shipping);
+  const prorated_tax      = round2(weight * invoice.tax);
 
   // True Total Cost = Unit Price - Prorated Discount + Prorated Shipping + Prorated Tax
-  const true_total_cost = item.unit_price
+  const true_total_cost = round2(item.unit_price
                         - prorated_discount
                         + prorated_shipping
-                        + prorated_tax;
+                        + prorated_tax);
 
   return {
     proration_weight:  weight,
@@ -69,19 +71,19 @@ export function reprorateBatch(items, invoice) {
  * @returns {{ platform_fees_amt: number, net_proceeds: number, net_profit: number, roi_pct: number }}
  */
 export function computeSaleMetrics(sale) {
-  const platform_fees_amt = ((sale.gross_sale_price || 0) * (sale.platform_fee_pct || 0))
-                          + (sale.platform_flat_fee || 0);
+  const platform_fees_amt = round2(((sale.gross_sale_price || 0) * (sale.platform_fee_pct || 0))
+                          + (sale.platform_flat_fee || 0));
 
-  const net_proceeds = sale.net_proceeds !== undefined && sale.net_proceeds !== null && !isNaN(Number(sale.net_proceeds))
+  const net_proceeds = round2(sale.net_proceeds !== undefined && sale.net_proceeds !== null && !isNaN(Number(sale.net_proceeds))
                      ? Number(sale.net_proceeds)
                      : ((sale.gross_sale_price || 0)
                         + (sale.buyer_shipping_paid || 0)
                         - (sale.actual_shipping_cost || 0)
                         - platform_fees_amt
                         - (sale.payment_processing_amt || 0)
-                        - (sale.promoted_listing_fee || 0));
+                        - (sale.promoted_listing_fee || 0)));
 
-  const net_profit = net_proceeds - (sale.true_total_cost || 0);
+  const net_profit = round2(net_proceeds - (sale.true_total_cost || 0));
   const roi_pct    = (sale.true_total_cost || 0) > 0
                    ? net_profit / sale.true_total_cost
                    : 0;
@@ -118,7 +120,7 @@ export function computePricingFloors(item) {
 export function computeManualAvg(c1, c2, c3) {
   const vals = [c1, c2, c3].filter(v => v != null && v > 0);
   if (vals.length === 0) return 0;
-  return vals.reduce((sum, v) => sum + v, 0) / vals.length;
+  return round2(vals.reduce((sum, v) => sum + v, 0) / vals.length);
 }
 
 /**
@@ -132,7 +134,7 @@ export function computeManualAvg(c1, c2, c3) {
  */
 export function computeRecommendedListPrice(min_sell_price, manual_avg, live_avg) {
   const avg = (live_avg && live_avg > 0) ? live_avg : manual_avg;
-  return avg > min_sell_price ? avg : min_sell_price;
+  return round2(avg > min_sell_price ? avg : min_sell_price);
 }
 
 /**

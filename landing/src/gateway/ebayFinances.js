@@ -28,8 +28,8 @@ export async function onRequestGet(context) {
     }
 
     const { isSandbox } = getEbayEndpoints(env);
-    const base = isSandbox ? 'https://api.sandbox.ebay.com' : 'https://api.ebay.com';
-    const financesUrl = `${base}/sell/finances/v1/transaction?orderId=${encodeURIComponent(orderId)}&limit=100`;
+    const base = isSandbox ? 'https://apiz.sandbox.ebay.com' : 'https://apiz.ebay.com';
+    const financesUrl = `${base}/sell/finances/v1/transaction?filter=orderId:{${encodeURIComponent(orderId)}}&limit=100`;
 
     const res = await fetch(financesUrl, {
       headers: {
@@ -64,28 +64,54 @@ export async function onRequestGet(context) {
     for (const txn of transactions) {
       const type = (txn.transactionType || '').toUpperCase();
       const amount = Math.abs(parseFloat(txn.amount?.value || '0'));
-      const feeType = (txn.feeType || txn.orderLineItems?.[0]?.feeType || '').toUpperCase();
 
       if (type === 'SALE') {
-        grossSaleAmount = amount;
+        const basis = parseFloat(txn.totalFeeBasisAmount?.value || txn.orderLineItems?.[0]?.feeBasisAmount?.value || txn.amount?.value || '0');
+        if (basis > 0) grossSaleAmount = basis;
+
+        const orderLineItems = txn.orderLineItems || [];
+        for (const oli of orderLineItems) {
+          if (oli.promotedListingRate) {
+            promotedListingRate = parseFloat(oli.promotedListingRate);
+            promotedListingActive = true;
+          }
+          const mpFees = oli.marketplaceFees || [];
+          for (const mf of mpFees) {
+            const fType = (mf.feeType || '').toUpperCase();
+            const fAmount = Math.abs(parseFloat(mf.amount?.value || '0'));
+            if (fType.includes('FINAL_VALUE')) {
+              finalValueFee += fAmount;
+            } else if (fType.includes('AD_FEE') || fType.includes('PROMOTED')) {
+              promotedListingFee += fAmount;
+              promotedListingActive = true;
+            } else if (fType.includes('REGULATORY')) {
+              regulatoryFee += fAmount;
+            } else {
+              paymentProcessingFee += fAmount;
+            }
+          }
+        }
+
+        if (finalValueFee === 0 && txn.totalFeeAmount?.value) {
+          finalValueFee = Math.abs(parseFloat(txn.totalFeeAmount.value));
+        }
+      } else if (type === 'SHIPPING_LABEL') {
+        shippingLabelCost += amount;
       } else if (type === 'NON_SALE_CHARGE') {
+        const feeType = (txn.feeType || txn.orderLineItems?.[0]?.feeType || '').toUpperCase();
         if (feeType.includes('FINAL_VALUE')) {
           finalValueFee += amount;
         } else if (feeType.includes('AD_FEE') || feeType.includes('PROMOTED')) {
           promotedListingFee += amount;
           promotedListingActive = true;
-          // Try to extract the ad rate from listing metadata
           if (txn.orderLineItems?.[0]?.promotedListingRate) {
             promotedListingRate = parseFloat(txn.orderLineItems[0].promotedListingRate);
           }
         } else if (feeType.includes('REGULATORY')) {
           regulatoryFee += amount;
         } else {
-          // Lump unknown non-sale charges into payment processing
           paymentProcessingFee += amount;
         }
-      } else if (type === 'SHIPPING_LABEL') {
-        shippingLabelCost += amount;
       }
     }
 

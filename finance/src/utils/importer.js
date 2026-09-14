@@ -1091,8 +1091,8 @@ export function inspectWorkbookSheets(arrayBuffer, fileName = '', existingAccoun
       hasExtraHeader: headerDetection.hasExtraHeader,
       suggestedHeaderIdx: headerDetection.suggestedHeaderIdx,
       detectionReason: headerDetection.reason,
-      suggestedAccountId: matchedAccount ? matchedAccount.id : (existingAccounts[0]?.id || ''),
-      suggestedAccountName: matchedAccount ? matchedAccount.name : (existingAccounts[0]?.name || name),
+      suggestedAccountId: matchedAccount ? matchedAccount.id : '',
+      suggestedAccountName: matchedAccount ? matchedAccount.name : '',
     };
   });
 

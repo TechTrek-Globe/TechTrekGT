@@ -411,7 +411,7 @@ export function SpreadsheetImporter({
       const initialConfigs = {};
       inspection.sheetsInfo.forEach(s => {
         initialConfigs[s.name] = {
-          targetAccountId: s.suggestedAccountId || targetAccountId || selectedTargetAccountId || budget.accounts[0]?.id || '',
+          targetAccountId: targetAccountId || selectedTargetAccountId || s.suggestedAccountId || budget.accounts[0]?.id || '',
           headerRowIdx: s.hasExtraHeader ? s.suggestedHeaderIdx : 0
         };
       });

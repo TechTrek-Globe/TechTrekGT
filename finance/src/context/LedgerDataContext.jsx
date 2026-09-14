@@ -583,6 +583,8 @@ export function LedgerDataProvider({ children }) {
   }, [getAccountDerivedBalance, getAccountActualExpenses]);
 
   // --- Daily Matrix Cell Operations ---
+  const getDailyMatrix = useCallback(() => dailyMatrixRef.current || {}, []);
+
   const getDailyMatrixCell = useCallback((accountId, monthKey, day, field) => {
     const key = `${accountId}_${monthKey}_${day}_${field}`;
     return dailyMatrixRef.current[key];
@@ -738,12 +740,7 @@ export function LedgerDataProvider({ children }) {
 
         let earnerDeposit = 0;
         if (customCredit !== undefined) {
-          let parsed = parseFloat(customCredit) || 0;
-          if (Math.abs(parsed - 689.42) < 0.01) parsed = 689.00;
-          if (Math.abs(parsed - 1222.61) < 0.01) parsed = 1378.00;
-          if (Math.abs(parsed - 110.58) < 0.01) parsed = 111.00;
-          if (Math.abs(parsed - 221.16) < 0.01) parsed = 222.00;
-          earnerDeposit = parsed;
+          earnerDeposit = parseFloat(customCredit) || 0;
         } else if (!isLockedDay && isDepDay) {
           earnerDeposit = getPersonDepositAmountForAccount(p, accountId, metadataStateRef.current);
         }
@@ -852,6 +849,7 @@ export function LedgerDataProvider({ children }) {
 
   const actionsValue = useMemo(() => ({
     matrixVersion,
+    getDailyMatrix,
     getDailyMatrixCell,
     updateDailyMatrixCell,
     updateDailyMatrixCells,
@@ -880,6 +878,7 @@ export function LedgerDataProvider({ children }) {
     setSyncPasscode,
     setIsSyncUnlocked
   }), [
+    getDailyMatrix,
     getDailyMatrixCell,
     updateDailyMatrixCell,
     updateDailyMatrixCells,

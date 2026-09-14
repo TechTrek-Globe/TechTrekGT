@@ -1151,15 +1151,15 @@ export async function fetchEbayOrderForListing(env, accessToken, listingId, sku 
  * @returns {Promise<object>} Financial fee breakdown
  */
 export async function fetchEbayOrderFinances(env, accessToken, orderId) {
-  if (!orderId) return { finances_available: false };
+  if (!orderId) return { finances_available: false, error: 'Order ID is required' };
   const cleanOrderId = String(orderId).trim();
   const isSandbox = isEbaySandbox(env);
-  const restBase = isSandbox
-    ? 'https://api.sandbox.ebay.com'
-    : 'https://api.ebay.com';
+  const financesBase = isSandbox
+    ? 'https://apiz.sandbox.ebay.com'
+    : 'https://apiz.ebay.com';
 
   try {
-    const res = await fetch(`${restBase}/sell/finances/v1/transaction?orderId=${encodeURIComponent(cleanOrderId)}&limit=100`, {
+    const res = await fetch(`${financesBase}/sell/finances/v1/transaction?filter=orderId:{${encodeURIComponent(cleanOrderId)}}&limit=100`, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
@@ -1178,7 +1178,7 @@ export async function fetchEbayOrderFinances(env, accessToken, orderId) {
         };
       }
       console.warn(`[tokenHelper] Finances API error (${res.status}):`, text.slice(0, 200));
-      return { finances_available: false, error: text.slice(0, 200) };
+      return { finances_available: false, error: text.slice(0, 200) || `Finances API error (${res.status})` };
     }
 
     const data = await res.json();
@@ -1196,11 +1196,43 @@ export async function fetchEbayOrderFinances(env, accessToken, orderId) {
     for (const txn of transactions) {
       const type = (txn.transactionType || '').toUpperCase();
       const amount = Math.abs(parseFloat(txn.amount?.value || '0'));
-      const feeType = (txn.feeType || txn.orderLineItems?.[0]?.feeType || '').toUpperCase();
 
       if (type === 'SALE') {
-        grossSaleAmount = amount;
+        const basis = parseFloat(txn.totalFeeBasisAmount?.value || txn.orderLineItems?.[0]?.feeBasisAmount?.value || txn.amount?.value || '0');
+        if (basis > 0) grossSaleAmount = basis;
+
+        // Parse order line item marketplace fees
+        const orderLineItems = txn.orderLineItems || [];
+        for (const oli of orderLineItems) {
+          if (oli.promotedListingRate) {
+            promotedListingRate = parseFloat(oli.promotedListingRate);
+            promotedListingActive = true;
+          }
+          const mpFees = oli.marketplaceFees || [];
+          for (const mf of mpFees) {
+            const fType = (mf.feeType || '').toUpperCase();
+            const fAmount = Math.abs(parseFloat(mf.amount?.value || '0'));
+            if (fType.includes('FINAL_VALUE')) {
+              finalValueFee += fAmount;
+            } else if (fType.includes('AD_FEE') || fType.includes('PROMOTED')) {
+              promotedListingFee += fAmount;
+              promotedListingActive = true;
+            } else if (fType.includes('REGULATORY')) {
+              regulatoryFee += fAmount;
+            } else {
+              paymentProcessingFee += fAmount;
+            }
+          }
+        }
+
+        // Fallback: If no marketplaceFees breakdown but totalFeeAmount is provided
+        if (finalValueFee === 0 && txn.totalFeeAmount?.value) {
+          finalValueFee = Math.abs(parseFloat(txn.totalFeeAmount.value));
+        }
+      } else if (type === 'SHIPPING_LABEL') {
+        shippingLabelCost += amount;
       } else if (type === 'NON_SALE_CHARGE') {
+        const feeType = (txn.feeType || txn.orderLineItems?.[0]?.feeType || '').toUpperCase();
         if (feeType.includes('FINAL_VALUE')) {
           finalValueFee += amount;
         } else if (feeType.includes('AD_FEE') || feeType.includes('PROMOTED')) {
@@ -1214,8 +1246,6 @@ export async function fetchEbayOrderFinances(env, accessToken, orderId) {
         } else {
           paymentProcessingFee += amount;
         }
-      } else if (type === 'SHIPPING_LABEL') {
-        shippingLabelCost += amount;
       }
     }
 

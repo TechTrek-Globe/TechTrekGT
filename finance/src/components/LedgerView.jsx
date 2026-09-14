@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { InlineEdit } from './InlineEdit';
 import { SpreadsheetImporter } from './SpreadsheetImporter';
+import { ColumnHeaderHoverTooltip } from './ColumnHeaderHoverTooltip';
 
 import { fmtMoney, fmtNum } from '../utils/formatters';
 import { isBillDueInMonth } from '../utils/paydayUtils';
@@ -307,6 +308,8 @@ const IsolatedTextInput = React.memo(function IsolatedTextInput({
 function DailySpreadsheetMatrix() {
   const {
     budget,
+    transactions,
+    getDailyMatrix,
     matrixVersion,
     lineItems,
     getBillMonthlyCost,
@@ -314,6 +317,7 @@ function DailySpreadsheetMatrix() {
     updateDailyMatrixCell,
     moveDailyMatrixCell,
     updateBill,
+    updatePerson,
     archiveBill,
     unarchiveBill,
     updateAccount,
@@ -343,6 +347,37 @@ function DailySpreadsheetMatrix() {
   const [billDraftName, setBillDraftName] = useState('');
   const [billToArchive, setBillToArchive] = useState(null);
   const [selectedRowKey, setSelectedRowKey] = useState(null);
+  const [hoveredHeader, setHoveredHeader] = useState(null);
+  const hoverTimeoutRef = useRef(null);
+
+  // Alias and Column Name update handlers for ColumnHeaderHoverTooltip
+  const handleUpdateAliases = useCallback((column, type, newAliases) => {
+    const aliasStr = Array.isArray(newAliases) ? newAliases.join(', ') : (newAliases || '');
+    if (type === 'bill') {
+      updateBill(column.id, { bankMatchNames: aliasStr, matchingKey: aliasStr });
+    } else if (type === 'person') {
+      updatePerson(column.id, { bankMatchNames: aliasStr, matchingKey: aliasStr });
+    }
+  }, [updateBill, updatePerson]);
+
+  const handleUpdateColumnName = useCallback((column, type, newName) => {
+    if (!newName || !newName.trim()) return;
+    if (type === 'bill') {
+      updateBill(column.id, { name: newName.trim() });
+    } else if (type === 'person') {
+      updatePerson(column.id, { name: newName.trim() });
+    }
+  }, [updateBill, updatePerson]);
+
+  // Keep hoveredHeader column reference current with latest state from budget
+  const activeHoveredColumn = useMemo(() => {
+    if (!hoveredHeader || !hoveredHeader.column) return null;
+    const colId = hoveredHeader.column.id;
+    if (hoveredHeader.type === 'bill') {
+      return budget.bills.find(b => b.id === colId) || hoveredHeader.column;
+    }
+    return budget.people.find(p => p.id === colId) || hoveredHeader.column;
+  }, [hoveredHeader, budget.bills, budget.people]);
 
 
   // Drag and drop sensor configuration
@@ -733,12 +768,7 @@ function DailySpreadsheetMatrix() {
 
           let earnerDeposit = 0;
           if (customCredit !== undefined) {
-            let parsed = parseFloat(customCredit) || 0;
-            if (Math.abs(parsed - 689.42) < 0.01) parsed = 689.00;
-            if (Math.abs(parsed - 1222.61) < 0.01) parsed = 1378.00;
-            if (Math.abs(parsed - 110.58) < 0.01) parsed = 111.00;
-            if (Math.abs(parsed - 221.16) < 0.01) parsed = 222.00;
-            earnerDeposit = parsed;
+            earnerDeposit = parseFloat(customCredit) || 0;
           } else if (!isLockedDay && isDepDay) {
             earnerDeposit = getPersonDepositAmountForAccount(p, selectedAccountId, budget);
           }
@@ -1006,6 +1036,29 @@ function DailySpreadsheetMatrix() {
     if (todayRowRef.current) {
       todayRowRef.current.scrollIntoView({ behavior: 'auto', block: 'center' });
     }
+  }, []);
+
+  // Dismiss header hover tooltip on scroll to prevent detached floating
+  useEffect(() => {
+    const handleScroll = () => {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+        hoverTimeoutRef.current = null;
+      }
+      setHoveredHeader(null);
+    };
+
+    const container = containerRef.current;
+    if (container) {
+      container.addEventListener('scroll', handleScroll, { passive: true });
+    }
+    window.addEventListener('scroll', handleScroll, { passive: true });
+
+    return () => {
+      if (container) container.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('scroll', handleScroll);
+      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    };
   }, []);
 
   // Column totals for selected month
@@ -1295,18 +1348,60 @@ function DailySpreadsheetMatrix() {
 
               {/* Credits */}
               {accountPeople.map(p => (
-                <th key={`hdr-cred-${p.id}`} className="px-2 h-10 text-right min-w-[85px] text-emerald-400 bg-slate-900 border-r border-slate-800 align-middle sticky top-[24px] z-20 border-b border-slate-700 font-bold" title={`${p.name} Deposit`}>
+                <th
+                  key={`hdr-cred-${p.id}`}
+                  className="px-2 h-10 text-right min-w-[85px] text-emerald-400 bg-slate-900 border-r border-slate-800 align-middle sticky top-[24px] z-20 border-b border-slate-700 font-bold cursor-help"
+                  onMouseEnter={(e) => {
+                    if (hoverTimeoutRef.current) {
+                      clearTimeout(hoverTimeoutRef.current);
+                      hoverTimeoutRef.current = null;
+                    }
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setHoveredHeader({
+                      column: p,
+                      type: 'person',
+                      rect
+                    });
+                  }}
+                  onMouseLeave={() => {
+                    hoverTimeoutRef.current = setTimeout(() => {
+                      setHoveredHeader(null);
+                    }, 120);
+                  }}
+                >
                   <span className="block text-[11px] leading-tight break-words whitespace-normal text-right">{p.name}</span>
                 </th>
               ))}
 
               {/* Bill Columns with Direct Inline Editing and 2nd Confirmation Archive */}
               {accountBills.map(b => (
-                <th key={`hdr-bill-${b.id}`} className="px-2 h-10 text-right min-w-[115px] text-rose-300 bg-slate-900 group align-middle sticky top-[24px] z-20 border-b border-slate-700 border-r border-slate-800 relative font-bold" title={`${b.name} ($${b.amount})`}>
+                <th
+                  key={`hdr-bill-${b.id}`}
+                  className="px-2 h-10 text-right min-w-[115px] text-rose-300 bg-slate-900 group align-middle sticky top-[24px] z-20 border-b border-slate-700 border-r border-slate-800 relative font-bold cursor-help"
+                  onMouseEnter={(e) => {
+                    if (editingBillId === b.id) return;
+                    if (hoverTimeoutRef.current) {
+                      clearTimeout(hoverTimeoutRef.current);
+                      hoverTimeoutRef.current = null;
+                    }
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setHoveredHeader({
+                      column: b,
+                      type: 'bill',
+                      rect
+                    });
+                  }}
+                  onMouseLeave={() => {
+                    hoverTimeoutRef.current = setTimeout(() => {
+                      setHoveredHeader(null);
+                    }, 120);
+                  }}
+                >
                   <button
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
+                      setHoveredHeader(null);
                       setBillToArchive(b);
                     }}
                     className="opacity-0 group-hover:opacity-100 hover:scale-110 p-0.5 text-slate-400 hover:text-amber-400 transition-all rounded absolute top-1 left-0.5 z-10 cursor-pointer"
@@ -1335,6 +1430,7 @@ function DailySpreadsheetMatrix() {
                   ) : (
                     <div
                       onClick={() => {
+                        setHoveredHeader(null);
                         setEditingBillId(b.id);
                         setBillDraftName(b.name);
                       }}
@@ -1765,6 +1861,8 @@ function DailySpreadsheetMatrix() {
           <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-4xl p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto my-auto">
             <SpreadsheetImporter
               isModal={true}
+              targetAccountId={selectedAccountId !== 'all' ? selectedAccountId : (budget.accounts[0]?.id || null)}
+              targetAccountName={selectedAccountId !== 'all' ? selectedAccount?.name : (budget.accounts[0]?.name || null)}
               onClose={() => setIsImportModalOpen(false)}
             />
           </div>
@@ -1808,6 +1906,32 @@ function DailySpreadsheetMatrix() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Interactive Column Header Hover Tooltip (Portal) */}
+      {hoveredHeader && activeHoveredColumn && (
+        <ColumnHeaderHoverTooltip
+          column={activeHoveredColumn}
+          type={hoveredHeader.type}
+          rect={hoveredHeader.rect}
+          transactions={transactions || budget.transactions || []}
+          dailyMatrix={getDailyMatrix ? getDailyMatrix() : {}}
+          selectedAccountId={selectedAccountId}
+          asOfDate={todayObj}
+          onUpdateAliases={handleUpdateAliases}
+          onUpdateName={handleUpdateColumnName}
+          onMouseEnter={() => {
+            if (hoverTimeoutRef.current) {
+              clearTimeout(hoverTimeoutRef.current);
+              hoverTimeoutRef.current = null;
+            }
+          }}
+          onMouseLeave={() => {
+            hoverTimeoutRef.current = setTimeout(() => {
+              setHoveredHeader(null);
+            }, 120);
+          }}
+        />
       )}
     </div>
     </DndContext>

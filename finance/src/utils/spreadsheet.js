@@ -82,6 +82,19 @@ export function processSpreadsheetImport({
   let matrixChanged = false;
   let transactionsChanged = false;
 
+  // Derive date boundaries of incoming import data to prevent historical/future data wipes
+  const incomingTxDates = (Array.isArray(data.transactions) ? data.transactions : [])
+    .map(t => normalizeIsoDate(t.date))
+    .filter(Boolean);
+  const incomingLedgerDates = (data.importedLedgerRows && typeof data.importedLedgerRows === 'object')
+    ? Object.keys(data.importedLedgerRows).map(d => normalizeIsoDate(d)).filter(Boolean)
+    : [];
+  const allIncomingDates = [...new Set([...incomingTxDates, ...incomingLedgerDates])].sort();
+  const minImportDate = allIncomingDates.length > 0 ? allIncomingDates[0] : null;
+  const maxImportDate = allIncomingDates.length > 0 ? allIncomingDates[allIncomingDates.length - 1] : null;
+  const minImportMonth = minImportDate ? minImportDate.slice(0, 7) : null;
+  const maxImportMonth = maxImportDate ? maxImportDate.slice(0, 7) : null;
+
   // 1. Process People
   if (namespaces.people && Array.isArray(data.people)) {
     logDebug('RECONCILE', 'Reconciling people namespace', { strategy: strategies.people, incomingCount: data.people.length, existingCount: nextPeople.length });
@@ -116,15 +129,18 @@ export function processSpreadsheetImport({
         nextAccounts = nextAccounts.map(a => {
           if (a.id === data.targetAccountId) {
             const importedRows = incomingTargetAcc?.importedLedgerRows || data.importedLedgerRows || {};
+            // Never wipe earlier historical ledger rows: merge incoming on top of existing
+            const mergedRows = { ...(a.importedLedgerRows || {}), ...importedRows };
             let newStartingBalance = a.startingBalance;
             let newExtraStarting = a.extraStartingBalance || 0;
             
             let newStartDate = a.startDate;
             let newBalanceAsOfDate = a.balanceAsOfDate;
             if (strategies.transactions === 'override') {
-              const dates = Object.keys(importedRows).sort();
-              if (dates.length > 0) {
-                const earliestRow = importedRows[dates[0]];
+              const dates = Object.keys(mergedRows).sort();
+              // Only adopt earliest date/balance if account has no prior startDate or if dates[0] is earlier than existing startDate
+              if (dates.length > 0 && (!a.startDate || dates[0] < a.startDate)) {
+                const earliestRow = mergedRows[dates[0]];
                 const rawReg = earliestRow.regBeg ?? earliestRow.totalBeg ?? newStartingBalance;
                 const rawExtra = earliestRow.extraBeg ?? (newExtraStarting ?? 0);
                 let startReg = rawReg;
@@ -150,7 +166,7 @@ export function processSpreadsheetImport({
               ...(incomingTargetAcc || {}),
               id: a.id,
               name: incomingTargetAcc?.name || a.name,
-              importedLedgerRows: importedRows,
+              importedLedgerRows: mergedRows,
               ledgerMode: 'import',
               startingBalance: newStartingBalance,
               extraStartingBalance: newExtraStarting,
@@ -189,7 +205,7 @@ export function processSpreadsheetImport({
             
             if (strategies.transactions === 'override') {
               const dates = Object.keys(incomingAcc.importedLedgerRows).sort();
-              if (dates.length > 0) {
+              if (dates.length > 0 && (!match.startDate || dates[0] < match.startDate)) {
                 const earliestRow = incomingAcc.importedLedgerRows[dates[0]];
                 const rawReg = earliestRow.regBeg ?? earliestRow.totalBeg ?? match.startingBalance;
                 const rawExtra = earliestRow.extraBeg ?? (match.extraStartingBalance || 0);
@@ -238,16 +254,12 @@ export function processSpreadsheetImport({
       if (acc.id === data.targetAccountId) {
         const patches = {};
         if (data.importedLedgerRows && Object.keys(data.importedLedgerRows).length > 0) {
-          if (strategies.accounts === 'override') {
-            patches.importedLedgerRows = data.importedLedgerRows;
-          } else {
-            patches.importedLedgerRows = { ...(acc.importedLedgerRows || {}), ...data.importedLedgerRows };
-          }
+          patches.importedLedgerRows = { ...(acc.importedLedgerRows || {}), ...data.importedLedgerRows };
           patches.ledgerMode = 'import';
           
           if (strategies.transactions === 'override') {
             const dates = Object.keys(data.importedLedgerRows).sort();
-            if (dates.length > 0) {
+            if (dates.length > 0 && (!acc.startDate || dates[0] < acc.startDate)) {
               const earliestRow = data.importedLedgerRows[dates[0]];
               const rawReg = earliestRow.regBeg ?? earliestRow.totalBeg ?? acc.startingBalance;
               const rawExtra = earliestRow.extraBeg ?? (acc.extraStartingBalance || 0);
@@ -324,11 +336,31 @@ export function processSpreadsheetImport({
 
     if (strategies.transactions === 'override') {
       if (data.targetAccountId) {
-        // Clear out existing transactions for THIS specific account, keep transactions of other accounts
-        const otherAccTransactions = nextTransactions.filter(t => t.accountId !== data.targetAccountId);
-        nextTransactions = [...otherAccTransactions, ...stampedTransactions];
+        if (minImportDate && maxImportDate) {
+          // Date-scoped override: ONLY replace transactions for THIS target account that fall within [minImportDate, maxImportDate].
+          // Historical transactions prior to minImportDate and future projected transactions after maxImportDate are strictly preserved.
+          const preservedTransactions = nextTransactions.filter(t => {
+            if (t.accountId !== data.targetAccountId) return true;
+            const tDate = normalizeIsoDate(t.date);
+            if (!tDate) return true;
+            return tDate < minImportDate || tDate > maxImportDate;
+          });
+          nextTransactions = [...preservedTransactions, ...stampedTransactions];
+        } else {
+          const otherAccTransactions = nextTransactions.filter(t => t.accountId !== data.targetAccountId);
+          nextTransactions = [...otherAccTransactions, ...stampedTransactions];
+        }
       } else {
-        nextTransactions = stampedTransactions;
+        if (minImportDate && maxImportDate) {
+          const preservedTransactions = nextTransactions.filter(t => {
+            const tDate = normalizeIsoDate(t.date);
+            if (!tDate) return true;
+            return tDate < minImportDate || tDate > maxImportDate;
+          });
+          nextTransactions = [...preservedTransactions, ...stampedTransactions];
+        } else {
+          nextTransactions = stampedTransactions;
+        }
       }
       transactionsChanged = true;
     } else {
@@ -353,22 +385,80 @@ export function processSpreadsheetImport({
   if (namespaces.transactions && Array.isArray(data.transactions)) {
     logDebug('RECONCILE', `Reconciling ${data.transactions.length} actual transactions against projected bills/deposits`);
     
-    // If Overriding transactions, clean out existing matrix cells and line items for this account first
+    // If Overriding transactions, clean out existing matrix cells and line items for this account only within the imported date range
     if (strategies.transactions === 'override') {
       if (data.targetAccountId) {
-        const nextCleanMatrix = {};
-        Object.entries(nextDailyMatrix).forEach(([k, v]) => {
-          if (!k.startsWith(`${data.targetAccountId}_`)) {
-            nextCleanMatrix[k] = v;
-          }
-        });
-        nextDailyMatrix = nextCleanMatrix;
+        if (minImportDate && maxImportDate) {
+          const nextCleanMatrix = {};
+          Object.entries(nextDailyMatrix).forEach(([k, v]) => {
+            if (!k.startsWith(`${data.targetAccountId}_`)) {
+              nextCleanMatrix[k] = v;
+              return;
+            }
+            const parts = k.split('_');
+            const mKey = parts[1];
+            if (!mKey || mKey < minImportMonth || mKey > maxImportMonth) {
+              nextCleanMatrix[k] = v;
+              return;
+            }
+            const rawDay = parseInt(parts[2], 10);
+            if (!isNaN(rawDay)) {
+              const keyDate = `${mKey}-${String(rawDay).padStart(2, '0')}`;
+              if (keyDate < minImportDate || keyDate > maxImportDate) {
+                nextCleanMatrix[k] = v;
+                return;
+              }
+            }
+          });
+          nextDailyMatrix = nextCleanMatrix;
 
-        const accountBillIds = new Set(nextBills.filter(b => b.accountId === data.targetAccountId).map(b => b.id));
-        nextLineItems = nextLineItems.filter(li => !accountBillIds.has(li.billId));
+          const accountBillIds = new Set(nextBills.filter(b => b.accountId === data.targetAccountId).map(b => b.id));
+          nextLineItems = nextLineItems.filter(li => {
+            if (!accountBillIds.has(li.billId)) return true;
+            if (!li.monthKey) return true;
+            return li.monthKey < minImportMonth || li.monthKey > maxImportMonth;
+          });
+        } else {
+          const nextCleanMatrix = {};
+          Object.entries(nextDailyMatrix).forEach(([k, v]) => {
+            if (!k.startsWith(`${data.targetAccountId}_`)) {
+              nextCleanMatrix[k] = v;
+            }
+          });
+          nextDailyMatrix = nextCleanMatrix;
+
+          const accountBillIds = new Set(nextBills.filter(b => b.accountId === data.targetAccountId).map(b => b.id));
+          nextLineItems = nextLineItems.filter(li => !accountBillIds.has(li.billId));
+        }
       } else {
-        nextDailyMatrix = {};
-        nextLineItems = [];
+        if (minImportDate && maxImportDate) {
+          const nextCleanMatrix = {};
+          Object.entries(nextDailyMatrix).forEach(([k, v]) => {
+            const parts = k.split('_');
+            const mKey = parts[1];
+            if (!mKey || mKey < minImportMonth || mKey > maxImportMonth) {
+              nextCleanMatrix[k] = v;
+              return;
+            }
+            const rawDay = parseInt(parts[2], 10);
+            if (!isNaN(rawDay)) {
+              const keyDate = `${mKey}-${String(rawDay).padStart(2, '0')}`;
+              if (keyDate < minImportDate || keyDate > maxImportDate) {
+                nextCleanMatrix[k] = v;
+                return;
+              }
+            }
+          });
+          nextDailyMatrix = nextCleanMatrix;
+
+          nextLineItems = nextLineItems.filter(li => {
+            if (!li.monthKey) return true;
+            return li.monthKey < minImportMonth || li.monthKey > maxImportMonth;
+          });
+        } else {
+          nextDailyMatrix = {};
+          nextLineItems = [];
+        }
       }
       matrixChanged = true;
       lineItemsChanged = true;

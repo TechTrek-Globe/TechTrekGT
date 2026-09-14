@@ -235,7 +235,8 @@ export async function onRequestGet(context) {
 
     const enrichedItems = (rows.results || []).map(row => {
       const isAmazon = typeof row.invoice_ref === 'string' && row.invoice_ref.startsWith('AMAZON-');
-      const imageUrl = parseImageFromNotes(row.notes);
+      // Parse image from notes first (Amazon pipe-delimited: "Image: https://...")
+      let imageUrl = parseImageFromNotes(row.notes);
       const userNote = parseUserNote(row.notes);
       const searchUrl = buildEbaySearchUrl(row.item_name, row.athlete_person, row.authenticator);
 
@@ -254,6 +255,21 @@ export async function onRequestGet(context) {
             if (parsed.source === 'amazon_vinescout' || parsed.is_vinescout) isVineScout = true;
             if (parsed.etv != null) etv = Number(parsed.etv);
             if (parsed.tax_cost != null) taxCost = Number(parsed.tax_cost);
+
+            // Fallback: pull image_url from attributes when notes did not yield one
+            if (!imageUrl) {
+              if (parsed.ebay_image_url) {
+                imageUrl = parsed.ebay_image_url;
+              } else if (parsed.image_url) {
+                imageUrl = parsed.image_url;
+              } else if (parsed.image_urls) {
+                // Handle plain array or double-serialized JSON string
+                const imgs = Array.isArray(parsed.image_urls)
+                  ? parsed.image_urls
+                  : (() => { try { return JSON.parse(parsed.image_urls); } catch (_) { return []; } })();
+                if (Array.isArray(imgs) && imgs[0]) imageUrl = imgs[0];
+              }
+            }
           }
         } catch (_) {}
       }

@@ -1,9 +1,10 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
+import { getEbayUserToken, fetchEbayOrderFinances } from './tokenHelper.js';
 
 /**
  * POST /api/ebay/reconcile
  *
- * Fetches actual eBay fee data via Central API Gateway (/api/ebay/finances)
+ * Fetches actual eBay fee data via direct Finances API call using tokenHelper
  * and inserts/updates an ebay_fee_reconciliations row in D1.
  *
  * Body: { sale_id, ebay_order_id }
@@ -27,41 +28,34 @@ export async function onRequestPost(context) {
 
     if (!sale) return err('Sale not found', 404);
 
-    // Call Central API Gateway on landing worker (holds eBay credentials & handles token refresh)
-    const origin = new URL(request.url).origin;
-    const isLocal = origin.includes('localhost') || origin.includes('127.0.0.1');
-    const gatewayUrl = `${isLocal ? 'http://localhost:8787' : 'https://techtrekgt.com'}/api/ebay/finances?order_id=${encodeURIComponent(ebay_order_id)}`;
-
-    const cookie = request.headers.get('Cookie') || '';
-    const authHeader = request.headers.get('Authorization') || '';
+    // Retrieve eBay access token directly via tokenHelper (eliminates server-to-server gateway loopback)
+    let accessToken;
+    try {
+      accessToken = await getEbayUserToken(env, payload.userId);
+    } catch (e) {
+      const msg = e.message || 'Unknown error';
+      if (msg.includes('not connected') || msg.includes('refresh token has expired')) {
+        return err(msg, 401);
+      }
+      return err(`eBay authentication failed: ${msg}`, 500);
+    }
 
     let finData;
     try {
-      const gatewayRes = await fetch(gatewayUrl, {
-        headers: {
-          'Cookie': cookie,
-          ...(authHeader ? { 'Authorization': authHeader } : {})
-        }
-      });
-
-      if (!gatewayRes.ok) {
-        const text = await gatewayRes.text().catch(() => '');
-        if (gatewayRes.status === 403) {
-          return ok({
-            reconciled: false,
-            pending_scope_approval: true,
-            message: 'eBay Finances API access requires sell.finances scope approval on developer.ebay.com.'
-          });
-        }
-        let errJson;
-        try { errJson = JSON.parse(text); } catch (_) {}
-        const msg = errJson?.error || text.slice(0, 200) || `Finances API error (${gatewayRes.status})`;
-        return err(msg, gatewayRes.status);
-      }
-
-      finData = await gatewayRes.json();
+      finData = await fetchEbayOrderFinances(env, accessToken, ebay_order_id);
     } catch (e) {
-      return err(`eBay finances gateway fetch failed: ${e.message}`, 502);
+      return err(`eBay finances fetch failed: ${e.message}`, 502);
+    }
+
+    if (!finData || !finData.finances_available) {
+      if (finData?.pending_scope_approval) {
+        return ok({
+          reconciled: false,
+          pending_scope_approval: true,
+          message: 'eBay Finances API access requires sell.finances scope approval on developer.ebay.com.'
+        });
+      }
+      return err(finData?.error || 'Failed to retrieve fee data from eBay Finances API', 502);
     }
 
     const finalValueFee = finData.final_value_fee || 0;
@@ -78,10 +72,12 @@ export async function onRequestPost(context) {
     const feeDelta = parseFloat((actualFees - estimatedFees).toFixed(4));
 
     // Reconciled net profit = gross - shipping - true_cost - actual_fees
-    const gross = parseFloat(sale.gross_sale_price || 0);
-    const shipping = parseFloat(sale.actual_shipping_cost || 0);
+    const gross = parseFloat(sale.gross_sale_price || finData.gross_sale_amount || 0);
+    const shipping = parseFloat(sale.actual_shipping_cost || shippingLabelCost || 0);
     const trueCost = parseFloat(sale.true_total_cost || 0);
     const reconciledNetProfit = parseFloat((gross - shipping - trueCost - actualFees).toFixed(4));
+    const buyerShipping = parseFloat(sale.buyer_shipping_paid || 0);
+    const netProceeds = parseFloat((gross + buyerShipping - actualFees).toFixed(2));
 
     const reconId = `recon-${crypto.randomUUID()}`;
 
@@ -121,10 +117,31 @@ export async function onRequestPost(context) {
       JSON.stringify(transactions).slice(0, 65535)
     ).run();
 
-    // Stamp the sale row
-    await env.DB.prepare(
-      'UPDATE auction_sales SET fee_reconciled_at = datetime(\'now\'), ebay_order_id = ? WHERE id = ?'
-    ).bind(ebay_order_id, sale_id).run();
+    // Stamp the sale row with reconciled fees, net proceeds, and profit
+    await env.DB.prepare(`
+      UPDATE auction_sales SET
+        fee_reconciled_at = datetime('now'),
+        ebay_order_id = ?,
+        platform_fees_amt = ?,
+        payment_processing_amt = ?,
+        promoted_listing_fee = ?,
+        actual_shipping_cost = CASE WHEN ? > 0 THEN ? ELSE actual_shipping_cost END,
+        net_proceeds = ?,
+        net_profit = ?,
+        roi_pct = CASE WHEN true_total_cost > 0 THEN ROUND(? / true_total_cost, 4) ELSE roi_pct END
+      WHERE id = ? AND user_id = ?
+    `).bind(
+      ebay_order_id,
+      parseFloat((finalValueFee + regulatoryFee).toFixed(2)),
+      paymentProcessingFee,
+      promotedListingFee,
+      shippingLabelCost, shippingLabelCost,
+      netProceeds,
+      reconciledNetProfit,
+      reconciledNetProfit,
+      sale_id,
+      payload.userId
+    ).run();
 
     return ok({
       reconciled: true,

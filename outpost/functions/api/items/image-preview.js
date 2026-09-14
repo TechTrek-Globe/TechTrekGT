@@ -111,12 +111,13 @@ export async function onRequestGet(context) {
             'Content-Type': 'application/json',
             'Cookie': request.headers.get('Cookie') || ''
           },
-          body: JSON.stringify({ asin: cleanAsin })
+          body: JSON.stringify({ input: cleanAsin })
         });
 
         if (gwRes.ok) {
           const gwData = await gwRes.json().catch(() => ({}));
-          const img = (Array.isArray(gwData.images) && gwData.images[0]) || gwData.image_url;
+          // Gateway returns `image` (singular), fallback to images[0] and image_url
+          const img = gwData.image || (Array.isArray(gwData.images) && gwData.images[0]) || gwData.image_url || null;
           if (img) {
             if (item) {
               attrs.image_url = img;

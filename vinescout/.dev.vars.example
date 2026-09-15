@@ -1,0 +1,7 @@
+# Local development secrets for techtrek-vinescout
+# Copy this file to .dev.vars and fill in real values.
+# NEVER commit .dev.vars to source control.
+
+# Shared SSO signing key - must match the value in finance/.dev.vars
+# and outpost/.dev.vars so cross-app logins work during local dev.
+JWT_SECRET=your-shared-jwt-secret-here

@@ -11,6 +11,7 @@ TechTrekGT is a multi-application platform hosted on `techtrekgt.com`. The repos
 | `landing/` | **Primary domain root** - platform hub / marketing page | `techtrekgt.com` *(Main Site)* | Static HTML/CSS/JS |
 | `finance/` | Personal budget tracker | `techtrekgt.com/finance/*` | React 19 + Vite + Cloudflare Workers |
 | `outpost/` | Resale / auction operations tracker | `techtrekgt.com/outpost/*` | React 19 + Vite + Cloudflare Workers |
+| `vinescout/`| Amazon Vine analytics & ETV tax tracker | `techtrekgt.com/vinescout/*` | React 19 + Vite + Cloudflare Workers |
 | `wayfinder/` | Poland Christmas 2026 travel guide | `techtrekgt.com/wayfinder/*` | React 19 + Vite + Cloudflare Workers |
 | `bigworm/` | Secure remote desktop portal (Guacamole) | `bigworm.techtrekgt.com` *(sub-domain)* | React 19 + Vite + Cloudflare Workers |
 
@@ -18,7 +19,7 @@ TechTrekGT is a multi-application platform hosted on `techtrekgt.com`. The repos
 
 ## 2. Tech Stack Overview
 
-### 2.1 Shared Frontend Stack (finance, outpost, wayfinder, bigworm)
+### 2.1 Shared Frontend Stack (finance, outpost, vinescout, wayfinder, bigworm)
 
 | Layer | Technology | Notes |
 |-------|-----------|-------|
@@ -109,6 +110,7 @@ Every React project follows the same structural convention:
 | Project | Unique Directories | Notes |
 |---------|-------------------|-------|
 | `finance/` | `src/components/`, `src/components/settings/`, `src/components/settings/datasync/`, `src/context/`, `src/utils/`, `src/assets/` | 4 context providers, modular settings sub-panels (Accounts, Bills, Dashboard, DataSync with dedicated CloudSync, ImportExport, StorageReset, and SyncQueue sub-panels, Security, Debug) |
+| `vinescout/` | `functions/api/vinescout/` | Dual-system platform synced via MV3 Chrome Extension |
 | `wayfinder/` | `src/components/city/`, `src/data/`, `src/hooks/`, `functions/api/wayfinder/` | 10 city tab sub-components, `data/poland-2026.js` static dataset, `hooks/useExchangeRate.js`, D1 wayfinder APIs |
 | `outpost/` | `functions/api/` (largest) | invoices, items, sales, platforms, comps, reports, sync, import |
 | `bigworm/` | `guacamole-config/` | `guacamole.properties`, `user-mapping.xml` for Docker Guacamole |
@@ -415,6 +417,7 @@ All apps (finance, outpost, wayfinder, bigworm) point at the same `personal-budg
 |------------|-----|--------|
 | `finance/schema.sql` | finance + shared | `users`, `households`, `household_members`, `accounts`, `people`, `bills`, `bill_splits`, `line_items`, `loans`, `household_settings`, `user_backups` |
 | `outpost/auction-schema.sql` | outpost | invoices, items, sales, platforms, comps, `market_comps`, supplies, `listing_traffic`, `auction_item_analytics`, `outpost_sync_settings` |
+| `vinescout/vinescout-schema.sql` | vinescout | `vine_items`, `vine_orders`, `vine_tax_settings`, `vine_asin_cache` |
 | `wayfinder/schema-wayfinder.sql` | wayfinder | journeys, itinerary items, documents, import jobs, budgets |
 
 ### 8.3 Key Design Points
@@ -461,6 +464,7 @@ The decision to run all four apps against a single Cloudflare D1 (SQLite) instan
 | landing | `techtrekgt.com` + `techtrekgt.com/*` | `techtrek-landing` |
 | finance | `techtrekgt.com/finance` + `techtrekgt.com/finance/*` | `techtrek-budget` |
 | outpost | `techtrekgt.com/outpost*` + case variants | `techtrek-outpost` |
+| vinescout | `techtrekgt.com/vinescout` + `techtrekgt.com/vinescout/*` | `techtrek-vinescout` |
 | wayfinder | `techtrekgt.com/wayfinder` + `techtrekgt.com/wayfinder/*` | `techtrek-wayfinder` |
 | bigworm | `bigworm.techtrekgt.com` (custom domain) | `techtrek-bigworm` |
 
@@ -654,6 +658,7 @@ Each project reads local secrets from a `.dev.vars` file (git-ignored) that is l
    | `finance/` | `npm run dev` | `http://localhost:3000` |
    | `outpost/` | `npm run dev` | `http://localhost:3001` |
    | `wayfinder/` | `npm run dev` | `http://localhost:5174` |
+   | `vinescout/` | `npm run dev` | `http://localhost:5175` |
    | `bigworm/` | `npm run dev` | `http://localhost:5173` |
 
 2. **Local database**: `wrangler d1 execute personal-budget-db --local` (or `npm run db:migrate:local` in outpost).

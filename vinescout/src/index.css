@@ -1,0 +1,123 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  html {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+
+  body {
+    @apply bg-surface text-slate-100 min-h-screen;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { @apply bg-surface-card; }
+  ::-webkit-scrollbar-thumb { @apply bg-surface-border rounded-full; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-slate-500; }
+}
+
+@layer components {
+  /* Glass card */
+  .vs-card {
+    @apply bg-surface-card border border-surface-border rounded-xl p-5;
+  }
+
+  /* KPI metric tile */
+  .vs-metric {
+    @apply vs-card flex flex-col gap-1;
+  }
+  .vs-metric-value {
+    @apply text-2xl font-bold text-white;
+  }
+  .vs-metric-label {
+    @apply text-xs font-medium text-surface-muted uppercase tracking-wider;
+  }
+
+  /* Table */
+  .vs-table {
+    @apply w-full text-sm;
+  }
+  .vs-table thead th {
+    @apply px-3 py-2 text-left text-xs font-semibold text-surface-muted uppercase tracking-wider border-b border-surface-border;
+  }
+  .vs-table tbody tr {
+    @apply border-b border-surface-border transition-colors duration-150 hover:bg-surface-hover;
+  }
+  .vs-table tbody td {
+    @apply px-3 py-2.5 text-slate-200;
+  }
+
+  /* Primary button */
+  .vs-btn {
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-150 cursor-pointer;
+  }
+  .vs-btn-primary {
+    @apply vs-btn bg-vs-600 hover:bg-vs-500 text-white;
+  }
+  .vs-btn-ghost {
+    @apply vs-btn bg-transparent hover:bg-surface-hover text-slate-300 hover:text-white border border-surface-border;
+  }
+
+  /* Status badges */
+  .vs-badge {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
+  }
+  .vs-badge-green  { @apply vs-badge bg-vs-900 text-vs-300; }
+  .vs-badge-yellow { @apply vs-badge bg-amber-900 text-amber-300; }
+  .vs-badge-red    { @apply vs-badge bg-red-900 text-red-300; }
+  .vs-badge-gray   { @apply vs-badge bg-slate-700 text-slate-300; }
+
+  /* Sidebar nav link */
+  .vs-nav-link {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 text-slate-400 hover:text-white hover:bg-surface-hover;
+  }
+  .vs-nav-link.active {
+    @apply text-white bg-surface-hover border-l-2 border-vs-500;
+  }
+
+  /* Input */
+  .vs-input {
+    @apply w-full px-3 py-2 rounded-lg bg-surface border border-surface-border text-slate-100 placeholder-slate-500 focus:outline-none focus:border-vs-500 focus:ring-1 focus:ring-vs-500 text-sm transition-colors;
+  }
+
+  /* Select */
+  .vs-select {
+    @apply vs-input appearance-none cursor-pointer;
+  }
+}
+
+@layer utilities {
+  /* Gradient text utility */
+  .text-gradient-green {
+    @apply bg-gradient-to-r from-vs-400 to-vs-600 bg-clip-text text-transparent;
+  }
+
+  /* Glow effect for KPI cards */
+  .vs-glow {
+    box-shadow: 0 0 20px rgba(34, 197, 94, 0.12);
+  }
+}
+
+/* Page fade-in animation */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in-up {
+  animation: fadeInUp 0.25s ease-out both;
+}
+
+/* Spinner */
+@keyframes spin { to { transform: rotate(360deg); } }
+.vs-spinner {
+  @apply w-5 h-5 border-2 border-surface-border border-t-vs-500 rounded-full;
+  animation: spin 0.7s linear infinite;
+}

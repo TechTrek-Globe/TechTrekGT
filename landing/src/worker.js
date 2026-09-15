@@ -32,6 +32,7 @@ const ALLOWED_ORIGINS = [
   'http://localhost:3001',  // outpost dev
   'http://localhost:3000',  // finance dev
   'http://localhost:5174',  // wayfinder dev
+  'http://localhost:5175',  // vinescout dev
   'http://localhost:5173',  // bigworm dev
   'http://localhost:8787'   // landing dev
 ];

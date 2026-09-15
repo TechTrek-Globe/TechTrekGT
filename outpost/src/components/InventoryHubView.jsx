@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Package, AlertCircle, CheckCircle2, Loader2, UploadCloud, Tag, RefreshCw, TableProperties, LayoutGrid } from 'lucide-react';
 import { useInventory } from '../context/InventoryContext';
-import { deleteItem } from '../utils/auctionApi';
+import { deleteItem, syncEbayItem, getItem, updateItem } from '../utils/auctionApi';
 import { cleanEbaySearchQuery } from '../utils/ebaySearch';
 import { fmtCurrency, formatPercent } from '../utils/formulaPreview';
 import { computeFeeBreakdown } from '../utils/feeEngine';
@@ -16,6 +16,7 @@ import { QueryEditModal } from './inventory/QueryEditModal';
 
 // Modals
 import { AddInvoiceModal } from './AddInvoiceModal';
+import { ViewInvoiceModal } from './ViewInvoiceModal';
 import { AmazonItemModal } from './AmazonItemModal';
 import { SpreadsheetImporterModal } from './SpreadsheetImporterModal';
 import { LogSaleModal } from './LogSaleModal';
@@ -82,6 +83,7 @@ export function InventoryHubView({ onNavigate }) {
   const [deleting, setDeleting] = useState(null);
   const [listingIdModalItem, setListingIdModalItem] = useState(null);
   const [delistDismissed, setDelistDismissed] = useState(false);
+  const [viewingInvoice, setViewingInvoice] = useState(null); // { invoiceRef, invoiceId }
 
   const displayItems = sortedItems;
 
@@ -154,6 +156,53 @@ export function InventoryHubView({ onNavigate }) {
   const handleConfirmSearch = (item, query) => {
     if (queryEditModal?.onConfirm) {
       queryEditModal.onConfirm(query);
+    }
+  };
+
+  const handleUpdateItemSync = async (item) => {
+    try {
+      let updatedData = null;
+      if (item.ebay_listing_id || item.sku) {
+        try {
+          const res = await syncEbayItem(item.id);
+          if (res?.item) {
+            updatedData = res.item;
+          }
+        } catch (syncErr) {
+          console.warn('eBay sync failed, falling back to direct item refresh:', syncErr);
+        }
+      }
+      if (!updatedData) {
+        const res = await getItem(item.id);
+        if (res?.item) {
+          updatedData = res.item;
+        }
+      }
+      if (updatedData) {
+        updateItemLocal(item.id, updatedData);
+        setSyncResult({ ok: true, msg: `Updated "${item.item_name || 'Item'}".` });
+      } else {
+        setSyncResult({ ok: true, msg: 'Item refreshed.' });
+      }
+    } catch (err) {
+      setSyncResult({ ok: false, msg: err.message || 'Failed to update item.' });
+    } finally {
+      setTimeout(() => setSyncResult(null), 4000);
+    }
+  };
+
+  const handleVerifyCert = async (item) => {
+    try {
+      await updateItem(item.id, { cert_verified: true });
+      const currentAttrs = typeof item.attributes === 'string' ? JSON.parse(item.attributes || '{}') : (item.attributes || {});
+      updateItemLocal(item.id, {
+        cert_verified: true,
+        attributes: { ...currentAttrs, cert_verified: true }
+      });
+      setSyncResult({ ok: true, msg: `Verified certificate for ${item.item_name || 'item'}.` });
+      setTimeout(() => setSyncResult(null), 3000);
+    } catch (err) {
+      console.error('Failed to mark certificate verified:', err);
     }
   };
 
@@ -251,6 +300,9 @@ export function InventoryHubView({ onNavigate }) {
             onOpenSaleModal={handleMarkSold}
             onOpenListingIdModal={setListingIdModalItem}
             onMarkSold={handleMarkSold}
+            onOpenInvoiceModal={(ref, id) => setViewingInvoice({ invoiceRef: ref, invoiceId: id })}
+            onUpdateItemSync={handleUpdateItemSync}
+            onVerifyCert={handleVerifyCert}
             userSettings={userSettings}
             setUserSettings={setUserSettings}
           />
@@ -289,6 +341,12 @@ export function InventoryHubView({ onNavigate }) {
         platforms={platforms}
         onClose={() => setModalOpen(false)}
         onCreated={() => fetchItems(1)}
+      />
+      <ViewInvoiceModal
+        isOpen={Boolean(viewingInvoice)}
+        invoiceRef={viewingInvoice?.invoiceRef}
+        invoiceId={viewingInvoice?.invoiceId}
+        onClose={() => setViewingInvoice(null)}
       />
       <AmazonItemModal
         isOpen={amazonModalOpen}

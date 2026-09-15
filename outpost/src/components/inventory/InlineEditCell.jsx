@@ -7,6 +7,7 @@ export function InlineEditCell({
   itemId,
   field,
   type = 'text',
+  isInteger = false,
   prefix,
   suffix,
   placeholder = '--',
@@ -21,7 +22,9 @@ export function InlineEditCell({
   const startEdit = () => {
     let initialDraft = '';
     if (value != null && value !== '') {
-      if (type === 'number' && !isNaN(Number(value))) {
+      if (isInteger && !isNaN(Number(value))) {
+        initialDraft = String(Math.round(Number(value)));
+      } else if (type === 'number' && !isNaN(Number(value))) {
         initialDraft = (Math.round(Number(value) * 100) / 100).toFixed(2);
       } else {
         initialDraft = String(value);
@@ -36,7 +39,10 @@ export function InlineEditCell({
 
   const save = async () => {
     let parsed;
-    if (type === 'number') {
+    if (isInteger) {
+      parsed = draft.trim() === '' ? null : parseInt(draft, 10);
+      if (parsed !== null && isNaN(parsed)) parsed = null;
+    } else if (type === 'number') {
       parsed = draft.trim() === '' ? null : Math.round(parseFloat(draft) * 100) / 100;
       if (parsed !== null && isNaN(parsed)) parsed = null;
     } else {
@@ -71,7 +77,8 @@ export function InlineEditCell({
         <input
           ref={inputRef}
           type={type}
-          step={type === 'number' ? '0.01' : undefined}
+          step={isInteger ? '1' : type === 'number' ? '0.01' : undefined}
+          min={isInteger ? '1' : undefined}
           className="w-full bg-slate-900 border border-amber-500 rounded px-1.5 py-0.5 text-xs text-white outline-none font-mono"
           value={draft}
           onChange={e => setDraft(e.target.value)}
@@ -87,9 +94,9 @@ export function InlineEditCell({
     );
   }
 
-  const isNumeric = type === 'number';
+  const isNumeric = type === 'number' || isInteger;
   const display = value != null && value !== ''
-    ? `${prefix || ''}${isNumeric && !isNaN(Number(value)) ? (Math.round(Number(value) * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : value}${suffix || ''}`
+    ? `${prefix || ''}${isNumeric && !isNaN(Number(value)) ? (isInteger ? Math.round(Number(value)).toLocaleString('en-US', { maximumFractionDigits: 0 }) : (Math.round(Number(value) * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) : value}${suffix || ''}`
     : placeholder;
 
   return (

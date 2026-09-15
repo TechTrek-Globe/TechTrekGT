@@ -68,6 +68,7 @@ const EMPTY_FORM = {
   authenticator: '',
   cert_number: '',
   cert_verification_url: '',
+  cert_verified: false,
   ebay_listing_id: '',
   // VineScout / Amazon Vine Link
   is_vinescout: false,
@@ -217,6 +218,7 @@ export function EditItemModal({
         authenticator: item.authenticator ? item.authenticator.replace(/#.*$/, '').trim() : '',
         cert_number: item.cert_number || '',
         cert_verification_url: item.cert_verification_url || '',
+        cert_verified: Boolean(item.cert_verified || (item.attributes && (typeof item.attributes === 'string' ? item.attributes.includes('"cert_verified":true') : item.attributes?.cert_verified))),
         ebay_listing_id: item.ebay_listing_id || '',
 
         // VineScout / Amazon Vine
@@ -567,6 +569,7 @@ export function EditItemModal({
         authenticator: form.authenticator || null,
         cert_number: form.cert_number?.trim() || null,
         cert_verification_url: form.cert_verification_url || null,
+        cert_verified: Boolean(form.cert_verified),
         ebay_listing_id: form.ebay_listing_id?.trim() || null,
 
         // VineScout / Amazon Vine fields

@@ -245,6 +245,8 @@ export async function onRequestGet(context) {
       let isVineScout = false;
       let etv = null;
       let taxCost = null;
+      let certVerified = false;
+      let certVerifiedAt = null;
 
       if (row.attributes) {
         try {
@@ -255,6 +257,8 @@ export async function onRequestGet(context) {
             if (parsed.source === 'amazon_vinescout' || parsed.is_vinescout) isVineScout = true;
             if (parsed.etv != null) etv = Number(parsed.etv);
             if (parsed.tax_cost != null) taxCost = Number(parsed.tax_cost);
+            if (parsed.cert_verified) certVerified = true;
+            if (parsed.cert_verified_at) certVerifiedAt = parsed.cert_verified_at;
 
             // Fallback: pull image_url from attributes when notes did not yield one
             if (!imageUrl) {
@@ -303,7 +307,9 @@ export async function onRequestGet(context) {
         asin: asin,
         order_id: orderId,
         etv: etv,
-        tax_cost: taxCost
+        tax_cost: taxCost,
+        cert_verified: certVerified,
+        cert_verified_at: certVerifiedAt
       };
     });
 

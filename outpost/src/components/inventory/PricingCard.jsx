@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ExternalLink, Copy, AlertCircle, Loader2, Save, CheckCircle2, ArrowUpRight, Zap, Edit3, ShoppingBag } from 'lucide-react';
+import { ExternalLink, Copy, AlertCircle, Loader2, Save, CheckCircle2, ArrowUpRight, Zap, Edit3, ShoppingBag, ShieldCheck } from 'lucide-react';
 import { StatusBadge } from './StatusBadge';
 import { MarginHealthBadge } from './MarginHealthBadge';
 import { cleanItemDescription, cleanAthleteName } from '../../utils/spreadsheetParser';
@@ -163,8 +163,13 @@ export function PricingCard({
                 </span>
               )}
               {item.authenticator && (
-                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-800 text-slate-300">
-                  {item.authenticator} {item.cert_number}
+                <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold inline-flex items-center gap-1 ${
+                  item.cert_verified
+                    ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                    : 'bg-slate-800 text-slate-300'
+                }`} title={item.cert_verified ? `Verified Certificate: ${item.authenticator} ${item.cert_number || ''}` : undefined}>
+                  {item.cert_verified && <ShieldCheck className="w-2.5 h-2.5 text-emerald-400 flex-shrink-0" />}
+                  <span>{item.authenticator} {item.cert_number}</span>
                 </span>
               )}
             </div>

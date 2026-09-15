@@ -1,5 +1,5 @@
-import React from 'react';
-import { Copy, DollarSign, Trash2, Pencil, Loader2, Edit3, ShoppingBag } from 'lucide-react';
+import React, { useState } from 'react';
+import { Copy, DollarSign, Trash2, Pencil, Loader2, Edit3, ShoppingBag, RefreshCw, ShieldCheck, ExternalLink } from 'lucide-react';
 import { InlineEditCell } from './InlineEditCell';
 import { InlineStatusSelect } from './InlineStatusSelect';
 import { InlineSelectCell } from './InlineSelectCell';
@@ -8,6 +8,7 @@ import { cleanItemDescription, cleanAthleteName } from '../../utils/spreadsheetP
 import { LISTING_FORMATS } from '../../utils/constants';
 import { fmtCurrency } from '../../utils/formulaPreview';
 import { computeFeeBreakdown } from '../../utils/feeEngine';
+import { getCertVerificationUrl } from '../../utils/certLookup';
 
 export function InventoryGridRow({
   item,
@@ -26,13 +27,20 @@ export function InventoryGridRow({
   onOpenSaleModal,
   onOpenListingIdModal,
   onMarkSold,
+  onOpenInvoiceModal,
+  onUpdateItemSync,
+  onVerifyCert,
   onShowTooltip,
   onHideTooltip
 }) {
+  const [updating, setUpdating] = useState(false);
+  const [editingCert, setEditingCert] = useState(false);
+  const [editingInvoiceRef, setEditingInvoiceRef] = useState(false);
+
   const isEven = index % 2 === 0;
   const rowBg = isEven ? 'bg-[#0b101d]' : 'bg-[#141d30]';
   const stickyBg = isEven ? 'bg-[#0b101d]' : 'bg-[#141d30]';
-  const actionsWidth = columnWidths.actions || 120;
+  const actionsWidth = columnWidths.actions || 140;
 
   // Detect if item was imported via VScout / Amazon Vine
   const isVineItem = Boolean(
@@ -54,6 +62,30 @@ export function InventoryGridRow({
           className={`px-2 py-1.5 whitespace-nowrap overflow-hidden sticky left-0 z-10 border-r border-slate-800/80 shadow-r transition-colors ${stickyBg} group-hover:bg-[#1a263d]`}
         >
           <div className="flex items-center gap-1">
+            {/* Update / Sync Item Button */}
+            <button
+              onClick={async () => {
+                if (updating) return;
+                setUpdating(true);
+                try {
+                  if (onUpdateItemSync) {
+                    await onUpdateItemSync(item);
+                  }
+                } finally {
+                  setUpdating(false);
+                }
+              }}
+              disabled={updating}
+              title={item.ebay_listing_id ? `Sync with eBay #${item.ebay_listing_id} (orders, fees & live price)` : 'Update / refresh item details'}
+              className={`w-6 h-6 rounded flex items-center justify-center transition-all ${
+                updating
+                  ? 'text-cyan-400 bg-cyan-500/20 animate-pulse'
+                  : 'text-slate-400 hover:text-cyan-400 hover:bg-cyan-500/15'
+              }`}
+            >
+              {updating ? <Loader2 className="w-3 h-3 animate-spin text-cyan-400" /> : <RefreshCw className="w-3 h-3" />}
+            </button>
+
             {/* Quick Edit Drawer Button */}
             <button
               onClick={() => onOpenQuickEdit && onOpenQuickEdit(item)}
@@ -419,12 +451,80 @@ export function InventoryGridRow({
           }}
           className="px-3 py-1.5 whitespace-nowrap overflow-hidden text-xs font-mono"
         >
-          <InlineEditCell
-            value={item.cert_number}
-            itemId={item.id}
-            field="cert_number"
-            onUpdated={onUpdateItem}
-          />
+          {(() => {
+            if (editingCert) {
+              return (
+                <InlineEditCell
+                  value={item.cert_number}
+                  itemId={item.id}
+                  field="cert_number"
+                  onUpdated={(id, patch) => {
+                    setEditingCert(false);
+                    if (onUpdateItem) onUpdateItem(id, patch);
+                  }}
+                />
+              );
+            }
+
+            if (!item.cert_number) {
+              return (
+                <InlineEditCell
+                  value={item.cert_number}
+                  itemId={item.id}
+                  field="cert_number"
+                  placeholder="-- Cert --"
+                  onUpdated={onUpdateItem}
+                />
+              );
+            }
+
+            const certUrl = item.cert_verification_url || getCertVerificationUrl(item.authenticator, item.cert_number);
+            const isCertVerified = Boolean(
+              item.cert_verified ||
+              (item.attributes && (typeof item.attributes === 'string' ? item.attributes.includes('"cert_verified":true') : item.attributes?.cert_verified))
+            );
+
+            return (
+              <div className="group/cert flex items-center justify-between gap-1 w-full">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (certUrl) {
+                      window.open(certUrl, '_blank', 'noopener,noreferrer');
+                    }
+                    if (onVerifyCert) {
+                      onVerifyCert(item);
+                    }
+                  }}
+                  className="cursor-pointer flex items-center gap-1 min-w-0 hover:underline transition-colors text-left"
+                  title={isCertVerified
+                    ? `Verified Certificate: ${item.authenticator || ''} #${item.cert_number} (Click to re-verify)`
+                    : `Click to open official certificate verification (${item.authenticator || 'Database'})`
+                  }
+                >
+                  {isCertVerified ? (
+                    <span className="inline-flex items-center gap-1 text-emerald-400 font-bold text-xs" title="Verified Certificate">
+                      <ShieldCheck className="w-3.5 h-3.5 flex-shrink-0 text-emerald-400" />
+                      <span className="truncate">{item.cert_number}</span>
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-cyan-300 hover:text-cyan-200 text-xs">
+                      <ExternalLink className="w-2.5 h-2.5 flex-shrink-0 text-slate-500 group-hover/cert:text-cyan-400" />
+                      <span className="truncate">{item.cert_number}</span>
+                    </span>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingCert(true)}
+                  className="opacity-0 group-hover/cert:opacity-100 p-0.5 text-slate-500 hover:text-amber-400 rounded transition-opacity flex-shrink-0"
+                  title="Edit cert number"
+                >
+                  <Pencil className="w-2.5 h-2.5" />
+                </button>
+              </div>
+            );
+          })()}
         </td>
       )}
 
@@ -463,6 +563,7 @@ export function InventoryGridRow({
             itemId={item.id}
             field="quantity"
             type="number"
+            isInteger={true}
             onUpdated={onUpdateItem}
           />
         </td>
@@ -478,12 +579,93 @@ export function InventoryGridRow({
           }}
           className="px-3 py-1.5 text-slate-500 whitespace-nowrap overflow-hidden text-xs"
         >
-          <InlineEditCell
-            value={item.invoice_ref}
-            itemId={item.id}
-            field="invoice_ref"
-            onUpdated={onUpdateItem}
-          />
+          {(() => {
+            if (editingInvoiceRef) {
+              return (
+                <InlineEditCell
+                  value={item.invoice_ref}
+                  itemId={item.id}
+                  field="invoice_ref"
+                  onUpdated={(id, patch) => {
+                    setEditingInvoiceRef(false);
+                    if (onUpdateItem) onUpdateItem(id, patch);
+                  }}
+                />
+              );
+            }
+
+            if (!item.invoice_ref) {
+              return (
+                <InlineEditCell
+                  value={item.invoice_ref}
+                  itemId={item.id}
+                  field="invoice_ref"
+                  placeholder="-- Ref --"
+                  onUpdated={onUpdateItem}
+                />
+              );
+            }
+
+            const isAmazon = Boolean(
+              (item.invoice_ref && item.invoice_ref.startsWith('AMAZON-')) ||
+              item.is_amazon ||
+              item.asin ||
+              (item.notes && item.notes.includes('ASIN:')) ||
+              (item.attributes && (typeof item.attributes === 'string' ? item.attributes.includes('amazon_vinescout') : item.attributes?.source === 'amazon_vinescout'))
+            );
+
+            const amazonAsin = item.asin ||
+              item.notes?.match(/\b(B0[A-Z0-9]{8})\b/i)?.[1] ||
+              item.invoice_ref?.match(/AMAZON-(B0[A-Z0-9]{8})/i)?.[1];
+            const amazonOrderId = item.order_id ||
+              item.notes?.match(/\b(\d{3}-\d{7}-\d{7})\b/)?.[1] ||
+              item.invoice_ref?.match(/AMAZON-ORDER-([\d-]+)/i)?.[1];
+
+            const amazonUrl = amazonAsin
+              ? `https://www.amazon.com/dp/${amazonAsin}`
+              : amazonOrderId
+              ? `https://www.amazon.com/gp/your-account/order-details?orderID=${amazonOrderId}`
+              : item.item_name
+              ? `https://www.amazon.com/s?k=${encodeURIComponent(item.item_name)}`
+              : 'https://www.amazon.com';
+
+            return (
+              <div className="group/inv flex items-center justify-between gap-1 w-full">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isAmazon) {
+                      window.open(amazonUrl, '_blank', 'noopener,noreferrer');
+                    } else if (onOpenInvoiceModal) {
+                      onOpenInvoiceModal(item.invoice_ref, item.invoice_id);
+                    }
+                  }}
+                  className="cursor-pointer flex items-center gap-1 min-w-0 hover:underline transition-colors truncate text-left"
+                  title={isAmazon
+                    ? `View Amazon Item (${amazonAsin ? `ASIN: ${amazonAsin}` : 'Amazon product'}) ↗`
+                    : `Click to view Invoice #${item.invoice_ref} details & items`
+                  }
+                >
+                  <span className={`truncate text-xs font-mono font-medium ${
+                    isAmazon
+                      ? 'text-teal-400 hover:text-teal-300'
+                      : 'text-amber-400/90 hover:text-amber-300'
+                  }`}>
+                    {item.invoice_ref}
+                  </span>
+                  <ExternalLink className="w-2.5 h-2.5 text-slate-500 group-hover/inv:text-amber-400 flex-shrink-0" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingInvoiceRef(true)}
+                  className="opacity-0 group-hover/inv:opacity-100 p-0.5 text-slate-500 hover:text-amber-400 rounded transition-opacity flex-shrink-0"
+                  title="Edit invoice reference"
+                >
+                  <Pencil className="w-2.5 h-2.5" />
+                </button>
+              </div>
+            );
+          })()}
         </td>
       )}
     </tr>

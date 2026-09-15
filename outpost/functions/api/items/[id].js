@@ -166,6 +166,14 @@ export async function onRequestPut(context) {
     if (body.tax_cost !== undefined) {
       nextAttrs.tax_cost = body.tax_cost !== '' && body.tax_cost != null ? parseFloat(body.tax_cost) : null;
     }
+    if (body.cert_verified !== undefined) {
+      nextAttrs.cert_verified = Boolean(body.cert_verified);
+      if (body.cert_verified && !nextAttrs.cert_verified_at) {
+        nextAttrs.cert_verified_at = new Date().toISOString();
+      } else if (!body.cert_verified) {
+        nextAttrs.cert_verified_at = null;
+      }
+    }
     if (body.attributes && typeof body.attributes === 'object') {
       nextAttrs = { ...nextAttrs, ...body.attributes };
     }

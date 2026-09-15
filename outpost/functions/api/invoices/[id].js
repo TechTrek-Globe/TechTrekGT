@@ -23,14 +23,14 @@ export async function onRequestGet(context) {
     if (!id) return err('Invoice ID required', 400);
 
     const invoice = await env.DB.prepare(
-      'SELECT * FROM auction_invoices WHERE id = ? AND user_id = ?'
-    ).bind(id, payload.userId).first();
+      'SELECT * FROM auction_invoices WHERE (id = ? OR invoice_ref = ?) AND user_id = ?'
+    ).bind(id, id, payload.userId).first();
 
     if (!invoice) return err('Invoice not found', 404);
 
     const items = await env.DB.prepare(
       'SELECT * FROM auction_items WHERE invoice_id = ? AND user_id = ? ORDER BY created_at ASC'
-    ).bind(id, payload.userId).all();
+    ).bind(invoice.id, payload.userId).all();
 
     return ok({ invoice, items: items.results || [] });
   });

@@ -27,6 +27,9 @@ async function apiFetch(path, options = {}) {
 export const getInvoices = () =>
   apiFetch('/api/invoices');
 
+export const getInvoice = (idOrRef) =>
+  apiFetch(`/api/invoices/${encodeURIComponent(idOrRef)}`);
+
 export const createInvoice = (body) =>
   apiFetch('/api/invoices', {
     method: 'POST',
@@ -45,6 +48,9 @@ export const deleteInvoice = (id) =>
   apiFetch(`/api/invoices/${id}`, { method: 'DELETE' });
 
 // --- Items ---
+export const getItem = (id) =>
+  apiFetch(`/api/items/${encodeURIComponent(id)}`);
+
 export const getItems = (params = {}) => {
   const qs = new URLSearchParams(
     Object.fromEntries(Object.entries(params).filter(([, v]) => v != null && v !== ''))

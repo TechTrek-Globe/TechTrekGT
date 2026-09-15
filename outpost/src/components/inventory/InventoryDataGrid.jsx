@@ -6,7 +6,7 @@ import { computeFeeBreakdown } from '../../utils/feeEngine';
 import { ItemImageHoverTooltip } from './ItemImageHoverTooltip';
 
 export const DEFAULT_COLUMNS = [
-  { key: 'actions', label: 'Actions', minWidth: 100 },
+  { key: 'actions', label: 'Actions', minWidth: 140 },
   { key: 'item_name', label: 'Item / Description', minWidth: 160 },
   { key: 'sku', label: 'SKU / Label', minWidth: 80 },
   { key: 'status', label: 'Status', minWidth: 100 },
@@ -43,6 +43,9 @@ export function InventoryDataGrid({
   onOpenSaleModal,
   onOpenListingIdModal,
   onMarkSold,
+  onOpenInvoiceModal,
+  onUpdateItemSync,
+  onVerifyCert,
   userSettings,
   setUserSettings
 }) {
@@ -181,6 +184,9 @@ export function InventoryDataGrid({
                     onOpenSaleModal={onOpenSaleModal}
                     onOpenListingIdModal={onOpenListingIdModal}
                     onMarkSold={onMarkSold}
+                    onOpenInvoiceModal={onOpenInvoiceModal}
+                    onUpdateItemSync={onUpdateItemSync}
+                    onVerifyCert={onVerifyCert}
                     onShowTooltip={showTooltip}
                     onHideTooltip={hideTooltip}
                   />
@@ -223,6 +229,9 @@ export function InventoryDataGrid({
                         onOpenSaleModal={onOpenSaleModal}
                         onOpenListingIdModal={onOpenListingIdModal}
                         onMarkSold={onMarkSold}
+                        onOpenInvoiceModal={onOpenInvoiceModal}
+                        onUpdateItemSync={onUpdateItemSync}
+                        onVerifyCert={onVerifyCert}
                         onShowTooltip={showTooltip}
                         onHideTooltip={hideTooltip}
                       />

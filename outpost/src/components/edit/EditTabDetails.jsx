@@ -211,17 +211,26 @@ export function EditTabDetails({ form, updateField, allCategories = [], item }) 
             <span className="text-xs font-bold text-white uppercase tracking-wider">Authentication & Certification</span>
           </div>
 
-          {effectiveCertUrl && (
-            <a
-              href={effectiveCertUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[11px] font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1.5 bg-emerald-500/10 px-3 py-1 rounded-lg border border-emerald-500/30 transition-all hover:bg-emerald-500/20"
-            >
-              <ExternalLink className="w-3.5 h-3.5" />
-              <span>Verify in Official Database ↗</span>
-            </a>
-          )}
+          <div className="flex items-center gap-2">
+            {(form.cert_verified ?? item?.cert_verified) && (
+              <span className="text-[11px] font-bold text-emerald-400 flex items-center gap-1 bg-emerald-500/15 px-2.5 py-1 rounded-lg border border-emerald-500/30">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Verified</span>
+              </span>
+            )}
+            {effectiveCertUrl && (
+              <a
+                href={effectiveCertUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => updateField('cert_verified', true)}
+                className="text-[11px] font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1.5 bg-emerald-500/10 px-3 py-1 rounded-lg border border-emerald-500/30 transition-all hover:bg-emerald-500/20"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span>Verify in Official Database ↗</span>
+              </a>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

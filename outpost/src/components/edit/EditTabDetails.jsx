@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   Tag, Hash, Trophy, User, Layers, Calendar, FileText,
-  ShieldCheck, ExternalLink, Award, CheckCircle2, Receipt, Calculator, ShoppingBag
+  Shield, ShieldCheck, ExternalLink, Award, CheckCircle2, Receipt, Calculator, ShoppingBag
 } from 'lucide-react';
 import { AUTHENTICATORS, getCertVerificationUrl, getAuthenticatorMeta } from '../../utils/certLookup';
 import { fmtCurrency } from '../../utils/formulaPreview';
@@ -212,22 +212,38 @@ export function EditTabDetails({ form, updateField, allCategories = [], item }) 
           </div>
 
           <div className="flex items-center gap-2">
-            {(form.cert_verified ?? item?.cert_verified) && (
-              <span className="text-[11px] font-bold text-emerald-400 flex items-center gap-1 bg-emerald-500/15 px-2.5 py-1 rounded-lg border border-emerald-500/30">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>Verified</span>
-              </span>
-            )}
+            <button
+              type="button"
+              onClick={() => updateField('cert_verified', !form.cert_verified)}
+              className={`text-[11px] font-bold flex items-center gap-1.5 px-3 py-1 rounded-lg border transition-all ${
+                form.cert_verified
+                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
+                  : 'bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 border-slate-700'
+              }`}
+              title={form.cert_verified ? 'Click to unmark verification' : 'Click to mark as verified'}
+            >
+              {form.cert_verified ? (
+                <>
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Verified ✓ (Click to Unverify)</span>
+                </>
+              ) : (
+                <>
+                  <Shield className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Unverified (Click to Mark Verified)</span>
+                </>
+              )}
+            </button>
             {effectiveCertUrl && (
               <a
                 href={effectiveCertUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                onClick={() => updateField('cert_verified', true)}
-                className="text-[11px] font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1.5 bg-emerald-500/10 px-3 py-1 rounded-lg border border-emerald-500/30 transition-all hover:bg-emerald-500/20"
+                className="text-[11px] font-bold text-cyan-400 hover:text-cyan-300 flex items-center gap-1.5 bg-cyan-500/10 px-3 py-1 rounded-lg border border-cyan-500/30 transition-all hover:bg-cyan-500/20"
+                title="Open official database search in a new tab"
               >
                 <ExternalLink className="w-3.5 h-3.5" />
-                <span>Verify in Official Database ↗</span>
+                <span>Open Database Lookup ↗</span>
               </a>
             )}
           </div>

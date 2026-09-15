@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Copy, DollarSign, Trash2, Pencil, Loader2, Edit3, ShoppingBag, RefreshCw, ShieldCheck, ExternalLink } from 'lucide-react';
+import { Copy, DollarSign, Trash2, Pencil, Loader2, Edit3, ShoppingBag, RefreshCw, Shield, ShieldCheck, ExternalLink } from 'lucide-react';
 import { InlineEditCell } from './InlineEditCell';
 import { InlineStatusSelect } from './InlineStatusSelect';
 import { InlineSelectCell } from './InlineSelectCell';
@@ -30,6 +30,7 @@ export function InventoryGridRow({
   onOpenInvoiceModal,
   onUpdateItemSync,
   onVerifyCert,
+  onPromptCertVerify,
   onShowTooltip,
   onHideTooltip
 }) {
@@ -486,34 +487,49 @@ export function InventoryGridRow({
 
             return (
               <div className="group/cert flex items-center justify-between gap-1 w-full">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (certUrl) {
-                      window.open(certUrl, '_blank', 'noopener,noreferrer');
+                <div className="flex items-center gap-1 min-w-0">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (onVerifyCert) {
+                        onVerifyCert(item, !isCertVerified);
+                      }
+                    }}
+                    className="p-0.5 rounded hover:bg-slate-800 transition-colors flex-shrink-0 cursor-pointer"
+                    title={isCertVerified
+                      ? `Verified Certificate: ${item.authenticator || ''} #${item.cert_number} (Click to unverify / mark not found)`
+                      : `Unverified Certificate (Click to mark verified)`
                     }
-                    if (onVerifyCert) {
-                      onVerifyCert(item);
+                  >
+                    {isCertVerified ? (
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 hover:text-rose-400 transition-colors" />
+                    ) : (
+                      <Shield className="w-3.5 h-3.5 text-slate-500 hover:text-emerald-400 transition-colors" />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (certUrl) {
+                        window.open(certUrl, '_blank', 'noopener,noreferrer');
+                      }
+                      if (onPromptCertVerify) {
+                        onPromptCertVerify(item, certUrl);
+                      }
+                    }}
+                    className={`cursor-pointer flex items-center gap-1 min-w-0 hover:underline transition-colors text-left text-xs ${
+                      isCertVerified ? 'text-emerald-300 hover:text-emerald-200 font-bold' : 'text-cyan-300 hover:text-cyan-200'
+                    }`}
+                    title={isCertVerified
+                      ? `Verified Certificate: ${item.authenticator || ''} #${item.cert_number} (Click to open verification site)`
+                      : `Click to open official certificate verification in new tab (${item.authenticator || 'Database'})`
                     }
-                  }}
-                  className="cursor-pointer flex items-center gap-1 min-w-0 hover:underline transition-colors text-left"
-                  title={isCertVerified
-                    ? `Verified Certificate: ${item.authenticator || ''} #${item.cert_number} (Click to re-verify)`
-                    : `Click to open official certificate verification (${item.authenticator || 'Database'})`
-                  }
-                >
-                  {isCertVerified ? (
-                    <span className="inline-flex items-center gap-1 text-emerald-400 font-bold text-xs" title="Verified Certificate">
-                      <ShieldCheck className="w-3.5 h-3.5 flex-shrink-0 text-emerald-400" />
-                      <span className="truncate">{item.cert_number}</span>
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 text-cyan-300 hover:text-cyan-200 text-xs">
-                      <ExternalLink className="w-2.5 h-2.5 flex-shrink-0 text-slate-500 group-hover/cert:text-cyan-400" />
-                      <span className="truncate">{item.cert_number}</span>
-                    </span>
-                  )}
-                </button>
+                  >
+                    <span className="truncate">{item.cert_number}</span>
+                    <ExternalLink className="w-2.5 h-2.5 flex-shrink-0 text-slate-500 group-hover/cert:text-cyan-400" />
+                  </button>
+                </div>
                 <button
                   type="button"
                   onClick={() => setEditingCert(true)}

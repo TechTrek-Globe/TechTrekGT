@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Package, AlertCircle, CheckCircle2, Loader2, UploadCloud, Tag, RefreshCw, TableProperties, LayoutGrid } from 'lucide-react';
+import { Package, AlertCircle, CheckCircle2, Loader2, UploadCloud, Tag, RefreshCw, TableProperties, LayoutGrid, Shield, ShieldCheck, X } from 'lucide-react';
 import { useInventory } from '../context/InventoryContext';
 import { deleteItem, syncEbayItem, getItem, updateItem } from '../utils/auctionApi';
 import { cleanEbaySearchQuery } from '../utils/ebaySearch';
@@ -191,23 +191,79 @@ export function InventoryHubView({ onNavigate }) {
     }
   };
 
-  const handleVerifyCert = async (item) => {
+  const [pendingCertPrompt, setPendingCertPrompt] = useState(null);
+
+  const handleToggleCertVerified = async (item, targetStatus) => {
     try {
-      await updateItem(item.id, { cert_verified: true });
+      const isVerified = typeof targetStatus === 'boolean' ? targetStatus : !item.cert_verified;
+      await updateItem(item.id, { cert_verified: isVerified });
       const currentAttrs = typeof item.attributes === 'string' ? JSON.parse(item.attributes || '{}') : (item.attributes || {});
       updateItemLocal(item.id, {
-        cert_verified: true,
-        attributes: { ...currentAttrs, cert_verified: true }
+        cert_verified: isVerified,
+        attributes: {
+          ...currentAttrs,
+          cert_verified: isVerified,
+          cert_verified_at: isVerified ? new Date().toISOString() : null
+        }
       });
-      setSyncResult({ ok: true, msg: `Verified certificate for ${item.item_name || 'item'}.` });
-      setTimeout(() => setSyncResult(null), 3000);
+      setSyncResult({
+        ok: true,
+        msg: isVerified
+          ? `Marked certificate as Verified for "${item.item_name || 'Item'}".`
+          : `Marked certificate as Unverified / Not Found for "${item.item_name || 'Item'}".`
+      });
+      setTimeout(() => setSyncResult(null), 3500);
     } catch (err) {
-      console.error('Failed to mark certificate verified:', err);
+      console.error('Failed to update certificate verification status:', err);
+      setSyncResult({ ok: false, msg: 'Failed to update certificate status.' });
+      setTimeout(() => setSyncResult(null), 4000);
     }
   };
 
   return (
     <div className="w-full flex-1 flex flex-col min-h-0 space-y-1.5">
+      {pendingCertPrompt && (
+        <div className="bg-slate-900 border border-cyan-500/40 rounded-xl p-3 shadow-2xl flex items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="flex items-center gap-2.5 text-xs text-slate-200 min-w-0">
+            <Shield className="w-4 h-4 text-cyan-400 flex-shrink-0" />
+            <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2">
+              <span className="truncate">
+                Official lookup opened for <strong className="text-cyan-300 font-mono">{pendingCertPrompt.item.authenticator || 'Cert'} #{pendingCertPrompt.item.cert_number}</strong>:
+              </span>
+              <span className="text-slate-400 text-[11px]">Did the official database find and verify this certificate?</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              onClick={() => {
+                handleToggleCertVerified(pendingCertPrompt.item, true);
+                setPendingCertPrompt(null);
+              }}
+              className="px-2.5 py-1 text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg shadow-sm flex items-center gap-1 transition-all cursor-pointer"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>Verified ✓</span>
+            </button>
+            <button
+              onClick={() => {
+                handleToggleCertVerified(pendingCertPrompt.item, false);
+                setPendingCertPrompt(null);
+              }}
+              className="px-2.5 py-1 text-xs font-bold bg-slate-800 hover:bg-rose-950/60 text-slate-300 hover:text-rose-300 border border-slate-700 hover:border-rose-500/40 rounded-lg flex items-center gap-1 transition-all cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+              <span>Not Found / Unverified</span>
+            </button>
+            <button
+              onClick={() => setPendingCertPrompt(null)}
+              className="p-1 text-slate-500 hover:text-slate-300 rounded cursor-pointer"
+              title="Dismiss prompt"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
       {/* Unified Command & Filter Bar */}
       <InventoryCommandBar
         viewMode={viewMode}
@@ -302,7 +358,8 @@ export function InventoryHubView({ onNavigate }) {
             onMarkSold={handleMarkSold}
             onOpenInvoiceModal={(ref, id) => setViewingInvoice({ invoiceRef: ref, invoiceId: id })}
             onUpdateItemSync={handleUpdateItemSync}
-            onVerifyCert={handleVerifyCert}
+            onVerifyCert={handleToggleCertVerified}
+            onPromptCertVerify={(item, url) => setPendingCertPrompt({ item, url })}
             userSettings={userSettings}
             setUserSettings={setUserSettings}
           />

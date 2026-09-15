@@ -46,6 +46,7 @@ export function InventoryDataGrid({
   onOpenInvoiceModal,
   onUpdateItemSync,
   onVerifyCert,
+  onPromptCertVerify,
   userSettings,
   setUserSettings
 }) {
@@ -187,6 +188,7 @@ export function InventoryDataGrid({
                     onOpenInvoiceModal={onOpenInvoiceModal}
                     onUpdateItemSync={onUpdateItemSync}
                     onVerifyCert={onVerifyCert}
+                    onPromptCertVerify={onPromptCertVerify}
                     onShowTooltip={showTooltip}
                     onHideTooltip={hideTooltip}
                   />
@@ -232,6 +234,7 @@ export function InventoryDataGrid({
                         onOpenInvoiceModal={onOpenInvoiceModal}
                         onUpdateItemSync={onUpdateItemSync}
                         onVerifyCert={onVerifyCert}
+                        onPromptCertVerify={onPromptCertVerify}
                         onShowTooltip={showTooltip}
                         onHideTooltip={hideTooltip}
                       />

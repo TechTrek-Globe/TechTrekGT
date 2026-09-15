@@ -3,10 +3,46 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { InventoryProvider } from './context/InventoryContext';
 import { AuthPage } from './components/AuthPage';
 import { AppLayout } from './components/AppLayout';
-const DashboardView = React.lazy(() => import('./components/DashboardView').then(m => ({ default: m.DashboardView })));
-const InventoryHubView = React.lazy(() => import('./components/InventoryHubView').then(m => ({ default: m.InventoryHubView })));
-const SalesLogView = React.lazy(() => import('./components/SalesLogView').then(m => ({ default: m.SalesLogView })));
-const SettingsView = React.lazy(() => import('./components/SettingsView').then(m => ({ default: m.SettingsView })));
+function lazyWithRetry(componentImport) {
+  return React.lazy(async () => {
+    try {
+      return await componentImport();
+    } catch (error) {
+      const isChunkError =
+        error?.message?.includes('dynamically imported module') ||
+        error?.message?.includes('Failed to fetch') ||
+        error?.name === 'ChunkLoadError';
+
+      if (isChunkError && typeof window !== 'undefined') {
+        const lastAttempt = Number(sessionStorage.getItem('outpost_chunk_reload_attempt') || '0');
+        const now = Date.now();
+        if (!lastAttempt || now - lastAttempt > 10000) {
+          sessionStorage.setItem('outpost_chunk_reload_attempt', String(now));
+          window.location.reload();
+          return new Promise(() => {});
+        }
+      }
+      throw error;
+    }
+  });
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('vite:preloadError', (event) => {
+    event.preventDefault();
+    const lastAttempt = Number(sessionStorage.getItem('outpost_chunk_reload_attempt') || '0');
+    const now = Date.now();
+    if (!lastAttempt || now - lastAttempt > 10000) {
+      sessionStorage.setItem('outpost_chunk_reload_attempt', String(now));
+      window.location.reload();
+    }
+  });
+}
+
+const DashboardView = lazyWithRetry(() => import('./components/DashboardView').then(m => ({ default: m.DashboardView })));
+const InventoryHubView = lazyWithRetry(() => import('./components/InventoryHubView').then(m => ({ default: m.InventoryHubView })));
+const SalesLogView = lazyWithRetry(() => import('./components/SalesLogView').then(m => ({ default: m.SalesLogView })));
+const SettingsView = lazyWithRetry(() => import('./components/SettingsView').then(m => ({ default: m.SettingsView })));
 
 const VIEWS = ['dashboard', 'inventory', 'sales', 'settings'];
 
@@ -28,22 +64,41 @@ class ErrorBoundary extends React.Component {
   }
   componentDidCatch(error, errorInfo) {
     console.error("ErrorBoundary caught error:", error, errorInfo);
+    const isChunkError =
+      error?.message?.includes('dynamically imported module') ||
+      error?.message?.includes('Failed to fetch') ||
+      error?.name === 'ChunkLoadError';
+    if (isChunkError && typeof window !== 'undefined') {
+      const lastAttempt = Number(sessionStorage.getItem('outpost_chunk_reload_attempt') || '0');
+      const now = Date.now();
+      if (!lastAttempt || now - lastAttempt > 10000) {
+        sessionStorage.setItem('outpost_chunk_reload_attempt', String(now));
+        window.location.reload();
+      }
+    }
   }
   render() {
     if (this.state.hasError) {
+      const isChunkError =
+        this.state.error?.message?.includes('dynamically imported module') ||
+        this.state.error?.message?.includes('Failed to fetch') ||
+        this.state.error?.name === 'ChunkLoadError';
+
       return (
         <div className="p-6 max-w-xl mx-auto my-8 glass-card rounded-2xl border border-red-500/30 text-slate-200">
           <div className="flex items-center gap-3 text-red-400 font-bold text-lg mb-2">
-            <span>Component Rendering Error</span>
+            <span>{isChunkError ? 'New Outpost Version Available' : 'Component Rendering Error'}</span>
           </div>
           <p className="text-xs font-mono text-red-300 bg-red-950/60 p-3 rounded-lg mb-4 overflow-x-auto">
-            {this.state.error?.toString() || 'Unknown error occurred'}
+            {isChunkError
+              ? 'A newer version of Outpost was deployed while this tab was open. Refreshing to load the latest components.'
+              : (this.state.error?.toString() || 'Unknown error occurred')}
           </p>
           <button
             onClick={() => { this.setState({ hasError: false }); window.location.reload(); }}
-            className="btn-primary py-2 px-4 text-xs"
+            className="btn-primary py-2 px-4 text-xs font-semibold"
           >
-            Reload Page
+            {isChunkError ? 'Refresh Outpost' : 'Reload Page'}
           </button>
         </div>
       );
@@ -80,6 +135,18 @@ function MainContent({ pathname, navigateTo }) {
     }
     if (v && v !== activeView) setActiveView(v);
   }, [pathname, isAuthenticated, isLoading]);
+
+  // Reset reload attempt latch once the app is stably rendered
+  useEffect(() => {
+    if (isAuthenticated && !isLoading) {
+      const timer = setTimeout(() => {
+        if (typeof window !== 'undefined') {
+          sessionStorage.removeItem('outpost_chunk_reload_attempt');
+        }
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [isAuthenticated, isLoading, activeView]);
 
   if (isLoading) {
     return (

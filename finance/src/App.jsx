@@ -14,6 +14,7 @@ const LedgerView = React.lazy(() => import('./components/LedgerView').then(m => 
 const AmortizationView = React.lazy(() => import('./components/AmortizationView').then(m => ({ default: m.AmortizationView })));
 const AuthPage = React.lazy(() => import('./components/AuthPage').then(m => ({ default: m.AuthPage })));
 const AuthModal = React.lazy(() => import('./components/AuthModal'));
+const AdminView = React.lazy(() => import('./components/AdminView').then(m => ({ default: m.AdminView })));
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -88,12 +89,13 @@ function getViewFromPathname(pathname) {
   if (path === '/finance/main-budget' || path === '/finance/bills') return 'main_budget';
   if (path === '/finance/amortization') return 'amortization';
   if (path === '/finance/settings') return 'settings';
+  if (path === '/finance/admin') return 'admin';
   return 'dashboard';
 }
 
 function MainContent({ pathname, navigateTo, onNavigateHome }) {
   const { isSettingsOpen } = useBudgetMetadataState();
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
 
   const normalized = (pathname || '').toLowerCase().replace(/\/$/, '');
   const activeView = getViewFromPathname(normalized);
@@ -156,6 +158,7 @@ function MainContent({ pathname, navigateTo, onNavigateHome }) {
         {activeView === 'ledger'      && <LedgerView onNavigateView={handleNavigateView} />}
         {activeView === 'amortization'&& <AmortizationView onNavigateView={handleNavigateView} />}
         {activeView === 'settings'    && <SettingsView onNavigateView={handleNavigateView} />}
+        {activeView === 'admin'       && user?.email === import.meta.env.VITE_ADMIN_EMAIL && <AdminView />}
         {isSettingsOpen && <SettingsModal />}
         <AuthModal />
       </React.Suspense>

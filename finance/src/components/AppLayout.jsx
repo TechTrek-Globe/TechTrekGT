@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useBudget } from '../context/BudgetContext';
+import { useAuth } from '../context/AuthContext';
 import {
   LayoutDashboard,
   ReceiptText,
@@ -15,7 +16,8 @@ import {
   X,
   Sun,
   Moon,
-  Globe
+  Globe,
+  Shield
 } from 'lucide-react';
 
 import headerLogoDark from '../assets/header-logo-dark.png';
@@ -31,13 +33,17 @@ const NAV_ITEMS = [
 
 const SIDEBAR_KEY = 'trekledger_sidebar_collapsed';
 
-const SidebarContent = ({ collapsed, activeView = 'dashboard', cashOnHand, netIncome, netFlow, onNavigateView, setIsSettingsOpen, onClose, isLight = false }) => {
+const SidebarContent = ({ collapsed, activeView = 'dashboard', cashOnHand, netIncome, netFlow, onNavigateView, setIsSettingsOpen, onClose, isLight = false, isAdmin = false }) => {
   const logoSrc = isLight ? headerLogoLight : headerLogoDark;
   const handleViewClick = (viewId) => {
     if (onNavigateView) {
       onNavigateView(viewId);
     }
   };
+
+  const visibleNavItems = isAdmin
+    ? [...NAV_ITEMS, { id: 'admin', label: 'Admin', icon: Shield, color: 'text-amber-400' }]
+    : NAV_ITEMS;
   return (
     <div className="flex flex-col h-full">
       {/* Logo */}
@@ -65,7 +71,7 @@ const SidebarContent = ({ collapsed, activeView = 'dashboard', cashOnHand, netIn
           Views
         </p>
       )}
-      {NAV_ITEMS.map((item) => {
+      {visibleNavItems.map((item) => {
         const Icon = item.icon;
         const isActive = activeView === item.id;
         return (
@@ -122,6 +128,9 @@ export function AppLayout({ children, onNavigateHome, onNavigateView, activeView
     getTotalMonthEndCashOnHand,
     getCalculatedBalanceAsOf,
   } = useBudget();
+
+  const { user } = useAuth();
+  const isAdmin = !!(user?.email && import.meta.env.VITE_ADMIN_EMAIL && user.email === import.meta.env.VITE_ADMIN_EMAIL);
 
   const [collapsed, setCollapsed] = useState(() => {
     try { return localStorage.getItem(SIDEBAR_KEY) === 'true'; }
@@ -188,6 +197,7 @@ export function AppLayout({ children, onNavigateHome, onNavigateView, activeView
           netIncome={netIncome}
           netFlow={netFlow}
           isLight={isLight}
+          isAdmin={isAdmin}
           onNavigateView={onNavigateView}
           setIsSettingsOpen={setIsSettingsOpen}
         />
@@ -231,6 +241,7 @@ export function AppLayout({ children, onNavigateHome, onNavigateView, activeView
               netIncome={netIncome}
               netFlow={netFlow}
               isLight={isLight}
+              isAdmin={isAdmin}
               onNavigateView={onNavigateView}
               setIsSettingsOpen={setIsSettingsOpen}
               onClose={() => setMobileOpen(false)}

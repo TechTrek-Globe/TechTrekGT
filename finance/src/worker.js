@@ -6,6 +6,7 @@ import { onRequestPost as forgotPasswordHandler } from '../functions/api/auth/fo
 import { onRequestPost as resetPasswordHandler } from '../functions/api/auth/reset-password.js';
 import { onRequestPost as securityQuestionHandler } from '../functions/api/auth/security-question.js';
 import { onRequestPost as updateProfileHandler } from '../functions/api/auth/update-profile.js';
+import { onRequestGet as adminStatsHandler } from '../functions/api/admin/stats.js';
 import { getTokenFromRequest, verifyToken } from '../functions/utils/auth.js';
 
 async function timingSafeStringEqual(a, b) {
@@ -187,8 +188,8 @@ async function handleSyncRestore(context) {
   try {
     console.log(`[SYNC:D1_PULL] Querying cloud vault backup for user ${userId}`);
     const row = await env.DB.prepare(`
-      SELECT data, updated_at FROM user_backups WHERE id = ? OR id = 'default_vault' ORDER BY (CASE WHEN id = ? THEN 0 ELSE 1 END) LIMIT 1
-    `).bind(userId, userId).first();
+      SELECT data, updated_at FROM user_backups WHERE id = ?
+    `).bind(userId).first();
 
     if (!row || !row.data) {
       console.warn(`[SYNC:D1_PULL_NOT_FOUND] No cloud vault backup found for user ${userId}`);
@@ -278,6 +279,8 @@ export default {
         response = await meHandler(context);
       } else if (apiPath === '/api/auth/logout' && request.method === 'POST') {
         response = await logoutHandler(context);
+      } else if (apiPath === '/api/admin/stats' && request.method === 'GET') {
+        response = await adminStatsHandler(context);
       } else if (apiPath.startsWith('/api/')) {
         // If URL starts with /api/ but didn't match any route above
         response = new Response(JSON.stringify({ error: 'Endpoint not found' }), {

@@ -166,7 +166,7 @@ export function buildAuthCookie(token, maxAge) {
     `auth_token=${token}`,
     'HttpOnly',
     'Secure',
-    'SameSite=Lax',
+    'SameSite=Strict',
     'Path=/',
     `Max-Age=${maxAge}`
   ].join('; ');

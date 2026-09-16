@@ -28,6 +28,7 @@ import { onRequestGet as amazonTokenGetHandler, onRequestPost as amazonTokenPost
 import { onRequestGet as syncFinanceGetHandler, onRequestPost as syncFinancePostHandler } from '../functions/api/sync/finance.js';
 import { onRequestGet as taxReportGetHandler } from '../functions/api/reports/tax.js';
 import { onRequestGet as marketAlertsGetHandler, onRequestPut as marketAlertsPutHandler, onRequestPost as marketAlertsPostHandler } from '../functions/api/market-alerts.js';
+import { onRequestGet as adminStatsGetHandler } from '../functions/api/admin/stats.js';
 import { onRequestGet as ebayOAuthStatusHandler } from '../functions/api/ebay/oauth-status.js';
 import { onRequestGet as ebayFindListingsHandler } from '../functions/api/ebay/find-listings.js';
 import { onRequestGet as ebayActiveListingsHandler } from '../functions/api/ebay/active-listings.js';
@@ -223,6 +224,9 @@ export default {
       // --- Dashboard ---
       } else if (apiPath === '/api/dashboard' && request.method === 'GET') {
         response = await dashboardHandler(context);
+      // --- Admin ---
+      } else if (apiPath === '/api/admin/stats' && request.method === 'GET') {
+        response = await adminStatsGetHandler(context);
       // --- Batch Import ---
       } else if (apiPath === '/api/import/batch' && request.method === 'POST') {
         response = await batchImportHandler(context);

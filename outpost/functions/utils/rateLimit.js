@@ -1,6 +1,9 @@
 // Uses Cloudflare KV for distributed rate limiting
 export async function checkRateLimit(kv, key, maxRequests, windowSeconds) {
-  if (!kv) return { allowed: true }; // graceful degradation if KV not bound
+  if (!kv) {
+    console.warn('[rateLimit] RATE_LIMIT_KV not bound - rate limiting disabled. Check wrangler config.');
+    return { allowed: true };
+  }
 
   const now = Math.floor(Date.now() / 1000);
   const windowKey = `rl:${key}:${Math.floor(now / windowSeconds)}`;

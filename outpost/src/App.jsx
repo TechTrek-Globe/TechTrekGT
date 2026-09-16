@@ -43,8 +43,9 @@ const DashboardView = lazyWithRetry(() => import('./components/DashboardView').t
 const InventoryHubView = lazyWithRetry(() => import('./components/InventoryHubView').then(m => ({ default: m.InventoryHubView })));
 const SalesLogView = lazyWithRetry(() => import('./components/SalesLogView').then(m => ({ default: m.SalesLogView })));
 const SettingsView = lazyWithRetry(() => import('./components/SettingsView').then(m => ({ default: m.SettingsView })));
+const AdminView = lazyWithRetry(() => import('./components/AdminView').then(m => ({ default: m.AdminView })));
 
-const VIEWS = ['dashboard', 'inventory', 'sales', 'settings'];
+const VIEWS = ['dashboard', 'inventory', 'sales', 'settings', 'admin'];
 
 function getViewFromPathname(pathname) {
   const path = (pathname || '').toLowerCase().replace(/\/$/, '');
@@ -108,7 +109,7 @@ class ErrorBoundary extends React.Component {
 }
 
 function MainContent({ pathname, navigateTo }) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
   const [activeView, setActiveView] = useState(() => getViewFromPathname(pathname));
 
   // Sync view from URL
@@ -127,6 +128,16 @@ function MainContent({ pathname, navigateTo }) {
       return;
     }
     const v = getViewFromPathname(normalized);
+    
+    if (v === 'admin') {
+      const adminEmail = import.meta.env.VITE_ADMIN_EMAIL || 'jgk1865@gmail.com';
+      if (user?.email?.toLowerCase() !== adminEmail.toLowerCase()) {
+        setActiveView('dashboard');
+        window.history.replaceState({}, '', '/outpost/dashboard');
+        return;
+      }
+    }
+
     if (v === 'dashboard' && (normalized === '/outpost/pricing' || normalized === '/auction/pricing')) {
       console.info('Pricing view has been consolidated into Inventory. Redirecting...');
       setActiveView('inventory');
@@ -185,6 +196,7 @@ function MainContent({ pathname, navigateTo }) {
             {activeView === 'inventory' && <InventoryHubView onNavigate={handleNavigate} />}
             {activeView === 'sales' && <SalesLogView onNavigate={handleNavigate} />}
             {activeView === 'settings' && <SettingsView />}
+            {activeView === 'admin' && <AdminView />}
           </React.Suspense>
         </ErrorBoundary>
       </AppLayout>

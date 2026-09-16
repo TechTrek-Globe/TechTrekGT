@@ -55,13 +55,7 @@ export async function onRequestPost(context) {
   }
 
   if (!userId) {
-    // Fallback: if only 1 user exists in DB, use that user
-    const fallbackUser = await env.DB.prepare(`SELECT id AS userId FROM users LIMIT 1`).first();
-    if (fallbackUser && fallbackUser.userId) {
-      userId = fallbackUser.userId;
-    } else {
-      return err('Unauthorized: invalid API token or secret', 401);
-    }
+    return err('Unauthorized: invalid API token or secret', 401);
   }
 
   // --- Parse body ---
@@ -167,13 +161,13 @@ export async function onRequestPost(context) {
         suggested_list_price = ?,
         attributes = ?,
         notes = ?
-      WHERE id = ?
+      WHERE id = ? AND user_id = ?
     `).bind(
       title.trim(),
       unitPrice, unitPrice, proration.true_total_cost,
       pricing.min_sell_price, pricing.suggested_list_price,
       attributes, itemNotes,
-      existingItem.id
+      existingItem.id, userId
     ).run();
 
     return ok({ 

@@ -355,7 +355,7 @@ export async function onRequestDelete(context) {
       return err('Cannot delete an item that has recorded sales. Set status to "Returned" instead.', 409);
     }
 
-    await env.DB.prepare('DELETE FROM auction_comps WHERE item_id = ?').bind(id).run();
+    await env.DB.prepare('DELETE FROM auction_comps WHERE item_id = ? AND user_id = ?').bind(id, payload.userId).run();
     await env.DB.prepare('DELETE FROM auction_items WHERE id = ? AND user_id = ?').bind(id, payload.userId).run();
 
     return ok({ success: true });

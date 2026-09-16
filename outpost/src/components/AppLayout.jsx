@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   LayoutDashboard, Package, ShoppingCart,
   Settings, LogOut, ChevronRight, ArrowRightLeft,
-  FileSpreadsheet, PanelLeftClose, PanelLeftOpen, Globe
+  FileSpreadsheet, PanelLeftClose, PanelLeftOpen, Globe, ShieldCheck
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { FinanceSyncModal } from './FinanceSyncModal';
@@ -23,6 +23,12 @@ const NAV_ITEMS = [
 export function AppLayout({ activeView, onNavigate, children }) {
   const { user, logout } = useAuth();
   const [financeSyncOpen, setFinanceSyncOpen] = useState(false);
+  
+  const adminEmail = import.meta.env.VITE_ADMIN_EMAIL || 'jgk1865@gmail.com';
+  const visibleNavItems = [...NAV_ITEMS];
+  if (user?.email?.toLowerCase() === adminEmail.toLowerCase()) {
+    visibleNavItems.push({ id: 'admin', label: 'Admin', icon: ShieldCheck });
+  }
   const [taxReportOpen, setTaxReportOpen] = useState(false);
 
   const [isCollapsed, setIsCollapsed] = useState(() => {
@@ -77,7 +83,7 @@ export function AppLayout({ activeView, onNavigate, children }) {
 
         {/* Nav */}
         <nav className={`px-2 py-3 space-y-1 flex-1 ${isCollapsed ? 'flex flex-col items-center' : ''}`}>
-          {NAV_ITEMS.map(({ id, label, icon: Icon }) => {
+          {visibleNavItems.map(({ id, label, icon: Icon }) => {
             const isActive = activeView === id;
             if (isCollapsed) {
               return (
@@ -275,7 +281,7 @@ export function AppLayout({ activeView, onNavigate, children }) {
 
         {/* Mobile nav */}
         <nav className="lg:hidden flex gap-1 px-3 pt-3 pb-1 overflow-x-auto">
-          {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
+          {visibleNavItems.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
               id={`mobile-nav-${id}`}

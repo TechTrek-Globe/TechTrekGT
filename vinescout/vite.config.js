@@ -10,7 +10,6 @@ export default defineConfig({
     open: true
   },
   build: {
-    outDir: 'dist/client',
     rollupOptions: {
       output: {
         manualChunks(id) {

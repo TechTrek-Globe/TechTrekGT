@@ -34,22 +34,16 @@ export async function onRequestPost(context) {
 
     const userId = payload.userId;
     const now    = new Date().toISOString();
-    let inserted = 0;
-    let updated  = 0;
     const errors = [];
+    const statements = [];
 
-    // Process items in series (D1 single-writer constraint)
     for (const item of items) {
       if (!item || typeof item.asin !== 'string' || !item.asin.trim()) continue;
-
+      const asin = item.asin.trim();
       const id = crypto.randomUUID();
-      try {
-        // Check if the item already exists for upsert tracking
-        const existing = await env.DB.prepare(
-          'SELECT id FROM vine_items WHERE user_id = ? AND asin = ?'
-        ).bind(userId, item.asin.trim()).first();
 
-        await env.DB.prepare(`
+      statements.push(
+        env.DB.prepare(`
           INSERT INTO vine_items (
             id, user_id, asin, title, etv, order_id, date_added,
             vine_category, category, marketplace, image_url,
@@ -70,7 +64,7 @@ export async function onRequestPost(context) {
         `).bind(
           id,
           userId,
-          item.asin.trim(),
+          asin,
           String(item.title || '').slice(0, 500),
           parseFloat(item.etv) || 0,
           item.order_id ? String(item.order_id) : null,
@@ -82,13 +76,12 @@ export async function onRequestPost(context) {
           item.review_written ? 1 : 0,
           item.rating !== undefined && item.rating !== null ? parseFloat(item.rating) : null,
           now
-        ).run();
+        )
+      );
 
-        if (existing) updated++; else inserted++;
-
-        // Update vine_asin_cache (best-effort, non-fatal)
-        if (item.image_url || item.category) {
-          await env.DB.prepare(`
+      if (item.image_url || item.category) {
+        statements.push(
+          env.DB.prepare(`
             INSERT INTO vine_asin_cache (asin, title, category, image_url, fetched_at, source)
             VALUES (?, ?, ?, ?, ?, 'extension')
             ON CONFLICT(asin) DO UPDATE SET
@@ -97,20 +90,24 @@ export async function onRequestPost(context) {
               image_url  = COALESCE(excluded.image_url, image_url),
               fetched_at = excluded.fetched_at
           `).bind(
-            item.asin.trim(),
+            asin,
             String(item.title || '').slice(0, 500),
             item.category ? String(item.category) : null,
             item.image_url ? String(item.image_url).slice(0, 1000) : null,
             now
-          ).run().catch(() => {}); // Non-fatal
-        }
-
-      } catch (err) {
-        errors.push(`ASIN ${item.asin}: ${err.message}`);
+          )
+        );
       }
     }
 
-    return new Response(JSON.stringify({ success: true, inserted, updated, errors }), {
+    // Execute in batch chunks (D1 batch limit is 100-128 statements per call)
+    const BATCH_CHUNK = 80;
+    for (let i = 0; i < statements.length; i += BATCH_CHUNK) {
+      const chunk = statements.slice(i, i + BATCH_CHUNK);
+      await env.DB.batch(chunk);
+    }
+
+    return new Response(JSON.stringify({ success: true, inserted: items.length, updated: 0, errors }), {
       status: 200, headers: { 'Content-Type': 'application/json' }
     });
 

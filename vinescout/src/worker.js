@@ -122,7 +122,35 @@ export default {
       return addCorsHeaders(response, origin, isLocalhost);
     }
 
-    // 4. SPA fallback - serve dist/client via ASSETS binding
-    return env.ASSETS.fetch(request);
+    // 4. SPA fallback and Asset Rewriting
+    let response;
+    if (url.pathname.startsWith('/vinescout/assets/')) {
+      // Rewrite asset requests: /vinescout/assets/ -> /assets/
+      const assetUrl = new URL(request.url);
+      assetUrl.pathname = assetUrl.pathname.slice('/vinescout'.length);
+      response = env?.ASSETS?.fetch
+        ? await env.ASSETS.fetch(new Request(assetUrl.toString(), request))
+        : await fetch(new Request(assetUrl.toString(), request));
+    } else if (url.pathname.startsWith('/vinescout/') && /\.[a-zA-Z0-9]+$/.test(url.pathname)) {
+      // Direct static asset requests: /vinescout/favicon.svg -> /favicon.svg
+      const assetUrl = new URL(request.url);
+      assetUrl.pathname = assetUrl.pathname.slice('/vinescout'.length);
+      response = env?.ASSETS?.fetch
+        ? await env.ASSETS.fetch(new Request(assetUrl.toString(), request))
+        : await fetch(new Request(assetUrl.toString(), request));
+    } else if (url.pathname === '/vinescout' || url.pathname.startsWith('/vinescout/')) {
+      // SPA fallback - serve index.html for all /vinescout/* routes
+      const spaUrl = new URL(request.url);
+      spaUrl.pathname = '/';
+      response = env?.ASSETS?.fetch
+        ? await env.ASSETS.fetch(new Request(spaUrl.toString(), request))
+        : await fetch(new Request(spaUrl.toString(), request));
+    } else {
+      response = env?.ASSETS?.fetch
+        ? await env.ASSETS.fetch(request)
+        : await fetch(request);
+    }
+
+    return addCorsHeaders(response, origin, isLocalhost);
   }
 };

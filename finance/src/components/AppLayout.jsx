@@ -319,22 +319,6 @@ export function AppLayout({ children, onNavigateHome, onNavigateView, activeView
             {theme === 'light' ? <Sun className="w-4 h-4 text-amber-500" /> : <Moon className="w-4 h-4 text-blue-400" />}
           </button>
 
-          <button
-            onClick={() => {
-              if (onNavigateView) {
-                onNavigateView('settings');
-              }
-            }}
-            aria-label="Open settings view"
-            className={`flex items-center gap-2 px-4 py-1.5 rounded-xl text-xs font-semibold shadow-lg transition-all hover:-translate-y-0.5 active:translate-y-0 ${
-              activeView === 'settings'
-                ? 'bg-blue-600 text-white ring-2 ring-blue-400/50 shadow-blue-600/30'
-                : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-blue-600/20'
-            }`}
-          >
-            <Settings className="w-3.5 h-3.5" />
-            <span>Settings &amp; Setup</span>
-          </button>
         </header>
 
         {/* Page Content */}

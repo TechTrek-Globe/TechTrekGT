@@ -6,6 +6,9 @@
   "observability": {
     "enabled": true
   },
+  "vars": {
+    "ADMIN_EMAIL": "jgk1865@gmail.com"
+  },
   "assets": {
     "directory": "./dist/client",
     "binding": "ASSETS",

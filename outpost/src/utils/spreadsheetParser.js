@@ -256,7 +256,8 @@ export function extractMetadataFromTitle(title) {
   }
 
   // 5. Cert # extraction (e.g. #WA123456, Cert # 123456, Cert: 123456)
-  const certMatch = t.match(/(?:cert|cert\s*#|coa\s*#|#)\s*([A-Za-z0-9]{4,15})\b/i);
+  const certMatch = t.match(/(?:cert(?:ificate)?\s*(?:#|:)?|coa\s*(?:#|:)?|hologram\s*(?:#|:)?|(?:psa|jsa|beckett|bas|sgc|bgs)\s*#)\s*([A-Za-z0-9]{4,15})\b/i) ||
+                    t.match(/\b#(?=[0-9]*[A-Za-z])([A-Za-z0-9]{4,15})\b/i);
   if (certMatch) {
     result.cert_number = certMatch[1];
   }

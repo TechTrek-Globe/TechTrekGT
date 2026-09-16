@@ -7,7 +7,7 @@
     "enabled": true
   },
   "vars": {
-    "VITE_ADMIN_EMAIL": ""
+    "VITE_ADMIN_EMAIL": "jgk1865@gmail.com"
   },
   "assets": {
     "directory": "./dist/client",

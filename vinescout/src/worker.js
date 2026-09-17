@@ -139,12 +139,8 @@ export default {
         ? await env.ASSETS.fetch(new Request(assetUrl.toString(), request))
         : await fetch(new Request(assetUrl.toString(), request));
     } else if (url.pathname === '/vinescout' || url.pathname.startsWith('/vinescout/')) {
-      // SPA fallback - serve index.html for all /vinescout/* routes
-      const spaUrl = new URL(request.url);
-      spaUrl.pathname = '/';
-      response = env?.ASSETS?.fetch
-        ? await env.ASSETS.fetch(new Request(spaUrl.toString(), request))
-        : await fetch(new Request(spaUrl.toString(), request));
+      // Redirect to old Vine Scout Google Sites page
+      return Response.redirect('https://sites.google.com/view/vine-scout/home?authuser=0', 302);
     } else {
       response = env?.ASSETS?.fetch
         ? await env.ASSETS.fetch(request)

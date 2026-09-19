@@ -96,6 +96,15 @@ export function InventoryProvider({ children }) {
     if (!sortConfig.key) return enrichedItemsWithMetrics;
 
     return [...enrichedItemsWithMetrics].sort((a, b) => {
+      // Default sort preset: prioritize 'Listed' items at the top on initial page load / default view
+      if (sortPreset === 'default' || (sortConfig.key === 'created_at' && sortConfig.direction === 'desc')) {
+        const isListedA = (a.status || '').toLowerCase() === 'listed' ? 1 : 0;
+        const isListedB = (b.status || '').toLowerCase() === 'listed' ? 1 : 0;
+        if (isListedA !== isListedB) {
+          return isListedB - isListedA;
+        }
+      }
+
       let valA;
       let valB;
 
@@ -123,7 +132,7 @@ export function InventoryProvider({ children }) {
       if (strA > strB) return sortConfig.direction === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [enrichedItemsWithMetrics, sortConfig]);
+  }, [enrichedItemsWithMetrics, sortConfig, sortPreset]);
 
   // --- Status counts ---
   const statusCounts = useMemo(() => {

@@ -1,5 +1,6 @@
 {
   "css.lint.unknownAtRules": "ignore",
+  "javascript.implicitProjectConfig.checkJs": false,
   "files.exclude": {
     "**/node_modules": false,
     "**/.git": false,

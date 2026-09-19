@@ -43,7 +43,7 @@ export function getCertVerificationUrl(authenticator, certNumber) {
 
   // JSA (James Spence)
   if (auth.includes('jsa') || auth.includes('spence')) {
-    return `https://www.spenceloa.com/verify-authenticity?certNo=${encodeURIComponent(cleanCert)}`;
+    return `https://www.spenceloa.com/verify-authenticity/results?certificateNumber=${encodeURIComponent(cleanCert)}`;
   }
 
   // ACOA (AutographCOA)

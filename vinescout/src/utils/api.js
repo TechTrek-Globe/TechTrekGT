@@ -11,12 +11,13 @@ export function getApiUrl(endpoint) {
 // Authenticated fetch wrapper: always sends credentials (HttpOnly cookie)
 export async function apiFetch(endpoint, options = {}) {
   const url = getApiUrl(endpoint);
+  const extraHeaders = options.headers || {};
   const res = await fetch(url, {
     ...options,
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
-      ...(options.headers || {})
+      ...extraHeaders
     }
   });
 

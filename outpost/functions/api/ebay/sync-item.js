@@ -4,7 +4,8 @@ import {
   fetchSingleEbayListing,
   fetchEbayOrderForListing,
   fetchEbayOrderFinances,
-  reconcileAndSaveEbaySale
+  reconcileAndSaveEbaySale,
+  normalizeHttps
 } from './tokenHelper.js';
 import { computePricingFloors } from '../../utils/auction.js';
 
@@ -161,6 +162,18 @@ export async function onRequestPost(context) {
       else if (titleOrCat.includes('puck')) category = 'Puck';
     }
 
+    // Extract and update image URL in attributes
+    let attrs = {};
+    if (item.attributes) {
+      try {
+        attrs = typeof item.attributes === 'string' ? JSON.parse(item.attributes) : (item.attributes || {});
+      } catch (_) {}
+    }
+    const liveImageUrl = normalizeHttps(liveListing?.image_url);
+    if (liveImageUrl) {
+      attrs.ebay_image_url = liveImageUrl;
+    }
+
     await env.DB.prepare(`
       UPDATE auction_items SET
         ebay_listing_id = COALESCE(?, ebay_listing_id),
@@ -181,6 +194,7 @@ export async function onRequestPost(context) {
         category = COALESCE(?, category),
         min_sell_price = ?,
         suggested_list_price = ?,
+        attributes = ?,
         updated_at = datetime('now')
       WHERE id = ? AND user_id = ?
     `).bind(
@@ -201,6 +215,7 @@ export async function onRequestPost(context) {
       category,
       pricing.min_sell_price,
       pricing.suggested_list_price,
+      JSON.stringify(attrs),
       itemId,
       payload.userId
     ).run();

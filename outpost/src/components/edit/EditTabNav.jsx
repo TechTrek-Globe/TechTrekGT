@@ -1,12 +1,13 @@
 import React from 'react';
-import { Tag, DollarSign, TrendingUp, BarChart2, ShoppingBag } from 'lucide-react';
+import { Tag, DollarSign, TrendingUp, BarChart2, ShoppingBag, Sparkles } from 'lucide-react';
 
 export const TABS = [
+  { id: 'financial',       label: 'Financials & Profit',     icon: DollarSign },
   { id: 'details',         label: 'Item Details',            icon: Tag },
-  { id: 'listing_pricing', label: 'Listing, Pricing & Fees', icon: DollarSign },
+  { id: 'listing_pricing', label: 'Listing & eBay Sync',     icon: ShoppingBag },
   { id: 'comps',           label: 'Market Comps',            icon: TrendingUp },
   { id: 'performance',     label: 'Performance & Traffic',   icon: BarChart2 },
-  { id: 'vinescout',       label: '🔗 VineScout / Vine',      icon: ShoppingBag },
+  { id: 'vinescout',       label: '🔗 VineScout / Vine',      icon: Sparkles },
 ];
 
 export function EditTabNav({ activeTab, setActiveTab, form }) {
@@ -17,7 +18,8 @@ export function EditTabNav({ activeTab, setActiveTab, form }) {
         const isActive = activeTab === tab.id;
 
         // Visual indicator badges for tabs with linked / enriched state
-        const showDetailsDot = tab.id === 'details' && Boolean(form.cert_number || form.authenticator || form.true_total_cost);
+        const showFinancialDot = tab.id === 'financial' && Boolean(form.true_total_cost || form.current_list_price);
+        const showDetailsDot = tab.id === 'details' && Boolean(form.cert_number || form.authenticator);
         const showListingDot = tab.id === 'listing_pricing' && Boolean(form.ebay_listing_id);
         const showCompsDot = tab.id === 'comps' && Boolean(form.comp_1 || form.active_comp_1);
         const showPerfDot = tab.id === 'performance' && Boolean(form.analytics_fetched_at || form.ebay_listing_id);
@@ -37,21 +39,27 @@ export function EditTabNav({ activeTab, setActiveTab, form }) {
             <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-amber-400' : 'text-slate-400'}`} />
             <span>{tab.label}</span>
 
+            {showFinancialDot && (
+              <span
+                className="w-2 h-2 rounded-full bg-emerald-400 shadow-sm"
+                title="Financials active"
+              />
+            )}
             {showDetailsDot && (
               <span
                 className="w-2 h-2 rounded-full bg-cyan-400 shadow-sm"
-                title="Details / Auth / Cost configured"
+                title="Details & Auth configured"
               />
             )}
             {showListingDot && (
               <span
-                className="w-2 h-2 rounded-full bg-emerald-400 shadow-sm"
+                className="w-2 h-2 rounded-full bg-blue-400 shadow-sm"
                 title={`Linked to eBay Listing #${form.ebay_listing_id}`}
               />
             )}
             {showCompsDot && (
               <span
-                className="w-2 h-2 rounded-full bg-blue-400 shadow-sm"
+                className="w-2 h-2 rounded-full bg-amber-400 shadow-sm"
                 title="Market comps entered"
               />
             )}

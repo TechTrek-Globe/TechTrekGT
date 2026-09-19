@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { Package, AlertCircle, CheckCircle2, Loader2, UploadCloud, Tag, RefreshCw, TableProperties, LayoutGrid, Shield, ShieldCheck, X } from 'lucide-react';
 import { useInventory } from '../context/InventoryContext';
 import { deleteItem, syncEbayItem, getItem, updateItem } from '../utils/auctionApi';
@@ -11,7 +11,6 @@ import { InventoryCommandBar } from './inventory/InventoryCommandBar';
 import { InventoryMetricsStrip } from './inventory/InventoryMetricsStrip';
 import { InventoryDataGrid } from './inventory/InventoryDataGrid';
 import { PricingCardGrid } from './inventory/PricingCardGrid';
-import { QuickEditDrawer } from './inventory/QuickEditDrawer';
 import { QueryEditModal } from './inventory/QueryEditModal';
 
 // Modals
@@ -70,14 +69,14 @@ export function InventoryHubView({ onNavigate }) {
   const [viewMode, setViewMode] = useState('table'); // 'table' or 'pricing'
   const [showMetrics, setShowMetrics] = useState(false);
 
-  // --- Drawer & Modal States ---
-  const [drawerItem, setDrawerItem] = useState(null);
+  // --- Modal States ---
   const [modalOpen, setModalOpen] = useState(false);
   const [amazonModalOpen, setAmazonModalOpen] = useState(false);
   const [importerOpen, setImporterOpen] = useState(false);
   const [saleModalOpen, setSaleModalOpen] = useState(false);
   const [itemToSell, setItemToSell] = useState(null);
   const [editModalItem, setEditModalItem] = useState(null);
+  const [editModalTab, setEditModalTab] = useState('financial');
   const [copyModalItem, setCopyModalItem] = useState(null);
   const [queryEditModal, setQueryEditModal] = useState(null);
   const [deleting, setDeleting] = useState(null);
@@ -220,6 +219,15 @@ export function InventoryHubView({ onNavigate }) {
     }
   };
 
+  const handleModalItemUpdated = useCallback((id, patch, meta) => {
+    updateItemLocal(id, patch);
+    setEditModalItem(prev => (prev?.id === id ? { ...prev, ...patch } : prev));
+    if (patch?.status === 'Sold' && !meta?.fromEbaySync && !meta?.sale) {
+      const fullItem = items.find(it => it.id === id);
+      handleMarkSold(fullItem ? { ...fullItem, ...patch } : { id, ...patch });
+    }
+  }, [updateItemLocal, items]);
+
   return (
     <div className="w-full flex-1 flex flex-col min-h-0 space-y-1.5">
       {pendingCertPrompt && (
@@ -350,11 +358,11 @@ export function InventoryHubView({ onNavigate }) {
             deleting={deleting}
             onUpdateItem={updateItemLocal}
             onDelete={handleDelete}
-            onOpenEditModal={setEditModalItem}
-            onOpenQuickEdit={setDrawerItem}
+            onOpenEditModal={(it) => { setEditModalTab('financial'); setEditModalItem(it); }}
+            onOpenQuickEdit={(it) => { setEditModalTab('financial'); setEditModalItem(it); }}
             onOpenCopyModal={setCopyModalItem}
             onOpenSaleModal={handleMarkSold}
-            onOpenListingIdModal={setListingIdModalItem}
+            onOpenListingIdModal={(it) => { setEditModalTab('listing_pricing'); setEditModalItem(it); }}
             onMarkSold={handleMarkSold}
             onOpenInvoiceModal={(ref, id) => setViewingInvoice({ invoiceRef: ref, invoiceId: id })}
             onUpdateItemSync={handleUpdateItemSync}
@@ -371,26 +379,12 @@ export function InventoryHubView({ onNavigate }) {
             onOpenCopyModal={setCopyModalItem}
             onOpenQueryEdit={handleOpenQueryEdit}
             onItemUpdated={updateItemLocal}
-            onOpenQuickEdit={setDrawerItem}
-            onOpenListingIdModal={setListingIdModalItem}
+            onOpenQuickEdit={(it) => { setEditModalTab('financial'); setEditModalItem(it); }}
+            onOpenEditModal={(it) => { setEditModalTab('financial'); setEditModalItem(it); }}
+            onOpenListingIdModal={(it) => { setEditModalTab('listing_pricing'); setEditModalItem(it); }}
           />
         )}
       </div>
-
-      {/* Quick Edit Slide-Out Drawer */}
-      <QuickEditDrawer
-        item={drawerItem}
-        isOpen={Boolean(drawerItem)}
-        onClose={() => setDrawerItem(null)}
-        categoryOptions={categoryOptions}
-        platformOptions={platformOptions}
-        onItemUpdated={(id, patch) => {
-          updateItemLocal(id, patch);
-          setDrawerItem(prev => (prev?.id === id ? { ...prev, ...patch } : prev));
-        }}
-        onOpenCopyModal={setCopyModalItem}
-        onOpenQueryEdit={handleOpenQueryEdit}
-      />
 
       {/* Modals */}
       <AddInvoiceModal
@@ -431,17 +425,12 @@ export function InventoryHubView({ onNavigate }) {
       <EditItemModal
         isOpen={Boolean(editModalItem)}
         item={editModalItem}
+        initialTab={editModalTab}
         categoryOptions={categoryOptions}
         platformOptions={platformOptions}
         onClose={() => setEditModalItem(null)}
         onOpenCopyModal={() => setCopyModalItem(editModalItem)}
-        onUpdated={(id, patch, meta) => {
-          updateItemLocal(id, patch);
-          if (patch?.status === 'Sold' && !meta?.fromEbaySync && !meta?.sale) {
-            const fullItem = items.find(it => it.id === id);
-            handleMarkSold(fullItem ? { ...fullItem, ...patch } : { id, ...patch });
-          }
-        }}
+        onUpdated={handleModalItemUpdated}
       />
       <QueryEditModal
         queryEditModal={queryEditModal}

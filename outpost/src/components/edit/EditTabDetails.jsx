@@ -1,12 +1,28 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Tag, Hash, Trophy, User, Layers, Calendar, FileText,
-  Shield, ShieldCheck, ExternalLink, Award, CheckCircle2, Receipt, Calculator, ShoppingBag
+  Shield, ShieldCheck, ExternalLink, Award, CheckCircle2, Receipt, Calculator, ShoppingBag,
+  Sparkles, Upload, Loader2, Image as ImageIcon, ImageOff
 } from 'lucide-react';
 import { AUTHENTICATORS, getCertVerificationUrl, getAuthenticatorMeta } from '../../utils/certLookup';
 import { fmtCurrency } from '../../utils/formulaPreview';
+import { generateSku } from '../../utils/skuGenerator';
+import { pushSkuToEbay } from '../../utils/auctionApi';
+
+function normalizeHttps(url) {
+  if (!url || typeof url !== 'string') return null;
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith('//')) return `https:${trimmed}`;
+  if (/^http:\/\//i.test(trimmed)) return trimmed.replace(/^http:\/\//i, 'https://');
+  return trimmed;
+}
 
 export function EditTabDetails({ form, updateField, allCategories = [], item }) {
+  const [imgError, setImgError] = useState(false);
+  const [pushingSku, setPushingSku] = useState(false);
+  const [skuFeedback, setSkuFeedback] = useState(null);
+
   const certMeta = getAuthenticatorMeta(form.authenticator);
   const autoCertUrl = getCertVerificationUrl(form.authenticator, form.cert_number);
   const effectiveCertUrl = form.cert_verification_url || autoCertUrl;
@@ -16,8 +32,81 @@ export function EditTabDetails({ form, updateField, allCategories = [], item }) 
   const proratedDisc = Number(item?.prorated_discount || 0);
   const proratedNet = proratedTax + proratedShip - proratedDisc;
 
+  // Extract primary image URL safely from item or form
+  let rawImg = item?.image_url || null;
+  let imageSource = null;
+  if (!rawImg && item?.attributes) {
+    try {
+      const parsed = typeof item.attributes === 'string' ? JSON.parse(item.attributes) : item.attributes;
+      if (parsed?.ebay_image_url) {
+        rawImg = parsed.ebay_image_url;
+        imageSource = 'eBay Active Listing';
+      } else if (parsed?.image_url) {
+        rawImg = parsed.image_url;
+        imageSource = 'Amazon Product';
+      } else if (Array.isArray(parsed?.image_urls) && parsed.image_urls[0]) {
+        rawImg = parsed.image_urls[0];
+        imageSource = 'Amazon Product';
+      }
+    } catch (_) {}
+  }
+  if (!imageSource && rawImg) {
+    imageSource = rawImg.includes('ebayimg') ? 'eBay Active Listing' : (rawImg.includes('amazon') ? 'Amazon Product' : 'Outpost Media');
+  }
+  const imageUrl = normalizeHttps(rawImg);
+
   return (
     <div className="space-y-4">
+      {/* 0. Product Media Card */}
+      <div className="flex flex-col sm:flex-row gap-4 p-3.5 rounded-xl bg-slate-900/60 border border-slate-800">
+        <div className="w-full sm:w-28 h-28 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-center overflow-hidden flex-shrink-0 relative">
+          {imageUrl && !imgError ? (
+            <img
+              src={imageUrl}
+              alt="Item Media"
+              className="w-full h-full object-contain p-1 rounded-lg"
+              onError={() => setImgError(true)}
+            />
+          ) : (
+            <div className="flex flex-col items-center justify-center text-slate-600 gap-1 text-center p-2">
+              <ImageOff className="w-6 h-6" />
+              <span className="text-[10px]">No photo</span>
+            </div>
+          )}
+        </div>
+        <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
+          <div>
+            <div className="flex items-center justify-between gap-2 flex-wrap mb-1">
+              <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                <ImageIcon className="w-3.5 h-3.5 text-amber-400" />
+                <span>Product Media &amp; Visual Assets</span>
+              </span>
+              {imageSource && (
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                  {imageSource}
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-slate-400">
+              Primary listing photo synchronized from live marketplace listings or inbound invoice records.
+            </p>
+          </div>
+          {imageUrl && !imgError && (
+            <div className="mt-2 flex items-center gap-2">
+              <a
+                href={imageUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg border border-slate-700 transition-colors"
+              >
+                <ExternalLink className="w-3 h-3 text-amber-400" />
+                <span>Open Full-Resolution Photo</span>
+              </a>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* 1. Primary Title / Description */}
       <div>
         <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center justify-between">
@@ -42,10 +131,48 @@ export function EditTabDetails({ form, updateField, allCategories = [], item }) 
       {/* 2. SKU & Category & Quantity */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>
-          <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center gap-1.5">
-            <Hash className="w-3.5 h-3.5 text-amber-400/80" />
-            <span>Store SKU / Code</span>
-          </label>
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+              <Hash className="w-3.5 h-3.5 text-amber-400/80" />
+              <span>Store SKU</span>
+            </label>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => updateField('sku', generateSku(form.purchase_date || form.date_acquired || new Date()))}
+                className="text-[10px] font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1 bg-amber-500/10 hover:bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-500/20 transition-colors cursor-pointer"
+                title="Auto-generate store SKU (OP-YYMMDD-XXXX)"
+              >
+                <Sparkles className="w-2.5 h-2.5" />
+                <span>Auto</span>
+              </button>
+              {(form.ebay_listing_id || item?.ebay_listing_id) && (
+                <button
+                  type="button"
+                  disabled={pushingSku || !form.sku}
+                  onClick={async () => {
+                    if (!form.sku || !item?.id) return;
+                    setPushingSku(true);
+                    setSkuFeedback(null);
+                    try {
+                      const res = await pushSkuToEbay(item.id, form.sku);
+                      setSkuFeedback({ ok: true, msg: res?.message || 'Pushed SKU to eBay!' });
+                    } catch (e) {
+                      setSkuFeedback({ ok: false, msg: e.message || 'Push failed.' });
+                    } finally {
+                      setPushingSku(false);
+                      setTimeout(() => setSkuFeedback(null), 4000);
+                    }
+                  }}
+                  className="text-[10px] font-bold text-blue-400 hover:text-blue-300 flex items-center gap-1 bg-blue-500/10 hover:bg-blue-500/20 px-1.5 py-0.5 rounded border border-blue-500/20 transition-colors cursor-pointer disabled:opacity-40"
+                  title="Push this SKU to the live linked eBay listing"
+                >
+                  {pushingSku ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Upload className="w-2.5 h-2.5" />}
+                  <span>Push</span>
+                </button>
+              )}
+            </div>
+          </div>
           <input
             type="text"
             value={form.sku || ''}
@@ -53,6 +180,11 @@ export function EditTabDetails({ form, updateField, allCategories = [], item }) 
             className="input-field text-xs font-mono text-amber-300 font-semibold"
             placeholder="e.g. TT-NFL-0042"
           />
+          {skuFeedback && (
+            <p className={`text-[10px] mt-1 font-medium ${skuFeedback.ok ? 'text-emerald-400' : 'text-red-400'}`}>
+              {skuFeedback.msg}
+            </p>
+          )}
         </div>
 
         <div>

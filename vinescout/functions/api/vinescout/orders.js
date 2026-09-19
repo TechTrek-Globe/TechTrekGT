@@ -18,8 +18,9 @@ export async function onRequestGet(context) {
     const page   = Math.max(1, parseInt(url.searchParams.get('page')  || '1', 10));
     const limit  = Math.min(200, Math.max(1, parseInt(url.searchParams.get('limit') || '50', 10)));
     const offset = (page - 1) * limit;
-    const sort   = ['order_date', 'etv', 'created_at'].includes(url.searchParams.get('sort'))
-      ? url.searchParams.get('sort') : 'order_date';
+    const sortParam = url.searchParams.get('sort');
+    const sort   = sortParam && ['order_date', 'etv', 'created_at'].includes(sortParam)
+      ? sortParam : 'order_date';
     const dir    = url.searchParams.get('dir') === 'asc' ? 'ASC' : 'DESC';
 
     const [countRow, rows] = await Promise.all([

@@ -134,6 +134,10 @@ export const resetPlatforms = () =>
 
 // --- Comps / Pricing Intelligence ---
 export const getComps = (params = {}) => {
+  if (typeof params === 'string') {
+    const qs = params.startsWith('?') ? params.slice(1) : params;
+    return apiFetch(`/api/comps?${qs}`);
+  }
   const q = new URLSearchParams();
   if (params.item_id) q.set('item_id', params.item_id);
   if (params.status) q.set('status', params.status);
@@ -190,8 +194,11 @@ export const fetchEbayCatalog = (query) =>
   });
 
 // --- eBay Item Details (via Central API Gateway) ---
-export const fetchEbayItemDetail = (itemId) =>
-  fetch(`${getGatewayBase()}/api/ebay/item/${encodeURIComponent(itemId)}`, {
+export const fetchEbayItemDetail = (idOrUrl) => {
+  const clean = String(idOrUrl || '').trim();
+  const m = clean.match(/(?:itm\/|item=|\b)(\d{12})\b/);
+  const targetId = m ? m[1] : clean;
+  return fetch(`${getGatewayBase()}/api/ebay/item/${encodeURIComponent(targetId)}`, {
     credentials: 'include',
     headers: JSON_HEADERS
   }).then(async r => {
@@ -199,6 +206,7 @@ export const fetchEbayItemDetail = (itemId) =>
     if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
     return data;
   });
+};
 
 // --- Amazon Product Fetch (via Central API Gateway) ---
 // Gateway endpoint: POST https://techtrekgt.com/api/amazon/fetch

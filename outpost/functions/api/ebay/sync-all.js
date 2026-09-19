@@ -7,7 +7,8 @@ import {
   calculateEbayCategoryFees,
   fetchEbayOrderForListing,
   fetchEbayOrderFinances,
-  reconcileAndSaveEbaySale
+  reconcileAndSaveEbaySale,
+  normalizeHttps
 } from './tokenHelper.js';
 import { computePricingFloors } from '../../utils/auction.js';
 
@@ -142,11 +143,12 @@ export async function onRequestPost(context) {
         let promotedRate = item.ebay_promoted_rate != null && item.ebay_promoted_rate !== ''
           ? parseFloat(item.ebay_promoted_rate)
           : 0;
+        let singleDetail = null;
 
         // If promoted rate is 0 or missing, enrich via fetchSingleEbayListing (capped at 30 to respect rate limits)
-        if ((promotedRate === 0 || isNaN(promotedRate)) && singleEnrichCount < MAX_SINGLE_ENRICH) {
+        if ((promotedRate === 0 || isNaN(promotedRate)) && singleEnrichCount < MAX_SINGLE_ENRICH && item.ebay_listing_id) {
           try {
-            const singleDetail = await fetchSingleEbayListing(env, accessToken, item.ebay_listing_id);
+            singleDetail = await fetchSingleEbayListing(env, accessToken, item.ebay_listing_id);
             if (singleDetail?.promoted_rate != null && singleDetail.promoted_rate > 0) {
               promotedRate = singleDetail.promoted_rate;
             }
@@ -181,6 +183,28 @@ export async function onRequestPost(context) {
         const newPrice = match.price > 0 ? match.price : item.current_list_price;
         const newStatus = isSold ? 'Sold' : 'Listed';
 
+        let rawImg = match.image_url || (singleDetail ? singleDetail.image_url : null);
+        if (!rawImg && singleEnrichCount < MAX_SINGLE_ENRICH && cleanListingId) {
+          try {
+            singleDetail = await fetchSingleEbayListing(env, accessToken, cleanListingId);
+            singleEnrichCount++;
+            if (singleDetail?.image_url) {
+              rawImg = singleDetail.image_url;
+            }
+          } catch (_) {}
+        }
+        const ebayImg = normalizeHttps(rawImg);
+
+        let attrs = {};
+        if (item.attributes) {
+          try {
+            attrs = typeof item.attributes === 'string' ? JSON.parse(item.attributes) : (item.attributes || {});
+          } catch (_) {}
+        }
+        if (ebayImg) {
+          attrs.ebay_image_url = ebayImg;
+        }
+
         await env.DB.prepare(`
           UPDATE auction_items SET
             current_list_price = ?,
@@ -193,6 +217,7 @@ export async function onRequestPost(context) {
             est_shipping_cost = ?,
             min_sell_price = ?,
             suggested_list_price = ?,
+            attributes = ?,
             updated_at = datetime('now')
           WHERE id = ? AND user_id = ?
         `).bind(
@@ -205,6 +230,7 @@ export async function onRequestPost(context) {
           estShippingCost,
           pricing.min_sell_price,
           pricing.suggested_list_price,
+          JSON.stringify(attrs),
           item.id,
           payload.userId
         ).run();
@@ -254,7 +280,21 @@ export async function onRequestPost(context) {
         try {
           const singleDetail = await fetchSingleEbayListing(env, accessToken, cleanListingId);
           singleEnrichCount++;
-          if (singleDetail && (singleDetail.status === 'Sold' || singleDetail.quantity_sold > 0)) {
+          if (singleDetail) {
+            if (singleDetail.image_url) {
+              try {
+                let sAttrs = {};
+                const sAttrSrc = item.attributes;
+                if (sAttrSrc) {
+                  sAttrs = typeof sAttrSrc === 'string' ? JSON.parse(sAttrSrc) : sAttrSrc;
+                }
+                sAttrs.ebay_image_url = singleDetail.image_url;
+                await env.DB.prepare(
+                  `UPDATE auction_items SET attributes = ?, updated_at = datetime('now') WHERE id = ? AND user_id = ?`
+                ).bind(JSON.stringify(sAttrs), item.id, payload.userId).run();
+              } catch (_) {}
+            }
+            if (singleDetail.status === 'Sold' || singleDetail.quantity_sold > 0) {
             const orderData = await fetchEbayOrderForListing(env, accessToken, cleanListingId, item.sku);
             let financeData = null;
             if (orderData?.orderId) {
@@ -284,7 +324,8 @@ export async function onRequestPost(context) {
               console.warn(`[sync-all] VScout write-back exception for item ${item.id}:`, wbErr);
             }
           }
-        } catch (singleErr) {
+        }
+      } catch (singleErr) {
           console.warn(`[sync-all] Single fallback exception for item ${item.id}:`, singleErr);
         }
       }

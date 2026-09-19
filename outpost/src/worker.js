@@ -53,7 +53,7 @@ function addSecurityHeaders(response, isLocalhost = false, requestOrigin = '') {
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com",
       "connect-src 'self' https://techtrekgt.com https://challenges.cloudflare.com",
-      "img-src 'self' data: blob: https://challenges.cloudflare.com",
+      "img-src 'self' data: blob: https://challenges.cloudflare.com https://*.ebayimg.com https://i.ebayimg.com https://*.ebaystatic.com https://*.media-amazon.com https://m.media-amazon.com https://images-na.ssl-images-amazon.com https://*.ssl-images-amazon.com",
       "font-src 'self' data: https://fonts.gstatic.com",
       "frame-src 'self' https://challenges.cloudflare.com blob:",
       "child-src 'self' https://challenges.cloudflare.com blob:",

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { updateItem, saveComp, fetchLiveComps, getActiveEbayListings, syncEbayItem, fetchEbayItemAnalytics } from '../utils/auctionApi';
+import { updateItem, saveComp, getComps, fetchLiveComps, getActiveEbayListings, syncEbayItem, fetchEbayItemAnalytics, fetchEbayItemDetail } from '../utils/auctionApi';
 import { computeFeeBreakdown } from '../utils/feeEngine';
 import { roundPrice } from '../utils/formulaPreview';
 import { cleanEbaySearchQuery, buildStructuredCompQuery } from '../utils/ebaySearch';
@@ -8,6 +8,7 @@ import { cleanEbaySearchQuery, buildStructuredCompQuery } from '../utils/ebaySea
 import { EditModalHeader } from './edit/EditModalHeader';
 import { EditModalFooter } from './edit/EditModalFooter';
 import { EditTabNav } from './edit/EditTabNav';
+import { EditTabFinancials } from './edit/EditTabFinancials';
 import { EditTabDetails } from './edit/EditTabDetails';
 import { EditTabListingPricing } from './edit/EditTabListingPricing';
 import { EditTabComps } from './edit/EditTabComps';
@@ -85,9 +86,10 @@ export function EditItemModal({
   platformOptions = [],
   onClose,
   onUpdated,
-  onOpenCopyModal
+  onOpenCopyModal,
+  initialTab = 'financial'
 }) {
-  const [activeTab, setActiveTab] = useState('details');
+  const [activeTab, setActiveTab] = useState(initialTab || 'financial');
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [error, setError] = useState('');
@@ -166,9 +168,26 @@ export function EditItemModal({
     }
   };
 
-  // Populate form on item change
+  const fmtCompVal = (val) => (val != null && val !== '' && !isNaN(Number(val)) && Number(val) > 0) ? Number(val).toFixed(2) : '';
+
+  const lastItemIdRef = useRef(null);
+  const fetchedCompItemIdRef = useRef(null);
+
+  // Reset tracking when modal closes
   useEffect(() => {
-    if (item) {
+    if (!isOpen) {
+      lastItemIdRef.current = null;
+      fetchedCompItemIdRef.current = null;
+    }
+  }, [isOpen]);
+
+  // Populate form only when modal opens for a new item
+  useEffect(() => {
+    if (!isOpen || !item) return;
+
+    if (item.id !== lastItemIdRef.current) {
+      lastItemIdRef.current = item.id;
+
       const populated = {
         item_name: item.item_name || '',
         sku: item.sku || '',
@@ -234,15 +253,13 @@ export function EditItemModal({
 
       // Comps
       setCompsDraft({
-        comp_1: item.comp_1 != null && item.comp_1 !== '' ? Number(item.comp_1).toFixed(2) : '',
-        comp_2: item.comp_2 != null && item.comp_2 !== '' ? Number(item.comp_2).toFixed(2) : '',
-        comp_3: item.comp_3 != null && item.comp_3 !== '' ? Number(item.comp_3).toFixed(2) : '',
-        active_comp_1: item.active_comp_1 != null && item.active_comp_1 !== '' ? Number(item.active_comp_1).toFixed(2) : '',
-        active_comp_2: item.active_comp_2 != null && item.active_comp_2 !== '' ? Number(item.active_comp_2).toFixed(2) : '',
-        active_comp_3: item.active_comp_3 != null && item.active_comp_3 !== '' ? Number(item.active_comp_3).toFixed(2) : '',
-        recommended_list_price: (item.recommended_list_price || item.current_list_price || item.suggested_list_price)
-          ? Number(item.recommended_list_price || item.current_list_price || item.suggested_list_price).toFixed(2)
-          : '',
+        comp_1: fmtCompVal(item.comp_1),
+        comp_2: fmtCompVal(item.comp_2),
+        comp_3: fmtCompVal(item.comp_3),
+        active_comp_1: fmtCompVal(item.active_comp_1),
+        active_comp_2: fmtCompVal(item.active_comp_2),
+        active_comp_3: fmtCompVal(item.active_comp_3),
+        recommended_list_price: fmtCompVal(item.recommended_list_price || item.current_list_price || item.suggested_list_price),
         saving: false,
         applied: false,
         fetchingLive: false,
@@ -254,16 +271,57 @@ export function EditItemModal({
       setLoadingAnalytics(false);
       setAnalyticsError('');
       setAnalyticsRange(30);
+      setActiveTab(initialTab || 'financial');
 
-      const initialQuery = item.item_name ? item.item_name.split(' ').slice(0, 3).join(' ') : '';
-      setEbaySearch(initialQuery);
+      // Start search empty so all active store listings are visible immediately
+      setEbaySearch('');
       fetchActiveListings();
 
       setError('');
       setSuccess('');
       setSaveSuccess(false);
     }
-  }, [item]);
+  }, [isOpen, item?.id, initialTab]);
+
+  // Synchronize comps directly from database once per opened item
+  useEffect(() => {
+    if (!isOpen || !item?.id) return;
+    if (fetchedCompItemIdRef.current === item.id) return;
+    fetchedCompItemIdRef.current = item.id;
+
+    let cancelled = false;
+
+    getComps({ item_id: item.id })
+      .then((data) => {
+        if (cancelled) return;
+        const comp = data?.comps?.[0] || data?.comp;
+        if (comp) {
+          const fresh1 = fmtCompVal(comp.comp_1);
+          const fresh2 = fmtCompVal(comp.comp_2);
+          const fresh3 = fmtCompVal(comp.comp_3);
+          const freshActive1 = fmtCompVal(comp.active_comp_1);
+          const freshActive2 = fmtCompVal(comp.active_comp_2);
+          const freshActive3 = fmtCompVal(comp.active_comp_3);
+          const freshRec = fmtCompVal(comp.recommended_list_price);
+
+          setCompsDraft(prev => ({
+            ...prev,
+            comp_1: fresh1 || prev.comp_1,
+            comp_2: fresh2 || prev.comp_2,
+            comp_3: fresh3 || prev.comp_3,
+            active_comp_1: freshActive1 || prev.active_comp_1,
+            active_comp_2: freshActive2 || prev.active_comp_2,
+            active_comp_3: freshActive3 || prev.active_comp_3,
+            recommended_list_price: freshRec || prev.recommended_list_price
+          }));
+        }
+      })
+      .catch((err) => {
+        console.warn('[EditItemModal] Background comps load note:', err?.message || err);
+      });
+
+    return () => { cancelled = true; };
+  }, [isOpen, item?.id]);
 
   // Dirty state calculation
   const isDirty = useMemo(() => {
@@ -292,9 +350,10 @@ export function EditItemModal({
   const fetchActiveListings = async () => {
     setLoadingEbayListings(true);
     try {
-      const data = await getActiveEbayListings({ limit: 100 });
+      const data = await getActiveEbayListings({ limit: 200 });
       setEbayListings(data.listings || []);
-    } catch (_) {
+    } catch (err) {
+      console.error('[EditItemModal] Failed to fetch active eBay listings:', err);
       setEbayListings([]);
     } finally {
       setLoadingEbayListings(false);
@@ -315,13 +374,15 @@ export function EditItemModal({
     }
   };
 
-  const handleSyncWithEbay = async () => {
-    if (!form.ebay_listing_id) return;
+  const handleSyncWithEbay = async (targetListingId = null, targetPromotedRate = null) => {
+    const listingIdToSync = targetListingId || form.ebay_listing_id;
+    if (!listingIdToSync) return;
     setSyncingEbay(true);
     setError('');
     setSuccess('');
     try {
-      const res = await syncEbayItem(item.id, form.ebay_listing_id, form.ebay_promoted_rate);
+      const rateToSync = targetPromotedRate != null ? targetPromotedRate : form.ebay_promoted_rate;
+      const res = await syncEbayItem(item.id, listingIdToSync, rateToSync);
       if (res?.item) {
         const it = res.item;
         const liveListing = res.liveListing || {};
@@ -329,7 +390,7 @@ export function EditItemModal({
           ? String(it.ebay_promoted_rate)
           : (liveListing.promoted_rate != null && Number(liveListing.promoted_rate) > 0
               ? String(liveListing.promoted_rate)
-              : (Number(form.ebay_promoted_rate) > 0 ? form.ebay_promoted_rate : ''));
+              : (Number(rateToSync) > 0 ? String(rateToSync) : ''));
 
         const syncBuyerShipping = liveListing.buyer_shipping_cost != null && liveListing.buyer_shipping_cost > 0
           ? String(Number(liveListing.buyer_shipping_cost).toFixed(2))
@@ -337,8 +398,9 @@ export function EditItemModal({
 
         setForm(prev => ({
           ...prev,
+          ebay_listing_id: listingIdToSync,
           current_list_price: it.current_list_price != null ? Number(it.current_list_price).toFixed(2) : prev.current_list_price,
-          status: it.status || prev.status,
+          status: it.status || (res.is_sold ? 'Sold' : 'Listed'),
           platform: 'eBay',
           platform_fee_pct: it.platform_fee_pct != null ? String((it.platform_fee_pct * 100).toFixed(2)) : '13.25',
           platform_flat_fee: it.platform_flat_fee != null ? String(Number(it.platform_flat_fee).toFixed(2)) : '0.40',
@@ -353,7 +415,7 @@ export function EditItemModal({
           const profitStr = res.sale?.net_profit != null ? `${res.sale.net_profit >= 0 ? '+' : ''}$${Number(res.sale.net_profit).toFixed(2)}` : '--';
           setSuccess(`🎉 Item Sold on eBay! Auto-recorded Sale: ${grossStr} (Net: ${netStr}, Profit: ${profitStr})`);
         } else {
-          setSuccess(`Synchronized with live eBay listing #${form.ebay_listing_id} (Price: $${it.current_list_price || '--'}, Ad Rate: ${syncPromotedRate || '0'}%)`);
+          setSuccess(`Synchronized with live eBay listing #${listingIdToSync} (Price: $${it.current_list_price || '--'}, Ad Rate: ${syncPromotedRate || '0'}%)`);
         }
         if (onUpdated) onUpdated(item.id, it, { fromEbaySync: true, is_sold: res.is_sold, sale: res.sale });
       }
@@ -364,21 +426,108 @@ export function EditItemModal({
     }
   };
 
+  const handlePairEbayListing = async (listingOrId) => {
+    let id = '';
+    let price = null;
+    let sku = null;
+    let rate = null;
+    let shipCost = null;
+
+    if (typeof listingOrId === 'object' && listingOrId !== null) {
+      id = String(listingOrId.listing_id || '').trim();
+      price = listingOrId.price;
+      sku = listingOrId.sku;
+      rate = listingOrId.promoted_rate;
+      shipCost = listingOrId.buyer_shipping_cost;
+    } else {
+      id = String(listingOrId || '').trim();
+    }
+
+    if (!id) return;
+
+    setForm(prev => ({
+      ...prev,
+      ebay_listing_id: id,
+      platform: 'eBay',
+      status: prev.status === 'Draft' || prev.status === 'Available' ? 'Listed' : prev.status,
+      current_list_price: price != null && !prev.current_list_price ? Number(price).toFixed(2) : prev.current_list_price,
+      sku: sku && !prev.sku ? sku : prev.sku,
+      ebay_promoted_rate: rate != null && rate > 0 ? String(rate) : prev.ebay_promoted_rate,
+      buyer_shipping_cost: shipCost != null ? String(Number(shipCost).toFixed(2)) : prev.buyer_shipping_cost
+    }));
+
+    await handleSyncWithEbay(id, rate);
+  };
+
   // Comps calculations & actions
   const updateCompDraft = (field, value) => {
     setCompsDraft(prev => {
       const updated = { ...prev, [field]: value, applied: false };
-      if (field.startsWith('comp_')) {
-        const c1 = field === 'comp_1' ? value : prev.comp_1;
-        const c2 = field === 'comp_2' ? value : prev.comp_2;
-        const c3 = field === 'comp_3' ? value : prev.comp_3;
-        const vals = [c1, c2, c3].filter(v => v !== '' && !isNaN(Number(v)) && Number(v) > 0).map(Number);
-        if (vals.length > 0) {
-          updated.recommended_list_price = (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2);
+      const c1 = field === 'comp_1' ? value : updated.comp_1;
+      const c2 = field === 'comp_2' ? value : updated.comp_2;
+      const c3 = field === 'comp_3' ? value : updated.comp_3;
+      const a1 = field === 'active_comp_1' ? value : updated.active_comp_1;
+      const a2 = field === 'active_comp_2' ? value : updated.active_comp_2;
+      const a3 = field === 'active_comp_3' ? value : updated.active_comp_3;
+
+      const soldVals = [c1, c2, c3].filter(v => v !== '' && v != null && !isNaN(Number(v)) && Number(v) > 0).map(Number);
+      const activeVals = [a1, a2, a3].filter(v => v !== '' && v != null && !isNaN(Number(v)) && Number(v) > 0).map(Number);
+
+      const soldAvg = soldVals.length > 0 ? (soldVals.reduce((a, b) => a + b, 0) / soldVals.length) : null;
+      const activeAvg = activeVals.length > 0 ? (activeVals.reduce((a, b) => a + b, 0) / activeVals.length) : null;
+
+      if (field.startsWith('comp_') || field.startsWith('active_comp_')) {
+        const target = soldAvg || activeAvg;
+        if (target != null) {
+          updated.recommended_list_price = Number(target).toFixed(2);
         }
       }
       return updated;
     });
+  };
+
+  const handleLookupEbayItem = async (idOrUrl, targetSlot = 'comp_1') => {
+    if (!idOrUrl || !idOrUrl.trim()) return;
+    try {
+      const detail = await fetchEbayItemDetail(idOrUrl);
+      if (detail && detail.price != null) {
+        const itemObj = {
+          title: detail.title || 'eBay Listing',
+          price: detail.price,
+          image_url: detail.image_url || null,
+          item_url: detail.item_url || (detail.itemId ? `https://www.ebay.com/itm/${detail.itemId}` : null),
+          ebay_item_id: detail.itemId || null,
+          condition: detail.condition || 'Sold / Ended'
+        };
+        const itemKey = `${targetSlot}_item`;
+        setCompsDraft(prev => {
+          const updated = {
+            ...prev,
+            [targetSlot]: Number(detail.price).toFixed(2),
+            [itemKey]: itemObj,
+            applied: false
+          };
+          const c1 = targetSlot === 'comp_1' ? detail.price : updated.comp_1;
+          const c2 = targetSlot === 'comp_2' ? detail.price : updated.comp_2;
+          const c3 = targetSlot === 'comp_3' ? detail.price : updated.comp_3;
+          const a1 = targetSlot === 'active_comp_1' ? detail.price : updated.active_comp_1;
+          const a2 = targetSlot === 'active_comp_2' ? detail.price : updated.active_comp_2;
+          const a3 = targetSlot === 'active_comp_3' ? detail.price : updated.active_comp_3;
+          const soldVals = [c1, c2, c3].filter(v => v !== '' && v != null && !isNaN(Number(v)) && Number(v) > 0).map(Number);
+          const activeVals = [a1, a2, a3].filter(v => v !== '' && v != null && !isNaN(Number(v)) && Number(v) > 0).map(Number);
+          const target = soldVals.length > 0 ? (soldVals.reduce((a, b) => a + b, 0) / soldVals.length) : (activeVals.length > 0 ? (activeVals.reduce((a, b) => a + b, 0) / activeVals.length) : null);
+          if (target != null) {
+            updated.recommended_list_price = Number(target).toFixed(2);
+          }
+          return updated;
+        });
+        return { success: true, detail: itemObj };
+      } else {
+        throw new Error('Listing found, but no sale/list price was returned.');
+      }
+    } catch (err) {
+      throw new Error(err.message || 'Failed to lookup eBay listing.');
+    }
   };
 
   const handleSaveComps = async (applyToItem = false) => {
@@ -386,24 +535,45 @@ export function EditItemModal({
     setError('');
     setSuccess('');
     try {
+      const c1 = (compsDraft.comp_1 !== '' && compsDraft.comp_1 != null && !isNaN(Number(compsDraft.comp_1)) && Number(compsDraft.comp_1) > 0) ? Number(compsDraft.comp_1) : null;
+      const c2 = (compsDraft.comp_2 !== '' && compsDraft.comp_2 != null && !isNaN(Number(compsDraft.comp_2)) && Number(compsDraft.comp_2) > 0) ? Number(compsDraft.comp_2) : null;
+      const c3 = (compsDraft.comp_3 !== '' && compsDraft.comp_3 != null && !isNaN(Number(compsDraft.comp_3)) && Number(compsDraft.comp_3) > 0) ? Number(compsDraft.comp_3) : null;
+      const a1 = (compsDraft.active_comp_1 !== '' && compsDraft.active_comp_1 != null && !isNaN(Number(compsDraft.active_comp_1)) && Number(compsDraft.active_comp_1) > 0) ? Number(compsDraft.active_comp_1) : null;
+      const a2 = (compsDraft.active_comp_2 !== '' && compsDraft.active_comp_2 != null && !isNaN(Number(compsDraft.active_comp_2)) && Number(compsDraft.active_comp_2) > 0) ? Number(compsDraft.active_comp_2) : null;
+      const a3 = (compsDraft.active_comp_3 !== '' && compsDraft.active_comp_3 != null && !isNaN(Number(compsDraft.active_comp_3)) && Number(compsDraft.active_comp_3) > 0) ? Number(compsDraft.active_comp_3) : null;
+      const rec = (compsDraft.recommended_list_price !== '' && compsDraft.recommended_list_price != null && !isNaN(Number(compsDraft.recommended_list_price)) && Number(compsDraft.recommended_list_price) > 0) ? Number(compsDraft.recommended_list_price) : null;
+
       await saveComp({
         item_id: item.id,
-        comp_1: compsDraft.comp_1 === '' ? null : Number(compsDraft.comp_1),
-        comp_2: compsDraft.comp_2 === '' ? null : Number(compsDraft.comp_2),
-        comp_3: compsDraft.comp_3 === '' ? null : Number(compsDraft.comp_3),
-        active_comp_1: compsDraft.active_comp_1 === '' ? null : Number(compsDraft.active_comp_1),
-        active_comp_2: compsDraft.active_comp_2 === '' ? null : Number(compsDraft.active_comp_2),
-        active_comp_3: compsDraft.active_comp_3 === '' ? null : Number(compsDraft.active_comp_3),
-        recommended_list_price: compsDraft.recommended_list_price === '' ? null : Number(compsDraft.recommended_list_price),
+        comp_1: c1,
+        comp_2: c2,
+        comp_3: c3,
+        active_comp_1: a1,
+        active_comp_2: a2,
+        active_comp_3: a3,
+        recommended_list_price: rec,
         apply_to_item: applyToItem
       });
       setCompsDraft(prev => ({ ...prev, saving: false, applied: applyToItem }));
       setSuccess(applyToItem ? 'Target price applied to item listing!' : 'Market comps saved successfully!');
-      if (applyToItem && compsDraft.recommended_list_price) {
-        setForm(prev => ({ ...prev, current_list_price: String(compsDraft.recommended_list_price) }));
-        if (onUpdated) {
-          onUpdated(item.id, { current_list_price: Number(compsDraft.recommended_list_price) });
-        }
+
+      const compsPatch = {
+        comp_1: c1,
+        comp_2: c2,
+        comp_3: c3,
+        active_comp_1: a1,
+        active_comp_2: a2,
+        active_comp_3: a3,
+        recommended_list_price: rec
+      };
+
+      if (applyToItem && rec) {
+        setForm(prev => ({ ...prev, current_list_price: String(rec) }));
+        compsPatch.current_list_price = rec;
+      }
+
+      if (onUpdated) {
+        onUpdated(item.id, compsPatch);
       }
     } catch (err) {
       setError(`Save comps failed: ${err.message}`);
@@ -439,10 +609,10 @@ export function EditItemModal({
   }, [activeTab, analytics, loadingAnalytics, form.ebay_listing_id, analyticsRange, handleFetchAnalytics]);
 
 
-  const handleFetchLiveComps = async () => {
+  const handleFetchLiveComps = async (customQuery = null) => {
     setCompsDraft(prev => ({ ...prev, fetchingLive: true, fetchMsg: null }));
     try {
-      const q = buildStructuredCompQuery(
+      const q = (customQuery && customQuery.trim()) || buildStructuredCompQuery(
         form.item_name || item.item_name,
         form.athlete_person || item.athlete_person,
         form.category || item.category,
@@ -580,10 +750,43 @@ export function EditItemModal({
         tax_cost: form.tax_cost !== '' && form.tax_cost != null ? parseFloat(form.tax_cost) : null
       };
 
+      // Auto-save comps if any comp value exists in draft
+      const hasCompsData = [
+        compsDraft.comp_1, compsDraft.comp_2, compsDraft.comp_3,
+        compsDraft.active_comp_1, compsDraft.active_comp_2, compsDraft.active_comp_3,
+        compsDraft.recommended_list_price
+      ].some(v => v !== '' && v != null && !isNaN(Number(v)) && Number(v) > 0);
+
+      let savedComps = null;
+      if (hasCompsData) {
+        try {
+          const compPayload = {
+            item_id: item.id,
+            comp_1: (compsDraft.comp_1 !== '' && compsDraft.comp_1 != null && !isNaN(Number(compsDraft.comp_1)) && Number(compsDraft.comp_1) > 0) ? Number(compsDraft.comp_1) : null,
+            comp_2: (compsDraft.comp_2 !== '' && compsDraft.comp_2 != null && !isNaN(Number(compsDraft.comp_2)) && Number(compsDraft.comp_2) > 0) ? Number(compsDraft.comp_2) : null,
+            comp_3: (compsDraft.comp_3 !== '' && compsDraft.comp_3 != null && !isNaN(Number(compsDraft.comp_3)) && Number(compsDraft.comp_3) > 0) ? Number(compsDraft.comp_3) : null,
+            active_comp_1: (compsDraft.active_comp_1 !== '' && compsDraft.active_comp_1 != null && !isNaN(Number(compsDraft.active_comp_1)) && Number(compsDraft.active_comp_1) > 0) ? Number(compsDraft.active_comp_1) : null,
+            active_comp_2: (compsDraft.active_comp_2 !== '' && compsDraft.active_comp_2 != null && !isNaN(Number(compsDraft.active_comp_2)) && Number(compsDraft.active_comp_2) > 0) ? Number(compsDraft.active_comp_2) : null,
+            active_comp_3: (compsDraft.active_comp_3 !== '' && compsDraft.active_comp_3 != null && !isNaN(Number(compsDraft.active_comp_3)) && Number(compsDraft.active_comp_3) > 0) ? Number(compsDraft.active_comp_3) : null,
+            recommended_list_price: (compsDraft.recommended_list_price !== '' && compsDraft.recommended_list_price != null && !isNaN(Number(compsDraft.recommended_list_price)) && Number(compsDraft.recommended_list_price) > 0) ? Number(compsDraft.recommended_list_price) : null,
+            apply_to_item: false
+          };
+          await saveComp(compPayload);
+          savedComps = compPayload;
+        } catch (compErr) {
+          console.warn('[EditItemModal] Auto-saving comps on submit warning:', compErr);
+        }
+      }
+
       const res = await updateItem(item.id, payload);
       setSaveSuccess(true);
       setSuccess('Item updated successfully!');
-      const merged = { ...item, ...payload, ...(res?.item || res || {}) };
+      const merged = {
+        ...item,
+        ...payload,
+        ...(savedComps || {}),
+        ...(res?.item || res || {})
+      };
       if (onUpdated) onUpdated(item.id, merged);
 
       // Snapshot new state as clean initial state
@@ -645,6 +848,17 @@ export function EditItemModal({
           onSubmit={handleSubmit}
           className="p-5 sm:p-6 overflow-y-auto flex-1 space-y-4 scrollbar-thin scrollbar-thumb-slate-800"
         >
+          {activeTab === 'financial' && (
+            <EditTabFinancials
+              form={form}
+              updateField={updateField}
+              item={item}
+              liveFees={liveFees}
+              compsDraft={compsDraft}
+              handleSaveComps={handleSaveComps}
+            />
+          )}
+
           {activeTab === 'details' && (
             <EditTabDetails
               form={form}
@@ -667,6 +881,9 @@ export function EditItemModal({
               ebaySearch={ebaySearch}
               setEbaySearch={setEbaySearch}
               liveFees={liveFees}
+              fetchActiveListings={fetchActiveListings}
+              handlePairEbayListing={handlePairEbayListing}
+              item={item}
             />
           )}
 
@@ -677,6 +894,7 @@ export function EditItemModal({
               updateCompDraft={updateCompDraft}
               handleFetchLiveComps={handleFetchLiveComps}
               handleSaveComps={handleSaveComps}
+              handleLookupEbayItem={handleLookupEbayItem}
               minSellPrice={item.min_sell_price}
             />
           )}

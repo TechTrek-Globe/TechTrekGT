@@ -46,9 +46,8 @@ export function EbayListingIdModal({ item, isOpen, onClose, onSaved }) {
       setSyncSummary('');
       setSelectedListing(null);
 
-      // Auto-populate search with first few words of item name
-      const initialQuery = item.item_name ? item.item_name.split(' ').slice(0, 3).join(' ') : '';
-      setBrowserSearch(initialQuery);
+      // Start search empty so all active store listings are visible immediately
+      setBrowserSearch('');
 
       // Fetch active listings on open
       fetchActiveListings();
@@ -71,23 +70,33 @@ export function EbayListingIdModal({ item, isOpen, onClose, onSaved }) {
 
   if (!isOpen || !item) return null;
 
+  const normalizeStr = (str) =>
+    (str || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .trim();
+
   const filteredListings = activeListings.filter(l => {
     if (!browserSearch.trim()) return true;
-    const q = browserSearch.trim().toLowerCase();
+    const q = normalizeStr(browserSearch);
     const cleanQ = q.replace(/[^a-z0-9]/g, '');
+    const cleanTitle = normalizeStr(l.title);
+    const cleanSku = normalizeStr(l.sku);
+    const listingId = String(l.listing_id || '').trim();
 
     // 1. Direct substring in title, sku, or listing_id
-    if (l.title && l.title.toLowerCase().includes(q)) return true;
-    if (l.sku && l.sku.toLowerCase().includes(q)) return true;
-    if (l.listing_id && String(l.listing_id).includes(q)) return true;
+    if (cleanTitle.includes(q)) return true;
+    if (cleanSku.includes(q)) return true;
+    if (listingId.includes(browserSearch.trim())) return true;
 
     // 2. Normalized alphanumeric match (handles "Superbox" vs "Super Box")
-    const cleanTitle = (l.title || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-    if (cleanTitle && cleanQ && cleanTitle.includes(cleanQ)) return true;
+    if (cleanTitle.replace(/\s+/g, '').includes(cleanQ)) return true;
 
     // 3. Token-based word match (all search words present in title)
     const tokens = q.split(/\s+/).filter(t => t.length > 1);
-    if (tokens.length > 0 && tokens.every(token => (l.title || '').toLowerCase().includes(token))) {
+    if (tokens.length > 0 && tokens.every(token => cleanTitle.includes(token))) {
       return true;
     }
 

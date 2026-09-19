@@ -147,6 +147,11 @@ export async function onRequestGet(context) {
         c.comp_3,
         c.manual_avg,
         c.live_avg,
+        c.active_comp_1,
+        c.active_comp_2,
+        c.active_comp_3,
+        c.active_avg,
+        c.sold_count,
         c.ebay_search_url,
         c.recommended_list_price,
         c.updated_at as comp_updated_at,
@@ -240,6 +245,9 @@ export async function onRequestPost(context) {
 
     if (!item) return err('Item not found', 404);
 
+    const toDbNumber = (val) => (val !== undefined && val !== null && val !== '' && !isNaN(Number(val)) && Number(val) > 0) ? Number(val) : null;
+    const toDbInt = (val) => (val !== undefined && val !== null && val !== '' && !isNaN(parseInt(val, 10)) && parseInt(val, 10) >= 0) ? parseInt(val, 10) : 0;
+
     const manualAvg = computeManualAvg(comp_1, comp_2, comp_3);
     const computedActiveAvg = active_avg !== undefined && active_avg !== null && active_avg !== ''
       ? Number(active_avg)
@@ -267,16 +275,16 @@ export async function onRequestPost(context) {
             recommended_list_price = ?, ebay_search_url = ?, updated_at = datetime('now')
         WHERE id = ? AND user_id = ?
       `).bind(
-        comp_1 !== undefined ? (comp_1 === '' ? null : Number(comp_1)) : null,
-        comp_2 !== undefined ? (comp_2 === '' ? null : Number(comp_2)) : null,
-        comp_3 !== undefined ? (comp_3 === '' ? null : Number(comp_3)) : null,
-        live_avg !== undefined ? (live_avg === '' ? null : Number(live_avg)) : null,
+        toDbNumber(comp_1),
+        toDbNumber(comp_2),
+        toDbNumber(comp_3),
+        toDbNumber(live_avg),
         manualAvg,
-        active_comp_1 !== undefined ? (active_comp_1 === '' ? null : Number(active_comp_1)) : null,
-        active_comp_2 !== undefined ? (active_comp_2 === '' ? null : Number(active_comp_2)) : null,
-        active_comp_3 !== undefined ? (active_comp_3 === '' ? null : Number(active_comp_3)) : null,
+        toDbNumber(active_comp_1),
+        toDbNumber(active_comp_2),
+        toDbNumber(active_comp_3),
         computedActiveAvg,
-        sold_count !== undefined ? (sold_count === '' ? 0 : Number(sold_count)) : 0,
+        toDbInt(sold_count),
         recPrice,
         searchUrl,
         compId,
@@ -295,16 +303,16 @@ export async function onRequestPost(context) {
         compId,
         item_id,
         userId,
-        comp_1 !== undefined ? (comp_1 === '' ? null : Number(comp_1)) : null,
-        comp_2 !== undefined ? (comp_2 === '' ? null : Number(comp_2)) : null,
-        comp_3 !== undefined ? (comp_3 === '' ? null : Number(comp_3)) : null,
-        live_avg !== undefined ? (live_avg === '' ? null : Number(live_avg)) : null,
+        toDbNumber(comp_1),
+        toDbNumber(comp_2),
+        toDbNumber(comp_3),
+        toDbNumber(live_avg),
         manualAvg,
-        active_comp_1 !== undefined ? (active_comp_1 === '' ? null : Number(active_comp_1)) : null,
-        active_comp_2 !== undefined ? (active_comp_2 === '' ? null : Number(active_comp_2)) : null,
-        active_comp_3 !== undefined ? (active_comp_3 === '' ? null : Number(active_comp_3)) : null,
+        toDbNumber(active_comp_1),
+        toDbNumber(active_comp_2),
+        toDbNumber(active_comp_3),
         computedActiveAvg,
-        sold_count !== undefined ? (sold_count === '' ? 0 : Number(sold_count)) : 0,
+        toDbInt(sold_count),
         recPrice,
         searchUrl
       ).run();

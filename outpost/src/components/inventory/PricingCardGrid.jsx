@@ -9,7 +9,8 @@ export function PricingCardGrid({
   onOpenQueryEdit,
   onItemUpdated,
   onOpenQuickEdit,
-  onOpenListingIdModal
+  onOpenListingIdModal,
+  onOpenEditModal
 }) {
   if (items.length === 0) {
     return (
@@ -33,6 +34,7 @@ export function PricingCardGrid({
               onItemUpdated={onItemUpdated}
               onOpenQuickEdit={onOpenQuickEdit}
               onOpenListingIdModal={onOpenListingIdModal}
+              onOpenEditModal={onOpenEditModal}
             />
           ))}
         </div>

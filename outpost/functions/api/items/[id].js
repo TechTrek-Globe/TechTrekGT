@@ -21,9 +21,31 @@ export async function onRequestGet(context) {
     const id = getItemId(new URL(request.url));
     if (!id) return err('Item ID required', 400);
 
-    const item = await env.DB.prepare(
-      'SELECT * FROM auction_items WHERE id = ? AND user_id = ?'
-    ).bind(id, payload.userId).first();
+    const item = await env.DB.prepare(`
+      SELECT
+        i.*,
+        inv.invoice_ref,
+        inv.discount AS inv_discount,
+        inv.shipping AS inv_shipping,
+        inv.tax      AS inv_tax,
+        c.comp_1,
+        c.comp_2,
+        c.comp_3,
+        c.manual_avg,
+        c.live_avg,
+        c.active_comp_1,
+        c.active_comp_2,
+        c.active_comp_3,
+        c.active_avg,
+        c.sold_count,
+        c.ebay_search_url AS comp_ebay_search_url,
+        c.recommended_list_price,
+        c.updated_at      AS comp_updated_at
+      FROM auction_items i
+      LEFT JOIN auction_invoices inv ON inv.id = i.invoice_id
+      LEFT JOIN auction_comps c ON i.id = c.item_id AND c.user_id = i.user_id
+      WHERE i.id = ? AND i.user_id = ?
+    `).bind(id, payload.userId).first();
 
     if (!item) return err('Item not found', 404);
     return ok({ item });

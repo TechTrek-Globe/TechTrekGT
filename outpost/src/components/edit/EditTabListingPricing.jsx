@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   ShoppingBag, ExternalLink, RefreshCw, Loader2,
   CheckCircle2, Search, X, Calendar, DollarSign, Unlink, Link2,
   Zap, Percent, ShieldCheck, ShieldAlert, Truck, ListChecks, ArrowRight, Lock,
-  TrendingUp, Info
+  TrendingUp, Info, Sparkles, Edit2
 } from 'lucide-react';
 import { ALL_STATUSES, LISTING_FORMATS, LISTING_STATUSES } from '../../utils/constants';
 import { LiveFeeReadout } from './LiveFeeReadout';
@@ -22,12 +22,22 @@ export function EditTabListingPricing({
   loadingEbayListings = false,
   ebaySearch = '',
   setEbaySearch,
-  liveFees
+  liveFees,
+  fetchActiveListings,
+  handlePairEbayListing,
+  item
 }) {
   const isSold = form.status === 'Sold';
   const isEbaySynced = Boolean(form.ebay_listing_id);
   const shippingCharged = parseFloat(form.buyer_shipping_cost || form.shipping_charged || 0) || 0;
   const isFreeShipping = shippingCharged === 0;
+
+  // Pairing workflow states
+  const [pairingMode, setPairingMode] = useState('browse'); // 'browse' | 'manual'
+  const [manualInput, setManualInput] = useState('');
+  const [manualError, setManualError] = useState('');
+  const [isPairingManual, setIsPairingManual] = useState(false);
+  const [showChangePicker, setShowChangePicker] = useState(false);
 
   // Compute suggested target price from target margin
   const cogs = parseFloat(form.true_total_cost) || parseFloat(form.unit_price) || 0;
@@ -46,6 +56,155 @@ export function EditTabListingPricing({
     flatFee,
     shippingCharged
   );
+
+  // Robust string normalizer: strips accents (e.g. Acuña -> Acuna) and removes punctuation
+  const normalizeText = (str) =>
+    (str || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+  // Extract 12-digit eBay item ID from raw numbers or full URLs
+  const extractEbayId = (input) => {
+    if (!input) return null;
+    const clean = input.trim();
+    const m = clean.match(/(?:itm\/|item=|\b)(\d{12})\b/);
+    return m ? m[1] : null;
+  };
+
+  // Smart search, ranking, and suggested match detection for active store listings
+  const { filteredListings, detectedIdMatch, hasSearchQuery, suggestedMatch } = useMemo(() => {
+    const rawQ = (ebaySearch || '').trim();
+    const itemSku = normalizeText(form.sku || item?.sku || '');
+    const athlete = normalizeText(item?.athlete_person || '');
+    const itemName = normalizeText(item?.item_name || '');
+
+    // 1. Identify suggested match when no query is typed
+    let bestSuggestion = null;
+    if (ebayListings.length > 0) {
+      const athleteTokens = athlete.split(' ').filter(t => t.length > 2);
+      const nameTokens = itemName.split(' ').filter(t => t.length > 3 && !['signed', 'autographed', 'auto', 'jersey', 'card', 'photo', 'ball', 'bat', 'helmet', 'framed'].includes(t));
+
+      let maxScore = 0;
+      let topListing = null;
+
+      ebayListings.forEach(l => {
+        const lTitle = normalizeText(l.title);
+        const lSku = normalizeText(l.sku);
+        let s = 0;
+
+        if (itemSku && lSku && itemSku === lSku) s += 500;
+        if (athlete && lTitle.includes(athlete)) s += 300;
+        else if (athleteTokens.length > 0) {
+          const matched = athleteTokens.filter(tok => lTitle.includes(tok));
+          if (matched.length === athleteTokens.length) s += 250;
+          else if (matched.length > 0) s += matched.length * 60;
+        }
+
+        if (nameTokens.length > 0) {
+          const matchedNameTokens = nameTokens.filter(tok => lTitle.includes(tok));
+          s += matchedNameTokens.length * 20;
+        }
+
+        if (s > maxScore) {
+          maxScore = s;
+          topListing = l;
+        }
+      });
+
+      if (maxScore >= 100) {
+        bestSuggestion = topListing;
+      }
+    }
+
+    if (!rawQ) {
+      return {
+        filteredListings: ebayListings,
+        detectedIdMatch: null,
+        hasSearchQuery: false,
+        suggestedMatch: bestSuggestion
+      };
+    }
+
+    const detectedId = extractEbayId(rawQ);
+    const normalizedQ = normalizeText(rawQ);
+    const searchTokens = normalizedQ.split(' ').filter(t => t.length > 0);
+
+    const scored = ebayListings.map(listing => {
+      const listingTitle = normalizeText(listing.title);
+      const listingSku = normalizeText(listing.sku);
+      const listingId = String(listing.listing_id || '').trim();
+      let score = 0;
+
+      // 1. Direct 12-digit ID match
+      if (detectedId && listingId === detectedId) {
+        score += 500;
+      } else if (rawQ && listingId.includes(rawQ)) {
+        score += 300;
+      }
+
+      // 2. Exact or partial SKU match
+      if (itemSku && listingSku === itemSku) {
+        score += 400;
+      } else if (listingSku && normalizedQ && (listingSku.includes(normalizedQ) || normalizedQ.includes(listingSku))) {
+        score += 200;
+      }
+
+      // 3. Normalized phrase match
+      if (listingTitle.includes(normalizedQ)) {
+        score += 150;
+      }
+
+      // 4. Token-based word matches
+      if (searchTokens.length > 0) {
+        const matchedTokens = searchTokens.filter(token => listingTitle.includes(token));
+        if (matchedTokens.length === searchTokens.length) {
+          score += 100;
+        } else if (matchedTokens.length > 0) {
+          score += (matchedTokens.length / searchTokens.length) * 60;
+        }
+      }
+
+      return { listing, score };
+    });
+
+    const matches = scored
+      .filter(entry => entry.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .map(entry => entry.listing);
+
+    return {
+      filteredListings: matches,
+      detectedIdMatch: detectedId,
+      hasSearchQuery: true,
+      suggestedMatch: null
+    };
+  }, [ebayListings, ebaySearch, form.sku, item]);
+
+  // Execute pairing action
+  const executePair = async (listingOrId) => {
+    if (handlePairEbayListing) {
+      await handlePairEbayListing(listingOrId);
+    } else {
+      let id = '';
+      let rate = null;
+      if (typeof listingOrId === 'object' && listingOrId !== null) {
+        id = listingOrId.listing_id;
+        rate = listingOrId.promoted_rate;
+        updateField('ebay_listing_id', id);
+        if (listingOrId.price != null) updateField('current_list_price', Number(listingOrId.price).toFixed(2));
+        if (listingOrId.sku && !form.sku) updateField('sku', listingOrId.sku);
+      } else {
+        id = String(listingOrId).trim();
+        updateField('ebay_listing_id', id);
+      }
+      if (handleSyncWithEbay) await handleSyncWithEbay(id, rate);
+    }
+    setShowChangePicker(false);
+  };
 
   return (
     <div className="space-y-4">
@@ -70,43 +229,66 @@ export function EditTabListingPricing({
           )}
         </div>
 
-        {isEbaySynced ? (
+        {isEbaySynced && !showChangePicker ? (
+          /* CONNECTED STATE */
           <div className="p-3.5 rounded-xl bg-emerald-950/20 border border-emerald-500/30 flex items-center justify-between gap-4 flex-wrap sm:flex-nowrap">
-            <div className="space-y-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                <span className="text-xs font-bold text-emerald-300">Live eBay Store Listing Connected</span>
-                <span className="text-[10px] text-slate-400 font-mono">({form.status || 'Active'})</span>
+            <div className="flex items-center gap-3 min-w-0">
+              {(form.ebay_image_url || form.image_url) && (
+                <div className="w-12 h-12 rounded-lg bg-slate-950 border border-emerald-500/30 overflow-hidden flex-shrink-0">
+                  <img
+                    src={form.ebay_image_url || form.image_url}
+                    alt="Listing thumbnail"
+                    className="w-full h-full object-cover"
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                  />
+                </div>
+              )}
+              <div className="space-y-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                  <span className="text-xs font-bold text-emerald-300">Live eBay Store Listing Connected</span>
+                  <span className="text-[10px] text-slate-400 font-mono">({form.status || 'Active'})</span>
+                </div>
+                <p className="text-xs text-slate-300 font-mono flex items-center gap-2 flex-wrap">
+                  <span>Listing ID: <strong className="text-white font-bold">#{form.ebay_listing_id}</strong></span>
+                  {Number(form.ebay_promoted_rate) > 0 && (
+                    <span className="text-amber-300 font-bold">• {form.ebay_promoted_rate}% Promoted Ad</span>
+                  )}
+                  {form.current_list_price && (
+                    <span className="text-emerald-400 font-bold">• ${Number(form.current_list_price).toFixed(2)} Listed</span>
+                  )}
+                </p>
+                <a
+                  href={`https://www.ebay.com/itm/${form.ebay_listing_id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-[11px] text-amber-400 hover:text-amber-300 underline pt-0.5"
+                >
+                  <ExternalLink className="w-3 h-3" /> View live listing on eBay.com ↗
+                </a>
               </div>
-              <p className="text-xs text-slate-300 font-mono flex items-center gap-2 flex-wrap">
-                <span>Listing ID: <strong className="text-white font-bold">{form.ebay_listing_id}</strong></span>
-                {Number(form.ebay_promoted_rate) > 0 && (
-                  <span className="text-amber-300 font-bold">• {form.ebay_promoted_rate}% Promoted Ad</span>
-                )}
-                {form.current_list_price && (
-                  <span className="text-emerald-400 font-bold">• ${Number(form.current_list_price).toFixed(2)} Listed</span>
-                )}
-              </p>
-              <a
-                href={`https://www.ebay.com/itm/${form.ebay_listing_id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-[11px] text-amber-400 hover:text-amber-300 underline pt-0.5"
-              >
-                <ExternalLink className="w-3 h-3" /> View live listing on eBay.com ↗
-              </a>
             </div>
 
             <div className="flex items-center gap-2 flex-shrink-0">
               <button
                 type="button"
                 disabled={syncingEbay}
-                onClick={handleSyncWithEbay}
+                onClick={() => handleSyncWithEbay && handleSyncWithEbay()}
                 className="px-3 py-1.5 rounded-xl text-xs font-semibold text-emerald-300 hover:text-white bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 transition-all flex items-center gap-1.5 disabled:opacity-50"
                 title="Sync title, price, status, shipping and ad rate from live eBay API"
               >
                 {syncingEbay ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
                 <span>{syncingEbay ? 'Syncing...' : 'Sync Live Data'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowChangePicker(true)}
+                className="px-3 py-1.5 rounded-xl text-xs font-semibold text-amber-400 hover:text-white bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 transition-all flex items-center gap-1"
+                title="Change or re-pair eBay listing"
+              >
+                <Edit2 className="w-3.5 h-3.5" />
+                <span>Change</span>
               </button>
 
               <button
@@ -121,103 +303,381 @@ export function EditTabListingPricing({
             </div>
           </div>
         ) : (
-          <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 space-y-3">
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-400">Not currently linked to an active eBay store listing.</span>
-              <span className="text-[11px] text-amber-400 font-semibold">Select an active listing to pair</span>
-            </div>
-
-            {/* Active eBay Listings Browser */}
-            <div className="space-y-2">
-              <div className="relative">
-                <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-2.5" />
-                <input
-                  type="text"
-                  value={ebaySearch}
-                  onChange={e => setEbaySearch(e.target.value)}
-                  placeholder="Filter your active eBay store listings by title, SKU, or item ID..."
-                  className="w-full pl-8 pr-7 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
-                />
-                {ebaySearch && (
+          /* PAIRING WORKFLOW HUB */
+          <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-slate-300 font-semibold">
+                  {isEbaySynced ? 'Change Paired eBay Listing' : 'Pair with Active eBay Listing'}
+                </span>
+                {isEbaySynced && (
                   <button
                     type="button"
-                    onClick={() => setEbaySearch('')}
-                    className="absolute right-2 top-2 text-slate-500 hover:text-slate-300 text-xs p-0.5"
+                    onClick={() => setShowChangePicker(false)}
+                    className="text-[11px] text-slate-400 hover:text-white underline ml-2"
                   >
-                    <X className="w-3 h-3" />
+                    Cancel
                   </button>
                 )}
               </div>
 
-              {loadingEbayListings ? (
-                <div className="py-4 flex items-center justify-center gap-2 text-xs text-slate-400">
-                  <Loader2 className="w-4 h-4 animate-spin text-amber-400" />
-                  <span>Loading active eBay store listings...</span>
+              {/* Mode Switcher & Refresh Button */}
+              <div className="flex items-center gap-1.5">
+                <div className="p-0.5 rounded-lg bg-slate-900 border border-slate-800 flex items-center text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setPairingMode('browse')}
+                    className={`px-2.5 py-1 rounded-md font-medium transition-all ${
+                      pairingMode === 'browse'
+                        ? 'bg-amber-500 text-slate-950 font-bold shadow-sm'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Browse Store ({ebayListings.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPairingMode('manual')}
+                    className={`px-2.5 py-1 rounded-md font-medium transition-all ${
+                      pairingMode === 'manual'
+                        ? 'bg-amber-500 text-slate-950 font-bold shadow-sm'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Enter ID / URL
+                  </button>
                 </div>
-              ) : ebayListings && ebayListings.length > 0 ? (
-                <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1 scrollbar-thin scrollbar-thumb-slate-800">
-                  {ebayListings
-                    .filter(l => {
-                      if (!ebaySearch) return true;
-                      const q = ebaySearch.toLowerCase();
-                      return (
-                        (l.title && l.title.toLowerCase().includes(q)) ||
-                        (l.listing_id && l.listing_id.includes(q)) ||
-                        (l.sku && l.sku.toLowerCase().includes(q))
-                      );
-                    })
-                    .slice(0, 20)
-                    .map(l => (
-                      <div
-                        key={l.listing_id}
-                        className="p-2 rounded-lg bg-slate-900 hover:bg-slate-800/80 border border-slate-800 hover:border-amber-500/30 flex items-center justify-between gap-3 text-xs transition-colors"
+
+                {fetchActiveListings && (
+                  <button
+                    type="button"
+                    disabled={loadingEbayListings}
+                    onClick={() => fetchActiveListings()}
+                    className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-amber-400 transition-colors disabled:opacity-50"
+                    title="Reload active eBay store listings"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${loadingEbayListings ? 'animate-spin text-amber-400' : ''}`} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* MODE A: BROWSE & SEARCH STORE LISTINGS */}
+            {pairingMode === 'browse' && (
+              <div className="space-y-2.5">
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-2.5" />
+                  <input
+                    type="text"
+                    value={ebaySearch}
+                    onChange={e => setEbaySearch(e.target.value)}
+                    placeholder="Search by athlete, title, SKU, or paste eBay Item ID..."
+                    className="w-full pl-8 pr-20 py-2 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                  />
+                  <div className="absolute right-2 top-2 flex items-center gap-1">
+                    {hasSearchQuery && (
+                      <span className="text-[10px] font-mono text-slate-400 px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700">
+                        {filteredListings.length} found
+                      </span>
+                    )}
+                    {ebaySearch && (
+                      <button
+                        type="button"
+                        onClick={() => setEbaySearch('')}
+                        className="text-slate-500 hover:text-slate-300 text-xs p-0.5"
+                        title="Clear search"
                       >
-                        <div className="min-w-0 flex-1">
-                          <p className="font-semibold text-slate-200 truncate">{l.title}</p>
-                          <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-0.5 font-mono">
-                            <span>ID: #{l.listing_id}</span>
-                            {l.sku && <span>SKU: {l.sku}</span>}
-                            {l.price != null && (
-                              <span className="text-emerald-400 font-bold">${Number(l.price).toFixed(2)}</span>
-                            )}
-                            {l.promoted_rate != null && l.promoted_rate > 0 && (
-                              <span className="text-amber-400 font-semibold">{l.promoted_rate}% Ad</span>
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Detected ID Quick-Pair Shortcut if user typed/pasted a 12-digit number */}
+                {detectedIdMatch && (
+                  <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-2 text-xs">
+                    <span className="text-amber-300 font-medium">
+                      Detected eBay Item ID: <strong className="text-white font-mono">#{detectedIdMatch}</strong>
+                    </span>
+                    <button
+                      type="button"
+                      disabled={syncingEbay}
+                      onClick={() => executePair(detectedIdMatch)}
+                      className="px-3 py-1 rounded-md font-bold bg-amber-500 text-slate-950 hover:bg-amber-400 transition-colors flex items-center gap-1 text-[11px]"
+                    >
+                      <Zap className="w-3 h-3" />
+                      <span>Pair ID #{detectedIdMatch}</span>
+                    </button>
+                  </div>
+                )}
+
+                {loadingEbayListings ? (
+                  <div className="py-8 flex flex-col items-center justify-center gap-2 text-xs text-slate-400">
+                    <Loader2 className="w-5 h-5 animate-spin text-amber-400" />
+                    <span>Loading active eBay store listings...</span>
+                  </div>
+                ) : (
+                  <>
+                    {/* Zero-result empty state banner with fail-safe fallback */}
+                    {hasSearchQuery && filteredListings.length === 0 && (
+                      <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 text-center space-y-2">
+                        <p className="text-xs text-slate-300">
+                          No active listings matched <strong className="text-amber-400">"{ebaySearch}"</strong>
+                        </p>
+                        <div className="flex items-center justify-center gap-2 flex-wrap">
+                          <button
+                            type="button"
+                            onClick={() => setEbaySearch('')}
+                            className="px-3 py-1 rounded-lg text-xs font-semibold bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 border border-amber-500/30 transition-colors"
+                          >
+                            Clear search to show all {ebayListings.length} listings
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPairingMode('manual');
+                              const extracted = extractEbayId(ebaySearch);
+                              if (extracted) setManualInput(extracted);
+                            }}
+                            className="px-3 py-1 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:text-white border border-slate-700 transition-colors"
+                          >
+                            Enter Item ID manually
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Top Suggested Match Highlight Card (When detected and no active search) */}
+                    {!hasSearchQuery && suggestedMatch && (
+                      <div className="p-3 rounded-xl bg-amber-500/10 border-2 border-amber-500/40 shadow-sm space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5 text-xs font-bold text-amber-400">
+                            <Sparkles className="w-4 h-4 text-amber-400" />
+                            <span>✨ Suggested Match for "{item?.athlete_person || item?.item_name || 'This Item'}"</span>
+                          </div>
+                          <span className="text-[10px] font-mono font-bold text-amber-300 bg-amber-500/20 border border-amber-500/30 px-2 py-0.5 rounded-full">
+                            Top Match
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-3 text-xs bg-slate-950/70 p-2.5 rounded-lg border border-amber-500/20">
+                          {/* Photo */}
+                          <div className="w-12 h-12 rounded-lg bg-slate-900 border border-slate-700 flex-shrink-0 overflow-hidden flex items-center justify-center">
+                            {suggestedMatch.image_url ? (
+                              <img
+                                src={suggestedMatch.image_url}
+                                alt={suggestedMatch.title}
+                                className="w-full h-full object-cover"
+                                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                              />
+                            ) : (
+                              <ShoppingBag className="w-5 h-5 text-slate-500" />
                             )}
                           </div>
+
+                          {/* Info */}
+                          <div className="min-w-0 flex-1 space-y-1">
+                            <p className="font-semibold text-white truncate text-xs">{suggestedMatch.title}</p>
+                            <div className="flex items-center gap-2 text-[11px] font-mono text-slate-300 flex-wrap">
+                              <span>ID: <strong className="text-amber-300">#{suggestedMatch.listing_id}</strong></span>
+                              {suggestedMatch.sku && <span>SKU: <strong className="text-slate-200">{suggestedMatch.sku}</strong></span>}
+                              {suggestedMatch.price != null && (
+                                <span className="text-emerald-400 font-bold">${Number(suggestedMatch.price).toFixed(2)}</span>
+                              )}
+                              {suggestedMatch.is_free_shipping ? (
+                                <span className="text-blue-400 font-medium">Free Shipping</span>
+                              ) : suggestedMatch.buyer_shipping_cost > 0 ? (
+                                <span className="text-slate-400">+${Number(suggestedMatch.buyer_shipping_cost).toFixed(2)} Ship</span>
+                              ) : null}
+                              {suggestedMatch.promoted_rate > 0 && (
+                                <span className="text-amber-400 font-semibold">{suggestedMatch.promoted_rate}% Ad</span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* 1-Click Pair Button */}
+                          <button
+                            type="button"
+                            disabled={syncingEbay}
+                            onClick={() => executePair(suggestedMatch)}
+                            className="px-3.5 py-2 rounded-lg text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition-all flex items-center gap-1.5 flex-shrink-0 shadow-md disabled:opacity-50"
+                          >
+                            <Link2 className="w-4 h-4" />
+                            <span>Pair This Match</span>
+                          </button>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            updateField('ebay_listing_id', l.listing_id);
-                            if (l.price != null && !form.current_list_price) {
-                              updateField('current_list_price', Number(l.price).toFixed(2));
-                            }
-                            if (l.sku && !form.sku) {
-                              updateField('sku', l.sku);
-                            }
-                            if (l.promoted_rate != null && l.promoted_rate > 0) {
-                              updateField('ebay_promoted_rate', String(l.promoted_rate));
-                            }
-                            if (l.buyer_shipping_cost != null && l.buyer_shipping_cost > 0) {
-                              updateField('buyer_shipping_cost', String(l.buyer_shipping_cost));
-                            } else if (l.is_free_shipping) {
-                              updateField('buyer_shipping_cost', '0.00');
-                            }
-                          }}
-                          className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 border border-amber-500/30 transition-all flex items-center gap-1 flex-shrink-0"
-                        >
-                          <Link2 className="w-3 h-3" />
-                          <span>Link Item</span>
-                        </button>
                       </div>
-                    ))}
+                    )}
+
+                    {/* Listings Display: shows filtered listings or all listings if search is empty/fallback */}
+                    {((hasSearchQuery && filteredListings.length > 0) || (!hasSearchQuery && ebayListings.length > 0) || (hasSearchQuery && filteredListings.length === 0 && ebayListings.length > 0)) && (
+                      <div className="space-y-1.5">
+                        <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between pt-1">
+                          <span>{hasSearchQuery ? `Filtered Listings (${filteredListings.length}):` : `All Active Store Listings (${ebayListings.length}):`}</span>
+                          {!hasSearchQuery && (
+                            <span className="text-[10px] text-slate-500 lowercase font-normal">showing all active items in your eBay store</span>
+                          )}
+                        </div>
+                        <div className="max-h-64 sm:max-h-72 overflow-y-auto space-y-2 pr-1 scrollbar-thin scrollbar-thumb-slate-800">
+                          {(hasSearchQuery && filteredListings.length > 0 ? filteredListings : ebayListings)
+                            .slice(0, 50)
+                            .map(l => {
+                              const itemSku = (form.sku || item?.sku || '').trim().toLowerCase();
+                              const listingSku = (l.sku || '').trim().toLowerCase();
+                              const isExactSku = Boolean(itemSku && listingSku && itemSku === listingSku);
+
+                              return (
+                                <div
+                                  key={l.listing_id || l.sku}
+                                  className={`p-3 rounded-xl bg-slate-900/90 hover:bg-slate-850 border transition-all flex items-center justify-between gap-3 text-xs ${
+                                    isExactSku ? 'border-amber-500/50 bg-amber-500/5' : 'border-slate-800 hover:border-slate-700'
+                                  }`}
+                                >
+                                  {/* Listing Photo Thumbnail */}
+                                  <div className="w-12 h-12 rounded-lg bg-slate-950 border border-slate-800 flex-shrink-0 overflow-hidden flex items-center justify-center">
+                                    {l.image_url ? (
+                                      <img
+                                        src={l.image_url}
+                                        alt={l.title}
+                                        className="w-full h-full object-cover"
+                                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                      />
+                                    ) : (
+                                      <ShoppingBag className="w-5 h-5 text-slate-600" />
+                                    )}
+                                  </div>
+
+                                  {/* Listing Info */}
+                                  <div className="min-w-0 flex-1 space-y-1">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <p className="font-semibold text-slate-100 truncate">{l.title}</p>
+                                      {isExactSku && (
+                                        <span className="text-[10px] font-bold text-amber-400 bg-amber-500/20 border border-amber-500/30 px-1.5 py-0.5 rounded">
+                                          SKU Match
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-2.5 text-[11px] text-slate-400 font-mono flex-wrap">
+                                      <span className="text-slate-300">ID: <strong className="text-white">#{l.listing_id}</strong></span>
+                                      {l.sku && <span>SKU: <strong className="text-amber-300">{l.sku}</strong></span>}
+                                      {l.price != null && (
+                                        <span className="text-emerald-400 font-bold">${Number(l.price).toFixed(2)}</span>
+                                      )}
+                                      {l.is_free_shipping ? (
+                                        <span className="text-blue-400 font-medium">Free Shipping</span>
+                                      ) : l.buyer_shipping_cost > 0 ? (
+                                        <span className="text-slate-400">+${Number(l.buyer_shipping_cost).toFixed(2)} Ship</span>
+                                      ) : null}
+                                      {l.promoted_rate > 0 && (
+                                        <span className="text-amber-400 font-semibold">{l.promoted_rate}% Ad</span>
+                                      )}
+                                      {l.listing_id && (
+                                        <a
+                                          href={`https://www.ebay.com/itm/${l.listing_id}`}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-amber-400 hover:text-amber-300 underline font-sans text-[10px] flex items-center gap-0.5"
+                                          onClick={(e) => e.stopPropagation()}
+                                        >
+                                          <ExternalLink className="w-2.5 h-2.5" /> View on eBay ↗
+                                        </a>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* Pair Button */}
+                                  <button
+                                    type="button"
+                                    disabled={syncingEbay}
+                                    onClick={() => executePair(l)}
+                                    className="px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition-all flex items-center gap-1.5 flex-shrink-0 shadow-sm disabled:opacity-50"
+                                  >
+                                    <Link2 className="w-3.5 h-3.5" />
+                                    <span>Pair with Item</span>
+                                  </button>
+                                </div>
+                              );
+                            })}
+                        </div>
+                      </div>
+                    )}
+
+                    {ebayListings.length === 0 && (
+                      <div className="py-6 text-center text-xs text-slate-400 space-y-2">
+                        <p>No active listings returned from your eBay store.</p>
+                        <p className="text-[11px] text-slate-500">
+                          If this item was listed recently, click the refresh button above or switch to "Enter ID / URL" mode.
+                        </p>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* MODE B: MANUAL ITEM ID OR URL ENTRY */}
+            {pairingMode === 'manual' && (
+              <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-3">
+                <div className="space-y-1">
+                  <label className="text-xs text-slate-200 font-semibold flex items-center gap-1.5">
+                    <Zap className="w-3.5 h-3.5 text-amber-400" />
+                    Enter 12-Digit eBay Item ID or Listing URL
+                  </label>
+                  <p className="text-[11px] text-slate-400">
+                    Paste the 12-digit numeric Item ID (e.g. <span className="font-mono text-slate-300">196351234567</span>) or the full eBay listing URL from your browser address bar.
+                  </p>
                 </div>
-              ) : (
-                <div className="py-2 text-center text-xs text-slate-500">
-                  <span>No active eBay listings found. Enter an eBay Listing ID manually if needed.</span>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={manualInput}
+                    onChange={(e) => {
+                      setManualInput(e.target.value);
+                      setManualError('');
+                    }}
+                    placeholder="e.g. 196351234567 or https://www.ebay.com/itm/196351234567..."
+                    className="flex-1 px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 font-mono"
+                  />
+                  <button
+                    type="button"
+                    disabled={syncingEbay || isPairingManual || !manualInput.trim()}
+                    onClick={async () => {
+                      const cleanId = extractEbayId(manualInput);
+                      if (!cleanId) {
+                        setManualError('Please enter a valid 12-digit eBay Item ID or paste an eBay item URL.');
+                        return;
+                      }
+                      setIsPairingManual(true);
+                      setManualError('');
+                      try {
+                        await executePair(cleanId);
+                        setManualInput('');
+                      } catch (e) {
+                        setManualError(e.message || 'Failed to pair with eBay listing ID.');
+                      } finally {
+                        setIsPairingManual(false);
+                      }
+                    }}
+                    className="px-4 py-2 rounded-lg text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition-all flex items-center gap-1.5 flex-shrink-0 disabled:opacity-50"
+                  >
+                    {syncingEbay || isPairingManual ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Zap className="w-3.5 h-3.5" />
+                    )}
+                    <span>Pair & Fetch Live Data</span>
+                  </button>
                 </div>
-              )}
-            </div>
+
+                {manualError && (
+                  <p className="text-xs text-red-400 flex items-center gap-1">
+                    <Info className="w-3.5 h-3.5 flex-shrink-0" />
+                    <span>{manualError}</span>
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

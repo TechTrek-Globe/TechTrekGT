@@ -61,6 +61,17 @@ async function encryptToken(plaintext, jwtSecret) {
   return `${bufToBase64(iv)}.${bufToBase64(cipherBuf)}`;
 }
 
+// --- URL Normalization ---
+
+export function normalizeHttps(url) {
+  if (!url || typeof url !== 'string') return null;
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith('//')) return `https:${trimmed}`;
+  if (/^http:\/\//i.test(trimmed)) return trimmed.replace(/^http:\/\//i, 'https://');
+  return trimmed;
+}
+
 // --- eBay endpoint resolution ---
 
 function isEbaySandbox(env) {
@@ -190,10 +201,11 @@ export async function fetchEbayActiveSellerListings(env, accessToken) {
   try {
     const xmlReq = `<?xml version="1.0" encoding="utf-8"?>
 <GetMyeBaySellingRequest xmlns="urn:ebay:apis:eBLBaseComponents">
+  <DetailLevel>ReturnAll</DetailLevel>
   <ActiveList>
     <Include>true</Include>
     <Pagination>
-      <EntriesPerPage>100</EntriesPerPage>
+      <EntriesPerPage>200</EntriesPerPage>
       <PageNumber>1</PageNumber>
     </Pagination>
   </ActiveList>
@@ -244,10 +256,11 @@ export async function fetchEbayActiveSellerListings(env, accessToken) {
             if (dm) shipCost = parseFloat(dm[1]) || 0;
           }
         }
-        // Extract gallery image if present
+        // Extract gallery or picture image if present
         const galleryMatch = block.match(/<GalleryURL[^>]*>(.*?)<\/GalleryURL>/i) ||
-                             block.match(/<PictureURL[^>]*>(.*?)<\/PictureURL>/i);
-        const galleryUrl = galleryMatch ? galleryMatch[1].trim() : null;
+                             block.match(/<PictureURL[^>]*>(.*?)<\/PictureURL>/i) ||
+                             block.match(/<PictureDetails>[\s\S]*?<PictureURL[^>]*>(.*?)<\/PictureURL>/i);
+        const galleryUrl = galleryMatch ? normalizeHttps(galleryMatch[1].trim()) : null;
 
         if (listingId || title) {
           const key = listingId || sku || title;
@@ -304,6 +317,7 @@ export async function fetchEbayActiveSellerListings(env, accessToken) {
                 price: parseFloat(offer?.pricingSummary?.price?.value || '0'),
                 quantity: inv.availability?.shipToLocationAvailability?.quantity || 1,
                 status: offer?.status || 'Active',
+                image_url: normalizeHttps(inv.product?.imageUrls?.[0]) || null,
                 listing_url: listingId ? `https://www.ebay.com/itm/${listingId}` : null
               });
             }
@@ -448,13 +462,14 @@ export async function fetchSingleEbayListing(env, accessToken, listingId) {
       const listingType = getTag('ListingType') || 'FixedPriceItem';
 
       // Picture / Image details
-      const galleryUrl = getTag('GalleryURL');
+      const galleryUrl = normalizeHttps(getTag('GalleryURL'));
       const pictureUrls = [];
       const picRegex = /<PictureURL[^>]*>(.*?)<\/PictureURL>/g;
       let pMatch;
       while ((pMatch = picRegex.exec(xmlText)) !== null) {
         if (pMatch[1] && pMatch[1].trim()) {
-          pictureUrls.push(pMatch[1].trim());
+          const norm = normalizeHttps(pMatch[1].trim());
+          if (norm) pictureUrls.push(norm);
         }
       }
       const imageUrl = pictureUrls[0] || galleryUrl || null;

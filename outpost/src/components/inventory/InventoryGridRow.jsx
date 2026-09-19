@@ -87,10 +87,10 @@ export function InventoryGridRow({
               {updating ? <Loader2 className="w-3 h-3 animate-spin text-cyan-400" /> : <RefreshCw className="w-3 h-3" />}
             </button>
 
-            {/* Quick Edit Drawer Button */}
+            {/* Quick Edit & Details Button */}
             <button
-              onClick={() => onOpenQuickEdit && onOpenQuickEdit(item)}
-              title="Open Quick Edit & Pricing Drawer"
+              onClick={() => (onOpenEditModal ? onOpenEditModal(item) : (onOpenQuickEdit && onOpenQuickEdit(item)))}
+              title="Open Item Details & Quick Edit"
               className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-amber-400 hover:bg-amber-500/15 transition-all"
             >
               <Edit3 className="w-3 h-3" />
@@ -151,15 +151,13 @@ export function InventoryGridRow({
             maxWidth: `${columnWidths.item_name || 220}px`,
             left: `${actionsWidth}px`
           }}
-          className={`px-3 py-1.5 border-r border-slate-800/60 transition-colors overflow-hidden text-xs sticky z-10 ${stickyBg} group-hover:bg-[#1a263d] shadow-r`}
+          className={`px-3 py-1.5 border-r border-slate-800/60 transition-colors overflow-hidden text-xs sticky z-10 ${stickyBg} group-hover:bg-[#1a263d] shadow-r cursor-pointer`}
+          onMouseEnter={(e) => onShowTooltip && onShowTooltip('item_image', item, e)}
+          onMouseLeave={() => onHideTooltip && onHideTooltip()}
+          onClick={() => onOpenEditModal && onOpenEditModal(item)}
+          title="Click to view & edit full item details"
         >
-          <div
-            onClick={() => onOpenEditModal && onOpenEditModal(item)}
-            onMouseEnter={(e) => onShowTooltip && onShowTooltip('item_image', item, e)}
-            onMouseLeave={() => onHideTooltip && onHideTooltip()}
-            className="group/name cursor-pointer flex items-center justify-between gap-1.5 hover:bg-slate-800/60 rounded px-1 -mx-1 py-0.5 transition-colors"
-            title="Click to view & edit full item details"
-          >
+          <div className="group/name flex items-center justify-between gap-1.5 hover:bg-slate-800/60 rounded px-1 -mx-1 py-0.5 transition-colors">
             <div className="flex items-center gap-1.5 truncate">
               {isVineItem && (
                 <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-teal-500/20 text-teal-300 border border-teal-500/40 flex-shrink-0 tracking-wide" title="Imported from VScout">

@@ -9,14 +9,27 @@ import { saveComp, fetchLiveComps } from '../../utils/auctionApi';
 import { FeeBreakdownPanel } from './FeeBreakdownPanel';
 import { computeFeeBreakdown } from '../../utils/feeEngine';
 
+function normalizeHttps(url) {
+  if (!url || typeof url !== 'string') return null;
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith('//')) return `https:${trimmed}`;
+  if (/^http:\/\//i.test(trimmed)) return trimmed.replace(/^http:\/\//i, 'https://');
+  return trimmed;
+}
+
 export function PricingCard({
   item,
   onOpenCopyModal,
   onOpenQueryEdit,
   onItemUpdated,
   onOpenQuickEdit,
-  onOpenListingIdModal
+  onOpenListingIdModal,
+  onOpenEditModal
 }) {
+  const [imgError, setImgError] = useState(false);
+  const imageUrl = normalizeHttps(item.image_url);
+
   const initDraft = () => ({
     comp_1: item.comp_1 !== null && item.comp_1 !== undefined ? roundPrice(item.comp_1) : '',
     comp_2: item.comp_2 !== null && item.comp_2 !== undefined ? roundPrice(item.comp_2) : '',
@@ -140,14 +153,24 @@ export function PricingCard({
         <div className="flex gap-3">
           {/* Image */}
           <div className="w-14 h-14 rounded-xl bg-slate-950 border border-slate-800 flex-shrink-0 overflow-hidden flex items-center justify-center">
-            {item.image_url ? (
-              <img src={item.image_url} alt="Item" className="w-full h-full object-cover" loading="lazy" />
+            {imageUrl && !imgError ? (
+              <img
+                src={imageUrl}
+                alt="Item"
+                className="w-full h-full object-cover"
+                loading="lazy"
+                onError={() => setImgError(true)}
+              />
             ) : (
               <span className="text-[9px] text-slate-600 font-medium">No Img</span>
             )}
           </div>
           <div className="flex-1 min-w-0 flex flex-col justify-center">
-            <h3 className="text-xs font-bold text-white leading-tight truncate">
+            <h3
+              onClick={() => (onOpenEditModal ? onOpenEditModal(item) : (onOpenQuickEdit && onOpenQuickEdit(item)))}
+              className="text-xs font-bold text-white leading-tight truncate hover:text-amber-400 hover:underline cursor-pointer transition-colors"
+              title="Click to view & edit full item details"
+            >
               {cleanItemDescription(item.item_name, item.athlete_person, item.authenticator)}
             </h3>
             {item.athlete_person && (
@@ -175,11 +198,11 @@ export function PricingCard({
             </div>
           </div>
 
-          {/* Quick Drawer trigger */}
+          {/* Quick Edit trigger */}
           <button
-            onClick={() => onOpenQuickEdit && onOpenQuickEdit(item)}
-            className="w-7 h-7 rounded-lg bg-slate-800/80 hover:bg-amber-500/20 text-slate-400 hover:text-amber-400 flex items-center justify-center transition-colors flex-shrink-0"
-            title="Open Quick Edit Drawer"
+            onClick={() => (onOpenEditModal ? onOpenEditModal(item) : (onOpenQuickEdit && onOpenQuickEdit(item)))}
+            className="w-7 h-7 rounded-lg bg-slate-800/80 hover:bg-amber-500/20 text-slate-400 hover:text-amber-400 flex items-center justify-center transition-colors flex-shrink-0 cursor-pointer"
+            title="Open Item Details & Quick Edit"
           >
             <Edit3 className="w-3.5 h-3.5" />
           </button>

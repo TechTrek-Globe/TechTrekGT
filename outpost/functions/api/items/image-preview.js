@@ -1,5 +1,5 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
-import { getEbayUserToken, fetchSingleEbayListing } from '../ebay/tokenHelper.js';
+import { getEbayUserToken, fetchSingleEbayListing, normalizeHttps } from '../ebay/tokenHelper.js';
 
 /**
  * GET /api/items/image-preview
@@ -37,8 +37,11 @@ export async function onRequestGet(context) {
 
         if (item.attributes) {
           try {
-            attrs = typeof item.attributes === 'string' ? JSON.parse(item.attributes) : item.attributes;
-          } catch (_) {}
+            const parsed = typeof item.attributes === 'string' ? JSON.parse(item.attributes) : item.attributes;
+            attrs = (parsed && typeof parsed === 'object') ? parsed : {};
+          } catch (_) {
+            attrs = {};
+          }
         }
 
         if (!asin && attrs.asin) {
@@ -47,28 +50,32 @@ export async function onRequestGet(context) {
 
         // Fast path 1: attributes already has an eBay image URL
         if (attrs.ebay_image_url) {
-          return ok({ success: true, imageUrl: attrs.ebay_image_url, source: 'eBay' });
+          const normEbay = normalizeHttps(attrs.ebay_image_url);
+          if (normEbay) return ok({ success: true, imageUrl: normEbay, source: 'eBay' });
         }
 
         // Fast path 2: attributes already has an Amazon image URL
         if (attrs.image_url) {
-          return ok({ success: true, imageUrl: attrs.image_url, source: 'Amazon' });
+          const normAmz = normalizeHttps(attrs.image_url);
+          if (normAmz) return ok({ success: true, imageUrl: normAmz, source: 'Amazon' });
         }
         // Handle image_urls as a JS array or as a double-serialized JSON string
         const resolvedImageUrls = Array.isArray(attrs.image_urls)
           ? attrs.image_urls
           : (typeof attrs.image_urls === 'string' ? (() => { try { return JSON.parse(attrs.image_urls); } catch (_) { return []; } })() : []);
         if (resolvedImageUrls.length > 0 && resolvedImageUrls[0]) {
-          return ok({ success: true, imageUrl: resolvedImageUrls[0], source: 'Amazon' });
+          const normArr = normalizeHttps(resolvedImageUrls[0]);
+          if (normArr) return ok({ success: true, imageUrl: normArr, source: 'Amazon' });
         }
 
         // Fast path 3: check notes for embedded image URL
         if (item.notes) {
-          const m = item.notes.match(/Image:\s*(https?:\/\/[^\s\n\r]+)/i) ||
-                    item.notes.match(/(https?:\/\/(?:m\.media-amazon\.com|i\.ebayimg\.com)[^\s\n\r]+)/i);
+          const m = String(item.notes).match(/Image:\s*(https?:\/\/[^\s\n\r|]+)/i) ||
+                    String(item.notes).match(/(https?:\/\/(?:m\.media-amazon\.com|i\.ebayimg\.com)[^\s\n\r|]+)/i);
           if (m && m[1]) {
             const isEbay = m[1].includes('ebayimg');
-            return ok({ success: true, imageUrl: m[1], source: isEbay ? 'eBay' : 'Amazon' });
+            const normNotes = normalizeHttps(m[1]);
+            if (normNotes) return ok({ success: true, imageUrl: normNotes, source: isEbay ? 'eBay' : 'Amazon' });
           }
         }
       }
@@ -80,15 +87,16 @@ export async function onRequestGet(context) {
         const accessToken = await getEbayUserToken(env, payload.userId);
         if (accessToken) {
           const singleDetail = await fetchSingleEbayListing(env, accessToken, listingId);
-          if (singleDetail?.image_url) {
+          const normSingle = normalizeHttps(singleDetail?.image_url);
+          if (normSingle) {
             // Cache back to attributes in DB so future hovers are instant
             if (item) {
-              attrs.ebay_image_url = singleDetail.image_url;
+              attrs.ebay_image_url = normSingle;
               await env.DB.prepare(
                 `UPDATE auction_items SET attributes = ?, updated_at = datetime('now') WHERE id = ? AND user_id = ?`
               ).bind(JSON.stringify(attrs), item.id, payload.userId).run().catch(() => {});
             }
-            return ok({ success: true, imageUrl: singleDetail.image_url, source: 'eBay' });
+            return ok({ success: true, imageUrl: normSingle, source: 'eBay' });
           }
         }
       } catch (ebayErr) {
@@ -117,7 +125,8 @@ export async function onRequestGet(context) {
         if (gwRes.ok) {
           const gwData = await gwRes.json().catch(() => ({}));
           // Gateway returns `image` (singular), fallback to images[0] and image_url
-          const img = gwData.image || (Array.isArray(gwData.images) && gwData.images[0]) || gwData.image_url || null;
+          const rawImg = gwData.image || (Array.isArray(gwData.images) && gwData.images[0]) || gwData.image_url || null;
+          const img = normalizeHttps(rawImg);
           if (img) {
             if (item) {
               attrs.image_url = img;

@@ -275,6 +275,7 @@ export function InventoryDataGrid({
       {/* Floating Product Photo Tooltip (eBay or Amazon) */}
       {hoverTooltip && hoverTooltip.type === 'item_image' && (
         <ItemImageHoverTooltip
+          key={hoverTooltip.item.id || hoverTooltip.item.ebay_listing_id || hoverTooltip.item.item_name}
           target={hoverTooltip.item}
           rect={hoverTooltip.rect}
         />

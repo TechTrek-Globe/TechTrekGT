@@ -1,10 +1,117 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Loader2, ExternalLink, Package, ImageOff, ImageIcon } from 'lucide-react';
 import { getItemImagePreview } from '../../utils/auctionApi';
 
-// Global in-memory cache to prevent duplicate fetches across hovers
+// Global in-memory cache for positive image hits across hovers
 const PREVIEW_CACHE = new Map();
+
+/**
+ * Normalizes an image URL to secure HTTPS and handles protocol-relative paths.
+ */
+function normalizeHttps(url) {
+  if (!url || typeof url !== 'string') return null;
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith('//')) return `https:${trimmed}`;
+  if (/^http:\/\//i.test(trimmed)) return trimmed.replace(/^http:\/\//i, 'https://');
+  return trimmed;
+}
+
+/**
+ * Safely extracts an attributes object from an item record.
+ */
+function extractSafeAttributes(target) {
+  if (!target?.attributes) return {};
+  if (typeof target.attributes === 'object' && target.attributes !== null) {
+    return target.attributes;
+  }
+  if (typeof target.attributes === 'string') {
+    try {
+      const parsed = JSON.parse(target.attributes);
+      return (parsed && typeof parsed === 'object') ? parsed : {};
+    } catch (_) {
+      return {};
+    }
+  }
+  return {};
+}
+
+/**
+ * Synchronously resolves an image directly from the item properties, attributes, or notes.
+ * Fully aligned with the extraction hierarchy in EditModalHeader.jsx and EditTabDetails.jsx.
+ */
+function resolveItemImage(target, attrs) {
+  let rawImg = target?.image_url || target?.ebay_image_url || target?.imageUrl || null;
+  let source = null;
+
+  if (!rawImg && attrs) {
+    if (attrs.ebay_image_url) {
+      rawImg = attrs.ebay_image_url;
+      source = 'eBay';
+    } else if (attrs.image_url) {
+      rawImg = attrs.image_url;
+      source = 'Amazon';
+    } else if (Array.isArray(attrs.image_urls) && attrs.image_urls[0]) {
+      rawImg = attrs.image_urls[0];
+      source = 'Amazon';
+    } else if (typeof attrs.image_urls === 'string') {
+      try {
+        const parsed = JSON.parse(attrs.image_urls);
+        if (Array.isArray(parsed) && parsed[0]) {
+          rawImg = parsed[0];
+          source = 'Amazon';
+        }
+      } catch (_) {}
+    }
+  }
+
+  if (!rawImg && target?.notes) {
+    const m = String(target.notes).match(/Image:\s*(https?:\/\/[^\s\n\r|]+)/i) ||
+              String(target.notes).match(/(https?:\/\/(?:m\.media-amazon\.com|i\.ebayimg\.com)[^\s\n\r|]+)/i);
+    if (m && m[1]) {
+      rawImg = m[1];
+    }
+  }
+
+  const norm = normalizeHttps(rawImg);
+  if (norm) {
+    if (!source) {
+      if (norm.includes('ebayimg') || target?.ebay_listing_id) source = 'eBay';
+      else if (norm.includes('amazon') || attrs?.asin || target?.asin) source = 'Amazon';
+      else source = 'Outpost';
+    }
+    return { imageUrl: norm, source, loading: false, notFound: false };
+  }
+
+  return null;
+}
+
+function resolveSyncImage(target, attrs, cacheKey) {
+  // 1. Inspect live target record directly (highest priority)
+  const direct = resolveItemImage(target, attrs);
+  if (direct) {
+    if (cacheKey) PREVIEW_CACHE.set(cacheKey, direct);
+    return direct;
+  }
+
+  // 2. Check in-memory cache for previously confirmed positive hits
+  if (cacheKey && PREVIEW_CACHE.has(cacheKey)) {
+    const cached = PREVIEW_CACHE.get(cacheKey);
+    if (cached && cached.imageUrl) {
+      return cached;
+    }
+  }
+
+  // 3. If the item has an identifier, allow async fallback
+  const hasIdentifier = Boolean(target?.id || target?.item_id || target?.ebay_listing_id || attrs?.asin || target?.asin);
+  return {
+    imageUrl: null,
+    source: target?.ebay_listing_id ? 'eBay' : (attrs?.asin || target?.asin ? 'Amazon' : null),
+    loading: hasIdentifier,
+    notFound: !hasIdentifier
+  };
+}
 
 /**
  * Floating tooltip that displays an item's product photo (eBay or Amazon) on hover.
@@ -15,65 +122,27 @@ export function ItemImageHoverTooltip({ target, rect }) {
 
   const itemId = target.id || target.item_id;
   const ebayListingId = target.ebay_listing_id;
-  
-  // Extract attributes safely
-  let attrs = {};
-  if (target.attributes) {
-    try {
-      attrs = typeof target.attributes === 'string' ? JSON.parse(target.attributes) : target.attributes;
-    } catch (_) {}
-  }
-  const asin = attrs.asin || null;
+  const attrs = extractSafeAttributes(target);
+  const asin = attrs.asin || target.asin || null;
 
   const cacheKey = itemId || ebayListingId || asin || target.item_name;
+  const [imgError, setImgError] = useState(false);
+  const [state, setState] = useState(() => resolveSyncImage(target, attrs, cacheKey));
 
-  const [state, setState] = useState(() => {
-    // 1. Check cache first
-    if (PREVIEW_CACHE.has(cacheKey)) {
-      return PREVIEW_CACHE.get(cacheKey);
-    }
+  useEffect(() => {
+    setImgError(false);
+    const resolved = resolveSyncImage(target, attrs, cacheKey);
+    setState(resolved);
+  }, [cacheKey]);
 
-    // 2. Check synchronous fields
-    if (attrs.ebay_image_url) {
-      const data = { imageUrl: attrs.ebay_image_url, source: 'eBay', loading: false, notFound: false };
-      PREVIEW_CACHE.set(cacheKey, data);
-      return data;
+  // Secondary fallback if primary source fails to render
+  const secondaryFallback = useMemo(() => {
+    if (state.source === 'eBay') {
+      const amz = attrs.image_url || (Array.isArray(attrs.image_urls) ? attrs.image_urls[0] : null);
+      return normalizeHttps(amz);
     }
-    if (attrs.image_url) {
-      const data = { imageUrl: attrs.image_url, source: 'Amazon', loading: false, notFound: false };
-      PREVIEW_CACHE.set(cacheKey, data);
-      return data;
-    }
-    // Handle image_urls as a JS array or as a double-serialized JSON string
-    const resolvedImageUrls = Array.isArray(attrs.image_urls)
-      ? attrs.image_urls
-      : (typeof attrs.image_urls === 'string' ? (() => { try { return JSON.parse(attrs.image_urls); } catch (_) { return []; } })() : []);
-    if (resolvedImageUrls.length > 0 && resolvedImageUrls[0]) {
-      const data = { imageUrl: resolvedImageUrls[0], source: 'Amazon', loading: false, notFound: false };
-      PREVIEW_CACHE.set(cacheKey, data);
-      return data;
-    }
-    // Check top-level image_url pre-parsed by enriched.js from notes (Image: https://...)
-    if (target.image_url) {
-      const isEbay = String(target.image_url).includes('ebayimg');
-      const data = { imageUrl: target.image_url, source: isEbay ? 'eBay' : 'Amazon', loading: false, notFound: false };
-      PREVIEW_CACHE.set(cacheKey, data);
-      return data;
-    }
-    if (target.notes) {
-      const m = target.notes.match(/Image:\s*(https?:\/\/[^\s\n\r]+)/i) ||
-                target.notes.match(/(https?:\/\/(?:m\.media-amazon\.com|i\.ebayimg\.com)[^\s\n\r]+)/i);
-      if (m && m[1]) {
-        const isEbay = m[1].includes('ebayimg');
-        const data = { imageUrl: m[1], source: isEbay ? 'eBay' : 'Amazon', loading: false, notFound: false };
-        PREVIEW_CACHE.set(cacheKey, data);
-        return data;
-      }
-    }
-
-    // Otherwise initiate async fetch
-    return { imageUrl: null, source: null, loading: true, notFound: false };
-  });
+    return null;
+  }, [state.source, attrs]);
 
   useEffect(() => {
     if (!state.loading) return;
@@ -87,26 +156,24 @@ export function ItemImageHoverTooltip({ target, rect }) {
     })
       .then(res => {
         if (!isMounted) return;
-        if (res?.success && res?.imageUrl) {
+        const normUrl = normalizeHttps(res?.imageUrl);
+        if (res?.success && normUrl) {
           const loadedData = {
-            imageUrl: res.imageUrl,
+            imageUrl: normUrl,
             source: res.source || (ebayListingId ? 'eBay' : 'Amazon'),
             loading: false,
             notFound: false
           };
-          PREVIEW_CACHE.set(cacheKey, loadedData);
+          if (cacheKey) PREVIEW_CACHE.set(cacheKey, loadedData);
           setState(loadedData);
         } else {
-          const failData = { imageUrl: null, source: null, loading: false, notFound: true };
-          PREVIEW_CACHE.set(cacheKey, failData);
-          setState(failData);
+          // Do not poison the global cache with notFound; allow subsequent attempts
+          setState({ imageUrl: null, source: null, loading: false, notFound: true });
         }
       })
       .catch(() => {
         if (!isMounted) return;
-        const failData = { imageUrl: null, source: null, loading: false, notFound: true };
-        PREVIEW_CACHE.set(cacheKey, failData);
-        setState(failData);
+        setState({ imageUrl: null, source: null, loading: false, notFound: true });
       });
 
     return () => {
@@ -119,7 +186,7 @@ export function ItemImageHoverTooltip({ target, rect }) {
   const tooltipHeight = 280;
 
   // Horizontal clamp
-  let left = rect.left;
+  let left = Math.max(16, rect.left);
   if (left + tooltipWidth > window.innerWidth - 16) {
     left = Math.max(16, window.innerWidth - tooltipWidth - 16);
   }
@@ -127,13 +194,19 @@ export function ItemImageHoverTooltip({ target, rect }) {
   // Vertical placement (prefer above, flip below if not enough room)
   const spaceAbove = rect.top;
   const placeAbove = spaceAbove >= tooltipHeight + 16;
-  const top = placeAbove ? rect.top - 8 : rect.bottom + 8;
+  const top = placeAbove
+    ? Math.max(16, rect.top - 8)
+    : Math.min(window.innerHeight - tooltipHeight - 16, rect.bottom + 8);
   const transform = placeAbove ? 'translateY(-100%)' : 'none';
 
-  return createPortal(
+  const tooltipContent = (
     <div
-      className="fixed z-[9999] w-64 p-3 rounded-xl bg-slate-950/95 border border-slate-700/80 shadow-2xl backdrop-blur-md pointer-events-none animate-in fade-in zoom-in-95 duration-100"
-      style={{ top, left, transform }}
+      className="fixed z-[9999] w-64 p-3 rounded-xl bg-slate-950/95 border border-slate-700/80 shadow-2xl backdrop-blur-md pointer-events-none transition-opacity duration-100"
+      style={{
+        top: `${top}px`,
+        left: `${left}px`,
+        transform
+      }}
     >
       {/* Header with Title and Platform Badge */}
       <div className="flex items-start justify-between gap-2 mb-2">
@@ -161,16 +234,23 @@ export function ItemImageHoverTooltip({ target, rect }) {
           </div>
         )}
 
-        {!state.loading && state.imageUrl && (
+        {!state.loading && state.imageUrl && !imgError && (
           <img
             src={state.imageUrl}
-            alt={target.item_name}
+            alt={target.item_name || 'Product Photo'}
             className="w-full h-full object-contain p-1.5 rounded-lg"
             loading="eager"
+            onError={() => {
+              if (secondaryFallback && state.imageUrl !== secondaryFallback) {
+                setState(prev => ({ ...prev, imageUrl: secondaryFallback, source: 'Amazon' }));
+              } else {
+                setImgError(true);
+              }
+            }}
           />
         )}
 
-        {!state.loading && (state.notFound || !state.imageUrl) && (
+        {!state.loading && (state.notFound || !state.imageUrl || imgError) && (
           <div className="flex flex-col items-center justify-center gap-1.5 text-slate-500 p-4 text-center">
             <ImageOff className="w-6 h-6 text-slate-600" />
             <span className="text-[10px]">No photo found on eBay or Amazon</span>
@@ -182,7 +262,10 @@ export function ItemImageHoverTooltip({ target, rect }) {
       <div className="mt-2 text-center">
         <p className="text-[9px] text-slate-500 font-medium">Click item to open full details</p>
       </div>
-    </div>,
-    document.body
+    </div>
   );
+
+  return typeof document !== 'undefined' && document.body
+    ? createPortal(tooltipContent, document.body)
+    : tooltipContent;
 }

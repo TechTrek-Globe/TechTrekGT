@@ -1,5 +1,6 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
 import { cleanItemName, cleanAthleteName } from '../../utils/auction.js';
+import { normalizeHttps } from '../ebay/tokenHelper.js';
 
 /**
  * Parses the "Image: <url>" fragment out of the notes column.
@@ -8,7 +9,7 @@ import { cleanItemName, cleanAthleteName } from '../../utils/auction.js';
 function parseImageFromNotes(notes) {
   if (!notes) return null;
   const match = String(notes).match(/\bImage:\s*(https?:\/\/[^\s|]+)/i);
-  return match ? match[1].trim() : null;
+  return match ? normalizeHttps(match[1].trim()) : null;
 }
 
 /**
@@ -166,6 +167,9 @@ export async function onRequestGet(context) {
       'buy_it_now_price': 'i.buy_it_now_price'
     };
     const sortCol = SORT_COLUMN_MAP[sortByParam] || 'i.created_at';
+    const orderByClause = (sortByParam === 'created_at' && sortDirParam === 'DESC')
+      ? "ORDER BY CASE WHEN LOWER(i.status) = 'listed' THEN 0 ELSE 1 END, i.created_at DESC"
+      : `ORDER BY ${sortCol} ${sortDirParam}`;
 
     // Build dynamic WHERE clauses
     const conditions = ['i.user_id = ?'];
@@ -229,7 +233,7 @@ export async function onRequestGet(context) {
       LEFT JOIN auction_invoices inv ON inv.id = i.invoice_id
       LEFT JOIN auction_comps c ON i.id = c.item_id AND c.user_id = i.user_id
       WHERE ${whereClause}
-      ORDER BY ${sortCol} ${sortDirParam}
+      ${orderByClause}
       LIMIT ? OFFSET ?
     `).bind(...bindings, limit, offset).all();
 
@@ -263,15 +267,15 @@ export async function onRequestGet(context) {
             // Fallback: pull image_url from attributes when notes did not yield one
             if (!imageUrl) {
               if (parsed.ebay_image_url) {
-                imageUrl = parsed.ebay_image_url;
+                imageUrl = normalizeHttps(parsed.ebay_image_url);
               } else if (parsed.image_url) {
-                imageUrl = parsed.image_url;
+                imageUrl = normalizeHttps(parsed.image_url);
               } else if (parsed.image_urls) {
                 // Handle plain array or double-serialized JSON string
                 const imgs = Array.isArray(parsed.image_urls)
                   ? parsed.image_urls
                   : (() => { try { return JSON.parse(parsed.image_urls); } catch (_) { return []; } })();
-                if (Array.isArray(imgs) && imgs[0]) imageUrl = imgs[0];
+                if (Array.isArray(imgs) && imgs[0]) imageUrl = normalizeHttps(imgs[0]);
               }
             }
           }
@@ -300,7 +304,7 @@ export async function onRequestGet(context) {
         item_name: cleanItemName(row.item_name),
         athlete_person: cleanAthleteName(row.athlete_person),
         ebay_search_url: searchUrl,
-        image_url: imageUrl,
+        image_url: normalizeHttps(imageUrl),
         user_note: userNote,
         is_amazon: isAmazon,
         is_vinescout: isVineScout,

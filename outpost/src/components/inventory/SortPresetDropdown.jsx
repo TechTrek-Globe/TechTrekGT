@@ -11,7 +11,7 @@ export function SortPresetDropdown({ sortPreset, onSelectPreset }) {
         onChange={e => onSelectPreset(e.target.value)}
         className="bg-transparent text-slate-200 outline-none cursor-pointer text-xs font-semibold"
       >
-        <option value="default" className="bg-slate-900 text-slate-200">Recent Added</option>
+        <option value="default" className="bg-slate-900 text-slate-200">Listed First (Recent)</option>
         <option value="margin-desc" className="bg-slate-900 text-slate-200">Highest Margin (%)</option>
         <option value="margin-asc" className="bg-slate-900 text-slate-200">Lowest Margin (%)</option>
         <option value="price-desc" className="bg-slate-900 text-slate-200">Price: High to Low</option>

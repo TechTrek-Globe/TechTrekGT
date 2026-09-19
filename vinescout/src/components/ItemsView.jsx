@@ -22,7 +22,7 @@ export default function ItemsView() {
     setLoading(true);
     try {
       const q = new URLSearchParams({
-        page, limit, sort, dir
+        page: String(page), limit: String(limit), sort, dir
       });
       if (search) q.set('search', search);
       if (category) q.set('category', category);
@@ -102,9 +102,9 @@ export default function ItemsView() {
             </thead>
             <tbody>
               {loading && items.length === 0 ? (
-                <tr><td colSpan="7" className="text-center py-12"><Loader2 className="w-6 h-6 animate-spin mx-auto text-vs-500" /></td></tr>
+                <tr><td colSpan={7} className="text-center py-12"><Loader2 className="w-6 h-6 animate-spin mx-auto text-vs-500" /></td></tr>
               ) : items.length === 0 ? (
-                <tr><td colSpan="7" className="text-center py-12 text-slate-500">No items found. Try syncing from the extension.</td></tr>
+                <tr><td colSpan={7} className="text-center py-12 text-slate-500">No items found. Try syncing from the extension.</td></tr>
               ) : (
                 items.map(item => (
                   <tr key={item.id}>

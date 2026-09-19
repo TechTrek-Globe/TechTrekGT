@@ -15,13 +15,14 @@ export async function onRequestGet(context) {
   }
 
   try {
-    const page     = Math.max(1, parseInt(url.searchParams.get('page')  || '1', 10));
+    const page     = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10));
     const limit    = Math.min(200, Math.max(1, parseInt(url.searchParams.get('limit') || '50', 10)));
     const offset   = (page - 1) * limit;
     const category = url.searchParams.get('category') || null;
     const reviewed = url.searchParams.get('reviewed');
-    const sort     = ['date_added', 'etv', 'title', 'created_at'].includes(url.searchParams.get('sort'))
-      ? url.searchParams.get('sort') : 'date_added';
+    const sortParam = url.searchParams.get('sort');
+    const sort     = sortParam && ['date_added', 'etv', 'title', 'created_at'].includes(sortParam)
+      ? sortParam : 'date_added';
     const dir      = url.searchParams.get('dir') === 'asc' ? 'ASC' : 'DESC';
     const search   = url.searchParams.get('search') || null;
 

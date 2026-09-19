@@ -1150,6 +1150,7 @@ export function SalesLogView() {
       <EditItemModal
         isOpen={Boolean(selectedDetailItem)}
         item={selectedDetailItem}
+        initialTab="financial"
         categoryOptions={categoryOptions}
         platformOptions={platformOptions}
         onClose={() => setSelectedDetailItem(null)}

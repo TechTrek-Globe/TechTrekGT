@@ -16,7 +16,7 @@ export default function OrdersView() {
   const fetchOrders = useCallback(async () => {
     setLoading(true);
     try {
-      const q = new URLSearchParams({ page, limit, sort, dir });
+      const q = new URLSearchParams({ page: String(page), limit: String(limit), sort, dir });
       const res = await apiFetch(`/api/vinescout/orders?${q.toString()}`);
       setOrders(res.orders || []);
       setTotal(res.total || 0);
@@ -66,9 +66,9 @@ export default function OrdersView() {
             </thead>
             <tbody>
               {loading && orders.length === 0 ? (
-                <tr><td colSpan="5" className="text-center py-12"><Loader2 className="w-6 h-6 animate-spin mx-auto text-vs-500" /></td></tr>
+                <tr><td colSpan={5} className="text-center py-12"><Loader2 className="w-6 h-6 animate-spin mx-auto text-vs-500" /></td></tr>
               ) : orders.length === 0 ? (
-                <tr><td colSpan="5" className="text-center py-12 text-slate-500">No orders synced yet.</td></tr>
+                <tr><td colSpan={5} className="text-center py-12 text-slate-500">No orders synced yet.</td></tr>
               ) : (
                 orders.map(order => (
                   <tr key={order.id}>

@@ -90,6 +90,53 @@ export function LedgerDataProvider({ children }) {
     }
   }, [isDbLoaded, initialLedgerSeed]);
 
+  // Self-healing: continuously correct bill matrix cells and line items doubled by prior import accumulation bug
+  useEffect(() => {
+    if (!isDbLoaded) return;
+    const bills = metadataState.bills || [];
+    if (bills.length === 0) return;
+
+    const billAmtMap = {};
+    bills.forEach(b => {
+      if (b.id) billAmtMap[b.id] = Math.round((parseFloat(b.amount) || 0) * 100) / 100;
+    });
+
+    const billKeyPattern = /_\d{4}-\d{2}_\d{1,2}_bill_(.+)$/;
+    let matrixChanged = false;
+    for (const [key, value] of Object.entries(dailyMatrixRef.current || {})) {
+      const m = key.match(billKeyPattern);
+      if (!m) continue;
+      const expected = billAmtMap[m[1]];
+      if (!expected || expected <= 0) continue;
+      const stored = Math.round((parseFloat(value) || 0) * 100) / 100;
+      if (stored > 0 && Math.abs(stored - 2 * expected) < 0.02) {
+        dailyMatrixRef.current[key] = expected;
+        matrixChanged = true;
+      }
+    }
+    if (matrixChanged) {
+      setDailyMatrix({ ...dailyMatrixRef.current });
+      setMatrixVersion(v => v + 1);
+      logLedger('REPAIR_BILL_DOUBLE', 'Healed doubled bill matrix cells in dailyMatrix');
+    }
+
+    let lineItemsChanged = false;
+    const currentLineItems = lineItemsRef.current || [];
+    const nextLineItems = currentLineItems.map(li => {
+      const expected = billAmtMap[li.billId];
+      if (expected && expected > 0 && Math.abs(li.actualAmount - 2 * expected) < 0.02) {
+        lineItemsChanged = true;
+        return { ...li, actualAmount: expected };
+      }
+      return li;
+    });
+    if (lineItemsChanged) {
+      lineItemsRef.current = nextLineItems;
+      setLineItems(nextLineItems);
+      logLedger('REPAIR_BILL_DOUBLE', 'Healed doubled bill line items');
+    }
+  }, [isDbLoaded, metadataState.bills]);
+
   // Combined full budget object representation for compatibility and persistence
   const getFullBudget = useCallback(() => ({
     ...metadataStateRef.current,
@@ -767,17 +814,21 @@ export function LedgerDataProvider({ children }) {
       accountBills.forEach(b => {
         const customBill = getDailyMatrixCell(accountId, monthKey, day, `bill_${b.id}`);
         let amt = 0;
+        const expectedBillAmt = Math.round((parseFloat(b.amount) || 0) * 100) / 100;
         if (customBill !== undefined) {
           hasDayBillOverride = true;
           amt = parseFloat(customBill) || 0;
+          if (expectedBillAmt > 0 && Math.abs(amt - 2 * expectedBillAmt) < 0.02) {
+            amt = expectedBillAmt;
+          }
         } else if (!isLockedDay) {
           const actualAmt = getActualAmount(b.id, monthKey);
           if (actualAmt !== null && parseInt(b.dueDay) === day && isBillDueInMonth(b, month, true)) {
-            amt = actualAmt;
+            amt = (expectedBillAmt > 0 && Math.abs(actualAmt - 2 * expectedBillAmt) < 0.02) ? expectedBillAmt : actualAmt;
           } else if (actualAmt !== null) {
             amt = 0;
           } else if (parseInt(b.dueDay) === day && isBillDueInMonth(b, month, true)) {
-            amt = parseFloat(b.amount) || 0;
+            amt = expectedBillAmt;
           }
         }
         dayBills += amt;

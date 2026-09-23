@@ -676,8 +676,7 @@ export function processSpreadsheetImport({
           const bill = nextBills.find(b => b.id === resolvedBillId);
           const billTargetAccId = bill?.accountId || accountId;
           const actualKey = `${billTargetAccId}_${monthKey}_${actualDay}_bill_${resolvedBillId}`;
-          const existingBillAmt = matrixUpdates[actualKey] ?? 0;
-          matrixUpdates[actualKey] = Math.round((existingBillAmt + actualAmount) * 100) / 100;
+          matrixUpdates[actualKey] = Math.round(actualAmount * 100) / 100;
 
           logDebug('MATCH', `Debit transaction #${txnIdx + 1} matched to bill "${bill?.name || resolvedBillId}" via ${matchStrategy}`, {
             date: normDate,

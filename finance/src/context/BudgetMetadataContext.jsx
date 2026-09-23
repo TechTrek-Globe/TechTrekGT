@@ -41,6 +41,10 @@ export const BudgetMetadataDispatchContext = createContext(null);
 
 const STORAGE_KEY = 'personal_budget_app_data_v1';
 
+function healDailyMatrix(matrix) {
+  return (matrix && typeof matrix === 'object') ? { ...matrix } : {};
+}
+
 // Migrates legacy amount/frequency goals to the new per-paycheck flat model and maps to real account IDs
 function migrateFundingGoals(goals, people, accounts) {
   const accList = Array.isArray(accounts) ? accounts : [];

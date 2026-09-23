@@ -801,21 +801,26 @@ function DailySpreadsheetMatrix() {
           const billAccId = selectedAccountId === 'all' ? b.accountId : selectedAccountId;
           const customBillVal = getDailyMatrixCell(billAccId, monthKey, day, `bill_${b.id}`);
           let amt = 0;
+          const expectedBillAmt = Math.round((parseFloat(b.amount) || 0) * 100) / 100;
 
           if (customBillVal !== undefined) {
             // Tier 1: manual dailyMatrix override (drag-drop, inline edit, or actual transaction) wins outright
             hasDayBillOverride = true;
             amt = parseFloat(customBillVal) || 0;
+            if (expectedBillAmt > 0 && Math.abs(amt - 2 * expectedBillAmt) < 0.02) {
+              amt = expectedBillAmt;
+              updateDailyMatrixCell(billAccId, monthKey, day, `bill_${b.id}`, expectedBillAmt);
+            }
           } else if (!isLockedDay) {
             // Tier 2: month-scoped actual amount from import reconciliation
             const actualAmt = getActualAmount(b.id, monthKey);
             if (actualAmt !== null && parseInt(b.dueDay) === day && isBillDueInMonth(b, month, true)) {
-              amt = actualAmt;
+              amt = (expectedBillAmt > 0 && Math.abs(actualAmt - 2 * expectedBillAmt) < 0.02) ? expectedBillAmt : actualAmt;
             } else if (actualAmt !== null) {
               amt = 0;
             } else if (parseInt(b.dueDay) === day && isBillDueInMonth(b, month, true)) {
               // Tier 3: standard projection for scheduled bills
-              amt = parseFloat(b.amount) || 0;
+              amt = expectedBillAmt;
             }
           } else {
             // On historical locked dates with no recorded transaction, do not add phantom scheduled bills

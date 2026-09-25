@@ -1,116 +1,102 @@
-import { hashPassword } from '../../utils/auth.js';
-import { checkRateLimit } from '../../utils/rateLimit.js';
+import {
+  readJson, asTrimmedString, json, fail, withCookies, clearedCookies,
+  MAX_BODY_AUTH, MAX_EMAIL_LEN, validatePassword,
+  hmacHex, constantTimeStringEqual, hashPassword, verifyPassword
+} from '../../utils/auth.js';
+import { enforceRateLimit } from '../../utils/rateLimit.js';
+
+const RESET_MAX_ATTEMPTS = 5;
 
 export async function onRequestPost(context) {
   const { request, env } = context;
+  const limited = await enforceRateLimit(context, 'reset', 5, 600);
+  if (limited) return limited;
 
-  const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
-  const rlKey = `reset:${ip}`;
-  const { allowed, retryAfter } = await checkRateLimit(env.RATE_LIMIT_KV, rlKey, 5, 600);
-
-  if (!allowed) {
-    return new Response(JSON.stringify({ error: 'Too many password reset attempts. Please wait.' }), {
-      status: 429,
-      headers: {
-        'Content-Type': 'application/json',
-        'Retry-After': String(retryAfter)
-      }
-    });
-  }
+  const GENERIC_BAD = 'Invalid or expired reset code.';
 
   try {
-    const body = await request.json();
-    const { email, token, newPassword } = body;
+    const body = await readJson(request, MAX_BODY_AUTH);
+    if (!body) return fail(400, 'Invalid request body.');
 
-    if (!email || !token || !newPassword) {
-      return new Response(JSON.stringify({ error: 'Email, reset token, and new password are required.' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      });
+    const rawEmail = asTrimmedString(body.email, MAX_EMAIL_LEN);
+    const code = asTrimmedString(body.token, 32);
+    const newPassword = body.newPassword;
+    const securityAnswer = typeof body.securityAnswer === 'string' ? body.securityAnswer.trim() : '';
+
+    if (!rawEmail || !code || typeof newPassword !== 'string') {
+      return fail(400, 'Email, reset code, and new password are required.');
     }
 
-    const cleanEmail = email.trim().toLowerCase();
-    const cleanToken = token.trim();
+    const pwError = validatePassword(newPassword);
+    if (pwError) return fail(400, pwError);
 
-    if (newPassword.length < 8) {
-      return new Response(JSON.stringify({ error: 'New password must be at least 8 characters long.' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      });
+    if (!env.DB || !env.JWT_SECRET) {
+      console.error('[reset-password] missing DB or JWT_SECRET binding');
+      return fail(503, 'Service unavailable. Please try again later.');
     }
 
-    if (!/[A-Z]/.test(newPassword) || !/[0-9]/.test(newPassword)) {
-      return new Response(JSON.stringify({ error: 'New password must contain at least one uppercase letter and one number.' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      });
+    const cleanEmail = rawEmail.toLowerCase();
+    const codeHash = await hmacHex(env.JWT_SECRET, `reset:${cleanEmail}:${code}`);
+
+    const record = await env.DB.prepare(
+      'SELECT id, user_id, expires_at, attempts FROM password_resets WHERE email = ? AND used = 0 ORDER BY created_at DESC LIMIT 1'
+    ).bind(cleanEmail).first();
+
+    if (!record) return fail(400, GENERIC_BAD);
+
+    if (Number(record.expires_at) < Date.now()) {
+      await env.DB.prepare('UPDATE password_resets SET used = 1 WHERE id = ?').bind(record.id).run();
+      return fail(400, GENERIC_BAD);
     }
 
-    if (newPassword.length > 128) {
-      return new Response(JSON.stringify({ error: 'Password exceeds maximum allowed length.' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      });
+    if (Number(record.attempts || 0) >= RESET_MAX_ATTEMPTS) {
+      await env.DB.prepare('UPDATE password_resets SET used = 1 WHERE id = ?').bind(record.id).run();
+      return fail(400, GENERIC_BAD);
     }
 
-    if (!env.DB) {
-      return new Response(JSON.stringify({ error: 'Database binding DB not available.' }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' }
-      });
+    const stored = await env.DB.prepare(
+      'SELECT token FROM password_resets WHERE id = ?'
+    ).bind(record.id).first();
+
+    const codeMatches = await constantTimeStringEqual(String(stored?.token || ''), codeHash);
+
+    const user = await env.DB.prepare(
+      'SELECT id, password_hash, security_answer_hash FROM users WHERE id = ?'
+    ).bind(record.user_id).first();
+
+    let answerMatches = true;
+    if (user && user.security_answer_hash) {
+      answerMatches = securityAnswer
+        ? await verifyPassword(securityAnswer.toLowerCase(), user.security_answer_hash)
+        : false;
     }
 
-    // Verify token record in D1
-    const resetRecord = await env.DB.prepare(
-      'SELECT * FROM password_resets WHERE email = ? AND token = ? AND used = 0'
-    ).bind(cleanEmail, cleanToken).first();
-
-    if (!resetRecord) {
-      return new Response(JSON.stringify({ error: 'Invalid or expired password reset token.' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      });
+    if (!codeMatches || !answerMatches || !user) {
+      // Single generic failure for a bad code, a bad answer, or a missing
+      // user, with a per-account attempt counter (fix H8).
+      await env.DB.prepare(
+        'UPDATE password_resets SET attempts = COALESCE(attempts, 0) + 1 WHERE id = ?'
+      ).bind(record.id).run();
+      return fail(400, GENERIC_BAD);
     }
 
-    if (resetRecord.expires_at < Date.now()) {
-      await env.DB.prepare('UPDATE password_resets SET used = 1 WHERE id = ?').bind(resetRecord.id).run();
-      return new Response(JSON.stringify({ error: 'Password reset token has expired. Please request a new code.' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-
-    // Verify user exists
-    const user = await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(cleanEmail).first();
-    if (!user) {
-      return new Response(JSON.stringify({ error: 'User account not found.' }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-
-    // Hash new password and update user record
     const newPasswordHash = await hashPassword(newPassword);
-    await env.DB.prepare(
-      'UPDATE users SET password_hash = ? WHERE id = ?'
-    ).bind(newPasswordHash, user.id).run();
 
-    // Mark token as used
-    await env.DB.prepare('UPDATE password_resets SET used = 1 WHERE id = ?').bind(resetRecord.id).run();
+    // Bumping token_version kills every outstanding session for this account.
+    await env.DB.batch([
+      env.DB.prepare(
+        'UPDATE users SET password_hash = ?, token_version = COALESCE(token_version, 0) + 1 WHERE id = ?'
+      ).bind(newPasswordHash, user.id),
+      env.DB.prepare('UPDATE password_resets SET used = 1 WHERE id = ?').bind(record.id),
+      env.DB.prepare('UPDATE password_resets SET used = 1 WHERE email = ? AND used = 0').bind(cleanEmail)
+    ]);
 
-    return new Response(JSON.stringify({
-      success: true,
-      message: 'Password reset successfully. You can now sign in with your new password.'
-    }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
-    });
-
+    return withCookies(
+      json({ success: true, message: 'Password reset successfully. Please sign in with your new password.' }),
+      clearedCookies()
+    );
   } catch (err) {
-    console.error('[reset-password] error:', err);
-    return new Response(JSON.stringify({ error: 'An internal error occurred. Please try again.' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    console.error('[reset-password] error:', err && err.message);
+    return fail(500, 'An internal error occurred. Please try again.');
   }
 }

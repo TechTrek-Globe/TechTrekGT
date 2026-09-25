@@ -1,68 +1,26 @@
-import { checkRateLimit } from '../../utils/rateLimit.js';
+import { authenticate, json, fail } from '../../utils/auth.js';
 
-export async function onRequestPost(context) {
-  const { request, env } = context;
-
-  const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
-  const rlKey = `sec-q:${ip}`;
-  const { allowed, retryAfter } = await checkRateLimit(env.RATE_LIMIT_KV, rlKey, 10, 60);
-
-  if (!allowed) {
-    return new Response(JSON.stringify({ error: 'Too many requests. Please wait.' }), {
-      status: 429,
-      headers: {
-        'Content-Type': 'application/json',
-        'Retry-After': String(retryAfter)
-      }
-    });
-  }
-
+/**
+ * GET /api/auth/security-question - now authenticated.
+ *
+ * The previous unauthenticated POST version handed any caller the security
+ * question for any email address, which was both account enumeration and a
+ * head start on the answer. The question is no longer exposed publicly; it
+ * is delivered in the reset email instead (fix H7).
+ */
+export async function onRequestGet(context) {
   try {
-    const body = await request.json();
-    const { email } = body;
-
-    if (!email) {
-      return new Response(JSON.stringify({ error: 'Email address is required.' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-
-    const cleanEmail = email.trim().toLowerCase();
-
-    if (!env.DB) {
-      return new Response(JSON.stringify({ error: 'Database binding DB not available.' }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-
-    const user = await env.DB.prepare(
-      'SELECT security_question FROM users WHERE email = ?'
-    ).bind(cleanEmail).first();
-
-    if (!user) {
-      return new Response(JSON.stringify({ error: 'No account found with this email address.' }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-
-    return new Response(JSON.stringify({
+    const auth = await authenticate(context, { requireCsrf: false });
+    if (auth.error) return auth.error;
+    const { user } = auth;
+    return json({
       success: true,
-      email: cleanEmail,
+      email: user.email,
       securityQuestion: user.security_question || null,
-      hasSecurityQuestion: Boolean(user.security_question)
-    }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
+      hasSecurityQuestion: Boolean(user.security_question && user.security_answer_hash)
     });
-
   } catch (err) {
-    console.error('[security-question] error:', err);
-    return new Response(JSON.stringify({ error: 'An internal error occurred.' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    console.error('[security-question] error:', err && err.message);
+    return fail(500, 'An internal error occurred.');
   }
 }

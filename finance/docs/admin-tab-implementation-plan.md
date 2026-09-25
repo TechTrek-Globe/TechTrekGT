@@ -86,20 +86,15 @@ The `users` table in [`schema.sql:8`](file:///e:/TechTrekGT/finance/schema.sql#L
 
 ### 2.1 Architecture Decision: Dual-Layer Gating
 
-Admin access uses two independent security gates:
+Admin access uses database role-based authorization (fix C3):
 
-1. **Backend gate (authoritative):** `GET /api/admin/stats` verifies the JWT, extracts `email` from the payload, and compares it using constant-time comparison against `env.ADMIN_EMAIL`. Returns `403 Forbidden` on any mismatch.
-2. **Frontend gate (UX only):** The Admin tab and nav item are conditionally rendered only when `user.email === import.meta.env.VITE_ADMIN_EMAIL`. This is convenience, not a security boundary.
+1. **Backend gate (authoritative):** `GET /api/admin/stats` verifies the authenticated session via `authenticate(context)` and confirms `user.role === 'admin'` in the database. Returns `403 Forbidden` if not an admin.
+2. **Frontend gate (UX only):** The Admin tab and nav item are conditionally rendered based on `user.isAdmin` returned from `/api/auth/me` and `/api/auth/login`.
 
 ### 2.2 Environment Variables
 
-| Variable | Where Set | Purpose |
-|---|---|---|
-| `ADMIN_EMAIL` | `finance/.dev.vars` + `wrangler secret put ADMIN_EMAIL` | Worker-side admin gate (never exposed to client) |
-| `VITE_ADMIN_EMAIL` | `finance/.dev.vars` + `wrangler.jsonc [vars]` | Vite-exposed frontend gate (baked into JS bundle) |
-
-> [!IMPORTANT]
-> `VITE_ADMIN_EMAIL` will be visible in the compiled JavaScript bundle. This is intentional and acceptable - it only controls UI visibility; the real security gate is `ADMIN_EMAIL` on the backend.
+> [!NOTE]
+> `ADMIN_EMAIL` and `VITE_ADMIN_EMAIL` are deprecated and removed. Admin status is now stored exclusively in the `users.role` column in the D1 database (`'admin'` or `'user'`).
 
 ### 2.3 D1 Migration
 

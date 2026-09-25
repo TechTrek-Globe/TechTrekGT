@@ -1,105 +1,85 @@
-import { verifyPassword, createToken } from '../../utils/auth.js';
-import { checkRateLimit } from '../../utils/rateLimit.js';
+import {
+  verifyPassword, hashPassword, needsRehash, readJson, asTrimmedString,
+  json, fail, issueSession, sessionCookies, withCookies, newCsrfToken,
+  MAX_BODY_AUTH, MAX_EMAIL_LEN, MAX_PASS_LEN
+} from '../../utils/auth.js';
+import { enforceRateLimit } from '../../utils/rateLimit.js';
 
 export async function onRequestPost(context) {
   const { request, env } = context;
 
-  const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
-  const rlKey = `login:${ip}`;
-  const { allowed, retryAfter } = await checkRateLimit(env.RATE_LIMIT_KV, rlKey, 10, 60);
-
-  if (!allowed) {
-    return new Response(JSON.stringify({ error: 'Too many login attempts. Please wait.' }), {
-      status: 429,
-      headers: {
-        'Content-Type': 'application/json',
-        'Retry-After': String(retryAfter)
-      }
-    });
-  }
+  const limited = await enforceRateLimit(context, 'login', 10, 60);
+  if (limited) return limited;
 
   try {
-    const body = await request.json();
-    const { email, password } = body;
+    const body = await readJson(request, MAX_BODY_AUTH);
+    if (!body) return fail(400, 'Invalid request body.');
 
-    if (!email || !password) {
-      return new Response(JSON.stringify({ error: 'Email and password are required' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      });
+    const rawEmail = asTrimmedString(body.email, MAX_EMAIL_LEN);
+    const { password } = body;
+
+    if (!rawEmail || typeof password !== 'string') {
+      return fail(400, 'Email and password are required.');
     }
 
-    const cleanEmail = email.trim().toLowerCase();
-
-    if (!env.DB) {
-      return new Response(JSON.stringify({ error: 'Database binding DB not available' }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' }
-      });
+    if (!env.DB || !env.JWT_SECRET) {
+      console.error('[login] missing DB or JWT_SECRET binding');
+      return fail(503, 'Service unavailable. Please try again later.');
     }
 
-    // Query user record
-    const user = await env.DB.prepare('SELECT * FROM users WHERE email = ?').bind(cleanEmail).first();
+    const cleanEmail = rawEmail.toLowerCase();
+
+    const user = await env.DB.prepare(
+      'SELECT id, email, name, password_hash, role, token_version, security_question, security_answer_hash FROM users WHERE email = ?'
+    ).bind(cleanEmail).first();
+
+    // Timing equalization: perform a hash even when the account does not exist
+    // so the response time does not reveal whether the address is registered. (H7)
     if (!user) {
-      return new Response(JSON.stringify({ error: 'Invalid email or password' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      await hashPassword(password).catch(() => {});
+      return fail(401, 'Invalid email or password.');
     }
 
-    // Verify password
     const isValid = await verifyPassword(password, user.password_hash);
-    if (!isValid) {
-      return new Response(JSON.stringify({ error: 'Invalid email or password' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' }
-      });
+    if (!isValid) return fail(401, 'Invalid email or password.');
+
+    // Transparent rehash on login: upgrades 310k-era or legacy two-part hashes
+    // without requiring the user to reset their password. (C2)
+    if (needsRehash(user.password_hash)) {
+      try {
+        const fresh = await hashPassword(password);
+        await env.DB.prepare('UPDATE users SET password_hash = ? WHERE id = ?').bind(fresh, user.id).run();
+      } catch (rehashErr) {
+        console.error('[login] rehash failed (non-fatal):', rehashErr && rehashErr.message);
+      }
     }
 
-    // Query household membership
     const member = await env.DB.prepare(
       'SELECT household_id FROM household_members WHERE user_id = ?'
     ).bind(user.id).first();
-
     const householdId = member ? member.household_id : null;
 
-    if (!env.JWT_SECRET) {
-      return new Response(JSON.stringify({ error: 'Server misconfiguration: missing JWT_SECRET' }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
+    const { token, csrf, maxAge } = await issueSession(env, user, householdId, Boolean(body.rememberMe));
 
-    // Create JWT token
-    const token = await createToken({ userId: user.id, email: user.email, householdId, name: user.name }, env.JWT_SECRET);
-    
-    const maxAge = body.rememberMe ? 30 * 24 * 3600 : 7200;
-    const cookieOptions = [
-      `auth_token=${token}`,
-      'HttpOnly',
-      'Secure',
-      'SameSite=Lax',
-      'Path=/',
-      `Max-Age=${maxAge}`
-    ].join('; ');
-
-    return new Response(JSON.stringify({
-      success: true,
-      user: { id: user.id, email: user.email, name: user.name },
-      householdId
-    }), {
-      status: 200,
-      headers: { 
-        'Content-Type': 'application/json',
-        'Set-Cookie': cookieOptions
-      }
-    });
+    return withCookies(
+      json({
+        success: true,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          isAdmin: user.role === 'admin',
+          securityQuestion: user.security_question || null,
+          hasSecurityQuestion: Boolean(user.security_question && user.security_answer_hash)
+        },
+        householdId,
+        csrfToken: csrf
+      }),
+      sessionCookies(token, csrf, maxAge)
+    );
 
   } catch (err) {
-    console.error('[login] handler error:', err);
-    return new Response(JSON.stringify({ error: 'An internal error occurred. Please try again.' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    console.error('[login] handler error:', err && err.message);
+    return fail(500, 'An internal error occurred. Please try again.');
   }
 }

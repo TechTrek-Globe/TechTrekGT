@@ -1,167 +1,133 @@
-import { verifyToken, getTokenFromRequest, hashPassword, verifyPassword, createToken } from '../../utils/auth.js';
+import {
+  authenticate, readJson, asTrimmedString, json, fail, withCookies, sessionCookies, newCsrfToken,
+  createToken, hashPassword, verifyPassword, validatePassword,
+  EMAIL_REGEX, MAX_BODY_AUTH, MAX_NAME_LEN, MAX_EMAIL_LEN, MAX_QUESTION_LEN, MAX_ANSWER_LEN,
+  ACCESS_TOKEN_TTL, SESSION_TTL_DEFAULT
+} from '../../utils/auth.js';
+import { enforceRateLimit } from '../../utils/rateLimit.js';
 
 export async function onRequestPost(context) {
   const { request, env } = context;
+  const limited = await enforceRateLimit(context, 'profile', 20, 60);
+  if (limited) return limited;
 
   try {
-    const token = getTokenFromRequest(request);
-    if (!token) {
-      return new Response(JSON.stringify({ error: 'Unauthorized: Missing token' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
+    const auth = await authenticate(context, { requireCsrf: true });
+    if (auth.error) return auth.error;
+    const { payload, user } = auth;
 
-    const payload = await verifyToken(token, env.JWT_SECRET);
-    if (!payload || !payload.userId) {
-      return new Response(JSON.stringify({ error: 'Unauthorized: Invalid token' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
+    const body = await readJson(request, MAX_BODY_AUTH);
+    if (!body) return fail(400, 'Invalid request body.');
 
-    if (!env.DB) {
-      return new Response(JSON.stringify({ error: 'Database binding DB not available.' }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-
-    const body = await request.json();
-    const { name, email, securityQuestion, securityAnswer, currentPassword, newPassword } = body;
-
-    const user = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(payload.userId).first();
-    if (!user) {
-      return new Response(JSON.stringify({ error: 'User not found.' }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
+    const { currentPassword, newPassword } = body;
 
     let updatedName = user.name;
     let updatedEmail = user.email;
     let updatedQuestion = user.security_question;
     let updatedAnswerHash = user.security_answer_hash;
     let updatedPasswordHash = user.password_hash;
+    let bumpTokenVersion = false;
 
-    // 1. Update Name
-    if (name && typeof name === 'string' && name.trim()) {
-      updatedName = name.trim();
-    }
+    const name = asTrimmedString(body.name, MAX_NAME_LEN);
+    if (name) updatedName = name;
 
-    // 2. Update Email
-    if (email && typeof email === 'string' && email.trim()) {
-      const cleanEmail = email.trim().toLowerCase();
-      const EMAIL_REGEX = /^[^\s@]{1,64}@[^\s@]{1,253}\.[^\s@]{2,}$/;
-      if (!EMAIL_REGEX.test(cleanEmail)) {
-        return new Response(JSON.stringify({ error: 'Invalid email address format.' }), {
-          status: 400,
-          headers: { 'Content-Type': 'application/json' }
-        });
-      }
-
+    const rawEmail = asTrimmedString(body.email, MAX_EMAIL_LEN);
+    if (rawEmail) {
+      const cleanEmail = rawEmail.toLowerCase();
+      if (!EMAIL_REGEX.test(cleanEmail)) return fail(400, 'Invalid email address format.');
       if (cleanEmail !== user.email) {
-        const existing = await env.DB.prepare('SELECT id FROM users WHERE email = ? AND id != ?').bind(cleanEmail, user.id).first();
-        if (existing) {
-          return new Response(JSON.stringify({ error: 'Email address is already in use by another account.' }), {
-            status: 409,
-            headers: { 'Content-Type': 'application/json' }
-          });
+        // Changing the address that owns the account is a security-sensitive
+        // action; require the current password.
+        if (!currentPassword || !(await verifyPassword(String(currentPassword), user.password_hash))) {
+          return fail(400, 'Current password is required to change your email address.');
         }
+        const existing = await env.DB.prepare(
+          'SELECT id FROM users WHERE email = ? AND id != ?'
+        ).bind(cleanEmail, user.id).first();
+        if (existing) return fail(409, 'That email address cannot be used.');
         updatedEmail = cleanEmail;
+        bumpTokenVersion = true;
       }
     }
 
-    // 3. Update Security Question & Answer
-    if (securityQuestion && typeof securityQuestion === 'string' && securityQuestion.trim()) {
-      updatedQuestion = securityQuestion.trim();
-      if (securityAnswer && typeof securityAnswer === 'string' && securityAnswer.trim()) {
-        const cleanAnswer = securityAnswer.trim().toLowerCase();
-        updatedAnswerHash = await hashPassword(cleanAnswer);
+    const securityQuestion = asTrimmedString(body.securityQuestion, MAX_QUESTION_LEN);
+    if (securityQuestion) {
+      const securityAnswer = asTrimmedString(body.securityAnswer, MAX_ANSWER_LEN);
+      if (!securityAnswer) {
+        return fail(400, 'A security answer is required when changing the security question.');
       }
+      if (!currentPassword || !(await verifyPassword(String(currentPassword), user.password_hash))) {
+        return fail(400, 'Current password is required to change your security question.');
+      }
+      updatedQuestion = securityQuestion;
+      updatedAnswerHash = await hashPassword(securityAnswer.toLowerCase());
     }
 
-    // 4. Update Password if requested
-    if (newPassword && typeof newPassword === 'string' && newPassword.length > 0) {
-      if (user.password_hash) {
-        if (!currentPassword) {
-          return new Response(JSON.stringify({ error: 'Current password is required to set a new password.' }), {
-            status: 400,
-            headers: { 'Content-Type': 'application/json' }
-          });
-        }
-        const isCurrentValid = await verifyPassword(currentPassword, user.password_hash);
-        if (!isCurrentValid) {
-          return new Response(JSON.stringify({ error: 'Current password is incorrect.' }), {
-            status: 400,
-            headers: { 'Content-Type': 'application/json' }
-          });
-        }
+    if (typeof newPassword === 'string' && newPassword.length > 0) {
+      if (!currentPassword || typeof currentPassword !== 'string') {
+        return fail(400, 'Current password is required to set a new password.');
       }
-
-      if (newPassword.length < 8) {
-        return new Response(JSON.stringify({ error: 'New password must be at least 8 characters long.' }), {
-          status: 400,
-          headers: { 'Content-Type': 'application/json' }
-        });
+      if (!(await verifyPassword(currentPassword, user.password_hash))) {
+        return fail(400, 'Current password is incorrect.');
       }
-
-      if (!/[A-Z]/.test(newPassword) || !/[0-9]/.test(newPassword)) {
-        return new Response(JSON.stringify({ error: 'New password must contain at least one uppercase letter and one number.' }), {
-          status: 400,
-          headers: { 'Content-Type': 'application/json' }
-        });
-      }
-
+      const pwError = validatePassword(newPassword);
+      if (pwError) return fail(400, pwError);
       updatedPasswordHash = await hashPassword(newPassword);
+      bumpTokenVersion = true;
     }
 
-    // Apply updates in DB
-    await env.DB.prepare(`
-      UPDATE users 
-      SET name = ?, email = ?, security_question = ?, security_answer_hash = ?, password_hash = ?
-      WHERE id = ?
-    `).bind(updatedName, updatedEmail, updatedQuestion, updatedAnswerHash, updatedPasswordHash, user.id).run();
+    const newTokenVersion = Number(user.token_version || 0) + (bumpTokenVersion ? 1 : 0);
 
-    // Generate fresh auth cookie with updated email and name
-    const newToken = await createToken({
-      userId: user.id,
-      email: updatedEmail,
-      householdId: payload.householdId,
-      name: updatedName
-    }, env.JWT_SECRET);
+    await env.DB.prepare(
+      `UPDATE users
+          SET name = ?, email = ?, security_question = ?, security_answer_hash = ?, password_hash = ?, token_version = ?
+        WHERE id = ?`
+    ).bind(
+      updatedName,
+      updatedEmail,
+      updatedQuestion,
+      updatedAnswerHash,
+      updatedPasswordHash,
+      newTokenVersion,
+      user.id
+    ).run();
 
-    const cookieOptions = [
-      `auth_token=${newToken}`,
-      'HttpOnly',
-      'Secure',
-      'SameSite=Strict',
-      'Path=/'
-    ].join('; ');
-
-    return new Response(JSON.stringify({
-      success: true,
-      message: 'Profile updated successfully.',
-      user: {
-        id: user.id,
+    // Re-issue within the existing session window rather than silently
+    // extending the session (fix H6).
+    const now = Math.floor(Date.now() / 1000);
+    const sexp = typeof payload.sexp === 'number' && payload.sexp > now ? payload.sexp : now + SESSION_TTL_DEFAULT;
+    const { token } = await createToken(
+      {
+        userId: user.id,
         email: updatedEmail,
+        householdId: payload.householdId,
         name: updatedName,
-        securityQuestion: updatedQuestion,
-        hasSecurityQuestion: Boolean(updatedQuestion && updatedAnswerHash)
-      }
-    }), {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'Set-Cookie': cookieOptions
-      }
-    });
+        tv: newTokenVersion,
+        sid: payload.sid || crypto.randomUUID()
+      },
+      env.JWT_SECRET,
+      ACCESS_TOKEN_TTL,
+      sexp
+    );
+    const csrf = newCsrfToken();
 
+    return withCookies(
+      json({
+        success: true,
+        message: 'Profile updated successfully.',
+        user: {
+          id: user.id,
+          email: updatedEmail,
+          name: updatedName,
+          securityQuestion: updatedQuestion,
+          hasSecurityQuestion: Boolean(updatedQuestion && updatedAnswerHash)
+        },
+        csrfToken: csrf
+      }),
+      sessionCookies(token, csrf, sexp - now)
+    );
   } catch (err) {
-    console.error('[update-profile] error:', err);
-    return new Response(JSON.stringify({ error: 'An internal error occurred.' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    console.error('[update-profile] error:', err && err.message);
+    return fail(500, 'An internal error occurred.');
   }
 }

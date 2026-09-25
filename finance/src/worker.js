@@ -4,217 +4,232 @@ import { onRequestGet as meHandler } from '../functions/api/auth/me.js';
 import { onRequestPost as logoutHandler } from '../functions/api/auth/logout.js';
 import { onRequestPost as forgotPasswordHandler } from '../functions/api/auth/forgot-password.js';
 import { onRequestPost as resetPasswordHandler } from '../functions/api/auth/reset-password.js';
-import { onRequestPost as securityQuestionHandler } from '../functions/api/auth/security-question.js';
+import { onRequestGet as securityQuestionHandler } from '../functions/api/auth/security-question.js';
 import { onRequestPost as updateProfileHandler } from '../functions/api/auth/update-profile.js';
 import { onRequestGet as adminStatsHandler } from '../functions/api/admin/stats.js';
-import { getTokenFromRequest, verifyToken } from '../functions/utils/auth.js';
+import {
+  authenticate,
+  readJson,
+  json,
+  fail,
+  base64UrlEncodeBytes,
+  constantTimeStringEqual,
+  MAX_BODY_AUTH,
+  MAX_BODY_SYNC
+} from '../functions/utils/auth.js';
+import { enforceRateLimit } from '../functions/utils/rateLimit.js';
 
-async function timingSafeStringEqual(a, b) {
-  if (typeof a !== 'string' || typeof b !== 'string') return false;
-  const encoder = new TextEncoder();
-  const aBuf = encoder.encode(a);
-  const bBuf = encoder.encode(b);
-  
-  const aHash = await crypto.subtle.digest('SHA-256', aBuf);
-  const bHash = await crypto.subtle.digest('SHA-256', bBuf);
-  
-  const aView = new Uint8Array(aHash);
-  const bView = new Uint8Array(bHash);
-  
-  let mismatch = 0;
-  for (let i = 0; i < aView.length; i++) {
-    mismatch |= (aView[i] ^ bView[i]);
-  }
-  return mismatch === 0;
+export { RateLimiter } from './RateLimiter.js';
+
+/* ------------------------------------------------------------------ */
+/* Allowed Origins & Security Configuration                            */
+/* ------------------------------------------------------------------ */
+
+export const ALLOWED_ORIGINS = [
+  'https://techtrekgt.com',
+  'https://techtrek-budget.pages.dev',
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'http://localhost:8787',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:8787'
+];
+
+function buildCsp(nonce) {
+  return [
+    "default-src 'self'",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    // No 'unsafe-inline' for scripts. Nonce + strict-dynamic instead.
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://challenges.cloudflare.com`,
+    "connect-src 'self' https://techtrekgt.com https://challenges.cloudflare.com",
+    "img-src 'self' data: blob: https://challenges.cloudflare.com",
+    "font-src 'self' data: https://fonts.gstatic.com",
+    "frame-src 'self' https://challenges.cloudflare.com blob:",
+    "child-src 'self' https://challenges.cloudflare.com blob:",
+    "object-src 'none'",
+    "frame-ancestors 'none'",
+    "form-action 'self'",
+    "base-uri 'self'",
+    "upgrade-insecure-requests"
+  ].join('; ');
 }
 
-/**
- * @param {Response} response
- * @param {boolean} [isLocalhost]
- */
-function addSecurityHeaders(response, isLocalhost = false, requestOrigin = '') {
-  const newHeaders = new Headers(response.headers);
+class NonceInjector {
+  constructor(nonce) {
+    this.nonce = nonce;
+  }
+  element(el) {
+    el.setAttribute('nonce', this.nonce);
+  }
+}
+
+function addSecurityHeaders(response, { isLocalhost = false, requestOrigin = '', nonce = '' } = {}) {
+  const headers = new Headers(response.headers);
+
   if (!isLocalhost) {
-    newHeaders.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-    newHeaders.set('Content-Security-Policy', [
-      "default-src 'self'",
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-      "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com",
-      "connect-src 'self' https://techtrekgt.com https://challenges.cloudflare.com",
-      "img-src 'self' data: blob: https://challenges.cloudflare.com",
-      "font-src 'self' data: https://fonts.gstatic.com",
-      "frame-src 'self' https://challenges.cloudflare.com blob:",
-      "child-src 'self' https://challenges.cloudflare.com blob:",
-      "frame-ancestors 'none'",
-      "form-action 'self'",
-      "base-uri 'self'"
-    ].join('; '));
-  }
-  newHeaders.set('X-Content-Type-Options', 'nosniff');
-  newHeaders.set('X-Frame-Options', 'DENY');
-  newHeaders.set('X-XSS-Protection', '0');
-  newHeaders.set('Referrer-Policy', 'strict-origin-when-cross-origin');
-  newHeaders.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
-
-  // CORS headers for production domain
-  const allowedOrigins = [
-    'https://techtrekgt.com',
-    'https://techtrek-budget.pages.dev',
-    'http://localhost:3000'
-  ];
-  if (requestOrigin && allowedOrigins.includes(requestOrigin)) {
-    newHeaders.set('Access-Control-Allow-Origin', requestOrigin);
-  } else {
-    newHeaders.set('Access-Control-Allow-Origin', 'https://techtrekgt.com');
-  }
-  newHeaders.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  newHeaders.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Sync-Passcode');
-  newHeaders.set('Access-Control-Allow-Credentials', 'true');
-  newHeaders.set('Access-Control-Max-Age', '86400');
-
-  const contentType = newHeaders.get('content-type') || '';
-  if (contentType.includes('text/html')) {
-    newHeaders.set('Cache-Control', 'no-cache, no-store, must-revalidate');
-    newHeaders.set('Pragma', 'no-cache');
-    newHeaders.set('Expires', '0');
+    headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+    headers.set('Content-Security-Policy', buildCsp(nonce));
   }
 
-  return new Response(response.body, {
+  headers.set('X-Content-Type-Options', 'nosniff');
+  headers.set('X-Frame-Options', 'DENY');
+  headers.set('X-XSS-Protection', '0');
+  headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
+  headers.set('Cross-Origin-Opener-Policy', 'same-origin');
+  headers.set('Cross-Origin-Resource-Policy', 'same-origin');
+
+  // Only emit CORS headers for origins on the allowlist, and always Vary on Origin
+  headers.append('Vary', 'Origin');
+  if (requestOrigin && ALLOWED_ORIGINS.includes(requestOrigin)) {
+    headers.set('Access-Control-Allow-Origin', requestOrigin);
+    headers.set('Access-Control-Allow-Credentials', 'true');
+    headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-CSRF-Token, X-Sync-Passcode');
+    headers.set('Access-Control-Max-Age', '86400');
+  }
+
+  const contentType = headers.get('content-type') || '';
+  const isHtml = contentType.includes('text/html');
+
+  if (isHtml) {
+    headers.set('Cache-Control', 'no-store, must-revalidate');
+    headers.set('Pragma', 'no-cache');
+    headers.set('Expires', '0');
+  }
+  if (contentType.includes('application/json')) {
+    headers.set('Cache-Control', 'no-store');
+  }
+
+  const rewritten = new Response(response.body, {
     status: response.status,
     statusText: response.statusText,
-    headers: newHeaders
+    headers
   });
+
+  if (isHtml && nonce && response.body) {
+    return new HTMLRewriter().on('script', new NonceInjector(nonce)).transform(rewritten);
+  }
+  return rewritten;
 }
+
+/* ------------------------------------------------------------------ */
+/* Sync Handlers (hardened)                                            */
+/* ------------------------------------------------------------------ */
 
 async function handleVerifySyncCode(context) {
   const { request, env } = context;
-  try {
-    const body = await request.json().catch(() => ({}));
-    const code = body?.code || '';
-    const secretCode = env?.SYNC_UNLOCK_CODE || '123456';
+  const limited = await enforceRateLimit(context, 'sync-code', 5, 300);
+  if (limited) return limited;
 
-    if (!code || !(await timingSafeStringEqual(String(code).trim(), String(secretCode).trim()))) {
-      return new Response(JSON.stringify({ error: 'Invalid access passcode' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-
-    return new Response(JSON.stringify({ success: true, token: 'vault-unlocked' }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  } catch (err) {
-    return new Response(JSON.stringify({ error: 'Verification failed' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
+  // Fails closed when unconfigured. No "123456" fallback (fix C4).
+  const secretCode = env?.SYNC_UNLOCK_CODE;
+  if (!secretCode) {
+    console.error('[verify-sync-code] SYNC_UNLOCK_CODE is not configured');
+    return fail(503, 'Service unavailable.');
   }
-}
 
-async function verifySyncGuard(request, env) {
-  const passcode = request.headers.get('x-sync-passcode') || request.headers.get('authorization')?.replace('Bearer ', '') || '';
-  const secretCode = env?.SYNC_UNLOCK_CODE || '123456';
-  return await timingSafeStringEqual(String(passcode).trim(), String(secretCode).trim());
+  try {
+    const body = await readJson(request, MAX_BODY_AUTH);
+    const code = body && typeof body.code === 'string' ? body.code.trim() : '';
+    if (!code || !(await constantTimeStringEqual(code, String(secretCode).trim()))) {
+      return fail(401, 'Invalid access passcode');
+    }
+    return json({ success: true, token: 'vault-unlocked' });
+  } catch (err) {
+    console.error('[verify-sync-code] error:', err && err.message);
+    return fail(500, 'Verification failed');
+  }
 }
 
 async function handleSyncBackup(context) {
   const { request, env } = context;
-
-  const token = getTokenFromRequest(request);
-  const payload = await verifyToken(token, env?.JWT_SECRET);
-  const userId = payload?.userId || payload?.id;
-  if (!payload || !userId) {
-    return new Response(JSON.stringify({ error: 'Unauthorized: Please log in to sync data' }), {
-      status: 401,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
-
-  if (!env?.DB) {
-    return new Response(JSON.stringify({ error: 'D1 database binding not available' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
-
   try {
-    const body = await request.json();
-    const dataStr = JSON.stringify(body.budget || body);
-    console.log(`[SYNC:D1_PUSH] Storing backup for user ${userId} (size: ${dataStr.length} bytes)`);
+    const auth = await authenticate(context, { requireCsrf: true });
+    if (auth.error) return auth.error;
+    const userId = auth.user.id;
 
-    await env.DB.prepare(`
-      INSERT INTO user_backups (id, data, updated_at)
-      VALUES (?, ?, datetime('now'))
-      ON CONFLICT(id) DO UPDATE SET data=excluded.data, updated_at=datetime('now')
-    `).bind(userId, dataStr).run();
+    const body = await readJson(request, MAX_BODY_SYNC);
+    if (!body) return fail(400, 'Invalid or oversized request body.');
 
-    const timestamp = new Date().toISOString();
-    console.log(`[SYNC:D1_PUSH_SUCCESS] User ${userId} backup successfully saved at ${timestamp}`);
+    const payload = body.budget !== undefined ? body.budget : body;
+    const dataStr = JSON.stringify(payload);
+    if (dataStr.length > MAX_BODY_SYNC) return fail(413, 'Backup payload is too large.');
 
-    return new Response(JSON.stringify({ success: true, timestamp }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    await env.DB.prepare(
+      `INSERT INTO user_backups (id, data, updated_at)
+       VALUES (?, ?, datetime('now'))
+       ON CONFLICT(id) DO UPDATE SET data = excluded.data, updated_at = datetime('now')`
+    ).bind(userId, dataStr).run();
+
+    return json({ success: true, timestamp: new Date().toISOString() });
   } catch (err) {
-    console.error(`[SYNC:D1_PUSH_ERROR] Backup failed for user ${userId}:`, err);
-    return new Response(JSON.stringify({ error: `Backup failed: ${err.message}` }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    console.error('[sync/backup] error:', err && err.message);
+    return fail(500, 'Backup failed.');
   }
 }
 
 async function handleSyncRestore(context) {
-  const { request, env } = context;
-
-  const token = getTokenFromRequest(request);
-  const payload = await verifyToken(token, env?.JWT_SECRET);
-  const userId = payload?.userId || payload?.id;
-  if (!payload || !userId) {
-    return new Response(JSON.stringify({ error: 'Unauthorized: Please log in to restore data' }), {
-      status: 401,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
-
-  if (!env?.DB) {
-    return new Response(JSON.stringify({ error: 'D1 database binding not available' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
-
+  const { env } = context;
   try {
-    console.log(`[SYNC:D1_PULL] Querying cloud vault backup for user ${userId}`);
-    const row = await env.DB.prepare(`
-      SELECT data, updated_at FROM user_backups WHERE id = ?
-    `).bind(userId).first();
+    const auth = await authenticate(context, { requireCsrf: false });
+    if (auth.error) return auth.error;
+    const userId = auth.user.id;
 
-    if (!row || !row.data) {
-      console.warn(`[SYNC:D1_PULL_NOT_FOUND] No cloud vault backup found for user ${userId}`);
-      return new Response(JSON.stringify({ error: 'No cloud vault backup found' }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json' }
-      });
+    const row = await env.DB.prepare(
+      'SELECT data, updated_at FROM user_backups WHERE id = ?'
+    ).bind(userId).first();
+
+    if (!row || !row.data) return fail(404, 'No cloud backup found');
+
+    let parsed;
+    try {
+      parsed = JSON.parse(row.data);
+    } catch {
+      console.error('[sync/restore] stored backup is not valid JSON for user', userId);
+      return fail(500, 'Stored backup could not be read.');
     }
 
-    const parsed = JSON.parse(row.data);
-    console.log(`[SYNC:D1_PULL_SUCCESS] Retrieved cloud backup for user ${userId} (last updated: ${row.updated_at})`);
-    return new Response(JSON.stringify({ success: true, budget: parsed.budget || parsed, updatedAt: row.updated_at }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
+    return json({
+      success: true,
+      budget: parsed && parsed.budget !== undefined ? parsed.budget : parsed,
+      updatedAt: row.updated_at
     });
   } catch (err) {
-    console.error(`[SYNC:D1_PULL_ERROR] Restore failed for user ${userId}:`, err);
-    return new Response(JSON.stringify({ error: `Restore failed: ${err.message}` }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    console.error('[sync/restore] error:', err && err.message);
+    return fail(500, 'Restore failed.');
   }
 }
 
-export default {
+/* ------------------------------------------------------------------ */
+/* Router & Dispatch                                                   */
+/* ------------------------------------------------------------------ */
+
+const ROUTES = {
+  'POST /api/verify-sync-code': handleVerifySyncCode,
+  'POST /api/sync/backup': handleSyncBackup,
+  'GET /api/sync/restore': handleSyncRestore,
+  'POST /api/auth/register': registerHandler,
+  'POST /api/auth/login': loginHandler,
+  'POST /api/auth/forgot-password': forgotPasswordHandler,
+  'POST /api/auth/reset-password': resetPasswordHandler,
+  'GET /api/auth/security-question': securityQuestionHandler,
+  'POST /api/auth/update-profile': updateProfileHandler,
+  'GET /api/auth/me': meHandler,
+  'POST /api/auth/logout': logoutHandler,
+  'GET /api/admin/stats': adminStatsHandler
+};
+
+async function fetchAsset(env, request, pathname) {
+  const assetUrl = new URL(request.url);
+  assetUrl.pathname = pathname;
+  const assetRequest = new Request(assetUrl.toString(), request);
+  if (env?.ASSETS?.fetch) return env.ASSETS.fetch(assetRequest);
+  return fetch(assetRequest);
+}
+
+const worker = {
   /**
    * @param {Request} request
    * @param {Record<string, any>} env
@@ -224,12 +239,20 @@ export default {
     const url = new URL(request.url);
     const context = { request, env, ctx };
     const requestOrigin = request.headers.get('Origin') || '';
-
-    // Force HTTPS redirect if accessed via HTTP (except localhost)
     const isLocalhost = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+    const nonce = base64UrlEncodeBytes(crypto.getRandomValues(new Uint8Array(16)));
+    const headerOpts = { isLocalhost, requestOrigin, nonce };
+
     if (!isLocalhost && (url.protocol === 'http:' || request.headers.get('x-forwarded-proto') === 'http')) {
       url.protocol = 'https:';
       return Response.redirect(url.toString(), 301);
+    }
+
+    if (request.method === 'OPTIONS') {
+      if (!requestOrigin || !ALLOWED_ORIGINS.includes(requestOrigin)) {
+        return addSecurityHeaders(new Response(null, { status: 403 }), headerOpts);
+      }
+      return addSecurityHeaders(new Response(null, { status: 204 }), headerOpts);
     }
 
     // Redirect requests for Outpost sub-site (/Outpost, /OUTPOST, /auction) to lowercase /outpost
@@ -241,14 +264,8 @@ export default {
       }
     }
 
-    // Handle OPTIONS preflight
-    if (request.method === 'OPTIONS') {
-      return addSecurityHeaders(new Response(null, { status: 204 }), isLocalhost, requestOrigin);
-    }
-
     let response;
     try {
-      // Normalize subpath /finance or /finance/ for API routing
       let apiPath = url.pathname;
       if (apiPath.startsWith('/finance/api/')) {
         apiPath = apiPath.slice('/finance'.length);
@@ -256,80 +273,36 @@ export default {
         apiPath = '/api';
       }
 
-      // API Route Routing
-      if (apiPath === '/api/verify-sync-code' && request.method === 'POST') {
-        response = await handleVerifySyncCode(context);
-      } else if (apiPath === '/api/sync/backup' && request.method === 'POST') {
-        response = await handleSyncBackup(context);
-      } else if (apiPath === '/api/sync/restore' && request.method === 'GET') {
-        response = await handleSyncRestore(context);
-      } else if (apiPath === '/api/auth/register' && request.method === 'POST') {
-        response = await registerHandler(context);
-      } else if (apiPath === '/api/auth/login' && request.method === 'POST') {
-        response = await loginHandler(context);
-      } else if (apiPath === '/api/auth/forgot-password' && request.method === 'POST') {
-        response = await forgotPasswordHandler(context);
-      } else if (apiPath === '/api/auth/reset-password' && request.method === 'POST') {
-        response = await resetPasswordHandler(context);
-      } else if (apiPath === '/api/auth/security-question' && request.method === 'POST') {
-        response = await securityQuestionHandler(context);
-      } else if (apiPath === '/api/auth/update-profile' && request.method === 'POST') {
-        response = await updateProfileHandler(context);
-      } else if (apiPath === '/api/auth/me' && request.method === 'GET') {
-        response = await meHandler(context);
-      } else if (apiPath === '/api/auth/logout' && request.method === 'POST') {
-        response = await logoutHandler(context);
-      } else if (apiPath === '/api/admin/stats' && request.method === 'GET') {
-        response = await adminStatsHandler(context);
+      const handler = ROUTES[`${request.method} ${apiPath}`];
+
+      if (handler) {
+        if (
+          request.method !== 'GET' &&
+          requestOrigin &&
+          !ALLOWED_ORIGINS.includes(requestOrigin)
+        ) {
+          response = fail(403, 'Forbidden');
+        } else {
+          response = await handler(context);
+        }
       } else if (apiPath.startsWith('/api/')) {
-        // If URL starts with /api/ but didn't match any route above
-        response = new Response(JSON.stringify({ error: 'Endpoint not found' }), {
-          status: 404,
-          headers: { 'Content-Type': 'application/json' }
-        });
+        response = fail(404, 'Endpoint not found');
       } else if (url.pathname.startsWith('/finance/assets/')) {
-        // Rewrite asset requests under /finance/assets/ to /assets/
-        const assetUrl = new URL(request.url);
-        assetUrl.pathname = assetUrl.pathname.slice('/finance'.length);
-        if (env?.ASSETS?.fetch) {
-          response = await env.ASSETS.fetch(new Request(assetUrl.toString(), request));
-        } else {
-          response = await fetch(new Request(assetUrl.toString(), request));
-        }
+        response = await fetchAsset(env, request, url.pathname.slice('/finance'.length));
       } else if (url.pathname.startsWith('/finance/') && /\.[a-zA-Z0-9]+$/.test(url.pathname)) {
-        // Direct static asset request under /finance/ (e.g. /finance/favicon.svg, /finance/manifest.webmanifest)
-        const assetUrl = new URL(request.url);
-        assetUrl.pathname = assetUrl.pathname.slice('/finance'.length);
-        if (env?.ASSETS?.fetch) {
-          response = await env.ASSETS.fetch(new Request(assetUrl.toString(), request));
-        } else {
-          response = await fetch(new Request(assetUrl.toString(), request));
-        }
+        response = await fetchAsset(env, request, url.pathname.slice('/finance'.length));
       } else if (url.pathname === '/finance' || url.pathname.startsWith('/finance/')) {
-        // SPA entry fallback for /finance subpath
-        const spaUrl = new URL(request.url);
-        spaUrl.pathname = '/';
-        if (env?.ASSETS?.fetch) {
-          response = await env.ASSETS.fetch(new Request(spaUrl.toString(), request));
-        } else {
-          response = await fetch(new Request(spaUrl.toString(), request));
-        }
+        response = await fetchAsset(env, request, '/');
       } else {
-        // Fallback to static SPA assets
-        if (env?.ASSETS?.fetch) {
-          response = await env.ASSETS.fetch(request);
-        } else {
-          response = await fetch(request);
-        }
+        response = env?.ASSETS?.fetch ? await env.ASSETS.fetch(request) : await fetch(request);
       }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : String(err || 'Server error');
-      response = new Response(JSON.stringify({ error: errorMessage }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      console.error('[worker] unhandled error:', err && err.message, err && err.stack);
+      response = fail(500, 'An internal error occurred.');
     }
 
-    return addSecurityHeaders(response, isLocalhost, requestOrigin);
+    return addSecurityHeaders(response, headerOpts);
   }
 };
+
+export default worker;

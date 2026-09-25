@@ -1,12 +1,16 @@
 -- Cloudflare D1 Database Schema for Personal Budget OS
 
 CREATE TABLE IF NOT EXISTS users (
-  id TEXT PRIMARY KEY,
-  email TEXT UNIQUE NOT NULL,
-  password_hash TEXT NOT NULL,
-  name TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'Active',
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  id                   TEXT PRIMARY KEY,
+  email                TEXT UNIQUE NOT NULL,
+  password_hash        TEXT NOT NULL,
+  name                 TEXT NOT NULL,
+  status               TEXT NOT NULL DEFAULT 'Active',
+  security_question    TEXT,
+  security_answer_hash TEXT,
+  role                 TEXT NOT NULL DEFAULT 'user',
+  token_version        INTEGER NOT NULL DEFAULT 0,
+  created_at           TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS households (
@@ -120,6 +124,18 @@ CREATE TABLE IF NOT EXISTS user_backups (
   id TEXT PRIMARY KEY DEFAULT 'default_vault',
   data TEXT NOT NULL,
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS password_resets (
+  id          TEXT    PRIMARY KEY,
+  user_id     TEXT    NOT NULL,
+  email       TEXT    NOT NULL,
+  token       TEXT    NOT NULL,
+  expires_at  INTEGER NOT NULL,
+  used        INTEGER NOT NULL DEFAULT 0,
+  attempts    INTEGER NOT NULL DEFAULT 0,
+  created_at  INTEGER NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_accounts_household ON accounts(household_id);

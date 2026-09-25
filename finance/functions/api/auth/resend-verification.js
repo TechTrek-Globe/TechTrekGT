@@ -21,15 +21,15 @@ export async function onRequestPost(context) {
       return json({ success: true, message: 'Email is already verified.' });
     }
 
-    if (!env.DB || !env.JWT_SECRET) {
-      console.error('[resend-verification] missing DB or JWT_SECRET binding');
+    if (!env.DB || !env.JWT_SECRET || !env.CODE_HMAC_SECRET) {
+      console.error('[resend-verification] missing DB, JWT_SECRET, or CODE_HMAC_SECRET binding');
       return fail(ERROR_CODES.SERVICE_UNAVAILABLE, 503, 'Service unavailable. Please try again later.');
     }
 
     let verificationCode = '';
     for (let i = 0; i < 8; i++) verificationCode += String(randomInt(10));
 
-    const codeHash = await hmacHex(env.JWT_SECRET, `verify:${user.email}:${verificationCode}`);
+    const codeHash = await hmacHex(env.CODE_HMAC_SECRET, `verify:${user.email}:${verificationCode}`);
     const verificationId = `vfy-${crypto.randomUUID()}`;
     const now = Date.now();
 

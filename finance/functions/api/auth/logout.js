@@ -1,4 +1,4 @@
-import { json, fail, withCookies, clearedCookies, getTokenFromRequest, verifyToken } from '../../utils/auth.js';
+import { json, fail, withCookies, clearedCookies, getTokenFromRequest, verifyToken, invalidateCachedUser } from '../../utils/auth.js';
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -15,6 +15,7 @@ export async function onRequestPost(context) {
         ).bind(payload.userId).run().catch((e) => {
           console.error('[logout] token_version bump failed:', e && e.message);
         });
+        await invalidateCachedUser(payload.userId, env).catch(() => {});
       }
     }
   } catch (err) {

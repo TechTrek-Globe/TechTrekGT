@@ -13,6 +13,11 @@ describe('Phase 2 Stage 7: Routing Cleanup', () => {
     JWT_SECRET: 'super-secret-jwt-key-32-bytes-long-for-testing'
   };
 
+  const prodEnv = {
+    ...dummyEnv,
+    ENVIRONMENT: 'production'
+  };
+
   // S7T1: Bare / returns 301 redirect to canonical /finance
   test('S7T1: bare / returns 301 redirect to canonical /finance mount', async () => {
     const req = new Request('https://techtrekgt.com/', { method: 'GET' });
@@ -27,7 +32,7 @@ describe('Phase 2 Stage 7: Routing Cleanup', () => {
       method: 'GET',
       headers: { 'cf-ray': 'dummy-ray-id' }
     });
-    const res = await worker.fetch(req, dummyEnv, {});
+    const res = await worker.fetch(req, prodEnv, {});
     assert.strictEqual(res.status, 301);
     assert.strictEqual(res.headers.get('Location'), 'https://techtrekgt.com/finance');
   });
@@ -53,7 +58,7 @@ describe('Phase 2 Stage 7: Routing Cleanup', () => {
       method: 'GET',
       headers: { 'cf-ray': 'dummy-ray-id' }
     });
-    const resProd = await worker.fetch(reqProd, dummyEnv, {});
+    const resProd = await worker.fetch(reqProd, prodEnv, {});
     assert.strictEqual(resProd.status, 301);
     assert.strictEqual(resProd.headers.get('Location'), 'https://techtrekgt.com/outpost');
 

@@ -66,6 +66,7 @@ describe('Phase 2 Stage 6: Uniform API Error Contract', () => {
     env = {
       DB: mockDb,
       JWT_SECRET: TEST_JWT_SECRET,
+      CODE_HMAC_SECRET: 'test-code-hmac-secret-32-bytes-long',
       SYNC_UNLOCK_CODE: 'valid-secret-sync-code'
     };
   });
@@ -216,7 +217,7 @@ describe('Phase 2 Stage 6: Uniform API Error Contract', () => {
       'INSERT INTO users (id, email, password_hash, name, role, token_version, status, email_verified, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
     ).bind(userObj.id, userObj.email, 'hash', userObj.name, 'user', 0, 'Active', 1, new Date().toISOString()).run();
 
-    const { token, csrf } = await issueSession(env, userObj, false);
+    const { token, csrf } = await issueSession(env, userObj, { rememberMe: false });
     const reqBadCsrf = new Request('https://techtrekgt.com/api/auth/update-profile', {
       method: 'POST',
       headers: {
@@ -297,7 +298,7 @@ describe('Phase 2 Stage 6: Uniform API Error Contract', () => {
       'INSERT INTO users (id, email, password_hash, name, role, token_version, status, email_verified, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
     ).bind(regularUser.id, regularUser.email, 'hash', regularUser.name, 'user', 0, 'Active', 1, new Date().toISOString()).run();
 
-    const { token } = await issueSession(env, regularUser, false);
+    const { token } = await issueSession(env, regularUser, { rememberMe: false });
     const reqAdmin = new Request('https://techtrekgt.com/api/admin/stats', {
       method: 'GET',
       headers: { 'Cookie': `auth_token=${token}` }
@@ -319,8 +320,8 @@ describe('Phase 2 Stage 6: Uniform API Error Contract', () => {
       'INSERT INTO users (id, email, password_hash, name, role, token_version, status, email_verified, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
     ).bind(userB.id, userB.email, 'hash', userB.name, 'user', 0, 'Active', 1, new Date().toISOString()).run();
 
-    const { token: tokenA, csrf: csrfA } = await issueSession(env, userA, false);
-    const { token: tokenB, csrf: csrfB } = await issueSession(env, userB, false);
+    const { token: tokenA, csrf: csrfA } = await issueSession(env, userA, { rememberMe: false });
+    const { token: tokenB, csrf: csrfB } = await issueSession(env, userB, { rememberMe: false });
 
     // 1. Missing baseVersion without force returns VALIDATION_ERROR
     const reqNoVer = new Request('https://techtrekgt.com/api/sync/backup', {
@@ -345,7 +346,17 @@ describe('Phase 2 Stage 6: Uniform API Error Contract', () => {
         'Cookie': `auth_token=${tokenA}; csrf_token=${csrfA}`,
         'X-CSRF-Token': csrfA
       },
-      body: JSON.stringify({ budget: { data: 'x'.repeat(1000) }, force: true })
+      body: JSON.stringify({
+        budget: {
+          accounts: [{ id: 1, name: 'Initial Account' }],
+          transactions: Array.from({ length: 20 }, (_, i) => ({
+            id: `tx-${i}`,
+            amount: 50,
+            description: 'Cloud state seed transaction'
+          }))
+        },
+        force: true
+      })
     });
     const initialRes = await worker.fetch(initialReq, env, {});
     assert.strictEqual(initialRes.status, 200);
@@ -373,7 +384,7 @@ describe('Phase 2 Stage 6: Uniform API Error Contract', () => {
         'Cookie': `auth_token=${tokenA}; csrf_token=${csrfA}`,
         'X-CSRF-Token': csrfA
       },
-      body: JSON.stringify({ budget: { d: 'small' }, baseVersion: Date.now() + 100000 })
+      body: JSON.stringify({ budget: { accounts: [] }, baseVersion: Date.now() + 100000 })
     });
     const resSuspicious = await worker.fetch(reqSuspicious, env, {});
     assert.strictEqual(resSuspicious.status, 409);

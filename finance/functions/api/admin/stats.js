@@ -1,7 +1,12 @@
 import { authenticate, json, fail, ERROR_CODES } from '../../utils/auth.js';
+import { enforceRateLimit } from '../../utils/rateLimit.js';
 
 export async function onRequestGet(context) {
   const { env } = context;
+
+  const limited = await enforceRateLimit(context, 'admin-stats', 30, 60);
+  if (limited) return limited;
+
   try {
     const auth = await authenticate(context, { requireCsrf: false });
     if (auth.error) return auth.error;
@@ -20,7 +25,7 @@ export async function onRequestGet(context) {
     const usersResult = await env.DB.prepare(
       'SELECT id, email, name, status, created_at FROM users ORDER BY created_at ASC LIMIT 1000'
     ).all();
-    const backupsResult = await env.DB.prepare('SELECT id, updated_at FROM user_backups').all();
+    const backupsResult = await env.DB.prepare('SELECT id, updated_at FROM user_backups LIMIT 1000').all();
 
     const backupMap = {};
     for (const row of backupsResult.results || []) {

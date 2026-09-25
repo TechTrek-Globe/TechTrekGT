@@ -6,6 +6,15 @@
   "observability": {
     "enabled": true
   },
+  "vars": {
+    "ENVIRONMENT": "production"
+    // Production secrets (provisioned via `wrangler secret put <KEY>`):
+    // - JWT_SECRET: Shared SSO session signing key
+    // - CODE_HMAC_SECRET: Dedicated HMAC key for verification and reset OTP codes
+    // - SYNC_UNLOCK_CODE: Cloud sync unlock passcode
+    // - RESEND_API_KEY: Transactional email delivery key
+    // - TURNSTILE_SECRET_KEY: Cloudflare Turnstile bot verification secret key
+  },
   "assets": {
     "directory": "./dist/client",
     "binding": "ASSETS",

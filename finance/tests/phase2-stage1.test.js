@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 import { onRequestPost as registerPost } from '../functions/api/auth/register.js';
 import { onRequestGet as meGet } from '../functions/api/auth/me.js';
-import { hashPassword, issueSession, createToken } from '../functions/utils/auth.js';
+import { hashPassword, issueSession, createToken, invalidateCachedUser, clearMemoryUserCache } from '../functions/utils/auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -54,9 +54,11 @@ describe('Phase 2 Stage 1: Phase 1 regression fixes', () => {
 
   beforeEach(() => {
     mockDb = createMockD1();
+    clearMemoryUserCache();
     env = {
       DB: mockDb,
       JWT_SECRET: TEST_JWT_SECRET,
+      CODE_HMAC_SECRET: 'test-code-hmac-secret-32-bytes-long',
       RESEND_API_KEY: 're_mock_test_key',
       MAIL_FROM: 'noreply@techtrekgt.com'
     };
@@ -117,7 +119,7 @@ describe('Phase 2 Stage 1: Phase 1 regression fixes', () => {
 
     // Issue a real token so /me can authenticate
     const user = { id: userId, email: 's1t3@example.com', name: 'Carol Test', token_version: 0 };
-    const { token } = await issueSession(env, user, false);
+    const { token } = await issueSession(env, user, { rememberMe: false });
 
     function makeMeRequest() {
       return new Request('http://localhost/api/auth/me', {
@@ -172,8 +174,8 @@ describe('Phase 2 Stage 1: Phase 1 regression fixes', () => {
     assert.match(body.csrfToken, /^[A-Za-z0-9_\-+/=]{20,}$/, 'csrfToken must be a non-trivial token string');
   });
 
-  // S1T4b: no KV cache added to /me (documentation test - assert /me hits DB on every call)
-  test('S1T4b: /me performs a DB lookup on every call (no stale-cache path)', async () => {
+  // S1T4b: /me uses short-TTL session cache (REM-17); invalidating cache on token_version bump rejects stale token
+  test('S1T4b: /me rejects stale token after token_version bump and cache invalidation (REM-17)', async () => {
     const pwHash = await hashPassword('ValidPass123!');
     const userId = 'usr-s1t4b';
     await mockDb.prepare(
@@ -181,7 +183,7 @@ describe('Phase 2 Stage 1: Phase 1 regression fixes', () => {
     ).bind(userId, 's1t4b@example.com', pwHash, 'Eve Test', 'user', 0, 'Active', new Date().toISOString()).run();
 
     const user = { id: userId, email: 's1t4b@example.com', name: 'Eve Test', token_version: 0 };
-    const { token } = await issueSession(env, user, false);
+    const { token } = await issueSession(env, user, { rememberMe: false });
 
     const req = new Request('http://localhost/api/auth/me', {
       method: 'GET',
@@ -191,10 +193,11 @@ describe('Phase 2 Stage 1: Phase 1 regression fixes', () => {
     assert.strictEqual(res.status, 200);
 
     const body = await res.json();
-    // token_version is checked against DB on every call; bump it and the next call must 401
+    // token_version is bumped and cache is invalidated (simulating logout/password change write)
     await mockDb.prepare(
       'UPDATE users SET token_version = token_version + 1 WHERE id = ?'
     ).bind(userId).run();
+    await invalidateCachedUser(userId, env);
 
     const req2 = new Request('http://localhost/api/auth/me', {
       method: 'GET',
@@ -202,6 +205,6 @@ describe('Phase 2 Stage 1: Phase 1 regression fixes', () => {
     });
     const res2 = await meGet({ request: req2, env, ctx: {} });
     // Must be 401 because DB token_version no longer matches the JWT tv claim
-    assert.strictEqual(res2.status, 401, '/me must hit DB every call - stale token must be rejected after token_version bump');
+    assert.strictEqual(res2.status, 401, 'stale token must be rejected after token_version bump');
   });
 });

@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { onRequestPost as adminUserStatusPost } from '../functions/api/admin/user-status.js';
 import { onRequestPost as loginPost } from '../functions/api/auth/login.js';
 import { onRequestGet as meGet } from '../functions/api/auth/me.js';
-import { hashPassword, issueSession } from '../functions/utils/auth.js';
+import { hashPassword, issueSession, ERROR_CODES } from '../functions/utils/auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -97,7 +97,7 @@ describe('Phase 2 Stage 4: Schema and Data Integrity', () => {
       'INSERT INTO users (id, email, password_hash, name, role, token_version, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
     ).bind(targetUser.id, targetUser.email, 'hash', targetUser.name, 'user', 0, 'Active', new Date().toISOString()).run();
 
-    const { token, csrf } = await issueSession(env, adminUser, false);
+    const { token, csrf } = await issueSession(env, adminUser, { rememberMe: false });
 
     const req = new Request('http://localhost/api/admin/user/' + targetUser.id + '/status', {
       method: 'POST',
@@ -128,7 +128,7 @@ describe('Phase 2 Stage 4: Schema and Data Integrity', () => {
       'INSERT INTO users (id, email, password_hash, name, role, token_version, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
     ).bind(regularUser.id, regularUser.email, 'hash', regularUser.name, 'user', 0, 'Active', new Date().toISOString()).run();
 
-    const { token, csrf } = await issueSession(env, regularUser, false);
+    const { token, csrf } = await issueSession(env, regularUser, { rememberMe: false });
 
     const req = new Request('http://localhost/api/admin/user/some-id/status', {
       method: 'POST',
@@ -151,7 +151,7 @@ describe('Phase 2 Stage 4: Schema and Data Integrity', () => {
       'INSERT INTO users (id, email, password_hash, name, role, token_version, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
     ).bind(adminUser.id, adminUser.email, 'hash', adminUser.name, 'admin', 0, 'Active', new Date().toISOString()).run();
 
-    const { token, csrf } = await issueSession(env, adminUser, false);
+    const { token, csrf } = await issueSession(env, adminUser, { rememberMe: false });
 
     const req = new Request('http://localhost/api/admin/user/' + adminUser.id + '/status', {
       method: 'POST',
@@ -177,7 +177,7 @@ describe('Phase 2 Stage 4: Schema and Data Integrity', () => {
       'INSERT INTO users (id, email, password_hash, name, role, token_version, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
     ).bind(adminUser.id, adminUser.email, 'hash', adminUser.name, 'admin', 0, 'Active', new Date().toISOString()).run();
 
-    const { token, csrf } = await issueSession(env, adminUser, false);
+    const { token, csrf } = await issueSession(env, adminUser, { rememberMe: false });
 
     const req = new Request('http://localhost/api/admin/user/target-id/status', {
       method: 'POST',
@@ -205,7 +205,7 @@ describe('Phase 2 Stage 4: Schema and Data Integrity', () => {
       'INSERT INTO users (id, email, password_hash, name, role, token_version, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
     ).bind(targetUser.id, targetUser.email, 'hash', targetUser.name, 'user', 5, 'Active', new Date().toISOString()).run();
 
-    const { token, csrf } = await issueSession(env, adminUser, false);
+    const { token, csrf } = await issueSession(env, adminUser, { rememberMe: false });
 
     const req = new Request('http://localhost/api/admin/user/' + targetUser.id + '/status', {
       method: 'POST',
@@ -241,15 +241,19 @@ describe('Phase 2 Stage 4: Schema and Data Integrity', () => {
     });
     const loginRes = await loginPost({ request: loginReq, env, ctx: {} });
     assert.strictEqual(loginRes.status, 403, 'Login must return 403 for suspended user');
+    const loginData = await loginRes.json();
+    assert.strictEqual(loginData.code, ERROR_CODES.ACCOUNT_SUSPENDED, 'Login must return ACCOUNT_SUSPENDED error code');
 
     // 2. Test session authenticate rejection
-    const { token } = await issueSession(env, suspendedUser, false);
+    const { token } = await issueSession(env, suspendedUser, { rememberMe: false });
     const meReq = new Request('http://localhost/api/auth/me', {
       method: 'GET',
       headers: { Cookie: `auth_token=${token}` }
     });
     const meRes = await meGet({ request: meReq, env, ctx: {} });
     assert.strictEqual(meRes.status, 403, 'Existing session must be rejected with 403');
+    const meData = await meRes.json();
+    assert.strictEqual(meData.code, ERROR_CODES.ACCOUNT_SUSPENDED, 'Authenticate must return ACCOUNT_SUSPENDED error code');
   });
 
   // S4T8: Admin can re-activate a Suspended user back to Active
@@ -265,7 +269,7 @@ describe('Phase 2 Stage 4: Schema and Data Integrity', () => {
       'INSERT INTO users (id, email, password_hash, name, role, token_version, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
     ).bind(targetUser.id, targetUser.email, pwHash, targetUser.name, 'user', 0, 'Suspended', new Date().toISOString()).run();
 
-    const { token, csrf } = await issueSession(env, adminUser, false);
+    const { token, csrf } = await issueSession(env, adminUser, { rememberMe: false });
 
     const req = new Request('http://localhost/api/admin/user/' + targetUser.id + '/status', {
       method: 'POST',

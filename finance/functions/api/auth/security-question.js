@@ -1,4 +1,4 @@
-import { authenticate, json, fail, ERROR_CODES } from '../../utils/auth.js';
+import { authenticate, json, fail, ERROR_CODES, toPublicUser } from '../../utils/auth.js';
 
 /**
  * GET /api/auth/security-question - now authenticated.
@@ -13,11 +13,12 @@ export async function onRequestGet(context) {
     const auth = await authenticate(context, { requireCsrf: false });
     if (auth.error) return auth.error;
     const { user } = auth;
+    const publicUser = toPublicUser(user);
     return json({
       success: true,
-      email: user.email,
-      securityQuestion: user.security_question || null,
-      hasSecurityQuestion: Boolean(user.security_question && user.security_answer_hash)
+      email: publicUser.email,
+      securityQuestion: publicUser.securityQuestion,
+      hasSecurityQuestion: publicUser.hasSecurityQuestion
     });
   } catch (err) {
     console.error('[security-question] error:', err && err.message);

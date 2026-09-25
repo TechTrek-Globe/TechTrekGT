@@ -1,9 +1,9 @@
 import {
   authenticate, readJson, asTrimmedString, json, fail, withCookies, sessionCookies, newCsrfToken,
   createToken, hashPassword, verifyPassword, validatePassword, randomInt, hmacHex,
-  sendVerificationEmail, sendEmailChangeNotification, ERROR_CODES,
+  sendVerificationEmail, sendEmailChangeNotification, ERROR_CODES, toPublicUser,
   EMAIL_REGEX, MAX_BODY_AUTH, MAX_NAME_LEN, MAX_EMAIL_LEN, MAX_QUESTION_LEN, MAX_ANSWER_LEN,
-  ACCESS_TOKEN_TTL, SESSION_TTL_DEFAULT
+  ACCESS_TOKEN_TTL, SESSION_TTL_DEFAULT, invalidateCachedUser
 } from '../../utils/auth.js';
 import { enforceRateLimit } from '../../utils/rateLimit.js';
 
@@ -13,9 +13,20 @@ export async function onRequestPost(context) {
   if (limited) return limited;
 
   try {
+    if (!env.DB || !env.JWT_SECRET || !env.CODE_HMAC_SECRET) {
+      console.error('[update-profile] missing DB, JWT_SECRET, or CODE_HMAC_SECRET binding');
+      return fail(ERROR_CODES.SERVICE_UNAVAILABLE, 503, 'Service unavailable. Please try again later.');
+    }
+
     const auth = await authenticate(context, { requireCsrf: true });
     if (auth.error) return auth.error;
     const { payload, user } = auth;
+
+    // Fetch credentials directly from D1 to keep them out of session cache (REM-13/REM-17)
+    const dbCreds = await env.DB.prepare(
+      'SELECT password_hash, security_answer_hash, security_question FROM users WHERE id = ?'
+    ).bind(user.id).first();
+    if (!dbCreds) return fail(ERROR_CODES.UNAUTHORIZED, 401, 'User not found.');
 
     const body = await readJson(request, MAX_BODY_AUTH);
     if (!body) return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Invalid request body.');
@@ -25,9 +36,9 @@ export async function onRequestPost(context) {
     let updatedName = user.name;
     let pendingEmail = user.pending_email || null;
     let emailChangeRequested = false;
-    let updatedQuestion = user.security_question;
-    let updatedAnswerHash = user.security_answer_hash;
-    let updatedPasswordHash = user.password_hash;
+    let updatedQuestion = dbCreds.security_question;
+    let updatedAnswerHash = dbCreds.security_answer_hash;
+    let updatedPasswordHash = dbCreds.password_hash;
     let bumpTokenVersion = false;
 
     const name = asTrimmedString(body.name, MAX_NAME_LEN);
@@ -40,7 +51,7 @@ export async function onRequestPost(context) {
       if (cleanEmail !== user.email) {
         // Changing the address that owns the account is a security-sensitive
         // action; require the current password.
-        if (!currentPassword || !(await verifyPassword(String(currentPassword), user.password_hash))) {
+        if (!currentPassword || !(await verifyPassword(String(currentPassword), dbCreds.password_hash))) {
           return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Current password is required to change your email address.');
         }
         const existing = await env.DB.prepare(
@@ -59,7 +70,7 @@ export async function onRequestPost(context) {
       if (!securityAnswer) {
         return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'A security answer is required when changing the security question.');
       }
-      if (!currentPassword || !(await verifyPassword(String(currentPassword), user.password_hash))) {
+      if (!currentPassword || !(await verifyPassword(String(currentPassword), dbCreds.password_hash))) {
         return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Current password is required to change your security question.');
       }
       updatedQuestion = securityQuestion;
@@ -70,7 +81,7 @@ export async function onRequestPost(context) {
       if (!currentPassword || typeof currentPassword !== 'string') {
         return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Current password is required to set a new password.');
       }
-      if (!(await verifyPassword(currentPassword, user.password_hash))) {
+      if (!(await verifyPassword(currentPassword, dbCreds.password_hash))) {
         return fail(ERROR_CODES.INVALID_CREDENTIALS, 400, 'Current password is incorrect.');
       }
       const pwError = validatePassword(newPassword);
@@ -84,7 +95,7 @@ export async function onRequestPost(context) {
     if (emailChangeRequested && pendingEmail) {
       let changeCode = '';
       for (let i = 0; i < 8; i++) changeCode += String(randomInt(10));
-      const codeHash = await hmacHex(env.JWT_SECRET, `verify:${pendingEmail}:${changeCode}`);
+      const codeHash = await hmacHex(env.CODE_HMAC_SECRET, `verify:${pendingEmail}:${changeCode}`);
       const verificationId = `vfy-${crypto.randomUUID()}`;
       const nowMs = Date.now();
       const VERIFY_CODE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -114,6 +125,8 @@ export async function onRequestPost(context) {
       user.id
     ).run();
 
+    await invalidateCachedUser(user.id, env);
+
     // Re-issue within the existing session window rather than silently
     // extending the session (fix H6).
     const now = Math.floor(Date.now() / 1000);
@@ -138,16 +151,12 @@ export async function onRequestPost(context) {
         message: emailChangeRequested
           ? 'Profile updated. A verification code has been sent to your new email address to confirm the change.'
           : 'Profile updated successfully.',
-        user: {
-          id: user.id,
-          email: user.email,
+        user: toPublicUser(user, {
           name: updatedName,
-          isAdmin: user.role === 'admin',
-          emailVerified: Boolean(user.email_verified),
           pendingEmail: pendingEmail || null,
           securityQuestion: updatedQuestion,
           hasSecurityQuestion: Boolean(updatedQuestion && updatedAnswerHash)
-        },
+        }),
         csrfToken: csrf
       }),
       sessionCookies(token, csrf, sexp - now)

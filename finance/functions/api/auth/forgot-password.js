@@ -28,8 +28,11 @@ export async function onRequestPost(context) {
     }
     const cleanEmail = rawEmail.toLowerCase();
 
-    if (!env.DB || !env.JWT_SECRET) {
-      console.error('[forgot-password] missing DB or JWT_SECRET binding', requestId ? { requestId } : '');
+    const accountLimited = await enforceRateLimit(context, 'forgot-account', 5, 600, cleanEmail);
+    if (accountLimited) return accountLimited;
+
+    if (!env.DB || !env.JWT_SECRET || !env.CODE_HMAC_SECRET) {
+      console.error('[forgot-password] missing DB, JWT_SECRET, or CODE_HMAC_SECRET binding', requestId ? { requestId } : '');
       return fail(ERROR_CODES.SERVICE_UNAVAILABLE, 503, 'Service unavailable. Please try again later.', requestId);
     }
 
@@ -55,7 +58,7 @@ export async function onRequestPost(context) {
 
     // Store only an HMAC of the code so a database leak does not yield
     // usable reset tokens (fix H8).
-    const codeHash = await hmacHex(env.JWT_SECRET, `reset:${cleanEmail}:${resetCode}`);
+    const codeHash = await hmacHex(env.CODE_HMAC_SECRET, `reset:${cleanEmail}:${resetCode}`);
     const resetId = `rst-${crypto.randomUUID()}`;
     const now = Date.now();
 

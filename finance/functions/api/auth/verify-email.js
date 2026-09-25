@@ -1,6 +1,6 @@
 import {
   authenticate, readJson, asTrimmedString, json, fail,
-  constantTimeStringEqual, hmacHex, MAX_BODY_AUTH, ERROR_CODES
+  constantTimeStringEqual, hmacHex, MAX_BODY_AUTH, ERROR_CODES, invalidateCachedUser
 } from '../../utils/auth.js';
 import { enforceRateLimit } from '../../utils/rateLimit.js';
 
@@ -27,8 +27,8 @@ export async function onRequestPost(context) {
       return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Please provide the valid 8-digit verification code.');
     }
 
-    if (!env.DB || !env.JWT_SECRET) {
-      console.error('[verify-email] missing DB or JWT_SECRET binding');
+    if (!env.DB || !env.JWT_SECRET || !env.CODE_HMAC_SECRET) {
+      console.error('[verify-email] missing DB, JWT_SECRET, or CODE_HMAC_SECRET binding');
       return fail(ERROR_CODES.SERVICE_UNAVAILABLE, 503, 'Service unavailable. Please try again later.');
     }
 
@@ -49,7 +49,7 @@ export async function onRequestPost(context) {
       return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Too many invalid attempts. Please request a new verification code.');
     }
 
-    const codeHash = await hmacHex(env.JWT_SECRET, `verify:${user.email}:${cleanCode}`);
+    const codeHash = await hmacHex(env.CODE_HMAC_SECRET, `verify:${user.email}:${cleanCode}`);
     const isValid = await constantTimeStringEqual(record.token, codeHash);
 
     if (!isValid) {
@@ -61,6 +61,8 @@ export async function onRequestPost(context) {
       env.DB.prepare('UPDATE email_verifications SET used = 1 WHERE id = ?').bind(record.id),
       env.DB.prepare('UPDATE users SET email_verified = 1 WHERE id = ?').bind(user.id)
     ]);
+
+    await invalidateCachedUser(user.id, env);
 
     return json({ success: true, message: 'Email verified successfully.' });
   } catch (err) {

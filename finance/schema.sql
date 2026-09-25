@@ -125,6 +125,7 @@ CREATE TABLE IF NOT EXISTS household_settings (
 CREATE TABLE IF NOT EXISTS user_backups (
   id TEXT PRIMARY KEY,
   data TEXT NOT NULL,
+  data_byte_length INTEGER,
   updated_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at_ms INTEGER
 );

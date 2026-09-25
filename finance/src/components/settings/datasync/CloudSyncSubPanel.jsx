@@ -54,6 +54,8 @@ export function CloudSyncSubPanel() {
     setIsVerifyingCode(true);
 
     try {
+      // Contract note: POST /api/verify-sync-code requires an active authenticated session
+      // (credentials: 'include' + X-CSRF-Token attached via apiFetch). Pre-login invocation is not supported.
       const res = await apiFetch('/api/verify-sync-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

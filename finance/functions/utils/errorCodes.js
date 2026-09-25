@@ -3,6 +3,8 @@ export const ERROR_CODES = {
   RESET_CODE_INVALID:   'RESET_CODE_INVALID',
   SESSION_EXPIRED:      'SESSION_EXPIRED',
   UNAUTHORIZED:         'UNAUTHORIZED',
+  // REM-21: Distinct code for suspended accounts so frontend avoids misinterpreting as session expiration/login redirect
+  ACCOUNT_SUSPENDED:    'ACCOUNT_SUSPENDED',
   FORBIDDEN:            'FORBIDDEN',
   CSRF_INVALID:         'CSRF_INVALID',
   RATE_LIMITED:         'RATE_LIMITED',

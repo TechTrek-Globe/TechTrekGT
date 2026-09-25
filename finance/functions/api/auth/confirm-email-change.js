@@ -1,7 +1,7 @@
 import {
   authenticate, readJson, asTrimmedString, json, fail, withCookies, sessionCookies,
-  newCsrfToken, createToken, constantTimeStringEqual, hmacHex,
-  MAX_BODY_AUTH, ACCESS_TOKEN_TTL, SESSION_TTL_DEFAULT, ERROR_CODES
+  newCsrfToken, createToken, constantTimeStringEqual, hmacHex, toPublicUser,
+  MAX_BODY_AUTH, ACCESS_TOKEN_TTL, SESSION_TTL_DEFAULT, ERROR_CODES, invalidateCachedUser
 } from '../../utils/auth.js';
 import { enforceRateLimit } from '../../utils/rateLimit.js';
 
@@ -12,6 +12,11 @@ export async function onRequestPost(context) {
   if (limited) return limited;
 
   try {
+    if (!env?.DB || !env?.JWT_SECRET || !env?.CODE_HMAC_SECRET) {
+      console.error('[confirm-email-change] missing DB, JWT_SECRET, or CODE_HMAC_SECRET binding');
+      return fail(ERROR_CODES.SERVICE_UNAVAILABLE, 503, 'Service unavailable. Please try again later.');
+    }
+
     const auth = await authenticate(context, { requireCsrf: true });
     if (auth.error) return auth.error;
     const { payload, user } = auth;
@@ -26,11 +31,6 @@ export async function onRequestPost(context) {
     const cleanCode = asTrimmedString(body.code, 16);
     if (!cleanCode || !/^\d{8}$/.test(cleanCode)) {
       return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Please provide the valid 8-digit confirmation code.');
-    }
-
-    if (!env.DB || !env.JWT_SECRET) {
-      console.error('[confirm-email-change] missing DB or JWT_SECRET binding');
-      return fail(ERROR_CODES.SERVICE_UNAVAILABLE, 503, 'Service unavailable. Please try again later.');
     }
 
     const newEmail = user.pending_email.toLowerCase();
@@ -52,7 +52,7 @@ export async function onRequestPost(context) {
       return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Too many invalid attempts. Please request a new confirmation code.');
     }
 
-    const codeHash = await hmacHex(env.JWT_SECRET, `verify:${newEmail}:${cleanCode}`);
+    const codeHash = await hmacHex(env.CODE_HMAC_SECRET, `verify:${newEmail}:${cleanCode}`);
     const isValid = await constantTimeStringEqual(record.token, codeHash);
 
     if (!isValid) {
@@ -66,6 +66,7 @@ export async function onRequestPost(context) {
 
     if (conflict) {
       await env.DB.prepare('UPDATE users SET pending_email = NULL WHERE id = ?').bind(user.id).run();
+      await invalidateCachedUser(user.id, env);
       return fail(ERROR_CODES.CONFLICT, 409, 'That email address is already in use by another account.');
     }
 
@@ -77,6 +78,8 @@ export async function onRequestPost(context) {
         'UPDATE users SET email = pending_email, pending_email = NULL, email_verified = 1, token_version = ? WHERE id = ?'
       ).bind(newTokenVersion, user.id)
     ]);
+
+    await invalidateCachedUser(user.id, env);
 
     const now = Math.floor(Date.now() / 1000);
     const sexp = typeof payload.sexp === 'number' && payload.sexp > now ? payload.sexp : now + SESSION_TTL_DEFAULT;
@@ -98,16 +101,11 @@ export async function onRequestPost(context) {
       json({
         success: true,
         message: 'Email address updated successfully.',
-        user: {
-          id: user.id,
+        user: toPublicUser(user, {
           email: newEmail,
-          name: user.name,
-          isAdmin: user.role === 'admin',
           emailVerified: true,
-          pendingEmail: null,
-          securityQuestion: user.security_question || null,
-          hasSecurityQuestion: Boolean(user.security_question && user.security_answer_hash)
-        },
+          pendingEmail: null
+        }),
         csrfToken: csrf
       }),
       sessionCookies(token, csrf, sexp - now)

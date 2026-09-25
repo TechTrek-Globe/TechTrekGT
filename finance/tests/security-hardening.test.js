@@ -27,6 +27,7 @@ const __dirname = path.dirname(__filename);
 const schemaSql = fs.readFileSync(path.join(__dirname, '../schema.sql'), 'utf8');
 
 const TEST_JWT_SECRET = 'super-secret-jwt-key-32-bytes-long-for-testing';
+const TEST_CODE_HMAC_SECRET = 'code-hmac-secret-32-bytes-long-for-testing';
 
 function createMockD1() {
   const db = new DatabaseSync(':memory:');
@@ -74,6 +75,7 @@ describe('Phase 1 Security Hardening Verification Tests (T1 - T12)', () => {
     env = {
       DB: mockDb,
       JWT_SECRET: TEST_JWT_SECRET,
+      CODE_HMAC_SECRET: TEST_CODE_HMAC_SECRET,
       RESEND_API_KEY: 're_mock_test_key',
       MAIL_FROM: 'noreply@techtrekgt.com'
     };
@@ -194,7 +196,7 @@ describe('Phase 1 Security Hardening Verification Tests (T1 - T12)', () => {
     ).bind('usr-t4', 'reset-attempt@example.com', pwHash, 'Attempt User', 'user', 0).run();
 
     const resetCode = '12345678';
-    const codeHash = await hmacHex(TEST_JWT_SECRET, `reset:reset-attempt@example.com:${resetCode}`);
+    const codeHash = await hmacHex(TEST_CODE_HMAC_SECRET, `reset:reset-attempt@example.com:${resetCode}`);
     const now = Date.now();
 
     // Seed reset record with attempts already at 5 (cap reached)
@@ -232,7 +234,7 @@ describe('Phase 1 Security Hardening Verification Tests (T1 - T12)', () => {
     ).bind('usr-t5', 'security-q@example.com', pwHash, 'SecQ User', 'Color?', answerHash, 'user', 0).run();
 
     const correctCode = '87654321';
-    const codeHash = await hmacHex(TEST_JWT_SECRET, `reset:security-q@example.com:${correctCode}`);
+    const codeHash = await hmacHex(TEST_CODE_HMAC_SECRET, `reset:security-q@example.com:${correctCode}`);
     const now = Date.now();
 
     await mockDb.prepare(
@@ -360,7 +362,7 @@ describe('Phase 1 Security Hardening Verification Tests (T1 - T12)', () => {
     ).bind('usr-t8', 'admin@techtrekgt.com', pwHash, 'Fake Admin', 'user', 0).run();
 
     const user = { id: 'usr-t8', email: 'admin@techtrekgt.com', name: 'Fake Admin', role: 'user', token_version: 0 };
-    const { token } = await issueSession(env, user, 'hh-t8', false);
+    const { token } = await issueSession(env, user, { rememberMe: false });
 
     const request = new Request('http://localhost/api/admin/stats', {
       method: 'GET',
@@ -382,7 +384,7 @@ describe('Phase 1 Security Hardening Verification Tests (T1 - T12)', () => {
     ).bind('usr-t9', 'real-admin@customdomain.org', pwHash, 'Real Admin', 'admin', 0).run();
 
     const user = { id: 'usr-t9', email: 'real-admin@customdomain.org', name: 'Real Admin', role: 'admin', token_version: 0 };
-    const { token } = await issueSession(env, user, 'hh-t9', false);
+    const { token } = await issueSession(env, user, { rememberMe: false });
 
     const request = new Request('http://localhost/api/admin/stats', {
       method: 'GET',
@@ -398,11 +400,37 @@ describe('Phase 1 Security Hardening Verification Tests (T1 - T12)', () => {
   });
 
   // T10: POST /api/verify-sync-code
-  test('T10: missing SYNC_UNLOCK_CODE binding returns 503, not 200', async () => {
-    // Fails closed when SYNC_UNLOCK_CODE is unset (no '123456' default)
-    const reqMissing = new Request('http://localhost/api/verify-sync-code', {
+  test('T10: POST /api/verify-sync-code requires auth, verifies passcode, and throttles per-account', async () => {
+    // 1. Calling without valid session returns 401 UNAUTHORIZED before code comparison runs
+    const reqNoAuth = new Request('http://localhost/api/verify-sync-code', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Origin: 'http://localhost:5173' },
+      body: JSON.stringify({ code: '123456' })
+    });
+
+    const resNoAuth = await worker.fetch(reqNoAuth, { DB: mockDb, JWT_SECRET: TEST_JWT_SECRET });
+    assert.strictEqual(resNoAuth.status, 401, 'Must return 401 when called without valid session');
+
+    // Setup authenticated user in mock DB
+    const pwHash = await hashPassword('ValidPass123!');
+    await mockDb.prepare(
+      'INSERT INTO users (id, email, password_hash, name, role, token_version) VALUES (?, ?, ?, ?, ?, ?)'
+    ).bind('usr-t10', 'user-t10@techtrekgt.com', pwHash, 'User T10', 'user', 0).run();
+
+    const user = { id: 'usr-t10', email: 'user-t10@techtrekgt.com', name: 'User T10', role: 'user', token_version: 0 };
+    const { token, csrf } = await issueSession({ DB: mockDb, JWT_SECRET: TEST_JWT_SECRET }, user, { rememberMe: false });
+
+    const authHeaders = {
+      'Content-Type': 'application/json',
+      Origin: 'http://localhost:5173',
+      Cookie: `auth_token=${token}; csrf_token=${csrf}`,
+      'X-CSRF-Token': csrf
+    };
+
+    // 2. Fails closed when SYNC_UNLOCK_CODE is unset (no '123456' default)
+    const reqMissing = new Request('http://localhost/api/verify-sync-code', {
+      method: 'POST',
+      headers: authHeaders,
       body: JSON.stringify({ code: '123456' })
     });
 
@@ -412,7 +440,7 @@ describe('Phase 1 Security Hardening Verification Tests (T1 - T12)', () => {
     const bodyMissing = await resMissing.json();
     assert.strictEqual(bodyMissing.error, 'Service unavailable.');
 
-    // Configured case
+    // 3. Configured case
     const envWithCode = {
       DB: mockDb,
       JWT_SECRET: TEST_JWT_SECRET,
@@ -422,7 +450,7 @@ describe('Phase 1 Security Hardening Verification Tests (T1 - T12)', () => {
     // Wrong code
     const reqWrong = new Request('http://localhost/api/verify-sync-code', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Origin: 'http://localhost:5173' },
+      headers: authHeaders,
       body: JSON.stringify({ code: '123456' })
     });
     const resWrong = await worker.fetch(reqWrong, envWithCode);
@@ -431,7 +459,7 @@ describe('Phase 1 Security Hardening Verification Tests (T1 - T12)', () => {
     // Correct code
     const reqCorrect = new Request('http://localhost/api/verify-sync-code', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Origin: 'http://localhost:5173' },
+      headers: authHeaders,
       body: JSON.stringify({ code: 'secure-vault-passcode' })
     });
     const resCorrect = await worker.fetch(reqCorrect, envWithCode);
@@ -439,6 +467,45 @@ describe('Phase 1 Security Hardening Verification Tests (T1 - T12)', () => {
     const bodyCorrect = await resCorrect.json();
     assert.strictEqual(bodyCorrect.success, true);
     assert.strictEqual(bodyCorrect.token, 'vault-unlocked');
+
+    // 4. Per-account brute force throttling independently of source IP
+    const kvStore = new Map();
+    const mockKv = {
+      async get(key) { return kvStore.get(key) || null; },
+      async put(key, val) { kvStore.set(key, String(val)); }
+    };
+    const envWithRateLimit = {
+      ...envWithCode,
+      RATE_LIMIT_KV: mockKv
+    };
+
+    // Perform 5 attempts from 5 distinct IP addresses for user usr-t10
+    for (let i = 1; i <= 5; i++) {
+      const reqDist = new Request('http://localhost/api/verify-sync-code', {
+        method: 'POST',
+        headers: {
+          ...authHeaders,
+          'CF-Connecting-IP': `198.51.100.${i}`
+        },
+        body: JSON.stringify({ code: 'wrong-passcode' })
+      });
+      const resDist = await worker.fetch(reqDist, envWithRateLimit);
+      assert.strictEqual(resDist.status, 401, `Attempt ${i} from distinct IP should pass rate limit and fail with 401 wrong code`);
+    }
+
+    // 6th attempt from a completely NEW 6th source IP against the same user account usr-t10
+    const reqDistThrottled = new Request('http://localhost/api/verify-sync-code', {
+      method: 'POST',
+      headers: {
+        ...authHeaders,
+        'CF-Connecting-IP': '198.51.100.99'
+      },
+      body: JSON.stringify({ code: 'wrong-passcode' })
+    });
+    const resDistThrottled = await worker.fetch(reqDistThrottled, envWithRateLimit);
+    assert.strictEqual(resDistThrottled.status, 429, 'Distributed brute force against same user account must return 429');
+    const bodyThrottled = await resDistThrottled.json();
+    assert.strictEqual(bodyThrottled.code, 'RATE_LIMITED');
   });
 
   // T11: POST /api/auth/logout
@@ -449,7 +516,7 @@ describe('Phase 1 Security Hardening Verification Tests (T1 - T12)', () => {
     ).bind('usr-t11', 'logout-user@example.com', pwHash, 'Logout User', 'user', 0).run();
 
     const user = { id: 'usr-t11', email: 'logout-user@example.com', name: 'Logout User', role: 'user', token_version: 0 };
-    const { token } = await issueSession(env, user, 'hh-t11', false);
+    const { token } = await issueSession(env, user, { rememberMe: false });
 
     const request = new Request('http://localhost/api/auth/logout', {
       method: 'POST',
@@ -477,7 +544,7 @@ describe('Phase 1 Security Hardening Verification Tests (T1 - T12)', () => {
 
     // Issue token with stale tv = 0
     const staleUser = { id: 'usr-t12', email: 'me-user@example.com', name: 'Me User', role: 'user', token_version: 0 };
-    const { token: staleToken } = await issueSession(env, staleUser, 'hh-t12', false);
+    const { token: staleToken } = await issueSession(env, staleUser, { rememberMe: false });
 
     const request = new Request('http://localhost/api/auth/me', {
       method: 'GET',

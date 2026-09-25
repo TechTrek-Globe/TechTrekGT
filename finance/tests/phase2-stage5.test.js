@@ -20,6 +20,7 @@ const schemaSql = fs.readFileSync(path.join(__dirname, '../schema.sql'), 'utf8')
 const migration0006Sql = fs.readFileSync(path.join(__dirname, '../migrations/0006_email_verification.sql'), 'utf8');
 
 const TEST_JWT_SECRET = 'super-secret-jwt-key-32-bytes-long-for-testing';
+const TEST_CODE_HMAC_SECRET = 'code-hmac-secret-32-bytes-long-for-testing';
 
 function createMockD1() {
   const db = new DatabaseSync(':memory:');
@@ -54,7 +55,8 @@ describe('Phase 2 Stage 5: Email Verification and Security', () => {
     mockDb = createMockD1();
     env = {
       DB: mockDb,
-      JWT_SECRET: TEST_JWT_SECRET
+      JWT_SECRET: TEST_JWT_SECRET,
+      CODE_HMAC_SECRET: TEST_CODE_HMAC_SECRET
     };
   });
 
@@ -127,13 +129,13 @@ describe('Phase 2 Stage 5: Email Verification and Security', () => {
     ).bind(userId, email, pwHash, 'Verify User', 'user', 0, 'Active', 0, new Date().toISOString()).run();
 
     const code = '12345678';
-    const codeHash = await hmacHex(TEST_JWT_SECRET, `verify:${email}:${code}`);
+    const codeHash = await hmacHex(TEST_CODE_HMAC_SECRET, `verify:${email}:${code}`);
     await mockDb.prepare(
       'INSERT INTO email_verifications (id, user_id, email, token, expires_at, used, attempts, created_at) VALUES (?, ?, ?, ?, ?, 0, 0, ?)'
     ).bind('vfy-1', userId, email, codeHash, Date.now() + 86400000, Date.now()).run();
 
     const userObj = { id: userId, email, name: 'Verify User', token_version: 0 };
-    const { token, csrf } = await issueSession(env, userObj, false);
+    const { token, csrf } = await issueSession(env, userObj, { rememberMe: false });
 
     const req = new Request('https://techtrekgt.com/api/auth/verify-email', {
       method: 'POST',
@@ -167,13 +169,13 @@ describe('Phase 2 Stage 5: Email Verification and Security', () => {
     ).bind(userId, email, pwHash, 'Fail User', 'user', 0, 'Active', 0, new Date().toISOString()).run();
 
     const correctCode = '88888888';
-    const codeHash = await hmacHex(TEST_JWT_SECRET, `verify:${email}:${correctCode}`);
+    const codeHash = await hmacHex(TEST_CODE_HMAC_SECRET, `verify:${email}:${correctCode}`);
     await mockDb.prepare(
       'INSERT INTO email_verifications (id, user_id, email, token, expires_at, used, attempts, created_at) VALUES (?, ?, ?, ?, ?, 0, 0, ?)'
     ).bind('vfy-fail', userId, email, codeHash, Date.now() + 86400000, Date.now()).run();
 
     const userObj = { id: userId, email, name: 'Fail User', token_version: 0 };
-    const { token, csrf } = await issueSession(env, userObj, false);
+    const { token, csrf } = await issueSession(env, userObj, { rememberMe: false });
 
     // Make 4 bad attempts
     for (let i = 1; i <= 4; i++) {
@@ -232,13 +234,13 @@ describe('Phase 2 Stage 5: Email Verification and Security', () => {
       'INSERT INTO users (id, email, password_hash, name, role, token_version, status, email_verified, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
     ).bind(userId, email, pwHash, 'Resend User', 'user', 0, 'Active', 0, new Date().toISOString()).run();
 
-    const oldHash = await hmacHex(TEST_JWT_SECRET, `verify:${email}:11111111`);
+    const oldHash = await hmacHex(TEST_CODE_HMAC_SECRET, `verify:${email}:11111111`);
     await mockDb.prepare(
       'INSERT INTO email_verifications (id, user_id, email, token, expires_at, used, attempts, created_at) VALUES (?, ?, ?, ?, ?, 0, 0, ?)'
     ).bind('vfy-old', userId, email, oldHash, Date.now() + 86400000, Date.now() - 1000).run();
 
     const userObj = { id: userId, email, name: 'Resend User', token_version: 0 };
-    const { token, csrf } = await issueSession(env, userObj, false);
+    const { token, csrf } = await issueSession(env, userObj, { rememberMe: false });
 
     const resendReq = new Request('https://techtrekgt.com/api/auth/resend-verification', {
       method: 'POST',
@@ -271,7 +273,7 @@ describe('Phase 2 Stage 5: Email Verification and Security', () => {
     ).bind(userId, currentEmail, pwHash, 'Email Changer', 'user', 0, 'Active', 1, new Date().toISOString()).run();
 
     const userObj = { id: userId, email: currentEmail, name: 'Email Changer', token_version: 0 };
-    const { token, csrf } = await issueSession(env, userObj, false);
+    const { token, csrf } = await issueSession(env, userObj, { rememberMe: false });
 
     const req = new Request('https://techtrekgt.com/api/auth/update-profile', {
       method: 'POST',
@@ -318,13 +320,13 @@ describe('Phase 2 Stage 5: Email Verification and Security', () => {
     ).bind(userId, oldEmail, newEmail, pwHash, 'Confirmer', 'user', initialTokenVersion, 'Active', 1, new Date().toISOString()).run();
 
     const changeCode = '77777777';
-    const codeHash = await hmacHex(TEST_JWT_SECRET, `verify:${newEmail}:${changeCode}`);
+    const codeHash = await hmacHex(TEST_CODE_HMAC_SECRET, `verify:${newEmail}:${changeCode}`);
     await mockDb.prepare(
       'INSERT INTO email_verifications (id, user_id, email, token, expires_at, used, attempts, created_at) VALUES (?, ?, ?, ?, ?, 0, 0, ?)'
     ).bind('vfy-change-1', userId, newEmail, codeHash, Date.now() + 86400000, Date.now()).run();
 
     const userObj = { id: userId, email: oldEmail, name: 'Confirmer', token_version: initialTokenVersion };
-    const { token: oldSessionToken, csrf: oldCsrf } = await issueSession(env, userObj, false);
+    const { token: oldSessionToken, csrf: oldCsrf } = await issueSession(env, userObj, { rememberMe: false });
 
     const req = new Request('https://techtrekgt.com/api/auth/confirm-email-change', {
       method: 'POST',

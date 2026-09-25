@@ -1,5 +1,5 @@
 import {
-  authenticate, json, fail, issueSession, sessionCookies, withCookies, newCsrfToken, ERROR_CODES
+  authenticate, json, fail, issueSession, sessionCookies, withCookies, readCookie, ACCESS_TOKEN_TTL, ERROR_CODES, toPublicUser
 } from '../../utils/auth.js';
 
 export async function onRequestGet(context) {
@@ -10,27 +10,50 @@ export async function onRequestGet(context) {
     if (auth.error) return auth.error;
     const { payload, user } = auth;
 
-    // Sliding refresh - bounded by the absolute session expiry embedded in the token. (H6)
     const now = Math.floor(Date.now() / 1000);
-    const sexp = typeof payload.sexp === 'number' && payload.sexp > now ? payload.sexp : now + 7200;
+    const REFRESH_THRESHOLD = Math.floor(ACCESS_TOKEN_TTL * 0.25);
+
+    const sexp = typeof payload.sexp === 'number' ? payload.sexp : (typeof payload.exp === 'number' ? payload.exp : 0);
+    const isExpiringSoon = (sexp - now <= REFRESH_THRESHOLD) ||
+                           (typeof payload.exp === 'number' && (payload.exp - now <= REFRESH_THRESHOLD));
+
+    const sessionFieldsDiffer =
+      Number(user.token_version || 0) !== Number(payload.tv || 0) ||
+      (payload.role !== undefined && payload.role !== (user.role || 'user')) ||
+      (payload.email !== undefined && payload.email !== user.email) ||
+      (payload.name !== undefined && payload.name !== user.name);
+
+    const existingCsrf = readCookie(context.request, 'csrf_token');
+    const hasValidCsrf = Boolean(existingCsrf && typeof existingCsrf === 'string' && existingCsrf.trim().length > 0);
+
+    const userData = toPublicUser(user);
+
+    // Only issue a new session and rotate cookies when needed:
+    // 1. Session or access token is within refresh threshold (< 25% of TTL remaining)
+    // 2. User claims differ from the database (role, name, email, token_version)
+    // 3. CSRF cookie is missing or invalid (recovering from partial cookie loss)
+    const needsRefresh = isExpiringSoon || sessionFieldsDiffer || !hasValidCsrf;
+
+    if (!needsRefresh) {
+      return json({
+        success: true,
+        user: userData,
+        householdId: null,
+        csrfToken: existingCsrf
+      });
+    }
+
+    const isRememberMe = (typeof payload.iat === 'number' && typeof payload.sexp === 'number' && (payload.sexp - payload.iat > ACCESS_TOKEN_TTL)) ||
+                         (sexp - now > ACCESS_TOKEN_TTL);
 
     const { token, csrf, maxAge } = await issueSession(
-      context.env, user, sexp - now > 2 * 60 * 60
+      context.env, user, { rememberMe: isRememberMe }
     );
 
     return withCookies(
       json({
         success: true,
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          isAdmin: user.role === 'admin',
-          emailVerified: Boolean(user.email_verified),
-          pendingEmail: user.pending_email || null,
-          securityQuestion: user.security_question || null,
-          hasSecurityQuestion: Boolean(user.security_question && user.security_answer_hash)
-        },
+        user: userData,
         householdId: null,
         csrfToken: csrf
       }),

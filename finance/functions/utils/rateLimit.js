@@ -6,7 +6,7 @@
 // Do not change the catch branch to fail-open - it exists because of a
 // specific finding documented in SECURITY-FIXES.md (H9).
 
-export async function checkRateLimit(env, key, maxRequests, windowSeconds) {
+export async function checkRateLimit(env, key, maxRequests, windowSeconds, isProduction = false) {
   const now = Math.floor(Date.now() / 1000);
   const retryAfter = windowSeconds - (now % windowSeconds);
 
@@ -34,9 +34,12 @@ export async function checkRateLimit(env, key, maxRequests, windowSeconds) {
   // (e.g. wrangler dev without DO). In production, RATE_LIMITER Durable Object handles all rate limiting.
   const kv = env?.RATE_LIMIT_KV;
   if (!kv) {
-    console.error('[rateLimit] NO LIMITER BOUND - requests are not being rate limited');
-    // No binding at all: allow through rather than blocking everything,
-    // but log loudly so the operator knows the gap.
+    const isProd = Boolean(isProduction || env?.ENVIRONMENT === 'production');
+    if (isProd) {
+      console.error('[rateLimit] NO LIMITER BOUND in production - failing closed');
+      return { allowed: false, retryAfter, unconfigured: true };
+    }
+    console.warn('[rateLimit] DEV MODE: no limiter bound, allowing request');
     return { allowed: true };
   }
 
@@ -58,21 +61,37 @@ import { fail } from './auth.js';
 
 // Convenience wrapper used by all handlers.
 // Gets the client IP from CF-Connecting-IP and calls checkRateLimit. (Stage 8.2)
-export async function enforceRateLimit(context, prefix, max, windowSeconds) {
+export async function enforceRateLimit(context, prefix, max, windowSeconds, customKey = null) {
+  let pfx = prefix;
+  let key = customKey;
+  if (!key && typeof prefix === 'string' && prefix.includes(':')) {
+    const splitIdx = prefix.indexOf(':');
+    pfx = prefix.slice(0, splitIdx);
+    key = prefix.slice(splitIdx + 1);
+  }
   const ip = context.request?.headers?.get('CF-Connecting-IP');
-  const isProduction = Boolean(context.request?.headers?.get('cf-ray'));
-  if (!ip && isProduction) {
+  const isProduction = Boolean(context.request?.headers?.get('cf-ray')) || context.env?.ENVIRONMENT === 'production';
+  if (!key && !ip && isProduction) {
     console.error('[rateLimit] CF-Connecting-IP absent in production', context.requestId ? { requestId: context.requestId } : '');
     return fail(ERROR_CODES.SERVICE_UNAVAILABLE, 503, 'Service unavailable.', context.requestId);
   }
-  const effectiveIp = ip || 'dev-unknown';
-  const { allowed, retryAfter } = await checkRateLimit(
+  const effectiveKey = key || ip || 'dev-unknown';
+  const hasLimiter = Boolean(context.env?.RATE_LIMITER || context.env?.RATE_LIMIT_KV);
+  const { allowed, retryAfter, unconfigured } = await checkRateLimit(
     context.env,
-    `${prefix}:${effectiveIp}`,
+    `${pfx}:${effectiveKey}`,
     max,
-    windowSeconds
+    windowSeconds,
+    isProduction
   );
   if (allowed) return null;
+
+  if (unconfigured || (!hasLimiter && isProduction)) {
+    console.error('[rateLimit] NO LIMITER BOUND in production', context.requestId ? { requestId: context.requestId } : '');
+    const res = fail(ERROR_CODES.SERVICE_UNAVAILABLE, 503, 'Service unavailable.', context.requestId);
+    if (retryAfter) res.headers.set('Retry-After', String(retryAfter));
+    return res;
+  }
 
   return new Response(
     JSON.stringify({

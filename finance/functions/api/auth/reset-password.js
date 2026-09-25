@@ -2,7 +2,7 @@ import {
   readJson, asTrimmedString, json, fail, withCookies, clearedCookies,
   MAX_BODY_AUTH, MAX_EMAIL_LEN, validatePassword,
   hmacHex, constantTimeStringEqual, hashPassword, verifyPassword,
-  ERROR_CODES, emitMetric
+  ERROR_CODES, emitMetric, invalidateCachedUser
 } from '../../utils/auth.js';
 import { enforceRateLimit } from '../../utils/rateLimit.js';
 
@@ -31,13 +31,13 @@ export async function onRequestPost(context) {
     const pwError = validatePassword(newPassword);
     if (pwError) return fail(ERROR_CODES.VALIDATION_ERROR, 400, pwError, requestId);
 
-    if (!env.DB || !env.JWT_SECRET) {
-      console.error('[reset-password] missing DB or JWT_SECRET binding', requestId ? { requestId } : '');
+    if (!env.DB || !env.JWT_SECRET || !env.CODE_HMAC_SECRET) {
+      console.error('[reset-password] missing DB, JWT_SECRET, or CODE_HMAC_SECRET binding', requestId ? { requestId } : '');
       return fail(ERROR_CODES.SERVICE_UNAVAILABLE, 503, 'Service unavailable. Please try again later.', requestId);
     }
 
     const cleanEmail = rawEmail.toLowerCase();
-    const codeHash = await hmacHex(env.JWT_SECRET, `reset:${cleanEmail}:${code}`);
+    const codeHash = await hmacHex(env.CODE_HMAC_SECRET, `reset:${cleanEmail}:${code}`);
 
     const record = await env.DB.prepare(
       'SELECT id, user_id, expires_at, attempts FROM password_resets WHERE email = ? AND used = 0 ORDER BY created_at DESC LIMIT 1'
@@ -97,6 +97,8 @@ export async function onRequestPost(context) {
       env.DB.prepare('UPDATE password_resets SET used = 1 WHERE id = ?').bind(record.id),
       env.DB.prepare('UPDATE password_resets SET used = 1 WHERE email = ? AND used = 0').bind(cleanEmail)
     ]);
+
+    await invalidateCachedUser(user.id, env);
 
     emitMetric('auth.reset.success', requestId);
 

@@ -5,10 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node scripts/check-safe-serialization.js && vite build",
     "preview": "npm run build && wrangler dev",
     "deploy": "npm run build && wrangler deploy",
-    "test": "node --test tests/phase2-*.test.js tests/security-hardening.test.js",
+    "check:serialization": "node scripts/check-safe-serialization.js",
+    "test": "node scripts/check-safe-serialization.js && node --test tests/phase2-*.test.js tests/security-hardening.test.js",
     "test:e2e": "node --test tests/live-e2e.test.js"
   },
   "dependencies": {

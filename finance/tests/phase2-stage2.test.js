@@ -168,7 +168,7 @@ describe('Phase 2 Stage 2: Stop losing user data (Sync Concurrency & Versioning)
   // S2T4: Restore of a prior version returns exactly the stored payload.
   test('S2T4: restore of a prior version returns exactly the stored payload', async () => {
     // 1. Push version 1
-    const v1Budget = { v: 1, title: 'First Backup Snapshot' };
+    const v1Budget = { accounts: [{ id: 'acc-1', name: 'First Backup Snapshot' }] };
     const req1 = new Request('http://localhost/api/sync/backup', {
       method: 'POST',
       headers: makeAuthHeaders(tokenA, csrfTokenA),
@@ -179,7 +179,7 @@ describe('Phase 2 Stage 2: Stop losing user data (Sync Concurrency & Versioning)
     const body1 = await res1.json();
 
     // 2. Push version 2
-    const v2Budget = { v: 2, title: 'Second Backup Snapshot' };
+    const v2Budget = { accounts: [{ id: 'acc-1', name: 'Second Backup Snapshot' }] };
     const req2 = new Request('http://localhost/api/sync/backup', {
       method: 'POST',
       headers: makeAuthHeaders(tokenA, csrfTokenA),
@@ -227,7 +227,7 @@ describe('Phase 2 Stage 2: Stop losing user data (Sync Concurrency & Versioning)
         method: 'POST',
         headers: makeAuthHeaders(tokenA, csrfTokenA),
         body: JSON.stringify({
-          budget: { count: i, payload: `Snapshot ${i}` },
+          budget: { accounts: [{ id: 'acc-1', name: `Snapshot ${i}` }] },
           force: true
         })
       });
@@ -242,10 +242,10 @@ describe('Phase 2 Stage 2: Stop losing user data (Sync Concurrency & Versioning)
     assert.strictEqual(versions.length, 10, 'Must have pruned to exactly 10 versions');
     // First version in table should have count: 3 (1 and 2 were pruned)
     const oldestRemaining = JSON.parse(versions[0].data);
-    assert.strictEqual(oldestRemaining.count, 3, 'Oldest versions (1 and 2) must be pruned first');
+    assert.strictEqual(oldestRemaining.accounts[0].name, 'Snapshot 3', 'Oldest versions (1 and 2) must be pruned first');
 
     const newestRemaining = JSON.parse(versions[versions.length - 1].data);
-    assert.strictEqual(newestRemaining.count, 12, 'Newest version (12) must be present');
+    assert.strictEqual(newestRemaining.accounts[0].name, 'Snapshot 12', 'Newest version (12) must be present');
   });
 
   // S2T6: Payload at 5% of stored size is rejected (SYNC_SUSPICIOUS).
@@ -254,8 +254,8 @@ describe('Phase 2 Stage 2: Stop losing user data (Sync Concurrency & Versioning)
     const largePayload = { accounts: [], padding: 'A'.repeat(10000) };
     const largeStr = JSON.stringify(largePayload);
     mockDb._raw.prepare(
-      `INSERT INTO user_backups (id, data, updated_at_ms) VALUES (?, ?, ?)`
-    ).run('user-a', largeStr, 1000);
+      `INSERT INTO user_backups (id, data, data_byte_length, updated_at_ms) VALUES (?, ?, ?, ?)`
+    ).run('user-a', largeStr, largeStr.length, 1000);
 
     // Tiny incoming payload (~50 bytes, far below 10%)
     const tinyPayload = { accounts: [] };
@@ -284,8 +284,8 @@ describe('Phase 2 Stage 2: Stop losing user data (Sync Concurrency & Versioning)
     const largePayload = { accounts: [], padding: 'B'.repeat(10000) };
     const largeStr = JSON.stringify(largePayload);
     mockDb._raw.prepare(
-      `INSERT INTO user_backups (id, data, updated_at_ms) VALUES (?, ?, ?)`
-    ).run('user-a', largeStr, 1000);
+      `INSERT INTO user_backups (id, data, data_byte_length, updated_at_ms) VALUES (?, ?, ?, ?)`
+    ).run('user-a', largeStr, largeStr.length, 1000);
 
     const tinyPayload = { accounts: [] };
     const req = new Request('http://localhost/api/sync/backup', {
@@ -302,8 +302,9 @@ describe('Phase 2 Stage 2: Stop losing user data (Sync Concurrency & Versioning)
     const body = await res.json();
     assert.strictEqual(body.success, true);
 
-    const row = mockDb._raw.prepare('SELECT data FROM user_backups WHERE id = ?').get('user-a');
+    const row = mockDb._raw.prepare('SELECT data, data_byte_length FROM user_backups WHERE id = ?').get('user-a');
     assert.deepStrictEqual(JSON.parse(row.data), tinyPayload);
+    assert.strictEqual(row.data_byte_length, JSON.stringify(tinyPayload).length);
   });
 
   // S2T8: Cross-user version access returns 403.
@@ -313,7 +314,7 @@ describe('Phase 2 Stage 2: Stop losing user data (Sync Concurrency & Versioning)
       method: 'POST',
       headers: makeAuthHeaders(tokenB, csrfTokenB),
       body: JSON.stringify({
-        budget: { user: 'B secret data' },
+        budget: { accounts: [{ id: 'acc-b', name: 'B secret data' }] },
         force: true
       })
     });
@@ -344,5 +345,60 @@ describe('Phase 2 Stage 2: Stop losing user data (Sync Concurrency & Versioning)
     });
     const resRestoreA = await worker.fetch(reqRestoreA, env);
     assert.strictEqual(resRestoreA.status, 403);
+  });
+
+  // S2T9: Two concurrent handleSyncBackup calls with the same baseVersion -> exactly one 200, one 409 SYNC_CONFLICT
+  test('S2T9: two concurrent handleSyncBackup calls with same baseVersion result in exactly one 200 and one 409 SYNC_CONFLICT', async () => {
+    // Seed initial backup with updated_at_ms = 2000
+    const initialData = JSON.stringify({ accounts: [{ id: 'acc-1', name: 'Initial' }] });
+    mockDb._raw.prepare(
+      `INSERT INTO user_backups (id, data, updated_at_ms) VALUES (?, ?, ?)`
+    ).run('user-a', initialData, 2000);
+
+    const req1 = new Request('http://localhost/api/sync/backup', {
+      method: 'POST',
+      headers: makeAuthHeaders(tokenA, csrfTokenA),
+      body: JSON.stringify({
+        budget: { accounts: [{ id: 'acc-1', name: 'Device 1' }] },
+        baseVersion: 2000
+      })
+    });
+
+    const req2 = new Request('http://localhost/api/sync/backup', {
+      method: 'POST',
+      headers: makeAuthHeaders(tokenA, csrfTokenA),
+      body: JSON.stringify({
+        budget: { accounts: [{ id: 'acc-1', name: 'Device 2' }] },
+        baseVersion: 2000
+      })
+    });
+
+    const [res1, res2] = await Promise.all([
+      worker.fetch(req1, env),
+      worker.fetch(req2, env)
+    ]);
+
+    const statuses = [res1.status, res2.status].sort();
+    assert.deepStrictEqual(statuses, [200, 409]);
+
+    const conflictRes = res1.status === 409 ? res1 : res2;
+    const successRes = res1.status === 200 ? res1 : res2;
+
+    const conflictBody = await conflictRes.json();
+    assert.strictEqual(conflictBody.code, 'SYNC_CONFLICT');
+    assert.strictEqual(conflictBody.conflict, true);
+    assert.ok(conflictBody.serverVersion > 2000);
+
+    const successBody = await successRes.json();
+    assert.strictEqual(successBody.success, true);
+    assert.strictEqual(conflictBody.serverVersion, successBody.version);
+
+    // Stored backup in DB must match the winner's version and data
+    const row = mockDb._raw.prepare('SELECT data, updated_at_ms FROM user_backups WHERE id = ?').get('user-a');
+    assert.strictEqual(row.updated_at_ms, successBody.version);
+
+    // Only 1 version should be recorded in user_backup_versions
+    const versions = mockDb._raw.prepare('SELECT id FROM user_backup_versions WHERE user_id = ?').all('user-a');
+    assert.strictEqual(versions.length, 1);
   });
 });

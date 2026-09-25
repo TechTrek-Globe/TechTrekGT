@@ -1,4 +1,4 @@
-import { authenticate, readJson, json, fail, MAX_BODY_AUTH, ERROR_CODES } from '../../utils/auth.js';
+import { authenticate, readJson, json, fail, MAX_BODY_AUTH, ERROR_CODES, invalidateCachedUser } from '../../utils/auth.js';
 import { enforceRateLimit } from '../../utils/rateLimit.js';
 
 export async function onRequestPost(context) {
@@ -54,6 +54,8 @@ export async function onRequestPost(context) {
     await env.DB.prepare(
       'UPDATE users SET status = ?, token_version = ? WHERE id = ?'
     ).bind(status, newTv, targetUserId).run();
+
+    await invalidateCachedUser(targetUserId, env);
 
     return json({
       success: true,

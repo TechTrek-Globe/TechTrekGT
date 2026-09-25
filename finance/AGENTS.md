@@ -8,7 +8,7 @@ Cloudflare Workers (or Pages Functions) on the edge runtime, D1 for persistence,
 
 ## Edge runtime constraints that bite
 
-- **PBKDF2 is capped at 100,000 iterations.** Above that the runtime throws `NotSupportedError`. Never raise `PBKDF2_ITERATIONS` past this without verifying against the live runtime. This caused a production outage in this repo.
+- **PBKDF2 is configured at 600,000 iterations (OWASP recommendation)** with a decoupled 2,000,000 sanity ceiling (`PBKDF2_MAX_SUPPORTED`). Benchmarked in the Cloudflare Workers runtime (workerd: 100k ~36ms, 300k ~107ms, 600k ~221ms, 1M ~360ms, 2M ~724ms). Existing accounts transparently migrate on successful login via `needsRehash`.
 - **`btoa` only accepts Latin-1.** Always encode to UTF-8 bytes before base64. Any user-supplied string reaching `btoa` directly is a bug.
 - **KV is eventually consistent.** Never use it for anything requiring atomicity or a correctness guarantee. Read-then-write against KV is a race.
 - **Subrequest and CPU limits apply.** Do not add loops that fan out `fetch` calls per record.
@@ -24,7 +24,7 @@ These encode fixes for real vulnerabilities that were found in this codebase. Do
 5. **Never leak internal error text to clients.** `console.error` the real message; return a fixed generic string. This includes the top-level router catch.
 6. **Every authenticated request validates `token_version`** against the user's database row. This is what makes password resets and logouts actually revoke sessions.
 7. **Every cookie-authenticated non-GET request requires a CSRF token** (double-submit cookie plus `X-CSRF-Token`). Bearer-authenticated requests are exempt.
-8. **Store secrets hashed.** Password reset codes are HMAC'd with `JWT_SECRET` before they touch the database. Passwords and security answers go through PBKDF2 with a per-record salt and stored cost.
+8. **Store secrets hashed.** Password reset and email verification codes are HMAC'd with `CODE_HMAC_SECRET` before they touch the database. Passwords and security answers go through PBKDF2 with a per-record salt and stored cost.
 9. **Randomness for security values comes from `crypto.getRandomValues` with rejection sampling.** `Math.random` is banned. Modulo on a raw 32-bit value is biased and also banned.
 10. **Compare secrets in constant time.** Use the SHA-256-then-XOR helper. No `===` on tokens, codes, or hashes.
 11. **No `unsafe-inline` in `script-src`.** The CSP uses a per-request nonce injected via HTMLRewriter. Nonce-bearing HTML must be `no-store`. Do not add inline event handlers to the markup.
@@ -59,7 +59,7 @@ These encode fixes for real vulnerabilities that were found in this codebase. Do
 
 ## Required bindings
 
-`JWT_SECRET`, `DB` (D1), `SYNC_UNLOCK_CODE`, `RESEND_API_KEY`, `MAIL_FROM`, `RATE_LIMIT_KV`, and optionally `RATE_LIMITER` (Durable Object, preferred over KV). `ADMIN_EMAIL` is deprecated and must not be reintroduced as an authorization mechanism.
+`JWT_SECRET`, `CODE_HMAC_SECRET`, `DB` (D1), `SYNC_UNLOCK_CODE`, `RESEND_API_KEY`, `MAIL_FROM`, `RATE_LIMIT_KV`, and optionally `RATE_LIMITER` (Durable Object, preferred over KV). `ADMIN_EMAIL` is deprecated and must not be reintroduced as an authorization mechanism.
 
 ## When in doubt
 

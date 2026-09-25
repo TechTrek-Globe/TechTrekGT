@@ -1,7 +1,7 @@
 import {
   verifyPassword, hashPassword, needsRehash, readJson, asTrimmedString,
   json, fail, issueSession, sessionCookies, withCookies, newCsrfToken,
-  ERROR_CODES, emitMetric,
+  verifyTurnstile, ERROR_CODES, emitMetric, toPublicUser,
   MAX_BODY_AUTH, MAX_EMAIL_LEN, MAX_PASS_LEN
 } from '../../utils/auth.js';
 import { enforceRateLimit } from '../../utils/rateLimit.js';
@@ -16,6 +16,15 @@ export async function onRequestPost(context) {
     const body = await readJson(request, MAX_BODY_AUTH);
     if (!body) return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Invalid request body.', requestId);
 
+    // Turnstile bot verification (cross-reference: CSP challenges.cloudflare.com)
+    // Runs before account rate limiting, DB lookups, or password hashing.
+    const turnstileToken = body.turnstileToken || body['cf-turnstile-response'];
+    const ip = request.headers?.get('CF-Connecting-IP');
+    const turnstileCheck = await verifyTurnstile(turnstileToken, env, ip, requestId);
+    if (!turnstileCheck.success) {
+      return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Security verification failed. Please try again.', requestId);
+    }
+
     const rawEmail = asTrimmedString(body.email, MAX_EMAIL_LEN);
     const { password } = body;
 
@@ -29,6 +38,9 @@ export async function onRequestPost(context) {
     }
 
     const cleanEmail = rawEmail.toLowerCase();
+
+    const accountLimited = await enforceRateLimit(context, 'login-account', 10, 300, cleanEmail);
+    if (accountLimited) return accountLimited;
 
     const user = await env.DB.prepare(
       'SELECT id, email, name, password_hash, role, token_version, security_question, security_answer_hash, status, email_verified, pending_email FROM users WHERE email = ?'
@@ -49,7 +61,8 @@ export async function onRequestPost(context) {
     }
 
     if (user.status === 'Suspended') {
-      return fail(ERROR_CODES.UNAUTHORIZED, 403, 'Account suspended. Please contact support.', requestId);
+      // REM-21: Distinct code so frontend distinguishes suspended accounts from unauthenticated sessions
+      return fail(ERROR_CODES.ACCOUNT_SUSPENDED, 403, 'Account suspended. Please contact support.', requestId);
     }
 
     // Transparent rehash on login: upgrades 310k-era or legacy two-part hashes
@@ -64,22 +77,13 @@ export async function onRequestPost(context) {
       }
     }
 
-    const { token, csrf, maxAge } = await issueSession(env, user, Boolean(body.rememberMe));
+    const { token, csrf, maxAge } = await issueSession(env, user, { rememberMe: Boolean(body.rememberMe) });
     emitMetric('auth.login.success', requestId);
 
     return withCookies(
       json({
         success: true,
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          isAdmin: user.role === 'admin',
-          emailVerified: Boolean(user.email_verified),
-          pendingEmail: user.pending_email || null,
-          securityQuestion: user.security_question || null,
-          hasSecurityQuestion: Boolean(user.security_question && user.security_answer_hash)
-        },
+        user: toPublicUser(user),
         householdId: null,
         csrfToken: csrf
       }),

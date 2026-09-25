@@ -18,13 +18,20 @@
 /* Configuration                                                       */
 /* ------------------------------------------------------------------ */
 
-// Cloudflare Workers hard-caps PBKDF2 at 100,000 iterations and throws
-// NotSupportedError above it. Do not raise this without verifying the runtime.
-const PBKDF2_ITERATIONS = 1e5;
-const PBKDF2_MAX_SUPPORTED = 1e5;
+// PBKDF2 configuration (benchmark validated 2026-09-25):
+// Target is 600,000 iterations (OWASP recommendation), benchmarked at ~221ms in
+// Cloudflare Workers runtime. PBKDF2_MAX_SUPPORTED is decoupled at 2,000,000
+// as a fail-closed sanity ceiling against excessive CPU consumption.
+const PBKDF2_ITERATIONS = 600000;
+const PBKDF2_MAX_SUPPORTED = 2000000;
 const PBKDF2_HASH = "SHA-256";
 const PBKDF2_BITS = 256;
 
+// NOTE: ACCESS_TOKEN_TTL is 2 hours regardless of the longer sexp granted for
+// "remember me" (SESSION_TTL_REMEMBER = 30 days). The frontend MUST call
+// /api/auth/refresh on an interval comfortably inside ACCESS_TOKEN_TTL
+// (for example every 90 minutes) for "remember me" sessions to actually last
+// SESSION_TTL_REMEMBER.
 const ACCESS_TOKEN_TTL = 2 * 60 * 60;          // 2 hours
 const SESSION_TTL_DEFAULT = 2 * 60 * 60;       // no rememberMe
 const SESSION_TTL_REMEMBER = 30 * 24 * 60 * 60; // rememberMe
@@ -368,17 +375,33 @@ async function csrfOk(request, source) {
   return constantTimeStringEqual(cookieValue, headerValue);
 }
 
+// Both cookies SameSite=Strict uniformly. (M10)
+// Cookie Path is scoped to /finance and /api to prevent transmission to unrelated app paths (e.g. /outpost, /auction).
+// Note: True isolation requires moving unrelated apps (outpost/auction) to a separate subdomain rather than
+// relying on cookie path scoping; filed as a longer-term architectural follow-up.
 function sessionCookies(token, csrfToken, maxAge) {
-  const base = `Path=/; Secure; SameSite=Strict`;
+  const financeBase = `Path=/finance; Secure; SameSite=Strict`;
+  const apiBase = `Path=/api; Secure; SameSite=Strict`;
   return [
-    `auth_token=${token}; HttpOnly; ${base}; Max-Age=${maxAge}`,
-    `csrf_token=${csrfToken}; ${base}; Max-Age=${maxAge}`
+    `auth_token=${token}; HttpOnly; ${financeBase}; Max-Age=${maxAge}`,
+    `csrf_token=${csrfToken}; ${financeBase}; Max-Age=${maxAge}`,
+    `auth_token=${token}; HttpOnly; ${apiBase}; Max-Age=${maxAge}`,
+    `csrf_token=${csrfToken}; ${apiBase}; Max-Age=${maxAge}`
   ];
 }
 
 function clearedCookies() {
-  const base = `Path=/; Secure; SameSite=Strict; Max-Age=0`;
-  return [`auth_token=; HttpOnly; ${base}`, `csrf_token=; ${base}`];
+  const financeBase = `Path=/finance; Secure; SameSite=Strict; Max-Age=0`;
+  const apiBase = `Path=/api; Secure; SameSite=Strict; Max-Age=0`;
+  const legacyBase = `Path=/; Secure; SameSite=Strict; Max-Age=0`;
+  return [
+    `auth_token=; HttpOnly; ${financeBase}`,
+    `csrf_token=; ${financeBase}`,
+    `auth_token=; HttpOnly; ${apiBase}`,
+    `csrf_token=; ${apiBase}`,
+    `auth_token=; HttpOnly; ${legacyBase}`,
+    `csrf_token=; ${legacyBase}`
+  ];
 }
 
 function withCookies(response, cookies) {
@@ -468,9 +491,10 @@ async function checkRateLimit(env, key, maxRequests, windowSeconds) {
   }
 }
 
-async function enforceRateLimit(context, prefix, max, windowSeconds) {
+async function enforceRateLimit(context, prefix, max, windowSeconds, customKey = null) {
   const ip = context.request.headers.get("CF-Connecting-IP") || "unknown";
-  const { allowed, retryAfter } = await checkRateLimit(context.env, `${prefix}:${ip}`, max, windowSeconds);
+  const effectiveKey = customKey || ip;
+  const { allowed, retryAfter } = await checkRateLimit(context.env, `${prefix}:${effectiveKey}`, max, windowSeconds);
   if (allowed) return null;
   return json({ error: "Too many requests. Please wait and try again." }, 429, {
     "Retry-After": String(retryAfter)
@@ -584,6 +608,8 @@ async function handleRegister(context) {
 
     const cleanEmail = rawEmail.toLowerCase();
     if (!EMAIL_REGEX.test(cleanEmail)) return fail(400, "Invalid email address format.");
+    const accountLimited = await enforceRateLimit(context, "register-account", 5, 300, cleanEmail);
+    if (accountLimited) return accountLimited;
 
     const pwError = validatePassword(password);
     if (pwError) return fail(400, pwError);
@@ -656,6 +682,8 @@ async function handleLogin(context) {
     }
 
     const cleanEmail = rawEmail.toLowerCase();
+    const accountLimited = await enforceRateLimit(context, "login-account", 10, 300, cleanEmail);
+    if (accountLimited) return accountLimited;
     const user = await env.DB.prepare(
       "SELECT id, email, name, password_hash, token_version FROM users WHERE email = ?"
     ).bind(cleanEmail).first();
@@ -793,9 +821,11 @@ async function handleForgotPassword(context) {
       return fail(400, "Invalid email address format.");
     }
     const cleanEmail = rawEmail.toLowerCase();
+    const accountLimited = await enforceRateLimit(context, "forgot-account", 5, 600, cleanEmail);
+    if (accountLimited) return accountLimited;
 
-    if (!env.DB || !env.JWT_SECRET) {
-      console.error("[forgot-password] missing DB or JWT_SECRET binding");
+    if (!env.DB || !env.JWT_SECRET || !env.CODE_HMAC_SECRET) {
+      console.error("[forgot-password] missing DB, JWT_SECRET, or CODE_HMAC_SECRET binding");
       return fail(503, "Service unavailable. Please try again later.");
     }
 
@@ -818,7 +848,7 @@ async function handleForgotPassword(context) {
 
     // Store only an HMAC of the code so a database leak does not yield
     // usable reset tokens (fix H8).
-    const codeHash = await hmacHex(env.JWT_SECRET, `reset:${cleanEmail}:${resetCode}`);
+    const codeHash = await hmacHex(env.CODE_HMAC_SECRET, `reset:${cleanEmail}:${resetCode}`);
     const resetId = `rst-${crypto.randomUUID()}`;
     const now = Date.now();
 
@@ -862,13 +892,13 @@ async function handleResetPassword(context) {
     const pwError = validatePassword(newPassword);
     if (pwError) return fail(400, pwError);
 
-    if (!env.DB || !env.JWT_SECRET) {
-      console.error("[reset-password] missing DB or JWT_SECRET binding");
+    if (!env.DB || !env.JWT_SECRET || !env.CODE_HMAC_SECRET) {
+      console.error("[reset-password] missing DB, JWT_SECRET, or CODE_HMAC_SECRET binding");
       return fail(503, "Service unavailable. Please try again later.");
     }
 
     const cleanEmail = rawEmail.toLowerCase();
-    const codeHash = await hmacHex(env.JWT_SECRET, `reset:${cleanEmail}:${code}`);
+    const codeHash = await hmacHex(env.CODE_HMAC_SECRET, `reset:${cleanEmail}:${code}`);
 
     const record = await env.DB.prepare(
       "SELECT id, user_id, expires_at, attempts FROM password_resets WHERE email = ? AND used = 0 ORDER BY created_at DESC LIMIT 1"
@@ -1141,6 +1171,13 @@ async function handleVerifySyncCode(context) {
   const limited = await enforceRateLimit(context, "sync-code", 5, 300);
   if (limited) return limited;
 
+  const auth = await authenticate(context, { requireCsrf: true });
+  if (auth.error) return auth.error;
+  const userId = auth.user.id;
+
+  const userLimited = await enforceRateLimit(context, "sync-code-account", 5, 300, userId);
+  if (userLimited) return userLimited;
+
   // Fails closed when unconfigured. No "123456" fallback (fix C4).
   const secretCode = env?.SYNC_UNLOCK_CODE;
   if (!secretCode) {
@@ -1252,7 +1289,11 @@ class NonceInjector {
   }
 }
 
-function addSecurityHeaders(response, { isLocalhost = false, requestOrigin = "", nonce = "" } = {}) {
+function addSecurityHeaders(response, options = {}) {
+  const opts = typeof options === 'object' && options !== null ? options : { isLocalhost: Boolean(options) };
+  const { isLocalhost = false, requestOrigin = '', nonce = '', requestPath: rawRequestPath = '' } = opts;
+  const rawPath = rawRequestPath || opts.path || opts.pathname || (opts.url ? new URL(opts.url, 'http://localhost').pathname : '') || (response.url ? new URL(response.url).pathname : '');
+  const requestPath = rawPath ? rawPath.split('?')[0].split('#')[0] : '';
   const headers = new Headers(response.headers);
 
   if (!isLocalhost) {
@@ -1290,6 +1331,35 @@ function addSecurityHeaders(response, { isLocalhost = false, requestOrigin = "",
   }
   if (contentType.includes("application/json")) {
     headers.set("Cache-Control", "no-store");
+  }
+
+  const isStaticAsset =
+    !isHtml &&
+    !contentType.includes("application/json") &&
+    (contentType.startsWith("application/javascript") ||
+      contentType.startsWith("text/javascript") ||
+      contentType.startsWith("text/css") ||
+      contentType.startsWith("image/") ||
+      contentType.startsWith("font/") ||
+      contentType.startsWith("application/font") ||
+      contentType.startsWith("application/wasm") ||
+      requestPath.startsWith("/finance/assets/") ||
+      requestPath.startsWith("/assets/") ||
+      /\.(?:js|css|png|jpe?g|gif|webp|svg|ico|woff2?|ttf|eot|webmanifest|wasm)$/i.test(requestPath));
+
+  if (isStaticAsset && (response.status < 400 || response.status === 304)) {
+    // Check if filename is content-hashed (e.g., name-hash.ext, name.hash.ext, or assets under /finance/assets/)
+    const isHashedAsset =
+      /[-.][a-zA-Z0-9_-]{8,}\.[a-zA-Z0-9]+$/i.test(requestPath) ||
+      requestPath.startsWith("/finance/assets/") ||
+      requestPath.startsWith("/assets/");
+
+    if (isHashedAsset) {
+      headers.set("Cache-Control", "public, max-age=31536000, immutable");
+    } else {
+      // TODO: Immutable caching requires content-hashed filenames to be safe against stale browser caches.
+      headers.set("Cache-Control", "public, max-age=3600, stale-while-revalidate=86400");
+    }
   }
 
   const rewritten = new Response(response.body, {
@@ -1343,7 +1413,7 @@ const worker = {
     const requestOrigin = request.headers.get("Origin") || "";
     const isLocalhost = url.hostname === "localhost" || url.hostname === "127.0.0.1";
     const nonce = base64UrlEncodeBytes(crypto.getRandomValues(new Uint8Array(16)));
-    const headerOpts = { isLocalhost, requestOrigin, nonce };
+    const headerOpts = { isLocalhost, requestOrigin, nonce, requestPath: url.pathname };
 
     if (!isLocalhost && (url.protocol === "http:" || request.headers.get("x-forwarded-proto") === "http")) {
       url.protocol = "https:";

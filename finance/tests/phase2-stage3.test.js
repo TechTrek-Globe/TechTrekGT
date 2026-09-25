@@ -51,6 +51,7 @@ describe('Phase 2 Stage 3: Option B - Household model simplification', () => {
     env = {
       DB: mockDb,
       JWT_SECRET: TEST_JWT_SECRET,
+      CODE_HMAC_SECRET: 'test-code-hmac-secret-32-bytes-long',
       RESEND_API_KEY: 're_mock_test_key',
       MAIL_FROM: 'noreply@techtrekgt.com'
     };
@@ -153,7 +154,7 @@ describe('Phase 2 Stage 3: Option B - Household model simplification', () => {
     ).bind(userId, 'solo.me@example.com', pwHash, 'Solo Me', 'user', 0, 'Active', new Date().toISOString()).run();
 
     const user = { id: userId, email: 'solo.me@example.com', name: 'Solo Me', token_version: 0 };
-    const { token } = await issueSession(env, user, false);
+    const { token } = await issueSession(env, user, { rememberMe: false });
 
     const req = new Request('http://localhost/api/auth/me', {
       method: 'GET',
@@ -173,7 +174,7 @@ describe('Phase 2 Stage 3: Option B - Household model simplification', () => {
   // S3T5: Issued JWT session token contains no householdId claim
   test('S3T5: issued session token contains no householdId claim', async () => {
     const user = { id: 'usr-s3t5', email: 'claim.test@example.com', name: 'Claim Test', token_version: 0 };
-    const { token } = await issueSession(env, user, false);
+    const { token } = await issueSession(env, user, { rememberMe: false });
 
     const payload = await verifyToken(token, env.JWT_SECRET);
     assert.ok(payload, 'Token must verify successfully');
@@ -190,7 +191,7 @@ describe('Phase 2 Stage 3: Option B - Household model simplification', () => {
     ).bind(userId, 'profile.test@example.com', pwHash, 'Profile Test', 'user', 0, 'Active', new Date().toISOString()).run();
 
     const user = { id: userId, email: 'profile.test@example.com', name: 'Profile Test', token_version: 0 };
-    const { token, csrf } = await issueSession(env, user, false);
+    const { token, csrf } = await issueSession(env, user, { rememberMe: false });
 
     const req = new Request('http://localhost/api/auth/update-profile', {
       method: 'POST',

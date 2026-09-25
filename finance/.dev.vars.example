@@ -1,0 +1,19 @@
+# TechTrekGT Finance OS - Local Environment Variables
+# Copy this file to .dev.vars for local development (`wrangler dev` / `npm run dev`)
+# Never commit .dev.vars to version control.
+
+# Shared SSO JWT secret for signing session tokens (HS256)
+JWT_SECRET=replace-with-shared-sso-jwt-secret-min-32-chars
+
+# Dedicated secret for HMAC-SHA256 generation/verification of one-time codes
+# Used by register, forgot-password, reset-password, update-profile,
+# verify-email, resend-verification, and confirm-email-change.
+# Must be provisioned separately from JWT_SECRET to avoid cryptographic key reuse.
+CODE_HMAC_SECRET=replace-with-code-hmac-secret-min-32-chars
+
+# Passcode for cloud sync vault unlock
+SYNC_UNLOCK_CODE=replace-with-sync-unlock-code
+
+# Optional email service bindings (used for transactional OTP emails)
+# RESEND_API_KEY=re_your_api_key_here
+# MAIL_FROM=noreply@techtrekgt.com

@@ -51,6 +51,13 @@ export function fail(code, status, message, requestId = null) {
   return json({ error: message, code, ...(requestId ? { requestId } : {}) }, status);
 }
 
+// Structured observability metric event (Stage 9.2)
+export function emitMetric(event, requestId = null) {
+  try {
+    console.log(JSON.stringify({ type: 'metric', event, ...(requestId ? { requestId } : {}), ts: Date.now() }));
+  } catch {}
+}
+
 function toHex(bytes) {
   let out = '';
   for (let i = 0; i < bytes.length; i++) out += bytes[i].toString(16).padStart(2, '0');

@@ -20,7 +20,8 @@ import {
   constantTimeStringEqual,
   MAX_BODY_AUTH,
   MAX_BODY_SYNC,
-  ERROR_CODES
+  ERROR_CODES,
+  emitMetric
 } from '../functions/utils/auth.js';
 import { enforceRateLimit } from '../functions/utils/rateLimit.js';
 
@@ -114,7 +115,7 @@ function addSecurityHeaders(response, { isLocalhost = false, requestOrigin = '',
     headers
   });
 
-  if (isHtml && nonce && response.body) {
+  if (isHtml && nonce && response.body && typeof HTMLRewriter !== 'undefined') {
     return new HTMLRewriter().on('script', new NonceInjector(nonce)).transform(rewritten);
   }
   return rewritten;
@@ -184,6 +185,7 @@ async function handleSyncBackup(context) {
       } catch {
         serverData = row.data;
       }
+      emitMetric('sync.backup.conflict', context.requestId);
       return json({
         code: ERROR_CODES.SYNC_CONFLICT,
         conflict: true,
@@ -197,6 +199,7 @@ async function handleSyncBackup(context) {
       const incomingSize = dataStr.length;
       const storedSize = row.data.length;
       if (incomingSize < storedSize * 0.1) {
+        emitMetric('sync.backup.suspicious', context.requestId);
         return json({
           code: ERROR_CODES.SYNC_SUSPICIOUS,
           suspicious: true,
@@ -233,10 +236,11 @@ async function handleSyncBackup(context) {
          updated_at_ms = excluded.updated_at_ms`
     ).bind(userId, dataStr, now).run();
 
+    emitMetric('sync.backup.success', context.requestId);
     return json({ success: true, version: now, timestamp: new Date(now).toISOString() });
   } catch (err) {
-    console.error('[sync/backup] error:', err && err.message);
-    return fail(ERROR_CODES.INTERNAL_ERROR, 500, 'Backup failed.');
+    console.error('[sync/backup] error:', context.requestId ? { requestId: context.requestId } : '', err && err.message);
+    return fail(ERROR_CODES.INTERNAL_ERROR, 500, 'Backup failed.', context.requestId);
   }
 }
 
@@ -251,19 +255,23 @@ async function handleSyncRestore(context) {
       'SELECT data, updated_at, updated_at_ms FROM user_backups WHERE id = ?'
     ).bind(userId).first();
 
-    if (!row || !row.data) return fail(ERROR_CODES.NOT_FOUND, 404, 'No cloud backup found');
+    if (!row || !row.data) {
+      emitMetric('sync.restore.not_found', context.requestId);
+      return fail(ERROR_CODES.NOT_FOUND, 404, 'No cloud backup found', context.requestId);
+    }
 
     let parsed;
     try {
       parsed = JSON.parse(row.data);
     } catch {
       console.error('[sync/restore] stored backup is not valid JSON for user', userId);
-      return fail(ERROR_CODES.INTERNAL_ERROR, 500, 'Stored backup could not be read.');
+      return fail(ERROR_CODES.INTERNAL_ERROR, 500, 'Stored backup could not be read.', context.requestId);
     }
 
     const version = row.updated_at_ms != null ? Number(row.updated_at_ms) : (row.updated_at ? new Date(row.updated_at).getTime() : 0);
     const updatedAtIso = version ? new Date(version).toISOString() : row.updated_at;
 
+    emitMetric('sync.restore.success', context.requestId);
     return json({
       success: true,
       budget: parsed && parsed.budget !== undefined ? parsed.budget : parsed,
@@ -271,8 +279,8 @@ async function handleSyncRestore(context) {
       version: version
     });
   } catch (err) {
-    console.error('[sync/restore] error:', err && err.message);
-    return fail(ERROR_CODES.INTERNAL_ERROR, 500, 'Restore failed.');
+    console.error('[sync/restore] error:', context.requestId ? { requestId: context.requestId } : '', err && err.message);
+    return fail(ERROR_CODES.INTERNAL_ERROR, 500, 'Restore failed.', context.requestId);
   }
 }
 
@@ -394,7 +402,8 @@ const worker = {
    */
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
-    const context = { request, env, ctx };
+    const requestId = crypto.randomUUID();
+    const context = { request, env, ctx, requestId };
     const host = request.headers.get('host') || url.host || '';
     const isProduction = Boolean(request.headers.get('cf-ray'));
     const isLocalhost = !isProduction || url.hostname === 'localhost' || url.hostname === '127.0.0.1' || host.includes('localhost') || host.includes('127.0.0.1') || Boolean(url.port);
@@ -402,7 +411,7 @@ const worker = {
     const nonce = base64UrlEncodeBytes(crypto.getRandomValues(new Uint8Array(16)));
     const headerOpts = { isLocalhost, requestOrigin, nonce };
 
-    if (isProduction && !isLocalhost && (url.protocol === 'http:' || request.headers.get('x-forwarded-proto') === 'http')) {
+    if (isProduction && !isLocalhost && url.protocol === 'http:') {
       url.protocol = 'https:';
       return Response.redirect(url.toString(), 301);
     }
@@ -414,8 +423,15 @@ const worker = {
       return addSecurityHeaders(new Response(null, { status: 204 }), headerOpts);
     }
 
-    // Redirect requests for Outpost sub-site (/Outpost, /OUTPOST, /auction) to lowercase /outpost
-    if (/^\/(outpost|auction)($|\/|\?)/i.test(url.pathname)) {
+    // Canonical SPA mount: dist/client/index.html references /finance/assets/*.
+    // Therefore /finance is the canonical mount path. Bare / redirects 301 to /finance.
+    if (url.pathname === '/' || url.pathname === '') {
+      url.pathname = '/finance';
+      return Response.redirect(url.toString(), 301);
+    }
+
+    // Redirect requests for Outpost sub-site (/Outpost, /OUTPOST, /auction) to lowercase /outpost (production only)
+    if (isProduction && /^\/(outpost|auction)($|\/|\?)/i.test(url.pathname)) {
       if (!url.pathname.startsWith('/outpost')) {
         const outpostUrl = new URL(request.url);
         outpostUrl.pathname = outpostUrl.pathname.replace(/^\/(outpost|auction)/i, '/outpost');
@@ -449,12 +465,12 @@ const worker = {
           requestOrigin &&
           !ALLOWED_ORIGINS.includes(requestOrigin)
         ) {
-          response = fail(ERROR_CODES.FORBIDDEN, 403, 'Forbidden');
+          response = fail(ERROR_CODES.FORBIDDEN, 403, 'Forbidden', requestId);
         } else {
           response = await handler(handlerContext);
         }
       } else if (apiPath.startsWith('/api/')) {
-        response = fail(ERROR_CODES.NOT_FOUND, 404, 'Endpoint not found');
+        response = fail(ERROR_CODES.NOT_FOUND, 404, 'Endpoint not found', requestId);
       } else if (url.pathname.startsWith('/finance/assets/')) {
         response = await fetchAsset(env, request, url.pathname.slice('/finance'.length));
       } else if (url.pathname.startsWith('/finance/') && /\.[a-zA-Z0-9]+$/.test(url.pathname)) {
@@ -465,8 +481,8 @@ const worker = {
         response = env?.ASSETS?.fetch ? await env.ASSETS.fetch(request) : await fetch(request);
       }
     } catch (err) {
-      console.error('[worker] unhandled error:', err && err.message, err && err.stack);
-      response = fail(ERROR_CODES.INTERNAL_ERROR, 500, 'An internal error occurred.');
+      console.error('[worker] unhandled error:', requestId ? { requestId } : '', err && err.message, err && err.stack);
+      response = fail(ERROR_CODES.INTERNAL_ERROR, 500, 'An internal error occurred.', requestId);
     }
 
     return addSecurityHeaders(response, headerOpts);

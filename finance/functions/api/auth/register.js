@@ -2,49 +2,50 @@ import {
   hashPassword, verifyPassword, readJson, asTrimmedString,
   json, fail, issueSession, sessionCookies, withCookies,
   validatePassword, EMAIL_REGEX, randomInt, hmacHex, sendVerificationEmail,
-  ERROR_CODES,
+  ERROR_CODES, emitMetric,
   MAX_BODY_AUTH, MAX_NAME_LEN, MAX_EMAIL_LEN, MAX_ANSWER_LEN, MAX_QUESTION_LEN
 } from '../../utils/auth.js';
 import { enforceRateLimit } from '../../utils/rateLimit.js';
 
 export async function onRequestPost(context) {
-  const { request, env } = context;
+  const { request, env, requestId } = context;
 
   const limited = await enforceRateLimit(context, 'register', 5, 60);
   if (limited) return limited;
 
   try {
     const body = await readJson(request, MAX_BODY_AUTH);
-    if (!body) return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Invalid request body.');
+    if (!body) return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Invalid request body.', requestId);
 
     const rawName = asTrimmedString(body.name, MAX_NAME_LEN);
     const rawEmail = asTrimmedString(body.email, MAX_EMAIL_LEN);
     const { password, securityQuestion, securityAnswer } = body;
 
     if (!rawName || !rawEmail || typeof password !== 'string' || !securityQuestion || !securityAnswer) {
-      return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Name, email, password, security question, and security answer are required.');
+      return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Name, email, password, security question, and security answer are required.', requestId);
     }
 
     const cleanEmail = rawEmail.toLowerCase();
-    if (!EMAIL_REGEX.test(cleanEmail)) return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Invalid email address format.');
+    if (!EMAIL_REGEX.test(cleanEmail)) return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Invalid email address format.', requestId);
 
     const pwError = validatePassword(password);
-    if (pwError) return fail(ERROR_CODES.VALIDATION_ERROR, 400, pwError);
+    if (pwError) return fail(ERROR_CODES.VALIDATION_ERROR, 400, pwError, requestId);
 
     const cleanQuestion = asTrimmedString(securityQuestion, MAX_QUESTION_LEN);
     const cleanAnswer = asTrimmedString(securityAnswer, MAX_ANSWER_LEN);
-    if (!cleanQuestion) return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Security question is required.');
-    if (!cleanAnswer) return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Security answer is required.');
+    if (!cleanQuestion) return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Security question is required.', requestId);
+    if (!cleanAnswer) return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Security answer is required.', requestId);
 
     if (!env.DB || !env.JWT_SECRET) {
-      console.error('[register] missing DB or JWT_SECRET binding');
-      return fail(ERROR_CODES.SERVICE_UNAVAILABLE, 503, 'Service unavailable. Please try again later.');
+      console.error('[register] missing DB or JWT_SECRET binding', requestId ? { requestId } : '');
+      return fail(ERROR_CODES.SERVICE_UNAVAILABLE, 503, 'Service unavailable. Please try again later.', requestId);
     }
 
     const existing = await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(cleanEmail).first();
     if (existing) {
+      emitMetric('auth.register.duplicate', requestId);
       // Neutral message: does not confirm whether the account exists. (H7)
-      return fail(ERROR_CODES.CONFLICT, 409, 'That email address cannot be registered.');
+      return fail(ERROR_CODES.CONFLICT, 409, 'That email address cannot be registered.', requestId);
     }
 
     const userId = `usr-${crypto.randomUUID()}`;
@@ -77,13 +78,15 @@ export async function onRequestPost(context) {
     const { token, csrf, maxAge } = await issueSession(env, newUser, Boolean(body.rememberMe));
     // csrf2 removed: issueSession already returns csrf above. (Stage 1.4 regression fix)
 
+    emitMetric('auth.register.success', requestId);
+
     return withCookies(
       json({ success: true, user: { id: userId, email: cleanEmail, name: rawName, emailVerified: false }, householdId: null, csrfToken: csrf }, 201),
       sessionCookies(token, csrf, maxAge)
     );
 
   } catch (err) {
-    console.error('[register] handler error:', err && err.message);
-    return fail(ERROR_CODES.INTERNAL_ERROR, 500, 'An internal error occurred. Please try again.');
+    console.error('[register] handler error:', requestId ? { requestId } : '', err && err.message);
+    return fail(ERROR_CODES.INTERNAL_ERROR, 500, 'An internal error occurred. Please try again.', requestId);
   }
 }

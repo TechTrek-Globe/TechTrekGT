@@ -30,6 +30,8 @@ export async function checkRateLimit(env, key, maxRequests, windowSeconds) {
     }
   }
 
+  // Note on KV fallback (Stage 8.1): RATE_LIMIT_KV is a development-only fallback
+  // (e.g. wrangler dev without DO). In production, RATE_LIMITER Durable Object handles all rate limiting.
   const kv = env?.RATE_LIMIT_KV;
   if (!kv) {
     console.error('[rateLimit] NO LIMITER BOUND - requests are not being rate limited');
@@ -52,21 +54,32 @@ export async function checkRateLimit(env, key, maxRequests, windowSeconds) {
 }
 
 import { ERROR_CODES } from './errorCodes.js';
+import { fail } from './auth.js';
 
 // Convenience wrapper used by all handlers.
-// Gets the client IP from CF-Connecting-IP and calls checkRateLimit.
+// Gets the client IP from CF-Connecting-IP and calls checkRateLimit. (Stage 8.2)
 export async function enforceRateLimit(context, prefix, max, windowSeconds) {
-  const ip = context.request.headers.get('CF-Connecting-IP') || 'unknown';
+  const ip = context.request?.headers?.get('CF-Connecting-IP');
+  const isProduction = Boolean(context.request?.headers?.get('cf-ray'));
+  if (!ip && isProduction) {
+    console.error('[rateLimit] CF-Connecting-IP absent in production', context.requestId ? { requestId: context.requestId } : '');
+    return fail(ERROR_CODES.SERVICE_UNAVAILABLE, 503, 'Service unavailable.', context.requestId);
+  }
+  const effectiveIp = ip || 'dev-unknown';
   const { allowed, retryAfter } = await checkRateLimit(
     context.env,
-    `${prefix}:${ip}`,
+    `${prefix}:${effectiveIp}`,
     max,
     windowSeconds
   );
   if (allowed) return null;
 
   return new Response(
-    JSON.stringify({ error: 'Too many requests. Please wait and try again.', code: ERROR_CODES.RATE_LIMITED }),
+    JSON.stringify({
+      error: 'Too many requests. Please wait and try again.',
+      code: ERROR_CODES.RATE_LIMITED,
+      ...(context.requestId ? { requestId: context.requestId } : {})
+    }),
     {
       status: 429,
       headers: {

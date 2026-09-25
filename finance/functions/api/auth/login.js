@@ -1,31 +1,31 @@
 import {
   verifyPassword, hashPassword, needsRehash, readJson, asTrimmedString,
   json, fail, issueSession, sessionCookies, withCookies, newCsrfToken,
-  ERROR_CODES,
+  ERROR_CODES, emitMetric,
   MAX_BODY_AUTH, MAX_EMAIL_LEN, MAX_PASS_LEN
 } from '../../utils/auth.js';
 import { enforceRateLimit } from '../../utils/rateLimit.js';
 
 export async function onRequestPost(context) {
-  const { request, env } = context;
+  const { request, env, requestId } = context;
 
   const limited = await enforceRateLimit(context, 'login', 10, 60);
   if (limited) return limited;
 
   try {
     const body = await readJson(request, MAX_BODY_AUTH);
-    if (!body) return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Invalid request body.');
+    if (!body) return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Invalid request body.', requestId);
 
     const rawEmail = asTrimmedString(body.email, MAX_EMAIL_LEN);
     const { password } = body;
 
     if (!rawEmail || typeof password !== 'string') {
-      return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Email and password are required.');
+      return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Email and password are required.', requestId);
     }
 
     if (!env.DB || !env.JWT_SECRET) {
-      console.error('[login] missing DB or JWT_SECRET binding');
-      return fail(ERROR_CODES.SERVICE_UNAVAILABLE, 503, 'Service unavailable. Please try again later.');
+      console.error('[login] missing DB or JWT_SECRET binding', requestId ? { requestId } : '');
+      return fail(ERROR_CODES.SERVICE_UNAVAILABLE, 503, 'Service unavailable. Please try again later.', requestId);
     }
 
     const cleanEmail = rawEmail.toLowerCase();
@@ -38,14 +38,18 @@ export async function onRequestPost(context) {
     // so the response time does not reveal whether the address is registered. (H7)
     if (!user) {
       await hashPassword(password).catch(() => {});
-      return fail(ERROR_CODES.INVALID_CREDENTIALS, 401, 'Invalid email or password.');
+      emitMetric('auth.login.invalid_credentials', requestId);
+      return fail(ERROR_CODES.INVALID_CREDENTIALS, 401, 'Invalid email or password.', requestId);
     }
 
     const isValid = await verifyPassword(password, user.password_hash);
-    if (!isValid) return fail(ERROR_CODES.INVALID_CREDENTIALS, 401, 'Invalid email or password.');
+    if (!isValid) {
+      emitMetric('auth.login.invalid_credentials', requestId);
+      return fail(ERROR_CODES.INVALID_CREDENTIALS, 401, 'Invalid email or password.', requestId);
+    }
 
     if (user.status === 'Suspended') {
-      return fail(ERROR_CODES.UNAUTHORIZED, 403, 'Account suspended. Please contact support.');
+      return fail(ERROR_CODES.UNAUTHORIZED, 403, 'Account suspended. Please contact support.', requestId);
     }
 
     // Transparent rehash on login: upgrades 310k-era or legacy two-part hashes
@@ -54,12 +58,14 @@ export async function onRequestPost(context) {
       try {
         const fresh = await hashPassword(password);
         await env.DB.prepare('UPDATE users SET password_hash = ? WHERE id = ?').bind(fresh, user.id).run();
+        emitMetric('auth.login.rehash', requestId);
       } catch (rehashErr) {
-        console.error('[login] rehash failed (non-fatal):', rehashErr && rehashErr.message);
+        console.error('[login] rehash failed (non-fatal):', requestId ? { requestId } : '', rehashErr && rehashErr.message);
       }
     }
 
     const { token, csrf, maxAge } = await issueSession(env, user, Boolean(body.rememberMe));
+    emitMetric('auth.login.success', requestId);
 
     return withCookies(
       json({
@@ -81,7 +87,7 @@ export async function onRequestPost(context) {
     );
 
   } catch (err) {
-    console.error('[login] handler error:', err && err.message);
-    return fail(ERROR_CODES.INTERNAL_ERROR, 500, 'An internal error occurred. Please try again.');
+    console.error('[login] handler error:', requestId ? { requestId } : '', err && err.message);
+    return fail(ERROR_CODES.INTERNAL_ERROR, 500, 'An internal error occurred. Please try again.', requestId);
   }
 }

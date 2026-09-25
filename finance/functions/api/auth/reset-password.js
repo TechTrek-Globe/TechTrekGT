@@ -2,22 +2,22 @@ import {
   readJson, asTrimmedString, json, fail, withCookies, clearedCookies,
   MAX_BODY_AUTH, MAX_EMAIL_LEN, validatePassword,
   hmacHex, constantTimeStringEqual, hashPassword, verifyPassword,
-  ERROR_CODES
+  ERROR_CODES, emitMetric
 } from '../../utils/auth.js';
 import { enforceRateLimit } from '../../utils/rateLimit.js';
 
 const RESET_MAX_ATTEMPTS = 5;
 
 export async function onRequestPost(context) {
-  const { request, env } = context;
-  const limited = await enforceRateLimit(context, 'reset', 5, 600);
+  const { request, env, requestId } = context;
+  const limited = await enforceRateLimit(context, 'reset', 10, 60);
   if (limited) return limited;
 
   const GENERIC_BAD = 'Invalid or expired reset code.';
 
   try {
     const body = await readJson(request, MAX_BODY_AUTH);
-    if (!body) return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Invalid request body.');
+    if (!body) return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Invalid request body.', requestId);
 
     const rawEmail = asTrimmedString(body.email, MAX_EMAIL_LEN);
     const code = asTrimmedString(body.token, 32);
@@ -25,15 +25,15 @@ export async function onRequestPost(context) {
     const securityAnswer = typeof body.securityAnswer === 'string' ? body.securityAnswer.trim() : '';
 
     if (!rawEmail || !code || typeof newPassword !== 'string') {
-      return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Email, reset code, and new password are required.');
+      return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Email, reset code, and new password are required.', requestId);
     }
 
     const pwError = validatePassword(newPassword);
-    if (pwError) return fail(ERROR_CODES.VALIDATION_ERROR, 400, pwError);
+    if (pwError) return fail(ERROR_CODES.VALIDATION_ERROR, 400, pwError, requestId);
 
     if (!env.DB || !env.JWT_SECRET) {
-      console.error('[reset-password] missing DB or JWT_SECRET binding');
-      return fail(ERROR_CODES.SERVICE_UNAVAILABLE, 503, 'Service unavailable. Please try again later.');
+      console.error('[reset-password] missing DB or JWT_SECRET binding', requestId ? { requestId } : '');
+      return fail(ERROR_CODES.SERVICE_UNAVAILABLE, 503, 'Service unavailable. Please try again later.', requestId);
     }
 
     const cleanEmail = rawEmail.toLowerCase();
@@ -43,16 +43,21 @@ export async function onRequestPost(context) {
       'SELECT id, user_id, expires_at, attempts FROM password_resets WHERE email = ? AND used = 0 ORDER BY created_at DESC LIMIT 1'
     ).bind(cleanEmail).first();
 
-    if (!record) return fail(ERROR_CODES.RESET_CODE_INVALID, 400, GENERIC_BAD);
+    if (!record) {
+      emitMetric('auth.reset.bad_code', requestId);
+      return fail(ERROR_CODES.RESET_CODE_INVALID, 400, GENERIC_BAD, requestId);
+    }
 
     if (Number(record.expires_at) < Date.now()) {
       await env.DB.prepare('UPDATE password_resets SET used = 1 WHERE id = ?').bind(record.id).run();
-      return fail(ERROR_CODES.RESET_CODE_INVALID, 400, GENERIC_BAD);
+      emitMetric('auth.reset.bad_code', requestId);
+      return fail(ERROR_CODES.RESET_CODE_INVALID, 400, GENERIC_BAD, requestId);
     }
 
     if (Number(record.attempts || 0) >= RESET_MAX_ATTEMPTS) {
       await env.DB.prepare('UPDATE password_resets SET used = 1 WHERE id = ?').bind(record.id).run();
-      return fail(ERROR_CODES.RESET_CODE_INVALID, 400, GENERIC_BAD);
+      emitMetric('auth.reset.bad_code', requestId);
+      return fail(ERROR_CODES.RESET_CODE_INVALID, 400, GENERIC_BAD, requestId);
     }
 
     const stored = await env.DB.prepare(
@@ -78,7 +83,8 @@ export async function onRequestPost(context) {
       await env.DB.prepare(
         'UPDATE password_resets SET attempts = COALESCE(attempts, 0) + 1 WHERE id = ?'
       ).bind(record.id).run();
-      return fail(ERROR_CODES.RESET_CODE_INVALID, 400, GENERIC_BAD);
+      emitMetric('auth.reset.bad_code', requestId);
+      return fail(ERROR_CODES.RESET_CODE_INVALID, 400, GENERIC_BAD, requestId);
     }
 
     const newPasswordHash = await hashPassword(newPassword);
@@ -92,12 +98,14 @@ export async function onRequestPost(context) {
       env.DB.prepare('UPDATE password_resets SET used = 1 WHERE email = ? AND used = 0').bind(cleanEmail)
     ]);
 
+    emitMetric('auth.reset.success', requestId);
+
     return withCookies(
       json({ success: true, message: 'Password reset successfully. Please sign in with your new password.' }),
       clearedCookies()
     );
   } catch (err) {
-    console.error('[reset-password] error:', err && err.message);
-    return fail(ERROR_CODES.INTERNAL_ERROR, 500, 'An internal error occurred. Please try again.');
+    console.error('[reset-password] error:', requestId ? { requestId } : '', err && err.message);
+    return fail(ERROR_CODES.INTERNAL_ERROR, 500, 'An internal error occurred. Please try again.', requestId);
   }
 }

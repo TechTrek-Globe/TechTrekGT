@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect, useLayoutEffect } from 'react';
 import { useBudget } from '../context/BudgetContext';
 import {
   Wallet,
@@ -633,23 +633,60 @@ function DailySpreadsheetMatrix() {
 
   const isProgrammaticScrollRef = useRef(false);
   const firstSelectedMonthRowRef = useRef(null);
+  const pendingScrollTargetRef = useRef(null);
+  const pendingPrependScrollRef = useRef(null);
 
-  // Full 12-month stream for the selected year for a completely stable, smooth-scrolling ledger
+  // Continuous multi-year stream range (startYear to endYear)
+  const [yearRange, setYearRange] = useState(() => {
+    const curYear = today.getFullYear();
+    const minYear = startDateObj ? startDateObj.getFullYear() : curYear;
+    return {
+      startYear: Math.max(minYear, curYear - 1),
+      endYear: curYear + 1
+    };
+  });
+
+  // Keep startYear constrained if startDateObj changes
+  useEffect(() => {
+    const minYear = startDateObj.getFullYear();
+    setYearRange(prev => {
+      if (prev.startYear < minYear) {
+        return { ...prev, startYear: minYear };
+      }
+      return prev;
+    });
+  }, [startDateObj]);
+
+  // Multi-year continuous stream for completely stable, smooth cross-year scrolling
   const monthList = useMemo(() => {
     const list = [];
-    for (let m = 0; m < 12; m++) {
-      const mKey = `${selectedYear}-${String(m + 1).padStart(2, '0')}`;
-      const mDays = new Date(selectedYear, m + 1, 0).getDate();
-      list.push({
-        year: selectedYear,
-        month: m,
-        monthKey: mKey,
-        daysInMonth: mDays,
-        offset: m
-      });
+    for (let y = yearRange.startYear; y <= yearRange.endYear; y++) {
+      for (let m = 0; m < 12; m++) {
+        const mKey = `${y}-${String(m + 1).padStart(2, '0')}`;
+        const mDays = new Date(y, m + 1, 0).getDate();
+        list.push({
+          year: y,
+          month: m,
+          monthKey: mKey,
+          daysInMonth: mDays,
+          offset: (y - yearRange.startYear) * 12 + m
+        });
+      }
     }
     return list;
-  }, [selectedYear]);
+  }, [yearRange.startYear, yearRange.endYear]);
+
+  // Compensate scroll position when prepending a previous year above the viewport
+  useLayoutEffect(() => {
+    if (pendingPrependScrollRef.current && containerRef.current) {
+      const { oldScrollHeight, oldScrollTop } = pendingPrependScrollRef.current;
+      pendingPrependScrollRef.current = null;
+      const heightDiff = containerRef.current.scrollHeight - oldScrollHeight;
+      if (heightDiff > 0) {
+        containerRef.current.scrollTop = oldScrollTop + heightDiff;
+      }
+    }
+  }, [monthList]);
 
   const showExtraColumns = selectedAccountId === 'all'
     ? budget.accounts.some(a => a.enableExtraSavings !== false)
@@ -1012,6 +1049,22 @@ function DailySpreadsheetMatrix() {
     return () => observer.disconnect();
   }, [monthGroups]);
 
+  // Handle programmatic scroll target when year/month changes outside the loaded window
+  useEffect(() => {
+    if (pendingScrollTargetRef.current) {
+      const target = pendingScrollTargetRef.current;
+      pendingScrollTargetRef.current = null;
+      isProgrammaticScrollRef.current = true;
+      if (target === 'today') {
+        todayRowRef.current?.scrollIntoView({ behavior: 'auto', block: 'center' });
+      } else {
+        const targetEl = containerRef.current?.querySelector(`tr[data-rowkey="${target}"]`);
+        targetEl?.scrollIntoView({ behavior: 'auto', block: 'start' });
+      }
+      setTimeout(() => { isProgrammaticScrollRef.current = false; }, 400);
+    }
+  }, [monthGroups]);
+
   // Scroll to selected month when user picks a new month from the dropdown
   const handleMonthSelect = (m) => {
     setSelectedMonth(m);
@@ -1026,13 +1079,22 @@ function DailySpreadsheetMatrix() {
 
   // Scroll to selected year when user changes year
   const handleYearSelect = (y) => {
+    if (isNaN(y) || y < 2000 || y > 2100) return;
     setSelectedYear(y);
     const targetKey = `${y}-${String(selectedMonth + 1).padStart(2, '0')}-1`;
-    const targetEl = containerRef.current?.querySelector(`tr[data-rowkey="${targetKey}"]`);
-    if (targetEl) {
-      isProgrammaticScrollRef.current = true;
-      targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      setTimeout(() => { isProgrammaticScrollRef.current = false; }, 400);
+    if (y < yearRange.startYear || y > yearRange.endYear) {
+      pendingScrollTargetRef.current = targetKey;
+      setYearRange({
+        startYear: Math.max(startDateObj.getFullYear(), y - 1),
+        endYear: y + 1
+      });
+    } else {
+      const targetEl = containerRef.current?.querySelector(`tr[data-rowkey="${targetKey}"]`);
+      if (targetEl) {
+        isProgrammaticScrollRef.current = true;
+        targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        setTimeout(() => { isProgrammaticScrollRef.current = false; }, 400);
+      }
     }
   };
 
@@ -1043,28 +1105,90 @@ function DailySpreadsheetMatrix() {
     }
   }, []);
 
-  // Dismiss header hover tooltip on scroll to prevent detached floating
+  const scrollRafIdRef = useRef(null);
+
+  // Synchronize active month & year on scroll, auto-expand years at boundaries, and dismiss tooltip
   useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
     const handleScroll = () => {
       if (hoverTimeoutRef.current) {
         clearTimeout(hoverTimeoutRef.current);
         hoverTimeoutRef.current = null;
       }
       setHoveredHeader(null);
+
+      if (scrollRafIdRef.current) return;
+      scrollRafIdRef.current = requestAnimationFrame(() => {
+        scrollRafIdRef.current = null;
+        const c = containerRef.current;
+        if (!c) return;
+
+        // Auto-expand next year when scrolling near the end of loaded months
+        const distanceToBottom = c.scrollHeight - c.scrollTop - c.clientHeight;
+        if (distanceToBottom < 800) {
+          setYearRange(prev => {
+            if (prev.endYear < 2050) {
+              return { ...prev, endYear: prev.endYear + 1 };
+            }
+            return prev;
+          });
+        }
+
+        // Prepend previous year when scrolling near top (if after account start date)
+        if (c.scrollTop < 400) {
+          const minStartYear = startDateObj.getFullYear();
+          setYearRange(prev => {
+            if (prev.startYear > minStartYear) {
+              pendingPrependScrollRef.current = {
+                oldScrollHeight: c.scrollHeight,
+                oldScrollTop: c.scrollTop
+              };
+              return { ...prev, startYear: prev.startYear - 1 };
+            }
+            return prev;
+          });
+        }
+
+        // Synchronize selectedMonth and selectedYear to the top visible row
+        if (!isProgrammaticScrollRef.current) {
+          const containerRect = c.getBoundingClientRect();
+          const topY = containerRect.top + 70;
+          const el = document.elementFromPoint(containerRect.left + 50, topY);
+          const monthHeader = el?.closest('tr[data-month-header]');
+          if (monthHeader) {
+            const raw = monthHeader.getAttribute('data-month-header');
+            if (raw) {
+              const [yStr, mStr] = raw.split('-');
+              const y = parseInt(yStr, 10);
+              const m = parseInt(mStr, 10);
+              if (!isNaN(y)) setSelectedYear(prev => prev !== y ? y : prev);
+              if (!isNaN(m)) setSelectedMonth(prev => prev !== m ? m : prev);
+            }
+          } else {
+            const row = el?.closest('tr[data-year]');
+            if (row) {
+              const y = parseInt(row.getAttribute('data-year'), 10);
+              const m = parseInt(row.getAttribute('data-month'), 10);
+              if (!isNaN(y)) setSelectedYear(prev => prev !== y ? y : prev);
+              if (!isNaN(m)) setSelectedMonth(prev => prev !== m ? m : prev);
+            }
+          }
+        }
+      });
     };
 
-    const container = containerRef.current;
-    if (container) {
-      container.addEventListener('scroll', handleScroll, { passive: true });
-    }
+    container.addEventListener('scroll', handleScroll, { passive: true });
     window.addEventListener('scroll', handleScroll, { passive: true });
 
     return () => {
-      if (container) container.removeEventListener('scroll', handleScroll);
+      container.removeEventListener('scroll', handleScroll);
       window.removeEventListener('scroll', handleScroll);
+      if (scrollRafIdRef.current) cancelAnimationFrame(scrollRafIdRef.current);
       if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
     };
-  }, []);
+  }, [startDateObj]);
 
   // Column totals for selected month
   const columnTotals = useMemo(() => {
@@ -1105,7 +1229,13 @@ function DailySpreadsheetMatrix() {
     return totals;
   }, [matrixData, selectedMonth, selectedYear, accountPeople, accountBills]);
 
-  const finalEndingBalance = matrixData[matrixData.length - 1]?.totalEnd || 0;
+  const finalEndingBalance = useMemo(() => {
+    const selectedMonthRows = matrixData.filter(r => r.month === selectedMonth && r.year === selectedYear);
+    if (selectedMonthRows.length > 0) {
+      return selectedMonthRows[selectedMonthRows.length - 1].totalEnd;
+    }
+    return matrixData[matrixData.length - 1]?.totalEnd || 0;
+  }, [matrixData, selectedMonth, selectedYear]);
 
   return (
     <DndContext
@@ -1228,13 +1358,24 @@ function DailySpreadsheetMatrix() {
           <button
             onClick={() => {
               const now = new Date();
-              handleMonthSelect(now.getMonth());
-              handleYearSelect(now.getFullYear());
-              setTimeout(() => {
+              const curYear = now.getFullYear();
+              const curMonth = now.getMonth();
+              setSelectedMonth(curMonth);
+              setSelectedYear(curYear);
+
+              if (curYear < yearRange.startYear || curYear > yearRange.endYear) {
+                pendingScrollTargetRef.current = 'today';
+                setYearRange({
+                  startYear: Math.max(startDateObj.getFullYear(), curYear - 1),
+                  endYear: curYear + 1
+                });
+              } else {
+                isProgrammaticScrollRef.current = true;
                 if (todayRowRef.current) {
                   todayRowRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 }
-              }, 50);
+                setTimeout(() => { isProgrammaticScrollRef.current = false; }, 400);
+              }
             }}
             className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/50 hover:border-amber-400 font-bold text-xs shadow-sm transition-all cursor-pointer active:scale-95"
             title="Jump to Today's Date"
@@ -1473,7 +1614,7 @@ function DailySpreadsheetMatrix() {
 
           {/* Matrix Rows (Continuous Multi-Month Stream with Natural In-Flow Month Banners) */}
           {monthGroups.map(group => (
-            <tbody key={group.monthKey} className="divide-y divide-slate-800/50 font-mono text-[10px]">
+            <tbody key={group.monthKey} data-month-group={`${group.year}-${group.month}`} className="divide-y divide-slate-800/50 font-mono text-[10px]">
               {/* Natural In-Flow Month Header Row (Non-sticky so it never obscures date rows) */}
               <tr
                 className="bg-slate-950 border-b border-slate-800"

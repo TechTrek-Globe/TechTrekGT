@@ -123,7 +123,16 @@ CREATE TABLE IF NOT EXISTS household_settings (
 CREATE TABLE IF NOT EXISTS user_backups (
   id TEXT PRIMARY KEY DEFAULT 'default_vault',
   data TEXT NOT NULL,
-  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at_ms INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS user_backup_versions (
+  id         TEXT    PRIMARY KEY,
+  user_id    TEXT    NOT NULL,
+  data       TEXT    NOT NULL,
+  saved_at   INTEGER NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS password_resets (
@@ -144,3 +153,4 @@ CREATE INDEX IF NOT EXISTS idx_bills_household ON bills(household_id);
 CREATE INDEX IF NOT EXISTS idx_people_household ON people(household_id);
 CREATE INDEX IF NOT EXISTS idx_loans_household ON loans(household_id);
 CREATE INDEX IF NOT EXISTS idx_password_resets_email_token ON password_resets(email, token);
+CREATE INDEX IF NOT EXISTS idx_backup_versions_user ON user_backup_versions(user_id, saved_at DESC);

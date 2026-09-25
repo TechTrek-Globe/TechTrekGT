@@ -1,6 +1,6 @@
 // @ts-nocheck
-import React, { useState } from 'react';
-import { apiFetch } from '../../../utils/api';
+import React, { useState, useEffect, useCallback } from 'react';
+import { apiFetch, fetchBackupVersions, restoreBackupVersion } from '../../../utils/api';
 import { useBudgetMetadata, useLedgerDataState, useLedgerDataDispatch } from '../../../context/BudgetContext';
 import { useAuth } from '../../../context/AuthContext';
 import { 
@@ -14,7 +14,9 @@ import {
   RefreshCw,
   Clock,
   ArrowUpRight,
-  ArrowDownLeft
+  ArrowDownLeft,
+  History,
+  RotateCcw
 } from 'lucide-react';
 import { getApiUrl } from '../../../utils/api';
 
@@ -32,6 +34,7 @@ export function CloudSyncSubPanel() {
   const {
     pushCloudBackup,
     pullCloudRestore,
+    restoreFromBackup,
     setSyncPasscode: setCloudPasscode,
     setIsSyncUnlocked: setIsCloudUnlocked,
   } = useLedgerDataDispatch();
@@ -78,6 +81,29 @@ export function CloudSyncSubPanel() {
     setCloudSyncStatus(null);
   };
 
+  const [versions, setVersions] = useState([]);
+  const [isLoadingVersions, setIsLoadingVersions] = useState(false);
+  const [restoringVersionId, setRestoringVersionId] = useState(null);
+
+  const loadVersions = useCallback(async () => {
+    if (!isAuthenticated) return;
+    setIsLoadingVersions(true);
+    try {
+      const vers = await fetchBackupVersions();
+      setVersions(vers);
+    } catch (err) {
+      console.warn('Failed to load backup versions:', err);
+    } finally {
+      setIsLoadingVersions(false);
+    }
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadVersions();
+    }
+  }, [isAuthenticated, loadVersions]);
+
   const handlePushCloudBackup = async () => {
     setIsPushing(true);
     setCloudSyncStatus({ type: 'info', message: 'Saving changes locally and syncing with Cloud Vault in background...' });
@@ -85,6 +111,11 @@ export function CloudSyncSubPanel() {
       const res = await pushCloudBackup();
       if (res && res.success) {
         setCloudSyncStatus({ type: 'success', message: `Successfully backed up data to Cloud Vault! (${new Date().toLocaleTimeString()})` });
+        loadVersions();
+      } else if (res?.conflict) {
+        setCloudSyncStatus({ type: 'warning', message: 'Sync conflict: Cloud has newer changes from another device.' });
+      } else if (res?.suspicious) {
+        setCloudSyncStatus({ type: 'warning', message: 'Suspicious payload: incoming backup is suspiciously smaller than stored backup.' });
       } else {
         setCloudSyncStatus({ type: 'warning', message: `Saved locally. ${res?.error || 'Cloud sync queued for background retry.'}` });
       }
@@ -95,12 +126,30 @@ export function CloudSyncSubPanel() {
     }
   };
 
+  const handleRestoreVersion = async (versionId) => {
+    if (!versionId) return;
+    setRestoringVersionId(versionId);
+    try {
+      const res = await restoreBackupVersion(versionId);
+      if (res && res.budget) {
+        await restoreFromBackup(res.budget);
+        setCloudSyncStatus({ type: 'success', message: `Restored snapshot from ${new Date(res.version || Date.now()).toLocaleString()}` });
+        await loadVersions();
+      }
+    } catch (err) {
+      setCloudSyncStatus({ type: 'error', message: `Failed to restore version: ${err.message}` });
+    } finally {
+      setRestoringVersionId(null);
+    }
+  };
+
   const handlePullCloudRestore = async () => {
     setCloudSyncStatus(null);
     setIsCloudSyncing(true);
     try {
       await pullCloudRestore();
       setCloudSyncStatus({ type: 'success', message: 'Successfully restored data from Cloud Vault! Database and UI state refreshed.' });
+      loadVersions();
     } catch (err) {
       setCloudSyncStatus({ type: 'error', message: `Cloud restore failed: ${err.message}` });
     } finally {
@@ -274,6 +323,56 @@ export function CloudSyncSubPanel() {
                 {isCloudSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowDownLeft className="w-4 h-4 text-purple-400" />}
                 <span>Restore from Cloud D1</span>
               </button>
+            </div>
+
+            {/* Version History Card */}
+            <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-200">
+                  <History className="w-4 h-4 text-purple-400" />
+                  <span>Cloud Vault Snapshots (Last 10 Versions)</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={loadVersions}
+                  disabled={isLoadingVersions}
+                  className="text-xs text-purple-400 hover:text-purple-300 flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3 h-3 ${isLoadingVersions ? 'animate-spin' : ''}`} />
+                  <span>Refresh</span>
+                </button>
+              </div>
+              {versions.length === 0 ? (
+                <p className="text-[11px] text-slate-500 italic">No historical snapshots saved yet.</p>
+              ) : (
+                <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                  {versions.map((ver, idx) => (
+                    <div key={ver.id} className="p-2.5 rounded-lg bg-slate-950/60 border border-slate-800/80 flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">
+                          #{idx + 1}
+                        </span>
+                        <span className="text-slate-300 font-mono text-[11px]">
+                          {new Date(ver.savedAt).toLocaleString()}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={restoringVersionId === ver.id}
+                        onClick={() => handleRestoreVersion(ver.id)}
+                        className="px-2.5 py-1 bg-purple-950 hover:bg-purple-900 text-purple-300 border border-purple-800 rounded-md text-[11px] font-semibold flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        {restoringVersionId === ver.id ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <RotateCcw className="w-3 h-3" />
+                        )}
+                        <span>Restore</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}

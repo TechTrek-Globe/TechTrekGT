@@ -9,6 +9,7 @@ import { getBudgetData, saveBudgetData, clearAndRestoreBudgetData, clearBudgetDa
 import { processSpreadsheetImport } from '../utils/spreadsheet';
 import { isBillDueInMonth } from '../utils/paydayUtils';
 import { logSync, logTransaction, logMatrix, logLedger, logState } from '../utils/logger';
+import { AlertTriangle } from 'lucide-react';
 
 export const LedgerDataContext = createContext(null);
 export const LedgerDataStateContext = createContext(null);
@@ -201,13 +202,43 @@ export function LedgerDataProvider({ children }) {
     };
   }, [flushSaveToIndexedDB]);
 
+  const [cloudVersion, setCloudVersion] = useState(() => {
+    try {
+      const v = typeof localStorage !== 'undefined' ? localStorage.getItem('tt_budget_cloud_version') : null;
+      return v ? parseInt(v, 10) : 0;
+    } catch {
+      return 0;
+    }
+  });
+  const cloudVersionRef = useRef(cloudVersion);
+  useEffect(() => {
+    cloudVersionRef.current = cloudVersion;
+  }, [cloudVersion]);
+
+  const [syncConflict, setSyncConflict] = useState(null);
+
   // Cloud Vault Push Backup (Optimistic + Fallback Queue)
-  const pushCloudBackup = useCallback(async (passcode) => {
-    logSync('PUSH_DISPATCH', 'Executing pushCloudBackup from LedgerDataContext', { hasPasscode: Boolean(passcode) });
-    const result = await pushCloudBackupOptimistic(passcode, budgetRef.current);
+  const pushCloudBackup = useCallback(async (passcode, options = {}) => {
+    logSync('PUSH_DISPATCH', 'Executing pushCloudBackup from LedgerDataContext', { hasPasscode: Boolean(passcode), options });
+    const effectiveBaseVersion = options.baseVersion !== undefined ? options.baseVersion : cloudVersionRef.current;
+    const result = await pushCloudBackupOptimistic(passcode, budgetRef.current, {
+      baseVersion: effectiveBaseVersion,
+      force: options.force
+    });
     if (result.success) {
+      if (result.version) {
+        setCloudVersion(result.version);
+        try { localStorage.setItem('tt_budget_cloud_version', String(result.version)); } catch {}
+      }
+      setSyncConflict(null);
       setLastCloudSyncTime(new Date().toLocaleTimeString());
       try { localStorage.setItem('tt_budget_last_modified', String(Date.now())); } catch {}
+    } else if (result.conflict) {
+      setSyncConflict({
+        serverData: result.serverData,
+        serverVersion: result.serverVersion,
+        localTimestamp: parseInt(localStorage.getItem('tt_budget_last_modified') || '0', 10) || Date.now()
+      });
     }
     return result;
   }, [setLastCloudSyncTime]);
@@ -248,6 +279,30 @@ export function LedgerDataProvider({ children }) {
     setTransactions(newTransactions);
     return true;
   }, [setMetadataState]);
+
+  const resolveConflictKeepLocal = useCallback(async () => {
+    logSync('CONFLICT_RESOLVE', 'User chose to keep local data (force push to cloud)');
+    const res = await pushCloudBackup(syncPasscode, { force: true });
+    if (res?.success) {
+      setSyncConflict(null);
+    }
+    return res;
+  }, [pushCloudBackup, syncPasscode]);
+
+  const resolveConflictUseCloud = useCallback(async () => {
+    if (!syncConflict || !syncConflict.serverData) return;
+    logSync('CONFLICT_RESOLVE', 'User chose to use cloud data (restore cloud backup)');
+    await restoreFromBackup(syncConflict.serverData);
+    if (syncConflict.serverVersion) {
+      setCloudVersion(syncConflict.serverVersion);
+      try {
+        localStorage.setItem('tt_budget_cloud_version', String(syncConflict.serverVersion));
+        localStorage.setItem('tt_budget_last_modified', String(syncConflict.serverVersion));
+      } catch {}
+    }
+    setLastCloudSyncTime(new Date().toLocaleTimeString());
+    setSyncConflict(null);
+  }, [syncConflict, restoreFromBackup, setLastCloudSyncTime]);
 
   // Cloud Vault Pull Restore
   const pullCloudRestore = useCallback(async (passcode) => {
@@ -336,28 +391,56 @@ export function LedgerDataProvider({ children }) {
         if (res.ok && cloudData && cloudData.success && cloudData.budget) {
           const localTimeStr = localStorage.getItem('tt_budget_last_modified');
           const localTime = localTimeStr ? parseInt(localTimeStr, 10) : 0;
-          const cloudTime = cloudData.updatedAt ? new Date(cloudData.updatedAt).getTime() : 0;
+          const cloudTime = cloudData.version || (cloudData.updatedAt ? new Date(cloudData.updatedAt).getTime() : 0);
           const localData = budgetRef.current;
           const isLocalEmpty = !localData || (!localData.accounts?.length && !localData.bills?.length);
+          const savedCloudVersion = cloudVersionRef.current || 0;
 
           logSync('CONFLICT_CHECK', 'Evaluated local vs cloud timestamps for 2-way sync', {
             localTime,
             cloudTime,
-            differenceMs: cloudTime - localTime,
-            isLocalEmpty,
-            action: (isLocalEmpty || cloudTime >= localTime) ? 'RESTORE_FROM_CLOUD' : (localTime > cloudTime ? 'PUSH_LOCAL_TO_CLOUD' : 'IDLE')
+            savedCloudVersion,
+            isLocalEmpty
           });
 
-          // If local is empty OR cloud is newer/equal to local, restore from cloud
-          if (isLocalEmpty || cloudTime >= localTime) {
+          if (isLocalEmpty) {
             await restoreFromBackup(cloudData.budget);
+            setCloudVersion(cloudTime);
             setLastCloudSyncTime(new Date().toLocaleTimeString());
             if (cloudTime > 0) {
-              try { localStorage.setItem('tt_budget_last_modified', String(cloudTime)); } catch {}
+              try {
+                localStorage.setItem('tt_budget_cloud_version', String(cloudTime));
+                localStorage.setItem('tt_budget_last_modified', String(cloudTime));
+              } catch {}
             }
-          } else if (localTime > cloudTime && !isLocalEmpty) {
-            // Local has newer unpushed changes made offline -> push to cloud
-            await pushCloudBackup(syncPasscode);
+          } else if (savedCloudVersion > 0 && cloudTime > savedCloudVersion && localTime > savedCloudVersion) {
+            // Both local and cloud changed since last sync: Prompt user
+            setSyncConflict({
+              serverData: cloudData.budget,
+              serverVersion: cloudTime,
+              localTimestamp: localTime
+            });
+          } else if (cloudTime > savedCloudVersion && localTime <= savedCloudVersion) {
+            // Cloud updated elsewhere, local is clean: apply cloud
+            await restoreFromBackup(cloudData.budget);
+            setCloudVersion(cloudTime);
+            setLastCloudSyncTime(new Date().toLocaleTimeString());
+            if (cloudTime > 0) {
+              try {
+                localStorage.setItem('tt_budget_cloud_version', String(cloudTime));
+                localStorage.setItem('tt_budget_last_modified', String(cloudTime));
+              } catch {}
+            }
+          } else if (localTime > savedCloudVersion && cloudTime <= savedCloudVersion) {
+            // Local changed offline: push local
+            await pushCloudBackup(syncPasscode, { baseVersion: savedCloudVersion });
+          } else if (cloudTime !== localTime && savedCloudVersion === 0) {
+            // First time syncing with both local and cloud populated: Prompt user
+            setSyncConflict({
+              serverData: cloudData.budget,
+              serverVersion: cloudTime,
+              localTimestamp: localTime
+            });
           }
         }
       } catch (err) {
@@ -893,8 +976,10 @@ export function LedgerDataProvider({ children }) {
     transactions,
     matrixVersion,
     syncPasscode,
-    isSyncUnlocked
-  }), [budgetForUI, lineItems, transactions, matrixVersion, syncPasscode, isSyncUnlocked]);
+    isSyncUnlocked,
+    syncConflict,
+    cloudVersion
+  }), [budgetForUI, lineItems, transactions, matrixVersion, syncPasscode, isSyncUnlocked, syncConflict, cloudVersion]);
 
   const actionsValue = useMemo(() => ({
     matrixVersion,
@@ -925,7 +1010,10 @@ export function LedgerDataProvider({ children }) {
     pushCloudBackup,
     pullCloudRestore,
     setSyncPasscode,
-    setIsSyncUnlocked
+    setIsSyncUnlocked,
+    setSyncConflict,
+    resolveConflictKeepLocal,
+    resolveConflictUseCloud
   }), [
     getDailyMatrix,
     getDailyMatrixCell,
@@ -955,6 +1043,9 @@ export function LedgerDataProvider({ children }) {
     pullCloudRestore,
     setSyncPasscode,
     setIsSyncUnlocked,
+    setSyncConflict,
+    resolveConflictKeepLocal,
+    resolveConflictUseCloud,
     matrixVersion
   ]);
 
@@ -968,6 +1059,57 @@ export function LedgerDataProvider({ children }) {
       <LedgerDataStateContext.Provider value={stateValue}>
         <LedgerDataContext.Provider value={contextValue}>
           {children}
+          {syncConflict && (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+              <div className="w-full max-w-lg p-6 rounded-2xl glass-card border border-amber-600/60 bg-gradient-to-br from-slate-900 via-slate-900 to-amber-950/30 text-slate-100 shadow-2xl space-y-5">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                    <AlertTriangle className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-100">Budget Sync Conflict</h3>
+                    <p className="text-xs text-slate-400">
+                      Your budget changed on another device. Keep local or use cloud?
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div className="p-3 rounded-xl bg-slate-800/80 border border-slate-700/60 space-y-1">
+                    <div className="text-slate-400 text-[11px] font-semibold uppercase tracking-wider">Local Changes</div>
+                    <div className="font-mono text-slate-200">
+                      {syncConflict.localTimestamp ? new Date(syncConflict.localTimestamp).toLocaleString() : 'Recent offline'}
+                    </div>
+                    <p className="text-[10px] text-slate-400">Current device edits</p>
+                  </div>
+                  <div className="p-3 rounded-xl bg-purple-950/40 border border-purple-800/60 space-y-1">
+                    <div className="text-purple-300 text-[11px] font-semibold uppercase tracking-wider">Cloud Version</div>
+                    <div className="font-mono text-slate-200">
+                      {syncConflict.serverVersion ? new Date(syncConflict.serverVersion).toLocaleString() : 'Remote update'}
+                    </div>
+                    <p className="text-[10px] text-slate-400">Changed on another device</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={resolveConflictKeepLocal}
+                    className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 transition-all cursor-pointer"
+                  >
+                    Keep Local (Overwrite Cloud)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={resolveConflictUseCloud}
+                    className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all shadow-md cursor-pointer"
+                  >
+                    Use Cloud (Overwrite Local)
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </LedgerDataContext.Provider>
       </LedgerDataStateContext.Provider>
     </LedgerDataDispatchContext.Provider>

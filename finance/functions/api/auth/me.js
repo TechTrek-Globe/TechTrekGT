@@ -13,14 +13,18 @@ export async function onRequestGet(context) {
     // Sliding refresh - bounded by the absolute session expiry embedded in the token. (H6)
     const now = Math.floor(Date.now() / 1000);
     const sexp = typeof payload.sexp === 'number' && payload.sexp > now ? payload.sexp : now + 7200;
-    const { token, csrf, maxAge } = await issueSession(
-      context.env, user, payload.householdId, sexp - now > 2 * 60 * 60
-    );
 
+    // Resolve householdId from DB before issuing the token so concurrent requests
+    // do not race: each reads the same membership row and issues tokens with the
+    // same householdId. (Stage 1.3 regression fix)
     const member = await context.env.DB.prepare(
       'SELECT household_id FROM household_members WHERE user_id = ?'
     ).bind(user.id).first();
     const householdId = member ? member.household_id : payload.householdId;
+
+    const { token, csrf, maxAge } = await issueSession(
+      context.env, user, householdId, sexp - now > 2 * 60 * 60
+    );
 
     return withCookies(
       json({

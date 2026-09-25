@@ -269,7 +269,7 @@ The finance platform supports flexible earner frequencies (`semi-monthly: 24/yr`
 |-------|-----------|---------|
 | IndexedDB | `utils/indexedDB.js` | Primary local persistence (get/set budget data) |
 | localStorage | Legacy key `personal_budget_app_data_v1` | Migration fallback for older data |
-| Cloudflare D1 | `user_backups` table | Cloud vault backup/restore via `/api/sync/backup` and `/api/sync/restore` |
+| Cloudflare D1 | `user_backups` & `user_backup_versions` | Cloud vault backup with optimistic concurrency (`baseVersion`), epoch ms timestamps (`updated_at_ms`), 10-snapshot version history (`user_backup_versions`), size sanity check (10% threshold), and UI conflict resolution prompt via `/api/sync/backup`, `/api/sync/restore`, `/api/sync/versions`, and `/api/sync/restore-version` |
 | API | Auth endpoints | User accounts, password reset, profile |
 
 **Daily Matrix Key Architecture (Flat Key-Value Store):**

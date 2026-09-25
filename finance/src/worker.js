@@ -154,17 +154,81 @@ async function handleSyncBackup(context) {
     const body = await readJson(request, MAX_BODY_SYNC);
     if (!body) return fail(400, 'Invalid or oversized request body.');
 
+    const baseVersion = body.baseVersion;
+    const force = Boolean(body.force);
+    const hasBaseVersion = typeof baseVersion === 'number' && !isNaN(baseVersion);
+
+    if (!hasBaseVersion && !force) {
+      return json({ code: 'VALIDATION_ERROR', error: 'baseVersion is required' }, 400);
+    }
+
     const payload = body.budget !== undefined ? body.budget : body;
     const dataStr = JSON.stringify(payload);
     if (dataStr.length > MAX_BODY_SYNC) return fail(413, 'Backup payload is too large.');
 
-    await env.DB.prepare(
-      `INSERT INTO user_backups (id, data, updated_at)
-       VALUES (?, ?, datetime('now'))
-       ON CONFLICT(id) DO UPDATE SET data = excluded.data, updated_at = datetime('now')`
-    ).bind(userId, dataStr).run();
+    const row = await env.DB.prepare(
+      'SELECT data, updated_at, updated_at_ms FROM user_backups WHERE id = ?'
+    ).bind(userId).first();
 
-    return json({ success: true, timestamp: new Date().toISOString() });
+    const storedVersion = row ? (row.updated_at_ms != null ? Number(row.updated_at_ms) : (row.updated_at ? new Date(row.updated_at).getTime() : 0)) : null;
+
+    if (row && !force && hasBaseVersion && storedVersion > baseVersion) {
+      let serverData;
+      try {
+        serverData = JSON.parse(row.data);
+      } catch {
+        serverData = row.data;
+      }
+      return json({
+        code: 'SYNC_CONFLICT',
+        conflict: true,
+        error: 'Cloud data has changed since your last sync.',
+        serverData: serverData && serverData.budget !== undefined ? serverData.budget : serverData,
+        serverVersion: storedVersion
+      }, 409);
+    }
+
+    if (row && row.data && row.data.length > 0 && !force) {
+      const incomingSize = dataStr.length;
+      const storedSize = row.data.length;
+      if (incomingSize < storedSize * 0.1) {
+        return json({
+          code: 'SYNC_SUSPICIOUS',
+          suspicious: true,
+          error: 'Incoming backup is suspiciously smaller than stored backup.'
+        }, 409);
+      }
+    }
+
+    const now = Date.now();
+    const versionId = crypto.randomUUID();
+
+    await env.DB.prepare(
+      `INSERT INTO user_backup_versions (id, user_id, data, saved_at)
+       VALUES (?, ?, ?, ?)`
+    ).bind(versionId, userId, dataStr, now).run();
+
+    await env.DB.prepare(
+      `DELETE FROM user_backup_versions
+       WHERE user_id = ?
+         AND id NOT IN (
+           SELECT id FROM user_backup_versions
+            WHERE user_id = ?
+            ORDER BY saved_at DESC, rowid DESC
+            LIMIT 10
+         )`
+    ).bind(userId, userId).run();
+
+    await env.DB.prepare(
+      `INSERT INTO user_backups (id, data, updated_at, updated_at_ms)
+       VALUES (?, ?, datetime('now'), ?)
+       ON CONFLICT(id) DO UPDATE SET
+         data = excluded.data,
+         updated_at = excluded.updated_at,
+         updated_at_ms = excluded.updated_at_ms`
+    ).bind(userId, dataStr, now).run();
+
+    return json({ success: true, version: now, timestamp: new Date(now).toISOString() });
   } catch (err) {
     console.error('[sync/backup] error:', err && err.message);
     return fail(500, 'Backup failed.');
@@ -179,7 +243,7 @@ async function handleSyncRestore(context) {
     const userId = auth.user.id;
 
     const row = await env.DB.prepare(
-      'SELECT data, updated_at FROM user_backups WHERE id = ?'
+      'SELECT data, updated_at, updated_at_ms FROM user_backups WHERE id = ?'
     ).bind(userId).first();
 
     if (!row || !row.data) return fail(404, 'No cloud backup found');
@@ -192,14 +256,95 @@ async function handleSyncRestore(context) {
       return fail(500, 'Stored backup could not be read.');
     }
 
+    const version = row.updated_at_ms != null ? Number(row.updated_at_ms) : (row.updated_at ? new Date(row.updated_at).getTime() : 0);
+    const updatedAtIso = version ? new Date(version).toISOString() : row.updated_at;
+
     return json({
       success: true,
       budget: parsed && parsed.budget !== undefined ? parsed.budget : parsed,
-      updatedAt: row.updated_at
+      updatedAt: updatedAtIso,
+      version: version
     });
   } catch (err) {
     console.error('[sync/restore] error:', err && err.message);
     return fail(500, 'Restore failed.');
+  }
+}
+
+async function handleSyncVersions(context) {
+  const { env } = context;
+  try {
+    const auth = await authenticate(context, { requireCsrf: false });
+    if (auth.error) return auth.error;
+    const userId = auth.user.id;
+
+    const rows = await env.DB.prepare(
+      `SELECT id, saved_at FROM user_backup_versions
+       WHERE user_id = ?
+       ORDER BY saved_at DESC, rowid DESC
+       LIMIT 10`
+    ).bind(userId).all();
+
+    const versions = (rows?.results || []).map(r => ({
+      id: r.id,
+      savedAt: Number(r.saved_at)
+    }));
+
+    return json({ success: true, versions });
+  } catch (err) {
+    console.error('[sync/versions] error:', err && err.message);
+    return fail(500, 'Failed to retrieve backup versions.');
+  }
+}
+
+async function handleSyncRestoreVersion(context) {
+  const { request, env } = context;
+  try {
+    const auth = await authenticate(context, { requireCsrf: true });
+    if (auth.error) return auth.error;
+    const userId = auth.user.id;
+
+    const body = await readJson(request, MAX_BODY_AUTH);
+    const versionId = body && typeof body.versionId === 'string' ? body.versionId.trim() : '';
+    if (!versionId) return fail(400, 'versionId is required');
+
+    const versionRow = await env.DB.prepare(
+      'SELECT id, user_id, data, saved_at FROM user_backup_versions WHERE id = ?'
+    ).bind(versionId).first();
+
+    if (!versionRow) return fail(404, 'Version not found');
+
+    if (versionRow.user_id !== userId) {
+      return fail(403, 'Forbidden: cannot restore another user\'s version');
+    }
+
+    let parsed;
+    try {
+      parsed = JSON.parse(versionRow.data);
+    } catch {
+      console.error('[sync/restore-version] version data corrupted for version', versionId);
+      return fail(500, 'Stored version data could not be read.');
+    }
+
+    const now = Date.now();
+    await env.DB.prepare(
+      `INSERT INTO user_backups (id, data, updated_at, updated_at_ms)
+       VALUES (?, ?, datetime('now'), ?)
+       ON CONFLICT(id) DO UPDATE SET
+         data = excluded.data,
+         updated_at = excluded.updated_at,
+         updated_at_ms = excluded.updated_at_ms`
+    ).bind(userId, versionRow.data, now).run();
+
+    return json({
+      success: true,
+      budget: parsed && parsed.budget !== undefined ? parsed.budget : parsed,
+      version: now,
+      updatedAt: new Date(now).toISOString()
+    });
+  } catch (err) {
+    console.error('[sync/restore-version] error:', err && err.message);
+    return fail(500, 'Restore version failed.');
   }
 }
 
@@ -211,6 +356,8 @@ const ROUTES = {
   'POST /api/verify-sync-code': handleVerifySyncCode,
   'POST /api/sync/backup': handleSyncBackup,
   'GET /api/sync/restore': handleSyncRestore,
+  'GET /api/sync/versions': handleSyncVersions,
+  'POST /api/sync/restore-version': handleSyncRestoreVersion,
   'POST /api/auth/register': registerHandler,
   'POST /api/auth/login': loginHandler,
   'POST /api/auth/forgot-password': forgotPasswordHandler,

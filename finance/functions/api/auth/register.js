@@ -1,6 +1,6 @@
 import {
   hashPassword, verifyPassword, readJson, asTrimmedString,
-  json, fail, issueSession, sessionCookies, withCookies, newCsrfToken,
+  json, fail, issueSession, sessionCookies, withCookies,
   validatePassword, EMAIL_REGEX,
   MAX_BODY_AUTH, MAX_NAME_LEN, MAX_EMAIL_LEN, MAX_ANSWER_LEN, MAX_QUESTION_LEN
 } from '../../utils/auth.js';
@@ -58,8 +58,10 @@ export async function onRequestPost(context) {
 
     await env.DB.batch([
       env.DB.prepare(
-        'INSERT INTO users (id, email, password_hash, name, security_question, security_answer_hash, role, token_version) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-      ).bind(userId, cleanEmail, passwordHash, rawName, cleanQuestion, securityAnswerHash, 'user', 0),
+        // created_at and status are written explicitly so this INSERT is not
+        // fragile against DDL default removal. (Stage 1.1 / 1.2 regression fix)
+        'INSERT INTO users (id, email, password_hash, name, security_question, security_answer_hash, role, token_version, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+      ).bind(userId, cleanEmail, passwordHash, rawName, cleanQuestion, securityAnswerHash, 'user', 0, 'Active', new Date().toISOString()),
       env.DB.prepare('INSERT INTO households (id, name) VALUES (?, ?)').bind(householdId, `${rawName}'s Household`),
       env.DB.prepare('INSERT INTO household_members (id, household_id, user_id, role) VALUES (?, ?, ?, ?)').bind(memberId, householdId, userId, 'owner'),
       env.DB.prepare(
@@ -69,7 +71,7 @@ export async function onRequestPost(context) {
 
     const newUser = { id: userId, email: cleanEmail, name: rawName, token_version: 0 };
     const { token, csrf, maxAge } = await issueSession(env, newUser, householdId, Boolean(body.rememberMe));
-    const csrf2 = newCsrfToken();
+    // csrf2 removed: issueSession already returns csrf above. (Stage 1.4 regression fix)
 
     return withCookies(
       json({ success: true, user: { id: userId, email: cleanEmail, name: rawName }, householdId, csrfToken: csrf }, 201),

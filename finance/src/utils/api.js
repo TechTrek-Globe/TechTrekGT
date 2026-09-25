@@ -144,17 +144,30 @@ export function clearPendingSync() {
  * @param {Object} budgetData 
  * @returns {Promise<{success: boolean, status: string, error?: string, data?: Object}>}
  */
-export async function pushCloudBackupOptimistic(passcode, budgetData) {
+export async function pushCloudBackupOptimistic(passcode, budgetData, options = {}) {
   savePendingSync(budgetData, passcode || '');
 
-  const serializedBody = JSON.stringify({ budget: budgetData });
+  const baseVersion = options?.baseVersion;
+  const force = Boolean(options?.force);
+
+  const requestBody = { budget: budgetData };
+  if (typeof baseVersion === 'number' && !isNaN(baseVersion)) {
+    requestBody.baseVersion = baseVersion;
+  }
+  if (force) {
+    requestBody.force = true;
+  }
+
+  const serializedBody = JSON.stringify(requestBody);
   logSync('PUSH_REQUEST', 'Initiating optimistic cloud backup to Worker API', {
     endpoint: getApiUrl('/api/sync/backup'),
     byteLength: serializedBody.length,
     accountsCount: budgetData?.accounts?.length || 0,
     billsCount: budgetData?.bills?.length || 0,
     matrixEntriesCount: Object.keys(budgetData?.dailyMatrix || {}).length,
-    hasPasscode: Boolean(passcode)
+    hasPasscode: Boolean(passcode),
+    baseVersion,
+    force
   });
 
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
@@ -180,9 +193,35 @@ export async function pushCloudBackupOptimistic(passcode, budgetData) {
       clearPendingSync();
       logSync('PUSH_SUCCESS', 'Cloud backup successfully stored in Cloudflare D1 database', {
         status: res.status,
-        timestamp: data.timestamp
+        timestamp: data.timestamp,
+        version: data.version
       });
-      return { success: true, status: 'synced', data };
+      return { success: true, status: 'synced', data, version: data.version };
+    }
+
+    if (res.status === 409) {
+      if (data?.conflict || data?.code === 'SYNC_CONFLICT') {
+        logSync('PUSH_CONFLICT', 'Cloud sync conflict detected', { serverVersion: data.serverVersion }, 'warn');
+        return {
+          success: false,
+          status: 'conflict',
+          conflict: true,
+          code: 'SYNC_CONFLICT',
+          serverData: data.serverData,
+          serverVersion: data.serverVersion,
+          error: data.error || 'Conflict detected: cloud data changed elsewhere.'
+        };
+      }
+      if (data?.suspicious || data?.code === 'SYNC_SUSPICIOUS') {
+        logSync('PUSH_SUSPICIOUS', 'Backup payload suspiciously smaller than stored version', null, 'warn');
+        return {
+          success: false,
+          status: 'suspicious',
+          suspicious: true,
+          code: 'SYNC_SUSPICIOUS',
+          error: data.error || 'Incoming backup is suspiciously smaller than stored backup.'
+        };
+      }
     }
 
     if (res.status >= 500 || res.status === 503 || res.status === 429) {
@@ -194,7 +233,7 @@ export async function pushCloudBackupOptimistic(passcode, budgetData) {
     }
 
     logSync('PUSH_FAILED', `Cloud backup rejected: ${data.error || res.statusText}`, { status: res.status, data }, 'error');
-    throw new Error(data.error || `HTTP ${res.status}: Failed to backup data.`);
+    return { success: false, status: 'failed', error: data.error || `HTTP ${res.status}: Failed to backup data.` };
   } catch (err) {
     logSync('PUSH_ERROR', `Cloud backup push error: ${err.message}`, { error: err.message }, 'error');
     return { success: false, status: 'queued', error: err.message };
@@ -225,15 +264,26 @@ export async function flushPendingCloudSync(passcode) {
       headers['X-Sync-Passcode'] = passcode;
     }
 
+    const savedVerStr = typeof localStorage !== 'undefined' ? localStorage.getItem('tt_budget_cloud_version') : null;
+    const bodyObj = { budget: pending.payload };
+    if (savedVerStr) {
+      bodyObj.baseVersion = parseInt(savedVerStr, 10);
+    } else {
+      bodyObj.force = true;
+    }
+
     const res = await apiFetch('/api/sync/backup', {
       method: 'POST',
       headers,
-      body: JSON.stringify({ budget: pending.payload })
+      body: JSON.stringify(bodyObj)
     });
 
     const data = await res.json().catch(() => ({}));
     if (res.ok && data.success) {
       clearPendingSync();
+      if (typeof localStorage !== 'undefined' && data.version) {
+        localStorage.setItem('tt_budget_cloud_version', String(data.version));
+      }
       logSync('FLUSH_SUCCESS', 'Offline sync queue successfully flushed to cloud', { timestamp: data.timestamp });
       return true;
     }
@@ -243,4 +293,29 @@ export async function flushPendingCloudSync(passcode) {
     console.warn('Background retry for pending sync failed:', err);
   }
   return false;
+}
+
+export async function fetchBackupVersions() {
+  const res = await apiFetch('/api/sync/versions', {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' }
+  });
+  const data = await res.json().catch(() => ({}));
+  if (res.ok && data.success) {
+    return data.versions || [];
+  }
+  throw new Error(data.error || 'Failed to fetch backup versions');
+}
+
+export async function restoreBackupVersion(versionId) {
+  const res = await apiFetch('/api/sync/restore-version', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ versionId })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (res.ok && data.success) {
+    return data;
+  }
+  throw new Error(data.error || 'Failed to restore backup version');
 }

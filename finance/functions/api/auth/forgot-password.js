@@ -1,7 +1,7 @@
 import {
   readJson, asTrimmedString, json, fail,
   EMAIL_REGEX, MAX_BODY_AUTH, MAX_EMAIL_LEN,
-  randomInt, hmacHex, sendResetEmail
+  randomInt, hmacHex, sendResetEmail, ERROR_CODES
 } from '../../utils/auth.js';
 import { enforceRateLimit } from '../../utils/rateLimit.js';
 
@@ -19,18 +19,18 @@ export async function onRequestPost(context) {
 
   try {
     const body = await readJson(request, MAX_BODY_AUTH);
-    if (!body) return fail(400, 'Invalid request body.');
+    if (!body) return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Invalid request body.');
 
     const rawEmail = asTrimmedString(body.email, MAX_EMAIL_LEN);
     if (!rawEmail || !EMAIL_REGEX.test(rawEmail.toLowerCase())) {
       // Format errors are safe to report; they reveal nothing about accounts.
-      return fail(400, 'Invalid email address format.');
+      return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Invalid email address format.');
     }
     const cleanEmail = rawEmail.toLowerCase();
 
     if (!env.DB || !env.JWT_SECRET) {
       console.error('[forgot-password] missing DB or JWT_SECRET binding');
-      return fail(503, 'Service unavailable. Please try again later.');
+      return fail(ERROR_CODES.SERVICE_UNAVAILABLE, 503, 'Service unavailable. Please try again later.');
     }
 
     const user = await env.DB.prepare(
@@ -69,6 +69,6 @@ export async function onRequestPost(context) {
     return json(GENERIC_RESET_RESPONSE);
   } catch (err) {
     console.error('[forgot-password] error:', err && err.message);
-    return fail(500, 'An internal error occurred. Please try again.');
+    return fail(ERROR_CODES.INTERNAL_ERROR, 500, 'An internal error occurred. Please try again.');
   }
 }

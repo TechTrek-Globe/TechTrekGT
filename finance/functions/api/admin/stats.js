@@ -1,4 +1,4 @@
-import { authenticate, json, fail } from '../../utils/auth.js';
+import { authenticate, json, fail, ERROR_CODES } from '../../utils/auth.js';
 
 export async function onRequestGet(context) {
   const { env } = context;
@@ -10,11 +10,11 @@ export async function onRequestGet(context) {
     // Authorization comes from the database role column, not an env var or
     // self-asserted email claim in the JWT (fix C3).
     if (String(user.role || 'user') !== 'admin') {
-      return fail(403, 'Forbidden');
+      return fail(ERROR_CODES.FORBIDDEN, 403, 'Forbidden');
     }
 
     if (!env?.DB) {
-      return fail(503, 'Database binding not available');
+      return fail(ERROR_CODES.SERVICE_UNAVAILABLE, 503, 'Database binding not available');
     }
 
     const usersResult = await env.DB.prepare(
@@ -40,6 +40,6 @@ export async function onRequestGet(context) {
     return json({ totalUsers: users.length, users });
   } catch (err) {
     console.error('[admin/stats] query error:', err && err.message);
-    return fail(500, 'Failed to fetch admin stats');
+    return fail(ERROR_CODES.INTERNAL_ERROR, 500, 'Failed to fetch admin stats');
   }
 }

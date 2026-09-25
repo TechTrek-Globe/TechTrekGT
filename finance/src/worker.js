@@ -19,7 +19,8 @@ import {
   base64UrlEncodeBytes,
   constantTimeStringEqual,
   MAX_BODY_AUTH,
-  MAX_BODY_SYNC
+  MAX_BODY_SYNC,
+  ERROR_CODES
 } from '../functions/utils/auth.js';
 import { enforceRateLimit } from '../functions/utils/rateLimit.js';
 
@@ -132,19 +133,19 @@ async function handleVerifySyncCode(context) {
   const secretCode = env?.SYNC_UNLOCK_CODE;
   if (!secretCode) {
     console.error('[verify-sync-code] SYNC_UNLOCK_CODE is not configured');
-    return fail(503, 'Service unavailable.');
+    return fail(ERROR_CODES.SERVICE_UNAVAILABLE, 503, 'Service unavailable.');
   }
 
   try {
     const body = await readJson(request, MAX_BODY_AUTH);
     const code = body && typeof body.code === 'string' ? body.code.trim() : '';
     if (!code || !(await constantTimeStringEqual(code, String(secretCode).trim()))) {
-      return fail(401, 'Invalid access passcode');
+      return fail(ERROR_CODES.UNAUTHORIZED, 401, 'Invalid access passcode');
     }
     return json({ success: true, token: 'vault-unlocked' });
   } catch (err) {
     console.error('[verify-sync-code] error:', err && err.message);
-    return fail(500, 'Verification failed');
+    return fail(ERROR_CODES.INTERNAL_ERROR, 500, 'Verification failed');
   }
 }
 
@@ -156,19 +157,19 @@ async function handleSyncBackup(context) {
     const userId = auth.user.id;
 
     const body = await readJson(request, MAX_BODY_SYNC);
-    if (!body) return fail(400, 'Invalid or oversized request body.');
+    if (!body) return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Invalid or oversized request body.');
 
     const baseVersion = body.baseVersion;
     const force = Boolean(body.force);
     const hasBaseVersion = typeof baseVersion === 'number' && !isNaN(baseVersion);
 
     if (!hasBaseVersion && !force) {
-      return json({ code: 'VALIDATION_ERROR', error: 'baseVersion is required' }, 400);
+      return json({ code: ERROR_CODES.VALIDATION_ERROR, error: 'baseVersion is required' }, 400);
     }
 
     const payload = body.budget !== undefined ? body.budget : body;
     const dataStr = JSON.stringify(payload);
-    if (dataStr.length > MAX_BODY_SYNC) return fail(413, 'Backup payload is too large.');
+    if (dataStr.length > MAX_BODY_SYNC) return fail(ERROR_CODES.VALIDATION_ERROR, 413, 'Backup payload is too large.');
 
     const row = await env.DB.prepare(
       'SELECT data, updated_at, updated_at_ms FROM user_backups WHERE id = ?'
@@ -184,7 +185,7 @@ async function handleSyncBackup(context) {
         serverData = row.data;
       }
       return json({
-        code: 'SYNC_CONFLICT',
+        code: ERROR_CODES.SYNC_CONFLICT,
         conflict: true,
         error: 'Cloud data has changed since your last sync.',
         serverData: serverData && serverData.budget !== undefined ? serverData.budget : serverData,
@@ -197,7 +198,7 @@ async function handleSyncBackup(context) {
       const storedSize = row.data.length;
       if (incomingSize < storedSize * 0.1) {
         return json({
-          code: 'SYNC_SUSPICIOUS',
+          code: ERROR_CODES.SYNC_SUSPICIOUS,
           suspicious: true,
           error: 'Incoming backup is suspiciously smaller than stored backup.'
         }, 409);
@@ -235,7 +236,7 @@ async function handleSyncBackup(context) {
     return json({ success: true, version: now, timestamp: new Date(now).toISOString() });
   } catch (err) {
     console.error('[sync/backup] error:', err && err.message);
-    return fail(500, 'Backup failed.');
+    return fail(ERROR_CODES.INTERNAL_ERROR, 500, 'Backup failed.');
   }
 }
 
@@ -250,14 +251,14 @@ async function handleSyncRestore(context) {
       'SELECT data, updated_at, updated_at_ms FROM user_backups WHERE id = ?'
     ).bind(userId).first();
 
-    if (!row || !row.data) return fail(404, 'No cloud backup found');
+    if (!row || !row.data) return fail(ERROR_CODES.NOT_FOUND, 404, 'No cloud backup found');
 
     let parsed;
     try {
       parsed = JSON.parse(row.data);
     } catch {
       console.error('[sync/restore] stored backup is not valid JSON for user', userId);
-      return fail(500, 'Stored backup could not be read.');
+      return fail(ERROR_CODES.INTERNAL_ERROR, 500, 'Stored backup could not be read.');
     }
 
     const version = row.updated_at_ms != null ? Number(row.updated_at_ms) : (row.updated_at ? new Date(row.updated_at).getTime() : 0);
@@ -271,7 +272,7 @@ async function handleSyncRestore(context) {
     });
   } catch (err) {
     console.error('[sync/restore] error:', err && err.message);
-    return fail(500, 'Restore failed.');
+    return fail(ERROR_CODES.INTERNAL_ERROR, 500, 'Restore failed.');
   }
 }
 
@@ -297,7 +298,7 @@ async function handleSyncVersions(context) {
     return json({ success: true, versions });
   } catch (err) {
     console.error('[sync/versions] error:', err && err.message);
-    return fail(500, 'Failed to retrieve backup versions.');
+    return fail(ERROR_CODES.INTERNAL_ERROR, 500, 'Failed to retrieve backup versions.');
   }
 }
 
@@ -310,16 +311,16 @@ async function handleSyncRestoreVersion(context) {
 
     const body = await readJson(request, MAX_BODY_AUTH);
     const versionId = body && typeof body.versionId === 'string' ? body.versionId.trim() : '';
-    if (!versionId) return fail(400, 'versionId is required');
+    if (!versionId) return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'versionId is required');
 
     const versionRow = await env.DB.prepare(
       'SELECT id, user_id, data, saved_at FROM user_backup_versions WHERE id = ?'
     ).bind(versionId).first();
 
-    if (!versionRow) return fail(404, 'Version not found');
+    if (!versionRow) return fail(ERROR_CODES.NOT_FOUND, 404, 'Version not found');
 
     if (versionRow.user_id !== userId) {
-      return fail(403, 'Forbidden: cannot restore another user\'s version');
+      return fail(ERROR_CODES.FORBIDDEN, 403, 'Forbidden: cannot restore another user\'s version');
     }
 
     let parsed;
@@ -327,7 +328,7 @@ async function handleSyncRestoreVersion(context) {
       parsed = JSON.parse(versionRow.data);
     } catch {
       console.error('[sync/restore-version] version data corrupted for version', versionId);
-      return fail(500, 'Stored version data could not be read.');
+      return fail(ERROR_CODES.INTERNAL_ERROR, 500, 'Stored version data could not be read.');
     }
 
     const now = Date.now();
@@ -348,7 +349,7 @@ async function handleSyncRestoreVersion(context) {
     });
   } catch (err) {
     console.error('[sync/restore-version] error:', err && err.message);
-    return fail(500, 'Restore version failed.');
+    return fail(ERROR_CODES.INTERNAL_ERROR, 500, 'Restore version failed.');
   }
 }
 
@@ -448,12 +449,12 @@ const worker = {
           requestOrigin &&
           !ALLOWED_ORIGINS.includes(requestOrigin)
         ) {
-          response = fail(403, 'Forbidden');
+          response = fail(ERROR_CODES.FORBIDDEN, 403, 'Forbidden');
         } else {
           response = await handler(handlerContext);
         }
       } else if (apiPath.startsWith('/api/')) {
-        response = fail(404, 'Endpoint not found');
+        response = fail(ERROR_CODES.NOT_FOUND, 404, 'Endpoint not found');
       } else if (url.pathname.startsWith('/finance/assets/')) {
         response = await fetchAsset(env, request, url.pathname.slice('/finance'.length));
       } else if (url.pathname.startsWith('/finance/') && /\.[a-zA-Z0-9]+$/.test(url.pathname)) {
@@ -465,7 +466,7 @@ const worker = {
       }
     } catch (err) {
       console.error('[worker] unhandled error:', err && err.message, err && err.stack);
-      response = fail(500, 'An internal error occurred.');
+      response = fail(ERROR_CODES.INTERNAL_ERROR, 500, 'An internal error occurred.');
     }
 
     return addSecurityHeaders(response, headerOpts);

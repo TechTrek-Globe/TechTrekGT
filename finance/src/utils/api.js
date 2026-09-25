@@ -1,4 +1,5 @@
 import { logSync } from './logger';
+import { ERROR_CODES } from './errorCodes.js';
 
 /**
  * Resolves an API endpoint path relative to the current subpath context.
@@ -79,7 +80,7 @@ export async function apiFetch(endpoint, options = {}) {
   if (res.status === 401 && typeof window !== 'undefined') {
     const clone = res.clone();
     clone.json().then(data => {
-      if (data?.error && (data.error.includes('Session expired') || data.error.includes('Unauthorized'))) {
+      if (data?.code && (data.code === ERROR_CODES.SESSION_EXPIRED || data.code === ERROR_CODES.UNAUTHORIZED)) {
         window.dispatchEvent(new CustomEvent('techtrek:session-expired', { detail: data }));
       }
     }).catch(() => {});
@@ -200,25 +201,25 @@ export async function pushCloudBackupOptimistic(passcode, budgetData, options = 
     }
 
     if (res.status === 409) {
-      if (data?.conflict || data?.code === 'SYNC_CONFLICT') {
+      if (data?.conflict || data?.code === ERROR_CODES.SYNC_CONFLICT) {
         logSync('PUSH_CONFLICT', 'Cloud sync conflict detected', { serverVersion: data.serverVersion }, 'warn');
         return {
           success: false,
           status: 'conflict',
           conflict: true,
-          code: 'SYNC_CONFLICT',
+          code: ERROR_CODES.SYNC_CONFLICT,
           serverData: data.serverData,
           serverVersion: data.serverVersion,
           error: data.error || 'Conflict detected: cloud data changed elsewhere.'
         };
       }
-      if (data?.suspicious || data?.code === 'SYNC_SUSPICIOUS') {
+      if (data?.suspicious || data?.code === ERROR_CODES.SYNC_SUSPICIOUS) {
         logSync('PUSH_SUSPICIOUS', 'Backup payload suspiciously smaller than stored version', null, 'warn');
         return {
           success: false,
           status: 'suspicious',
           suspicious: true,
-          code: 'SYNC_SUSPICIOUS',
+          code: ERROR_CODES.SYNC_SUSPICIOUS,
           error: data.error || 'Incoming backup is suspiciously smaller than stored backup.'
         };
       }

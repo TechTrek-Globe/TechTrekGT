@@ -1,7 +1,8 @@
 import {
   readJson, asTrimmedString, json, fail, withCookies, clearedCookies,
   MAX_BODY_AUTH, MAX_EMAIL_LEN, validatePassword,
-  hmacHex, constantTimeStringEqual, hashPassword, verifyPassword
+  hmacHex, constantTimeStringEqual, hashPassword, verifyPassword,
+  ERROR_CODES
 } from '../../utils/auth.js';
 import { enforceRateLimit } from '../../utils/rateLimit.js';
 
@@ -16,7 +17,7 @@ export async function onRequestPost(context) {
 
   try {
     const body = await readJson(request, MAX_BODY_AUTH);
-    if (!body) return fail(400, 'Invalid request body.');
+    if (!body) return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Invalid request body.');
 
     const rawEmail = asTrimmedString(body.email, MAX_EMAIL_LEN);
     const code = asTrimmedString(body.token, 32);
@@ -24,15 +25,15 @@ export async function onRequestPost(context) {
     const securityAnswer = typeof body.securityAnswer === 'string' ? body.securityAnswer.trim() : '';
 
     if (!rawEmail || !code || typeof newPassword !== 'string') {
-      return fail(400, 'Email, reset code, and new password are required.');
+      return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Email, reset code, and new password are required.');
     }
 
     const pwError = validatePassword(newPassword);
-    if (pwError) return fail(400, pwError);
+    if (pwError) return fail(ERROR_CODES.VALIDATION_ERROR, 400, pwError);
 
     if (!env.DB || !env.JWT_SECRET) {
       console.error('[reset-password] missing DB or JWT_SECRET binding');
-      return fail(503, 'Service unavailable. Please try again later.');
+      return fail(ERROR_CODES.SERVICE_UNAVAILABLE, 503, 'Service unavailable. Please try again later.');
     }
 
     const cleanEmail = rawEmail.toLowerCase();
@@ -42,16 +43,16 @@ export async function onRequestPost(context) {
       'SELECT id, user_id, expires_at, attempts FROM password_resets WHERE email = ? AND used = 0 ORDER BY created_at DESC LIMIT 1'
     ).bind(cleanEmail).first();
 
-    if (!record) return fail(400, GENERIC_BAD);
+    if (!record) return fail(ERROR_CODES.RESET_CODE_INVALID, 400, GENERIC_BAD);
 
     if (Number(record.expires_at) < Date.now()) {
       await env.DB.prepare('UPDATE password_resets SET used = 1 WHERE id = ?').bind(record.id).run();
-      return fail(400, GENERIC_BAD);
+      return fail(ERROR_CODES.RESET_CODE_INVALID, 400, GENERIC_BAD);
     }
 
     if (Number(record.attempts || 0) >= RESET_MAX_ATTEMPTS) {
       await env.DB.prepare('UPDATE password_resets SET used = 1 WHERE id = ?').bind(record.id).run();
-      return fail(400, GENERIC_BAD);
+      return fail(ERROR_CODES.RESET_CODE_INVALID, 400, GENERIC_BAD);
     }
 
     const stored = await env.DB.prepare(
@@ -77,7 +78,7 @@ export async function onRequestPost(context) {
       await env.DB.prepare(
         'UPDATE password_resets SET attempts = COALESCE(attempts, 0) + 1 WHERE id = ?'
       ).bind(record.id).run();
-      return fail(400, GENERIC_BAD);
+      return fail(ERROR_CODES.RESET_CODE_INVALID, 400, GENERIC_BAD);
     }
 
     const newPasswordHash = await hashPassword(newPassword);
@@ -97,6 +98,6 @@ export async function onRequestPost(context) {
     );
   } catch (err) {
     console.error('[reset-password] error:', err && err.message);
-    return fail(500, 'An internal error occurred. Please try again.');
+    return fail(ERROR_CODES.INTERNAL_ERROR, 500, 'An internal error occurred. Please try again.');
   }
 }

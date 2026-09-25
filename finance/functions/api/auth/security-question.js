@@ -1,4 +1,4 @@
-import { authenticate, json, fail } from '../../utils/auth.js';
+import { authenticate, json, fail, ERROR_CODES } from '../../utils/auth.js';
 
 /**
  * GET /api/auth/security-question - now authenticated.
@@ -21,6 +21,6 @@ export async function onRequestGet(context) {
     });
   } catch (err) {
     console.error('[security-question] error:', err && err.message);
-    return fail(500, 'An internal error occurred.');
+    return fail(ERROR_CODES.INTERNAL_ERROR, 500, 'An internal error occurred.');
   }
 }

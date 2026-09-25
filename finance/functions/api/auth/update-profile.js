@@ -1,7 +1,7 @@
 import {
   authenticate, readJson, asTrimmedString, json, fail, withCookies, sessionCookies, newCsrfToken,
   createToken, hashPassword, verifyPassword, validatePassword, randomInt, hmacHex,
-  sendVerificationEmail, sendEmailChangeNotification,
+  sendVerificationEmail, sendEmailChangeNotification, ERROR_CODES,
   EMAIL_REGEX, MAX_BODY_AUTH, MAX_NAME_LEN, MAX_EMAIL_LEN, MAX_QUESTION_LEN, MAX_ANSWER_LEN,
   ACCESS_TOKEN_TTL, SESSION_TTL_DEFAULT
 } from '../../utils/auth.js';
@@ -18,7 +18,7 @@ export async function onRequestPost(context) {
     const { payload, user } = auth;
 
     const body = await readJson(request, MAX_BODY_AUTH);
-    if (!body) return fail(400, 'Invalid request body.');
+    if (!body) return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Invalid request body.');
 
     const { currentPassword, newPassword } = body;
 
@@ -36,17 +36,17 @@ export async function onRequestPost(context) {
     const rawEmail = asTrimmedString(body.email, MAX_EMAIL_LEN);
     if (rawEmail) {
       const cleanEmail = rawEmail.toLowerCase();
-      if (!EMAIL_REGEX.test(cleanEmail)) return fail(400, 'Invalid email address format.');
+      if (!EMAIL_REGEX.test(cleanEmail)) return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Invalid email address format.');
       if (cleanEmail !== user.email) {
         // Changing the address that owns the account is a security-sensitive
         // action; require the current password.
         if (!currentPassword || !(await verifyPassword(String(currentPassword), user.password_hash))) {
-          return fail(400, 'Current password is required to change your email address.');
+          return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Current password is required to change your email address.');
         }
         const existing = await env.DB.prepare(
           'SELECT id FROM users WHERE email = ? AND id != ?'
         ).bind(cleanEmail, user.id).first();
-        if (existing) return fail(409, 'That email address cannot be used.');
+        if (existing) return fail(ERROR_CODES.CONFLICT, 409, 'That email address cannot be used.');
 
         pendingEmail = cleanEmail;
         emailChangeRequested = true;
@@ -57,10 +57,10 @@ export async function onRequestPost(context) {
     if (securityQuestion) {
       const securityAnswer = asTrimmedString(body.securityAnswer, MAX_ANSWER_LEN);
       if (!securityAnswer) {
-        return fail(400, 'A security answer is required when changing the security question.');
+        return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'A security answer is required when changing the security question.');
       }
       if (!currentPassword || !(await verifyPassword(String(currentPassword), user.password_hash))) {
-        return fail(400, 'Current password is required to change your security question.');
+        return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Current password is required to change your security question.');
       }
       updatedQuestion = securityQuestion;
       updatedAnswerHash = await hashPassword(securityAnswer.toLowerCase());
@@ -68,13 +68,13 @@ export async function onRequestPost(context) {
 
     if (typeof newPassword === 'string' && newPassword.length > 0) {
       if (!currentPassword || typeof currentPassword !== 'string') {
-        return fail(400, 'Current password is required to set a new password.');
+        return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Current password is required to set a new password.');
       }
       if (!(await verifyPassword(currentPassword, user.password_hash))) {
-        return fail(400, 'Current password is incorrect.');
+        return fail(ERROR_CODES.INVALID_CREDENTIALS, 400, 'Current password is incorrect.');
       }
       const pwError = validatePassword(newPassword);
-      if (pwError) return fail(400, pwError);
+      if (pwError) return fail(ERROR_CODES.VALIDATION_ERROR, 400, pwError);
       updatedPasswordHash = await hashPassword(newPassword);
       bumpTokenVersion = true;
     }
@@ -154,6 +154,6 @@ export async function onRequestPost(context) {
     );
   } catch (err) {
     console.error('[update-profile] error:', err && err.message);
-    return fail(500, 'An internal error occurred.');
+    return fail(ERROR_CODES.INTERNAL_ERROR, 500, 'An internal error occurred.');
   }
 }

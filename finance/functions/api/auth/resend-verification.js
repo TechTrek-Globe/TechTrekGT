@@ -1,6 +1,6 @@
 import {
   authenticate, json, fail,
-  randomInt, hmacHex, sendVerificationEmail
+  randomInt, hmacHex, sendVerificationEmail, ERROR_CODES
 } from '../../utils/auth.js';
 import { enforceRateLimit } from '../../utils/rateLimit.js';
 
@@ -23,7 +23,7 @@ export async function onRequestPost(context) {
 
     if (!env.DB || !env.JWT_SECRET) {
       console.error('[resend-verification] missing DB or JWT_SECRET binding');
-      return fail(503, 'Service unavailable. Please try again later.');
+      return fail(ERROR_CODES.SERVICE_UNAVAILABLE, 503, 'Service unavailable. Please try again later.');
     }
 
     let verificationCode = '';
@@ -45,6 +45,6 @@ export async function onRequestPost(context) {
     return json({ success: true, message: 'Verification code sent.' });
   } catch (err) {
     console.error('[resend-verification] error:', err && err.message);
-    return fail(500, 'An internal error occurred. Please try again.');
+    return fail(ERROR_CODES.INTERNAL_ERROR, 500, 'An internal error occurred. Please try again.');
   }
 }

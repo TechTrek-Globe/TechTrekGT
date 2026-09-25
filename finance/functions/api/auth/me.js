@@ -1,5 +1,5 @@
 import {
-  authenticate, json, fail, issueSession, sessionCookies, withCookies, newCsrfToken
+  authenticate, json, fail, issueSession, sessionCookies, withCookies, newCsrfToken, ERROR_CODES
 } from '../../utils/auth.js';
 
 export async function onRequestGet(context) {
@@ -39,6 +39,6 @@ export async function onRequestGet(context) {
 
   } catch (err) {
     console.error('[me] handler error:', err && err.message);
-    return fail(500, 'An internal error occurred.');
+    return fail(ERROR_CODES.INTERNAL_ERROR, 500, 'An internal error occurred.');
   }
 }

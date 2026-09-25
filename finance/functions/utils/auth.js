@@ -3,6 +3,9 @@
 // Do not simplify constant-time comparisons, fail-closed branches, or
 // the PBKDF2 iteration cap - each maps to a specific security finding.
 
+import { ERROR_CODES } from './errorCodes.js';
+export { ERROR_CODES };
+
 /* ------------------------------------------------------------------ */
 /* Constants                                                           */
 /* ------------------------------------------------------------------ */
@@ -43,9 +46,9 @@ export function json(data, status = 200, extraHeaders = {}) {
   });
 }
 
-// Generic error body. Never echo internal exception text to clients. (M10)
-export function fail(status, message) {
-  return json({ error: message }, status);
+// Generic error body. Never echo internal exception text to clients. (M10, Stage 6.2)
+export function fail(code, status, message, requestId = null) {
+  return json({ error: message, code, ...(requestId ? { requestId } : {}) }, status);
 }
 
 function toHex(bytes) {
@@ -404,31 +407,31 @@ export function withCookies(response, cookies) {
 export async function authenticate(context, { requireCsrf = true } = {}) {
   const { request, env } = context;
   const { token, source } = getTokenFromRequest(request);
-  if (!token) return { error: fail(401, 'Unauthorized') };
+  if (!token) return { error: fail(ERROR_CODES.UNAUTHORIZED, 401, 'Unauthorized') };
 
   const payload = await verifyToken(token, env?.JWT_SECRET);
-  if (!payload) return { error: fail(401, 'Unauthorized') };
+  if (!payload) return { error: fail(ERROR_CODES.UNAUTHORIZED, 401, 'Unauthorized') };
 
   if (requireCsrf && !(await csrfOk(request, source))) {
-    return { error: fail(403, 'Invalid or missing CSRF token') };
+    return { error: fail(ERROR_CODES.CSRF_INVALID, 403, 'Invalid or missing CSRF token') };
   }
 
-  if (!env?.DB) return { error: fail(503, 'Service unavailable') };
+  if (!env?.DB) return { error: fail(ERROR_CODES.SERVICE_UNAVAILABLE, 503, 'Service unavailable') };
 
   const user = await env.DB.prepare(
     'SELECT id, email, name, role, token_version, security_question, security_answer_hash, password_hash, status, email_verified, pending_email FROM users WHERE id = ?'
   ).bind(payload.userId).first();
 
-  if (!user) return { error: fail(401, 'Unauthorized') };
+  if (!user) return { error: fail(ERROR_CODES.UNAUTHORIZED, 401, 'Unauthorized') };
 
   if (user.status === 'Suspended') {
-    return { error: fail(403, 'Account suspended. Please contact support.') };
+    return { error: fail(ERROR_CODES.UNAUTHORIZED, 403, 'Account suspended. Please contact support.') };
   }
 
   const currentVersion = Number(user.token_version || 0);
   const tokenVersion = Number(payload.tv || 0);
   if (currentVersion !== tokenVersion) {
-    return { error: fail(401, 'Session expired. Please sign in again.') };
+    return { error: fail(ERROR_CODES.SESSION_EXPIRED, 401, 'Session expired. Please sign in again.') };
   }
 
   return { payload, user, source };

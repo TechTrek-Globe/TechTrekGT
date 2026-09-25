@@ -51,6 +51,8 @@ export async function checkRateLimit(env, key, maxRequests, windowSeconds) {
   }
 }
 
+import { ERROR_CODES } from './errorCodes.js';
+
 // Convenience wrapper used by all handlers.
 // Gets the client IP from CF-Connecting-IP and calls checkRateLimit.
 export async function enforceRateLimit(context, prefix, max, windowSeconds) {
@@ -64,7 +66,7 @@ export async function enforceRateLimit(context, prefix, max, windowSeconds) {
   if (allowed) return null;
 
   return new Response(
-    JSON.stringify({ error: 'Too many requests. Please wait and try again.' }),
+    JSON.stringify({ error: 'Too many requests. Please wait and try again.', code: ERROR_CODES.RATE_LIMITED }),
     {
       status: 429,
       headers: {

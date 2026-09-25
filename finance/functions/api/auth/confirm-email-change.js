@@ -1,7 +1,7 @@
 import {
   authenticate, readJson, asTrimmedString, json, fail, withCookies, sessionCookies,
   newCsrfToken, createToken, constantTimeStringEqual, hmacHex,
-  MAX_BODY_AUTH, ACCESS_TOKEN_TTL, SESSION_TTL_DEFAULT
+  MAX_BODY_AUTH, ACCESS_TOKEN_TTL, SESSION_TTL_DEFAULT, ERROR_CODES
 } from '../../utils/auth.js';
 import { enforceRateLimit } from '../../utils/rateLimit.js';
 
@@ -17,20 +17,20 @@ export async function onRequestPost(context) {
     const { payload, user } = auth;
 
     if (!user.pending_email) {
-      return fail(400, 'No pending email change request found.');
+      return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'No pending email change request found.');
     }
 
     const body = await readJson(request, MAX_BODY_AUTH);
-    if (!body) return fail(400, 'Invalid request body.');
+    if (!body) return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Invalid request body.');
 
     const cleanCode = asTrimmedString(body.code, 16);
     if (!cleanCode || !/^\d{8}$/.test(cleanCode)) {
-      return fail(400, 'Please provide the valid 8-digit confirmation code.');
+      return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Please provide the valid 8-digit confirmation code.');
     }
 
     if (!env.DB || !env.JWT_SECRET) {
       console.error('[confirm-email-change] missing DB or JWT_SECRET binding');
-      return fail(503, 'Service unavailable. Please try again later.');
+      return fail(ERROR_CODES.SERVICE_UNAVAILABLE, 503, 'Service unavailable. Please try again later.');
     }
 
     const newEmail = user.pending_email.toLowerCase();
@@ -40,16 +40,16 @@ export async function onRequestPost(context) {
     ).bind(user.id, newEmail).first();
 
     if (!record) {
-      return fail(400, 'No active verification code found for this email address.');
+      return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'No active verification code found for this email address.');
     }
 
     if (Date.now() > record.expires_at) {
-      return fail(400, 'Confirmation code has expired. Please request a new email change.');
+      return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Confirmation code has expired. Please request a new email change.');
     }
 
     if (Number(record.attempts || 0) >= 5) {
       await env.DB.prepare('UPDATE email_verifications SET used = 1 WHERE id = ?').bind(record.id).run();
-      return fail(400, 'Too many invalid attempts. Please request a new confirmation code.');
+      return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Too many invalid attempts. Please request a new confirmation code.');
     }
 
     const codeHash = await hmacHex(env.JWT_SECRET, `verify:${newEmail}:${cleanCode}`);
@@ -57,7 +57,7 @@ export async function onRequestPost(context) {
 
     if (!isValid) {
       await env.DB.prepare('UPDATE email_verifications SET attempts = attempts + 1 WHERE id = ?').bind(record.id).run();
-      return fail(400, 'Invalid confirmation code.');
+      return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Invalid confirmation code.');
     }
 
     const conflict = await env.DB.prepare(
@@ -66,7 +66,7 @@ export async function onRequestPost(context) {
 
     if (conflict) {
       await env.DB.prepare('UPDATE users SET pending_email = NULL WHERE id = ?').bind(user.id).run();
-      return fail(409, 'That email address is already in use by another account.');
+      return fail(ERROR_CODES.CONFLICT, 409, 'That email address is already in use by another account.');
     }
 
     const newTokenVersion = Number(user.token_version || 0) + 1;
@@ -114,6 +114,6 @@ export async function onRequestPost(context) {
     );
   } catch (err) {
     console.error('[confirm-email-change] error:', err && err.message);
-    return fail(500, 'An internal error occurred. Please try again.');
+    return fail(ERROR_CODES.INTERNAL_ERROR, 500, 'An internal error occurred. Please try again.');
   }
 }

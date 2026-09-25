@@ -1,6 +1,7 @@
 import {
   verifyPassword, hashPassword, needsRehash, readJson, asTrimmedString,
   json, fail, issueSession, sessionCookies, withCookies, newCsrfToken,
+  ERROR_CODES,
   MAX_BODY_AUTH, MAX_EMAIL_LEN, MAX_PASS_LEN
 } from '../../utils/auth.js';
 import { enforceRateLimit } from '../../utils/rateLimit.js';
@@ -13,18 +14,18 @@ export async function onRequestPost(context) {
 
   try {
     const body = await readJson(request, MAX_BODY_AUTH);
-    if (!body) return fail(400, 'Invalid request body.');
+    if (!body) return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Invalid request body.');
 
     const rawEmail = asTrimmedString(body.email, MAX_EMAIL_LEN);
     const { password } = body;
 
     if (!rawEmail || typeof password !== 'string') {
-      return fail(400, 'Email and password are required.');
+      return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Email and password are required.');
     }
 
     if (!env.DB || !env.JWT_SECRET) {
       console.error('[login] missing DB or JWT_SECRET binding');
-      return fail(503, 'Service unavailable. Please try again later.');
+      return fail(ERROR_CODES.SERVICE_UNAVAILABLE, 503, 'Service unavailable. Please try again later.');
     }
 
     const cleanEmail = rawEmail.toLowerCase();
@@ -37,14 +38,14 @@ export async function onRequestPost(context) {
     // so the response time does not reveal whether the address is registered. (H7)
     if (!user) {
       await hashPassword(password).catch(() => {});
-      return fail(401, 'Invalid email or password.');
+      return fail(ERROR_CODES.INVALID_CREDENTIALS, 401, 'Invalid email or password.');
     }
 
     const isValid = await verifyPassword(password, user.password_hash);
-    if (!isValid) return fail(401, 'Invalid email or password.');
+    if (!isValid) return fail(ERROR_CODES.INVALID_CREDENTIALS, 401, 'Invalid email or password.');
 
     if (user.status === 'Suspended') {
-      return fail(403, 'Account suspended. Please contact support.');
+      return fail(ERROR_CODES.UNAUTHORIZED, 403, 'Account suspended. Please contact support.');
     }
 
     // Transparent rehash on login: upgrades 310k-era or legacy two-part hashes
@@ -81,6 +82,6 @@ export async function onRequestPost(context) {
 
   } catch (err) {
     console.error('[login] handler error:', err && err.message);
-    return fail(500, 'An internal error occurred. Please try again.');
+    return fail(ERROR_CODES.INTERNAL_ERROR, 500, 'An internal error occurred. Please try again.');
   }
 }

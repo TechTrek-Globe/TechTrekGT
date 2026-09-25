@@ -47,10 +47,6 @@ export default function AuthModal() {
   const [securityQuestion, setSecurityQuestion] = useState(PRESET_SECURITY_QUESTIONS[0]);
   const [securityAnswer, setSecurityAnswer] = useState('');
   
-  // Forgot password step state
-  const [forgotStep, setForgotStep] = useState(1); // 1 = enter email, 2 = answer question
-  const [loadedQuestion, setLoadedQuestion] = useState('');
-  
   // Reset password state
   const [resetToken, setResetToken] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -65,34 +61,8 @@ export default function AuthModal() {
     setMode(newMode);
     setError('');
     setInfoMessage('');
-    setForgotStep(1);
-    setLoadedQuestion('');
-  };
-
-  const handleFetchQuestion = async (e) => {
-    if (e) e.preventDefault();
-    if (!email) {
-      setError('Please enter your email address.');
-      return;
-    }
-
-    setError('');
-    setIsSubmitting(true);
-    try {
-      const res = await getSecurityQuestion(email);
-      if (res.securityQuestion) {
-        setLoadedQuestion(res.securityQuestion);
-        setForgotStep(2);
-      } else {
-        // User exists but has no security question set (legacy account)
-        setLoadedQuestion('Security Question Not Set (Legacy Account)');
-        setForgotStep(2);
-      }
-    } catch (err) {
-      setError(err.message || 'No account found with this email address.');
-    } finally {
-      setIsSubmitting(false);
-    }
+    setResetToken('');
+    setSecurityAnswer('');
   };
 
   const handleSubmit = async (e) => {
@@ -122,19 +92,12 @@ export default function AuthModal() {
           try { localStorage.removeItem('techtrek_saved_email'); } catch (e) {}
         }
       } else if (mode === 'forgot') {
-        if (forgotStep === 1) {
-          await handleFetchQuestion();
-          return;
-        }
-        // Step 2: Submit security answer
-        const res = await forgotPassword(email, securityAnswer);
-        setInfoMessage(res.message || 'Security answer verified! Reset code generated.');
-        if (res.resetToken) {
-          setResetToken(res.resetToken);
-        }
+        const res = await forgotPassword(email);
+        setInfoMessage(res.message || 'If an account exists for that address, a reset code has been sent to it.');
+        setResetToken('');
         setMode('reset');
       } else if (mode === 'reset') {
-        const res = await resetPassword(email, resetToken, newPassword);
+        const res = await resetPassword(email, resetToken, newPassword, securityAnswer);
         setInfoMessage(res.message || 'Password updated successfully! Sign in with your new password.');
         setPassword('');
         setNewPassword('');
@@ -177,7 +140,7 @@ export default function AuthModal() {
               <p className="text-xs text-slate-400">
                 {mode === 'register' && 'Required: Email, Name & Security Question'}
                 {mode === 'signin' && 'Sign in to access your personal dashboard'}
-                {mode === 'forgot' && (forgotStep === 1 ? 'Enter your registered email address' : 'Answer your security question')}
+                {mode === 'forgot' && 'Enter your registered email address to receive a reset code'}
                 {mode === 'reset' && 'Enter your reset code and new password'}
               </p>
             </div>
@@ -309,44 +272,34 @@ export default function AuthModal() {
             </>
           )}
 
-          {/* Security Question Prompt on Forgot Password Step 2 */}
-          {mode === 'forgot' && forgotStep === 2 && (
-            <div>
-              <label className="block text-xs font-medium text-emerald-400 mb-1">
-                Security Question:
-              </label>
-              <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 mb-3 font-medium">
-                {loadedQuestion}
-              </div>
-
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">Security Answer</label>
-              <div className="relative">
-                <KeyRound className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
-                <input
-                  type="text"
-                  required
-                  value={securityAnswer}
-                  onChange={(e) => setSecurityAnswer(e.target.value)}
-                  placeholder="Enter your security answer"
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-950/80 border border-slate-800 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500/80 focus:ring-1 focus:ring-emerald-500/80 transition-all"
-                />
-              </div>
-            </div>
-          )}
-
           {mode === 'reset' && (
             <>
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">Verification Reset Code</label>
+                <label className="block text-xs font-medium text-slate-300 mb-1.5">8-Digit Reset Code (From Email)</label>
                 <div className="relative">
                   <KeyRound className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
                   <input
                     type="text"
                     required
+                    maxLength={8}
                     value={resetToken}
-                    onChange={(e) => setResetToken(e.target.value)}
-                    placeholder="e.g. 649201"
+                    onChange={(e) => setResetToken(e.target.value.replace(/\D/g, ''))}
+                    placeholder="e.g. 12345678"
                     className="w-full pl-10 pr-4 py-2.5 bg-slate-950/80 border border-slate-800 rounded-xl text-sm text-slate-100 font-mono tracking-wider placeholder-slate-500 focus:outline-none focus:border-emerald-500/80 focus:ring-1 focus:ring-emerald-500/80 transition-all"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1.5">Security Answer (if set on your account)</label>
+                <div className="relative">
+                  <HelpCircle className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+                  <input
+                    type="text"
+                    value={securityAnswer}
+                    onChange={(e) => setSecurityAnswer(e.target.value)}
+                    placeholder="Enter your security answer"
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-950/80 border border-slate-800 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500/80 focus:ring-1 focus:ring-emerald-500/80 transition-all"
                   />
                 </div>
               </div>
@@ -401,7 +354,7 @@ export default function AuthModal() {
                 <span>
                   {mode === 'register' && 'Create Account'}
                   {mode === 'signin' && 'Sign In'}
-                  {mode === 'forgot' && (forgotStep === 1 ? 'Verify Email' : 'Verify Answer & Reset')}
+                  {mode === 'forgot' && 'Send Reset Code'}
                   {mode === 'reset' && 'Reset Password'}
                 </span>
                 <ArrowRight className="w-4 h-4" />

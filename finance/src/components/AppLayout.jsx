@@ -130,7 +130,7 @@ export function AppLayout({ children, onNavigateHome, onNavigateView, activeView
   } = useBudget();
 
   const { user } = useAuth();
-  const isAdmin = !!(user?.email && import.meta.env.VITE_ADMIN_EMAIL && user.email === import.meta.env.VITE_ADMIN_EMAIL);
+  const isAdmin = Boolean(user?.isAdmin);
 
   const [collapsed, setCollapsed] = useState(() => {
     try { return localStorage.getItem(SIDEBAR_KEY) === 'true'; }

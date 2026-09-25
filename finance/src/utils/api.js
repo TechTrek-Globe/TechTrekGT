@@ -21,6 +21,73 @@ export function getApiUrl(endpoint) {
   return cleanEndpoint;
 }
 
+let currentCsrfToken = null;
+
+export function setCsrfToken(token) {
+  currentCsrfToken = token;
+}
+
+export function getCsrfToken() {
+  if (currentCsrfToken) return currentCsrfToken;
+  if (typeof document !== 'undefined') {
+    const match = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
+    if (match && match[1]) {
+      currentCsrfToken = decodeURIComponent(match[1]);
+      return currentCsrfToken;
+    }
+  }
+  return null;
+}
+
+export function getAuthHeaders(customHeaders = {}) {
+  const headers = { ...customHeaders };
+  const csrf = getCsrfToken();
+  if (csrf) {
+    headers['X-CSRF-Token'] = csrf;
+  }
+  return headers;
+}
+
+/**
+ * Centralized API client wrapper that handles:
+ * - URL path resolution via getApiUrl
+ * - Automatic X-CSRF-Token attachment for state-changing requests
+ * - Uniform credentials: 'include'
+ * - Session expiry broadcast (401 with "Session expired")
+ */
+export async function apiFetch(endpoint, options = {}) {
+  const url = getApiUrl(endpoint);
+  const method = (options.method || 'GET').toUpperCase();
+  const headers = { ...(options.headers || {}) };
+
+  if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
+    const csrf = getCsrfToken();
+    if (csrf && !headers['X-CSRF-Token']) {
+      headers['X-CSRF-Token'] = csrf;
+    }
+  }
+
+  const opts = {
+    ...options,
+    method,
+    headers,
+    credentials: options.credentials || 'include'
+  };
+
+  const res = await fetch(url, opts);
+
+  if (res.status === 401 && typeof window !== 'undefined') {
+    const clone = res.clone();
+    clone.json().then(data => {
+      if (data?.error && (data.error.includes('Session expired') || data.error.includes('Unauthorized'))) {
+        window.dispatchEvent(new CustomEvent('techtrek:session-expired', { detail: data }));
+      }
+    }).catch(() => {});
+  }
+
+  return res;
+}
+
 const PENDING_SYNC_KEY = 'cf_pending_sync';
 
 /**
@@ -101,9 +168,8 @@ export async function pushCloudBackupOptimistic(passcode, budgetData) {
       headers['X-Sync-Passcode'] = passcode;
     }
 
-    const res = await fetch(getApiUrl('/api/sync/backup'), {
+    const res = await apiFetch('/api/sync/backup', {
       method: 'POST',
-      credentials: 'include',
       headers,
       body: serializedBody
     });
@@ -159,9 +225,8 @@ export async function flushPendingCloudSync(passcode) {
       headers['X-Sync-Passcode'] = passcode;
     }
 
-    const res = await fetch(getApiUrl('/api/sync/backup'), {
+    const res = await apiFetch('/api/sync/backup', {
       method: 'POST',
-      credentials: 'include',
       headers,
       body: JSON.stringify({ budget: pending.payload })
     });

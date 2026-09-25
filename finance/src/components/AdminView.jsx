@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Shield, Users, CheckCircle, Lock, Database, Calendar, AlertTriangle, RefreshCw } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useBudget } from '../context/BudgetContext';
-import { getApiUrl } from '../utils/api';
+import { apiFetch } from '../utils/api';
 
 function StatusBadge({ status }) {
   const isLocked = status === 'Locked';
@@ -48,9 +48,7 @@ export function AdminView() {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await fetch(getApiUrl('/api/admin/stats'), {
-        credentials: 'include'
-      });
+      const res = await apiFetch('/api/admin/stats');
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(data.error || `Request failed (HTTP ${res.status})`);

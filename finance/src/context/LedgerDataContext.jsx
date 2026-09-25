@@ -4,7 +4,7 @@ import { initialBudgetData } from '../initialData';
 import { fakeDemoBudgetData } from '../demoPresetData';
 import { useBudgetMetadata } from './BudgetMetadataContext';
 import { useAuth } from './AuthContext';
-import { getApiUrl, pushCloudBackupOptimistic, flushPendingCloudSync } from '../utils/api';
+import { apiFetch, pushCloudBackupOptimistic, flushPendingCloudSync } from '../utils/api';
 import { getBudgetData, saveBudgetData, clearAndRestoreBudgetData, clearBudgetData } from '../utils/indexedDB';
 import { processSpreadsheetImport } from '../utils/spreadsheet';
 import { isBillDueInMonth } from '../utils/paydayUtils';
@@ -257,9 +257,8 @@ export function LedgerDataProvider({ children }) {
     if (code) {
       headers['X-Sync-Passcode'] = code;
     }
-    const res = await fetch(getApiUrl('/api/sync/restore'), {
+    const res = await apiFetch('/api/sync/restore', {
       method: 'GET',
-      credentials: 'include',
       headers
     });
     const data = await res.json();
@@ -328,9 +327,8 @@ export function LedgerDataProvider({ children }) {
     (async () => {
       try {
         hasAutoPulledRef.current = true;
-        const res = await fetch(getApiUrl('/api/sync/restore'), {
+        const res = await apiFetch('/api/sync/restore', {
           method: 'GET',
-          credentials: 'include',
           headers: { 'Content-Type': 'application/json' }
         });
         const cloudData = await res.json().catch(() => null);

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { getApiUrl } from '../utils/api';
+import { getApiUrl, apiFetch, setCsrfToken, getCsrfToken } from '../utils/api';
 
 /** @type {React.Context<any>} */
 const AuthContext = createContext(null);
@@ -11,21 +11,43 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [householdId, setHouseholdId] = useState(null);
+  const [csrfToken, setCsrfTokenState] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
+  // Handle global session expiry (token_version bump on other device or timeout)
+  useEffect(() => {
+    const handleSessionExpired = (e) => {
+      console.warn('[auth] Session expired event received:', e.detail);
+      sessionStorage.removeItem('personal_budget_last_activity');
+      setIsAuthenticated(false);
+      setUser(null);
+      setHouseholdId(null);
+      setCsrfTokenState(null);
+      setCsrfToken(null);
+      setIsAuthModalOpen(true);
+      if (typeof window !== 'undefined') {
+        window.history.pushState({}, '', '/finance');
+      }
+    };
+    window.addEventListener('techtrek:session-expired', handleSessionExpired);
+    return () => window.removeEventListener('techtrek:session-expired', handleSessionExpired);
+  }, []);
 
   // Restore session on mount via /api/auth/me
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch(getApiUrl('/api/auth/me'), {
-          credentials: 'include'
-        });
+        const res = await apiFetch('/api/auth/me');
         if (res.ok) {
           const data = await res.json().catch(() => ({}));
           if (data.user) {
             setUser(data.user);
             setHouseholdId(data.householdId || null);
+            if (data.csrfToken) {
+              setCsrfTokenState(data.csrfToken);
+              setCsrfToken(data.csrfToken);
+            }
             setIsAuthenticated(true);
             setIsAuthModalOpen(false);
           }
@@ -80,12 +102,16 @@ export function AuthProvider({ children }) {
    * @param {string} password
    * @param {boolean} rememberMe
    */
+  /**
+   * @param {string} email
+   * @param {string} password
+   * @param {boolean} rememberMe
+   */
   const login = async (email, password, rememberMe = false) => {
     try {
-      const res = await fetch(getApiUrl('/api/auth/login'), {
+      const res = await apiFetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({ email, password, rememberMe })
       });
 
@@ -97,6 +123,10 @@ export function AuthProvider({ children }) {
       setIsAuthenticated(true);
       setUser(data.user);
       setHouseholdId(data.householdId);
+      if (data.csrfToken) {
+        setCsrfTokenState(data.csrfToken);
+        setCsrfToken(data.csrfToken);
+      }
       setIsAuthModalOpen(false);
       return data;
     } catch (err) {
@@ -125,10 +155,9 @@ export function AuthProvider({ children }) {
    */
   const register = async (name, email, password, securityQuestion, securityAnswer, rememberMe = false) => {
     try {
-      const res = await fetch(getApiUrl('/api/auth/register'), {
+      const res = await apiFetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({ name, email, password, securityQuestion, securityAnswer, rememberMe })
       });
 
@@ -140,6 +169,10 @@ export function AuthProvider({ children }) {
       setIsAuthenticated(true);
       setUser(data.user);
       setHouseholdId(data.householdId);
+      if (data.csrfToken) {
+        setCsrfTokenState(data.csrfToken);
+        setCsrfToken(data.csrfToken);
+      }
       setIsAuthModalOpen(false);
       return data;
     } catch (err) {
@@ -158,12 +191,9 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const getSecurityQuestion = async (email) => {
-    const res = await fetch(getApiUrl('/api/auth/security-question'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ email })
+  const getSecurityQuestion = async () => {
+    const res = await apiFetch('/api/auth/security-question', {
+      method: 'GET'
     });
 
     const data = await res.json().catch(() => ({}));
@@ -174,26 +204,24 @@ export function AuthProvider({ children }) {
   };
 
   const forgotPassword = async (email, securityAnswer) => {
-    const res = await fetch(getApiUrl('/api/auth/forgot-password'), {
+    const res = await apiFetch('/api/auth/forgot-password', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
       body: JSON.stringify({ email, securityAnswer })
     });
 
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      throw new Error(data.error || `Failed to generate reset code (HTTP ${res.status})`);
+      throw new Error(data.error || `Failed to process reset request (HTTP ${res.status})`);
     }
     return data;
   };
 
-  const resetPassword = async (email, token, newPassword) => {
-    const res = await fetch(getApiUrl('/api/auth/reset-password'), {
+  const resetPassword = async (email, token, newPassword, securityAnswer = '') => {
+    const res = await apiFetch('/api/auth/reset-password', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ email, token, newPassword })
+      body: JSON.stringify({ email, token, newPassword, securityAnswer })
     });
 
     const data = await res.json().catch(() => ({}));
@@ -204,10 +232,9 @@ export function AuthProvider({ children }) {
   };
 
   const updateProfile = async (profileData) => {
-    const res = await fetch(getApiUrl('/api/auth/update-profile'), {
+    const res = await apiFetch('/api/auth/update-profile', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
       body: JSON.stringify(profileData)
     });
 
@@ -218,6 +245,10 @@ export function AuthProvider({ children }) {
     if (data.user) {
       setUser(data.user);
     }
+    if (data.csrfToken) {
+      setCsrfTokenState(data.csrfToken);
+      setCsrfToken(data.csrfToken);
+    }
     return data;
   };
 
@@ -226,11 +257,13 @@ export function AuthProvider({ children }) {
     setIsAuthenticated(false);
     setUser(null);
     setHouseholdId(null);
+    setCsrfTokenState(null);
+    setCsrfToken(null);
     if (typeof window !== 'undefined') {
       window.history.pushState({}, '', '/finance');
     }
     try {
-      await fetch(getApiUrl('/api/auth/logout'), { method: 'POST', credentials: 'include' });
+      await apiFetch('/api/auth/logout', { method: 'POST' });
     } catch (e) {
       // ignore
     }
@@ -242,6 +275,7 @@ export function AuthProvider({ children }) {
       isAuthenticated,
       token: isAuthenticated ? 'cookie-active' : null, // alias for backwards compatibility with BudgetContext
       householdId,
+      csrfToken,
       isLoading,
       isAuthModalOpen,
       setIsAuthModalOpen,

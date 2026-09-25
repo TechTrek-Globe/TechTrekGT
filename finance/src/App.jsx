@@ -158,7 +158,7 @@ function MainContent({ pathname, navigateTo, onNavigateHome }) {
         {activeView === 'ledger'      && <LedgerView onNavigateView={handleNavigateView} />}
         {activeView === 'amortization'&& <AmortizationView onNavigateView={handleNavigateView} />}
         {activeView === 'settings'    && <SettingsView onNavigateView={handleNavigateView} />}
-        {activeView === 'admin'       && user?.email === import.meta.env.VITE_ADMIN_EMAIL && <AdminView />}
+        {activeView === 'admin'       && user?.isAdmin && <AdminView />}
         {isSettingsOpen && <SettingsModal />}
         <AuthModal />
       </React.Suspense>

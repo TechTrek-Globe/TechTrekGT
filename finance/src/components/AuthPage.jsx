@@ -59,9 +59,6 @@ export function AuthPage({ onNavigateHome, onAuthSuccess }) {
   const [securityQuestion, setSecurityQuestion] = useState(PRESET_SECURITY_QUESTIONS[0]);
   const [securityAnswer, setSecurityAnswer] = useState('');
   
-  // Forgot password step state
-  const [forgotStep, setForgotStep] = useState(1);
-  const [loadedQuestion, setLoadedQuestion] = useState('');
   
   // Reset password state
   const [resetToken, setResetToken] = useState('');
@@ -75,33 +72,8 @@ export function AuthPage({ onNavigateHome, onAuthSuccess }) {
     setMode(newMode);
     setError('');
     setInfoMessage('');
-    setForgotStep(1);
-    setLoadedQuestion('');
-  };
-
-  const handleFetchQuestion = async (e) => {
-    if (e) e.preventDefault();
-    if (!email) {
-      setError('Please enter your email address.');
-      return;
-    }
-
-    setError('');
-    setIsSubmitting(true);
-    try {
-      const res = await getSecurityQuestion(email);
-      if (res.securityQuestion) {
-        setLoadedQuestion(res.securityQuestion);
-        setForgotStep(2);
-      } else {
-        setLoadedQuestion('Security Question Not Set (Legacy Account)');
-        setForgotStep(2);
-      }
-    } catch (err) {
-      setError(err.message || 'No account found with this email address.');
-    } finally {
-      setIsSubmitting(false);
-    }
+    setResetToken('');
+    setSecurityAnswer('');
   };
 
   const handleSubmit = async (e) => {
@@ -133,18 +105,12 @@ export function AuthPage({ onNavigateHome, onAuthSuccess }) {
         }
         if (onAuthSuccess) onAuthSuccess();
       } else if (mode === 'forgot') {
-        if (forgotStep === 1) {
-          await handleFetchQuestion();
-          return;
-        }
-        const res = await forgotPassword(email, securityAnswer);
-        setInfoMessage(res.message || 'Security answer verified! Reset code generated.');
-        if (res.resetToken) {
-          setResetToken(res.resetToken);
-        }
+        const res = await forgotPassword(email);
+        setInfoMessage(res.message || 'If an account exists for that address, a reset code has been sent to it.');
+        setResetToken('');
         setMode('reset');
       } else if (mode === 'reset') {
-        const res = await resetPassword(email, resetToken, newPassword);
+        const res = await resetPassword(email, resetToken, newPassword, securityAnswer);
         setInfoMessage(res.message || 'Password updated successfully! Sign in with your new password.');
         setPassword('');
         setNewPassword('');
@@ -399,44 +365,34 @@ export function AuthPage({ onNavigateHome, onAuthSuccess }) {
                     </>
                   )}
 
-                  {/* Security Question Prompt on Forgot Password Step 2 */}
-                  {mode === 'forgot' && forgotStep === 2 && (
-                    <div>
-                      <label className="block text-xs font-medium text-emerald-400 mb-1">
-                        Security Question:
-                      </label>
-                      <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 mb-3 font-medium">
-                        {loadedQuestion}
-                      </div>
-
-                      <label className="block text-xs font-medium text-slate-300 mb-1.5">Security Answer</label>
-                      <div className="relative">
-                        <KeyRound className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
-                        <input
-                          type="text"
-                          required
-                          value={securityAnswer}
-                          onChange={(e) => setSecurityAnswer(e.target.value)}
-                          placeholder="Enter your security answer"
-                          className="w-full pl-10 pr-4 py-2.5 bg-slate-950/80 border border-slate-800 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500/80 focus:ring-1 focus:ring-blue-500/80 transition-all"
-                        />
-                      </div>
-                    </div>
-                  )}
-
                   {mode === 'reset' && (
                     <>
                       <div>
-                        <label className="block text-xs font-medium text-slate-300 mb-1.5">Verification Reset Code</label>
+                        <label className="block text-xs font-medium text-slate-300 mb-1.5">8-Digit Reset Code (From Email)</label>
                         <div className="relative">
                           <KeyRound className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
                           <input
                             type="text"
                             required
+                            maxLength={8}
                             value={resetToken}
-                            onChange={(e) => setResetToken(e.target.value)}
-                            placeholder="e.g. 649201"
+                            onChange={(e) => setResetToken(e.target.value.replace(/\D/g, ''))}
+                            placeholder="e.g. 12345678"
                             className="w-full pl-10 pr-4 py-2.5 bg-slate-950/80 border border-slate-800 rounded-xl text-sm text-slate-100 font-mono tracking-wider placeholder-slate-500 focus:outline-none focus:border-blue-500/80 focus:ring-1 focus:ring-blue-500/80 transition-all"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1.5">Security Answer (if set on your account)</label>
+                        <div className="relative">
+                          <HelpCircle className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+                          <input
+                            type="text"
+                            value={securityAnswer}
+                            onChange={(e) => setSecurityAnswer(e.target.value)}
+                            placeholder="Enter your security answer"
+                            className="w-full pl-10 pr-4 py-2.5 bg-slate-950/80 border border-slate-800 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500/80 focus:ring-1 focus:ring-blue-500/80 transition-all"
                           />
                         </div>
                       </div>
@@ -490,7 +446,7 @@ export function AuthPage({ onNavigateHome, onAuthSuccess }) {
                         <span>
                           {mode === 'register' && 'Create Account & Access Dashboard'}
                           {mode === 'signin' && 'Sign In to Dashboard'}
-                          {mode === 'forgot' && (forgotStep === 1 ? 'Verify Email' : 'Verify Answer & Reset')}
+                          {mode === 'forgot' && 'Send Reset Code'}
                           {mode === 'reset' && 'Reset Password'}
                         </span>
                         <ArrowRight className="w-4 h-4" />

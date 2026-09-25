@@ -1,5 +1,6 @@
 // @ts-nocheck
 import React, { useState } from 'react';
+import { apiFetch } from '../../../utils/api';
 import { useBudgetMetadata, useLedgerDataState, useLedgerDataDispatch } from '../../../context/BudgetContext';
 import { useAuth } from '../../../context/AuthContext';
 import { 
@@ -50,10 +51,9 @@ export function CloudSyncSubPanel() {
     setIsVerifyingCode(true);
 
     try {
-      const res = await fetch(getApiUrl('/api/verify-sync-code'), {
+      const res = await apiFetch('/api/verify-sync-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({ code: passcodeInput })
       });
       const data = await res.json();

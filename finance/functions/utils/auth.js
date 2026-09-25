@@ -416,10 +416,14 @@ export async function authenticate(context, { requireCsrf = true } = {}) {
   if (!env?.DB) return { error: fail(503, 'Service unavailable') };
 
   const user = await env.DB.prepare(
-    'SELECT id, email, name, role, token_version, security_question, security_answer_hash, password_hash FROM users WHERE id = ?'
+    'SELECT id, email, name, role, token_version, security_question, security_answer_hash, password_hash, status, email_verified, pending_email FROM users WHERE id = ?'
   ).bind(payload.userId).first();
 
   if (!user) return { error: fail(401, 'Unauthorized') };
+
+  if (user.status === 'Suspended') {
+    return { error: fail(403, 'Account suspended. Please contact support.') };
+  }
 
   const currentVersion = Number(user.token_version || 0);
   const tokenVersion = Number(payload.tv || 0);
@@ -434,7 +438,8 @@ export async function authenticate(context, { requireCsrf = true } = {}) {
 /* Session issuance (fix H6)                                          */
 /* ------------------------------------------------------------------ */
 
-export async function issueSession(env, user, householdId, rememberMe) {
+export async function issueSession(env, user, arg3, arg4) {
+  const rememberMe = typeof arg3 === 'boolean' ? arg3 : Boolean(arg4);
   const now = Math.floor(Date.now() / 1000);
   const sessionTtl = rememberMe ? SESSION_TTL_REMEMBER : SESSION_TTL_DEFAULT;
   const sessionExp = now + sessionTtl;
@@ -442,7 +447,6 @@ export async function issueSession(env, user, householdId, rememberMe) {
     {
       userId: user.id,
       email: user.email,
-      householdId,
       name: user.name,
       tv: Number(user.token_version || 0),
       sid: crypto.randomUUID()
@@ -500,6 +504,89 @@ export async function sendResetEmail(env, toEmail, code, securityQuestion) {
     return true;
   } catch (err) {
     console.error('[forgot-password] mail send failed:', err && err.message);
+    return false;
+  }
+}
+
+export async function sendVerificationEmail(env, toEmail, code, type = 'verify') {
+  if (!env?.RESEND_API_KEY || !env?.MAIL_FROM) {
+    console.error(
+      `[email-verify] mail delivery is not configured (RESEND_API_KEY / MAIL_FROM); dev code for ${toEmail}: ${code}`
+    );
+    return false;
+  }
+  const subject = type === 'change'
+    ? 'Verify your new TechTrek email address'
+    : 'Verify your TechTrek account email';
+  const lines = [
+    type === 'change'
+      ? 'You requested to change your TechTrek email address.'
+      : 'Thank you for registering with TechTrek.',
+    '',
+    `Your verification code is: ${code}`,
+    '',
+    'The code expires in 24 hours and can be used once.',
+    '',
+    'If you did not request this, you can ignore this message. No changes have been made.'
+  ];
+
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        from: env.MAIL_FROM,
+        to: [toEmail],
+        subject,
+        text: lines.join('\n')
+      })
+    });
+    if (!res.ok) {
+      console.error('[email-verify] mail provider returned', res.status);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('[email-verify] mail send failed:', err && err.message);
+    return false;
+  }
+}
+
+export async function sendEmailChangeNotification(env, oldEmail, newEmail) {
+  if (!env?.RESEND_API_KEY || !env?.MAIL_FROM) {
+    console.error(
+      `[email-change-notice] mail delivery is not configured (RESEND_API_KEY / MAIL_FROM); notice for ${oldEmail} -> ${newEmail}`
+    );
+    return false;
+  }
+  const lines = [
+    'A request was made to change the email address on your TechTrek account.',
+    '',
+    `New address requested: ${newEmail}`,
+    '',
+    'A verification code was sent to the new email address. If you did not request this change, please sign in to your TechTrek account and reset your password immediately.'
+  ];
+
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        from: env.MAIL_FROM,
+        to: [oldEmail],
+        subject: 'Security Alert: Email change requested for your TechTrek account',
+        text: lines.join('\n')
+      })
+    });
+    return res.ok;
+  } catch (err) {
+    console.error('[email-change-notice] mail send failed:', err && err.message);
     return false;
   }
 }

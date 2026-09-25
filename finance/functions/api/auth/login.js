@@ -30,7 +30,7 @@ export async function onRequestPost(context) {
     const cleanEmail = rawEmail.toLowerCase();
 
     const user = await env.DB.prepare(
-      'SELECT id, email, name, password_hash, role, token_version, security_question, security_answer_hash FROM users WHERE email = ?'
+      'SELECT id, email, name, password_hash, role, token_version, security_question, security_answer_hash, status, email_verified, pending_email FROM users WHERE email = ?'
     ).bind(cleanEmail).first();
 
     // Timing equalization: perform a hash even when the account does not exist
@@ -43,6 +43,10 @@ export async function onRequestPost(context) {
     const isValid = await verifyPassword(password, user.password_hash);
     if (!isValid) return fail(401, 'Invalid email or password.');
 
+    if (user.status === 'Suspended') {
+      return fail(403, 'Account suspended. Please contact support.');
+    }
+
     // Transparent rehash on login: upgrades 310k-era or legacy two-part hashes
     // without requiring the user to reset their password. (C2)
     if (needsRehash(user.password_hash)) {
@@ -54,12 +58,7 @@ export async function onRequestPost(context) {
       }
     }
 
-    const member = await env.DB.prepare(
-      'SELECT household_id FROM household_members WHERE user_id = ?'
-    ).bind(user.id).first();
-    const householdId = member ? member.household_id : null;
-
-    const { token, csrf, maxAge } = await issueSession(env, user, householdId, Boolean(body.rememberMe));
+    const { token, csrf, maxAge } = await issueSession(env, user, Boolean(body.rememberMe));
 
     return withCookies(
       json({
@@ -69,10 +68,12 @@ export async function onRequestPost(context) {
           email: user.email,
           name: user.name,
           isAdmin: user.role === 'admin',
+          emailVerified: Boolean(user.email_verified),
+          pendingEmail: user.pending_email || null,
           securityQuestion: user.security_question || null,
           hasSecurityQuestion: Boolean(user.security_question && user.security_answer_hash)
         },
-        householdId,
+        householdId: null,
         csrfToken: csrf
       }),
       sessionCookies(token, csrf, maxAge)

@@ -106,25 +106,18 @@ describe('Phase 2 Stage 1: Phase 1 regression fixes', () => {
     assert.strictEqual(row.status, 'Active', 'status must be "Active" immediately after registration');
   });
 
-  // S1T3: two concurrent /me calls return the same householdId and both tokens are valid (Stage 1.3)
-  test('S1T3: two concurrent /me calls succeed and return consistent householdId', async () => {
-    // Seed a user and household
+  // S1T3: two concurrent /me calls succeed and return consistent session info (Stage 1.3)
+  test('S1T3: two concurrent /me calls succeed and return consistent session info', async () => {
+    // Seed a user
     const pwHash = await hashPassword('ValidPass123!');
     const userId = 'usr-s1t3';
-    const householdId = 'hh-s1t3';
     await mockDb.prepare(
       'INSERT INTO users (id, email, password_hash, name, role, token_version, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
     ).bind(userId, 's1t3@example.com', pwHash, 'Carol Test', 'user', 0, 'Active', new Date().toISOString()).run();
-    await mockDb.prepare(
-      'INSERT INTO households (id, name) VALUES (?, ?)'
-    ).bind(householdId, "Carol Test's Household").run();
-    await mockDb.prepare(
-      'INSERT INTO household_members (id, household_id, user_id, role) VALUES (?, ?, ?, ?)'
-    ).bind('hm-s1t3', householdId, userId, 'owner').run();
 
     // Issue a real token so /me can authenticate
     const user = { id: userId, email: 's1t3@example.com', name: 'Carol Test', token_version: 0 };
-    const { token } = await issueSession(env, user, householdId, false);
+    const { token } = await issueSession(env, user, false);
 
     function makeMeRequest() {
       return new Request('http://localhost/api/auth/me', {
@@ -145,9 +138,9 @@ describe('Phase 2 Stage 1: Phase 1 regression fixes', () => {
     const body1 = await res1.json();
     const body2 = await res2.json();
 
-    assert.strictEqual(body1.householdId, householdId, 'First /me must return correct householdId');
-    assert.strictEqual(body2.householdId, householdId, 'Second /me must return correct householdId');
-    assert.strictEqual(body1.householdId, body2.householdId, 'Both /me calls must return same householdId');
+    assert.strictEqual(body1.user.id, userId, 'First /me must return correct user ID');
+    assert.strictEqual(body2.user.id, userId, 'Second /me must return correct user ID');
+    assert.strictEqual(body1.user.email, body2.user.email, 'Both /me calls must return same user email');
 
     // Both responses must include a usable csrfToken
     assert.ok(body1.csrfToken, 'First /me must return csrfToken');
@@ -183,17 +176,12 @@ describe('Phase 2 Stage 1: Phase 1 regression fixes', () => {
   test('S1T4b: /me performs a DB lookup on every call (no stale-cache path)', async () => {
     const pwHash = await hashPassword('ValidPass123!');
     const userId = 'usr-s1t4b';
-    const householdId = 'hh-s1t4b';
     await mockDb.prepare(
       'INSERT INTO users (id, email, password_hash, name, role, token_version, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
     ).bind(userId, 's1t4b@example.com', pwHash, 'Eve Test', 'user', 0, 'Active', new Date().toISOString()).run();
-    await mockDb.prepare('INSERT INTO households (id, name) VALUES (?, ?)').bind(householdId, "Eve's Household").run();
-    await mockDb.prepare(
-      'INSERT INTO household_members (id, household_id, user_id, role) VALUES (?, ?, ?, ?)'
-    ).bind('hm-s1t4b', householdId, userId, 'owner').run();
 
     const user = { id: userId, email: 's1t4b@example.com', name: 'Eve Test', token_version: 0 };
-    const { token } = await issueSession(env, user, householdId, false);
+    const { token } = await issueSession(env, user, false);
 
     const req = new Request('http://localhost/api/auth/me', {
       method: 'GET',

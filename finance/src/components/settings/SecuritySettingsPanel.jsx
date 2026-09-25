@@ -5,12 +5,15 @@ import {
   ShieldCheck, 
   AlertTriangle, 
   CheckCircle2, 
-  Save 
+  Save,
+  Mail,
+  KeyRound,
+  Loader2
 } from 'lucide-react';
 import { PRESET_SECURITY_QUESTIONS } from '../AuthModal';
 
 export function SecuritySettingsPanel() {
-  const { user, updateProfile } = useAuth();
+  const { user, updateProfile, confirmEmailChange } = useAuth();
   const [profileForm, setProfileForm] = useState(() => ({
     name: user?.name || '',
     email: user?.email || '',
@@ -22,6 +25,9 @@ export function SecuritySettingsPanel() {
 
   const [profileStatus, setProfileStatus] = useState(null);
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
+  const [confirmCode, setConfirmCode] = useState('');
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [confirmStatus, setConfirmStatus] = useState(null);
 
   const handleSaveProfile = async (e) => {
     e.preventDefault();
@@ -38,6 +44,25 @@ export function SecuritySettingsPanel() {
     }
   };
 
+  const handleConfirmEmail = async (e) => {
+    e.preventDefault();
+    if (!confirmCode.trim()) return;
+    setConfirmStatus(null);
+    setIsConfirming(true);
+    try {
+      const res = await confirmEmailChange(confirmCode.trim());
+      setConfirmStatus({ type: 'success', message: res.message || 'Email address confirmed and updated successfully!' });
+      if (res.user?.email) {
+        setProfileForm(prev => ({ ...prev, email: res.user.email }));
+      }
+      setConfirmCode('');
+    } catch (err) {
+      setConfirmStatus({ type: 'error', message: err.message || 'Failed to confirm email change.' });
+    } finally {
+      setIsConfirming(false);
+    }
+  };
+
   return (
     <div className="space-y-6 max-w-xl mx-auto animate-fade-in">
       <div className="flex items-center space-x-3 p-4 bg-slate-900 border border-slate-800 rounded-2xl">
@@ -49,6 +74,47 @@ export function SecuritySettingsPanel() {
           <p className="text-xs text-slate-400">Update your email, name, security question, and password</p>
         </div>
       </div>
+
+      {user?.pendingEmail && (
+        <div className="p-4 bg-amber-950/60 border border-amber-800/80 rounded-2xl text-amber-200 text-xs space-y-3">
+          <div className="flex items-center space-x-2 font-bold text-amber-100">
+            <Mail className="w-4 h-4 text-amber-400" />
+            <span>Pending Email Change: {user.pendingEmail}</span>
+          </div>
+          <p className="text-amber-300">
+            A confirmation code was sent to <strong className="text-amber-100">{user.pendingEmail}</strong>. Enter the 8-digit code below to complete the update:
+          </p>
+
+          {confirmStatus && (
+            <div className={`p-2.5 rounded-xl text-xs flex items-center space-x-2 ${
+              confirmStatus.type === 'success' ? 'bg-emerald-950/80 border border-emerald-800 text-emerald-300' : 'bg-red-950/80 border border-red-800 text-red-300'
+            }`}>
+              {confirmStatus.type === 'success' && <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />}
+              <span>{confirmStatus.message}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleConfirmEmail} className="flex items-center gap-2 pt-1">
+            <input
+              type="text"
+              required
+              maxLength={8}
+              value={confirmCode}
+              onChange={e => setConfirmCode(e.target.value.replace(/\D/g, ''))}
+              placeholder="8-digit code"
+              className="w-36 px-3 py-1.5 text-xs bg-slate-950 border border-amber-700/60 rounded-xl text-slate-100 font-mono tracking-widest text-center focus:outline-none focus:border-amber-400"
+            />
+            <button
+              type="submit"
+              disabled={isConfirming || confirmCode.length !== 8}
+              className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 text-xs font-semibold rounded-xl shadow transition-colors flex items-center space-x-1 cursor-pointer"
+            >
+              {isConfirming ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <KeyRound className="w-3.5 h-3.5" />}
+              <span>Confirm Change</span>
+            </button>
+          </form>
+        </div>
+      )}
 
       {user && !user.hasSecurityQuestion && (
         <div className="p-4 bg-amber-950/60 border border-amber-800/80 rounded-2xl text-amber-300 text-xs space-y-1">

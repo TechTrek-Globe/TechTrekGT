@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { 
   ShieldCheck, 
@@ -67,6 +67,15 @@ export function AuthPage({ onNavigateHome, onAuthSuccess }) {
   const [error, setError] = useState('');
   const [infoMessage, setInfoMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const interval = setInterval(() => {
+      setResendCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [resendCooldown]);
 
   const switchMode = (newMode) => {
     setMode(newMode);
@@ -108,6 +117,7 @@ export function AuthPage({ onNavigateHome, onAuthSuccess }) {
         const res = await forgotPassword(email);
         setInfoMessage(res.message || 'If an account exists for that address, a reset code has been sent to it.');
         setResetToken('');
+        setResendCooldown(60);
         setMode('reset');
       } else if (mode === 'reset') {
         const res = await resetPassword(email, resetToken, newPassword, securityAnswer);
@@ -368,7 +378,29 @@ export function AuthPage({ onNavigateHome, onAuthSuccess }) {
                   {mode === 'reset' && (
                     <>
                       <div>
-                        <label className="block text-xs font-medium text-slate-300 mb-1.5">8-Digit Reset Code (From Email)</label>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="block text-xs font-medium text-slate-300">8-Digit Reset Code (From Email)</label>
+                          <button
+                            type="button"
+                            disabled={resendCooldown > 0 || isSubmitting}
+                            onClick={async () => {
+                              try {
+                                setIsSubmitting(true);
+                                setError('');
+                                await forgotPassword(email);
+                                setResendCooldown(60);
+                                setInfoMessage('If an account exists, a new reset code has been sent to your email.');
+                              } catch (err) {
+                                setError(err.message || 'Failed to resend reset code.');
+                              } finally {
+                                setIsSubmitting(false);
+                              }
+                            }}
+                            className="text-xs text-blue-400 hover:text-blue-300 disabled:text-slate-500 disabled:cursor-not-allowed transition-colors"
+                          >
+                            {resendCooldown > 0 ? `Resend Code (${resendCooldown}s)` : 'Resend Code'}
+                          </button>
+                        </div>
                         <div className="relative">
                           <KeyRound className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
                           <input

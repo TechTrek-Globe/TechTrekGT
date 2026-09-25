@@ -1,7 +1,7 @@
 import {
   hashPassword, verifyPassword, readJson, asTrimmedString,
   json, fail, issueSession, sessionCookies, withCookies,
-  validatePassword, EMAIL_REGEX,
+  validatePassword, EMAIL_REGEX, randomInt, hmacHex, sendVerificationEmail,
   MAX_BODY_AUTH, MAX_NAME_LEN, MAX_EMAIL_LEN, MAX_ANSWER_LEN, MAX_QUESTION_LEN
 } from '../../utils/auth.js';
 import { enforceRateLimit } from '../../utils/rateLimit.js';
@@ -47,34 +47,37 @@ export async function onRequestPost(context) {
     }
 
     const userId = `usr-${crypto.randomUUID()}`;
-    const householdId = `hh-${crypto.randomUUID()}`;
-    const memberId = `hm-${crypto.randomUUID()}`;
-    const person1Id = `person-${crypto.randomUUID()}`;
 
     const [passwordHash, securityAnswerHash] = await Promise.all([
       hashPassword(password),
       hashPassword(cleanAnswer.toLowerCase())
     ]);
 
-    await env.DB.batch([
-      env.DB.prepare(
-        // created_at and status are written explicitly so this INSERT is not
-        // fragile against DDL default removal. (Stage 1.1 / 1.2 regression fix)
-        'INSERT INTO users (id, email, password_hash, name, security_question, security_answer_hash, role, token_version, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-      ).bind(userId, cleanEmail, passwordHash, rawName, cleanQuestion, securityAnswerHash, 'user', 0, 'Active', new Date().toISOString()),
-      env.DB.prepare('INSERT INTO households (id, name) VALUES (?, ?)').bind(householdId, `${rawName}'s Household`),
-      env.DB.prepare('INSERT INTO household_members (id, household_id, user_id, role) VALUES (?, ?, ?, ?)').bind(memberId, householdId, userId, 'owner'),
-      env.DB.prepare(
-        'INSERT INTO people (id, household_id, name, role, pay_frequency, pay_day1, pay_day2, gross_per_pay, net_per_pay, color) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-      ).bind(person1Id, householdId, rawName, 'Primary', 'bi-weekly', '15', 'last', 0, 0, 'purple')
-    ]);
+    await env.DB.prepare(
+      // created_at, status, and email_verified are written explicitly so this INSERT is not
+      // fragile against DDL default removal. (Stage 1.1 / 1.2 / 5.2)
+      'INSERT INTO users (id, email, password_hash, name, security_question, security_answer_hash, role, token_version, status, email_verified, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    ).bind(userId, cleanEmail, passwordHash, rawName, cleanQuestion, securityAnswerHash, 'user', 0, 'Active', 0, new Date().toISOString()).run();
+
+    let verificationCode = '';
+    for (let i = 0; i < 8; i++) verificationCode += String(randomInt(10));
+    const codeHash = await hmacHex(env.JWT_SECRET, `verify:${cleanEmail}:${verificationCode}`);
+    const verificationId = `vfy-${crypto.randomUUID()}`;
+    const now = Date.now();
+    const VERIFY_CODE_TTL_MS = 24 * 60 * 60 * 1000;
+
+    await env.DB.prepare(
+      'INSERT INTO email_verifications (id, user_id, email, token, expires_at, used, attempts, created_at) VALUES (?, ?, ?, ?, ?, 0, 0, ?)'
+    ).bind(verificationId, userId, cleanEmail, codeHash, now + VERIFY_CODE_TTL_MS, now).run();
+
+    await sendVerificationEmail(env, cleanEmail, verificationCode, 'register').catch(() => {});
 
     const newUser = { id: userId, email: cleanEmail, name: rawName, token_version: 0 };
-    const { token, csrf, maxAge } = await issueSession(env, newUser, householdId, Boolean(body.rememberMe));
+    const { token, csrf, maxAge } = await issueSession(env, newUser, Boolean(body.rememberMe));
     // csrf2 removed: issueSession already returns csrf above. (Stage 1.4 regression fix)
 
     return withCookies(
-      json({ success: true, user: { id: userId, email: cleanEmail, name: rawName }, householdId, csrfToken: csrf }, 201),
+      json({ success: true, user: { id: userId, email: cleanEmail, name: rawName, emailVerified: false }, householdId: null, csrfToken: csrf }, 201),
       sessionCookies(token, csrf, maxAge)
     );
 

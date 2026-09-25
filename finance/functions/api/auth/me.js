@@ -14,16 +14,8 @@ export async function onRequestGet(context) {
     const now = Math.floor(Date.now() / 1000);
     const sexp = typeof payload.sexp === 'number' && payload.sexp > now ? payload.sexp : now + 7200;
 
-    // Resolve householdId from DB before issuing the token so concurrent requests
-    // do not race: each reads the same membership row and issues tokens with the
-    // same householdId. (Stage 1.3 regression fix)
-    const member = await context.env.DB.prepare(
-      'SELECT household_id FROM household_members WHERE user_id = ?'
-    ).bind(user.id).first();
-    const householdId = member ? member.household_id : payload.householdId;
-
     const { token, csrf, maxAge } = await issueSession(
-      context.env, user, householdId, sexp - now > 2 * 60 * 60
+      context.env, user, sexp - now > 2 * 60 * 60
     );
 
     return withCookies(
@@ -34,10 +26,12 @@ export async function onRequestGet(context) {
           email: user.email,
           name: user.name,
           isAdmin: user.role === 'admin',
+          emailVerified: Boolean(user.email_verified),
+          pendingEmail: user.pending_email || null,
           securityQuestion: user.security_question || null,
           hasSecurityQuestion: Boolean(user.security_question && user.security_answer_hash)
         },
-        householdId,
+        householdId: null,
         csrfToken: csrf
       }),
       sessionCookies(token, csrf, maxAge)

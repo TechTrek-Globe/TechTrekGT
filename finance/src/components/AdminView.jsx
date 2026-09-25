@@ -5,14 +5,14 @@ import { useBudget } from '../context/BudgetContext';
 import { apiFetch } from '../utils/api';
 
 function StatusBadge({ status }) {
-  const isLocked = status === 'Locked';
+  const isSuspended = status === 'Suspended' || status === 'Locked';
   return (
     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${
-      isLocked
+      isSuspended
         ? 'bg-rose-950/60 text-rose-400 border border-rose-800/50'
         : 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/50'
     }`}>
-      {isLocked
+      {isSuspended
         ? <Lock className="w-2.5 h-2.5" />
         : <CheckCircle className="w-2.5 h-2.5" />
       }
@@ -43,6 +43,8 @@ export function AdminView() {
   const [stats, setStats] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [updatingUserId, setUpdatingUserId] = useState(null);
+  const [actionError, setActionError] = useState(null);
 
   const fetchStats = async () => {
     setIsLoading(true);
@@ -64,12 +66,40 @@ export function AdminView() {
     }
   };
 
+  const handleToggleStatus = async (targetUser) => {
+    const currentStatus = targetUser.status || 'Active';
+    const nextStatus = currentStatus === 'Active' ? 'Suspended' : 'Active';
+    const promptMsg = nextStatus === 'Suspended'
+      ? `Suspend user account "${targetUser.email}"? This will invalidate their active sessions.`
+      : `Reactivate user account "${targetUser.email}"?`;
+    if (!window.confirm(promptMsg)) return;
+
+    setUpdatingUserId(targetUser.id);
+    setActionError(null);
+    try {
+      const res = await apiFetch(`/api/admin/user/${targetUser.id}/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: nextStatus })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || `Failed to update status (HTTP ${res.status})`);
+      }
+      await fetchStats();
+    } catch (err) {
+      setActionError(err.message || 'Failed to update user status.');
+    } finally {
+      setUpdatingUserId(null);
+    }
+  };
+
   useEffect(() => {
     fetchStats();
   }, []);
 
   const activeCount = stats?.users?.filter(u => (u.status || 'Active') === 'Active').length ?? 0;
-  const lockedCount = stats?.users?.filter(u => u.status === 'Locked').length ?? 0;
+  const lockedCount = stats?.users?.filter(u => u.status === 'Locked' || u.status === 'Suspended').length ?? 0;
   const backedUpCount = stats?.users?.filter(u => u.backupCount > 0).length ?? 0;
 
   const cardBase = isLight
@@ -132,6 +162,21 @@ export function AdminView() {
         </div>
       )}
 
+      {/* Action error */}
+      {actionError && (
+        <div className={`flex items-start gap-3 p-4 rounded-2xl border ${
+          isLight
+            ? 'bg-rose-50 border-rose-200 text-rose-700'
+            : 'bg-rose-950/40 border-rose-800/50 text-rose-400'
+        }`}>
+          <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold text-sm">Action failed</p>
+            <p className="text-xs mt-0.5 opacity-80">{actionError}</p>
+          </div>
+        </div>
+      )}
+
       {/* Loading skeleton */}
       {isLoading && !stats && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -147,7 +192,7 @@ export function AdminView() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <StatCard icon={Users}        label="Total Users"   value={stats.totalUsers}   color="bg-blue-500/10 text-blue-400" />
             <StatCard icon={CheckCircle}  label="Active"        value={activeCount}         color="bg-emerald-500/10 text-emerald-400" />
-            <StatCard icon={Lock}         label="Locked"        value={lockedCount}         color="bg-rose-500/10 text-rose-400" />
+            <StatCard icon={Lock}         label="Locked/Suspended" value={lockedCount}      color="bg-rose-500/10 text-rose-400" />
             <StatCard icon={Database}     label="With Backups"  value={backedUpCount}       color="bg-violet-500/10 text-violet-400" />
           </div>
 
@@ -169,6 +214,7 @@ export function AdminView() {
                     <th className="text-left px-5 py-3">Name</th>
                     <th className="text-left px-5 py-3">Email</th>
                     <th className="text-left px-4 py-3">Status</th>
+                    <th className="text-left px-4 py-3">Actions</th>
                     <th className="text-center px-4 py-3">Backups</th>
                     <th className="text-left px-4 py-3">Last Backup</th>
                     <th className="text-left px-4 py-3">Member Since</th>
@@ -190,6 +236,32 @@ export function AdminView() {
                       </td>
                       <td className="px-4 py-3.5">
                         <StatusBadge status={u.status} />
+                      </td>
+                      <td className="px-4 py-3.5">
+                        {u.id === user?.id ? (
+                          <span className="text-[11px] text-slate-500 italic">Current User</span>
+                        ) : (
+                          <button
+                            onClick={() => handleToggleStatus(u)}
+                            disabled={updatingUserId === u.id}
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-colors ${
+                              (u.status || 'Active') === 'Active'
+                                ? (isLight
+                                    ? 'bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200'
+                                    : 'bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 border-rose-800/50')
+                                : (isLight
+                                    ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
+                                    : 'bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-400 border-emerald-800/50')
+                            } disabled:opacity-50`}
+                          >
+                            {updatingUserId === u.id
+                              ? 'Updating...'
+                              : (u.status || 'Active') === 'Active'
+                                ? 'Suspend'
+                                : 'Activate'
+                            }
+                          </button>
+                        )}
                       </td>
                       <td className="px-4 py-3.5 text-center">
                         <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
@@ -219,7 +291,7 @@ export function AdminView() {
                   ))}
                   {stats.users.length === 0 && (
                     <tr>
-                      <td colSpan={6} className={`px-5 py-10 text-center text-sm ${isLight ? 'text-slate-400' : 'text-slate-600'}`}>
+                      <td colSpan={7} className={`px-5 py-10 text-center text-sm ${isLight ? 'text-slate-400' : 'text-slate-600'}`}>
                         No user accounts found.
                       </td>
                     </tr>

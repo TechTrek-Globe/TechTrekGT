@@ -18,7 +18,11 @@ import {
   Moon,
   Globe,
   Shield,
-  LogOut
+  LogOut,
+  Mail,
+  AlertCircle,
+  CheckCircle2,
+  Loader2
 } from 'lucide-react';
 
 import headerLogoDark from '../assets/header-logo-dark.png';
@@ -145,8 +149,54 @@ export function AppLayout({ children, onNavigateHome, onNavigateView, activeView
     getCalculatedBalanceAsOf,
   } = useBudget();
 
-  const { user, logout } = useAuth();
+  const { user, logout, verifyEmail, resendVerification } = useAuth();
   const isAdmin = Boolean(user?.isAdmin);
+
+  const [showVerifyModal, setShowVerifyModal] = useState(false);
+  const [verifyCode, setVerifyCode] = useState('');
+  const [verifyError, setVerifyError] = useState('');
+  const [verifySuccess, setVerifySuccess] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const interval = setInterval(() => {
+      setResendCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [resendCooldown]);
+
+  const handleResend = async () => {
+    try {
+      setVerifyError('');
+      await resendVerification();
+      setResendCooldown(60);
+      setVerifySuccess('A new 8-digit verification code has been sent to your email.');
+    } catch (err) {
+      setVerifyError(err.message || 'Failed to resend code.');
+    }
+  };
+
+  const handleVerify = async (e) => {
+    e.preventDefault();
+    if (!verifyCode.trim()) return;
+    setIsVerifying(true);
+    setVerifyError('');
+    setVerifySuccess('');
+    try {
+      await verifyEmail(verifyCode.trim());
+      setVerifySuccess('Email verified successfully!');
+      setTimeout(() => {
+        setShowVerifyModal(false);
+        setVerifyCode('');
+      }, 1500);
+    } catch (err) {
+      setVerifyError(err.message || 'Invalid or expired verification code.');
+    } finally {
+      setIsVerifying(false);
+    }
+  };
 
   const [collapsed, setCollapsed] = useState(() => {
     try { return localStorage.getItem(SIDEBAR_KEY) === 'true'; }
@@ -341,6 +391,35 @@ export function AppLayout({ children, onNavigateHome, onNavigateView, activeView
 
         </header>
 
+        {/* Email Verification Banner */}
+        {user && user.emailVerified === false && (
+          <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 text-xs flex flex-wrap items-center justify-between gap-2 text-amber-200">
+            <div className="flex items-center gap-2">
+              <Mail className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>
+                Your email address (<strong className="font-semibold text-amber-100">{user.email}</strong>) is not verified. Check your inbox for your 8-digit verification code.
+              </span>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => { setShowVerifyModal(true); setVerifyError(''); setVerifySuccess(''); }}
+                className="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 rounded-lg font-medium transition-colors cursor-pointer"
+              >
+                Enter Code
+              </button>
+              <button
+                type="button"
+                disabled={resendCooldown > 0}
+                onClick={handleResend}
+                className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-300 border border-slate-700 rounded-lg font-medium transition-colors cursor-pointer"
+              >
+                {resendCooldown > 0 ? `Resend (${resendCooldown}s)` : 'Resend Code'}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Page Content */}
         <main className={`flex-1 min-h-0 flex flex-col matrix-scrollbar ${activeView === 'ledger' ? 'p-2 sm:p-3 overflow-hidden' : 'overflow-auto px-3 sm:px-4 pt-0 pb-4'}`}>
           {!isDbLoaded ? (
@@ -358,6 +437,96 @@ export function AppLayout({ children, onNavigateHome, onNavigateView, activeView
           <div role="alert" className="fixed bottom-4 right-4 z-50 p-3 rounded-xl bg-rose-950 border border-rose-700 text-rose-200 text-xs font-semibold shadow-2xl flex items-center gap-2">
             <span>⚠️</span>
             <span>{saveError}</span>
+          </div>
+        )}
+
+        {/* Verification Modal */}
+        {showVerifyModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
+            <div className="relative w-full max-w-sm bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-6 text-slate-100 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div className="flex items-center space-x-2">
+                  <Mail className="w-5 h-5 text-amber-400" />
+                  <h3 className="text-base font-semibold text-slate-100">Verify Your Email</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowVerifyModal(false)}
+                  className="p-1 text-slate-400 hover:text-slate-200 rounded-lg"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <p className="text-xs text-slate-400">
+                Please enter the 8-digit verification code sent to <span className="font-semibold text-slate-200">{user?.email}</span>.
+              </p>
+
+              {verifyError && (
+                <div className="p-2.5 bg-red-950/70 border border-red-800/80 rounded-xl text-red-300 text-xs flex items-center space-x-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
+                  <span>{verifyError}</span>
+                </div>
+              )}
+
+              {verifySuccess && (
+                <div className="p-2.5 bg-emerald-950/70 border border-emerald-800/80 rounded-xl text-emerald-300 text-xs flex items-center space-x-2">
+                  <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+                  <span>{verifySuccess}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleVerify} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1.5">8-Digit Verification Code</label>
+                  <input
+                    type="text"
+                    required
+                    maxLength={8}
+                    autoFocus
+                    value={verifyCode}
+                    onChange={(e) => setVerifyCode(e.target.value.replace(/\D/g, ''))}
+                    placeholder="e.g. 12345678"
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-center text-lg text-slate-100 font-mono tracking-widest focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between pt-1">
+                  <button
+                    type="button"
+                    disabled={resendCooldown > 0 || isVerifying}
+                    onClick={handleResend}
+                    className="text-xs text-amber-400 hover:text-amber-300 disabled:text-slate-500 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {resendCooldown > 0 ? `Resend (${resendCooldown}s)` : 'Resend Code'}
+                  </button>
+
+                  <div className="flex items-center space-x-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowVerifyModal(false)}
+                      className="px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isVerifying || verifyCode.length !== 8}
+                      className="px-4 py-1.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 font-semibold text-xs rounded-xl shadow-md transition-all flex items-center space-x-1.5 cursor-pointer"
+                    >
+                      {isVerifying ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Verifying...</span>
+                        </>
+                      ) : (
+                        <span>Verify Email</span>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </div>
           </div>
         )}
       </div>

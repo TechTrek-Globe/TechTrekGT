@@ -415,7 +415,7 @@ All apps (finance, outpost, wayfinder, bigworm) point at the same `personal-budg
 
 | Schema File | App | Tables |
 |------------|-----|--------|
-| `finance/schema.sql` | finance + shared | `users`, `households`, `household_members`, `accounts`, `people`, `bills`, `bill_splits`, `line_items`, `loans`, `household_settings`, `user_backups` |
+| `finance/schema.sql` | finance + shared | `users`, `_bak_households`, `_bak_household_members`, `accounts`, `_bak_people`, `bills`, `_bak_bill_splits`, `line_items`, `loans`, `household_settings`, `user_backups`, `user_backup_versions`, `password_resets` |
 | `outpost/auction-schema.sql` | outpost | invoices, items, sales, platforms, comps, `market_comps`, supplies, `listing_traffic`, `auction_item_analytics`, `outpost_sync_settings` |
 | `vinescout/vinescout-schema.sql` | vinescout | `vine_items`, `vine_orders`, `vine_tax_settings`, `vine_asin_cache` |
 | `wayfinder/schema-wayfinder.sql` | wayfinder | journeys, itinerary items, documents, import jobs, budgets |
@@ -423,6 +423,9 @@ All apps (finance, outpost, wayfinder, bigworm) point at the same `personal-budg
 ### 8.3 Key Design Points
 
 - **Shared `users` table**: the auth system is common, so registration in one app enables login across all.
+- **Phase 2 Stage 3 Household Simplification (Option B)**: The legacy relational household model has been simplified to per-user architecture. Migration `0004_drop_households.sql` reversibly archived `households`, `household_members`, `people`, and `bill_splits` into `_bak_*` tables, and purged the orphaned `default_vault` row. User registration issues a single `INSERT INTO users`. `householdId` claims and client context properties have been purged across auth utilities, tokens, endpoints, and `AuthContext`.
+- **Phase 2 Stage 4 Schema & Data Integrity**: Migration `0005_backfill_user_created_at.sql` backfills missing creation timestamps with the sentinel timestamp `'1970-01-01T00:00:00.000Z'`. The `users.status` column is fully settable via `POST /api/admin/user/:id/status` (`Active` or `Suspended`) by admins, with immediate session revocation (`token_version` bump) and 403 enforcement across `login` and `authenticate`.
+- **Phase 2 Stage 5 Email Verification & Security**: Migration `0006_email_verification.sql` added `email_verified` (DEFAULT 0) and `pending_email` columns to `users`, backfilled existing users with `email_verified = 1`, and created `email_verifications` table and indices (`idx_email_verifications_user`, `idx_email_verifications_email`). 8-digit verification codes are hashed with HMAC (`verify:${email}:${code}`) to prevent token leakage from database exposure. Registration issues unverified accounts (`email_verified = 0`) with non-blocking email dispatch. Endpoints `POST /api/auth/verify-email` (5/60s rate limit) and `POST /api/auth/resend-verification` (3/600s rate limit) allow verification with a visible 60s cooldown timer and persistent UI banner. Secure dual-notification email change flow (`update-profile.js` and `POST /api/auth/confirm-email-change`) writes to `pending_email`, notifies old and new addresses, and upon code verification atomically updates `email`, clears `pending_email`, sets `email_verified = 1`, and bumps `token_version` to revoke all prior sessions.
 - **Resale/shop tables** (outpost) live in the same database, avoiding cross-database joins.
 - **`nodejs_compat` compatibility flag** enables Node APIs inside workers (e.g., crypto, path).
 - **KV usage**: `RATE_LIMIT_KV` in bigworm, `GATEWAY_KV` for API token caching in the landing gateway. Finance and outpost have commented-out KV placeholders.

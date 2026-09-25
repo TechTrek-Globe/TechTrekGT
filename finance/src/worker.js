@@ -6,7 +6,11 @@ import { onRequestPost as forgotPasswordHandler } from '../functions/api/auth/fo
 import { onRequestPost as resetPasswordHandler } from '../functions/api/auth/reset-password.js';
 import { onRequestGet as securityQuestionHandler } from '../functions/api/auth/security-question.js';
 import { onRequestPost as updateProfileHandler } from '../functions/api/auth/update-profile.js';
+import { onRequestPost as verifyEmailHandler } from '../functions/api/auth/verify-email.js';
+import { onRequestPost as resendVerificationHandler } from '../functions/api/auth/resend-verification.js';
+import { onRequestPost as confirmEmailChangeHandler } from '../functions/api/auth/confirm-email-change.js';
 import { onRequestGet as adminStatsHandler } from '../functions/api/admin/stats.js';
+import { onRequestPost as adminUserStatusHandler } from '../functions/api/admin/user-status.js';
 import {
   authenticate,
   readJson,
@@ -364,9 +368,13 @@ const ROUTES = {
   'POST /api/auth/reset-password': resetPasswordHandler,
   'GET /api/auth/security-question': securityQuestionHandler,
   'POST /api/auth/update-profile': updateProfileHandler,
+  'POST /api/auth/verify-email': verifyEmailHandler,
+  'POST /api/auth/resend-verification': resendVerificationHandler,
+  'POST /api/auth/confirm-email-change': confirmEmailChangeHandler,
   'GET /api/auth/me': meHandler,
   'POST /api/auth/logout': logoutHandler,
-  'GET /api/admin/stats': adminStatsHandler
+  'GET /api/admin/stats': adminStatsHandler,
+  'POST /api/admin/user-status': adminUserStatusHandler
 };
 
 async function fetchAsset(env, request, pathname) {
@@ -423,7 +431,16 @@ const worker = {
         apiPath = '/api';
       }
 
-      const handler = ROUTES[`${request.method} ${apiPath}`];
+      let handler = ROUTES[`${request.method} ${apiPath}`];
+      let handlerContext = context;
+
+      if (!handler && request.method === 'POST') {
+        const userStatusMatch = apiPath.match(/^\/api\/admin\/user\/([^/]+)\/status$/);
+        if (userStatusMatch) {
+          handler = adminUserStatusHandler;
+          handlerContext = { ...context, params: { id: decodeURIComponent(userStatusMatch[1]) } };
+        }
+      }
 
       if (handler) {
         if (
@@ -433,7 +450,7 @@ const worker = {
         ) {
           response = fail(403, 'Forbidden');
         } else {
-          response = await handler(context);
+          response = await handler(handlerContext);
         }
       } else if (apiPath.startsWith('/api/')) {
         response = fail(404, 'Endpoint not found');

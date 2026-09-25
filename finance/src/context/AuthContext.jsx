@@ -10,7 +10,6 @@ const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [householdId, setHouseholdId] = useState(null);
   const [csrfToken, setCsrfTokenState] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -22,7 +21,6 @@ export function AuthProvider({ children }) {
       sessionStorage.removeItem('personal_budget_last_activity');
       setIsAuthenticated(false);
       setUser(null);
-      setHouseholdId(null);
       setCsrfTokenState(null);
       setCsrfToken(null);
       setIsAuthModalOpen(true);
@@ -43,7 +41,6 @@ export function AuthProvider({ children }) {
           const data = await res.json().catch(() => ({}));
           if (data.user) {
             setUser(data.user);
-            setHouseholdId(data.householdId || null);
             if (data.csrfToken) {
               setCsrfTokenState(data.csrfToken);
               setCsrfToken(data.csrfToken);
@@ -122,7 +119,6 @@ export function AuthProvider({ children }) {
 
       setIsAuthenticated(true);
       setUser(data.user);
-      setHouseholdId(data.householdId);
       if (data.csrfToken) {
         setCsrfTokenState(data.csrfToken);
         setCsrfToken(data.csrfToken);
@@ -137,9 +133,8 @@ export function AuthProvider({ children }) {
         const localUser = { id: 'local-user', name: email.split('@')[0] || 'Local User', email };
         setIsAuthenticated(true);
         setUser(localUser);
-        setHouseholdId('local-household');
         setIsAuthModalOpen(false);
-        return { success: true, user: localUser, householdId: 'local-household' };
+        return { success: true, user: localUser };
       }
       throw err;
     }
@@ -168,7 +163,6 @@ export function AuthProvider({ children }) {
 
       setIsAuthenticated(true);
       setUser(data.user);
-      setHouseholdId(data.householdId);
       if (data.csrfToken) {
         setCsrfTokenState(data.csrfToken);
         setCsrfToken(data.csrfToken);
@@ -183,9 +177,8 @@ export function AuthProvider({ children }) {
         const localUser = { id: 'local-user', name: name || email.split('@')[0] || 'Local User', email };
         setIsAuthenticated(true);
         setUser(localUser);
-        setHouseholdId('local-household');
         setIsAuthModalOpen(false);
-        return { success: true, user: localUser, householdId: 'local-household' };
+        return { success: true, user: localUser };
       }
       throw err;
     }
@@ -252,11 +245,55 @@ export function AuthProvider({ children }) {
     return data;
   };
 
+  const verifyEmail = async (code) => {
+    const res = await apiFetch('/api/auth/verify-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.error || `Failed to verify email (HTTP ${res.status})`);
+    }
+    setUser(prev => prev ? { ...prev, emailVerified: true } : prev);
+    return data;
+  };
+
+  const resendVerification = async () => {
+    const res = await apiFetch('/api/auth/resend-verification', {
+      method: 'POST'
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.error || `Failed to resend verification (HTTP ${res.status})`);
+    }
+    return data;
+  };
+
+  const confirmEmailChange = async (code) => {
+    const res = await apiFetch('/api/auth/confirm-email-change', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.error || `Failed to confirm email change (HTTP ${res.status})`);
+    }
+    if (data.user) {
+      setUser(data.user);
+    }
+    if (data.csrfToken) {
+      setCsrfTokenState(data.csrfToken);
+      setCsrfToken(data.csrfToken);
+    }
+    return data;
+  };
+
   const logout = async () => {
     sessionStorage.removeItem('personal_budget_last_activity');
     setIsAuthenticated(false);
     setUser(null);
-    setHouseholdId(null);
     setCsrfTokenState(null);
     setCsrfToken(null);
     if (typeof window !== 'undefined') {
@@ -274,7 +311,6 @@ export function AuthProvider({ children }) {
       user,
       isAuthenticated,
       token: isAuthenticated ? 'cookie-active' : null, // alias for backwards compatibility with BudgetContext
-      householdId,
       csrfToken,
       isLoading,
       isAuthModalOpen,
@@ -285,6 +321,9 @@ export function AuthProvider({ children }) {
       forgotPassword,
       resetPassword,
       updateProfile,
+      verifyEmail,
+      resendVerification,
+      confirmEmailChange,
       logout
     }}>
       {children}

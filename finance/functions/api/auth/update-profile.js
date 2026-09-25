@@ -1,6 +1,7 @@
 import {
   authenticate, readJson, asTrimmedString, json, fail, withCookies, sessionCookies, newCsrfToken,
-  createToken, hashPassword, verifyPassword, validatePassword,
+  createToken, hashPassword, verifyPassword, validatePassword, randomInt, hmacHex,
+  sendVerificationEmail, sendEmailChangeNotification,
   EMAIL_REGEX, MAX_BODY_AUTH, MAX_NAME_LEN, MAX_EMAIL_LEN, MAX_QUESTION_LEN, MAX_ANSWER_LEN,
   ACCESS_TOKEN_TTL, SESSION_TTL_DEFAULT
 } from '../../utils/auth.js';
@@ -22,7 +23,8 @@ export async function onRequestPost(context) {
     const { currentPassword, newPassword } = body;
 
     let updatedName = user.name;
-    let updatedEmail = user.email;
+    let pendingEmail = user.pending_email || null;
+    let emailChangeRequested = false;
     let updatedQuestion = user.security_question;
     let updatedAnswerHash = user.security_answer_hash;
     let updatedPasswordHash = user.password_hash;
@@ -45,8 +47,9 @@ export async function onRequestPost(context) {
           'SELECT id FROM users WHERE email = ? AND id != ?'
         ).bind(cleanEmail, user.id).first();
         if (existing) return fail(409, 'That email address cannot be used.');
-        updatedEmail = cleanEmail;
-        bumpTokenVersion = true;
+
+        pendingEmail = cleanEmail;
+        emailChangeRequested = true;
       }
     }
 
@@ -78,13 +81,32 @@ export async function onRequestPost(context) {
 
     const newTokenVersion = Number(user.token_version || 0) + (bumpTokenVersion ? 1 : 0);
 
+    if (emailChangeRequested && pendingEmail) {
+      let changeCode = '';
+      for (let i = 0; i < 8; i++) changeCode += String(randomInt(10));
+      const codeHash = await hmacHex(env.JWT_SECRET, `verify:${pendingEmail}:${changeCode}`);
+      const verificationId = `vfy-${crypto.randomUUID()}`;
+      const nowMs = Date.now();
+      const VERIFY_CODE_TTL_MS = 24 * 60 * 60 * 1000;
+
+      await env.DB.batch([
+        env.DB.prepare('UPDATE email_verifications SET used = 1 WHERE user_id = ? AND email = ? AND used = 0').bind(user.id, pendingEmail),
+        env.DB.prepare(
+          'INSERT INTO email_verifications (id, user_id, email, token, expires_at, used, attempts, created_at) VALUES (?, ?, ?, ?, ?, 0, 0, ?)'
+        ).bind(verificationId, user.id, pendingEmail, codeHash, nowMs + VERIFY_CODE_TTL_MS, nowMs)
+      ]);
+
+      await sendVerificationEmail(env, pendingEmail, changeCode, 'change').catch(() => {});
+      await sendEmailChangeNotification(env, user.email, pendingEmail).catch(() => {});
+    }
+
     await env.DB.prepare(
       `UPDATE users
-          SET name = ?, email = ?, security_question = ?, security_answer_hash = ?, password_hash = ?, token_version = ?
+          SET name = ?, pending_email = ?, security_question = ?, security_answer_hash = ?, password_hash = ?, token_version = ?
         WHERE id = ?`
     ).bind(
       updatedName,
-      updatedEmail,
+      pendingEmail,
       updatedQuestion,
       updatedAnswerHash,
       updatedPasswordHash,
@@ -99,8 +121,7 @@ export async function onRequestPost(context) {
     const { token } = await createToken(
       {
         userId: user.id,
-        email: updatedEmail,
-        householdId: payload.householdId,
+        email: user.email,
         name: updatedName,
         tv: newTokenVersion,
         sid: payload.sid || crypto.randomUUID()
@@ -114,11 +135,16 @@ export async function onRequestPost(context) {
     return withCookies(
       json({
         success: true,
-        message: 'Profile updated successfully.',
+        message: emailChangeRequested
+          ? 'Profile updated. A verification code has been sent to your new email address to confirm the change.'
+          : 'Profile updated successfully.',
         user: {
           id: user.id,
-          email: updatedEmail,
+          email: user.email,
           name: updatedName,
+          isAdmin: user.role === 'admin',
+          emailVerified: Boolean(user.email_verified),
+          pendingEmail: pendingEmail || null,
           securityQuestion: updatedQuestion,
           hasSecurityQuestion: Boolean(updatedQuestion && updatedAnswerHash)
         },

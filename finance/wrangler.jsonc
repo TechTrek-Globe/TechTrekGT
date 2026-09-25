@@ -32,6 +32,20 @@
       "database_id": "10f220d4-1c10-49e9-b63e-5d4cb08d599f"
     }
   ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "RATE_LIMITER",
+        "class_name": "RateLimiter"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_classes": ["RateLimiter"]
+    }
+  ],
   "kv_namespaces": [
     // {
     //   "binding": "RATE_LIMIT_KV",

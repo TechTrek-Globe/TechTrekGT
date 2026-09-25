@@ -463,7 +463,7 @@ export async function issueSession(env, user, householdId, rememberMe) {
 export async function sendResetEmail(env, toEmail, code, securityQuestion) {
   if (!env?.RESEND_API_KEY || !env?.MAIL_FROM) {
     console.error(
-      '[forgot-password] mail delivery is not configured (RESEND_API_KEY / MAIL_FROM); reset code was generated but not sent'
+      `[forgot-password] mail delivery is not configured (RESEND_API_KEY / MAIL_FROM); dev reset code for ${toEmail}: ${code}`
     );
     return false;
   }

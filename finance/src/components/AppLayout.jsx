@@ -17,7 +17,8 @@ import {
   Sun,
   Moon,
   Globe,
-  Shield
+  Shield,
+  LogOut
 } from 'lucide-react';
 
 import headerLogoDark from '../assets/header-logo-dark.png';
@@ -33,7 +34,7 @@ const NAV_ITEMS = [
 
 const SIDEBAR_KEY = 'trekledger_sidebar_collapsed';
 
-const SidebarContent = ({ collapsed, activeView = 'dashboard', cashOnHand, netIncome, netFlow, onNavigateView, setIsSettingsOpen, onClose, isLight = false, isAdmin = false }) => {
+const SidebarContent = ({ collapsed, activeView = 'dashboard', cashOnHand, netIncome, netFlow, onNavigateView, setIsSettingsOpen, onClose, isLight = false, isAdmin = false, user, onLogout }) => {
   const logoSrc = isLight ? headerLogoLight : headerLogoDark;
   const handleViewClick = (viewId) => {
     if (onNavigateView) {
@@ -93,8 +94,23 @@ const SidebarContent = ({ collapsed, activeView = 'dashboard', cashOnHand, netIn
     </nav>
 
 
+    {/* Sign Out Button */}
+    {user && onLogout && (
+      <div className={`mx-3 mb-1.5 pt-2 border-t ${isLight ? 'border-slate-200' : 'border-slate-800/60'}`}>
+        <button
+          type="button"
+          onClick={onLogout}
+          className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 transition-all ${collapsed ? 'justify-center px-2' : ''}`}
+          title="Sign Out"
+        >
+          <LogOut className="w-4 h-4 flex-shrink-0" />
+          {!collapsed && <span className="font-semibold truncate">Sign Out</span>}
+        </button>
+      </div>
+    )}
+
     {/* Launch Pad Navigation Link */}
-    <div className={`mx-3 mb-3 pt-2 border-t ${isLight ? 'border-slate-200' : 'border-slate-800/60'}`}>
+    <div className={`mx-3 mb-3 ${user && onLogout ? 'pt-1' : 'pt-2 border-t'} ${isLight ? 'border-slate-200' : 'border-slate-800/60'}`}>
       <a
         href="https://techtrekgt.com"
         className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all ${
@@ -129,7 +145,7 @@ export function AppLayout({ children, onNavigateHome, onNavigateView, activeView
     getCalculatedBalanceAsOf,
   } = useBudget();
 
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const isAdmin = Boolean(user?.isAdmin);
 
   const [collapsed, setCollapsed] = useState(() => {
@@ -198,6 +214,8 @@ export function AppLayout({ children, onNavigateHome, onNavigateView, activeView
           netFlow={netFlow}
           isLight={isLight}
           isAdmin={isAdmin}
+          user={user}
+          onLogout={logout}
           onNavigateView={onNavigateView}
           setIsSettingsOpen={setIsSettingsOpen}
         />
@@ -242,6 +260,8 @@ export function AppLayout({ children, onNavigateHome, onNavigateView, activeView
               netFlow={netFlow}
               isLight={isLight}
               isAdmin={isAdmin}
+              user={user}
+              onLogout={logout}
               onNavigateView={onNavigateView}
               setIsSettingsOpen={setIsSettingsOpen}
               onClose={() => setMobileOpen(false)}

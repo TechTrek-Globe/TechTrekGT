@@ -27,6 +27,7 @@ export { RateLimiter } from './RateLimiter.js';
 
 export const ALLOWED_ORIGINS = [
   'https://techtrekgt.com',
+  'http://techtrekgt.com',
   'https://techtrek-budget.pages.dev',
   'http://localhost:5173',
   'http://localhost:3000',
@@ -238,12 +239,14 @@ const worker = {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const context = { request, env, ctx };
+    const host = request.headers.get('host') || url.host || '';
+    const isProduction = Boolean(request.headers.get('cf-ray'));
+    const isLocalhost = !isProduction || url.hostname === 'localhost' || url.hostname === '127.0.0.1' || host.includes('localhost') || host.includes('127.0.0.1') || Boolean(url.port);
     const requestOrigin = request.headers.get('Origin') || '';
-    const isLocalhost = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
     const nonce = base64UrlEncodeBytes(crypto.getRandomValues(new Uint8Array(16)));
     const headerOpts = { isLocalhost, requestOrigin, nonce };
 
-    if (!isLocalhost && (url.protocol === 'http:' || request.headers.get('x-forwarded-proto') === 'http')) {
+    if (isProduction && !isLocalhost && (url.protocol === 'http:' || request.headers.get('x-forwarded-proto') === 'http')) {
       url.protocol = 'https:';
       return Response.redirect(url.toString(), 301);
     }

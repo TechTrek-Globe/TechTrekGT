@@ -290,7 +290,7 @@ export function AuthPage({ onNavigateHome, onAuthSuccess }) {
                         <input
                           type="email"
                           required
-                          disabled={mode === 'forgot' && forgotStep === 2}
+                          disabled={mode === 'reset'}
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
                           placeholder="you@example.com"
@@ -492,10 +492,10 @@ export function AuthPage({ onNavigateHome, onAuthSuccess }) {
                       >
                         Back to Sign In
                       </button>
-                      {mode === 'forgot' && forgotStep === 2 && (
+                      {mode === 'reset' && (
                         <button
                           type="button"
-                          onClick={() => { setForgotStep(1); setError(''); }}
+                          onClick={() => { switchMode('forgot'); setError(''); }}
                           className="text-slate-400 hover:text-slate-200 hover:underline"
                         >
                           Change Email

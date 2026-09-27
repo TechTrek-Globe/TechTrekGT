@@ -27,6 +27,7 @@ export function EbayConnectBanner({ onFindListings }) {
   const [syncingAll, setSyncingAll] = useState(false);
   const [syncMsg, setSyncMsg] = useState('');
   const [error, setError] = useState('');
+  const [disconnecting, setDisconnecting] = useState(false);
 
   const fetchStatus = useCallback(async () => {
     setLoading(true);
@@ -58,14 +59,22 @@ export function EbayConnectBanner({ onFindListings }) {
 
   const handleDisconnect = async () => {
     if (!window.confirm('Disconnect your eBay account? Webhooks and fee reconciliation will stop working.')) return;
+    setDisconnecting(true);
+    setError('');
+    setSyncMsg('');
     try {
-      await fetch(`${GATEWAY_BASE}/api/ebay/oauth/disconnect`, {
+      const res = await fetch(`${GATEWAY_BASE}/api/ebay/oauth/disconnect`, {
         method: 'DELETE',
         credentials: 'include'
       });
-      setStatus({ connected: false });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      await fetchStatus();
     } catch (e) {
       setError(`Disconnect failed: ${e.message}`);
+      fetchStatus();
+    } finally {
+      setDisconnecting(false);
     }
   };
 
@@ -188,9 +197,11 @@ export function EbayConnectBanner({ onFindListings }) {
           <button
             id="ebay-disconnect-btn"
             onClick={handleDisconnect}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 transition-all"
+            disabled={disconnecting}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 transition-all disabled:opacity-50"
           >
-            <Unlink className="w-3 h-3" /> Disconnect
+            {disconnecting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Unlink className="w-3 h-3" />}
+            {disconnecting ? 'Disconnecting...' : 'Disconnect'}
           </button>
         </div>
       </div>

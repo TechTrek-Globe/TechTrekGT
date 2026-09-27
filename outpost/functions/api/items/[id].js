@@ -12,6 +12,16 @@ function getItemId(url) {
   return parts[parts.length - 1] || null;
 }
 
+export const CLIENT_SETTABLE_ATTR_KEYS = Object.freeze([
+  'asin',
+  'order_id',
+  'etv',
+  'tax_cost',
+  'cert_verified',
+  'is_vinescout',
+  'cert_verified_at'
+]);
+
 export async function onRequestGet(context) {
   const { request, env } = context;
   return withAuth(async () => {
@@ -196,8 +206,43 @@ export async function onRequestPut(context) {
         nextAttrs.cert_verified_at = null;
       }
     }
-    if (body.attributes && typeof body.attributes === 'object') {
-      nextAttrs = { ...nextAttrs, ...body.attributes };
+    if (body.attributes !== undefined) {
+      if (!body.attributes || typeof body.attributes !== 'object' || Array.isArray(body.attributes)) {
+        return err('Invalid attributes object', 400);
+      }
+      const disallowedKeys = Object.keys(body.attributes).filter(
+        key => !CLIENT_SETTABLE_ATTR_KEYS.includes(key)
+      );
+      if (disallowedKeys.length > 0) {
+        return err(`Disallowed attribute key(s): ${disallowedKeys.join(', ')}`, 400);
+      }
+      for (const [key, val] of Object.entries(body.attributes)) {
+        if (key === 'asin') {
+          nextAttrs.asin = val ? String(val).trim().toUpperCase() : null;
+        } else if (key === 'order_id') {
+          nextAttrs.order_id = val ? String(val).trim() : null;
+        } else if (key === 'is_vinescout') {
+          nextAttrs.is_vinescout = Boolean(val);
+          if (nextAttrs.is_vinescout) {
+            nextAttrs.source = 'amazon_vinescout';
+          }
+        } else if (key === 'etv') {
+          nextAttrs.etv = val !== '' && val != null ? parseFloat(val) : null;
+        } else if (key === 'tax_cost') {
+          nextAttrs.tax_cost = val !== '' && val != null ? parseFloat(val) : null;
+        } else if (key === 'cert_verified') {
+          nextAttrs.cert_verified = Boolean(val);
+          if (nextAttrs.cert_verified && !nextAttrs.cert_verified_at) {
+            nextAttrs.cert_verified_at = new Date().toISOString();
+          } else if (!nextAttrs.cert_verified) {
+            nextAttrs.cert_verified_at = null;
+          }
+        } else if (key === 'cert_verified_at') {
+          nextAttrs.cert_verified_at = val ? String(val) : null;
+        } else {
+          nextAttrs[key] = val;
+        }
+      }
     }
 
     const attributesJson = JSON.stringify(nextAttrs);

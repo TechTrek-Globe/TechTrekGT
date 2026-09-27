@@ -311,8 +311,42 @@ export async function onRequestGetStatus(context) {
 }
 
 /**
+ * Revokes the stored eBay refresh token at eBay (RFC 7009 token revocation).
+ * Best-effort: an upstream revoke failure never blocks the local disconnect.
+ * Returns true when eBay confirmed the revocation.
+ */
+async function revokeEbayToken(env, encryptedRefreshToken) {
+  if (!encryptedRefreshToken) return false;
+  try {
+    const encKey = env.TOKEN_ENCRYPTION_KEY || env.JWT_SECRET;
+    const refreshToken = await decryptToken(encryptedRefreshToken, encKey, env.JWT_SECRET);
+    const { oauthUrl } = getEbayEndpoints(env);
+    const credentials = btoa(`${getClientId(env)}:${getClientSecret(env)}`);
+
+    const res = await fetch(`${oauthUrl}/revoke`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': `Basic ${credentials}`
+      },
+      body: `token=${encodeURIComponent(refreshToken)}&token_type_hint=refresh_token`
+    });
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      console.error(`[ebayOAuth disconnect] eBay token revoke failed (${res.status}):`, text);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error('[ebayOAuth disconnect] eBay token revoke error:', e && e.message ? e.message : e);
+    return false;
+  }
+}
+
+/**
  * DELETE /api/ebay/oauth/disconnect
- * Removes eBay token for the authenticated user.
+ * Revokes the eBay refresh token, then removes the token row for the authenticated user.
  */
 export async function onRequestDelete(context) {
   const { request, env } = context;
@@ -320,10 +354,20 @@ export async function onRequestDelete(context) {
     const { userId } = await requireGatewayAuth(request, env);
     if (!env.DB) return err('DB not available', 500);
 
+    const row = await env.DB.prepare(
+      'SELECT refresh_token FROM ebay_oauth_tokens WHERE user_id = ?'
+    ).bind(userId).first();
+
+    if (!row) {
+      return ok({ disconnected: true, revoked: false, already_disconnected: true });
+    }
+
+    const revoked = await revokeEbayToken(env, row.refresh_token);
+
     await env.DB.prepare(
       'DELETE FROM ebay_oauth_tokens WHERE user_id = ?'
     ).bind(userId).run();
 
-    return ok({ disconnected: true });
+    return ok({ disconnected: true, revoked });
   });
 }

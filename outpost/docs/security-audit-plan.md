@@ -182,6 +182,25 @@ While the item itself is correctly guarded, the comps cascade delete lacks a use
 
 ---
 
+### MEDIUM-6: Unrestricted Attribute Mass-Assignment via body.attributes Spread (REMEDIATED)
+
+**Severity:** MEDIUM (Integrity & Authorization Bypass)
+**Status:** REMEDIATED & TESTED
+**Files:** [`functions/api/items/[id].js`](file:///e:/TechTrekGT/outpost/functions/api/items/[id].js)
+
+**Finding:** The PUT `/api/items/:id` endpoint executed `nextAttrs = { ...nextAttrs, ...body.attributes }`, allowing callers to merge arbitrary JSON keys into the persisted `auction_items.attributes` column. This enabled malicious mass-assignment of system-managed flags such as `outpost_liquidated`, `ebay_order_id`, `sale_price`, and `sold_at`, circumventing automated reconciliation and liquidation invariants.
+
+**Remediation:**
+1. Defined an explicit immutable allowlist: `CLIENT_SETTABLE_ATTR_KEYS = Object.freeze(['asin', 'order_id', 'etv', 'tax_cost', 'cert_verified', 'is_vinescout', 'cert_verified_at'])`.
+2. Removed blanket `...body.attributes` spread. Replaced with strict allowlist validation that inspects all keys in `body.attributes`.
+3. If any disallowed or system-managed key is present in `body.attributes`, the endpoint immediately rejects the request with HTTP 400 (`Disallowed attribute key(s): ...`), preventing silent data poisoning or parameter injection.
+4. Enforced type validation on `body.attributes` (rejecting non-object or array payloads with 400).
+5. Sanitized and type-cast allowed keys (e.g. uppercasing/trimming `asin`, parsing floats for `etv` and `tax_cost`, managing `cert_verified` and automatic `cert_verified_at` timestamping).
+6. Preserved existing system-managed keys present in `existingAttrs` (e.g. when legitimate background processes stamped `outpost_liquidated` or `ebay_order_id`) during allowed updates.
+7. Added comprehensive automated test suite in `tests/med-6-attribute-mass-assignment.test.js` (6 tests) verifying rejection of system keys (`outpost_liquidated`, `ebay_order_id`, `sale_price`, `sold_at`), non-object validation, safe merging of allowed keys, and preservation of existing system keys.
+
+---
+
 ## Confirmed Secure: No Findings Required
 
 The following areas were audited and confirmed correctly implemented:

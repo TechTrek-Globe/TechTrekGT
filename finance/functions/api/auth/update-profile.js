@@ -1,6 +1,6 @@
 import {
   authenticate, readJson, asTrimmedString, json, fail, withCookies, sessionCookies, newCsrfToken,
-  createToken, hashPassword, verifyPassword, validatePassword, randomInt, hmacHex,
+  createToken, hashPassword, verifyPassword, validatePassword, issueOneTimeCode, ONE_TIME_CODE_TTL_MS,
   sendVerificationEmail, sendEmailChangeNotification, ERROR_CODES, toPublicUser,
   EMAIL_REGEX, MAX_BODY_AUTH, MAX_NAME_LEN, MAX_EMAIL_LEN, MAX_QUESTION_LEN, MAX_ANSWER_LEN,
   ACCESS_TOKEN_TTL, SESSION_TTL_DEFAULT, invalidateCachedUser
@@ -93,19 +93,13 @@ export async function onRequestPost(context) {
     const newTokenVersion = Number(user.token_version || 0) + (bumpTokenVersion ? 1 : 0);
 
     if (emailChangeRequested && pendingEmail) {
-      let changeCode = '';
-      for (let i = 0; i < 8; i++) changeCode += String(randomInt(10));
-      const codeHash = await hmacHex(env.CODE_HMAC_SECRET, `verify:${pendingEmail}:${changeCode}`);
-      const verificationId = `vfy-${crypto.randomUUID()}`;
-      const nowMs = Date.now();
-      const VERIFY_CODE_TTL_MS = 24 * 60 * 60 * 1000;
-
-      await env.DB.batch([
-        env.DB.prepare('UPDATE email_verifications SET used = 1 WHERE user_id = ? AND email = ? AND used = 0').bind(user.id, pendingEmail),
-        env.DB.prepare(
-          'INSERT INTO email_verifications (id, user_id, email, token, expires_at, used, attempts, created_at) VALUES (?, ?, ?, ?, ?, 0, 0, ?)'
-        ).bind(verificationId, user.id, pendingEmail, codeHash, nowMs + VERIFY_CODE_TTL_MS, nowMs)
-      ]);
+      const { code: changeCode } = await issueOneTimeCode(env, {
+        table: 'email_verifications',
+        userId: user.id,
+        email: pendingEmail,
+        purpose: 'verify',
+        ttlMs: ONE_TIME_CODE_TTL_MS
+      });
 
       await sendVerificationEmail(env, pendingEmail, changeCode, 'change').catch(() => {});
       await sendEmailChangeNotification(env, user.email, pendingEmail).catch(() => {});

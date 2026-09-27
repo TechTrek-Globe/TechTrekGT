@@ -42,6 +42,7 @@ TechTrekGT is a multi-application platform hosted on `techtrekgt.com`. The repos
 | Sessions | HttpOnly cookies | `credentials: 'include'` on all fetch calls |
 | Deploy | Wrangler 3/4 | `wrangler.jsonc` per project |
 | Networking | Cloudflare Tunnel | Used by bigworm to reach Guacamole |
+| CORS & Origins | Environment-Gated Origins | Production origins strictly separate from dev localhost/127.0.0.1 |
 
 ### 2.3 Landing Stack
 

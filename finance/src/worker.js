@@ -32,10 +32,13 @@ export { RateLimiter } from './RateLimiter.js';
 /* Allowed Origins & Security Configuration                            */
 /* ------------------------------------------------------------------ */
 
-export const ALLOWED_ORIGINS = [
+export const PRODUCTION_ORIGINS = [
   'https://techtrekgt.com',
   'http://techtrekgt.com',
-  'https://techtrek-budget.pages.dev',
+  'https://techtrek-budget.pages.dev'
+];
+
+export const DEV_ORIGINS = [
   'http://localhost:5173',
   'http://localhost:3000',
   'http://localhost:8787',
@@ -43,6 +46,8 @@ export const ALLOWED_ORIGINS = [
   'http://127.0.0.1:3000',
   'http://127.0.0.1:8787'
 ];
+
+export const ALLOWED_ORIGINS = PRODUCTION_ORIGINS.concat(DEV_ORIGINS);
 
 // Cloudflare Turnstile bot verification & Edge WAF challenges:
 // challenges.cloudflare.com is allowlisted below across script-src, connect-src, img-src,
@@ -83,6 +88,7 @@ function addSecurityHeaders(response, options = {}) {
   const rawPath = rawRequestPath || opts.path || opts.pathname || (opts.url ? new URL(opts.url, 'http://localhost').pathname : '') || (response.url ? new URL(response.url).pathname : '');
   const requestPath = rawPath ? rawPath.split('?')[0].split('#')[0] : '';
   const headers = new Headers(response.headers);
+  const effectiveAllowedOrigins = opts.allowedOrigins || PRODUCTION_ORIGINS.concat(isProduction ? [] : DEV_ORIGINS);
 
   if (isProduction && !isLocalhost) {
     headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
@@ -99,7 +105,7 @@ function addSecurityHeaders(response, options = {}) {
 
   // Only emit CORS headers for origins on the allowlist, and always Vary on Origin
   headers.append('Vary', 'Origin');
-  if (requestOrigin && ALLOWED_ORIGINS.includes(requestOrigin)) {
+  if (requestOrigin && effectiveAllowedOrigins.includes(requestOrigin)) {
     headers.set('Access-Control-Allow-Origin', requestOrigin);
     headers.set('Access-Control-Allow-Credentials', 'true');
     headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -857,7 +863,8 @@ const worker = {
     const isLocalhost = !isProduction || url.hostname === 'localhost' || url.hostname === '127.0.0.1' || host.includes('localhost') || host.includes('127.0.0.1') || Boolean(url.port);
     const requestOrigin = request.headers.get('Origin') || '';
     const nonce = base64UrlEncodeBytes(crypto.getRandomValues(new Uint8Array(16)));
-    const headerOpts = { isLocalhost, isProduction, requestOrigin, nonce, requestPath: url.pathname };
+    const effectiveAllowedOrigins = PRODUCTION_ORIGINS.concat(isProduction ? [] : DEV_ORIGINS);
+    const headerOpts = { isLocalhost, isProduction, requestOrigin, nonce, requestPath: url.pathname, allowedOrigins: effectiveAllowedOrigins };
 
     if (isProduction && !isLocalhost && url.protocol === 'http:') {
       url.protocol = 'https:';
@@ -865,7 +872,7 @@ const worker = {
     }
 
     if (request.method === 'OPTIONS') {
-      if (!requestOrigin || !ALLOWED_ORIGINS.includes(requestOrigin)) {
+      if (!requestOrigin || !effectiveAllowedOrigins.includes(requestOrigin)) {
         return addSecurityHeaders(new Response(null, { status: 403 }), headerOpts);
       }
       return addSecurityHeaders(new Response(null, { status: 204 }), headerOpts);
@@ -911,7 +918,7 @@ const worker = {
         if (
           request.method !== 'GET' &&
           requestOrigin &&
-          !ALLOWED_ORIGINS.includes(requestOrigin)
+          !effectiveAllowedOrigins.includes(requestOrigin)
         ) {
           response = fail(ERROR_CODES.FORBIDDEN, 403, 'Forbidden', requestId);
         } else {

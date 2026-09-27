@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import worker, { addSecurityHeaders } from '../src/worker.js';
+import worker, { addSecurityHeaders, PRODUCTION_ORIGINS, DEV_ORIGINS, ALLOWED_ORIGINS } from '../src/worker.js';
 
 describe('Phase 2: Explicit Production Environment Binding & Security Headers', () => {
   const baseEnv = {
@@ -136,5 +136,119 @@ describe('Phase 2: Explicit Production Environment Binding & Security Headers', 
     const res3 = addSecurityHeaders(makeRes(), { isProduction: false, isLocalhost: false });
     assert.strictEqual(res3.headers.get('Content-Security-Policy'), null);
     assert.strictEqual(res3.headers.get('Strict-Transport-Security'), null);
+  });
+
+  // T7: Origin constants export shape
+  test('T7: PRODUCTION_ORIGINS, DEV_ORIGINS, and ALLOWED_ORIGINS exports exist and have expected values', () => {
+    assert.ok(Array.isArray(PRODUCTION_ORIGINS), 'PRODUCTION_ORIGINS must be an array');
+    assert.ok(Array.isArray(DEV_ORIGINS), 'DEV_ORIGINS must be an array');
+    assert.ok(Array.isArray(ALLOWED_ORIGINS), 'ALLOWED_ORIGINS must be an array');
+
+    assert.ok(PRODUCTION_ORIGINS.includes('https://techtrekgt.com'));
+    assert.ok(PRODUCTION_ORIGINS.includes('http://techtrekgt.com'));
+    assert.ok(PRODUCTION_ORIGINS.includes('https://techtrek-budget.pages.dev'));
+    assert.strictEqual(PRODUCTION_ORIGINS.length, 3);
+
+    assert.ok(DEV_ORIGINS.includes('http://localhost:3000'));
+    assert.ok(DEV_ORIGINS.includes('http://localhost:5173'));
+    assert.ok(DEV_ORIGINS.includes('http://localhost:8787'));
+    assert.ok(DEV_ORIGINS.includes('http://127.0.0.1:3000'));
+    assert.ok(DEV_ORIGINS.includes('http://127.0.0.1:5173'));
+    assert.ok(DEV_ORIGINS.includes('http://127.0.0.1:8787'));
+    assert.strictEqual(DEV_ORIGINS.length, 6);
+
+    assert.strictEqual(ALLOWED_ORIGINS.length, PRODUCTION_ORIGINS.length + DEV_ORIGINS.length);
+    assert.deepStrictEqual(ALLOWED_ORIGINS, [...PRODUCTION_ORIGINS, ...DEV_ORIGINS]);
+  });
+
+  // T8: In production, OPTIONS preflight from localhost origin is rejected with 403 and omits CORS headers
+  test('T8: In production, OPTIONS preflight from localhost origin returns 403 and omits CORS headers', async () => {
+    const req = new Request('https://techtrekgt.com/finance/api/auth/login', {
+      method: 'OPTIONS',
+      headers: {
+        'Origin': 'http://localhost:3000'
+      }
+    });
+
+    const res = await worker.fetch(req, prodEnv, {});
+    assert.strictEqual(res.status, 403);
+    assert.strictEqual(res.headers.get('Access-Control-Allow-Origin'), null);
+    assert.strictEqual(res.headers.get('Access-Control-Allow-Credentials'), null);
+  });
+
+  // T9: In production, OPTIONS preflight from allowed production origin returns 204 and includes CORS headers
+  test('T9: In production, OPTIONS preflight from production origin returns 204 with CORS headers', async () => {
+    const req = new Request('https://techtrekgt.com/finance/api/auth/login', {
+      method: 'OPTIONS',
+      headers: {
+        'Origin': 'https://techtrekgt.com'
+      }
+    });
+
+    const res = await worker.fetch(req, prodEnv, {});
+    assert.strictEqual(res.status, 204);
+    assert.strictEqual(res.headers.get('Access-Control-Allow-Origin'), 'https://techtrekgt.com');
+    assert.strictEqual(res.headers.get('Access-Control-Allow-Credentials'), 'true');
+  });
+
+  // T10: In production, non-GET state-changing request from localhost origin is rejected with 403 Forbidden
+  test('T10: In production, state-changing request with Origin from localhost is rejected with 403', async () => {
+    const req = new Request('https://techtrekgt.com/finance/api/auth/logout', {
+      method: 'POST',
+      headers: {
+        'Origin': 'http://localhost:3000',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({})
+    });
+
+    const res = await worker.fetch(req, prodEnv, {});
+    assert.strictEqual(res.status, 403);
+    assert.strictEqual(res.headers.get('Access-Control-Allow-Origin'), null);
+    assert.strictEqual(res.headers.get('Access-Control-Allow-Credentials'), null);
+  });
+
+  // T11: In development, requests from localhost origins receive CORS headers and are allowed
+  test('T11: In development, requests from localhost origins receive CORS headers and are allowed', async () => {
+    const preflightReq = new Request('http://localhost:3000/finance/api/auth/login', {
+      method: 'OPTIONS',
+      headers: {
+        'Origin': 'http://localhost:3000'
+      }
+    });
+
+    const preflightRes = await worker.fetch(preflightReq, devEnv, {});
+    assert.strictEqual(preflightRes.status, 204);
+    assert.strictEqual(preflightRes.headers.get('Access-Control-Allow-Origin'), 'http://localhost:3000');
+    assert.strictEqual(preflightRes.headers.get('Access-Control-Allow-Credentials'), 'true');
+  });
+
+  // T12: addSecurityHeaders unit test for isProduction origin gating
+  test('T12: addSecurityHeaders unit test gates CORS headers by isProduction', () => {
+    const makeRes = () => new Response('test', { status: 200 });
+
+    // 1. Production with localhost origin -> CORS headers omitted
+    const resProdLocal = addSecurityHeaders(makeRes(), {
+      isProduction: true,
+      requestOrigin: 'http://localhost:3000'
+    });
+    assert.strictEqual(resProdLocal.headers.get('Access-Control-Allow-Origin'), null);
+    assert.strictEqual(resProdLocal.headers.get('Access-Control-Allow-Credentials'), null);
+
+    // 2. Production with production origin -> CORS headers included
+    const resProdAllowed = addSecurityHeaders(makeRes(), {
+      isProduction: true,
+      requestOrigin: 'https://techtrekgt.com'
+    });
+    assert.strictEqual(resProdAllowed.headers.get('Access-Control-Allow-Origin'), 'https://techtrekgt.com');
+    assert.strictEqual(resProdAllowed.headers.get('Access-Control-Allow-Credentials'), 'true');
+
+    // 3. Development with localhost origin -> CORS headers included
+    const resDevLocal = addSecurityHeaders(makeRes(), {
+      isProduction: false,
+      requestOrigin: 'http://localhost:3000'
+    });
+    assert.strictEqual(resDevLocal.headers.get('Access-Control-Allow-Origin'), 'http://localhost:3000');
+    assert.strictEqual(resDevLocal.headers.get('Access-Control-Allow-Credentials'), 'true');
   });
 });

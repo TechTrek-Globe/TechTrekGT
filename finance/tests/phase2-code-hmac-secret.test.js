@@ -12,7 +12,7 @@ import { onRequestPost as updateProfilePost } from '../functions/api/auth/update
 import { onRequestPost as verifyEmailPost } from '../functions/api/auth/verify-email.js';
 import { onRequestPost as resendVerificationPost } from '../functions/api/auth/resend-verification.js';
 import { onRequestPost as confirmEmailChangePost } from '../functions/api/auth/confirm-email-change.js';
-import { hashPassword, issueSession, hmacHex, clearMemoryUserCache } from '../functions/utils/auth.js';
+import { hashPassword, issueSession, hmacHex, clearMemoryUserCache, issueOneTimeCode, ONE_TIME_CODE_TTL_MS, RESET_CODE_TTL_MS, VERIFY_CODE_TTL_MS, sendTransactionalEmail, sendResetEmail, sendVerificationEmail, sendEmailChangeNotification } from '../functions/utils/auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -255,4 +255,207 @@ describe('REM-09: Dedicated CODE_HMAC_SECRET for One-Time Codes', () => {
     const data = await res.json();
     assert.strictEqual(data.error, 'Invalid verification code.');
   });
+
+  // 4. Centralized TTL constants
+  test('ONE_TIME_CODE_TTL_MS and RESET_CODE_TTL_MS constants match expected durations', () => {
+    assert.strictEqual(ONE_TIME_CODE_TTL_MS, 24 * 60 * 60 * 1000);
+    assert.strictEqual(VERIFY_CODE_TTL_MS, 24 * 60 * 60 * 1000);
+    assert.strictEqual(RESET_CODE_TTL_MS, 15 * 60 * 1000);
+  });
+
+  // 5. issueOneTimeCode helper unit tests
+  test('issueOneTimeCode generates valid 8-digit code, HMACs with CODE_HMAC_SECRET, and invalidates prior records', async () => {
+    const env = { DB: mockDb, JWT_SECRET: TEST_JWT_SECRET, CODE_HMAC_SECRET: TEST_CODE_HMAC_SECRET };
+    const userId = 'usr-otc-test';
+    const email = 'otc@example.com';
+
+    await mockDb.prepare(
+      'INSERT INTO users (id, email, password_hash, name, role, token_version, status, email_verified, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    ).bind(userId, email, 'hash', 'OTC User', 'user', 0, 'Active', 0, new Date().toISOString()).run();
+
+    // First issuance
+    const res1 = await issueOneTimeCode(env, {
+      table: 'email_verifications',
+      userId,
+      email,
+      purpose: 'verify',
+      ttlMs: ONE_TIME_CODE_TTL_MS
+    });
+
+    assert.ok(res1.code);
+    assert.match(res1.code, /^\d{8}$/);
+    assert.ok(res1.verificationId.startsWith('vfy-'));
+
+    // Check DB record
+    const row1 = await mockDb.prepare('SELECT id, token, used, attempts FROM email_verifications WHERE id = ?').bind(res1.verificationId).first();
+    assert.ok(row1);
+    assert.strictEqual(row1.used, 0);
+    const expectedHash1 = await hmacHex(TEST_CODE_HMAC_SECRET, `verify:${email}:${res1.code}`);
+    assert.strictEqual(row1.token, expectedHash1);
+
+    // Second issuance (should invalidate first record)
+    const res2 = await issueOneTimeCode(env, {
+      table: 'email_verifications',
+      userId,
+      email,
+      purpose: 'verify',
+      ttlMs: ONE_TIME_CODE_TTL_MS
+    });
+
+    assert.match(res2.code, /^\d{8}$/);
+    const row1After = await mockDb.prepare('SELECT used FROM email_verifications WHERE id = ?').bind(res1.verificationId).first();
+    assert.strictEqual(row1After.used, 1, 'Prior verification record must be marked as used');
+
+    const row2 = await mockDb.prepare('SELECT used FROM email_verifications WHERE id = ?').bind(res2.verificationId).first();
+    assert.strictEqual(row2.used, 0, 'New verification record must be active');
+
+    // Test password_resets issuance
+    const resReset = await issueOneTimeCode(env, {
+      table: 'password_resets',
+      userId,
+      email,
+      purpose: 'reset',
+      ttlMs: RESET_CODE_TTL_MS
+    });
+
+    assert.ok(resReset.verificationId.startsWith('rst-'));
+    assert.match(resReset.code, /^\d{8}$/);
+    const resetRow = await mockDb.prepare('SELECT id, token, used FROM password_resets WHERE id = ?').bind(resReset.verificationId).first();
+    assert.ok(resetRow);
+    assert.strictEqual(resetRow.used, 0);
+    const expectedResetHash = await hmacHex(TEST_CODE_HMAC_SECRET, `reset:${email}:${resReset.code}`);
+    assert.strictEqual(resetRow.token, expectedResetHash);
+  });
+
+  // 6. sendTransactionalEmail shared helper tests
+  test('sendTransactionalEmail handles unconfigured env gracefully and formats request', async () => {
+    const originalConsoleError = console.error;
+    const errors = [];
+    console.error = (...args) => errors.push(args.join(' '));
+
+    try {
+      const okNoEnv = await sendTransactionalEmail({}, {
+        to: 'user@example.com',
+        subject: 'Test Subject',
+        bodyLines: ['Hello', 'World'],
+        logPrefix: '[email-verify]',
+        devFallbackMessage: 'dev fallback test'
+      });
+      assert.strictEqual(okNoEnv, false);
+      assert.ok(errors.some(e => e.includes('[email-verify] dev fallback test')));
+
+      const originalFetch = globalThis.fetch;
+      try {
+        let sentBody = null;
+        globalThis.fetch = async (url, opts) => {
+          sentBody = JSON.parse(opts.body);
+          return new Response(JSON.stringify({ id: 'resend-123' }), { status: 200 });
+        };
+
+        const okSuccess = await sendTransactionalEmail({
+          RESEND_API_KEY: 'test-key',
+          MAIL_FROM: 'noreply@techtrekgt.com'
+        }, {
+          to: 'user@example.com',
+          subject: 'Test Subject',
+          bodyLines: ['Line 1', 'Line 2'],
+          logPrefix: '[test]'
+        });
+
+        assert.strictEqual(okSuccess, true);
+        assert.deepStrictEqual(sentBody.to, ['user@example.com']);
+        assert.strictEqual(sentBody.subject, 'Test Subject');
+        assert.strictEqual(sentBody.text, 'Line 1\nLine 2');
+        assert.strictEqual(sentBody.from, 'noreply@techtrekgt.com');
+
+        globalThis.fetch = async () => new Response('Unauthorized', { status: 401 });
+        const okFail = await sendTransactionalEmail({
+          RESEND_API_KEY: 'test-key',
+          MAIL_FROM: 'noreply@techtrekgt.com'
+        }, {
+          to: 'user@example.com',
+          subject: 'Test',
+          bodyLines: ['Hi'],
+          logPrefix: '[test-fail]'
+        });
+        assert.strictEqual(okFail, false);
+        assert.ok(errors.some(e => e.includes('[test-fail] mail provider returned 401')));
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    } finally {
+      console.error = originalConsoleError;
+    }
+  });
+
+  // 7. Wrapper functions: sendResetEmail, sendVerificationEmail, sendEmailChangeNotification
+  test('sendResetEmail, sendVerificationEmail, and sendEmailChangeNotification delegate correctly', async () => {
+    const originalConsoleError = console.error;
+    const errors = [];
+    console.error = (...args) => errors.push(args.join(' '));
+
+    const originalFetch = globalThis.fetch;
+    let lastSent = null;
+
+    try {
+      // Test dev fallbacks when unconfigured
+      const resetDev = await sendResetEmail({}, 'reset@example.com', '12345678', 'Favorite food?');
+      assert.strictEqual(resetDev, false);
+      assert.ok(errors.some(e => e.includes('[forgot-password]') && e.includes('12345678')));
+
+      const verifyDev = await sendVerificationEmail({}, 'verify@example.com', '87654321');
+      assert.strictEqual(verifyDev, false);
+      assert.ok(errors.some(e => e.includes('[email-verify]') && e.includes('87654321')));
+
+      const noticeDev = await sendEmailChangeNotification({}, 'old@example.com', 'new@example.com');
+      assert.strictEqual(noticeDev, false);
+      assert.ok(errors.some(e => e.includes('[email-change-notice]') && e.includes('old@example.com -> new@example.com')));
+
+      // Test configured delivery
+      globalThis.fetch = async (url, opts) => {
+        lastSent = JSON.parse(opts.body);
+        return new Response(JSON.stringify({ id: 'msg-1' }), { status: 200 });
+      };
+
+      const envConfigured = {
+        RESEND_API_KEY: 'mock-resend-key',
+        MAIL_FROM: 'noreply@techtrekgt.com'
+      };
+
+      // sendResetEmail
+      const resetOk = await sendResetEmail(envConfigured, 'reset@example.com', '11223344', 'Favorite city?');
+      assert.strictEqual(resetOk, true);
+      assert.deepStrictEqual(lastSent.to, ['reset@example.com']);
+      assert.strictEqual(lastSent.subject, 'Your TechTrek password reset code');
+      assert.ok(lastSent.text.includes('Your reset code is: 11223344'));
+      assert.ok(lastSent.text.includes('Favorite city?'));
+
+      // sendVerificationEmail (register)
+      const verifyRegOk = await sendVerificationEmail(envConfigured, 'new@example.com', '99887766', 'register');
+      assert.strictEqual(verifyRegOk, true);
+      assert.deepStrictEqual(lastSent.to, ['new@example.com']);
+      assert.strictEqual(lastSent.subject, 'Verify your TechTrek account email');
+      assert.ok(lastSent.text.includes('Your verification code is: 99887766'));
+      assert.ok(lastSent.text.includes('Thank you for registering with TechTrek.'));
+
+      // sendVerificationEmail (change)
+      const verifyChangeOk = await sendVerificationEmail(envConfigured, 'pending@example.com', '55443322', 'change');
+      assert.strictEqual(verifyChangeOk, true);
+      assert.deepStrictEqual(lastSent.to, ['pending@example.com']);
+      assert.strictEqual(lastSent.subject, 'Verify your new TechTrek email address');
+      assert.ok(lastSent.text.includes('Your verification code is: 55443322'));
+      assert.ok(lastSent.text.includes('You requested to change your TechTrek email address.'));
+
+      // sendEmailChangeNotification (sends to OLD email, references NEW email)
+      const noticeOk = await sendEmailChangeNotification(envConfigured, 'old@example.com', 'new@example.com');
+      assert.strictEqual(noticeOk, true);
+      assert.deepStrictEqual(lastSent.to, ['old@example.com']);
+      assert.strictEqual(lastSent.subject, 'Security Alert: Email change requested for your TechTrek account');
+      assert.ok(lastSent.text.includes('New address requested: new@example.com'));
+    } finally {
+      console.error = originalConsoleError;
+      globalThis.fetch = originalFetch;
+    }
+  });
 });
+

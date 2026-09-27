@@ -1,11 +1,9 @@
 import {
   readJson, asTrimmedString, json, fail,
   EMAIL_REGEX, MAX_BODY_AUTH, MAX_EMAIL_LEN,
-  randomInt, hmacHex, sendResetEmail, ERROR_CODES, emitMetric
+  issueOneTimeCode, RESET_CODE_TTL_MS, sendResetEmail, ERROR_CODES, emitMetric
 } from '../../utils/auth.js';
 import { enforceRateLimit } from '../../utils/rateLimit.js';
-
-const RESET_CODE_TTL_MS = 15 * 60 * 1000;
 
 const GENERIC_RESET_RESPONSE = {
   success: true,
@@ -52,22 +50,13 @@ export async function onRequestPost(context) {
       return json(GENERIC_RESET_RESPONSE);
     }
 
-    // 8 digits, unbiased, ~26.6 bits.
-    let resetCode = '';
-    for (let i = 0; i < 8; i++) resetCode += String(randomInt(10));
-
-    // Store only an HMAC of the code so a database leak does not yield
-    // usable reset tokens (fix H8).
-    const codeHash = await hmacHex(env.CODE_HMAC_SECRET, `reset:${cleanEmail}:${resetCode}`);
-    const resetId = `rst-${crypto.randomUUID()}`;
-    const now = Date.now();
-
-    await env.DB.batch([
-      env.DB.prepare('UPDATE password_resets SET used = 1 WHERE email = ? AND used = 0').bind(cleanEmail),
-      env.DB.prepare(
-        'INSERT INTO password_resets (id, user_id, email, token, expires_at, used, attempts, created_at) VALUES (?, ?, ?, ?, ?, 0, 0, ?)'
-      ).bind(resetId, user.id, cleanEmail, codeHash, now + RESET_CODE_TTL_MS, now)
-    ]);
+    const { code: resetCode } = await issueOneTimeCode(env, {
+      table: 'password_resets',
+      userId: user.id,
+      email: cleanEmail,
+      purpose: 'reset',
+      ttlMs: RESET_CODE_TTL_MS
+    });
 
     await sendResetEmail(env, user.email, resetCode, user.security_question || null);
     emitMetric('auth.forgot.sent', requestId);

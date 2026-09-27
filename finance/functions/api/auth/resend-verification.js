@@ -1,10 +1,8 @@
 import {
   authenticate, json, fail,
-  randomInt, hmacHex, sendVerificationEmail, ERROR_CODES
+  issueOneTimeCode, ONE_TIME_CODE_TTL_MS, sendVerificationEmail, ERROR_CODES
 } from '../../utils/auth.js';
 import { enforceRateLimit } from '../../utils/rateLimit.js';
-
-const VERIFY_CODE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 export async function onRequestPost(context) {
   const { env } = context;
@@ -26,19 +24,13 @@ export async function onRequestPost(context) {
       return fail(ERROR_CODES.SERVICE_UNAVAILABLE, 503, 'Service unavailable. Please try again later.');
     }
 
-    let verificationCode = '';
-    for (let i = 0; i < 8; i++) verificationCode += String(randomInt(10));
-
-    const codeHash = await hmacHex(env.CODE_HMAC_SECRET, `verify:${user.email}:${verificationCode}`);
-    const verificationId = `vfy-${crypto.randomUUID()}`;
-    const now = Date.now();
-
-    await env.DB.batch([
-      env.DB.prepare('UPDATE email_verifications SET used = 1 WHERE user_id = ? AND email = ? AND used = 0').bind(user.id, user.email),
-      env.DB.prepare(
-        'INSERT INTO email_verifications (id, user_id, email, token, expires_at, used, attempts, created_at) VALUES (?, ?, ?, ?, ?, 0, 0, ?)'
-      ).bind(verificationId, user.id, user.email, codeHash, now + VERIFY_CODE_TTL_MS, now)
-    ]);
+    const { code: verificationCode } = await issueOneTimeCode(env, {
+      table: 'email_verifications',
+      userId: user.id,
+      email: user.email,
+      purpose: 'verify',
+      ttlMs: ONE_TIME_CODE_TTL_MS
+    });
 
     await sendVerificationEmail(env, user.email, verificationCode, 'verify').catch(() => {});
 

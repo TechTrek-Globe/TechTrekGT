@@ -37,6 +37,10 @@ export const ACCESS_TOKEN_TTL = 2 * 60 * 60;           // 2 hours
 export const SESSION_TTL_DEFAULT = 2 * 60 * 60;         // no rememberMe
 export const SESSION_TTL_REMEMBER = 30 * 24 * 60 * 60; // rememberMe
 
+export const ONE_TIME_CODE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+export const VERIFY_CODE_TTL_MS = ONE_TIME_CODE_TTL_MS;   // 24 hours (backward compatibility alias)
+export const RESET_CODE_TTL_MS = 15 * 60 * 1000;         // 15 minutes
+
 export const MAX_BODY_AUTH = 64 * 1024;          // 64 KB
 export const MAX_BODY_SYNC = 2 * 1024 * 1024;   // 2 MB
 
@@ -680,15 +684,66 @@ export async function issueSession(env, user, options = {}) {
 /* Out-of-band email delivery (fix C1)                                */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Shared transactional email delivery helper via Resend.
+ * Handles configuration checks, request formatting, and structured logging.
+ *
+ * @param {Record<string, any>} env Worker environment bindings
+ * @param {{
+ *   to: string | string[],
+ *   subject: string,
+ *   bodyLines: string[],
+ *   logPrefix?: string,
+ *   devFallbackMessage?: string
+ * }} options
+ * @returns {Promise<boolean>}
+ */
+export async function sendTransactionalEmail(env, {
+  to,
+  subject,
+  bodyLines = [],
+  logPrefix = '[email]',
+  devFallbackMessage = ''
+}) {
+  if (!env?.RESEND_API_KEY || !env?.MAIL_FROM) {
+    if (devFallbackMessage) {
+      console.error(`${logPrefix} ${devFallbackMessage}`);
+    } else {
+      console.error(`${logPrefix} mail delivery is not configured (RESEND_API_KEY / MAIL_FROM); dev notification for ${to}`);
+    }
+    return false;
+  }
+
+  const recipients = Array.isArray(to) ? to : [to];
+
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        from: env.MAIL_FROM,
+        to: recipients,
+        subject,
+        text: bodyLines.join('\n')
+      })
+    });
+    if (!res.ok) {
+      console.error(`${logPrefix} mail provider returned`, res.status);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error(`${logPrefix} mail send failed:`, err && err.message);
+    return false;
+  }
+}
+
 // Reset codes MUST NOT be returned in an HTTP response under any condition. (C1)
 // This function returns a boolean and never throws into the handler.
 export async function sendResetEmail(env, toEmail, code, securityQuestion) {
-  if (!env?.RESEND_API_KEY || !env?.MAIL_FROM) {
-    console.error(
-      `[forgot-password] mail delivery is not configured (RESEND_API_KEY / MAIL_FROM); dev reset code for ${toEmail}: ${code}`
-    );
-    return false;
-  }
   const lines = [
     'You asked to reset your TechTrek password.',
     '',
@@ -701,38 +756,16 @@ export async function sendResetEmail(env, toEmail, code, securityQuestion) {
   }
   lines.push('', 'If you did not request this, you can ignore this message. No changes have been made.');
 
-  try {
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${env.RESEND_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        from: env.MAIL_FROM,
-        to: [toEmail],
-        subject: 'Your TechTrek password reset code',
-        text: lines.join('\n')
-      })
-    });
-    if (!res.ok) {
-      console.error('[forgot-password] mail provider returned', res.status);
-      return false;
-    }
-    return true;
-  } catch (err) {
-    console.error('[forgot-password] mail send failed:', err && err.message);
-    return false;
-  }
+  return sendTransactionalEmail(env, {
+    to: toEmail,
+    subject: 'Your TechTrek password reset code',
+    bodyLines: lines,
+    logPrefix: '[forgot-password]',
+    devFallbackMessage: `mail delivery is not configured (RESEND_API_KEY / MAIL_FROM); dev reset code for ${toEmail}: ${code}`
+  });
 }
 
 export async function sendVerificationEmail(env, toEmail, code, type = 'verify') {
-  if (!env?.RESEND_API_KEY || !env?.MAIL_FROM) {
-    console.error(
-      `[email-verify] mail delivery is not configured (RESEND_API_KEY / MAIL_FROM); dev code for ${toEmail}: ${code}`
-    );
-    return false;
-  }
   const subject = type === 'change'
     ? 'Verify your new TechTrek email address'
     : 'Verify your TechTrek account email';
@@ -748,38 +781,16 @@ export async function sendVerificationEmail(env, toEmail, code, type = 'verify')
     'If you did not request this, you can ignore this message. No changes have been made.'
   ];
 
-  try {
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${env.RESEND_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        from: env.MAIL_FROM,
-        to: [toEmail],
-        subject,
-        text: lines.join('\n')
-      })
-    });
-    if (!res.ok) {
-      console.error('[email-verify] mail provider returned', res.status);
-      return false;
-    }
-    return true;
-  } catch (err) {
-    console.error('[email-verify] mail send failed:', err && err.message);
-    return false;
-  }
+  return sendTransactionalEmail(env, {
+    to: toEmail,
+    subject,
+    bodyLines: lines,
+    logPrefix: '[email-verify]',
+    devFallbackMessage: `mail delivery is not configured (RESEND_API_KEY / MAIL_FROM); dev code for ${toEmail}: ${code}`
+  });
 }
 
 export async function sendEmailChangeNotification(env, oldEmail, newEmail) {
-  if (!env?.RESEND_API_KEY || !env?.MAIL_FROM) {
-    console.error(
-      `[email-change-notice] mail delivery is not configured (RESEND_API_KEY / MAIL_FROM); notice for ${oldEmail} -> ${newEmail}`
-    );
-    return false;
-  }
   const lines = [
     'A request was made to change the email address on your TechTrek account.',
     '',
@@ -788,25 +799,52 @@ export async function sendEmailChangeNotification(env, oldEmail, newEmail) {
     'A verification code was sent to the new email address. If you did not request this change, please sign in to your TechTrek account and reset your password immediately.'
   ];
 
-  try {
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${env.RESEND_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        from: env.MAIL_FROM,
-        to: [oldEmail],
-        subject: 'Security Alert: Email change requested for your TechTrek account',
-        text: lines.join('\n')
-      })
-    });
-    return res.ok;
-  } catch (err) {
-    console.error('[email-change-notice] mail send failed:', err && err.message);
-    return false;
+  return sendTransactionalEmail(env, {
+    to: oldEmail,
+    subject: 'Security Alert: Email change requested for your TechTrek account',
+    bodyLines: lines,
+    logPrefix: '[email-change-notice]',
+    devFallbackMessage: `mail delivery is not configured (RESEND_API_KEY / MAIL_FROM); notice for ${oldEmail} -> ${newEmail}`
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/* One-time verification & password reset code issuance               */
+/* ------------------------------------------------------------------ */
+
+export async function issueOneTimeCode(env, {
+  table,
+  userId,
+  email,
+  purpose,
+  ttlMs = ONE_TIME_CODE_TTL_MS
+}) {
+  if (table !== 'email_verifications' && table !== 'password_resets') {
+    throw new Error(`Invalid table for one-time code: ${table}`);
   }
+  if (!env?.CODE_HMAC_SECRET) {
+    throw new Error('Missing CODE_HMAC_SECRET binding');
+  }
+
+  let code = '';
+  for (let i = 0; i < 8; i++) code += String(randomInt(10));
+
+  const codeHash = await hmacHex(env.CODE_HMAC_SECRET, `${purpose}:${email}:${code}`);
+  const idPrefix = table === 'password_resets' ? 'rst-' : 'vfy-';
+  const verificationId = `${idPrefix}${crypto.randomUUID()}`;
+  const now = Date.now();
+
+  const invalidateStmt = table === 'password_resets'
+    ? env.DB.prepare('UPDATE password_resets SET used = 1 WHERE email = ? AND used = 0').bind(email)
+    : env.DB.prepare('UPDATE email_verifications SET used = 1 WHERE user_id = ? AND email = ? AND used = 0').bind(userId, email);
+
+  const insertStmt = env.DB.prepare(
+    `INSERT INTO ${table} (id, user_id, email, token, expires_at, used, attempts, created_at) VALUES (?, ?, ?, ?, ?, 0, 0, ?)`
+  ).bind(verificationId, userId, email, codeHash, now + ttlMs, now);
+
+  await env.DB.batch([invalidateStmt, insertStmt]);
+
+  return { code, verificationId, codeHash };
 }
 
 /* ------------------------------------------------------------------ */

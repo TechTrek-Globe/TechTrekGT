@@ -1,7 +1,7 @@
 import {
   hashPassword, verifyPassword, readJson, asTrimmedString,
   json, fail, issueSession, sessionCookies, withCookies,
-  validatePassword, EMAIL_REGEX, randomInt, hmacHex, sendVerificationEmail,
+  validatePassword, EMAIL_REGEX, issueOneTimeCode, ONE_TIME_CODE_TTL_MS, sendVerificationEmail,
   verifyTurnstile, ERROR_CODES, emitMetric, toPublicUser,
   MAX_BODY_AUTH, MAX_NAME_LEN, MAX_EMAIL_LEN, MAX_ANSWER_LEN, MAX_QUESTION_LEN
 } from '../../utils/auth.js';
@@ -56,7 +56,22 @@ export async function onRequestPost(context) {
     const existing = await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(cleanEmail).first();
     if (existing) {
       emitMetric('auth.register.duplicate', requestId);
-      // Neutral message: does not confirm whether the account exists. (H7)
+      // Tradeoff Decision & Enumeration Policy:
+      // A 409 CONFLICT response ('That email address cannot be registered.') is intentionally accepted
+      // here rather than returning a generic 201 success. Unlike login and forgot-password (which return
+      // generic responses), registration issues an active authenticated session and HttpOnly cookies on 201.
+      // Returning a generic 201 on duplicate emails would require omitting session cookies and breaking
+      // seamless registration UX, or creating multi-step email confirmation flows.
+      //
+      // Enumeration Risk Mitigation:
+      // Mass email harvesting/enumeration is strictly bounded by:
+      // 1. Cloudflare Turnstile bot verification before any DB queries or rate-limit checks.
+      // 2. IP-level rate limiting (5 attempts / 60s).
+      // 3. Account-level rate limiting on cleanEmail (5 attempts / 300s).
+      // 4. Neutral message phrasing ('That email address cannot be registered.') rather than confirming existence.
+      //
+      // Future Reviewers: This is an intentional, documented architecture tradeoff. Do not alter
+      // without product review and coordination with AuthContext client session initialization.
       return fail(ERROR_CODES.CONFLICT, 409, 'That email address cannot be registered.', requestId);
     }
 
@@ -73,16 +88,13 @@ export async function onRequestPost(context) {
       'INSERT INTO users (id, email, password_hash, name, security_question, security_answer_hash, role, token_version, status, email_verified, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     ).bind(userId, cleanEmail, passwordHash, rawName, cleanQuestion, securityAnswerHash, 'user', 0, 'Active', 0, new Date().toISOString()).run();
 
-    let verificationCode = '';
-    for (let i = 0; i < 8; i++) verificationCode += String(randomInt(10));
-    const codeHash = await hmacHex(env.CODE_HMAC_SECRET, `verify:${cleanEmail}:${verificationCode}`);
-    const verificationId = `vfy-${crypto.randomUUID()}`;
-    const now = Date.now();
-    const VERIFY_CODE_TTL_MS = 24 * 60 * 60 * 1000;
-
-    await env.DB.prepare(
-      'INSERT INTO email_verifications (id, user_id, email, token, expires_at, used, attempts, created_at) VALUES (?, ?, ?, ?, ?, 0, 0, ?)'
-    ).bind(verificationId, userId, cleanEmail, codeHash, now + VERIFY_CODE_TTL_MS, now).run();
+    const { code: verificationCode } = await issueOneTimeCode(env, {
+      table: 'email_verifications',
+      userId,
+      email: cleanEmail,
+      purpose: 'verify',
+      ttlMs: ONE_TIME_CODE_TTL_MS
+    });
 
     await sendVerificationEmail(env, cleanEmail, verificationCode, 'register').catch(() => {});
 

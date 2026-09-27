@@ -25,7 +25,7 @@ export async function onRequestGet(context) {
         v.invoice_ref
       FROM auction_items i
       LEFT JOIN auction_invoices v ON i.invoice_id = v.id
-      WHERE (i.user_id = ? OR i.user_id = 'usr-1785511589441-3fvgv')
+      WHERE i.user_id = ?
         AND (
           v.invoice_ref LIKE 'AMAZON-%'
           OR i.notes LIKE '%ASIN:%'
@@ -38,7 +38,7 @@ export async function onRequestGet(context) {
       LIMIT 250
     `;
 
-    const { results } = await env.DB.prepare(query).bind(payload.userId || 'usr-1785511589441-3fvgv').all();
+    const { results } = await env.DB.prepare(query).bind(payload.userId).all();
 
     const catalog = (results || []).map(row => {
       let asin = null;

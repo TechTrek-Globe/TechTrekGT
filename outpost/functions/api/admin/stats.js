@@ -3,15 +3,15 @@ import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
 export async function onRequestGet(context) {
   return withAuth(async () => {
     const { request, env } = context;
-    const { email } = await requireAuth(request, env);
+    const { userId } = await requireAuth(request, env);
     const db = env.DB;
-    const adminEmail = env.ADMIN_EMAIL;
 
-    if (!adminEmail) {
-      return err('Server misconfiguration: ADMIN_EMAIL not set', 500);
+    if (!db) {
+      return err('Database binding unavailable', 500);
     }
 
-    if (email.toLowerCase() !== adminEmail.toLowerCase()) {
+    const userRecord = await db.prepare('SELECT is_admin FROM users WHERE id = ?').bind(userId).first();
+    if (!userRecord || Number(userRecord.is_admin) !== 1) {
       return err('Forbidden: Admin access only', 403);
     }
 

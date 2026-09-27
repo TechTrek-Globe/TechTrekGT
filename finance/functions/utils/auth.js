@@ -276,6 +276,16 @@ export async function hashPassword(password) {
   return `${toHex(salt)}:${PBKDF2_ITERATIONS}:${toHex(hash)}`;
 }
 
+export function isThreePartHash(storedHash) {
+  if (typeof storedHash !== 'string') return false;
+  const parts = storedHash.split(':');
+  if (parts.length !== 3) return false;
+  const salt = fromHex(parts[0]);
+  const iterations = parseInt(parts[1], 10);
+  const hash = fromHex(parts[2]);
+  return Boolean(salt && hash && Number.isInteger(iterations) && iterations >= 1);
+}
+
 export function parseStoredHash(storedHash) {
   if (typeof storedHash !== 'string') return null;
   const parts = storedHash.split(':');
@@ -285,13 +295,6 @@ export function parseStoredHash(storedHash) {
     const hash = fromHex(parts[2]);
     if (!salt || !hash || !Number.isInteger(iterations) || iterations < 1) return null;
     return { salt, iterations, hash };
-  }
-  if (parts.length === 2) {
-    // Legacy two-part records predate the stored cost field.
-    const salt = fromHex(parts[0]);
-    const hash = fromHex(parts[1]);
-    if (!salt || !hash) return null;
-    return { salt, iterations: 1e5, hash, legacy: true };
   }
   return null;
 }
@@ -315,8 +318,8 @@ export async function verifyPassword(password, storedHash) {
 // True when a stored hash should be transparently upgraded after a good login.
 export function needsRehash(storedHash) {
   const parsed = parseStoredHash(storedHash);
-  if (!parsed) return true;
-  return parsed.legacy || parsed.iterations !== PBKDF2_ITERATIONS;
+  if (!parsed) return false;
+  return parsed.iterations !== PBKDF2_ITERATIONS;
 }
 
 /* ------------------------------------------------------------------ */

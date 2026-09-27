@@ -73,8 +73,30 @@ export async function onRequestPost(context) {
       date_acquired || null
     ).run();
 
+    // Collect distinct platforms needing fee lookup
+    const platformMap = new Map();
+    const neededPlatforms = [...new Set(
+      items
+        .filter(it => it.platform && !it.platform_fee_pct)
+        .map(it => it.platform.trim())
+        .filter(Boolean)
+    )];
+
+    if (neededPlatforms.length > 0) {
+      const placeholders = neededPlatforms.map(() => '?').join(', ');
+      const platRows = await env.DB.prepare(
+        `SELECT name, fee_pct, flat_fee FROM auction_platforms WHERE user_id = ? AND name IN (${placeholders})`
+      ).bind(payload.userId, ...neededPlatforms).all();
+
+      for (const plat of (platRows.results || [])) {
+        platformMap.set(plat.name, plat);
+      }
+    }
+
     // Insert each item with proration computed
     const insertedItems = [];
+    const insertStatements = [];
+
     for (const it of items) {
       const itemId = `item-${crypto.randomUUID()}`;
       const proration = computeItemProration({ unit_price: it.unit_price }, invoicePayload);
@@ -83,9 +105,7 @@ export async function onRequestPost(context) {
       let feePct = it.platform_fee_pct || 0;
       let flatFee = it.platform_flat_fee || 0;
       if (it.platform && (!it.platform_fee_pct)) {
-        const plat = await env.DB.prepare(
-          'SELECT fee_pct, flat_fee FROM auction_platforms WHERE user_id = ? AND name = ?'
-        ).bind(payload.userId, it.platform).first();
+        const plat = platformMap.get(it.platform.trim()) || platformMap.get(it.platform);
         if (plat) { feePct = plat.fee_pct; flatFee = plat.flat_fee; }
       }
 
@@ -104,40 +124,42 @@ export async function onRequestPost(context) {
 
       const itemSku = (it.sku && String(it.sku).trim()) ? String(it.sku).trim() : generateSku(date_acquired || new Date());
 
-      await env.DB.prepare(`
-        INSERT INTO auction_items (
-          id, user_id, invoice_id, item_name, category, sport_genre, athlete_person,
-          authenticator, cert_number, unit_price, item_base_total,
-          proration_weight, prorated_discount, prorated_shipping, prorated_tax, true_total_cost,
-          status, platform, platform_fee_pct, platform_flat_fee,
-          est_shipping_cost, boost_pct, min_sell_price, suggested_list_price,
-          current_list_price, target_margin_pct,
-          date_acquired, date_listed, notes, best_listing_window, sku
-        ) VALUES (
-          ?,?,?,?,?,?,?,
-          ?,?,?,?,
-          ?,?,?,?,?,
-          ?,?,?,?,
-          ?,?,?,?,
-          ?,?,
-          ?,?,?,?,?
+      insertStatements.push(
+        env.DB.prepare(`
+          INSERT INTO auction_items (
+            id, user_id, invoice_id, item_name, category, sport_genre, athlete_person,
+            authenticator, cert_number, unit_price, item_base_total,
+            proration_weight, prorated_discount, prorated_shipping, prorated_tax, true_total_cost,
+            status, platform, platform_fee_pct, platform_flat_fee,
+            est_shipping_cost, boost_pct, min_sell_price, suggested_list_price,
+            current_list_price, target_margin_pct,
+            date_acquired, date_listed, notes, best_listing_window, sku
+          ) VALUES (
+            ?,?,?,?,?,?,?,
+            ?,?,?,?,
+            ?,?,?,?,?,
+            ?,?,?,?,
+            ?,?,?,?,
+            ?,?,
+            ?,?,?,?,?
+          )
+        `).bind(
+          itemId, payload.userId, invoiceId,
+          it.item_name.trim(),
+          it.category || null, it.sport_genre || null, it.athlete_person || null,
+          it.authenticator || null, it.cert_number || null,
+          it.unit_price, it.unit_price,
+          proration.proration_weight, proration.prorated_discount,
+          proration.prorated_shipping, proration.prorated_tax, proration.true_total_cost,
+          it.status || 'Available',
+          it.platform || null, feePct, flatFee,
+          estShipping, boostPct, pricing.min_sell_price, pricing.suggested_list_price,
+          it.current_list_price || null, targetMarginPct,
+          date_acquired || null, it.date_listed || null,
+          it.notes || null, it.best_listing_window || null,
+          itemSku
         )
-      `).bind(
-        itemId, payload.userId, invoiceId,
-        it.item_name.trim(),
-        it.category || null, it.sport_genre || null, it.athlete_person || null,
-        it.authenticator || null, it.cert_number || null,
-        it.unit_price, it.unit_price,
-        proration.proration_weight, proration.prorated_discount,
-        proration.prorated_shipping, proration.prorated_tax, proration.true_total_cost,
-        it.status || 'Available',
-        it.platform || null, feePct, flatFee,
-        estShipping, boostPct, pricing.min_sell_price, pricing.suggested_list_price,
-        it.current_list_price || null, targetMarginPct,
-        date_acquired || null, it.date_listed || null,
-        it.notes || null, it.best_listing_window || null,
-        itemSku
-      ).run();
+      );
 
       insertedItems.push({
         id: itemId,
@@ -149,6 +171,13 @@ export async function onRequestPost(context) {
         suggested_list_price: pricing.suggested_list_price,
         status: it.status || 'Available'
       });
+    }
+
+    if (insertStatements.length > 0) {
+      const CHUNK_SIZE = 50;
+      for (let i = 0; i < insertStatements.length; i += CHUNK_SIZE) {
+        await env.DB.batch(insertStatements.slice(i, i + CHUNK_SIZE));
+      }
     }
 
     return ok({

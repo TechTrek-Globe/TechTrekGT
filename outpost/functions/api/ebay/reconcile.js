@@ -33,18 +33,20 @@ export async function onRequestPost(context) {
     try {
       accessToken = await getEbayUserToken(env, payload.userId);
     } catch (e) {
-      const msg = e.message || 'Unknown error';
-      if (msg.includes('not connected') || msg.includes('refresh token has expired')) {
-        return err(msg, 401);
+      console.error('[reconcile] eBay authentication failed:', e);
+      const msg = e.message || '';
+      if (msg.includes('not connected') || msg.includes('expired')) {
+        return err('eBay account not connected or session expired. Please connect your eBay account.', 401);
       }
-      return err(`eBay authentication failed: ${msg}`, 500);
+      return err('eBay authentication failed. Please try reconnecting your account.', 401);
     }
 
     let finData;
     try {
       finData = await fetchEbayOrderFinances(env, accessToken, ebay_order_id);
     } catch (e) {
-      return err(`eBay finances fetch failed: ${e.message}`, 502);
+      console.error('[reconcile] eBay finances fetch failed:', e);
+      return err('Failed to retrieve fee data from eBay Finances API. Please try again.', 502);
     }
 
     if (!finData || !finData.finances_available) {

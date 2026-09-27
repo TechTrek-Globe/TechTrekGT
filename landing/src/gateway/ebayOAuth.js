@@ -65,6 +65,8 @@ function getRedirectUri(env) {
  */
 export async function getEbayUserToken(env, userId) {
   if (!env.DB) throw new Error('DB binding not available');
+  const encKey = env.TOKEN_ENCRYPTION_KEY || env.JWT_SECRET;
+  if (!encKey) throw new Error('TOKEN_ENCRYPTION_KEY binding not available');
 
   const row = await env.DB.prepare(
     'SELECT * FROM ebay_oauth_tokens WHERE user_id = ?'
@@ -82,11 +84,11 @@ export async function getEbayUserToken(env, userId) {
 
   // Token still valid (>5min remaining)
   if (accessExp > now + 5 * 60 * 1000) {
-    return decryptToken(row.access_token, env.JWT_SECRET);
+    return decryptToken(row.access_token, encKey, env.JWT_SECRET);
   }
 
   // Need to refresh
-  const refreshToken = await decryptToken(row.refresh_token, env.JWT_SECRET);
+  const refreshToken = await decryptToken(row.refresh_token, encKey, env.JWT_SECRET);
   const { oauthUrl } = getEbayEndpoints(env);
   const credentials = btoa(`${getClientId(env)}:${getClientSecret(env)}`);
 
@@ -101,7 +103,8 @@ export async function getEbayUserToken(env, userId) {
 
   if (!res.ok) {
     const text = await res.text().catch(() => '');
-    throw new Error(`eBay token refresh failed (${res.status}): ${text.slice(0, 200)}`);
+    console.error(`[ebayOAuth] eBay token refresh failed (${res.status}):`, text);
+    throw new Error('eBay token refresh failed. Please reconnect your eBay account.');
   }
 
   const data = await res.json();
@@ -109,7 +112,7 @@ export async function getEbayUserToken(env, userId) {
   const newExpMs = Date.now() + (data.expires_in || 7200) * 1000;
   const newExpIso = new Date(newExpMs).toISOString();
 
-  const encAccess = await encryptToken(newAccessToken, env.JWT_SECRET);
+  const encAccess = await encryptToken(newAccessToken, env.TOKEN_ENCRYPTION_KEY || encKey);
 
   await env.DB.prepare(`
     UPDATE ebay_oauth_tokens SET
@@ -225,9 +228,10 @@ export async function onRequestGetCallback(context) {
     const accessExpMs = Date.now() + (tokenData.expires_in || 7200) * 1000;
     const refreshExpMs = Date.now() + (tokenData.refresh_token_expires_in || 47304000) * 1000;
 
+    const encKey = env.TOKEN_ENCRYPTION_KEY || env.JWT_SECRET;
     const [encAccess, encRefresh] = await Promise.all([
-      encryptToken(accessToken, env.JWT_SECRET),
-      encryptToken(refreshToken, env.JWT_SECRET)
+      encryptToken(accessToken, encKey),
+      encryptToken(refreshToken, encKey)
     ]);
 
     // Fetch eBay username from identity endpoint

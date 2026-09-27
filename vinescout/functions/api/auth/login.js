@@ -1,4 +1,4 @@
-import { verifyPassword, createToken, buildAuthCookie } from '../../utils/auth.js';
+import { verifyPassword, createToken, buildAuthCookie, isThreePartHash } from '../../utils/auth.js';
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -27,6 +27,19 @@ export async function onRequestPost(context) {
       });
     }
 
+    if (user.force_password_reset === 1 || !isThreePartHash(user.password_hash)) {
+      return new Response(JSON.stringify({
+        error: 'Password reset required. Your account security credentials must be updated before logging in.',
+        forcePasswordReset: true,
+        requiresReset: true,
+        redirectTo: '/reset-password',
+        email: user.email
+      }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
     const isValid = await verifyPassword(password, user.password_hash);
     if (!isValid) {
       return new Response(JSON.stringify({ error: 'Invalid email or password' }), {
@@ -40,8 +53,8 @@ export async function onRequestPost(context) {
       });
     }
 
-    const token = await createToken({ userId: user.id, email: user.email, name: user.name }, env.JWT_SECRET);
     const maxAge = body.rememberMe ? 30 * 24 * 3600 : 7200;
+    const token = await createToken({ userId: user.id, email: user.email, name: user.name }, env.JWT_SECRET, maxAge);
 
     return new Response(JSON.stringify({ success: true, user: { id: user.id, email: user.email, name: user.name } }), {
       status: 200,

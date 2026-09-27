@@ -1,6 +1,8 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
 import { computePricingFloors, computeItemProration } from '../../utils/auction.js';
 import { generateSku } from '../utils/sku.js';
+import { resolveIntegrationUserId } from '../../utils/apiIntegrations.js';
+
 
 /**
  * POST /api/import/amazon
@@ -37,22 +39,7 @@ export async function onRequestPost(context) {
     return err('Unauthorized: missing Bearer token or valid X-VineScout-Auth', 401);
   }
 
-  let userId = null;
-
-  // 1. Try matching amazon_api_token in users table
-  const userRow = await env.DB.prepare(
-    `SELECT id AS userId FROM users WHERE amazon_api_token = ? LIMIT 1`
-  ).bind(token).first();
-
-  if (userRow && userRow.userId) {
-    userId = userRow.userId;
-  } else if (env.OUTPOST_SECRET_KEY && token === env.OUTPOST_SECRET_KEY) {
-    // 2. Secret key matched - find primary user in database
-    const primaryUser = await env.DB.prepare(`SELECT id AS userId FROM users ORDER BY created_at ASC LIMIT 1`).first();
-    if (primaryUser && primaryUser.userId) {
-      userId = primaryUser.userId;
-    }
-  }
+  const userId = await resolveIntegrationUserId(token, env);
 
   if (!userId) {
     return err('Unauthorized: invalid API token or secret', 401);

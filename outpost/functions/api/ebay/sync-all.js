@@ -45,7 +45,8 @@ export async function onRequestPost(context) {
     try {
       accessToken = await getEbayUserToken(env, payload.userId);
     } catch (e) {
-      return err(`eBay authentication failed: ${e.message}`, 401);
+      console.error('[sync-all] eBay authentication failed:', e);
+      return err('eBay authentication failed. Please reconnect your eBay account.', 401);
     }
 
     // Fetch active listings and recent orders in parallel
@@ -91,244 +92,268 @@ export async function onRequestPost(context) {
     let singleEnrichCount = 0;
     const MAX_SINGLE_ENRICH = 30;
 
+    // Hoisted in-memory campaignCache scoped to this sync-all run (HIGH-8)
+    const campaignCache = new Map();
+
+    // Concurrency control: max 3 at a time with short delay between batches
+    const CONCURRENCY_LIMIT = 3;
+    let activePromises = [];
+    const DELAY_MS = 100;
+
     for (const item of items) {
-      const cleanListingId = item.ebay_listing_id ? String(item.ebay_listing_id).trim() : null;
-      const cleanSku = item.sku ? String(item.sku).trim().toLowerCase() : null;
+      const p = (async () => {
+        const cleanListingId = item.ebay_listing_id ? String(item.ebay_listing_id).trim() : null;
+        const cleanSku = item.sku ? String(item.sku).trim().toLowerCase() : null;
 
-      // 1. Check if item has a sold order in recent orders
-      const matchedOrder = (cleanListingId && ordersByListingId.get(cleanListingId)) ||
-                           (cleanSku && ordersBySku.get(cleanSku)) || null;
+        // 1. Check if item has a sold order in recent orders
+        const matchedOrder = (cleanListingId && ordersByListingId.get(cleanListingId)) ||
+                             (cleanSku && ordersBySku.get(cleanSku)) || null;
 
-      if (matchedOrder) {
-        if (item.status !== 'Sold') {
-          try {
-            let financeData = null;
-            if (matchedOrder.orderId) {
-              financeData = await fetchEbayOrderFinances(env, accessToken, matchedOrder.orderId);
-            }
-            await reconcileAndSaveEbaySale(env, payload.userId, item, matchedOrder, financeData);
-            soldRecordedCount++;
-            updatedCount++;
-
-            // P7: VScout write-back - stamp sold metadata on Vine-sourced items
+        if (matchedOrder) {
+          if (item.status !== 'Sold') {
             try {
-              let attrs = {};
-              const attrSrc = item.attributes;
-              if (attrSrc) {
-                attrs = typeof attrSrc === 'string' ? JSON.parse(attrSrc) : attrSrc;
+              let financeData = null;
+              if (matchedOrder.orderId) {
+                financeData = await fetchEbayOrderFinances(env, accessToken, matchedOrder.orderId);
               }
-              if (attrs.asin || attrs.order_id) {
-                attrs.outpost_liquidated = 1;
-                if (matchedOrder.salePrice != null) attrs.sale_price = matchedOrder.salePrice;
-                attrs.sold_at = matchedOrder.creationDate || new Date().toISOString();
-                if (matchedOrder.orderId) attrs.ebay_order_id = matchedOrder.orderId;
-                await env.DB.prepare(
-                  `UPDATE auction_items SET attributes = ?, updated_at = datetime('now') WHERE id = ? AND user_id = ?`
-                ).bind(JSON.stringify(attrs), item.id, payload.userId).run();
-              }
-            } catch (wbErr) {
-              console.warn(`[sync-all] VScout write-back exception for item ${item.id}:`, wbErr);
-            }
-          } catch (soldErr) {
-            console.warn(`[sync-all] Order reconciliation exception for item ${item.id}:`, soldErr);
-          }
-        }
-        continue;
-      }
+              await reconcileAndSaveEbaySale(env, payload.userId, item, matchedOrder, financeData);
+              soldRecordedCount++;
+              updatedCount++;
 
-      // 2. Check active seller listings
-      const match = (cleanListingId && listingMap.get(cleanListingId)) ||
-                    (cleanSku && listingMap.get(cleanSku)) || null;
-      if (match) {
-        let promotedRate = item.ebay_promoted_rate != null && item.ebay_promoted_rate !== ''
-          ? parseFloat(item.ebay_promoted_rate)
-          : 0;
-        let singleDetail = null;
-
-        // If promoted rate is 0 or missing, enrich via fetchSingleEbayListing (capped at 30 to respect rate limits)
-        if ((promotedRate === 0 || isNaN(promotedRate)) && singleEnrichCount < MAX_SINGLE_ENRICH && item.ebay_listing_id) {
-          try {
-            singleDetail = await fetchSingleEbayListing(env, accessToken, item.ebay_listing_id);
-            if (singleDetail?.promoted_rate != null && singleDetail.promoted_rate > 0) {
-              promotedRate = singleDetail.promoted_rate;
-            }
-            singleEnrichCount++;
-          } catch (_) {}
-        }
-
-        const targetCost = item.true_total_cost != null ? item.true_total_cost : (item.unit_price || 0);
-        const boostPct = promotedRate > 0 ? promotedRate / 100 : 0;
-
-        const feeStructure = calculateEbayCategoryFees(match.category_id, match.category_name || match.title, match.price || 0);
-        const platformFeePct = feeStructure.fee_pct;
-        const platformFlatFee = feeStructure.flat_fee;
-
-        let estShippingCost = item.est_shipping_cost || 0;
-        if (match.is_free_shipping === false) {
-          estShippingCost = 0.00;
-        } else if (match.is_free_shipping === true && (!estShippingCost || estShippingCost === 0)) {
-          estShippingCost = 4.50;
-        }
-
-        const pricing = computePricingFloors({
-          true_total_cost: targetCost,
-          est_shipping_cost: estShippingCost,
-          platform_flat_fee: platformFlatFee,
-          platform_fee_pct: platformFeePct,
-          boost_pct: boostPct,
-          target_margin_pct: item.target_margin_pct || 0.20
-        });
-
-        const isSold = match.status === 'Completed' || match.status === 'Sold' || (match.quantity_sold != null && match.quantity_sold > 0);
-        const newPrice = match.price > 0 ? match.price : item.current_list_price;
-        const newStatus = isSold ? 'Sold' : 'Listed';
-
-        let rawImg = match.image_url || (singleDetail ? singleDetail.image_url : null);
-        if (!rawImg && singleEnrichCount < MAX_SINGLE_ENRICH && cleanListingId) {
-          try {
-            singleDetail = await fetchSingleEbayListing(env, accessToken, cleanListingId);
-            singleEnrichCount++;
-            if (singleDetail?.image_url) {
-              rawImg = singleDetail.image_url;
-            }
-          } catch (_) {}
-        }
-        const ebayImg = normalizeHttps(rawImg);
-
-        let attrs = {};
-        if (item.attributes) {
-          try {
-            attrs = typeof item.attributes === 'string' ? JSON.parse(item.attributes) : (item.attributes || {});
-          } catch (_) {}
-        }
-        if (ebayImg) {
-          attrs.ebay_image_url = ebayImg;
-        }
-
-        await env.DB.prepare(`
-          UPDATE auction_items SET
-            current_list_price = ?,
-            status = ?,
-            platform = 'eBay',
-            platform_fee_pct = ?,
-            platform_flat_fee = ?,
-            ebay_promoted_rate = ?,
-            boost_pct = ?,
-            est_shipping_cost = ?,
-            min_sell_price = ?,
-            suggested_list_price = ?,
-            attributes = ?,
-            updated_at = datetime('now')
-          WHERE id = ? AND user_id = ?
-        `).bind(
-          newPrice,
-          newStatus,
-          platformFeePct,
-          platformFlatFee,
-          promotedRate,
-          boostPct,
-          estShippingCost,
-          pricing.min_sell_price,
-          pricing.suggested_list_price,
-          JSON.stringify(attrs),
-          item.id,
-          payload.userId
-        ).run();
-
-        updatedCount++;
-
-        // If item sold, auto-record the sale
-        if (isSold) {
-          try {
-            const updatedRow = await env.DB.prepare(
-              'SELECT * FROM auction_items WHERE id = ? AND user_id = ?'
-            ).bind(item.id, payload.userId).first();
-
-            const orderData = await fetchEbayOrderForListing(env, accessToken, item.ebay_listing_id, item.sku || match.sku);
-            let financeData = null;
-            if (orderData?.orderId) {
-              financeData = await fetchEbayOrderFinances(env, accessToken, orderData.orderId);
-            }
-            await reconcileAndSaveEbaySale(env, payload.userId, updatedRow || item, orderData, financeData);
-            soldRecordedCount++;
-
-            // P7: VScout write-back - stamp sold metadata on Vine-sourced items
-            try {
-              let attrs = {};
-              const attrSrc = (updatedRow || item).attributes;
-              if (attrSrc) {
-                attrs = typeof attrSrc === 'string' ? JSON.parse(attrSrc) : attrSrc;
-              }
-              if (attrs.asin || attrs.order_id) {
-                attrs.outpost_liquidated = 1;
-                if (orderData?.salePrice != null) attrs.sale_price = orderData.salePrice;
-                attrs.sold_at = orderData?.createdDate || new Date().toISOString();
-                if (orderData?.orderId) attrs.ebay_order_id = orderData.orderId;
-                await env.DB.prepare(
-                  `UPDATE auction_items SET attributes = ?, updated_at = datetime('now') WHERE id = ? AND user_id = ?`
-                ).bind(JSON.stringify(attrs), item.id, payload.userId).run();
-              }
-            } catch (wbErr) {
-              console.warn(`[sync-all] VScout write-back exception for item ${item.id}:`, wbErr);
-            }
-          } catch (soldErr) {
-            console.warn(`[sync-all] Auto-sale record exception for item ${item.id}:`, soldErr);
-          }
-        }
-      } else if (item.status === 'Listed' && cleanListingId && singleEnrichCount < MAX_SINGLE_ENRICH) {
-        // 3. Fallback: item was listed, not in active listings and not in top 100 recent orders
-        try {
-          const singleDetail = await fetchSingleEbayListing(env, accessToken, cleanListingId);
-          singleEnrichCount++;
-          if (singleDetail) {
-            if (singleDetail.image_url) {
+              // P7: VScout write-back - stamp sold metadata on Vine-sourced items
               try {
-                let sAttrs = {};
-                const sAttrSrc = item.attributes;
-                if (sAttrSrc) {
-                  sAttrs = typeof sAttrSrc === 'string' ? JSON.parse(sAttrSrc) : sAttrSrc;
+                let attrs = {};
+                const attrSrc = item.attributes;
+                if (attrSrc) {
+                  attrs = typeof attrSrc === 'string' ? JSON.parse(attrSrc) : attrSrc;
                 }
-                sAttrs.ebay_image_url = singleDetail.image_url;
-                await env.DB.prepare(
-                  `UPDATE auction_items SET attributes = ?, updated_at = datetime('now') WHERE id = ? AND user_id = ?`
-                ).bind(JSON.stringify(sAttrs), item.id, payload.userId).run();
-              } catch (_) {}
-            }
-            if (singleDetail.status === 'Sold' || singleDetail.quantity_sold > 0) {
-            const orderData = await fetchEbayOrderForListing(env, accessToken, cleanListingId, item.sku);
-            let financeData = null;
-            if (orderData?.orderId) {
-              financeData = await fetchEbayOrderFinances(env, accessToken, orderData.orderId);
-            }
-            await reconcileAndSaveEbaySale(env, payload.userId, item, orderData, financeData);
-            soldRecordedCount++;
-            updatedCount++;
-
-            // P7: VScout write-back
-            try {
-              let attrs = {};
-              const attrSrc = item.attributes;
-              if (attrSrc) {
-                attrs = typeof attrSrc === 'string' ? JSON.parse(attrSrc) : attrSrc;
+                if (attrs.asin || attrs.order_id) {
+                  attrs.outpost_liquidated = 1;
+                  if (matchedOrder.salePrice != null) attrs.sale_price = matchedOrder.salePrice;
+                  attrs.sold_at = matchedOrder.creationDate || new Date().toISOString();
+                  if (matchedOrder.orderId) attrs.ebay_order_id = matchedOrder.orderId;
+                  await env.DB.prepare(
+                    `UPDATE auction_items SET attributes = ?, updated_at = datetime('now') WHERE id = ? AND user_id = ?`
+                  ).bind(JSON.stringify(attrs), item.id, payload.userId).run();
+                }
+              } catch (wbErr) {
+                console.warn(`[sync-all] VScout write-back exception for item ${item.id}:`, wbErr);
               }
-              if (attrs.asin || attrs.order_id) {
-                attrs.outpost_liquidated = 1;
-                if (orderData?.salePrice != null) attrs.sale_price = orderData.salePrice;
-                attrs.sold_at = orderData?.createdDate || new Date().toISOString();
-                if (orderData?.orderId) attrs.ebay_order_id = orderData.orderId;
-                await env.DB.prepare(
-                  `UPDATE auction_items SET attributes = ?, updated_at = datetime('now') WHERE id = ? AND user_id = ?`
-                ).bind(JSON.stringify(attrs), item.id, payload.userId).run();
-              }
-            } catch (wbErr) {
-              console.warn(`[sync-all] VScout write-back exception for item ${item.id}:`, wbErr);
+            } catch (soldErr) {
+              console.warn(`[sync-all] Order reconciliation exception for item ${item.id}:`, soldErr);
             }
           }
+          return;
         }
-      } catch (singleErr) {
-          console.warn(`[sync-all] Single fallback exception for item ${item.id}:`, singleErr);
+
+        // 2. Check active seller listings
+        const match = (cleanListingId && listingMap.get(cleanListingId)) ||
+                      (cleanSku && listingMap.get(cleanSku)) || null;
+        if (match) {
+          let promotedRate = item.ebay_promoted_rate != null && item.ebay_promoted_rate !== ''
+            ? parseFloat(item.ebay_promoted_rate)
+            : 0;
+          let singleDetail = null;
+
+          // If promoted rate is 0 or missing, enrich via fetchSingleEbayListing (capped at 30 to respect rate limits)
+          if ((promotedRate === 0 || isNaN(promotedRate)) && singleEnrichCount < MAX_SINGLE_ENRICH && item.ebay_listing_id) {
+            singleEnrichCount++;
+            try {
+              singleDetail = await fetchSingleEbayListing(env, accessToken, item.ebay_listing_id, campaignCache);
+              if (singleDetail?.promoted_rate != null && singleDetail.promoted_rate > 0) {
+                promotedRate = singleDetail.promoted_rate;
+              }
+            } catch (_) {}
+          }
+
+          const targetCost = item.true_total_cost != null ? item.true_total_cost : (item.unit_price || 0);
+          const boostPct = promotedRate > 0 ? promotedRate / 100 : 0;
+
+          const feeStructure = calculateEbayCategoryFees(match.category_id, match.category_name || match.title, match.price || 0);
+          const platformFeePct = feeStructure.fee_pct;
+          const platformFlatFee = feeStructure.flat_fee;
+
+          let estShippingCost = item.est_shipping_cost || 0;
+          if (match.is_free_shipping === false) {
+            estShippingCost = 0.00;
+          } else if (match.is_free_shipping === true && (!estShippingCost || estShippingCost === 0)) {
+            estShippingCost = 4.50;
+          }
+
+          const pricing = computePricingFloors({
+            true_total_cost: targetCost,
+            est_shipping_cost: estShippingCost,
+            platform_flat_fee: platformFlatFee,
+            platform_fee_pct: platformFeePct,
+            boost_pct: boostPct,
+            target_margin_pct: item.target_margin_pct || 0.20
+          });
+
+          const isSold = match.status === 'Completed' || match.status === 'Sold' || (match.quantity_sold != null && match.quantity_sold > 0);
+          const newPrice = match.price > 0 ? match.price : item.current_list_price;
+          const newStatus = isSold ? 'Sold' : 'Listed';
+
+          let rawImg = match.image_url || (singleDetail ? singleDetail.image_url : null);
+          if (!rawImg && singleEnrichCount < MAX_SINGLE_ENRICH && cleanListingId) {
+            singleEnrichCount++;
+            try {
+              singleDetail = await fetchSingleEbayListing(env, accessToken, cleanListingId, campaignCache);
+              if (singleDetail?.image_url) {
+                rawImg = singleDetail.image_url;
+              }
+            } catch (_) {}
+          }
+          const ebayImg = normalizeHttps(rawImg);
+
+          let attrs = {};
+          if (item.attributes) {
+            try {
+              attrs = typeof item.attributes === 'string' ? JSON.parse(item.attributes) : (item.attributes || {});
+            } catch (_) {}
+          }
+          if (ebayImg) {
+            attrs.ebay_image_url = ebayImg;
+          }
+
+          await env.DB.prepare(`
+            UPDATE auction_items SET
+              current_list_price = ?,
+              status = ?,
+              platform = 'eBay',
+              platform_fee_pct = ?,
+              platform_flat_fee = ?,
+              ebay_promoted_rate = ?,
+              boost_pct = ?,
+              est_shipping_cost = ?,
+              min_sell_price = ?,
+              suggested_list_price = ?,
+              attributes = ?,
+              updated_at = datetime('now')
+            WHERE id = ? AND user_id = ?
+          `).bind(
+            newPrice,
+            newStatus,
+            platformFeePct,
+            platformFlatFee,
+            promotedRate,
+            boostPct,
+            estShippingCost,
+            pricing.min_sell_price,
+            pricing.suggested_list_price,
+            JSON.stringify(attrs),
+            item.id,
+            payload.userId
+          ).run();
+
+          updatedCount++;
+
+          // If item sold, auto-record the sale
+          if (isSold) {
+            try {
+              const updatedRow = await env.DB.prepare(
+                'SELECT * FROM auction_items WHERE id = ? AND user_id = ?'
+              ).bind(item.id, payload.userId).first();
+
+              const orderData = await fetchEbayOrderForListing(env, accessToken, item.ebay_listing_id, item.sku || match.sku);
+              let financeData = null;
+              if (orderData?.orderId) {
+                financeData = await fetchEbayOrderFinances(env, accessToken, orderData.orderId);
+              }
+              await reconcileAndSaveEbaySale(env, payload.userId, updatedRow || item, orderData, financeData);
+              soldRecordedCount++;
+
+              // P7: VScout write-back - stamp sold metadata on Vine-sourced items
+              try {
+                let attrs = {};
+                const attrSrc = (updatedRow || item).attributes;
+                if (attrSrc) {
+                  attrs = typeof attrSrc === 'string' ? JSON.parse(attrSrc) : attrSrc;
+                }
+                if (attrs.asin || attrs.order_id) {
+                  attrs.outpost_liquidated = 1;
+                  if (orderData?.salePrice != null) attrs.sale_price = orderData.salePrice;
+                  attrs.sold_at = orderData?.createdDate || new Date().toISOString();
+                  if (orderData?.orderId) attrs.ebay_order_id = orderData.orderId;
+                  await env.DB.prepare(
+                    `UPDATE auction_items SET attributes = ?, updated_at = datetime('now') WHERE id = ? AND user_id = ?`
+                  ).bind(JSON.stringify(attrs), item.id, payload.userId).run();
+                }
+              } catch (wbErr) {
+                console.warn(`[sync-all] VScout write-back exception for item ${item.id}:`, wbErr);
+              }
+            } catch (soldErr) {
+              console.warn(`[sync-all] Auto-sale record exception for item ${item.id}:`, soldErr);
+            }
+          }
+        } else if (item.status === 'Listed' && cleanListingId && singleEnrichCount < MAX_SINGLE_ENRICH) {
+          // 3. Fallback: item was listed, not in active listings and not in top 100 recent orders
+          singleEnrichCount++;
+          try {
+            const singleDetail = await fetchSingleEbayListing(env, accessToken, cleanListingId, campaignCache);
+            if (singleDetail) {
+              if (singleDetail.image_url) {
+                try {
+                  let sAttrs = {};
+                  const sAttrSrc = item.attributes;
+                  if (sAttrSrc) {
+                    sAttrs = typeof sAttrSrc === 'string' ? JSON.parse(sAttrSrc) : sAttrSrc;
+                  }
+                  sAttrs.ebay_image_url = singleDetail.image_url;
+                  await env.DB.prepare(
+                    `UPDATE auction_items SET attributes = ?, updated_at = datetime('now') WHERE id = ? AND user_id = ?`
+                  ).bind(JSON.stringify(sAttrs), item.id, payload.userId).run();
+                } catch (_) {}
+              }
+              if (singleDetail.status === 'Sold' || singleDetail.quantity_sold > 0) {
+                const orderData = await fetchEbayOrderForListing(env, accessToken, cleanListingId, item.sku);
+                let financeData = null;
+                if (orderData?.orderId) {
+                  financeData = await fetchEbayOrderFinances(env, accessToken, orderData.orderId);
+                }
+                await reconcileAndSaveEbaySale(env, payload.userId, item, orderData, financeData);
+                soldRecordedCount++;
+                updatedCount++;
+
+                // P7: VScout write-back
+                try {
+                  let attrs = {};
+                  const attrSrc = item.attributes;
+                  if (attrSrc) {
+                    attrs = typeof attrSrc === 'string' ? JSON.parse(attrSrc) : attrSrc;
+                  }
+                  if (attrs.asin || attrs.order_id) {
+                    attrs.outpost_liquidated = 1;
+                    if (orderData?.salePrice != null) attrs.sale_price = orderData.salePrice;
+                    attrs.sold_at = orderData?.createdDate || new Date().toISOString();
+                    if (orderData?.orderId) attrs.ebay_order_id = orderData.orderId;
+                    await env.DB.prepare(
+                      `UPDATE auction_items SET attributes = ?, updated_at = datetime('now') WHERE id = ? AND user_id = ?`
+                    ).bind(JSON.stringify(attrs), item.id, payload.userId).run();
+                  }
+                } catch (wbErr) {
+                  console.warn(`[sync-all] VScout write-back exception for item ${item.id}:`, wbErr);
+                }
+              }
+            }
+          } catch (singleErr) {
+            console.warn(`[sync-all] Single fallback exception for item ${item.id}:`, singleErr);
+          }
+        }
+      })();
+
+      activePromises.push(p);
+
+      if (activePromises.length >= CONCURRENCY_LIMIT) {
+        await Promise.all(activePromises);
+        activePromises = [];
+        if (DELAY_MS > 0) {
+          await new Promise(r => setTimeout(r, DELAY_MS));
         }
       }
+    }
+
+    if (activePromises.length > 0) {
+      await Promise.all(activePromises);
     }
 
     // Stamp last_refreshed_at on success

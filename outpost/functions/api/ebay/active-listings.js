@@ -23,9 +23,12 @@ export async function onRequestGet(context) {
         total: listings.length
       });
     } catch (e) {
-      const msg = e.message || 'Unknown error';
-      if (msg.includes('not connected') || msg.includes('refresh token has expired')) return err(msg, 401);
-      return err(`Failed to fetch active eBay listings: ${msg}`, 500);
+      console.error('[active-listings] Failed to fetch active eBay listings:', e);
+      const msg = e.message || '';
+      if (msg.includes('not connected') || msg.includes('expired')) {
+        return err('eBay account not connected or session expired. Please connect your eBay account.', 401);
+      }
+      return err('Failed to fetch active eBay listings. Please try again.', 500);
     }
   });
 }

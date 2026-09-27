@@ -11,7 +11,11 @@ CREATE TABLE IF NOT EXISTS users (
   role                 TEXT NOT NULL DEFAULT 'user',
   token_version        INTEGER NOT NULL DEFAULT 0,
   email_verified       INTEGER NOT NULL DEFAULT 0,
+  email_verified_at    TEXT,
   pending_email        TEXT,
+  is_admin             INTEGER NOT NULL DEFAULT 0,
+  amazon_api_token_hash TEXT,
+  force_password_reset INTEGER NOT NULL DEFAULT 0,
   created_at           TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

@@ -15,10 +15,11 @@ import { daysBetween } from '../../utils/auction.js';
 
 // --- Token Crypto (AES-GCM, matches landing/src/gateway/tokenCrypto.js) ---
 
-const SALT = new TextEncoder().encode('techtrekgt-ebay-token-v1');
-const PBKDF2_ITERATIONS = 100_000;
+export const OLD_SALT = new TextEncoder().encode('techtrekgt-ebay-token-v1');
+export const NEW_SALT = new TextEncoder().encode('techtrekgt-token-encryption-v2');
+export const PBKDF2_ITERATIONS = 100_000;
 
-async function deriveKey(secret) {
+export async function deriveKey(secret, salt = NEW_SALT) {
   const raw = await crypto.subtle.importKey(
     'raw',
     new TextEncoder().encode(secret),
@@ -27,7 +28,7 @@ async function deriveKey(secret) {
     ['deriveKey']
   );
   return crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt: SALT, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
+    { name: 'PBKDF2', salt, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
     raw,
     { name: 'AES-GCM', length: 256 },
     false,
@@ -43,23 +44,48 @@ function base64ToBuf(b64) {
   return Uint8Array.from(atob(b64), c => c.charCodeAt(0));
 }
 
-async function decryptToken(encrypted, jwtSecret) {
+export async function decryptToken(encrypted, tokenEncryptionKey, fallbackSecret = null) {
+  if (!encrypted) return null;
   const [ivB64, cipherB64] = encrypted.split('.');
   if (!ivB64 || !cipherB64) throw new Error('Invalid encrypted token format');
-  const key = await deriveKey(jwtSecret);
   const iv = base64ToBuf(ivB64);
   const cipherBuf = base64ToBuf(cipherB64);
-  const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, cipherBuf);
-  return new TextDecoder().decode(plainBuf);
+
+  // 1. Try decrypting with primary TOKEN_ENCRYPTION_KEY and NEW_SALT
+  if (tokenEncryptionKey) {
+    try {
+      const key = await deriveKey(tokenEncryptionKey, NEW_SALT);
+      const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, cipherBuf);
+      return new TextDecoder().decode(plainBuf);
+    } catch (_) {
+      // Transition fallback if ciphertext was encrypted with legacy derivation
+    }
+  }
+
+  // 2. Transition window fallback: try legacy key derivation with OLD_SALT
+  const oldSecret = fallbackSecret || tokenEncryptionKey;
+  if (oldSecret) {
+    try {
+      const oldKey = await deriveKey(oldSecret, OLD_SALT);
+      const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, oldKey, cipherBuf);
+      return new TextDecoder().decode(plainBuf);
+    } catch (_) {
+      // Both attempts failed
+    }
+  }
+
+  throw new Error('Failed to decrypt token: invalid key or ciphertext corrupted');
 }
 
-async function encryptToken(plaintext, jwtSecret) {
-  const key = await deriveKey(jwtSecret);
+export async function encryptToken(plaintext, tokenEncryptionKey) {
+  if (!tokenEncryptionKey) throw new Error('TOKEN_ENCRYPTION_KEY binding is required');
+  const key = await deriveKey(tokenEncryptionKey, NEW_SALT);
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const encoded = new TextEncoder().encode(plaintext);
   const cipherBuf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, encoded);
   return `${bufToBase64(iv)}.${bufToBase64(cipherBuf)}`;
 }
+
 
 // --- URL Normalization ---
 
@@ -112,7 +138,8 @@ export function getEbayApiBase(env) {
  */
 export async function getEbayUserToken(env, userId) {
   if (!env.DB) throw new Error('DB binding not available');
-  if (!env.JWT_SECRET) throw new Error('JWT_SECRET binding not available');
+  const encKey = env.TOKEN_ENCRYPTION_KEY || env.JWT_SECRET;
+  if (!encKey) throw new Error('TOKEN_ENCRYPTION_KEY binding not available');
 
   const row = await env.DB.prepare(
     'SELECT * FROM ebay_oauth_tokens WHERE user_id = ?'
@@ -132,7 +159,7 @@ export async function getEbayUserToken(env, userId) {
 
   // Access token still valid (>5 min remaining) - return it directly
   if (accessExp > now + 5 * 60 * 1000) {
-    return decryptToken(row.access_token, env.JWT_SECRET);
+    return decryptToken(row.access_token, encKey, env.JWT_SECRET);
   }
 
   // Access token expired or near-expiry - refresh it
@@ -140,7 +167,7 @@ export async function getEbayUserToken(env, userId) {
     throw new Error('EBAY_CLIENT_ID / EBAY_CLIENT_SECRET not configured on this worker. Cannot refresh token.');
   }
 
-  const refreshToken = await decryptToken(row.refresh_token, env.JWT_SECRET);
+  const refreshToken = await decryptToken(row.refresh_token, encKey, env.JWT_SECRET);
   const clientId = String(env.EBAY_CLIENT_ID).trim().replace(/^['"]|['"]$/g, '');
   const clientSecret = String(env.EBAY_CLIENT_SECRET).trim().replace(/^['"]|['"]$/g, '');
   const credentials = btoa(`${clientId}:${clientSecret}`);
@@ -157,7 +184,8 @@ export async function getEbayUserToken(env, userId) {
 
   if (!res.ok) {
     const text = await res.text().catch(() => '');
-    throw new Error(`eBay token refresh failed (${res.status}): ${text.slice(0, 200)}`);
+    console.error(`[tokenHelper] eBay token refresh failed (${res.status}):`, text);
+    throw new Error('eBay token refresh failed. Please reconnect your eBay account.');
   }
 
   const data = await res.json();
@@ -165,7 +193,7 @@ export async function getEbayUserToken(env, userId) {
   const newExpMs = Date.now() + (data.expires_in || 7200) * 1000;
   const newExpIso = new Date(newExpMs).toISOString();
 
-  const encAccess = await encryptToken(newAccessToken, env.JWT_SECRET);
+  const encAccess = await encryptToken(newAccessToken, env.TOKEN_ENCRYPTION_KEY || encKey);
 
   await env.DB.prepare(`
     UPDATE ebay_oauth_tokens SET
@@ -413,7 +441,7 @@ export function calculateEbayCategoryFees(categoryId, categoryName, currentPrice
  * @param {string} listingId - 12-digit eBay ItemID
  * @returns {Promise<object|null>} Expanded listing details object
  */
-export async function fetchSingleEbayListing(env, accessToken, listingId) {
+export async function fetchSingleEbayListing(env, accessToken, listingId, campaignCache = null) {
   if (!listingId) return null;
   const cleanId = String(listingId).trim();
   const isSandbox = isEbaySandbox(env);
@@ -660,78 +688,151 @@ export async function fetchSingleEbayListing(env, accessToken, listingId) {
       if (autoPromotedRate == null) {
         try {
           const mktBase = isSandbox ? 'https://api.sandbox.ebay.com' : 'https://api.ebay.com';
-          const campRes = await fetch(`${mktBase}/sell/marketing/v1/ad_campaign?limit=50`, {
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-              Accept: 'application/json',
-              'Content-Type': 'application/json'
-            }
-          });
+          if (!campaignCache) campaignCache = new Map();
 
-          if (campRes.ok) {
-            const campData = await campRes.json();
-            const campaigns = campData.campaigns || [];
+          let campaigns = null;
+          let campPromise = campaignCache.get('__campaigns__');
+          if (campPromise) {
+            campaigns = campPromise instanceof Promise ? await campPromise : campPromise;
+          } else {
+            const fetchCamp = (async () => {
+              const campRes = await fetch(`${mktBase}/sell/marketing/v1/ad_campaign?limit=50`, {
+                headers: {
+                  Authorization: `Bearer ${accessToken}`,
+                  Accept: 'application/json',
+                  'Content-Type': 'application/json'
+                }
+              });
 
+              if (campRes.ok) {
+                const campData = await campRes.json();
+                return campData.campaigns || [];
+              }
+              return [];
+            })();
+
+            campaignCache.set('__campaigns__', fetchCamp);
+            campaigns = await fetchCamp;
+            campaignCache.set('__campaigns__', campaigns);
+          }
+
+          if (campaigns && campaigns.length > 0) {
             for (const camp of campaigns) {
               if (!camp.campaignId) continue;
 
-              // Query campaign ads specifically for this listing ID (using singular listing_id query parameter)
-              try {
-                const adRes = await fetch(`${mktBase}/sell/marketing/v1/ad_campaign/${camp.campaignId}/ad?listing_id=${cleanId}`, {
-                  headers: {
-                    Authorization: `Bearer ${accessToken}`,
-                    Accept: 'application/json',
-                    'Content-Type': 'application/json'
-                  }
-                });
-                if (adRes.ok) {
-                  const adData = await adRes.json();
-                  const ads = adData.ads || [];
-                  const matchedAd = ads.find(a => String(a.listingId) === cleanId || String(a.listingId).includes(cleanId));
-                  if (matchedAd?.bidPercentage) {
-                    const r = parseFloat(matchedAd.bidPercentage);
-                    if (r > 0) {
-                      autoPromotedRate = r;
-                      promotedRateSource = 'ad_level';
-                      break;
-                    }
-                  }
+              // Check in-memory campaignCache first for this campaignId (HIGH-8)
+              if (campaignCache.has(camp.campaignId)) {
+                let cachedVal = campaignCache.get(camp.campaignId);
+                if (cachedVal instanceof Promise) {
+                  cachedVal = await cachedVal;
                 }
-              } catch (_) {}
+                const cachedRate = (typeof cachedVal === 'object' && cachedVal.adsByListing && cachedVal.adsByListing[cleanId])
+                  ? cachedVal.adsByListing[cleanId]
+                  : (typeof cachedVal === 'object' ? cachedVal.promotedRate : cachedVal);
+                if (cachedRate != null && cachedRate > 0) {
+                  autoPromotedRate = cachedRate;
+                  promotedRateSource = (typeof cachedVal === 'object' && cachedVal.promotedRateSource) || 'ad_level';
+                  break;
+                }
+              }
 
-              // Also check campaign ads collection up to limit 200
-              if (autoPromotedRate == null) {
+              // In-flight deduplication / discovery promise for this campaign
+              const discoverAdPromise = (async () => {
+                let foundRate = null;
+                let foundSource = null;
+                const adsByListing = {};
+
+                // 1. Query campaign ads specifically for this listing ID (using singular listing_id query parameter)
                 try {
-                  const checkAds = await fetch(`${mktBase}/sell/marketing/v1/ad_campaign/${camp.campaignId}/ad?limit=200`, {
+                  const adRes = await fetch(`${mktBase}/sell/marketing/v1/ad_campaign/${camp.campaignId}/ad?listing_id=${cleanId}`, {
                     headers: {
                       Authorization: `Bearer ${accessToken}`,
                       Accept: 'application/json',
                       'Content-Type': 'application/json'
                     }
                   });
-                  if (checkAds.ok) {
-                    const checkData = await checkAds.json();
-                    const specificAd = (checkData.ads || []).find(a => String(a.listingId) === cleanId || String(a.listingId).includes(cleanId));
-                    if (specificAd?.bidPercentage) {
-                      const r = parseFloat(specificAd.bidPercentage);
+                  if (adRes.ok) {
+                    const adData = await adRes.json();
+                    const ads = adData.ads || [];
+                    for (const a of ads) {
+                      if (a.listingId && a.bidPercentage) {
+                        const r = parseFloat(a.bidPercentage);
+                        if (r > 0) adsByListing[String(a.listingId).trim()] = r;
+                      }
+                    }
+                    const matchedAd = ads.find(a => String(a.listingId) === cleanId || String(a.listingId).includes(cleanId));
+                    if (matchedAd?.bidPercentage) {
+                      const r = parseFloat(matchedAd.bidPercentage);
                       if (r > 0) {
-                        autoPromotedRate = r;
-                        promotedRateSource = 'ad_level';
-                        break;
+                        foundRate = r;
+                        foundSource = 'ad_level';
                       }
                     }
                   }
                 } catch (_) {}
-              }
 
-              // Fallback to campaign funding strategy bidPercentage (e.g. campaign-level 7.0%)
-              if (autoPromotedRate == null && camp.fundingStrategy?.bidPercentage) {
-                const r = parseFloat(camp.fundingStrategy.bidPercentage);
-                if (r > 0) {
-                  autoPromotedRate = r;
-                  promotedRateSource = 'campaign_default';
-                  break;
+                // 2. Also check campaign ads collection up to limit 200
+                if (foundRate == null) {
+                  try {
+                    const checkAds = await fetch(`${mktBase}/sell/marketing/v1/ad_campaign/${camp.campaignId}/ad?limit=200`, {
+                      headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                        Accept: 'application/json',
+                        'Content-Type': 'application/json'
+                      }
+                    });
+                    if (checkAds.ok) {
+                      const checkData = await checkAds.json();
+                      const ads = checkData.ads || [];
+                      for (const a of ads) {
+                        if (a.listingId && a.bidPercentage) {
+                          const rate = parseFloat(a.bidPercentage);
+                          if (rate > 0) adsByListing[String(a.listingId).trim()] = rate;
+                        }
+                      }
+                      const specificAd = ads.find(a => String(a.listingId) === cleanId || String(a.listingId).includes(cleanId));
+                      if (specificAd?.bidPercentage) {
+                        const r = parseFloat(specificAd.bidPercentage);
+                        if (r > 0) {
+                          foundRate = r;
+                          foundSource = 'ad_level';
+                        }
+                      } else if (Object.keys(adsByListing).length > 0) {
+                        foundRate = Object.values(adsByListing)[0];
+                        foundSource = 'ad_level';
+                      }
+                    }
+                  } catch (_) {}
                 }
+
+                // 3. Fallback to campaign funding strategy bidPercentage (e.g. campaign-level 7.0%)
+                if (foundRate == null && camp.fundingStrategy?.bidPercentage) {
+                  const r = parseFloat(camp.fundingStrategy.bidPercentage);
+                  if (r > 0) {
+                    foundRate = r;
+                    foundSource = 'campaign_default';
+                  }
+                }
+
+                return {
+                  promotedRate: foundRate,
+                  promotedRateSource: foundSource,
+                  adsByListing
+                };
+              })();
+
+              campaignCache.set(camp.campaignId, discoverAdPromise);
+              const result = await discoverAdPromise;
+              campaignCache.set(camp.campaignId, result);
+
+              const chosenRate = (result.adsByListing && result.adsByListing[cleanId])
+                ? result.adsByListing[cleanId]
+                : result.promotedRate;
+
+              if (chosenRate != null && chosenRate > 0) {
+                autoPromotedRate = chosenRate;
+                promotedRateSource = result.promotedRateSource || 'ad_level';
+                break;
               }
             }
 
@@ -741,6 +842,11 @@ export async function fetchSingleEbayListing(env, accessToken, listingId) {
               if (candidate) {
                 autoPromotedRate = parseFloat(candidate.fundingStrategy.bidPercentage);
                 promotedRateSource = 'campaign_default';
+                if (candidate.campaignId) {
+                  const existing = campaignCache.get(candidate.campaignId) || {};
+                  const adsByListing = (typeof existing === 'object' && existing.adsByListing) ? { ...existing.adsByListing } : {};
+                  campaignCache.set(candidate.campaignId, { promotedRate: autoPromotedRate, promotedRateSource: 'campaign_default', adsByListing });
+                }
               }
             }
           }
@@ -1192,8 +1298,8 @@ export async function fetchEbayOrderFinances(env, accessToken, orderId) {
           message: 'eBay Finances API access requires sell.finances scope approval.'
         };
       }
-      console.warn(`[tokenHelper] Finances API error (${res.status}):`, text.slice(0, 200));
-      return { finances_available: false, error: text.slice(0, 200) || `Finances API error (${res.status})` };
+      console.warn(`[tokenHelper] Finances API error (${res.status}):`, text);
+      return { finances_available: false, error: 'eBay Finances request failed. Please check your eBay connection.' };
     }
 
     const data = await res.json();
@@ -1283,7 +1389,7 @@ export async function fetchEbayOrderFinances(env, accessToken, orderId) {
     };
   } catch (e) {
     console.warn('[tokenHelper] Finances API exception:', e);
-    return { finances_available: false, error: e.message };
+    return { finances_available: false, error: 'Failed to retrieve eBay finances data.' };
   }
 }
 

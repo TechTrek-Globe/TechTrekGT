@@ -38,9 +38,8 @@ export async function withAuth(fn) {
     return await fn();
   } catch (err) {
     if (err instanceof Response) return err;
-    console.error('[withAuth] unexpected error:', err);
-    const errorMessage = err instanceof Error ? err.message : (typeof err === 'string' ? err : 'An internal error occurred.');
-    return new Response(JSON.stringify({ error: errorMessage }), {
+    console.error('[withAuth] unexpected error:', err && err.stack ? err.stack : err);
+    return new Response(JSON.stringify({ error: 'An internal error occurred. Please try again.' }), {
       status: 500, headers: { 'Content-Type': 'application/json' }
     });
   }

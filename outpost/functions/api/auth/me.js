@@ -24,7 +24,7 @@ export async function onRequestGet(context) {
     if (env.DB) {
       try {
         const dbUser = await env.DB.prepare(
-          'SELECT id, email, name, security_question, security_answer_hash FROM users WHERE id = ?'
+          'SELECT id, email, name, security_question, security_answer_hash, email_verified, email_verified_at FROM users WHERE id = ?'
         ).bind(payload.userId).first();
         if (dbUser) {
           userDetails = {
@@ -32,7 +32,9 @@ export async function onRequestGet(context) {
             email: dbUser.email,
             name: dbUser.name,
             securityQuestion: dbUser.security_question || null,
-            hasSecurityQuestion: Boolean(dbUser.security_question && dbUser.security_answer_hash)
+            hasSecurityQuestion: Boolean(dbUser.security_question && dbUser.security_answer_hash),
+            emailVerified: Boolean(dbUser.email_verified || dbUser.email_verified_at),
+            emailVerifiedAt: dbUser.email_verified_at || null
           };
         }
       } catch (e) {

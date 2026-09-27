@@ -73,6 +73,7 @@ export async function onRequestPut(context) {
     ).bind(id, payload.userId).all();
 
     const updatedInvoice = { ...invoice, discount: newDiscount, shipping: newShipping, tax: newTax };
+    const updateStatements = [];
 
     for (const item of (existing.results || [])) {
       const proration = computeItemProration({ unit_price: item.unit_price }, updatedInvoice);
@@ -85,18 +86,27 @@ export async function onRequestPut(context) {
         target_margin_pct: item.target_margin_pct || 0
       });
 
-      await env.DB.prepare(`
-        UPDATE auction_items
-        SET proration_weight = ?, prorated_discount = ?, prorated_shipping = ?,
-            prorated_tax = ?, true_total_cost = ?,
-            min_sell_price = ?, suggested_list_price = ?, updated_at = datetime('now')
-        WHERE id = ? AND user_id = ?
-      `).bind(
-        proration.proration_weight, proration.prorated_discount,
-        proration.prorated_shipping, proration.prorated_tax, proration.true_total_cost,
-        pricing.min_sell_price, pricing.suggested_list_price,
-        item.id, payload.userId
-      ).run();
+      updateStatements.push(
+        env.DB.prepare(`
+          UPDATE auction_items
+          SET proration_weight = ?, prorated_discount = ?, prorated_shipping = ?,
+              prorated_tax = ?, true_total_cost = ?,
+              min_sell_price = ?, suggested_list_price = ?, updated_at = datetime('now')
+          WHERE id = ? AND user_id = ?
+        `).bind(
+          proration.proration_weight, proration.prorated_discount,
+          proration.prorated_shipping, proration.prorated_tax, proration.true_total_cost,
+          pricing.min_sell_price, pricing.suggested_list_price,
+          item.id, payload.userId
+        )
+      );
+    }
+
+    if (updateStatements.length > 0) {
+      const CHUNK_SIZE = 50;
+      for (let i = 0; i < updateStatements.length; i += CHUNK_SIZE) {
+        await env.DB.batch(updateStatements.slice(i, i + CHUNK_SIZE));
+      }
     }
 
     return ok({ success: true, message: `Invoice updated and ${existing.results?.length || 0} items re-prorated.` });

@@ -476,4 +476,42 @@ CREATE TABLE IF NOT EXISTS outpost_sync_settings (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_sync_settings_user ON outpost_sync_settings(user_id);
 
+-- ============================================================
+-- HIGH-2 MIGRATION - Per-Installation API Integration Secrets
+-- Table: api_integrations
+-- Replaces shared OUTPOST_SECRET_KEY with per-user/device hashed secrets
+-- ============================================================
+CREATE TABLE IF NOT EXISTS api_integrations (
+  id          TEXT PRIMARY KEY,
+  user_id     TEXT NOT NULL,
+  secret_hash TEXT NOT NULL,
+  label       TEXT,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  revoked_at  TEXT,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_api_integrations_hash ON api_integrations(secret_hash);
+CREATE INDEX IF NOT EXISTS idx_api_integrations_user ON api_integrations(user_id);
+
+-- ============================================================
+-- EMAIL VERIFICATIONS (MED-3)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS email_verifications (
+  id         TEXT    PRIMARY KEY,
+  user_id    TEXT    NOT NULL,
+  email      TEXT    NOT NULL,
+  token      TEXT    NOT NULL,
+  expires_at INTEGER NOT NULL,
+  used       INTEGER NOT NULL DEFAULT 0,
+  attempts   INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_email_verifications_user ON email_verifications(user_id, used);
+CREATE INDEX IF NOT EXISTS idx_email_verifications_token ON email_verifications(token, used);
+CREATE INDEX IF NOT EXISTS idx_email_verifications_email ON email_verifications(email, token);
+
+
 

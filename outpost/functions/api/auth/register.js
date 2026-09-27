@@ -1,4 +1,4 @@
-import { hashPassword, createToken, buildAuthCookie } from '../../utils/auth.js';
+import { hashPassword, sendVerificationEmail } from '../../utils/auth.js';
 import { checkRateLimit } from '../../utils/rateLimit.js';
 
 const DEFAULT_PLATFORMS = [
@@ -21,21 +21,28 @@ export async function onRequestPost(context) {
   const { request, env } = context;
 
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
-  const rlKey = `register:${ip}`;
-  const { allowed, retryAfter } = await checkRateLimit(env.RATE_LIMIT_KV, rlKey, 5, 60);
-
-  if (!allowed) {
-    return new Response(JSON.stringify({ error: 'Too many registration attempts. Please wait.' }), {
-      status: 429,
-      headers: { 'Content-Type': 'application/json', 'Retry-After': String(retryAfter) }
-    });
-  }
+  const ipRlKey = `register:${ip}`;
+  const ipLimit = await checkRateLimit(env.RATE_LIMIT_KV, ipRlKey, 5, 60, true);
 
   try {
     const body = await request.json();
+
+    if (body && ('is_admin' in body || body.is_admin !== undefined || 'isAdmin' in body || body.isAdmin !== undefined)) {
+      return new Response(JSON.stringify({ error: 'Field is_admin cannot be set via client request.' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
     const { email, password, name, securityQuestion, securityAnswer } = body;
 
     if (!email || !password || !name || !securityQuestion || !securityAnswer) {
+      if (!ipLimit.allowed) {
+        return new Response(JSON.stringify({ error: 'Too many registration attempts. Please wait.' }), {
+          status: 429,
+          headers: { 'Content-Type': 'application/json', 'Retry-After': String(ipLimit.retryAfter) }
+        });
+      }
       return new Response(JSON.stringify({ error: 'Name, email, password, security question, and security answer are required.' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' }
@@ -53,6 +60,20 @@ export async function onRequestPost(context) {
     if (!EMAIL_REGEX.test(cleanEmail)) {
       return new Response(JSON.stringify({ error: 'Invalid email address format.' }), {
         status: 400, headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    const accountRlKey = `register-account:${cleanEmail}`;
+    const accountLimit = await checkRateLimit(env.RATE_LIMIT_KV, accountRlKey, 5, 900, true);
+
+    if (!ipLimit.allowed || !accountLimit.allowed) {
+      const retryAfter = Math.max(
+        !ipLimit.allowed ? (ipLimit.retryAfter || 60) : 0,
+        !accountLimit.allowed ? (accountLimit.retryAfter || 60) : 0
+      );
+      return new Response(JSON.stringify({ error: 'Too many registration attempts. Please wait.' }), {
+        status: 429,
+        headers: { 'Content-Type': 'application/json', 'Retry-After': String(retryAfter) }
       });
     }
 
@@ -88,7 +109,7 @@ export async function onRequestPost(context) {
     const securityAnswerHash = await hashPassword(cleanSecurityAnswer);
 
     await env.DB.prepare(
-      'INSERT INTO users (id, email, password_hash, name, security_question, security_answer_hash) VALUES (?, ?, ?, ?, ?, ?)'
+      'INSERT INTO users (id, email, password_hash, name, security_question, security_answer_hash, email_verified, email_verified_at) VALUES (?, ?, ?, ?, ?, ?, 0, NULL)'
     ).bind(userId, cleanEmail, passwordHash, name.trim(), cleanSecurityQuestion, securityAnswerHash).run();
 
     // Seed default platform fee records for new user
@@ -101,28 +122,45 @@ export async function onRequestPost(context) {
       } catch (e) { /* skip if table not yet migrated */ }
     }
 
-    if (!env.JWT_SECRET) {
-      return new Response(JSON.stringify({ error: 'Server misconfiguration: missing JWT_SECRET' }), {
-        status: 500, headers: { 'Content-Type': 'application/json' }
-      });
-    }
+    // Issue single-use email verification token (MED-3)
+    const verifId = `vfy-${crypto.randomUUID()}`;
+    const verificationToken = crypto.randomUUID();
+    const now = Date.now();
+    const expiresAt = now + 24 * 60 * 60 * 1000; // 24 hours
 
-    const token = await createToken({ userId, email: cleanEmail, name: name.trim() }, env.JWT_SECRET);
+    await env.DB.prepare(
+      'INSERT INTO email_verifications (id, user_id, email, token, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+    ).bind(verifId, userId, cleanEmail, verificationToken, expiresAt, now).run();
 
-    const maxAge = body.rememberMe ? 30 * 24 * 3600 : 7200;
+    await sendVerificationEmail(env, cleanEmail, verificationToken).catch(e => {
+      console.error('[register] failed to dispatch verification email:', e);
+    });
 
     return new Response(JSON.stringify({
       success: true,
-      user: { id: userId, email: cleanEmail, name: name.trim() }
+      verificationPending: true,
+      message: 'Registration successful. A verification email has been sent. Please verify your email address to activate your account.',
+      user: {
+        id: userId,
+        email: cleanEmail,
+        name: name.trim(),
+        email_verified: 0,
+        email_verified_at: null
+      }
     }), {
       status: 201,
       headers: {
-        'Content-Type': 'application/json',
-        'Set-Cookie': buildAuthCookie(token, maxAge)
+        'Content-Type': 'application/json'
       }
     });
 
   } catch (err) {
+    if (ipLimit && !ipLimit.allowed) {
+      return new Response(JSON.stringify({ error: 'Too many registration attempts. Please wait.' }), {
+        status: 429,
+        headers: { 'Content-Type': 'application/json', 'Retry-After': String(ipLimit.retryAfter) }
+      });
+    }
     console.error('[auction register] handler error:', err);
     return new Response(JSON.stringify({ error: 'An internal error occurred. Please try again.' }), {
       status: 500, headers: { 'Content-Type': 'application/json' }

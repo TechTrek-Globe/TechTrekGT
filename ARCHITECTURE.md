@@ -65,11 +65,19 @@ TechTrekGT is a multi-application platform hosted on `techtrekgt.com`. The repos
 | **Google Places & Maps API** | `wayfinder` | (wayfinder-local) | Live venue details, ratings, photography, neighborhood & hotel lookup queries, coordinate navigation links, and mandatory dual verification. *(Phase 2: migrate to gateway `/api/places/search`)* |
 | **Geoapify API** | `wayfinder` | (wayfinder-local) | Primary POI generation, geocoding, and venue coordinate dual verification. *(Phase 2: migrate to gateway `/api/geo/places`)* |
 | **National Bank of Poland (NBP) API** | `wayfinder` | (wayfinder-local) | Real-time PLN/USD and PLN/EUR exchange rates via worker proxy. |
-| **Amazon VineScout Import** | `outpost` | `POST /api/import/amazon` | Chrome Extension Bearer-token endpoint; writes to D1 only - no external API call. Stays in outpost permanently. |
+| **Amazon VineScout Import & Export** | `outpost` | `POST /api/import/amazon`, `GET /api/export/vinescout-sales`, `GET /api/export/vinescout-inventory` | VScout and Chrome Extension integration endpoints. Authenticates via per-installation hashed secrets in `api_integrations` (with `amazon_api_token` and migration `OUTPOST_SECRET_KEY` fallback). Reads/writes to user-isolated D1 tables. Stays in outpost permanently. |
+| **API Integrations Management** | `outpost` | `GET/POST /api/integrations`, `POST /api/integrations/:id/revoke`, `DELETE /api/integrations/:id` | HIGH-2 per-device API integration key issuance and revocation. Generates `op_sec_` secrets, stores deterministic SHA-256 `secret_hash`, and supports instant revocation. |
 | **Amazon URL Ingestion** | `outpost` | `POST /api/import/amazon-url` | Takes an Amazon ASIN/URL and routes through the Landing Gateway (`/api/amazon/fetch`) for hydrated data, authenticated via the standard SSO JWT cookie. |
 | **Market Comps Engine** | `outpost` | `GET/POST /api/comps/market` | Stores and calculates median/benchmark metrics against verified market comparables (`market_comps`). Replaces legacy pricing models. |
 | **SKU & Custom Label Engine** | `outpost` | `POST /api/items/auto-sku`, `POST /api/ebay/push-sku` | Generates unique structured SKUs (`OP-YYMMDD-XXXX`) on creation/backfill and pushes custom labels directly to live eBay store listings via Trading API (`ReviseFixedPriceItem` / `ReviseItem`). |
 | **Bi-Directional Sync Engine & VScout Write-Back** | `outpost` | `GET/PUT /api/sync/settings`, `GET/POST /api/sync/vinescout-catalog`, `POST /api/ebay/sync-all` | Phase 7 automated & manual bi-directional sync engine. Reconciles eBay sales via Fulfillment API, stamps sold metadata back to VScout items (`outpost_liquidated`, `sold_at`, `sale_price`, `ebay_order_id`) in `auction_items.attributes`, manages per-user automation preferences in `outpost_sync_settings`, and runs context-level background polling via `InventoryContext` (Option K). |
+| **Invoice Ingestion & Re-Proration Engine** | `outpost` | `POST /api/invoices`, `PUT /api/invoices/:id` | HIGH-7 N+1 query elimination. Pre-fetches distinct platform fee rates in a single query via `IN (...)` and executes all item insertions and re-proration updates in batched atomic D1 calls (`env.DB.batch`), eliminating 2N+1 sequential database round-trips. |
+| **eBay Batch Sync Concurrency & Campaign Cache Engine** | `outpost` | `POST /api/ebay/sync-all` | HIGH-8 Bounded concurrency and in-memory marketing cache. Replaces serial per-item network awaits with bounded concurrency (`CONCURRENCY_LIMIT = 3`, `DELAY_MS = 100`), and introduces a request-scoped `campaignCache` Map with in-flight Promise deduplication in `fetchSingleEbayListing` to reuse discovered campaign and ad-level promoted rates across items, eliminating redundant Marketing API subrequests and preventing Workers CPU/subrequest limit exhaustion. |
+| **Rate Limiting & Brute-Force Defense** | `outpost` | `POST /api/auth/login`, `POST /api/auth/register`, `POST /api/auth/forgot-password`, `POST /api/auth/reset-password`, `POST /api/auth/security-question` | MED-1 & MED-2 Dual-layer fail-closed rate limiting and per-account lockout defense. Critical auth endpoints enforce fail-closed 60-second blocks if `RATE_LIMIT_KV` fails, and implement dual-layer checks against both `CF-Connecting-IP` and normalized email accounts (e.g. `login-account:${cleanEmail}` with 10 attempts / 15 min; password recovery / registration with 5 attempts / 15 min), returning HTTP 429 with the stricter `Retry-After` duration to defeat distributed attacks across rotating IPs. |
+| **Email Verification at Registration** | `outpost` | `POST /api/auth/register`, `GET/POST /api/auth/verify-email` | MED-3 Registration email verification and token lifecycle. Registration inserts unverified accounts (`email_verified = 0`, `email_verified_at = NULL`) and issues single-use tokens in `email_verifications` without returning active session cookies. Verification validates 24-hour expiration, atomically marks `email_verified = 1`, and issues the authenticated JWT session cookie. Administrative access matching `ADMIN_EMAIL` is gated on verified email status. |
+| **CSP Nonce & Script Hardening** | `outpost` | Worker fetch, HTMLRewriter | MED-4 Content-Security-Policy script protection. Eliminates `unsafe-inline` from `script-src`, injects per-request cryptographic nonces (`script-src 'self' 'nonce-${nonce}' https://challenges.cloudflare.com`), and uses `HTMLRewriter` to attach nonces to `<script>` tags and inject `<meta name="csp-nonce">` into HTML responses. |
+| **Internal Error & Upstream Message Sanitization** | `outpost`, `landing` | `withAuth`, `worker.fetch`, eBay APIs (`/api/ebay/*`), Amazon Proxy (`/api/amazon/*`) | MED-5 Internal error and third-party response body sanitization. Prevents information disclosure by replacing raw exception messages (`err.message`), database driver internals, and upstream API error bodies (`text.slice(0, 200)`) with generic client-facing messages ("An internal error occurred. Please try again.", "eBay request failed. Please try reconnecting your account.") while logging full error details and stack traces server-side via `console.error`. |
+
 
 > **Dual-Verification Standard:** All external API POI coordinates, venue geocoding, and address metadata MUST be dual-verified across both Google Places API and Geoapify API (delta distance threshold < 250m) prior to dataset ingestion in `wayfinder/src/data/poland-2026.js`.
 
@@ -231,8 +239,10 @@ All four React apps share the same auth design:
 
 **Backend auth utilities** (`functions/utils/auth.js` in each app):
 
-- `hashPassword(password)` - PBKDF2-SHA256, 600,000 iterations (OWASP recommendation), salted.
-- `verifyPassword(password, storedHash)` - supports legacy 2-part and current 3-part hash formats.
+- `hashPassword(password)` - PBKDF2-SHA256, 310,000 iterations (OWASP recommendation), salted with format `salt:iterations:hash`.
+- `verifyPassword(password, storedHash)` - strictly validates 3-part `salt:iterations:hash` format; the legacy 100,000-iteration guessing fallback is completely eliminated to prevent silent authentication mismatch.
+- `isThreePartHash(storedHash)` - verifies whether a stored hash conforms to the 3-part delimiter format.
+- **Forced Password Reset Flow (HIGH-6):** Stored accounts lacking a valid 3-part hash or marked with `force_password_reset = 1` are intercepted at login (`POST /api/auth/login`) with HTTP 403 Forbidden and redirected directly to `/reset-password` (`forcePasswordReset: true, redirectTo: '/reset-password'`) rather than failing silently with credential errors. A migration/audit script (`npm run check:legacy-hashes`) identifies non-compliant hashes, and password reset clears the `force_password_reset` flag to 0.
 - `toPublicUser(user, overrides)` - central serializer returning safe client fields only (id, email, name, role-derived isAdmin, emailVerified, pendingEmail, securityQuestion, hasSecurityQuestion), strictly stripping internal credential hashes.
 - `verifyToken(token, env)` - HS256 JWT verification via WebCrypto.
 - `getTokenFromRequest(request)` - extracts JWT from cookie or `Authorization: Bearer` header.
@@ -300,8 +310,50 @@ The resale platform implements a bi-directional sync engine across eBay sales re
 - **VScout Ingestion & Outbound Sale Write-Back:** Amazon Vine items ingested via `POST /api/import/amazon` store ASIN, order ID, ETV, and metadata in `auction_items.attributes` (JSON blob). When an eBay sale is reconciled, the engine stamps sold details (`outpost_liquidated: 1`, `sale_price`, `sold_at`, `ebay_order_id`) directly into the item's attributes via `POST /api/sync/vinescout-catalog`.
 - **Sync Configuration & Persistence:** Per-user automation preferences (`ebay_auto_sync`, `ebay_sync_interval_m`, `vscout_auto_sync`, `vscout_sync_interval_m`) are stored in D1 table `outpost_sync_settings` and configured via the Settings View Integrations tab (`GET/PUT /api/sync/settings`).
 
+### 5.6 Outpost Per-Installation API Integration Secrets (HIGH-2)
+
+Outpost uses per-device / per-installation integration secrets to authenticate automated clients (e.g. VineScout Chrome Extension) and prevent cross-tenant data pollution:
+- **`api_integrations` Table:** Stores `id`, `user_id`, `secret_hash` (deterministic SHA-256 hex digest), `label`, `created_at`, and `revoked_at`.
+- **Hashed Token Resolution:** `resolveIntegrationUserId(token, env)` computes SHA-256 of incoming `Authorization: Bearer <secret>` or `X-VineScout-Auth: <secret>` and queries `SELECT id, user_id, revoked_at FROM api_integrations WHERE secret_hash = ?`.
+- **Revocation Guard:** If `revoked_at IS NOT NULL`, the secret is immediately rejected with 401 and never falls back.
+- **Migration Fallback:** Legacy `users.amazon_api_token` and `env.OUTPOST_SECRET_KEY` (oldest user) remain as backward-compatibility fallbacks during migration, allowing zero-downtime transition to per-installation secrets.
+- **Management Endpoints & CLI:** `GET /api/integrations` (list), `POST /api/integrations` (issue `op_sec_` key), `POST /api/integrations/:id/revoke` and `DELETE /api/integrations/:id` (revoke), plus admin CLI `scripts/manage-integrations.js`.
+
+### 5.7 eBay OAuth Token Encryption Key Isolation (HIGH-3)
+
+Outpost and the Landing Gateway isolate token encryption keys to ensure stored third-party OAuth credentials are never compromised by a session JWT secret leak:
+- **Dedicated Secret Binding:** `env.TOKEN_ENCRYPTION_KEY` is provisioned separately from `JWT_SECRET` via `wrangler secret put` in both `techtrek-outpost` and `techtrek-landing`.
+- **Key Derivation & Dedicated Salt:** AES-256-GCM cryptographic keys are derived via PBKDF2 (100,000 iterations, SHA-256) using `TOKEN_ENCRYPTION_KEY` and dedicated salt `techtrekgt-token-encryption-v2` (`NEW_SALT`). Random 12-byte initialization vectors (`crypto.getRandomValues(new Uint8Array(12))`) are prepended to ciphertexts as `${ivB64}.${cipherB64}`.
+- **Transition Fallback Window:** `decryptToken(encrypted, tokenEncryptionKey, fallbackSecret)` attempts decryption using `TOKEN_ENCRYPTION_KEY` and `NEW_SALT` first. If decryption fails and a fallback secret is provided, it attempts legacy decryption with `OLD_SALT` (`techtrekgt-ebay-token-v1`), ensuring zero downtime during data migrations.
+- **Call-Site Token Resolution:** `getEbayUserToken` in `outpost/functions/utils/ebayAuth.js`, `outpost/functions/api/ebay/tokenHelper.js`, and `landing/src/gateway/ebayOAuth.js` exclusively resolves `env.TOKEN_ENCRYPTION_KEY` for reading and writing tokens in `ebay_oauth_tokens`.
+- **One-Time Data Migration:** Automated migration script `scripts/migrate-ebay-tokens.js` (`npm run migrate:ebay-tokens -- --remote`) re-encrypts all stored `access_token` and `refresh_token` rows in Cloudflare D1 and verifies decryption against `TOKEN_ENCRYPTION_KEY`.
+
+### 5.8 Hashed Storage of Amazon/VineScout Bearer Tokens (HIGH-4)
+
+Outpost remediates bearer token storage by hashing extension credentials and enforcing single-reveal UX:
+- **Hashed Column Storage:** Replaced plaintext storage in `users.amazon_api_token` with `users.amazon_api_token_hash TEXT`, storing only deterministic 64-character SHA-256 lowercase hex digests (`crypto.subtle.digest('SHA-256', ...)`).
+- **Single-Use Return Semantics:** `GET /api/import/amazon-token` and `POST /api/import/amazon-token` generate a 40-character hex bearer token, hash it, store the hash in D1, and return the raw token string to the client exactly once. Subsequent `GET` requests return `{ token: null, hasToken: true }`, ensuring raw credentials cannot be extracted from the database or API.
+- **Hashed Lookup Site:** `resolveIntegrationUserId` in `outpost/functions/utils/apiIntegrations.js` hashes incoming `Authorization: Bearer <token>` or `X-VineScout-Auth` headers via SHA-256 and queries `SELECT id FROM users WHERE amazon_api_token_hash = ? LIMIT 1`. Raw tokens are never compared or stored in plaintext.
+- **Force-Rotation Migration:** Database migration `scripts/migrate-amazon-tokens.js` (`npm run migrate:amazon-tokens -- --remote`) ensures the `amazon_api_token_hash` column exists, force-rotates all legacy plaintext tokens, writes their SHA-256 hashes, sets `amazon_api_token = NULL`, and emits rotation notifications for affected integration users.
+
+### 5.9 JWT Expiry Alignment with Remember-Me Cookie Duration (HIGH-5)
+
+Outpost and shared auth utilities align the JWT `payload.exp` claim with the cookie `Max-Age` header:
+- **Configurable Token TTL:** `createToken(payload, secret, expiresInSeconds = 7200)` accepts an explicit lifetime parameter defaulting to 2 hours.
+- **Login and Registration Duration Sync:** `login.js` and `register.js` compute `maxAge = body.rememberMe ? 30 * 24 * 3600 : 7200` and pass this value to both `createToken(payload, env.JWT_SECRET, maxAge)` and `buildAuthCookie(token, maxAge)`. Sessions with "Remember me" enabled remain valid for the full 30 days without premature 2-hour exp expiration.
+- **Profile Update Preservation:** `update-profile.js` reissues session tokens using the existing `remainingSeconds = Math.max(payload.exp - Math.floor(Date.now() / 1000), 3600)` lifetime, preventing profile changes from truncating long-lived sessions.
+
+### 5.10 Outpost eBay Batch Sync Bounded Concurrency & Campaign Cache (HIGH-8)
+
+Outpost hardens the bulk inventory synchronization pipeline (`POST /api/ebay/sync-all` and `fetchSingleEbayListing`) against Cloudflare Workers CPU/duration limits and subrequest quotas:
+- **Bounded Concurrency Pattern:** Replaced fully serial `for (const item of items)` loop in `sync-all.js` with bounded concurrency (`CONCURRENCY_LIMIT = 3`, `DELAY_MS = 100`, `Promise.all`), matching the pattern established in `runMarketRefresh`. Up to 3 item tasks run concurrently, pausing briefly between batches to prevent rate limits.
+- **In-Memory Request-Scoped Campaign Cache:** `sync-all.js` hoists a `campaignCache = new Map()` passed directly into `fetchSingleEbayListing(env, accessToken, listingId, campaignCache)`.
+- **In-Flight Promise Deduplication:** To prevent redundant network calls across concurrent tasks in the same batch, `campaignCache` stores in-flight promises for both the marketing campaign list (`__campaigns__`) and campaign ad discovery (`camp.campaignId`). All concurrent workers await the single shared promise.
+- **Cross-Item Rate & Ad Reuse:** Once a campaign's ad-level rate or default funding strategy rate is fetched, subsequent items mapped to that campaign immediately reuse the cached rate without triggering duplicate calls to `/sell/marketing/v1/ad_campaign` or `/sell/marketing/v1/ad_campaign/:id/ad`.
+- **Zero Hallucination / Identical Output:** Concurrency and caching optimizations alter only network dispatch and caching topology; all pricing floors, fee tiers, status transitions, and VScout write-backs produce identical outputs to serial execution.
 
 ---
+
 
 ## 6. Component Architecture
 
@@ -445,13 +497,16 @@ All apps (finance, outpost, wayfinder, bigworm) point at the same `personal-budg
 | Schema File | App | Tables |
 |------------|-----|--------|
 | `finance/schema.sql` | finance + shared | `users`, `_bak_households`, `_bak_household_members`, `accounts`, `_bak_people`, `bills`, `_bak_bill_splits`, `line_items`, `loans`, `household_settings`, `user_backups`, `user_backup_versions`, `password_resets` |
-| `outpost/auction-schema.sql` | outpost | invoices, items, sales, platforms, comps, `market_comps`, supplies, `listing_traffic`, `auction_item_analytics`, `outpost_sync_settings` |
+| `outpost/auction-schema.sql` | outpost | invoices, items, sales, platforms, comps, `market_comps`, supplies, `listing_traffic`, `auction_item_analytics`, `outpost_sync_settings`, `api_integrations`, `email_verifications` |
 | `vinescout/vinescout-schema.sql` | vinescout | `vine_items`, `vine_orders`, `vine_tax_settings`, `vine_asin_cache` |
 | `wayfinder/schema-wayfinder.sql` | wayfinder | journeys, itinerary items, documents, import jobs, budgets |
 
 ### 8.3 Key Design Points
 
 - **Shared `users` table**: the auth system is common, so registration in one app enables login across all.
+- **Outpost Email Verification & Sensitive Action Gating (MED-3)**: Registration in Outpost creates unverified accounts (`email_verified = 0`, `email_verified_at = NULL`) and issues single-use tokens in `email_verifications` without issuing active session cookies. Verification via `GET/POST /api/auth/verify-email` checks a 24-hour expiration window, atomically sets `email_verified = 1` and `email_verified_at = ISO timestamp`, and issues the session cookie (`auth_token`). Administrative access matching `ADMIN_EMAIL` is strictly gated on email verification.
+- **Outpost Nonce-Based CSP & Script Hardening (MED-4)**: Outpost enforces strict nonce-based Content-Security-Policy (`script-src 'self' 'nonce-${nonce}' https://challenges.cloudflare.com`) with `'unsafe-inline'` completely removed from `script-src`. Each request generates a 16-byte base64url nonce via WebCrypto; `HTMLRewriter` stamps the nonce attribute onto HTML `<script>` tags and injects `<meta name="csp-nonce">` into `<head>`, protecting against inline XSS while allowing modular Vite-bundled assets and Cloudflare challenge scripts.
+- **Internal Error & Upstream Response Sanitization (MED-5)**: Prevents raw exception messages, database driver internals, and truncated third-party API response bodies (`text.slice(0, 200)`) from leaking to API callers. In `withAuth` and `worker.fetch`, internal exceptions return generic client messages (`An internal error occurred. Please try again.`) with 500 status while logging full errors with stack traces to `console.error`. Upstream eBay and Amazon integration endpoints log full upstream error bodies server-side while returning generic summary messages (e.g. `eBay request failed. Please try reconnecting your account.`) with preserved upstream HTTP status codes (401, 403, 500, 502).
 - **Phase 2 Stage 2 Sync Concurrency & Versioning**: Cloud backup sync in `handleSyncBackup` executes atomic compare-and-swap (CAS) via conditional SQL upsert guarded with `WHERE (? = 1 OR user_backups.updated_at_ms IS NULL OR user_backups.updated_at_ms <= ?)` and batches version snapshot insertion, version table pruning (last 10 versions), and backup upsert in a single `env.DB.batch([...])` transaction, preventing concurrent tab/device data overwrites with deterministic 409 `SYNC_CONFLICT` responses.
 - **Phase 2 Stage 3 Household Simplification (Option B)**: The legacy relational household model has been simplified to per-user architecture. Migration `0004_drop_households.sql` reversibly archived `households`, `household_members`, `people`, and `bill_splits` into `_bak_*` tables, and purged the orphaned `default_vault` row. User registration issues a single `INSERT INTO users`. `householdId` claims and client context properties have been purged across auth utilities, tokens, endpoints, and `AuthContext`.
 - **Phase 2 Stage 4 Schema & Data Integrity**: Migration `0005_backfill_user_created_at.sql` backfills missing creation timestamps with the sentinel timestamp `'1970-01-01T00:00:00.000Z'`. The `users.status` column is fully settable via `POST /api/admin/user/:id/status` (`Active` or `Suspended`) by admins, with immediate session revocation (`token_version` bump) and 403 enforcement across `login` and `authenticate`.
@@ -539,6 +594,7 @@ Set via `wrangler secret put`:
 | Secret | Apps | Purpose |
 |--------|------|---------|
 | `JWT_SECRET` | all five apps (incl. landing gateway) | Shared SSO signing key |
+| `TOKEN_ENCRYPTION_KEY` | `landing` (gateway), `outpost` | Isolated AES-256-GCM encryption key for stored eBay OAuth tokens (PBKDF2 salt `techtrekgt-token-encryption-v2`) |
 | `EBAY_CLIENT_ID` | `landing` (gateway), `outpost` | eBay Developer App ID (OAuth Client ID) |
 | `EBAY_CLIENT_SECRET` | `landing` (gateway), `outpost` | eBay Developer Cert ID (OAuth Client Secret) |
 | `EBAY_RUNAME` | `landing` (gateway), `outpost` | eBay RuName (redirect URI name) for token refresh |

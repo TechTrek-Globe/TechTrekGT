@@ -43,7 +43,8 @@ export async function onRequestGet(context) {
 
       if (!res.ok) {
         const text = await res.text().catch(() => '');
-        return err(`eBay listing fetch failed (${res.status}): ${text.slice(0, 200)}`, res.status);
+        console.error(`[ebayListings] eBay listing fetch failed (${res.status}):`, text);
+        return err('Failed to fetch eBay listing details. Please try again.', res.status);
       }
 
       const data = await res.json();
@@ -72,10 +73,11 @@ export async function onRequestGet(context) {
 
     if (!res.ok) {
       const text = await res.text().catch(() => '');
+      console.error(`[ebayListings] eBay Inventory API error (${res.status}):`, text);
       if (res.status === 403) {
         return err('eBay Sell Inventory API access requires sell.inventory.readonly scope approval.', 403);
       }
-      return err(`eBay Inventory API error (${res.status}): ${text.slice(0, 200)}`, res.status);
+      return err('Failed to fetch eBay inventory. Please try again.', res.status);
     }
 
     const data = await res.json();

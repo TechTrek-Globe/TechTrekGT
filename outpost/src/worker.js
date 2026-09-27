@@ -6,6 +6,7 @@ import { onRequestPost as forgotPasswordHandler } from '../functions/api/auth/fo
 import { onRequestPost as resetPasswordHandler }  from '../functions/api/auth/reset-password.js';
 import { onRequestPost as securityQuestionHandler } from '../functions/api/auth/security-question.js';
 import { onRequestPost as updateProfileHandler }  from '../functions/api/auth/update-profile.js';
+import { onRequestGet as verifyEmailGetHandler, onRequestPost as verifyEmailPostHandler } from '../functions/api/auth/verify-email.js';
 import { onRequestGet as invoicesListHandler, onRequestPost as invoicesCreateHandler } from '../functions/api/invoices/index.js';
 import { onRequestGet as invoiceGetHandler, onRequestPut as invoicePutHandler, onRequestDelete as invoiceDeleteHandler } from '../functions/api/invoices/[id].js';
 import { onRequestGet as itemsListHandler } from '../functions/api/items/index.js';
@@ -43,15 +44,61 @@ import { onRequestGet as vinescoutInventoryExportHandler } from '../functions/ap
 import { onRequestGet as vinescoutCatalogHandler } from '../functions/api/sync/vinescout-catalog.js';
 import { onRequestPost as vinescoutCatalogPostHandler } from '../functions/api/sync/vinescout-catalog.js';
 import { onRequestGet as syncSettingsGetHandler, onRequestPut as syncSettingsPutHandler } from '../functions/api/sync/settings.js';
+import { onRequestGet as integrationsListHandler, onRequestPost as integrationsCreateHandler } from '../functions/api/integrations/index.js';
+import { onRequestPost as integrationRevokeHandler, onRequestDelete as integrationDeleteHandler } from '../functions/api/integrations/[id].js';
 
-function addSecurityHeaders(response, isLocalhost = false, requestOrigin = '') {
+
+function base64UrlEncodeBytes(bytes) {
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+class NonceInjector {
+  constructor(nonce) {
+    this.nonce = nonce;
+  }
+  element(el) {
+    el.setAttribute('nonce', this.nonce);
+  }
+}
+
+class HeadNonceInjector {
+  constructor(nonce) {
+    this.nonce = nonce;
+  }
+  element(el) {
+    el.append(`<meta name="csp-nonce" content="${this.nonce}" />`, { html: true });
+  }
+}
+
+function addSecurityHeaders(response, isLocalhostOrOptions = false, maybeRequestOrigin = '', maybeNonce = '') {
+  let isLocalhost = false;
+  let requestOrigin = '';
+  let nonce = '';
+
+  if (typeof isLocalhostOrOptions === 'object' && isLocalhostOrOptions !== null) {
+    isLocalhost = Boolean(isLocalhostOrOptions.isLocalhost);
+    requestOrigin = isLocalhostOrOptions.requestOrigin || '';
+    nonce = isLocalhostOrOptions.nonce || '';
+  } else {
+    isLocalhost = Boolean(isLocalhostOrOptions);
+    requestOrigin = maybeRequestOrigin || '';
+    nonce = maybeNonce || '';
+  }
+
   const newHeaders = new Headers(response.headers);
   if (!isLocalhost) {
     newHeaders.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    const scriptSrc = nonce
+      ? `script-src 'self' 'nonce-${nonce}' https://challenges.cloudflare.com`
+      : "script-src 'self' https://challenges.cloudflare.com";
     newHeaders.set('Content-Security-Policy', [
       "default-src 'self'",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-      "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com",
+      scriptSrc,
       "connect-src 'self' https://techtrekgt.com https://challenges.cloudflare.com",
       "img-src 'self' data: blob: https://challenges.cloudflare.com https://*.ebayimg.com https://i.ebayimg.com https://*.ebaystatic.com https://*.media-amazon.com https://m.media-amazon.com https://images-na.ssl-images-amazon.com https://*.ssl-images-amazon.com",
       "font-src 'self' data: https://fonts.gstatic.com",
@@ -86,17 +133,27 @@ function addSecurityHeaders(response, isLocalhost = false, requestOrigin = '') {
   newHeaders.set('Access-Control-Max-Age', '86400');
 
   const contentType = newHeaders.get('content-type') || '';
-  if (contentType.includes('text/html')) {
+  const isHtml = contentType.includes('text/html');
+  if (isHtml) {
     newHeaders.set('Cache-Control', 'no-cache, no-store, must-revalidate');
     newHeaders.set('Pragma', 'no-cache');
     newHeaders.set('Expires', '0');
   }
 
-  return new Response(response.body, {
+  const rewritten = new Response(response.body, {
     status: response.status,
     statusText: response.statusText,
     headers: newHeaders
   });
+
+  if (isHtml && nonce && response.body && typeof HTMLRewriter !== 'undefined') {
+    return new HTMLRewriter()
+      .on('script', new NonceInjector(nonce))
+      .on('head', new HeadNonceInjector(nonce))
+      .transform(rewritten);
+  }
+
+  return rewritten;
 }
 
 export default {
@@ -106,6 +163,7 @@ export default {
 
     const isLocalhost = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
     const requestOrigin = request.headers.get('Origin') || '';
+    const nonce = base64UrlEncodeBytes(crypto.getRandomValues(new Uint8Array(16)));
     if (!isLocalhost && (url.protocol === 'http:' || request.headers.get('x-forwarded-proto') === 'http')) {
       url.protocol = 'https:';
       return Response.redirect(url.toString(), 301);
@@ -121,7 +179,7 @@ export default {
     }
 
     if (request.method === 'OPTIONS') {
-      return addSecurityHeaders(new Response(null, { status: 204 }), isLocalhost, requestOrigin);
+      return addSecurityHeaders(new Response(null, { status: 204 }), isLocalhost, requestOrigin, nonce);
     }
 
     let response;
@@ -152,6 +210,10 @@ export default {
         response = await updateProfileHandler(context);
       } else if (apiPath === '/api/auth/me' && request.method === 'GET') {
         response = await meHandler(context);
+      } else if (apiPath === '/api/auth/verify-email' && request.method === 'GET') {
+        response = await verifyEmailGetHandler(context);
+      } else if (apiPath === '/api/auth/verify-email' && request.method === 'POST') {
+        response = await verifyEmailPostHandler(context);
       } else if (apiPath === '/api/auth/logout' && request.method === 'POST') {
         response = await logoutHandler(context);
       // --- Invoices ---
@@ -293,6 +355,15 @@ export default {
         response = await syncSettingsPutHandler(context);
       } else if (apiPath === '/api/sync/item' && request.method === 'POST') {
         response = await amazonImportHandler(context);
+      // --- API Integrations (HIGH-2) ---
+      } else if (apiPath === '/api/integrations' && request.method === 'GET') {
+        response = await integrationsListHandler(context);
+      } else if (apiPath === '/api/integrations' && request.method === 'POST') {
+        response = await integrationsCreateHandler(context);
+      } else if ((apiPath === '/api/integrations/revoke' || /^\/api\/integrations\/[^/]+\/revoke$/.test(apiPath)) && request.method === 'POST') {
+        response = await integrationRevokeHandler(context);
+      } else if (/^\/api\/integrations\/[^/]+$/.test(apiPath) && request.method === 'DELETE') {
+        response = await integrationDeleteHandler(context);
       } else if (apiPath.startsWith('/api/')) {
         response = new Response(JSON.stringify({ error: 'Endpoint not found' }), {
           status: 404,
@@ -367,13 +438,15 @@ export default {
           : await fetch(request);
       }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : String(err || 'Server error');
-      response = new Response(JSON.stringify({ error: errorMessage }), {
+      console.error('[worker] unhandled error:', err && err.stack ? err.stack : err);
+      response = new Response(JSON.stringify({ error: 'An internal error occurred. Please try again.' }), {
         status: 500,
         headers: { 'Content-Type': 'application/json' }
       });
     }
 
-    return addSecurityHeaders(response, isLocalhost, requestOrigin);
+    return addSecurityHeaders(response, isLocalhost, requestOrigin, nonce);
   }
 };
+
+export { addSecurityHeaders };

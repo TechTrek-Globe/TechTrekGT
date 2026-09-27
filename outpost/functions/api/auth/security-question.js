@@ -4,27 +4,39 @@ export async function onRequestPost(context) {
   const { request, env } = context;
 
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
-  const rlKey = `sec-q:${ip}`;
-  const { allowed, retryAfter } = await checkRateLimit(env.RATE_LIMIT_KV, rlKey, 10, 60);
-
-  if (!allowed) {
-    return new Response(JSON.stringify({ error: 'Too many requests. Please wait.' }), {
-      status: 429,
-      headers: { 'Content-Type': 'application/json', 'Retry-After': String(retryAfter) }
-    });
-  }
+  const ipRlKey = `sec-q:${ip}`;
+  const ipLimit = await checkRateLimit(env.RATE_LIMIT_KV, ipRlKey, 10, 60);
 
   try {
     const body = await request.json();
     const { email } = body;
 
     if (!email) {
+      if (!ipLimit.allowed) {
+        return new Response(JSON.stringify({ error: 'Too many requests. Please wait.' }), {
+          status: 429,
+          headers: { 'Content-Type': 'application/json', 'Retry-After': String(ipLimit.retryAfter) }
+        });
+      }
       return new Response(JSON.stringify({ error: 'Email address is required.' }), {
         status: 400, headers: { 'Content-Type': 'application/json' }
       });
     }
 
     const cleanEmail = email.trim().toLowerCase();
+    const accountRlKey = `sec-q-account:${cleanEmail}`;
+    const accountLimit = await checkRateLimit(env.RATE_LIMIT_KV, accountRlKey, 10, 900);
+
+    if (!ipLimit.allowed || !accountLimit.allowed) {
+      const retryAfter = Math.max(
+        !ipLimit.allowed ? (ipLimit.retryAfter || 60) : 0,
+        !accountLimit.allowed ? (accountLimit.retryAfter || 60) : 0
+      );
+      return new Response(JSON.stringify({ error: 'Too many requests. Please wait.' }), {
+        status: 429,
+        headers: { 'Content-Type': 'application/json', 'Retry-After': String(retryAfter) }
+      });
+    }
 
     if (!env.DB) {
       return new Response(JSON.stringify({ error: 'Database binding DB not available.' }), {
@@ -63,6 +75,12 @@ export async function onRequestPost(context) {
     });
 
   } catch (err) {
+    if (ipLimit && !ipLimit.allowed) {
+      return new Response(JSON.stringify({ error: 'Too many requests. Please wait.' }), {
+        status: 429,
+        headers: { 'Content-Type': 'application/json', 'Retry-After': String(ipLimit.retryAfter) }
+      });
+    }
     console.error('[outpost security-question] error:', err);
     return new Response(JSON.stringify({ error: 'An internal error occurred.' }), {
       status: 500, headers: { 'Content-Type': 'application/json' }

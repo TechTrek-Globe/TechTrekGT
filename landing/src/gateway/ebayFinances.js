@@ -41,11 +41,12 @@ export async function onRequestGet(context) {
 
     if (!res.ok) {
       const text = await res.text().catch(() => '');
+      console.error(`[ebayFinances] eBay Finances API error (${res.status}):`, text);
       // 403 likely means sell.finances scope not yet approved
       if (res.status === 403) {
         return err('eBay Finances API access not approved. Apply for sell.finances scope at developer.ebay.com.', 403);
       }
-      return err(`eBay Finances API error (${res.status}): ${text.slice(0, 200)}`, res.status);
+      return err('Failed to retrieve fee data from eBay Finances API. Please try again.', res.status);
     }
 
     const data = await res.json();

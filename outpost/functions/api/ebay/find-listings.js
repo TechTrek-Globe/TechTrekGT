@@ -38,10 +38,15 @@ export async function onRequestGet(context) {
       ).bind(payload.userId).run().catch(() => {});
 
     } catch (e) {
-      const msg = e.message || 'Unknown error';
-      if (msg.includes('not connected') || msg.includes('refresh token has expired')) return err(msg, 401);
-      if (msg.includes('EBAY_CLIENT_ID') || msg.includes('Cannot refresh token')) return err(msg, 500);
-      return err(`eBay sync failed: ${msg}`, 502);
+      console.error('[find-listings] eBay listings fetch failed:', e);
+      const msg = e.message || '';
+      if (msg.includes('not connected') || msg.includes('expired')) {
+        return err('eBay account not connected or session expired. Please connect your eBay account.', 401);
+      }
+      if (msg.includes('EBAY_CLIENT_ID') || msg.includes('Cannot refresh token')) {
+        return err('Server misconfiguration: eBay client credentials missing or invalid.', 500);
+      }
+      return err('Failed to fetch active eBay listings. Please try again.', 502);
     }
 
     const rows = await env.DB.prepare(`

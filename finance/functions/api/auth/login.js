@@ -1,7 +1,7 @@
 import {
   verifyPassword, hashPassword, needsRehash, readJson, asTrimmedString,
   json, fail, issueSession, sessionCookies, withCookies, newCsrfToken,
-  verifyTurnstile, ERROR_CODES, emitMetric, toPublicUser,
+  verifyTurnstile, ERROR_CODES, emitMetric, toPublicUser, isThreePartHash,
   MAX_BODY_AUTH, MAX_EMAIL_LEN, MAX_PASS_LEN
 } from '../../utils/auth.js';
 import { enforceRateLimit } from '../../utils/rateLimit.js';
@@ -43,7 +43,7 @@ export async function onRequestPost(context) {
     if (accountLimited) return accountLimited;
 
     const user = await env.DB.prepare(
-      'SELECT id, email, name, password_hash, role, token_version, security_question, security_answer_hash, status, email_verified, pending_email FROM users WHERE email = ?'
+      'SELECT id, email, name, password_hash, role, token_version, security_question, security_answer_hash, status, email_verified, pending_email, force_password_reset FROM users WHERE email = ?'
     ).bind(cleanEmail).first();
 
     // Timing equalization: perform a hash even when the account does not exist
@@ -52,6 +52,21 @@ export async function onRequestPost(context) {
       await hashPassword(password).catch(() => {});
       emitMetric('auth.login.invalid_credentials', requestId);
       return fail(ERROR_CODES.INVALID_CREDENTIALS, 401, 'Invalid email or password.', requestId);
+    }
+
+    // Forced password reset check (HIGH-6):
+    // Accounts marked with force_password_reset or legacy non-3-part hashes must reset password.
+    if (user.force_password_reset === 1 || !isThreePartHash(user.password_hash)) {
+      emitMetric('auth.login.force_password_reset', requestId);
+      return json({
+        error: 'Password reset required. Your account security credentials must be updated before logging in.',
+        code: 'PASSWORD_RESET_REQUIRED',
+        forcePasswordReset: true,
+        requiresReset: true,
+        redirectTo: '/reset-password',
+        email: user.email,
+        ...(requestId ? { requestId } : {})
+      }, 403);
     }
 
     const isValid = await verifyPassword(password, user.password_hash);

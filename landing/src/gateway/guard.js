@@ -37,9 +37,8 @@ export async function withGatewayAuth(fn) {
     return await fn();
   } catch (err) {
     if (err instanceof Response) return err;
-    console.error('[gateway] unexpected error:', err);
-    const msg = err instanceof Error ? err.message : 'An internal gateway error occurred.';
-    return new Response(JSON.stringify({ error: msg }),
+    console.error('[gateway] unexpected error:', err && err.stack ? err.stack : err);
+    return new Response(JSON.stringify({ error: 'An internal error occurred. Please try again.' }),
       { status: 500, headers: { 'Content-Type': 'application/json' } });
   }
 }

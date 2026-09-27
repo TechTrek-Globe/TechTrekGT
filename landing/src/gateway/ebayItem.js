@@ -36,7 +36,8 @@ export async function onRequestGet(context) {
 
     if (!res.ok) {
       const text = await res.text().catch(() => '');
-      return err(`eBay item fetch failed (${res.status}): ${text.slice(0, 200)}`, res.status);
+      console.error(`[ebayItem] eBay item fetch failed (${res.status}):`, text);
+      return err('Failed to fetch eBay item details. Please try again.', res.status);
     }
 
     const data = await res.json();

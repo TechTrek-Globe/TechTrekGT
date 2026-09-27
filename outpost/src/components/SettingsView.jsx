@@ -72,6 +72,7 @@ export function SettingsView() {
 
   // VineScout / Amazon API token
   const [amazonToken, setAmazonToken] = useState(null);
+  const [hasAmazonToken, setHasAmazonToken] = useState(false);
   const [tokenLoading, setTokenLoading] = useState(false);
   const [tokenRotating, setTokenRotating] = useState(false);
   const [tokenCopied, setTokenCopied] = useState(false);
@@ -90,11 +91,14 @@ export function SettingsView() {
 
   // Auto-fetch API token when visiting the integrations tab
   useEffect(() => {
-    if (activeTab === 'integrations' && !amazonToken && !tokenLoading) {
+    if (activeTab === 'integrations' && !amazonToken && !hasAmazonToken && !tokenLoading) {
       setTokenLoading(true);
       fetch(getApiUrl('/api/import/amazon-token'), { credentials: 'include' })
         .then(r => r.json())
-        .then(d => { if (d.token) setAmazonToken(d.token); })
+        .then(d => {
+          if (d.token) setAmazonToken(d.token);
+          if (d.hasToken) setHasAmazonToken(true);
+        })
         .catch(err => console.error('Failed to auto-fetch API token:', err))
         .finally(() => setTokenLoading(false));
     }
@@ -819,6 +823,7 @@ export function SettingsView() {
             {/* 2. VineScout / Amazon Integration */}
             <VineScoutSection
               token={amazonToken}
+              hasToken={hasAmazonToken}
               loading={tokenLoading}
               rotating={tokenRotating}
               copied={tokenCopied}
@@ -827,7 +832,8 @@ export function SettingsView() {
                 try {
                   const res = await fetch(getApiUrl('/api/import/amazon-token'), { credentials: 'include' });
                   const d = await res.json();
-                  setAmazonToken(d.token || null);
+                  if (d.token) setAmazonToken(d.token);
+                  if (d.hasToken) setHasAmazonToken(true);
                 } catch (e) { console.error(e); } finally { setTokenLoading(false); }
               }}
               onRotate={async () => {
@@ -836,7 +842,8 @@ export function SettingsView() {
                 try {
                   const res = await fetch(getApiUrl('/api/import/amazon-token'), { method: 'POST', credentials: 'include' });
                   const d = await res.json();
-                  setAmazonToken(d.token || null);
+                  if (d.token) setAmazonToken(d.token);
+                  if (d.hasToken) setHasAmazonToken(true);
                   showSuccess('API token regenerated successfully.');
                 } catch (e) { console.error(e); } finally { setTokenRotating(false); }
               }}
@@ -1455,7 +1462,7 @@ export function SettingsView() {
 // ---------------------------------------------------------------------------
 // VineScout / Amazon Integration Section
 // ---------------------------------------------------------------------------
-function VineScoutSection({ token, loading, rotating, copied, onLoad, onRotate, onCopy }) {
+function VineScoutSection({ token, hasToken, loading, rotating, copied, onLoad, onRotate, onCopy }) {
   const [revealed, setRevealed] = React.useState(false);
   const [urlCopied, setUrlCopied] = React.useState(false);
 
@@ -1490,14 +1497,14 @@ function VineScoutSection({ token, loading, rotating, copied, onLoad, onRotate, 
             Connect your VScout Chrome extension for real-time item sync and automated sold reconciliation
           </p>
         </div>
-        {!token && (
+        {!token && !hasToken && (
           <button
             onClick={onLoad}
             disabled={loading}
             className="px-3.5 py-2 rounded-xl text-xs font-semibold text-teal-300 bg-teal-950/60 hover:bg-teal-900/60 border border-teal-500/40 transition-all flex items-center gap-1.5 disabled:opacity-50 shadow-sm"
           >
             {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShoppingCart className="w-3.5 h-3.5" />}
-            {loading ? 'Loading...' : 'Show Credentials'}
+            {loading ? 'Loading...' : 'Generate API Key'}
           </button>
         )}
       </div>
@@ -1546,9 +1553,14 @@ function VineScoutSection({ token, loading, rotating, copied, onLoad, onRotate, 
         {/* API Secret Key */}
         {token ? (
           <div>
-            <label className="block text-[11px] font-bold text-slate-300 mb-1.5 uppercase tracking-wide">
-              API Secret Key (Paste into VScout)
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wide">
+                API Secret Key (Paste into VScout)
+              </label>
+              <span className="text-[10px] text-amber-400 font-semibold bg-amber-950/40 px-2 py-0.5 rounded border border-amber-900/40">
+                Shown Once Upon Generation
+              </span>
+            </div>
             <div className="flex items-center gap-2">
               <div className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 font-mono text-xs text-amber-300 overflow-hidden whitespace-nowrap overflow-ellipsis">
                 {displayToken}
@@ -1575,6 +1587,9 @@ function VineScoutSection({ token, loading, rotating, copied, onLoad, onRotate, 
                 {copied ? 'Copied!' : 'Copy Key'}
               </button>
             </div>
+            <p className="text-[11px] text-amber-300/80 mt-2">
+              Make sure to copy your key now. For your security, raw credentials are never stored or displayed again.
+            </p>
             <div className="flex items-center justify-between pt-3 mt-3 border-t border-slate-800/60">
               <p className="text-[11px] text-slate-400">Key is user-scoped and never expires unless rotated.</p>
               <button
@@ -1588,16 +1603,46 @@ function VineScoutSection({ token, loading, rotating, copied, onLoad, onRotate, 
               </button>
             </div>
           </div>
+        ) : hasToken ? (
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wide">
+                API Secret Key (Active)
+              </label>
+              <span className="text-[10px] text-emerald-400 font-semibold bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-900/40">
+                SHA-256 Hashed
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 font-mono text-xs text-slate-400 select-none">
+                ••••••••••••••••••••••••••••••••••••••••
+              </div>
+            </div>
+            <div className="flex items-center justify-between pt-3 mt-3 border-t border-slate-800/60">
+              <p className="text-[11px] text-slate-400">
+                Your key is active and securely hashed. For security, raw keys cannot be viewed again. If you lost your key, rotate below.
+              </p>
+              <button
+                type="button"
+                onClick={onRotate}
+                disabled={rotating}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-amber-400 hover:text-amber-300 bg-amber-950/30 hover:bg-amber-950/60 border border-amber-900/40 transition-all flex items-center gap-1.5 disabled:opacity-50 flex-shrink-0"
+              >
+                {rotating ? <Loader2 className="w-3 h-3 animate-spin" /> : <RotateCcw className="w-3 h-3" />}
+                <span>Rotate Key</span>
+              </button>
+            </div>
+          </div>
         ) : (
           <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 text-center">
-            <p className="text-xs text-slate-400 mb-2">Click "Show Credentials" above to generate and reveal your API Secret Key.</p>
+            <p className="text-xs text-slate-400 mb-2">Click "Generate API Key" above to create and reveal your initial API Secret Key.</p>
             <button
               onClick={onLoad}
               disabled={loading}
               className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-teal-300 bg-teal-950/60 hover:bg-teal-900/60 border border-teal-500/40 transition-all inline-flex items-center gap-1.5 disabled:opacity-50"
             >
               {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
-              <span>Generate / Reveal API Key</span>
+              <span>Generate API Key</span>
             </button>
           </div>
         )}

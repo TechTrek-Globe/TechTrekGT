@@ -92,7 +92,7 @@ export async function onRequestPost(context) {
     // Bumping token_version kills every outstanding session for this account.
     await env.DB.batch([
       env.DB.prepare(
-        'UPDATE users SET password_hash = ?, token_version = COALESCE(token_version, 0) + 1 WHERE id = ?'
+        'UPDATE users SET password_hash = ?, token_version = COALESCE(token_version, 0) + 1, force_password_reset = 0 WHERE id = ?'
       ).bind(newPasswordHash, user.id),
       env.DB.prepare('UPDATE password_resets SET used = 1 WHERE id = ?').bind(record.id),
       env.DB.prepare('UPDATE password_resets SET used = 1 WHERE email = ? AND used = 0').bind(cleanEmail)

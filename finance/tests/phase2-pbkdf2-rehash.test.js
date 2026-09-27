@@ -84,13 +84,11 @@ describe('PBKDF2 Decoupling & Transparent Migration Tests', () => {
     );
   });
 
-  test('needsRehash correctly flags legacy and older iteration counts for upgrade', () => {
-    const legacyHash = '0123456789abcdef0123456789abcdef:fedcba9876543210fedcba9876543210';
+  test('needsRehash correctly flags older 3-part iteration counts for upgrade', () => {
     const old100kHash = '0123456789abcdef0123456789abcdef:100000:fedcba9876543210fedcba9876543210';
     const old310kHash = '0123456789abcdef0123456789abcdef:310000:fedcba9876543210fedcba9876543210';
     const current600kHash = '0123456789abcdef0123456789abcdef:600000:fedcba9876543210fedcba9876543210';
 
-    assert.strictEqual(needsRehash(legacyHash), true, 'Legacy 2-part hash must require rehash');
     assert.strictEqual(needsRehash(old100kHash), true, '100k iteration hash must require rehash');
     assert.strictEqual(needsRehash(old310kHash), true, '310k iteration hash must require rehash');
     assert.strictEqual(needsRehash(current600kHash), false, '600k iteration hash must NOT require rehash');
@@ -132,13 +130,11 @@ describe('PBKDF2 Decoupling & Transparent Migration Tests', () => {
     assert.strictEqual(recheck, true, 'verifyPassword must validate against the updated 600k hash');
   });
 
-  test('fresh login by existing user with legacy 2-part hash transparently rehashes to 600,000', async () => {
+  test('login by existing user with legacy 2-part hash is intercepted and redirected to reset-password (HIGH-6)', async () => {
     const password = 'LegacyUserPass123!';
     const salt = crypto.getRandomValues(new Uint8Array(16));
     const oldBits = await deriveBits(password, salt, 100000);
     const legacyHash = `${toHex(salt)}:${toHex(oldBits)}`;
-
-    assert.strictEqual(needsRehash(legacyHash), true, 'Legacy hash must require rehash');
 
     await mockDb.prepare(
       'INSERT INTO users (id, email, password_hash, name, role, token_version) VALUES (?, ?, ?, ?, ?, ?)'
@@ -151,12 +147,11 @@ describe('PBKDF2 Decoupling & Transparent Migration Tests', () => {
     });
 
     const res = await loginPost({ request: req, env, requestId: 'test-migration-req-2' });
-    assert.strictEqual(res.status, 200, 'Login must succeed for legacy user');
-
-    const updatedUser = await mockDb.prepare('SELECT password_hash FROM users WHERE id = ?').bind('usr-migration-legacy').first();
-    const parsedUpdated = parseStoredHash(updatedUser.password_hash);
-    assert.ok(parsedUpdated, 'Updated hash must be valid 3-part format');
-    assert.strictEqual(parsedUpdated.iterations, 600000, 'Updated hash must use 600,000 iterations');
+    assert.strictEqual(res.status, 403, 'Login must be rejected with 403 Forbidden for legacy 2-part hash');
+    const data = await res.json();
+    assert.strictEqual(data.forcePasswordReset, true);
+    assert.strictEqual(data.requiresReset, true);
+    assert.strictEqual(data.redirectTo, '/reset-password');
   });
 
   test('stored hash with iterations exceeding ceiling fails closed safely on login attempt', async () => {

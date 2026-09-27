@@ -30,14 +30,38 @@ export async function hashPassword(password) {
   return `${saltHex}:310000:${hashHex}`;
 }
 
-// Verify PBKDF2 Password Hash
-export async function verifyPassword(password, storedHash) {
+// Check if a stored password hash strictly complies with 3-part format (salt:iterations:hash)
+export function isThreePartHash(storedHash) {
+  if (!storedHash || typeof storedHash !== 'string') return false;
   const parts = storedHash.split(':');
-  const [saltHex, iterationsOrHash, maybeHash] = parts;
-  const iterations = parts.length === 3 ? parseInt(iterationsOrHash, 10) : 100000;
-  const originalHashHex = parts.length === 3 ? maybeHash : iterationsOrHash;
+  if (parts.length !== 3) return false;
+  const [saltHex, iterationsStr, hashHex] = parts;
+  const iterations = parseInt(iterationsStr, 10);
+  return Boolean(
+    saltHex &&
+    saltHex.length === 32 &&
+    hashHex &&
+    hashHex.length === 64 &&
+    Number.isInteger(iterations) &&
+    iterations >= 1000
+  );
+}
 
-  if (!saltHex || !originalHashHex) return false;
+// Verify PBKDF2 Password Hash (HIGH-6: strictly enforces 3-part salt:iterations:hash format, no fallback)
+export async function verifyPassword(password, storedHash) {
+  if (!password || !storedHash || typeof storedHash !== 'string') return false;
+
+  const parts = storedHash.split(':');
+  if (parts.length !== 3) {
+    // Non-3-part format is rejected; never silently guess iterations
+    return false;
+  }
+
+  const [saltHex, iterationsStr, originalHashHex] = parts;
+  const iterations = parseInt(iterationsStr, 10);
+  if (!saltHex || !originalHashHex || !Number.isInteger(iterations) || iterations < 1) {
+    return false;
+  }
 
   const salt = new Uint8Array(saltHex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
   const enc = new TextEncoder();
@@ -86,14 +110,14 @@ function base64UrlDecode(str) {
   return atob(base64);
 }
 
-// Create Signed JWT Token
-export async function createToken(payload, secret) {
+// Create Signed JWT Token (HIGH-5: accepts expiresInSeconds, defaulting to 7200)
+export async function createToken(payload, secret, expiresInSeconds = 7200) {
   if (!secret) throw new Error('JWT_SECRET is not defined in environment variables');
   const header = { alg: 'HS256', typ: 'JWT' };
   const encodedHeader = base64UrlEncode(JSON.stringify(header));
   const encodedPayload = base64UrlEncode(JSON.stringify({
     ...payload,
-    exp: Math.floor(Date.now() / 1000) + (2 * 60 * 60)
+    exp: Math.floor(Date.now() / 1000) + expiresInSeconds
   }));
 
   const dataToSign = `${encodedHeader}.${encodedPayload}`;
@@ -189,3 +213,117 @@ export function getTokenFromRequest(request) {
 
   return null;
 }
+
+/**
+ * Sends a transactional email using Cloudflare Email Workers, Resend API, or falls back to dev logging.
+ */
+export async function sendTransactionalEmail(env, {
+  to,
+  subject,
+  bodyLines = [],
+  logPrefix = '[email]',
+  devFallbackMessage = ''
+}) {
+  const text = bodyLines.join('\n');
+  const recipients = Array.isArray(to) ? to : [to];
+
+  if (env?.SEND_EMAIL && typeof env.SEND_EMAIL.send === 'function') {
+    try {
+      await env.SEND_EMAIL.send({
+        to: recipients[0],
+        from: env.MAIL_FROM || 'no-reply@techtrekgt.com',
+        subject,
+        text
+      });
+      return true;
+    } catch (e) {
+      console.error(`${logPrefix} Cloudflare send_email failed:`, e && e.message);
+    }
+  }
+
+  if (env?.RESEND_API_KEY && env?.MAIL_FROM) {
+    try {
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${env.RESEND_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          from: env.MAIL_FROM,
+          to: recipients,
+          subject,
+          text
+        })
+      });
+      if (!res.ok) {
+        console.error(`${logPrefix} mail provider returned`, res.status);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.error(`${logPrefix} mail send failed:`, err && err.message);
+      return false;
+    }
+  }
+
+  if (devFallbackMessage) {
+    console.error(`${logPrefix} ${devFallbackMessage}`);
+  } else {
+    console.error(`${logPrefix} mail delivery is not configured; dev notification for ${recipients.join(', ')}`);
+  }
+  return false;
+}
+
+/**
+ * Sends a password reset email containing the single-use reset token.
+ */
+export async function sendResetEmail(env, toEmail, token, securityQuestion) {
+  const lines = [
+    'You asked to reset your TechTrek Outpost password.',
+    '',
+    `Your password reset token is: ${token}`,
+    '',
+    'This token expires in 15 minutes and can only be used once.'
+  ];
+  if (securityQuestion) {
+    lines.push('', `Security question: ${securityQuestion}`);
+  }
+  lines.push('', 'If you did not request this, you can safely ignore this email.');
+
+  return sendTransactionalEmail(env, {
+    to: toEmail,
+    subject: 'TechTrek Outpost - Password Reset Token',
+    bodyLines: lines,
+    logPrefix: '[forgot-password]',
+    devFallbackMessage: `mail delivery is not configured; dev reset token for ${toEmail}: ${token}`
+  });
+}
+
+/**
+ * Sends an email verification email containing the verification link and single-use token.
+ */
+export async function sendVerificationEmail(env, toEmail, token) {
+  const verifyUrl = `https://techtrekgt.com/outpost/api/auth/verify-email?token=${encodeURIComponent(token)}`;
+  const lines = [
+    'Thank you for registering for TechTrek Outpost.',
+    '',
+    'Please verify your email address to complete your registration and activate your account:',
+    verifyUrl,
+    '',
+    `Your single-use verification token is: ${token}`,
+    '',
+    'This verification token expires in 24 hours and can only be used once.',
+    '',
+    'If you did not create this account, you can safely ignore this email.'
+  ];
+
+  return sendTransactionalEmail(env, {
+    to: toEmail,
+    subject: 'TechTrek Outpost - Verify Your Email Address',
+    bodyLines: lines,
+    logPrefix: '[verify-email]',
+    devFallbackMessage: `mail delivery is not configured; dev verification link for ${toEmail}: ${verifyUrl}`
+  });
+}
+

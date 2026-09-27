@@ -76,7 +76,8 @@ async function fetchFreshEbayToken(env) {
 
   if (!response.ok) {
     const text = await response.text().catch(() => '');
-    throw new Error(`eBay OAuth failed (${response.status}) [target: ${isSandbox ? 'sandbox' : 'production'}]: ${text.slice(0, 300)}`);
+    console.error(`[ebay] eBay OAuth failed (${response.status}) [target: ${isSandbox ? 'sandbox' : 'production'}]:`, text);
+    throw new Error('eBay authentication failed. Please reconnect your eBay account.');
   }
 
   const data = await response.json();

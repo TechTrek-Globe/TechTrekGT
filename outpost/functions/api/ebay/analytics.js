@@ -90,7 +90,8 @@ export async function onRequestGet(context) {
     try {
       accessToken = await getEbayUserToken(env, payload.userId);
     } catch (e) {
-      return err(`eBay authentication failed: ${e.message}`, 401);
+      console.error('[analytics] eBay authentication failed:', e);
+      return err('eBay authentication failed. Please reconnect your eBay account.', 401);
     }
 
     const tokenRow = await env.DB.prepare(
@@ -149,7 +150,7 @@ export async function onRequestGet(context) {
 
       if (!res.ok) {
         const errorText = await res.text().catch(() => '');
-        console.warn(`[analytics] eBay API responded with ${res.status}:`, errorText);
+        console.error(`[analytics] eBay API responded with ${res.status}:`, errorText);
         if (res.status === 403 || errorText.includes('scope') || errorText.includes('Unauthorized')) {
           return ok({
             success: false,
@@ -159,12 +160,13 @@ export async function onRequestGet(context) {
             error: 'eBay Analytics scope approval required. Please re-authorize your eBay account.'
           });
         }
-        return err(`eBay Analytics API error (${res.status}): ${errorText.slice(0, 200)}`, res.status);
+        return err('eBay Analytics request failed. Please try reconnecting your account.', res.status);
       }
 
       ebayData = await res.json();
     } catch (e) {
-      return err(`Failed to fetch traffic report from eBay: ${e.message}`, 500);
+      console.error('[analytics] Failed to fetch traffic report from eBay:', e);
+      return err('Failed to fetch traffic report from eBay. Please try again.', 500);
     }
 
     // 5. Parse eBay Analytics Data
@@ -370,7 +372,8 @@ export async function onRequestPost(context) {
     try {
       accessToken = await getEbayUserToken(env, payload.userId);
     } catch (e) {
-      return err(`eBay authentication failed: ${e.message}`, 401);
+      console.error('[analytics] eBay authentication failed:', e);
+      return err('eBay authentication failed. Please reconnect your eBay account.', 401);
     }
 
     // --- Pacific Time date boundaries with mandatory T-1 lag ---
@@ -418,11 +421,13 @@ export async function onRequestPost(context) {
       });
       if (!res.ok) {
         const errText = await res.text().catch(() => '');
-        return err(`eBay Analytics API error (${res.status}): ${errText.slice(0, 200)}`, res.status);
+        console.error(`[analytics] eBay Analytics API error (${res.status}):`, errText);
+        return err('eBay Analytics request failed. Please try reconnecting your account.', res.status);
       }
       ebayData = await res.json();
     } catch (e) {
-      return err(`Failed to fetch daily traffic from eBay: ${e.message}`, 500);
+      console.error('[analytics] Failed to fetch daily traffic from eBay:', e);
+      return err('Failed to fetch daily traffic from eBay. Please try again.', 500);
     }
 
     // --- Parse metric key index map ---

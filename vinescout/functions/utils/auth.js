@@ -11,12 +11,20 @@ export async function hashPassword(password) {
   return `${saltHex}:310000:${hashHex}`;
 }
 
-export async function verifyPassword(password, storedHash) {
+export function isThreePartHash(storedHash) {
+  if (typeof storedHash !== 'string') return false;
   const parts = storedHash.split(':');
-  const [saltHex, iterationsOrHash, maybeHash] = parts;
-  const iterations = parts.length === 3 ? parseInt(iterationsOrHash, 10) : 100000;
-  const originalHashHex = parts.length === 3 ? maybeHash : iterationsOrHash;
-  if (!saltHex || !originalHashHex) return false;
+  if (parts.length !== 3) return false;
+  const [saltHex, iterStr, hashHex] = parts;
+  const iterations = parseInt(iterStr, 10);
+  return Boolean(saltHex && hashHex && Number.isInteger(iterations) && iterations >= 1);
+}
+
+export async function verifyPassword(password, storedHash) {
+  if (!isThreePartHash(storedHash)) return false;
+  const parts = storedHash.split(':');
+  const [saltHex, iterStr, originalHashHex] = parts;
+  const iterations = parseInt(iterStr, 10);
   const salt = new Uint8Array(saltHex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
   const enc = new TextEncoder();
   const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(password), { name: 'PBKDF2' }, false, ['deriveBits']);
@@ -38,11 +46,11 @@ function base64UrlDecode(str) {
   return atob(base64);
 }
 
-export async function createToken(payload, secret) {
+export async function createToken(payload, secret, expiresInSeconds = 7200) {
   if (!secret) throw new Error('JWT_SECRET is not defined');
   const header = { alg: 'HS256', typ: 'JWT' };
   const encodedHeader = base64UrlEncode(JSON.stringify(header));
-  const encodedPayload = base64UrlEncode(JSON.stringify({ ...payload, exp: Math.floor(Date.now() / 1000) + (2 * 60 * 60) }));
+  const encodedPayload = base64UrlEncode(JSON.stringify({ ...payload, exp: Math.floor(Date.now() / 1000) + expiresInSeconds }));
   const dataToSign = `${encodedHeader}.${encodedPayload}`;
   const enc = new TextEncoder();
   const cryptoKey = await crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);

@@ -47,12 +47,12 @@ function base64UrlDecode(str) {
   return atob(base64);
 }
 
-export async function createToken(payload, secret) {
+export async function createToken(payload, secret, expiresInSeconds = 7200) {
   if (!secret) throw new Error('JWT_SECRET is not defined');
   const header = { alg: 'HS256', typ: 'JWT' };
   const encodedHeader = base64UrlEncode(JSON.stringify(header));
   const encodedPayload = base64UrlEncode(JSON.stringify({
-    ...payload, exp: Math.floor(Date.now() / 1000) + (2 * 60 * 60)
+    ...payload, exp: Math.floor(Date.now() / 1000) + expiresInSeconds
   }));
   const dataToSign = `${encodedHeader}.${encodedPayload}`;
   const enc = new TextEncoder();

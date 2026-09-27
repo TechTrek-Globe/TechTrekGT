@@ -1,3 +1,5 @@
+import { resolveIntegrationUserId } from '../../utils/apiIntegrations.js';
+
 export async function onRequestGet({ request, env }) {
   try {
     const rawAuth = request.headers.get('X-VineScout-Auth') ||
@@ -10,17 +12,9 @@ export async function onRequestGet({ request, env }) {
       });
     }
 
-    let isAuthorized = false;
-    if (env.OUTPOST_SECRET_KEY && rawAuth === env.OUTPOST_SECRET_KEY) {
-      isAuthorized = true;
-    } else if (env.DB) {
-      const user = await env.DB.prepare(
-        `SELECT id FROM users WHERE amazon_api_token = ? LIMIT 1`
-      ).bind(rawAuth).first();
-      if (user) isAuthorized = true;
-    }
+    const userId = await resolveIntegrationUserId(rawAuth, env);
 
-    if (!isAuthorized) {
+    if (!userId) {
       return new Response(JSON.stringify({ error: 'Unauthorized: invalid token' }), {
         status: 401,
         headers: { 'Content-Type': 'application/json' }
@@ -49,9 +43,10 @@ export async function onRequestGet({ request, env }) {
       FROM auction_items i
       LEFT JOIN auction_invoices v ON i.invoice_id = v.id
       WHERE i.status != 'Sold'
+        AND i.user_id = ?
     `;
 
-    const { results } = await env.DB.prepare(query).all();
+    const { results } = await env.DB.prepare(query).bind(userId).all();
 
     const inventoryList = (results || []).map(row => {
       let asin = null;

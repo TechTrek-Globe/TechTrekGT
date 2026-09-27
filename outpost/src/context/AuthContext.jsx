@@ -79,6 +79,10 @@ export function AuthProvider({ children }) {
 
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
+      if (data.requiresReset || data.forcePasswordReset) {
+        window.location.href = `${getApiUrl('/reset-password')}?email=${encodeURIComponent(email)}&reason=legacy_hash`;
+        return { requiresReset: true };
+      }
       throw new Error(data.error || `Login failed (HTTP ${res.status})`);
     }
 

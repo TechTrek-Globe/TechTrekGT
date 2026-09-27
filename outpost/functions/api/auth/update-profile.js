@@ -36,6 +36,14 @@ export async function onRequestPost(context) {
     }
 
     const body = await request.json();
+
+    if (body && ('is_admin' in body || body.is_admin !== undefined || 'isAdmin' in body || body.isAdmin !== undefined)) {
+      return new Response(JSON.stringify({ error: 'Field is_admin cannot be set via client request.' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
     const { name, email, securityQuestion, securityAnswer, currentPassword, newPassword } = body;
 
     const user = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(payload.userId).first();
@@ -115,16 +123,16 @@ export async function onRequestPost(context) {
       WHERE id = ?
     `).bind(updatedName, updatedEmail, updatedQuestion, updatedAnswerHash, updatedPasswordHash, user.id).run();
 
+    // Preserve remaining JWT lifetime so rememberMe users don't get downgraded (MEDIUM-2, HIGH-5)
+    const remainingSeconds = payload.exp
+      ? Math.max(payload.exp - Math.floor(Date.now() / 1000), 3600)
+      : 7200;
+
     const newToken = await createToken({
       userId: user.id,
       email: updatedEmail,
       name: updatedName
-    }, env.JWT_SECRET);
-
-    // Preserve remaining JWT lifetime so rememberMe users don't get downgraded (MEDIUM-2)
-    const remainingSeconds = payload.exp
-      ? Math.max(payload.exp - Math.floor(Date.now() / 1000), 3600)
-      : 7200;
+    }, env.JWT_SECRET, remainingSeconds);
 
     return new Response(JSON.stringify({
       success: true,

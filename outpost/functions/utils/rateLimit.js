@@ -1,7 +1,14 @@
 // Uses Cloudflare KV for distributed rate limiting
-export async function checkRateLimit(kv, key, maxRequests, windowSeconds) {
+export async function checkRateLimit(kv, key, maxRequests, windowSeconds, failClosed = false) {
+  const isFailClosed = typeof failClosed === 'object' && failClosed !== null
+    ? Boolean(failClosed.failClosed)
+    : Boolean(failClosed);
+
   if (!kv) {
     console.warn('[rateLimit] RATE_LIMIT_KV not bound - rate limiting disabled. Check wrangler config.');
+    if (isFailClosed) {
+      return { allowed: false, retryAfter: 60 };
+    }
     return { allowed: true };
   }
 
@@ -18,6 +25,9 @@ export async function checkRateLimit(kv, key, maxRequests, windowSeconds) {
     return { allowed: true };
   } catch (err) {
     console.error('[rateLimit] failed to check KV:', err);
+    if (isFailClosed) {
+      return { allowed: false, retryAfter: 60 };
+    }
     return { allowed: true };
   }
 }

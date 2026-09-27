@@ -55,7 +55,8 @@ export async function onRequestPost(context) {
     try {
       accessToken = await getEbayUserToken(env, payload.userId);
     } catch (e) {
-      return err(`eBay authentication failed: ${e.message}`, 401);
+      console.error('[sync-item] eBay authentication failed:', e);
+      return err('eBay authentication failed. Please reconnect your eBay account.', 401);
     }
 
     // If no eBay listing ID is linked, attempt to discover order or active listing by SKU or Title

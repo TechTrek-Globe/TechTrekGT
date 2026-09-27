@@ -1,31 +1,43 @@
-import { hashPassword } from '../../utils/auth.js';
+import { hashPassword, verifyPassword } from '../../utils/auth.js';
 import { checkRateLimit } from '../../utils/rateLimit.js';
 
 export async function onRequestPost(context) {
   const { request, env } = context;
 
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
-  const rlKey = `reset:${ip}`;
-  const { allowed, retryAfter } = await checkRateLimit(env.RATE_LIMIT_KV, rlKey, 5, 600);
-
-  if (!allowed) {
-    return new Response(JSON.stringify({ error: 'Too many password reset attempts. Please wait.' }), {
-      status: 429,
-      headers: { 'Content-Type': 'application/json', 'Retry-After': String(retryAfter) }
-    });
-  }
+  const ipRlKey = `reset:${ip}`;
+  const ipLimit = await checkRateLimit(env.RATE_LIMIT_KV, ipRlKey, 5, 600);
 
   try {
-    const body = await request.json();
-    const { email, newPassword } = body;
+    const body = await request.json().catch(() => ({}));
+    const { email, newPassword, token: bodyToken, resetToken: bodyResetToken, securityAnswer } = body;
 
     if (!email || !newPassword) {
+      if (!ipLimit.allowed) {
+        return new Response(JSON.stringify({ error: 'Too many password reset attempts. Please wait.' }), {
+          status: 429,
+          headers: { 'Content-Type': 'application/json', 'Retry-After': String(ipLimit.retryAfter) }
+        });
+      }
       return new Response(JSON.stringify({ error: 'Email and new password are required.' }), {
         status: 400, headers: { 'Content-Type': 'application/json' }
       });
     }
 
     const cleanEmail = email.trim().toLowerCase();
+    const accountRlKey = `reset-account:${cleanEmail}`;
+    const accountLimit = await checkRateLimit(env.RATE_LIMIT_KV, accountRlKey, 5, 900);
+
+    if (!ipLimit.allowed || !accountLimit.allowed) {
+      const retryAfter = Math.max(
+        !ipLimit.allowed ? (ipLimit.retryAfter || 60) : 0,
+        !accountLimit.allowed ? (accountLimit.retryAfter || 60) : 0
+      );
+      return new Response(JSON.stringify({ error: 'Too many password reset attempts. Please wait.' }), {
+        status: 429,
+        headers: { 'Content-Type': 'application/json', 'Retry-After': String(retryAfter) }
+      });
+    }
 
     if (newPassword.length < 8) {
       return new Response(JSON.stringify({ error: 'New password must be at least 8 characters long.' }), {
@@ -51,44 +63,62 @@ export async function onRequestPost(context) {
       });
     }
 
-    // Read the reset session from HttpOnly cookie (CRITICAL-1 - never from the request body)
+    // Read the reset token from body or from HttpOnly cookie
     const cookieHeader = request.headers.get('Cookie') || '';
     const sessionMatch = cookieHeader.match(/(?:^|;\s*)reset_session=([^;]+)/);
-    const sessionId = sessionMatch ? sessionMatch[1].trim() : null;
+    const token = (bodyToken || bodyResetToken || (sessionMatch ? sessionMatch[1].trim() : '')).trim();
 
-    if (!sessionId) {
-      return new Response(JSON.stringify({ error: 'No active password reset session. Please restart the reset flow.' }), {
+    if (!token) {
+      return new Response(JSON.stringify({ error: 'Password reset token is required.' }), {
         status: 400, headers: { 'Content-Type': 'application/json' }
       });
     }
 
     const resetRecord = await env.DB.prepare(
       'SELECT * FROM password_resets WHERE token = ? AND email = ? AND used = 0'
-    ).bind(sessionId, cleanEmail).first();
+    ).bind(token, cleanEmail).first();
 
     if (!resetRecord) {
-      return new Response(JSON.stringify({ error: 'Invalid or expired password reset session. Please restart the reset flow.' }), {
+      return new Response(JSON.stringify({ error: 'Invalid or expired password reset token. Please restart the reset flow.' }), {
         status: 400, headers: { 'Content-Type': 'application/json' }
       });
     }
 
     if (resetRecord.expires_at < Date.now()) {
       await env.DB.prepare('UPDATE password_resets SET used = 1 WHERE id = ?').bind(resetRecord.id).run();
-      return new Response(JSON.stringify({ error: 'Password reset session has expired. Please request a new one.' }), {
+      return new Response(JSON.stringify({ error: 'Password reset token has expired. Please request a new one.' }), {
         status: 400, headers: { 'Content-Type': 'application/json' }
       });
     }
 
-    const user = await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(cleanEmail).first();
+    const user = await env.DB.prepare(
+      'SELECT id, password_hash, security_answer_hash FROM users WHERE email = ?'
+    ).bind(cleanEmail).first();
+
     if (!user) {
       return new Response(JSON.stringify({ error: 'User account not found.' }), {
         status: 404, headers: { 'Content-Type': 'application/json' }
       });
     }
 
+    // Optional security answer check if provided
+    if (securityAnswer && user.security_answer_hash) {
+      const isAnswerValid = await verifyPassword(securityAnswer.trim().toLowerCase(), user.security_answer_hash);
+      if (!isAnswerValid) {
+        return new Response(JSON.stringify({ error: 'Incorrect security answer. Please try again.' }), {
+          status: 400, headers: { 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
     const newPasswordHash = await hashPassword(newPassword);
-    await env.DB.prepare('UPDATE users SET password_hash = ? WHERE id = ?').bind(newPasswordHash, user.id).run();
+    try {
+      await env.DB.prepare('UPDATE users SET password_hash = ?, force_password_reset = 0 WHERE id = ?').bind(newPasswordHash, user.id).run();
+    } catch (_) {
+      await env.DB.prepare('UPDATE users SET password_hash = ? WHERE id = ?').bind(newPasswordHash, user.id).run();
+    }
     await env.DB.prepare('UPDATE password_resets SET used = 1 WHERE id = ?').bind(resetRecord.id).run();
+    await env.DB.prepare('UPDATE password_resets SET used = 1 WHERE email = ? AND used = 0').bind(cleanEmail).run();
 
     // Clear the reset_session cookie
     const clearCookie = [
@@ -112,6 +142,12 @@ export async function onRequestPost(context) {
     });
 
   } catch (err) {
+    if (ipLimit && !ipLimit.allowed) {
+      return new Response(JSON.stringify({ error: 'Too many password reset attempts. Please wait.' }), {
+        status: 429,
+        headers: { 'Content-Type': 'application/json', 'Retry-After': String(ipLimit.retryAfter) }
+      });
+    }
     console.error('[outpost reset-password] error:', err);
     return new Response(JSON.stringify({ error: 'An internal error occurred. Please try again.' }), {
       status: 500, headers: { 'Content-Type': 'application/json' }

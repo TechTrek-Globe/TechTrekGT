@@ -370,3 +370,21 @@ export const confirmSoldEbayVineMatch = (payload) =>
     headers: JSON_HEADERS,
     body: JSON.stringify(payload)
   });
+
+// --- API Integrations (HIGH-2) ---
+export const getIntegrations = () =>
+  apiFetch('/api/integrations');
+
+export const createIntegration = (body) =>
+  apiFetch('/api/integrations', {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify(body)
+  });
+
+export const revokeIntegration = (id) =>
+  apiFetch(`/api/integrations/${encodeURIComponent(id)}/revoke`, {
+    method: 'POST',
+    headers: JSON_HEADERS
+  });
+

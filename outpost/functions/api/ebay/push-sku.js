@@ -23,7 +23,8 @@ export async function onRequestPost(context) {
     try {
       accessToken = await getEbayUserToken(env, payload.userId);
     } catch (e) {
-      return err(`eBay authentication failed: ${e.message}`, 401);
+      console.error('[push-sku] eBay authentication failed:', e);
+      return err('eBay authentication failed. Please reconnect your eBay account.', 401);
     }
 
     // 1. Single Item Push
@@ -54,7 +55,8 @@ export async function onRequestPost(context) {
           message: result.message
         });
       } catch (pushErr) {
-        return err(`Failed to push SKU to eBay: ${pushErr.message}`, 502);
+        console.error('[push-sku] Failed to push SKU to eBay:', pushErr);
+        return err('Failed to push SKU to eBay. Please verify your listing and try again.', 502);
       }
     }
 
@@ -89,7 +91,8 @@ export async function onRequestPost(context) {
           results.push({ id: it.id, listing_id: it.ebay_listing_id, sku: currentSku, status: 'success' });
           successCount++;
         } catch (e) {
-          results.push({ id: it.id, listing_id: it.ebay_listing_id, sku: currentSku, status: 'failed', error: e.message });
+          console.error(`[push-sku] Failed to push SKU for item ${it.id}:`, e);
+          results.push({ id: it.id, listing_id: it.ebay_listing_id, sku: currentSku, status: 'failed', error: 'Failed to update eBay listing SKU.' });
           failCount++;
         }
       }

@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Pencil, Loader2 } from 'lucide-react';
 import { updateItem } from '../../utils/auctionApi';
+import { round2 } from '../../utils/formulaPreview';
 
 export function InlineEditCell({
   value,
@@ -25,7 +26,7 @@ export function InlineEditCell({
       if (isInteger && !isNaN(Number(value))) {
         initialDraft = String(Math.round(Number(value)));
       } else if (type === 'number' && !isNaN(Number(value))) {
-        initialDraft = (Math.round(Number(value) * 100) / 100).toFixed(2);
+        initialDraft = round2(value).toFixed(2);
       } else {
         initialDraft = String(value);
       }
@@ -43,7 +44,7 @@ export function InlineEditCell({
       parsed = draft.trim() === '' ? null : parseInt(draft, 10);
       if (parsed !== null && isNaN(parsed)) parsed = null;
     } else if (type === 'number') {
-      parsed = draft.trim() === '' ? null : Math.round(parseFloat(draft) * 100) / 100;
+      parsed = draft.trim() === '' ? null : round2(draft);
       if (parsed !== null && isNaN(parsed)) parsed = null;
     } else {
       parsed = draft.trim() === '' ? null : draft.trim();
@@ -96,7 +97,7 @@ export function InlineEditCell({
 
   const isNumeric = type === 'number' || isInteger;
   const display = value != null && value !== ''
-    ? `${prefix || ''}${isNumeric && !isNaN(Number(value)) ? (isInteger ? Math.round(Number(value)).toLocaleString('en-US', { maximumFractionDigits: 0 }) : (Math.round(Number(value) * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) : value}${suffix || ''}`
+    ? `${prefix || ''}${isNumeric && !isNaN(Number(value)) ? (isInteger ? Math.round(Number(value)).toLocaleString('en-US', { maximumFractionDigits: 0 }) : (round2(value)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) : value}${suffix || ''}`
     : placeholder;
 
   return (

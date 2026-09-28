@@ -35,6 +35,14 @@ export async function onRequestPost(context) {
     const { userId } = await requireAuth(request, env);
     if (!env.DB) return err('Database binding unavailable', 500);
 
+    const countRow = await env.DB.prepare(
+      'SELECT COUNT(*) as cnt FROM api_integrations WHERE user_id = ? AND revoked_at IS NULL'
+    ).bind(userId).first();
+
+    if (countRow && Number(countRow.cnt) >= 10) {
+      return err('Maximum number of active API integrations (10) reached. Revoke an existing integration before creating a new one.', 429);
+    }
+
     const body = await request.json().catch(() => ({}));
     const label = (body?.label || 'VineScout Integration').trim().slice(0, 100);
 

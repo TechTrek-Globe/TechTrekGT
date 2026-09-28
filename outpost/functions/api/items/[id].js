@@ -1,5 +1,5 @@
-import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
-import { computePricingFloors, computeSaleMetrics, daysBetween, validateNonNegativeMoney } from '../../utils/auction.js';
+import { requireAuth, withAuth, ok, err, isValidPrefixedId } from '../../utils/guard.js';
+import { computePricingFloors, computeSaleMetrics, daysBetween, validateNonNegativeMoney, round2, markItemSold } from '../../utils/auction.js';
 
 // ============================================================
 // GET    /api/items/:id  - get single item
@@ -8,8 +8,9 @@ import { computePricingFloors, computeSaleMetrics, daysBetween, validateNonNegat
 // ============================================================
 
 function getItemId(url) {
-  const parts = url.pathname.split('/');
-  return parts[parts.length - 1] || null;
+  const parts = url.pathname.split('/').filter(Boolean);
+  const candidate = parts[parts.length - 1] || null;
+  return isValidPrefixedId(candidate, 'item') ? candidate : null;
 }
 
 export const CLIENT_SETTABLE_ATTR_KEYS = Object.freeze([
@@ -125,7 +126,7 @@ export async function onRequestPut(context) {
       return err(e.message, 400);
     }
 
-    const round2 = (val) => (val != null && val !== '' && !isNaN(Number(val))) ? Math.round(Number(val) * 100) / 100 : null;
+    const round2Nullable = (val) => (val != null && val !== '' && !isNaN(Number(val))) ? round2(val) : null;
 
     // Merge only provided fields
     const updated = {
@@ -135,17 +136,17 @@ export async function onRequestPut(context) {
       athlete_person:     body.athlete_person     ?? item.athlete_person,
       authenticator:      body.authenticator      ?? item.authenticator,
       cert_number:        body.cert_number        ?? item.cert_number,
-      unit_price:         body.unit_price != null ? round2(body.unit_price) : round2(item.unit_price),
-      true_total_cost:    body.true_total_cost != null ? round2(body.true_total_cost) : (body.unit_price != null ? round2(parseFloat(body.unit_price) - (item.prorated_discount || 0) + (item.prorated_shipping || 0) + (item.prorated_tax || 0)) : round2(item.true_total_cost)),
+      unit_price:         body.unit_price != null ? round2Nullable(body.unit_price) : round2Nullable(item.unit_price),
+      true_total_cost:    body.true_total_cost != null ? round2Nullable(body.true_total_cost) : (body.unit_price != null ? round2Nullable(parseFloat(body.unit_price) - (item.prorated_discount || 0) + (item.prorated_shipping || 0) + (item.prorated_tax || 0)) : round2Nullable(item.true_total_cost)),
       status:             body.status             ?? item.status,
       platform:           body.platform           ?? item.platform,
       platform_fee_pct:   body.platform_fee_pct   ?? item.platform_fee_pct,
       platform_flat_fee:  body.platform_flat_fee  ?? item.platform_flat_fee,
-      est_shipping_cost:  body.est_shipping_cost != null ? round2(body.est_shipping_cost) : round2(item.est_shipping_cost),
+      est_shipping_cost:  body.est_shipping_cost != null ? round2Nullable(body.est_shipping_cost) : round2Nullable(item.est_shipping_cost),
       boost_pct:          body.boost_pct          ?? item.boost_pct,
       target_margin_pct:  body.target_margin_pct  ?? item.target_margin_pct,
-      current_list_price: body.current_list_price != null ? round2(body.current_list_price) : round2(item.current_list_price),
-      actual_sell_price:  body.actual_sell_price  != null ? round2(body.actual_sell_price) : round2(item.actual_sell_price),
+      current_list_price: body.current_list_price != null ? round2Nullable(body.current_list_price) : round2Nullable(item.current_list_price),
+      actual_sell_price:  body.actual_sell_price  != null ? round2Nullable(body.actual_sell_price) : round2Nullable(item.actual_sell_price),
       date_acquired:      body.date_acquired      !== undefined ? body.date_acquired : item.date_acquired,
       date_listed:        body.date_listed        ?? item.date_listed,
       date_sold:          body.date_sold          ?? item.date_sold,
@@ -350,127 +351,20 @@ export async function onRequestPut(context) {
         true_total_cost: updated.true_total_cost || item.true_total_cost || 0
       });
 
-      const existingSale = await env.DB.prepare(
-        'SELECT id FROM auction_sales WHERE item_id = ? AND user_id = ?'
-      ).bind(id, payload.userId).first();
-
-      let saleId = existingSale?.id || `sale-${crypto.randomUUID()}`;
-
-      try {
-        if (existingSale) {
-          await env.DB.prepare(`
-            UPDATE auction_sales SET
-              sale_date = ?,
-              platform = ?,
-              gross_sale_price = ?,
-              platform_fee_pct = ?,
-              platform_flat_fee = ?,
-              platform_fees_amt = ?,
-              actual_shipping_cost = ?,
-              net_proceeds = ?,
-              true_total_cost = ?,
-              net_profit = ?,
-              roi_pct = ?,
-              days_to_sell = ?
-            WHERE id = ? AND user_id = ?
-          `).bind(
-            saleDate,
-            platformName,
-            grossPrice,
-            feePct,
-            flatFee,
-            saleMetrics.platform_fees_amt,
-            shippingCost,
-            saleMetrics.net_proceeds,
-            item.true_total_cost || 0,
-            saleMetrics.net_profit,
-            saleMetrics.roi_pct,
-            daysToSell,
-            existingSale.id,
-            payload.userId
-          ).run();
-        } else {
-          await env.DB.prepare(`
-            INSERT INTO auction_sales (
-              id, user_id, item_id, sale_date, platform, buyer_handle,
-              gross_sale_price, buyer_shipping_paid, actual_shipping_cost,
-              platform_fee_pct, platform_flat_fee, platform_fees_amt,
-              payment_processing_amt, promoted_listing_fee,
-              net_proceeds, true_total_cost, net_profit, roi_pct,
-              days_to_sell
-            ) VALUES (
-              ?, ?, ?, ?, ?, NULL,
-              ?, 0, ?,
-              ?, ?, ?,
-              0, 0,
-              ?, ?, ?, ?,
-              ?
-            )
-            ON CONFLICT(item_id) DO UPDATE SET
-              sale_date = excluded.sale_date,
-              platform = excluded.platform,
-              gross_sale_price = excluded.gross_sale_price,
-              actual_shipping_cost = excluded.actual_shipping_cost,
-              platform_fee_pct = excluded.platform_fee_pct,
-              platform_flat_fee = excluded.platform_flat_fee,
-              platform_fees_amt = excluded.platform_fees_amt,
-              net_proceeds = excluded.net_proceeds,
-              true_total_cost = excluded.true_total_cost,
-              net_profit = excluded.net_profit,
-              roi_pct = excluded.roi_pct,
-              days_to_sell = excluded.days_to_sell
-          `).bind(
-            saleId,
-            payload.userId,
-            id,
-            saleDate,
-            platformName,
-            grossPrice,
-            shippingCost,
-            feePct,
-            flatFee,
-            saleMetrics.platform_fees_amt,
-            saleMetrics.net_proceeds,
-            item.true_total_cost || 0,
-            saleMetrics.net_profit,
-            saleMetrics.roi_pct,
-            daysToSell
-          ).run();
-        }
-      } catch (saleErr) {
-        console.warn('[items/id] Sold sync conflict, updating existing sale:', saleErr);
-        await env.DB.prepare(`
-          UPDATE auction_sales SET
-            sale_date = ?,
-            platform = ?,
-            gross_sale_price = ?,
-            platform_fee_pct = ?,
-            platform_flat_fee = ?,
-            platform_fees_amt = ?,
-            actual_shipping_cost = ?,
-            net_proceeds = ?,
-            true_total_cost = ?,
-            net_profit = ?,
-            roi_pct = ?,
-            days_to_sell = ?
-          WHERE item_id = ? AND user_id = ?
-        `).bind(
-          saleDate,
-          platformName,
-          grossPrice,
-          feePct,
-          flatFee,
-          saleMetrics.platform_fees_amt,
-          shippingCost,
-          saleMetrics.net_proceeds,
-          item.true_total_cost || 0,
-          saleMetrics.net_profit,
-          saleMetrics.roi_pct,
-          daysToSell,
-          id,
-          payload.userId
-        ).run();
-      }
+      await markItemSold(env, payload.userId, { ...item, ...updated, id }, {
+        sale_date: saleDate,
+        platform: platformName,
+        gross_sale_price: grossPrice,
+        actual_shipping_cost: shippingCost,
+        platform_fee_pct: feePct,
+        platform_flat_fee: flatFee,
+        platform_fees_amt: saleMetrics.platform_fees_amt,
+        net_proceeds: saleMetrics.net_proceeds,
+        true_total_cost: updated.true_total_cost || item.true_total_cost || 0,
+        net_profit: saleMetrics.net_profit,
+        roi_pct: saleMetrics.roi_pct,
+        days_to_sell: daysToSell
+      });
     } else if (item.status === 'Sold' && updated.status !== 'Sold') {
       // Reverted away from Sold - remove corresponding sale record to keep Sold Tracker clean
       await env.DB.prepare(

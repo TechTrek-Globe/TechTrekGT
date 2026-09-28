@@ -11,7 +11,7 @@
  * Optional: EBAY_ENV (set to 'sandbox' to use sandbox API URLs)
  */
 
-import { daysBetween } from '../../utils/auction.js';
+import { daysBetween, markItemSold } from '../../utils/auction.js';
 
 // --- Token Crypto (AES-GCM, matches landing/src/gateway/tokenCrypto.js) ---
 
@@ -157,7 +157,10 @@ export function getEbayApiBase(env) {
  */
 export async function getEbayUserToken(env, userId) {
   if (!env.DB) throw new Error('DB binding not available');
-  const encKey = env.TOKEN_ENCRYPTION_KEY || env.JWT_SECRET;
+  const encKey = env.TOKEN_ENCRYPTION_KEY || (() => {
+    console.error('[getEbayUserToken] TOKEN_ENCRYPTION_KEY not configured - falling back to JWT_SECRET for eBay token encryption. This defeats key separation; configure TOKEN_ENCRYPTION_KEY immediately.');
+    return env.JWT_SECRET;
+  })();
   if (!encKey) throw new Error('TOKEN_ENCRYPTION_KEY binding not available');
 
   const row = await env.DB.prepare(
@@ -1077,6 +1080,7 @@ export async function fetchEbayOrderForListing(env, accessToken, listingId, sku 
     const orders = await fetchEbayRecentOrders(env, accessToken, 100);
     for (const order of orders) {
       const lineItems = order.lineItems || [];
+        let isExactMatch = false;
         const matchedLine = lineItems.find(li => {
           const lineItemIdMatch = cleanId && (
             String(li.legacyItemId) === cleanId ||
@@ -1084,12 +1088,20 @@ export async function fetchEbayOrderForListing(env, accessToken, listingId, sku 
             String(li.itemId || '') === cleanId
           );
           const lineSkuMatch = cleanSku && (String(li.sku || '').toLowerCase() === cleanSku.toLowerCase());
+          if (lineItemIdMatch || lineSkuMatch) {
+            isExactMatch = true;
+            return true;
+          }
           const lineTitle = String(li.title || '').toLowerCase();
           const titleMatch = cleanTitle && (
             lineTitle === cleanTitle ||
             (cleanTitle.length >= 20 && (lineTitle.includes(cleanTitle) || cleanTitle.includes(lineTitle)))
           );
-          return lineItemIdMatch || lineSkuMatch || titleMatch;
+          if (titleMatch) {
+            isExactMatch = false;
+            return true;
+          }
+          return false;
         });
 
         if (matchedLine) {
@@ -1113,6 +1125,7 @@ export async function fetchEbayOrderForListing(env, accessToken, listingId, sku 
             deliveryCost,
             matchedLine,
             rawOrder: order,
+            isExactMatch,
             source: 'fulfillment_api'
           };
         }
@@ -1169,6 +1182,7 @@ export async function fetchEbayOrderForListing(env, accessToken, listingId, sku 
               lineItemCost: amountPaid,
               deliveryCost: shipCost,
               finalValueFee: fvf,
+              isExactMatch: true,
               source: 'trading_transactions'
             };
           }
@@ -1218,6 +1232,7 @@ export async function fetchEbayOrderForListing(env, accessToken, listingId, sku 
         );
 
         if (matchId || matchSku || matchTitle) {
+          const isExactMatch = Boolean(matchId || matchSku);
           const orderId = extractXmlTag(block, 'OrderID') || extractXmlTag(block, 'ExtendedOrderID') || `${cleanId || 'order'}-sale`;
           const buyerHandle = extractXmlTag(block, 'BuyerUserID') || extractXmlTag(block, 'UserID') || '';
           const createdDate = extractXmlTag(block, 'CreatedTime') || extractXmlTag(block, 'PaidTime');
@@ -1238,6 +1253,7 @@ export async function fetchEbayOrderForListing(env, accessToken, listingId, sku 
             lineItemCost: subtotal > 0 ? subtotal : totalPaid,
             deliveryCost: shipCost,
             finalValueFee: fvf,
+            isExactMatch,
             source: 'trading_orders'
           };
         }
@@ -1450,166 +1466,27 @@ export async function reconcileAndSaveEbaySale(env, userId, item, orderData = nu
   const startDate = item.date_listed || item.date_acquired;
   const daysToSell = daysBetween(startDate, saleDate) ?? 0;
 
-  // Check existing sale by item_id
-  const existingSale = await env.DB.prepare(
-    'SELECT * FROM auction_sales WHERE item_id = ? AND user_id = ?'
-  ).bind(item.id, userId).first();
-
-  let saleId = existingSale?.id || `sale-${crypto.randomUUID()}`;
-
-  try {
-    if (existingSale) {
-      await env.DB.prepare(`
-        UPDATE auction_sales SET
-          sale_date = ?,
-          platform = 'eBay',
-          buyer_handle = COALESCE(?, buyer_handle),
-          gross_sale_price = ?,
-          buyer_shipping_paid = ?,
-          actual_shipping_cost = ?,
-          platform_fee_pct = ?,
-          platform_flat_fee = ?,
-          platform_fees_amt = ?,
-          payment_processing_amt = ?,
-          promoted_listing_fee = ?,
-          net_proceeds = ?,
-          true_total_cost = ?,
-          net_profit = ?,
-          roi_pct = ?,
-          days_to_sell = ?,
-          ebay_order_id = COALESCE(?, ebay_order_id),
-          fee_reconciled_at = datetime('now')
-        WHERE id = ? AND user_id = ?
-      `).bind(
-        saleDate,
-        buyerHandle || null,
-        grossSalePrice,
-        buyerShippingPaid,
-        actualShippingCost,
-        item.platform_fee_pct || 0.135,
-        item.platform_flat_fee || 0.40,
-        platformFeesAmt,
-        paymentProcessingFee,
-        promotedListingFee,
-        netProceeds,
-        trueCost,
-        netProfit,
-        roiPct,
-        daysToSell,
-        ebayOrderId || null,
-        saleId,
-        userId
-      ).run();
-    } else {
-      await env.DB.prepare(`
-        INSERT INTO auction_sales (
-          id, user_id, item_id, sale_date, platform, buyer_handle,
-          gross_sale_price, buyer_shipping_paid, actual_shipping_cost,
-          platform_fee_pct, platform_flat_fee, platform_fees_amt,
-          payment_processing_amt, promoted_listing_fee,
-          net_proceeds, true_total_cost, net_profit, roi_pct,
-          days_to_sell, ebay_order_id, fee_reconciled_at
-        ) VALUES (
-          ?, ?, ?, ?, 'eBay', ?,
-          ?, ?, ?,
-          ?, ?, ?,
-          ?, ?,
-          ?, ?, ?, ?,
-          ?, ?, datetime('now')
-        )
-        ON CONFLICT(item_id) DO UPDATE SET
-          sale_date = excluded.sale_date,
-          platform = excluded.platform,
-          buyer_handle = COALESCE(excluded.buyer_handle, auction_sales.buyer_handle),
-          gross_sale_price = excluded.gross_sale_price,
-          buyer_shipping_paid = excluded.buyer_shipping_paid,
-          actual_shipping_cost = excluded.actual_shipping_cost,
-          platform_fee_pct = excluded.platform_fee_pct,
-          platform_flat_fee = excluded.platform_flat_fee,
-          platform_fees_amt = excluded.platform_fees_amt,
-          payment_processing_amt = excluded.payment_processing_amt,
-          promoted_listing_fee = excluded.promoted_listing_fee,
-          net_proceeds = excluded.net_proceeds,
-          true_total_cost = excluded.true_total_cost,
-          net_profit = excluded.net_profit,
-          roi_pct = excluded.roi_pct,
-          days_to_sell = excluded.days_to_sell,
-          ebay_order_id = COALESCE(excluded.ebay_order_id, auction_sales.ebay_order_id),
-          fee_reconciled_at = excluded.fee_reconciled_at
-      `).bind(
-        saleId,
-        userId,
-        item.id,
-        saleDate,
-        buyerHandle || null,
-        grossSalePrice,
-        buyerShippingPaid,
-        actualShippingCost,
-        item.platform_fee_pct || 0.135,
-        item.platform_flat_fee || 0.40,
-        platformFeesAmt,
-        paymentProcessingFee,
-        promotedListingFee,
-        netProceeds,
-        trueCost,
-        netProfit,
-        roiPct,
-        daysToSell,
-        ebayOrderId || null
-      ).run();
-    }
-  } catch (saleErr) {
-    console.warn('[tokenHelper] Sale upsert race encountered, falling back to update:', saleErr);
-    await env.DB.prepare(`
-      UPDATE auction_sales SET
-        sale_date = ?,
-        platform = 'eBay',
-        buyer_handle = COALESCE(?, buyer_handle),
-        gross_sale_price = ?,
-        buyer_shipping_paid = ?,
-        actual_shipping_cost = ?,
-        platform_fee_pct = ?,
-        platform_flat_fee = ?,
-        platform_fees_amt = ?,
-        payment_processing_amt = ?,
-        promoted_listing_fee = ?,
-        net_proceeds = ?,
-        true_total_cost = ?,
-        net_profit = ?,
-        roi_pct = ?,
-        days_to_sell = ?,
-        ebay_order_id = COALESCE(?, ebay_order_id),
-        fee_reconciled_at = datetime('now')
-      WHERE item_id = ? AND user_id = ?
-    `).bind(
-      saleDate,
-      buyerHandle || null,
-      grossSalePrice,
-      buyerShippingPaid,
-      actualShippingCost,
-      item.platform_fee_pct || 0.135,
-      item.platform_flat_fee || 0.40,
-      platformFeesAmt,
-      paymentProcessingFee,
-      promotedListingFee,
-      netProceeds,
-      trueCost,
-      netProfit,
-      roiPct,
-      daysToSell,
-      ebayOrderId || null,
-      item.id,
-      userId
-    ).run();
-  }
-
-  // Ensure saleId matches the persisted row
-  if (!existingSale) {
-    const persisted = await env.DB.prepare(
-      'SELECT id FROM auction_sales WHERE item_id = ? AND user_id = ?'
-    ).bind(item.id, userId).first();
-    if (persisted?.id) saleId = persisted.id;
-  }
+  let savedSale = await markItemSold(env, userId, item, {
+    sale_date: saleDate,
+    platform: 'eBay',
+    buyer_handle: buyerHandle || null,
+    ebay_order_id: ebayOrderId || null,
+    gross_sale_price: grossSalePrice,
+    buyer_shipping_paid: buyerShippingPaid,
+    actual_shipping_cost: actualShippingCost,
+    platform_fee_pct: item.platform_fee_pct || 0.135,
+    platform_flat_fee: item.platform_flat_fee || 0.40,
+    platform_fees_amt: platformFeesAmt,
+    payment_processing_amt: paymentProcessingFee,
+    promoted_listing_fee: promotedListingFee,
+    net_proceeds: netProceeds,
+    true_total_cost: trueCost,
+    net_profit: netProfit,
+    roi_pct: roiPct,
+    days_to_sell: daysToSell,
+    fee_reconciled: true
+  });
+  let saleId = savedSale.id;
 
   // Upsert ebay_fee_reconciliations if ebayOrderId is known
   let reconRow = null;
@@ -1697,7 +1574,7 @@ export async function reconcileAndSaveEbaySale(env, userId, item, orderData = nu
     'SELECT * FROM auction_items WHERE id = ? AND user_id = ?'
   ).bind(item.id, userId).first();
 
-  const savedSale = await env.DB.prepare(
+  savedSale = await env.DB.prepare(
     'SELECT * FROM auction_sales WHERE id = ? AND user_id = ?'
   ).bind(saleId, userId).first();
 

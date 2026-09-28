@@ -3,6 +3,9 @@
  * Used for live proration previews in the AddInvoiceModal without a server round-trip.
  */
 
+// LOW-5: Shared currency rounding helper. Centralizes floating-point rounding. Candidate for future integer-cents migration.
+export const round2 = (val) => Math.round((Number(val) || 0) * 100) / 100;
+
 export function computeItemProration(item, invoice) {
   // MED-10: If base_total is 0 (all $0 acquisition items), weight safely defaults to 0.
   const base   = invoice.base_total || 0;
@@ -12,10 +15,10 @@ export function computeItemProration(item, invoice) {
   const invShipping = invoice.shipping || 0;
   const invTax      = invoice.tax || 0;
 
-  const prorated_discount = Math.round((weight * invDiscount) * 100) / 100;
-  const prorated_shipping = Math.round((weight * invShipping) * 100) / 100;
-  const prorated_tax      = Math.round((weight * invTax) * 100) / 100;
-  const true_total_cost   = Math.round(((item.unit_price || 0) - prorated_discount + prorated_shipping + prorated_tax) * 100) / 100;
+  const prorated_discount = round2(weight * invDiscount);
+  const prorated_shipping = round2(weight * invShipping);
+  const prorated_tax      = round2(weight * invTax);
+  const true_total_cost   = round2((item.unit_price || 0) - prorated_discount + prorated_shipping + prorated_tax);
   return { proration_weight: weight, prorated_discount, prorated_shipping, prorated_tax, true_total_cost };
 }
 
@@ -26,31 +29,31 @@ export function computePricingFloors(item) {
   // true_total_cost safely defaults to 0 for un-costed drafts or $0 acquisition items.
   const costBasis = (item.true_total_cost || 0) + (item.est_shipping_cost || 0) + (item.platform_flat_fee || 0);
   const min_sell_price = divisor > 0
-    ? Math.round((costBasis / divisor) * 100) / 100
+    ? round2(costBasis / divisor)
     : 0;
   // MED-10: target_margin_pct defaults to 0 (no markup) if omitted.
-  const suggested_list_price = Math.round((min_sell_price * (1 + (item.target_margin_pct || 0))) * 100) / 100;
+  const suggested_list_price = round2(min_sell_price * (1 + (item.target_margin_pct || 0)));
   return { min_sell_price, suggested_list_price };
 }
 
 export function computeSaleMetrics(sale) {
   // MED-10: Optional fee fields legitimately default to 0 (e.g. private/cash sales without platform fees).
-  const platform_fees_amt = ((sale.gross_sale_price || 0) * (sale.platform_fee_pct || 0))
-                          + (sale.platform_flat_fee || 0);
+  const platform_fees_amt = round2(((sale.gross_sale_price || 0) * (sale.platform_fee_pct || 0))
+                          + (sale.platform_flat_fee || 0));
 
   // MED-10: buyer_shipping_paid, actual_shipping_cost, payment_processing_amt, promoted_listing_fee
   // legitimately default to 0 for free shipping, digital delivery, or fee-free platforms.
-  const net_proceeds = sale.net_proceeds !== undefined && sale.net_proceeds !== null && !isNaN(Number(sale.net_proceeds))
+  const net_proceeds = round2(sale.net_proceeds !== undefined && sale.net_proceeds !== null && !isNaN(Number(sale.net_proceeds))
                      ? Number(sale.net_proceeds)
                      : ((sale.gross_sale_price || 0)
                         + (sale.buyer_shipping_paid || 0)
                         - (sale.actual_shipping_cost || 0)
                         - platform_fees_amt
                         - (sale.payment_processing_amt || 0)
-                        - (sale.promoted_listing_fee || 0));
+                        - (sale.promoted_listing_fee || 0)));
 
   // MED-10: true_total_cost legitimately defaults to 0 for zero-cost acquisitions (gifts, $0 ETV Vine items).
-  const net_profit = net_proceeds - (sale.true_total_cost || 0);
+  const net_profit = round2(net_proceeds - (sale.true_total_cost || 0));
   // MED-10: Guard against division by zero when item acquisition cost basis is 0.
   const roi_pct    = (sale.true_total_cost || 0) > 0
                    ? net_profit / sale.true_total_cost
@@ -104,7 +107,7 @@ export function formatCurrency(n) {
 
 export function roundPrice(val) {
   if (val === null || val === undefined || val === '' || isNaN(Number(val))) return '';
-  return Math.round(Number(val) * 100) / 100;
+  return round2(val);
 }
 
 export function roundToDecimals(val, decimals = 2) {

@@ -1,10 +1,15 @@
-import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
+import { requireAuth, withAuth, ok, err, isValidPrefixedId } from '../../utils/guard.js';
 import { validateNonNegativeMoney } from '../../utils/auction.js';
 
 function extractId(request, params) {
-  if (params?.id) return params.id;
-  const match = new URL(request.url).pathname.match(/\/api\/platforms\/([^/]+)/);
-  return match ? match[1] : null;
+  let candidate = null;
+  if (params?.id) {
+    candidate = params.id;
+  } else {
+    const match = new URL(request.url).pathname.match(/\/api\/platforms\/([^/]+)/);
+    candidate = match ? match[1] : null;
+  }
+  return isValidPrefixedId(candidate, 'plat', { allowPureUuid: true }) ? candidate : null;
 }
 
 /**
@@ -15,7 +20,7 @@ export async function onRequestPut(context) {
   return withAuth(async () => {
     const { userId } = await requireAuth(request, env);
     const id = extractId(request, params);
-    if (!id) return err('Platform ID required');
+    if (!id) return err('Platform ID required', 400);
 
     const existing = await env.DB.prepare(
       'SELECT * FROM auction_platforms WHERE id = ? AND user_id = ?'
@@ -80,7 +85,7 @@ export async function onRequestDelete(context) {
   return withAuth(async () => {
     const { userId } = await requireAuth(request, env);
     const id = extractId(request, params);
-    if (!id) return err('Platform ID required');
+    if (!id) return err('Platform ID required', 400);
 
     const existing = await env.DB.prepare(
       'SELECT * FROM auction_platforms WHERE id = ? AND user_id = ?'

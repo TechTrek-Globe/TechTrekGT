@@ -1,5 +1,5 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
-import { cleanItemName } from '../../utils/auction.js';
+import { cleanItemName, daysBetween, validateNonNegativeMoney, markItemSold } from '../../utils/auction.js';
 
 /**
  * GET /api/sync/vinescout-catalog
@@ -118,8 +118,17 @@ export async function onRequestPost(context) {
     const { item_id, sale_price, sale_date, ebay_order_id } = body;
     if (!item_id) return err('item_id is required', 400);
 
+    let parsedSalePrice = null;
+    if (sale_price != null) {
+      try {
+        parsedSalePrice = validateNonNegativeMoney(sale_price, 'sale_price');
+      } catch (e) {
+        return err(e.message, 400);
+      }
+    }
+
     const row = await env.DB.prepare(
-      'SELECT id, attributes, user_id FROM auction_items WHERE id = ? AND user_id = ?'
+      'SELECT * FROM auction_items WHERE id = ? AND user_id = ?'
     ).bind(item_id, userId).first();
 
     if (!row) return err('Item not found or does not belong to this account', 404);
@@ -136,15 +145,55 @@ export async function onRequestPost(context) {
       return err('Item does not appear to be VScout-sourced (no ASIN or order_id in attributes)', 400);
     }
 
+    if (parsedSalePrice == null) {
+      try {
+        parsedSalePrice = validateNonNegativeMoney(row.actual_sell_price ?? row.current_list_price ?? 0, 'actual_sell_price');
+      } catch (_) {
+        parsedSalePrice = 0;
+      }
+    }
+
+    const finalSaleDate = sale_date ? String(sale_date) : (row.date_sold || new Date().toISOString().split('T')[0]);
+    const daysOnMarket = daysBetween(row.date_listed || row.date_acquired, finalSaleDate) ?? 0;
+
     // Merge sale metadata
     attrs.outpost_liquidated = 1;
-    if (sale_price != null) attrs.sale_price = Number(sale_price);
-    if (sale_date) attrs.sold_at = String(sale_date);
+    if (sale_price != null) {
+      try {
+        attrs.sale_price = validateNonNegativeMoney(sale_price, 'sale_price');
+      } catch (e) {
+        return err(e.message, 400);
+      }
+    } else if (parsedSalePrice != null) {
+      attrs.sale_price = parsedSalePrice;
+    }
+    if (finalSaleDate) attrs.sold_at = String(finalSaleDate);
     if (ebay_order_id) attrs.ebay_order_id = String(ebay_order_id);
 
-    await env.DB.prepare(
-      `UPDATE auction_items SET attributes = ?, updated_at = datetime('now') WHERE id = ? AND user_id = ?`
-    ).bind(JSON.stringify(attrs), item_id, userId).run();
+    await env.DB.prepare(`
+      UPDATE auction_items SET
+        status = 'Sold',
+        actual_sell_price = ?,
+        date_sold = ?,
+        days_on_market = ?,
+        attributes = ?,
+        updated_at = datetime('now')
+      WHERE id = ? AND user_id = ?
+    `).bind(
+      parsedSalePrice,
+      finalSaleDate,
+      daysOnMarket,
+      JSON.stringify(attrs),
+      item_id,
+      userId
+    ).run();
+
+    await markItemSold(env, userId, row, {
+      sale_date: finalSaleDate,
+      gross_sale_price: parsedSalePrice,
+      ebay_order_id: ebay_order_id ? String(ebay_order_id) : null,
+      days_to_sell: daysOnMarket
+    });
 
     return ok({ success: true, item_id });
   });

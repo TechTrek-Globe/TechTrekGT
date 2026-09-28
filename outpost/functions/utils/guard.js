@@ -60,3 +60,39 @@ export function err(message, status = 400) {
     headers: { 'Content-Type': 'application/json' }
   });
 }
+
+/**
+ * Validates that an ID matches an expected resource prefix (e.g. "inv-", "item-", "sale-")
+ * or optionally conforms to a standard UUID format.
+ * Prevents downstream database lookups on malformed or unvalidated trailing path segments.
+ *
+ * @param {any} id - Candidate ID string extracted from URL path segment or params
+ * @param {string|string[]} prefix - Expected prefix (e.g. 'inv' or 'inv-') or array of allowed prefixes
+ * @param {object} [options]
+ * @param {boolean} [options.allowPureUuid=false] - Whether to also accept 36-char standard UUIDs
+ * @returns {boolean}
+ */
+export function isValidPrefixedId(id, prefix, options = {}) {
+  if (typeof id !== 'string') return false;
+  const cleanId = id.trim();
+  if (!cleanId) return false;
+
+  const { allowPureUuid = false } = options;
+
+  if (prefix) {
+    const prefixes = Array.isArray(prefix) ? prefix : [prefix];
+    for (const p of prefixes) {
+      if (typeof p !== 'string' || !p) continue;
+      const cleanPrefix = p.replace(/-+$/, '');
+      const prefixedRegex = new RegExp(`^${cleanPrefix}-[a-zA-Z0-9_-]+$`, 'i');
+      if (prefixedRegex.test(cleanId)) return true;
+    }
+  }
+
+  if (allowPureUuid) {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (uuidRegex.test(cleanId)) return true;
+  }
+
+  return false;
+}

@@ -4,7 +4,7 @@ import {
   CheckCircle2, AlertCircle, Loader2, Save, FileText, Database, ShieldCheck,
   FileSpreadsheet, Upload, ArrowRightLeft, Sparkles, Calculator, LayoutGrid,
   ArrowUp, ArrowDown, Eye, EyeOff, ShoppingCart, Copy, RotateCcw, Plug, User,
-  DollarSign, Package, Layers, Sliders, HardDrive
+  DollarSign, Package, Layers, Sliders, HardDrive, Key
 } from 'lucide-react';
 import { SpreadsheetImporterModal } from './SpreadsheetImporterModal';
 import { FinanceSyncModal } from './FinanceSyncModal';
@@ -17,7 +17,8 @@ import {
   getPlatforms, createPlatform, updatePlatform, deletePlatform, resetPlatforms,
   getItems, getSales, getInvoices, getComps, getApiUrl,
   autoAssignSkus, pushAllSkusToEbay,
-  getSyncSettings, updateSyncSettings, syncAllEbayItems, getVineScoutCatalog
+  getSyncSettings, updateSyncSettings, syncAllEbayItems, getVineScoutCatalog,
+  getIntegrations, createIntegration, revokeIntegration
 } from '../utils/auctionApi';
 import { fmtCurrency, fmtPct } from '../utils/formulaPreview';
 import { DEFAULT_COLUMNS, DEFAULT_CATEGORIES, getStoredUserSettings, saveUserSettings, resetColumnWidths } from '../utils/userSettings';
@@ -855,6 +856,9 @@ export function SettingsView() {
               }}
             />
 
+            {/* 2b. API Integrations & Programmatic Access (MED-4) */}
+            <ApiIntegrationsSection />
+
             {/* 3. eBay Auto-Sync Card */}
             <div className="glass-card rounded-2xl p-6 border border-blue-500/20 space-y-4">
               <div className="border-b border-slate-800/60 pb-4 flex items-center justify-between gap-3">
@@ -1324,6 +1328,25 @@ export function SettingsView() {
                     HttpOnly Cookie JWT SSO
                   </p>
                 </div>
+                <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 col-span-1 sm:col-span-2">
+                  <div>
+                    <span className="text-slate-500 font-semibold uppercase tracking-wider text-[10px]">API Integrations & Quota</span>
+                    <p className="text-sm font-bold text-slate-100 mt-0.5">
+                      External programmatic access tokens & VineScout keys
+                    </p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Active limit: 10 integrations per account. Prune unused keys to stay within quota.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('integrations')}
+                    className="px-3.5 py-2 rounded-xl text-xs font-semibold text-amber-400 hover:text-amber-300 bg-amber-950/30 hover:bg-amber-950/60 border border-amber-900/40 transition-all flex items-center justify-center gap-1.5 flex-shrink-0"
+                  >
+                    <Key className="w-3.5 h-3.5" />
+                    <span>Manage & Prune Keys</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -1644,6 +1667,307 @@ function VineScoutSection({ token, hasToken, loading, rotating, copied, onLoad, 
               {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
               <span>Generate API Key</span>
             </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// API Integrations Section (MED-4: Active Quota & Pruning)
+// ---------------------------------------------------------------------------
+function ApiIntegrationsSection() {
+  const [integrations, setIntegrations] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [revokingId, setRevokingId] = useState(null);
+  const [newLabel, setNewLabel] = useState('');
+  const [createdSecret, setCreatedSecret] = useState(null);
+  const [secretRevealed, setSecretRevealed] = useState(false);
+  const [copiedSecret, setCopiedSecret] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [statusMsg, setStatusMsg] = useState('');
+
+  const loadIntegrations = useCallback(async () => {
+    setLoading(true);
+    setErrorMsg('');
+    try {
+      const res = await getIntegrations();
+      if (res && Array.isArray(res.integrations)) {
+        setIntegrations(res.integrations);
+      }
+    } catch (e) {
+      console.error('Failed to load integrations:', e);
+      setErrorMsg(e.message || 'Failed to load API integrations');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadIntegrations();
+  }, [loadIntegrations]);
+
+  const activeIntegrations = useMemo(
+    () => integrations.filter(i => !i.revoked_at),
+    [integrations]
+  );
+  const activeCount = activeIntegrations.length;
+  const isAtLimit = activeCount >= 10;
+
+  const handleCreate = async (e) => {
+    e.preventDefault();
+    if (isAtLimit) {
+      setErrorMsg('Maximum number of active API integrations (10) reached. Revoke an existing integration before creating a new one.');
+      return;
+    }
+    setCreating(true);
+    setErrorMsg('');
+    setStatusMsg('');
+    try {
+      const res = await createIntegration({ label: newLabel.trim() || undefined });
+      if (res && res.integration) {
+        setCreatedSecret(res.integration);
+        setNewLabel('');
+        setStatusMsg('New API integration created. Copy the secret now - it will never be displayed again.');
+        await loadIntegrations();
+      }
+    } catch (err) {
+      setErrorMsg(err.message || 'Failed to create integration');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleRevoke = async (id, label) => {
+    if (!window.confirm(`Revoke API integration "${label || id}"? Any external client using this key will immediately lose access.`)) {
+      return;
+    }
+    setRevokingId(id);
+    setErrorMsg('');
+    setStatusMsg('');
+    try {
+      await revokeIntegration(id);
+      setStatusMsg('Integration revoked successfully. An active slot has been freed.');
+      await loadIntegrations();
+    } catch (err) {
+      setErrorMsg(err.message || 'Failed to revoke integration');
+    } finally {
+      setRevokingId(null);
+    }
+  };
+
+  const copyToClipboard = (text) => {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    setCopiedSecret(true);
+    setTimeout(() => setCopiedSecret(false), 2000);
+  };
+
+  return (
+    <div className="glass-card rounded-2xl p-6 border border-slate-800 space-y-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/60 pb-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <Key className="w-4 h-4 text-amber-400" />
+            <h2 className="text-base font-bold text-slate-100">API Integrations & External Keys</h2>
+            <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${
+              isAtLimit
+                ? 'bg-red-950/60 text-red-400 border-red-800/60'
+                : 'bg-amber-950/40 text-amber-400 border-amber-800/40'
+            }`}>
+              {activeCount} / 10 Active
+            </span>
+          </div>
+          <p className="text-xs text-slate-400 mt-0.5">
+            Manage granular API tokens for VineScout, background daemons, and programmatic integrations. Quota limit: 10 active keys.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={loadIntegrations}
+          disabled={loading}
+          className="px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-slate-900 border border-slate-700 transition-all flex items-center gap-1.5 self-start sm:self-auto disabled:opacity-50"
+          title="Refresh integrations list"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+          <span>Refresh</span>
+        </button>
+      </div>
+
+      {/* Notifications */}
+      {statusMsg && (
+        <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+          <span>{statusMsg}</span>
+        </div>
+      )}
+      {errorMsg && (
+        <div className="p-3 rounded-xl bg-red-950/40 border border-red-500/30 text-red-300 text-xs flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+          <span>{errorMsg}</span>
+        </div>
+      )}
+
+      {/* Newly Created Secret Modal / Alert */}
+      {createdSecret && (
+        <div className="p-4 rounded-xl bg-amber-950/30 border border-amber-500/40 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-amber-300 flex items-center gap-1.5 uppercase tracking-wider">
+              <Key className="w-3.5 h-3.5" />
+              New Secret Key Generated: {createdSecret.label}
+            </span>
+            <button
+              type="button"
+              onClick={() => setCreatedSecret(null)}
+              className="text-xs text-slate-400 hover:text-white"
+            >
+              ✕ Dismiss
+            </button>
+          </div>
+          <p className="text-[11px] text-amber-200/90 leading-relaxed">
+            Please copy this secret immediately. For security, raw secret keys are cryptographically hashed and cannot be retrieved again.
+          </p>
+          <div className="flex items-center gap-2">
+            <div className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-amber-300 overflow-x-auto whitespace-nowrap">
+              {secretRevealed ? createdSecret.secret : (createdSecret.secret ? createdSecret.secret.slice(0, 10) + '••••••••••••••••••••••••••••••••••••••••' : '')}
+            </div>
+            <button
+              type="button"
+              onClick={() => setSecretRevealed(r => !r)}
+              className="px-3 py-2 rounded-xl text-xs border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 transition-all"
+              title={secretRevealed ? 'Mask secret' : 'Reveal secret'}
+            >
+              {secretRevealed ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+            </button>
+            <button
+              type="button"
+              onClick={() => copyToClipboard(createdSecret.secret)}
+              className={`px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all flex items-center gap-1.5 ${
+                copiedSecret
+                  ? 'text-emerald-300 border-emerald-500/50 bg-emerald-950/40'
+                  : 'text-slate-300 border-slate-700 hover:text-white hover:bg-slate-800'
+              }`}
+            >
+              {copiedSecret ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+              {copiedSecret ? 'Copied!' : 'Copy Secret'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Create Integration Form */}
+      <form onSubmit={handleCreate} className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-3">
+        <label className="block text-xs font-bold text-slate-300 uppercase tracking-wide">
+          Issue New Integration Key
+        </label>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <input
+            type="text"
+            placeholder="e.g. Home Desktop VineScout, Laptop Extension"
+            value={newLabel}
+            onChange={(e) => setNewLabel(e.target.value)}
+            disabled={isAtLimit || creating}
+            className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-xs text-slate-100 placeholder-slate-500 outline-none focus:border-amber-400 disabled:opacity-50"
+          />
+          <button
+            type="submit"
+            disabled={isAtLimit || creating}
+            className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all flex-shrink-0 ${
+              isAtLimit
+                ? 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed'
+                : 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-sm'
+            }`}
+          >
+            {creating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+            <span>{creating ? 'Creating...' : 'Create Key'}</span>
+          </button>
+        </div>
+        {isAtLimit && (
+          <p className="text-[11px] text-red-400 flex items-center gap-1.5">
+            <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+            Maximum quota reached (10/10 active keys). Revoke an existing integration below to issue a new key.
+          </p>
+        )}
+      </form>
+
+      {/* Integrations Table / List */}
+      <div className="space-y-2">
+        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wide">
+          Existing Keys ({integrations.length})
+        </h3>
+        {loading && integrations.length === 0 ? (
+          <div className="p-6 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
+            <Loader2 className="w-4 h-4 animate-spin text-amber-400" />
+            <span>Loading integrations...</span>
+          </div>
+        ) : integrations.length === 0 ? (
+          <div className="p-6 rounded-xl bg-slate-900/40 border border-slate-800 text-center text-xs text-slate-400">
+            No API integrations found. Use the form above to generate your first key.
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-950/60">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-900/80 text-slate-400 uppercase font-mono text-[10px] border-b border-slate-800">
+                <tr>
+                  <th className="px-4 py-3">Label / Name</th>
+                  <th className="px-4 py-3">Integration ID</th>
+                  <th className="px-4 py-3">Created</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60 text-slate-200">
+                {integrations.map((item) => {
+                  const isRevoked = !!item.revoked_at;
+                  return (
+                    <tr key={item.id} className="hover:bg-slate-900/40 transition-colors">
+                      <td className="px-4 py-3 font-medium">
+                        <span className="text-slate-100">{item.label || 'API Integration'}</span>
+                      </td>
+                      <td className="px-4 py-3 font-mono text-slate-400 text-[11px]">
+                        {item.id ? `${item.id.slice(0, 8)}...` : 'N/A'}
+                      </td>
+                      <td className="px-4 py-3 text-slate-400 text-[11px]">
+                        {item.created_at ? new Date(item.created_at).toLocaleDateString() : 'N/A'}
+                      </td>
+                      <td className="px-4 py-3">
+                        {isRevoked ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-800 text-slate-400 border border-slate-700">
+                            Revoked
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-950/60 text-emerald-400 border border-emerald-800/40">
+                            Active
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {isRevoked ? (
+                          <span className="text-[11px] text-slate-500 italic">Inactive</span>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={revokingId === item.id}
+                            onClick={() => handleRevoke(item.id, item.label)}
+                            className="px-2.5 py-1 rounded-lg text-[11px] font-semibold text-red-400 hover:text-red-300 bg-red-950/30 hover:bg-red-950/60 border border-red-900/40 transition-all inline-flex items-center gap-1 disabled:opacity-50"
+                            title="Revoke this integration key to free an active slot"
+                          >
+                            {revokingId === item.id ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-3 h-3" />
+                            )}
+                            <span>Revoke</span>
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </div>

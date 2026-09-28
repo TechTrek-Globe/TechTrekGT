@@ -4,12 +4,12 @@ import { updateItem, saveComp, fetchLiveComps, pushSkuToEbay } from '../../utils
 import { ALL_STATUSES, LISTING_FORMATS } from '../../utils/constants';
 import { FeeBreakdownPanel } from './FeeBreakdownPanel';
 import { buildEbaySearchUrl } from '../../utils/ebaySearch';
-import { fmtCurrency, roundPrice } from '../../utils/formulaPreview';
+import { fmtCurrency, roundPrice, round2 } from '../../utils/formulaPreview';
 import { generateSku } from '../../utils/skuGenerator';
 
 const formatDec2 = (val) => {
   if (val == null || val === '' || isNaN(Number(val))) return '';
-  return (Math.round(Number(val) * 100) / 100).toFixed(2);
+  return round2(val).toFixed(2);
 };
 
 export function QuickEditDrawer({
@@ -129,7 +129,7 @@ export function QuickEditDrawer({
         const c3 = field === 'comp_3' ? value : prev.comp_3;
         const vals = [c1, c2, c3].filter(v => v !== '' && !isNaN(Number(v)) && Number(v) > 0).map(Number);
         if (vals.length > 0) {
-          updated.recommended_list_price = Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 100) / 100;
+          updated.recommended_list_price = round2(vals.reduce((a, b) => a + b, 0) / vals.length);
         }
       }
       return updated;
@@ -152,11 +152,11 @@ export function QuickEditDrawer({
         status: draft.status,
         platform: draft.platform,
         listing_format: draft.listing_format,
-        true_total_cost: draft.true_total_cost !== '' && draft.true_total_cost != null ? Math.round(parseFloat(draft.true_total_cost) * 100) / 100 : null,
-        est_shipping_cost: draft.est_shipping_cost !== '' && draft.est_shipping_cost != null ? Math.round(parseFloat(draft.est_shipping_cost) * 100) / 100 : 0,
-        current_list_price: draft.current_list_price !== '' && draft.current_list_price != null ? Math.round(parseFloat(draft.current_list_price) * 100) / 100 : null,
-        buy_it_now_price: draft.buy_it_now_price !== '' && draft.buy_it_now_price != null ? Math.round(parseFloat(draft.buy_it_now_price) * 100) / 100 : null,
-        floor_price: draft.floor_price !== '' && draft.floor_price != null ? Math.round(parseFloat(draft.floor_price) * 100) / 100 : null,
+        true_total_cost: draft.true_total_cost !== '' && draft.true_total_cost != null ? round2(draft.true_total_cost) : null,
+        est_shipping_cost: draft.est_shipping_cost !== '' && draft.est_shipping_cost != null ? round2(draft.est_shipping_cost) : 0,
+        current_list_price: draft.current_list_price !== '' && draft.current_list_price != null ? round2(draft.current_list_price) : null,
+        buy_it_now_price: draft.buy_it_now_price !== '' && draft.buy_it_now_price != null ? round2(draft.buy_it_now_price) : null,
+        floor_price: draft.floor_price !== '' && draft.floor_price != null ? round2(draft.floor_price) : null,
         ebay_promoted_rate: draft.ebay_promoted_rate !== '' ? parseFloat(draft.ebay_promoted_rate) : null,
         target_margin_pct: draft.target_margin_pct !== '' ? parseFloat(draft.target_margin_pct) / 100 : 0.15,
         ebay_listing_id: draft.ebay_listing_id ? draft.ebay_listing_id.trim() : null,
@@ -166,8 +166,8 @@ export function QuickEditDrawer({
         is_vinescout: Boolean(draft.is_vinescout),
         asin: draft.asin ? draft.asin.trim().toUpperCase() : null,
         order_id: draft.order_id ? draft.order_id.trim() : null,
-        etv: draft.etv !== '' && draft.etv != null ? Math.round(parseFloat(draft.etv) * 100) / 100 : null,
-        tax_cost: draft.tax_cost !== '' && draft.tax_cost != null ? Math.round(parseFloat(draft.tax_cost) * 100) / 100 : null
+        etv: draft.etv !== '' && draft.etv != null ? round2(draft.etv) : null,
+        tax_cost: draft.tax_cost !== '' && draft.tax_cost != null ? round2(draft.tax_cost) : null
       };
 
       const res = await updateItem(item.id, itemPatch);
@@ -179,13 +179,13 @@ export function QuickEditDrawer({
       if (hasComps) {
         await saveComp({
           item_id: item.id,
-          comp_1: draft.comp_1 !== '' ? Math.round(Number(draft.comp_1) * 100) / 100 : null,
-          comp_2: draft.comp_2 !== '' ? Math.round(Number(draft.comp_2) * 100) / 100 : null,
-          comp_3: draft.comp_3 !== '' ? Math.round(Number(draft.comp_3) * 100) / 100 : null,
-          active_comp_1: draft.active_comp_1 !== '' ? Math.round(Number(draft.active_comp_1) * 100) / 100 : null,
-          active_comp_2: draft.active_comp_2 !== '' ? Math.round(Number(draft.active_comp_2) * 100) / 100 : null,
-          active_comp_3: draft.active_comp_3 !== '' ? Math.round(Number(draft.active_comp_3) * 100) / 100 : null,
-          recommended_list_price: draft.recommended_list_price !== '' ? Math.round(Number(draft.recommended_list_price) * 100) / 100 : null,
+          comp_1: draft.comp_1 !== '' ? round2(draft.comp_1) : null,
+          comp_2: draft.comp_2 !== '' ? round2(draft.comp_2) : null,
+          comp_3: draft.comp_3 !== '' ? round2(draft.comp_3) : null,
+          active_comp_1: draft.active_comp_1 !== '' ? round2(draft.active_comp_1) : null,
+          active_comp_2: draft.active_comp_2 !== '' ? round2(draft.active_comp_2) : null,
+          active_comp_3: draft.active_comp_3 !== '' ? round2(draft.active_comp_3) : null,
+          recommended_list_price: draft.recommended_list_price !== '' ? round2(draft.recommended_list_price) : null,
           apply_to_item: false
         });
       }

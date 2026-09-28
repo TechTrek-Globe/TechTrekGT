@@ -8,6 +8,7 @@ export const LISTINGS_CACHE_TTL_MINUTES = 15;
 
 /**
  * Ensures the cache table exists in the database.
+ * Retained for manual setup / testing; no longer invoked on the hot path (LOW-2).
  *
  * @param {object} db - Cloudflare D1 database binding
  */
@@ -80,9 +81,6 @@ export async function setCachedEbayListings(db, userId, listings) {
   try {
     const json = JSON.stringify(listings);
     const nowIso = new Date().toISOString();
-
-    // Ensure table exists on first write in case migrations haven't run
-    await ensureEbayListingsCacheTable(db);
 
     await db.prepare(`
       INSERT INTO ebay_listings_cache (user_id, listings_json, fetched_at)

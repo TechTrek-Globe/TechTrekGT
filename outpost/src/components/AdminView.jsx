@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { getApiUrl } from '../utils/api';
-import { Users, Package, AlertTriangle, ShieldCheck, CheckCircle2, Lock } from 'lucide-react';
+import { Users, Package, AlertTriangle, ShieldCheck, CheckCircle2, Lock, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export function AdminView() {
   const { user } = useAuth();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(50);
 
   // Fallback check, though App.jsx should protect the route
   const isAdmin = user?.email?.toLowerCase() === (import.meta.env.VITE_ADMIN_EMAIL || 'jgk1865@gmail.com').toLowerCase();
@@ -21,7 +23,7 @@ export function AdminView() {
 
     const fetchStats = async () => {
       try {
-        const res = await fetch(getApiUrl('/api/admin/stats'), {
+        const res = await fetch(getApiUrl(`/api/admin/stats?page=${page}&limit=${limit}`), {
           credentials: 'include'
         });
         const data = await res.json();
@@ -39,7 +41,7 @@ export function AdminView() {
     };
 
     fetchStats();
-  }, [isAdmin]);
+  }, [isAdmin, page, limit]);
 
   if (loading) {
     return (
@@ -166,6 +168,40 @@ export function AdminView() {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Controls */}
+        {stats?.pagination && stats.pagination.pages > 1 && (
+          <div className="px-5 py-3 border-t border-slate-800/60 bg-slate-950/40 flex items-center justify-between text-xs text-slate-400">
+            <div>
+              Showing {((stats.pagination.page - 1) * stats.pagination.limit) + 1} to{' '}
+              {Math.min(stats.pagination.page * stats.pagination.limit, stats.pagination.total)} of{' '}
+              {stats.pagination.total} users
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={stats.pagination.page <= 1}
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                className="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-200 border border-slate-700 disabled:opacity-40 hover:bg-slate-700 transition-all flex items-center gap-1"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+                Previous
+              </button>
+              <span className="font-mono text-slate-300 px-1">
+                Page {stats.pagination.page} of {stats.pagination.pages}
+              </span>
+              <button
+                type="button"
+                disabled={stats.pagination.page >= stats.pagination.pages}
+                onClick={() => setPage(p => Math.min(stats.pagination.pages, p + 1))}
+                className="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-200 border border-slate-700 disabled:opacity-40 hover:bg-slate-700 transition-all flex items-center gap-1"
+              >
+                Next
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

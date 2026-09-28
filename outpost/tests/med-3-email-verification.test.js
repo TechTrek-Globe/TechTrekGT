@@ -412,8 +412,8 @@ describe('MED-3: Registration Email Verification & Token Lifecycle', () => {
       env
     });
 
-    // Attempt again after email verification
-    const revokeResVerified = await revokeIntegrationPost({
+    // Attempt again after email verification without is_admin = 1 (CRIT-2)
+    const revokeResVerifiedNonAdmin = await revokeIntegrationPost({
       request: new Request('https://outpost.techtrekgt.com/api/integrations/target-int-1', {
         method: 'POST',
         headers: {
@@ -426,9 +426,28 @@ describe('MED-3: Registration Email Verification & Token Lifecycle', () => {
       params: { id: 'target-int-1' }
     });
 
+    // Without is_admin = 1, email matching ADMIN_EMAIL must NOT grant admin access
+    assert.strictEqual(revokeResVerifiedNonAdmin.status, 404, 'Verified user matching ADMIN_EMAIL without is_admin = 1 must NOT be granted admin privileges');
+
+    // Grant is_admin = 1 in database
+    await env.DB.prepare('UPDATE users SET is_admin = 1 WHERE id = ?').bind(adminUser.id).run();
+
     // Now admin access is granted and integration is revoked
-    assert.strictEqual(revokeResVerified.status, 200, 'Verified user matching ADMIN_EMAIL is granted admin privileges');
-    const revokeBody = await revokeResVerified.json();
+    const revokeResAdmin = await revokeIntegrationPost({
+      request: new Request('https://outpost.techtrekgt.com/api/integrations/target-int-1', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: `auth_token=${unverifiedAdminJwt}`
+        },
+        body: JSON.stringify({ id: 'target-int-1' })
+      }),
+      env,
+      params: { id: 'target-int-1' }
+    });
+
+    assert.strictEqual(revokeResAdmin.status, 200, 'User with is_admin = 1 is granted admin privileges');
+    const revokeBody = await revokeResAdmin.json();
     assert.strictEqual(revokeBody.revoked, true);
   });
 });

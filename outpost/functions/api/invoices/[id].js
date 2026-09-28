@@ -1,4 +1,4 @@
-import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
+import { requireAuth, withAuth, ok, err, isValidPrefixedId } from '../../utils/guard.js';
 import { computeItemProration, computePricingFloors, validateNonNegativeMoney } from '../../utils/auction.js';
 
 // ============================================================
@@ -9,8 +9,9 @@ import { computeItemProration, computePricingFloors, validateNonNegativeMoney } 
 
 function getInvoiceId(url) {
   // pathname: /api/invoices/<id>
-  const parts = url.pathname.split('/');
-  return parts[parts.length - 1] || null;
+  const parts = url.pathname.split('/').filter(Boolean);
+  const candidate = parts[parts.length - 1] || null;
+  return isValidPrefixedId(candidate, ['inv', 'AMAZON']) ? candidate : null;
 }
 
 export async function onRequestGet(context) {

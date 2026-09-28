@@ -67,15 +67,18 @@ export async function onRequestPost(context) {
     if (!targetListingId) {
       try {
         orderData = await fetchEbayOrderForListing(env, accessToken, null, item.sku, item.item_name);
-        if (orderData) {
+        if (orderData && orderData.isExactMatch !== false) {
           targetListingId = orderData.matchedLine?.legacyItemId || orderData.matchedLine?.itemId || null;
         }
       } catch (_) {}
     }
 
+    // Hoisted in-memory campaignCache scoped to this sync-item run (LOW-3)
+    const campaignCache = new Map();
+
     let liveListing = null;
     if (targetListingId) {
-      liveListing = await fetchSingleEbayListing(env, accessToken, targetListingId);
+      liveListing = await fetchSingleEbayListing(env, accessToken, targetListingId, campaignCache);
     }
 
     // If order was not yet fetched, query using targetListingId / sku / title
@@ -93,6 +96,16 @@ export async function onRequestPost(context) {
       }
     }
 
+    if (!liveListing && orderData && orderData.isExactMatch !== false) {
+      const discoveredId = orderData.matchedLine?.legacyItemId || orderData.matchedLine?.itemId;
+      if (discoveredId) {
+        targetListingId = discoveredId;
+        try {
+          liveListing = await fetchSingleEbayListing(env, accessToken, targetListingId, campaignCache);
+        } catch (_) {}
+      }
+    }
+
     if (orderData?.orderId) {
       try {
         financeData = await fetchEbayOrderFinances(env, accessToken, orderData.orderId);
@@ -101,7 +114,7 @@ export async function onRequestPost(context) {
       }
     }
 
-    const hasOrder = Boolean(orderData?.orderId || orderData?.buyerHandle || (orderData?.lineItemCost && orderData.lineItemCost > 0));
+    const hasOrder = Boolean(orderData && orderData.isExactMatch !== false && (orderData.orderId || orderData.buyerHandle || (orderData.lineItemCost && orderData.lineItemCost > 0)));
     const isSold = hasOrder ||
                    liveListing?.status === 'Sold' ||
                    liveListing?.raw_status === 'Completed' ||
@@ -228,6 +241,38 @@ export async function onRequestPost(context) {
 
     // Invalidate active listings cache on explicit single-item sync (MED-15)
     await invalidateEbayListingsCache(env.DB, payload.userId);
+
+    // MED-2: If order was matched solely by title similarity, do NOT auto-reconcile sale.
+    // Instead, insert a pending review alert into auction_market_alerts for human confirmation.
+    if (orderData && orderData.isExactMatch === false) {
+      const alertId = `alt_${crypto.randomUUID()}`;
+      const salePrice = orderData.salePrice || orderData.lineItemCost || 0;
+      const currentPrice = item.current_list_price || 0;
+      const pctChange = currentPrice > 0 ? ((salePrice - currentPrice) / currentPrice) * 100 : 0;
+
+      await env.DB.prepare(`
+        INSERT INTO auction_market_alerts (id, user_id, item_id, alert_type, old_value, new_value, percentage_change, is_read, created_at)
+        VALUES (?, ?, ?, 'PENDING_SALE_MATCH', ?, ?, ?, 0, datetime('now'))
+      `).bind(
+        alertId,
+        payload.userId,
+        itemId,
+        currentPrice,
+        salePrice,
+        pctChange
+      ).run();
+
+      return ok({
+        success: true,
+        is_sold: false,
+        pending_review: true,
+        alert_id: alertId,
+        message: `Suggested sale match found by title similarity (Order #${orderData.orderId || 'N/A'}). Created pending review alert for user confirmation.`,
+        item: updatedItem,
+        pendingOrder: orderData,
+        liveListing
+      });
+    }
 
     // If item is sold, automatically reconcile and save sale
     if (isSold) {

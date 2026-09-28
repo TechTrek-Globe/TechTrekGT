@@ -5,8 +5,11 @@
  * net profit, ROI, and margin health tiers.
  */
 
+import { round2 } from './formulaPreview.js';
+
 export function round(val, decimals = 2) {
   if (val == null || isNaN(Number(val))) return 0;
+  if (decimals === 2) return round2(val);
   const factor = Math.pow(10, decimals);
   return Math.round(Number(val) * factor) / factor;
 }

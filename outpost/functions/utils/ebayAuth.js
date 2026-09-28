@@ -6,7 +6,10 @@ import { decryptToken, encryptToken } from './tokenCrypto.js';
  */
 export async function getEbayUserToken(env, userId) {
   if (!env.DB) throw new Error('DB binding not available');
-  const encKey = env.TOKEN_ENCRYPTION_KEY || env.JWT_SECRET;
+  const encKey = env.TOKEN_ENCRYPTION_KEY || (() => {
+    console.error('[getEbayUserToken] TOKEN_ENCRYPTION_KEY not configured - falling back to JWT_SECRET for eBay token encryption. This defeats key separation; configure TOKEN_ENCRYPTION_KEY immediately.');
+    return env.JWT_SECRET;
+  })();
   if (!encKey) throw new Error('TOKEN_ENCRYPTION_KEY binding not available');
 
   const row = await env.DB.prepare(

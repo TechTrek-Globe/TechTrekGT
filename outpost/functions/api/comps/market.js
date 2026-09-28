@@ -1,5 +1,5 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
-import { validateNonNegativeMoney } from '../../utils/auction.js';
+import { validateNonNegativeMoney, round2 } from '../../utils/auction.js';
 
 // eBay condition IDs that are always excluded from median benchmark calculations.
 // condition_id '7000' = For Parts / Not Working
@@ -167,7 +167,7 @@ export async function onRequestPost(context) {
     }
 
     const landedCost = parsedListPrice !== null
-      ? Math.round((parsedListPrice + parsedShippingFee) * 100) / 100
+      ? round2(parsedListPrice + parsedShippingFee)
       : null;
 
     // Auto-determine validity unless caller explicitly sets it

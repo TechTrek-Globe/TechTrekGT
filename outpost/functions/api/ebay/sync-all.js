@@ -222,21 +222,41 @@ export async function onRequestPost(context) {
           // If item sold, auto-record the sale and stamp VineScout write-back before final update
           if (isSold) {
             try {
-              const orderData = await fetchEbayOrderForListing(env, accessToken, item.ebay_listing_id, item.sku || match.sku);
-              let financeData = null;
-              if (orderData?.orderId) {
-                financeData = await fetchEbayOrderFinances(env, accessToken, orderData.orderId);
-              }
-              await reconcileAndSaveEbaySale(env, payload.userId, item, orderData, financeData);
-              soldRecordedCount++;
+              const orderData = await fetchEbayOrderForListing(env, accessToken, item.ebay_listing_id, item.sku || match.sku, item.item_name || match.title);
+              if (orderData && orderData.isExactMatch === false) {
+                // MED-2: Title similarity match only - do NOT call reconcileAndSaveEbaySale automatically.
+                // Insert into auction_market_alerts for human confirmation.
+                const alertId = `alt_${crypto.randomUUID()}`;
+                const salePrice = orderData.salePrice || orderData.lineItemCost || 0;
+                const currentPrice = item.current_list_price || 0;
+                const pctChange = currentPrice > 0 ? ((salePrice - currentPrice) / currentPrice) * 100 : 0;
+                await env.DB.prepare(`
+                  INSERT INTO auction_market_alerts (id, user_id, item_id, alert_type, old_value, new_value, percentage_change, is_read, created_at)
+                  VALUES (?, ?, ?, 'PENDING_SALE_MATCH', ?, ?, ?, 0, datetime('now'))
+                `).bind(
+                  alertId,
+                  payload.userId,
+                  item.id,
+                  currentPrice,
+                  salePrice,
+                  pctChange
+                ).run();
+              } else {
+                let financeData = null;
+                if (orderData?.orderId) {
+                  financeData = await fetchEbayOrderFinances(env, accessToken, orderData.orderId);
+                }
+                await reconcileAndSaveEbaySale(env, payload.userId, item, orderData, financeData);
+                soldRecordedCount++;
 
-              // P7: VScout write-back - stamp sold metadata on Vine-sourced items
-              if (attrs.asin || attrs.order_id) {
-                attrs.outpost_liquidated = 1;
-                const sp = orderData?.salePrice != null ? orderData.salePrice : (orderData?.lineItemCost != null ? orderData.lineItemCost : null);
-                if (sp != null) attrs.sale_price = sp;
-                attrs.sold_at = orderData?.creationDate || orderData?.createdDate || new Date().toISOString();
-                if (orderData?.orderId) attrs.ebay_order_id = orderData.orderId;
+                // P7: VScout write-back - stamp sold metadata on Vine-sourced items
+                if (attrs.asin || attrs.order_id) {
+                  attrs.outpost_liquidated = 1;
+                  const sp = orderData?.salePrice != null ? orderData.salePrice : (orderData?.lineItemCost != null ? orderData.lineItemCost : null);
+                  if (sp != null) attrs.sale_price = sp;
+                  attrs.sold_at = orderData?.creationDate || orderData?.createdDate || new Date().toISOString();
+                  if (orderData?.orderId) attrs.ebay_order_id = orderData.orderId;
+                }
               }
             } catch (soldErr) {
               console.warn(`[sync-all] Auto-sale record exception for item ${item.id}:`, soldErr);
@@ -289,23 +309,42 @@ export async function onRequestPost(context) {
                 }
               }
               if (singleDetail.status === 'Sold' || singleDetail.quantity_sold > 0) {
-                const orderData = await fetchEbayOrderForListing(env, accessToken, cleanListingId, item.sku);
-                let financeData = null;
-                if (orderData?.orderId) {
-                  financeData = await fetchEbayOrderFinances(env, accessToken, orderData.orderId);
-                }
-                await reconcileAndSaveEbaySale(env, payload.userId, item, orderData, financeData);
-                soldRecordedCount++;
-                updatedCount++;
+                const orderData = await fetchEbayOrderForListing(env, accessToken, cleanListingId, item.sku, item.item_name);
+                if (orderData && orderData.isExactMatch === false) {
+                  // MED-2: Title similarity match only - do NOT call reconcileAndSaveEbaySale automatically.
+                  const alertId = `alt_${crypto.randomUUID()}`;
+                  const salePrice = orderData.salePrice || orderData.lineItemCost || 0;
+                  const currentPrice = item.current_list_price || 0;
+                  const pctChange = currentPrice > 0 ? ((salePrice - currentPrice) / currentPrice) * 100 : 0;
+                  await env.DB.prepare(`
+                    INSERT INTO auction_market_alerts (id, user_id, item_id, alert_type, old_value, new_value, percentage_change, is_read, created_at)
+                    VALUES (?, ?, ?, 'PENDING_SALE_MATCH', ?, ?, ?, 0, datetime('now'))
+                  `).bind(
+                    alertId,
+                    payload.userId,
+                    item.id,
+                    currentPrice,
+                    salePrice,
+                    pctChange
+                  ).run();
+                } else {
+                  let financeData = null;
+                  if (orderData?.orderId) {
+                    financeData = await fetchEbayOrderFinances(env, accessToken, orderData.orderId);
+                  }
+                  await reconcileAndSaveEbaySale(env, payload.userId, item, orderData, financeData);
+                  soldRecordedCount++;
+                  updatedCount++;
 
-                // P7: VScout write-back
-                if (attrs.asin || attrs.order_id) {
-                  attrs.outpost_liquidated = 1;
-                  const sp = orderData?.salePrice != null ? orderData.salePrice : (orderData?.lineItemCost != null ? orderData.lineItemCost : null);
-                  if (sp != null) attrs.sale_price = sp;
-                  attrs.sold_at = orderData?.creationDate || orderData?.createdDate || new Date().toISOString();
-                  if (orderData?.orderId) attrs.ebay_order_id = orderData.orderId;
-                  attrsDirty = true;
+                  // P7: VScout write-back
+                  if (attrs.asin || attrs.order_id) {
+                    attrs.outpost_liquidated = 1;
+                    const sp = orderData?.salePrice != null ? orderData.salePrice : (orderData?.lineItemCost != null ? orderData.lineItemCost : null);
+                    if (sp != null) attrs.sale_price = sp;
+                    attrs.sold_at = orderData?.creationDate || orderData?.createdDate || new Date().toISOString();
+                    if (orderData?.orderId) attrs.ebay_order_id = orderData.orderId;
+                    attrsDirty = true;
+                  }
                 }
               }
 

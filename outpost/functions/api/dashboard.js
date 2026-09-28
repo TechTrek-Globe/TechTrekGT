@@ -1,4 +1,5 @@
 import { requireAuth, withAuth, ok, err } from '../utils/guard.js';
+import { round2 } from '../utils/auction.js';
 
 /**
  * GET /api/dashboard
@@ -186,7 +187,7 @@ export async function onRequestGet(context) {
         total_shipping_costs: salesStats?.total_shipping_costs || 0,
         total_net_profit: totalNetProfit,
         total_sold_cost: totalSoldCost,
-        avg_cogs: Math.round(avgCogs * 100) / 100,
+        avg_cogs: round2(avgCogs),
         blended_roi: blendedRoi,
         avg_days_to_sell: Math.round((salesStats?.avg_days_to_sell || 0) * 10) / 10
       },

@@ -3,7 +3,7 @@ import { ExternalLink, Copy, AlertCircle, Loader2, Save, CheckCircle2, ArrowUpRi
 import { StatusBadge } from './StatusBadge';
 import { MarginHealthBadge } from './MarginHealthBadge';
 import { cleanItemDescription, cleanAthleteName } from '../../utils/spreadsheetParser';
-import { fmtCurrency, roundPrice } from '../../utils/formulaPreview';
+import { fmtCurrency, roundPrice, round2 } from '../../utils/formulaPreview';
 import { buildEbaySearchUrl } from '../../utils/ebaySearch';
 import { saveComp, fetchLiveComps } from '../../utils/auctionApi';
 import { FeeBreakdownPanel } from './FeeBreakdownPanel';
@@ -55,7 +55,7 @@ export function PricingCard({
         const c3 = field === 'comp_3' ? value : prev.comp_3;
         const vals = [c1, c2, c3].filter(v => v !== '' && !isNaN(Number(v)) && Number(v) > 0).map(Number);
         if (vals.length > 0) {
-          updated.recommended_list_price = Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 100) / 100;
+          updated.recommended_list_price = round2(vals.reduce((a, b) => a + b, 0) / vals.length);
         }
       }
       return updated;

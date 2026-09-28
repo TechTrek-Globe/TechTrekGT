@@ -1,3 +1,4 @@
+import { round2 } from './formulaPreview.js';
 
 /**
  * Convert Excel serial date or date string to YYYY-MM-DD string
@@ -469,16 +470,16 @@ export async function parseAuctionWorkbook(buffer) {
         item.prorated_tax = item.proration_weight * inv.tax;
       }
       if (item.true_total_cost === item.unit_price && (inv.discount > 0 || inv.shipping > 0 || inv.tax > 0)) {
-        item.true_total_cost = item.unit_price - item.prorated_discount + item.prorated_shipping + item.prorated_tax;
+        item.true_total_cost = round2(item.unit_price - item.prorated_discount + item.prorated_shipping + item.prorated_tax);
       }
     }
     // Compute pricing floors if not present
     if (item.min_sell_price === 0 && item.true_total_cost > 0) {
       const divisor = 1 - item.platform_fee_pct - item.boost_pct;
       item.min_sell_price = divisor > 0
-        ? Math.round(((item.true_total_cost + item.est_shipping_cost + item.platform_flat_fee) / divisor) * 100) / 100
+        ? round2((item.true_total_cost + item.est_shipping_cost + item.platform_flat_fee) / divisor)
         : 0;
-      item.suggested_list_price = Math.round((item.min_sell_price * (1 + item.target_margin_pct)) * 100) / 100;
+      item.suggested_list_price = round2(item.min_sell_price * (1 + item.target_margin_pct));
     }
   });
 

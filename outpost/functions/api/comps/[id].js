@@ -1,10 +1,15 @@
-import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
+import { requireAuth, withAuth, ok, err, isValidPrefixedId } from '../../utils/guard.js';
 import { computeManualAvg } from '../../utils/auction.js';
 
 function extractId(request, params) {
-  if (params?.id) return params.id;
-  const match = new URL(request.url).pathname.match(/\/api\/comps\/([^/]+)/);
-  return match ? match[1] : null;
+  let candidate = null;
+  if (params?.id) {
+    candidate = params.id;
+  } else {
+    const match = new URL(request.url).pathname.match(/\/api\/comps\/([^/]+)/);
+    candidate = match ? match[1] : null;
+  }
+  return isValidPrefixedId(candidate, 'comp', { allowPureUuid: true }) ? candidate : null;
 }
 
 /**
@@ -15,7 +20,7 @@ export async function onRequestGet(context) {
   return withAuth(async () => {
     const { userId } = await requireAuth(request, env);
     const id = extractId(request, params);
-    if (!id) return err('Comp ID required');
+    if (!id) return err('Comp ID required', 400);
 
     const comp = await env.DB.prepare(`
       SELECT c.*, i.item_name, i.category, i.athlete_person, i.authenticator, i.cert_number, i.true_total_cost, i.min_sell_price, i.current_list_price
@@ -37,7 +42,7 @@ export async function onRequestPut(context) {
   return withAuth(async () => {
     const { userId } = await requireAuth(request, env);
     const id = extractId(request, params);
-    if (!id) return err('Comp ID required');
+    if (!id) return err('Comp ID required', 400);
 
     const existing = await env.DB.prepare(
       'SELECT * FROM auction_comps WHERE id = ? AND user_id = ?'
@@ -118,7 +123,7 @@ export async function onRequestDelete(context) {
   return withAuth(async () => {
     const { userId } = await requireAuth(request, env);
     const id = extractId(request, params);
-    if (!id) return err('Comp ID required');
+    if (!id) return err('Comp ID required', 400);
 
     const existing = await env.DB.prepare(
       'SELECT id FROM auction_comps WHERE id = ? AND user_id = ?'

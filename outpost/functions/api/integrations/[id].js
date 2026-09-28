@@ -24,9 +24,8 @@ export async function onRequestPost(context) {
 
     if (!id) return err('Integration ID required', 400);
 
-    const authUser = await env.DB.prepare('SELECT is_admin, email_verified, email_verified_at FROM users WHERE id = ?').bind(auth.userId).first();
-    const isVerified = Boolean(authUser?.email_verified || authUser?.email_verified_at);
-    const isAdmin = authUser?.is_admin === 1 || (isVerified && env.ADMIN_EMAIL && auth.email === env.ADMIN_EMAIL);
+    const authUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.userId).first();
+    const isAdmin = authUser?.is_admin === 1;
     const existing = isAdmin
       ? await env.DB.prepare('SELECT id, user_id, label, revoked_at FROM api_integrations WHERE id = ?').bind(id).first()
       : await env.DB.prepare('SELECT id, user_id, label, revoked_at FROM api_integrations WHERE id = ? AND user_id = ?').bind(id, auth.userId).first();
@@ -62,9 +61,8 @@ export async function onRequestDelete(context) {
     const id = extractId(request, params);
     if (!id) return err('Integration ID required', 400);
 
-    const authUser = await env.DB.prepare('SELECT is_admin, email_verified, email_verified_at FROM users WHERE id = ?').bind(auth.userId).first();
-    const isVerified = Boolean(authUser?.email_verified || authUser?.email_verified_at);
-    const isAdmin = authUser?.is_admin === 1 || (isVerified && env.ADMIN_EMAIL && auth.email === env.ADMIN_EMAIL);
+    const authUser = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(auth.userId).first();
+    const isAdmin = authUser?.is_admin === 1;
     const existing = isAdmin
       ? await env.DB.prepare('SELECT id, user_id, label, revoked_at FROM api_integrations WHERE id = ?').bind(id).first()
       : await env.DB.prepare('SELECT id, user_id, label, revoked_at FROM api_integrations WHERE id = ? AND user_id = ?').bind(id, auth.userId).first();

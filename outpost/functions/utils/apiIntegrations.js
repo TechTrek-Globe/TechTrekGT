@@ -100,8 +100,9 @@ export async function resolveIntegrationUserId(rawToken, env) {
     }
   }
 
-  // 3. Migration fallback: OUTPOST_SECRET_KEY
+  // 3. Migration fallback: OUTPOST_SECRET_KEY [DEPRECATED: Scheduled for removal on 2026-11-30]
   if (env?.OUTPOST_SECRET_KEY && token === env.OUTPOST_SECRET_KEY) {
+    console.warn('[DEPRECATION WARNING] Request authenticated using legacy shared OUTPOST_SECRET_KEY resolving to oldest user. This fallback is deprecated and scheduled for removal on 2026-11-30. Please migrate to a per-installation secret via POST /api/integrations.');
     if (env.DB) {
       const primaryUser = await env.DB.prepare(
         'SELECT id FROM users ORDER BY created_at ASC LIMIT 1'

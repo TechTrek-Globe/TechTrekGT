@@ -1,5 +1,5 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
-import { computeItemProration, computePricingFloors } from '../../utils/auction.js';
+import { computeItemProration, computePricingFloors, validateNonNegativeMoney } from '../../utils/auction.js';
 
 // ============================================================
 // GET    /api/invoices/:id  - get single invoice with items
@@ -54,9 +54,23 @@ export async function onRequestPut(context) {
     const body = await request.json();
     const { invoice_ref, description, discount, shipping, tax, date_acquired } = body;
 
-    const newDiscount  = discount  ?? invoice.discount;
-    const newShipping  = shipping  ?? invoice.shipping;
-    const newTax       = tax       ?? invoice.tax;
+    let newDiscount = invoice.discount;
+    let newShipping = invoice.shipping;
+    let newTax      = invoice.tax;
+
+    try {
+      if (discount !== undefined) {
+        newDiscount = validateNonNegativeMoney(discount, 'discount') ?? invoice.discount;
+      }
+      if (shipping !== undefined) {
+        newShipping = validateNonNegativeMoney(shipping, 'shipping') ?? invoice.shipping;
+      }
+      if (tax !== undefined) {
+        newTax = validateNonNegativeMoney(tax, 'tax') ?? invoice.tax;
+      }
+    } catch (e) {
+      return err(e.message, 400);
+    }
     const newRef       = invoice_ref ?? invoice.invoice_ref;
     const newDesc      = description ?? invoice.description;
     const newDateAcq   = date_acquired ?? invoice.date_acquired;

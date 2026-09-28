@@ -80,6 +80,7 @@ export function SoldEbayVineMatcherModal({ isOpen, onClose, onMatched }) {
 
     try {
       await confirmSoldEbayVineMatch({
+        confirm: true,
         item_id: vscoutItem.id,
         ebay_order_id: ebayOrder.order_id,
         ebay_listing_id: ebayOrder.legacy_item_id,
@@ -100,7 +101,8 @@ export function SoldEbayVineMatcherModal({ isOpen, onClose, onMatched }) {
   const handleBatchConfirmHighConfidence = async () => {
     const highConfidence = matchData.suggested_matches.filter(m => {
       const state = cardStates[m.ebay_order.order_id];
-      return m.confidence >= 0.85 && (!state || !state.saved);
+      const isHigh = m.high_confidence !== undefined ? m.high_confidence : m.confidence >= 0.80;
+      return isHigh && (!state || !state.saved);
     });
 
     if (highConfidence.length === 0) return;
@@ -109,6 +111,7 @@ export function SoldEbayVineMatcherModal({ isOpen, onClose, onMatched }) {
     for (const match of highConfidence) {
       try {
         await confirmSoldEbayVineMatch({
+          confirm: true,
           item_id: match.vinescout_item.id,
           ebay_order_id: match.ebay_order.order_id,
           ebay_listing_id: match.ebay_order.legacy_item_id,
@@ -135,6 +138,7 @@ export function SoldEbayVineMatcherModal({ isOpen, onClose, onMatched }) {
 
     try {
       await confirmSoldEbayVineMatch({
+        confirm: true,
         item_id: selectedVScoutItem.id,
         ebay_order_id: selectedEbayOrder.order_id,
         ebay_listing_id: selectedEbayOrder.legacy_item_id,
@@ -192,7 +196,8 @@ export function SoldEbayVineMatcherModal({ isOpen, onClose, onMatched }) {
 
   const highConfidenceCount = matchData.suggested_matches.filter(m => {
     const state = cardStates[m.ebay_order.order_id];
-    return m.confidence >= 0.85 && (!state || !state.saved);
+    const isHigh = m.high_confidence !== undefined ? m.high_confidence : m.confidence >= 0.80;
+    return isHigh && (!state || !state.saved);
   }).length;
 
   return (
@@ -435,13 +440,13 @@ export function SoldEbayVineMatcherModal({ isOpen, onClose, onMatched }) {
                           {/* 2. Center: Match Indicator */}
                           <div className="lg:col-span-2 flex flex-col items-center justify-center gap-1 text-center py-2 px-1 border-y lg:border-y-0 lg:border-x border-slate-800/80">
                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-                              match.confidence >= 0.95
+                              (match.high_confidence !== undefined ? match.high_confidence : match.confidence >= 0.80)
                                 ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                                : match.confidence >= 0.70
+                                : match.confidence >= 0.60
                                 ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
                                 : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
                             }`}>
-                              {(match.confidence * 100).toFixed(0)}% Match
+                              {(match.confidence * 100).toFixed(0)}% Match {(match.high_confidence !== undefined ? match.high_confidence : match.confidence >= 0.80) ? '(High Confidence)' : '(Requires Review)'}
                             </span>
                             <span className="text-[9px] text-slate-400 leading-tight">
                               {match.match_reason}

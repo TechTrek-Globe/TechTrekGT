@@ -1,5 +1,5 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
-import { computeSaleMetrics, daysBetween } from '../../utils/auction.js';
+import { computeSaleMetrics, daysBetween, validateNonNegativeMoney } from '../../utils/auction.js';
 
 // ============================================================
 // GET    /api/sales/:id - retrieve single sale with item info
@@ -79,16 +79,49 @@ export async function onRequestPut(context) {
     const sale_date = body.sale_date ?? existing.sale_date;
     const platform = body.platform ?? existing.platform;
     const buyer_handle = body.buyer_handle !== undefined ? body.buyer_handle : existing.buyer_handle;
-    const gross_sale_price = typeof body.gross_sale_price === 'number' ? body.gross_sale_price : existing.gross_sale_price;
-    const buyer_shipping_paid = typeof body.buyer_shipping_paid === 'number' ? body.buyer_shipping_paid : existing.buyer_shipping_paid;
-    const actual_shipping_cost = typeof body.actual_shipping_cost === 'number' ? body.actual_shipping_cost : existing.actual_shipping_cost;
-    const platform_fee_pct = typeof body.platform_fee_pct === 'number' ? body.platform_fee_pct : existing.platform_fee_pct;
-    const platform_flat_fee = typeof body.platform_flat_fee === 'number' ? body.platform_flat_fee : existing.platform_flat_fee;
-    const payment_processing_amt = typeof body.payment_processing_amt === 'number' ? body.payment_processing_amt : existing.payment_processing_amt;
-    const promoted_listing_fee = typeof body.promoted_listing_fee === 'number' ? body.promoted_listing_fee : existing.promoted_listing_fee;
-    const directNetProceeds = typeof body.net_proceeds === 'number'
-      ? body.net_proceeds
-      : (typeof body.net_earnings === 'number' ? body.net_earnings : (body.net_proceeds === undefined ? undefined : existing.net_proceeds));
+
+    let gross_sale_price = existing.gross_sale_price;
+    let buyer_shipping_paid = existing.buyer_shipping_paid;
+    let actual_shipping_cost = existing.actual_shipping_cost;
+    let platform_fee_pct = existing.platform_fee_pct;
+    let platform_flat_fee = existing.platform_flat_fee;
+    let payment_processing_amt = existing.payment_processing_amt;
+    let promoted_listing_fee = existing.promoted_listing_fee;
+    let directNetProceeds = existing.net_proceeds;
+
+    try {
+      if (body.gross_sale_price !== undefined) {
+        gross_sale_price = validateNonNegativeMoney(body.gross_sale_price, 'gross_sale_price') ?? existing.gross_sale_price;
+      }
+      if (body.buyer_shipping_paid !== undefined) {
+        buyer_shipping_paid = validateNonNegativeMoney(body.buyer_shipping_paid, 'buyer_shipping_paid') ?? 0;
+      }
+      if (body.actual_shipping_cost !== undefined) {
+        actual_shipping_cost = validateNonNegativeMoney(body.actual_shipping_cost, 'actual_shipping_cost') ?? 0;
+      }
+      if (body.platform_fee_pct !== undefined) {
+        platform_fee_pct = validateNonNegativeMoney(body.platform_fee_pct, 'platform_fee_pct') ?? 0;
+      }
+      if (body.platform_flat_fee !== undefined) {
+        platform_flat_fee = validateNonNegativeMoney(body.platform_flat_fee, 'platform_flat_fee') ?? 0;
+      }
+      if (body.payment_processing_amt !== undefined) {
+        payment_processing_amt = validateNonNegativeMoney(body.payment_processing_amt, 'payment_processing_amt') ?? 0;
+      }
+      if (body.promoted_listing_fee !== undefined) {
+        promoted_listing_fee = validateNonNegativeMoney(body.promoted_listing_fee, 'promoted_listing_fee') ?? 0;
+      }
+      if (body.shipping_fee !== undefined) {
+        validateNonNegativeMoney(body.shipping_fee, 'shipping_fee');
+      }
+      if (body.net_proceeds !== undefined) {
+        directNetProceeds = validateNonNegativeMoney(body.net_proceeds, 'net_proceeds');
+      } else if (body.net_earnings !== undefined) {
+        directNetProceeds = validateNonNegativeMoney(body.net_earnings, 'net_earnings');
+      }
+    } catch (e) {
+      return err(e.message, 400);
+    }
 
     const metrics = computeSaleMetrics({
       gross_sale_price,

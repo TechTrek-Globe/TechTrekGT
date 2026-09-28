@@ -368,7 +368,7 @@ export const confirmSoldEbayVineMatch = (payload) =>
   apiFetch('/api/ebay/match-sold-vinescout', {
     method: 'POST',
     headers: JSON_HEADERS,
-    body: JSON.stringify(payload)
+    body: JSON.stringify({ confirm: true, ...payload })
   });
 
 // --- API Integrations (HIGH-2) ---

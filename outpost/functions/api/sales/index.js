@@ -1,5 +1,5 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
-import { computeSaleMetrics, daysBetween } from '../../utils/auction.js';
+import { computeSaleMetrics, daysBetween, validateNonNegativeMoney } from '../../utils/auction.js';
 
 // ============================================================
 // GET  /api/sales - list all sales with aggregates & item joins
@@ -140,8 +140,41 @@ export async function onRequestPost(context) {
     if (!item_id) return err('item_id is required');
     if (!sale_date) return err('sale_date is required');
     if (!platform) return err('platform is required');
-    if (typeof gross_sale_price !== 'number' || gross_sale_price < 0) {
-      return err('Valid gross_sale_price is required');
+
+    let vGrossSalePrice;
+    let bShippingPaid;
+    let aShippingCost;
+    let pProcessingAmt;
+    let pListingFee;
+    let feePct;
+    let flatFee;
+    let directNetProceeds;
+
+    try {
+      vGrossSalePrice = validateNonNegativeMoney(gross_sale_price, 'gross_sale_price');
+      if (vGrossSalePrice === null) {
+        return err('Valid gross_sale_price is required', 400);
+      }
+      bShippingPaid = validateNonNegativeMoney(buyer_shipping_paid, 'buyer_shipping_paid') ?? 0;
+      aShippingCost = validateNonNegativeMoney(actual_shipping_cost, 'actual_shipping_cost') ?? 0;
+      pProcessingAmt = validateNonNegativeMoney(payment_processing_amt, 'payment_processing_amt') ?? 0;
+      pListingFee = validateNonNegativeMoney(promoted_listing_fee, 'promoted_listing_fee') ?? 0;
+      if (platform_fee_pct !== undefined) {
+        feePct = validateNonNegativeMoney(platform_fee_pct, 'platform_fee_pct');
+      }
+      if (platform_flat_fee !== undefined) {
+        flatFee = validateNonNegativeMoney(platform_flat_fee, 'platform_flat_fee');
+      }
+      if (body.shipping_fee !== undefined) {
+        validateNonNegativeMoney(body.shipping_fee, 'shipping_fee');
+      }
+      if (net_proceeds !== undefined) {
+        directNetProceeds = validateNonNegativeMoney(net_proceeds, 'net_proceeds');
+      } else if (net_earnings !== undefined) {
+        directNetProceeds = validateNonNegativeMoney(net_earnings, 'net_earnings');
+      }
+    } catch (e) {
+      return err(e.message, 400);
     }
 
     // Retrieve the item to get true_total_cost & dates
@@ -152,8 +185,6 @@ export async function onRequestPost(context) {
     if (!item) return err('Item not found', 404);
 
     // Platform fees defaults if not explicitly passed
-    let feePct = platform_fee_pct;
-    let flatFee = platform_flat_fee;
     if (feePct == null || flatFee == null) {
       const plat = await env.DB.prepare(
         'SELECT fee_pct, flat_fee FROM auction_platforms WHERE user_id = ? AND name = ?'
@@ -162,14 +193,8 @@ export async function onRequestPost(context) {
       flatFee = flatFee ?? (plat?.flat_fee || 0);
     }
 
-    const bShippingPaid = buyer_shipping_paid || 0;
-    const aShippingCost = actual_shipping_cost || 0;
-    const pProcessingAmt = payment_processing_amt || 0;
-    const pListingFee = promoted_listing_fee || 0;
-    const directNetProceeds = typeof net_proceeds === 'number' ? net_proceeds : (typeof net_earnings === 'number' ? net_earnings : undefined);
-
     const metrics = computeSaleMetrics({
-      gross_sale_price,
+      gross_sale_price: vGrossSalePrice,
       buyer_shipping_paid: bShippingPaid,
       actual_shipping_cost: aShippingCost,
       platform_fee_pct: feePct,
@@ -183,33 +208,129 @@ export async function onRequestPost(context) {
     const startDate = item.date_listed || item.date_acquired;
     const daysToSell = daysBetween(startDate, sale_date) ?? 0;
 
-    const saleId = `sale-${crypto.randomUUID()}`;
+    const existingSale = await env.DB.prepare(
+      'SELECT id FROM auction_sales WHERE item_id = ? AND user_id = ?'
+    ).bind(item_id, payload.userId).first();
 
-    await env.DB.prepare(`
-      INSERT INTO auction_sales (
-        id, user_id, item_id, sale_date, platform, buyer_handle,
-        gross_sale_price, buyer_shipping_paid, actual_shipping_cost,
-        platform_fee_pct, platform_flat_fee, platform_fees_amt,
-        payment_processing_amt, promoted_listing_fee,
-        net_proceeds, true_total_cost, net_profit, roi_pct,
-        days_to_sell, ebay_order_id
-      ) VALUES (
-        ?, ?, ?, ?, ?, ?,
-        ?, ?, ?,
-        ?, ?, ?,
-        ?, ?,
-        ?, ?, ?, ?,
-        ?, ?
-      )
-    `).bind(
-      saleId, payload.userId, item_id, sale_date, platform, buyer_handle || null,
-      gross_sale_price, bShippingPaid, aShippingCost,
-      feePct, flatFee, metrics.platform_fees_amt,
-      pProcessingAmt, pListingFee,
-      metrics.net_proceeds, item.true_total_cost, metrics.net_profit, metrics.roi_pct,
-      daysToSell >= 0 ? daysToSell : 0,
-      ebay_order_id || null
-    ).run();
+    let saleId = existingSale?.id || `sale-${crypto.randomUUID()}`;
+
+    try {
+      if (existingSale) {
+        await env.DB.prepare(`
+          UPDATE auction_sales SET
+            sale_date = ?,
+            platform = ?,
+            buyer_handle = COALESCE(?, buyer_handle),
+            gross_sale_price = ?,
+            buyer_shipping_paid = ?,
+            actual_shipping_cost = ?,
+            platform_fee_pct = ?,
+            platform_flat_fee = ?,
+            platform_fees_amt = ?,
+            payment_processing_amt = ?,
+            promoted_listing_fee = ?,
+            net_proceeds = ?,
+            true_total_cost = ?,
+            net_profit = ?,
+            roi_pct = ?,
+            days_to_sell = ?,
+            ebay_order_id = COALESCE(?, ebay_order_id)
+          WHERE id = ? AND user_id = ?
+        `).bind(
+          sale_date, platform, buyer_handle || null,
+          vGrossSalePrice, bShippingPaid, aShippingCost,
+          feePct, flatFee, metrics.platform_fees_amt,
+          pProcessingAmt, pListingFee,
+          metrics.net_proceeds, item.true_total_cost, metrics.net_profit, metrics.roi_pct,
+          daysToSell >= 0 ? daysToSell : 0,
+          ebay_order_id || null,
+          existingSale.id, payload.userId
+        ).run();
+      } else {
+        await env.DB.prepare(`
+          INSERT INTO auction_sales (
+            id, user_id, item_id, sale_date, platform, buyer_handle,
+            gross_sale_price, buyer_shipping_paid, actual_shipping_cost,
+            platform_fee_pct, platform_flat_fee, platform_fees_amt,
+            payment_processing_amt, promoted_listing_fee,
+            net_proceeds, true_total_cost, net_profit, roi_pct,
+            days_to_sell, ebay_order_id
+          ) VALUES (
+            ?, ?, ?, ?, ?, ?,
+            ?, ?, ?,
+            ?, ?, ?,
+            ?, ?,
+            ?, ?, ?, ?,
+            ?, ?
+          )
+          ON CONFLICT(item_id) DO UPDATE SET
+            sale_date = excluded.sale_date,
+            platform = excluded.platform,
+            buyer_handle = COALESCE(excluded.buyer_handle, auction_sales.buyer_handle),
+            gross_sale_price = excluded.gross_sale_price,
+            buyer_shipping_paid = excluded.buyer_shipping_paid,
+            actual_shipping_cost = excluded.actual_shipping_cost,
+            platform_fee_pct = excluded.platform_fee_pct,
+            platform_flat_fee = excluded.platform_flat_fee,
+            platform_fees_amt = excluded.platform_fees_amt,
+            payment_processing_amt = excluded.payment_processing_amt,
+            promoted_listing_fee = excluded.promoted_listing_fee,
+            net_proceeds = excluded.net_proceeds,
+            true_total_cost = excluded.true_total_cost,
+            net_profit = excluded.net_profit,
+            roi_pct = excluded.roi_pct,
+            days_to_sell = excluded.days_to_sell,
+            ebay_order_id = COALESCE(excluded.ebay_order_id, auction_sales.ebay_order_id)
+        `).bind(
+          saleId, payload.userId, item_id, sale_date, platform, buyer_handle || null,
+          vGrossSalePrice, bShippingPaid, aShippingCost,
+          feePct, flatFee, metrics.platform_fees_amt,
+          pProcessingAmt, pListingFee,
+          metrics.net_proceeds, item.true_total_cost, metrics.net_profit, metrics.roi_pct,
+          daysToSell >= 0 ? daysToSell : 0,
+          ebay_order_id || null
+        ).run();
+      }
+    } catch (saleErr) {
+      console.warn('[sales/index] Sale insert conflict, updating existing row:', saleErr);
+      await env.DB.prepare(`
+        UPDATE auction_sales SET
+          sale_date = ?,
+          platform = ?,
+          buyer_handle = COALESCE(?, buyer_handle),
+          gross_sale_price = ?,
+          buyer_shipping_paid = ?,
+          actual_shipping_cost = ?,
+          platform_fee_pct = ?,
+          platform_flat_fee = ?,
+          platform_fees_amt = ?,
+          payment_processing_amt = ?,
+          promoted_listing_fee = ?,
+          net_proceeds = ?,
+          true_total_cost = ?,
+          net_profit = ?,
+          roi_pct = ?,
+          days_to_sell = ?,
+          ebay_order_id = COALESCE(?, ebay_order_id)
+        WHERE item_id = ? AND user_id = ?
+      `).bind(
+        sale_date, platform, buyer_handle || null,
+        vGrossSalePrice, bShippingPaid, aShippingCost,
+        feePct, flatFee, metrics.platform_fees_amt,
+        pProcessingAmt, pListingFee,
+        metrics.net_proceeds, item.true_total_cost, metrics.net_profit, metrics.roi_pct,
+        daysToSell >= 0 ? daysToSell : 0,
+        ebay_order_id || null,
+        item_id, payload.userId
+      ).run();
+    }
+
+    if (!existingSale) {
+      const persisted = await env.DB.prepare(
+        'SELECT id FROM auction_sales WHERE item_id = ? AND user_id = ?'
+      ).bind(item_id, payload.userId).first();
+      if (persisted?.id) saleId = persisted.id;
+    }
 
     // Update item status to Sold with sale metadata
     await env.DB.prepare(`

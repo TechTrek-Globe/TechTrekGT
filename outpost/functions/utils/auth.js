@@ -47,13 +47,35 @@ export function isThreePartHash(storedHash) {
   );
 }
 
-// Verify PBKDF2 Password Hash (HIGH-6: strictly enforces 3-part salt:iterations:hash format, no fallback)
+// ============================================================================
+// PBKDF2 Password Verification & Iteration Consistency (HIGH-6 / MED-16)
+//
+// Historical Context:
+// Early iterations of the platform created 2-part password hashes ("salt:hash")
+// that relied on an implicit, hardcoded iteration count (100,000 iterations in
+// early client/gateway services, vs. 600,000 iterations in finance). Modern
+// platform accounts use the explicit 3-part format ("salt:iterations:hash",
+// standardized at 310,000 iterations per OWASP/WebCrypto guidelines).
+//
+// Audit & Migration Plan (HIGH-6 / MED-16):
+// 1. Data Audit: An audit script (`scripts/check-legacy-hashes.js`) scans user
+//    accounts in Cloudflare D1 for non-compliant hashes.
+// 2. Fallback Elimination: Rather than guessing iterations or silently falling back
+//    to 100k (which creates security ambiguities and hides legacy debt), Outpost
+//    strictly requires the 3-part format.
+// 3. User Migration: Any account with a legacy 2-part hash or flagged with
+//    `force_password_reset = 1` is intercepted at `/api/auth/login` (HTTP 403)
+//    and guided to `/reset-password` to upgrade to the modern 310k 3-part format.
+// 4. Removal Timeline: Legacy fallback logic is completely deprecated. The strict
+//    3-part check (`parts.length === 3`) is the permanent security standard and
+//    must NOT be reverted to allow unversioned 2-part hashes.
+// ============================================================================
 export async function verifyPassword(password, storedHash) {
   if (!password || !storedHash || typeof storedHash !== 'string') return false;
 
   const parts = storedHash.split(':');
   if (parts.length !== 3) {
-    // Non-3-part format is rejected; never silently guess iterations
+    // Non-3-part format is rejected: never silently guess iterations (HIGH-6 / MED-16)
     return false;
   }
 
@@ -196,6 +218,25 @@ export function buildAuthCookie(token, maxAge) {
   ].join('; ');
 }
 
+/**
+ * Extracts the JWT session token from an incoming HTTP request.
+ *
+ * Dual Authentication Acceptance Path (LOW-1):
+ * 1. Primary (Browser Web SPA):
+ *    Extracts the token from the HttpOnly `auth_token` cookie. The React SPA
+ *    relies exclusively on HttpOnly session cookies (`credentials: 'include'`).
+ *    Browser JavaScript never reads the JWT into client storage (no localStorage/
+ *    sessionStorage usage), preventing token exfiltration via XSS.
+ *
+ * 2. Secondary (Non-Browser & API Clients):
+ *    Accepts an `Authorization: Bearer <token>` header solely to support
+ *    non-browser clients (desktop companion applications, automated CI/CD test
+ *    suites, CLI automation scripts, and server-to-server API integrations).
+ *    Browser web traffic will always match the HttpOnly cookie above first.
+ *
+ * @param {Request} request - Incoming HTTP Request
+ * @returns {string|null} - Extracted JWT token string or null
+ */
 export function getTokenFromRequest(request) {
   const cookieHeader = request.headers.get('Cookie') || '';
   const match = cookieHeader.match(/(?:^|;\s*)auth_token=([^;]+)/);
@@ -203,6 +244,9 @@ export function getTokenFromRequest(request) {
     return match[1];
   }
 
+  // Fallback: Authorization Bearer header for non-browser clients (LOW-1)
+  // Web SPA traffic uses the HttpOnly cookie above. Bearer is retained for
+  // desktop companion tools, automated testing, and headless API consumers.
   const authHeader = request.headers.get('Authorization');
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.split(' ')[1];

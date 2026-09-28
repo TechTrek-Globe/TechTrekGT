@@ -1,19 +1,8 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
+import { validateNonNegativeMoney } from '../../utils/auction.js';
+import { DEFAULT_PLATFORMS } from '../../utils/platforms.js';
 
-export const DEFAULT_PLATFORMS = [
-  { name: 'eBay', fee_pct: 0.136, flat_fee: 0.40, notes: '13.6% final value fee + $0.40 per order (avg)', is_default: 1 },
-  { name: 'eBay (Promoted 2%)', fee_pct: 0.156, flat_fee: 0.40, notes: 'FVF + 2% promoted listing rate', is_default: 0 },
-  { name: 'eBay (Promoted 5%)', fee_pct: 0.186, flat_fee: 0.40, notes: 'FVF + 5% promoted listing rate', is_default: 0 },
-  { name: 'Facebook Marketplace (Local)', fee_pct: 0, flat_fee: 0, notes: 'No fees for local pickup', is_default: 0 },
-  { name: 'Facebook Marketplace (Shipped)', fee_pct: 0.05, flat_fee: 0, notes: '5% seller fee on shipped orders', is_default: 0 },
-  { name: 'OfferUp', fee_pct: 0.129, flat_fee: 0, notes: '12.9% on shipped orders', is_default: 0 },
-  { name: 'Mercari', fee_pct: 0.10, flat_fee: 0, notes: '10% seller fee + payment processing', is_default: 0 },
-  { name: 'Whatnot (Live)', fee_pct: 0.08, flat_fee: 0.30, notes: '8% + $0.30, live auction platform', is_default: 0 },
-  { name: 'COMC', fee_pct: 0.20, flat_fee: 0, notes: 'Consignment ~20% depending on tier', is_default: 0 },
-  { name: 'PWCC', fee_pct: 0.20, flat_fee: 0, notes: 'Vault/consignment ~20%', is_default: 0 },
-  { name: 'Craigslist', fee_pct: 0, flat_fee: 0, notes: 'No fees - local only', is_default: 0 },
-  { name: 'Other', fee_pct: 0, flat_fee: 0, notes: 'Custom', is_default: 0 },
-];
+export { DEFAULT_PLATFORMS };
 
 /**
  * GET /api/platforms - list platforms for current user
@@ -78,6 +67,15 @@ export async function onRequestPost(context) {
       return err('Platform name is required');
     }
 
+    let parsedFeePct;
+    let parsedFlatFee;
+    try {
+      parsedFeePct = validateNonNegativeMoney(fee_pct, 'fee_pct') ?? 0;
+      parsedFlatFee = validateNonNegativeMoney(flat_fee, 'flat_fee') ?? 0;
+    } catch (e) {
+      return err(e.message, 400);
+    }
+
     // If marked default, unset other defaults
     if (is_default) {
       await env.DB.prepare('UPDATE auction_platforms SET is_default = 0 WHERE user_id = ?').bind(userId).run();
@@ -87,7 +85,7 @@ export async function onRequestPost(context) {
     await env.DB.prepare(
       `INSERT INTO auction_platforms (id, user_id, name, fee_pct, flat_fee, notes, is_default)
        VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(id, userId, name.trim(), Number(fee_pct) || 0, Number(flat_fee) || 0, notes.trim(), is_default ? 1 : 0).run();
+    ).bind(id, userId, name.trim(), parsedFeePct, parsedFlatFee, notes.trim(), is_default ? 1 : 0).run();
 
     const created = await env.DB.prepare('SELECT * FROM auction_platforms WHERE id = ?').bind(id).first();
     return ok({ platform: created }, 201);

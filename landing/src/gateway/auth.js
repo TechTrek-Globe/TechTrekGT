@@ -16,9 +16,21 @@ export async function hashPassword(password) {
   return `${saltHex}:310000:${hashHex}`;
 }
 
+// PBKDF2 Password Verification & Iteration Consistency (HIGH-6 / MED-16)
+//
+// Historical Context:
+// Early accounts used a legacy 2-part format ("salt:hash") with an implicit 100k iteration count.
+// Modern platform accounts use the 3-part format ("salt:iterations:hash", standardized at 310k).
+//
+// Migration Plan & Fallback Removal:
+// The legacy 100k fallback below exists temporarily to support unmigrated sessions during
+// platform rollout. Once all legacy accounts have reset their passwords via /reset-password
+// (audited via `scripts/check-legacy-hashes.js`), this fallback can be safely removed in
+// favor of strict 3-part verification matching Outpost.
 export async function verifyPassword(password, storedHash) {
   const parts = storedHash.split(':');
   const [saltHex, iterationsOrHash, maybeHash] = parts;
+  // Fallback to 100k iterations for legacy 2-part hashes (deprecated: see MED-16)
   const iterations = parts.length === 3 ? parseInt(iterationsOrHash, 10) : 100000;
   const originalHashHex = parts.length === 3 ? maybeHash : iterationsOrHash;
   if (!saltHex || !originalHashHex) return false;
@@ -92,6 +104,9 @@ export function buildAuthCookie(token, maxAge) {
   return [`auth_token=${token}`, 'HttpOnly', 'Secure', 'SameSite=Lax', 'Path=/', `Max-Age=${maxAge}`].join('; ');
 }
 
+// Dual Authentication Acceptance Path (LOW-1):
+// 1. Primary: HttpOnly auth_token cookie (used by web SPA with credentials: 'include').
+// 2. Secondary: Authorization Bearer header for non-browser clients (desktop companion, CLI, testing).
 export function getTokenFromRequest(request) {
   const cookieHeader = request.headers.get('Cookie') || '';
   const match = cookieHeader.match(/(?:^|;\s*)auth_token=([^;]+)/);

@@ -98,6 +98,25 @@ export function normalizeHttps(url) {
   return trimmed;
 }
 
+// --- XML Extraction Helper (eBay Trading API) ---
+
+/**
+ * Shared XML tag extractor for eBay Trading API responses.
+ * Extracts the inner text of <tag>...</tag> and unwraps CDATA if present.
+ *
+ * @param {string} xml - XML string or isolated XML block
+ * @param {string} tag - Tag name to extract
+ * @returns {string|null}
+ */
+export function extractXmlTag(xml, tag) {
+  if (!xml || typeof xml !== 'string' || !tag) return null;
+  const m = xml.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`));
+  if (!m) return null;
+  const val = m[1].trim();
+  const cdata = val.match(/<!\[CDATA\[([\s\S]*?)\]\]>/);
+  return cdata ? cdata[1].trim() : val;
+}
+
 // --- eBay endpoint resolution ---
 
 function isEbaySandbox(env) {
@@ -256,19 +275,13 @@ export async function fetchEbayActiveSellerListings(env, accessToken) {
       const itemBlocks = xmlText.match(/<Item[\s>][\s\S]*?<\/Item>/g) || [];
 
       for (const block of itemBlocks) {
-        const getTag = (tag) => {
-          const m = block.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`));
-          if (!m) return null;
-          let val = m[1].trim();
-          const cdata = val.match(/<!\[CDATA\[([\s\S]*?)\]\]>/);
-          return cdata ? cdata[1].trim() : val;
-        };
-
-        const listingId = getTag('ItemID');
-        const title = getTag('Title');
-        const currentPriceStr = getTag('CurrentPrice') || getTag('BuyItNowPrice') || '0';
-        const qtyStr = getTag('QuantityAvailable') || getTag('Quantity') || '1';
-        const sku = getTag('SKU') || null;
+        const listingId = extractXmlTag(block, 'ItemID');
+        const title = extractXmlTag(block, 'Title');
+        const currentPriceStr = extractXmlTag(block, 'CurrentPrice') || extractXmlTag(block, 'BuyItNowPrice') || '0';
+        const qtyStr = extractXmlTag(block, 'QuantityAvailable') || extractXmlTag(block, 'Quantity') || '1';
+        const qtySoldStr = extractXmlTag(block, 'QuantitySold') || '0';
+        const listingStatus = extractXmlTag(block, 'ListingStatus') || 'Active';
+        const sku = extractXmlTag(block, 'SKU') || null;
 
         // Extract shipping from block
         const freeShip = block.includes('<FreeShipping>true</FreeShipping>');
@@ -298,10 +311,11 @@ export async function fetchEbayActiveSellerListings(env, accessToken) {
             title: title || '',
             price: parseFloat(currentPriceStr) || 0,
             quantity: parseInt(qtyStr, 10) || 1,
+            quantity_sold: parseInt(qtySoldStr, 10) || 0,
             buyer_shipping_cost: shipCost,
             is_free_shipping: freeShip || (shipCost === 0),
             condition: 'Active',
-            status: 'Active',
+            status: listingStatus === 'Completed' ? 'Sold' : listingStatus,
             image_url: galleryUrl,
             listing_url: listingId ? `https://www.ebay.com/itm/${listingId}` : null
           });
@@ -470,27 +484,19 @@ export async function fetchSingleEbayListing(env, accessToken, listingId, campai
 
     if (res.ok) {
       const xmlText = await res.text();
-      const getTag = (tag, src = xmlText) => {
-        const m = src.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`));
-        if (!m) return null;
-        let val = m[1].trim();
-        const cdata = val.match(/<!\[CDATA\[([\s\S]*?)\]\]>/);
-        return cdata ? cdata[1].trim() : val;
-      };
-
-      const itemId = getTag('ItemID');
-      const title = getTag('Title');
-      const currentPriceStr = getTag('CurrentPrice') || getTag('BuyItNowPrice') || '0';
+      const itemId = extractXmlTag(xmlText, 'ItemID');
+      const title = extractXmlTag(xmlText, 'Title');
+      const currentPriceStr = extractXmlTag(xmlText, 'CurrentPrice') || extractXmlTag(xmlText, 'BuyItNowPrice') || '0';
       const price = parseFloat(currentPriceStr) || 0;
-      const startTime = getTag('StartTime');
-      const listingStatus = getTag('ListingStatus') || 'Active';
-      const qtyStr = getTag('QuantityAvailable') || getTag('Quantity') || '1';
-      const qtySoldStr = getTag('QuantitySold') || '0';
-      const sku = getTag('SKU') || null;
-      const listingType = getTag('ListingType') || 'FixedPriceItem';
+      const startTime = extractXmlTag(xmlText, 'StartTime');
+      const listingStatus = extractXmlTag(xmlText, 'ListingStatus') || 'Active';
+      const qtyStr = extractXmlTag(xmlText, 'QuantityAvailable') || extractXmlTag(xmlText, 'Quantity') || '1';
+      const qtySoldStr = extractXmlTag(xmlText, 'QuantitySold') || '0';
+      const sku = extractXmlTag(xmlText, 'SKU') || null;
+      const listingType = extractXmlTag(xmlText, 'ListingType') || 'FixedPriceItem';
 
       // Picture / Image details
-      const galleryUrl = normalizeHttps(getTag('GalleryURL'));
+      const galleryUrl = normalizeHttps(extractXmlTag(xmlText, 'GalleryURL'));
       const pictureUrls = [];
       const picRegex = /<PictureURL[^>]*>(.*?)<\/PictureURL>/g;
       let pMatch;
@@ -503,8 +509,8 @@ export async function fetchSingleEbayListing(env, accessToken, listingId, campai
       const imageUrl = pictureUrls[0] || galleryUrl || null;
 
       // Category details
-      const categoryId = getTag('CategoryID');
-      const categoryName = getTag('CategoryName');
+      const categoryId = extractXmlTag(xmlText, 'CategoryID');
+      const categoryName = extractXmlTag(xmlText, 'CategoryName');
       const feeStructure = calculateEbayCategoryFees(categoryId, categoryName, price);
 
       // Shipping details (Free shipping vs Buyer pays flat/calculated)
@@ -656,8 +662,8 @@ export async function fetchSingleEbayListing(env, accessToken, listingId, campai
       let nvMatch;
       while ((nvMatch = nvRegex.exec(xmlText)) !== null) {
         const block = nvMatch[1];
-        const n = getTag('Name', block);
-        const v = getTag('Value', block);
+        const n = extractXmlTag(block, 'Name');
+        const v = extractXmlTag(block, 'Value');
         if (n && v) {
           const key = n.toLowerCase().trim();
           specifics[key] = v.trim();
@@ -974,8 +980,7 @@ export async function updateEbayListingSku(env, accessToken, listingId, sku) {
   });
 
   let text = await res.text();
-  let ackMatch = text.match(/<Ack[^>]*>(.*?)<\/Ack>/i);
-  let ack = ackMatch ? ackMatch[1] : 'Failure';
+  let ack = extractXmlTag(text, 'Ack') || 'Failure';
 
   // 2. If item is an Auction format, try ReviseItem
   if (ack !== 'Success' && ack !== 'Warning') {
@@ -991,13 +996,11 @@ export async function updateEbayListingSku(env, accessToken, listingId, sku) {
       body: makeXml('ReviseItem')
     });
     text = await res.text();
-    ackMatch = text.match(/<Ack[^>]*>(.*?)<\/Ack>/i);
-    ack = ackMatch ? ackMatch[1] : 'Failure';
+    ack = extractXmlTag(text, 'Ack') || 'Failure';
   }
 
-  const errMsgMatch = text.match(/<LongMessage[^>]*>(.*?)<\/LongMessage>/i) ||
-                      text.match(/<ShortMessage[^>]*>(.*?)<\/ShortMessage>/i);
-  const errMsg = errMsgMatch ? errMsgMatch[1] : null;
+  const errMsg = extractXmlTag(text, 'LongMessage') ||
+                 extractXmlTag(text, 'ShortMessage') || null;
 
   if (ack === 'Success' || ack === 'Warning') {
     return { success: true, message: `SKU '${cleanSku}' successfully pushed to eBay listing #${cleanId}`, ack };
@@ -1083,9 +1086,8 @@ export async function fetchEbayOrderForListing(env, accessToken, listingId, sku 
           const lineSkuMatch = cleanSku && (String(li.sku || '').toLowerCase() === cleanSku.toLowerCase());
           const lineTitle = String(li.title || '').toLowerCase();
           const titleMatch = cleanTitle && (
-            lineTitle.includes(cleanTitle) ||
-            cleanTitle.includes(lineTitle) ||
-            (cleanTitle.length > 15 && lineTitle.slice(0, 25) === cleanTitle.slice(0, 25))
+            lineTitle === cleanTitle ||
+            (cleanTitle.length >= 20 && (lineTitle.includes(cleanTitle) || cleanTitle.includes(lineTitle)))
           );
           return lineItemIdMatch || lineSkuMatch || titleMatch;
         });
@@ -1106,6 +1108,7 @@ export async function fetchEbayOrderForListing(env, accessToken, listingId, sku 
             saleDate,
             buyerHandle,
             orderStatus,
+            salePrice: lineItemCost,
             lineItemCost,
             deliveryCost,
             matchedLine,
@@ -1144,20 +1147,12 @@ export async function fetchEbayOrderForListing(env, accessToken, listingId, sku 
         const txnBlockMatch = xml.match(/<Transaction[\s>][\s\S]*?<\/Transaction>/i);
         if (txnBlockMatch) {
           const block = txnBlockMatch[0];
-          const getTag = (tag, src = block) => {
-            const m = src.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`));
-            if (!m) return null;
-            let val = m[1].trim();
-            const cdata = val.match(/<!\[CDATA\[([\s\S]*?)\]\]>/);
-            return cdata ? cdata[1].trim() : val;
-          };
-
-          const buyerHandle = getTag('UserID') || getTag('Email') || '';
-          const createdDate = getTag('CreatedDate') || getTag('PaidTime');
+          const buyerHandle = extractXmlTag(block, 'UserID') || extractXmlTag(block, 'Email') || '';
+          const createdDate = extractXmlTag(block, 'CreatedDate') || extractXmlTag(block, 'PaidTime');
           const saleDate = createdDate ? createdDate.split('T')[0] : new Date().toISOString().split('T')[0];
-          const amountPaid = parseFloat(getTag('AmountPaid') || getTag('TransactionPrice') || '0');
-          const fvf = parseFloat(getTag('FinalValueFee') || '0');
-          const orderId = getTag('OrderID') || getTag('OrderLineItemID') || `${cleanId}-sale`;
+          const amountPaid = parseFloat(extractXmlTag(block, 'AmountPaid') || extractXmlTag(block, 'TransactionPrice') || '0');
+          const fvf = parseFloat(extractXmlTag(block, 'FinalValueFee') || '0');
+          const orderId = extractXmlTag(block, 'OrderID') || extractXmlTag(block, 'OrderLineItemID') || `${cleanId}-sale`;
           const shipCostMatch = block.match(/<ShippingServiceCost[^>]*>([0-9.]+)<\/ShippingServiceCost>/i) ||
                                 block.match(/<ShippingCost[^>]*>([0-9.]+)<\/ShippingCost>/i);
           const shipCost = shipCostMatch ? parseFloat(shipCostMatch[1]) : 0;
@@ -1170,6 +1165,7 @@ export async function fetchEbayOrderForListing(env, accessToken, listingId, sku 
               saleDate,
               buyerHandle,
               orderStatus: 'PAID',
+              salePrice: amountPaid,
               lineItemCost: amountPaid,
               deliveryCost: shipCost,
               finalValueFee: fvf,
@@ -1210,35 +1206,26 @@ export async function fetchEbayOrderForListing(env, accessToken, listingId, sku 
       const orderBlocks = xml.match(/<Order[\s>][\s\S]*?<\/Order>/g) || [];
 
       for (const block of orderBlocks) {
-        const getTag = (tag, src = block) => {
-          const m = src.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`));
-          if (!m) return null;
-          let val = m[1].trim();
-          const cdata = val.match(/<!\[CDATA\[([\s\S]*?)\]\]>/);
-          return cdata ? cdata[1].trim() : val;
-        };
-
-        const itemIdInOrder = getTag('ItemID');
-        const skuInOrder = getTag('SKU');
-        const titleInOrder = (getTag('Title') || '').toLowerCase();
+        const itemIdInOrder = extractXmlTag(block, 'ItemID');
+        const skuInOrder = extractXmlTag(block, 'SKU');
+        const titleInOrder = (extractXmlTag(block, 'Title') || '').toLowerCase();
 
         const matchId = cleanId && (itemIdInOrder === cleanId || block.includes(`<ItemID>${cleanId}</ItemID>`));
         const matchSku = cleanSku && (skuInOrder?.toLowerCase() === cleanSku.toLowerCase());
         const matchTitle = cleanTitle && (
-          titleInOrder.includes(cleanTitle) ||
-          cleanTitle.includes(titleInOrder) ||
-          (cleanTitle.length > 15 && titleInOrder.slice(0, 25) === cleanTitle.slice(0, 25))
+          titleInOrder === cleanTitle ||
+          (cleanTitle.length >= 20 && (titleInOrder.includes(cleanTitle) || cleanTitle.includes(titleInOrder)))
         );
 
         if (matchId || matchSku || matchTitle) {
-          const orderId = getTag('OrderID') || getTag('ExtendedOrderID') || `${cleanId || 'order'}-sale`;
-          const buyerHandle = getTag('BuyerUserID') || getTag('UserID') || '';
-          const createdDate = getTag('CreatedTime') || getTag('PaidTime');
+          const orderId = extractXmlTag(block, 'OrderID') || extractXmlTag(block, 'ExtendedOrderID') || `${cleanId || 'order'}-sale`;
+          const buyerHandle = extractXmlTag(block, 'BuyerUserID') || extractXmlTag(block, 'UserID') || '';
+          const createdDate = extractXmlTag(block, 'CreatedTime') || extractXmlTag(block, 'PaidTime');
           const saleDate = createdDate ? createdDate.split('T')[0] : new Date().toISOString().split('T')[0];
-          const totalPaid = parseFloat(getTag('AmountPaid') || getTag('Total') || '0');
-          const subtotal = parseFloat(getTag('Subtotal') || getTag('TransactionPrice') || String(totalPaid));
-          const shipCost = parseFloat(getTag('ShippingServiceCost') || getTag('ShippingCost') || '0');
-          const fvf = parseFloat(getTag('FinalValueFee') || '0');
+          const totalPaid = parseFloat(extractXmlTag(block, 'AmountPaid') || extractXmlTag(block, 'Total') || '0');
+          const subtotal = parseFloat(extractXmlTag(block, 'Subtotal') || extractXmlTag(block, 'TransactionPrice') || String(totalPaid));
+          const shipCost = parseFloat(extractXmlTag(block, 'ShippingServiceCost') || extractXmlTag(block, 'ShippingCost') || '0');
+          const fvf = parseFloat(extractXmlTag(block, 'FinalValueFee') || '0');
 
           return {
             orderId,
@@ -1247,6 +1234,7 @@ export async function fetchEbayOrderForListing(env, accessToken, listingId, sku 
             saleDate,
             buyerHandle,
             orderStatus: 'PAID',
+            salePrice: subtotal > 0 ? subtotal : totalPaid,
             lineItemCost: subtotal > 0 ? subtotal : totalPaid,
             deliveryCost: shipCost,
             finalValueFee: fvf,
@@ -1460,17 +1448,118 @@ export async function reconcileAndSaveEbaySale(env, userId, item, orderData = nu
   const roiPct = trueCost > 0 ? parseFloat((netProfit / trueCost).toFixed(4)) : 0;
 
   const startDate = item.date_listed || item.date_acquired;
-  const rawDays = daysBetween(startDate, saleDate) ?? 0;
-  const daysToSell = rawDays >= 0 ? rawDays : 0;
+  const daysToSell = daysBetween(startDate, saleDate) ?? 0;
 
-  // Check existing sale
+  // Check existing sale by item_id
   const existingSale = await env.DB.prepare(
     'SELECT * FROM auction_sales WHERE item_id = ? AND user_id = ?'
   ).bind(item.id, userId).first();
 
-  let saleId;
-  if (existingSale) {
-    saleId = existingSale.id;
+  let saleId = existingSale?.id || `sale-${crypto.randomUUID()}`;
+
+  try {
+    if (existingSale) {
+      await env.DB.prepare(`
+        UPDATE auction_sales SET
+          sale_date = ?,
+          platform = 'eBay',
+          buyer_handle = COALESCE(?, buyer_handle),
+          gross_sale_price = ?,
+          buyer_shipping_paid = ?,
+          actual_shipping_cost = ?,
+          platform_fee_pct = ?,
+          platform_flat_fee = ?,
+          platform_fees_amt = ?,
+          payment_processing_amt = ?,
+          promoted_listing_fee = ?,
+          net_proceeds = ?,
+          true_total_cost = ?,
+          net_profit = ?,
+          roi_pct = ?,
+          days_to_sell = ?,
+          ebay_order_id = COALESCE(?, ebay_order_id),
+          fee_reconciled_at = datetime('now')
+        WHERE id = ? AND user_id = ?
+      `).bind(
+        saleDate,
+        buyerHandle || null,
+        grossSalePrice,
+        buyerShippingPaid,
+        actualShippingCost,
+        item.platform_fee_pct || 0.135,
+        item.platform_flat_fee || 0.40,
+        platformFeesAmt,
+        paymentProcessingFee,
+        promotedListingFee,
+        netProceeds,
+        trueCost,
+        netProfit,
+        roiPct,
+        daysToSell,
+        ebayOrderId || null,
+        saleId,
+        userId
+      ).run();
+    } else {
+      await env.DB.prepare(`
+        INSERT INTO auction_sales (
+          id, user_id, item_id, sale_date, platform, buyer_handle,
+          gross_sale_price, buyer_shipping_paid, actual_shipping_cost,
+          platform_fee_pct, platform_flat_fee, platform_fees_amt,
+          payment_processing_amt, promoted_listing_fee,
+          net_proceeds, true_total_cost, net_profit, roi_pct,
+          days_to_sell, ebay_order_id, fee_reconciled_at
+        ) VALUES (
+          ?, ?, ?, ?, 'eBay', ?,
+          ?, ?, ?,
+          ?, ?, ?,
+          ?, ?,
+          ?, ?, ?, ?,
+          ?, ?, datetime('now')
+        )
+        ON CONFLICT(item_id) DO UPDATE SET
+          sale_date = excluded.sale_date,
+          platform = excluded.platform,
+          buyer_handle = COALESCE(excluded.buyer_handle, auction_sales.buyer_handle),
+          gross_sale_price = excluded.gross_sale_price,
+          buyer_shipping_paid = excluded.buyer_shipping_paid,
+          actual_shipping_cost = excluded.actual_shipping_cost,
+          platform_fee_pct = excluded.platform_fee_pct,
+          platform_flat_fee = excluded.platform_flat_fee,
+          platform_fees_amt = excluded.platform_fees_amt,
+          payment_processing_amt = excluded.payment_processing_amt,
+          promoted_listing_fee = excluded.promoted_listing_fee,
+          net_proceeds = excluded.net_proceeds,
+          true_total_cost = excluded.true_total_cost,
+          net_profit = excluded.net_profit,
+          roi_pct = excluded.roi_pct,
+          days_to_sell = excluded.days_to_sell,
+          ebay_order_id = COALESCE(excluded.ebay_order_id, auction_sales.ebay_order_id),
+          fee_reconciled_at = excluded.fee_reconciled_at
+      `).bind(
+        saleId,
+        userId,
+        item.id,
+        saleDate,
+        buyerHandle || null,
+        grossSalePrice,
+        buyerShippingPaid,
+        actualShippingCost,
+        item.platform_fee_pct || 0.135,
+        item.platform_flat_fee || 0.40,
+        platformFeesAmt,
+        paymentProcessingFee,
+        promotedListingFee,
+        netProceeds,
+        trueCost,
+        netProfit,
+        roiPct,
+        daysToSell,
+        ebayOrderId || null
+      ).run();
+    }
+  } catch (saleErr) {
+    console.warn('[tokenHelper] Sale upsert race encountered, falling back to update:', saleErr);
     await env.DB.prepare(`
       UPDATE auction_sales SET
         sale_date = ?,
@@ -1491,7 +1580,7 @@ export async function reconcileAndSaveEbaySale(env, userId, item, orderData = nu
         days_to_sell = ?,
         ebay_order_id = COALESCE(?, ebay_order_id),
         fee_reconciled_at = datetime('now')
-      WHERE id = ? AND user_id = ?
+      WHERE item_id = ? AND user_id = ?
     `).bind(
       saleDate,
       buyerHandle || null,
@@ -1509,48 +1598,17 @@ export async function reconcileAndSaveEbaySale(env, userId, item, orderData = nu
       roiPct,
       daysToSell,
       ebayOrderId || null,
-      saleId,
+      item.id,
       userId
     ).run();
-  } else {
-    saleId = `sale-${crypto.randomUUID()}`;
-    await env.DB.prepare(`
-      INSERT INTO auction_sales (
-        id, user_id, item_id, sale_date, platform, buyer_handle,
-        gross_sale_price, buyer_shipping_paid, actual_shipping_cost,
-        platform_fee_pct, platform_flat_fee, platform_fees_amt,
-        payment_processing_amt, promoted_listing_fee,
-        net_proceeds, true_total_cost, net_profit, roi_pct,
-        days_to_sell, ebay_order_id, fee_reconciled_at
-      ) VALUES (
-        ?, ?, ?, ?, 'eBay', ?,
-        ?, ?, ?,
-        ?, ?, ?,
-        ?, ?,
-        ?, ?, ?, ?,
-        ?, ?, datetime('now')
-      )
-    `).bind(
-      saleId,
-      userId,
-      item.id,
-      saleDate,
-      buyerHandle || null,
-      grossSalePrice,
-      buyerShippingPaid,
-      actualShippingCost,
-      item.platform_fee_pct || 0.135,
-      item.platform_flat_fee || 0.40,
-      platformFeesAmt,
-      paymentProcessingFee,
-      promotedListingFee,
-      netProceeds,
-      trueCost,
-      netProfit,
-      roiPct,
-      daysToSell,
-      ebayOrderId || null
-    ).run();
+  }
+
+  // Ensure saleId matches the persisted row
+  if (!existingSale) {
+    const persisted = await env.DB.prepare(
+      'SELECT id FROM auction_sales WHERE item_id = ? AND user_id = ?'
+    ).bind(item.id, userId).first();
+    if (persisted?.id) saleId = persisted.id;
   }
 
   // Upsert ebay_fee_reconciliations if ebayOrderId is known

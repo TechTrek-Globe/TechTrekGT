@@ -1,4 +1,5 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
+import { validateNonNegativeMoney } from '../../utils/auction.js';
 
 // eBay condition IDs that are always excluded from median benchmark calculations.
 // condition_id '7000' = For Parts / Not Working
@@ -151,9 +152,21 @@ export async function onRequestPost(context) {
       return err(`source must be one of: ${validSources.join(', ')}`, 400);
     }
 
-    const parsedListPrice   = list_price !== undefined && list_price !== null ? Number(list_price) : null;
-    const parsedShippingFee = Number(shipping_fee) || 0;
-    const landedCost        = parsedListPrice !== null
+    let parsedListPrice = null;
+    let parsedShippingFee = 0;
+
+    try {
+      if (list_price !== undefined && list_price !== null && list_price !== '') {
+        parsedListPrice = validateNonNegativeMoney(list_price, 'list_price');
+      }
+      if (shipping_fee !== undefined) {
+        parsedShippingFee = validateNonNegativeMoney(shipping_fee, 'shipping_fee') ?? 0;
+      }
+    } catch (e) {
+      return err(e.message, 400);
+    }
+
+    const landedCost = parsedListPrice !== null
       ? Math.round((parsedListPrice + parsedShippingFee) * 100) / 100
       : null;
 

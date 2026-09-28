@@ -1,5 +1,5 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
-import { computePricingFloors, computeItemProration } from '../../utils/auction.js';
+import { computePricingFloors, computeItemProration, validateNonNegativeMoney } from '../../utils/auction.js';
 
 /**
  * POST /api/import/amazon-url
@@ -48,8 +48,16 @@ export async function onRequestPost(context) {
     }
 
     const cleanAsin  = asinMatch[1].toUpperCase();
-    const unitPrice  = Number(vine_value);
-    const taxAmt     = Number(tax_value) || 0;
+    let unitPrice = 0;
+    let taxAmt = 0;
+    try {
+      unitPrice = validateNonNegativeMoney(vine_value, 'vine_value') ?? 0;
+      taxAmt    = validateNonNegativeMoney(tax_value, 'tax_value') ?? 0;
+    } catch (e) {
+      return err(e.message, 400);
+    }
+    // MED-10: $0 vine_value (ETV) and $0 tax_value are legitimate defaults for zero-ETV items.
+    // Upstream validation guarantees non-negative bounds.
     const today      = new Date().toISOString().split('T')[0];
     const invoiceRef = `AMAZON-${cleanAsin}-${today}`;
 

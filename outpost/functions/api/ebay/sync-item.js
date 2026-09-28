@@ -8,6 +8,7 @@ import {
   normalizeHttps
 } from './tokenHelper.js';
 import { computePricingFloors } from '../../utils/auction.js';
+import { invalidateEbayListingsCache } from './listingsCache.js';
 
 /**
  * POST /api/ebay/sync-item
@@ -224,6 +225,9 @@ export async function onRequestPost(context) {
     const updatedItem = await env.DB.prepare(
       'SELECT * FROM auction_items WHERE id = ? AND user_id = ?'
     ).bind(itemId, payload.userId).first();
+
+    // Invalidate active listings cache on explicit single-item sync (MED-15)
+    await invalidateEbayListingsCache(env.DB, payload.userId);
 
     // If item is sold, automatically reconcile and save sale
     if (isSold) {

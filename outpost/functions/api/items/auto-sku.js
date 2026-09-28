@@ -1,5 +1,5 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
-import { generateSku } from '../utils/sku.js';
+import { generateSku, generateUniqueSku } from '../utils/sku.js';
 
 /**
  * POST /api/items/auto-sku
@@ -30,12 +30,13 @@ export async function onRequestPost(context) {
 
     const statements = [];
     const assigned = [];
+    const seenSkus = new Set();
 
     for (const it of blankItems) {
-      const newSku = generateSku(it.date_acquired || new Date());
+      const newSku = await generateUniqueSku(env.DB, payload.userId, it.date_acquired || new Date(), 5, seenSkus);
       statements.push(
         env.DB.prepare(
-          'UPDATE auction_items SET sku = ?, updated_at = datetime("now") WHERE id = ? AND user_id = ?'
+          'UPDATE auction_items SET sku = ?, updated_at = datetime(\'now\') WHERE id = ? AND user_id = ?'
         ).bind(newSku, it.id, payload.userId)
       );
       assigned.push({ id: it.id, item_name: it.item_name, sku: newSku });

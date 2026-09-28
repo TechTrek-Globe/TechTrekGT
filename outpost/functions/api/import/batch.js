@@ -1,6 +1,6 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
 import { computeSaleMetrics, computePricingFloors } from '../../utils/auction.js';
-import { generateSku } from '../utils/sku.js';
+import { generateSku, generateUniqueSku } from '../utils/sku.js';
 
 /**
  * Handles batch import of spreadsheet data for the authenticated user.
@@ -65,6 +65,7 @@ export async function onRequestPost(context) {
 
     // Process Items
     const itemMap = new Map(); // item_name or id -> id
+    const seenSkus = new Set();
     for (const itm of items) {
       const itemId = itm.id || `item-${crypto.randomUUID()}`;
       let invId = itm.invoice_id;
@@ -105,7 +106,12 @@ export async function onRequestPost(context) {
       const minSell = Number(itm.min_sell_price) || floors.min_sell_price;
       const suggestedList = Number(itm.suggested_list_price) || floors.suggested_list_price;
 
-      const itemSku = (itm.sku && String(itm.sku).trim()) ? String(itm.sku).trim() : generateSku(itm.date_acquired || new Date());
+      let itemSku = (itm.sku && String(itm.sku).trim()) ? String(itm.sku).trim() : null;
+      if (!itemSku) {
+        itemSku = await generateUniqueSku(env.DB, userId, itm.date_acquired || new Date(), 5, seenSkus);
+      } else {
+        seenSkus.add(itemSku);
+      }
 
       statements.push(
         env.DB.prepare(`

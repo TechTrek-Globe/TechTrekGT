@@ -1,5 +1,6 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
 import { getEbayUserToken, fetchEbayActiveSellerListings } from './tokenHelper.js';
+import { getCachedEbayListings, setCachedEbayListings } from './listingsCache.js';
 
 /**
  * GET /api/ebay/active-listings
@@ -7,6 +8,9 @@ import { getEbayUserToken, fetchEbayActiveSellerListings } from './tokenHelper.j
  * Fast on-demand fetch of active eBay seller listings supporting both
  * traditional web/app listings (eBay Trading API) and REST Inventory listings (Sell Inventory API).
  * Used by interactive listing selectors (e.g. EbayListingIdModal, ListingMatchReviewModal, EditItemModal).
+ *
+ * Implements a 15-minute cache (MED-15) backed by D1 `ebay_listings_cache` to eliminate
+ * redundant multi-call upstream eBay fetches.
  */
 export async function onRequestGet(context) {
   const { request, env } = context;
@@ -14,13 +18,32 @@ export async function onRequestGet(context) {
     const payload = await requireAuth(request, env);
     if (!env.DB) return err('Database not available', 500);
 
+    const url = new URL(request.url);
+    const force = url.searchParams.get('force') === 'true' || url.searchParams.get('refresh') === 'true';
+
     try {
+      if (!force) {
+        const cached = await getCachedEbayListings(env.DB, payload.userId, 15);
+        if (cached) {
+          return ok({
+            listings: cached.listings,
+            total: cached.listings.length,
+            cached: true,
+            fetched_at: cached.fetched_at
+          });
+        }
+      }
+
       const accessToken = await getEbayUserToken(env, payload.userId);
       const listings = await fetchEbayActiveSellerListings(env, accessToken);
 
+      await setCachedEbayListings(env.DB, payload.userId, listings);
+
       return ok({
         listings,
-        total: listings.length
+        total: listings.length,
+        cached: false,
+        fetched_at: new Date().toISOString()
       });
     } catch (e) {
       console.error('[active-listings] Failed to fetch active eBay listings:', e);

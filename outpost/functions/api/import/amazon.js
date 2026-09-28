@@ -1,6 +1,6 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
-import { computePricingFloors, computeItemProration } from '../../utils/auction.js';
-import { generateSku } from '../utils/sku.js';
+import { computePricingFloors, computeItemProration, validateNonNegativeMoney } from '../../utils/auction.js';
+import { generateSku, generateUniqueSku } from '../utils/sku.js';
 import { resolveIntegrationUserId } from '../../utils/apiIntegrations.js';
 
 
@@ -62,9 +62,18 @@ export async function onRequestPost(context) {
   if (!title || !title.trim()) return err('title is required');
 
   const cleanAsin   = asin.toUpperCase().trim();
-  const etvAmt      = Number(etv !== undefined ? etv : (vine_value !== undefined ? vine_value : 0)) || 0;
-  // Tax cost represents the true acquisition cost (COGS) for Vine items
-  const taxCostAmt  = Number(taxCost !== undefined ? taxCost : (tax_cost !== undefined ? tax_cost : (tax_value !== undefined ? tax_value : (cost !== undefined ? cost : etvAmt)))) || 0;
+  let etvAmt = 0;
+  let taxCostAmt = 0;
+  try {
+    const rawEtv = etv !== undefined ? etv : (vine_value !== undefined ? vine_value : 0);
+    etvAmt = validateNonNegativeMoney(rawEtv, 'etv') ?? 0;
+    const rawTaxCost = taxCost !== undefined ? taxCost : (tax_cost !== undefined ? tax_cost : (tax_value !== undefined ? tax_value : (cost !== undefined ? cost : etvAmt)));
+    taxCostAmt = validateNonNegativeMoney(rawTaxCost, 'tax_cost') ?? 0;
+  } catch (e) {
+    return err(e.message, 400);
+  }
+  // MED-10: $0 ETV and $0 tax cost are legitimate defaults for Vine items (e.g. food/beauty categories).
+  // Upstream validation guarantees non-negative bounds.
   const unitPrice   = taxCostAmt; // Outpost inventory item cost basis
   const taxAmt      = 0;
   const resolvedCat = sellingCategory || amazonCategory || category || 'Other';
@@ -181,7 +190,7 @@ export async function onRequestPost(context) {
 
   // Create item - includes new attributes column and auto-generated SKU
   const itemId = `item-${crypto.randomUUID()}`;
-  const itemSku = generateSku(new Date());
+  const itemSku = await generateUniqueSku(env.DB, userId, new Date(), 5);
 
   await env.DB.prepare(`
     INSERT INTO auction_items (

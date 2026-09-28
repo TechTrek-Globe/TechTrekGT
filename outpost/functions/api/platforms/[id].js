@@ -1,4 +1,5 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
+import { validateNonNegativeMoney } from '../../utils/auction.js';
 
 function extractId(request, params) {
   if (params?.id) return params.id;
@@ -31,6 +32,20 @@ export async function onRequestPut(context) {
       is_default = existing.is_default
     } = body;
 
+    let parsedFeePct = existing.fee_pct;
+    let parsedFlatFee = existing.flat_fee;
+
+    try {
+      if (body.fee_pct !== undefined) {
+        parsedFeePct = validateNonNegativeMoney(body.fee_pct, 'fee_pct') ?? existing.fee_pct;
+      }
+      if (body.flat_fee !== undefined) {
+        parsedFlatFee = validateNonNegativeMoney(body.flat_fee, 'flat_fee') ?? existing.flat_fee;
+      }
+    } catch (e) {
+      return err(e.message, 400);
+    }
+
     if (is_default && !existing.is_default) {
       await env.DB.prepare('UPDATE auction_platforms SET is_default = 0 WHERE user_id = ?').bind(userId).run();
     }
@@ -41,8 +56,8 @@ export async function onRequestPut(context) {
       WHERE id = ? AND user_id = ?
     `).bind(
       name.trim(),
-      Number(fee_pct) || 0,
-      Number(flat_fee) || 0,
+      parsedFeePct,
+      parsedFlatFee,
       (notes || '').trim(),
       is_default ? 1 : 0,
       id,

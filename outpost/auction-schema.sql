@@ -82,7 +82,7 @@ CREATE INDEX IF NOT EXISTS idx_auction_items_status  ON auction_items(status);
 CREATE TABLE IF NOT EXISTS auction_sales (
   id                      TEXT PRIMARY KEY,
   user_id                 TEXT NOT NULL,
-  item_id                 TEXT NOT NULL,
+  item_id                 TEXT NOT NULL UNIQUE,
   sale_date               TEXT NOT NULL,
   platform                TEXT NOT NULL,
   buyer_handle            TEXT,
@@ -105,7 +105,8 @@ CREATE TABLE IF NOT EXISTS auction_sales (
 );
 
 CREATE INDEX IF NOT EXISTS idx_auction_sales_user ON auction_sales(user_id);
-CREATE INDEX IF NOT EXISTS idx_auction_sales_item ON auction_sales(item_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_auction_sales_item ON auction_sales(item_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_auction_sales_item_unique ON auction_sales(item_id);
 
 -- ============================================================
 -- AUCTION COMPS (pricing intelligence per item)
@@ -512,6 +513,32 @@ CREATE TABLE IF NOT EXISTS email_verifications (
 CREATE INDEX IF NOT EXISTS idx_email_verifications_user ON email_verifications(user_id, used);
 CREATE INDEX IF NOT EXISTS idx_email_verifications_token ON email_verifications(token, used);
 CREATE INDEX IF NOT EXISTS idx_email_verifications_email ON email_verifications(email, token);
+
+-- ============================================================
+-- MED-9 MIGRATION: UNIQUE CONSTRAINT ON AUCTION_SALES(ITEM_ID)
+-- Prevents duplicate sale records and reconciliation race conditions
+-- ============================================================
+CREATE UNIQUE INDEX IF NOT EXISTS idx_auction_sales_item_unique ON auction_sales(item_id);
+
+-- ============================================================
+-- MED-15 MIGRATION: EBAY LISTINGS CACHE TABLE
+-- Caches active seller listings per user with 15-minute TTL
+-- ============================================================
+CREATE TABLE IF NOT EXISTS ebay_listings_cache (
+  user_id       TEXT PRIMARY KEY,
+  listings_json TEXT NOT NULL,
+  fetched_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_ebay_listings_cache_user ON ebay_listings_cache(user_id);
+
+-- ============================================================
+-- LOW-2 MIGRATION: INDEX ON AUCTION_ITEMS(USER_ID, SKU)
+-- Optimizes SKU collision detection and uniqueness lookups
+-- ============================================================
+CREATE INDEX IF NOT EXISTS idx_auction_items_user_sku ON auction_items(user_id, sku);
+
 
 
 

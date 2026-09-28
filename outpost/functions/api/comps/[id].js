@@ -1,16 +1,10 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
+import { computeManualAvg } from '../../utils/auction.js';
 
 function extractId(request, params) {
   if (params?.id) return params.id;
   const match = new URL(request.url).pathname.match(/\/api\/comps\/([^/]+)/);
   return match ? match[1] : null;
-}
-
-function computeManualAvg(comp1, comp2, comp3) {
-  const vals = [comp1, comp2, comp3].filter(v => v !== null && v !== undefined && v !== '' && !isNaN(Number(v)) && Number(v) > 0).map(Number);
-  if (vals.length === 0) return null;
-  const sum = vals.reduce((a, b) => a + b, 0);
-  return Math.round((sum / vals.length) * 100) / 100;
 }
 
 /**

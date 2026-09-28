@@ -1,6 +1,6 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
-import { computeItemProration, computePricingFloors } from '../../utils/auction.js';
-import { generateSku } from '../utils/sku.js';
+import { computeItemProration, computePricingFloors, validateNonNegativeMoney } from '../../utils/auction.js';
+import { generateSku, generateUniqueSku } from '../utils/sku.js';
 
 // ============================================================
 // GET /api/invoices  - list all invoices for authenticated user
@@ -42,17 +42,45 @@ export async function onRequestPost(context) {
     if (!invoice_ref) return err('invoice_ref is required');
     if (!Array.isArray(items) || items.length === 0) return err('At least one item is required');
 
-    // Validate each item has a name and unit_price
-    for (const it of items) {
-      if (!it.item_name || !it.item_name.trim()) return err('Each item must have a name');
-      if (typeof it.unit_price !== 'number' || it.unit_price <= 0) return err(`Item "${it.item_name}" must have a positive unit_price`);
+    let invDiscount;
+    let invShipping;
+    let invTax;
+
+    try {
+      invDiscount = validateNonNegativeMoney(discount, 'discount') ?? 0;
+      invShipping = validateNonNegativeMoney(shipping, 'shipping') ?? 0;
+      invTax      = validateNonNegativeMoney(tax, 'tax') ?? 0;
+
+      // Validate each item has a name and non-negative monetary fields
+      for (let i = 0; i < items.length; i++) {
+        const it = items[i];
+        if (!it.item_name || !it.item_name.trim()) return err('Each item must have a name', 400);
+        const up = validateNonNegativeMoney(it.unit_price, `items[${i}].unit_price`);
+        if (up === null || up <= 0) return err(`Item "${it.item_name}" must have a positive unit_price`, 400);
+        it.unit_price = up;
+
+        if (it.platform_fee_pct !== undefined) {
+          it.platform_fee_pct = validateNonNegativeMoney(it.platform_fee_pct, `items[${i}].platform_fee_pct`);
+        }
+        if (it.platform_flat_fee !== undefined) {
+          it.platform_flat_fee = validateNonNegativeMoney(it.platform_flat_fee, `items[${i}].platform_flat_fee`);
+        }
+        if (it.est_shipping_cost !== undefined) {
+          it.est_shipping_cost = validateNonNegativeMoney(it.est_shipping_cost, `items[${i}].est_shipping_cost`);
+        }
+        if (it.boost_pct !== undefined) {
+          it.boost_pct = validateNonNegativeMoney(it.boost_pct, `items[${i}].boost_pct`);
+        }
+        if (it.target_margin_pct !== undefined) {
+          it.target_margin_pct = validateNonNegativeMoney(it.target_margin_pct, `items[${i}].target_margin_pct`);
+        }
+      }
+    } catch (e) {
+      return err(e.message, 400);
     }
 
     // Compute invoice base_total from item unit prices
     const base_total = items.reduce((sum, it) => sum + (it.unit_price || 0), 0);
-    const invDiscount = discount || 0;
-    const invShipping = shipping || 0;
-    const invTax      = tax || 0;
 
     const invoiceId = `inv-${crypto.randomUUID()}`;
     const invoicePayload = {
@@ -96,6 +124,7 @@ export async function onRequestPost(context) {
     // Insert each item with proration computed
     const insertedItems = [];
     const insertStatements = [];
+    const seenSkus = new Set();
 
     for (const it of items) {
       const itemId = `item-${crypto.randomUUID()}`;
@@ -122,7 +151,12 @@ export async function onRequestPost(context) {
         target_margin_pct: targetMarginPct
       });
 
-      const itemSku = (it.sku && String(it.sku).trim()) ? String(it.sku).trim() : generateSku(date_acquired || new Date());
+      let itemSku = (it.sku && String(it.sku).trim()) ? String(it.sku).trim() : null;
+      if (!itemSku) {
+        itemSku = await generateUniqueSku(env.DB, payload.userId, date_acquired || new Date(), 5, seenSkus);
+      } else {
+        seenSkus.add(itemSku);
+      }
 
       insertStatements.push(
         env.DB.prepare(`

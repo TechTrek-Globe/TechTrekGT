@@ -1,4 +1,5 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
+import { validateNonNegativeMoney } from '../../utils/auction.js';
 import {
   getEbayUserToken,
   fetchEbayRecentOrders,
@@ -10,7 +11,7 @@ import {
 /**
  * Calculates a token-based similarity score between two strings.
  */
-function calculateSimilarity(strA, strB) {
+export function calculateSimilarity(strA, strB) {
   if (!strA || !strB) return 0;
   const normalize = (s) => (s || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').trim();
   const tokensA = normalize(strA).split(/\s+/).filter(t => t.length > 2);
@@ -136,7 +137,7 @@ export async function onRequestGet(context) {
         asin,
         amazon_order_id: orderId,
         etv,
-        tax_cost,
+        tax_cost: taxCost,
         image_url: imageUrl,
         is_sold: isSold,
         sale_id: existingSale?.id || null,
@@ -269,6 +270,7 @@ export async function onRequestGet(context) {
       if (bestMatch && highestScore >= 0.35) {
         suggestedMatches.push({
           confidence: parseFloat(highestScore.toFixed(2)),
+          high_confidence: highestScore >= 0.80,
           match_reason: matchReason,
           ebay_order: ebayItem,
           vinescout_item: bestMatch
@@ -317,8 +319,13 @@ export async function onRequestPost(context) {
       sale_date,
       buyer_handle,
       buyer_shipping_paid = 0,
-      actual_shipping_cost = 0
+      actual_shipping_cost = 0,
+      confirm
     } = body;
+
+    if (confirm !== true) {
+      return err('Explicit user confirmation (confirm: true) is required to reconcile this match', 400);
+    }
 
     if (!item_id) return err('item_id is required', 400);
     if (!ebay_order_id) return err('ebay_order_id is required', 400);
@@ -330,9 +337,17 @@ export async function onRequestPost(context) {
 
     if (!item) return err('Item not found or does not belong to this account', 404);
 
-    const price = parseFloat(sale_price) || parseFloat(item.current_list_price) || 0;
+    let price, bShip, aShip;
+    try {
+      price = sale_price !== undefined ? validateNonNegativeMoney(sale_price, 'sale_price') : (parseFloat(item.current_list_price) || 0);
+      bShip = validateNonNegativeMoney(buyer_shipping_paid, 'buyer_shipping_paid') || 0;
+      aShip = validateNonNegativeMoney(actual_shipping_cost, 'actual_shipping_cost') || 0;
+    } catch (ve) {
+      return err(ve.message, 400);
+    }
+
     const finalSaleDate = sale_date || new Date().toISOString().split('T')[0];
-    const buyer = buyerHandle || '';
+    const buyer = buyer_handle || body.buyerHandle || '';
 
     // 2. Update auction_items status and attributes
     let attrs = {};
@@ -365,8 +380,6 @@ export async function onRequestPost(context) {
     // 3. Compute Net Proceeds & Profit
     const feeStructure = calculateEbayCategoryFees(item.category_id, item.category, price);
     const platformFeeAmt = parseFloat(((price * feeStructure.fee_pct) + feeStructure.flat_fee).toFixed(2));
-    const bShip = parseFloat(buyer_shipping_paid) || 0;
-    const aShip = parseFloat(actual_shipping_cost) || 0;
     const netProceeds = parseFloat((price + bShip - aShip - platformFeeAmt).toFixed(2));
     const landedCost = parseFloat(item.true_total_cost) || 0;
     const netProfit = parseFloat((netProceeds - landedCost).toFixed(2));
@@ -374,17 +387,99 @@ export async function onRequestPost(context) {
 
     // 4. Create or Update auction_sales record
     const existingSale = await env.DB.prepare(`
-      SELECT id FROM auction_sales WHERE (ebay_order_id = ? OR item_id = ?) AND user_id = ?
-    `).bind(String(ebay_order_id), item.id, payload.userId).first();
+      SELECT id FROM auction_sales WHERE item_id = ? AND user_id = ?
+    `).bind(item.id, payload.userId).first();
 
     let saleId = existingSale?.id || `sale-${crypto.randomUUID()}`;
 
-    if (existingSale) {
+    try {
+      if (existingSale) {
+        await env.DB.prepare(`
+          UPDATE auction_sales
+          SET platform = 'eBay',
+              ebay_order_id = ?,
+              sale_date = ?,
+              buyer_handle = ?,
+              gross_sale_price = ?,
+              buyer_shipping_paid = ?,
+              actual_shipping_cost = ?,
+              platform_fee_pct = ?,
+              platform_flat_fee = ?,
+              platform_fees_amt = ?,
+              net_proceeds = ?,
+              true_total_cost = ?,
+              net_profit = ?,
+              roi_pct = ?
+          WHERE id = ? AND user_id = ?
+        `).bind(
+          String(ebay_order_id),
+          finalSaleDate,
+          buyer,
+          price,
+          bShip,
+          aShip,
+          feeStructure.fee_pct,
+          feeStructure.flat_fee,
+          platformFeeAmt,
+          netProceeds,
+          landedCost,
+          netProfit,
+          roiPct,
+          saleId,
+          payload.userId
+        ).run();
+      } else {
+        await env.DB.prepare(`
+          INSERT INTO auction_sales (
+            id, user_id, item_id, platform, ebay_order_id,
+            sale_date, buyer_handle, gross_sale_price, buyer_shipping_paid,
+            actual_shipping_cost, platform_fee_pct, platform_flat_fee,
+            platform_fees_amt, net_proceeds, true_total_cost, net_profit, roi_pct
+          ) VALUES (
+            ?, ?, ?, 'eBay', ?,
+            ?, ?, ?, ?,
+            ?, ?, ?,
+            ?, ?, ?, ?, ?
+          )
+          ON CONFLICT(item_id) DO UPDATE SET
+            platform = excluded.platform,
+            ebay_order_id = excluded.ebay_order_id,
+            sale_date = excluded.sale_date,
+            buyer_handle = excluded.buyer_handle,
+            gross_sale_price = excluded.gross_sale_price,
+            buyer_shipping_paid = excluded.buyer_shipping_paid,
+            actual_shipping_cost = excluded.actual_shipping_cost,
+            platform_fee_pct = excluded.platform_fee_pct,
+            platform_flat_fee = excluded.platform_flat_fee,
+            platform_fees_amt = excluded.platform_fees_amt,
+            net_proceeds = excluded.net_proceeds,
+            true_total_cost = excluded.true_total_cost,
+            net_profit = excluded.net_profit,
+            roi_pct = excluded.roi_pct
+        `).bind(
+          saleId,
+          payload.userId,
+          item.id,
+          String(ebay_order_id),
+          finalSaleDate,
+          buyer,
+          price,
+          bShip,
+          aShip,
+          feeStructure.fee_pct,
+          feeStructure.flat_fee,
+          platformFeeAmt,
+          netProceeds,
+          landedCost,
+          netProfit,
+          roiPct
+        ).run();
+      }
+    } catch (saleErr) {
+      console.warn('[match-sold-vinescout] Sale upsert conflict, updating existing row:', saleErr);
       await env.DB.prepare(`
         UPDATE auction_sales
-        SET item_id = ?,
-            item_name = ?,
-            platform = 'eBay',
+        SET platform = 'eBay',
             ebay_order_id = ?,
             sale_date = ?,
             buyer_handle = ?,
@@ -397,12 +492,9 @@ export async function onRequestPost(context) {
             net_proceeds = ?,
             true_total_cost = ?,
             net_profit = ?,
-            roi_pct = ?,
-            updated_at = datetime('now')
-        WHERE id = ? AND user_id = ?
+            roi_pct = ?
+        WHERE item_id = ? AND user_id = ?
       `).bind(
-        item.id,
-        item.item_name,
         String(ebay_order_id),
         finalSaleDate,
         buyer,
@@ -416,41 +508,16 @@ export async function onRequestPost(context) {
         landedCost,
         netProfit,
         roiPct,
-        saleId,
+        item.id,
         payload.userId
       ).run();
-    } else {
-      await env.DB.prepare(`
-        INSERT INTO auction_sales (
-          id, user_id, item_id, item_name, platform, ebay_order_id,
-          sale_date, buyer_handle, gross_sale_price, buyer_shipping_paid,
-          actual_shipping_cost, platform_fee_pct, platform_flat_fee,
-          platform_fees_amt, net_proceeds, true_total_cost, net_profit, roi_pct
-        ) VALUES (
-          ?, ?, ?, ?, 'eBay', ?,
-          ?, ?, ?, ?,
-          ?, ?, ?,
-          ?, ?, ?, ?, ?
-        )
-      `).bind(
-        saleId,
-        payload.userId,
-        item.id,
-        item.item_name,
-        String(ebay_order_id),
-        finalSaleDate,
-        buyer,
-        price,
-        bShip,
-        aShip,
-        feeStructure.fee_pct,
-        feeStructure.flat_fee,
-        platformFeeAmt,
-        netProceeds,
-        landedCost,
-        netProfit,
-        roiPct
-      ).run();
+    }
+
+    if (!existingSale) {
+      const persisted = await env.DB.prepare(
+        'SELECT id FROM auction_sales WHERE item_id = ? AND user_id = ?'
+      ).bind(item.id, payload.userId).first();
+      if (persisted?.id) saleId = persisted.id;
     }
 
     // 5. Asynchronous Finances / Fee Reconciliation

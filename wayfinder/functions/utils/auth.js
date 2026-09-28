@@ -29,10 +29,19 @@ export async function hashPassword(password) {
   return `${saltHex}:310000:${hashHex}`;
 }
 
-// Verify PBKDF2 Password Hash
+// Verify PBKDF2 Password Hash (HIGH-6 / MED-16)
+//
+// Historical Context:
+// Early accounts used a legacy 2-part format ("salt:hash") with an implicit 100k iteration count.
+// Modern platform accounts use the 3-part format ("salt:iterations:hash", standardized at 310k).
+//
+// Migration Plan & Fallback Removal:
+// The legacy 100k fallback exists temporarily to support legacy sessions during rollout.
+// Once all legacy accounts have reset passwords via /reset-password (audited via
+// check-legacy-hashes.js), this fallback can be removed in favor of strict 3-part verification.
 export async function verifyPassword(password, storedHash) {
   const parts = storedHash.split(':');
-  // Support both old 2-part format and new 3-part format
+  // Fallback to 100k iterations for legacy 2-part hashes (deprecated: see MED-16)
   const [saltHex, iterationsOrHash, maybeHash] = parts;
   const iterations = parts.length === 3 ? parseInt(iterationsOrHash, 10) : 100000;
   const originalHashHex = parts.length === 3 ? maybeHash : iterationsOrHash;

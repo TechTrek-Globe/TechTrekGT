@@ -1,5 +1,6 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
 import { getEbayUserToken, fetchEbayActiveSellerListings } from './tokenHelper.js';
+import { getCachedEbayListings, setCachedEbayListings } from './listingsCache.js';
 
 /**
  * GET /api/ebay/find-listings
@@ -8,9 +9,10 @@ import { getEbayUserToken, fetchEbayActiveSellerListings } from './tokenHelper.j
  * and REST inventory listings, then fuzzy-matches them against internal auction_items in D1.
  *
  * Returns a list of { ebay_listing, matched_item, confidence } for user review.
+ * Implements a 15-minute cache (MED-15) backed by D1 `ebay_listings_cache`.
  */
 
-function fuzzyScore(ebayTitle, itemName, athletePerson) {
+export function fuzzyScore(ebayTitle, itemName, athletePerson) {
   if (!ebayTitle) return 0;
   const normalize = (s) => (s || '').toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
   const titleTokens = normalize(ebayTitle).split(/\s+/).filter(t => t.length > 2);
@@ -27,15 +29,35 @@ export async function onRequestGet(context) {
     const payload = await requireAuth(request, env);
     if (!env.DB) return err('Database not available', 500);
 
-    let ebayListings = [];
-    try {
-      const accessToken = await getEbayUserToken(env, payload.userId);
-      ebayListings = await fetchEbayActiveSellerListings(env, accessToken);
+    const url = new URL(request.url);
+    const force = url.searchParams.get('force') === 'true' || url.searchParams.get('refresh') === 'true';
 
-      // Stamp last_refreshed_at on success
-      await env.DB.prepare(
-        `UPDATE ebay_oauth_tokens SET last_refreshed_at = datetime('now') WHERE user_id = ?`
-      ).bind(payload.userId).run().catch(() => {});
+    let ebayListings = [];
+    let fromCache = false;
+    let fetchedAt = null;
+
+    try {
+      if (!force) {
+        const cached = await getCachedEbayListings(env.DB, payload.userId, 15);
+        if (cached) {
+          ebayListings = cached.listings;
+          fromCache = true;
+          fetchedAt = cached.fetched_at;
+        }
+      }
+
+      if (!fromCache) {
+        const accessToken = await getEbayUserToken(env, payload.userId);
+        ebayListings = await fetchEbayActiveSellerListings(env, accessToken);
+
+        await setCachedEbayListings(env.DB, payload.userId, ebayListings);
+        fetchedAt = new Date().toISOString();
+
+        // Stamp last_refreshed_at on success
+        await env.DB.prepare(
+          `UPDATE ebay_oauth_tokens SET last_refreshed_at = datetime('now') WHERE user_id = ?`
+        ).bind(payload.userId).run().catch(() => {});
+      }
 
     } catch (e) {
       console.error('[find-listings] eBay listings fetch failed:', e);
@@ -106,7 +128,8 @@ export async function onRequestGet(context) {
           id: c.item.id,
           item_name: c.item.item_name,
           athlete_person: c.item.athlete_person,
-          confidence: parseFloat(c.score.toFixed(2))
+          confidence: parseFloat(c.score.toFixed(2)),
+          high_confidence: c.score >= 0.80
         }))
       });
     }
@@ -127,7 +150,9 @@ export async function onRequestGet(context) {
       all_internal_items: internalItems,
       ebay_listing_count: ebayListings.length,
       internal_item_count: internalItems.length,
-      match_count: matches.length
+      match_count: matches.length,
+      cached: fromCache,
+      fetched_at: fetchedAt
     });
   });
 }

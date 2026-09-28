@@ -1,6 +1,6 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
 import { getEbayUserToken, updateEbayListingSku } from './tokenHelper.js';
-import { generateSku } from '../utils/sku.js';
+import { generateSku, generateUniqueSku } from '../utils/sku.js';
 
 /**
  * POST /api/ebay/push-sku
@@ -39,9 +39,9 @@ export async function onRequestPost(context) {
       // If SKU was passed in body or missing in DB, resolve and persist it
       let targetSku = (body.sku || item.sku || '').trim();
       if (!targetSku) {
-        targetSku = generateSku(item.date_acquired || new Date());
+        targetSku = await generateUniqueSku(env.DB, payload.userId, item.date_acquired || new Date(), 5);
         await env.DB.prepare(
-          'UPDATE auction_items SET sku = ?, updated_at = datetime("now") WHERE id = ? AND user_id = ?'
+          'UPDATE auction_items SET sku = ?, updated_at = datetime(\'now\') WHERE id = ? AND user_id = ?'
         ).bind(targetSku, item.id, payload.userId).run();
       }
 
@@ -77,13 +77,16 @@ export async function onRequestPost(context) {
       let successCount = 0;
       let failCount = 0;
 
+      const seenSkus = new Set();
       for (const it of items) {
         let currentSku = (it.sku || '').trim();
         if (!currentSku) {
-          currentSku = generateSku(it.date_acquired || new Date());
+          currentSku = await generateUniqueSku(env.DB, payload.userId, it.date_acquired || new Date(), 5, seenSkus);
           await env.DB.prepare(
-            'UPDATE auction_items SET sku = ?, updated_at = datetime("now") WHERE id = ? AND user_id = ?'
+            'UPDATE auction_items SET sku = ?, updated_at = datetime(\'now\') WHERE id = ? AND user_id = ?'
           ).bind(currentSku, it.id, payload.userId).run();
+        } else {
+          seenSkus.add(currentSku);
         }
 
         try {

@@ -1,5 +1,5 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
-import { computePricingFloors, computeSaleMetrics, daysBetween } from '../../utils/auction.js';
+import { computePricingFloors, computeSaleMetrics, daysBetween, validateNonNegativeMoney } from '../../utils/auction.js';
 
 // ============================================================
 // GET    /api/items/:id  - get single item
@@ -77,6 +77,53 @@ export async function onRequestPut(context) {
     if (!item) return err('Item not found', 404);
 
     const body = await request.json();
+
+    try {
+      if (body.unit_price !== undefined) {
+        validateNonNegativeMoney(body.unit_price, 'unit_price');
+      }
+      if (body.est_shipping_cost !== undefined) {
+        validateNonNegativeMoney(body.est_shipping_cost, 'est_shipping_cost');
+      }
+      if (body.platform_fee_pct !== undefined) {
+        validateNonNegativeMoney(body.platform_fee_pct, 'platform_fee_pct');
+      }
+      if (body.platform_flat_fee !== undefined) {
+        validateNonNegativeMoney(body.platform_flat_fee, 'platform_flat_fee');
+      }
+      if (body.boost_pct !== undefined) {
+        validateNonNegativeMoney(body.boost_pct, 'boost_pct');
+      }
+      if (body.target_margin_pct !== undefined) {
+        validateNonNegativeMoney(body.target_margin_pct, 'target_margin_pct');
+      }
+      if (body.current_list_price !== undefined) {
+        validateNonNegativeMoney(body.current_list_price, 'current_list_price');
+      }
+      if (body.actual_sell_price !== undefined) {
+        validateNonNegativeMoney(body.actual_sell_price, 'actual_sell_price');
+      }
+      if (body.ebay_promoted_rate !== undefined) {
+        validateNonNegativeMoney(body.ebay_promoted_rate, 'ebay_promoted_rate');
+      }
+      if (body.floor_price !== undefined) {
+        validateNonNegativeMoney(body.floor_price, 'floor_price');
+      }
+      if (body.buy_it_now_price !== undefined) {
+        validateNonNegativeMoney(body.buy_it_now_price, 'buy_it_now_price');
+      }
+      if (body.buyer_shipping_cost !== undefined) {
+        validateNonNegativeMoney(body.buyer_shipping_cost, 'buyer_shipping_cost');
+      }
+      if (body.etv !== undefined) {
+        validateNonNegativeMoney(body.etv, 'etv');
+      }
+      if (body.tax_cost !== undefined) {
+        validateNonNegativeMoney(body.tax_cost, 'tax_cost');
+      }
+    } catch (e) {
+      return err(e.message, 400);
+    }
 
     const round2 = (val) => (val != null && val !== '' && !isNaN(Number(val))) ? Math.round(Number(val) * 100) / 100 : null;
 
@@ -157,13 +204,12 @@ export async function onRequestPut(context) {
       updated.date_sold = new Date().toISOString().split('T')[0];
     }
 
-    // Compute days on market if status changed to Sold
+    // Compute days on market if status changed to Sold (MED-11: clamped to >= 0 by daysBetween)
     let days_on_market = item.days_on_market;
     if (updated.status === 'Sold') {
       const from = updated.date_listed || item.date_listed || item.date_acquired;
       const to = updated.date_sold || new Date().toISOString().split('T')[0];
-      const diff = daysBetween(from, to);
-      days_on_market = diff != null && diff >= 0 ? diff : 0;
+      days_on_market = daysBetween(from, to) ?? 0;
     }
 
     // Determine actual_sell_price if marking as Sold and no actual_sell_price provided
@@ -227,9 +273,9 @@ export async function onRequestPut(context) {
             nextAttrs.source = 'amazon_vinescout';
           }
         } else if (key === 'etv') {
-          nextAttrs.etv = val !== '' && val != null ? parseFloat(val) : null;
+          nextAttrs.etv = validateNonNegativeMoney(val, 'etv');
         } else if (key === 'tax_cost') {
-          nextAttrs.tax_cost = val !== '' && val != null ? parseFloat(val) : null;
+          nextAttrs.tax_cost = validateNonNegativeMoney(val, 'tax_cost');
         } else if (key === 'cert_verified') {
           nextAttrs.cert_verified = Boolean(val);
           if (nextAttrs.cert_verified && !nextAttrs.cert_verified_at) {
@@ -308,7 +354,91 @@ export async function onRequestPut(context) {
         'SELECT id FROM auction_sales WHERE item_id = ? AND user_id = ?'
       ).bind(id, payload.userId).first();
 
-      if (existingSale) {
+      let saleId = existingSale?.id || `sale-${crypto.randomUUID()}`;
+
+      try {
+        if (existingSale) {
+          await env.DB.prepare(`
+            UPDATE auction_sales SET
+              sale_date = ?,
+              platform = ?,
+              gross_sale_price = ?,
+              platform_fee_pct = ?,
+              platform_flat_fee = ?,
+              platform_fees_amt = ?,
+              actual_shipping_cost = ?,
+              net_proceeds = ?,
+              true_total_cost = ?,
+              net_profit = ?,
+              roi_pct = ?,
+              days_to_sell = ?
+            WHERE id = ? AND user_id = ?
+          `).bind(
+            saleDate,
+            platformName,
+            grossPrice,
+            feePct,
+            flatFee,
+            saleMetrics.platform_fees_amt,
+            shippingCost,
+            saleMetrics.net_proceeds,
+            item.true_total_cost || 0,
+            saleMetrics.net_profit,
+            saleMetrics.roi_pct,
+            daysToSell,
+            existingSale.id,
+            payload.userId
+          ).run();
+        } else {
+          await env.DB.prepare(`
+            INSERT INTO auction_sales (
+              id, user_id, item_id, sale_date, platform, buyer_handle,
+              gross_sale_price, buyer_shipping_paid, actual_shipping_cost,
+              platform_fee_pct, platform_flat_fee, platform_fees_amt,
+              payment_processing_amt, promoted_listing_fee,
+              net_proceeds, true_total_cost, net_profit, roi_pct,
+              days_to_sell
+            ) VALUES (
+              ?, ?, ?, ?, ?, NULL,
+              ?, 0, ?,
+              ?, ?, ?,
+              0, 0,
+              ?, ?, ?, ?,
+              ?
+            )
+            ON CONFLICT(item_id) DO UPDATE SET
+              sale_date = excluded.sale_date,
+              platform = excluded.platform,
+              gross_sale_price = excluded.gross_sale_price,
+              actual_shipping_cost = excluded.actual_shipping_cost,
+              platform_fee_pct = excluded.platform_fee_pct,
+              platform_flat_fee = excluded.platform_flat_fee,
+              platform_fees_amt = excluded.platform_fees_amt,
+              net_proceeds = excluded.net_proceeds,
+              true_total_cost = excluded.true_total_cost,
+              net_profit = excluded.net_profit,
+              roi_pct = excluded.roi_pct,
+              days_to_sell = excluded.days_to_sell
+          `).bind(
+            saleId,
+            payload.userId,
+            id,
+            saleDate,
+            platformName,
+            grossPrice,
+            shippingCost,
+            feePct,
+            flatFee,
+            saleMetrics.platform_fees_amt,
+            saleMetrics.net_proceeds,
+            item.true_total_cost || 0,
+            saleMetrics.net_profit,
+            saleMetrics.roi_pct,
+            daysToSell
+          ).run();
+        }
+      } catch (saleErr) {
+        console.warn('[items/id] Sold sync conflict, updating existing sale:', saleErr);
         await env.DB.prepare(`
           UPDATE auction_sales SET
             sale_date = ?,
@@ -323,7 +453,7 @@ export async function onRequestPut(context) {
             net_profit = ?,
             roi_pct = ?,
             days_to_sell = ?
-          WHERE id = ? AND user_id = ?
+          WHERE item_id = ? AND user_id = ?
         `).bind(
           saleDate,
           platformName,
@@ -337,43 +467,8 @@ export async function onRequestPut(context) {
           saleMetrics.net_profit,
           saleMetrics.roi_pct,
           daysToSell,
-          existingSale.id,
-          payload.userId
-        ).run();
-      } else {
-        const saleId = `sale-${crypto.randomUUID()}`;
-        await env.DB.prepare(`
-          INSERT INTO auction_sales (
-            id, user_id, item_id, sale_date, platform, buyer_handle,
-            gross_sale_price, buyer_shipping_paid, actual_shipping_cost,
-            platform_fee_pct, platform_flat_fee, platform_fees_amt,
-            payment_processing_amt, promoted_listing_fee,
-            net_proceeds, true_total_cost, net_profit, roi_pct,
-            days_to_sell
-          ) VALUES (
-            ?, ?, ?, ?, ?, NULL,
-            ?, 0, ?,
-            ?, ?, ?,
-            0, 0,
-            ?, ?, ?, ?,
-            ?
-          )
-        `).bind(
-          saleId,
-          payload.userId,
           id,
-          saleDate,
-          platformName,
-          grossPrice,
-          shippingCost,
-          feePct,
-          flatFee,
-          saleMetrics.platform_fees_amt,
-          saleMetrics.net_proceeds,
-          item.true_total_cost || 0,
-          saleMetrics.net_profit,
-          saleMetrics.roi_pct,
-          daysToSell
+          payload.userId
         ).run();
       }
     } else if (item.status === 'Sold' && updated.status !== 'Sold') {

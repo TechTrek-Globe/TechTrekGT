@@ -1,9 +1,5 @@
-/**
- * apiIntegrations.js - Utilities for managing and resolving per-installation API integration secrets.
- *
- * Implements [HIGH-2]: Hashed secret lookup against `api_integrations` table.
- * Replaces shared OUTPOST_SECRET_KEY resolution with direct per-user/device secret resolution.
- */
+import { verifyToken } from './auth.js';
+
 
 /**
  * Computes a deterministic SHA-256 hex hash of a raw secret string.
@@ -52,6 +48,16 @@ export async function resolveIntegrationUserId(rawToken, env) {
   const token = rawToken.trim();
   if (!token) return null;
 
+  // 0. Verify if token is a valid signed JWT session token
+  if (env?.JWT_SECRET) {
+    try {
+      const payload = await verifyToken(token, env.JWT_SECRET);
+      if (payload?.userId) {
+        return payload.userId;
+      }
+    } catch (_) {}
+  }
+
   if (env?.DB) {
     // 1. Check api_integrations by secret_hash
     const secretHash = await hashSecret(token);
@@ -85,11 +91,11 @@ export async function resolveIntegrationUserId(rawToken, env) {
         // Column amazon_api_token_hash might not exist in unmigrated test fixtures
       }
 
-      // Also support repurposed amazon_api_token column matching hash
+      // Also support legacy/plaintext amazon_api_token matching hash or raw token
       try {
         const user = await env.DB.prepare(
-          'SELECT id FROM users WHERE amazon_api_token = ? LIMIT 1'
-        ).bind(secretHash).first();
+          'SELECT id FROM users WHERE amazon_api_token = ? OR amazon_api_token = ? LIMIT 1'
+        ).bind(secretHash, token).first();
 
         if (user?.id) {
           return user.id;

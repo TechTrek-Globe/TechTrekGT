@@ -1,9 +1,15 @@
 import { resolveIntegrationUserId } from '../../utils/apiIntegrations.js';
+import { getAllTokensFromRequest } from '../../utils/auth.js';
 
 export async function onRequestGet({ request, env }) {
   try {
-    const rawAuth = request.headers.get('X-VineScout-Auth') ||
-      (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '').trim();
+    let rawAuth = (request.headers.get('X-VineScout-Auth') ||
+      (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '')).trim();
+
+    if (!rawAuth) {
+      const tokens = getAllTokensFromRequest(request);
+      if (tokens.length > 0) rawAuth = tokens[0];
+    }
 
     if (!rawAuth) {
       return new Response(JSON.stringify({ error: 'Unauthorized: missing auth token' }), {
@@ -15,6 +21,7 @@ export async function onRequestGet({ request, env }) {
     const userId = await resolveIntegrationUserId(rawAuth, env);
 
     if (!userId) {
+      console.warn('[VINESCOUT_SALES_EXPORT] Auth failed. Token prefix:', rawAuth.substring(0, 12), 'length:', rawAuth.length);
       return new Response(JSON.stringify({ error: 'Unauthorized: invalid token' }), {
         status: 401,
         headers: { 'Content-Type': 'application/json' }

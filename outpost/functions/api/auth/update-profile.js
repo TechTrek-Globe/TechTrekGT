@@ -1,18 +1,26 @@
-import { verifyToken, getTokenFromRequest, hashPassword, verifyPassword, createToken, buildAuthCookie } from '../../utils/auth.js';
+import { verifyToken, getTokenFromRequest, getAllTokensFromRequest, hashPassword, verifyPassword, createToken, buildAuthCookie } from '../../utils/auth.js';
 import { checkRateLimit } from '../../utils/rateLimit.js';
 
 export async function onRequestPost(context) {
   const { request, env } = context;
 
   try {
-    const token = getTokenFromRequest(request);
-    if (!token) {
+    const tokens = getAllTokensFromRequest(request);
+    if (tokens.length === 0) {
       return new Response(JSON.stringify({ error: 'Unauthorized: Missing token' }), {
         status: 401, headers: { 'Content-Type': 'application/json' }
       });
     }
 
-    const payload = await verifyToken(token, env.JWT_SECRET);
+    let payload = null;
+    for (const t of tokens) {
+      const p = await verifyToken(t, env.JWT_SECRET);
+      if (p && p.userId) {
+        payload = p;
+        break;
+      }
+    }
+
     if (!payload || !payload.userId) {
       return new Response(JSON.stringify({ error: 'Unauthorized: Invalid token' }), {
         status: 401, headers: { 'Content-Type': 'application/json' }

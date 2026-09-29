@@ -16,10 +16,24 @@ function getGatewayBase() {
   return 'https://techtrekgt.com';
 }
 
+function getAuthErrorMessage(status, dataError) {
+  if (status === 401) {
+    if (!dataError || /unauthorized|expired|invalid token|missing token/i.test(dataError)) {
+      return 'Your session has expired or authentication is required. Please refresh the page or sign in again.';
+    }
+  }
+  return dataError || `HTTP ${status}`;
+}
+
 async function apiFetch(path, options = {}) {
   const res = await fetch(getApiUrl(path), { ...OPTS, ...options });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  if (!res.ok) {
+    if (res.status === 401 && typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('outpost:unauthorized', { detail: { path, error: data.error } }));
+    }
+    throw new Error(getAuthErrorMessage(res.status, data.error));
+  }
   return data;
 }
 
@@ -178,7 +192,7 @@ export const fetchLiveComps = (query, itemId = null) =>
     body: JSON.stringify({ query, itemId })
   }).then(async r => {
     const data = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+    if (!r.ok) throw new Error(getAuthErrorMessage(r.status, data.error));
     return data;
   });
 
@@ -189,7 +203,7 @@ export const fetchEbayCatalog = (query) =>
     headers: JSON_HEADERS
   }).then(async r => {
     const data = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+    if (!r.ok) throw new Error(getAuthErrorMessage(r.status, data.error));
     return data;
   });
 
@@ -203,7 +217,7 @@ export const fetchEbayItemDetail = (idOrUrl) => {
     headers: JSON_HEADERS
   }).then(async r => {
     const data = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+    if (!r.ok) throw new Error(getAuthErrorMessage(r.status, data.error));
     return data;
   });
 };

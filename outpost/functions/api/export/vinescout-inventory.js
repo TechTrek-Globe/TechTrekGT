@@ -1,9 +1,15 @@
 import { resolveIntegrationUserId } from '../../utils/apiIntegrations.js';
+import { getAllTokensFromRequest } from '../../utils/auth.js';
 
 export async function onRequestGet({ request, env }) {
   try {
-    const rawAuth = request.headers.get('X-VineScout-Auth') ||
-      (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '').trim();
+    let rawAuth = (request.headers.get('X-VineScout-Auth') ||
+      (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '')).trim();
+
+    if (!rawAuth) {
+      const tokens = getAllTokensFromRequest(request);
+      if (tokens.length > 0) rawAuth = tokens[0];
+    }
 
     if (!rawAuth) {
       return new Response(JSON.stringify({ error: 'Unauthorized: missing auth token' }), {
@@ -42,7 +48,7 @@ export async function onRequestGet({ request, env }) {
         v.invoice_ref
       FROM auction_items i
       LEFT JOIN auction_invoices v ON i.invoice_id = v.id
-      WHERE i.status != 'Sold'
+      WHERE i.status IN ('Selling', 'Listed', 'Available')
         AND i.user_id = ?
     `;
 

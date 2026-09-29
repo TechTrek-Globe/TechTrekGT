@@ -1,17 +1,25 @@
-import { verifyToken, getTokenFromRequest } from '../../utils/auth.js';
+import { verifyToken, getTokenFromRequest, getAllTokensFromRequest } from '../../utils/auth.js';
 
 export async function onRequestGet(context) {
   const { request, env } = context;
 
   try {
-    const token = getTokenFromRequest(request);
-    if (!token) {
+    const tokens = getAllTokensFromRequest(request);
+    if (tokens.length === 0) {
       return new Response(JSON.stringify({ error: 'Unauthorized: Missing token' }), {
         status: 401,
         headers: { 'Content-Type': 'application/json' }
       });
     }
-    const payload = await verifyToken(token, env.JWT_SECRET);
+
+    let payload = null;
+    for (const t of tokens) {
+      const p = await verifyToken(t, env.JWT_SECRET);
+      if (p && p.userId) {
+        payload = p;
+        break;
+      }
+    }
 
     if (!payload) {
       return new Response(JSON.stringify({ error: 'Unauthorized: Invalid or expired token' }), {

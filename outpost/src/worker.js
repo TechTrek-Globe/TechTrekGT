@@ -128,7 +128,7 @@ function addSecurityHeaders(response, isLocalhostOrOptions = false, maybeRequest
     newHeaders.set('Access-Control-Allow-Origin', 'https://techtrekgt.com');
   }
   newHeaders.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  newHeaders.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  newHeaders.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-VineScout-Auth');
   newHeaders.set('Access-Control-Allow-Credentials', 'true');
   newHeaders.set('Access-Control-Max-Age', '86400');
 

@@ -1,4 +1,5 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
+import { getAllTokensFromRequest } from '../../utils/auth.js';
 import { computePricingFloors, computeItemProration, validateNonNegativeMoney } from '../../utils/auction.js';
 import { generateSku, generateUniqueSku } from '../utils/sku.js';
 import { resolveIntegrationUserId } from '../../utils/apiIntegrations.js';
@@ -33,7 +34,12 @@ export async function onRequestPost(context) {
   // --- Auth via Webhook Secret or Bearer API token ---
   const vineScoutAuth = (request.headers.get('X-VineScout-Auth') || '').trim();
   const authHeader = (request.headers.get('Authorization') || '').trim();
-  const token = (authHeader.startsWith('Bearer ') ? authHeader.slice(7) : vineScoutAuth).trim();
+  let token = (authHeader.startsWith('Bearer ') ? authHeader.slice(7) : vineScoutAuth).trim();
+
+  if (!token) {
+    const tokens = getAllTokensFromRequest(request);
+    if (tokens.length > 0) token = tokens[0];
+  }
 
   if (!token) {
     return err('Unauthorized: missing Bearer token or valid X-VineScout-Auth', 401);

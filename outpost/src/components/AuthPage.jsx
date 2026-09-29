@@ -43,7 +43,11 @@ export function AuthPage({ onAuthSuccess }) {
 
   const [name, setName] = useState('');
   const [rememberMe, setRememberMe] = useState(() => {
-    try { return Boolean(sessionStorage.getItem('outpost_saved_email')); } catch (e) { return false; }
+    try {
+      const saved = sessionStorage.getItem('outpost_remember_me');
+      if (saved !== null) return saved === 'true';
+      return true;
+    } catch (e) { return true; }
   });
   const [email, setEmail] = useState(() => {
     try { return sessionStorage.getItem('outpost_saved_email') || ''; } catch (e) { return ''; }
@@ -74,6 +78,7 @@ export function AuthPage({ onAuthSuccess }) {
     setIsSubmitting(true);
     setError('');
     try {
+      sessionStorage.setItem('outpost_remember_me', String(rememberMe));
       if (rememberMe) {
         sessionStorage.setItem('outpost_saved_email', email.trim().toLowerCase());
       } else {

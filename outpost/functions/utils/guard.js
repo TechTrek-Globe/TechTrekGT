@@ -1,4 +1,4 @@
-import { verifyToken, getTokenFromRequest } from './auth.js';
+import { verifyToken, getTokenFromRequest, getAllTokensFromRequest } from './auth.js';
 
 /**
  * Verifies the auth_token cookie and returns the decoded payload.
@@ -13,19 +13,21 @@ export async function requireAuth(request, env) {
       status: 500, headers: { 'Content-Type': 'application/json' }
     });
   }
-  const token = getTokenFromRequest(request);
-  if (!token) {
+  const tokens = getAllTokensFromRequest(request);
+  if (tokens.length === 0) {
     throw new Response(JSON.stringify({ error: 'Unauthorized: missing token' }), {
       status: 401, headers: { 'Content-Type': 'application/json' }
     });
   }
-  const payload = await verifyToken(token, env.JWT_SECRET);
-  if (!payload || !payload.userId) {
-    throw new Response(JSON.stringify({ error: 'Unauthorized: invalid or expired token' }), {
-      status: 401, headers: { 'Content-Type': 'application/json' }
-    });
+  for (const token of tokens) {
+    const payload = await verifyToken(token, env.JWT_SECRET);
+    if (payload && payload.userId) {
+      return payload;
+    }
   }
-  return payload;
+  throw new Response(JSON.stringify({ error: 'Unauthorized: invalid or expired token' }), {
+    status: 401, headers: { 'Content-Type': 'application/json' }
+  });
 }
 
 /**

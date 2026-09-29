@@ -237,25 +237,27 @@ export function buildAuthCookie(token, maxAge) {
  * @param {Request} request - Incoming HTTP Request
  * @returns {string|null} - Extracted JWT token string or null
  */
-export function getTokenFromRequest(request) {
+export function getAllTokensFromRequest(request) {
+  const tokens = [];
   const cookieHeader = request.headers.get('Cookie') || '';
-  const match = cookieHeader.match(/(?:^|;\s*)auth_token=([^;]+)/);
-  if (match && match[1]) {
-    return match[1];
+  const regex = /(?:^|;\s*)auth_token=([^;]+)/g;
+  let match;
+  while ((match = regex.exec(cookieHeader)) !== null) {
+    if (match[1]) tokens.push(match[1]);
   }
-
-  // Fallback: Authorization Bearer header for non-browser clients (LOW-1)
-  // Web SPA traffic uses the HttpOnly cookie above. Bearer is retained for
-  // desktop companion tools, automated testing, and headless API consumers.
   const authHeader = request.headers.get('Authorization');
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.split(' ')[1];
     if (token && token !== 'cookie-active' && token !== 'null' && token !== 'undefined') {
-      return token;
+      tokens.push(token);
     }
   }
+  return tokens;
+}
 
-  return null;
+export function getTokenFromRequest(request) {
+  const tokens = getAllTokensFromRequest(request);
+  return tokens.length > 0 ? tokens[0] : null;
 }
 
 /**

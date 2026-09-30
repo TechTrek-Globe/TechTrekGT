@@ -1,6 +1,7 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
 import { computeItemProration, computePricingFloors, validateNonNegativeMoney } from '../../utils/auction.js';
 import { generateSku, generateUniqueSku } from '../utils/sku.js';
+import { CHUNK_SIZE } from '../../utils/constants.js';
 
 // ============================================================
 // GET /api/invoices  - list all invoices for authenticated user
@@ -128,7 +129,7 @@ export async function onRequestPost(context) {
 
     for (const it of items) {
       const itemId = `item-${crypto.randomUUID()}`;
-      const proration = computeItemProration({ unit_price: it.unit_price }, invoicePayload);
+      const proration = computeItemProration({ unit_price: it.unit_price }, invoicePayload, items.length);
 
       // Fetch platform fee defaults if platform name provided
       let feePct = it.platform_fee_pct || 0;

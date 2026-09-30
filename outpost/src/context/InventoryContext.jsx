@@ -78,6 +78,13 @@ export function InventoryProvider({ children }) {
   }, [userSettings?.categoryOrder, items]);
 
   // --- Computed item metrics & sorting ---
+  //
+  // T-10 item 5: `_computedFloor` is GONE. It came from feeEngine's second,
+  // divergent break-even formula, so the grid could show a floor the server
+  // never persisted - two contradictory floors for one item. The authoritative
+  // floor is the server-computed `min_sell_price` (or the user's explicit
+  // `floor_price`). The remaining fields are margin/profit previews, labelled
+  // as such in the UI, and are not persisted.
   const enrichedItemsWithMetrics = useMemo(() => {
     return items.map(it => {
       const breakdown = computeFeeBreakdown(it);
@@ -86,7 +93,6 @@ export function InventoryProvider({ children }) {
         _computedMargin: breakdown.marginPct,
         _computedNetProfit: breakdown.netProfit,
         _computedMarginHealth: breakdown.marginHealth,
-        _computedFloor: breakdown.breakEvenFloor,
       };
     });
   }, [items]);

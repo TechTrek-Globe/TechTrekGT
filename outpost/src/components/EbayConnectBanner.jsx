@@ -3,12 +3,11 @@ import {
   ShoppingBag, CheckCircle2, XCircle, AlertTriangle, ExternalLink,
   RefreshCw, Search, Loader2, Unlink, Zap
 } from 'lucide-react';
-import { getEbayOAuthStatus, findEbayListings, syncAllEbayItems } from '../utils/auctionApi';
+import { getEbayOAuthStatus, findEbayListings, syncAllEbayItems, getGatewayBase } from '../utils/auctionApi';
 
-const GATEWAY_BASE =
-  typeof window !== 'undefined' && window.location.hostname === 'localhost'
-    ? 'http://localhost:8787'
-    : 'https://techtrekgt.com';
+// T-10 item 9: resolved through the shared helper so there is no second
+// hardcoded hostname to drift.
+const GATEWAY_BASE = getGatewayBase();
 
 /**
  * EbayConnectBanner

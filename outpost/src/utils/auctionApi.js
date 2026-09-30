@@ -1,20 +1,29 @@
 import { getApiUrl } from '../utils/api';
 export { getApiUrl };
+import { FALLBACK_GATEWAY_ORIGIN, LOCAL_DEV_ORIGIN } from '../../functions/utils/constants.js';
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
 const OPTS = { credentials: 'include' };
 
 /**
  * Resolves the landing API gateway base URL.
- * In local dev (localhost) routes to wrangler dev port 8787.
- * In production routes to https://techtrekgt.com (techtrek-landing Worker).
+ *
+ * T-10 item 9: no hardcoded production hostname. VITE_GATEWAY_BASE_URL (set per
+ * environment) wins, so a staging build no longer calls production. Local dev
+ * falls back to the wrangler dev port; otherwise the current origin is used.
  */
 function getGatewayBase() {
+  const configured = import.meta.env?.VITE_GATEWAY_BASE_URL;
+  if (configured) return configured.replace(/\/$/, '');
   if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
-    return 'http://localhost:8787';
+    return LOCAL_DEV_ORIGIN;
   }
-  return 'https://techtrekgt.com';
+  if (typeof window !== 'undefined' && window.location.origin) {
+    return window.location.origin;
+  }
+  return FALLBACK_GATEWAY_ORIGIN;
 }
+export { getGatewayBase };
 
 function getAuthErrorMessage(status, dataError) {
   if (status === 401) {

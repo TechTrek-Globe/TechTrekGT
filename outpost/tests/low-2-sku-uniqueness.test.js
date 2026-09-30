@@ -83,6 +83,7 @@ describe('LOW-2: SKU Collision Detection & Uniqueness Regeneration', () => {
     env = {
       DB: mockDb,
       JWT_SECRET: TEST_JWT_SECRET,
+      TOKEN_ENCRYPTION_KEY: 'test-token-encryption-key-low2',
       EBAY_SANDBOX: 'false'
     };
   });
@@ -408,7 +409,7 @@ describe('LOW-2: SKU Collision Detection & Uniqueness Regeneration', () => {
 
     test('POST /api/ebay/push-sku generates and persists unique SKU when target item lacks one', async () => {
       // Seed eBay OAuth token so handler reaches SKU assignment
-      const encAccess = await encryptToken('mock_ebay_access_low2', TEST_JWT_SECRET);
+      const encAccess = await encryptToken('mock_ebay_access_low2', env.TOKEN_ENCRYPTION_KEY);
       mockDb._raw.prepare(`
         INSERT INTO ebay_oauth_tokens (
           id, user_id, access_token, refresh_token, access_token_exp, refresh_token_exp, scopes, connected_at

@@ -18,6 +18,7 @@ const auctionSchema = fs.readFileSync(path.join(__dirname, '../auction-schema.sq
 import { encryptToken } from '../functions/utils/tokenCrypto.js';
 
 const TEST_JWT_SECRET = 'test-jwt-secret-key-32-bytes-minimum-length-for-hmac';
+const TEST_TOKEN_KEY = 'test-token-encryption-key-med8';
 
 function createMockD1() {
   const db = new DatabaseSync(':memory:');
@@ -72,7 +73,7 @@ describe('MED-8: Fuzzy Title-Matching Heuristics and Safe Sales Attribution', ()
     `).run('inv-med8-test', testUserId, 'AMAZON-2026-MED8');
 
     // Seed eBay OAuth token
-    const encAccess = await encryptToken('mock_ebay_access_token', TEST_JWT_SECRET);
+    const encAccess = await encryptToken('mock_ebay_access_token', TEST_TOKEN_KEY);
     mockDb._raw.prepare(`
       INSERT INTO ebay_oauth_tokens (
         id, user_id, access_token, refresh_token, access_token_exp, refresh_token_exp, scopes, connected_at
@@ -381,7 +382,7 @@ describe('MED-8: Fuzzy Title-Matching Heuristics and Safe Sales Attribution', ()
           }
         });
 
-        const res = await onRequestGet({ request: req, env: { DB: mockDb, JWT_SECRET: TEST_JWT_SECRET, EBAY_SANDBOX: 'false' } });
+        const res = await onRequestGet({ request: req, env: { DB: mockDb, JWT_SECRET: TEST_JWT_SECRET, TOKEN_ENCRYPTION_KEY: TEST_TOKEN_KEY, EBAY_SANDBOX: 'false' } });
         assert.strictEqual(res.status, 200);
         const data = await res.json();
 

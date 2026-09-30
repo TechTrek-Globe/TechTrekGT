@@ -2,6 +2,11 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { updateItem, saveComp, getComps, fetchLiveComps, getActiveEbayListings, syncEbayItem, fetchEbayItemAnalytics, fetchEbayItemDetail } from '../utils/auctionApi';
 import { computeFeeBreakdown } from '../utils/feeEngine';
 import { roundPrice, round2 } from '../utils/formulaPreview';
+import {
+  DEFAULT_PLATFORM_FEE_PCT,
+  DEFAULT_PLATFORM_FLAT_FEE,
+  DEFAULT_TARGET_MARGIN_PCT
+} from '../../functions/utils/constants.js';
 import { cleanEbaySearchQuery, buildStructuredCompQuery } from '../utils/ebaySearch';
 
 // Subcomponents
@@ -16,7 +21,9 @@ import { EditTabPerformance } from './edit/EditTabPerformance';
 import { EditTabVineScout } from './edit/EditTabVineScout';
 
 const PLATFORM_FEE_PRESETS = {
-  'eBay':         { fee_pct: 13.5, flat_fee: 0.40 },
+  // T-10 item 3: the eBay preset uses the shared default rather than an inline
+  // 13.5, so the preset, the seed row and every write path agree.
+  'eBay':         { fee_pct: DEFAULT_PLATFORM_FEE_PCT * 100, flat_fee: DEFAULT_PLATFORM_FLAT_FEE },
   'Whatnot':      { fee_pct: 8.0,  flat_fee: 0.30 },
   'Mercari':      { fee_pct: 10.0, flat_fee: 0.50 },
   'Poshmark':     { fee_pct: 20.0, flat_fee: 0.00 },
@@ -49,8 +56,8 @@ const EMPTY_FORM = {
   listing_format: 'Fixed Price',
   listing_status: 'Draft',
   platform: 'eBay',
-  platform_fee_pct: '13.5',
-  platform_flat_fee: '0.40',
+  platform_fee_pct: String(DEFAULT_PLATFORM_FEE_PCT * 100),
+  platform_flat_fee: DEFAULT_PLATFORM_FLAT_FEE.toFixed(2),
   est_shipping_cost: '0.00',
   buyer_shipping_cost: '0.00',
   // Pricing
@@ -58,7 +65,7 @@ const EMPTY_FORM = {
   buy_it_now_price: '',
   floor_price: '',
   actual_sell_price: '',
-  target_margin_pct: '15',
+  target_margin_pct: String(DEFAULT_TARGET_MARGIN_PCT * 100),
   ebay_promoted_rate: '',
   // Dates
   purchase_date: '',
@@ -128,12 +135,16 @@ export function EditItemModal({
   // Auto-saving state for immediate seller assumption synchronization
   const [autoSaving, setAutoSaving] = useState(false);
   const [autoSavedTime, setAutoSavedTime] = useState(null);
+  // T-11 item 9: auto-save failures were swallowed by console.warn only, so a
+  // rejected partial update was invisible. These are surfaced in the header.
+  const [autoSaveError, setAutoSaveError] = useState('');
   const autoSaveTimerRef = useRef(null);
 
   const autoSaveField = useCallback(async (fieldName, value) => {
     if (!item?.id) return;
     try {
       setAutoSaving(true);
+      setAutoSaveError('');
       const parsedVal = value === '' ? 0 : parseFloat(value);
       const payload = {
         [fieldName]: fieldName === 'target_margin_pct' ? (parsedVal / 100) : parsedVal
@@ -146,7 +157,9 @@ export function EditItemModal({
         setAutoSavedTime(Date.now());
       }
     } catch (e) {
+      const msg = e?.message || 'Auto-save failed';
       console.warn('[EditItemModal] Auto-save error:', e);
+      setAutoSaveError(`Could not save ${fieldName.replace(/_/g, ' ')}: ${msg}`);
     } finally {
       setAutoSaving(false);
     }
@@ -155,7 +168,9 @@ export function EditItemModal({
   const updateField = (key, value, immediate = false) => {
     setForm(prev => ({ ...prev, [key]: value }));
 
-    // Real-time auto-persistence for seller assumptions (est_shipping_cost, target_margin_pct)
+    // Real-time auto-persistence for seller assumptions (est_shipping_cost, target_margin_pct).
+    // The payload carries ONLY the edited field, so the server must leave every
+    // other column untouched; that is enforced in functions/api/items/[id].js.
     if (key === 'est_shipping_cost' || key === 'target_margin_pct') {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
       if (immediate) {
@@ -207,10 +222,10 @@ export function EditItemModal({
         platform: item.platform || 'eBay',
         platform_fee_pct: item.platform_fee_pct != null
           ? String(parseFloat((Number(item.platform_fee_pct) * 100).toFixed(2)))
-          : '13.5',
+          : String(DEFAULT_PLATFORM_FEE_PCT * 100),
         platform_flat_fee: item.platform_flat_fee != null
           ? Number(item.platform_flat_fee).toFixed(2)
-          : '0.40',
+          : DEFAULT_PLATFORM_FLAT_FEE.toFixed(2),
         est_shipping_cost: item.est_shipping_cost != null
           ? Number(item.est_shipping_cost).toFixed(2)
           : '0.00',
@@ -224,7 +239,12 @@ export function EditItemModal({
         actual_sell_price: item.actual_sell_price != null ? Number(item.actual_sell_price).toFixed(2) : '',
         target_margin_pct: item.target_margin_pct != null
           ? String(parseFloat((Number(item.target_margin_pct) * 100).toFixed(2)))
-          : '30',
+          // T-10 item 4: this used to be a hardcoded '30'. Opening the modal on
+          // an item with a null margin showed 30%, and saving without touching
+          // the field persisted 30% - silently changing the item's pricing
+          // assumption merely by viewing it. Same constant as EMPTY_FORM and the
+          // submit branch.
+          : String(DEFAULT_TARGET_MARGIN_PCT * 100),
         ebay_promoted_rate: (item.ebay_promoted_rate != null && Number(item.ebay_promoted_rate) > 0)
           ? String(item.ebay_promoted_rate)
           : (item.boost_pct != null && Number(item.boost_pct) > 0 ? String(parseFloat((Number(item.boost_pct) * 100).toFixed(2))) : ''),
@@ -669,11 +689,11 @@ export function EditItemModal({
       sellPrice: parseFloat(form.current_list_price) || 0,
       buyer_shipping_cost: parseFloat(form.buyer_shipping_cost) || 0,
       cogs: parseFloat(form.true_total_cost) || parseFloat(form.unit_price) || 0,
-      platform_fee_pct: (parseFloat(form.platform_fee_pct) || 13.5) / 100,
-      platform_flat_fee: parseFloat(form.platform_flat_fee) || 0.40,
+      platform_fee_pct: (parseFloat(form.platform_fee_pct) || DEFAULT_PLATFORM_FEE_PCT * 100) / 100,
+      platform_flat_fee: parseFloat(form.platform_flat_fee) || DEFAULT_PLATFORM_FLAT_FEE,
       ebay_promoted_rate: parseFloat(form.ebay_promoted_rate) || 0,
       est_shipping_cost: parseFloat(form.est_shipping_cost) || 0,
-      target_margin_pct: (parseFloat(form.target_margin_pct) || 15) / 100
+      target_margin_pct: (parseFloat(form.target_margin_pct) || DEFAULT_TARGET_MARGIN_PCT * 100) / 100
     });
   }, [
     form.current_list_price,
@@ -717,8 +737,8 @@ export function EditItemModal({
         listing_format: form.listing_format || null,
         listing_status: form.listing_status || null,
         platform: form.platform || null,
-        platform_fee_pct: form.platform_fee_pct !== '' ? parseFloat(form.platform_fee_pct) / 100 : 0.135,
-        platform_flat_fee: form.platform_flat_fee !== '' ? parseFloat(form.platform_flat_fee) : 0.40,
+        platform_fee_pct: form.platform_fee_pct !== '' ? parseFloat(form.platform_fee_pct) / 100 : DEFAULT_PLATFORM_FEE_PCT,
+        platform_flat_fee: form.platform_flat_fee !== '' ? parseFloat(form.platform_flat_fee) : DEFAULT_PLATFORM_FLAT_FEE,
         est_shipping_cost: form.est_shipping_cost !== '' ? round2(form.est_shipping_cost) : 0,
         buyer_shipping_cost: form.buyer_shipping_cost !== '' ? round2(form.buyer_shipping_cost) : 0,
 
@@ -726,7 +746,7 @@ export function EditItemModal({
         buy_it_now_price: form.buy_it_now_price !== '' ? round2(form.buy_it_now_price) : null,
         floor_price: form.floor_price !== '' ? round2(form.floor_price) : null,
         actual_sell_price: form.actual_sell_price !== '' ? round2(form.actual_sell_price) : null,
-        target_margin_pct: form.target_margin_pct !== '' ? parseFloat(form.target_margin_pct) / 100 : 0.15,
+        target_margin_pct: form.target_margin_pct !== '' ? parseFloat(form.target_margin_pct) / 100 : DEFAULT_TARGET_MARGIN_PCT,
 
         ebay_promoted_rate: form.ebay_promoted_rate !== '' ? parseFloat(form.ebay_promoted_rate) : null,
         boost_pct: form.ebay_promoted_rate !== '' ? (parseFloat(form.ebay_promoted_rate) / 100) : 0,
@@ -832,6 +852,7 @@ export function EditItemModal({
           isDirty={isDirty}
           autoSaving={autoSaving}
           autoSavedTime={autoSavedTime}
+          autoSaveError={autoSaveError}
           onClose={handleClose}
         />
 

@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { fmtCurrency, formatPercent } from '../../utils/formulaPreview';
 import { computeTargetPriceFromMargin } from '../../utils/feeEngine';
+import { DEFAULT_PLATFORM_FEE_PCT, DEFAULT_PLATFORM_FLAT_FEE } from '../../../functions/utils/constants.js';
 import { MarginHealthBadge } from '../inventory/MarginHealthBadge';
 
 export function EditTabFinancials({
@@ -34,7 +35,7 @@ export function EditTabFinancials({
   // Outbound fulfillment & platform assumptions
   const estShippingCost = parseFloat(form.est_shipping_cost) || 0;
   const targetMarginPct = (parseFloat(form.target_margin_pct) || 15) / 100;
-  const platformFeePct = (parseFloat(form.platform_fee_pct) || 13.5) / 100;
+  const platformFeePct = (parseFloat(form.platform_fee_pct) || DEFAULT_PLATFORM_FEE_PCT * 100) / 100;
   const promotedRate = parseFloat(form.ebay_promoted_rate) || 0;
   const platformFlatFee = parseFloat(form.platform_flat_fee) || 0.40;
 

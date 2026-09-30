@@ -56,5 +56,19 @@
       "binding": "RATE_LIMIT_KV",
       "id": "12a9495ec88b45cdb492f1a63786066c"
     }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "RATE_LIMIT_DO",
+        "class_name": "RateLimitCounter"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1-rate-limit-do",
+      "new_sqlite_classes": ["RateLimitCounter"]
+    }
   ]
 }

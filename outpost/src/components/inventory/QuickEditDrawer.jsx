@@ -6,6 +6,7 @@ import { FeeBreakdownPanel } from './FeeBreakdownPanel';
 import { buildEbaySearchUrl } from '../../utils/ebaySearch';
 import { fmtCurrency, roundPrice, round2 } from '../../utils/formulaPreview';
 import { generateSku } from '../../utils/skuGenerator';
+import { DEFAULT_TARGET_MARGIN_PCT } from '../../../functions/utils/constants.js';
 
 const formatDec2 = (val) => {
   if (val == null || val === '' || isNaN(Number(val))) return '';
@@ -158,7 +159,7 @@ export function QuickEditDrawer({
         buy_it_now_price: draft.buy_it_now_price !== '' && draft.buy_it_now_price != null ? round2(draft.buy_it_now_price) : null,
         floor_price: draft.floor_price !== '' && draft.floor_price != null ? round2(draft.floor_price) : null,
         ebay_promoted_rate: draft.ebay_promoted_rate !== '' ? parseFloat(draft.ebay_promoted_rate) : null,
-        target_margin_pct: draft.target_margin_pct !== '' ? parseFloat(draft.target_margin_pct) / 100 : 0.15,
+        target_margin_pct: draft.target_margin_pct !== '' ? parseFloat(draft.target_margin_pct) / 100 : DEFAULT_TARGET_MARGIN_PCT,
         ebay_listing_id: draft.ebay_listing_id ? draft.ebay_listing_id.trim() : null,
         notes: draft.notes || null,
 

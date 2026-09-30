@@ -138,8 +138,7 @@ export async function onRequestPost(context) {
 
     const newToken = await createToken({
       userId: user.id,
-      email: updatedEmail,
-      name: updatedName
+      tv: user.token_version ?? 1
     }, env.JWT_SECRET, remainingSeconds);
 
     return new Response(JSON.stringify({

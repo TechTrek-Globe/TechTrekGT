@@ -201,8 +201,17 @@ test('MED-10: Pervasive Number(x)||0 Coercion & Financial Calculation Audit', as
     assert.equal(draft.suggested_list_price, 0);
     assert.equal(isNaN(draft.min_sell_price), false);
     assert.equal(isNaN(draft.suggested_list_price), false);
+    assert.equal(draft.pricing_error, null);
 
-    // Client mirror produces identical results
+    // T-10 item 6: a divisor of zero means NO break-even price exists. This must
+    // be null plus a reason, never 0 - a floor of 0 reads as "give it away free".
+    const impossible = computePricingFloors({ platform_fee_pct: 0.85, boost_pct: 0.20 });
+    assert.equal(impossible.min_sell_price, null);
+    assert.equal(impossible.suggested_list_price, null);
+    assert.ok(impossible.pricing_error && /no break-even price exists/.test(impossible.pricing_error));
+
+    // Client preview is the SAME function (re-export), not a mirror.
+    assert.equal(clientComputePricingFloors, computePricingFloors);
     const clientResult = clientComputePricingFloors({});
     assert.deepEqual(clientResult, draft);
   });

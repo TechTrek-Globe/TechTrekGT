@@ -62,7 +62,7 @@ describe('Multi-Cookie Authentication & Token Resilience', () => {
     const payload = await requireAuth(req, TEST_ENV);
     assert.ok(payload);
     assert.strictEqual(payload.userId, 'user-active-123');
-    assert.strictEqual(payload.email, 'active@example.com');
+    assert.strictEqual(payload.email, undefined); // PRIV-003: no email in JWT payload
   });
 
   test('requireGatewayAuth succeeds when an expired cookie precedes a valid cookie', async () => {

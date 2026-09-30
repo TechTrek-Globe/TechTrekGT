@@ -1,5 +1,11 @@
 import { parseCleanNumber, formatExcelDate, extractMetadataFromTitle, cleanItemName } from './spreadsheetParser.js';
 import { computePricingFloors } from './formulaPreview.js';
+import {
+  DEFAULT_PLATFORM_FEE_PCT,
+  DEFAULT_PLATFORM_FLAT_FEE,
+  DEFAULT_EST_SHIPPING_COST,
+  DEFAULT_TARGET_MARGIN_PCT
+} from '../../functions/utils/constants.js';
 
 /**
  * Extract structured text lines from a PDF binary ArrayBuffer using PDF.js
@@ -325,14 +331,14 @@ export function parsePristineAuctionInvoiceText(rawText, fallbackDate = null) {
     const proratedTax = weight * invoice.tax;
     const trueTotalCost = unitPrice - proratedDiscount + proratedShipping + proratedTax;
 
-    const defaultPlatform = { fee_pct: 0.136, flat_fee: 0.40, est_shipping: 6.50 };
+    const defaultPlatform = { fee_pct: DEFAULT_PLATFORM_FEE_PCT, flat_fee: DEFAULT_PLATFORM_FLAT_FEE, est_shipping: DEFAULT_EST_SHIPPING_COST };
     const floors = computePricingFloors({
       true_total_cost: trueTotalCost,
       est_shipping_cost: defaultPlatform.est_shipping,
       platform_fee_pct: defaultPlatform.fee_pct,
       platform_flat_fee: defaultPlatform.flat_fee,
       boost_pct: 0,
-      target_margin_pct: 0.15
+    target_margin_pct: DEFAULT_TARGET_MARGIN_PCT
     });
 
     const notesParts = [];
@@ -364,7 +370,7 @@ export function parsePristineAuctionInvoiceText(rawText, fallbackDate = null) {
       suggested_list_price: floors.suggested_list_price,
       current_list_price: null,
       actual_sell_price: null,
-      target_margin_pct: 0.15,
+      target_margin_pct: DEFAULT_TARGET_MARGIN_PCT,
       date_acquired: dateAcquired,
       date_listed: null,
       date_sold: null,

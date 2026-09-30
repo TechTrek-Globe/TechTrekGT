@@ -1,5 +1,6 @@
 import { requireAuth, withAuth, ok, err, isValidPrefixedId } from '../../utils/guard.js';
-import { computeSaleMetrics, daysBetween, validateNonNegativeMoney } from '../../utils/auction.js';
+import { validateNonNegativeMoney, validatePercentage, validateSignedMoney } from '../../utils/auction.js';
+import { normalizeSaleInput, upsertSale } from '../../utils/sales.js';
 
 // ============================================================
 // GET    /api/sales/:id - retrieve single sale with item info
@@ -88,7 +89,11 @@ export async function onRequestPut(context) {
     let platform_flat_fee = existing.platform_flat_fee;
     let payment_processing_amt = existing.payment_processing_amt;
     let promoted_listing_fee = existing.promoted_listing_fee;
-    let directNetProceeds = existing.net_proceeds;
+    // Left undefined so normalizeSaleInput derives net_proceeds from the (possibly
+    // changed) gross/percentages. Seeding this with existing.net_proceeds made a
+    // partial PUT keep the OLD net proceeds next to a NEW gross price, so the row
+    // was internally inconsistent and roi_pct stopped tracking the sale price.
+    let directNetProceeds;
 
     try {
       if (body.gross_sale_price !== undefined) {
@@ -101,7 +106,8 @@ export async function onRequestPut(context) {
         actual_shipping_cost = validateNonNegativeMoney(body.actual_shipping_cost, 'actual_shipping_cost') ?? 0;
       }
       if (body.platform_fee_pct !== undefined) {
-        platform_fee_pct = validateNonNegativeMoney(body.platform_fee_pct, 'platform_fee_pct') ?? 0;
+        // T-10 item 7: reject out-of-range percentages at the API boundary.
+        platform_fee_pct = validatePercentage(body.platform_fee_pct, 'platform_fee_pct') ?? 0;
       }
       if (body.platform_flat_fee !== undefined) {
         platform_flat_fee = validateNonNegativeMoney(body.platform_flat_fee, 'platform_flat_fee') ?? 0;
@@ -116,15 +122,22 @@ export async function onRequestPut(context) {
         validateNonNegativeMoney(body.shipping_fee, 'shipping_fee');
       }
       if (body.net_proceeds !== undefined) {
-        directNetProceeds = validateNonNegativeMoney(body.net_proceeds, 'net_proceeds');
+        directNetProceeds = validateSignedMoney(body.net_proceeds, 'net_proceeds');
       } else if (body.net_earnings !== undefined) {
-        directNetProceeds = validateNonNegativeMoney(body.net_earnings, 'net_earnings');
+        directNetProceeds = validateSignedMoney(body.net_earnings, 'net_earnings');
       }
     } catch (e) {
       return err(e.message, 400);
     }
 
-    const metrics = computeSaleMetrics({
+    // T-08: normalize + upsert, same path as every other sale entry point. Fields
+    // omitted from the body fall back to the stored sale values below, so a
+    // partial PUT still produces the same row as the equivalent full create.
+    const record = normalizeSaleInput({
+      item_id: existing.item_id,
+      sale_date,
+      platform,
+      buyer_handle,
       gross_sale_price,
       buyer_shipping_paid,
       actual_shipping_cost,
@@ -134,50 +147,9 @@ export async function onRequestPut(context) {
       promoted_listing_fee,
       net_proceeds: directNetProceeds,
       true_total_cost: item.true_total_cost
-    });
+    }, item);
 
-    const startDate = item.date_listed || item.date_acquired;
-    const daysToSell = daysBetween(startDate, sale_date) ?? existing.days_to_sell;
-
-    await env.DB.prepare(`
-      UPDATE auction_sales SET
-        sale_date = ?,
-        platform = ?,
-        buyer_handle = ?,
-        gross_sale_price = ?,
-        buyer_shipping_paid = ?,
-        actual_shipping_cost = ?,
-        platform_fee_pct = ?,
-        platform_flat_fee = ?,
-        platform_fees_amt = ?,
-        payment_processing_amt = ?,
-        promoted_listing_fee = ?,
-        net_proceeds = ?,
-        true_total_cost = ?,
-        net_profit = ?,
-        roi_pct = ?,
-        days_to_sell = ?
-      WHERE id = ? AND user_id = ?
-    `).bind(
-      sale_date,
-      platform,
-      buyer_handle || null,
-      gross_sale_price,
-      buyer_shipping_paid,
-      actual_shipping_cost,
-      platform_fee_pct,
-      platform_flat_fee,
-      metrics.platform_fees_amt,
-      payment_processing_amt,
-      promoted_listing_fee,
-      metrics.net_proceeds,
-      item.true_total_cost,
-      metrics.net_profit,
-      metrics.roi_pct,
-      daysToSell >= 0 ? daysToSell : 0,
-      id,
-      payload.userId
-    ).run();
+    await upsertSale(env, payload.userId, record);
 
     // Update item actual_sell_price & date_sold
     await env.DB.prepare(`
@@ -188,9 +160,9 @@ export async function onRequestPut(context) {
         updated_at = datetime('now')
       WHERE id = ? AND user_id = ?
     `).bind(
-      gross_sale_price,
-      sale_date,
-      daysToSell >= 0 ? daysToSell : 0,
+      record.gross_sale_price,
+      record.sale_date,
+      record.days_to_sell ?? null,
       existing.item_id,
       payload.userId
     ).run();

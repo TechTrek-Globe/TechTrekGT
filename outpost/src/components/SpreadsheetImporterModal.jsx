@@ -17,6 +17,8 @@ export function SpreadsheetImporterModal({ isOpen, onClose, onImportSuccess }) {
   const [error, setError] = useState('');
   const [successResult, setSuccessResult] = useState(null);
 
+  const [confirmReplace, setConfirmReplace] = useState('');
+
   const fileInputRef = useRef(null);
 
   if (!isOpen) return null;
@@ -63,6 +65,10 @@ export function SpreadsheetImporterModal({ isOpen, onClose, onImportSuccess }) {
 
   const handleCommitImport = async () => {
     if (!parsedData) return;
+    if (strategy === 'replace' && confirmReplace.trim() !== 'REPLACE') {
+      setError('Type REPLACE in the confirmation field to proceed with replace strategy.');
+      return;
+    }
     setIsSubmitting(true);
     setError('');
     try {
@@ -72,6 +78,7 @@ export function SpreadsheetImporterModal({ isOpen, onClose, onImportSuccess }) {
         credentials: 'include',
         body: JSON.stringify({
           strategy,
+          confirmReplace: strategy === 'replace',
           invoices: parsedData.invoices,
           items: parsedData.items,
           sales: parsedData.sales,
@@ -81,7 +88,15 @@ export function SpreadsheetImporterModal({ isOpen, onClose, onImportSuccess }) {
 
       const data = await res.json();
       if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Import failed');
+        // Parse structured validation errors (from batch.js server-side validation)
+        let errMsg = data.error || 'Import failed';
+        try {
+          const parsed = JSON.parse(typeof errMsg === 'string' ? errMsg : '{}');
+          if (parsed.errors && Array.isArray(parsed.errors)) {
+            errMsg = parsed.errors.join('\n');
+          }
+        } catch (_) {}
+        throw new Error(errMsg);
       }
 
       setSuccessResult(data.imported);
@@ -322,8 +337,22 @@ export function SpreadsheetImporterModal({ isOpen, onClose, onImportSuccess }) {
                     <p className="text-[11px] text-slate-400 mt-1">Wipe old inventory for your account and replace with this workbook.</p>
                   </button>
                 </div>
-              </div>
 
+                {strategy === 'replace' && (
+                  <div className="mt-3 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30">
+                    <p className="text-xs font-semibold text-rose-300 mb-1">DANGER: This will DELETE all existing data</p>
+                    <p className="text-[11px] text-slate-400 mb-2">Type <span className="font-mono font-bold text-rose-300">REPLACE</span> to confirm:</p>
+                    <input
+                      type="text" autoComplete="off"
+                      className="input-field w-full"
+                      placeholder="Type REPLACE to confirm"
+                      value={confirmReplace}
+                      onChange={e => setConfirmReplace(e.target.value)}
+                    />
+                  </div>
+                )}
+
+              </div>
             </div>
           )}
 
@@ -344,7 +373,7 @@ export function SpreadsheetImporterModal({ isOpen, onClose, onImportSuccess }) {
               type="button"
               id="confirm-import-btn"
               onClick={handleCommitImport}
-              disabled={isSubmitting}
+              disabled={isSubmitting || (strategy === 'replace' && confirmReplace.trim() !== 'REPLACE')}
               className="btn-primary flex items-center gap-2"
             >
               {isSubmitting ? (
@@ -355,7 +384,7 @@ export function SpreadsheetImporterModal({ isOpen, onClose, onImportSuccess }) {
               ) : (
                 <>
                   <Database className="w-4 h-4" />
-                  <span>Execute Import ({parsedData.summary.itemCount} Items)</span>
+                  <span>Execute Import ({parsedData.summary?.itemCount || parsedData.items?.length || 0} Items)</span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}

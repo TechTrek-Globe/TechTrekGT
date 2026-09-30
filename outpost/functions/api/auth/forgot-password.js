@@ -6,7 +6,7 @@ export async function onRequestPost(context) {
 
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
   const ipRlKey = `forgot:${ip}`;
-  const ipLimit = await checkRateLimit(env.RATE_LIMIT_KV, ipRlKey, 5, 600);
+  const ipLimit = await checkRateLimit(env.RATE_LIMIT_KV, ipRlKey, 5, 600, true, env.RATE_LIMIT_DO);
 
   // Generic response used to prevent enumeration (HIGH-1, HIGH-2)
   const genericOk = new Response(JSON.stringify({
@@ -33,7 +33,7 @@ export async function onRequestPost(context) {
 
     const cleanEmail = email.trim().toLowerCase();
     const accountRlKey = `forgot-account:${cleanEmail}`;
-    const accountLimit = await checkRateLimit(env.RATE_LIMIT_KV, accountRlKey, 5, 900);
+    const accountLimit = await checkRateLimit(env.RATE_LIMIT_KV, accountRlKey, 5, 900, true, env.RATE_LIMIT_DO);
 
     if (!ipLimit.allowed || !accountLimit.allowed) {
       const retryAfter = Math.max(

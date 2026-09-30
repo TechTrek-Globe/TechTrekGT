@@ -1,5 +1,11 @@
 import { requireAuth, withAuth, ok, err, isValidPrefixedId } from '../../utils/guard.js';
-import { computePricingFloors, computeSaleMetrics, daysBetween, validateNonNegativeMoney, round2, markItemSold } from '../../utils/auction.js';
+import { computePricingFloors, daysBetween, markItemSold, round2Nullable, validateNonNegativeMoney, validatePercentage } from '../../utils/auction.js';
+import {
+  DEFAULT_PLATFORM_FEE_PCT,
+  DEFAULT_PLATFORM_FLAT_FEE,
+  normalizeItemStatus,
+  invalidStatusError
+} from '../../utils/constants.js';
 
 // ============================================================
 // GET    /api/items/:id  - get single item
@@ -87,16 +93,17 @@ export async function onRequestPut(context) {
         validateNonNegativeMoney(body.est_shipping_cost, 'est_shipping_cost');
       }
       if (body.platform_fee_pct !== undefined) {
-        validateNonNegativeMoney(body.platform_fee_pct, 'platform_fee_pct');
+        // T-10 item 7: percentages are fractions in [0, 1).
+        validatePercentage(body.platform_fee_pct, 'platform_fee_pct');
       }
       if (body.platform_flat_fee !== undefined) {
         validateNonNegativeMoney(body.platform_flat_fee, 'platform_flat_fee');
       }
       if (body.boost_pct !== undefined) {
-        validateNonNegativeMoney(body.boost_pct, 'boost_pct');
+        validatePercentage(body.boost_pct, 'boost_pct');
       }
       if (body.target_margin_pct !== undefined) {
-        validateNonNegativeMoney(body.target_margin_pct, 'target_margin_pct');
+        validatePercentage(body.target_margin_pct, 'target_margin_pct');
       }
       if (body.current_list_price !== undefined) {
         validateNonNegativeMoney(body.current_list_price, 'current_list_price');
@@ -114,7 +121,7 @@ export async function onRequestPut(context) {
         validateNonNegativeMoney(body.buy_it_now_price, 'buy_it_now_price');
       }
       if (body.buyer_shipping_cost !== undefined) {
-        validateNonNegativeMoney(body.buyer_shipping_cost, 'buyer_shipping_cost');
+        validateNonNegativeMoney(body.buyer_shipping_cost, 'buyer_shipping_cost', 10000);
       }
       if (body.etv !== undefined) {
         validateNonNegativeMoney(body.etv, 'etv');
@@ -126,7 +133,18 @@ export async function onRequestPut(context) {
       return err(e.message, 400);
     }
 
-    const round2Nullable = (val) => (val != null && val !== '' && !isNaN(Number(val))) ? round2(val) : null;
+    // T-11 item 5: validate status against the enum and reject unknown values,
+    // naming the permitted set. Previously status was written straight from the
+    // body, so {"status":"banana"} persisted and the item silently vanished from
+    // every filter, aggregate and CASE expression.
+    let normalizedStatus = item.status;
+    if (body.status !== undefined) {
+      const canonical = normalizeItemStatus(body.status);
+      if (!canonical) {
+        return err(invalidStatusError(body.status).error, 400);
+      }
+      normalizedStatus = canonical;
+    }
 
     // Merge only provided fields
     const updated = {
@@ -138,7 +156,7 @@ export async function onRequestPut(context) {
       cert_number:        body.cert_number        ?? item.cert_number,
       unit_price:         body.unit_price != null ? round2Nullable(body.unit_price) : round2Nullable(item.unit_price),
       true_total_cost:    body.true_total_cost != null ? round2Nullable(body.true_total_cost) : (body.unit_price != null ? round2Nullable(parseFloat(body.unit_price) - (item.prorated_discount || 0) + (item.prorated_shipping || 0) + (item.prorated_tax || 0)) : round2Nullable(item.true_total_cost)),
-      status:             body.status             ?? item.status,
+      status:             normalizedStatus,
       platform:           body.platform           ?? item.platform,
       platform_fee_pct:   body.platform_fee_pct   ?? item.platform_fee_pct,
       platform_flat_fee:  body.platform_flat_fee  ?? item.platform_flat_fee,
@@ -163,9 +181,16 @@ export async function onRequestPut(context) {
       listing_status:             body.listing_status             !== undefined ? (body.listing_status || null) : item.listing_status,
       quantity:                   body.quantity                   != null ? parseInt(body.quantity, 10) : (item.quantity ?? 1),
       purchase_date:              body.purchase_date              !== undefined ? (body.purchase_date || null) : item.purchase_date,
-      floor_price:                body.floor_price                !== undefined ? (body.floor_price !== '' && body.floor_price != null ? round2(body.floor_price) : null) : round2(item.floor_price),
-      buy_it_now_price:           body.buy_it_now_price           !== undefined ? (body.buy_it_now_price !== '' && body.buy_it_now_price != null ? round2(body.buy_it_now_price) : null) : round2(item.buy_it_now_price),
-      buyer_shipping_cost:        body.buyer_shipping_cost        !== undefined ? (body.buyer_shipping_cost !== '' && body.buyer_shipping_cost != null ? round2(body.buyer_shipping_cost) : 0) : (round2(item.buyer_shipping_cost) ?? 0)
+      // T-11 item 1: these three are round2Nullable, not round2. round2 coerces null
+      // to 0 (Number(null) === 0), so any PUT that merely OMITTED one of them
+      // rewrote the column from NULL to 0. A floor_price of 0 means "no price
+      // protection", which is not the same as "not set". This fires constantly:
+      // EditItemModal auto-saves est_shipping_cost on a 500ms keystroke timer
+      // with a partial payload, so one character typed into the shipping field
+      // silently zeroed three unrelated price columns.
+      floor_price:                body.floor_price          !== undefined ? round2Nullable(body.floor_price)          : round2Nullable(item.floor_price),
+      buy_it_now_price:           body.buy_it_now_price     !== undefined ? round2Nullable(body.buy_it_now_price)     : round2Nullable(item.buy_it_now_price),
+      buyer_shipping_cost:        body.buyer_shipping_cost  !== undefined ? round2Nullable(body.buyer_shipping_cost)  : round2Nullable(item.buyer_shipping_cost)
     };
 
     // If platform changed, auto-lookup fees from auction_platforms
@@ -196,6 +221,13 @@ export async function onRequestPut(context) {
       target_margin_pct: updated.target_margin_pct
     });
 
+    // T-10 item 6: when fees consume >=100% of revenue there is no break-even
+    // price. Persisting 0 would read as "free", so the request is rejected and
+    // the reason is returned instead.
+    if (pricing.pricing_error) {
+      return err(pricing.pricing_error, 400);
+    }
+
     // Auto-populate date_listed if status changed to Listed and not already set
     if (updated.status === 'Listed' && !updated.date_listed) {
       updated.date_listed = new Date().toISOString().split('T')[0];
@@ -204,13 +236,26 @@ export async function onRequestPut(context) {
     if (updated.status === 'Sold' && !updated.date_sold) {
       updated.date_sold = new Date().toISOString().split('T')[0];
     }
+    // T-11: leaving Sold clears the sale date. date_sold used to survive a revert,
+    // so an Available item kept a stale sold date - and because the Sold branch
+    // above only auto-stamps when date_sold is empty, the NEXT sale inherited the
+    // old date and skewed days_to_sell and every average built on it.
+    if (item.status === 'Sold' && updated.status !== 'Sold' && body.date_sold === undefined) {
+      updated.date_sold = null;
+    }
 
-    // Compute days on market if status changed to Sold (MED-11: clamped to >= 0 by daysBetween)
+    // Compute days on market if status changed to Sold. T-11 item 8: daysBetween
+    // returns null for an invalid ordering (sale date before listing date), and
+    // that null is persisted. AVG(days_to_sell) ignores NULLs, so a bad date
+    // no longer contributes a phantom zero to the average.
     let days_on_market = item.days_on_market;
     if (updated.status === 'Sold') {
       const from = updated.date_listed || item.date_listed || item.date_acquired;
       const to = updated.date_sold || new Date().toISOString().split('T')[0];
-      days_on_market = daysBetween(from, to) ?? 0;
+      days_on_market = daysBetween(from, to);
+    } else if (item.status === 'Sold') {
+      // Reverted out of Sold: days on market has no meaning without a sale.
+      days_on_market = null;
     }
 
     // Determine actual_sell_price if marking as Sold and no actual_sell_price provided
@@ -331,25 +376,18 @@ export async function onRequestPut(context) {
     ).run();
 
     // Auto-sync Sold Tracker (auction_sales table)
-    if (updated.status === 'Sold') {
+    // T-11 item 6 transition guard: the ONLY sanctioned way out of Sold is the
+    // delete branch below. markItemSold is the only way into Sold.
+    const wasSold = item.status === 'Sold';
+    const isSold = updated.status === 'Sold';
+
+    if (isSold) {
       const saleDate = updated.date_sold || new Date().toISOString().split('T')[0];
       const grossPrice = Number(updated.actual_sell_price) || 0;
       const platformName = updated.platform || item.platform || 'eBay';
       const shippingCost = Number(updated.est_shipping_cost ?? item.est_shipping_cost ?? 0);
-      const feePct = Number(updated.platform_fee_pct ?? item.platform_fee_pct ?? 0.135);
-      const flatFee = Number(updated.platform_flat_fee ?? item.platform_flat_fee ?? 0.40);
-      const daysToSell = days_on_market ?? 0;
-
-      const saleMetrics = computeSaleMetrics({
-        gross_sale_price: grossPrice,
-        buyer_shipping_paid: 0,
-        actual_shipping_cost: shippingCost,
-        platform_fee_pct: feePct,
-        platform_flat_fee: flatFee,
-        payment_processing_amt: 0,
-        promoted_listing_fee: 0,
-        true_total_cost: updated.true_total_cost || item.true_total_cost || 0
-      });
+      const feePct = Number(updated.platform_fee_pct ?? item.platform_fee_pct ?? DEFAULT_PLATFORM_FEE_PCT);
+      const flatFee = Number(updated.platform_flat_fee ?? item.platform_flat_fee ?? DEFAULT_PLATFORM_FLAT_FEE);
 
       await markItemSold(env, payload.userId, { ...item, ...updated, id }, {
         sale_date: saleDate,
@@ -358,14 +396,12 @@ export async function onRequestPut(context) {
         actual_shipping_cost: shippingCost,
         platform_fee_pct: feePct,
         platform_flat_fee: flatFee,
-        platform_fees_amt: saleMetrics.platform_fees_amt,
-        net_proceeds: saleMetrics.net_proceeds,
         true_total_cost: updated.true_total_cost || item.true_total_cost || 0,
-        net_profit: saleMetrics.net_profit,
-        roi_pct: saleMetrics.roi_pct,
-        days_to_sell: daysToSell
+        // T-11 item 8: null (invalid date ordering) is passed through rather
+        // than coerced to 0.
+        days_to_sell: days_on_market ?? null
       });
-    } else if (item.status === 'Sold' && updated.status !== 'Sold') {
+    } else if (wasSold && !isSold) {
       // Reverted away from Sold - remove corresponding sale record to keep Sold Tracker clean
       await env.DB.prepare(
         'DELETE FROM auction_sales WHERE item_id = ? AND user_id = ?'

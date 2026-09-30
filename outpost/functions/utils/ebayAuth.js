@@ -1,16 +1,32 @@
 import { decryptToken, encryptToken } from './tokenCrypto.js';
 
+// Startup-time binding presence log (value is never logged)
+if (typeof console !== 'undefined') {
+  // This module is imported once per isolate warm-up.
+  // We log presence/absence only - never the key value or its length.
+  console.log('[ebayAuth] TOKEN_ENCRYPTION_KEY binding present at module load: will be checked per-call');
+}
+
 /**
  * Retrieves a valid user-level eBay access token directly from D1.
  * Auto-refreshes if within 5min of expiry.
+ *
+ * FAIL-CLOSED: If TOKEN_ENCRYPTION_KEY is not bound, throws an error that maps
+ * to 503 at the handler level. JWT_SECRET is NEVER substituted.
  */
 export async function getEbayUserToken(env, userId) {
   if (!env.DB) throw new Error('DB binding not available');
-  const encKey = env.TOKEN_ENCRYPTION_KEY || (() => {
-    console.error('[getEbayUserToken] TOKEN_ENCRYPTION_KEY not configured - falling back to JWT_SECRET for eBay token encryption. This defeats key separation; configure TOKEN_ENCRYPTION_KEY immediately.');
-    return env.JWT_SECRET;
-  })();
-  if (!encKey) throw new Error('TOKEN_ENCRYPTION_KEY binding not available');
+
+  if (!env.TOKEN_ENCRYPTION_KEY) {
+    console.error('[ebayAuth] FATAL: TOKEN_ENCRYPTION_KEY is not bound. eBay integration unavailable.');
+    throw Object.assign(
+      new Error('eBay integration is temporarily unavailable due to a server configuration issue. Please contact support.'),
+      { statusCode: 503 }
+    );
+  }
+  const encKey = env.TOKEN_ENCRYPTION_KEY;
+
+  console.log(`[ebayAuth] TOKEN_ENCRYPTION_KEY binding present: yes`);
 
   const row = await env.DB.prepare(
     'SELECT * FROM ebay_oauth_tokens WHERE user_id = ?'
@@ -26,23 +42,41 @@ export async function getEbayUserToken(env, userId) {
     throw new Error('eBay refresh token has expired. Please reconnect your eBay account in Settings.');
   }
 
-  // Token still valid (>5min remaining)
-  if (accessExp > now + 5 * 60 * 1000) {
-    return decryptToken(row.access_token, encKey, env.JWT_SECRET);
+  // Helper: decrypt and re-encrypt legacy tokens in-place
+  async function decryptAndMigrate(encrypted, column) {
+    const { plaintext, wasLegacy } = await decryptToken(encrypted, encKey);
+    if (wasLegacy && plaintext) {
+      try {
+        const reencrypted = await encryptToken(plaintext, encKey);
+        await env.DB.prepare(
+          `UPDATE ebay_oauth_tokens SET ${column} = ? WHERE user_id = ?`
+        ).bind(reencrypted, userId).run();
+        console.log(`[ebayAuth] Migrated legacy ${column} to v2 envelope for user ${userId}`);
+      } catch (migrateErr) {
+        console.error(`[ebayAuth] Failed to persist migrated ${column}:`, migrateErr);
+        // Non-fatal: continue with the decrypted plaintext
+      }
+    }
+    return plaintext;
   }
 
-  // If token is still not expired, use it
+  // Token still valid (>5min remaining)
+  if (accessExp > now + 5 * 60 * 1000) {
+    return decryptAndMigrate(row.access_token, 'access_token');
+  }
+
+  // If token is still not expired but within 5min window, use it
   if (accessExp > now) {
-    return decryptToken(row.access_token, encKey, env.JWT_SECRET);
+    return decryptAndMigrate(row.access_token, 'access_token');
   }
 
   // Need to refresh
-  const clientId = String(env.EBAY_CLIENT_ID || '').trim().replace(/^['"]+|['"]+$/g, '');
-  const clientSecret = String(env.EBAY_CLIENT_SECRET || '').trim().replace(/^['"]+|['"]+$/g, '');
+  const clientId = String(env.EBAY_CLIENT_ID || '').trim().replace(/^['\"]+|['\"]+$/g, '');
+  const clientSecret = String(env.EBAY_CLIENT_SECRET || '').trim().replace(/^['\"]+|['\"]+$/g, '');
   if (!clientId || !clientSecret) {
     throw new Error('eBay client credentials (EBAY_CLIENT_ID/EBAY_CLIENT_SECRET) not configured in worker environment. Route requests via Central Gateway (techtrekgt.com/api/ebay/*).');
   }
-  const refreshToken = await decryptToken(row.refresh_token, encKey, env.JWT_SECRET);
+  const refreshToken = await decryptAndMigrate(row.refresh_token, 'refresh_token');
   const credentials = btoa(`${clientId}:${clientSecret}`);
 
   const res = await fetch('https://api.ebay.com/identity/v1/oauth2/token', {
@@ -55,9 +89,10 @@ export async function getEbayUserToken(env, userId) {
   });
 
   if (!res.ok) {
-    // If refresh fails but token is still within validity window, return existing
+    // If refresh fails but access token is still within validity window, return existing
     if (accessExp > now) {
-      return decryptToken(row.access_token, encKey, env.JWT_SECRET);
+      const { plaintext } = await decryptToken(row.access_token, encKey);
+      return plaintext;
     }
     const text = await res.text().catch(() => '');
     console.error(`[ebayAuth] eBay token refresh failed (${res.status}):`, text);
@@ -69,7 +104,7 @@ export async function getEbayUserToken(env, userId) {
   const newExpMs = Date.now() + (data.expires_in || 7200) * 1000;
   const newExpIso = new Date(newExpMs).toISOString();
 
-  const encAccess = await encryptToken(newAccessToken, env.TOKEN_ENCRYPTION_KEY || encKey);
+  const encAccess = await encryptToken(newAccessToken, encKey);
 
   await env.DB.prepare(`
     UPDATE ebay_oauth_tokens SET

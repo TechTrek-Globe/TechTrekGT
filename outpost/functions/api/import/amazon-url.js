@@ -1,5 +1,10 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
 import { computePricingFloors, computeItemProration, validateNonNegativeMoney } from '../../utils/auction.js';
+import {
+  DEFAULT_PLATFORM_FEE_PCT,
+  DEFAULT_PLATFORM_FLAT_FEE,
+  DEFAULT_TARGET_MARGIN_PCT
+} from '../../utils/constants.js';
 
 /**
  * POST /api/import/amazon-url
@@ -119,7 +124,7 @@ export async function onRequestPost(context) {
     // --- Fetch user default platform ---
     const plat = await env.DB.prepare(
       `SELECT fee_pct, flat_fee, name FROM auction_platforms WHERE user_id = ? AND is_default = 1 LIMIT 1`
-    ).bind(userId).first() || { name: 'eBay', fee_pct: 0.136, flat_fee: 0.40 };
+    ).bind(userId).first() || { name: 'eBay', fee_pct: DEFAULT_PLATFORM_FEE_PCT, flat_fee: DEFAULT_PLATFORM_FLAT_FEE };
 
     // --- Create invoice ---
     const invoiceId = `inv-${crypto.randomUUID()}`;
@@ -144,7 +149,7 @@ export async function onRequestPost(context) {
       platform_flat_fee: plat.flat_fee || 0,
       platform_fee_pct:  plat.fee_pct  || 0,
       boost_pct:         0,
-      target_margin_pct: 0.20
+      target_margin_pct: DEFAULT_TARGET_MARGIN_PCT
     });
 
     // --- Build legacy notes string (backward compat with comps parser) ---
@@ -183,7 +188,7 @@ export async function onRequestPost(context) {
       'Available', plat.name, plat.fee_pct, plat.flat_fee,
       0, 0,
       pricing.min_sell_price, pricing.suggested_list_price,
-      null, 0.20, today, itemNotes, attributes
+      null, DEFAULT_TARGET_MARGIN_PCT, today, itemNotes, attributes
     ).run();
 
     return ok({

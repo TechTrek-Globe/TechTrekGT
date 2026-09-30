@@ -1,15 +1,20 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
 import { getAllTokensFromRequest } from '../../utils/auth.js';
-import { computePricingFloors, computeItemProration, validateNonNegativeMoney } from '../../utils/auction.js';
+import { computePricingFloors, computeItemProration, validateNonNegativeMoney, validatePercentage } from '../../utils/auction.js';
+import {
+  DEFAULT_PLATFORM_FEE_PCT,
+  DEFAULT_PLATFORM_FLAT_FEE,
+  DEFAULT_TARGET_MARGIN_PCT
+} from '../../utils/constants.js';
 import { generateSku, generateUniqueSku } from '../utils/sku.js';
-import { resolveIntegrationUserId } from '../../utils/apiIntegrations.js';
+import { resolveIntegrationUserId, checkOutpostSecretKey } from '../../utils/apiIntegrations.js';
 
 
 /**
  * POST /api/import/amazon
  *
  * Called by the VineScout chrome extension or any trusted client.
- * Auth: Bearer token stored in users.amazon_api_token
+ * Auth: Bearer token stored in the api_integrations table.
  *
  * Body:
  * {
@@ -31,6 +36,9 @@ export async function onRequestPost(context) {
   const { request, env } = context;
   if (!env.DB) return err('Database binding unavailable', 500);
 
+  // Alert if deprecated shared secret is still bound
+  checkOutpostSecretKey(env);
+
   // --- Auth via Webhook Secret or Bearer API token ---
   const vineScoutAuth = (request.headers.get('X-VineScout-Auth') || '').trim();
   const authHeader = (request.headers.get('Authorization') || '').trim();
@@ -48,7 +56,7 @@ export async function onRequestPost(context) {
   const userId = await resolveIntegrationUserId(token, env);
 
   if (!userId) {
-    return err('Unauthorized: invalid API token or secret', 401);
+    return err('Unauthorized: invalid API token. Create an integration secret in Settings, API Integrations.', 401);
   }
 
   // --- Parse body ---
@@ -112,7 +120,7 @@ export async function onRequestPost(context) {
   // Fetch user default platform
   const plat = await env.DB.prepare(
     `SELECT fee_pct, flat_fee, name FROM auction_platforms WHERE user_id = ? AND is_default = 1 LIMIT 1`
-  ).bind(userId).first() || { name: 'eBay', fee_pct: 0.136, flat_fee: 0.40 };
+  ).bind(userId).first() || { name: 'eBay', fee_pct: DEFAULT_PLATFORM_FEE_PCT, flat_fee: DEFAULT_PLATFORM_FLAT_FEE };
 
   // Check if item already exists by ASIN or Order ID to prevent duplicate inventory
   const existingItem = await env.DB.prepare(`
@@ -138,7 +146,7 @@ export async function onRequestPost(context) {
     platform_flat_fee:  plat.flat_fee || 0,
     platform_fee_pct:   plat.fee_pct  || 0,
     boost_pct:          0,
-    target_margin_pct:  0.15
+    target_margin_pct:  DEFAULT_TARGET_MARGIN_PCT
   });
 
   // Build legacy notes string (kept for backward compat with existing comps parser)
@@ -224,7 +232,7 @@ export async function onRequestPost(context) {
     'Available', plat.name, plat.fee_pct, plat.flat_fee,
     0, 0,
     pricing.min_sell_price, pricing.suggested_list_price,
-    null, 0.15, today, itemNotes, attributes, itemSku
+    null, DEFAULT_TARGET_MARGIN_PCT, today, itemNotes, attributes, itemSku
   ).run();
 
   return ok({ success: true, item_id: itemId, sku: itemSku, invoice_ref: invoiceRef }, 201);

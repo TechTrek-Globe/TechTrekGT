@@ -4,6 +4,11 @@ import {
   Sparkles, ClipboardPaste
 } from 'lucide-react';
 import { createInvoice, fetchAmazonProduct } from '../utils/auctionApi';
+import {
+  DEFAULT_PLATFORM_FEE_PCT,
+  DEFAULT_PLATFORM_FLAT_FEE,
+  DEFAULT_TARGET_MARGIN_PCT
+} from '../../functions/utils/constants.js';
 import { parseAmazonProductContent } from '../utils/amazonParser';
 
 const CATEGORIES = [
@@ -64,7 +69,7 @@ export function AmazonItemModal({ isOpen, platforms = [], onClose, onCreated }) 
 
   const defaultPlatform = (platforms || []).find(p => p.is_default)
     || (platforms || [])[0]
-    || { name: 'eBay', fee_pct: 0.136, flat_fee: 0.40 };
+    || { name: 'eBay', fee_pct: DEFAULT_PLATFORM_FEE_PCT, flat_fee: DEFAULT_PLATFORM_FLAT_FEE };
 
   // Parse ASIN & Order ID whenever input changes
   useEffect(() => {
@@ -210,7 +215,7 @@ export function AmazonItemModal({ isOpen, platforms = [], onClose, onCreated }) 
           platform_flat_fee: defaultPlatform.flat_fee || 0,
           est_shipping_cost: 0,
           boost_pct: 0,
-          target_margin_pct: 0.15,
+          target_margin_pct: DEFAULT_TARGET_MARGIN_PCT,
           status: 'Available',
           notes: noteParts.join(' | ') || 'Imported from Amazon',
           best_listing_window: ''

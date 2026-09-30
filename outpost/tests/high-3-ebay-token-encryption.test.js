@@ -10,7 +10,8 @@ import {
   encryptToken,
   decryptToken,
   OLD_SALT,
-  NEW_SALT
+  NEW_SALT,
+  PBKDF2_ITERATIONS_V1
 } from '../functions/utils/tokenCrypto.js';
 import { getEbayUserToken } from '../functions/utils/ebayAuth.js';
 import { getEbayUserToken as getEbayUserTokenHelper } from '../functions/api/ebay/tokenHelper.js';
@@ -77,31 +78,32 @@ describe('[HIGH-3] eBay OAuth Token Encryption Key Isolation', () => {
     assert.ok(encrypted.includes('.'));
 
     // Decrypting with NEW key succeeds
-    const decrypted = await decryptToken(encrypted, TEST_TOKEN_ENCRYPTION_KEY);
+    const { plaintext: decrypted } = await decryptToken(encrypted, TEST_TOKEN_ENCRYPTION_KEY);
     assert.strictEqual(decrypted, rawPlaintext);
 
-    // Decrypting with OLD key derivation (JWT_SECRET) fails to decrypt
+    // Decrypting with wrong key fails to decrypt
     await assert.rejects(
       async () => {
         await decryptToken(encrypted, TEST_JWT_SECRET);
       },
-      /Failed to decrypt token/
+      /Failed to decrypt/
     );
   });
 
   test('decryptToken supports transition window for legacy tokens', async () => {
     const legacyPlaintext = 'legacy_refresh_token_value_abc_xyz';
 
-    // Legacy encryption: OLD_SALT + JWT_SECRET
-    const oldKey = await deriveKey(TEST_JWT_SECRET, OLD_SALT);
+    // Legacy encryption: OLD_SALT + TOKEN_ENCRYPTION_KEY (100k iterations)
+    const oldKey = await deriveKey(TEST_TOKEN_ENCRYPTION_KEY, OLD_SALT, PBKDF2_ITERATIONS_V1);
     const iv = crypto.getRandomValues(new Uint8Array(12));
     const encoded = new TextEncoder().encode(legacyPlaintext);
     const cipherBuf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, oldKey, encoded);
     const legacyEncrypted = `${btoa(String.fromCharCode(...new Uint8Array(iv)))}.${btoa(String.fromCharCode(...new Uint8Array(cipherBuf)))}`;
 
-    // Transition decrypt: primary key is TOKEN_ENCRYPTION_KEY, fallback is JWT_SECRET
-    const decrypted = await decryptToken(legacyEncrypted, TEST_TOKEN_ENCRYPTION_KEY, TEST_JWT_SECRET);
+    // Transition decrypt: primary key is TOKEN_ENCRYPTION_KEY
+    const { plaintext: decrypted, wasLegacy } = await decryptToken(legacyEncrypted, TEST_TOKEN_ENCRYPTION_KEY);
     assert.strictEqual(decrypted, legacyPlaintext);
+    assert.strictEqual(wasLegacy, true);
   });
 
   test('getEbayUserToken decrypts and returns tokens using ONLY TOKEN_ENCRYPTION_KEY', async () => {
@@ -138,8 +140,8 @@ describe('[HIGH-3] eBay OAuth Token Encryption Key Isolation', () => {
     const legacyAccess = 'v^1.1#legacy_access_token_prior_to_migration';
     const legacyRefresh = 'v^1.1#legacy_refresh_token_prior_to_migration';
 
-    // Simulate pre-existing row in D1 encrypted with JWT_SECRET and OLD_SALT
-    const oldKey = await deriveKey(TEST_JWT_SECRET, OLD_SALT);
+    // Simulate pre-existing row in D1 encrypted with TOKEN_ENCRYPTION_KEY and OLD_SALT
+    const oldKey = await deriveKey(TEST_TOKEN_ENCRYPTION_KEY, OLD_SALT, PBKDF2_ITERATIONS_V1);
     const ivA = crypto.getRandomValues(new Uint8Array(12));
     const cipherA = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: ivA }, oldKey, new TextEncoder().encode(legacyAccess));
     const legacyEncAccess = `${btoa(String.fromCharCode(...new Uint8Array(ivA)))}.${btoa(String.fromCharCode(...new Uint8Array(cipherA)))}`;
@@ -158,8 +160,8 @@ describe('[HIGH-3] eBay OAuth Token Encryption Key Isolation', () => {
 
     // Perform migration logic:
     // 1. Decrypt with OLD key derivation
-    const decryptedAccess = await decryptToken(legacyEncAccess, TEST_TOKEN_ENCRYPTION_KEY, TEST_JWT_SECRET);
-    const decryptedRefresh = await decryptToken(legacyEncRefresh, TEST_TOKEN_ENCRYPTION_KEY, TEST_JWT_SECRET);
+    const { plaintext: decryptedAccess } = await decryptToken(legacyEncAccess, TEST_TOKEN_ENCRYPTION_KEY);
+    const { plaintext: decryptedRefresh } = await decryptToken(legacyEncRefresh, TEST_TOKEN_ENCRYPTION_KEY);
     assert.strictEqual(decryptedAccess, legacyAccess);
     assert.strictEqual(decryptedRefresh, legacyRefresh);
 

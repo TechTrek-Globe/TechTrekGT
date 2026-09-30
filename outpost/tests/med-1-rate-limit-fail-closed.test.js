@@ -260,8 +260,8 @@ describe('[MED-1] Rate limiter failClosed support and brute-force protection', (
     });
   });
 
-  describe('Lower-risk endpoints maintain fail-open default', () => {
-    test('POST /api/auth/security-question fails open (allows request) when RATE_LIMIT_KV is null', async () => {
+  describe('PERF-007: Auth-adjacent endpoints fail closed', () => {
+    test('POST /api/auth/security-question fails closed (returns 429) when RATE_LIMIT_KV is null', async () => {
       const req = new Request('https://techtrekgt.com/api/auth/security-question', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': '198.51.100.7' },
@@ -271,10 +271,9 @@ describe('[MED-1] Rate limiter failClosed support and brute-force protection', (
       const env = { DB: mockDb, JWT_SECRET: TEST_JWT_SECRET, RATE_LIMIT_KV: null };
       const res = await securityQuestionPost({ request: req, env });
 
-      assert.notStrictEqual(res.status, 429);
-      assert.strictEqual(res.status, 200);
+      assert.strictEqual(res.status, 429);
       const body = await res.json();
-      assert.strictEqual(body.securityQuestion, testUser.securityQuestion);
+      assert.ok(body.error);
     });
 
     test('POST /api/auth/update-profile fails open (allows request) when RATE_LIMIT_KV is null', async () => {

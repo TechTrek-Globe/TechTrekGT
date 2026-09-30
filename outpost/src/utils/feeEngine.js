@@ -5,7 +5,8 @@
  * net profit, ROI, and margin health tiers.
  */
 
-import { round2 } from './formulaPreview.js';
+import { round2, computePricingFloors } from '../../functions/utils/auction.js';
+import { DEFAULT_PLATFORM_FEE_PCT, DEFAULT_PLATFORM_FLAT_FEE, DEFAULT_TARGET_MARGIN_PCT } from '../../functions/utils/constants.js';
 
 export function round(val, decimals = 2) {
   if (val == null || isNaN(Number(val))) return 0;
@@ -93,8 +94,8 @@ export function computeFeeBreakdown(params = {}) {
   // Platform fees
   const platformFeePct = params.platform_fee_pct != null
     ? normalizeRateDecimal(params.platform_fee_pct)
-    : 0.1325; // Default eBay ~13.25%
-  const platformFlatFee = Number(params.platform_flat_fee ?? 0.40) || 0;
+    : DEFAULT_PLATFORM_FEE_PCT; // T-10 item 3: one fee default, no inline 13.25
+  const platformFlatFee = Number(params.platform_flat_fee ?? DEFAULT_PLATFORM_FLAT_FEE) || 0;
 
   // Promoted listing rate
   const rawPromoted = params.ebay_promoted_rate ?? params.boost_pct ?? 0;
@@ -133,19 +134,28 @@ export function computeFeeBreakdown(params = {}) {
   // Shipping net margin (profit/loss on shipping charge vs label cost)
   const shippingNet = round(shippingCharged - shippingCost);
 
-  // Break-even floor price calculation
-  const totalVariableRate = platformFeePct + promotedDecimal + paymentProcessingPct;
-  const retentionDivisor = 1 - totalVariableRate;
-  
-  // Shipping revenue kept after platform fees are applied to the buyer's shipping charge
-  const shippingRevenueKept = shippingCharged * (1 - (platformFeePct + paymentProcessingPct));
-  
-  // Total fixed costs to cover minus the shipping revenue we keep
-  const fixedCostNumerator = cogs + shippingCost + platformFlatFee - shippingRevenueKept;
-  
-  const breakEvenFloor = retentionDivisor > 0
-    ? Math.max(0, round(fixedCostNumerator / retentionDivisor))
-    : 0;
+  // Break-even floor price.
+  //
+  // T-10 item 1/5: THIS NOW CALLS THE SHARED FORMULA. The old inline version
+  // subtracted shippingCharged * (1 - fee - processing) from the numerator and
+  // added a payment-processing rate to the divisor, so the number the grid
+  // showed was never the number the server persisted in min_sell_price.
+  // Business rule (documented on computePricingFloors): buyer-paid shipping
+  // does NOT offset the floor.
+  //
+  // This value is a WHAT-IF PREVIEW at the currently-entered price inputs. The
+  // authoritative floor shown in the floor_price column is the server's
+  // min_sell_price; see InventoryContext / InventoryDataGrid.
+  const floorCalc = computePricingFloors({
+    true_total_cost: cogs,
+    est_shipping_cost: shippingCost,
+    platform_flat_fee: platformFlatFee,
+    platform_fee_pct: platformFeePct,
+    boost_pct: promotedDecimal,
+    target_margin_pct: 0
+  });
+  const breakEvenFloor = floorCalc.min_sell_price ?? 0;
+  const floorPricingError = floorCalc.pricing_error;
 
   return {
     sellPrice,
@@ -170,7 +180,8 @@ export function computeFeeBreakdown(params = {}) {
     roiPct,
     marginPct,
     marginHealth,
-    breakEvenFloor
+    breakEvenFloor,
+    floorPricingError
   };
 }
 
@@ -179,11 +190,11 @@ export function computeFeeBreakdown(params = {}) {
  */
 export function computeTargetPriceFromMargin(
   cogs,
-  targetMarginPct = 0.15,
-  platformFeePct = 0.1325,
+  targetMarginPct = DEFAULT_TARGET_MARGIN_PCT,
+  platformFeePct = DEFAULT_PLATFORM_FEE_PCT,
   promotedRate = 0,
   shippingCost = 0,
-  flatFee = 0.40,
+  flatFee = DEFAULT_PLATFORM_FLAT_FEE,
   shippingCharged = 0
 ) {
   const promDec = normalizeRateDecimal(promotedRate);

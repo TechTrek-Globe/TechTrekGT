@@ -30,17 +30,34 @@ export function generateIntegrationSecret() {
 }
 
 /**
+ * Alerts operators if the deprecated OUTPOST_SECRET_KEY binding is still
+ * provisioned. Should be called once at the start of each consuming endpoint.
+ * @param {Record<string, any>} env
+ */
+export function checkOutpostSecretKey(env) {
+  if (env?.OUTPOST_SECRET_KEY) {
+    console.error('[SECURITY] OUTPOST_SECRET_KEY is still bound in this environment. '
+      + 'This deprecated shared secret has been removed from the authentication flow. '
+      + 'Any client presenting it will receive 401 Unauthorized. '
+      + 'Unset it with: wrangler secret delete OUTPOST_SECRET_KEY');
+  }
+}
+
+/**
  * Resolves the authenticated user_id associated with a presented token or secret.
  *
  * Evaluation Order:
- * 1. api_integrations table lookup by SHA-256 secret_hash.
+ * 1. Signed JWT session token (via JWT_SECRET).
+ * 2. api_integrations table lookup by SHA-256 secret_hash.
  *    - If record found and revoked_at IS NOT NULL -> explicitly revoked (returns null).
  *    - If record found and revoked_at IS NULL -> returns user_id directly.
- * 2. users.amazon_api_token lookup (legacy per-user extension token).
- * 3. Migration fallback: env.OUTPOST_SECRET_KEY match resolves oldest user in DB.
+ * 3. users.amazon_api_token_hash lookup (legacy hashed per-user extension token).
+ *
+ * NOTE: Plaintext amazon_api_token and shared OUTPOST_SECRET_KEY fallbacks
+ * have been REMOVED. Any client relying on these will receive 401.
  *
  * @param {string} rawToken - Presented token / header value
- * @param {Record<string, any>} env - Cloudflare Worker environment (DB, OUTPOST_SECRET_KEY)
+ * @param {Record<string, any>} env - Cloudflare Worker environment (DB, JWT_SECRET)
  * @returns {Promise<string|null>} - Resolved user_id or null
  */
 export async function resolveIntegrationUserId(rawToken, env) {
@@ -67,7 +84,7 @@ export async function resolveIntegrationUserId(rawToken, env) {
       ).bind(secretHash).first();
 
       if (integration) {
-        // If revoked, explicitly reject - do NOT fall through to fallback
+        // If revoked, explicitly reject
         if (integration.revoked_at) {
           return null;
         }
@@ -77,7 +94,7 @@ export async function resolveIntegrationUserId(rawToken, env) {
       }
     }
 
-    // 2. Hashed lookup against users.amazon_api_token_hash (HIGH-4)
+    // 2. Hashed lookup against users.amazon_api_token_hash (legacy migration)
     if (secretHash) {
       try {
         const user = await env.DB.prepare(
@@ -89,19 +106,6 @@ export async function resolveIntegrationUserId(rawToken, env) {
         }
       } catch (_) {
         // Column amazon_api_token_hash might not exist in unmigrated test fixtures
-      }
-
-      // Also support legacy/plaintext amazon_api_token matching hash or raw token
-      try {
-        const user = await env.DB.prepare(
-          'SELECT id FROM users WHERE amazon_api_token = ? OR amazon_api_token = ? LIMIT 1'
-        ).bind(secretHash, token).first();
-
-        if (user?.id) {
-          return user.id;
-        }
-      } catch (_) {
-        // Column amazon_api_token might not exist in unmigrated test fixtures
       }
     }
   }

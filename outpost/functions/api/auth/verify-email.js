@@ -6,7 +6,7 @@ async function handleVerification(context, token, rememberMe = false) {
 
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
   const ipRlKey = `verify-email:${ip}`;
-  const ipLimit = await checkRateLimit(env.RATE_LIMIT_KV, ipRlKey, 15, 60);
+  const ipLimit = await checkRateLimit(env.RATE_LIMIT_KV, ipRlKey, 15, 60, true, env.RATE_LIMIT_DO);
 
   if (!ipLimit.allowed) {
     return new Response(JSON.stringify({ error: 'Too many verification attempts. Please wait.' }), {
@@ -92,7 +92,7 @@ async function handleVerification(context, token, rememberMe = false) {
 
     const maxAge = rememberMe ? 30 * 24 * 3600 : 7200;
     const authToken = await createToken(
-      { userId: user.id, email: user.email, name: user.name },
+      { userId: user.id, tv: user.token_version ?? 1 },
       env.JWT_SECRET,
       maxAge
     );

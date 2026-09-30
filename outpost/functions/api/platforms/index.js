@@ -1,8 +1,18 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
-import { validateNonNegativeMoney } from '../../utils/auction.js';
+import { validateNonNegativeMoney, validatePercentage } from '../../utils/auction.js';
+import {
+  DEFAULT_PLATFORM_FEE_PCT,
+  DEFAULT_PLATFORM_FLAT_FEE,
+  ITEM_STATUSES
+} from '../../utils/constants.js';
 import { DEFAULT_PLATFORMS } from '../../utils/platforms.js';
 
-export { DEFAULT_PLATFORMS };
+export {
+  DEFAULT_PLATFORMS,
+  DEFAULT_PLATFORM_FEE_PCT,
+  DEFAULT_PLATFORM_FLAT_FEE,
+  ITEM_STATUSES
+};
 
 /**
  * GET /api/platforms - list platforms for current user
@@ -70,8 +80,9 @@ export async function onRequestPost(context) {
     let parsedFeePct;
     let parsedFlatFee;
     try {
-      parsedFeePct = validateNonNegativeMoney(fee_pct, 'fee_pct') ?? 0;
-      parsedFlatFee = validateNonNegativeMoney(flat_fee, 'flat_fee') ?? 0;
+      // T-10 item 7: fee_pct is a FRACTION in [0,1); flat_fee is bounded.
+      parsedFeePct = validatePercentage(fee_pct, 'fee_pct') ?? 0;
+      parsedFlatFee = validateNonNegativeMoney(flat_fee, 'flat_fee', 1000) ?? 0;
     } catch (e) {
       return err(e.message, 400);
     }

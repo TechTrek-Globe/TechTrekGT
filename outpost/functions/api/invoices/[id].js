@@ -1,5 +1,6 @@
 import { requireAuth, withAuth, ok, err, isValidPrefixedId } from '../../utils/guard.js';
 import { computeItemProration, computePricingFloors, validateNonNegativeMoney } from '../../utils/auction.js';
+import { CHUNK_SIZE } from '../../utils/constants.js';
 
 // ============================================================
 // GET    /api/invoices/:id  - get single invoice with items

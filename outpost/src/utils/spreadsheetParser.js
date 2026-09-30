@@ -1,4 +1,9 @@
 import { round2 } from './formulaPreview.js';
+import {
+  DEFAULT_PLATFORM_FEE_PCT,
+  DEFAULT_PLATFORM_FLAT_FEE,
+  DEFAULT_TARGET_MARGIN_PCT
+} from '../../functions/utils/constants.js';
 
 /**
  * Convert Excel serial date or date string to YYYY-MM-DD string
@@ -432,7 +437,7 @@ export async function parseAuctionWorkbook(buffer) {
         true_total_cost: trueCost,
         status: String(rawStatus || 'Available').trim(),
         platform: String(rawPlatform || 'eBay').trim(),
-        platform_fee_pct: parseCleanNumber(getRowValue(row, invHeaderMap, ['platformfeepct', 'platformfee']), 0.136),
+        platform_fee_pct: parseCleanNumber(getRowValue(row, invHeaderMap, ['platformfeepct', 'platformfee']), DEFAULT_PLATFORM_FEE_PCT),
         platform_flat_fee: parseCleanNumber(getRowValue(row, invHeaderMap, ['platformflatfee']), 0.40),
         est_shipping_cost: parseCleanNumber(getRowValue(row, invHeaderMap, ['estshippingcost', 'estshipping']), 6.50),
         boost_pct: parseCleanNumber(getRowValue(row, invHeaderMap, ['boostpct', 'boost']), 0),
@@ -440,7 +445,7 @@ export async function parseAuctionWorkbook(buffer) {
         suggested_list_price: parseCleanNumber(getRowValue(row, invHeaderMap, ['suggestedlistprice']), 0),
         current_list_price: parseCleanNumber(getRowValue(row, invHeaderMap, ['currentlistprice']), null),
         actual_sell_price: parseCleanNumber(getRowValue(row, invHeaderMap, ['actualsellprice']), null),
-        target_margin_pct: Math.round(parseCleanNumber(getRowValue(row, invHeaderMap, ['marginpcttarget', 'targetmargin']), 0.15) * 10000) / 10000,
+        target_margin_pct: Math.round(parseCleanNumber(getRowValue(row, invHeaderMap, ['marginpcttarget', 'targetmargin']), DEFAULT_TARGET_MARGIN_PCT) * 10000) / 10000,
         date_acquired: dateAcquired,
         date_listed: dateListed,
         date_sold: dateSold,
@@ -512,7 +517,7 @@ export async function parseAuctionWorkbook(buffer) {
           gross_sale_price: gross,
           buyer_shipping_paid: parseCleanNumber(getRowValue(row, salesHeaderMap, ['buyershippingpaid', 'buyershipping']), 0),
           actual_shipping_cost: parseCleanNumber(getRowValue(row, salesHeaderMap, ['actualshippingcost', 'actualshipping']), 0),
-          platform_fee_pct: parseCleanNumber(getRowValue(row, salesHeaderMap, ['platformfeepct', 'platformfee']), 0.136),
+          platform_fee_pct: parseCleanNumber(getRowValue(row, salesHeaderMap, ['platformfeepct', 'platformfee']), DEFAULT_PLATFORM_FEE_PCT),
           platform_flat_fee: parseCleanNumber(getRowValue(row, salesHeaderMap, ['platformflatfee']), 0.40),
           days_to_sell: parseInt(getRowValue(row, salesHeaderMap, ['daystosell']), 10) || null
         });

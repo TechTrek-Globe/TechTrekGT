@@ -8,6 +8,7 @@ import {
 import { ALL_STATUSES, LISTING_FORMATS, LISTING_STATUSES } from '../../utils/constants';
 import { LiveFeeReadout } from './LiveFeeReadout';
 import { computeTargetPriceFromMargin } from '../../utils/feeEngine';
+import { DEFAULT_PLATFORM_FEE_PCT, DEFAULT_PLATFORM_FLAT_FEE } from '../../../functions/utils/constants.js';
 import { fmtCurrency, formatPercent } from '../../utils/formulaPreview';
 import { MarginHealthBadge } from '../inventory/MarginHealthBadge';
 
@@ -42,7 +43,7 @@ export function EditTabListingPricing({
   // Compute suggested target price from target margin
   const cogs = parseFloat(form.true_total_cost) || parseFloat(form.unit_price) || 0;
   const targetMarginPct = (parseFloat(form.target_margin_pct) || 15) / 100;
-  const platformFeePct = (parseFloat(form.platform_fee_pct) || 13.5) / 100;
+  const platformFeePct = (parseFloat(form.platform_fee_pct) || DEFAULT_PLATFORM_FEE_PCT * 100) / 100;
   const promotedRate = parseFloat(form.ebay_promoted_rate) || 0;
   const shippingCost = parseFloat(form.est_shipping_cost) || 0;
   const flatFee = parseFloat(form.platform_flat_fee) || 0.40;

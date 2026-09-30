@@ -3,22 +3,52 @@
  * All formulas are direct translations of the Excel spreadsheet logic.
  */
 
-// MED-10: (Number(val) || 0) is intentional for formatting/rounding to 2 decimals.
-// Direct monetary write inputs are guarded upstream by validateNonNegativeMoney (MED-7).
-// Here, undefined/null/empty/0 safely coalesce to 0.00 without throwing or returning NaN.
+// T-08: sales.js holds ALL auction_sales write SQL plus the SaleRecord alias
+// map. It imports computeSaleMetrics/daysBetween back from this module. The
+// cycle is safe because both sides export hoisted function declarations that
+// are only invoked at call time, never during module evaluation.
+import { normalizeSaleInput, upsertSale } from './sales.js';
+
 // LOW-5: Shared currency rounding helper. Centralizes floating-point rounding. Candidate for future integer-cents migration.
+//
+// WARNING (T-11 item 3): round2 COERCES null/undefined/'' to 0, because
+// Number(null) === 0. Use it for display formatting only. For any value
+// persisted into a database column, use round2Nullable instead, so that a
+// genuine NULL is not silently rewritten as 0.
 export const round2 = (val) => Math.round((Number(val) || 0) * 100) / 100;
 
 /**
+ * round2Nullable - rounding helper SAFE FOR PERSISTENCE.
+ *
+ * Returns null for null/undefined/'' and rounds anything else to 2 decimals.
+ * Use this for every monetary value written to a column that is allowed to
+ * hold NULL (floor_price, buy_it_now_price, buyer_shipping_cost, ...).
+ * A price of 0 means "free"; NULL means "not set". Collapsing the two loses
+ * the distinction permanently, because a null-to-zero write cannot be
+ * distinguished from a deliberate zero afterwards.
+ *
+ * @param {any} val
+ * @returns {number|null}
+ */
+export const round2Nullable = (val) =>
+  (val != null && val !== '' && !isNaN(Number(val))) ? round2(val) : null;
+
+/**
  * Validates that a numeric monetary or fee input is a non-negative number.
- * Throws an Error if val is provided and is either NaN or negative.
+ * Throws an Error if val is provided and is NaN, negative, infinite, or above
+ * `max` (default MAX_SAFE_INTEGER).
  * Returns null if val is undefined, null, or empty string.
+ *
+ * T-10 item 7: the upper bound is what makes fee_pct: 1.5 rejectable. Without
+ * it, a 150% platform fee produced a negative pricing divisor and a floor of
+ * 0, which reads as "free" rather than "impossible".
  *
  * @param {any} val
  * @param {string} fieldName
+ * @param {number} [max=Number.MAX_SAFE_INTEGER]
  * @returns {number|null}
  */
-export function validateNonNegativeMoney(val, fieldName = 'Amount') {
+export function validateNonNegativeMoney(val, fieldName = 'Amount', max = Number.MAX_SAFE_INTEGER) {
   if (val === undefined || val === null || val === '') {
     return null;
   }
@@ -26,8 +56,55 @@ export function validateNonNegativeMoney(val, fieldName = 'Amount') {
     throw new Error(`${fieldName} must be a non-negative number`);
   }
   const n = Number(val);
-  if (isNaN(n) || n < 0) {
-    throw new Error(`${fieldName} must be a non-negative number`);
+  if (isNaN(n) || !isFinite(n) || n < 0 || Math.abs(n) > Number.MAX_SAFE_INTEGER || n > max) {
+    const bound = max === Number.MAX_SAFE_INTEGER ? '' : ` and at most ${max}`;
+    throw new Error(`${fieldName} must be a non-negative number${bound}`);
+  }
+  return n;
+}
+
+/**
+ * Validates a percentage expressed as a FRACTION in the range [0, 1).
+ *
+ * T-10 item 7: fee percentages, boost percentages and margins are all stored
+ * as fractions. A value of 1.5 means 150%, which is not a real fee; accepting
+ * it is what allowed the pricing formula to divide by a negative number.
+ * 1 is excluded because a 100% take rate leaves no revenue to recover cost
+ * from - the pricing floor is undefined, not zero.
+ *
+ * @param {any} val
+ * @param {string} fieldName
+ * @returns {number|null}
+ */
+export function validatePercentage(val, fieldName = 'Percentage') {
+  const n = validateNonNegativeMoney(val, fieldName, 0.999999);
+  if (n === null) return null;
+  if (n >= 1) {
+    throw new Error(`${fieldName} must be a fraction between 0 and 1 (e.g. 0.15 for 15%), not ${n}`);
+  }
+  return n;
+}
+
+/**
+ * Validates that a numeric monetary or profit/loss input is a valid signed number.
+ * Allows negative numbers (for loss-making sales, negative margins, net proceeds).
+ * Throws an Error if val is provided and is either NaN, boolean, infinite, or exceeds MAX_SAFE_INTEGER.
+ * Returns null if val is undefined, null, or empty string.
+ *
+ * @param {any} val
+ * @param {string} fieldName
+ * @returns {number|null}
+ */
+export function validateSignedMoney(val, fieldName = 'Amount') {
+  if (val === undefined || val === null || val === '') {
+    return null;
+  }
+  if (typeof val === 'boolean') {
+    throw new Error(`${fieldName} must be a valid number`);
+  }
+  const n = Number(val);
+  if (isNaN(n) || !isFinite(n) || Math.abs(n) > Number.MAX_SAFE_INTEGER) {
+    throw new Error(`${fieldName} must be a valid number`);
   }
   return n;
 }
@@ -36,15 +113,34 @@ export function validateNonNegativeMoney(val, fieldName = 'Amount') {
  * Computes all proration fields for a single item given its invoice totals.
  * - Spreadsheet: Proration Weight = Item Base Total / Invoice Base Total
  *
- * @param {{ unit_price: number, item_base_total: number }} item
+ * ZERO-BASE-TOTAL RULE (T-11 item 7): when base_total is 0 the invoice cannot
+ * be apportioned by value, so the discount, shipping and tax are distributed
+ * EVENLY at 1/N across the invoice's items. This is the real Amazon Vine case:
+ * ETV is $0, so base_total is 0, but the seller still paid shipping and tax.
+ * The previous `weight = 0` silently discarded all three, understating landed
+ * cost for every item on the invoice.
+ *
+ * `itemCount` is the number of items on the invoice. Callers that know it MUST
+ * pass it. When it is unknown the legacy weight-0 behaviour is retained rather
+ * than guessing a divisor.
+ *
+ * @param {{ unit_price: number, item_base_total?: number }} item
  * @param {{ base_total: number, discount: number, shipping: number, tax: number }} invoice
+ * @param {number} [itemCount] - number of items sharing this invoice
  * @returns {{ proration_weight: number, prorated_discount: number, prorated_shipping: number, prorated_tax: number, true_total_cost: number }}
  */
-export function computeItemProration(item, invoice) {
+export function computeItemProration(item, invoice, itemCount = 0) {
   // MED-10: invoice.base_total and item.unit_price are validated non-negative upstream (MED-7).
-  // If base_total is 0 (e.g. invoice with all $0 acquisition items), weight safely defaults to 0.
   const base = invoice.base_total || 0;
-  const weight = base > 0 ? (item.unit_price || 0) / base : 0;
+  let weight;
+  if (base > 0) {
+    weight = (item.unit_price || 0) / base;
+  } else if (itemCount > 0) {
+    // Even split; see ZERO-BASE-TOTAL RULE above.
+    weight = 1 / itemCount;
+  } else {
+    weight = 0;
+  }
 
   // MED-10: Optional invoice adjustments (discount, shipping, tax) legitimately default to 0
   // when omitted or zero on the invoice; non-zero values are validated non-negative upstream.
@@ -80,9 +176,10 @@ export function computeItemProration(item, invoice) {
  * @returns {Array<Object>}
  */
 export function reprorateBatch(items, invoice) {
+  // Pass the roster size so a zero-base invoice still splits evenly.
   return items.map(item => ({
     ...item,
-    ...computeItemProration(item, invoice)
+    ...computeItemProration(item, invoice, items.length)
   }));
 }
 
@@ -133,27 +230,60 @@ export function computeSaleMetrics(sale) {
 }
 
 /**
- * Computes minimum sell price and suggested list price.
- * - Min Sell = (True Cost + Est Shipping + Flat Fee) / (1 - Fee % - Boost %)
- * - Suggested List = Min Sell * (1 + Target Margin %)
+ * THE pricing formula. Server and client both call this exact implementation.
  *
- * @param {{ true_total_cost: number, est_shipping_cost: number, platform_flat_fee: number, platform_fee_pct: number, boost_pct: number, target_margin_pct: number }} item
- * @returns {{ min_sell_price: number, suggested_list_price: number }}
+ *   min_sell_price      = (true_total_cost + est_shipping_cost + platform_flat_fee)
+ *                         / (1 - platform_fee_pct - boost_pct)
+ *   suggested_list_price = min_sell_price * (1 + target_margin_pct)
+ *
+ * BUSINESS RULE - buyer-paid shipping does NOT offset the floor (T-10 item 1).
+ * Decided once, here, and implemented once. Rationale: the floor answers "at
+ * what price does this sale stop losing money". If the buyer pays $8 shipping,
+ * the seller still has to buy a $6 label; netting one against the other hides
+ * the cash the seller must front before the order arrives, and it makes the
+ * floor depend on a value (buyer shipping) that is frequently unknown at
+ * pricing time. The previous feeEngine variant subtracted
+ * shippingCharged * (1 - fee - processing) from the numerator and added a
+ * payment-processing rate to the divisor, so the two implementations disagreed
+ * for every item with buyer shipping and the grid showed a floor the server
+ * never computed. This is now the only formula.
+ *
+ * INVALID INPUT (T-10 item 6): when the divisor is non-positive (fees
+ * consuming 100% or more of revenue) there is no price that breaks even.
+ * Returning 0 read as "free"; this returns null plus a pricing_error the
+ * caller can surface, and callers must not persist a floor in that case.
+ *
+ * @param {{ true_total_cost?: number, est_shipping_cost?: number,
+ *           platform_flat_fee?: number, platform_fee_pct?: number,
+ *           boost_pct?: number, target_margin_pct?: number }} item
+ * @returns {{ min_sell_price: number|null, suggested_list_price: number|null,
+ *             pricing_error: string|null, fee_divisor: number }}
  */
 export function computePricingFloors(item) {
   // MED-10: platform_fee_pct and boost_pct default to 0 if not configured.
   const divisor = 1 - (item.platform_fee_pct || 0) - (item.boost_pct || 0);
+
+  if (divisor <= 0) {
+    return {
+      min_sell_price: null,
+      suggested_list_price: null,
+      pricing_error:
+        `Platform fee plus promoted-listing boost (${round2((item.platform_fee_pct || 0) * 100)}% + ${round2((item.boost_pct || 0) * 100)}%) ` +
+        'consumes 100% or more of the sale price, so no break-even price exists. ' +
+        'Reduce the platform fee or the ad boost.',
+      fee_divisor: divisor
+    };
+  }
+
   // MED-10: est_shipping_cost and platform_flat_fee default to 0 if not applicable.
   // true_total_cost safely defaults to 0 for un-costed drafts or $0 acquisition items.
   const costBasis = (item.true_total_cost || 0) + (item.est_shipping_cost || 0) + (item.platform_flat_fee || 0);
-  const min_sell_price = divisor > 0
-    ? round2(costBasis / divisor)
-    : 0;
+  const min_sell_price = round2(costBasis / divisor);
 
   // MED-10: target_margin_pct defaults to 0 (no markup) if omitted.
   const suggested_list_price = round2(min_sell_price * (1 + (item.target_margin_pct || 0)));
 
-  return { min_sell_price, suggested_list_price };
+  return { min_sell_price, suggested_list_price, pricing_error: null, fee_divisor: divisor };
 }
 
 /**
@@ -187,8 +317,14 @@ export function computeRecommendedListPrice(min_sell_price, manual_avg, live_avg
 }
 
 /**
- * Returns days between two ISO date strings (or null if either is missing or invalid).
- * Clamps negative results to 0 when toDate precedes fromDate (MED-11).
+ * Returns days between two ISO date strings.
+ *
+ * T-11 item 8: returns null when either date is missing/unparseable OR when the
+ * ordering is invalid (toDate precedes fromDate). It no longer clamps a negative
+ * span to 0. A clamp turns a data-entry error into a real measurement: the sale
+ * would land in AVG(days_to_sell) as a genuine "sold same day", quietly pulling
+ * the portfolio average down and hiding the bad date from the user. Callers
+ * persist the null, which AVG ignores, and the warning tells the operator.
  *
  * @param {string|null} fromDate
  * @param {string|null} toDate
@@ -203,8 +339,11 @@ export function daysBetween(fromDate, toDate) {
   const ms = toTime - fromTime;
   const days = Math.floor(ms / (1000 * 60 * 60 * 24));
   if (days < 0) {
-    console.warn(`[daysBetween] Clamped negative days (${days}) to 0 for fromDate: "${fromDate}", toDate: "${toDate}"`);
-    return 0;
+    console.warn(
+      `[daysBetween] Invalid ordering: toDate "${toDate}" precedes fromDate "${fromDate}" ` +
+      `(would be ${days} days). Returning null so the sale is excluded from avg_days_to_sell.`
+    );
+    return null;
   }
   return days;
 }
@@ -273,235 +412,20 @@ export function cleanItemDescription(itemName, athletePerson, authenticator) {
 
 /**
  * Shared helper for upserting an auction_sales record when an item is marked Sold.
- * Prevents drift across reconcileAndSaveEbaySale, items/[id].js PUT, and sync/vinescout-catalog.js POST.
- * Uses atomic ON CONFLICT(item_id) DO UPDATE with try/catch UPDATE fallback for race safety.
+ *
+ * T-08: this is now a thin delegate. All alias mapping and ALL auction_sales
+ * write SQL live in utils/sales.js (normalizeSaleInput + upsertSale), which is
+ * the only module allowed to write that table. Kept as a named export because
+ * four call sites (items PUT, tokenHelper reconcile, vinescout-catalog,
+ * sales POST) read better with this signature than with normalize+upsert.
  *
  * @param {object} env - Cloudflare Worker environment with DB binding
- * @param {string} userId - User ID
+ * @param {string} userId - User ID (REQUIRED; never derived from ambient context)
  * @param {object} item - auction_items row
- * @param {object} saleFields - Sale details (sale_date, gross_sale_price, platform, buyer_handle, etc.)
+ * @param {object} saleFields - Raw sale input; aliases documented in normalizeSaleInput
  * @returns {Promise<object>} The persisted auction_sales row
  */
 export async function markItemSold(env, userId, item, saleFields = {}) {
-  const saleDate = saleFields.sale_date || saleFields.saleDate || item.date_sold || new Date().toISOString().split('T')[0];
-  const platformName = saleFields.platform || item.platform || 'eBay';
-  const buyerHandle = saleFields.buyer_handle || saleFields.buyerHandle || null;
-  const ebayOrderId = saleFields.ebay_order_id || saleFields.ebayOrderId || null;
-
-  const grossSalePrice = Number(saleFields.gross_sale_price ?? saleFields.sale_price ?? saleFields.actual_sell_price ?? item.actual_sell_price ?? item.current_list_price ?? 0);
-  const buyerShippingPaid = Number(saleFields.buyer_shipping_paid ?? saleFields.deliveryCost ?? item.buyer_shipping_cost ?? 0);
-  const actualShippingCost = Number(saleFields.actual_shipping_cost ?? saleFields.shippingLabelCost ?? saleFields.est_shipping_cost ?? item.est_shipping_cost ?? 0);
-  const platformFeePct = Number(saleFields.platform_fee_pct ?? item.platform_fee_pct ?? 0.135);
-  const platformFlatFee = Number(saleFields.platform_flat_fee ?? item.platform_flat_fee ?? 0.40);
-  const paymentProcessingAmt = Number(saleFields.payment_processing_amt ?? saleFields.paymentProcessingFee ?? 0);
-  const promotedListingFee = Number(saleFields.promoted_listing_fee ?? saleFields.promotedListingFee ?? 0);
-  const trueTotalCost = Number(saleFields.true_total_cost ?? item.true_total_cost ?? item.unit_price ?? 0);
-
-  const daysToSell = saleFields.days_to_sell != null
-    ? saleFields.days_to_sell
-    : (saleFields.days_on_market != null
-        ? saleFields.days_on_market
-        : (daysBetween(item.date_listed || item.date_acquired, saleDate) ?? 0));
-
-  let platformFeesAmt = saleFields.platform_fees_amt;
-  let netProceeds = saleFields.net_proceeds;
-  let netProfit = saleFields.net_profit;
-  let roiPct = saleFields.roi_pct;
-
-  if (platformFeesAmt == null || netProceeds == null || netProfit == null || roiPct == null) {
-    const metrics = computeSaleMetrics({
-      gross_sale_price: grossSalePrice,
-      buyer_shipping_paid: buyerShippingPaid,
-      actual_shipping_cost: actualShippingCost,
-      platform_fee_pct: platformFeePct,
-      platform_flat_fee: platformFlatFee,
-      payment_processing_amt: paymentProcessingAmt,
-      promoted_listing_fee: promotedListingFee,
-      net_proceeds: saleFields.net_proceeds,
-      true_total_cost: trueTotalCost
-    });
-    if (platformFeesAmt == null) platformFeesAmt = metrics.platform_fees_amt;
-    if (netProceeds == null) netProceeds = metrics.net_proceeds;
-    if (netProfit == null) netProfit = metrics.net_profit;
-    if (roiPct == null) roiPct = metrics.roi_pct;
-  }
-
-  const feeReconciledAt = saleFields.fee_reconciled_at !== undefined
-    ? saleFields.fee_reconciled_at
-    : (saleFields.fee_reconciled ? new Date().toISOString().replace('T', ' ').slice(0, 19) : null);
-
-  const itemId = item.id || item.item_id;
-
-  const existingSale = await env.DB.prepare(
-    'SELECT * FROM auction_sales WHERE item_id = ? AND user_id = ?'
-  ).bind(itemId, userId).first();
-
-  let saleId = existingSale?.id || `sale-${crypto.randomUUID()}`;
-
-  try {
-    if (existingSale) {
-      await env.DB.prepare(`
-        UPDATE auction_sales SET
-          sale_date = ?,
-          platform = ?,
-          buyer_handle = COALESCE(?, buyer_handle),
-          gross_sale_price = ?,
-          buyer_shipping_paid = ?,
-          actual_shipping_cost = ?,
-          platform_fee_pct = ?,
-          platform_flat_fee = ?,
-          platform_fees_amt = ?,
-          payment_processing_amt = ?,
-          promoted_listing_fee = ?,
-          net_proceeds = ?,
-          true_total_cost = ?,
-          net_profit = ?,
-          roi_pct = ?,
-          days_to_sell = ?,
-          ebay_order_id = COALESCE(?, ebay_order_id),
-          fee_reconciled_at = COALESCE(?, fee_reconciled_at)
-        WHERE id = ? AND user_id = ?
-      `).bind(
-        saleDate,
-        platformName,
-        buyerHandle,
-        grossSalePrice,
-        buyerShippingPaid,
-        actualShippingCost,
-        platformFeePct,
-        platformFlatFee,
-        platformFeesAmt,
-        paymentProcessingAmt,
-        promotedListingFee,
-        netProceeds,
-        trueTotalCost,
-        netProfit,
-        roiPct,
-        daysToSell >= 0 ? daysToSell : 0,
-        ebayOrderId,
-        feeReconciledAt,
-        existingSale.id,
-        userId
-      ).run();
-    } else {
-      await env.DB.prepare(`
-        INSERT INTO auction_sales (
-          id, user_id, item_id, sale_date, platform, buyer_handle,
-          gross_sale_price, buyer_shipping_paid, actual_shipping_cost,
-          platform_fee_pct, platform_flat_fee, platform_fees_amt,
-          payment_processing_amt, promoted_listing_fee,
-          net_proceeds, true_total_cost, net_profit, roi_pct,
-          days_to_sell, ebay_order_id, fee_reconciled_at
-        ) VALUES (
-          ?, ?, ?, ?, ?, ?,
-          ?, ?, ?,
-          ?, ?, ?,
-          ?, ?,
-          ?, ?, ?, ?,
-          ?, ?, ?
-        )
-        ON CONFLICT(item_id) DO UPDATE SET
-          sale_date = excluded.sale_date,
-          platform = excluded.platform,
-          buyer_handle = COALESCE(excluded.buyer_handle, auction_sales.buyer_handle),
-          gross_sale_price = excluded.gross_sale_price,
-          buyer_shipping_paid = excluded.buyer_shipping_paid,
-          actual_shipping_cost = excluded.actual_shipping_cost,
-          platform_fee_pct = excluded.platform_fee_pct,
-          platform_flat_fee = excluded.platform_flat_fee,
-          platform_fees_amt = excluded.platform_fees_amt,
-          payment_processing_amt = excluded.payment_processing_amt,
-          promoted_listing_fee = excluded.promoted_listing_fee,
-          net_proceeds = excluded.net_proceeds,
-          true_total_cost = excluded.true_total_cost,
-          net_profit = excluded.net_profit,
-          roi_pct = excluded.roi_pct,
-          days_to_sell = excluded.days_to_sell,
-          ebay_order_id = COALESCE(excluded.ebay_order_id, auction_sales.ebay_order_id),
-          fee_reconciled_at = COALESCE(excluded.fee_reconciled_at, auction_sales.fee_reconciled_at)
-      `).bind(
-        saleId,
-        userId,
-        itemId,
-        saleDate,
-        platformName,
-        buyerHandle,
-        grossSalePrice,
-        buyerShippingPaid,
-        actualShippingCost,
-        platformFeePct,
-        platformFlatFee,
-        platformFeesAmt,
-        paymentProcessingAmt,
-        promotedListingFee,
-        netProceeds,
-        trueTotalCost,
-        netProfit,
-        roiPct,
-        daysToSell >= 0 ? daysToSell : 0,
-        ebayOrderId,
-        feeReconciledAt
-      ).run();
-    }
-  } catch (saleErr) {
-    console.warn('[markItemSold] Sale upsert race encountered, falling back to update:', saleErr);
-    await env.DB.prepare(`
-      UPDATE auction_sales SET
-        sale_date = ?,
-        platform = ?,
-        buyer_handle = COALESCE(?, buyer_handle),
-        gross_sale_price = ?,
-        buyer_shipping_paid = ?,
-        actual_shipping_cost = ?,
-        platform_fee_pct = ?,
-        platform_flat_fee = ?,
-        platform_fees_amt = ?,
-        payment_processing_amt = ?,
-        promoted_listing_fee = ?,
-        net_proceeds = ?,
-        true_total_cost = ?,
-        net_profit = ?,
-        roi_pct = ?,
-        days_to_sell = ?,
-        ebay_order_id = COALESCE(?, ebay_order_id),
-        fee_reconciled_at = COALESCE(?, fee_reconciled_at)
-      WHERE item_id = ? AND user_id = ?
-    `).bind(
-      saleDate,
-      platformName,
-      buyerHandle,
-      grossSalePrice,
-      buyerShippingPaid,
-      actualShippingCost,
-      platformFeePct,
-      platformFlatFee,
-      platformFeesAmt,
-      paymentProcessingAmt,
-      promotedListingFee,
-      netProceeds,
-      trueTotalCost,
-      netProfit,
-      roiPct,
-      daysToSell >= 0 ? daysToSell : 0,
-      ebayOrderId,
-      feeReconciledAt,
-      itemId,
-      userId
-    ).run();
-  }
-
-  // Ensure saleId matches persisted row
-  if (!existingSale) {
-    const persisted = await env.DB.prepare(
-      'SELECT id FROM auction_sales WHERE item_id = ? AND user_id = ?'
-    ).bind(itemId, userId).first();
-    if (persisted?.id) saleId = persisted.id;
-  }
-
-  const savedSale = await env.DB.prepare(
-    'SELECT * FROM auction_sales WHERE id = ? AND user_id = ?'
-  ).bind(saleId, userId).first();
-
-  return savedSale || { id: saleId };
+  const record = normalizeSaleInput({ ...saleFields, item_id: item.id || item.item_id }, item);
+  return upsertSale(env, userId, record);
 }
-

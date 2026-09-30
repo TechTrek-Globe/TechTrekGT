@@ -47,6 +47,8 @@ import { onRequestGet as syncSettingsGetHandler, onRequestPut as syncSettingsPut
 import { onRequestGet as integrationsListHandler, onRequestPost as integrationsCreateHandler } from '../functions/api/integrations/index.js';
 import { onRequestPost as integrationRevokeHandler, onRequestDelete as integrationDeleteHandler } from '../functions/api/integrations/[id].js';
 
+// Durable Object export - required for wrangler DO binding
+export { RateLimitCounter } from '../functions/utils/RateLimitCounter.js';
 
 function base64UrlEncodeBytes(bytes) {
   let binary = '';
@@ -156,10 +158,251 @@ function addSecurityHeaders(response, isLocalhostOrOptions = false, maybeRequest
   return rewritten;
 }
 
+export const ROUTES = [
+  // Auth (10 routes)
+  { method: 'POST',   pattern: '/api/auth/register',          handler: registerHandler,           auth: 'public' },
+  { method: 'POST',   pattern: '/api/auth/login',             handler: loginHandler,              auth: 'public' },
+  { method: 'POST',   pattern: '/api/auth/forgot-password',   handler: forgotPasswordHandler,     auth: 'public' },
+  { method: 'POST',   pattern: '/api/auth/reset-password',    handler: resetPasswordHandler,      auth: 'public' },
+  { method: 'POST',   pattern: '/api/auth/security-question', handler: securityQuestionHandler,   auth: 'public' },
+  { method: 'POST',   pattern: '/api/auth/update-profile',    handler: updateProfileHandler,      auth: 'session' },
+  { method: 'GET',    pattern: '/api/auth/me',                handler: meHandler,                 auth: 'session' },
+  { method: 'GET',    pattern: '/api/auth/verify-email',      handler: verifyEmailGetHandler,     auth: 'public' },
+  { method: 'POST',   pattern: '/api/auth/verify-email',      handler: verifyEmailPostHandler,    auth: 'public' },
+  { method: 'POST',   pattern: '/api/auth/logout',            handler: logoutHandler,             auth: 'public' },
+
+  // Invoices (5 routes)
+  { method: 'GET',    pattern: '/api/invoices',               handler: invoicesListHandler,       auth: 'session' },
+  { method: 'POST',   pattern: '/api/invoices',               handler: invoicesCreateHandler,     auth: 'session' },
+  { method: 'GET',    pattern: '/api/invoices/:id',           handler: invoiceGetHandler,         auth: 'session' },
+  { method: 'PUT',    pattern: '/api/invoices/:id',           handler: invoicePutHandler,         auth: 'session' },
+  { method: 'DELETE', pattern: '/api/invoices/:id',           handler: invoiceDeleteHandler,      auth: 'session' },
+
+  // Items (7 routes)
+  { method: 'GET',    pattern: '/api/items/image-preview',    handler: itemImagePreviewHandler,   auth: 'session' },
+  { method: 'GET',    pattern: '/api/items/enriched',         handler: itemsEnrichedHandler,      auth: 'session' },
+  { method: 'POST',   pattern: '/api/items/auto-sku',         handler: itemsAutoSkuHandler,       auth: 'session' },
+  { method: 'GET',    pattern: '/api/items',                  handler: itemsListHandler,          auth: 'session' },
+  { method: 'GET',    pattern: '/api/items/:id',              handler: itemGetHandler,            auth: 'session' },
+  { method: 'PUT',    pattern: '/api/items/:id',              handler: itemPutHandler,            auth: 'session' },
+  { method: 'DELETE', pattern: '/api/items/:id',              handler: itemDeleteHandler,         auth: 'session' },
+
+  // Sales (5 routes)
+  { method: 'GET',    pattern: '/api/sales',                  handler: salesListHandler,          auth: 'session' },
+  { method: 'POST',   pattern: '/api/sales',                  handler: salesCreateHandler,        auth: 'session' },
+  { method: 'GET',    pattern: '/api/sales/:id',              handler: saleGetHandler,            auth: 'session' },
+  { method: 'PUT',    pattern: '/api/sales/:id',              handler: salePutHandler,            auth: 'session' },
+  { method: 'DELETE', pattern: '/api/sales/:id',              handler: saleDeleteHandler,         auth: 'session' },
+
+  // Platforms (4 routes)
+  { method: 'GET',    pattern: '/api/platforms',              handler: platformsListHandler,      auth: 'session' },
+  { method: 'POST',   pattern: '/api/platforms',              handler: platformsCreateHandler,    auth: 'session' },
+  { method: 'PUT',    pattern: '/api/platforms/:id',          handler: platformPutHandler,        auth: 'session' },
+  { method: 'DELETE', pattern: '/api/platforms/:id',          handler: platformDeleteHandler,     auth: 'session' },
+
+  // Comps & Market Comps (9 routes)
+  { method: 'GET',    pattern: '/api/comps',                  handler: compsListHandler,          auth: 'session' },
+  { method: 'POST',   pattern: '/api/comps',                  handler: compsCreateHandler,        auth: 'session' },
+  { method: 'GET',    pattern: '/api/comps/market',           handler: marketCompsGetHandler,     auth: 'session' },
+  { method: 'POST',   pattern: '/api/comps/market',           handler: marketCompsPostHandler,    auth: 'session' },
+  { method: 'PUT',    pattern: '/api/comps/market/:id',       handler: marketCompsPutHandler,     auth: 'session' },
+  { method: 'DELETE', pattern: '/api/comps/market/:id',       handler: marketCompsDeleteHandler,  auth: 'session' },
+  { method: 'GET',    pattern: '/api/comps/:id',              handler: compGetHandler,            auth: 'session' },
+  { method: 'PUT',    pattern: '/api/comps/:id',              handler: compPutHandler,            auth: 'session' },
+  { method: 'DELETE', pattern: '/api/comps/:id',              handler: compDeleteHandler,         auth: 'session' },
+
+  // Dashboard & Admin (2 routes)
+  { method: 'GET',    pattern: '/api/dashboard',              handler: dashboardHandler,          auth: 'session' },
+  { method: 'GET',    pattern: '/api/admin/stats',            handler: adminStatsGetHandler,      auth: 'session_admin' },
+
+  // Batch & Amazon Import (5 routes)
+  { method: 'POST',   pattern: '/api/import/batch',           handler: batchImportHandler,        auth: 'session' },
+  { method: 'POST',   pattern: '/api/import/amazon',          handler: amazonImportHandler,       auth: 'bearer_or_secret' },
+  { method: 'POST',   pattern: '/api/import/amazon-url',      handler: amazonUrlImportHandler,    auth: 'session' },
+  { method: 'GET',    pattern: '/api/import/amazon-token',    handler: amazonTokenGetHandler,     auth: 'session' },
+  { method: 'POST',   pattern: '/api/import/amazon-token',    handler: amazonTokenPostHandler,    auth: 'session' },
+
+  // Sync & Reports (6 routes)
+  { method: 'GET',    pattern: '/api/sync/finance',           handler: syncFinanceGetHandler,     auth: 'session' },
+  { method: 'POST',   pattern: '/api/sync/finance',           handler: syncFinancePostHandler,    auth: 'session' },
+  { method: 'GET',    pattern: '/api/reports/tax',            handler: taxReportGetHandler,       auth: 'session' },
+  { method: 'GET',    pattern: '/api/market-alerts',          handler: marketAlertsGetHandler,    auth: 'session' },
+  { method: 'POST',   pattern: '/api/market-alerts/refresh-all', handler: marketAlertsPostHandler, auth: 'session' },
+  { method: 'PUT',    pattern: '/api/market-alerts/:id',      handler: marketAlertsPutHandler,    auth: 'session' },
+
+  // eBay Operations & Analytics (11 routes)
+  { method: 'GET',    pattern: '/api/ebay/oauth-status',      handler: ebayOAuthStatusHandler,    auth: 'session' },
+  { method: 'GET',    pattern: '/api/ebay/find-listings',     handler: ebayFindListingsHandler,   auth: 'session' },
+  { method: 'GET',    pattern: '/api/ebay/active-listings',   handler: ebayActiveListingsHandler, auth: 'session' },
+  { method: 'POST',   pattern: '/api/ebay/sync-item',         handler: ebaySyncItemHandler,       auth: 'session' },
+  { method: 'POST',   pattern: '/api/ebay/sync-all',          handler: ebaySyncAllHandler,        auth: 'session' },
+  { method: 'GET',    pattern: '/api/ebay/match-sold-vinescout', handler: matchSoldVinescoutGetHandler, auth: 'session' },
+  { method: 'POST',   pattern: '/api/ebay/match-sold-vinescout', handler: matchSoldVinescoutPostHandler, auth: 'session' },
+  { method: 'POST',   pattern: '/api/ebay/push-sku',          handler: ebayPushSkuHandler,        auth: 'session' },
+  { method: 'GET',    pattern: '/api/ebay/analytics',         handler: ebayAnalyticsHandler,      auth: 'session' },
+  { method: 'POST',   pattern: '/api/ebay/analytics/ingest-traffic', handler: ebayAnalyticsIngestHandler, auth: 'session' },
+  { method: 'POST',   pattern: '/api/ebay/reconcile',         handler: ebayReconcileHandler,      auth: 'session' },
+
+  // Export & VineScout Sync (7 routes)
+  { method: 'GET',    pattern: '/api/export/vinescout-sales', handler: vinescoutSalesExportHandler, auth: 'bearer_or_secret' },
+  { method: 'GET',    pattern: '/api/export/vinescout-inventory', handler: vinescoutInventoryExportHandler, auth: 'bearer_or_secret' },
+  { method: 'GET',    pattern: '/api/sync/vinescout-catalog', handler: vinescoutCatalogHandler,   auth: 'session' },
+  { method: 'POST',   pattern: '/api/sync/vinescout-catalog', handler: vinescoutCatalogPostHandler, auth: 'session' },
+  { method: 'GET',    pattern: '/api/sync/settings',          handler: syncSettingsGetHandler,    auth: 'session' },
+  { method: 'PUT',    pattern: '/api/sync/settings',          handler: syncSettingsPutHandler,    auth: 'session' },
+  { method: 'POST',   pattern: '/api/sync/item',              handler: amazonImportHandler,       auth: 'bearer_or_secret' },
+
+  // API Integrations (4 routes)
+  { method: 'GET',    pattern: '/api/integrations',           handler: integrationsListHandler,   auth: 'session' },
+  { method: 'POST',   pattern: '/api/integrations',           handler: integrationsCreateHandler, auth: 'session' },
+  { method: 'POST',   pattern: '/api/integrations/:id/revoke', handler: integrationRevokeHandler, auth: 'session' },
+  { method: 'DELETE', pattern: '/api/integrations/:id',       handler: integrationDeleteHandler,  auth: 'session' }
+];
+
+export function compileRoute(entry) {
+  const method = entry.method.toUpperCase();
+  const pattern = entry.pattern;
+  const segments = pattern.split('/').filter(Boolean);
+  const paramNames = [];
+  let staticCount = 0;
+  let dynamicCount = 0;
+
+  for (const seg of segments) {
+    if (seg.startsWith(':')) {
+      dynamicCount++;
+      paramNames.push(seg.slice(1).replace(/\?$/, ''));
+    } else {
+      staticCount++;
+    }
+  }
+
+  let regex;
+  if (pattern === '/api/integrations/:id/revoke') {
+    // Supports both /api/integrations/:id/revoke and /api/integrations/revoke
+    regex = /^\/api\/integrations(?:\/([^/]+))?\/revoke$/;
+  } else {
+    const regexPattern = pattern
+      .replace(/\/+/g, '/')
+      .replace(/:([a-zA-Z0-9_]+)/g, '([^/]+)');
+    regex = new RegExp(`^${regexPattern}$`);
+  }
+
+  return {
+    method,
+    pattern,
+    handler: entry.handler,
+    auth: entry.auth || 'session',
+    paramNames,
+    staticCount,
+    dynamicCount,
+    totalCount: segments.length,
+    regex
+  };
+}
+
+export function sortRoutes(routes) {
+  return [...routes].sort((a, b) => {
+    // 1. More static segments first
+    if (b.staticCount !== a.staticCount) {
+      return b.staticCount - a.staticCount;
+    }
+    // 2. Fewer dynamic segments first
+    if (a.dynamicCount !== b.dynamicCount) {
+      return a.dynamicCount - b.dynamicCount;
+    }
+    // 3. More total segments first
+    if (b.totalCount !== a.totalCount) {
+      return b.totalCount - a.totalCount;
+    }
+    // 4. Stable alphabetical tie-breaker
+    return a.pattern.localeCompare(b.pattern);
+  });
+}
+
+export function assertNoShadowedRoutes(compiledRoutes) {
+  for (let i = 0; i < compiledRoutes.length; i++) {
+    const target = compiledRoutes[i];
+    const probePath = target.pattern.replace(/:([a-zA-Z0-9_]+)/g, '__probe_id__');
+
+    for (let j = 0; j < i; j++) {
+      const prev = compiledRoutes[j];
+      if (prev.method !== target.method) continue;
+
+      if (prev.pattern === target.pattern) {
+        throw new Error(`Duplicate route registration: [${target.method} ${target.pattern}]`);
+      }
+
+      // If target is static, check if prev regex matches target's exact static pattern
+      if (target.dynamicCount === 0 && prev.regex.test(target.pattern)) {
+        throw new Error(`Route shadowing detected: [${prev.method} ${prev.pattern}] shadows [${target.method} ${target.pattern}]`);
+      }
+
+      // If both dynamic, check probePath collision
+      if (target.dynamicCount > 0 && prev.dynamicCount > 0 && prev.regex.test(probePath)) {
+        throw new Error(`Route collision detected: [${prev.method} ${prev.pattern}] conflicts with [${target.method} ${target.pattern}]`);
+      }
+    }
+  }
+}
+
+// Compile, sort, and validate route table at module load scope
+export const COMPILED_ROUTES = sortRoutes(ROUTES.map(compileRoute));
+assertNoShadowedRoutes(COMPILED_ROUTES);
+
+export const ROUTE_MANIFEST = COMPILED_ROUTES.map(r => ({
+  method: r.method,
+  pattern: r.pattern,
+  auth: r.auth
+}));
+
+export function matchRoute(method, pathname) {
+  const normMethod = (method || '').toUpperCase();
+  const pathMatches = [];
+
+  for (const route of COMPILED_ROUTES) {
+    const match = route.regex.exec(pathname);
+    if (match) {
+      pathMatches.push({ route, match });
+    }
+  }
+
+  if (pathMatches.length === 0) {
+    return { handler: null, params: {}, methodNotAllowed: false, allowedMethods: [] };
+  }
+
+  const methodMatch = pathMatches.find(m => m.route.method === normMethod);
+  if (methodMatch) {
+    const { route, match } = methodMatch;
+    const params = {};
+    if (route.paramNames && route.paramNames.length > 0) {
+      for (let i = 0; i < route.paramNames.length; i++) {
+        params[route.paramNames[i]] = match[i + 1] !== undefined ? decodeURIComponent(match[i + 1]) : undefined;
+      }
+    }
+    return {
+      handler: route.handler,
+      params,
+      route,
+      methodNotAllowed: false,
+      allowedMethods: []
+    };
+  }
+
+  const allowedMethods = [...new Set(pathMatches.map(m => m.route.method))].sort();
+  return {
+    handler: null,
+    params: {},
+    methodNotAllowed: true,
+    allowedMethods
+  };
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
-    const context = { request, env, ctx };
+    const correlationId = request.headers.get('x-correlation-id') || crypto.randomUUID();
+    const context = { request, env, ctx, correlationId };
+    request.correlationId = correlationId;
 
     const isLocalhost = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
     const requestOrigin = request.headers.get('Origin') || '';
@@ -196,179 +439,27 @@ export default {
         apiPath = '/api';
       }
 
-      if (apiPath === '/api/auth/register' && request.method === 'POST') {
-        response = await registerHandler(context);
-      } else if (apiPath === '/api/auth/login' && request.method === 'POST') {
-        response = await loginHandler(context);
-      } else if (apiPath === '/api/auth/forgot-password' && request.method === 'POST') {
-        response = await forgotPasswordHandler(context);
-      } else if (apiPath === '/api/auth/reset-password' && request.method === 'POST') {
-        response = await resetPasswordHandler(context);
-      } else if (apiPath === '/api/auth/security-question' && request.method === 'POST') {
-        response = await securityQuestionHandler(context);
-      } else if (apiPath === '/api/auth/update-profile' && request.method === 'POST') {
-        response = await updateProfileHandler(context);
-      } else if (apiPath === '/api/auth/me' && request.method === 'GET') {
-        response = await meHandler(context);
-      } else if (apiPath === '/api/auth/verify-email' && request.method === 'GET') {
-        response = await verifyEmailGetHandler(context);
-      } else if (apiPath === '/api/auth/verify-email' && request.method === 'POST') {
-        response = await verifyEmailPostHandler(context);
-      } else if (apiPath === '/api/auth/logout' && request.method === 'POST') {
-        response = await logoutHandler(context);
-      // --- Invoices ---
-      } else if (apiPath === '/api/invoices' && request.method === 'GET') {
-        response = await invoicesListHandler(context);
-      } else if (apiPath === '/api/invoices' && request.method === 'POST') {
-        response = await invoicesCreateHandler(context);
-      } else if (/^\/api\/invoices\/[^/]+$/.test(apiPath) && request.method === 'GET') {
-        response = await invoiceGetHandler(context);
-      } else if (/^\/api\/invoices\/[^/]+$/.test(apiPath) && request.method === 'PUT') {
-        response = await invoicePutHandler(context);
-      } else if (/^\/api\/invoices\/[^/]+$/.test(apiPath) && request.method === 'DELETE') {
-        response = await invoiceDeleteHandler(context);
-      // --- Items ---
-      } else if (apiPath === '/api/items/image-preview' && request.method === 'GET') {
-        response = await itemImagePreviewHandler(context);
-      } else if (apiPath === '/api/items/enriched' && request.method === 'GET') {
-        response = await itemsEnrichedHandler(context);
-      } else if (apiPath === '/api/items/auto-sku' && request.method === 'POST') {
-        response = await itemsAutoSkuHandler(context);
-      } else if (apiPath === '/api/items' && request.method === 'GET') {
-        response = await itemsListHandler(context);
-      } else if (/^\/api\/items\/[^/]+$/.test(apiPath) && request.method === 'GET') {
-        response = await itemGetHandler(context);
-      } else if (/^\/api\/items\/[^/]+$/.test(apiPath) && request.method === 'PUT') {
-        response = await itemPutHandler(context);
-      } else if (/^\/api\/items\/[^/]+$/.test(apiPath) && request.method === 'DELETE') {
-        response = await itemDeleteHandler(context);
-      // --- Sales ---
-      } else if (apiPath === '/api/sales' && request.method === 'GET') {
-        response = await salesListHandler(context);
-      } else if (apiPath === '/api/sales' && request.method === 'POST') {
-        response = await salesCreateHandler(context);
-      } else if (/^\/api\/sales\/[^/]+$/.test(apiPath) && request.method === 'GET') {
-        response = await saleGetHandler(context);
-      } else if (/^\/api\/sales\/[^/]+$/.test(apiPath) && request.method === 'PUT') {
-        response = await salePutHandler(context);
-      } else if (/^\/api\/sales\/[^/]+$/.test(apiPath) && request.method === 'DELETE') {
-        response = await saleDeleteHandler(context);
-      // --- Platforms ---
-      } else if (apiPath === '/api/platforms' && request.method === 'GET') {
-        response = await platformsListHandler(context);
-      } else if (apiPath === '/api/platforms' && request.method === 'POST') {
-        response = await platformsCreateHandler(context);
-      } else if (/^\/api\/platforms\/[^/]+$/.test(apiPath) && request.method === 'PUT') {
-        response = await platformPutHandler(context);
-      } else if (/^\/api\/platforms\/[^/]+$/.test(apiPath) && request.method === 'DELETE') {
-        response = await platformDeleteHandler(context);
-      // --- Comps / Pricing Intelligence (D1 CRUD) ---
-      // Note: Live eBay comps now served by the landing gateway at /api/ebay/comps
-      } else if (apiPath === '/api/comps' && request.method === 'GET') {
-        response = await compsListHandler(context);
-      } else if (apiPath === '/api/comps' && request.method === 'POST') {
-        response = await compsCreateHandler(context);
-      } else if (/^\/api\/comps\/[^/]+$/.test(apiPath) && request.method === 'GET') {
-        response = await compGetHandler(context);
-      } else if (/^\/api\/comps\/[^/]+$/.test(apiPath) && request.method === 'PUT') {
-        response = await compPutHandler(context);
-      } else if (/^\/api\/comps\/[^/]+$/.test(apiPath) && request.method === 'DELETE') {
-        response = await compDeleteHandler(context);
-      // --- Market Comps Engine (normalized market_comps table) ---
-      } else if (apiPath === '/api/comps/market' && request.method === 'GET') {
-        response = await marketCompsGetHandler(context);
-      } else if (apiPath === '/api/comps/market' && request.method === 'POST') {
-        response = await marketCompsPostHandler(context);
-      } else if (/^\/api\/comps\/market\/[^/]+$/.test(apiPath) && request.method === 'PUT') {
-        response = await marketCompsPutHandler(context);
-      } else if (/^\/api\/comps\/market\/[^/]+$/.test(apiPath) && request.method === 'DELETE') {
-        response = await marketCompsDeleteHandler(context);
-      // --- Dashboard ---
-      } else if (apiPath === '/api/dashboard' && request.method === 'GET') {
-        response = await dashboardHandler(context);
-      // --- Admin ---
-      } else if (apiPath === '/api/admin/stats' && request.method === 'GET') {
-        response = await adminStatsGetHandler(context);
-      // --- Batch Import ---
-      } else if (apiPath === '/api/import/batch' && request.method === 'POST') {
-        response = await batchImportHandler(context);
-      // --- Amazon / VineScout Import (Bearer token auth - stays in outpost) ---
-      // Note: Amazon product fetch now served by landing gateway at /api/amazon/fetch
-      } else if (apiPath === '/api/import/amazon' && request.method === 'POST') {
-        response = await amazonImportHandler(context);
-      // --- Amazon URL Import (SSO JWT cookie auth - UI-driven) ---
-      } else if (apiPath === '/api/import/amazon-url' && request.method === 'POST') {
-        response = await amazonUrlImportHandler(context);
-      } else if (apiPath === '/api/import/amazon-token' && request.method === 'GET') {
-        response = await amazonTokenGetHandler(context);
-      } else if (apiPath === '/api/import/amazon-token' && request.method === 'POST') {
-        response = await amazonTokenPostHandler(context);
-      // --- TechTrek Finance Sync ---
-      } else if (apiPath === '/api/sync/finance' && request.method === 'GET') {
-        response = await syncFinanceGetHandler(context);
-      } else if (apiPath === '/api/sync/finance' && request.method === 'POST') {
-        response = await syncFinancePostHandler(context);
-      // --- Year-End Tax & Schedule C Reports ---
-      } else if (apiPath === '/api/reports/tax' && request.method === 'GET') {
-        response = await taxReportGetHandler(context);
-      // --- Market Alerts ---
-      } else if (apiPath === '/api/market-alerts' && request.method === 'GET') {
-        response = await marketAlertsGetHandler(context);
-      } else if (apiPath === '/api/market-alerts/refresh-all' && request.method === 'POST') {
-        response = await marketAlertsPostHandler(context);
-      } else if (/^\/api\/market-alerts\/[^/]+$/.test(apiPath) && request.method === 'PUT') {
-        response = await marketAlertsPutHandler(context);
-      // --- eBay Phase 3: OAuth, Listing Discovery, Fee Reconciliation ---
-      } else if (apiPath === '/api/ebay/oauth-status' && request.method === 'GET') {
-        response = await ebayOAuthStatusHandler(context);
-      } else if (apiPath === '/api/ebay/find-listings' && request.method === 'GET') {
-        response = await ebayFindListingsHandler(context);
-      } else if (apiPath === '/api/ebay/active-listings' && request.method === 'GET') {
-        response = await ebayActiveListingsHandler(context);
-      } else if (apiPath === '/api/ebay/sync-item' && request.method === 'POST') {
-        response = await ebaySyncItemHandler(context);
-      } else if (apiPath === '/api/ebay/sync-all' && request.method === 'POST') {
-        response = await ebaySyncAllHandler(context);
-      } else if (apiPath === '/api/ebay/match-sold-vinescout' && request.method === 'GET') {
-        response = await matchSoldVinescoutGetHandler(context);
-      } else if (apiPath === '/api/ebay/match-sold-vinescout' && request.method === 'POST') {
-        response = await matchSoldVinescoutPostHandler(context);
-      } else if (apiPath === '/api/ebay/push-sku' && request.method === 'POST') {
-        response = await ebayPushSkuHandler(context);
-      } else if (apiPath === '/api/ebay/analytics' && request.method === 'GET') {
-        response = await ebayAnalyticsHandler(context);
-      } else if (apiPath === '/api/ebay/analytics/ingest-traffic' && request.method === 'POST') {
-        response = await ebayAnalyticsIngestHandler(context);
-      } else if (apiPath === '/api/ebay/reconcile' && request.method === 'POST') {
-        response = await ebayReconcileHandler(context);
-      } else if (apiPath === '/api/export/vinescout-sales' && request.method === 'GET') {
-        response = await vinescoutSalesExportHandler(context);
-      } else if (apiPath === '/api/export/vinescout-inventory' && request.method === 'GET') {
-        response = await vinescoutInventoryExportHandler(context);
-      } else if (apiPath === '/api/sync/vinescout-catalog' && request.method === 'GET') {
-        response = await vinescoutCatalogHandler(context);
-      } else if (apiPath === '/api/sync/vinescout-catalog' && request.method === 'POST') {
-        response = await vinescoutCatalogPostHandler(context);
-      } else if (apiPath === '/api/sync/settings' && request.method === 'GET') {
-        response = await syncSettingsGetHandler(context);
-      } else if (apiPath === '/api/sync/settings' && request.method === 'PUT') {
-        response = await syncSettingsPutHandler(context);
-      } else if (apiPath === '/api/sync/item' && request.method === 'POST') {
-        response = await amazonImportHandler(context);
-      // --- API Integrations (HIGH-2) ---
-      } else if (apiPath === '/api/integrations' && request.method === 'GET') {
-        response = await integrationsListHandler(context);
-      } else if (apiPath === '/api/integrations' && request.method === 'POST') {
-        response = await integrationsCreateHandler(context);
-      } else if ((apiPath === '/api/integrations/revoke' || /^\/api\/integrations\/[^/]+\/revoke$/.test(apiPath)) && request.method === 'POST') {
-        response = await integrationRevokeHandler(context);
-      } else if (/^\/api\/integrations\/[^/]+$/.test(apiPath) && request.method === 'DELETE') {
-        response = await integrationDeleteHandler(context);
-      } else if (apiPath.startsWith('/api/')) {
-        response = new Response(JSON.stringify({ error: 'Endpoint not found' }), {
-          status: 404,
-          headers: { 'Content-Type': 'application/json' }
-        });
+      if (apiPath === '/api' || apiPath.startsWith('/api/')) {
+        const routeMatch = matchRoute(request.method, apiPath);
+        if (routeMatch.handler) {
+          context.params = routeMatch.params;
+          response = await routeMatch.handler(context);
+        } else if (routeMatch.methodNotAllowed) {
+          response = new Response(JSON.stringify({
+            error: `Method ${request.method} not allowed for ${apiPath}. Allowed: ${routeMatch.allowedMethods.join(', ')}`
+          }), {
+            status: 405,
+            headers: {
+              'Content-Type': 'application/json',
+              'Allow': routeMatch.allowedMethods.join(', ')
+            }
+          });
+        } else {
+          response = new Response(JSON.stringify({ error: 'Endpoint not found' }), {
+            status: 404,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
       } else if (url.pathname.startsWith('/outpost/assets/')) {
         // Rewrite asset requests: /outpost/assets/ -> /assets/
         const assetUrl = new URL(request.url);
@@ -438,11 +529,46 @@ export default {
           : await fetch(request);
       }
     } catch (err) {
-      console.error('[worker] unhandled error:', err && err.stack ? err.stack : err);
-      response = new Response(JSON.stringify({ error: 'An internal error occurred. Please try again.' }), {
+      console.error(`[worker][${correlationId}] unhandled error:`, err && err.stack ? err.stack : err);
+      response = new Response(JSON.stringify({ error: 'An internal error occurred. Please try again.', correlationId }), {
         status: 500,
-        headers: { 'Content-Type': 'application/json' }
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Correlation-Id': correlationId
+        }
       });
+    }
+
+    if (response && response.status >= 500) {
+      console.error(`[worker][${correlationId}] 5xx response (${response.status}) returned for ${request.method} ${url.pathname}`);
+      const headers = new Headers(response.headers);
+      headers.set('X-Correlation-Id', correlationId);
+      const contentType = headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        try {
+          const bodyJson = await response.json();
+          if (bodyJson && typeof bodyJson === 'object' && !bodyJson.correlationId) {
+            bodyJson.correlationId = correlationId;
+          }
+          response = new Response(JSON.stringify(bodyJson), {
+            status: response.status,
+            statusText: response.statusText,
+            headers
+          });
+        } catch (_) {
+          response = new Response(response.body, {
+            status: response.status,
+            statusText: response.statusText,
+            headers
+          });
+        }
+      } else {
+        response = new Response(response.body, {
+          status: response.status,
+          statusText: response.statusText,
+          headers
+        });
+      }
     }
 
     return addSecurityHeaders(response, isLocalhost, requestOrigin, nonce);

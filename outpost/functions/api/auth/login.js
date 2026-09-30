@@ -6,7 +6,7 @@ export async function onRequestPost(context) {
 
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
   const ipRlKey = `login:${ip}`;
-  const ipLimit = await checkRateLimit(env.RATE_LIMIT_KV, ipRlKey, 10, 60, true);
+  const ipLimit = await checkRateLimit(env.RATE_LIMIT_KV, ipRlKey, 10, 60, true, env.RATE_LIMIT_DO);
 
   try {
     const body = await request.json();
@@ -30,7 +30,7 @@ export async function onRequestPost(context) {
 
     const cleanEmail = email.trim().toLowerCase();
     const accountRlKey = `login-account:${cleanEmail}`;
-    const accountLimit = await checkRateLimit(env.RATE_LIMIT_KV, accountRlKey, 10, 900, true);
+    const accountLimit = await checkRateLimit(env.RATE_LIMIT_KV, accountRlKey, 10, 900, true, env.RATE_LIMIT_DO);
 
     if (!ipLimit.allowed || !accountLimit.allowed) {
       const retryAfter = Math.max(
@@ -94,7 +94,7 @@ export async function onRequestPost(context) {
     const maxAge = body.rememberMe ? 30 * 24 * 3600 : 7200;
 
     const token = await createToken(
-      { userId: user.id, email: user.email, name: user.name },
+      { userId: user.id, tv: user.token_version ?? 1 },
       env.JWT_SECRET,
       maxAge
     );

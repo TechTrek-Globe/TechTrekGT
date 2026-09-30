@@ -8,7 +8,7 @@ export async function onRequestPost(context) {
 
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
   const ipRlKey = `register:${ip}`;
-  const ipLimit = await checkRateLimit(env.RATE_LIMIT_KV, ipRlKey, 5, 60, true);
+  const ipLimit = await checkRateLimit(env.RATE_LIMIT_KV, ipRlKey, 5, 60, true, env.RATE_LIMIT_DO);
 
   try {
     const body = await request.json();
@@ -50,7 +50,7 @@ export async function onRequestPost(context) {
     }
 
     const accountRlKey = `register-account:${cleanEmail}`;
-    const accountLimit = await checkRateLimit(env.RATE_LIMIT_KV, accountRlKey, 5, 900, true);
+    const accountLimit = await checkRateLimit(env.RATE_LIMIT_KV, accountRlKey, 5, 900, true, env.RATE_LIMIT_DO);
 
     if (!ipLimit.allowed || !accountLimit.allowed) {
       const retryAfter = Math.max(

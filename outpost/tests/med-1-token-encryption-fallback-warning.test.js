@@ -87,20 +87,21 @@ describe('[MED-1] eBay OAuth Token Decryption Fallback Logging', () => {
     console.error = originalConsoleError;
   });
 
-  test('tokenHelper.getEbayUserToken logs warning when TOKEN_ENCRYPTION_KEY is unset and falls back to JWT_SECRET', async () => {
+  test('tokenHelper.getEbayUserToken throws 503 when TOKEN_ENCRYPTION_KEY is unset and does NOT fall back to JWT_SECRET', async () => {
     const envNoTokenKey = {
       DB: mockDb,
       JWT_SECRET: TEST_JWT_SECRET
       // TOKEN_ENCRYPTION_KEY intentionally omitted
     };
 
-    const token = await getEbayUserTokenHelper(envNoTokenKey, userId);
-    assert.strictEqual(token, 'ebay_access_test_token_abc');
-
-    const warningFound = loggedErrors.some(msg =>
-      msg.includes('[getEbayUserToken] TOKEN_ENCRYPTION_KEY not configured - falling back to JWT_SECRET')
+    await assert.rejects(
+      async () => getEbayUserTokenHelper(envNoTokenKey, userId),
+      (err) => {
+        assert.strictEqual(err.statusCode, 503);
+        assert.ok(err.message.includes('server configuration issue'));
+        return true;
+      }
     );
-    assert.ok(warningFound, 'Expected fallback warning to be logged via console.error');
   });
 
   test('tokenHelper.getEbayUserToken does NOT log warning when TOKEN_ENCRYPTION_KEY is present', async () => {
@@ -128,22 +129,23 @@ describe('[MED-1] eBay OAuth Token Decryption Fallback Logging', () => {
     assert.strictEqual(warningFound, false, 'No fallback warning should be logged when TOKEN_ENCRYPTION_KEY is configured');
   });
 
-  test('ebayAuth.getEbayUserToken logs warning when TOKEN_ENCRYPTION_KEY is unset', async () => {
+  test('ebayAuth.getEbayUserToken throws 503 when TOKEN_ENCRYPTION_KEY is unset', async () => {
     const envNoTokenKey = {
       DB: mockDb,
       JWT_SECRET: TEST_JWT_SECRET
     };
 
-    const token = await getEbayUserTokenAuth(envNoTokenKey, userId);
-    assert.strictEqual(token, 'ebay_access_test_token_abc');
-
-    const warningFound = loggedErrors.some(msg =>
-      msg.includes('[getEbayUserToken] TOKEN_ENCRYPTION_KEY not configured - falling back to JWT_SECRET')
+    await assert.rejects(
+      async () => getEbayUserTokenAuth(envNoTokenKey, userId),
+      (err) => {
+        assert.strictEqual(err.statusCode, 503);
+        assert.ok(err.message.includes('server configuration issue'));
+        return true;
+      }
     );
-    assert.ok(warningFound, 'Expected fallback warning to be logged via console.error in ebayAuth');
   });
 
-  test('/api/ebay/active-listings endpoint surfaces warning in logs when TOKEN_ENCRYPTION_KEY is unset, and is silent when configured', async () => {
+  test('/api/ebay/active-listings endpoint returns 503 when TOKEN_ENCRYPTION_KEY is unset, and succeeds 200 when configured', async () => {
     const authToken = await createToken({ userId, email: 'seller@techtrekgt.test' }, TEST_JWT_SECRET, 3600);
 
     // Mock fetch for eBay Trading API
@@ -166,7 +168,7 @@ describe('[MED-1] eBay OAuth Token Decryption Fallback Logging', () => {
     };
 
     try {
-      // 1. Request with TOKEN_ENCRYPTION_KEY unset
+      // 1. Request with TOKEN_ENCRYPTION_KEY unset fails closed with 503
       const envUnset = {
         DB: mockDb,
         JWT_SECRET: TEST_JWT_SECRET
@@ -179,12 +181,9 @@ describe('[MED-1] eBay OAuth Token Decryption Fallback Logging', () => {
       });
 
       const resUnset = await activeListingsGet({ request: reqUnset, env: envUnset });
-      assert.strictEqual(resUnset.status, 200);
-
-      const warningFound = loggedErrors.some(msg =>
-        msg.includes('[getEbayUserToken] TOKEN_ENCRYPTION_KEY not configured - falling back to JWT_SECRET')
-      );
-      assert.ok(warningFound, 'Warning must appear in logs when endpoint triggers getEbayUserToken without TOKEN_ENCRYPTION_KEY');
+      assert.strictEqual(resUnset.status, 503);
+      const errBody = await resUnset.json();
+      assert.ok(errBody.error.includes('server configuration issue'));
 
       // Clear logged errors
       loggedErrors = [];

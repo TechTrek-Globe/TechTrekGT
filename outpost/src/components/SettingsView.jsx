@@ -1499,7 +1499,7 @@ function VineScoutSection({ token, hasToken, loading, rotating, copied, onLoad, 
   }, []);
 
   const displayToken = token
-    ? (revealed ? token : token.slice(0, 6) + '••••••••••••••••••••••••••••••••••')
+    ? (revealed ? token : '••••••••••••••••••••••••••••••••••••••••')
     : null;
 
   const handleCopyUrl = () => {
@@ -1585,7 +1585,11 @@ function VineScoutSection({ token, hasToken, loading, rotating, copied, onLoad, 
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 font-mono text-xs text-amber-300 overflow-hidden whitespace-nowrap overflow-ellipsis">
+              <div
+                className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 font-mono text-xs text-amber-300 overflow-hidden whitespace-nowrap overflow-ellipsis"
+                role="text"
+                aria-label={revealed ? "API Secret Key" : "Masked API Secret Key"}
+              >
                 {displayToken}
               </div>
               <button
@@ -1830,8 +1834,12 @@ function ApiIntegrationsSection() {
             Please copy this secret immediately. For security, raw secret keys are cryptographically hashed and cannot be retrieved again.
           </p>
           <div className="flex items-center gap-2">
-            <div className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-amber-300 overflow-x-auto whitespace-nowrap">
-              {secretRevealed ? createdSecret.secret : (createdSecret.secret ? createdSecret.secret.slice(0, 10) + '••••••••••••••••••••••••••••••••••••••••' : '')}
+            <div
+              className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-amber-300 overflow-x-auto whitespace-nowrap"
+              role="text"
+              aria-label={secretRevealed ? "API Secret Key" : "Masked API Secret Key"}
+            >
+              {secretRevealed ? createdSecret.secret : (createdSecret.secret ? '••••••••••••••••••••••••••••••••••••••••' : '')}
             </div>
             <button
               type="button"

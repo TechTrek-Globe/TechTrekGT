@@ -3,8 +3,16 @@
  * Shared between registration seeding and platform management endpoints.
  */
 
+import { DEFAULT_PLATFORM_FEE_PCT, DEFAULT_PLATFORM_FLAT_FEE } from './constants.js';
+
+/**
+ * Seed rows for a brand-new account. The eBay rows reference
+ * DEFAULT_PLATFORM_FEE_PCT / DEFAULT_PLATFORM_FLAT_FEE so the seed and every
+ * write path can never disagree about what "default" means (T-10 item 3).
+ * Category-specific eBay rates live in ebayFeeSchedule.js, not here.
+ */
 export const DEFAULT_PLATFORMS = [
-  { name: 'eBay', fee_pct: 0.136, flat_fee: 0.40, notes: '13.6% final value fee + $0.40 per order (avg)', is_default: 1 },
+  { name: 'eBay', fee_pct: DEFAULT_PLATFORM_FEE_PCT, flat_fee: DEFAULT_PLATFORM_FLAT_FEE, notes: '13.6% final value fee + $0.40 per order (avg)', is_default: 1 },
   { name: 'eBay (Promoted 2%)', fee_pct: 0.156, flat_fee: 0.40, notes: 'FVF + 2% promoted listing rate', is_default: 0 },
   { name: 'eBay (Promoted 5%)', fee_pct: 0.186, flat_fee: 0.40, notes: 'FVF + 5% promoted listing rate', is_default: 0 },
   { name: 'Facebook Marketplace (Local)', fee_pct: 0, flat_fee: 0, notes: 'No fees for local pickup', is_default: 0 },

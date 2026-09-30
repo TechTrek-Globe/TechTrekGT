@@ -1,5 +1,11 @@
 import { requireAuth, withAuth, ok, err } from '../utils/guard.js';
 import { cleanEbaySearchQuery } from './comps/index.js';
+import {
+  FALLBACK_GATEWAY_ORIGIN,
+  LOCAL_DEV_ORIGIN,
+  CONCURRENCY_LIMIT,
+  REQUEST_STAGGER_MS
+} from '../utils/constants.js';
 
 /**
  * GET /api/market-alerts
@@ -97,20 +103,24 @@ async function runMarketRefresh(userId, env, request) {
 
     if (!items.results || items.results.length === 0) return;
 
-    // 2. Fetch the central gateway URL from request origin to call ourselves
+    // 2. Resolve the gateway origin to call back into ourselves.
+    // T-10 item 9: no hardcoded production hostname. GATEWAY_BASE_URL wins, so a
+    // staging deployment points at staging instead of silently calling prod.
+    // Local dev falls back to the wrangler dev port; otherwise we reuse the
+    // origin the request already arrived on.
     const origin = new URL(request.url).origin;
-    // We assume the gateway is on techtrekgt.com, but if local we use localhost:8787
     const isLocal = origin.includes('localhost') || origin.includes('127.0.0.1');
-    const gatewayUrl = isLocal ? 'http://localhost:8787/api/ebay/comps' : 'https://techtrekgt.com/api/ebay/comps';
+    const gatewayOrigin = env.GATEWAY_BASE_URL
+      || (isLocal ? LOCAL_DEV_ORIGIN : (origin || FALLBACK_GATEWAY_ORIGIN));
+    const gatewayUrl = `${gatewayOrigin}/api/ebay/comps`;
 
     // To authenticate against the gateway from a worker, we need the user's cookie.
     // Fortunately, since this is context.waitUntil, we still have the original request headers.
     const cookie = request.headers.get('Cookie');
-    
-    // Concurrency control: max 3 at a time
-    const CONCURRENCY_LIMIT = 3;
+
+    // Concurrency control: bounded by CONCURRENCY_LIMIT
     let activePromises = [];
-    const DELAY_MS = 300;
+    const DELAY_MS = REQUEST_STAGGER_MS;
 
     for (const item of items.results) {
       // Create a promise for fetching and processing this item

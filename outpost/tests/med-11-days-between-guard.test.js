@@ -59,16 +59,18 @@ function createMockD1() {
   };
 }
 
-test('MED-11: Inconsistent negative day-count guarding across daysBetween() call sites', async (t) => {
+test('MED-11: daysBetween returns null for invalid ordering across every call site', async (t) => {
 
-  await t.test('daysBetween unit: clamps negative difference to 0 and warns', () => {
+  await t.test('daysBetween unit: returns null (not 0) for an invalid ordering', () => {
     // Normal positive day counts
     assert.equal(daysBetween('2026-05-01', '2026-05-10'), 9);
     assert.equal(daysBetween('2026-05-01', '2026-05-01'), 0);
 
-    // Negative day counts (toDate precedes fromDate): must return 0 (not negative)
-    assert.equal(daysBetween('2026-05-10', '2026-05-01'), 0);
-    assert.equal(daysBetween('2026-12-31', '2026-01-01'), 0);
+    // T-11 item 8: a sale dated BEFORE its listing is a data-entry error, not a
+    // zero-day sale. Clamping it to 0 let the bad row into AVG(days_to_sell) as
+    // a genuine measurement. It now returns null, which AVG ignores.
+    assert.equal(daysBetween('2026-05-10', '2026-05-01'), null);
+    assert.equal(daysBetween('2026-12-31', '2026-01-01'), null);
 
     // Missing, null, or invalid dates: returns null
     assert.equal(daysBetween(null, '2026-05-01'), null);
@@ -76,12 +78,12 @@ test('MED-11: Inconsistent negative day-count guarding across daysBetween() call
     assert.equal(daysBetween('', '2026-05-01'), null);
     assert.equal(daysBetween('invalid-date', '2026-05-01'), null);
 
-    // Client formulaPreview.js mirror produces identical clamped results
-    assert.equal(clientDaysBetween('2026-05-10', '2026-05-01'), 0);
+    // Client preview is the SAME function (re-export), not a mirror.
+    assert.equal(clientDaysBetween, daysBetween);
     assert.equal(clientDaysBetween('2026-05-01', '2026-05-10'), 9);
   });
 
-  await t.test('POST /api/sales clamps days_to_sell to 0 when sale_date precedes date_acquired', async () => {
+  await t.test('POST /api/sales stores NULL days_to_sell when sale_date precedes date_acquired', async () => {
     const mockDb = createMockD1();
     mockDb._raw.prepare("INSERT INTO users (id, name, email, password_hash) VALUES ('user-1', 'Test User', 'test@example.com', 'hash')").run();
     mockDb._raw.prepare("INSERT INTO auction_invoices (id, user_id, invoice_ref) VALUES ('inv-1', 'user-1', 'INV-001')").run();
@@ -120,10 +122,10 @@ test('MED-11: Inconsistent negative day-count guarding across daysBetween() call
 
     const saleRow = mockDb._raw.prepare('SELECT days_to_sell FROM auction_sales WHERE item_id = ?').get('item-1');
     assert.ok(saleRow);
-    assert.equal(saleRow.days_to_sell, 0); // Must be clamped to 0, not -14
+    assert.equal(saleRow.days_to_sell, null); // T-11: invalid ordering stores NULL, so AVG ignores it
   });
 
-  await t.test('PUT /api/sales/:id clamps days_to_sell to 0 when sale_date updated to precede acquisition', async () => {
+  await t.test('PUT /api/sales/:id stores NULL days_to_sell when sale_date precedes acquisition', async () => {
     const mockDb = createMockD1();
     mockDb._raw.prepare("INSERT INTO users (id, name, email, password_hash) VALUES ('user-1', 'Test User', 'test@example.com', 'hash')").run();
     mockDb._raw.prepare("INSERT INTO auction_invoices (id, user_id, invoice_ref) VALUES ('inv-1', 'user-1', 'INV-001')").run();
@@ -160,10 +162,10 @@ test('MED-11: Inconsistent negative day-count guarding across daysBetween() call
     assert.equal(res.status, 200);
 
     const updatedSale = mockDb._raw.prepare('SELECT days_to_sell FROM auction_sales WHERE id = ?').get('sale-2');
-    assert.equal(updatedSale.days_to_sell, 0); // Must be clamped to 0, not -10
+    assert.equal(updatedSale.days_to_sell, null); // T-11: invalid ordering stores NULL, not 0
   });
 
-  await t.test('PUT /api/items/:id (marking Sold) clamps days_on_market to 0 when date_sold precedes date_acquired', async () => {
+  await t.test('PUT /api/items/:id (marking Sold) stores NULL days_on_market when date_sold precedes date_acquired', async () => {
     const mockDb = createMockD1();
     mockDb._raw.prepare("INSERT INTO users (id, name, email, password_hash) VALUES ('user-1', 'Test User', 'test@example.com', 'hash')").run();
     mockDb._raw.prepare("INSERT INTO auction_invoices (id, user_id, invoice_ref) VALUES ('inv-1', 'user-1', 'INV-001')").run();
@@ -197,14 +199,14 @@ test('MED-11: Inconsistent negative day-count guarding across daysBetween() call
     assert.equal(res.status, 200);
 
     const updatedItem = mockDb._raw.prepare('SELECT days_on_market FROM auction_items WHERE id = ?').get('item-3');
-    assert.equal(updatedItem.days_on_market, 0);
+    assert.equal(updatedItem.days_on_market, null); // T-11: invalid ordering stores NULL, not 0
 
     const autoSyncedSale = mockDb._raw.prepare('SELECT days_to_sell FROM auction_sales WHERE item_id = ?').get('item-3');
     assert.ok(autoSyncedSale);
-    assert.equal(autoSyncedSale.days_to_sell, 0);
+    assert.equal(autoSyncedSale.days_to_sell, null); // T-11: invalid ordering stores NULL, not 0
   });
 
-  await t.test('reconcileAndSaveEbaySale clamps days_to_sell to 0 when eBay saleDate precedes date_acquired', async () => {
+  await t.test('reconcileAndSaveEbaySale stores NULL days_to_sell when eBay saleDate precedes date_acquired', async () => {
     const mockDb = createMockD1();
     mockDb._raw.prepare("INSERT INTO users (id, name, email, password_hash) VALUES ('user-1', 'Test User', 'test@example.com', 'hash')").run();
     mockDb._raw.prepare("INSERT INTO auction_invoices (id, user_id, invoice_ref) VALUES ('inv-1', 'user-1', 'INV-001')").run();
@@ -232,6 +234,6 @@ test('MED-11: Inconsistent negative day-count guarding across daysBetween() call
     assert.ok(result);
     const sale = mockDb._raw.prepare('SELECT days_to_sell FROM auction_sales WHERE item_id = ?').get('item-4');
     assert.ok(sale);
-    assert.equal(sale.days_to_sell, 0); // Must be clamped to 0, not -19
+    assert.equal(sale.days_to_sell, null); // T-11: invalid ordering stores NULL, not 0
   });
 });

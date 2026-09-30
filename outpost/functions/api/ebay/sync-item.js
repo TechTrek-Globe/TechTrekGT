@@ -8,6 +8,11 @@ import {
   normalizeHttps
 } from './tokenHelper.js';
 import { computePricingFloors } from '../../utils/auction.js';
+import {
+  DEFAULT_PLATFORM_FEE_PCT,
+  DEFAULT_PLATFORM_FLAT_FEE,
+  DEFAULT_TARGET_MARGIN_PCT
+} from '../../utils/constants.js';
 import { invalidateEbayListingsCache } from './listingsCache.js';
 
 /**
@@ -57,6 +62,7 @@ export async function onRequestPost(context) {
       accessToken = await getEbayUserToken(env, payload.userId);
     } catch (e) {
       console.error('[sync-item] eBay authentication failed:', e);
+      if (e?.statusCode === 503) return err(e.message, 503);
       return err('eBay authentication failed. Please reconnect your eBay account.', 401);
     }
 
@@ -136,8 +142,8 @@ export async function onRequestPost(context) {
     const boostPct = promotedRate > 0 ? promotedRate / 100 : 0;
 
     const targetCost = item.true_total_cost != null ? item.true_total_cost : (item.unit_price || 0);
-    const platformFeePct = liveListing?.platform_fee_pct || 0.135;
-    const platformFlatFee = liveListing?.platform_flat_fee != null ? liveListing.platform_flat_fee : 0.40;
+    const platformFeePct = liveListing?.platform_fee_pct ?? DEFAULT_PLATFORM_FEE_PCT;
+    const platformFlatFee = liveListing?.platform_flat_fee != null ? liveListing.platform_flat_fee : DEFAULT_PLATFORM_FLAT_FEE;
 
     const buyerShipping = (liveListing?.buyer_shipping_cost != null && liveListing.buyer_shipping_cost > 0)
       ? liveListing.buyer_shipping_cost
@@ -153,7 +159,7 @@ export async function onRequestPost(context) {
       platform_flat_fee: platformFlatFee,
       platform_fee_pct: platformFeePct,
       boost_pct: boostPct,
-      target_margin_pct: item.target_margin_pct || 0.20
+      target_margin_pct: item.target_margin_pct ?? DEFAULT_TARGET_MARGIN_PCT
     });
 
     const newStatus = isSold ? 'Sold' : (liveListing?.status || 'Listed');

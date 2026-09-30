@@ -479,6 +479,19 @@ export function EditTabPerformance({
         </div>
       )}
 
+      {/* Partial / Missing Traffic Data Banner */}
+      {analytics && analytics.data_complete === false && (analytics.missing_dates || []).length > 0 && (
+        <div className="p-3.5 rounded-xl bg-amber-950/30 border border-amber-500/30 flex items-start gap-2.5">
+          <Info className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+          <div className="text-xs space-y-1">
+            <span className="font-bold text-amber-300">Partial Traffic Data</span>
+            <p className="text-slate-300">
+              eBay reported no activity for {analytics.missing_dates.length} date{analytics.missing_dates.length === 1 ? '' : 's'} in this range ({analytics.missing_dates.slice(0, 3).join(', ')}{analytics.missing_dates.length > 3 ? '...' : ''}). Missing dates are excluded without synthetic interpolation.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* 3. Error Banner */}
       {analyticsError && !needsReauth && (
         <div className="p-4 rounded-xl bg-red-950/40 border border-red-500/30 space-y-2">

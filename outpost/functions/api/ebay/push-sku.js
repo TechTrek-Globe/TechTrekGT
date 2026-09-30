@@ -24,6 +24,7 @@ export async function onRequestPost(context) {
       accessToken = await getEbayUserToken(env, payload.userId);
     } catch (e) {
       console.error('[push-sku] eBay authentication failed:', e);
+      if (e?.statusCode === 503) return err(e.message, 503);
       return err('eBay authentication failed. Please reconnect your eBay account.', 401);
     }
 

@@ -1,5 +1,12 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
 import { validateNonNegativeMoney } from '../../utils/auction.js';
+import { normalizeSaleInput, upsertSale } from '../../utils/sales.js';
+import {
+  DEFAULT_PLATFORM_FEE_PCT,
+  DEFAULT_TARGET_MARGIN_PCT,
+  FUZZY_MATCH_THRESHOLD,
+  HIGH_CONFIDENCE_THRESHOLD
+} from '../../utils/constants.js';
 import {
   getEbayUserToken,
   fetchEbayRecentOrders,
@@ -40,6 +47,9 @@ export async function onRequestGet(context) {
       const accessToken = await getEbayUserToken(env, payload.userId);
       ebayOrders = await fetchEbayRecentOrders(env, accessToken, 100);
     } catch (e) {
+      if (e?.statusCode === 503) {
+        return err(e.message, 503);
+      }
       console.warn('[match-sold-vinescout] eBay recent orders error:', e);
       // Return empty eBay orders if eBay is not connected or token expired
     }
@@ -260,17 +270,17 @@ export async function onRequestGet(context) {
         const reverseScore = calculateSimilarity(vItem.item_name, ebayItem.title);
         const combinedScore = (forwardScore * 0.6) + (reverseScore * 0.4);
 
-        if (combinedScore > highestScore && combinedScore >= 0.35) {
+        if (combinedScore > highestScore && combinedScore >= FUZZY_MATCH_THRESHOLD) {
           highestScore = combinedScore;
           bestMatch = vItem;
           matchReason = `Title Similarity (${Math.round(combinedScore * 100)}%)`;
         }
       }
 
-      if (bestMatch && highestScore >= 0.35) {
+      if (bestMatch && highestScore >= FUZZY_MATCH_THRESHOLD) {
         suggestedMatches.push({
           confidence: parseFloat(highestScore.toFixed(2)),
-          high_confidence: highestScore >= 0.80,
+          high_confidence: highestScore >= HIGH_CONFIDENCE_THRESHOLD,
           match_reason: matchReason,
           ebay_order: ebayItem,
           vinescout_item: bestMatch
@@ -377,148 +387,34 @@ export async function onRequestPost(context) {
       payload.userId
     ).run();
 
-    // 3. Compute Net Proceeds & Profit
-    const feeStructure = calculateEbayCategoryFees(item.category_id, item.category, price);
-    const platformFeeAmt = parseFloat(((price * feeStructure.fee_pct) + feeStructure.flat_fee).toFixed(2));
-    const netProceeds = parseFloat((price + bShip - aShip - platformFeeAmt).toFixed(2));
-    const landedCost = parseFloat(item.true_total_cost) || 0;
-    const netProfit = parseFloat((netProceeds - landedCost).toFixed(2));
-    const roiPct = landedCost > 0 ? parseFloat(((netProfit / landedCost) * 100).toFixed(2)) : 0;
+    // 3. Resolve the eBay fee schedule for this category. T-09 item 2: the *100 is
+    // GONE. roi_pct is a FRACTION everywhere in this codebase; multiplying here
+    // was what made a VineScout-matched sale render as 3500% beside a correct
+    // portfolio figure. computeSaleMetrics now produces it, and it is stored and
+    // returned as a fraction.
+    const feeStructure = calculateEbayCategoryFees(item.category_id, item.category, price, {
+      defaultFeePct: DEFAULT_PLATFORM_FEE_PCT
+    });
 
-    // 4. Create or Update auction_sales record
-    const existingSale = await env.DB.prepare(`
-      SELECT id FROM auction_sales WHERE item_id = ? AND user_id = ?
-    `).bind(item.id, payload.userId).first();
+    // 4. Normalize + upsert via the single shared sales module (T-08).
+    const record = normalizeSaleInput({
+      item_id: item.id,
+      sale_date: finalSaleDate,
+      platform: 'eBay',
+      ebay_order_id: String(ebay_order_id),
+      buyer_handle: buyer,
+      gross_sale_price: price,
+      buyer_shipping_paid: bShip,
+      actual_shipping_cost: aShip,
+      platform_fee_pct: feeStructure.fee_pct,
+      platform_flat_fee: feeStructure.flat_fee,
+      true_total_cost: item.true_total_cost
+    }, item);
 
-    let saleId = existingSale?.id || `sale-${crypto.randomUUID()}`;
-
-    try {
-      if (existingSale) {
-        await env.DB.prepare(`
-          UPDATE auction_sales
-          SET platform = 'eBay',
-              ebay_order_id = ?,
-              sale_date = ?,
-              buyer_handle = ?,
-              gross_sale_price = ?,
-              buyer_shipping_paid = ?,
-              actual_shipping_cost = ?,
-              platform_fee_pct = ?,
-              platform_flat_fee = ?,
-              platform_fees_amt = ?,
-              net_proceeds = ?,
-              true_total_cost = ?,
-              net_profit = ?,
-              roi_pct = ?
-          WHERE id = ? AND user_id = ?
-        `).bind(
-          String(ebay_order_id),
-          finalSaleDate,
-          buyer,
-          price,
-          bShip,
-          aShip,
-          feeStructure.fee_pct,
-          feeStructure.flat_fee,
-          platformFeeAmt,
-          netProceeds,
-          landedCost,
-          netProfit,
-          roiPct,
-          saleId,
-          payload.userId
-        ).run();
-      } else {
-        await env.DB.prepare(`
-          INSERT INTO auction_sales (
-            id, user_id, item_id, platform, ebay_order_id,
-            sale_date, buyer_handle, gross_sale_price, buyer_shipping_paid,
-            actual_shipping_cost, platform_fee_pct, platform_flat_fee,
-            platform_fees_amt, net_proceeds, true_total_cost, net_profit, roi_pct
-          ) VALUES (
-            ?, ?, ?, 'eBay', ?,
-            ?, ?, ?, ?,
-            ?, ?, ?,
-            ?, ?, ?, ?, ?
-          )
-          ON CONFLICT(item_id) DO UPDATE SET
-            platform = excluded.platform,
-            ebay_order_id = excluded.ebay_order_id,
-            sale_date = excluded.sale_date,
-            buyer_handle = excluded.buyer_handle,
-            gross_sale_price = excluded.gross_sale_price,
-            buyer_shipping_paid = excluded.buyer_shipping_paid,
-            actual_shipping_cost = excluded.actual_shipping_cost,
-            platform_fee_pct = excluded.platform_fee_pct,
-            platform_flat_fee = excluded.platform_flat_fee,
-            platform_fees_amt = excluded.platform_fees_amt,
-            net_proceeds = excluded.net_proceeds,
-            true_total_cost = excluded.true_total_cost,
-            net_profit = excluded.net_profit,
-            roi_pct = excluded.roi_pct
-        `).bind(
-          saleId,
-          payload.userId,
-          item.id,
-          String(ebay_order_id),
-          finalSaleDate,
-          buyer,
-          price,
-          bShip,
-          aShip,
-          feeStructure.fee_pct,
-          feeStructure.flat_fee,
-          platformFeeAmt,
-          netProceeds,
-          landedCost,
-          netProfit,
-          roiPct
-        ).run();
-      }
-    } catch (saleErr) {
-      console.warn('[match-sold-vinescout] Sale upsert conflict, updating existing row:', saleErr);
-      await env.DB.prepare(`
-        UPDATE auction_sales
-        SET platform = 'eBay',
-            ebay_order_id = ?,
-            sale_date = ?,
-            buyer_handle = ?,
-            gross_sale_price = ?,
-            buyer_shipping_paid = ?,
-            actual_shipping_cost = ?,
-            platform_fee_pct = ?,
-            platform_flat_fee = ?,
-            platform_fees_amt = ?,
-            net_proceeds = ?,
-            true_total_cost = ?,
-            net_profit = ?,
-            roi_pct = ?
-        WHERE item_id = ? AND user_id = ?
-      `).bind(
-        String(ebay_order_id),
-        finalSaleDate,
-        buyer,
-        price,
-        bShip,
-        aShip,
-        feeStructure.fee_pct,
-        feeStructure.flat_fee,
-        platformFeeAmt,
-        netProceeds,
-        landedCost,
-        netProfit,
-        roiPct,
-        item.id,
-        payload.userId
-      ).run();
-    }
-
-    if (!existingSale) {
-      const persisted = await env.DB.prepare(
-        'SELECT id FROM auction_sales WHERE item_id = ? AND user_id = ?'
-      ).bind(item.id, payload.userId).first();
-      if (persisted?.id) saleId = persisted.id;
-    }
+    const savedSale = await upsertSale(env, payload.userId, record);
+    const saleId = savedSale.id;
+    const roiPct = record.roi_pct;
+    const netProfit = record.net_profit;
 
     // 5. Asynchronous Finances / Fee Reconciliation
     try {

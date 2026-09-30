@@ -325,7 +325,11 @@ export function InventoryGridRow({
           className="px-3 py-1.5 whitespace-nowrap overflow-hidden text-xs font-mono cursor-help"
         >
           <InlineEditCell
-            value={item.floor_price || item._computedFloor || item.min_sell_price}
+            // T-10 item 5: display the server-computed floor only. The old expression
+          // preferred item.floor_price, then a client-only _computedFloor from a
+          // second pricing formula, then min_sell_price - three sources, one of
+          // which the server had never seen.
+          value={item.floor_price || item.min_sell_price}
             itemId={item.id}
             field="floor_price"
             type="number"

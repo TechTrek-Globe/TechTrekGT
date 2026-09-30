@@ -1,5 +1,5 @@
 import React from 'react';
-import { Package, X, ShieldCheck, Tag, ExternalLink, Check, Loader2 } from 'lucide-react';
+import { Package, X, ShieldCheck, Tag, ExternalLink, Check, Loader2, AlertTriangle } from 'lucide-react';
 import { STATUS_META } from '../../utils/constants';
 
 function normalizeHttps(url) {
@@ -11,7 +11,7 @@ function normalizeHttps(url) {
   return trimmed;
 }
 
-export function EditModalHeader({ form, item, isDirty, autoSaving, autoSavedTime, onClose }) {
+export function EditModalHeader({ form, item, isDirty, autoSaving, autoSavedTime, autoSaveError, onClose }) {
   const [imgError, setImgError] = React.useState(false);
   const statusMeta = STATUS_META[form.status] || STATUS_META['Available'];
   const title = form.item_name || item?.item_name || 'Untitled Inventory Item';
@@ -51,6 +51,15 @@ export function EditModalHeader({ form, item, isDirty, autoSaving, autoSavedTime
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-300 border border-amber-500/30 animate-pulse">
                 <Loader2 className="w-2.5 h-2.5 animate-spin" />
                 Saving...
+              </span>
+            ) : autoSaveError ? (
+              // T-11 item 9: a failed auto-save must be visible, not console-only.
+              <span
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500/10 text-red-400 border border-red-500/30"
+                title={autoSaveError}
+              >
+                <AlertTriangle className="w-2.5 h-2.5" />
+                Auto-save failed
               </span>
             ) : isRecentlySaved ? (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">

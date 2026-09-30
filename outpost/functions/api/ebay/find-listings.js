@@ -1,6 +1,7 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
 import { getEbayUserToken, fetchEbayActiveSellerListings } from './tokenHelper.js';
 import { getCachedEbayListings, setCachedEbayListings } from './listingsCache.js';
+import { FUZZY_MATCH_THRESHOLD, HIGH_CONFIDENCE_THRESHOLD } from '../../utils/constants.js';
 
 /**
  * GET /api/ebay/find-listings
@@ -61,6 +62,7 @@ export async function onRequestGet(context) {
 
     } catch (e) {
       console.error('[find-listings] eBay listings fetch failed:', e);
+      if (e?.statusCode === 503) return err(e.message, 503);
       const msg = e.message || '';
       if (msg.includes('not connected') || msg.includes('expired')) {
         return err('eBay account not connected or session expired. Please connect your eBay account.', 401);
@@ -97,7 +99,7 @@ export async function onRequestGet(context) {
       const candidates = internalItems.map(item => ({
         item,
         score: fuzzyScore(listing.title, item.item_name, item.athlete_person)
-      })).filter(c => c.score >= 0.35);
+      })).filter(c => c.score >= FUZZY_MATCH_THRESHOLD);
 
       if (candidates.length === 0) continue;
 
@@ -123,13 +125,13 @@ export async function onRequestGet(context) {
           category: best.item.category
         },
         confidence: parseFloat(best.score.toFixed(2)),
-        high_confidence: best.score >= 0.80,
+        high_confidence: best.score >= HIGH_CONFIDENCE_THRESHOLD,
         alternatives: candidates.slice(1, 3).map(c => ({
           id: c.item.id,
           item_name: c.item.item_name,
           athlete_person: c.item.athlete_person,
           confidence: parseFloat(c.score.toFixed(2)),
-          high_confidence: c.score >= 0.80
+          high_confidence: c.score >= HIGH_CONFIDENCE_THRESHOLD
         }))
       });
     }

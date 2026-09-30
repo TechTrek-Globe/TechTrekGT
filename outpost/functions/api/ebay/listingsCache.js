@@ -4,7 +4,11 @@
  * re-fetches (Trading API + REST Inventory API + per-SKU offers).
  */
 
-export const LISTINGS_CACHE_TTL_MINUTES = 15;
+import { LISTINGS_CACHE_TTL_MINUTES } from '../../utils/constants.js';
+
+// T-10 item 2: one cache TTL definition. Re-exported here so existing importers
+// of this module keep working.
+export { LISTINGS_CACHE_TTL_MINUTES };
 
 /**
  * Ensures the cache table exists in the database.

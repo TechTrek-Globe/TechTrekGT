@@ -300,9 +300,13 @@ describe('[HIGH-7] N+1 Query Elimination in Invoice Item Creation and Update', (
     mockDb.queryLog.length = 0;
     mockDb.batchLog.length = 0;
 
+    // T-10 item 7: the fixture previously used 12.0, which is 1200% as a fraction.
+    // That is out of range for a fee and is now rejected at the API boundary.
+    // The intent of the test (an explicit fee skips the platform lookup) is
+    // unchanged; only the invalid value is corrected.
     const items = [
       { item_name: 'No Platform Item 1', unit_price: 15.0 },
-      { item_name: 'Explicit Fee Item 2', unit_price: 25.0, platform: 'CustomPlat', platform_fee_pct: 12.0 }
+      { item_name: 'Explicit Fee Item 2', unit_price: 25.0, platform: 'CustomPlat', platform_fee_pct: 0.12 }
     ];
 
     const req = new Request('https://techtrekgt.com/api/invoices', {

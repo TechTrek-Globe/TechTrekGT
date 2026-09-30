@@ -2,24 +2,44 @@
  * tokenHelper.js - eBay user-level OAuth token retrieval for the Outpost Worker.
  *
  * Mirrors the getEbayUserToken function from landing/src/gateway/ebayOAuth.js,
- * operating against the Outpost's own D1 + JWT_SECRET bindings.
+ * operating against the Outpost's own D1 bindings.
  *
  * Eliminates the server-to-server gateway fetch pattern that caused the
  * "Endpoint not found" loopback bug in find-listings.js.
  *
- * Required env bindings: DB, JWT_SECRET, EBAY_CLIENT_ID, EBAY_CLIENT_SECRET
+ * Required env bindings: DB, TOKEN_ENCRYPTION_KEY, EBAY_CLIENT_ID, EBAY_CLIENT_SECRET
  * Optional: EBAY_ENV (set to 'sandbox' to use sandbox API URLs)
+ *
+ * FAIL-CLOSED: TOKEN_ENCRYPTION_KEY must be bound. JWT_SECRET is NEVER substituted.
  */
 
 import { daysBetween, markItemSold } from '../../utils/auction.js';
+import {
+  DEFAULT_PLATFORM_FEE_PCT,
+  DEFAULT_PLATFORM_FLAT_FEE,
+  DEFAULT_TARGET_MARGIN_PCT
+} from '../../utils/constants.js';
+import {
+  calculateEbayCategoryFees as resolveEbayCategoryFees,
+  getActiveFeeSchedule
+} from '../../utils/ebayFeeSchedule.js';
 
-// --- Token Crypto (AES-GCM, matches landing/src/gateway/tokenCrypto.js) ---
+// --- Token Crypto (AES-GCM, matches outpost/functions/utils/tokenCrypto.js) ---
+//
+// v1 (legacy): "<iv_b64>.<ciphertext_b64>"    - PBKDF2 100k iters, OLD_SALT or NEW_SALT
+// v2 (current): "v2.<iv_b64>.<ciphertext_b64>" - PBKDF2 310k iters, NEW_SALT
+//
+// FOLLOW-UP: Remove v1/OLD_SALT decryption path after all tokens re-encrypted. 2026-12-31.
 
 export const OLD_SALT = new TextEncoder().encode('techtrekgt-ebay-token-v1');
 export const NEW_SALT = new TextEncoder().encode('techtrekgt-token-encryption-v2');
-export const PBKDF2_ITERATIONS = 100_000;
+export const PBKDF2_ITERATIONS_V1 = 100_000;
+export const PBKDF2_ITERATIONS_V2 = 310_000;
+export const PBKDF2_ITERATIONS = PBKDF2_ITERATIONS_V2;
 
-export async function deriveKey(secret, salt = NEW_SALT) {
+const _V2_PREFIX = 'v2';
+
+export async function deriveKey(secret, salt = NEW_SALT, iterations = PBKDF2_ITERATIONS_V2) {
   const raw = await crypto.subtle.importKey(
     'raw',
     new TextEncoder().encode(secret),
@@ -28,7 +48,7 @@ export async function deriveKey(secret, salt = NEW_SALT) {
     ['deriveKey']
   );
   return crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
+    { name: 'PBKDF2', salt, iterations, hash: 'SHA-256' },
     raw,
     { name: 'AES-GCM', length: 256 },
     false,
@@ -44,46 +64,65 @@ function base64ToBuf(b64) {
   return Uint8Array.from(atob(b64), c => c.charCodeAt(0));
 }
 
-export async function decryptToken(encrypted, tokenEncryptionKey, fallbackSecret = null) {
-  if (!encrypted) return null;
-  const [ivB64, cipherB64] = encrypted.split('.');
-  if (!ivB64 || !cipherB64) throw new Error('Invalid encrypted token format');
-  const iv = base64ToBuf(ivB64);
-  const cipherBuf = base64ToBuf(cipherB64);
+/**
+ * Decrypts a stored eBay token.
+ * Returns { plaintext, wasLegacy } - wasLegacy=true signals caller to re-encrypt under v2.
+ * Throws a clear error on corrupted ciphertext - never returns null silently.
+ * TOKEN_ENCRYPTION_KEY required. No JWT_SECRET substitution.
+ */
+export async function decryptToken(encrypted, tokenEncryptionKey) {
+  if (!encrypted) return { plaintext: null, wasLegacy: false };
+  if (!tokenEncryptionKey) throw new Error('TOKEN_ENCRYPTION_KEY binding is required for decryption');
 
-  // 1. Try decrypting with primary TOKEN_ENCRYPTION_KEY and NEW_SALT
-  if (tokenEncryptionKey) {
+  // --- v2 path ---
+  if (encrypted.startsWith(`${_V2_PREFIX}.`)) {
+    const rest = encrypted.slice(_V2_PREFIX.length + 1);
+    const dotIdx = rest.indexOf('.');
+    if (dotIdx === -1) throw new Error('Invalid v2 encrypted token format');
+    const iv = base64ToBuf(rest.slice(0, dotIdx));
+    const cipherBuf = base64ToBuf(rest.slice(dotIdx + 1));
+    const key = await deriveKey(tokenEncryptionKey, NEW_SALT, PBKDF2_ITERATIONS_V2);
+    let plainBuf;
     try {
-      const key = await deriveKey(tokenEncryptionKey, NEW_SALT);
-      const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, cipherBuf);
-      return new TextDecoder().decode(plainBuf);
+      plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, cipherBuf);
     } catch (_) {
-      // Transition fallback if ciphertext was encrypted with legacy derivation
+      throw new Error('Failed to decrypt v2 token: invalid key or ciphertext corrupted');
     }
+    return { plaintext: new TextDecoder().decode(plainBuf), wasLegacy: false };
   }
 
-  // 2. Transition window fallback: try legacy key derivation with OLD_SALT
-  const oldSecret = fallbackSecret || tokenEncryptionKey;
-  if (oldSecret) {
-    try {
-      const oldKey = await deriveKey(oldSecret, OLD_SALT);
-      const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, oldKey, cipherBuf);
-      return new TextDecoder().decode(plainBuf);
-    } catch (_) {
-      // Both attempts failed
-    }
-  }
+  // --- v1 (legacy) path ---
+  const dotIdx = encrypted.indexOf('.');
+  if (dotIdx === -1) throw new Error('Invalid encrypted token format');
+  const iv = base64ToBuf(encrypted.slice(0, dotIdx));
+  const cipherBuf = base64ToBuf(encrypted.slice(dotIdx + 1));
+
+  try {
+    const key = await deriveKey(tokenEncryptionKey, NEW_SALT, PBKDF2_ITERATIONS_V1);
+    const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, cipherBuf);
+    return { plaintext: new TextDecoder().decode(plainBuf), wasLegacy: true };
+  } catch (_) { /* fall through */ }
+
+  try {
+    const key = await deriveKey(tokenEncryptionKey, OLD_SALT, PBKDF2_ITERATIONS_V1);
+    const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, cipherBuf);
+    return { plaintext: new TextDecoder().decode(plainBuf), wasLegacy: true };
+  } catch (_) { /* both paths exhausted */ }
 
   throw new Error('Failed to decrypt token: invalid key or ciphertext corrupted');
 }
 
+/**
+ * Encrypts a plain-text token. Returns v2 versioned envelope.
+ * TOKEN_ENCRYPTION_KEY required. Throws if absent.
+ */
 export async function encryptToken(plaintext, tokenEncryptionKey) {
   if (!tokenEncryptionKey) throw new Error('TOKEN_ENCRYPTION_KEY binding is required');
-  const key = await deriveKey(tokenEncryptionKey, NEW_SALT);
+  const key = await deriveKey(tokenEncryptionKey, NEW_SALT, PBKDF2_ITERATIONS_V2);
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const encoded = new TextEncoder().encode(plaintext);
   const cipherBuf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, encoded);
-  return `${bufToBase64(iv)}.${bufToBase64(cipherBuf)}`;
+  return `${_V2_PREFIX}.${bufToBase64(iv)}.${bufToBase64(cipherBuf)}`;
 }
 
 
@@ -157,11 +196,17 @@ export function getEbayApiBase(env) {
  */
 export async function getEbayUserToken(env, userId) {
   if (!env.DB) throw new Error('DB binding not available');
-  const encKey = env.TOKEN_ENCRYPTION_KEY || (() => {
-    console.error('[getEbayUserToken] TOKEN_ENCRYPTION_KEY not configured - falling back to JWT_SECRET for eBay token encryption. This defeats key separation; configure TOKEN_ENCRYPTION_KEY immediately.');
-    return env.JWT_SECRET;
-  })();
-  if (!encKey) throw new Error('TOKEN_ENCRYPTION_KEY binding not available');
+
+  if (!env.TOKEN_ENCRYPTION_KEY) {
+    console.error('[tokenHelper] FATAL: TOKEN_ENCRYPTION_KEY is not bound. eBay integration unavailable.');
+    throw Object.assign(
+      new Error('eBay integration is temporarily unavailable due to a server configuration issue. Please contact support.'),
+      { statusCode: 503 }
+    );
+  }
+  const encKey = env.TOKEN_ENCRYPTION_KEY;
+
+  console.log('[tokenHelper] TOKEN_ENCRYPTION_KEY binding present: yes');
 
   const row = await env.DB.prepare(
     'SELECT * FROM ebay_oauth_tokens WHERE user_id = ?'
@@ -179,9 +224,27 @@ export async function getEbayUserToken(env, userId) {
     throw new Error('eBay refresh token has expired. Please reconnect your eBay account in Settings.');
   }
 
+  // Helper: decrypt and re-encrypt legacy tokens in-place to drain the v1 path
+  async function decryptAndMigrate(encrypted, column) {
+    const { plaintext, wasLegacy } = await decryptToken(encrypted, encKey);
+    if (wasLegacy && plaintext) {
+      try {
+        const reencrypted = await encryptToken(plaintext, encKey);
+        await env.DB.prepare(
+          `UPDATE ebay_oauth_tokens SET ${column} = ? WHERE user_id = ?`
+        ).bind(reencrypted, userId).run();
+        console.log(`[tokenHelper] Migrated legacy ${column} to v2 envelope for user ${userId}`);
+      } catch (migrateErr) {
+        console.error(`[tokenHelper] Failed to persist migrated ${column}:`, migrateErr);
+        // Non-fatal: continue with the decrypted plaintext
+      }
+    }
+    return plaintext;
+  }
+
   // Access token still valid (>5 min remaining) - return it directly
   if (accessExp > now + 5 * 60 * 1000) {
-    return decryptToken(row.access_token, encKey, env.JWT_SECRET);
+    return decryptAndMigrate(row.access_token, 'access_token');
   }
 
   // Access token expired or near-expiry - refresh it
@@ -189,7 +252,7 @@ export async function getEbayUserToken(env, userId) {
     throw new Error('EBAY_CLIENT_ID / EBAY_CLIENT_SECRET not configured on this worker. Cannot refresh token.');
   }
 
-  const refreshToken = await decryptToken(row.refresh_token, encKey, env.JWT_SECRET);
+  const refreshToken = await decryptAndMigrate(row.refresh_token, 'refresh_token');
   const clientId = String(env.EBAY_CLIENT_ID).trim().replace(/^['"]|['"]$/g, '');
   const clientSecret = String(env.EBAY_CLIENT_SECRET).trim().replace(/^['"]|['"]$/g, '');
   const credentials = btoa(`${clientId}:${clientSecret}`);
@@ -215,7 +278,7 @@ export async function getEbayUserToken(env, userId) {
   const newExpMs = Date.now() + (data.expires_in || 7200) * 1000;
   const newExpIso = new Date(newExpMs).toISOString();
 
-  const encAccess = await encryptToken(newAccessToken, env.TOKEN_ENCRYPTION_KEY || encKey);
+  const encAccess = await encryptToken(newAccessToken, encKey);
 
   await env.DB.prepare(`
     UPDATE ebay_oauth_tokens SET
@@ -379,75 +442,30 @@ export async function fetchEbayActiveSellerListings(env, accessToken) {
 
 /**
  * Calculates eBay category-specific final value fee rate and flat fee.
- * 
- * Rules:
- * - Sports Trading Cards (Singles & Boxes / Lots): 13.25% + $0.30 (if total <= $10) or $0.40 (if total > $10)
- * - Books, Movies, Music: 14.95% + $0.40
- * - Select Consumer Electronics: 13.25% + $0.40 (or 9.35% for select subcategories)
- * - Sports Memorabilia / Standard Default: 13.50% + $0.40
+ *
+ * T-10 item 8: the rates and category IDs now live in the versioned schedule at
+ * utils/ebayFeeSchedule.js. This function is kept as the module-local entry
+ * point so existing callers do not change, and it now also returns which
+ * schedule produced the numbers, so an estimate can be audited later.
  *
  * @param {string|null} categoryId
  * @param {string|null} categoryName
  * @param {number} currentPrice
- * @returns {{ fee_pct: number, flat_fee: number, category_tier: string }}
+ * @returns {{ fee_pct: number, flat_fee: number, category_tier: string,
+ *             category_tier_id: string, schedule_version: string,
+ *             schedule_effective_date: string }}
  */
 export function calculateEbayCategoryFees(categoryId, categoryName, currentPrice = 0) {
-  const catLower = (categoryName || '').toLowerCase();
-  const idStr = String(categoryId || '');
-
-  // 1. Sports Trading Cards & Collectible Card Games (IDs: 213, 214, 215, 216, 261328, 183454, 183050, etc.)
-  if (
-    catLower.includes('trading card') ||
-    catLower.includes('baseball card') ||
-    catLower.includes('football card') ||
-    catLower.includes('basketball card') ||
-    catLower.includes('hockey card') ||
-    catLower.includes('soccer card') ||
-    catLower.includes('pokemon') ||
-    catLower.includes('magic: the gathering') ||
-    ['213', '214', '215', '216', '261328', '183454', '183050', '261068'].includes(idStr)
-  ) {
-    return {
-      fee_pct: 0.1325, // 13.25%
-      flat_fee: currentPrice > 0 && currentPrice <= 10.0 ? 0.30 : 0.40,
-      category_tier: 'Trading Cards (13.25%)'
-    };
-  }
-
-  // 2. Books, Movies & Music (IDs: 267, 11232, 11233, etc.)
-  if (
-    catLower.includes('books & magazines') ||
-    catLower.includes('dvds & movies') ||
-    catLower.includes('music') ||
-    ['267', '11232', '11233', '176984'].includes(idStr)
-  ) {
-    return {
-      fee_pct: 0.1495, // 14.95%
-      flat_fee: 0.40,
-      category_tier: 'Media / Books (14.95%)'
-    };
-  }
-
-  // 3. Select Consumer Electronics (IDs: 9355, 175672, 177, etc.)
-  if (
-    catLower.includes('computers/tablets') ||
-    catLower.includes('cell phones & smartphones') ||
-    ['9355', '175672', '177'].includes(idStr)
-  ) {
-    return {
-      fee_pct: 0.1325,
-      flat_fee: 0.40,
-      category_tier: 'Electronics (13.25%)'
-    };
-  }
-
-  // 4. Default: Sports Memorabilia, Fan Apparel, Antiques & General Merchandise
-  return {
-    fee_pct: 0.1350, // 13.50%
-    flat_fee: 0.40,
-    category_tier: 'Standard / Sports Mem (13.50%)'
-  };
+  return resolveEbayCategoryFees(categoryId, categoryName, currentPrice, {
+    defaultFeePct: DEFAULT_PLATFORM_FEE_PCT
+  });
 }
+
+/**
+ * Returns the eBay fee schedule in force today. Exposed so operators can see
+ * which version produced recent estimates.
+ */
+export { getActiveFeeSchedule };
 
 /**
  * Fetches expanded details for a single eBay listing by its 12-digit ItemID.
@@ -1398,6 +1416,56 @@ export async function fetchEbayOrderFinances(env, accessToken, orderId) {
 }
 
 /**
+ * Minimizes eBay finances transaction data into a bounded, structured summary
+ * containing only the financial audit fields used by Outpost, preventing
+ * raw PII retention liability and ensuring valid parseable JSON (PRIV-002 / FUNC-020).
+ *
+ * @param {Array} rawTransactions - Raw transaction list from eBay Finances API
+ * @param {number} retentionDays - Retention period in days (default: 90)
+ * @returns {string} Serialized valid JSON summary
+ */
+export function buildFinancesSummary(rawTransactions, retentionDays = 90) {
+  const transactions = Array.isArray(rawTransactions) ? rawTransactions : [];
+  const now = new Date();
+  const retentionUntil = new Date(now.getTime() + retentionDays * 86400000).toISOString();
+
+  const summary = {
+    version: '1.0',
+    reconciled_at: now.toISOString(),
+    retention_days: retentionDays,
+    retention_until: retentionUntil,
+    transaction_count: transactions.length,
+    transactions: transactions.slice(0, 50).map(t => {
+      const fees = [];
+      const orderLineItems = Array.isArray(t.orderLineItems) ? t.orderLineItems : [];
+      for (const oli of orderLineItems) {
+        if (Array.isArray(oli.marketplaceFees)) {
+          for (const mf of oli.marketplaceFees) {
+            fees.push({
+              feeType: mf.feeType || null,
+              amount: mf.amount?.value ? parseFloat(mf.amount.value) : null
+            });
+          }
+        }
+      }
+      return {
+        transactionId: t.transactionId || null,
+        transactionType: t.transactionType || null,
+        transactionDate: t.transactionDate || null,
+        amount: t.amount?.value ? parseFloat(t.amount.value) : (typeof t.amount === 'number' ? t.amount : null),
+        feeBasisAmount: t.totalFeeBasisAmount?.value
+          ? parseFloat(t.totalFeeBasisAmount.value)
+          : (orderLineItems[0]?.feeBasisAmount?.value ? parseFloat(orderLineItems[0].feeBasisAmount.value) : null),
+        feeType: t.feeType || orderLineItems[0]?.feeType || null,
+        fees: fees.length > 0 ? fees : undefined
+      };
+    })
+  };
+
+  return JSON.stringify(summary);
+}
+
+/**
  * Reconciles and atomically saves a completed eBay sale into Cloudflare D1.
  * Upserts auction_sales, ebay_fee_reconciliations, and updates auction_items.
  *
@@ -1437,6 +1505,11 @@ export async function reconcileAndSaveEbaySale(env, userId, item, orderData = nu
   let promotedRate = item.ebay_promoted_rate || (item.boost_pct ? item.boost_pct * 100 : 0);
   let promotedActive = false;
 
+  // T-10 item 3: one fee default, hoisted so both the estimate branch and the
+  // reconciliation estimate below read the same numbers.
+  const feePct = item.platform_fee_pct ?? DEFAULT_PLATFORM_FEE_PCT;
+  const flatFee = item.platform_flat_fee ?? DEFAULT_PLATFORM_FLAT_FEE;
+
   if (financeData?.finances_available) {
     finalValueFee = financeData.final_value_fee || 0;
     promotedListingFee = financeData.promoted_listing_fee || 0;
@@ -1447,8 +1520,6 @@ export async function reconcileAndSaveEbaySale(env, userId, item, orderData = nu
     promotedRate = financeData.promoted_listing_rate ?? promotedRate;
     promotedActive = Boolean(financeData.promoted_listing_active || promotedListingFee > 0);
   } else {
-    const feePct = item.platform_fee_pct || 0.135;
-    const flatFee = item.platform_flat_fee || 0.40;
     finalValueFee = parseFloat((grossSalePrice * feePct + flatFee).toFixed(2));
     promotedListingFee = promotedRate > 0 ? parseFloat((grossSalePrice * (promotedRate / 100)).toFixed(2)) : 0;
     shippingLabelCost = item.est_shipping_cost || 0;
@@ -1461,10 +1532,15 @@ export async function reconcileAndSaveEbaySale(env, userId, item, orderData = nu
   const netProceeds = parseFloat((grossSalePrice + buyerShippingPaid - platformFeesAmt - actualShippingCost).toFixed(2));
   const trueCost = item.true_total_cost || (item.unit_price || 0);
   const netProfit = parseFloat((netProceeds - trueCost).toFixed(2));
-  const roiPct = trueCost > 0 ? parseFloat((netProfit / trueCost).toFixed(4)) : 0;
+  // T-09 item 2: roi_pct is NOT computed here. normalizeSaleInput derives it from
+  // computeSaleMetrics using the same net_proceeds and true_total_cost, so this
+  // path cannot drift from the other three.
 
+  // T-11 item 8: daysBetween returns null for an invalid ordering (sale date
+  // before acquisition). That null is passed straight through so the row is
+  // EXCLUDED from AVG(days_to_sell) instead of contributing a phantom zero.
   const startDate = item.date_listed || item.date_acquired;
-  const daysToSell = daysBetween(startDate, saleDate) ?? 0;
+  const daysToSell = daysBetween(startDate, saleDate);
 
   let savedSale = await markItemSold(env, userId, item, {
     sale_date: saleDate,
@@ -1474,25 +1550,32 @@ export async function reconcileAndSaveEbaySale(env, userId, item, orderData = nu
     gross_sale_price: grossSalePrice,
     buyer_shipping_paid: buyerShippingPaid,
     actual_shipping_cost: actualShippingCost,
-    platform_fee_pct: item.platform_fee_pct || 0.135,
-    platform_flat_fee: item.platform_flat_fee || 0.40,
+    platform_fee_pct: feePct,
+    platform_flat_fee: flatFee,
     platform_fees_amt: platformFeesAmt,
     payment_processing_amt: paymentProcessingFee,
     promoted_listing_fee: promotedListingFee,
     net_proceeds: netProceeds,
     true_total_cost: trueCost,
-    net_profit: netProfit,
-    roi_pct: roiPct,
     days_to_sell: daysToSell,
-    fee_reconciled: true
+    // T-12 item 1: the flag must describe what actually happened. The estimate
+    // branch above (finances_available false) derives fees from platform_fee_pct
+    // and never contacts the Finances API, so nothing was reconciled. Stamping
+    // fee_reconciled_at there marked a row as verified while the
+    // ebay_fee_reconciliations insert below was skipped, producing a reconciled
+    // timestamp with no reconciliation record and no order id.
+    fee_reconciled: Boolean(financeData?.finances_available)
   });
   let saleId = savedSale.id;
 
-  // Upsert ebay_fee_reconciliations if ebayOrderId is known
+  // Upsert ebay_fee_reconciliations if ebayOrderId is known. T-12 item 2: an
+  // order id alone is not enough, because without Finances API data this row
+  // would store estimate-derived fees in a table whose every other row holds
+  // eBay-verified amounts.
   let reconRow = null;
-  if (ebayOrderId) {
+  if (ebayOrderId && financeData?.finances_available) {
     const reconId = `recon-${crypto.randomUUID()}`;
-    const estimatedFees = parseFloat((item.platform_fees_amt || (grossSalePrice * (item.platform_fee_pct || 0.135) + 0.40)).toFixed(2));
+    const estimatedFees = parseFloat((item.platform_fees_amt || (grossSalePrice * feePct + flatFee)).toFixed(2));
     const feeDelta = parseFloat((totalEbayFees - estimatedFees).toFixed(4));
 
     await env.DB.prepare(`
@@ -1535,7 +1618,7 @@ export async function reconcileAndSaveEbaySale(env, userId, item, orderData = nu
       netProfit,
       promotedRate,
       promotedActive ? 1 : 0,
-      JSON.stringify(financeData?.raw || []).slice(0, 65535)
+      buildFinancesSummary(financeData?.raw || [])
     ).run();
 
     reconRow = {

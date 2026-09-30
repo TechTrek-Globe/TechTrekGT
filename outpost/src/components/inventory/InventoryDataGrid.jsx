@@ -4,6 +4,7 @@ import { InventoryGridRow } from './InventoryGridRow';
 import { fmtCurrency } from '../../utils/formulaPreview';
 import { computeFeeBreakdown } from '../../utils/feeEngine';
 import { ItemImageHoverTooltip } from './ItemImageHoverTooltip';
+import { DEFAULT_TARGET_MARGIN_PCT } from '../../../functions/utils/constants.js';
 
 export const DEFAULT_COLUMNS = [
   { key: 'actions', label: 'Actions', minWidth: 140 },
@@ -363,7 +364,8 @@ export function InventoryDataGrid({
           {hoverTooltip.type === 'floor' && (() => {
             const item = hoverTooltip.item;
             const feeData = computeFeeBreakdown(item);
-            const floorVal = Number(item.floor_price || item._computedFloor || item.min_sell_price || feeData.breakEvenFloorPrice || 0);
+            // T-10 item 5: server-computed floor only (see InventoryContext).
+    const floorVal = Number(item.floor_price || item.min_sell_price || feeData.breakEvenFloorPrice || 0);
             return (
               <div className="space-y-1.5 text-[11px]">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-1">
@@ -409,7 +411,7 @@ export function InventoryDataGrid({
           {hoverTooltip.type === 'suggested' && (() => {
             const item = hoverTooltip.item;
             const feeData = computeFeeBreakdown(item);
-            const targetMargin = Number(item.target_margin_pct) || 0.15;
+            const targetMargin = Number(item.target_margin_pct) || DEFAULT_TARGET_MARGIN_PCT;
             const suggested = Number(item.suggested_list_price) || 0;
             return (
               <div className="space-y-1.5 text-[11px]">

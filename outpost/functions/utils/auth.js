@@ -132,15 +132,30 @@ function base64UrlDecode(str) {
   return atob(base64);
 }
 
-// Create Signed JWT Token (HIGH-5: accepts expiresInSeconds, defaulting to 7200)
+// Truncated SHA-256 of credential to support correlation in logs without disclosure (PRIV-001)
+export async function hashTokenForLog(token) {
+  if (!token || typeof token !== 'string') return 'none';
+  try {
+    const enc = new TextEncoder();
+    const digest = await crypto.subtle.digest('SHA-256', enc.encode(token.trim()));
+    const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+    return hex.slice(0, 12);
+  } catch (_) {
+    return 'unknown';
+  }
+}
+
+// Create Signed JWT Token (HIGH-5, PRIV-003: minimal claims { userId, exp, tv }, no PII)
 export async function createToken(payload, secret, expiresInSeconds = 7200) {
   if (!secret) throw new Error('JWT_SECRET is not defined in environment variables');
   const header = { alg: 'HS256', typ: 'JWT' };
   const encodedHeader = base64UrlEncode(JSON.stringify(header));
-  const encodedPayload = base64UrlEncode(JSON.stringify({
-    ...payload,
-    exp: Math.floor(Date.now() / 1000) + expiresInSeconds
-  }));
+  const tokenPayload = {
+    userId: payload.userId || payload.id,
+    exp: Math.floor(Date.now() / 1000) + expiresInSeconds,
+    tv: payload.tv !== undefined ? payload.tv : 1
+  };
+  const encodedPayload = base64UrlEncode(JSON.stringify(tokenPayload));
 
   const dataToSign = `${encodedHeader}.${encodedPayload}`;
   const enc = new TextEncoder();

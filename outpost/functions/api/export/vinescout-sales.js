@@ -1,8 +1,22 @@
-import { resolveIntegrationUserId } from '../../utils/apiIntegrations.js';
-import { getAllTokensFromRequest } from '../../utils/auth.js';
+import { resolveIntegrationUserId, checkOutpostSecretKey } from '../../utils/apiIntegrations.js';
+import { getAllTokensFromRequest, hashTokenForLog } from '../../utils/auth.js';
+import { checkRateLimit } from '../../utils/rateLimit.js';
 
 export async function onRequestGet({ request, env }) {
   try {
+    // Alert if deprecated shared secret is still bound
+    checkOutpostSecretKey(env);
+
+    // Rate limiting: 30 requests per 60 seconds per IP
+    const ip = request.headers.get('CF-Connecting-IP') || 'export-unknown';
+    const rl = await checkRateLimit(env?.RATE_LIMIT_KV, `vinescout-sales:${ip}`, 30, 60, false);
+    if (!rl.allowed) {
+      return new Response(JSON.stringify({ error: 'Too many requests. Please wait before retrying.' }), {
+        status: 429,
+        headers: { 'Content-Type': 'application/json', 'Retry-After': String(rl.retryAfter) }
+      });
+    }
+
     let rawAuth = (request.headers.get('X-VineScout-Auth') ||
       (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '')).trim();
 
@@ -21,8 +35,9 @@ export async function onRequestGet({ request, env }) {
     const userId = await resolveIntegrationUserId(rawAuth, env);
 
     if (!userId) {
-      console.warn('[VINESCOUT_SALES_EXPORT] Auth failed. Token prefix:', rawAuth.substring(0, 12), 'length:', rawAuth.length);
-      return new Response(JSON.stringify({ error: 'Unauthorized: invalid token' }), {
+      const tokenHash = await hashTokenForLog(rawAuth);
+      console.warn(`[VINESCOUT_SALES_EXPORT] Auth failed. Credential hash: ${tokenHash}`);
+      return new Response(JSON.stringify({ error: 'Unauthorized: invalid API token. Create an integration secret in Settings, API Integrations.' }), {
         status: 401,
         headers: { 'Content-Type': 'application/json' }
       });

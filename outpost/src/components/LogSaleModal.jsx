@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { createSale, updateSale, getItems, syncEbayItem } from '../utils/auctionApi';
 import { computeSaleMetrics, daysBetween, fmtCurrency, fmtPct } from '../utils/formulaPreview';
+import { DEFAULT_PLATFORM_FEE_PCT, DEFAULT_PLATFORM_FLAT_FEE } from '../../functions/utils/constants.js';
 
 /**
  * @param {{
@@ -37,8 +38,8 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
 
   const [buyerShippingPaid, setBuyerShippingPaid] = useState('0');
   const [actualShippingCost, setActualShippingCost] = useState('0');
-  const [platformFeePct, setPlatformFeePct] = useState('13.6');
-  const [platformFlatFee, setPlatformFlatFee] = useState('0.40');
+  const [platformFeePct, setPlatformFeePct] = useState(String(DEFAULT_PLATFORM_FEE_PCT * 100));
+  const [platformFlatFee, setPlatformFlatFee] = useState(DEFAULT_PLATFORM_FLAT_FEE.toFixed(2));
   const [paymentProcessingAmt, setPaymentProcessingAmt] = useState('0');
   const [promotedListingFee, setPromotedListingFee] = useState('0');
 
@@ -51,7 +52,7 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
 
   // Default platform fallback
   const defaultPlatform = useMemo(() => {
-    return (platforms || []).find(p => p.is_default) || (platforms || [])[0] || { name: 'eBay', fee_pct: 0.136, flat_fee: 0.40 };
+    return (platforms || []).find(p => p.is_default) || (platforms || [])[0] || { name: 'eBay', fee_pct: DEFAULT_PLATFORM_FEE_PCT, flat_fee: DEFAULT_PLATFORM_FLAT_FEE };
   }, [platforms]);
 
   const calculateAutoNetEarnings = (grossVal, bShipVal, aShipVal, fPctVal, fFlatVal, pProcVal, pListVal) => {
@@ -144,8 +145,8 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
       setIsManualNetEarnings(saleToEdit.net_proceeds != null);
       setBuyerShippingPaid(String(saleToEdit.buyer_shipping_paid != null ? Number(saleToEdit.buyer_shipping_paid).toFixed(2) : '0.00'));
       setActualShippingCost(String(saleToEdit.actual_shipping_cost != null ? Number(saleToEdit.actual_shipping_cost).toFixed(2) : '0.00'));
-      setPlatformFeePct(String(parseFloat(((saleToEdit.platform_fee_pct || 0.136) * 100).toFixed(2))));
-      setPlatformFlatFee(String(saleToEdit.platform_flat_fee != null ? Number(saleToEdit.platform_flat_fee).toFixed(2) : '0.40'));
+      setPlatformFeePct(String(parseFloat(((saleToEdit.platform_fee_pct || DEFAULT_PLATFORM_FEE_PCT) * 100).toFixed(2))));
+      setPlatformFlatFee(String(saleToEdit.platform_flat_fee != null ? Number(saleToEdit.platform_flat_fee).toFixed(2) : DEFAULT_PLATFORM_FLAT_FEE.toFixed(2)));
       setPaymentProcessingAmt(String(saleToEdit.payment_processing_amt != null ? Number(saleToEdit.payment_processing_amt).toFixed(2) : '0.00'));
       setPromotedListingFee(String(saleToEdit.promoted_listing_fee != null ? Number(saleToEdit.promoted_listing_fee).toFixed(2) : '0.00'));
       return;
@@ -179,8 +180,8 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
   const applyItemPlatformDefaults = (item, platName) => {
     setPlatform(platName);
     const plat = (platforms || []).find(p => p.name === platName) || defaultPlatform;
-    let feePct = '13.6';
-    let flatFee = '0.40';
+    let feePct = String(DEFAULT_PLATFORM_FEE_PCT * 100);
+    let flatFee = DEFAULT_PLATFORM_FLAT_FEE.toFixed(2);
     let estShip = '0';
     if (plat) {
       feePct = String(parseFloat((plat.fee_pct * 100).toFixed(4)));
@@ -556,6 +557,11 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
               <p className="text-[10px] text-slate-400 mt-1">
                 {isManualNetEarnings ? 'Manual payout entry' : 'Bank deposit payout after fees & shipping'}
               </p>
+              {parseFloat(netEarnings) < 0 && (
+                <p className="text-[11px] text-amber-400 font-medium mt-1 flex items-center gap-1">
+                  <span>ℹ️</span> This sale is recorded at a loss
+                </p>
+              )}
             </div>
           </div>
 
@@ -690,7 +696,10 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
                 </div>
                 <div className="bg-slate-950/40 p-2 rounded-lg border border-slate-800/60">
                   <span className="text-slate-500 block text-[9px] uppercase font-semibold">Net Earnings</span>
-                  <span className="text-emerald-400 font-bold text-xs">{fmtCurrency(previewMetrics.net_proceeds)}</span>
+                  <span className={`font-bold text-xs ${previewMetrics.net_proceeds >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {fmtCurrency(previewMetrics.net_proceeds)}
+                    {previewMetrics.net_proceeds < 0 && <span className="text-[9px] font-normal block text-amber-400">Recorded at a loss</span>}
+                  </span>
                 </div>
                 <div className="bg-slate-950/40 p-2 rounded-lg border border-slate-800/60">
                   <span className="text-slate-500 block text-[9px] uppercase font-semibold">Landed Cost</span>
@@ -700,6 +709,7 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
                   <span className="text-slate-500 block text-[9px] uppercase font-semibold">Net Profit</span>
                   <span className={`font-bold text-xs ${previewMetrics.net_profit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                     {fmtCurrency(previewMetrics.net_profit)} <span className="text-[10px] font-normal">({fmtPct(previewMetrics.roi_pct)})</span>
+                    {previewMetrics.net_profit < 0 && <span className="text-[9px] font-normal block text-red-300">Loss</span>}
                   </span>
                 </div>
               </div>

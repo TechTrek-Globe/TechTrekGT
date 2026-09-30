@@ -11,6 +11,7 @@ import {
   normalizeHttps
 } from './tokenHelper.js';
 import { computePricingFloors } from '../../utils/auction.js';
+import { DEFAULT_TARGET_MARGIN_PCT, MAX_SINGLE_ENRICH } from '../../utils/constants.js';
 import { setCachedEbayListings } from './listingsCache.js';
 
 function parseAttributes(attrSrc) {
@@ -58,6 +59,7 @@ export async function onRequestPost(context) {
       accessToken = await getEbayUserToken(env, payload.userId);
     } catch (e) {
       console.error('[sync-all] eBay authentication failed:', e);
+      if (e?.statusCode === 503) return err(e.message, 503);
       return err('eBay authentication failed. Please reconnect your eBay account.', 401);
     }
 
@@ -105,7 +107,7 @@ export async function onRequestPost(context) {
     let updatedCount = 0;
     let soldRecordedCount = 0;
     let singleEnrichCount = 0;
-    const MAX_SINGLE_ENRICH = 30;
+    // T-10 item 2: bounded by MAX_SINGLE_ENRICH.
 
     // Hoisted in-memory campaignCache scoped to this sync-all run (HIGH-8)
     const campaignCache = new Map();
@@ -197,7 +199,7 @@ export async function onRequestPost(context) {
             platform_flat_fee: platformFlatFee,
             platform_fee_pct: platformFeePct,
             boost_pct: boostPct,
-            target_margin_pct: item.target_margin_pct || 0.20
+            target_margin_pct: item.target_margin_pct ?? DEFAULT_TARGET_MARGIN_PCT
           });
 
           const isSold = match.status === 'Completed' || match.status === 'Sold' || (match.quantity_sold != null && match.quantity_sold > 0);

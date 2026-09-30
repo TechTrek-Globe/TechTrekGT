@@ -47,6 +47,9 @@ export async function onRequestGet(context) {
       });
     } catch (e) {
       console.error('[active-listings] Failed to fetch active eBay listings:', e);
+      if (e?.statusCode === 503) {
+        return err(e.message, 503);
+      }
       const msg = e.message || '';
       if (msg.includes('not connected') || msg.includes('expired')) {
         return err('eBay account not connected or session expired. Please connect your eBay account.', 401);

@@ -97,7 +97,36 @@ CREATE TABLE IF NOT EXISTS auction_sales (
   net_proceeds            REAL NOT NULL DEFAULT 0.0,
   true_total_cost         REAL NOT NULL DEFAULT 0.0,
   net_profit              REAL NOT NULL DEFAULT 0.0,
-  roi_pct                 REAL NOT NULL DEFAULT 0.0,
+  -- UNIT (T-09): roi_pct is a FRACTION, not a percentage. 0.35 means 35% ROI.
+  -- Display code (formulaPreview.fmtPct) multiplies by 100 for rendering.
+  -- Never store 35.0 here: POST /api/ebay/match-sold-vinescout used to do exactly
+  -- that, which rendered as 3500% beside a correct portfolio figure.
+  -- Produced exclusively by computeSaleMetrics() in functions/utils/auction.js.
+  --
+  -- The CHECK enforces DERIVATION, not a range. Deliberately NO lower bound:
+  -- roi_pct = net_profit / true_total_cost, and net_profit = net_proceeds - cost,
+  -- so any sale whose net proceeds are negative yields roi_pct < -1. That is a
+  -- supported case, not a unit error: T-06 pins a $6.00 sale with $6.50 shipping
+  -- on a $5.00 item at roi_pct = -1.344, and a worse one reaches -12.5. A
+  -- "roi_pct >= -1" guard would reject those legitimate loss sales at INSERT.
+  --
+  -- A consistency test IS safe, and it is what actually catches a leaked
+  -- percentage: net_profit and true_total_cost are unit-unambiguous dollars, so
+  -- a row written in percent convention cannot satisfy this unless it also
+  -- corrupted those columns. The 0.01 window is deliberately looser than the
+  -- 0.0001 needed to absorb the migration's 4-decimal ROUND, because hand-written
+  -- admin SQL has historically stored rounded values such as 0.848 for an exact
+  -- 0.8483478. It is still ~9900x tighter than the smallest possible unit error
+  -- (a leak is 100x the true value, so |leak - true| = 99 * |roi|), which is
+  -- orders of magnitude larger than any rounding a human or this codebase
+  -- produces. Rows with no positive cost basis are exempt, which keeps every
+  -- legitimate zero-cost / $0-ETV Vine flip insertable and updatable.
+  roi_pct                 REAL NOT NULL DEFAULT 0.0
+                            CHECK (
+                              true_total_cost IS NULL
+                              OR true_total_cost <= 0
+                              OR ABS(roi_pct - (net_profit / true_total_cost)) < 0.01
+                            ),
   days_to_sell            INTEGER,
   created_at              TEXT NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -538,6 +567,16 @@ CREATE INDEX IF NOT EXISTS idx_ebay_listings_cache_user ON ebay_listings_cache(u
 -- Optimizes SKU collision detection and uniqueness lookups
 -- ============================================================
 CREATE INDEX IF NOT EXISTS idx_auction_items_user_sku ON auction_items(user_id, sku);
+
+-- ============================================================
+-- T-02 MIGRATION: IMPORT BATCH ID COLUMNS
+-- Stamps every row created during batch import so that
+-- partial-failure recovery can delete only new rows.
+-- ============================================================
+ALTER TABLE auction_invoices ADD COLUMN import_batch_id TEXT;
+ALTER TABLE auction_items ADD COLUMN import_batch_id TEXT;
+ALTER TABLE auction_sales ADD COLUMN import_batch_id TEXT;
+ALTER TABLE auction_comps ADD COLUMN import_batch_id TEXT;
 
 
 

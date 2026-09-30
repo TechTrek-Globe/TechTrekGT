@@ -1,5 +1,6 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
-import { getEbayUserToken, fetchEbayOrderFinances } from './tokenHelper.js';
+import { computeSaleMetrics } from '../../utils/auction.js';
+import { getEbayUserToken, fetchEbayOrderFinances, buildFinancesSummary } from './tokenHelper.js';
 
 /**
  * POST /api/ebay/reconcile
@@ -34,6 +35,7 @@ export async function onRequestPost(context) {
       accessToken = await getEbayUserToken(env, payload.userId);
     } catch (e) {
       console.error('[reconcile] eBay authentication failed:', e);
+      if (e?.statusCode === 503) return err(e.message, 503);
       const msg = e.message || '';
       if (msg.includes('not connected') || msg.includes('expired')) {
         return err('eBay account not connected or session expired. Please connect your eBay account.', 401);
@@ -77,9 +79,27 @@ export async function onRequestPost(context) {
     const gross = parseFloat(sale.gross_sale_price || finData.gross_sale_amount || 0);
     const shipping = parseFloat(sale.actual_shipping_cost || shippingLabelCost || 0);
     const trueCost = parseFloat(sale.true_total_cost || 0);
-    const reconciledNetProfit = parseFloat((gross - shipping - trueCost - actualFees).toFixed(4));
     const buyerShipping = parseFloat(sale.buyer_shipping_paid || 0);
     const netProceeds = parseFloat((gross + buyerShipping - actualFees).toFixed(2));
+
+    // T-09 item 2: roi_pct comes only from computeSaleMetrics, as a FRACTION.
+    // The previous inline `ROUND(? / true_total_cost, 4)` was already a fraction
+    // but lived outside the single metrics path, which is how the units drifted
+    // in the first place. net_proceeds is passed explicitly, so the metrics
+    // derive net_profit and roi_pct from the same reconciled inputs.
+    const reconciledMetrics = computeSaleMetrics({
+      gross_sale_price: gross,
+      buyer_shipping_paid: buyerShipping,
+      actual_shipping_cost: shipping,
+      platform_fee_pct: 0,
+      platform_flat_fee: 0,
+      payment_processing_amt: paymentProcessingFee,
+      promoted_listing_fee: promotedListingFee,
+      net_proceeds: netProceeds,
+      true_total_cost: trueCost
+    });
+    const reconciledNetProfit = reconciledMetrics.net_profit;
+    const reconciledRoi = reconciledMetrics.roi_pct;
 
     const reconId = `recon-${crypto.randomUUID()}`;
 
@@ -116,7 +136,7 @@ export async function onRequestPost(context) {
       actualFees, estimatedFees, feeDelta, reconciledNetProfit,
       promotedListingRate,
       promotedListingActive ? 1 : 0,
-      JSON.stringify(transactions).slice(0, 65535)
+      buildFinancesSummary(transactions)
     ).run();
 
     // Stamp the sale row with reconciled fees, net proceeds, and profit
@@ -130,7 +150,7 @@ export async function onRequestPost(context) {
         actual_shipping_cost = CASE WHEN ? > 0 THEN ? ELSE actual_shipping_cost END,
         net_proceeds = ?,
         net_profit = ?,
-        roi_pct = CASE WHEN true_total_cost > 0 THEN ROUND(? / true_total_cost, 4) ELSE roi_pct END
+        roi_pct = CASE WHEN true_total_cost > 0 THEN ? ELSE roi_pct END
       WHERE id = ? AND user_id = ?
     `).bind(
       ebay_order_id,
@@ -140,7 +160,9 @@ export async function onRequestPost(context) {
       shippingLabelCost, shippingLabelCost,
       netProceeds,
       reconciledNetProfit,
-      reconciledNetProfit,
+      // T-09: the fraction from computeSaleMetrics. The CASE still preserves the
+      // stored value when cost is 0, since ROI is undefined there.
+      reconciledRoi,
       sale_id,
       payload.userId
     ).run();

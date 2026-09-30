@@ -366,7 +366,10 @@ describe('MED-7: Financial Numeric Input Validation', () => {
 
       assert.strictEqual(res.status, 400);
       const body = await res.json();
-      assert.strictEqual(body.error, 'fee_pct must be a non-negative number');
+      // T-10 item 7: fee_pct is now validated as a FRACTION in [0,1), so the
+      // error names the upper bound as well as the lower one.
+      assert.match(body.error, /fee_pct must be a non-negative number/);
+      assert.match(body.error, /at most/);
     });
 
     test('PUT /api/platforms/:id returns 400 on negative flat_fee', async () => {

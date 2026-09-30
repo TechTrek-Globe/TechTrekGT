@@ -4,6 +4,11 @@ import {
   DollarSign, Truck, Tag, Sparkles
 } from 'lucide-react';
 import { createInvoice } from '../utils/auctionApi';
+import {
+  DEFAULT_PLATFORM_FEE_PCT,
+  DEFAULT_PLATFORM_FLAT_FEE,
+  DEFAULT_TARGET_MARGIN_PCT
+} from '../../functions/utils/constants.js';
 import { computeItemProration, computePricingFloors } from '../utils/formulaPreview';
 import { CatalogSearchDropdown } from './inventory/CatalogSearchDropdown';
 
@@ -17,7 +22,7 @@ const emptyItem = () => ({
   item_name: '', category: 'Jersey', sport_genre: '', athlete_person: '',
   authenticator: 'JSA', cert_number: '', unit_price: '',
   platform: 'eBay', boost_pct: 0, est_shipping_cost: 6.5,
-  target_margin_pct: 0.15, status: 'Available',
+  target_margin_pct: DEFAULT_TARGET_MARGIN_PCT, status: 'Available',
   notes: '', best_listing_window: '',
   // preview-only (computed client-side)
   _preview: null
@@ -44,7 +49,7 @@ export function AddInvoiceModal({ open, isOpen, platforms = [], onClose, onCreat
   const [items, setItems] = useState([emptyItem()]);
 
   // Default platform (eBay)
-  const defaultPlatform = (platforms || []).find(p => p.is_default) || (platforms || [])[0] || { name: 'eBay', fee_pct: 0.136, flat_fee: 0.40 };
+  const defaultPlatform = (platforms || []).find(p => p.is_default) || (platforms || [])[0] || { name: 'eBay', fee_pct: DEFAULT_PLATFORM_FEE_PCT, flat_fee: DEFAULT_PLATFORM_FLAT_FEE };
 
   const reset = () => {
     setStep(1); setError('');

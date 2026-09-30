@@ -202,7 +202,8 @@ describe('[HIGH-6] Legacy PBKDF2 Iteration Fallback Removal & Forced Password Re
     const resetReq = new Request('https://techtrekgt.com/api/auth/reset-password', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Cookie': 'reset_session=token-123'
       },
       body: JSON.stringify({
         email: flaggedUser.email,

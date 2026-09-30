@@ -536,6 +536,7 @@ CREATE TABLE IF NOT EXISTS email_verifications (
   used       INTEGER NOT NULL DEFAULT 0,
   attempts   INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL,
+  change_type TEXT DEFAULT 'register',
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 

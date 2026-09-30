@@ -118,14 +118,19 @@ export async function onRequestPost(context) {
       'INSERT INTO email_verifications (id, user_id, email, token, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?)'
     ).bind(verifId, userId, cleanEmail, verificationToken, expiresAt, now).run();
 
-    await sendVerificationEmail(env, cleanEmail, verificationToken).catch(e => {
+    let emailDispatched = false;
+    try {
+      emailDispatched = Boolean(await sendVerificationEmail(env, cleanEmail, verificationToken));
+    } catch (e) {
       console.error('[register] failed to dispatch verification email:', e);
-    });
+      emailDispatched = false;
+    }
 
     return new Response(JSON.stringify({
       success: true,
       verificationPending: true,
-      message: 'Registration successful. A verification email has been sent. Please verify your email address to activate your account.',
+      emailDispatched,
+      message: 'Registration successful. A verification email has been sent to confirm your email address.',
       user: {
         id: userId,
         email: cleanEmail,

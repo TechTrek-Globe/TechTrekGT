@@ -39,13 +39,15 @@ if (typeof window !== 'undefined') {
   });
 }
 
+import { getApiUrl } from './utils/api';
+
 const DashboardView = lazyWithRetry(() => import('./components/DashboardView').then(m => ({ default: m.DashboardView })));
 const InventoryHubView = lazyWithRetry(() => import('./components/InventoryHubView').then(m => ({ default: m.InventoryHubView })));
 const SalesLogView = lazyWithRetry(() => import('./components/SalesLogView').then(m => ({ default: m.SalesLogView })));
 const SettingsView = lazyWithRetry(() => import('./components/SettingsView').then(m => ({ default: m.SettingsView })));
 const AdminView = lazyWithRetry(() => import('./components/AdminView').then(m => ({ default: m.AdminView })));
 
-const VIEWS = ['dashboard', 'inventory', 'sales', 'settings', 'admin'];
+const VIEWS = ['dashboard', 'inventory', 'sales', 'settings', 'admin', 'reset-password', 'verify-email'];
 
 function getViewFromPathname(pathname) {
   const path = (pathname || '').toLowerCase().replace(/\/$/, '');
@@ -111,13 +113,57 @@ class ErrorBoundary extends React.Component {
 function MainContent({ pathname, navigateTo }) {
   const { user, isAuthenticated, isLoading } = useAuth();
   const [activeView, setActiveView] = useState(() => getViewFromPathname(pathname));
+  const [verifyNotification, setVerifyNotification] = useState(null);
+
+  // Inspect search params for email verification flow (T-13 / Problem C & Items 9-10)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    const verified = params.get('verified');
+    const normalized = (pathname || '').toLowerCase().replace(/\/$/, '');
+
+    if (verified === 'true') {
+      setVerifyNotification({ type: 'success', message: 'Your email address has been successfully verified.' });
+      const cleanUrl = window.location.pathname;
+      window.history.replaceState({}, '', cleanUrl);
+    } else if ((normalized.includes('/verify-email') || params.get('action') === 'verify') && token) {
+      // POST client-side verification to avoid leaking token in history / referrers
+      fetch(getApiUrl('/api/auth/verify-email'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token })
+      })
+        .then(async (res) => {
+          const data = await res.json().catch(() => ({}));
+          if (res.ok) {
+            setVerifyNotification({ type: 'success', message: data.message || 'Email verified successfully.' });
+            window.history.replaceState({}, '', '/outpost?verified=true');
+          } else {
+            setVerifyNotification({ type: 'error', message: data.error || 'Verification link is invalid or expired.' });
+            window.history.replaceState({}, '', '/outpost');
+          }
+        })
+        .catch(() => {
+          setVerifyNotification({ type: 'error', message: 'Network error verifying email.' });
+          window.history.replaceState({}, '', '/outpost');
+        });
+    }
+  }, [pathname]);
 
   // Sync view from URL
   useEffect(() => {
     if (isLoading) return;
     const normalized = (pathname || '').toLowerCase().replace(/\/$/, '');
     if (!isAuthenticated) {
-      if (normalized !== '/outpost' && normalized !== '/auction') {
+      if (
+        normalized !== '/outpost' &&
+        normalized !== '/auction' &&
+        normalized !== '/outpost/reset-password' &&
+        normalized !== '/auction/reset-password' &&
+        normalized !== '/outpost/verify-email' &&
+        normalized !== '/auction/verify-email'
+      ) {
         window.history.replaceState({}, '', '/outpost');
         navigateTo('/outpost');
       }
@@ -171,8 +217,12 @@ function MainContent({ pathname, navigateTo }) {
   }
 
   if (!isAuthenticated) {
+    const normalized = (pathname || '').toLowerCase().replace(/\/$/, '');
+    const isReset = normalized === '/outpost/reset-password' || normalized === '/auction/reset-password';
     return (
       <AuthPage
+        initialMode={isReset ? 'forgot' : 'signin'}
+        verifyNotification={verifyNotification}
         onAuthSuccess={() => navigateTo('/outpost/dashboard')}
       />
     );
@@ -186,6 +236,24 @@ function MainContent({ pathname, navigateTo }) {
   return (
     <InventoryProvider>
       <AppLayout activeView={activeView} onNavigate={handleNavigate}>
+        {verifyNotification && (
+          <div className={`p-3 text-xs flex items-center justify-between border-b ${
+            verifyNotification.type === 'success'
+              ? 'bg-emerald-950/80 border-emerald-500/30 text-emerald-300'
+              : 'bg-red-950/80 border-red-500/30 text-red-300'
+          }`}>
+            <span>{verifyNotification.message}</span>
+            <button onClick={() => setVerifyNotification(null)} className="text-slate-400 hover:text-white ml-2">✕</button>
+          </div>
+        )}
+        {user && !user.emailVerified && (
+          <div className="bg-amber-950/80 border-b border-amber-500/30 px-4 py-2 text-xs text-amber-200 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+              <span>Your email address ({user.email}) is unverified. Check your inbox for the verification link.</span>
+            </div>
+          </div>
+        )}
         <ErrorBoundary key={activeView}>
           <React.Suspense fallback={
             <div className="flex items-center justify-center p-12">

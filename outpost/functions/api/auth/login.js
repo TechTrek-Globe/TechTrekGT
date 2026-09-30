@@ -101,7 +101,12 @@ export async function onRequestPost(context) {
 
     return new Response(JSON.stringify({
       success: true,
-      user: { id: user.id, email: user.email, name: user.name }
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        emailVerified: Boolean(user.email_verified || user.email_verified_at)
+      }
     }), {
       status: 200,
       headers: {

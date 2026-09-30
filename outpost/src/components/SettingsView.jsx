@@ -1312,9 +1312,28 @@ export function SettingsView() {
                   <p className="text-base font-bold text-slate-100 mt-1">{user?.name || 'Account Holder'}</p>
                 </div>
                 <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
-                  <span className="text-slate-500 font-semibold uppercase tracking-wider text-[10px]">Registered Email</span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500 font-semibold uppercase tracking-wider text-[10px]">Registered Email</span>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                      user?.emailVerified
+                        ? 'bg-emerald-950/60 text-emerald-400 border-emerald-800/60'
+                        : 'bg-amber-950/60 text-amber-400 border-amber-800/60'
+                    }`}>
+                      {user?.emailVerified ? 'Verified' : 'Unverified'}
+                    </span>
+                  </div>
                   <p className="text-base font-bold text-slate-100 mt-1">{user?.email || 'N/A'}</p>
                 </div>
+                {user?.pendingEmail && (
+                  <div className="p-4 rounded-xl bg-amber-950/40 border border-amber-500/40 col-span-1 sm:col-span-2">
+                    <span className="text-amber-400 font-semibold uppercase tracking-wider text-[10px] flex items-center gap-1.5">
+                      <AlertCircle className="w-3.5 h-3.5" /> Pending Email Confirmation
+                    </span>
+                    <p className="text-xs text-amber-200 mt-1">
+                      A change request to <span className="font-mono font-bold text-white">{user.pendingEmail}</span> is awaiting confirmation. Please check the verification link sent to that address.
+                    </p>
+                  </div>
+                )}
                 <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
                   <span className="text-slate-500 font-semibold uppercase tracking-wider text-[10px]">Database Connection</span>
                   <p className="text-xs font-semibold text-emerald-400 mt-1 flex items-center gap-1.5">

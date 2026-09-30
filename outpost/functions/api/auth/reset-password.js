@@ -63,13 +63,14 @@ export async function onRequestPost(context) {
       });
     }
 
-    // Read the reset token from body or from HttpOnly cookie
+    // Read the reset token strictly from HttpOnly reset_session cookie (T-12 / Item 5)
+    // Body token fallback is eliminated to enforce that security verification occurred in step 2
     const cookieHeader = request.headers.get('Cookie') || '';
     const sessionMatch = cookieHeader.match(/(?:^|;\s*)reset_session=([^;]+)/);
-    const token = (bodyToken || bodyResetToken || (sessionMatch ? sessionMatch[1].trim() : '')).trim();
+    const token = (sessionMatch ? sessionMatch[1].trim() : '');
 
     if (!token) {
-      return new Response(JSON.stringify({ error: 'Password reset token is required.' }), {
+      return new Response(JSON.stringify({ error: 'Password reset session token is required. Please verify your identity first.' }), {
         status: 400, headers: { 'Content-Type': 'application/json' }
       });
     }
@@ -101,32 +102,22 @@ export async function onRequestPost(context) {
       });
     }
 
-    // Optional security answer check if provided
-    if (securityAnswer && user.security_answer_hash) {
-      const isAnswerValid = await verifyPassword(securityAnswer.trim().toLowerCase(), user.security_answer_hash);
-      if (!isAnswerValid) {
-        return new Response(JSON.stringify({ error: 'Incorrect security answer. Please try again.' }), {
-          status: 400, headers: { 'Content-Type': 'application/json' }
-        });
-      }
-    }
-
     const newPasswordHash = await hashPassword(newPassword);
     try {
-      await env.DB.prepare('UPDATE users SET password_hash = ?, force_password_reset = 0 WHERE id = ?').bind(newPasswordHash, user.id).run();
+      await env.DB.prepare('UPDATE users SET password_hash = ?, force_password_reset = 0, token_version = COALESCE(token_version, 1) + 1 WHERE id = ?').bind(newPasswordHash, user.id).run();
     } catch (_) {
-      await env.DB.prepare('UPDATE users SET password_hash = ? WHERE id = ?').bind(newPasswordHash, user.id).run();
+      await env.DB.prepare('UPDATE users SET password_hash = ?, force_password_reset = 0 WHERE id = ?').bind(newPasswordHash, user.id).run();
     }
     await env.DB.prepare('UPDATE password_resets SET used = 1 WHERE id = ?').bind(resetRecord.id).run();
     await env.DB.prepare('UPDATE password_resets SET used = 1 WHERE email = ? AND used = 0').bind(cleanEmail).run();
 
-    // Clear the reset_session cookie
+    // Clear the reset_session cookie with Path=/ (matching where it was written)
     const clearCookie = [
       'reset_session=',
       'HttpOnly',
       'Secure',
       'SameSite=Strict',
-      'Path=/api/auth/reset-password',
+      'Path=/',
       'Max-Age=0'
     ].join('; ');
 

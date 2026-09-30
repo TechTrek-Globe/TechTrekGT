@@ -78,16 +78,41 @@ async function handleVerification(context, token, rememberMe = false) {
     }
 
     const nowIso = new Date().toISOString();
-    if (typeof env.DB.batch === 'function') {
-      await env.DB.batch([
-        env.DB.prepare('UPDATE users SET email_verified = 1, email_verified_at = ? WHERE id = ?').bind(nowIso, user.id),
-        env.DB.prepare('UPDATE email_verifications SET used = 1 WHERE id = ?').bind(verifRecord.id),
-        env.DB.prepare('UPDATE email_verifications SET used = 1 WHERE user_id = ? AND used = 0').bind(user.id)
-      ]);
+    const isEmailChange = verifRecord.change_type === 'email_change' || (verifRecord.email && verifRecord.email.toLowerCase() !== user.email.toLowerCase());
+    const verifiedEmail = isEmailChange ? verifRecord.email.trim().toLowerCase() : user.email;
+
+    if (isEmailChange) {
+      const existing = await env.DB.prepare('SELECT id FROM users WHERE email = ? AND id != ?').bind(verifiedEmail, user.id).first();
+      if (existing) {
+        return new Response(JSON.stringify({ error: 'This email address is already in use by another account.' }), {
+          status: 409,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      if (typeof env.DB.batch === 'function') {
+        await env.DB.batch([
+          env.DB.prepare('UPDATE users SET email = ?, email_verified = 1, email_verified_at = ? WHERE id = ?').bind(verifiedEmail, nowIso, user.id),
+          env.DB.prepare('UPDATE email_verifications SET used = 1 WHERE id = ?').bind(verifRecord.id),
+          env.DB.prepare('UPDATE email_verifications SET used = 1 WHERE user_id = ? AND used = 0').bind(user.id)
+        ]);
+      } else {
+        await env.DB.prepare('UPDATE users SET email = ?, email_verified = 1, email_verified_at = ? WHERE id = ?').bind(verifiedEmail, nowIso, user.id).run();
+        await env.DB.prepare('UPDATE email_verifications SET used = 1 WHERE id = ?').bind(verifRecord.id).run();
+        await env.DB.prepare('UPDATE email_verifications SET used = 1 WHERE user_id = ? AND used = 0').bind(user.id).run();
+      }
     } else {
-      await env.DB.prepare('UPDATE users SET email_verified = 1, email_verified_at = ? WHERE id = ?').bind(nowIso, user.id).run();
-      await env.DB.prepare('UPDATE email_verifications SET used = 1 WHERE id = ?').bind(verifRecord.id).run();
-      await env.DB.prepare('UPDATE email_verifications SET used = 1 WHERE user_id = ? AND used = 0').bind(user.id).run();
+      if (typeof env.DB.batch === 'function') {
+        await env.DB.batch([
+          env.DB.prepare('UPDATE users SET email_verified = 1, email_verified_at = ? WHERE id = ?').bind(nowIso, user.id),
+          env.DB.prepare('UPDATE email_verifications SET used = 1 WHERE id = ?').bind(verifRecord.id),
+          env.DB.prepare('UPDATE email_verifications SET used = 1 WHERE user_id = ? AND used = 0').bind(user.id)
+        ]);
+      } else {
+        await env.DB.prepare('UPDATE users SET email_verified = 1, email_verified_at = ? WHERE id = ?').bind(nowIso, user.id).run();
+        await env.DB.prepare('UPDATE email_verifications SET used = 1 WHERE id = ?').bind(verifRecord.id).run();
+        await env.DB.prepare('UPDATE email_verifications SET used = 1 WHERE user_id = ? AND used = 0').bind(user.id).run();
+      }
     }
 
     const maxAge = rememberMe ? 30 * 24 * 3600 : 7200;
@@ -97,13 +122,13 @@ async function handleVerification(context, token, rememberMe = false) {
       maxAge
     );
 
+    // Remove cookie-setting GET redirect (T-13 / Item 9 / Problem C)
     const acceptHeader = request.headers.get('Accept') || '';
     if (request.method === 'GET' && acceptHeader.includes('text/html')) {
       return new Response(null, {
         status: 302,
         headers: {
-          'Location': '/outpost?verified=true',
-          'Set-Cookie': buildAuthCookie(authToken, maxAge)
+          'Location': '/outpost?verified=true'
         }
       });
     }
@@ -114,7 +139,7 @@ async function handleVerification(context, token, rememberMe = false) {
       message: 'Email successfully verified.',
       user: {
         id: user.id,
-        email: user.email,
+        email: verifiedEmail,
         name: user.name,
         emailVerified: true,
         emailVerifiedAt: nowIso

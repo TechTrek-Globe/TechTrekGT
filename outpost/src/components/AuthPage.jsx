@@ -29,17 +29,27 @@ export const PRESET_SECURITY_QUESTIONS = [
   "What is your favorite book or movie?"
 ];
 
-export function AuthPage({ onAuthSuccess }) {
+export function AuthPage({ onAuthSuccess, initialMode = 'signin', verifyNotification = null }) {
   const {
     login,
     register,
     getSecurityQuestion,
+    requestPasswordReset,
     forgotPassword,
     resetPassword
   } = useAuth();
 
   // mode: 'signin' | 'register' | 'forgot' | 'reset'
-  const [mode, setMode] = useState('signin');
+  const [mode, setMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const path = window.location.pathname.toLowerCase();
+      if (path.includes('reset-password')) return 'forgot';
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('mode') === 'forgot' || params.get('reason')) return 'forgot';
+      if (params.get('mode') === 'register') return 'register';
+    }
+    return initialMode;
+  });
 
   const [name, setName] = useState('');
   const [rememberMe, setRememberMe] = useState(() => {
@@ -50,13 +60,42 @@ export function AuthPage({ onAuthSuccess }) {
     } catch (e) { return true; }
   });
   const [email, setEmail] = useState(() => {
-    try { return sessionStorage.getItem('outpost_saved_email') || ''; } catch (e) { return ''; }
+    try {
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        const qEmail = params.get('email');
+        if (qEmail) return qEmail;
+      }
+      return sessionStorage.getItem('outpost_saved_email') || '';
+    } catch (e) { return ''; }
   });
   const [password, setPassword] = useState('');
   const [securityQuestion, setSecurityQuestion] = useState(PRESET_SECURITY_QUESTIONS[0]);
   const [securityAnswer, setSecurityAnswer] = useState('');
 
-  const [forgotStep, setForgotStep] = useState(1);
+  const [resetReason, setResetReason] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('reason') || '';
+    }
+    return '';
+  });
+
+  const [resetToken, setResetToken] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('token') || '';
+    }
+    return '';
+  });
+
+  const [forgotStep, setForgotStep] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('token')) return 2;
+    }
+    return 1;
+  });
   const [loadedQuestion, setLoadedQuestion] = useState('');
   const [newPassword, setNewPassword] = useState('');
 
@@ -64,12 +103,24 @@ export function AuthPage({ onAuthSuccess }) {
   const [infoMessage, setInfoMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Auto-fetch security question if arriving with email + token
+  useEffect(() => {
+    if (email && forgotStep === 2 && !loadedQuestion) {
+      getSecurityQuestion(email)
+        .then(data => {
+          setLoadedQuestion(data.securityQuestion || 'Security question');
+        })
+        .catch(() => {});
+    }
+  }, [email, forgotStep, loadedQuestion, getSecurityQuestion]);
+
   const switchMode = (newMode) => {
     setMode(newMode);
     setError('');
     setInfoMessage('');
     setForgotStep(1);
     setLoadedQuestion('');
+    setResetReason('');
   };
 
   const handleSignIn = async (e) => {
@@ -87,6 +138,12 @@ export function AuthPage({ onAuthSuccess }) {
       await login(email, password, rememberMe);
       onAuthSuccess?.();
     } catch (err) {
+      if (err.requiresReset || err.message?.includes('legacy') || err.message?.includes('reset')) {
+        setMode('forgot');
+        setResetReason(err.message?.includes('legacy') ? 'legacy_hash' : 'force_reset');
+        setError('');
+        return;
+      }
       setError(err.message || 'Sign in failed. Please try again.');
     } finally {
       setIsSubmitting(false);
@@ -104,8 +161,13 @@ export function AuthPage({ onAuthSuccess }) {
     setIsSubmitting(true);
     setError('');
     try {
-      await register(name, email, password, securityQuestion, securityAnswer, rememberMe);
-      onAuthSuccess?.();
+      const data = await register(name, email, password, securityQuestion, securityAnswer, rememberMe);
+      if (data?.emailDispatched === false) {
+        setInfoMessage('Account created! Verification email could not be automatically dispatched, but you may sign in.');
+      } else {
+        setInfoMessage('Account created! A confirmation link has been sent to your email. You can sign in below.');
+      }
+      setTimeout(() => switchMode('signin'), 3000);
     } catch (err) {
       setError(err.message || 'Registration failed. Please try again.');
     } finally {
@@ -119,9 +181,11 @@ export function AuthPage({ onAuthSuccess }) {
     setIsSubmitting(true);
     setError('');
     try {
+      await requestPasswordReset(email);
       const data = await getSecurityQuestion(email);
-      setLoadedQuestion(data.securityQuestion || 'No security question set for this account.');
+      setLoadedQuestion(data.securityQuestion || 'Security question');
       setForgotStep(2);
+      setInfoMessage('A single-use reset code has been sent to your email. Enter the code and your security answer below.');
     } catch (err) {
       setError(err.message || 'Could not find that email address.');
     } finally {
@@ -131,16 +195,16 @@ export function AuthPage({ onAuthSuccess }) {
 
   const handleForgotStep2 = async (e) => {
     e.preventDefault();
+    if (!resetToken) { setError('Please enter the reset code sent to your email.'); return; }
     if (!securityAnswer) { setError('Please enter your security answer.'); return; }
     setIsSubmitting(true);
     setError('');
     try {
-      const data = await forgotPassword(email, securityAnswer);
-      void data; // reset_session cookie set by server; no token in response body
+      await forgotPassword(email, securityAnswer, resetToken);
       setForgotStep(3);
       setInfoMessage('Identity verified. Enter your new password below.');
     } catch (err) {
-      setError(err.message || 'Security answer verification failed.');
+      setError(err.message || 'Verification failed. The security answer or reset code is incorrect or expired.');
     } finally {
       setIsSubmitting(false);
     }
@@ -157,7 +221,14 @@ export function AuthPage({ onAuthSuccess }) {
     try {
       await resetPassword(email, newPassword);
       setInfoMessage('Password reset successfully! You can now sign in with your new password.');
-      setTimeout(() => switchMode('signin'), 2500);
+      setTimeout(() => {
+        switchMode('signin');
+        setForgotStep(1);
+        setSecurityAnswer('');
+        setResetToken('');
+        setNewPassword('');
+        setResetReason('');
+      }, 2500);
     } catch (err) {
       setError(err.message || 'Password reset failed.');
     } finally {
@@ -266,6 +337,17 @@ export function AuthPage({ onAuthSuccess }) {
           <div className="glass-card rounded-3xl p-7 sm:p-8 glow-amber-sm shadow-2xl border border-slate-800/80 relative overflow-hidden">
             {/* Inner top highlight */}
             <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-amber-500/30 to-transparent" />
+
+            {/* Verification Alert Banner */}
+            {verifyNotification && (
+              <div className={`mb-5 p-3.5 rounded-xl border text-xs font-medium leading-relaxed ${
+                verifyNotification.type === 'success'
+                  ? 'bg-emerald-950/50 border-emerald-800/50 text-emerald-300'
+                  : 'bg-red-950/50 border-red-800/50 text-red-400'
+              }`}>
+                {verifyNotification.message}
+              </div>
+            )}
 
             {/* Mode Switcher Tabs (Sign In / Register) */}
             {(mode === 'signin' || mode === 'register') && (
@@ -422,11 +504,20 @@ export function AuthPage({ onAuthSuccess }) {
                   </button>
                   <h2 className="text-2xl font-black text-white tracking-tight">Reset password</h2>
                   <p className="text-slate-400 text-sm mt-1.5">
-                    {forgotStep === 1 && "Enter your email to look up your security question."}
-                    {forgotStep === 2 && "Answer your security question to verify identity."}
-                    {forgotStep === 3 && "Enter your reset code and new password."}
+                    {forgotStep === 1 && "Enter your email to request a single-use reset code."}
+                    {forgotStep === 2 && "Enter your emailed reset code and answer your security question."}
+                    {forgotStep === 3 && "Set your new account password below."}
                   </p>
                 </div>
+
+                {resetReason && (
+                  <div className="mb-4 p-3.5 rounded-xl bg-amber-950/60 border border-amber-500/40 text-amber-300 text-xs font-medium leading-relaxed">
+                    {resetReason === 'legacy_hash'
+                      ? 'Security Update Required: Your account uses a legacy password format. Please verify your identity to set a new secure password.'
+                      : 'Account Update Required: A password reset is required for your account before signing in. Please verify your identity below.'}
+                  </div>
+                )}
+
                 {error && <div className="mb-4 p-3.5 rounded-xl bg-red-950/50 border border-red-800/50 text-red-400 text-xs font-medium">{error}</div>}
                 {infoMessage && <div className="mb-4 p-3.5 rounded-xl bg-emerald-950/50 border border-emerald-800/50 text-emerald-300 text-xs font-medium">{infoMessage}</div>}
 
@@ -440,7 +531,7 @@ export function AuthPage({ onAuthSuccess }) {
                       </div>
                     </div>
                     <button id="forgot-lookup-submit" type="submit" className="btn-primary" disabled={isSubmitting}>
-                      {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <><span>Look up account</span><ArrowRight className="w-4 h-4" /></>}
+                      {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <><span>Send Reset Code</span><ArrowRight className="w-4 h-4" /></>}
                     </button>
                   </form>
                 )}
@@ -448,14 +539,30 @@ export function AuthPage({ onAuthSuccess }) {
                 {forgotStep === 2 && (
                   <form onSubmit={handleForgotStep2} className="space-y-4" id="forgot-step2-form">
                     <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs font-medium">
-                      <HelpCircle className="w-3.5 h-3.5 inline mr-1.5 mb-0.5" />{loadedQuestion}
+                      <HelpCircle className="w-3.5 h-3.5 inline mr-1.5 mb-0.5" />{loadedQuestion || 'Security Question'}
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-slate-300 mb-1.5">Your answer</label>
-                      <input id="forgot-security-answer" type="text" autoComplete="off" className="input-field" placeholder="Case-insensitive" value={securityAnswer} onChange={e => setSecurityAnswer(e.target.value)} />
+                      <input id="forgot-security-answer" type="text" autoComplete="off" className="input-field" placeholder="Case-insensitive answer" value={securityAnswer} onChange={e => setSecurityAnswer(e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 mb-1.5">Reset Code from Email</label>
+                      <div className="relative">
+                        <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                        <input
+                          id="forgot-reset-token"
+                          type="text"
+                          autoComplete="off"
+                          className="input-field pl-10 font-mono text-xs"
+                          placeholder="Paste single-use code from email"
+                          value={resetToken}
+                          onChange={e => setResetToken(e.target.value)}
+                        />
+                      </div>
+                      <p className="text-[10px] text-slate-500 mt-1">Check your inbox for the recovery token sent to {email}.</p>
                     </div>
                     <button id="forgot-verify-submit" type="submit" className="btn-primary" disabled={isSubmitting}>
-                      {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <><span>Verify answer</span><ArrowRight className="w-4 h-4" /></>}
+                      {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <><span>Verify Code & Answer</span><ArrowRight className="w-4 h-4" /></>}
                     </button>
                   </form>
                 )}

@@ -253,26 +253,66 @@ export function buildAuthCookie(token, maxAge) {
  * @returns {string|null} - Extracted JWT token string or null
  */
 export function getAllTokensFromRequest(request) {
-  const tokens = [];
   const cookieHeader = request.headers.get('Cookie') || '';
+  const cookieTokens = [];
   const regex = /(?:^|;\s*)auth_token=([^;]+)/g;
   let match;
   while ((match = regex.exec(cookieHeader)) !== null) {
-    if (match[1]) tokens.push(match[1]);
+    if (match[1]) cookieTokens.push(match[1]);
   }
+
+  let bearerToken = null;
   const authHeader = request.headers.get('Authorization');
   if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.split(' ')[1];
-    if (token && token !== 'cookie-active' && token !== 'null' && token !== 'undefined') {
-      tokens.push(token);
+    const candidate = authHeader.split(' ')[1];
+    if (candidate && candidate !== 'cookie-active' && candidate !== 'null' && candidate !== 'undefined') {
+      bearerToken = candidate;
     }
   }
-  return tokens;
+
+  // Reject multi-credential requests carrying both cookie and Bearer credentials with HTTP 400 (T-14 / SEC-008)
+  if (cookieTokens.length > 0 && bearerToken) {
+    throw new Response(JSON.stringify({
+      error: 'Multiple credentials provided. Provide either a session cookie or a Bearer token, not both.'
+    }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  // Prefer cookie credentials over Bearer
+  if (cookieTokens.length > 0) {
+    return cookieTokens;
+  }
+
+  if (bearerToken) {
+    return [bearerToken];
+  }
+
+  return [];
 }
 
 export function getTokenFromRequest(request) {
   const tokens = getAllTokensFromRequest(request);
   return tokens.length > 0 ? tokens[0] : null;
+}
+
+/**
+ * Masks an email address to protect privacy (e.g. "jonathan@example.com" -> "j***@e***.com") (T-13 / SEC-015).
+ */
+export function maskEmail(email) {
+  if (!email || typeof email !== 'string') return '';
+  const [local, domain] = email.trim().toLowerCase().split('@');
+  if (!domain) return email;
+  const maskedLocal = local.length > 0 ? `${local[0]}***` : '***';
+  const dotIndex = domain.lastIndexOf('.');
+  if (dotIndex > 0) {
+    const domainName = domain.slice(0, dotIndex);
+    const tld = domain.slice(dotIndex);
+    const maskedDomain = domainName.length > 0 ? `${domainName[0]}***` : '***';
+    return `${maskedLocal}@${maskedDomain}${tld}`;
+  }
+  return `${maskedLocal}@${domain[0] || ''}***`;
 }
 
 /**
@@ -337,20 +377,19 @@ export async function sendTransactionalEmail(env, {
 }
 
 /**
- * Sends a password reset email containing the single-use reset token.
+ * Sends a password reset email containing ONLY the single-use reset token (T-12 / SEC-014).
+ * The security question is deliberately omitted to avoid disclosing one factor alongside another.
  */
-export async function sendResetEmail(env, toEmail, token, securityQuestion) {
+export async function sendResetEmail(env, toEmail, token) {
   const lines = [
     'You asked to reset your TechTrek Outpost password.',
     '',
     `Your password reset token is: ${token}`,
     '',
-    'This token expires in 15 minutes and can only be used once.'
+    'This token expires in 15 minutes and can only be used once.',
+    '',
+    'If you did not request this, you can safely ignore this email.'
   ];
-  if (securityQuestion) {
-    lines.push('', `Security question: ${securityQuestion}`);
-  }
-  lines.push('', 'If you did not request this, you can safely ignore this email.');
 
   return sendTransactionalEmail(env, {
     to: toEmail,
@@ -362,14 +401,14 @@ export async function sendResetEmail(env, toEmail, token, securityQuestion) {
 }
 
 /**
- * Sends an email verification email containing the verification link and single-use token.
+ * Sends an email verification email containing the client-side verification link and token (T-13).
  */
 export async function sendVerificationEmail(env, toEmail, token) {
-  const verifyUrl = `https://techtrekgt.com/outpost/api/auth/verify-email?token=${encodeURIComponent(token)}`;
+  const verifyUrl = `https://techtrekgt.com/outpost/verify-email?token=${encodeURIComponent(token)}`;
   const lines = [
     'Thank you for registering for TechTrek Outpost.',
     '',
-    'Please verify your email address to complete your registration and activate your account:',
+    'Please verify your email address to confirm your account:',
     verifyUrl,
     '',
     `Your single-use verification token is: ${token}`,
@@ -387,4 +426,57 @@ export async function sendVerificationEmail(env, toEmail, token) {
     devFallbackMessage: `mail delivery is not configured; dev verification link for ${toEmail}: ${verifyUrl}`
   });
 }
+
+/**
+ * Sends a confirmation email to the NEW email address for an account email change (T-13 / SEC-015).
+ */
+export async function sendEmailChangeConfirmation(env, toEmail, token) {
+  const confirmUrl = `https://techtrekgt.com/outpost/verify-email?token=${encodeURIComponent(token)}`;
+  const lines = [
+    'A request was made to update your TechTrek Outpost account email to this address.',
+    '',
+    'Please confirm this change by clicking the link below:',
+    confirmUrl,
+    '',
+    `Your single-use confirmation token is: ${token}`,
+    '',
+    'This confirmation token expires in 24 hours and can only be used once.',
+    '',
+    'If you did not request this email change, no action is needed.'
+  ];
+
+  return sendTransactionalEmail(env, {
+    to: toEmail,
+    subject: 'TechTrek Outpost - Confirm Your New Email Address',
+    bodyLines: lines,
+    logPrefix: '[email-change-confirm]',
+    devFallbackMessage: `mail delivery is not configured; dev email change confirmation link for ${toEmail}: ${confirmUrl}`
+  });
+}
+
+/**
+ * Sends a notification email to the OLD email address when an email change is initiated (T-13 / SEC-015).
+ * The new address is masked to protect privacy.
+ */
+export async function sendEmailChangeNotification(env, toEmail, maskedNewEmail) {
+  const lines = [
+    'A request has been received to change the email address on your TechTrek Outpost account.',
+    '',
+    `Requested new email: ${maskedNewEmail}`,
+    '',
+    'If you requested this change, please check your new inbox for the confirmation link.',
+    '',
+    'IF YOU DID NOT REQUEST THIS CHANGE, your account credentials may be compromised.',
+    'Please immediately sign in and change your password, or contact an administrator.'
+  ];
+
+  return sendTransactionalEmail(env, {
+    to: toEmail,
+    subject: 'TechTrek Outpost - Security Alert: Email Change Requested',
+    bodyLines: lines,
+    logPrefix: '[email-change-alert]',
+    devFallbackMessage: `mail delivery is not configured; dev email change security alert for ${toEmail} (new: ${maskedNewEmail})`
+  });
+}
+
 

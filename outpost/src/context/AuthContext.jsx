@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { getApiUrl } from '../utils/api';
 
 /** @type {React.Context<any>} */
@@ -11,6 +11,13 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRememberMe, setIsRememberMe] = useState(() => {
+    try {
+      return sessionStorage.getItem('outpost_remember_me') === 'true';
+    } catch (_) {
+      return false;
+    }
+  });
 
   // Restore session on mount
   useEffect(() => {
@@ -34,18 +41,26 @@ export function AuthProvider({ children }) {
     })();
   }, []);
 
-  // 15-min inactivity auto-logout
+  // Session Policy Decision (T-14 / SEC-020):
+  // Option (a) - Honour rememberMe. When rememberMe is checked, the 15-minute client inactivity
+  // timeout is bypassed to align with the 30-day session cookie and allow 30-60 minute background
+  // auto-sync timers (eBay/VineScout) to execute without premature session termination.
+  const logoutRef = useRef(null);
+
   useEffect(() => {
     if (!isAuthenticated) return;
+    if (isRememberMe) return; // Honour rememberMe: no 15-minute idle logout
 
     const INACTIVITY_TIMEOUT = 15 * 60 * 1000;
     let timer;
 
     const resetTimer = () => {
       clearTimeout(timer);
-      sessionStorage.setItem('outpost_last_activity', Date.now().toString());
+      try {
+        sessionStorage.setItem('outpost_last_activity', Date.now().toString());
+      } catch (_) {}
       timer = setTimeout(() => {
-        logout();
+        logoutRef.current?.();
       }, INACTIVITY_TIMEOUT);
     };
 
@@ -62,7 +77,7 @@ export function AuthProvider({ children }) {
         window.removeEventListener(event, resetTimer);
       });
     };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, isRememberMe]);
 
   /**
    * @param {string} email
@@ -86,6 +101,10 @@ export function AuthProvider({ children }) {
       throw new Error(data.error || `Login failed (HTTP ${res.status})`);
     }
 
+    try {
+      sessionStorage.setItem('outpost_remember_me', String(rememberMe));
+    } catch (_) {}
+    setIsRememberMe(Boolean(rememberMe));
     setIsAuthenticated(true);
     setUser(data.user);
     return data;
@@ -132,19 +151,40 @@ export function AuthProvider({ children }) {
     return data;
   };
 
-  const forgotPassword = async (email, securityAnswer) => {
+  /**
+   * Primary step: request a single-use reset token sent via email (T-12)
+   */
+  const requestPasswordReset = async (email) => {
     const res = await fetch(getApiUrl('/api/auth/forgot-password'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ email, securityAnswer })
+      body: JSON.stringify({ email })
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.error || `Failed to request password reset (HTTP ${res.status})`);
+    }
+    return data;
+  };
+
+  /**
+   * Secondary verification step: verifies security answer AND active emailed token (T-12 / Item 4)
+   * Server validates both and sets HttpOnly reset_session cookie with Path=/
+   */
+  const forgotPassword = async (email, securityAnswer, token = '') => {
+    const res = await fetch(getApiUrl('/api/auth/forgot-password'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ email, securityAnswer, token: token || undefined })
     });
 
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       throw new Error(data.error || `Failed to verify security answer (HTTP ${res.status})`);
     }
-    // resetToken is intentionally NOT returned - the server sets an HttpOnly reset_session cookie
     return data;
   };
 
@@ -153,7 +193,7 @@ export function AuthProvider({ children }) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      // token is NOT sent in the body - the server reads the HttpOnly reset_session cookie
+      // token is NOT sent in the body - the server reads the HttpOnly reset_session cookie (T-12 / Item 5)
       body: JSON.stringify({ email, newPassword })
     });
 
@@ -182,28 +222,41 @@ export function AuthProvider({ children }) {
     return data;
   };
 
-  const logout = async () => {
-    sessionStorage.removeItem('outpost_last_activity');
+  const logout = async (all = false) => {
+    try {
+      sessionStorage.removeItem('outpost_last_activity');
+      sessionStorage.removeItem('outpost_remember_me');
+    } catch (_) {}
+    setIsRememberMe(false);
     setIsAuthenticated(false);
     setUser(null);
     if (typeof window !== 'undefined') {
       window.history.pushState({}, '', '/outpost');
     }
     try {
-      await fetch(getApiUrl('/api/auth/logout'), { method: 'POST', credentials: 'include' });
+      await fetch(getApiUrl('/api/auth/logout'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ all: Boolean(all) })
+      });
     } catch (e) {
       // ignore
     }
   };
+
+  logoutRef.current = logout;
 
   return (
     <AuthContext.Provider value={{
       user,
       isAuthenticated,
       isLoading,
+      isRememberMe,
       login,
       register,
       getSecurityQuestion,
+      requestPasswordReset,
       forgotPassword,
       resetPassword,
       updateProfile,

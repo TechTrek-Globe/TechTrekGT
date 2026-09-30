@@ -1,11 +1,29 @@
-import { verifyToken, getTokenFromRequest, getAllTokensFromRequest, hashPassword, verifyPassword, createToken, buildAuthCookie } from '../../utils/auth.js';
+import {
+  verifyToken,
+  getTokenFromRequest,
+  getAllTokensFromRequest,
+  hashPassword,
+  verifyPassword,
+  createToken,
+  buildAuthCookie,
+  maskEmail,
+  sendEmailChangeConfirmation,
+  sendEmailChangeNotification
+} from '../../utils/auth.js';
 import { checkRateLimit } from '../../utils/rateLimit.js';
 
 export async function onRequestPost(context) {
   const { request, env } = context;
 
   try {
-    const tokens = getAllTokensFromRequest(request);
+    let tokens = [];
+    try {
+      tokens = getAllTokensFromRequest(request);
+    } catch (err) {
+      if (err instanceof Response) return err;
+      throw err;
+    }
+
     if (tokens.length === 0) {
       return new Response(JSON.stringify({ error: 'Unauthorized: Missing token' }), {
         status: 401, headers: { 'Content-Type': 'application/json' }
@@ -61,16 +79,28 @@ export async function onRequestPost(context) {
       });
     }
 
+    // Token version check (T-14 / SEC-020)
+    const currentTv = user.token_version ?? 1;
+    const tokenTv = payload.tv ?? payload.token_version ?? 1;
+    if (tokenTv < currentTv) {
+      return new Response(JSON.stringify({ error: 'Unauthorized: Token has been invalidated. Please sign in again.' }), {
+        status: 401, headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
     let updatedName         = user.name;
-    let updatedEmail        = user.email;
     let updatedQuestion     = user.security_question;
     let updatedAnswerHash   = user.security_answer_hash;
     let updatedPasswordHash = user.password_hash;
+    let updatedTokenVersion = currentTv;
+    let emailChangePending  = false;
+    let pendingEmailValue   = null;
 
     if (name && typeof name === 'string' && name.trim()) {
       updatedName = name.trim();
     }
 
+    // Pending email change workflow (T-13 / SEC-015)
     if (email && typeof email === 'string' && email.trim()) {
       const cleanEmail = email.trim().toLowerCase();
       const EMAIL_REGEX = /^[^\s@]{1,64}@[^\s@]{1,253}\.[^\s@]{2,}$/;
@@ -86,7 +116,47 @@ export async function onRequestPost(context) {
             status: 409, headers: { 'Content-Type': 'application/json' }
           });
         }
-        updatedEmail = cleanEmail;
+
+        // Rate limit email changes per account (T-13 constraint: 5 changes per 15 min)
+        const emailChangeKey = `email-change:${user.id}`;
+        const changeLimit = await checkRateLimit(env.RATE_LIMIT_KV, emailChangeKey, 5, 900);
+        if (!changeLimit.allowed) {
+          return new Response(JSON.stringify({ error: 'Too many email change requests. Please wait.' }), {
+            status: 429,
+            headers: { 'Content-Type': 'application/json', 'Retry-After': String(changeLimit.retryAfter) }
+          });
+        }
+
+        // Invalidate any existing unused change tokens for this user
+        await env.DB.prepare(
+          "UPDATE email_verifications SET used = 1 WHERE user_id = ? AND used = 0 AND (change_type = 'email_change' OR email != ?)"
+        ).bind(user.id, user.email).run().catch(() => {});
+
+        // Issue single-use 24-hour verification token for new email address
+        const verifId = `vfy-${crypto.randomUUID()}`;
+        const changeToken = crypto.randomUUID();
+        const now = Date.now();
+        const expiresAt = now + 24 * 60 * 60 * 1000; // 24 hours
+
+        try {
+          await env.DB.prepare(`
+            INSERT INTO email_verifications (id, user_id, email, token, expires_at, used, created_at, change_type)
+            VALUES (?, ?, ?, ?, ?, 0, ?, 'email_change')
+          `).bind(verifId, user.id, cleanEmail, changeToken, expiresAt, now).run();
+        } catch (_) {
+          // Fallback if change_type column not yet present
+          await env.DB.prepare(`
+            INSERT INTO email_verifications (id, user_id, email, token, expires_at, used, created_at)
+            VALUES (?, ?, ?, ?, ?, 0, ?)
+          `).bind(verifId, user.id, cleanEmail, changeToken, expiresAt, now).run();
+        }
+
+        // Dispatch confirmation to NEW address & notification with masked address to OLD address
+        await sendEmailChangeConfirmation(env, cleanEmail, changeToken);
+        await sendEmailChangeNotification(env, user.email, maskEmail(cleanEmail));
+
+        emailChangePending = true;
+        pendingEmailValue = cleanEmail;
       }
     }
 
@@ -123,31 +193,42 @@ export async function onRequestPost(context) {
         });
       }
       updatedPasswordHash = await hashPassword(newPassword);
+      // Invalidate existing sessions on password change by bumping token_version (T-14 / SEC-020)
+      updatedTokenVersion = currentTv + 1;
     }
 
+    // Notice: email column in users remains user.email (NOT modified until confirmation)
     await env.DB.prepare(`
       UPDATE users
-      SET name = ?, email = ?, security_question = ?, security_answer_hash = ?, password_hash = ?
+      SET name = ?, security_question = ?, security_answer_hash = ?, password_hash = ?, token_version = ?
       WHERE id = ?
-    `).bind(updatedName, updatedEmail, updatedQuestion, updatedAnswerHash, updatedPasswordHash, user.id).run();
+    `).bind(updatedName, updatedQuestion, updatedAnswerHash, updatedPasswordHash, updatedTokenVersion, user.id).run();
 
-    // Preserve remaining JWT lifetime so rememberMe users don't get downgraded (MEDIUM-2, HIGH-5)
+    // Reissue JWT with only the REMAINING lifetime; NEVER extend beyond original expiry (T-13 / Item 6)
+    const nowSec = Math.floor(Date.now() / 1000);
     const remainingSeconds = payload.exp
-      ? Math.max(payload.exp - Math.floor(Date.now() / 1000), 3600)
+      ? Math.max(payload.exp - nowSec, 1)
       : 7200;
 
     const newToken = await createToken({
       userId: user.id,
-      tv: user.token_version ?? 1
+      tv: updatedTokenVersion
     }, env.JWT_SECRET, remainingSeconds);
+
+    const message = emailChangePending
+      ? 'Profile updated. A confirmation link has been sent to your new email address.'
+      : 'Profile updated successfully.';
 
     return new Response(JSON.stringify({
       success: true,
-      message: 'Profile updated successfully.',
+      message,
+      emailChangePending,
+      pendingEmail: pendingEmailValue,
       user: {
         id: user.id,
-        email: updatedEmail,
+        email: user.email,
         name: updatedName,
+        pendingEmail: pendingEmailValue,
         securityQuestion: updatedQuestion,
         hasSecurityQuestion: Boolean(updatedQuestion && updatedAnswerHash)
       }

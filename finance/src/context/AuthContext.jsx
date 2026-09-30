@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { getApiUrl, apiFetch, setCsrfToken, getCsrfToken } from '../utils/api';
 
+import { isNetworkError } from '../utils/networkError';
+
 /** @type {React.Context<any>} */
 const AuthContext = createContext(null);
 
@@ -13,16 +15,27 @@ export function AuthProvider({ children }) {
   const [csrfToken, setCsrfTokenState] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState(null);
+
+  // CRIT-002: Track the signed-in user id so budget/sync state can be scoped.
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try { window.sessionStorage.setItem('tt_signed_in_user_id', user?.id || ''); } catch {}
+    }
+  }, [user]);
 
   // Handle global session expiry (token_version bump on other device or timeout)
   useEffect(() => {
     const handleSessionExpired = (e) => {
       console.warn('[auth] Session expired event received:', e.detail);
       sessionStorage.removeItem('personal_budget_last_activity');
+      try { window.sessionStorage.removeItem('tt_signed_in_user_id'); } catch {}
       setIsAuthenticated(false);
       setUser(null);
       setCsrfTokenState(null);
       setCsrfToken(null);
+      setCurrentUserId(null);
+      window.dispatchEvent(new CustomEvent('techtrek:user-logout', { detail: { userId: null, reason: 'session-expired' } }));
       setIsAuthModalOpen(true);
       if (typeof window !== 'undefined') {
         window.history.pushState({}, '', '/finance');
@@ -119,6 +132,7 @@ export function AuthProvider({ children }) {
 
       setIsAuthenticated(true);
       setUser(data.user);
+      setCurrentUserId(data.user?.id || null);
       if (data.csrfToken) {
         setCsrfTokenState(data.csrfToken);
         setCsrfToken(data.csrfToken);
@@ -126,15 +140,8 @@ export function AuthProvider({ children }) {
       setIsAuthModalOpen(false);
       return data;
     } catch (err) {
-      if (err.message && err.message !== 'Failed to fetch' && !err.message.includes('NetworkError') && !err.message.includes('fetch')) {
-        throw err;
-      }
-      if (email && password) {
-        const localUser = { id: 'local-user', name: email.split('@')[0] || 'Local User', email };
-        setIsAuthenticated(true);
-        setUser(localUser);
-        setIsAuthModalOpen(false);
-        return { success: true, user: localUser };
+      if (isNetworkError(err)) {
+        throw new Error('We could not reach the server. Check your connection and try again.', { cause: err });
       }
       throw err;
     }
@@ -163,6 +170,7 @@ export function AuthProvider({ children }) {
 
       setIsAuthenticated(true);
       setUser(data.user);
+      setCurrentUserId(data.user?.id || null);
       if (data.csrfToken) {
         setCsrfTokenState(data.csrfToken);
         setCsrfToken(data.csrfToken);
@@ -170,15 +178,8 @@ export function AuthProvider({ children }) {
       setIsAuthModalOpen(false);
       return data;
     } catch (err) {
-      if (err.message && err.message !== 'Failed to fetch' && !err.message.includes('NetworkError') && !err.message.includes('fetch')) {
-        throw err;
-      }
-      if (email && password) {
-        const localUser = { id: 'local-user', name: name || email.split('@')[0] || 'Local User', email };
-        setIsAuthenticated(true);
-        setUser(localUser);
-        setIsAuthModalOpen(false);
-        return { success: true, user: localUser };
+      if (isNetworkError(err)) {
+        throw new Error('We could not reach the server. Check your connection and try again.', { cause: err });
       }
       throw err;
     }
@@ -291,11 +292,14 @@ export function AuthProvider({ children }) {
   };
 
   const logout = async () => {
+    const signedInUserId = currentUserId || getCurrentUserId();
+    window.dispatchEvent(new CustomEvent('techtrek:user-logout', { detail: { userId: signedInUserId, reason: 'logout' } }));
     sessionStorage.removeItem('personal_budget_last_activity');
     setIsAuthenticated(false);
     setUser(null);
     setCsrfTokenState(null);
     setCsrfToken(null);
+    setCurrentUserId(null);
     if (typeof window !== 'undefined') {
       window.history.pushState({}, '', '/finance');
     }
@@ -310,6 +314,7 @@ export function AuthProvider({ children }) {
     <AuthContext.Provider value={{
       user,
       isAuthenticated,
+      currentUserId,
       token: isAuthenticated ? 'cookie-active' : null, // alias for backwards compatibility with BudgetContext
       csrfToken,
       isLoading,

@@ -1,4 +1,4 @@
-import { logSync } from './logger';
+import { logSync } from './logger.js';
 import { ERROR_CODES } from './errorCodes.js';
 
 /**
@@ -92,18 +92,35 @@ export async function apiFetch(endpoint, options = {}) {
 const PENDING_SYNC_KEY = 'cf_pending_sync';
 
 /**
- * Persists pending backup payload into localStorage fallback queue.
- * @param {Object} payload 
- * @param {string} passcode 
+ * Returns the user-scoped localStorage key for the pending sync queue.
+ * CRIT-002: The offline queue is scoped per user so a second signed-in user
+ * never inherits or pushes another user's pending payload.
+ * @param {string|null} [userId]
+ * @returns {string}
  */
-export function savePendingSync(payload, passcode) {
+export function pendingSyncKey(userId) {
+  const id = userId ? String(userId) : 'legacy';
+  return `cf_pending_sync:${id}`;
+}
+
+/**
+ * Persists pending backup payload into the user-scoped localStorage fallback queue.
+ * CRIT-002: Stops storing the full budget under a global key.
+ * @param {Object} payload
+ * @param {string} passcode
+ * @param {string|null} [userId]
+ */
+export function savePendingSync(payload, passcode, userId = null) {
+  const key = pendingSyncSyncKey(userId);
   try {
     const data = {
       payload,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      owner_id: userId || null
     };
-    localStorage.setItem(PENDING_SYNC_KEY, JSON.stringify(data));
-    logSync('QUEUE_ENQUEUE', 'Enqueued sync payload to localStorage offline queue', {
+    localStorage.setItem(key, JSON.stringify(data));
+    logSync('QUEUE_ENQUEUE', 'Enqueued sync payload to user-scoped offline queue', {
+      storageKey: key,
       accountsCount: payload?.accounts?.length,
       billsCount: payload?.bills?.length,
       matrixEntries: Object.keys(payload?.dailyMatrix || {}).length,
@@ -115,12 +132,14 @@ export function savePendingSync(payload, passcode) {
 }
 
 /**
- * Retrieves pending sync payload from localStorage.
+ * Retrieves the pending sync payload from the user-scoped localStorage queue.
+ * @param {string|null} [userId]
  * @returns {Object|null}
  */
-export function getPendingSync() {
+export function getPendingSync(userId = null) {
+  const key = pendingSyncSyncKey(userId);
   try {
-    const raw = localStorage.getItem(PENDING_SYNC_KEY);
+    const raw = localStorage.getItem(key);
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
@@ -128,13 +147,24 @@ export function getPendingSync() {
 }
 
 /**
- * Clears pending sync payload from localStorage.
+ * Clears the pending sync payload from the user-scoped localStorage queue.
+ * @param {string|null} [userId]
  */
-export function clearPendingSync() {
+export function clearPendingSync(userId = null) {
+  const key = pendingSyncSyncKey(userId);
   try {
-    localStorage.removeItem(PENDING_SYNC_KEY);
-    logSync('QUEUE_CLEAR', 'Cleared pending sync payload from localStorage queue');
+    localStorage.removeItem(key);
+    logSync('QUEUE_CLEAR', 'Cleared pending sync payload from user-scoped localStorage queue', { storageKey: key });
   } catch {}
+}
+
+/**
+ * Internal helper that resolves the effective pending-sync storage key.
+ * @param {string|null} [userId]
+ * @returns {string}
+ */
+function pendingSyncSyncKey(userId) {
+  return pendingSyncKey(userId);
 }
 
 /**
@@ -145,8 +175,8 @@ export function clearPendingSync() {
  * @param {Object} budgetData 
  * @returns {Promise<{success: boolean, status: string, error?: string, data?: Object}>}
  */
-export async function pushCloudBackupOptimistic(passcode, budgetData, options = {}) {
-  savePendingSync(budgetData, passcode || '');
+export async function pushCloudBackupOptimistic(passcode, budgetData, options = {}, userId = null) {
+  savePendingSync(budgetData, passcode || '', userId);
 
   const baseVersion = options?.baseVersion;
   const force = Boolean(options?.force);

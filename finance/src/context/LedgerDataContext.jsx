@@ -4,8 +4,8 @@ import { initialBudgetData } from '../initialData';
 import { fakeDemoBudgetData } from '../demoPresetData';
 import { useBudgetMetadata } from './BudgetMetadataContext';
 import { useAuth } from './AuthContext';
-import { apiFetch, pushCloudBackupOptimistic, flushPendingCloudSync } from '../utils/api';
-import { getBudgetData, saveBudgetData, clearAndRestoreBudgetData, clearBudgetData } from '../utils/indexedDB';
+import { apiFetch, pushCloudBackupOptimistic, flushPendingCloudSync, savePendingSync, getPendingSync, clearPendingSync, pendingSyncKey } from '../utils/api';
+import { getBudgetData, saveBudgetData, clearAndRestoreBudgetData, clearBudgetData, migrateLegacyBudgetToUser, listBudgetRecordKeys, getCurrentUserId } from '../utils/indexedDB';
 import { processSpreadsheetImport } from '../utils/spreadsheet';
 import { isBillDueInMonth } from '../utils/paydayUtils';
 import { logSync, logTransaction, logMatrix, logLedger, logState } from '../utils/logger';
@@ -16,7 +16,7 @@ export const LedgerDataStateContext = createContext(null);
 export const LedgerDataDispatchContext = createContext(null);
 
 export function LedgerDataProvider({ children }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, currentUserId } = useAuth();
   const metadata = useBudgetMetadata();
   const {
     metadataState,
@@ -63,10 +63,11 @@ export function LedgerDataProvider({ children }) {
   const flushSaveToIndexedDB = useCallback(() => {
     if (!isPendingSaveRef.current || !budgetRef.current) return;
     isPendingSaveRef.current = false;
-    saveBudgetData(budgetRef.current)
+    saveBudgetData(budgetRef.current, currentUserId || getCurrentUserId())
       .then(() => {
         setSaveError(null);
         logState('INDEXEDDB_FLUSH', 'Flushed pending budget state to IndexedDB', {
+          recordKey: budgetRecordKey(currentUserId || getCurrentUserId()),
           accountsCount: budgetRef.current?.accounts?.length,
           billsCount: budgetRef.current?.bills?.length,
           matrixEntriesCount: Object.keys(budgetRef.current?.dailyMatrix || {}).length
@@ -76,7 +77,7 @@ export function LedgerDataProvider({ children }) {
         console.error('Failed to flush budget to IndexedDB:', err);
         setSaveError('Local storage save failed. Browser storage quota may be exceeded.');
       });
-  }, [setSaveError]);
+  }, [setSaveError, currentUserId]);
 
   // Sync initial seed loaded from IndexedDB by BudgetMetadataProvider
   useEffect(() => {
@@ -90,6 +91,27 @@ export function LedgerDataProvider({ children }) {
       if (initialLedgerSeed.transactions) setTransactions(initialLedgerSeed.transactions);
     }
   }, [isDbLoaded, initialLedgerSeed]);
+
+  // CRIT-002: On sign-out or session-expiry, flush pending sync, then clear the
+  // signed-in user's local budget record and pending sync queue so the next
+  // signed-in user never inherits another user's data.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleUserLogout = async (e) => {
+      const userId = e?.detail?.userId;
+      logSync('USER_LOGOUT', 'Clearing user-scoped local budget state', { userId, reason: e?.detail?.reason || 'logout' });
+      try { flushSaveToIndexedDB(); } catch {}
+      try { await clearPendingSync(userId || currentUserId || getCurrentUserId()); } catch {}
+      try { await clearBudgetData(userId || currentUserId || getCurrentUserId()); } catch {}
+      try {
+        localStorage.removeItem('tt_budget_cloud_version');
+        localStorage.removeItem('tt_budget_last_modified');
+      } catch {}
+      try { window.sessionStorage.removeItem('tt_signed_in_user_id'); } catch {}
+    };
+    window.addEventListener('techtrek:user-logout', handleUserLogout);
+    return () => window.removeEventListener('techtrek:user-logout', handleUserLogout);
+  }, [flushSaveToIndexedDB, currentUserId]);
 
   // Self-healing: continuously correct bill matrix cells and line items doubled by prior import accumulation bug
   useEffect(() => {
@@ -165,10 +187,12 @@ export function LedgerDataProvider({ children }) {
     const timer = setTimeout(() => {
       if (isPendingSaveRef.current && budgetRef.current) {
         isPendingSaveRef.current = false;
-        saveBudgetData(budgetRef.current)
+        saveBudgetData(budgetRef.current, currentUserId || getCurrentUserId())
           .then(() => {
             setSaveError(null);
-            logState('INDEXEDDB_AUTO_SAVE', 'Debounced budget auto-save to IndexedDB complete');
+            logState('INDEXEDDB_AUTO_SAVE', 'Debounced budget auto-save to IndexedDB complete', {
+              recordKey: budgetRecordKey(currentUserId || getCurrentUserId())
+            });
           })
           .catch(err => {
             console.error('Failed to save budget to IndexedDB:', err);
@@ -177,7 +201,7 @@ export function LedgerDataProvider({ children }) {
       }
     }, 500);
     return () => clearTimeout(timer);
-  }, [budgetForUI, matrixVersion, isDbLoaded, setSaveError]);
+  }, [budgetForUI, matrixVersion, isDbLoaded, setSaveError, currentUserId]);
 
   // Flush pending save on tab close, page hide, or visibility change
   useEffect(() => {
@@ -224,7 +248,7 @@ export function LedgerDataProvider({ children }) {
     const result = await pushCloudBackupOptimistic(passcode, budgetRef.current, {
       baseVersion: effectiveBaseVersion,
       force: options.force
-    });
+    }, currentUserId || getCurrentUserId());
     if (result.success) {
       if (result.version) {
         setCloudVersion(result.version);
@@ -265,7 +289,7 @@ export function LedgerDataProvider({ children }) {
 
     const fullMerged = { ...mergedMetadata, dailyMatrix: newDailyMatrix, lineItems: newLineItems, transactions: newTransactions };
 
-    await clearAndRestoreBudgetData(fullMerged);
+    await clearAndRestoreBudgetData(fullMerged, currentUserId || getCurrentUserId());
     dailyMatrixRef.current = newDailyMatrix;
     metadataStateRef.current = mergedMetadata;
     transactionsRef.current = newTransactions;
@@ -369,12 +393,25 @@ export function LedgerDataProvider({ children }) {
   // Initial auto cloud restore / 2-way sync on authenticated load or fresh sign-in
   const hasAutoPulledRef = useRef(false);
   const prevAuthRef = useRef(isAuthenticated);
+  const prevUserIdRef = useRef(currentUserId);
   useEffect(() => {
     if (!prevAuthRef.current && isAuthenticated) {
       hasAutoPulledRef.current = false;
     }
+    if (currentUserId && currentUserId !== prevUserIdRef.current) {
+      hasAutoPulledRef.current = false;
+      // CRIT-002: migrate legacy unkeyed record only when the target user record is empty.
+      (async () => {
+        try {
+          await migrateLegacyBudgetToUser(currentUserId);
+        } catch (err) {
+          console.warn('Legacy budget migration skipped:', err?.message || err);
+        }
+      })();
+    }
+    prevUserIdRef.current = currentUserId;
     prevAuthRef.current = isAuthenticated;
-  }, [isAuthenticated]);
+  }, [isAuthenticated, currentUserId]);
 
   useEffect(() => {
     if (!isAuthenticated || !isDbLoaded || hasAutoPulledRef.current || isSyncOnLoadEnabled === false) return;
@@ -507,8 +544,8 @@ export function LedgerDataProvider({ children }) {
     setDailyMatrix(initialBudgetData.dailyMatrix || {});
     setLineItems(initialBudgetData.lineItems || []);
     setTransactions(initialBudgetData.transactions || []);
-    await saveBudgetData(initialBudgetData);
-  }, [setMetadataState]);
+    await saveBudgetData(initialBudgetData, currentUserId || getCurrentUserId());
+  }, [setMetadataState, currentUserId]);
 
   // Clear all data (100% clean slate)
   const clearAllData = useCallback(async () => {

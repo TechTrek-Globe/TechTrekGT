@@ -239,7 +239,10 @@ export async function listBudgetRecordKeys() {
     const request = store.getAllKeys();
 
     request.onsuccess = () => {
-      const keys = (request.result || []).filter((k) => typeof k === 'string' && k.startsWith('current_budget'));
+      /** @type {string[]} */
+      const keys = (request.result || [])
+        .filter((k) => typeof k === 'string' && k.startsWith('current_budget'))
+        .map((/** @type {string} */ k) => k);
       resolve(keys);
     };
     request.onerror = () => reject(request.error);

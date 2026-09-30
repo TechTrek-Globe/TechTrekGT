@@ -5,9 +5,9 @@ import { fakeDemoBudgetData } from '../demoPresetData';
 import { useBudgetMetadata } from './BudgetMetadataContext';
 import { useAuth } from './AuthContext';
 import { apiFetch, pushCloudBackupOptimistic, flushPendingCloudSync, savePendingSync, getPendingSync, clearPendingSync, pendingSyncKey } from '../utils/api';
-import { getBudgetData, saveBudgetData, clearAndRestoreBudgetData, clearBudgetData, migrateLegacyBudgetToUser, listBudgetRecordKeys, getCurrentUserId } from '../utils/indexedDB';
+import { getBudgetData, saveBudgetData, clearAndRestoreBudgetData, clearBudgetData, migrateLegacyBudgetToUser, listBudgetRecordKeys, getCurrentUserId, budgetRecordKey } from '../utils/indexedDB';
 import { processSpreadsheetImport } from '../utils/spreadsheet';
-import { isBillDueInMonth } from '../utils/paydayUtils';
+import { isBillDueInMonth, effectiveDueDay } from '../utils/paydayUtils';
 import { logSync, logTransaction, logMatrix, logLedger, logState } from '../utils/logger';
 import { AlertTriangle } from 'lucide-react';
 
@@ -945,11 +945,11 @@ export function LedgerDataProvider({ children }) {
           }
         } else if (!isLockedDay) {
           const actualAmt = getActualAmount(b.id, monthKey);
-          if (actualAmt !== null && parseInt(b.dueDay) === day && isBillDueInMonth(b, month, true)) {
+          if (actualAmt !== null && effectiveDueDay(b, year, month) === day && isBillDueInMonth(b, month, true)) {
             amt = (expectedBillAmt > 0 && Math.abs(actualAmt - 2 * expectedBillAmt) < 0.02) ? expectedBillAmt : actualAmt;
           } else if (actualAmt !== null) {
             amt = 0;
-          } else if (parseInt(b.dueDay) === day && isBillDueInMonth(b, month, true)) {
+          } else if (effectiveDueDay(b, year, month) === day && isBillDueInMonth(b, month, true)) {
             amt = expectedBillAmt;
           }
         }

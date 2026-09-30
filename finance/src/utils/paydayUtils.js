@@ -29,6 +29,22 @@ export function parseDayNumber(val, daysInMonth) {
 }
 
 /**
+ * Returns the effective due day for a bill in a given month, clamping dueDay
+ * (e.g. 29/30/31) to the actual number of days in the month so bills due on
+ * the 31st still fire in shorter months like February and April.
+ * @param {Object} bill
+ * @param {number} year - 4-digit year
+ * @param {number} month - 0-indexed month (0 = Jan, 11 = Dec)
+ * @returns {number}
+ */
+export function effectiveDueDay(bill, year, month) {
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const dueDay = parseInt(bill?.dueDay, 10);
+  if (!Number.isFinite(dueDay) || dueDay < 1) return daysInMonth;
+  return Math.min(dueDay, daysInMonth);
+}
+
+/**
  * Calculates target payday Date objects for a person in a given month.
  * @param {Object} person
  * @param {number} year - 4-digit year

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { getApiUrl, apiFetch, setCsrfToken, getCsrfToken } from '../utils/api';
 
 import { isNetworkError } from '../utils/networkError';
+import { getCurrentUserId } from '../utils/indexedDB';
 
 /** @type {React.Context<any>} */
 const AuthContext = createContext(null);

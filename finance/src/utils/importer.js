@@ -853,7 +853,7 @@ export function matchCreditToEarner({
     const monthlyB = Math.round((calcMonthlyPortion(activeBills) + extraPortion) * 100) / 100;
 
     // Try both scopes; use the one that produces the better (smaller delta) match
-    for (const [totalMonthly, scopeLabel] of [[monthlyA, 'Account'], [monthlyB, 'Total']]) {
+    for (const { totalMonthly, scopeLabel } of [{ totalMonthly: monthlyA, scopeLabel: 'Account' }, { totalMonthly: monthlyB, scopeLabel: 'Total' }]) {
       // CRITICAL GUARD: only attempt matching if calculated amount is meaningful
       if (totalMonthly < MIN_EARNER_AMOUNT) continue;
 
@@ -913,9 +913,9 @@ export function matchCreditToEarner({
 /**
  * Row-by-row merge of incoming bills with existing bills.
  * Matches rows by bill name or bank document matching key, preserving existing comments/notes.
- * @param {object[]} existing
- * @param {object[]} incoming
- * @returns {object[]}
+ * @param {any[]} existing
+ * @param {any[]} incoming
+ * @returns {any[]}
  */
 export function mergeBills(existing = [], incoming = []) {
   const result = existing.map(b => ({ ...b }));
@@ -1044,8 +1044,8 @@ export function detectExtraHeaderRow(rawRows = []) {
  * Inspects all sheets in a workbook array buffer, extracting metadata, previews, and header detection.
  * @param {ArrayBuffer} arrayBuffer
  * @param {string} fileName
- * @param {object[]} existingAccounts
- * @returns {{ isWorkbook: boolean, sheetNames: string[], sheetsInfo: object[] }}
+ * @param {any[]} [existingAccounts]
+ * @returns {{ isWorkbook: boolean, sheetNames: string[], sheetsInfo: any[] }}
  */
 export function inspectWorkbookSheets(arrayBuffer, fileName = '', existingAccounts = []) {
   const workbook = XLSX.read(arrayBuffer, { type: 'array', raw: true, cellDates: false });

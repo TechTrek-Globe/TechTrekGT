@@ -755,7 +755,7 @@ export function SpreadsheetImporter({
         }
 
         // Fetch the ledger's calculated running balance exactly as of the import date
-        let calculated = 0;
+        let calculated;
         if (maxImportDate) {
           calculated = getLedgerRunningBalanceAsOfDate({
             targetAccountId: targetAccId,

@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Backwards compatibility bridge for debugLogger.js.
  * All logging and subscriber logic is centralized in logger.js.

@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Granular, Categorized Debug Logger for TechTrek Finance.
  * Zero-overhead when debug mode or specific categories are disabled.

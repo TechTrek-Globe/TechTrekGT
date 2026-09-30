@@ -30,7 +30,7 @@ export function parseDayNumber(val, daysInMonth) {
 
 /**
  * Calculates target payday Date objects for a person in a given month.
- * @param {object} person
+ * @param {Object} person
  * @param {number} year - 4-digit year
  * @param {number} month - 0-indexed month (0 = Jan, 11 = Dec)
  * @returns {Date[]} Array of target payday Date objects
@@ -76,7 +76,7 @@ export function getPersonTargetPayDaysForMonth(person, year, month) {
 
 /**
  * Calculates actual deposit Date objects for a person taking into account early pay offset (payOffsetDays).
- * @param {object} person
+ * @param {Object} person
  * @param {number} year - 4-digit year
  * @param {number} month - 0-indexed month
  * @returns {Date[]} Array of actual deposit Date objects
@@ -102,7 +102,7 @@ export function getPersonDepositDatesForMonth(person, year, month) {
 
 /**
  * Checks if a specific day in a month is an actual deposit day for a person.
- * @param {object} person
+ * @param {Object} person
  * @param {number} year
  * @param {number} month - 0-indexed month
  * @param {number} day - 1-based day of month
@@ -134,7 +134,7 @@ export const FREQUENCY_ANNUAL_PERIODS = {
 export function getAnnualAmount(amount, frequency) {
   const norm = String(frequency || 'monthly').toLowerCase().replace(/_/g, '-');
   const periods = FREQUENCY_ANNUAL_PERIODS[norm] ?? 12;
-  return (parseFloat(amount) || 0) * periods;
+  return (parseFloat(String(amount)) || 0) * periods;
 }
 
 /**
@@ -190,7 +190,7 @@ export function goalMonthlyDisplay(goal, contributorPayFrequency) {
  * Calculates total expected contributions (monthly, annual, per-paycheck) across all accounts and goals for a contributor.
  * @param {string} contributorId
  * @param {Array} fundingGoals
- * @param {object} budget
+ * @param {Object} budget
  * @returns {object}
  */
 export function calculateDashboardTotalsForContributor(contributorId, fundingGoals = [], budget = null) {
@@ -216,10 +216,10 @@ export function calculateDashboardTotalsForContributor(contributorId, fundingGoa
 
 /**
  * Generates the specific transaction breakdown per account on deposit days.
- * @param {object} contributor
+ * @param {Object} contributor
  * @param {Date|string} depositDate
  * @param {Array} fundingGoals
- * @param {object} budget
+ * @param {Object} budget
  * @returns {object}
  */
 export function generatePaycheckTransactions(contributor, depositDate, fundingGoals = [], budget = null) {
@@ -250,9 +250,9 @@ export function generatePaycheckTransactions(contributor, depositDate, fundingGo
 /**
  * Resolves the deposit amount for a person for a specific account selection.
  * Supports explicit fundingGoals, explicit accountAllocations, unallocated paycheck remainders, and dynamic bill/savings split fallbacks.
- * @param {object} person
+ * @param {Object} person
  * @param {string} selectedAccountId - 'all' or specific account ID
- * @param {object} [budget] - optional budget context containing accounts, bills, and fundingGoals
+ * @param {Object} [budget] - optional budget context containing accounts, bills, and fundingGoals
  * @returns {number}
  */
 export function getPersonDepositAmountForAccount(person, selectedAccountId = 'all', budget = null) {
@@ -301,9 +301,9 @@ export function getPersonDepositAmountForAccount(person, selectedAccountId = 'al
 /**
  * Calculates the monthly bill obligation for a given person and account based on active bill splits.
  *
- * @param {object} person
+ * @param {Object} person
  * @param {string} accountId
- * @param {object} budget
+ * @param {Object} budget
  * @returns {number}
  */
 export function getPersonBillMonthlyPortionForAccount(person, accountId, budget) {
@@ -329,9 +329,9 @@ export function getPersonBillMonthlyPortionForAccount(person, accountId, budget)
 /**
  * Calculates the per-paycheck bill obligation for a given person and account based on pay frequency.
  *
- * @param {object} person
+ * @param {Object} person
  * @param {string} accountId
- * @param {object} budget
+ * @param {Object} budget
  * @returns {number}
  */
 export function getPersonBillPerPaycheckPortionForAccount(person, accountId, budget) {
@@ -355,9 +355,9 @@ export function getPersonBillPerPaycheckPortionForAccount(person, accountId, bud
  * Calculates the monthly extra savings portion for a given person and account based on split percentages,
  * income ratio, or automatic buffer from goal allocations exceeding projected bills.
  *
- * @param {object} account
- * @param {object} person
- * @param {object} budget
+ * @param {Object} account
+ * @param {Object} person
+ * @param {Object} budget
  * @returns {number}
  */
 export function getAccountSaveExtraPersonPortion(account, person, budget) {
@@ -375,9 +375,9 @@ export function getAccountSaveExtraPersonPortion(account, person, budget) {
  * Savings overflow = deposit minus bills, strictly 2dp safe.
  * On a 3-paycheck bi-weekly month, the entire 3rd paycheck deposit routes to extra savings.
  *
- * @param {object} person
+ * @param {Object} person
  * @param {string} selectedAccountId - 'all' or specific account ID
- * @param {object} budget
+ * @param {Object} budget
  * @returns {number}
  */
 export function getPersonExtraSavingsDepositAmountForAccount(person, selectedAccountId = 'all', budget = null) {
@@ -410,7 +410,7 @@ export const MONTH_SHORT_NAMES = [
 
 /**
  * Returns an array of 1-based month indices (1..12) when a bill is due.
- * @param {object} bill
+ * @param {Object} bill
  * @returns {number[]}
  */
 export function getBillDueMonths(bill) {
@@ -458,7 +458,7 @@ export function getBillDueMonths(bill) {
 
 /**
  * Checks if a bill is due in a given month (1-based 1..12 or 0-based 0..11 if isZeroBased=true).
- * @param {object} bill
+ * @param {Object} bill
  * @param {number} monthNum - Month index
  * @param {boolean} [isZeroBased=false]
  * @returns {boolean}
@@ -473,7 +473,7 @@ export function isBillDueInMonth(bill, monthNum, isZeroBased = false) {
 
 /**
  * Computes the exact next upcoming due Date for a bill relative to refDate.
- * @param {object} bill
+ * @param {Object} bill
  * @param {Date} [refDate=new Date()]
  * @returns {Date}
  */
@@ -510,7 +510,7 @@ export function getNextBillDueDate(bill, refDate = new Date()) {
 
 /**
  * Formats due month(s) description for display (e.g. "Nov", "Jan, Jul", "Jan, Apr, Jul, Oct").
- * @param {object} bill
+ * @param {Object} bill
  * @returns {string}
  */
 export function formatBillDueMonths(bill) {

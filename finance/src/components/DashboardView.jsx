@@ -952,8 +952,8 @@ export function DashboardView() {
             const person = peopleList.find(p => p.id === pId);
             const pName = person ? person.name : pId;
             const splitType = acc.saveExtraSplitType || 'percentage';
-            let portion = 0;
-            let splitPct = 0;
+            let portion;
+            let splitPct;
             if (splitType === 'amount') {
               portion = parseFloat(val) || 0;
               splitPct = extraAmt > 0 ? Math.round((portion / extraAmt) * 100) : 0;

@@ -236,8 +236,6 @@ export function ColumnHeaderHoverTooltip({
   onMouseEnter,
   onMouseLeave
 }) {
-  if (!column || !rect) return null;
-
   // Inline editing state for aliases
   const [editingAliasIdx, setEditingAliasIdx] = useState(null);
   const [draftAliasValue, setDraftAliasValue] = useState('');
@@ -247,6 +245,8 @@ export function ColumnHeaderHoverTooltip({
   // Inline editing state for column name
   const [isEditingName, setIsEditingName] = useState(false);
   const [draftNameValue, setDraftNameValue] = useState('');
+
+  if (!column || !rect) return null;
 
   const aliases = getColumnAliases(column, type);
   const recentTxns = getColumnRecentTransactions({

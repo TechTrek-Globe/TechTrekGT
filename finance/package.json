@@ -9,7 +9,10 @@
     "preview": "npm run build && wrangler dev",
     "deploy": "npm run build && wrangler deploy",
     "check:serialization": "node scripts/check-safe-serialization.js",
-    "test": "node scripts/check-safe-serialization.js && node --test tests/phase2-*.test.js tests/security-hardening.test.js",
+    "lint": "npx eslint src",
+    "lint:quiet": "npx eslint src --quiet",
+    "typecheck": "npx tsc -p jsconfig.json",
+    "test": "node scripts/check-safe-serialization.js && node --test tests/phase2-*.test.js tests/security-hardening.test.js tests/calculation-engine.test.js",
     "test:e2e": "node --test tests/live-e2e.test.js"
   },
   "dependencies": {
@@ -24,10 +27,15 @@
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.50.0",
+    "@eslint/js": "^10.0.1",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
+    "eslint": "^10.11.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.12.0",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
+    "typescript": "^7.0.2",
     "vite": "^6.0.7",
     "wrangler": "^4.118.0"
   }

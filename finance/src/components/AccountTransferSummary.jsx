@@ -78,7 +78,7 @@ export function AccountTransferSummary() {
         const hasFundingGoals = (budget?.fundingGoals || []).some(g => g.contributorId === p.id);
         const isExplicit = hasLegacyAllocations || hasFundingGoals;
   
-        let rawPortion = 0;
+        let rawPortion;
         if (basisMode === 'direct_deposit' || (basisMode === 'auto' && isExplicit)) {
           const perPaycheckDeposit = getPersonDepositAmountForAccount(p, acc.id, budget);
           if (mode === 'paycheck') {

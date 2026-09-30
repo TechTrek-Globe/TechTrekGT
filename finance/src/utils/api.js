@@ -197,13 +197,13 @@ export async function pushCloudBackupOptimistic(passcode, budgetData, options = 
         timestamp: data.timestamp,
         version: data.version
       });
-      return { success: true, status: 'synced', data, version: data.version };
+      return /** @type {any} */ ({ success: true, status: 'synced', data, version: data.version });
     }
 
     if (res.status === 409) {
       if (data?.conflict || data?.code === ERROR_CODES.SYNC_CONFLICT) {
         logSync('PUSH_CONFLICT', 'Cloud sync conflict detected', { serverVersion: data.serverVersion }, 'warn');
-        return {
+        return /** @type {any} */ ({
           success: false,
           status: 'conflict',
           conflict: true,
@@ -211,17 +211,17 @@ export async function pushCloudBackupOptimistic(passcode, budgetData, options = 
           serverData: data.serverData,
           serverVersion: data.serverVersion,
           error: data.error || 'Conflict detected: cloud data changed elsewhere.'
-        };
+        });
       }
       if (data?.suspicious || data?.code === ERROR_CODES.SYNC_SUSPICIOUS) {
         logSync('PUSH_SUSPICIOUS', 'Backup payload suspiciously smaller than stored version', null, 'warn');
-        return {
+        return /** @type {any} */ ({
           success: false,
           status: 'suspicious',
           suspicious: true,
           code: ERROR_CODES.SYNC_SUSPICIOUS,
           error: data.error || 'Incoming backup is suspiciously smaller than stored backup.'
-        };
+        });
       }
     }
 

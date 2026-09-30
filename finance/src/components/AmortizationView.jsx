@@ -102,7 +102,7 @@ export function AmortizationView() {
 
     while (balance > 0.01 && period <= 1200) {
       const interestForPeriod = balance * periodInterestRate;
-      let principalPortion = 0;
+      let principalPortion;
 
       if (paymentType === 'interest_only') {
         principalPortion = 0;

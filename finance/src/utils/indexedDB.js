@@ -22,18 +22,19 @@ export function openDB() {
     const request = window.indexedDB.open(DB_NAME, DB_VERSION);
 
     request.onupgradeneeded = (event) => {
+      // @ts-ignore - IDBVersionChangeEvent.target.result
       const db = event.target.result;
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         db.createObjectStore(STORE_NAME);
       }
     };
 
-    request.onsuccess = (event) => {
-      resolve(event.target.result);
+    request.onsuccess = () => {
+      resolve(request.result);
     };
 
-    request.onerror = (event) => {
-      reject(event.target.error);
+    request.onerror = () => {
+      reject(request.error);
     };
   });
 }
@@ -62,16 +63,16 @@ export async function getBudgetData() {
       resolve(res);
     };
 
-    request.onerror = (event) => {
-      logState('INDEXEDDB_READ_ERROR', 'Failed to read budget state from IndexedDB', { error: event.target.error }, 'error');
-      reject(event.target.error);
+    request.onerror = () => {
+      logState('INDEXEDDB_READ_ERROR', 'Failed to read budget state from IndexedDB', { error: request.error }, 'error');
+      reject(request.error);
     };
   });
 }
 
 /**
  * Silently saves the current application budget state to IndexedDB.
- * @param {object} budgetData
+ * @param {Object} budgetData
  * @returns {Promise<void>}
  */
 export async function saveBudgetData(budgetData) {
@@ -90,16 +91,16 @@ export async function saveBudgetData(budgetData) {
       resolve();
     };
 
-    request.onerror = (event) => {
-      logState('INDEXEDDB_WRITE_ERROR', 'Failed to write budget state to IndexedDB', { error: event.target.error }, 'error');
-      reject(event.target.error);
+    request.onerror = () => {
+      logState('INDEXEDDB_WRITE_ERROR', 'Failed to write budget state to IndexedDB', { error: request.error }, 'error');
+      reject(request.error);
     };
   });
 }
 
 /**
  * Clears current database state and saves new imported budget data.
- * @param {object} newBudgetData
+ * @param {Object} newBudgetData
  * @returns {Promise<void>}
  */
 export async function clearAndRestoreBudgetData(newBudgetData) {
@@ -118,10 +119,10 @@ export async function clearAndRestoreBudgetData(newBudgetData) {
         });
         resolve();
       };
-      putRequest.onerror = (event) => reject(event.target.error);
+      putRequest.onerror = () => reject(putRequest.error);
     };
 
-    clearRequest.onerror = (event) => reject(event.target.error);
+    clearRequest.onerror = () => reject(clearRequest.error);
   });
 }
 
@@ -140,6 +141,6 @@ export async function clearBudgetData() {
       logState('INDEXEDDB_CLEAR', 'Purged all records from IndexedDB app_state store');
       resolve();
     };
-    request.onerror = (event) => reject(event.target.error);
+    request.onerror = () => reject(request.error);
   });
 }

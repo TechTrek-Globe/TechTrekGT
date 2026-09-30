@@ -59,8 +59,8 @@ export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
   try {
     logDebug('PARSER', `Starting Emory Parc workbook parsing: "${fileName}"`, { fileName });
     const workbook = typeof fileData === 'string'
-      ? XLSX.read(fileData, { type: 'string', cellFormulas: true })
-      : XLSX.read(fileData, { type: 'array', cellFormulas: true });
+      ? XLSX.read(fileData, { type: 'string', cellFormula: true })
+      : XLSX.read(fileData, { type: 'array', cellFormula: true });
 
     logDebug('PARSER', `Workbook loaded with ${workbook.SheetNames.length} sheets`, { sheetNames: workbook.SheetNames });
 
@@ -194,7 +194,7 @@ export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
             // Found a valid bill row
             const billName = col0;
             const amount = Math.abs(cleanNum(row[3] || row[2] || row[4], 0));
-            const periodStr = rowText.includes('semi-annual') ? 'Semi-Annual' : rowText.includes('annual') ? 'Annual' : rowText.includes('weekly') ? 'Weekly' : 'Monthly';
+            const periodStr = rowText.includes('semi-annual') ? 'Semi-Annual' : rowText.includes('annual') ? 'Annual' : rowText.includes('quarterly') ? 'Quarterly' : rowText.includes('weekly') ? 'Weekly' : 'Monthly';
 
             // Find due day or date if present
             let dueDay = 15;
@@ -738,15 +738,16 @@ export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
 
 /**
  * Parses a single sheet's raw rows with a specific header row index and target account.
- * @param {object} params
+ * @param {Object} params
  * @param {any[][]} params.rawRows
  * @param {string} params.sheetName
  * @param {number} params.headerRowIdx
  * @param {string} params.targetAccountId
  * @param {string} params.targetAccountName
- * @param {object[]} params.existingBills
- * @param {object[]} params.existingPeople
- * @returns {{ transactions: object[], importedLedgerRows: object, discoveredBills: object[], discoveredPeople: object[] }}
+ * @param {any[]} [params.existingBills]
+ * @param {any[]} [params.existingPeople]
+ * @param {any[]} [params.existingAccounts]
+ * @returns {{ transactions: any[], importedLedgerRows: Object, discoveredBills: any[], discoveredPeople: any[] }}
  */
 export function parseSingleSheet({
   rawRows = [],
@@ -952,9 +953,11 @@ export function parseSingleSheet({
           accounts: existingAccounts
         });
         if (match) {
-          personId = match.person.id;
+          // @ts-ignore dynamic shape
+          personId = match.person.id; // @ts-ignore
           category = 'Income / Transfer';
-          logDebug('PARSER', `Matched credit transaction #${transactions.length + 1} to earner "${match.person.name}" via ${match.reason}`, {
+          // @ts-ignore dynamic shape
+          logDebug("PARSER", `Matched credit transaction #${transactions.length + 1} to earner "${match.person.name}" via ${match.reason}`, { // @ts-ignore
             amount,
             description,
             personId
@@ -1227,4 +1230,3 @@ export function parseSingleSheet({
     discoveredPeople
   };
 }
-

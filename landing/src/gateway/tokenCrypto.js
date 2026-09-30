@@ -1,17 +1,29 @@
 /**
- * tokenCrypto.js - AES-GCM 256-bit encrypt/decrypt for eBay OAuth tokens
+ * tokenCrypto.js - AES-GCM 256-bit encrypt/decrypt for eBay OAuth tokens (Landing Gateway)
  *
- * Uses JWT_SECRET as key material (PBKDF2-SHA256, 100k iterations, fixed salt).
- * All callers receive/return plain-text strings; encryption is transparent.
+ * Ciphertext envelope versions:
+ *   v1 (legacy): "<iv_b64>.<ciphertext_b64>"        - PBKDF2 100k iterations, OLD_SALT or NEW_SALT
+ *   v2 (current): "v2.<iv_b64>.<ciphertext_b64>"    - PBKDF2 310k iterations, NEW_SALT
  *
- * Used by: ebayOAuth.js (store tokens), getEbayUserToken (read tokens)
+ * TOKEN_ENCRYPTION_KEY is REQUIRED. No substitution for JWT_SECRET is ever permitted.
+ *
+ * FOLLOW-UP: Remove legacy v1/OLD_SALT decryption path once all stored tokens
+ *            have been re-encrypted under v2. Scheduled: 2026-12-31.
  */
 
 export const OLD_SALT = new TextEncoder().encode('techtrekgt-ebay-token-v1');
 export const NEW_SALT = new TextEncoder().encode('techtrekgt-token-encryption-v2');
-export const PBKDF2_ITERATIONS = 100_000;
 
-export async function deriveKey(secret, salt = NEW_SALT) {
+// v1 legacy iteration count - retained ONLY for decryption of existing stored tokens
+export const PBKDF2_ITERATIONS_V1 = 100_000;
+// v2 current iteration count - matches password hashing OWASP recommendation (310k)
+export const PBKDF2_ITERATIONS_V2 = 310_000;
+// Alias kept for callers that imported the original name
+export const PBKDF2_ITERATIONS = PBKDF2_ITERATIONS_V2;
+
+const V2_PREFIX = 'v2';
+
+export async function deriveKey(secret, salt = NEW_SALT, iterations = PBKDF2_ITERATIONS_V2) {
   const raw = await crypto.subtle.importKey(
     'raw',
     new TextEncoder().encode(secret),
@@ -20,7 +32,7 @@ export async function deriveKey(secret, salt = NEW_SALT) {
     ['deriveKey']
   );
   return crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
+    { name: 'PBKDF2', salt, iterations, hash: 'SHA-256' },
     raw,
     { name: 'AES-GCM', length: 256 },
     false,
@@ -38,53 +50,75 @@ function base64ToBuf(b64) {
 
 /**
  * Encrypts a plain-text token string using TOKEN_ENCRYPTION_KEY.
- * Returns a base64 string: "<iv_b64>.<ciphertext_b64>"
+ * Returns a v2 versioned envelope: "v2.<iv_b64>.<ciphertext_b64>"
+ *
+ * TOKEN_ENCRYPTION_KEY is required. Throws if absent.
  */
 export async function encryptToken(plaintext, tokenEncryptionKey) {
   if (!tokenEncryptionKey) throw new Error('TOKEN_ENCRYPTION_KEY binding is required');
-  const key = await deriveKey(tokenEncryptionKey, NEW_SALT);
+  const key = await deriveKey(tokenEncryptionKey, NEW_SALT, PBKDF2_ITERATIONS_V2);
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const encoded = new TextEncoder().encode(plaintext);
   const cipherBuf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, encoded);
-  return `${bufToBase64(iv)}.${bufToBase64(cipherBuf)}`;
+  return `${V2_PREFIX}.${bufToBase64(iv)}.${bufToBase64(cipherBuf)}`;
 }
 
 /**
  * Decrypts a token previously encrypted by encryptToken.
- * Supports transition window: tries TOKEN_ENCRYPTION_KEY with NEW_SALT first,
- * falling back to legacy derivation (fallbackSecret || tokenEncryptionKey with OLD_SALT)
- * if necessary.
  *
- * Returns the original plain-text string.
+ * Version detection:
+ *   - Starts with "v2." -> v2 envelope: TOKEN_ENCRYPTION_KEY + NEW_SALT + 310k iterations
+ *   - Otherwise        -> v1 (legacy): try NEW_SALT+100k then OLD_SALT+100k
+ *
+ * Returns { plaintext, wasLegacy } where wasLegacy=true signals the caller to re-encrypt
+ * under v2 and persist, draining the legacy path naturally.
+ *
+ * Throws a clear error on corrupted ciphertext - never returns null silently.
+ * TOKEN_ENCRYPTION_KEY is required. No JWT_SECRET substitution is ever attempted.
  */
-export async function decryptToken(encrypted, tokenEncryptionKey, fallbackSecret = null) {
-  if (!encrypted) return null;
-  const [ivB64, cipherB64] = encrypted.split('.');
-  if (!ivB64 || !cipherB64) throw new Error('Invalid encrypted token format');
-  const iv = base64ToBuf(ivB64);
-  const cipherBuf = base64ToBuf(cipherB64);
+export async function decryptToken(encrypted, tokenEncryptionKey) {
+  if (!encrypted) return { plaintext: null, wasLegacy: false };
+  if (!tokenEncryptionKey) throw new Error('TOKEN_ENCRYPTION_KEY binding is required for decryption');
 
-  // 1. Try decrypting with primary TOKEN_ENCRYPTION_KEY and NEW_SALT
-  if (tokenEncryptionKey) {
+  // --- v2 path ---
+  if (encrypted.startsWith(`${V2_PREFIX}.`)) {
+    const rest = encrypted.slice(V2_PREFIX.length + 1);
+    const dotIdx = rest.indexOf('.');
+    if (dotIdx === -1) throw new Error('Invalid v2 encrypted token format');
+    const iv = base64ToBuf(rest.slice(0, dotIdx));
+    const cipherBuf = base64ToBuf(rest.slice(dotIdx + 1));
+    const key = await deriveKey(tokenEncryptionKey, NEW_SALT, PBKDF2_ITERATIONS_V2);
+    let plainBuf;
     try {
-      const key = await deriveKey(tokenEncryptionKey, NEW_SALT);
-      const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, cipherBuf);
-      return new TextDecoder().decode(plainBuf);
+      plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, cipherBuf);
     } catch (_) {
-      // Transition fallback if ciphertext was encrypted with legacy derivation
+      throw new Error('Failed to decrypt v2 token: invalid key or ciphertext corrupted');
     }
+    return { plaintext: new TextDecoder().decode(plainBuf), wasLegacy: false };
   }
 
-  // 2. Transition window fallback: try legacy key derivation with OLD_SALT
-  const oldSecret = fallbackSecret || tokenEncryptionKey;
-  if (oldSecret) {
-    try {
-      const oldKey = await deriveKey(oldSecret, OLD_SALT);
-      const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, oldKey, cipherBuf);
-      return new TextDecoder().decode(plainBuf);
-    } catch (_) {
-      // Both attempts failed
-    }
+  // --- v1 (legacy) path ---
+  const dotIdx = encrypted.indexOf('.');
+  if (dotIdx === -1) throw new Error('Invalid encrypted token format');
+  const iv = base64ToBuf(encrypted.slice(0, dotIdx));
+  const cipherBuf = base64ToBuf(encrypted.slice(dotIdx + 1));
+
+  // v1 attempt 1: TOKEN_ENCRYPTION_KEY + NEW_SALT + 100k iterations
+  try {
+    const key = await deriveKey(tokenEncryptionKey, NEW_SALT, PBKDF2_ITERATIONS_V1);
+    const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, cipherBuf);
+    return { plaintext: new TextDecoder().decode(plainBuf), wasLegacy: true };
+  } catch (_) {
+    // fall through to OLD_SALT attempt
+  }
+
+  // v1 attempt 2: TOKEN_ENCRYPTION_KEY + OLD_SALT + 100k (oldest stored tokens)
+  try {
+    const key = await deriveKey(tokenEncryptionKey, OLD_SALT, PBKDF2_ITERATIONS_V1);
+    const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, cipherBuf);
+    return { plaintext: new TextDecoder().decode(plainBuf), wasLegacy: true };
+  } catch (_) {
+    // both v1 paths exhausted
   }
 
   throw new Error('Failed to decrypt token: invalid key or ciphertext corrupted');

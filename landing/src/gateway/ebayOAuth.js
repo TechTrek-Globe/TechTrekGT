@@ -65,8 +65,15 @@ function getRedirectUri(env) {
  */
 export async function getEbayUserToken(env, userId) {
   if (!env.DB) throw new Error('DB binding not available');
-  const encKey = env.TOKEN_ENCRYPTION_KEY || env.JWT_SECRET;
-  if (!encKey) throw new Error('TOKEN_ENCRYPTION_KEY binding not available');
+
+  if (!env.TOKEN_ENCRYPTION_KEY) {
+    console.error('[ebayOAuth] FATAL: TOKEN_ENCRYPTION_KEY is not bound. eBay integration unavailable.');
+    throw Object.assign(
+      new Error('eBay integration is temporarily unavailable due to a server configuration issue. Please contact support.'),
+      { statusCode: 503 }
+    );
+  }
+  const encKey = env.TOKEN_ENCRYPTION_KEY;
 
   const row = await env.DB.prepare(
     'SELECT * FROM ebay_oauth_tokens WHERE user_id = ?'
@@ -82,13 +89,30 @@ export async function getEbayUserToken(env, userId) {
     throw new Error('eBay refresh token has expired. Please reconnect your eBay account in Settings.');
   }
 
+  // Helper: decrypt and re-encrypt legacy tokens in-place to drain the v1 path
+  async function decryptAndMigrate(encrypted, column) {
+    const { plaintext, wasLegacy } = await decryptToken(encrypted, encKey);
+    if (wasLegacy && plaintext) {
+      try {
+        const reencrypted = await encryptToken(plaintext, encKey);
+        await env.DB.prepare(
+          `UPDATE ebay_oauth_tokens SET ${column} = ? WHERE user_id = ?`
+        ).bind(reencrypted, userId).run();
+        console.log(`[ebayOAuth] Migrated legacy ${column} to v2 envelope for user ${userId}`);
+      } catch (migrateErr) {
+        console.error(`[ebayOAuth] Failed to persist migrated ${column}:`, migrateErr);
+      }
+    }
+    return plaintext;
+  }
+
   // Token still valid (>5min remaining)
   if (accessExp > now + 5 * 60 * 1000) {
-    return decryptToken(row.access_token, encKey, env.JWT_SECRET);
+    return decryptAndMigrate(row.access_token, 'access_token');
   }
 
   // Need to refresh
-  const refreshToken = await decryptToken(row.refresh_token, encKey, env.JWT_SECRET);
+  const refreshToken = await decryptAndMigrate(row.refresh_token, 'refresh_token');
   const { oauthUrl } = getEbayEndpoints(env);
   const credentials = btoa(`${getClientId(env)}:${getClientSecret(env)}`);
 
@@ -112,7 +136,7 @@ export async function getEbayUserToken(env, userId) {
   const newExpMs = Date.now() + (data.expires_in || 7200) * 1000;
   const newExpIso = new Date(newExpMs).toISOString();
 
-  const encAccess = await encryptToken(newAccessToken, env.TOKEN_ENCRYPTION_KEY || encKey);
+  const encAccess = await encryptToken(newAccessToken, encKey);
 
   await env.DB.prepare(`
     UPDATE ebay_oauth_tokens SET
@@ -189,6 +213,10 @@ export async function onRequestGetCallback(context) {
     if (!env.GATEWAY_KV || !env.DB) {
       return Response.redirect(`${redirectBase}?ebay=error&reason=server_config`, 302);
     }
+    if (!env.TOKEN_ENCRYPTION_KEY) {
+      console.error('[ebayOAuth callback] FATAL: TOKEN_ENCRYPTION_KEY not bound. Cannot store tokens.');
+      return Response.redirect(`${redirectBase}?ebay=error&reason=server_config`, 302);
+    }
 
     const stateData = await env.GATEWAY_KV.get(`${KV_STATE_PREFIX}${state}`, { type: 'json' });
     if (!stateData) {
@@ -228,7 +256,7 @@ export async function onRequestGetCallback(context) {
     const accessExpMs = Date.now() + (tokenData.expires_in || 7200) * 1000;
     const refreshExpMs = Date.now() + (tokenData.refresh_token_expires_in || 47304000) * 1000;
 
-    const encKey = env.TOKEN_ENCRYPTION_KEY || env.JWT_SECRET;
+    const encKey = env.TOKEN_ENCRYPTION_KEY;
     const [encAccess, encRefresh] = await Promise.all([
       encryptToken(accessToken, encKey),
       encryptToken(refreshToken, encKey)
@@ -317,9 +345,14 @@ export async function onRequestGetStatus(context) {
  */
 async function revokeEbayToken(env, encryptedRefreshToken) {
   if (!encryptedRefreshToken) return false;
+  if (!env.TOKEN_ENCRYPTION_KEY) {
+    console.error('[ebayOAuth disconnect] TOKEN_ENCRYPTION_KEY not bound; cannot decrypt token for revocation. Skipping upstream revoke.');
+    return false;
+  }
   try {
-    const encKey = env.TOKEN_ENCRYPTION_KEY || env.JWT_SECRET;
-    const refreshToken = await decryptToken(encryptedRefreshToken, encKey, env.JWT_SECRET);
+    const encKey = env.TOKEN_ENCRYPTION_KEY;
+    const { plaintext: refreshToken } = await decryptToken(encryptedRefreshToken, encKey);
+    if (!refreshToken) return false;
     const { oauthUrl } = getEbayEndpoints(env);
     const credentials = btoa(`${getClientId(env)}:${getClientSecret(env)}`);
 

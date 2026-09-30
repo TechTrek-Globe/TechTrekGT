@@ -488,5 +488,73 @@ describe('LOW-2: SKU Collision Detection & Uniqueness Regeneration', () => {
       assert.strictEqual(json.items[0].image_url, 'https://example.com/item.jpg'); // normalized to https
       assert.strictEqual(json.items[0].suggested_list_price, 135.0);
     });
+
+    test('GET /api/items/enriched starts count and paginated row queries concurrently', async () => {
+      const originalPrepare = mockDb.prepare.bind(mockDb);
+      const startedQueries = new Set();
+      const queryBindings = {};
+      let releaseQueries;
+      const bothQueriesStarted = new Promise(resolve => {
+        releaseQueries = resolve;
+      });
+
+      mockDb.prepare = sql => {
+        const statement = originalPrepare(sql);
+        let bindings = [];
+        return {
+          bind(...values) {
+            bindings = values;
+            statement.bind(...values);
+            return this;
+          },
+          first() {
+            if (!sql.includes('SELECT COUNT(*) AS total FROM auction_items i')) {
+              return statement.first();
+            }
+            startedQueries.add('count');
+            queryBindings.count = bindings;
+            if (startedQueries.size === 2) releaseQueries();
+            return bothQueriesStarted.then(() => statement.first());
+          },
+          all() {
+            if (!sql.includes('LIMIT ? OFFSET ?')) return statement.all();
+            startedQueries.add('rows');
+            queryBindings.rows = bindings;
+            if (startedQueries.size === 2) releaseQueries();
+            return bothQueriesStarted.then(() => statement.all());
+          }
+        };
+      };
+
+      const req = new Request(
+        'http://localhost/api/items/enriched?status=Available&category=Memorabilia&page=2&limit=10',
+        { headers: { 'Authorization': `Bearer ${authToken}` } }
+      );
+
+      let timeoutId;
+      let res;
+      try {
+        res = await Promise.race([
+          enrichedGetHandler({ request: req, env }),
+          new Promise((_, reject) => {
+            timeoutId = setTimeout(
+              () => reject(new Error('Count and row queries did not start concurrently')),
+              1000
+            );
+          })
+        ]);
+      } finally {
+        clearTimeout(timeoutId);
+      }
+
+      assert.strictEqual(res.status, 200);
+      assert.deepStrictEqual([...startedQueries].sort(), ['count', 'rows']);
+      assert.deepStrictEqual(queryBindings.count, [testUserId, 'Available', 'Memorabilia']);
+      assert.deepStrictEqual(queryBindings.rows, [testUserId, 'Available', 'Memorabilia', 10, 10]);
+
+      const json = await res.json();
+      assert.deepStrictEqual(json.items, []);
+      assert.deepStrictEqual(json.pagination, { total: 0, page: 2, limit: 10, pages: 0 });
+    });
   });
 });

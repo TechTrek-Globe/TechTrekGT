@@ -92,11 +92,11 @@ export async function onRequestGet(context) {
 
     const whereClause = conditions.join(' AND ');
 
-    const countRow = await env.DB.prepare(
-      `SELECT COUNT(*) AS total FROM auction_items i WHERE ${whereClause}`
-    ).bind(...bindings).first();
-
-    const rows = await env.DB.prepare(`
+    const [countRow, rows] = await Promise.all([
+      env.DB.prepare(
+        `SELECT COUNT(*) AS total FROM auction_items i WHERE ${whereClause}`
+      ).bind(...bindings).first(),
+      env.DB.prepare(`
       SELECT
         i.*,
         inv.invoice_ref,
@@ -123,7 +123,8 @@ export async function onRequestGet(context) {
       WHERE ${whereClause}
       ${orderByClause}
       LIMIT ? OFFSET ?
-    `).bind(...bindings, limit, offset).all();
+      `).bind(...bindings, limit, offset).all()
+    ]);
 
     const enrichedItems = (rows.results || []).map(row => {
       const isAmazon = typeof row.invoice_ref === 'string' && row.invoice_ref.startsWith('AMAZON-');
@@ -216,4 +217,3 @@ export async function onRequestGet(context) {
     });
   });
 }
-

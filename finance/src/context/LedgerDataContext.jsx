@@ -278,6 +278,7 @@ export function LedgerDataProvider({ children }) {
       people: Array.isArray(parsedData.people) ? parsedData.people : initialBudgetData.people,
       bills: Array.isArray(parsedData.bills) ? parsedData.bills : initialBudgetData.bills,
       loans: Array.isArray(parsedData.loans) ? parsedData.loans : initialBudgetData.loans,
+      fundingGoals: Array.isArray(parsedData.fundingGoals) ? parsedData.fundingGoals : (initialBudgetData.fundingGoals || []),
       dashboardWidgets: Array.isArray(parsedData.dashboardWidgets) ? parsedData.dashboardWidgets : initialBudgetData.dashboardWidgets,
       theme: parsedData.theme || 'dark',
       hideDashboardHeader: Boolean(parsedData.hideDashboardHeader)
@@ -521,6 +522,7 @@ export function LedgerDataProvider({ children }) {
       people: fakeDemoBudgetData.people || [],
       bills: fakeDemoBudgetData.bills || [],
       loans: fakeDemoBudgetData.loans || [],
+      fundingGoals: fakeDemoBudgetData.fundingGoals || [],
       dashboardWidgets: fakeDemoBudgetData.dashboardWidgets || initialBudgetData.dashboardWidgets,
       theme: fakeDemoBudgetData.theme || 'dark',
       hideDashboardHeader: Boolean(fakeDemoBudgetData.hideDashboardHeader)
@@ -537,6 +539,7 @@ export function LedgerDataProvider({ children }) {
       people: initialBudgetData.people || [],
       bills: initialBudgetData.bills || [],
       loans: initialBudgetData.loans || [],
+      fundingGoals: initialBudgetData.fundingGoals || [],
       dashboardWidgets: initialBudgetData.dashboardWidgets || [],
       theme: 'dark',
       hideDashboardHeader: false
@@ -555,6 +558,7 @@ export function LedgerDataProvider({ children }) {
       people: [],
       bills: [],
       loans: [],
+      fundingGoals: [],
       dashboardWidgets: initialBudgetData.dashboardWidgets || [],
       theme: 'dark',
       hideDashboardHeader: false

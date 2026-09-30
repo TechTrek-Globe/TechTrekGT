@@ -48,9 +48,7 @@ function healDailyMatrix(matrix) {
 // Migrates legacy amount/frequency goals to the new per-paycheck flat model and maps to real account IDs
 function migrateFundingGoals(goals, people, accounts) {
   const accList = Array.isArray(accounts) ? accounts : [];
-  const goalList = Array.isArray(goals) && goals.length > 0
-    ? goals
-    : (fakeDemoBudgetData.fundingGoals || []);
+  const goalList = Array.isArray(goals) ? goals : [];
 
   return goalList.map(g => {
     let amountPerPay = g.amountPerPay;

@@ -306,10 +306,10 @@ export function StorageResetSubPanel() {
 
             <button
               type="button"
-              onClick={() => {
+              onClick={async () => {
                 if (clearFutureMatrixCredits) {
-                  const res = clearFutureMatrixCredits();
-                  setClearCreditsStatus(`Cleared ${res?.removedCount || 0} future credit overrides. Live funding goals now govern future months.`);
+                  const res = await clearFutureMatrixCredits();
+                  setClearCreditsStatus(`Cleared ${res?.removedCount || 0} future credit overrides and synced to Cloud Vault. Live funding goals now govern future months.`);
                   setTimeout(() => setClearCreditsStatus(null), 6000);
                 }
               }}

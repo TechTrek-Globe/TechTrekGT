@@ -188,9 +188,6 @@ export function LedgerDataProvider({ children }) {
   useEffect(() => {
     if (!isDbLoaded) return;
     try {
-      const alreadyRun = localStorage.getItem('tt_cleared_legacy_future_credits_v1');
-      if (alreadyRun === 'true') return;
-
       const today = new Date();
       const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
       const creditKeyPattern = /^(.+)_(\d{4}-\d{2})_(\d{1,2})_(?:extra_)?credit_(.+)$/;
@@ -210,8 +207,6 @@ export function LedgerDataProvider({ children }) {
         }
       }
 
-      localStorage.setItem('tt_cleared_legacy_future_credits_v1', 'true');
-
       if (removedCount > 0) {
         dailyMatrixRef.current = cleanMatrix;
         setDailyMatrix(cleanMatrix);
@@ -224,12 +219,15 @@ export function LedgerDataProvider({ children }) {
           budgetRef.current.dailyMatrix = cleanMatrix;
           isPendingSaveRef.current = true;
           saveBudgetData(budgetRef.current, currentUserId || getCurrentUserId()).catch(() => {});
+          if (isAuthenticated) {
+            pushCloudBackup(syncPasscode, { force: true }).catch(() => {});
+          }
         }
       }
     } catch (err) {
       console.warn('Failed to check/clear future credit cells:', err);
     }
-  }, [isDbLoaded, currentUserId]);
+  }, [isDbLoaded, matrixVersion, currentUserId, isAuthenticated, pushCloudBackup, syncPasscode]);
 
   // Combined full budget object representation for compatibility and persistence
   const getFullBudget = useCallback(() => ({
@@ -373,7 +371,21 @@ export function LedgerDataProvider({ children }) {
       }
     }
 
-    const newDailyMatrix = (parsedData.dailyMatrix && typeof parsedData.dailyMatrix === 'object') ? parsedData.dailyMatrix : {};
+    const rawDailyMatrix = (parsedData.dailyMatrix && typeof parsedData.dailyMatrix === 'object') ? parsedData.dailyMatrix : {};
+    const today = new Date();
+    const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const creditKeyPattern = /^(.+)_(\d{4}-\d{2})_(\d{1,2})_(?:extra_)?credit_(.+)$/;
+    const newDailyMatrix = { ...rawDailyMatrix };
+    for (const [key] of Object.entries(newDailyMatrix)) {
+      const match = key.match(creditKeyPattern);
+      if (!match) continue;
+      const [, , monthKey, dayStr] = match;
+      const day = parseInt(dayStr, 10);
+      const cellIso = `${monthKey}-${String(day).padStart(2, '0')}`;
+      if (cellIso > todayIso) {
+        delete newDailyMatrix[key];
+      }
+    }
     const newLineItems = Array.isArray(parsedData.lineItems) ? parsedData.lineItems : [];
     const newTransactions = Array.isArray(parsedData.transactions) ? parsedData.transactions : [];
 
@@ -761,7 +773,7 @@ export function LedgerDataProvider({ children }) {
   }, [setMetadataState]);
 
   // Clears future matrix credit cells (> today) so live funding goals govern future months cleanly
-  const clearFutureMatrixCredits = useCallback((asOfDate = new Date()) => {
+  const clearFutureMatrixCredits = useCallback(async (asOfDate = new Date()) => {
     const todayMidnight = new Date(asOfDate.getFullYear(), asOfDate.getMonth(), asOfDate.getDate());
     const todayIso = `${todayMidnight.getFullYear()}-${String(todayMidnight.getMonth() + 1).padStart(2, '0')}-${String(todayMidnight.getDate()).padStart(2, '0')}`;
 
@@ -794,10 +806,13 @@ export function LedgerDataProvider({ children }) {
         budgetRef.current.dailyMatrix = cleanMatrix;
         isPendingSaveRef.current = true;
         saveBudgetData(budgetRef.current, currentUserId || getCurrentUserId()).catch(() => {});
+        if (isAuthenticated) {
+          await pushCloudBackup(syncPasscode, { force: true }).catch(() => {});
+        }
       }
     }
     return { success: true, removedCount };
-  }, [currentUserId]);
+  }, [currentUserId, isAuthenticated, pushCloudBackup, syncPasscode]);
 
   // Selective per-namespace spreadsheet import
   const importSpreadsheetSelective = useCallback(({ namespaces, strategies, data, dryRun = false, resolutions = {} }) => {

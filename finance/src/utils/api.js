@@ -202,11 +202,29 @@ export async function pushCloudBackupOptimistic(passcode, budgetData, options = 
   const baseVersion = options?.baseVersion;
   const force = Boolean(options?.force);
 
-  // P4: Strip client-only fields (owner_id) before sending to the worker.
-  // owner_id is used locally for ownership verification but is NOT in
-  // ALLOWED_BUDGET_KEYS on the server and causes HTTP 400 if included.
-  const uploadPayload = { ...budgetData };
-  delete uploadPayload.owner_id;
+  // Project only server-allowed keys and sanitize client-side state
+  const ALLOWED_KEYS = [
+    'accounts', 'people', 'bills', 'transactions', 'lineItems',
+    'fundingGoals', 'loans', 'loan', 'dailyMatrix', 'dashboardWidgets',
+    'theme', 'hideDashboardHeader', 'categories'
+  ];
+  const uploadPayload = {};
+  for (const key of ALLOWED_KEYS) {
+    if (budgetData && budgetData[key] !== undefined) {
+      uploadPayload[key] = budgetData[key];
+    }
+  }
+
+  // Ensure dailyMatrix only contains finite numbers (strip any null, undefined, or empty values)
+  if (uploadPayload.dailyMatrix && typeof uploadPayload.dailyMatrix === 'object') {
+    const cleanMatrix = {};
+    for (const [k, v] of Object.entries(uploadPayload.dailyMatrix)) {
+      if (typeof v === 'number' && Number.isFinite(v)) {
+        cleanMatrix[k] = v;
+      }
+    }
+    uploadPayload.dailyMatrix = cleanMatrix;
+  }
 
   const requestBody = { budget: uploadPayload };
   if (typeof baseVersion === 'number' && !isNaN(baseVersion)) {
@@ -291,8 +309,9 @@ export async function pushCloudBackupOptimistic(passcode, budgetData, options = 
       return { success: false, status: 'queued', error: `Server response status ${res.status}. Retrying later.` };
     }
 
-    logSync('PUSH_FAILED', `Cloud backup rejected: ${data.error || res.statusText}`, { status: res.status, data }, 'error');
-    return { success: false, status: 'failed', error: data.error || `HTTP ${res.status}: Failed to backup data.` };
+    const failureMsg = data?.details ? `${data.error} (${data.details})` : (data?.error || `HTTP ${res.status}: Failed to backup data.`);
+    logSync('PUSH_FAILED', `Cloud backup rejected: ${failureMsg}`, { status: res.status, data }, 'error');
+    return { success: false, status: 'failed', error: failureMsg };
   } catch (err) {
     logSync('PUSH_ERROR', `Cloud backup push error: ${err.message}`, { error: err.message }, 'error');
     return { success: false, status: 'queued', error: err.message };

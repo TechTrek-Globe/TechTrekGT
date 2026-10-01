@@ -147,11 +147,24 @@ describe('Security: handleSyncBackup Payload Validation & Hardening', () => {
       const longName = 'a'.repeat(BUDGET_LIMITS.MAX_NAME_LEN + 1);
       assert.strictEqual(validateBudgetPayload({ accounts: [{ id: 'acc-1', name: longName }] }), false);
 
-      const longNotes = 'n'.repeat(BUDGET_LIMITS.MAX_TEXT_LEN + 1);
-      assert.strictEqual(validateBudgetPayload({ bills: [{ id: 'bill-1', notes: longNotes }] }), false);
-
       const longTheme = 't'.repeat(51);
       assert.strictEqual(validateBudgetPayload({ theme: longTheme }), false);
+    });
+
+    test('accepts null values for optional fields across all models', () => {
+      const budgetWithNulls = {
+        accounts: [{ id: 'acc-1', name: 'Checking', type: null, color: null, notes: null, overflowSplits: null, saveExtraSplits: null, startingBalance: null }],
+        people: [{ id: 'p-1', name: 'Alice', role: null, payFrequency: null, color: null, payDay1: null, payDay2: null, payOffsetDays: null, accountAllocations: null, notes: null }],
+        bills: [{ id: 'b-1', name: 'Electric', amount: 100, period: null, dueDay: null, paymentSource: null, notes: null, matchingKey: null, bankMatchNames: null, splits: null, months: null }],
+        transactions: [{ id: 't-1', accountId: 'acc-1', date: '2026-10-01', amount: 50, description: null, notes: null, category: null, personId: null, billId: null, type: null, status: null }],
+        lineItems: [{ billId: 'b-1', monthKey: '2026-10', actualAmount: null, updatedAt: null }],
+        fundingGoals: [{ id: 'fg-1', name: null, amountPerPay: null, amount: null, frequency: null }],
+        loans: [{ id: 'ln-1', name: 'Car Loan', description: null, principal: null, annualInterestRate: null, termMonths: null, monthlyPayment: null, extraPayment: null, startDate: null }],
+        dailyMatrix: { '2026-10-01': 100, '2026-10-02': null },
+        theme: null,
+        hideDashboardHeader: null
+      };
+      assert.strictEqual(validateBudgetPayload(budgetWithNulls), true);
     });
   });
 

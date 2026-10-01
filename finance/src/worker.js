@@ -257,10 +257,11 @@ function isStringUnder(val, maxLen) {
 }
 
 function validateStringMap(map, maxKeyLen = BUDGET_LIMITS.MAX_ID_LEN) {
+  if (map === null || map === undefined) return true;
   if (!isObject(map)) return false;
   for (const [k, v] of Object.entries(map)) {
     if (typeof k !== 'string' || k.length > maxKeyLen) return false;
-    if (!isFiniteNumber(v)) return false;
+    if (v !== null && v !== undefined && !isFiniteNumber(v)) return false;
   }
   return true;
 }
@@ -269,91 +270,96 @@ function validateStringMap(map, maxKeyLen = BUDGET_LIMITS.MAX_ID_LEN) {
  * Validates incoming budget payload against explicit schema, type, and length constraints.
  * Rejects unknown top-level keys to prevent unauthorized or unexpected field injection.
  * Enforces collection count limits and per-field type and string length boundaries.
+ * Null values on optional fields are gracefully permitted.
  *
  * @param {*} payload - The budget data object to validate
- * @returns {boolean} True if payload conforms to schema, false otherwise
+ * @returns {{ valid: boolean, reason?: string }} Result object with validation status and failure reason
  */
-export function validateBudgetPayload(payload) {
+export function validateBudgetPayloadDetailed(payload) {
   if (!isObject(payload)) {
-    return false;
+    return { valid: false, reason: 'Payload must be an object' };
   }
 
   // Reject unknown top-level keys
   const keys = Object.keys(payload);
   for (const key of keys) {
     if (!ALLOWED_BUDGET_KEYS.has(key)) {
-      return false;
+      return { valid: false, reason: `Unknown top-level key: ${key}` };
     }
   }
 
   // 1. accounts
   if (payload.accounts !== undefined) {
     if (!Array.isArray(payload.accounts) || payload.accounts.length > BUDGET_LIMITS.MAX_ACCOUNTS) {
-      return false;
+      return { valid: false, reason: `accounts must be an array <= ${BUDGET_LIMITS.MAX_ACCOUNTS}` };
     }
-    for (const item of payload.accounts) {
-      if (!isObject(item)) return false;
-      if (item.id !== undefined && !isStringUnder(item.id, BUDGET_LIMITS.MAX_ID_LEN) && !isFiniteNumber(item.id)) return false;
-      if (item.name !== undefined && !isStringUnder(item.name, BUDGET_LIMITS.MAX_NAME_LEN)) return false;
-      if (item.type !== undefined && !isStringUnder(item.type, BUDGET_LIMITS.MAX_SHORT_STR_LEN)) return false;
-      if (item.color !== undefined && !isStringUnder(item.color, BUDGET_LIMITS.MAX_SHORT_STR_LEN)) return false;
-      if (item.notes !== undefined && !isStringUnder(item.notes, BUDGET_LIMITS.MAX_TEXT_LEN)) return false;
-      if (item.startingBalance !== undefined && !isFiniteNumber(item.startingBalance)) return false;
-      if (item.extraStartingBalance !== undefined && !isFiniteNumber(item.extraStartingBalance)) return false;
-      if (item.saveExtraMonthly !== undefined && !isFiniteNumber(item.saveExtraMonthly)) return false;
-      if (item.enableExtraSavings !== undefined && typeof item.enableExtraSavings !== 'boolean') return false;
-      if (item.isArchived !== undefined && typeof item.isArchived !== 'boolean') return false;
-      if (item.overflowSplits !== undefined && !validateStringMap(item.overflowSplits)) return false;
-      if (item.saveExtraSplits !== undefined && !validateStringMap(item.saveExtraSplits)) return false;
-      if (item.importedLedgerRows !== undefined && !isObject(item.importedLedgerRows)) return false;
+    for (let i = 0; i < payload.accounts.length; i++) {
+      const item = payload.accounts[i];
+      if (!isObject(item)) return { valid: false, reason: `accounts[${i}] must be an object` };
+      if (item.id !== undefined && item.id !== null && !isStringUnder(item.id, BUDGET_LIMITS.MAX_ID_LEN) && !isFiniteNumber(item.id)) return { valid: false, reason: `accounts[${i}].id invalid` };
+      if (item.name !== undefined && item.name !== null && !isStringUnder(item.name, BUDGET_LIMITS.MAX_NAME_LEN)) return { valid: false, reason: `accounts[${i}].name invalid` };
+      if (item.type !== undefined && item.type !== null && !isStringUnder(item.type, BUDGET_LIMITS.MAX_SHORT_STR_LEN)) return { valid: false, reason: `accounts[${i}].type invalid` };
+      if (item.color !== undefined && item.color !== null && !isStringUnder(item.color, BUDGET_LIMITS.MAX_SHORT_STR_LEN)) return { valid: false, reason: `accounts[${i}].color invalid` };
+      if (item.notes !== undefined && item.notes !== null && !isStringUnder(item.notes, BUDGET_LIMITS.MAX_TEXT_LEN)) return { valid: false, reason: `accounts[${i}].notes invalid` };
+      if (item.startingBalance !== undefined && item.startingBalance !== null && !isFiniteNumber(item.startingBalance)) return { valid: false, reason: `accounts[${i}].startingBalance invalid` };
+      if (item.extraStartingBalance !== undefined && item.extraStartingBalance !== null && !isFiniteNumber(item.extraStartingBalance)) return { valid: false, reason: `accounts[${i}].extraStartingBalance invalid` };
+      if (item.saveExtraMonthly !== undefined && item.saveExtraMonthly !== null && !isFiniteNumber(item.saveExtraMonthly)) return { valid: false, reason: `accounts[${i}].saveExtraMonthly invalid` };
+      if (item.enableExtraSavings !== undefined && item.enableExtraSavings !== null && typeof item.enableExtraSavings !== 'boolean') return { valid: false, reason: `accounts[${i}].enableExtraSavings invalid` };
+      if (item.isArchived !== undefined && item.isArchived !== null && typeof item.isArchived !== 'boolean') return { valid: false, reason: `accounts[${i}].isArchived invalid` };
+      if (item.overflowSplits !== undefined && item.overflowSplits !== null && !validateStringMap(item.overflowSplits)) return { valid: false, reason: `accounts[${i}].overflowSplits invalid` };
+      if (item.saveExtraSplits !== undefined && item.saveExtraSplits !== null && !validateStringMap(item.saveExtraSplits)) return { valid: false, reason: `accounts[${i}].saveExtraSplits invalid` };
+      if (item.importedLedgerRows !== undefined && item.importedLedgerRows !== null && !isObject(item.importedLedgerRows)) return { valid: false, reason: `accounts[${i}].importedLedgerRows invalid` };
     }
   }
 
   // 2. people
   if (payload.people !== undefined) {
     if (!Array.isArray(payload.people) || payload.people.length > BUDGET_LIMITS.MAX_PEOPLE) {
-      return false;
+      return { valid: false, reason: `people must be an array <= ${BUDGET_LIMITS.MAX_PEOPLE}` };
     }
-    for (const item of payload.people) {
-      if (!isObject(item)) return false;
-      if (item.id !== undefined && !isStringUnder(item.id, BUDGET_LIMITS.MAX_ID_LEN) && !isFiniteNumber(item.id)) return false;
-      if (item.name !== undefined && !isStringUnder(item.name, BUDGET_LIMITS.MAX_NAME_LEN)) return false;
-      if (item.role !== undefined && !isStringUnder(item.role, BUDGET_LIMITS.MAX_SHORT_STR_LEN)) return false;
-      if (item.payFrequency !== undefined && !isStringUnder(item.payFrequency, BUDGET_LIMITS.MAX_SHORT_STR_LEN)) return false;
-      if (item.color !== undefined && !isStringUnder(item.color, BUDGET_LIMITS.MAX_SHORT_STR_LEN)) return false;
-      if (item.payDay1 !== undefined && item.payDay1 !== null && !isStringUnder(item.payDay1, 50) && !isFiniteNumber(item.payDay1)) return false;
-      if (item.payDay2 !== undefined && item.payDay2 !== null && !isStringUnder(item.payDay2, 50) && !isFiniteNumber(item.payDay2)) return false;
-      if (item.payOffsetDays !== undefined && item.payOffsetDays !== null && !isFiniteNumber(item.payOffsetDays)) return false;
-      if (item.grossPerPay !== undefined && !isFiniteNumber(item.grossPerPay)) return false;
-      if (item.netPerPay !== undefined && !isFiniteNumber(item.netPerPay)) return false;
-      if (item.isArchived !== undefined && typeof item.isArchived !== 'boolean') return false;
-      if (item.accountAllocations !== undefined && !validateStringMap(item.accountAllocations)) return false;
+    for (let i = 0; i < payload.people.length; i++) {
+      const item = payload.people[i];
+      if (!isObject(item)) return { valid: false, reason: `people[${i}] must be an object` };
+      if (item.id !== undefined && item.id !== null && !isStringUnder(item.id, BUDGET_LIMITS.MAX_ID_LEN) && !isFiniteNumber(item.id)) return { valid: false, reason: `people[${i}].id invalid` };
+      if (item.name !== undefined && item.name !== null && !isStringUnder(item.name, BUDGET_LIMITS.MAX_NAME_LEN)) return { valid: false, reason: `people[${i}].name invalid` };
+      if (item.role !== undefined && item.role !== null && !isStringUnder(item.role, BUDGET_LIMITS.MAX_SHORT_STR_LEN)) return { valid: false, reason: `people[${i}].role invalid` };
+      if (item.payFrequency !== undefined && item.payFrequency !== null && !isStringUnder(item.payFrequency, BUDGET_LIMITS.MAX_SHORT_STR_LEN)) return { valid: false, reason: `people[${i}].payFrequency invalid` };
+      if (item.color !== undefined && item.color !== null && !isStringUnder(item.color, BUDGET_LIMITS.MAX_SHORT_STR_LEN)) return { valid: false, reason: `people[${i}].color invalid` };
+      if (item.payDay1 !== undefined && item.payDay1 !== null && !isStringUnder(item.payDay1, 50) && !isFiniteNumber(item.payDay1)) return { valid: false, reason: `people[${i}].payDay1 invalid` };
+      if (item.payDay2 !== undefined && item.payDay2 !== null && !isStringUnder(item.payDay2, 50) && !isFiniteNumber(item.payDay2)) return { valid: false, reason: `people[${i}].payDay2 invalid` };
+      if (item.payOffsetDays !== undefined && item.payOffsetDays !== null && !isFiniteNumber(item.payOffsetDays)) return { valid: false, reason: `people[${i}].payOffsetDays invalid` };
+      if (item.grossPerPay !== undefined && item.grossPerPay !== null && !isFiniteNumber(item.grossPerPay)) return { valid: false, reason: `people[${i}].grossPerPay invalid` };
+      if (item.netPerPay !== undefined && item.netPerPay !== null && !isFiniteNumber(item.netPerPay)) return { valid: false, reason: `people[${i}].netPerPay invalid` };
+      if (item.isArchived !== undefined && item.isArchived !== null && typeof item.isArchived !== 'boolean') return { valid: false, reason: `people[${i}].isArchived invalid` };
+      if (item.accountAllocations !== undefined && item.accountAllocations !== null && !validateStringMap(item.accountAllocations)) return { valid: false, reason: `people[${i}].accountAllocations invalid` };
+      if (item.notes !== undefined && item.notes !== null && !isStringUnder(item.notes, BUDGET_LIMITS.MAX_TEXT_LEN)) return { valid: false, reason: `people[${i}].notes invalid` };
     }
   }
 
   // 3. bills
   if (payload.bills !== undefined) {
     if (!Array.isArray(payload.bills) || payload.bills.length > BUDGET_LIMITS.MAX_BILLS) {
-      return false;
+      return { valid: false, reason: `bills must be an array <= ${BUDGET_LIMITS.MAX_BILLS}` };
     }
-    for (const item of payload.bills) {
-      if (!isObject(item)) return false;
-      if (item.id !== undefined && !isStringUnder(item.id, BUDGET_LIMITS.MAX_ID_LEN) && !isFiniteNumber(item.id)) return false;
-      if (item.accountId !== undefined && !isStringUnder(item.accountId, BUDGET_LIMITS.MAX_ID_LEN) && !isFiniteNumber(item.accountId)) return false;
-      if (item.name !== undefined && !isStringUnder(item.name, BUDGET_LIMITS.MAX_NAME_LEN)) return false;
-      if (item.amount !== undefined && !isFiniteNumber(item.amount)) return false;
-      if (item.period !== undefined && !isStringUnder(item.period, BUDGET_LIMITS.MAX_SHORT_STR_LEN)) return false;
-      if (item.dueDay !== undefined && !isStringUnder(item.dueDay, 50) && !isFiniteNumber(item.dueDay)) return false;
-      if (item.paymentSource !== undefined && !isStringUnder(item.paymentSource, BUDGET_LIMITS.MAX_SHORT_STR_LEN)) return false;
-      if (item.notes !== undefined && !isStringUnder(item.notes, BUDGET_LIMITS.MAX_TEXT_LEN)) return false;
-      if (item.matchingKey !== undefined && !isStringUnder(item.matchingKey, 1000)) return false;
-      if (item.bankMatchNames !== undefined && !isStringUnder(item.bankMatchNames, 1000)) return false;
-      if (item.isArchived !== undefined && typeof item.isArchived !== 'boolean') return false;
-      if (item.splits !== undefined && !validateStringMap(item.splits)) return false;
-      if (item.months !== undefined) {
-        if (!Array.isArray(item.months) || item.months.length > 12) return false;
+    for (let i = 0; i < payload.bills.length; i++) {
+      const item = payload.bills[i];
+      if (!isObject(item)) return { valid: false, reason: `bills[${i}] must be an object` };
+      if (item.id !== undefined && item.id !== null && !isStringUnder(item.id, BUDGET_LIMITS.MAX_ID_LEN) && !isFiniteNumber(item.id)) return { valid: false, reason: `bills[${i}].id invalid` };
+      if (item.accountId !== undefined && item.accountId !== null && !isStringUnder(item.accountId, BUDGET_LIMITS.MAX_ID_LEN) && !isFiniteNumber(item.accountId)) return { valid: false, reason: `bills[${i}].accountId invalid` };
+      if (item.name !== undefined && item.name !== null && !isStringUnder(item.name, BUDGET_LIMITS.MAX_NAME_LEN)) return { valid: false, reason: `bills[${i}].name invalid` };
+      if (item.amount !== undefined && item.amount !== null && !isFiniteNumber(item.amount)) return { valid: false, reason: `bills[${i}].amount invalid` };
+      if (item.period !== undefined && item.period !== null && !isStringUnder(item.period, BUDGET_LIMITS.MAX_SHORT_STR_LEN)) return { valid: false, reason: `bills[${i}].period invalid` };
+      if (item.dueDay !== undefined && item.dueDay !== null && !isStringUnder(item.dueDay, 50) && !isFiniteNumber(item.dueDay)) return { valid: false, reason: `bills[${i}].dueDay invalid` };
+      if (item.paymentSource !== undefined && item.paymentSource !== null && !isStringUnder(item.paymentSource, BUDGET_LIMITS.MAX_SHORT_STR_LEN)) return { valid: false, reason: `bills[${i}].paymentSource invalid` };
+      if (item.notes !== undefined && item.notes !== null && !isStringUnder(item.notes, BUDGET_LIMITS.MAX_TEXT_LEN)) return { valid: false, reason: `bills[${i}].notes invalid` };
+      if (item.matchingKey !== undefined && item.matchingKey !== null && !isStringUnder(item.matchingKey, 1000)) return { valid: false, reason: `bills[${i}].matchingKey invalid` };
+      if (item.bankMatchNames !== undefined && item.bankMatchNames !== null && !isStringUnder(item.bankMatchNames, 1000)) return { valid: false, reason: `bills[${i}].bankMatchNames invalid` };
+      if (item.isArchived !== undefined && item.isArchived !== null && typeof item.isArchived !== 'boolean') return { valid: false, reason: `bills[${i}].isArchived invalid` };
+      if (item.splits !== undefined && item.splits !== null && !validateStringMap(item.splits)) return { valid: false, reason: `bills[${i}].splits invalid` };
+      if (item.months !== undefined && item.months !== null) {
+        if (!Array.isArray(item.months) || item.months.length > 12) return { valid: false, reason: `bills[${i}].months must be an array <= 12` };
         for (const m of item.months) {
-          if (!isFiniteNumber(m)) return false;
+          if (!isFiniteNumber(m)) return { valid: false, reason: `bills[${i}].months contains non-finite number` };
         }
       }
     }
@@ -362,154 +368,164 @@ export function validateBudgetPayload(payload) {
   // 4. transactions
   if (payload.transactions !== undefined) {
     if (!Array.isArray(payload.transactions) || payload.transactions.length > BUDGET_LIMITS.MAX_TRANSACTIONS) {
-      return false;
+      return { valid: false, reason: `transactions must be an array <= ${BUDGET_LIMITS.MAX_TRANSACTIONS}` };
     }
-    for (const item of payload.transactions) {
-      if (!isObject(item)) return false;
-      if (item.id !== undefined && !isStringUnder(item.id, BUDGET_LIMITS.MAX_ID_LEN) && !isFiniteNumber(item.id)) return false;
-      if (item.accountId !== undefined && !isStringUnder(item.accountId, BUDGET_LIMITS.MAX_ID_LEN) && !isFiniteNumber(item.accountId)) return false;
-      if (item.date !== undefined && !isStringUnder(item.date, 50)) return false;
-      if (item.amount !== undefined && !isFiniteNumber(item.amount)) return false;
-      if (item.description !== undefined && !isStringUnder(item.description, 500)) return false;
-      if (item.notes !== undefined && !isStringUnder(item.notes, BUDGET_LIMITS.MAX_TEXT_LEN)) return false;
-      if (item.category !== undefined && !isStringUnder(item.category, BUDGET_LIMITS.MAX_NAME_LEN)) return false;
-      if (item.personId !== undefined && !isStringUnder(item.personId, BUDGET_LIMITS.MAX_ID_LEN) && !isFiniteNumber(item.personId)) return false;
-      if (item.billId !== undefined && !isStringUnder(item.billId, BUDGET_LIMITS.MAX_ID_LEN) && !isFiniteNumber(item.billId)) return false;
-      if (item.isOther !== undefined && typeof item.isOther !== 'boolean') return false;
-      if (item.type !== undefined && !isStringUnder(item.type, 50)) return false;
-      if (item.status !== undefined && !isStringUnder(item.status, 50)) return false;
+    for (let i = 0; i < payload.transactions.length; i++) {
+      const item = payload.transactions[i];
+      if (!isObject(item)) return { valid: false, reason: `transactions[${i}] must be an object` };
+      if (item.id !== undefined && item.id !== null && !isStringUnder(item.id, BUDGET_LIMITS.MAX_ID_LEN) && !isFiniteNumber(item.id)) return { valid: false, reason: `transactions[${i}].id invalid` };
+      if (item.accountId !== undefined && item.accountId !== null && !isStringUnder(item.accountId, BUDGET_LIMITS.MAX_ID_LEN) && !isFiniteNumber(item.accountId)) return { valid: false, reason: `transactions[${i}].accountId invalid` };
+      if (item.date !== undefined && item.date !== null && !isStringUnder(item.date, 50)) return { valid: false, reason: `transactions[${i}].date invalid` };
+      if (item.amount !== undefined && item.amount !== null && !isFiniteNumber(item.amount)) return { valid: false, reason: `transactions[${i}].amount invalid` };
+      if (item.description !== undefined && item.description !== null && !isStringUnder(item.description, 500)) return { valid: false, reason: `transactions[${i}].description invalid` };
+      if (item.notes !== undefined && item.notes !== null && !isStringUnder(item.notes, BUDGET_LIMITS.MAX_TEXT_LEN)) return { valid: false, reason: `transactions[${i}].notes invalid` };
+      if (item.category !== undefined && item.category !== null && !isStringUnder(item.category, BUDGET_LIMITS.MAX_NAME_LEN)) return { valid: false, reason: `transactions[${i}].category invalid` };
+      if (item.personId !== undefined && item.personId !== null && !isStringUnder(item.personId, BUDGET_LIMITS.MAX_ID_LEN) && !isFiniteNumber(item.personId)) return { valid: false, reason: `transactions[${i}].personId invalid` };
+      if (item.billId !== undefined && item.billId !== null && !isStringUnder(item.billId, BUDGET_LIMITS.MAX_ID_LEN) && !isFiniteNumber(item.billId)) return { valid: false, reason: `transactions[${i}].billId invalid` };
+      if (item.isOther !== undefined && item.isOther !== null && typeof item.isOther !== 'boolean') return { valid: false, reason: `transactions[${i}].isOther invalid` };
+      if (item.type !== undefined && item.type !== null && !isStringUnder(item.type, 50)) return { valid: false, reason: `transactions[${i}].type invalid` };
+      if (item.status !== undefined && item.status !== null && !isStringUnder(item.status, 50)) return { valid: false, reason: `transactions[${i}].status invalid` };
     }
   }
 
   // 5. lineItems
   if (payload.lineItems !== undefined) {
     if (!Array.isArray(payload.lineItems) || payload.lineItems.length > BUDGET_LIMITS.MAX_LINE_ITEMS) {
-      return false;
+      return { valid: false, reason: `lineItems must be an array <= ${BUDGET_LIMITS.MAX_LINE_ITEMS}` };
     }
-    for (const item of payload.lineItems) {
-      if (!isObject(item)) return false;
-      if (item.billId !== undefined && !isStringUnder(item.billId, BUDGET_LIMITS.MAX_ID_LEN) && !isFiniteNumber(item.billId)) return false;
-      if (item.monthKey !== undefined && !isStringUnder(item.monthKey, 50)) return false;
-      if (item.actualAmount !== undefined && !isFiniteNumber(item.actualAmount)) return false;
-      if (item.updatedAt !== undefined && !isFiniteNumber(item.updatedAt)) return false;
+    for (let i = 0; i < payload.lineItems.length; i++) {
+      const item = payload.lineItems[i];
+      if (!isObject(item)) return { valid: false, reason: `lineItems[${i}] must be an object` };
+      if (item.billId !== undefined && item.billId !== null && !isStringUnder(item.billId, BUDGET_LIMITS.MAX_ID_LEN) && !isFiniteNumber(item.billId)) return { valid: false, reason: `lineItems[${i}].billId invalid` };
+      if (item.monthKey !== undefined && item.monthKey !== null && !isStringUnder(item.monthKey, 50)) return { valid: false, reason: `lineItems[${i}].monthKey invalid` };
+      if (item.actualAmount !== undefined && item.actualAmount !== null && !isFiniteNumber(item.actualAmount)) return { valid: false, reason: `lineItems[${i}].actualAmount invalid` };
+      if (item.updatedAt !== undefined && item.updatedAt !== null && !isFiniteNumber(item.updatedAt)) return { valid: false, reason: `lineItems[${i}].updatedAt invalid` };
     }
   }
 
   // 6. fundingGoals
   if (payload.fundingGoals !== undefined) {
     if (!Array.isArray(payload.fundingGoals) || payload.fundingGoals.length > BUDGET_LIMITS.MAX_FUNDING_GOALS) {
-      return false;
+      return { valid: false, reason: `fundingGoals must be an array <= ${BUDGET_LIMITS.MAX_FUNDING_GOALS}` };
     }
-    for (const item of payload.fundingGoals) {
-      if (!isObject(item)) return false;
-      if (item.id !== undefined && !isStringUnder(item.id, BUDGET_LIMITS.MAX_ID_LEN) && !isFiniteNumber(item.id)) return false;
-      if (item.contributorId !== undefined && !isStringUnder(item.contributorId, BUDGET_LIMITS.MAX_ID_LEN) && !isFiniteNumber(item.contributorId)) return false;
-      if (item.accountId !== undefined && !isStringUnder(item.accountId, BUDGET_LIMITS.MAX_ID_LEN) && !isFiniteNumber(item.accountId)) return false;
-      if (item.name !== undefined && !isStringUnder(item.name, BUDGET_LIMITS.MAX_NAME_LEN)) return false;
-      if (item.amountPerPay !== undefined && !isFiniteNumber(item.amountPerPay)) return false;
-      if (item.amount !== undefined && !isFiniteNumber(item.amount)) return false;
-      if (item.frequency !== undefined && !isStringUnder(item.frequency, BUDGET_LIMITS.MAX_SHORT_STR_LEN)) return false;
+    for (let i = 0; i < payload.fundingGoals.length; i++) {
+      const item = payload.fundingGoals[i];
+      if (!isObject(item)) return { valid: false, reason: `fundingGoals[${i}] must be an object` };
+      if (item.id !== undefined && item.id !== null && !isStringUnder(item.id, BUDGET_LIMITS.MAX_ID_LEN) && !isFiniteNumber(item.id)) return { valid: false, reason: `fundingGoals[${i}].id invalid` };
+      if (item.contributorId !== undefined && item.contributorId !== null && !isStringUnder(item.contributorId, BUDGET_LIMITS.MAX_ID_LEN) && !isFiniteNumber(item.contributorId)) return { valid: false, reason: `fundingGoals[${i}].contributorId invalid` };
+      if (item.accountId !== undefined && item.accountId !== null && !isStringUnder(item.accountId, BUDGET_LIMITS.MAX_ID_LEN) && !isFiniteNumber(item.accountId)) return { valid: false, reason: `fundingGoals[${i}].accountId invalid` };
+      if (item.name !== undefined && item.name !== null && !isStringUnder(item.name, BUDGET_LIMITS.MAX_NAME_LEN)) return { valid: false, reason: `fundingGoals[${i}].name invalid` };
+      if (item.amountPerPay !== undefined && item.amountPerPay !== null && !isFiniteNumber(item.amountPerPay)) return { valid: false, reason: `fundingGoals[${i}].amountPerPay invalid` };
+      if (item.amount !== undefined && item.amount !== null && !isFiniteNumber(item.amount)) return { valid: false, reason: `fundingGoals[${i}].amount invalid` };
+      if (item.frequency !== undefined && item.frequency !== null && !isStringUnder(item.frequency, BUDGET_LIMITS.MAX_SHORT_STR_LEN)) return { valid: false, reason: `fundingGoals[${i}].frequency invalid` };
     }
   }
 
   // 7. loans
   if (payload.loans !== undefined) {
     if (!Array.isArray(payload.loans) || payload.loans.length > BUDGET_LIMITS.MAX_LOANS) {
-      return false;
+      return { valid: false, reason: `loans must be an array <= ${BUDGET_LIMITS.MAX_LOANS}` };
     }
-    for (const item of payload.loans) {
-      if (!isObject(item)) return false;
-      if (item.id !== undefined && !isStringUnder(item.id, BUDGET_LIMITS.MAX_ID_LEN) && !isFiniteNumber(item.id)) return false;
-      if (item.name !== undefined && !isStringUnder(item.name, BUDGET_LIMITS.MAX_NAME_LEN)) return false;
-      if (item.description !== undefined && !isStringUnder(item.description, 500)) return false;
-      if (item.principal !== undefined && !isFiniteNumber(item.principal)) return false;
-      if (item.annualInterestRate !== undefined && !isFiniteNumber(item.annualInterestRate)) return false;
-      if (item.termMonths !== undefined && !isFiniteNumber(item.termMonths)) return false;
-      if (item.monthlyPayment !== undefined && !isFiniteNumber(item.monthlyPayment)) return false;
-      if (item.extraPayment !== undefined && !isFiniteNumber(item.extraPayment)) return false;
-      if (item.startDate !== undefined && !isStringUnder(item.startDate, 50)) return false;
-      if (item.isArchived !== undefined && typeof item.isArchived !== 'boolean') return false;
+    for (let i = 0; i < payload.loans.length; i++) {
+      const item = payload.loans[i];
+      if (!isObject(item)) return { valid: false, reason: `loans[${i}] must be an object` };
+      if (item.id !== undefined && item.id !== null && !isStringUnder(item.id, BUDGET_LIMITS.MAX_ID_LEN) && !isFiniteNumber(item.id)) return { valid: false, reason: `loans[${i}].id invalid` };
+      if (item.name !== undefined && item.name !== null && !isStringUnder(item.name, BUDGET_LIMITS.MAX_NAME_LEN)) return { valid: false, reason: `loans[${i}].name invalid` };
+      if (item.description !== undefined && item.description !== null && !isStringUnder(item.description, 500)) return { valid: false, reason: `loans[${i}].description invalid` };
+      if (item.principal !== undefined && item.principal !== null && !isFiniteNumber(item.principal)) return { valid: false, reason: `loans[${i}].principal invalid` };
+      if (item.annualInterestRate !== undefined && item.annualInterestRate !== null && !isFiniteNumber(item.annualInterestRate)) return { valid: false, reason: `loans[${i}].annualInterestRate invalid` };
+      if (item.termMonths !== undefined && item.termMonths !== null && !isFiniteNumber(item.termMonths)) return { valid: false, reason: `loans[${i}].termMonths invalid` };
+      if (item.monthlyPayment !== undefined && item.monthlyPayment !== null && !isFiniteNumber(item.monthlyPayment)) return { valid: false, reason: `loans[${i}].monthlyPayment invalid` };
+      if (item.extraPayment !== undefined && item.extraPayment !== null && !isFiniteNumber(item.extraPayment)) return { valid: false, reason: `loans[${i}].extraPayment invalid` };
+      if (item.startDate !== undefined && item.startDate !== null && !isStringUnder(item.startDate, 50)) return { valid: false, reason: `loans[${i}].startDate invalid` };
+      if (item.isArchived !== undefined && item.isArchived !== null && typeof item.isArchived !== 'boolean') return { valid: false, reason: `loans[${i}].isArchived invalid` };
     }
   }
 
   // 8. loan (legacy single object)
-  if (payload.loan !== undefined) {
-    if (!isObject(payload.loan)) return false;
+  if (payload.loan !== undefined && payload.loan !== null) {
+    if (!isObject(payload.loan)) return { valid: false, reason: 'loan must be an object' };
     const item = payload.loan;
-    if (item.name !== undefined && !isStringUnder(item.name, BUDGET_LIMITS.MAX_NAME_LEN)) return false;
-    if (item.description !== undefined && !isStringUnder(item.description, 500)) return false;
-    if (item.principal !== undefined && !isFiniteNumber(item.principal)) return false;
-    if (item.annualInterestRate !== undefined && !isFiniteNumber(item.annualInterestRate)) return false;
-    if (item.termMonths !== undefined && !isFiniteNumber(item.termMonths)) return false;
-    if (item.monthlyPayment !== undefined && !isFiniteNumber(item.monthlyPayment)) return false;
-    if (item.extraPayment !== undefined && !isFiniteNumber(item.extraPayment)) return false;
-    if (item.startDate !== undefined && !isStringUnder(item.startDate, 50)) return false;
+    if (item.name !== undefined && item.name !== null && !isStringUnder(item.name, BUDGET_LIMITS.MAX_NAME_LEN)) return { valid: false, reason: 'loan.name invalid' };
+    if (item.description !== undefined && item.description !== null && !isStringUnder(item.description, 500)) return { valid: false, reason: 'loan.description invalid' };
+    if (item.principal !== undefined && item.principal !== null && !isFiniteNumber(item.principal)) return { valid: false, reason: 'loan.principal invalid' };
+    if (item.annualInterestRate !== undefined && item.annualInterestRate !== null && !isFiniteNumber(item.annualInterestRate)) return { valid: false, reason: 'loan.annualInterestRate invalid' };
+    if (item.termMonths !== undefined && item.termMonths !== null && !isFiniteNumber(item.termMonths)) return { valid: false, reason: 'loan.termMonths invalid' };
+    if (item.monthlyPayment !== undefined && item.monthlyPayment !== null && !isFiniteNumber(item.monthlyPayment)) return { valid: false, reason: 'loan.monthlyPayment invalid' };
+    if (item.extraPayment !== undefined && item.extraPayment !== null && !isFiniteNumber(item.extraPayment)) return { valid: false, reason: 'loan.extraPayment invalid' };
+    if (item.startDate !== undefined && item.startDate !== null && !isStringUnder(item.startDate, 50)) return { valid: false, reason: 'loan.startDate invalid' };
   }
 
   // 9. dashboardWidgets
   if (payload.dashboardWidgets !== undefined) {
     if (!Array.isArray(payload.dashboardWidgets) || payload.dashboardWidgets.length > BUDGET_LIMITS.MAX_DASHBOARD_WIDGETS) {
-      return false;
+      return { valid: false, reason: `dashboardWidgets must be an array <= ${BUDGET_LIMITS.MAX_DASHBOARD_WIDGETS}` };
     }
-    for (const item of payload.dashboardWidgets) {
-      if (!isObject(item)) return false;
-      if (item.id !== undefined && !isStringUnder(item.id, BUDGET_LIMITS.MAX_ID_LEN) && !isFiniteNumber(item.id)) return false;
-      if (item.title !== undefined && !isStringUnder(item.title, BUDGET_LIMITS.MAX_NAME_LEN)) return false;
-      if (item.description !== undefined && !isStringUnder(item.description, 500)) return false;
-      if (item.category !== undefined && !isStringUnder(item.category, BUDGET_LIMITS.MAX_SHORT_STR_LEN)) return false;
-      if (item.visible !== undefined && typeof item.visible !== 'boolean') return false;
-      if (item.width !== undefined && !isStringUnder(item.width, 50)) return false;
+    for (let i = 0; i < payload.dashboardWidgets.length; i++) {
+      const item = payload.dashboardWidgets[i];
+      if (!isObject(item)) return { valid: false, reason: `dashboardWidgets[${i}] must be an object` };
+      if (item.id !== undefined && item.id !== null && !isStringUnder(item.id, BUDGET_LIMITS.MAX_ID_LEN) && !isFiniteNumber(item.id)) return { valid: false, reason: `dashboardWidgets[${i}].id invalid` };
+      if (item.title !== undefined && item.title !== null && !isStringUnder(item.title, BUDGET_LIMITS.MAX_NAME_LEN)) return { valid: false, reason: `dashboardWidgets[${i}].title invalid` };
+      if (item.description !== undefined && item.description !== null && !isStringUnder(item.description, 500)) return { valid: false, reason: `dashboardWidgets[${i}].description invalid` };
+      if (item.category !== undefined && item.category !== null && !isStringUnder(item.category, BUDGET_LIMITS.MAX_SHORT_STR_LEN)) return { valid: false, reason: `dashboardWidgets[${i}].category invalid` };
+      if (item.visible !== undefined && item.visible !== null && typeof item.visible !== 'boolean') return { valid: false, reason: `dashboardWidgets[${i}].visible invalid` };
+      if (item.width !== undefined && item.width !== null && !isStringUnder(item.width, 50)) return { valid: false, reason: `dashboardWidgets[${i}].width invalid` };
     }
   }
 
   // 10. dailyMatrix
   if (payload.dailyMatrix !== undefined) {
-    if (!isObject(payload.dailyMatrix)) return false;
+    if (!isObject(payload.dailyMatrix)) return { valid: false, reason: 'dailyMatrix must be an object' };
     const matrixKeys = Object.keys(payload.dailyMatrix);
-    if (matrixKeys.length > BUDGET_LIMITS.MAX_DAILY_MATRIX_KEYS) return false;
+    if (matrixKeys.length > BUDGET_LIMITS.MAX_DAILY_MATRIX_KEYS) return { valid: false, reason: `dailyMatrix exceeds max keys ${BUDGET_LIMITS.MAX_DAILY_MATRIX_KEYS}` };
     for (const k of matrixKeys) {
-      if (typeof k !== 'string' || k.length > BUDGET_LIMITS.MAX_ID_LEN) return false;
+      if (typeof k !== 'string' || k.length > BUDGET_LIMITS.MAX_ID_LEN) return { valid: false, reason: `dailyMatrix key invalid: ${k}` };
       const v = payload.dailyMatrix[k];
-      if (!isFiniteNumber(v)) return false;
+      if (v !== null && v !== undefined && !isFiniteNumber(v)) return { valid: false, reason: `dailyMatrix[${k}] must be a finite number or null` };
     }
   }
 
   // 11. theme
-  if (payload.theme !== undefined) {
-    if (!isStringUnder(payload.theme, 50)) return false;
+  if (payload.theme !== undefined && payload.theme !== null) {
+    if (!isStringUnder(payload.theme, 50)) return { valid: false, reason: 'theme invalid' };
   }
 
   // 12. hideDashboardHeader
-  if (payload.hideDashboardHeader !== undefined) {
-    if (typeof payload.hideDashboardHeader !== 'boolean') return false;
+  if (payload.hideDashboardHeader !== undefined && payload.hideDashboardHeader !== null) {
+    if (typeof payload.hideDashboardHeader !== 'boolean') return { valid: false, reason: 'hideDashboardHeader must be a boolean' };
   }
 
   // 13. categories
-  if (payload.categories !== undefined) {
+  if (payload.categories !== undefined && payload.categories !== null) {
     if (Array.isArray(payload.categories)) {
-      if (payload.categories.length > BUDGET_LIMITS.MAX_CATEGORIES) return false;
-      for (const cat of payload.categories) {
+      if (payload.categories.length > BUDGET_LIMITS.MAX_CATEGORIES) return { valid: false, reason: `categories exceeds limit ${BUDGET_LIMITS.MAX_CATEGORIES}` };
+      for (let i = 0; i < payload.categories.length; i++) {
+        const cat = payload.categories[i];
         if (typeof cat === 'string') {
-          if (cat.length > BUDGET_LIMITS.MAX_NAME_LEN) return false;
+          if (cat.length > BUDGET_LIMITS.MAX_NAME_LEN) return { valid: false, reason: `categories[${i}] string length exceeded` };
         } else if (isObject(cat)) {
-          if (cat.id !== undefined && !isStringUnder(cat.id, BUDGET_LIMITS.MAX_ID_LEN) && !isFiniteNumber(cat.id)) return false;
-          if (cat.name !== undefined && !isStringUnder(cat.name, BUDGET_LIMITS.MAX_NAME_LEN)) return false;
+          if (cat.id !== undefined && cat.id !== null && !isStringUnder(cat.id, BUDGET_LIMITS.MAX_ID_LEN) && !isFiniteNumber(cat.id)) return { valid: false, reason: `categories[${i}].id invalid` };
+          if (cat.name !== undefined && cat.name !== null && !isStringUnder(cat.name, BUDGET_LIMITS.MAX_NAME_LEN)) return { valid: false, reason: `categories[${i}].name invalid` };
         } else {
-          return false;
+          return { valid: false, reason: `categories[${i}] invalid type` };
         }
       }
     } else if (isObject(payload.categories)) {
-      if (Object.keys(payload.categories).length > BUDGET_LIMITS.MAX_CATEGORIES) return false;
+      if (Object.keys(payload.categories).length > BUDGET_LIMITS.MAX_CATEGORIES) return { valid: false, reason: `categories object keys exceeded ${BUDGET_LIMITS.MAX_CATEGORIES}` };
       for (const [k, v] of Object.entries(payload.categories)) {
-        if (typeof k !== 'string' || k.length > BUDGET_LIMITS.MAX_NAME_LEN) return false;
-        if (typeof v !== 'string' && typeof v !== 'boolean' && !isFiniteNumber(v)) return false;
+        if (typeof k !== 'string' || k.length > BUDGET_LIMITS.MAX_NAME_LEN) return { valid: false, reason: `categories key invalid: ${k}` };
+        if (v !== null && v !== undefined && typeof v !== 'string' && typeof v !== 'boolean' && !isFiniteNumber(v)) return { valid: false, reason: `categories[${k}] invalid value` };
       }
     } else {
-      return false;
+      return { valid: false, reason: 'categories must be an array or object' };
     }
   }
 
-  return true;
+  return { valid: true };
+}
+
+export function validateBudgetPayload(payload) {
+  return validateBudgetPayloadDetailed(payload).valid;
 }
 
 async function handleSyncBackup(context) {
@@ -538,8 +554,15 @@ async function handleSyncBackup(context) {
       payload = rest;
     }
 
-    if (!validateBudgetPayload(payload)) {
-      return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Invalid backup payload.', context.requestId);
+    const validation = validateBudgetPayloadDetailed(payload);
+    if (!validation.valid) {
+      console.warn(`[sync.backup] Validation failed for user ${userId}: ${validation.reason}`);
+      return json({
+        code: ERROR_CODES.VALIDATION_ERROR,
+        error: 'Invalid backup payload.',
+        details: validation.reason,
+        ...(context.requestId ? { requestId: context.requestId } : {})
+      }, 400);
     }
 
     const dataStr = JSON.stringify(payload);

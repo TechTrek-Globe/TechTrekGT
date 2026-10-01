@@ -785,7 +785,8 @@ export function LedgerDataProvider({ children }) {
 
   const getTotalActualExpenses = useCallback((monthKey, billsOverride) => {
     const bills = billsOverride || metadataState.bills || [];
-    return bills.reduce((sum, b) => {
+    // P9: exclude archived bills from actual expense total
+    return bills.filter(b => !b.isArchived).reduce((sum, b) => {
       const li = (lineItemsRef.current || []).find(item => item.billId === b.id && item.monthKey === monthKey);
       return sum + (li ? li.actualAmount : getBillMonthlyCost(b));
     }, 0);
@@ -794,7 +795,8 @@ export function LedgerDataProvider({ children }) {
   const getAccountActualExpenses = useCallback((accountId, monthKey, billsOverride) => {
     const bills = billsOverride || metadataState.bills || [];
     return bills
-      .filter(b => b.accountId === accountId)
+      // P9: exclude archived bills from account actual expense total
+      .filter(b => !b.isArchived && b.accountId === accountId)
       .reduce((sum, b) => sum + getEffectiveAmount(b, monthKey), 0);
   }, [metadataState.bills, getEffectiveAmount]);
 

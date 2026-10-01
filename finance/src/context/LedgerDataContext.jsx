@@ -252,7 +252,10 @@ export function LedgerDataProvider({ children }) {
 
   const [cloudVersion, setCloudVersion] = useState(() => {
     try {
-      const v = typeof localStorage !== 'undefined' ? localStorage.getItem('tt_budget_cloud_version') : null;
+      const uid = getCurrentUserId();
+      // P3: version marker scoped to userId so users cannot collide
+      const vKey = uid ? `tt_budget_cloud_version:${uid}` : 'tt_budget_cloud_version';
+      const v = typeof localStorage !== 'undefined' ? localStorage.getItem(vKey) : null;
       return v ? parseInt(v, 10) : 0;
     } catch {
       return 0;
@@ -276,16 +279,22 @@ export function LedgerDataProvider({ children }) {
     if (result.success) {
       if (result.version) {
         setCloudVersion(result.version);
-        try { localStorage.setItem('tt_budget_cloud_version', String(result.version)); } catch {}
+        // P3: scope to userId
+        const uid = currentUserId || getCurrentUserId();
+        const vKey = uid ? `tt_budget_cloud_version:${uid}` : 'tt_budget_cloud_version';
+        const mKey = uid ? `tt_budget_last_modified:${uid}` : 'tt_budget_last_modified';
+        try { localStorage.setItem(vKey, String(result.version)); } catch {}
+        try { localStorage.setItem(mKey, String(Date.now())); } catch {}
       }
       setSyncConflict(null);
       setLastCloudSyncTime(new Date().toLocaleTimeString());
-      try { localStorage.setItem('tt_budget_last_modified', String(Date.now())); } catch {}
     } else if (result.conflict) {
+      const uid = currentUserId || getCurrentUserId();
+      const mKey = uid ? `tt_budget_last_modified:${uid}` : 'tt_budget_last_modified';
       setSyncConflict({
         serverData: result.serverData,
         serverVersion: result.serverVersion,
-        localTimestamp: parseInt(localStorage.getItem('tt_budget_last_modified') || '0', 10) || Date.now()
+        localTimestamp: parseInt(localStorage.getItem(mKey) || '0', 10) || Date.now()
       });
     }
     return result;
@@ -487,12 +496,17 @@ export function LedgerDataProvider({ children }) {
         const cloudData = await res.json().catch(() => null);
 
         if (res.ok && cloudData && cloudData.success && cloudData.budget) {
-          const localTimeStr = localStorage.getItem('tt_budget_last_modified');
+          // P3: scope version markers to userId
+          const uid = currentUserId || getCurrentUserId();
+          const vKey = uid ? `tt_budget_cloud_version:${uid}` : 'tt_budget_cloud_version';
+          const mKey = uid ? `tt_budget_last_modified:${uid}` : 'tt_budget_last_modified';
+          const localTimeStr = localStorage.getItem(mKey);
           const localTime = localTimeStr ? parseInt(localTimeStr, 10) : 0;
           const cloudTime = cloudData.version || (cloudData.updatedAt ? new Date(cloudData.updatedAt).getTime() : 0);
           const localData = budgetRef.current;
-          const isLocalEmpty = !localData || (!localData.accounts?.length && !localData.bills?.length);
-          const savedCloudVersion = cloudVersionRef.current || 0;
+          // P3: include fundingGoals in empty check - local with goals is never empty
+          const isLocalEmpty = !localData || (!localData.accounts?.length && !localData.bills?.length && !localData.fundingGoals?.length);
+          const savedCloudVersion = cloudVersionRef.current || parseInt(localStorage.getItem(vKey) || '0', 10) || 0;
 
           logSync('CONFLICT_CHECK', 'Evaluated local vs cloud timestamps for 2-way sync', {
             localTime,
@@ -507,8 +521,8 @@ export function LedgerDataProvider({ children }) {
             setLastCloudSyncTime(new Date().toLocaleTimeString());
             if (cloudTime > 0) {
               try {
-                localStorage.setItem('tt_budget_cloud_version', String(cloudTime));
-                localStorage.setItem('tt_budget_last_modified', String(cloudTime));
+                localStorage.setItem(vKey, String(cloudTime));
+                localStorage.setItem(mKey, String(cloudTime));
               } catch {}
             }
           } else if (savedCloudVersion > 0 && cloudTime > savedCloudVersion && localTime > savedCloudVersion) {
@@ -520,14 +534,26 @@ export function LedgerDataProvider({ children }) {
             });
           } else if (cloudTime > savedCloudVersion && localTime <= savedCloudVersion) {
             // Cloud updated elsewhere, local is clean: apply cloud
-            await restoreFromBackup(cloudData.budget);
-            setCloudVersion(cloudTime);
-            setLastCloudSyncTime(new Date().toLocaleTimeString());
-            if (cloudTime > 0) {
-              try {
-                localStorage.setItem('tt_budget_cloud_version', String(cloudTime));
-                localStorage.setItem('tt_budget_last_modified', String(cloudTime));
-              } catch {}
+            // P3: but never silently overwrite local fundingGoals with empty cloud goals
+            const localGoals = localData?.fundingGoals;
+            const cloudGoals = cloudData.budget?.fundingGoals;
+            if (localGoals?.length > 0 && (!cloudGoals || cloudGoals.length === 0)) {
+              logSync('GOALS_PROTECT', 'Cloud backup has no fundingGoals but local does; showing conflict dialog instead of silent overwrite', { localGoalCount: localGoals.length }, 'warn');
+              setSyncConflict({
+                serverData: cloudData.budget,
+                serverVersion: cloudTime,
+                localTimestamp: localTime
+              });
+            } else {
+              await restoreFromBackup(cloudData.budget);
+              setCloudVersion(cloudTime);
+              setLastCloudSyncTime(new Date().toLocaleTimeString());
+              if (cloudTime > 0) {
+                try {
+                  localStorage.setItem(vKey, String(cloudTime));
+                  localStorage.setItem(mKey, String(cloudTime));
+                } catch {}
+              }
             }
           } else if (localTime > savedCloudVersion && cloudTime <= savedCloudVersion) {
             // Local changed offline: push local
@@ -667,11 +693,13 @@ export function LedgerDataProvider({ children }) {
             ...acc,
             importedLedgerRows: {},
             ledgerMode: 'projected',
-            startingBalance: 0,
-            extraStartingBalance: 0,
-            startDate: '2026-01-01',
-            balanceAsOfDate: '2026-01-01'
+            // P12-a: preserve existing startingBalance/dates - clearing transactions does not reset the balance
+            startingBalance: acc.startingBalance ?? 0,
+            extraStartingBalance: acc.extraStartingBalance ?? 0,
+            startDate: acc.startDate ?? acc.balanceAsOfDate ?? new Date().toISOString().split('T')[0],
+            balanceAsOfDate: acc.balanceAsOfDate ?? acc.startDate ?? new Date().toISOString().split('T')[0]
           };
+
         }
         return acc;
       });
@@ -957,13 +985,17 @@ export function LedgerDataProvider({ children }) {
       const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`;
       const isoDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       
-      const isLockedDay = isImportMode && maxImportDateStr && isoDate <= maxImportDateStr;
+      // P6: clamp import lock boundary to today so future dates project normally.
+      const todayLockStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      const effectiveLockEnd = maxImportDateStr && maxImportDateStr < todayLockStr ? maxImportDateStr : todayLockStr;
+      const isLockedDay = isImportMode && maxImportDateStr && isoDate <= effectiveLockEnd;
+
 
       // 1. Credits
       let dayCredits = 0;
       let dayExtraAdd = 0;
       people.forEach(p => {
-        const alloc = allocateEarnerCredit(p, accountId, year, month, day, metadataStateRef.current, {}, { isLockedDay: isLockedDay });
+        const alloc = allocateEarnerCredit(p, accountId, year, month, day, metadataStateRef.current, dailyMatrixRef.current, { isLockedDay: isLockedDay });
         dayCredits += alloc.earnerReg;
         dayExtraAdd += alloc.earnerExtra;
       });

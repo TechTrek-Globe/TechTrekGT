@@ -27,7 +27,7 @@ import { SpreadsheetImporter } from './SpreadsheetImporter';
 import { ColumnHeaderHoverTooltip } from './ColumnHeaderHoverTooltip';
 
 import { fmtMoney, fmtNum } from '../utils/formatters';
-import { isBillDueInMonth, isPersonDepositDay, getPersonDepositAmountForAccount, getPersonExtraSavingsDepositAmountForAccount } from '../utils/paydayUtils';
+import { isBillDueInMonth, isPersonDepositDay, effectiveDueDay, getPersonDepositAmountForAccount, getPersonExtraSavingsDepositAmountForAccount } from '../utils/paydayUtils';
 import { allocateEarnerCredit } from '../utils/ledgerEngine';
 import { logTransaction, logMatrix, logLedger } from '../utils/logger';
 
@@ -768,7 +768,12 @@ function DailySpreadsheetMatrix() {
         const isToday = todayObj.getFullYear() === year && todayObj.getMonth() === month && todayObj.getDate() === day;
 
         const isoDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        const isLockedDay = isImportMode && maxImportDateStr && isoDate <= maxImportDateStr;
+        // P6: clamp lock boundary to today so future dates project normally.
+        // Historical dates (isoDate <= todayStr) keep the import lock.
+        // Stored credit cells on future dates still win via allocateEarnerCredit.
+        const todayStr = `${todayObj.getFullYear()}-${String(todayObj.getMonth() + 1).padStart(2, '0')}-${String(todayObj.getDate()).padStart(2, '0')}`;
+        const effectiveLockEnd = maxImportDateStr && maxImportDateStr < todayStr ? maxImportDateStr : todayStr;
+        const isLockedDay = isImportMode && maxImportDateStr && isoDate <= effectiveLockEnd;
 
         // 1. Credits (Deposits) for enabled account earners
         const personCredits = {};
@@ -778,7 +783,7 @@ function DailySpreadsheetMatrix() {
         accountPeople.forEach(p => {
           const isDepDay = isPersonDepositDay(p, year, month, day);
 
-          const alloc = allocateEarnerCredit(p, selectedAccountId, year, month, day, budget, undefined, { isLockedDay: isLockedDay });
+          const alloc = allocateEarnerCredit(p, selectedAccountId, year, month, day, budget, getDailyMatrix(), { isLockedDay: isLockedDay });
           personCredits[p.id] = alloc.earnerDeposit;
 
           const earnerExtra = alloc.earnerExtra;
@@ -806,18 +811,20 @@ function DailySpreadsheetMatrix() {
             // Tier 1: manual dailyMatrix override (drag-drop, inline edit, or actual transaction) wins outright
             hasDayBillOverride = true;
             amt = parseFloat(customBillVal) || 0;
+            // P11-a: display-only correction - do not call updateDailyMatrixCell inside render (useMemo).
+            // The self-heal effect in LedgerDataContext already corrects doubled cells.
             if (expectedBillAmt > 0 && Math.abs(amt - 2 * expectedBillAmt) < 0.02) {
               amt = expectedBillAmt;
-              updateDailyMatrixCell(billAccId, monthKey, day, `bill_${b.id}`, expectedBillAmt);
             }
           } else if (!isLockedDay) {
             // Tier 2: month-scoped actual amount from import reconciliation
             const actualAmt = getActualAmount(b.id, monthKey);
-            if (actualAmt !== null && parseInt(b.dueDay) === day && isBillDueInMonth(b, month, true)) {
+            // P8: use effectiveDueDay to clamp day 29/30/31 to the real last day of shorter months
+            if (actualAmt !== null && effectiveDueDay(b, year, month) === day && isBillDueInMonth(b, month, true)) {
               amt = (expectedBillAmt > 0 && Math.abs(actualAmt - 2 * expectedBillAmt) < 0.02) ? expectedBillAmt : actualAmt;
             } else if (actualAmt !== null) {
               amt = 0;
-            } else if (parseInt(b.dueDay) === day && isBillDueInMonth(b, month, true)) {
+            } else if (effectiveDueDay(b, year, month) === day && isBillDueInMonth(b, month, true)) {
               // Tier 3: standard projection for scheduled bills
               amt = expectedBillAmt;
             }

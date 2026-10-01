@@ -58,12 +58,10 @@ function migrateFundingGoals(goals, people, accounts) {
       amountPerPay = getAmountPerPaycheck(g.amount, g.frequency, person?.payFrequency);
     }
     
-    // Self-healing legacy drift correction
-    if (Math.abs(amountPerPay - 110.58) < 0.01) amountPerPay = 111.00;
-    if (Math.abs(amountPerPay - 221.16) < 0.01) amountPerPay = 222.00;
-    if (Math.abs(amountPerPay - 689.42) < 0.01) amountPerPay = 689.00;
-    if (Math.abs(amountPerPay - 1222.61) < 0.01) amountPerPay = 1378.00;
-    
+    // P2: Removed hardcoded self-heal corrections that silently mutated stored goal amounts.
+    // Stored amountPerPay values are preserved exactly as-is.
+    // See docs/incident/DIAGNOSIS.md C5 for the proposed versioned migration plan.
+
     // Remap accountId if it points to a preset ID and a real matching account exists
     let targetAccountId = g.accountId;
     if (accList.length > 0) {
@@ -731,13 +729,15 @@ export function BudgetMetadataProvider({ children }) {
 
   const getTotalMonthlyExpenses = useCallback((billsOverride) => {
     const bills = billsOverride || metadataState.bills || [];
-    return bills.reduce((sum, b) => sum + getBillMonthlyCost(b), 0);
+    // P9: exclude archived bills from monthly expense total
+    return bills.filter(b => !b.isArchived).reduce((sum, b) => sum + getBillMonthlyCost(b), 0);
   }, [metadataState.bills, getBillMonthlyCost]);
 
   const getAccountMonthlyExpenses = useCallback((accountId, billsOverride) => {
     const bills = billsOverride || metadataState.bills || [];
     return bills
-      .filter(b => b.accountId === accountId)
+      // P9: exclude archived bills from account monthly expense total
+      .filter(b => !b.isArchived && b.accountId === accountId)
       .reduce((sum, b) => sum + getBillMonthlyCost(b), 0);
   }, [metadataState.bills, getBillMonthlyCost]);
 
@@ -751,7 +751,8 @@ export function BudgetMetadataProvider({ children }) {
   const getPersonMonthlyTotal = useCallback((personId, stateOverride) => {
     const state = stateOverride || metadataState;
     const person = (state.people || []).find(p => p.id === personId);
-    const billsTotal = (state.bills || []).reduce((sum, b) => sum + getBillPersonMonthlyPortion(b, personId), 0);
+    // P9: exclude archived bills from person's monthly obligation total
+    const billsTotal = (state.bills || []).filter(b => !b.isArchived).reduce((sum, b) => sum + getBillPersonMonthlyPortion(b, personId), 0);
     if (!person) return billsTotal;
     const extraSavingsTotal = (state.accounts || []).reduce((sum, acc) => {
       return sum + getAccountSaveExtraPersonPortion(acc, person, state);
@@ -777,7 +778,8 @@ export function BudgetMetadataProvider({ children }) {
   const getUpcomingBills = useCallback((limit = 5, stateOverride) => {
     const state = stateOverride || metadataState;
     const today = new Date();
-    const mapped = (state.bills || []).map(bill => {
+    // P9: exclude archived bills from upcoming bills list
+    const mapped = (state.bills || []).filter(b => !b.isArchived).map(bill => {
       const dueDate = getNextBillDueDate(bill, today);
       const diffTime = dueDate.getTime() - today.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));

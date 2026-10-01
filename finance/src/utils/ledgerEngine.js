@@ -23,9 +23,10 @@ export function allocateEarnerCredit(person, accountId, year, month, day, budget
       earnerExtra = parseFloat(ec) || 0;
       source = LEDGER_SOURCE.MANUAL;
     } else {
-      const billPortion = Math.max(0, projectedDeposit - projectedExtra);
-      const availableForExtra = Math.max(0, earnerDeposit - billPortion);
-      earnerExtra = Math.min(projectedExtra, availableForExtra);
+      // P10: stored credit with no stored extra_credit is treated as purely regular.
+      // Do NOT infer an extra split from projected amounts - that would double-apply
+      // the extra savings deduction on a deposit that was already settled by import.
+      earnerExtra = 0;
       source = LEDGER_SOURCE.ACTUAL_IMPORT;
     }
   } else {

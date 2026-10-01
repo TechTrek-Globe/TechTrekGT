@@ -538,9 +538,21 @@ export function processSpreadsheetImport({
             creditKey
           });
 
-          // Zero out the scheduled payday in this half of the month so it isn't duplicated
-          const targetPayDay = actualDay <= 15 ? (matchedPerson.payDay1 || 15) : (matchedPerson.payDay2 === 'last' ? 31 : (matchedPerson.payDay2 || 30));
-          const numericPayDay = typeof targetPayDay === 'number' ? targetPayDay : parseInt(targetPayDay) || (actualDay <= 15 ? 15 : 30);
+          // Zero out the scheduled payday in this half of the month so it isn't duplicated.
+          // P7: clamp to daysInMonth so we never write keys like '2026-09_31_credit_...' in
+          // a 30-day month. new Date(y, m, 0) returns the last day of month m-1 in JS.
+          const txnYear = parseInt(parts[0], 10);
+          const txnMonthOneBased = parseInt(parts[1], 10); // 1-12
+          const daysInTxnMonth = new Date(txnYear, txnMonthOneBased, 0).getDate();
+
+          const targetPayDay = actualDay <= 15
+            ? (matchedPerson.payDay1 || 15)
+            : (matchedPerson.payDay2 === 'last' ? daysInTxnMonth : (matchedPerson.payDay2 || daysInTxnMonth));
+          const rawNumericPayDay = typeof targetPayDay === 'number'
+            ? targetPayDay
+            : parseInt(targetPayDay) || (actualDay <= 15 ? 15 : daysInTxnMonth);
+          const numericPayDay = Math.min(rawNumericPayDay, daysInTxnMonth);
+
           if (numericPayDay !== actualDay) {
             const schedCreditKey = `${accountId}_${monthKey}_${numericPayDay}_credit_${matchedPerson.id}`;
             if (matrixUpdates[schedCreditKey] === undefined) {
@@ -919,7 +931,8 @@ export function getLedgerRunningBalanceAsOfDate({
   }
 
   const people = metadataState.people || [];
-  const bills = (metadataState.bills || []).filter(b => b.accountId === targetAccountId);
+  // P9: exclude archived bills from the running balance simulation
+  const bills = (metadataState.bills || []).filter(b => !b.isArchived && b.accountId === targetAccountId);
 
   let runningReg = startReg;
   let runningExtra = startExtra;

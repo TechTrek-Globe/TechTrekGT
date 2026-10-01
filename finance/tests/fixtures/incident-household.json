@@ -1,0 +1,158 @@
+{
+  "owner_id": "usr-test-001",
+  "accounts": [
+    {
+      "id": "acc-mortgage-test",
+      "name": "Test Mortgage Checking",
+      "type": "checking",
+      "ledgerMode": "import",
+      "startingBalance": 5000.00,
+      "extraStartingBalance": 1200.00,
+      "saveExtraMonthly": 50,
+      "enableExtraSavings": true,
+      "balanceAsOfDate": "2025-12-31",
+      "startDate": "2025-12-31",
+      "color": "blue",
+      "notes": "",
+      "importedLedgerRows": {
+        "2025-12-31": { "regBeg": 5000, "extraBeg": 1200, "totalBeg": 6200, "regEnding": 5000, "extraEnding": 1200, "totalEnding": 6200 },
+        "2026-01-15": { "regBeg": 5000, "extraBeg": 1200, "totalBeg": 6200, "regEnding": 5689, "extraEnding": 1200, "totalEnding": 6889 },
+        "2026-09-25": { "regBeg": 4800, "extraBeg": 1200, "totalBeg": 6000, "regEnding": 6022, "extraEnding": 1200, "totalEnding": 7222 },
+        "2026-09-29": { "regBeg": 6022, "extraBeg": 1200, "totalBeg": 7222, "regEnding": 6711, "extraEnding": 1200, "totalEnding": 7911 },
+        "2027-06-06": { "regBeg": 9000, "extraBeg": 1500, "totalBeg": 10500, "regEnding": 9000, "extraEnding": 1500, "totalEnding": 10500 }
+      }
+    },
+    {
+      "id": "acc-hoa-test",
+      "name": "Test HOA Savings",
+      "type": "savings",
+      "ledgerMode": "projected",
+      "startingBalance": 2000.00,
+      "extraStartingBalance": 0,
+      "saveExtraMonthly": 0,
+      "enableExtraSavings": false,
+      "balanceAsOfDate": "2026-01-01",
+      "startDate": "2026-01-01",
+      "color": "purple",
+      "notes": ""
+    }
+  ],
+  "people": [
+    {
+      "id": "person-alice",
+      "name": "Alice",
+      "role": "Primary",
+      "payFrequency": "semi-monthly",
+      "payDay1": 15,
+      "payDay2": "last",
+      "payOffsetDays": 0,
+      "grossPerPay": 800.00,
+      "netPerPay": 689.42,
+      "color": "blue",
+      "accountAllocations": { "acc-mortgage-test": 689.42 }
+    },
+    {
+      "id": "person-bob",
+      "name": "Bob",
+      "role": "Secondary",
+      "payFrequency": "monthly",
+      "payDay1": 25,
+      "payDay2": null,
+      "payOffsetDays": 0,
+      "grossPerPay": 1400.00,
+      "netPerPay": 1222.61,
+      "color": "green",
+      "accountAllocations": { "acc-mortgage-test": 1222.61 }
+    }
+  ],
+  "bills": [
+    {
+      "id": "bill-mortgage",
+      "name": "Test Mortgage",
+      "amount": 2756.00,
+      "dueDay": 1,
+      "accountId": "acc-mortgage-test",
+      "isArchived": false,
+      "matchingKey": "Test Mortgage",
+      "bankMatchNames": "Test Mortgage"
+    },
+    {
+      "id": "bill-hoa",
+      "name": "Test HOA",
+      "amount": 444.00,
+      "dueDay": 1,
+      "accountId": "acc-hoa-test",
+      "isArchived": false,
+      "matchingKey": "Test HOA",
+      "bankMatchNames": "Test HOA"
+    },
+    {
+      "id": "bill-archived-utility",
+      "name": "Old Utility (Archived)",
+      "amount": 150.00,
+      "dueDay": 15,
+      "accountId": "acc-mortgage-test",
+      "isArchived": true,
+      "matchingKey": "Old Utility",
+      "bankMatchNames": "Old Utility"
+    },
+    {
+      "id": "bill-shortmonth",
+      "name": "End-of-Month Bill",
+      "amount": 99.00,
+      "dueDay": 31,
+      "accountId": "acc-mortgage-test",
+      "isArchived": false,
+      "matchingKey": "End of Month Bill",
+      "bankMatchNames": "End of Month Bill"
+    }
+  ],
+  "transactions": [],
+  "lineItems": [],
+  "fundingGoals": [
+    {
+      "id": "goal-alice-mortgage",
+      "name": "Alice Mortgage",
+      "contributorId": "person-alice",
+      "accountId": "acc-mortgage-test",
+      "amountPerPay": 689.00
+    },
+    {
+      "id": "goal-alice-hoa",
+      "name": "Alice HOA",
+      "contributorId": "person-alice",
+      "accountId": "acc-hoa-test",
+      "amountPerPay": 111.00
+    },
+    {
+      "id": "goal-bob-mortgage",
+      "name": "Bob Mortgage",
+      "contributorId": "person-bob",
+      "accountId": "acc-mortgage-test",
+      "amountPerPay": 1378.00
+    },
+    {
+      "id": "goal-bob-hoa",
+      "name": "Bob HOA",
+      "contributorId": "person-bob",
+      "accountId": "acc-hoa-test",
+      "amountPerPay": 222.00
+    }
+  ],
+  "loans": [],
+  "dashboardWidgets": [],
+  "theme": "dark",
+  "hideDashboardHeader": false,
+  "categories": {},
+  "dailyMatrix": {
+    "acc-mortgage-test_2026-09_25_credit_person-bob": 1222.61,
+    "acc-mortgage-test_2026-09_29_credit_person-alice": 689.42,
+    "acc-mortgage-test_2026-10_13_credit_person-alice": 689.42,
+    "acc-mortgage-test_2026-10_18_credit_person-bob": 1222.61,
+    "acc-mortgage-test_2026-09_25_credit_person-alice": 0,
+    "acc-mortgage-test_2026-09_15_credit_person-alice": 0,
+    "acc-mortgage-test_2026-09_31_credit_person-bob": 0,
+    "acc-mortgage-test_2026-01_15_credit_person-alice": 689.42,
+    "acc-mortgage-test_2026-01_1_bill_bill-mortgage": 2756.00
+  }
+}

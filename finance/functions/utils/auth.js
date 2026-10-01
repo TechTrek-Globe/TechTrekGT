@@ -764,7 +764,10 @@ export async function sendResetEmail(env, toEmail, code, securityQuestion) {
     subject: 'Your TechTrek password reset code',
     bodyLines: lines,
     logPrefix: '[forgot-password]',
-    devFallbackMessage: `mail delivery is not configured (RESEND_API_KEY / MAIL_FROM); dev reset code for ${toEmail}: ${code}`
+    // P14: never log the code or full email - redact in production
+    devFallbackMessage: env?.ENVIRONMENT !== 'production'
+      ? `mail delivery is not configured; dev reset code for ${toEmail}: ${code}`
+      : `mail delivery is not configured; reset code issued (details redacted in production)`
   });
 }
 
@@ -789,7 +792,10 @@ export async function sendVerificationEmail(env, toEmail, code, type = 'verify')
     subject,
     bodyLines: lines,
     logPrefix: '[email-verify]',
-    devFallbackMessage: `mail delivery is not configured (RESEND_API_KEY / MAIL_FROM); dev code for ${toEmail}: ${code}`
+    // P14: never log the code or full email in production
+    devFallbackMessage: env?.ENVIRONMENT !== 'production'
+      ? `mail delivery is not configured; dev code for ${toEmail}: ${code}`
+      : `mail delivery is not configured; verification code issued (details redacted in production)`
   });
 }
 
@@ -807,7 +813,10 @@ export async function sendEmailChangeNotification(env, oldEmail, newEmail) {
     subject: 'Security Alert: Email change requested for your TechTrek account',
     bodyLines: lines,
     logPrefix: '[email-change-notice]',
-    devFallbackMessage: `mail delivery is not configured (RESEND_API_KEY / MAIL_FROM); notice for ${oldEmail} -> ${newEmail}`
+    // P14: redact email addresses in production logs
+    devFallbackMessage: env?.ENVIRONMENT !== 'production'
+      ? `mail delivery is not configured; notice for ${oldEmail} -> ${newEmail}`
+      : `mail delivery is not configured; email change notice issued (details redacted in production)`
   });
 }
 

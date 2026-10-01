@@ -321,8 +321,9 @@ export function validateBudgetPayload(payload) {
       if (item.role !== undefined && !isStringUnder(item.role, BUDGET_LIMITS.MAX_SHORT_STR_LEN)) return false;
       if (item.payFrequency !== undefined && !isStringUnder(item.payFrequency, BUDGET_LIMITS.MAX_SHORT_STR_LEN)) return false;
       if (item.color !== undefined && !isStringUnder(item.color, BUDGET_LIMITS.MAX_SHORT_STR_LEN)) return false;
-      if (item.payDay1 !== undefined && !isStringUnder(item.payDay1, 50) && !isFiniteNumber(item.payDay1)) return false;
-      if (item.payDay2 !== undefined && !isStringUnder(item.payDay2, 50) && !isFiniteNumber(item.payDay2)) return false;
+      if (item.payDay1 !== undefined && item.payDay1 !== null && !isStringUnder(item.payDay1, 50) && !isFiniteNumber(item.payDay1)) return false;
+      if (item.payDay2 !== undefined && item.payDay2 !== null && !isStringUnder(item.payDay2, 50) && !isFiniteNumber(item.payDay2)) return false;
+      if (item.payOffsetDays !== undefined && item.payOffsetDays !== null && !isFiniteNumber(item.payOffsetDays)) return false;
       if (item.grossPerPay !== undefined && !isFiniteNumber(item.grossPerPay)) return false;
       if (item.netPerPay !== undefined && !isFiniteNumber(item.netPerPay)) return false;
       if (item.isArchived !== undefined && typeof item.isArchived !== 'boolean') return false;
@@ -485,18 +486,26 @@ export function validateBudgetPayload(payload) {
 
   // 13. categories
   if (payload.categories !== undefined) {
-    if (!Array.isArray(payload.categories) || payload.categories.length > BUDGET_LIMITS.MAX_CATEGORIES) {
-      return false;
-    }
-    for (const cat of payload.categories) {
-      if (typeof cat === 'string') {
-        if (cat.length > BUDGET_LIMITS.MAX_NAME_LEN) return false;
-      } else if (isObject(cat)) {
-        if (cat.id !== undefined && !isStringUnder(cat.id, BUDGET_LIMITS.MAX_ID_LEN) && !isFiniteNumber(cat.id)) return false;
-        if (cat.name !== undefined && !isStringUnder(cat.name, BUDGET_LIMITS.MAX_NAME_LEN)) return false;
-      } else {
-        return false;
+    if (Array.isArray(payload.categories)) {
+      if (payload.categories.length > BUDGET_LIMITS.MAX_CATEGORIES) return false;
+      for (const cat of payload.categories) {
+        if (typeof cat === 'string') {
+          if (cat.length > BUDGET_LIMITS.MAX_NAME_LEN) return false;
+        } else if (isObject(cat)) {
+          if (cat.id !== undefined && !isStringUnder(cat.id, BUDGET_LIMITS.MAX_ID_LEN) && !isFiniteNumber(cat.id)) return false;
+          if (cat.name !== undefined && !isStringUnder(cat.name, BUDGET_LIMITS.MAX_NAME_LEN)) return false;
+        } else {
+          return false;
+        }
       }
+    } else if (isObject(payload.categories)) {
+      if (Object.keys(payload.categories).length > BUDGET_LIMITS.MAX_CATEGORIES) return false;
+      for (const [k, v] of Object.entries(payload.categories)) {
+        if (typeof k !== 'string' || k.length > BUDGET_LIMITS.MAX_NAME_LEN) return false;
+        if (typeof v !== 'string' && typeof v !== 'boolean' && !isFiniteNumber(v)) return false;
+      }
+    } else {
+      return false;
     }
   }
 

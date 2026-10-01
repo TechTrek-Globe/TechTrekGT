@@ -109,6 +109,44 @@ export function AuthProvider({ children }) {
     };
   }, [isAuthenticated]);
 
+  // P15: Proactive token refresh every 90 minutes and on tab re-focus.
+  // The /api/auth/me endpoint already re-issues a token when < 30 min remain;
+  // calling it periodically prevents silent expiry during long single-page sessions.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const REFRESH_INTERVAL_MS = 90 * 60 * 1000; // 90 minutes
+
+    const refreshSession = async () => {
+      try {
+        const res = await apiFetch('/api/auth/me');
+        if (res.ok) {
+          const data = await res.json().catch(() => ({}));
+          if (data.csrfToken) {
+            setCsrfTokenState(data.csrfToken);
+            setCsrfToken(data.csrfToken);
+          }
+        }
+      } catch {
+        // Network error - do nothing; inactivity timer will handle timeout
+      }
+    };
+
+    const intervalId = setInterval(refreshSession, REFRESH_INTERVAL_MS);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        refreshSession();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isAuthenticated]);
+
   /**
    * @param {string} email
    * @param {string} password

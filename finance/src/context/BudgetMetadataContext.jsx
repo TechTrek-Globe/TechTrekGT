@@ -58,12 +58,10 @@ function migrateFundingGoals(goals, people, accounts) {
       amountPerPay = getAmountPerPaycheck(g.amount, g.frequency, person?.payFrequency);
     }
     
-    // Self-healing legacy drift correction
-    if (Math.abs(amountPerPay - 110.58) < 0.01) amountPerPay = 111.00;
-    if (Math.abs(amountPerPay - 221.16) < 0.01) amountPerPay = 222.00;
-    if (Math.abs(amountPerPay - 689.42) < 0.01) amountPerPay = 689.00;
-    if (Math.abs(amountPerPay - 1222.61) < 0.01) amountPerPay = 1378.00;
-    
+    // P2: Removed hardcoded self-heal corrections that silently mutated stored goal amounts.
+    // Stored amountPerPay values are preserved exactly as-is.
+    // See docs/incident/DIAGNOSIS.md C5 for the proposed versioned migration plan.
+
     // Remap accountId if it points to a preset ID and a real matching account exists
     let targetAccountId = g.accountId;
     if (accList.length > 0) {

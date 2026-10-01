@@ -202,7 +202,13 @@ export async function pushCloudBackupOptimistic(passcode, budgetData, options = 
   const baseVersion = options?.baseVersion;
   const force = Boolean(options?.force);
 
-  const requestBody = { budget: budgetData };
+  // P4: Strip client-only fields (owner_id) before sending to the worker.
+  // owner_id is used locally for ownership verification but is NOT in
+  // ALLOWED_BUDGET_KEYS on the server and causes HTTP 400 if included.
+  const uploadPayload = { ...budgetData };
+  delete uploadPayload.owner_id;
+
+  const requestBody = { budget: uploadPayload };
   if (typeof baseVersion === 'number' && !isNaN(baseVersion)) {
     requestBody.baseVersion = baseVersion;
   }
@@ -211,6 +217,7 @@ export async function pushCloudBackupOptimistic(passcode, budgetData, options = 
   }
 
   const serializedBody = JSON.stringify(requestBody);
+
   logSync('PUSH_REQUEST', 'Initiating optimistic cloud backup to Worker API', {
     endpoint: getApiUrl('/api/sync/backup'),
     byteLength: serializedBody.length,

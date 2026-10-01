@@ -184,6 +184,53 @@ export function LedgerDataProvider({ children }) {
     }
   }, [isDbLoaded, metadataState.bills]);
 
+  // Option A self-healing migration: clear legacy future credit cells (> today) from previous spreadsheet workbook
+  useEffect(() => {
+    if (!isDbLoaded) return;
+    try {
+      const alreadyRun = localStorage.getItem('tt_cleared_legacy_future_credits_v1');
+      if (alreadyRun === 'true') return;
+
+      const today = new Date();
+      const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      const creditKeyPattern = /^(.+)_(\d{4}-\d{2})_(\d{1,2})_(?:extra_)?credit_(.+)$/;
+      let removedCount = 0;
+      const cleanMatrix = { ...dailyMatrixRef.current };
+
+      for (const [key] of Object.entries(cleanMatrix)) {
+        const match = key.match(creditKeyPattern);
+        if (!match) continue;
+        const [, accountId, monthKey, dayStr] = match;
+        const day = parseInt(dayStr, 10);
+        const cellIso = `${monthKey}-${String(day).padStart(2, '0')}`;
+
+        if (cellIso > todayIso) {
+          delete cleanMatrix[key];
+          removedCount++;
+        }
+      }
+
+      localStorage.setItem('tt_cleared_legacy_future_credits_v1', 'true');
+
+      if (removedCount > 0) {
+        dailyMatrixRef.current = cleanMatrix;
+        setDailyMatrix(cleanMatrix);
+        setMatrixVersion(v => v + 1);
+        logLedger('REPAIR_FUTURE_CREDITS', `Auto-cleared ${removedCount} future stored credit cells so live projections take over`, {
+          removedCount,
+          asOfDate: todayIso
+        });
+        if (budgetRef.current) {
+          budgetRef.current.dailyMatrix = cleanMatrix;
+          isPendingSaveRef.current = true;
+          saveBudgetData(budgetRef.current, currentUserId || getCurrentUserId()).catch(() => {});
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to check/clear future credit cells:', err);
+    }
+  }, [isDbLoaded, currentUserId]);
+
   // Combined full budget object representation for compatibility and persistence
   const getFullBudget = useCallback(() => ({
     ...metadataStateRef.current,
@@ -713,6 +760,45 @@ export function LedgerDataProvider({ children }) {
     return { success: true };
   }, [setMetadataState]);
 
+  // Clears future matrix credit cells (> today) so live funding goals govern future months cleanly
+  const clearFutureMatrixCredits = useCallback((asOfDate = new Date()) => {
+    const todayMidnight = new Date(asOfDate.getFullYear(), asOfDate.getMonth(), asOfDate.getDate());
+    const todayIso = `${todayMidnight.getFullYear()}-${String(todayMidnight.getMonth() + 1).padStart(2, '0')}-${String(todayMidnight.getDate()).padStart(2, '0')}`;
+
+    const creditKeyPattern = /^(.+)_(\d{4}-\d{2})_(\d{1,2})_(?:extra_)?credit_(.+)$/;
+    let removedCount = 0;
+    const cleanMatrix = { ...dailyMatrixRef.current };
+
+    for (const [key] of Object.entries(cleanMatrix)) {
+      const match = key.match(creditKeyPattern);
+      if (!match) continue;
+      const [, accountId, monthKey, dayStr] = match;
+      const day = parseInt(dayStr, 10);
+      const cellIso = `${monthKey}-${String(day).padStart(2, '0')}`;
+
+      if (cellIso > todayIso) {
+        delete cleanMatrix[key];
+        removedCount++;
+      }
+    }
+
+    if (removedCount > 0) {
+      dailyMatrixRef.current = cleanMatrix;
+      setDailyMatrix(cleanMatrix);
+      setMatrixVersion(v => v + 1);
+      logLedger('CLEAR_FUTURE_CREDITS', `Cleared ${removedCount} future stored credit cells`, {
+        removedCount,
+        asOfDate: todayIso
+      });
+      if (budgetRef.current) {
+        budgetRef.current.dailyMatrix = cleanMatrix;
+        isPendingSaveRef.current = true;
+        saveBudgetData(budgetRef.current, currentUserId || getCurrentUserId()).catch(() => {});
+      }
+    }
+    return { success: true, removedCount };
+  }, [currentUserId]);
+
   // Selective per-namespace spreadsheet import
   const importSpreadsheetSelective = useCallback(({ namespaces, strategies, data, dryRun = false, resolutions = {} }) => {
     const result = processSpreadsheetImport({
@@ -1128,7 +1214,8 @@ export function LedgerDataProvider({ children }) {
     setIsSyncUnlocked,
     setSyncConflict,
     resolveConflictKeepLocal,
-    resolveConflictUseCloud
+    resolveConflictUseCloud,
+    clearFutureMatrixCredits
   }), [
     getDailyMatrix,
     getDailyMatrixCell,
@@ -1151,6 +1238,7 @@ export function LedgerDataProvider({ children }) {
     resetToDefaults,
     clearAllData,
     clearAccountTransactions,
+    clearFutureMatrixCredits,
     importSpreadsheetSelective,
     exportBackupJson,
     restoreFromBackup,

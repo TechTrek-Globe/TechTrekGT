@@ -36,7 +36,7 @@
 |----|------|--------|
 | C1 | Bi-weekly pay model ambiguity | Owner decision needed |
 | C2 | saveExtraMonthly vs goal overflow edge case | Owner clarification needed |
-| C3 | Stored future credit cells 689.42 / 1222.61 (2026-10 to 2027-06) | Owner to decide: clear vs keep |
+| C3 | Stored future credit cells 689.42 / 1222.61 (2026-10 to 2027-06) | Resolved: Option A auto-migration + Settings reset button |
 | C4 | Deleted fundingGoals recovery | Owner to re-enter manually |
 | C5 | Versioned migration plan for goal frequency normalization | Propose schema versioning (C5) |
 | C6 | Cloud backup consent vs default-on UX | UX decision needed |

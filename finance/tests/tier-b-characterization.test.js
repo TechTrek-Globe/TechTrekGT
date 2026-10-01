@@ -1,5 +1,11 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // ============================================================
 // Tier B Characterization Tests
@@ -8,7 +14,7 @@ import assert from 'node:assert';
 // corrected expected behavior is asserted after fixes.
 // ============================================================
 
-import { allocateEarnerCredit } from '../src/utils/ledgerEngine.js';
+import { allocateEarnerCredit, listFutureCreditOverrideDiagnostics } from '../src/utils/ledgerEngine.js';
 import { processSpreadsheetImport } from '../src/utils/spreadsheet.js';
 import { effectiveDueDay, isBillDueInMonth } from '../src/utils/paydayUtils.js';
 
@@ -426,5 +432,78 @@ describe('P7 (IMP-001): Importer does not write day keys beyond daysInMonth', ()
       invalidFebKeys.length, 0,
       `No February key should have day > 28. Found: ${invalidFebKeys.join(', ')}`
     );
+  });
+});
+
+describe('Option A (C3): Clear future matrix credit overrides', () => {
+  const fixture = JSON.parse(
+    fs.readFileSync(
+      path.join(__dirname, 'fixtures/incident-household.json'),
+      'utf-8'
+    )
+  );
+
+  test('future credit cells are cleared while past historical cells and bills remain intact', () => {
+    const todayIso = '2026-10-01';
+    const creditKeyPattern = /^(.+)_(\d{4}-\d{2})_(\d{1,2})_(?:extra_)?credit_(.+)$/;
+    const cleanMatrix = { ...fixture.dailyMatrix };
+    let removed = 0;
+
+    for (const [key] of Object.entries(cleanMatrix)) {
+      const m = key.match(creditKeyPattern);
+      if (!m) continue;
+      const [, accId, mKey, dayStr] = m;
+      const cellIso = `${mKey}-${dayStr.padStart(2, '0')}`;
+      if (cellIso > todayIso) {
+        delete cleanMatrix[key];
+        removed++;
+      }
+    }
+
+    assert.strictEqual(removed, 2, 'Should clear exactly the 2 future credit cells (10/13 and 10/18)');
+    // Past historical cells MUST be preserved
+    assert.strictEqual(cleanMatrix['acc-mortgage-test_2026-09_25_credit_person-bob'], 1222.61);
+    assert.strictEqual(cleanMatrix['acc-mortgage-test_2026-09_29_credit_person-alice'], 689.42);
+    assert.strictEqual(cleanMatrix['acc-mortgage-test_2026-01_15_credit_person-alice'], 689.42);
+    // Bills MUST be preserved
+    assert.strictEqual(cleanMatrix['acc-mortgage-test_2026-01_1_bill_bill-mortgage'], 2756.00);
+    // Future cells MUST be deleted
+    assert.strictEqual(cleanMatrix['acc-mortgage-test_2026-10_13_credit_person-alice'], undefined);
+    assert.strictEqual(cleanMatrix['acc-mortgage-test_2026-10_18_credit_person-bob'], undefined);
+  });
+
+  test('after future cleanup, live funding goals project cleanly on paydays without double credits', () => {
+    const todayIso = '2026-10-01';
+    const creditKeyPattern = /^(.+)_(\d{4}-\d{2})_(\d{1,2})_(?:extra_)?credit_(.+)$/;
+    const cleanMatrix = { ...fixture.dailyMatrix };
+
+    for (const [key] of Object.entries(cleanMatrix)) {
+      const m = key.match(creditKeyPattern);
+      if (!m) continue;
+      const [, accId, mKey, dayStr] = m;
+      const cellIso = `${mKey}-${dayStr.padStart(2, '0')}`;
+      if (cellIso > todayIso) {
+        delete cleanMatrix[key];
+      }
+    }
+
+    const bob = fixture.people[1];
+    const accId = 'acc-mortgage-test';
+
+    // On Oct 18 (Sunday, non-payday): credit is 0, no phantom $1,222.61
+    const oct18 = allocateEarnerCredit(bob, accId, 2026, 9, 18, fixture, cleanMatrix, { isLockedDay: false });
+    assert.strictEqual(oct18.earnerDeposit, 0);
+
+    // On Oct 25 (Bob's scheduled monthly payday): clean live projection of $1,378
+    const oct25 = allocateEarnerCredit(bob, accId, 2026, 9, 25, fixture, cleanMatrix, { isLockedDay: false });
+    assert.strictEqual(oct25.earnerDeposit, 1378);
+    assert.strictEqual(oct25.source, 'projected');
+  });
+
+  test('listFutureCreditOverrideDiagnostics runs cleanly without reference errors', () => {
+    const results = listFutureCreditOverrideDiagnostics(fixture, fixture.dailyMatrix);
+    assert.ok(Array.isArray(results));
+    assert.ok(results.length > 0);
+    assert.ok(results.some(r => r.monthKey === '2026-10' && r.day === 18 && r.override === 1222.61));
   });
 });

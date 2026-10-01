@@ -21,12 +21,14 @@ export function StorageResetSubPanel() {
     resetToDefaults,
     clearAllData,
     loadDemoPreset,
+    clearFutureMatrixCredits
   } = useLedgerDataDispatch();
 
   // Storage Quota State
   const [storageEstimate, setStorageEstimate] = useState(null);
   const [isFlushingCache, setIsFlushingCache] = useState(false);
   const [flushStatus, setFlushStatus] = useState(null);
+  const [clearCreditsStatus, setClearCreditsStatus] = useState(null);
 
   // Danger zone confirmations
   const [confirmClearAll, setConfirmClearAll] = useState(false);
@@ -280,6 +282,48 @@ export function StorageResetSubPanel() {
               </button>
             )}
           </div>
+        </div>
+
+        {/* Reset Future Credit Overrides */}
+        <div className="p-5 rounded-xl glass-card border border-blue-800/60 bg-blue-950/10 space-y-4 hover:border-blue-700/80 transition-colors">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-blue-300 flex items-center gap-2">
+              <RefreshCw className="w-5 h-5 text-blue-400" />
+              Reset Future Credit Overrides
+            </h3>
+            <span className="text-[10px] font-mono text-blue-400 bg-blue-950 px-2.5 py-1 rounded-full border border-blue-800">
+              Live Projections
+            </span>
+          </div>
+          <p className="text-xs text-slate-300 leading-relaxed">
+            Clears static future matrix credit overrides from legacy spreadsheet imports so that your active Funding Goals automatically project onto your planned paydays without duplicate or outdated entries.
+          </p>
+
+          <div className="flex items-center justify-between flex-wrap gap-2 pt-2">
+            <div className="text-xs text-slate-400 font-mono">
+              Safe: Preserves all past history and all bill overrides.
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                if (clearFutureMatrixCredits) {
+                  const res = clearFutureMatrixCredits();
+                  setClearCreditsStatus(`Cleared ${res?.removedCount || 0} future credit overrides. Live funding goals now govern future months.`);
+                  setTimeout(() => setClearCreditsStatus(null), 6000);
+                }
+              }}
+              className="px-5 py-2.5 bg-blue-600/80 hover:bg-blue-600 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2 cursor-pointer"
+            >
+              <RefreshCw className="w-4 h-4" />
+              <span>Reset Future Credits</span>
+            </button>
+          </div>
+          {clearCreditsStatus && (
+            <div className="text-xs text-emerald-400 bg-emerald-950/40 border border-emerald-800 p-2.5 rounded-lg">
+              {clearCreditsStatus}
+            </div>
+          )}
         </div>
 
         {/* Load Demo Dataset */}

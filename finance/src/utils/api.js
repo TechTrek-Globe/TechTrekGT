@@ -170,12 +170,33 @@ function pendingSyncSyncKey(userId) {
 /**
  * Performs background fetch to Cloudflare API with graceful degradation.
  * Saves payload to pending queue on network error or 5xx failures.
+ * CRIT-002: Before any auto push, verify the local record's owner id equals the signed-in user id; if not, block the push and show a conflict message.
  * 
  * @param {string} passcode 
  * @param {Object} budgetData 
+ * @param {string|null} userId - The signed-in user id for ownership verification
  * @returns {Promise<{success: boolean, status: string, error?: string, data?: Object}>}
  */
 export async function pushCloudBackupOptimistic(passcode, budgetData, options = {}, userId = null) {
+  // CRIT-002: Ownership verification - check if budgetData has an owner_id that matches the signed-in user
+  if (budgetData && budgetData.owner_id && userId && budgetData.owner_id !== userId) {
+    logSync('PUSH_BLOCKED_OWNERSHIP', 'Blocked push: local budget owner does not match signed-in user', { 
+      budgetOwnerId: budgetData.owner_id, 
+      signedInUserId: userId 
+    }, 'warn');
+    return { 
+      success: false, 
+      status: 'ownership_conflict', 
+      error: 'Local budget data belongs to a different user. Cannot push to cloud.',
+      ownershipConflict: true
+    };
+  }
+
+  // Set owner_id on the budget data for future verification
+  if (budgetData && userId) {
+    budgetData.owner_id = userId;
+  }
+
   savePendingSync(budgetData, passcode || '', userId);
 
   const baseVersion = options?.baseVersion;

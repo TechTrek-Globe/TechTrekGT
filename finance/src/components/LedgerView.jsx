@@ -27,7 +27,8 @@ import { SpreadsheetImporter } from './SpreadsheetImporter';
 import { ColumnHeaderHoverTooltip } from './ColumnHeaderHoverTooltip';
 
 import { fmtMoney, fmtNum } from '../utils/formatters';
-import { isBillDueInMonth } from '../utils/paydayUtils';
+import { isBillDueInMonth, isPersonDepositDay, getPersonDepositAmountForAccount, getPersonExtraSavingsDepositAmountForAccount } from '../utils/paydayUtils';
+import { allocateEarnerCredit } from '../utils/ledgerEngine';
 import { logTransaction, logMatrix, logLedger } from '../utils/logger';
 
 import {
@@ -775,52 +776,13 @@ function DailySpreadsheetMatrix() {
         let dayExtraAdd = 0;
 
         accountPeople.forEach(p => {
-          let customCredit;
-          let customExtra;
-          if (selectedAccountId === 'all') {
-            let sum = 0;
-            let hasCustom = false;
-            let sumExtra = 0;
-            let hasCustomExtra = false;
-            budget.accounts.forEach(a => {
-              const val = getDailyMatrixCell(a.id, monthKey, day, `credit_${p.id}`);
-              if (val !== undefined) {
-                sum += parseFloat(val) || 0;
-                hasCustom = true;
-              }
-              const valEx = getDailyMatrixCell(a.id, monthKey, day, `extra_credit_${p.id}`);
-              if (valEx !== undefined) {
-                sumExtra += parseFloat(valEx) || 0;
-                hasCustomExtra = true;
-              }
-            });
-            if (hasCustom) customCredit = sum;
-            if (hasCustomExtra) customExtra = sumExtra;
-          } else {
-            customCredit = getDailyMatrixCell(selectedAccountId, monthKey, day, `credit_${p.id}`);
-            customExtra = getDailyMatrixCell(selectedAccountId, monthKey, day, `extra_credit_${p.id}`);
-          }
-
           const isDepDay = isPersonDepositDay(p, year, month, day);
 
-          let earnerDeposit = 0;
-          if (customCredit !== undefined) {
-            earnerDeposit = parseFloat(customCredit) || 0;
-          } else if (!isLockedDay && isDepDay) {
-            earnerDeposit = getPersonDepositAmountForAccount(p, selectedAccountId, budget);
-          }
+          const alloc = allocateEarnerCredit(p, selectedAccountId, year, month, day, budget, undefined, { isLockedDay: isLockedDay });
+          personCredits[p.id] = alloc.earnerDeposit;
 
-          personCredits[p.id] = earnerDeposit;
-
-          let earnerExtra = 0;
-          if (customExtra !== undefined) {
-            earnerExtra = parseFloat(customExtra) || 0;
-          } else if (earnerDeposit > 0) {
-            earnerExtra = getPersonExtraSavingsDepositAmountForAccount(p, selectedAccountId, budget);
-          }
-
-          earnerExtra = Math.min(earnerExtra, earnerDeposit);
-          const earnerReg = Math.max(0, earnerDeposit - earnerExtra);
+          const earnerExtra = alloc.earnerExtra;
+          const earnerReg = alloc.earnerReg;
 
           dayExtraAdd += earnerExtra;
           totalRegCredits += earnerReg;

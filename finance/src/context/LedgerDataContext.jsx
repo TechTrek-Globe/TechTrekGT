@@ -8,8 +8,10 @@ import { apiFetch, pushCloudBackupOptimistic, flushPendingCloudSync, savePending
 import { getBudgetData, saveBudgetData, clearAndRestoreBudgetData, clearBudgetData, migrateLegacyBudgetToUser, listBudgetRecordKeys, getCurrentUserId, budgetRecordKey } from '../utils/indexedDB';
 import { processSpreadsheetImport } from '../utils/spreadsheet';
 import { isBillDueInMonth, effectiveDueDay } from '../utils/paydayUtils';
+import { allocateEarnerCredit } from '../utils/ledgerEngine';
 import { logSync, logTransaction, logMatrix, logLedger, logState } from '../utils/logger';
 import { AlertTriangle } from 'lucide-react';
+import { ALLOWED_BUDGET_KEYS } from '../worker.js';
 
 export const LedgerDataContext = createContext(null);
 export const LedgerDataStateContext = createContext(null);
@@ -42,6 +44,10 @@ export function LedgerDataProvider({ children }) {
   const [syncPasscode, setSyncPasscode] = useState('');
   const [isSyncUnlockedManual, setIsSyncUnlocked] = useState(false);
   const isSyncUnlocked = isAuthenticated || isSyncUnlockedManual;
+
+  // CRIT-002: Legacy budget migration confirmation state
+  const [showMigrationConfirm, setShowMigrationConfirm] = useState(false);
+  const [pendingMigrationUserId, setPendingMigrationUserId] = useState(null);
 
   const dailyMatrixRef = useRef(dailyMatrix);
   const [matrixVersion, setMatrixVersion] = useState(0);
@@ -101,8 +107,26 @@ export function LedgerDataProvider({ children }) {
       const userId = e?.detail?.userId;
       logSync('USER_LOGOUT', 'Clearing user-scoped local budget state', { userId, reason: e?.detail?.reason || 'logout' });
       try { flushSaveToIndexedDB(); } catch {}
+      
+      // Always clear the pending sync queue and version markers
       try { await clearPendingSync(userId || currentUserId || getCurrentUserId()); } catch {}
-      try { await clearBudgetData(userId || currentUserId || getCurrentUserId()); } catch {}
+      
+      // CRIT-002: Check "Remove data from this device" setting (defaults to true for shared devices)
+      const shouldRemoveData = (() => {
+        try {
+          const stored = localStorage.getItem('tt_remove_data_on_logout');
+          return stored === null ? true : stored === 'true';
+        } catch {
+          return true;
+        }
+      })();
+      
+      if (shouldRemoveData) {
+        try { await clearBudgetData(userId || currentUserId || getCurrentUserId()); } catch {}
+      } else {
+        logSync('USER_LOGOUT', 'Preserving local budget data per user setting', { userId });
+      }
+      
       try {
         localStorage.removeItem('tt_budget_cloud_version');
         localStorage.removeItem('tt_budget_last_modified');
@@ -273,16 +297,25 @@ export function LedgerDataProvider({ children }) {
       throw new Error('Invalid backup file format.');
     }
 
-    const mergedMetadata = {
-      accounts: Array.isArray(parsedData.accounts) ? parsedData.accounts : initialBudgetData.accounts,
-      people: Array.isArray(parsedData.people) ? parsedData.people : initialBudgetData.people,
-      bills: Array.isArray(parsedData.bills) ? parsedData.bills : initialBudgetData.bills,
-      loans: Array.isArray(parsedData.loans) ? parsedData.loans : initialBudgetData.loans,
-      fundingGoals: Array.isArray(parsedData.fundingGoals) ? parsedData.fundingGoals : (initialBudgetData.fundingGoals || []),
-      dashboardWidgets: Array.isArray(parsedData.dashboardWidgets) ? parsedData.dashboardWidgets : initialBudgetData.dashboardWidgets,
-      theme: parsedData.theme || 'dark',
-      hideDashboardHeader: Boolean(parsedData.hideDashboardHeader)
-    };
+    // CRIT-003: Build merged metadata using ALLOWED_BUDGET_KEYS so every persisted key round-trips
+    const mergedMetadata = {};
+    for (const key of ALLOWED_BUDGET_KEYS) {
+      const value = parsedData[key];
+      if (Array.isArray(value)) {
+        mergedMetadata[key] = value;
+      } else if (key === 'theme') {
+        mergedMetadata[key] = typeof value === 'string' && value ? value : 'dark';
+      } else if (key === 'hideDashboardHeader') {
+        mergedMetadata[key] = Boolean(value);
+      } else if (key === 'dailyMatrix' || key === 'lineItems' || key === 'transactions') {
+        // These are handled separately
+        continue;
+      } else if (value !== undefined && value !== null) {
+        mergedMetadata[key] = value;
+      } else {
+        mergedMetadata[key] = initialBudgetData[key] || (Array.isArray(initialBudgetData[key]) ? [] : {});
+      }
+    }
 
     const newDailyMatrix = (parsedData.dailyMatrix && typeof parsedData.dailyMatrix === 'object') ? parsedData.dailyMatrix : {};
     const newLineItems = Array.isArray(parsedData.lineItems) ? parsedData.lineItems : [];
@@ -401,12 +434,39 @@ export function LedgerDataProvider({ children }) {
     }
     if (currentUserId && currentUserId !== prevUserIdRef.current) {
       hasAutoPulledRef.current = false;
-      // CRIT-002: migrate legacy unkeyed record only when the target user record is empty.
+      // CRIT-002: migrate legacy unkeyed record only when the target user record is empty AND user confirms
       (async () => {
         try {
-          await migrateLegacyBudgetToUser(currentUserId);
+          const db = await (await import('../utils/indexedDB.js')).openDB();
+          const legacyKey = (await import('../utils/indexedDB.js')).LEGACY_BUDGET_KEY;
+          const userKey = (await import('../utils/indexedDB.js')).budgetRecordKey(currentUserId);
+          
+          const tx = db.transaction('app_state', 'readonly');
+          const store = tx.objectStore('app_state');
+          
+          const legacyRequest = store.get(legacyKey);
+          const userRequest = store.get(userKey);
+          
+          Promise.all([
+            new Promise((resolve, reject) => {
+              legacyRequest.onsuccess = () => resolve(legacyRequest.result);
+              legacyRequest.onerror = () => reject(legacyRequest.error);
+            }),
+            new Promise((resolve, reject) => {
+              userRequest.onsuccess = () => resolve(userRequest.result);
+              userRequest.onerror = () => reject(userRequest.error);
+            })
+          ]).then(([legacy, userData]) => {
+            if (legacy && typeof legacy === 'object' && (!userData || typeof userData !== 'object')) {
+              // Legacy record exists and user record is empty - show confirmation
+              setPendingMigrationUserId(currentUserId);
+              setShowMigrationConfirm(true);
+            }
+          }).catch(err => {
+            console.warn('Legacy budget migration check failed:', err?.message || err);
+          });
         } catch (err) {
-          console.warn('Legacy budget migration skipped:', err?.message || err);
+          console.warn('Legacy budget migration check failed:', err?.message || err);
         }
       })();
     }
@@ -552,7 +612,7 @@ export function LedgerDataProvider({ children }) {
 
   // Clear all data (100% clean slate)
   const clearAllData = useCallback(async () => {
-    await clearBudgetData();
+    await clearBudgetData(currentUserId || getCurrentUserId());
     setMetadataState({
       accounts: [],
       people: [],
@@ -566,7 +626,7 @@ export function LedgerDataProvider({ children }) {
     setDailyMatrix({});
     setLineItems([]);
     setTransactions([]);
-  }, [setMetadataState]);
+  }, [setMetadataState, currentUserId]);
 
   // Clear all transactions, matrix actuals, and imported balance history for a specific account
   const clearAccountTransactions = useCallback(async (accountId) => {
@@ -903,29 +963,9 @@ export function LedgerDataProvider({ children }) {
       let dayCredits = 0;
       let dayExtraAdd = 0;
       people.forEach(p => {
-        const isDepDay = isPersonDepositDay(p, year, month, day);
-        const customCredit = getDailyMatrixCell(accountId, monthKey, day, `credit_${p.id}`);
-        const customExtra = getDailyMatrixCell(accountId, monthKey, day, `extra_credit_${p.id}`);
-
-        let earnerDeposit = 0;
-        if (customCredit !== undefined) {
-          earnerDeposit = parseFloat(customCredit) || 0;
-        } else if (!isLockedDay && isDepDay) {
-          earnerDeposit = getPersonDepositAmountForAccount(p, accountId, metadataStateRef.current);
-        }
-
-        let earnerExtra = 0;
-        if (customExtra !== undefined) {
-          earnerExtra = parseFloat(customExtra) || 0;
-        } else if (earnerDeposit > 0) {
-          earnerExtra = getPersonExtraSavingsDepositAmountForAccount(p, accountId, metadataStateRef.current);
-        }
-
-        earnerExtra = Math.min(earnerExtra, earnerDeposit);
-        const earnerReg = Math.max(0, earnerDeposit - earnerExtra);
-
-        dayCredits += earnerReg;
-        dayExtraAdd += earnerExtra;
+        const alloc = allocateEarnerCredit(p, accountId, year, month, day, metadataStateRef.current, {}, { isLockedDay: isLockedDay });
+        dayCredits += alloc.earnerReg;
+        dayExtraAdd += alloc.earnerExtra;
       });
 
       // 2. Bills
@@ -1100,6 +1140,61 @@ export function LedgerDataProvider({ children }) {
       <LedgerDataStateContext.Provider value={stateValue}>
         <LedgerDataContext.Provider value={contextValue}>
           {children}
+          {/* CRIT-002: Legacy Budget Migration Confirmation Dialog */}
+          {showMigrationConfirm && pendingMigrationUserId && (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+              <div className="w-full max-w-md p-6 rounded-2xl glass-card border border-amber-600/60 bg-gradient-to-br from-slate-900 via-slate-900 to-amber-950/30 text-slate-100 shadow-2xl space-y-5">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                    <AlertTriangle className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-100">Migrate Legacy Budget Data?</h3>
+                    <p className="text-xs text-slate-400">
+                      Found existing budget data from a previous version. Import it for this user?
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-xl bg-slate-800/80 border border-slate-700/60 space-y-1 text-xs">
+                  <div className="text-slate-400 text-[11px] font-semibold uppercase tracking-wider">What This Does</div>
+                  <p className="text-slate-300 leading-relaxed">
+                    Copies your existing local budget (accounts, bills, earners, ledger) into the new user-scoped storage for <strong>{pendingMigrationUserId}</strong>. This is a one-time migration that only happens when a user record is empty.
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowMigrationConfirm(false);
+                      setPendingMigrationUserId(null);
+                    }}
+                    className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 transition-all cursor-pointer"
+                  >
+                    Skip (Start Fresh)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await migrateLegacyBudgetToUser(pendingMigrationUserId);
+                        logSync('USER_MIGRATION', 'User confirmed legacy budget migration', { userId: pendingMigrationUserId });
+                      } catch (err) {
+                        console.warn('Legacy budget migration failed:', err?.message || err);
+                      }
+                      setShowMigrationConfirm(false);
+                      setPendingMigrationUserId(null);
+                    }}
+                    className="px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold transition-all shadow-md cursor-pointer"
+                  >
+                    Migrate My Data
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {syncConflict && (
             <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
               <div className="w-full max-w-lg p-6 rounded-2xl glass-card border border-amber-600/60 bg-gradient-to-br from-slate-900 via-slate-900 to-amber-950/30 text-slate-100 shadow-2xl space-y-5">

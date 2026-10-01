@@ -1,6 +1,8 @@
 // @ts-nocheck
 import { normalizeIsoDate, mergeBills, mergeTransactions, detectTransactionConflicts, matchCreditToEarner } from './importer.js';
 import { logDebug, logWarn, logInfo } from './debugLogger.js';
+import { isPersonDepositDay, getPersonDepositAmountForAccount, getPersonExtraSavingsDepositAmountForAccount } from './paydayUtils.js';
+import { allocateEarnerCredit } from './ledgerEngine.js';
 
 /**
  * Pure utility function to reconcile and apply selective spreadsheet/CSV imports.
@@ -932,14 +934,9 @@ export function getLedgerRunningBalanceAsOfDate({
     let dayCredits = 0;
     let dayExtraCredits = 0;
     people.forEach(p => {
-      const c = dailyMatrix[`${targetAccountId}_${mKey}_${d}_credit_${p.id}`];
-      const ec = dailyMatrix[`${targetAccountId}_${mKey}_${d}_extra_credit_${p.id}`];
-      const earnerDeposit = (c !== undefined && c !== null && c !== '') ? (parseFloat(c) || 0) : 0;
-      const earnerExtra = (ec !== undefined && ec !== null && ec !== '') ? (parseFloat(ec) || 0) : 0;
-      const clampedExtra = Math.min(earnerExtra, earnerDeposit);
-      const earnerReg = Math.max(0, earnerDeposit - clampedExtra);
-      dayCredits += earnerReg;
-      dayExtraCredits += (earnerDeposit > 0 ? clampedExtra : earnerExtra);
+      const alloc = allocateEarnerCredit(p, targetAccountId, y, m, d, { accounts: metadataState.accounts, people: metadataState.people, bills: metadataState.bills, fundingGoals: metadataState.fundingGoals }, dailyMatrix, { isLockedDay: false });
+      dayCredits += alloc.earnerReg;
+      dayExtraCredits += alloc.earnerExtra;
     });
 
     let dayBills = 0;

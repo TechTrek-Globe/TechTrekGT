@@ -113,6 +113,10 @@ export async function getBudgetData(userId = null) {
  * @returns {Promise<void>}
  */
 export async function saveBudgetData(budgetData, userId = null) {
+  // CRIT-002: Set owner_id on the budget data for ownership verification
+  if (budgetData && userId) {
+    budgetData.owner_id = userId;
+  }
   const db = await openDB();
   const key = userId ? budgetRecordKey(userId) : LEGACY_BUDGET_KEY;
   return new Promise((resolve, reject) => {
@@ -146,6 +150,10 @@ export async function saveBudgetData(budgetData, userId = null) {
  * @returns {Promise<void>}
  */
 export async function clearAndRestoreBudgetData(newBudgetData, userId = null) {
+  // CRIT-002: Set owner_id on the budget data for ownership verification
+  if (newBudgetData && userId) {
+    newBudgetData.owner_id = userId;
+  }
   const db = await openDB();
   const key = userId ? budgetRecordKey(userId) : LEGACY_BUDGET_KEY;
   return new Promise((resolve, reject) => {

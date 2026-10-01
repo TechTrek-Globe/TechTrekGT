@@ -345,7 +345,8 @@ describe('getLedgerRunningBalanceAsOfDate', () => {
       payFrequency: 'semi-monthly',
       payDay1: '1st',
       payDay2: '15th',
-      payOffsetDays: 0
+      payOffsetDays: 0,
+      netPerPay: 1378.00
     }],
     bills: [{
       id: 'b-1',
@@ -431,5 +432,80 @@ describe('Edge cases: February and leap years', () => {
   test('bi-weekly deposit dates survive leap year', () => {
     const dates = getPersonDepositDatesForMonth(biWeeklyPerson, 2028, 1);
     assert.ok(dates.length >= 2);
+  });
+});
+  
+
+  
+
+
+describe('CRIT-004: Credit override split (characterization tests)', () => {
+  const accId = 'acc-credit-override';
+  const personId = 'p-credit-override';
+
+  const metadataState = {
+    accounts: [{
+      id: accId,
+      name: 'Credit Override Account',
+      startingBalance: 0,
+      extraStartingBalance: 0,
+      enableExtraSavings: true,
+      balanceAsOfDate: '2026-01-01',
+      startDate: '2026-01-01'
+    }],
+    people: [{
+      id: personId,
+      name: 'Override Earner',
+      payFrequency: 'semi-monthly',
+      payDay1: '1st',
+      payDay2: null,
+      payOffsetDays: 0,
+      netPerPay: 1378.00,
+      accountAllocations: { [accId]: 1378.00 }
+    }],
+    bills: [{
+      id: 'b-override',
+      name: 'Fixed Bill',
+      amount: 1222.61,
+      accountId: accId,
+      dueDay: 1,
+      period: 'Monthly'
+    }]
+  };
+
+  const dailyMatrix = {};
+  dailyMatrix[accId + '_2026-01_1_credit_' + personId] = 1222.61;
+
+  test('override without paired extra_credit: extra = min(projected overflow, override - bill portion clamped at 0)', () => {
+    const bal = getLedgerRunningBalanceAsOfDate({
+      targetAccountId: accId,
+      targetDate: '2026-01-31',
+      metadataState,
+      dailyMatrix,
+      transactions: []
+    });
+    assert.strictEqual(bal, 2600.61);
+  });
+
+  test('no override: reg = deposit - extra', () => {
+    const bal = getLedgerRunningBalanceAsOfDate({
+      targetAccountId: accId,
+      targetDate: '2026-01-31',
+      metadataState,
+      dailyMatrix: {},
+      transactions: []
+    });
+    assert.strictEqual(bal, 2756.00);
+  });
+
+  test('reg change + extra change = credits - bills + other', () => {
+    const bal = getLedgerRunningBalanceAsOfDate({
+      targetAccountId: accId,
+      targetDate: '2026-01-31',
+      metadataState,
+      dailyMatrix,
+      transactions: []
+    });
+    assert.strictEqual(bal, 2600.61);
   });
 });

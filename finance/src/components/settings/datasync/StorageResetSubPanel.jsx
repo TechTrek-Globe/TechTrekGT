@@ -32,6 +32,16 @@ export function StorageResetSubPanel() {
   const [confirmClearAll, setConfirmClearAll] = useState(false);
   const [confirmLoadDemo, setConfirmLoadDemo] = useState(false);
   const [confirmResetDefaults, setConfirmResetDefaults] = useState(false);
+  
+  // CRIT-002: Remove data from this device on logout - defaults to true for shared devices
+  const [removeDataOnLogout, setRemoveDataOnLogout] = useState(() => {
+    try {
+      const stored = localStorage.getItem('tt_remove_data_on_logout');
+      return stored === null ? true : stored === 'true'; // Default true for shared devices
+    } catch {
+      return true;
+    }
+  });
 
   // Query browser storage estimate
   const checkStorageQuota = async () => {
@@ -178,6 +188,37 @@ export function StorageResetSubPanel() {
             <button onClick={() => setFlushStatus(null)} className="text-slate-400 hover:text-white font-bold ml-4 text-xs cursor-pointer">✕</button>
           </div>
         )}
+      </div>
+
+      {/* CRIT-002: Remove data from this device setting */}
+      <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-between hover:border-slate-700/80 transition-colors">
+        <div className="space-y-1 pr-3">
+          <div className="text-xs font-bold text-slate-200 flex items-center gap-2">
+            <Trash2 className="w-4 h-4 text-rose-400" />
+            <span>Remove Data from This Device on Logout</span>
+          </div>
+          <div className="text-[11px] text-slate-400 leading-relaxed">
+            When enabled, signing out will delete your user-scoped IndexedDB budget record and pending sync queue from this device. Recommended for shared computers.
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            const newVal = !removeDataOnLogout;
+            setRemoveDataOnLogout(newVal);
+            try { localStorage.setItem('tt_remove_data_on_logout', String(newVal)); } catch {}
+          }}
+          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+            removeDataOnLogout ? 'bg-rose-600' : 'bg-slate-700'
+          }`}
+          title={removeDataOnLogout ? 'Disable: keep data on this device after logout' : 'Enable: remove data from this device on logout'}
+        >
+          <span
+            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+              removeDataOnLogout ? 'translate-x-5' : 'translate-x-0'
+            }`}
+          />
+        </button>
       </div>
 
       {/* Danger Zone */}

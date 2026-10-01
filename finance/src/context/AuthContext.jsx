@@ -36,7 +36,8 @@ export function AuthProvider({ children }) {
       setCsrfTokenState(null);
       setCsrfToken(null);
       setCurrentUserId(null);
-      window.dispatchEvent(new CustomEvent('techtrek:user-logout', { detail: { userId: null, reason: 'session-expired' } }));
+      // Dispatch user-logout event so LedgerDataContext can clean up user-scoped data
+      window.dispatchEvent(new CustomEvent('techtrek:user-logout', { detail: { userId: e?.detail?.userId || null, reason: 'session-expired' } }));
       setIsAuthModalOpen(true);
       if (typeof window !== 'undefined') {
         window.history.pushState({}, '', '/finance');

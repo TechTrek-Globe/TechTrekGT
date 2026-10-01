@@ -18,7 +18,8 @@ import {
   generatePaycheckTransactions
 } from '../utils/paydayUtils';
 import { getApiUrl } from '../utils/api';
-import { getBudgetData } from '../utils/indexedDB';
+import { getBudgetData, getCurrentUserId } from '../utils/indexedDB';
+import { ALLOWED_BUDGET_KEYS } from '../worker.js';
 import { 
   getDebugEnabled, 
   setDebugEnabled, 
@@ -192,7 +193,9 @@ export function BudgetMetadataProvider({ children }) {
   useEffect(() => {
     async function initLocalStorageOrIndexedDB() {
       try {
-        const stored = await getBudgetData();
+        // CRIT-002: Use user-scoped record key if user is authenticated
+        const userId = getCurrentUserId();
+        const stored = await getBudgetData(userId);
         if (stored && typeof stored === 'object') {
           setMetadataState({
             accounts: Array.isArray(stored.accounts) ? stored.accounts : initialBudgetData.accounts,

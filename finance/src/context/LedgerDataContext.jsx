@@ -184,50 +184,6 @@ export function LedgerDataProvider({ children }) {
     }
   }, [isDbLoaded, metadataState.bills]);
 
-  // Option A self-healing migration: clear legacy future credit cells (> today) from previous spreadsheet workbook
-  useEffect(() => {
-    if (!isDbLoaded) return;
-    try {
-      const today = new Date();
-      const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-      const creditKeyPattern = /^(.+)_(\d{4}-\d{2})_(\d{1,2})_(?:extra_)?credit_(.+)$/;
-      let removedCount = 0;
-      const cleanMatrix = { ...dailyMatrixRef.current };
-
-      for (const [key] of Object.entries(cleanMatrix)) {
-        const match = key.match(creditKeyPattern);
-        if (!match) continue;
-        const [, accountId, monthKey, dayStr] = match;
-        const day = parseInt(dayStr, 10);
-        const cellIso = `${monthKey}-${String(day).padStart(2, '0')}`;
-
-        if (cellIso > todayIso) {
-          delete cleanMatrix[key];
-          removedCount++;
-        }
-      }
-
-      if (removedCount > 0) {
-        dailyMatrixRef.current = cleanMatrix;
-        setDailyMatrix(cleanMatrix);
-        setMatrixVersion(v => v + 1);
-        logLedger('REPAIR_FUTURE_CREDITS', `Auto-cleared ${removedCount} future stored credit cells so live projections take over`, {
-          removedCount,
-          asOfDate: todayIso
-        });
-        if (budgetRef.current) {
-          budgetRef.current.dailyMatrix = cleanMatrix;
-          isPendingSaveRef.current = true;
-          saveBudgetData(budgetRef.current, currentUserId || getCurrentUserId()).catch(() => {});
-          if (isAuthenticated) {
-            pushCloudBackup(syncPasscode, { force: true }).catch(() => {});
-          }
-        }
-      }
-    } catch (err) {
-      console.warn('Failed to check/clear future credit cells:', err);
-    }
-  }, [isDbLoaded, matrixVersion, currentUserId, isAuthenticated, pushCloudBackup, syncPasscode]);
 
   // Combined full budget object representation for compatibility and persistence
   const getFullBudget = useCallback(() => ({
@@ -344,6 +300,51 @@ export function LedgerDataProvider({ children }) {
     }
     return result;
   }, [setLastCloudSyncTime]);
+
+  // Option A self-healing migration: clear legacy future credit cells (> today) from previous spreadsheet workbook
+  useEffect(() => {
+    if (!isDbLoaded) return;
+    try {
+      const today = new Date();
+      const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      const creditKeyPattern = /^(.+)_(\d{4}-\d{2})_(\d{1,2})_(?:extra_)?credit_(.+)$/;
+      let removedCount = 0;
+      const cleanMatrix = { ...dailyMatrixRef.current };
+
+      for (const [key] of Object.entries(cleanMatrix)) {
+        const match = key.match(creditKeyPattern);
+        if (!match) continue;
+        const [, accountId, monthKey, dayStr] = match;
+        const day = parseInt(dayStr, 10);
+        const cellIso = `${monthKey}-${String(day).padStart(2, '0')}`;
+
+        if (cellIso > todayIso) {
+          delete cleanMatrix[key];
+          removedCount++;
+        }
+      }
+
+      if (removedCount > 0) {
+        dailyMatrixRef.current = cleanMatrix;
+        setDailyMatrix(cleanMatrix);
+        setMatrixVersion(v => v + 1);
+        logLedger('REPAIR_FUTURE_CREDITS', `Auto-cleared ${removedCount} future stored credit cells so live projections take over`, {
+          removedCount,
+          asOfDate: todayIso
+        });
+        if (budgetRef.current) {
+          budgetRef.current.dailyMatrix = cleanMatrix;
+          isPendingSaveRef.current = true;
+          saveBudgetData(budgetRef.current, currentUserId || getCurrentUserId()).catch(() => {});
+          if (isAuthenticated) {
+            pushCloudBackup(syncPasscode, { force: true }).catch(() => {});
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to check/clear future credit cells:', err);
+    }
+  }, [isDbLoaded, matrixVersion, currentUserId, isAuthenticated, pushCloudBackup, syncPasscode]);
 
   // Restore budget state from imported JSON backup
   const restoreFromBackup = useCallback(async (parsedData) => {

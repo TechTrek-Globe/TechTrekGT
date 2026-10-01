@@ -544,7 +544,12 @@ export function LedgerDataProvider({ children }) {
   }, [isAuthenticated, currentUserId]);
 
   useEffect(() => {
-    if (!isAuthenticated || !isDbLoaded || hasAutoPulledRef.current || isSyncOnLoadEnabled === false) return;
+    if (!isAuthenticated || !isDbLoaded || hasAutoPulledRef.current) return;
+    if (isSyncOnLoadEnabled === false) {
+      const localData = budgetRef.current;
+      const isLocalEmpty = !localData || (!localData.accounts?.length && !localData.bills?.length && !localData.fundingGoals?.length);
+      if (!isLocalEmpty) return;
+    }
 
     (async () => {
       try {

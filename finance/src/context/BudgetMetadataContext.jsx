@@ -192,7 +192,7 @@ export function BudgetMetadataProvider({ children }) {
     async function initLocalStorageOrIndexedDB() {
       try {
         // CRIT-002: Use user-scoped record key if user is authenticated
-        const userId = getCurrentUserId();
+        const userId = user?.id || getCurrentUserId();
         const stored = await getBudgetData(userId);
         if (stored && typeof stored === 'object') {
           setMetadataState({
@@ -281,7 +281,7 @@ export function BudgetMetadataProvider({ children }) {
     }
 
     initLocalStorageOrIndexedDB();
-  }, []);
+  }, [user?.id]);
 
   // Auto Cloud Backup State & Control (defaults to true for authenticated users)
   const [isAutoCloudBackupEnabled, setIsAutoCloudBackupEnabled] = useState(() => {

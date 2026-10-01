@@ -56,6 +56,10 @@ export function AuthProvider({ children }) {
           const data = await res.json().catch(() => ({}));
           if (data.user) {
             setUser(data.user);
+            setCurrentUserId(data.user.id || null);
+            if (typeof window !== 'undefined') {
+              try { window.sessionStorage.setItem('tt_signed_in_user_id', data.user.id || ''); } catch {}
+            }
             if (data.csrfToken) {
               setCsrfTokenState(data.csrfToken);
               setCsrfToken(data.csrfToken);

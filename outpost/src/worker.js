@@ -461,6 +461,10 @@ export default {
             headers: { 'Content-Type': 'application/json' }
           });
         }
+      } else if (url.pathname.startsWith('/outpost/@') || url.pathname.startsWith('/outpost/node_modules/') || url.pathname.startsWith('/outpost/src/')) {
+        response = env?.ASSETS?.fetch
+          ? await env.ASSETS.fetch(request)
+          : await fetch(request);
       } else if (url.pathname.startsWith('/outpost/assets/')) {
         // Rewrite asset requests: /outpost/assets/ -> /assets/
         const assetUrl = new URL(request.url);
@@ -503,10 +507,6 @@ export default {
             }
           });
         }
-      } else if (url.pathname.startsWith('/outpost/@') || url.pathname.startsWith('/outpost/node_modules/') || url.pathname.startsWith('/outpost/src/')) {
-        response = env?.ASSETS?.fetch
-          ? await env.ASSETS.fetch(request)
-          : await fetch(request);
       } else if (url.pathname === '/outpost' || url.pathname.startsWith('/outpost/')) {
         // SPA fallback - serve index.html for all /outpost/* routes
         const spaUrl = new URL(request.url);

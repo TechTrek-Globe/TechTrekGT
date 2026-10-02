@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import outpostHeaderBanner from '../assets/outpost-ai-cropped.webp';
 import {

@@ -29,6 +29,7 @@ export function QuickEditDrawer({
   const [fetchingLive, setFetchingLive] = useState(false);
   const [fetchMsg, setFetchMsg] = useState(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   useEffect(() => {
     if (item) {
@@ -103,6 +104,7 @@ export function QuickEditDrawer({
       });
       setFetchMsg(null);
       setSaveSuccess(false);
+      setSaveError('');
     }
   }, [item]);
 
@@ -140,6 +142,7 @@ export function QuickEditDrawer({
   const handleSave = async () => {
     setSaving(true);
     setSaveSuccess(false);
+    setSaveError('');
     try {
       const itemPatch = {
         item_name: draft.item_name.trim(),
@@ -210,7 +213,7 @@ export function QuickEditDrawer({
         setSaveSuccess(false);
       }, 2000);
     } catch (e) {
-      alert(`Save error: ${e.message}`);
+      setSaveError(`Save error: ${e.message}`);
     } finally {
       setSaving(false);
     }
@@ -758,6 +761,13 @@ export function QuickEditDrawer({
             </div>
           </div>
         </div>
+
+        {saveError && (
+          <div className="px-4 py-2 bg-red-950/80 border-t border-red-500/30 text-red-300 text-xs flex items-center gap-1.5 flex-shrink-0">
+            <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 text-red-400" />
+            <span>{saveError}</span>
+          </div>
+        )}
 
         {/* Drawer Sticky Footer */}
         <div className="p-3 bg-slate-950 border-t border-slate-800 flex items-center justify-between gap-3 flex-shrink-0">

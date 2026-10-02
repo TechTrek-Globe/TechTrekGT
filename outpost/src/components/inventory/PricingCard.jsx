@@ -63,7 +63,7 @@ export function PricingCard({
   };
 
   const handleSave = async (applyToItem = false) => {
-    setDraft(prev => ({ ...prev, saving: true }));
+    setDraft(prev => ({ ...prev, saving: true, fetchMsg: null }));
     try {
       await saveComp({
         item_id: item.id,
@@ -76,7 +76,7 @@ export function PricingCard({
         recommended_list_price: draft.recommended_list_price === '' ? null : Number(draft.recommended_list_price),
         apply_to_item: applyToItem
       });
-      setDraft(prev => ({ ...prev, saving: false, applied: applyToItem }));
+      setDraft(prev => ({ ...prev, applied: applyToItem }));
       if (onItemUpdated) {
         const patch = {
           comp_1: draft.comp_1,
@@ -93,7 +93,8 @@ export function PricingCard({
         onItemUpdated(item.id, patch);
       }
     } catch (err) {
-      alert(`Save failed: ${err.message}`);
+      setDraft(prev => ({ ...prev, fetchMsg: { type: 'error', text: `Save failed: ${err.message}` } }));
+    } finally {
       setDraft(prev => ({ ...prev, saving: false }));
     }
   };
@@ -115,23 +116,22 @@ export function PricingCard({
           comp_2: res.comp_2 !== null && res.comp_2 !== undefined ? roundPrice(res.comp_2) : prev.comp_2,
           comp_3: res.comp_3 !== null && res.comp_3 !== undefined ? roundPrice(res.comp_3) : prev.comp_3,
           recommended_list_price: roundPrice(res.live_avg || res.median || prev.recommended_list_price),
-          fetchingLive: false,
           fetchMsg: { type: 'success', text: `Found ${res.count} sold comps! Avg: ${fmtCurrency(res.live_avg)}` },
           applied: false,
         }));
       } else {
         setDraft(prev => ({
           ...prev,
-          fetchingLive: false,
           fetchMsg: { type: 'info', text: 'No comps found. Try clicking eBay Comps directly.' }
         }));
       }
     } catch (err) {
       setDraft(prev => ({
         ...prev,
-        fetchingLive: false,
         fetchMsg: { type: 'error', text: err.message || 'Auto-fetch error.' }
       }));
+    } finally {
+      setDraft(prev => ({ ...prev, fetchingLive: false }));
     }
   };
 

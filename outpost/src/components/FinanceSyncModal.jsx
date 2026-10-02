@@ -55,6 +55,8 @@ export function FinanceSyncModal({ isOpen, onClose }) {
         setSuccess(`Successfully synchronized ${fmtCurrency(res.synced_net_profit)} to your TechTrek Finance account!`);
         // Refresh metrics
         await fetchMetrics();
+      } else {
+        setError(res?.error || 'Synchronization failed.');
       }
     } catch (err) {
       setError(err.message || 'Synchronization failed.');

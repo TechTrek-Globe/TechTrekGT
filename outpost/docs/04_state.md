@@ -70,4 +70,25 @@ Outpost uses React Context and standard React hooks (`useState`, `useReducer`, `
   - `InventoryContext` re-fetches sync settings on both success and error paths, re-throwing caught errors to notify calling UI components.
   - `SettingsView` renders informative status alerts for `failed` and `partial` states with explicit error messages and timestamps for the last successful sync, preventing misleading green checks or stuck loading states.
 
+### Frontend State and UI Consistency [ACTION ID: AUDIT-004]
+
+- **Elimination of False-Positive Success Responses (`apiFetch`)**:
+  - Centralized in `src/utils/auctionApi.js`: `apiFetch` validates that `data.success !== false`. If an endpoint returns HTTP 200 with `{ success: false, error: '...' }`, `apiFetch` throws an Error immediately.
+  - Calling components can never misinterpret a rejected business transaction as a success.
+- **Asynchronous Request Counters & Race Condition Isolation**:
+  - `InventoryContext` (`fetchItems`), `SalesLogView` (`fetchSales`), and `CatalogSearchDropdown` (`searchCatalog`) implement monotonic request counters via `useRef` latches (`fetchRequestIdRef`).
+  - Slower, out-of-order network responses from earlier queries or pagination changes cannot overwrite fresh search results.
+- **User-Scoped Lifecycle State & Cross-Session Cache Purging**:
+  - `src/App.jsx` mounts `<InventoryProvider key={user?.id}>`. Logging out or switching users immediately destroys the existing React tree and purges cached inventory, platform lists, and sync timers from memory.
+  - `src/context/AuthContext.jsx` includes `isMounted` guards to prevent memory leaks and unmounted state updates during session restoration, and gates `isAuthenticated` on `!data.verificationPending`.
+- **Guaranteed Loading State Recovery via `finally {}` Blocks**:
+  - All asynchronous mutation workflows (`handleSubmit`, `handleSave`, `handleSync`, `handleReconcile`, `handleDelete`) reset button loading and submitting flags inside `finally {}` blocks.
+  - If a network failure, validation error, or unexpected exception occurs, submission buttons and spinners are guaranteed to re-enable.
+- **Non-Blocking In-App Error Presentation**:
+  - Raw browser `alert()` invocations across all components (`InventoryHubView`, `SalesLogView`, `SettingsView`, `QuickEditDrawer`, `PricingCard`, `ListingCopyModal`, `DelistPendingAlert`) are replaced with local, non-blocking contextual state (`setError`, `saveError`, `fetchMsg`).
+  - Components render accessible alert badges with retry actions rather than halting browser thread execution.
+- **Dependent View Null/Failure States (`DashboardView`)**:
+  - If initial dashboard telemetry fails to load (`!data && !loading && error`), `DashboardView` replaces misleading $0.00 zero-value skeleton widgets with an explicit connection error state and a manual retry button.
+
+
 

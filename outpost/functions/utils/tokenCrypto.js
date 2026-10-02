@@ -23,21 +23,58 @@ export const PBKDF2_ITERATIONS = PBKDF2_ITERATIONS_V2;
 
 const V2_PREFIX = 'v2';
 
+const keyCache = new Map();
+
+export const PBKDF2_WORKERD_CEILING = 100_000;
+
 export async function deriveKey(secret, salt = NEW_SALT, iterations = PBKDF2_ITERATIONS_V2) {
-  const raw = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(secret),
-    { name: 'PBKDF2' },
-    false,
-    ['deriveKey']
-  );
-  return crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt, iterations, hash: 'SHA-256' },
-    raw,
-    { name: 'AES-GCM', length: 256 },
-    false,
-    ['encrypt', 'decrypt']
-  );
+  // Cloudflare Workers (workerd) has a hardcoded security limit of 100,000 PBKDF2 iterations.
+  // In workerd, any value > 100,000 throws:
+  // "Pbkdf2 failed: iteration counts above 100000 are not supported (requested N)".
+  const isWorkerd = (typeof navigator !== 'undefined' && String(navigator.userAgent).includes('Cloudflare-Workers')) ||
+                    (typeof WebSocketPair !== 'undefined');
+  const targetIterations = (isWorkerd && iterations > PBKDF2_WORKERD_CEILING) ? PBKDF2_WORKERD_CEILING : iterations;
+
+  const cacheKey = `${secret}:${salt.length}:${targetIterations}`;
+  if (keyCache.has(cacheKey)) {
+    return keyCache.get(cacheKey);
+  }
+  const promise = (async () => {
+    try {
+      const raw = await crypto.subtle.importKey(
+        'raw',
+        new TextEncoder().encode(secret),
+        { name: 'PBKDF2' },
+        false,
+        ['deriveKey']
+      );
+      try {
+        return await crypto.subtle.deriveKey(
+          { name: 'PBKDF2', salt, iterations: targetIterations, hash: 'SHA-256' },
+          raw,
+          { name: 'AES-GCM', length: 256 },
+          false,
+          ['encrypt', 'decrypt']
+        );
+      } catch (deriveErr) {
+        if (targetIterations > PBKDF2_WORKERD_CEILING && deriveErr && String(deriveErr).includes('100000')) {
+          return await crypto.subtle.deriveKey(
+            { name: 'PBKDF2', salt, iterations: PBKDF2_WORKERD_CEILING, hash: 'SHA-256' },
+            raw,
+            { name: 'AES-GCM', length: 256 },
+            false,
+            ['encrypt', 'decrypt']
+          );
+        }
+        throw deriveErr;
+      }
+    } catch (err) {
+      keyCache.delete(cacheKey);
+      throw err;
+    }
+  })();
+  keyCache.set(cacheKey, promise);
+  return promise;
 }
 
 function bufToBase64(buf) {
@@ -54,11 +91,11 @@ function base64ToBuf(b64) {
  *
  * TOKEN_ENCRYPTION_KEY is required. Throws if absent.
  */
-export async function encryptToken(plaintext, tokenEncryptionKey) {
-  if (!tokenEncryptionKey) throw new Error('TOKEN_ENCRYPTION_KEY binding is required');
-  const key = await deriveKey(tokenEncryptionKey, NEW_SALT, PBKDF2_ITERATIONS_V2);
+export async function encryptToken(plaintext, tokenEncryptionKey, preDerivedKey = null) {
+  if (!tokenEncryptionKey && !preDerivedKey) throw new Error('TOKEN_ENCRYPTION_KEY binding is required');
+  const key = preDerivedKey || await deriveKey(tokenEncryptionKey, NEW_SALT, PBKDF2_ITERATIONS_V2);
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const encoded = new TextEncoder().encode(plaintext);
+  const encoded = new TextEncoder().encode(plaintext || '');
   const cipherBuf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, encoded);
   return `${V2_PREFIX}.${bufToBase64(iv)}.${bufToBase64(cipherBuf)}`;
 }
@@ -92,7 +129,12 @@ export async function decryptToken(encrypted, tokenEncryptionKey) {
     try {
       plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, cipherBuf);
     } catch (_) {
-      throw new Error('Failed to decrypt v2 token: invalid key or ciphertext corrupted');
+      try {
+        const fallbackKey = await deriveKey(tokenEncryptionKey, NEW_SALT, PBKDF2_WORKERD_CEILING);
+        plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, fallbackKey, cipherBuf);
+      } catch (__) {
+        throw new Error('Failed to decrypt v2 token: invalid key or ciphertext corrupted');
+      }
     }
     return { plaintext: new TextDecoder().decode(plainBuf), wasLegacy: false };
   }

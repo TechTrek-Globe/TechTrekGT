@@ -121,3 +121,26 @@ Comprehensive resilience hardening of all outbound platform integrations (eBay T
    - `SettingsView.jsx` and `InventoryContext.jsx` consume `last_ebay_sync_status` and `last_ebay_sync_error`.
    - Renders distinctive failure and partial warning badges with specific error diagnostics, ensuring users are accurately informed rather than leaving UI components in stuck loading states.
 
+## Frontend State and UI Consistency Audit [ACTION ID: AUDIT-004]
+
+Audit and refactor of React context providers, hooks, and component lifecycles to eliminate stale data caching, false-positive success messages, and infinite rendering loops.
+
+### Key Capabilities
+1. **Centralized API Error Invariant (`auctionApi.js`)**:
+   - `apiFetch` throws an Error whenever an API payload contains `{ success: false }`, even if the HTTP response code was 200 OK.
+   - Prevents all caller components from assuming successful transactions or displaying false-positive toast confirmations.
+2. **Race Condition Elimination with Request Latching**:
+   - Monotonic request counters (`fetchRequestIdRef = useRef(0)`) implemented in `InventoryContext`, `SalesLogView`, and `CatalogSearchDropdown`.
+   - Out-of-order responses from delayed network flights are dropped, ensuring newer search and filter queries always win.
+3. **Session Cache Purging on Authentication Changes**:
+   - Keyed `InventoryProvider` (`<InventoryProvider key={user?.id}>`) in `App.jsx` ensures complete teardown and re-initialization of inventory, platform, and sync state whenever authentication identity changes.
+   - `AuthContext.jsx` registration workflow gates `setIsAuthenticated(true)` on `!data.verificationPending`.
+4. **Guaranteed Loading State Recovery**:
+   - All async mutation triggers (`isSubmitting`, `saving`, `isProcessing`, `finding`, `syncing`) implement guaranteed cleanup paths within `finally {}` blocks.
+   - Disconnected network calls or server rejections reliably restore buttons to interactive states.
+5. **Non-Blocking Error Presentation**:
+   - Removed all browser `alert()` popups in favor of accessible, non-blocking component error states and warning alerts (`SettingsView`, `InventoryHubView`, `SalesLogView`, `QuickEditDrawer`, `PricingCard`, `ListingCopyModal`, `DelistPendingAlert`).
+6. **Resilient Dependent Views (`DashboardView`)**:
+   - Initial data fetch failures replace empty $0.00 zero-value skeleton widgets with an explicit connection error state and a manual retry button.
+
+

@@ -235,7 +235,7 @@ function MainContent({ pathname, navigateTo }) {
   };
 
   return (
-    <InventoryProvider>
+    <InventoryProvider key={user?.id}>
       <AppLayout activeView={activeView} onNavigate={handleNavigate}>
         {verifyNotification && (
           <div className={`p-3 text-xs flex items-center justify-between border-b ${

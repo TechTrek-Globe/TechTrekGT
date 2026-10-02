@@ -699,7 +699,18 @@ export function EditTabListingPricing({
             <div className="text-[11px] text-slate-400 flex items-center gap-2">
               <span>Channel: <strong className="text-slate-200">eBay Store</strong></span>
               <span>•</span>
-              <span>Listing: <strong className="text-emerald-400">{form.status || 'Active'}</strong></span>
+              <span className="flex items-center gap-1.5">
+                <span>Status:</span>
+                <select
+                  value={form.status}
+                  onChange={e => updateField('status', e.target.value)}
+                  className="bg-slate-900 border border-slate-700 rounded px-2 py-0.5 text-xs font-semibold text-white focus:outline-none focus:border-amber-500 cursor-pointer"
+                >
+                  {ALL_STATUSES.map(s => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </span>
             </div>
           </div>
 

@@ -121,10 +121,8 @@ export async function onRequestPost(context) {
     }
 
     const hasOrder = Boolean(orderData && orderData.isExactMatch !== false && (orderData.orderId || orderData.buyerHandle || (orderData.lineItemCost && orderData.lineItemCost > 0)));
-    const isSold = hasOrder ||
-                   liveListing?.status === 'Sold' ||
-                   liveListing?.raw_status === 'Completed' ||
-                   (liveListing?.quantity_sold != null && liveListing.quantity_sold > 0);
+    const qtySold = Number(liveListing?.quantity_sold) || 0;
+    const isSold = hasOrder || (qtySold > 0);
 
     const liveRate = (liveListing?.promoted_rate != null && Number(liveListing.promoted_rate) > 0)
       ? Number(liveListing.promoted_rate)
@@ -162,7 +160,23 @@ export async function onRequestPost(context) {
       target_margin_pct: item.target_margin_pct ?? DEFAULT_TARGET_MARGIN_PCT
     });
 
-    const newStatus = isSold ? 'Sold' : (liveListing?.status || 'Listed');
+    let newStatus = 'Listed';
+    if (isSold) {
+      newStatus = 'Sold';
+    } else if (['Kept for Self', 'Returned'].includes(item.status)) {
+      newStatus = item.status;
+    } else if (liveListing?.status === 'Unsold' || liveListing?.raw_status === 'Completed' || liveListing?.raw_status === 'Ended') {
+      newStatus = 'Unsold';
+    } else if (liveListing?.status === 'Listed' || liveListing?.raw_status === 'Active') {
+      newStatus = 'Listed';
+    } else {
+      newStatus = item.status || 'Available';
+    }
+
+    const nextActualSellPrice = isSold ? item.actual_sell_price : (item.status === 'Sold' ? null : item.actual_sell_price);
+    const nextDateSold = isSold ? item.date_sold : (item.status === 'Sold' ? null : item.date_sold);
+    const nextDaysOnMarket = isSold ? item.days_on_market : (item.status === 'Sold' ? null : item.days_on_market);
+
     const newPrice = (liveListing?.price && liveListing.price > 0) ? liveListing.price : item.current_list_price;
     const newDateListed = liveListing?.date_listed || item.date_listed || new Date().toISOString().split('T')[0];
 
@@ -195,12 +209,25 @@ export async function onRequestPost(context) {
       attrs.ebay_image_url = liveImageUrl;
     }
 
+    // Clean up phantom sale records if reverting out of Sold state
+    if (item.status === 'Sold' && !isSold) {
+      await env.DB.prepare(
+        'DELETE FROM ebay_fee_reconciliations WHERE user_id = ? AND sale_id IN (SELECT id FROM auction_sales WHERE item_id = ? AND user_id = ?)'
+      ).bind(payload.userId, itemId, payload.userId).run().catch(() => {});
+      await env.DB.prepare(
+        'DELETE FROM auction_sales WHERE item_id = ? AND user_id = ?'
+      ).bind(itemId, payload.userId).run().catch(() => {});
+    }
+
     await env.DB.prepare(`
       UPDATE auction_items SET
         ebay_listing_id = COALESCE(?, ebay_listing_id),
         current_list_price = COALESCE(?, current_list_price),
         date_listed = ?,
         status = ?,
+        actual_sell_price = ?,
+        date_sold = ?,
+        days_on_market = ?,
         platform = 'eBay',
         platform_fee_pct = ?,
         platform_flat_fee = ?,
@@ -223,6 +250,9 @@ export async function onRequestPost(context) {
       newPrice || null,
       newDateListed,
       newStatus,
+      nextActualSellPrice,
+      nextDateSold,
+      nextDaysOnMarket,
       platformFeePct,
       platformFlatFee,
       promotedRate,

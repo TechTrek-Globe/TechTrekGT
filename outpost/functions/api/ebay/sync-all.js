@@ -250,9 +250,19 @@ export async function onRequestPost(context) {
               target_margin_pct: item.target_margin_pct ?? DEFAULT_TARGET_MARGIN_PCT
             });
 
-            const isSold = match.status === 'Completed' || match.status === 'Sold' || (match.quantity_sold != null && match.quantity_sold > 0);
+            const qtySold = Number(match.quantity_sold) || 0;
+            const isSold = qtySold > 0;
             const newPrice = match.price > 0 ? match.price : item.current_list_price;
-            const newStatus = isSold ? 'Sold' : 'Listed';
+            let newStatus = 'Listed';
+            if (isSold) {
+              newStatus = 'Sold';
+            } else if (['Kept for Self', 'Returned'].includes(item.status)) {
+              newStatus = item.status;
+            } else if (match.status === 'Unsold' || match.status === 'Completed' || match.status === 'Ended') {
+              newStatus = 'Unsold';
+            } else {
+              newStatus = 'Listed';
+            }
 
             let rawImg = match.image_url || (singleDetail ? singleDetail.image_url : null);
             if (!rawImg && singleEnrichCount < MAX_SINGLE_ENRICH && cleanListingId) {
@@ -359,7 +369,8 @@ export async function onRequestPost(context) {
                     attrsDirty = true;
                   }
                 }
-                if (singleDetail.status === 'Sold' || singleDetail.quantity_sold > 0) {
+                const singleQtySold = Number(singleDetail.quantity_sold) || 0;
+                if (singleQtySold > 0) {
                   const orderData = await fetchEbayOrderForListing(env, accessToken, cleanListingId, item.sku, item.item_name);
                   if (orderData && orderData.isExactMatch === false) {
                     // MED-2: Title similarity match only - do NOT call reconcileAndSaveEbaySale automatically.
@@ -396,6 +407,12 @@ export async function onRequestPost(context) {
                       if (orderData?.orderId) attrs.ebay_order_id = orderData.orderId;
                       attrsDirty = true;
                     }
+                  }
+                } else if (['Unsold', 'Completed', 'Ended'].includes(singleDetail.status) || ['Completed', 'Ended'].includes(singleDetail.raw_status)) {
+                  if (!['Kept for Self', 'Returned'].includes(item.status)) {
+                    await env.DB.prepare(
+                      `UPDATE auction_items SET status = 'Unsold', updated_at = datetime('now') WHERE id = ? AND user_id = ? AND status = 'Listed'`
+                    ).bind(item.id, payload.userId).run();
                   }
                 }
 

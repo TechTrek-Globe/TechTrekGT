@@ -233,11 +233,11 @@ export function SettingsView() {
   const handleAddCategory = () => {
     const name = newCategoryInput.trim();
     if (!name) return;
-    if (userSettings.categoryOrder.includes(name)) {
-      alert(`Category '${name}' already exists.`);
+    if ((userSettings?.categoryOrder || DEFAULT_CATEGORIES).includes(name)) {
+      setError(`Category '${name}' already exists.`);
       return;
     }
-    const categories = [...userSettings.categoryOrder, name];
+    const categories = [...(userSettings?.categoryOrder || DEFAULT_CATEGORIES), name];
     const newSettings = saveUserSettings({ ...userSettings, categoryOrder: categories });
     setUserSettingsState(newSettings);
     setNewCategoryInput('');
@@ -245,12 +245,12 @@ export function SettingsView() {
   };
 
   const handleDeleteCategory = (cat) => {
-    if (userSettings.categoryOrder.length <= 1) {
-      alert('Must keep at least one category.');
+    if ((userSettings?.categoryOrder || DEFAULT_CATEGORIES).length <= 1) {
+      setError('Must keep at least one category.');
       return;
     }
     if (!window.confirm(`Remove category '${cat}' from list?`)) return;
-    const categories = userSettings.categoryOrder.filter(c => c !== cat);
+    const categories = (userSettings?.categoryOrder || DEFAULT_CATEGORIES).filter(c => c !== cat);
     const newSettings = saveUserSettings({ ...userSettings, categoryOrder: categories });
     setUserSettingsState(newSettings);
     showSuccess(`Removed category '${cat}'.`);
@@ -346,7 +346,7 @@ export function SettingsView() {
       const res = await getItems({ limit: 10000 });
       const items = res.items || [];
       if (items.length === 0) {
-        alert('No inventory items found to export.');
+        setError('No inventory items found to export.');
         return;
       }
 
@@ -384,7 +384,7 @@ export function SettingsView() {
       downloadCSV(filename, csvContent);
       showSuccess(`Exported ${items.length} inventory items to CSV.`);
     } catch (err) {
-      alert(`Export failed: ${err.message}`);
+      setError(`Export failed: ${err.message}`);
     } finally {
       setExporting(false);
     }
@@ -396,7 +396,7 @@ export function SettingsView() {
       const res = await getSales({ limit: 10000 });
       const sales = res.sales || [];
       if (sales.length === 0) {
-        alert('No sales records found to export.');
+        setError('No sales records found to export.');
         return;
       }
 
@@ -434,7 +434,7 @@ export function SettingsView() {
       downloadCSV(filename, csvContent);
       showSuccess(`Exported ${sales.length} sales records to CSV.`);
     } catch (err) {
-      alert(`Export failed: ${err.message}`);
+      setError(`Export failed: ${err.message}`);
     } finally {
       setExporting(false);
     }
@@ -468,7 +468,7 @@ export function SettingsView() {
       link.click();
       showSuccess('Exported complete JSON system backup.');
     } catch (err) {
-      alert(`Backup failed: ${err.message}`);
+      setError(`Backup failed: ${err.message}`);
     } finally {
       setExporting(false);
     }

@@ -1,4 +1,4 @@
-import { getApiUrl } from '../utils/api';
+import { getApiUrl } from './api.js';
 export { getApiUrl };
 import { FALLBACK_GATEWAY_ORIGIN, LOCAL_DEV_ORIGIN } from '../../functions/utils/constants.js';
 
@@ -25,8 +25,12 @@ function getGatewayBase() {
 }
 export { getGatewayBase };
 
-function getAuthErrorMessage(status, dataError) {
+function getAuthErrorMessage(status, dataError, path = '') {
   if (status === 401) {
+    const isEbay = (typeof path === 'string' && path.includes('/ebay/')) || (typeof dataError === 'string' && /ebay/i.test(dataError));
+    if (isEbay) {
+      return dataError || 'eBay authentication required. Please connect your eBay account.';
+    }
     if (!dataError || /unauthorized|expired|invalid token|missing token/i.test(dataError)) {
       return 'Your session has expired or authentication is required. Please refresh the page or sign in again.';
     }
@@ -38,10 +42,17 @@ async function apiFetch(path, options = {}) {
   const res = await fetch(getApiUrl(path), { ...OPTS, ...options });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    if (res.status === 401 && typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('outpost:unauthorized', { detail: { path, error: data.error } }));
+    const isEbay = (typeof path === 'string' && path.includes('/ebay/')) || (typeof data.error === 'string' && /ebay/i.test(data.error));
+    if (res.status === 401 && !isEbay && typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+      const evt = typeof CustomEvent !== 'undefined'
+        ? new CustomEvent('outpost:unauthorized', { detail: { path, error: data.error } })
+        : { type: 'outpost:unauthorized', detail: { path, error: data.error } };
+      window.dispatchEvent(evt);
     }
-    throw new Error(getAuthErrorMessage(res.status, data.error));
+    throw new Error(getAuthErrorMessage(res.status, data.error, path));
+  }
+  if (data && data.success === false) {
+    throw new Error(data.error || 'Request failed');
   }
   return data;
 }
@@ -201,7 +212,7 @@ export const fetchLiveComps = (query, itemId = null) =>
     body: JSON.stringify({ query, itemId })
   }).then(async r => {
     const data = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(getAuthErrorMessage(r.status, data.error));
+    if (!r.ok) throw new Error(getAuthErrorMessage(r.status, data.error, '/api/ebay/comps'));
     return data;
   });
 
@@ -212,7 +223,7 @@ export const fetchEbayCatalog = (query) =>
     headers: JSON_HEADERS
   }).then(async r => {
     const data = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(getAuthErrorMessage(r.status, data.error));
+    if (!r.ok) throw new Error(getAuthErrorMessage(r.status, data.error, '/api/ebay/catalog'));
     return data;
   });
 
@@ -226,7 +237,7 @@ export const fetchEbayItemDetail = (idOrUrl) => {
     headers: JSON_HEADERS
   }).then(async r => {
     const data = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(getAuthErrorMessage(r.status, data.error));
+    if (!r.ok) throw new Error(getAuthErrorMessage(r.status, data.error, '/api/ebay/item'));
     return data;
   });
 };

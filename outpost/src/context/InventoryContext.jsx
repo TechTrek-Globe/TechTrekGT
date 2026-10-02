@@ -151,7 +151,9 @@ export function InventoryProvider({ children }) {
   }, [items]);
 
   // --- Data Fetching ---
+  const fetchRequestIdRef = useRef(0);
   const fetchItems = useCallback(async (page = 1) => {
+    const reqId = ++fetchRequestIdRef.current;
     setLoading(true);
     setError('');
     try {
@@ -169,12 +171,18 @@ export function InventoryProvider({ children }) {
       }
 
       const data = await getEnrichedItems(params);
-      setItems(data.items || []);
-      setPagination(data.pagination || { total: 0, page: 1, pages: 1 });
+      if (reqId === fetchRequestIdRef.current) {
+        setItems(data.items || []);
+        setPagination(data.pagination || { total: 0, page: 1, pages: 1 });
+      }
     } catch (e) {
-      setError(e.message);
+      if (reqId === fetchRequestIdRef.current) {
+        setError(e.message);
+      }
     } finally {
-      setLoading(false);
+      if (reqId === fetchRequestIdRef.current) {
+        setLoading(false);
+      }
     }
   }, [debouncedSearch, statusFilter, categoryFilter, listingFormatFilter, listingStatusFilter, sortConfig]);
 
@@ -185,21 +193,30 @@ export function InventoryProvider({ children }) {
         const d = await res.json();
         setPlatforms(d.platforms || []);
       }
-    } catch (e) { /* silent */ }
+    } catch (e) {
+      console.warn('[InventoryContext] fetchPlatforms failed:', e);
+    }
   }, []);
 
   // Initial data load
-  useEffect(() => { fetchPlatforms(); }, []);
+  useEffect(() => {
+    let active = true;
+    fetchPlatforms();
+    getSyncSettings()
+      .then(d => {
+        if (active) setSyncSettings(d.settings || d);
+      })
+      .catch(err => {
+        console.warn('[InventoryContext] getSyncSettings failed:', err);
+      });
+    return () => {
+      active = false;
+    };
+  }, [fetchPlatforms]);
+
   useEffect(() => {
     fetchItems(1);
   }, [debouncedSearch, statusFilter, categoryFilter, listingFormatFilter, listingStatusFilter, sortConfig.key, sortConfig.direction]);
-
-  // Load sync settings once on mount
-  useEffect(() => {
-    getSyncSettings()
-      .then(d => setSyncSettings(d.settings || d))
-      .catch(() => {});
-  }, []);
 
   // --- Sync Engine Handlers ---
   const handleSyncEbay = useCallback(async () => {

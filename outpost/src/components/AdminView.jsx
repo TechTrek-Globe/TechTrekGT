@@ -15,11 +15,15 @@ export function AdminView() {
   const isAdmin = user?.email?.toLowerCase() === (import.meta.env.VITE_ADMIN_EMAIL || 'jgk1865@gmail.com').toLowerCase();
 
   useEffect(() => {
+    let active = true;
     if (!isAdmin) {
       setError('Forbidden: Admin access only.');
       setLoading(false);
       return;
     }
+
+    setLoading(true);
+    setError('');
 
     const fetchStats = async () => {
       try {
@@ -32,15 +36,18 @@ export function AdminView() {
           throw new Error(data.error || 'Failed to fetch admin stats');
         }
         
-        setStats(data);
+        if (active) setStats(data);
       } catch (err) {
-        setError(err.message);
+        if (active) setError(err.message);
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
 
     fetchStats();
+    return () => {
+      active = false;
+    };
   }, [isAdmin, page, limit]);
 
   if (loading) {

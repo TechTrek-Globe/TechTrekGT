@@ -126,6 +126,7 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
   // Load available items if creating a new sale without a pre-selected item
   useEffect(() => {
     if (!isModalOpen) return;
+    setError('');
 
     if (isEdit && saleToEdit) {
       setSelectedItem({
@@ -169,6 +170,7 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
         setAvailableItems(data.items || []);
       } catch (err) {
         console.error(err);
+        setError(err.message || 'Failed to load inventory items.');
       } finally {
         setLoadingItems(false);
       }

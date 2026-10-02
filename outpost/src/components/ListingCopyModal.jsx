@@ -57,6 +57,7 @@ export function ListingCopyModal({ isOpen, onClose, item }) {
   
   // eBay Item Fetch State
   const [generatingReport, setGeneratingReport] = useState(false);
+  const [conditionMsg, setConditionMsg] = useState(null);
 
   // Initialize fields when item changes or modal opens
   useEffect(() => {
@@ -77,6 +78,7 @@ export function ListingCopyModal({ isOpen, onClose, item }) {
     setDescription(item.notes || '');
     setIncludedInSale('');
     setAmazonMsg(null);
+    setConditionMsg(null);
     setSmartPasteText('');
     setShowSmartPaste(false);
   }, [item, isOpen]);
@@ -174,12 +176,16 @@ export function ListingCopyModal({ isOpen, onClose, item }) {
 
   // Handle Fetching eBay Item Details for Condition Report
   const handleAutoGenerateCondition = async () => {
+    setConditionMsg(null);
     // Try to extract an eBay Item ID from asinInput or notes.
     // eBay item IDs are usually 12 digits.
     const searchStr = `${asinInput} ${item.notes || ''} ${item.invoice_ref || ''}`;
     const match = searchStr.match(/\b(\d{12})\b/);
     if (!match) {
-      alert("Could not detect a 12-digit eBay Item ID in the Amazon lookup field, notes, or invoice_ref.");
+      setConditionMsg({
+        type: 'error',
+        text: 'Could not detect a 12-digit eBay Item ID in the Amazon lookup field, notes, or invoice_ref.'
+      });
       return;
     }
     const itemId = `v1|${match[1]}|0`;
@@ -219,8 +225,15 @@ export function ListingCopyModal({ isOpen, onClose, item }) {
         return reportLines.join('\n');
       });
       
+      setConditionMsg({
+        type: 'success',
+        text: `Condition report generated from eBay item ${match[1]}.`
+      });
     } catch (err) {
-      alert(`Failed to fetch eBay item details: ${err.message}`);
+      setConditionMsg({
+        type: 'error',
+        text: `Failed to fetch eBay item details: ${err.message}`
+      });
     } finally {
       setGeneratingReport(false);
     }
@@ -531,6 +544,15 @@ export function ListingCopyModal({ isOpen, onClose, item }) {
                       Auto-Gen Report
                     </button>
                   </div>
+                  {conditionMsg && (
+                    <div className={`text-[10px] p-2 rounded-lg border ${
+                      conditionMsg.type === 'error'
+                        ? 'bg-red-950/60 border-red-500/40 text-red-300'
+                        : 'bg-emerald-950/60 border-emerald-500/40 text-emerald-300'
+                    }`}>
+                      {conditionMsg.text}
+                    </div>
+                  )}
                   <input
                     type="text"
                     value={conditionHeader}

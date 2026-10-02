@@ -212,6 +212,7 @@ CREATE INDEX IF NOT EXISTS idx_password_resets_email ON password_resets(email, u
 -- ============================================================
 -- ALTER TABLE users ADD COLUMN security_question TEXT;
 -- ALTER TABLE users ADD COLUMN security_answer_hash TEXT;
+-- ALTER TABLE users ADD COLUMN email_verified_at TEXT;
 
 -- ============================================================
 -- MARKET ALERTS (Feature B)

@@ -121,7 +121,9 @@ export function SalesLogView() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  const fetchRequestIdRef = useRef(0);
   const fetchSales = useCallback(async (page = 1) => {
+    const reqId = ++fetchRequestIdRef.current;
     setLoading(true);
     setError('');
     try {
@@ -129,21 +131,27 @@ export function SalesLogView() {
       if (search) params.q = search;
       if (platformFilter) params.platform = platformFilter;
       const data = await getSales(params);
-      setSales(data.sales || []);
-      setSummary(data.summary || {
-        total_count: 0,
-        total_gross: 0,
-        total_net_proceeds: 0,
-        total_cost: 0,
-        total_net_profit: 0,
-        blended_roi: 0,
-        avg_days_to_sell: 0
-      });
-      setPagination(data.pagination || { total: 0, page: 1, pages: 1 });
+      if (reqId === fetchRequestIdRef.current) {
+        setSales(data.sales || []);
+        setSummary(data.summary || {
+          total_count: 0,
+          total_gross: 0,
+          total_net_proceeds: 0,
+          total_cost: 0,
+          total_net_profit: 0,
+          blended_roi: 0,
+          avg_days_to_sell: 0
+        });
+        setPagination(data.pagination || { total: 0, page: 1, pages: 1 });
+      }
     } catch (err) {
-      setError(err.message || 'Failed to load sales log.');
+      if (reqId === fetchRequestIdRef.current) {
+        setError(err.message || 'Failed to load sales log.');
+      }
     } finally {
-      setLoading(false);
+      if (reqId === fetchRequestIdRef.current) {
+        setLoading(false);
+      }
     }
   }, [search, platformFilter]);
 
@@ -290,11 +298,12 @@ export function SalesLogView() {
   const handleDeleteSale = async (id) => {
     if (!window.confirm('Delete this sale record? The item will be reverted back to active inventory.')) return;
     setDeletingId(id);
+    setError('');
     try {
       await deleteSale(id);
       await fetchSales(pagination.page);
     } catch (err) {
-      alert(err.message || 'Failed to delete sale.');
+      setError(err.message || 'Failed to delete sale.');
     } finally {
       setDeletingId(null);
     }

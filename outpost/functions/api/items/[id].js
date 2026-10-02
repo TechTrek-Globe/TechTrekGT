@@ -240,8 +240,9 @@ export async function onRequestPut(context) {
     // so an Available item kept a stale sold date - and because the Sold branch
     // above only auto-stamps when date_sold is empty, the NEXT sale inherited the
     // old date and skewed days_to_sell and every average built on it.
-    if (item.status === 'Sold' && updated.status !== 'Sold' && body.date_sold === undefined) {
-      updated.date_sold = null;
+    if (item.status === 'Sold' && updated.status !== 'Sold') {
+      if (body.date_sold === undefined) updated.date_sold = null;
+      if (body.actual_sell_price === undefined) updated.actual_sell_price = null;
     }
 
     // Compute days on market if status changed to Sold. T-11 item 8: daysBetween
@@ -404,6 +405,9 @@ export async function onRequestPut(context) {
         });
       } else if (wasSold && !isSold) {
         // Reverted away from Sold - remove corresponding sale record to keep Sold Tracker clean
+        await env.DB.prepare(
+          'DELETE FROM ebay_fee_reconciliations WHERE user_id = ? AND sale_id IN (SELECT id FROM auction_sales WHERE item_id = ? AND user_id = ?)'
+        ).bind(payload.userId, id, payload.userId).run().catch(() => {});
         await env.DB.prepare(
           'DELETE FROM auction_sales WHERE item_id = ? AND user_id = ?'
         ).bind(id, payload.userId).run();

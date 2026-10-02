@@ -19,6 +19,7 @@ import { resolveDelistPending } from '../utils/auctionApi';
 export function DelistPendingAlert({ items, onResolved, onDismiss }) {
   const [resolvingId, setResolvingId] = useState(null);
   const [resolvedIds, setResolvedIds] = useState(new Set());
+  const [error, setError] = useState('');
 
   if (!items || items.length === 0) return null;
 
@@ -27,12 +28,13 @@ export function DelistPendingAlert({ items, onResolved, onDismiss }) {
 
   const handleMarkSold = async (item) => {
     setResolvingId(item.id);
+    setError('');
     try {
       await resolveDelistPending(item.id);
       setResolvedIds(prev => new Set([...prev, item.id]));
       if (onResolved) onResolved(item.id);
     } catch (e) {
-      alert(`Failed to mark as sold: ${e.message}`);
+      setError(`Failed to mark as sold: ${e.message}`);
     } finally {
       setResolvingId(null);
     }
@@ -68,6 +70,12 @@ export function DelistPendingAlert({ items, onResolved, onDismiss }) {
           </button>
         )}
       </div>
+
+      {error && (
+        <div className="text-red-400 text-xs bg-red-950/60 p-2.5 rounded-lg border border-red-500/30">
+          {error}
+        </div>
+      )}
 
       <p className="text-xs text-amber-200/70">
         eBay sent an <strong>ITEM_SOLD</strong> webhook for the items below.

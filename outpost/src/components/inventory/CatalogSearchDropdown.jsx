@@ -25,7 +25,9 @@ export function CatalogSearchDropdown({ onSelectProduct }) {
     };
   }, []);
 
+  const searchReqIdRef = useRef(0);
   const searchCatalog = async (searchTerm) => {
+    const reqId = ++searchReqIdRef.current;
     if (!searchTerm || searchTerm.length < 3) {
       setResults([]);
       setError(null);
@@ -36,15 +38,24 @@ export function CatalogSearchDropdown({ onSelectProduct }) {
     setError(null);
     try {
       const res = await fetchEbayCatalog(searchTerm);
-      if (res && res.products) {
-        setResults(res.products);
-        setIsOpen(res.products.length > 0);
+      if (reqId === searchReqIdRef.current) {
+        if (res && res.products) {
+          setResults(res.products);
+          setIsOpen(res.products.length > 0);
+        } else {
+          setResults([]);
+          setIsOpen(false);
+        }
       }
     } catch (err) {
-      setError('Failed to fetch catalog: ' + err.message);
-      setResults([]);
+      if (reqId === searchReqIdRef.current) {
+        setError('Failed to fetch catalog: ' + err.message);
+        setResults([]);
+      }
     } finally {
-      setLoading(false);
+      if (reqId === searchReqIdRef.current) {
+        setLoading(false);
+      }
     }
   };
 

@@ -45,7 +45,8 @@ export function AuthPage({ onAuthSuccess, initialMode = 'signin', verifyNotifica
       const path = window.location.pathname.toLowerCase();
       if (path.includes('reset-password')) return 'forgot';
       const params = new URLSearchParams(window.location.search);
-      if (params.get('mode') === 'forgot' || params.get('reason')) return 'forgot';
+      const isPasswordResetReason = params.get('reason') === 'legacy_hash';
+      if (params.get('mode') === 'forgot' || isPasswordResetReason) return 'forgot';
       if (params.get('mode') === 'register') return 'register';
     }
     return initialMode;
@@ -75,8 +76,11 @@ export function AuthPage({ onAuthSuccess, initialMode = 'signin', verifyNotifica
 
   const [resetReason, setResetReason] = useState(() => {
     if (typeof window !== 'undefined') {
+      const path = window.location.pathname.toLowerCase();
       const params = new URLSearchParams(window.location.search);
-      return params.get('reason') || '';
+      if (path.includes('reset-password') || params.get('mode') === 'forgot' || params.get('reason') === 'legacy_hash') {
+        return params.get('reason') || '';
+      }
     }
     return '';
   });

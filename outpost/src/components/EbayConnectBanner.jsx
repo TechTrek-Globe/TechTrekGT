@@ -35,7 +35,10 @@ export function EbayConnectBanner({ onFindListings }) {
       const data = await getEbayOAuthStatus();
       setStatus(data);
     } catch (e) {
-      if (!e.message?.includes('not connected')) setError(e.message);
+      const msg = e.message || '';
+      if (!msg.toLowerCase().includes('not connected') && !msg.toLowerCase().includes('connect your ebay account')) {
+        setError(msg);
+      }
       setStatus({ connected: false });
     } finally {
       setLoading(false);
@@ -49,10 +52,26 @@ export function EbayConnectBanner({ onFindListings }) {
     if (params.get('ebay') === 'connected') {
       fetchStatus();
       window.history.replaceState({}, '', window.location.pathname);
+    } else if (params.get('ebay') === 'error') {
+      const reason = params.get('reason') || '';
+      const detail = params.get('detail') || '';
+      const status = params.get('status') || '';
+      const reasonMap = {
+        token_exchange: `eBay token exchange failed${status ? ` (HTTP ${status})` : ''}. Please verify that your eBay developer credentials are active.`,
+        invalid_state: 'The OAuth state parameter expired or was invalid. Please try connecting again.',
+        access_denied: 'eBay authorization was cancelled or denied.',
+        server_config: 'Server configuration error: missing required environment secrets or bindings.',
+        missing_params: 'Missing required OAuth response parameters from eBay.',
+        invalid_scope: 'One or more requested permissions are not approved on your eBay developer account.'
+      };
+      const baseMsg = reasonMap[reason] || `eBay connection failed (${reason}). Please try again.`;
+      setError(detail ? `${baseMsg} (${detail})` : baseMsg);
+      window.history.replaceState({}, '', window.location.pathname);
     }
   }, [fetchStatus]);
 
-  const handleConnect = () => {
+  const handleConnect = (e) => {
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
     window.location.href = `${GATEWAY_BASE}/api/ebay/oauth/start`;
   };
 
@@ -82,6 +101,9 @@ export function EbayConnectBanner({ onFindListings }) {
     setError('');
     try {
       const data = await findEbayListings();
+      if (data && data.success === false && data.error) {
+        throw new Error(data.error);
+      }
       if (onFindListings) onFindListings(data.matches || [], data);
       // Reflect the refreshed timestamp in local state without a full refetch
       setStatus(prev => prev ? { ...prev, last_refreshed_at: new Date().toISOString() } : prev);
@@ -89,8 +111,9 @@ export function EbayConnectBanner({ onFindListings }) {
       const msg = e.message || '';
       if (msg.includes('sell.inventory') || msg.includes('scope approval')) {
         setError('eBay Sell Inventory scope not approved. Apply for sell.inventory.readonly at developer.ebay.com.');
-      } else if (msg.includes('not connected') || msg.includes('refresh token has expired')) {
-        setError('eBay token expired or disconnected. Please disconnect and reconnect your account.');
+      } else if (msg.includes('not connected') || msg.includes('expired') || msg.includes('reconnect')) {
+        setError('eBay account not connected or token expired. Please connect your eBay account.');
+        setStatus({ connected: false });
       } else if (msg.includes('Endpoint not found') || msg.includes('gateway')) {
         setError('Backend routing error. Please contact support.');
       } else {
@@ -107,11 +130,20 @@ export function EbayConnectBanner({ onFindListings }) {
     setError('');
     try {
       const res = await syncAllEbayItems();
+      if (res && res.success === false && res.error) {
+        throw new Error(res.error);
+      }
       setSyncMsg(res.message || `Successfully synced ${res.updated_count || 0} linked listings!`);
       setStatus(prev => prev ? { ...prev, last_refreshed_at: new Date().toISOString() } : prev);
       setTimeout(() => setSyncMsg(''), 5000);
     } catch (e) {
-      setError(e.message || 'Batch sync failed');
+      const msg = e.message || '';
+      if (msg.includes('not connected') || msg.includes('expired') || msg.includes('reconnect')) {
+        setError('eBay account not connected or token expired. Please connect your eBay account.');
+        setStatus({ connected: false });
+      } else {
+        setError(msg || 'Batch sync failed');
+      }
     } finally {
       setSyncingAll(false);
     }
@@ -144,6 +176,7 @@ export function EbayConnectBanner({ onFindListings }) {
           </div>
         )}
         <button
+          type="button"
           id="ebay-connect-btn"
           onClick={handleConnect}
           className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition-all shadow-sm"
@@ -167,6 +200,7 @@ export function EbayConnectBanner({ onFindListings }) {
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <button
+            type="button"
             id="ebay-sync-all-btn"
             onClick={handleSyncAll}
             disabled={syncingAll}
@@ -177,6 +211,7 @@ export function EbayConnectBanner({ onFindListings }) {
             {syncingAll ? 'Syncing All...' : 'Sync All Linked Listings'}
           </button>
           <button
+            type="button"
             id="ebay-find-listings-btn"
             onClick={handleFindListings}
             disabled={finding}
@@ -186,6 +221,7 @@ export function EbayConnectBanner({ onFindListings }) {
             {finding ? 'Searching...' : 'Find Listings'}
           </button>
           <button
+            type="button"
             id="ebay-refresh-status-btn"
             onClick={fetchStatus}
             className="p-1.5 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-all"
@@ -194,6 +230,7 @@ export function EbayConnectBanner({ onFindListings }) {
             <RefreshCw className="w-3.5 h-3.5" />
           </button>
           <button
+            type="button"
             id="ebay-disconnect-btn"
             onClick={handleDisconnect}
             disabled={disconnecting}

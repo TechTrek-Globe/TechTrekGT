@@ -26,9 +26,20 @@ export async function onRequestGet(context) {
       const p = await verifyToken(t, env.JWT_SECRET);
       if (p && p.userId) {
         if (env.DB) {
-          const u = await env.DB.prepare(
-            'SELECT id, email, name, security_question, security_answer_hash, email_verified, email_verified_at, token_version FROM users WHERE id = ?'
-          ).bind(p.userId).first();
+          let u = null;
+          try {
+            u = await env.DB.prepare(
+              'SELECT id, email, name, security_question, security_answer_hash, email_verified, email_verified_at, token_version FROM users WHERE id = ?'
+            ).bind(p.userId).first();
+          } catch (dbErr) {
+            if (String(dbErr).includes('email_verified_at')) {
+              u = await env.DB.prepare(
+                'SELECT id, email, name, security_question, security_answer_hash, email_verified, token_version FROM users WHERE id = ?'
+              ).bind(p.userId).first();
+            } else {
+              throw dbErr;
+            }
+          }
 
           if (u) {
             const currentTv = u.token_version ?? 1;

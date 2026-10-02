@@ -21,6 +21,7 @@ export function AuthProvider({ children }) {
 
   // Restore session on mount
   useEffect(() => {
+    let isMounted = true;
     (async () => {
       try {
         const res = await fetch(getApiUrl('/api/auth/me'), {
@@ -28,7 +29,7 @@ export function AuthProvider({ children }) {
         });
         if (res.ok) {
           const data = await res.json().catch(() => ({}));
-          if (data.user) {
+          if (isMounted && data.user) {
             setUser(data.user);
             setIsAuthenticated(true);
           }
@@ -36,9 +37,14 @@ export function AuthProvider({ children }) {
       } catch (e) {
         // No session
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     })();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   // Session Policy Decision (T-14 / SEC-020):
@@ -131,8 +137,10 @@ export function AuthProvider({ children }) {
       throw new Error(data.error || `Registration failed (HTTP ${res.status})`);
     }
 
-    setIsAuthenticated(true);
-    setUser(data.user);
+    if (!data.verificationPending) {
+      setIsAuthenticated(true);
+      setUser(data.user);
+    }
     return data;
   };
 

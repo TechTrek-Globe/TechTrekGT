@@ -83,21 +83,54 @@ export async function fetchWithTimeout(url, options = {}, timeoutMs = DEFAULT_EX
   }
 }
 
+const _keyCache = new Map();
+export const PBKDF2_WORKERD_CEILING = 100_000;
+
 export async function deriveKey(secret, salt = NEW_SALT, iterations = PBKDF2_ITERATIONS_V2) {
-  const raw = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(secret),
-    { name: 'PBKDF2' },
-    false,
-    ['deriveKey']
-  );
-  return crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt, iterations, hash: 'SHA-256' },
-    raw,
-    { name: 'AES-GCM', length: 256 },
-    false,
-    ['encrypt', 'decrypt']
-  );
+  const isWorkerd = (typeof navigator !== 'undefined' && String(navigator.userAgent).includes('Cloudflare-Workers')) ||
+                    (typeof WebSocketPair !== 'undefined');
+  const targetIterations = (isWorkerd && iterations > PBKDF2_WORKERD_CEILING) ? PBKDF2_WORKERD_CEILING : iterations;
+
+  const cacheKey = `${secret}:${salt.length}:${targetIterations}`;
+  if (_keyCache.has(cacheKey)) {
+    return _keyCache.get(cacheKey);
+  }
+  const promise = (async () => {
+    try {
+      const raw = await crypto.subtle.importKey(
+        'raw',
+        new TextEncoder().encode(secret),
+        { name: 'PBKDF2' },
+        false,
+        ['deriveKey']
+      );
+      try {
+        return await crypto.subtle.deriveKey(
+          { name: 'PBKDF2', salt, iterations: targetIterations, hash: 'SHA-256' },
+          raw,
+          { name: 'AES-GCM', length: 256 },
+          false,
+          ['encrypt', 'decrypt']
+        );
+      } catch (deriveErr) {
+        if (targetIterations > PBKDF2_WORKERD_CEILING && deriveErr && String(deriveErr).includes('100000')) {
+          return await crypto.subtle.deriveKey(
+            { name: 'PBKDF2', salt, iterations: PBKDF2_WORKERD_CEILING, hash: 'SHA-256' },
+            raw,
+            { name: 'AES-GCM', length: 256 },
+            false,
+            ['encrypt', 'decrypt']
+          );
+        }
+        throw deriveErr;
+      }
+    } catch (err) {
+      _keyCache.delete(cacheKey);
+      throw err;
+    }
+  })();
+  _keyCache.set(cacheKey, promise);
+  return promise;
 }
 
 function bufToBase64(buf) {
@@ -130,7 +163,12 @@ export async function decryptToken(encrypted, tokenEncryptionKey) {
     try {
       plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, cipherBuf);
     } catch (_) {
-      throw new Error('Failed to decrypt v2 token: invalid key or ciphertext corrupted');
+      try {
+        const fallbackKey = await deriveKey(tokenEncryptionKey, NEW_SALT, PBKDF2_WORKERD_CEILING);
+        plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, fallbackKey, cipherBuf);
+      } catch (__) {
+        throw new Error('Failed to decrypt v2 token: invalid key or ciphertext corrupted');
+      }
     }
     return { plaintext: new TextDecoder().decode(plainBuf), wasLegacy: false };
   }
@@ -328,6 +366,11 @@ export async function getEbayUserToken(env, userId) {
   }
 
   if (!res.ok) {
+    // If refresh fails but access token is still within validity window, return existing
+    if (accessExp > now) {
+      const { plaintext } = await decryptToken(row.access_token, encKey);
+      if (plaintext) return plaintext;
+    }
     const text = await res.text().catch(() => '');
     console.error(`[tokenHelper] eBay token refresh failed (${res.status}):`, text);
     if ((res.status === 400 || res.status === 401) && env.DB) {
@@ -450,7 +493,9 @@ export async function fetchEbayActiveSellerListings(env, accessToken) {
             buyer_shipping_cost: shipCost,
             is_free_shipping: freeShip || (shipCost === 0),
             condition: 'Active',
-            status: listingStatus === 'Completed' ? 'Sold' : listingStatus,
+            status: (listingStatus === 'Completed' || listingStatus === 'Ended')
+              ? (parseInt(qtySoldStr, 10) > 0 ? 'Sold' : 'Unsold')
+              : (listingStatus === 'Active' ? 'Listed' : listingStatus),
             image_url: galleryUrl,
             listing_url: listingId ? `https://www.ebay.com/itm/${listingId}` : null
           });
@@ -961,7 +1006,9 @@ export async function fetchSingleEbayListing(env, accessToken, listingId, campai
           title: title || '',
           price: price,
           date_listed: startTime ? startTime.slice(0, 10) : new Date().toISOString().split('T')[0],
-          status: listingStatus === 'Completed' ? 'Sold' : 'Listed',
+          status: (listingStatus === 'Completed' || listingStatus === 'Ended')
+            ? ((parseInt(qtySoldStr, 10) || 0) > 0 ? 'Sold' : 'Unsold')
+            : (listingStatus === 'Active' ? 'Listed' : 'Listed'),
           raw_status: listingStatus,
           quantity: parseInt(qtyStr, 10) || 1,
           quantity_sold: parseInt(qtySoldStr, 10) || 0,
@@ -1006,7 +1053,9 @@ export async function fetchSingleEbayListing(env, accessToken, listingId, campai
       title: found.title || '',
       price: found.price || 0,
       date_listed: new Date().toISOString().split('T')[0],
-      status: found.status === 'Completed' ? 'Sold' : 'Listed',
+      status: (found.status === 'Completed' || found.status === 'Ended')
+        ? (found.quantity_sold > 0 ? 'Sold' : 'Unsold')
+        : (found.status === 'Active' ? 'Listed' : (found.status || 'Listed')),
       quantity: found.quantity || 1,
       quantity_sold: 0,
       sku: found.sku,

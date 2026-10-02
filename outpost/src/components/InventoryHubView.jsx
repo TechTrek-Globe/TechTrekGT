@@ -51,6 +51,7 @@ export function InventoryHubView({ onNavigate }) {
   // --- Sync toast state ---
   const [syncResult, setSyncResult] = useState(null);
   const [soldMatcherOpen, setSoldMatcherOpen] = useState(false);
+  const [actionError, setActionError] = useState('');
 
   // Wrap context handler to add local toast feedback
   const handleSyncEbayWithToast = async () => {
@@ -127,11 +128,12 @@ export function InventoryHubView({ onNavigate }) {
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this item completely?')) return;
     setDeleting(id);
+    setActionError('');
     try {
       await deleteItem(id);
       refreshAll();
     } catch (e) {
-      alert(`Delete failed: ${e.message}`);
+      setActionError(`Delete failed: ${e.message}`);
     } finally {
       setDeleting(null);
     }
@@ -332,10 +334,10 @@ export function InventoryHubView({ onNavigate }) {
         />
       )}
 
-      {error && (
+      {(error || actionError) && (
         <div className="p-2 bg-red-950/40 border border-red-500/30 rounded-xl text-red-400 text-xs flex items-center gap-2 flex-shrink-0">
           <AlertCircle className="w-4 h-4 flex-shrink-0" />
-          <span>{error}</span>
+          <span>{actionError || error}</span>
         </div>
       )}
 

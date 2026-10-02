@@ -50,6 +50,9 @@ export function FeeReconciliationPanel({ sale, onReconciled }) {
 
     try {
       const data = await reconcileSaleFees(sale.id, trimmedId);
+      if (data && data.success === false) {
+        throw new Error(data.error || 'Reconciliation failed');
+      }
       if (data.pending_scope_approval) {
         setPendingScope(true);
         return;

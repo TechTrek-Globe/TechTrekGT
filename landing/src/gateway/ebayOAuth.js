@@ -1,5 +1,5 @@
 import { requireGatewayAuth, withGatewayAuth, ok, err } from './guard.js';
-import { encryptToken, decryptToken } from './tokenCrypto.js';
+import { encryptToken, decryptToken, deriveKey } from './tokenCrypto.js';
 import { getEbayEndpoints, isEbaySandbox } from './ebay.js';
 
 /**
@@ -127,8 +127,15 @@ export async function getEbayUserToken(env, userId) {
   });
 
   if (!res.ok) {
+    if (accessExp > now) {
+      const { plaintext } = await decryptToken(row.access_token, encKey);
+      if (plaintext) return plaintext;
+    }
     const text = await res.text().catch(() => '');
     console.error(`[ebayOAuth] eBay token refresh failed (${res.status}):`, text);
+    if ((res.status === 400 || res.status === 401) && env.DB) {
+      await env.DB.prepare('DELETE FROM ebay_oauth_tokens WHERE user_id = ?').bind(userId).run();
+    }
     throw new Error('eBay token refresh failed. Please reconnect your eBay account.');
   }
 
@@ -201,31 +208,36 @@ export async function onRequestGetCallback(context) {
   const state = url.searchParams.get('state');
   const errorParam = url.searchParams.get('error');
 
-  const redirectBase = 'https://techtrekgt.com/outpost/settings';
+  const redirectBase = 'https://techtrekgt.com/outpost/settings?tab=integrations';
 
   if (errorParam) {
-    return Response.redirect(`${redirectBase}?ebay=error&reason=${encodeURIComponent(errorParam)}`, 302);
+    return Response.redirect(`${redirectBase}&ebay=error&reason=${encodeURIComponent(errorParam)}`, 302);
   }
   if (!code || !state) {
-    return Response.redirect(`${redirectBase}?ebay=error&reason=missing_params`, 302);
+    return Response.redirect(`${redirectBase}&ebay=error&reason=missing_params`, 302);
   }
 
   try {
     if (!env.GATEWAY_KV || !env.DB) {
-      return Response.redirect(`${redirectBase}?ebay=error&reason=server_config`, 302);
+      return Response.redirect(`${redirectBase}&ebay=error&reason=server_config`, 302);
     }
     if (!env.TOKEN_ENCRYPTION_KEY) {
       console.error('[ebayOAuth callback] FATAL: TOKEN_ENCRYPTION_KEY not bound. Cannot store tokens.');
-      return Response.redirect(`${redirectBase}?ebay=error&reason=server_config`, 302);
+      return Response.redirect(`${redirectBase}&ebay=error&reason=server_config`, 302);
     }
 
     const stateData = await env.GATEWAY_KV.get(`${KV_STATE_PREFIX}${state}`, { type: 'json' });
     if (!stateData) {
-      return Response.redirect(`${redirectBase}?ebay=error&reason=invalid_state`, 302);
+      return Response.redirect(`${redirectBase}&ebay=error&reason=invalid_state`, 302);
     }
     await env.GATEWAY_KV.delete(`${KV_STATE_PREFIX}${state}`);
 
-    const { userId } = stateData;
+    const { userId: stateUserId, id: stateId, user_id: stateAltId } = (stateData || {});
+    const userId = stateUserId || stateId || stateAltId;
+    if (!userId) {
+      console.error('[ebayOAuth callback] stateData missing userId:', JSON.stringify(stateData));
+      return Response.redirect(`${redirectBase}&ebay=error&reason=invalid_state&detail=missing_user_in_state`, 302);
+    }
     const redirectUri = getRedirectUri(env);
 
     const { oauthUrl } = getEbayEndpoints(env);
@@ -245,22 +257,27 @@ export async function onRequestGetCallback(context) {
     });
 
     if (!tokenRes.ok) {
-      console.error('[ebayOAuth callback] token exchange failed:', tokenRes.status);
-      return Response.redirect(`${redirectBase}?ebay=error&reason=token_exchange`, 302);
+      const errText = await tokenRes.text().catch(() => '');
+      console.error('[ebayOAuth callback] token exchange failed:', tokenRes.status, errText);
+      return Response.redirect(`${redirectBase}&ebay=error&reason=token_exchange&status=${tokenRes.status}`, 302);
     }
-
 
     const tokenData = await tokenRes.json();
     const accessToken = tokenData.access_token;
-    const refreshToken = tokenData.refresh_token;
+    if (!accessToken) {
+      console.error('[ebayOAuth callback] tokenData missing access_token:', JSON.stringify(tokenData));
+      return Response.redirect(`${redirectBase}&ebay=error&reason=token_exchange&detail=missing_access_token`, 302);
+    }
+    const refreshToken = tokenData.refresh_token || accessToken;
 
-    const accessExpMs = Date.now() + (tokenData.expires_in || 7200) * 1000;
-    const refreshExpMs = Date.now() + (tokenData.refresh_token_expires_in || 47304000) * 1000;
+    const accessExpMs = Date.now() + (Number(tokenData.expires_in) || 7200) * 1000;
+    const refreshExpMs = Date.now() + (Number(tokenData.refresh_token_expires_in) || 47304000) * 1000;
 
     const encKey = env.TOKEN_ENCRYPTION_KEY;
+    const derivedKey = await deriveKey(encKey);
     const [encAccess, encRefresh] = await Promise.all([
-      encryptToken(accessToken, encKey),
-      encryptToken(refreshToken, encKey)
+      encryptToken(accessToken, encKey, derivedKey),
+      encryptToken(refreshToken, encKey, derivedKey)
     ]);
 
     // Fetch eBay username from identity endpoint
@@ -275,6 +292,14 @@ export async function onRequestGetCallback(context) {
       }
     } catch (_) { /* non-fatal */ }
 
+    const scopesStr = typeof tokenData.scope === 'string'
+      ? tokenData.scope
+      : (Array.isArray(tokenData.scope) ? tokenData.scope.join(' ') : EBAY_ACG_SCOPES);
+
+    const tokenId = (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
+      ? crypto.randomUUID()
+      : `tok-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
     await env.DB.prepare(`
       INSERT INTO ebay_oauth_tokens
         (id, user_id, access_token, refresh_token, access_token_exp, refresh_token_exp, scopes, ebay_user_id)
@@ -288,20 +313,21 @@ export async function onRequestGetCallback(context) {
         ebay_user_id = excluded.ebay_user_id,
         last_refreshed_at = datetime('now')
     `).bind(
-      crypto.randomUUID(),
+      tokenId,
       userId,
       encAccess,
       encRefresh,
       new Date(accessExpMs).toISOString(),
       new Date(refreshExpMs).toISOString(),
-      tokenData.scope || EBAY_ACG_SCOPES,
-      ebayUserId
+      scopesStr,
+      ebayUserId ?? null
     ).run();
 
-    return Response.redirect(`${redirectBase}?ebay=connected`, 302);
+    return Response.redirect(`${redirectBase}&ebay=connected`, 302);
   } catch (e) {
-    console.error('[ebayOAuth callback] error:', e.message);
-    return Response.redirect(`${redirectBase}?ebay=error&reason=server_error`, 302);
+    console.error('[ebayOAuth callback] error:', e && e.stack ? e.stack : e);
+    const detail = e instanceof Error ? e.message : String(e);
+    return Response.redirect(`${redirectBase}&ebay=error&reason=server_error&detail=${encodeURIComponent(detail)}`, 302);
   }
 }
 

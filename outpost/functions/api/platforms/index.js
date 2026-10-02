@@ -58,13 +58,22 @@ export async function onRequestPost(context) {
 
     // Reset to defaults action
     if (body.action === 'reset_defaults') {
-      await env.DB.prepare('DELETE FROM auction_platforms WHERE user_id = ?').bind(userId).run();
+      const resetStmts = [
+        env.DB.prepare('DELETE FROM auction_platforms WHERE user_id = ?').bind(userId)
+      ];
       for (const p of DEFAULT_PLATFORMS) {
         const id = crypto.randomUUID();
-        await env.DB.prepare(
-          `INSERT INTO auction_platforms (id, user_id, name, fee_pct, flat_fee, notes, is_default)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`
-        ).bind(id, userId, p.name, p.fee_pct, p.flat_fee, p.notes, p.is_default).run();
+        resetStmts.push(
+          env.DB.prepare(
+            `INSERT INTO auction_platforms (id, user_id, name, fee_pct, flat_fee, notes, is_default)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`
+          ).bind(id, userId, p.name, p.fee_pct, p.flat_fee, p.notes, p.is_default)
+        );
+      }
+      if (typeof env.DB.batch === 'function') {
+        await env.DB.batch(resetStmts);
+      } else {
+        for (const s of resetStmts) await s.run();
       }
       const rows = await env.DB.prepare(
         'SELECT * FROM auction_platforms WHERE user_id = ? ORDER BY is_default DESC, name ASC'
@@ -87,16 +96,23 @@ export async function onRequestPost(context) {
       return err(e.message, 400);
     }
 
-    // If marked default, unset other defaults
-    if (is_default) {
-      await env.DB.prepare('UPDATE auction_platforms SET is_default = 0 WHERE user_id = ?').bind(userId).run();
-    }
-
     const id = crypto.randomUUID();
-    await env.DB.prepare(
+    const insertStmt = env.DB.prepare(
       `INSERT INTO auction_platforms (id, user_id, name, fee_pct, flat_fee, notes, is_default)
        VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(id, userId, name.trim(), parsedFeePct, parsedFlatFee, notes.trim(), is_default ? 1 : 0).run();
+    ).bind(id, userId, name.trim(), parsedFeePct, parsedFlatFee, notes.trim(), is_default ? 1 : 0);
+
+    if (is_default) {
+      const unsetStmt = env.DB.prepare('UPDATE auction_platforms SET is_default = 0 WHERE user_id = ?').bind(userId);
+      if (typeof env.DB.batch === 'function') {
+        await env.DB.batch([unsetStmt, insertStmt]);
+      } else {
+        await unsetStmt.run();
+        await insertStmt.run();
+      }
+    } else {
+      await insertStmt.run();
+    }
 
     const created = await env.DB.prepare('SELECT * FROM auction_platforms WHERE id = ?').bind(id).first();
     return ok({ platform: created }, 201);

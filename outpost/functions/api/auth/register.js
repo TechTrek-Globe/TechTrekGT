@@ -114,9 +114,18 @@ export async function onRequestPost(context) {
     const now = Date.now();
     const expiresAt = now + 24 * 60 * 60 * 1000; // 24 hours
 
-    await env.DB.prepare(
-      'INSERT INTO email_verifications (id, user_id, email, token, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?)'
-    ).bind(verifId, userId, cleanEmail, verificationToken, expiresAt, now).run();
+    try {
+      await env.DB.prepare(
+        'INSERT INTO email_verifications (id, user_id, email, token, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+      ).bind(verifId, userId, cleanEmail, verificationToken, expiresAt, now).run();
+    } catch (verifErr) {
+      console.error('[register] Failed to create email verification record, rolling back user registration:', verifErr);
+      await env.DB.prepare('DELETE FROM auction_platforms WHERE user_id = ?').bind(userId).run().catch(() => {});
+      await env.DB.prepare('DELETE FROM users WHERE id = ?').bind(userId).run().catch(() => {});
+      return new Response(JSON.stringify({ error: 'Registration failed during verification token issuance. Database state rolled back.' }), {
+        status: 500, headers: { 'Content-Type': 'application/json' }
+      });
+    }
 
     let emailDispatched = false;
     try {

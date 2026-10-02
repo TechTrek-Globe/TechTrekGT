@@ -207,11 +207,18 @@ export async function onRequestPost(context) {
       });
     }
 
-    if (insertStatements.length > 0) {
-      const CHUNK_SIZE = 50;
-      for (let i = 0; i < insertStatements.length; i += CHUNK_SIZE) {
-        await env.DB.batch(insertStatements.slice(i, i + CHUNK_SIZE));
+    try {
+      if (insertStatements.length > 0) {
+        const CHUNK_SIZE = 50;
+        for (let i = 0; i < insertStatements.length; i += CHUNK_SIZE) {
+          await env.DB.batch(insertStatements.slice(i, i + CHUNK_SIZE));
+        }
       }
+    } catch (insertErr) {
+      console.error('[invoices] Failed to insert invoice items, cleaning up invoice:', insertErr);
+      await env.DB.prepare('DELETE FROM auction_items WHERE invoice_id = ? AND user_id = ?').bind(invoiceId, payload.userId).run().catch(() => {});
+      await env.DB.prepare('DELETE FROM auction_invoices WHERE id = ? AND user_id = ?').bind(invoiceId, payload.userId).run().catch(() => {});
+      return err('Failed to create invoice items. Invoice creation rolled back.', 500);
     }
 
     return ok({

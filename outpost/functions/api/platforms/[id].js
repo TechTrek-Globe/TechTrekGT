@@ -51,11 +51,7 @@ export async function onRequestPut(context) {
       return err(e.message, 400);
     }
 
-    if (is_default && !existing.is_default) {
-      await env.DB.prepare('UPDATE auction_platforms SET is_default = 0 WHERE user_id = ?').bind(userId).run();
-    }
-
-    await env.DB.prepare(`
+    const updateStmt = env.DB.prepare(`
       UPDATE auction_platforms
       SET name = ?, fee_pct = ?, flat_fee = ?, notes = ?, is_default = ?
       WHERE id = ? AND user_id = ?
@@ -67,7 +63,19 @@ export async function onRequestPut(context) {
       is_default ? 1 : 0,
       id,
       userId
-    ).run();
+    );
+
+    if (is_default && !existing.is_default) {
+      const unsetStmt = env.DB.prepare('UPDATE auction_platforms SET is_default = 0 WHERE user_id = ?').bind(userId);
+      if (typeof env.DB.batch === 'function') {
+        await env.DB.batch([unsetStmt, updateStmt]);
+      } else {
+        await unsetStmt.run();
+        await updateStmt.run();
+      }
+    } else {
+      await updateStmt.run();
+    }
 
     const updated = await env.DB.prepare(
       'SELECT * FROM auction_platforms WHERE id = ?'

@@ -103,13 +103,27 @@ export async function onRequestPost(context) {
     }
 
     const newPasswordHash = await hashPassword(newPassword);
+    const markUsedStmt1 = env.DB.prepare('UPDATE password_resets SET used = 1 WHERE id = ?').bind(resetRecord.id);
+    const markUsedStmt2 = env.DB.prepare('UPDATE password_resets SET used = 1 WHERE email = ? AND used = 0').bind(cleanEmail);
     try {
-      await env.DB.prepare('UPDATE users SET password_hash = ?, force_password_reset = 0, token_version = COALESCE(token_version, 1) + 1 WHERE id = ?').bind(newPasswordHash, user.id).run();
+      const userUpdateStmt = env.DB.prepare('UPDATE users SET password_hash = ?, force_password_reset = 0, token_version = COALESCE(token_version, 1) + 1 WHERE id = ?').bind(newPasswordHash, user.id);
+      if (typeof env.DB.batch === 'function') {
+        await env.DB.batch([userUpdateStmt, markUsedStmt1, markUsedStmt2]);
+      } else {
+        await userUpdateStmt.run();
+        await markUsedStmt1.run();
+        await markUsedStmt2.run();
+      }
     } catch (_) {
-      await env.DB.prepare('UPDATE users SET password_hash = ?, force_password_reset = 0 WHERE id = ?').bind(newPasswordHash, user.id).run();
+      const userUpdateFallbackStmt = env.DB.prepare('UPDATE users SET password_hash = ?, force_password_reset = 0 WHERE id = ?').bind(newPasswordHash, user.id);
+      if (typeof env.DB.batch === 'function') {
+        await env.DB.batch([userUpdateFallbackStmt, markUsedStmt1, markUsedStmt2]);
+      } else {
+        await userUpdateFallbackStmt.run();
+        await markUsedStmt1.run();
+        await markUsedStmt2.run();
+      }
     }
-    await env.DB.prepare('UPDATE password_resets SET used = 1 WHERE id = ?').bind(resetRecord.id).run();
-    await env.DB.prepare('UPDATE password_resets SET used = 1 WHERE email = ? AND used = 0').bind(cleanEmail).run();
 
     // Clear the reset_session cookie with Path=/ (matching where it was written)
     const clearCookie = [

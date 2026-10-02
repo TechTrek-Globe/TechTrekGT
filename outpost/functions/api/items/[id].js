@@ -381,31 +381,41 @@ export async function onRequestPut(context) {
     const wasSold = item.status === 'Sold';
     const isSold = updated.status === 'Sold';
 
-    if (isSold) {
-      const saleDate = updated.date_sold || new Date().toISOString().split('T')[0];
-      const grossPrice = Number(updated.actual_sell_price) || 0;
-      const platformName = updated.platform || item.platform || 'eBay';
-      const shippingCost = Number(updated.est_shipping_cost ?? item.est_shipping_cost ?? 0);
-      const feePct = Number(updated.platform_fee_pct ?? item.platform_fee_pct ?? DEFAULT_PLATFORM_FEE_PCT);
-      const flatFee = Number(updated.platform_flat_fee ?? item.platform_flat_fee ?? DEFAULT_PLATFORM_FLAT_FEE);
+    try {
+      if (isSold) {
+        const saleDate = updated.date_sold || new Date().toISOString().split('T')[0];
+        const grossPrice = Number(updated.actual_sell_price) || 0;
+        const platformName = updated.platform || item.platform || 'eBay';
+        const shippingCost = Number(updated.est_shipping_cost ?? item.est_shipping_cost ?? 0);
+        const feePct = Number(updated.platform_fee_pct ?? item.platform_fee_pct ?? DEFAULT_PLATFORM_FEE_PCT);
+        const flatFee = Number(updated.platform_flat_fee ?? item.platform_flat_fee ?? DEFAULT_PLATFORM_FLAT_FEE);
 
-      await markItemSold(env, payload.userId, { ...item, ...updated, id }, {
-        sale_date: saleDate,
-        platform: platformName,
-        gross_sale_price: grossPrice,
-        actual_shipping_cost: shippingCost,
-        platform_fee_pct: feePct,
-        platform_flat_fee: flatFee,
-        true_total_cost: updated.true_total_cost || item.true_total_cost || 0,
-        // T-11 item 8: null (invalid date ordering) is passed through rather
-        // than coerced to 0.
-        days_to_sell: days_on_market ?? null
-      });
-    } else if (wasSold && !isSold) {
-      // Reverted away from Sold - remove corresponding sale record to keep Sold Tracker clean
-      await env.DB.prepare(
-        'DELETE FROM auction_sales WHERE item_id = ? AND user_id = ?'
-      ).bind(id, payload.userId).run();
+        await markItemSold(env, payload.userId, { ...item, ...updated, id }, {
+          sale_date: saleDate,
+          platform: platformName,
+          gross_sale_price: grossPrice,
+          actual_shipping_cost: shippingCost,
+          platform_fee_pct: feePct,
+          platform_flat_fee: flatFee,
+          true_total_cost: updated.true_total_cost || item.true_total_cost || 0,
+          // T-11 item 8: null (invalid date ordering) is passed through rather
+          // than coerced to 0.
+          days_to_sell: days_on_market ?? null
+        });
+      } else if (wasSold && !isSold) {
+        // Reverted away from Sold - remove corresponding sale record to keep Sold Tracker clean
+        await env.DB.prepare(
+          'DELETE FROM auction_sales WHERE item_id = ? AND user_id = ?'
+        ).bind(id, payload.userId).run();
+      }
+    } catch (syncErr) {
+      console.error('[items] Failed to synchronize Sold Tracker status, reverting item:', syncErr);
+      await env.DB.prepare(`
+        UPDATE auction_items SET
+          status = ?, actual_sell_price = ?, date_sold = ?, days_on_market = ?, updated_at = datetime('now')
+        WHERE id = ? AND user_id = ?
+      `).bind(item.status, item.actual_sell_price, item.date_sold, item.days_on_market, id, payload.userId).run().catch(() => {});
+      return err('Failed to synchronize sale status. Item state restored.', 500);
     }
 
     return ok({
@@ -447,8 +457,15 @@ export async function onRequestDelete(context) {
       return err('Cannot delete an item that has recorded sales. Set status to "Returned" instead.', 409);
     }
 
-    await env.DB.prepare('DELETE FROM auction_comps WHERE item_id = ? AND user_id = ?').bind(id, payload.userId).run();
-    await env.DB.prepare('DELETE FROM auction_items WHERE id = ? AND user_id = ?').bind(id, payload.userId).run();
+    const deleteCompsStmt = env.DB.prepare('DELETE FROM auction_comps WHERE item_id = ? AND user_id = ?').bind(id, payload.userId);
+    const deleteItemStmt = env.DB.prepare('DELETE FROM auction_items WHERE id = ? AND user_id = ?').bind(id, payload.userId);
+
+    if (typeof env.DB.batch === 'function') {
+      await env.DB.batch([deleteCompsStmt, deleteItemStmt]);
+    } else {
+      await deleteCompsStmt.run();
+      await deleteItemStmt.run();
+    }
 
     return ok({ success: true });
   });

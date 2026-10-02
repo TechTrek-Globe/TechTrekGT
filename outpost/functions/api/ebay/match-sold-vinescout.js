@@ -411,7 +411,27 @@ export async function onRequestPost(context) {
       true_total_cost: item.true_total_cost
     }, item);
 
-    const savedSale = await upsertSale(env, payload.userId, record);
+    let savedSale;
+    try {
+      savedSale = await upsertSale(env, payload.userId, record);
+    } catch (saleErr) {
+      console.error('[match-sold-vinescout] Failed to save sale, reverting item:', saleErr);
+      await env.DB.prepare(`
+        UPDATE auction_items
+        SET status = ?,
+            ebay_listing_id = ?,
+            attributes = ?,
+            updated_at = datetime('now')
+        WHERE id = ? AND user_id = ?
+      `).bind(
+        item.status,
+        item.ebay_listing_id || null,
+        item.attributes,
+        item.id,
+        payload.userId
+      ).run().catch(() => {});
+      return err('Failed to record matched sale. Item state restored.', 500);
+    }
     const saleId = savedSale.id;
     const roiPct = record.roi_pct;
     const netProfit = record.net_profit;

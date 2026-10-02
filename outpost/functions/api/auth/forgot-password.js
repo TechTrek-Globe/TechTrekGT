@@ -124,11 +124,17 @@ export async function onRequestPost(context) {
       const now = Date.now();
       const expiresAt = now + (15 * 60 * 1000); // 15-minute window
 
-      await env.DB.prepare('UPDATE password_resets SET used = 1 WHERE email = ? AND used = 0').bind(cleanEmail).run();
-
-      await env.DB.prepare(
+      const invalidateStmt = env.DB.prepare('UPDATE password_resets SET used = 1 WHERE email = ? AND used = 0').bind(cleanEmail);
+      const insertResetStmt = env.DB.prepare(
         'INSERT INTO password_resets (id, user_id, email, token, expires_at, used, created_at) VALUES (?, ?, ?, ?, ?, 0, ?)'
-      ).bind(resetId, user.id, cleanEmail, resetToken, expiresAt, now).run();
+      ).bind(resetId, user.id, cleanEmail, resetToken, expiresAt, now);
+
+      if (typeof env.DB.batch === 'function') {
+        await env.DB.batch([invalidateStmt, insertResetStmt]);
+      } else {
+        await invalidateStmt.run();
+        await insertResetStmt.run();
+      }
 
       await sendResetEmail(env, user.email, resetToken);
     }

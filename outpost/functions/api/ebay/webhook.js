@@ -286,13 +286,26 @@ export async function dispatchWebhookEvent(eventType, payload, eventId, env) {
           ).bind(item.id, item.user_id).first();
 
           if (!existing && grossPrice > 0) {
-            // Upsert sale via shared markItemSold helper
-            await markItemSold(env, item.user_id, item, {
-              sale_date: saleDate,
-              platform: item.platform || 'eBay',
-              gross_sale_price: grossPrice,
-              ebay_order_id: ebayOrderId || null
-            });
+            try {
+              // Upsert sale via shared markItemSold helper
+              await markItemSold(env, item.user_id, item, {
+                sale_date: saleDate,
+                platform: item.platform || 'eBay',
+                gross_sale_price: grossPrice,
+                ebay_order_id: ebayOrderId || null
+              });
+            } catch (saleErr) {
+              console.error(`[ebayWebhook] Failed to mark sale for item ${item.id}, reverting item status:`, saleErr);
+              await env.DB.prepare(`
+                UPDATE auction_items SET
+                  status = ?,
+                  actual_sell_price = ?,
+                  date_sold = ?,
+                  updated_at = datetime('now')
+                WHERE id = ?
+              `).bind(item.status, item.actual_sell_price, item.date_sold, item.id).run().catch(() => {});
+              throw saleErr;
+            }
           } else if (existing && ebayOrderId && !existing.ebay_order_id) {
             // Patch existing sale with eBay order ID
             await env.DB.prepare(

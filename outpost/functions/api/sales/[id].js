@@ -151,21 +151,30 @@ export async function onRequestPut(context) {
 
     await upsertSale(env, payload.userId, record);
 
-    // Update item actual_sell_price & date_sold
-    await env.DB.prepare(`
-      UPDATE auction_items SET
-        actual_sell_price = ?,
-        date_sold = ?,
-        days_on_market = ?,
-        updated_at = datetime('now')
-      WHERE id = ? AND user_id = ?
-    `).bind(
-      record.gross_sale_price,
-      record.sale_date,
-      record.days_to_sell ?? null,
-      existing.item_id,
-      payload.userId
-    ).run();
+    try {
+      // Update item actual_sell_price & date_sold
+      await env.DB.prepare(`
+        UPDATE auction_items SET
+          actual_sell_price = ?,
+          date_sold = ?,
+          days_on_market = ?,
+          updated_at = datetime('now')
+        WHERE id = ? AND user_id = ?
+      `).bind(
+        record.gross_sale_price,
+        record.sale_date,
+        record.days_to_sell ?? null,
+        existing.item_id,
+        payload.userId
+      ).run();
+    } catch (itemErr) {
+      console.error('[sales] Failed to update item on sale edit, rolling back sale:', itemErr);
+      await upsertSale(env, payload.userId, normalizeSaleInput({
+        ...existing,
+        item_id: existing.item_id
+      }, item)).catch(() => {});
+      return err('Failed to update associated item. Sale update rolled back.', 500);
+    }
 
     return ok({ success: true, message: 'Sale updated successfully' });
   });
@@ -186,13 +195,16 @@ export async function onRequestDelete(context) {
 
     if (!existing) return err('Sale not found', 404);
 
-    // Delete sale
-    await env.DB.prepare(
-      'DELETE FROM auction_sales WHERE id = ? AND user_id = ?'
-    ).bind(id, payload.userId).run();
+    // Delete linked fee reconciliations, delete sale, and revert item status atomically
+    const deleteReconStmt = env.DB.prepare(
+      'DELETE FROM ebay_fee_reconciliations WHERE sale_id = ? AND user_id = ?'
+    ).bind(id, payload.userId);
 
-    // Revert item back to Listed or Available
-    await env.DB.prepare(`
+    const deleteSaleStmt = env.DB.prepare(
+      'DELETE FROM auction_sales WHERE id = ? AND user_id = ?'
+    ).bind(id, payload.userId);
+
+    const revertItemStmt = env.DB.prepare(`
       UPDATE auction_items SET
         status = CASE WHEN date_listed IS NOT NULL AND date_listed != '' THEN 'Listed' ELSE 'Available' END,
         actual_sell_price = NULL,
@@ -200,7 +212,20 @@ export async function onRequestDelete(context) {
         days_on_market = NULL,
         updated_at = datetime('now')
       WHERE id = ? AND user_id = ?
-    `).bind(existing.item_id, payload.userId).run();
+    `).bind(existing.item_id, payload.userId);
+
+    try {
+      if (typeof env.DB.batch === 'function') {
+        await env.DB.batch([deleteReconStmt, deleteSaleStmt, revertItemStmt]);
+      } else {
+        await deleteReconStmt.run();
+        await deleteSaleStmt.run();
+        await revertItemStmt.run();
+      }
+    } catch (delErr) {
+      console.error('[sales] Failed to delete sale and revert item status:', delErr);
+      return err('Failed to delete sale. Database state preserved.', 500);
+    }
 
     return ok({ success: true, message: 'Sale deleted and item status reverted' });
   });

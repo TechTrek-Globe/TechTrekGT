@@ -1574,85 +1574,97 @@ export async function reconcileAndSaveEbaySale(env, userId, item, orderData = nu
   // would store estimate-derived fees in a table whose every other row holds
   // eBay-verified amounts.
   let reconRow = null;
-  if (ebayOrderId && financeData?.finances_available) {
-    const reconId = `recon-${crypto.randomUUID()}`;
-    const estimatedFees = parseFloat((item.platform_fees_amt || (grossSalePrice * feePct + flatFee)).toFixed(2));
-    const feeDelta = parseFloat((totalEbayFees - estimatedFees).toFixed(4));
+  try {
+    if (ebayOrderId && financeData?.finances_available) {
+      const reconId = `recon-${crypto.randomUUID()}`;
+      const estimatedFees = parseFloat((item.platform_fees_amt || (grossSalePrice * feePct + flatFee)).toFixed(2));
+      const feeDelta = parseFloat((totalEbayFees - estimatedFees).toFixed(4));
 
+      await env.DB.prepare(`
+        INSERT INTO ebay_fee_reconciliations (
+          id, sale_id, user_id, ebay_order_id,
+          final_value_fee, promoted_listing_fee, shipping_label_cost,
+          payment_processing_fee, regulatory_fee,
+          total_ebay_fees, estimated_fees, fee_delta, reconciled_net_profit,
+          promoted_listing_rate, promoted_listing_active, finances_api_raw,
+          reconciled_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+        ON CONFLICT(sale_id) DO UPDATE SET
+          ebay_order_id           = excluded.ebay_order_id,
+          final_value_fee         = excluded.final_value_fee,
+          promoted_listing_fee    = excluded.promoted_listing_fee,
+          shipping_label_cost     = excluded.shipping_label_cost,
+          payment_processing_fee  = excluded.payment_processing_fee,
+          regulatory_fee          = excluded.regulatory_fee,
+          total_ebay_fees         = excluded.total_ebay_fees,
+          estimated_fees          = excluded.estimated_fees,
+          fee_delta               = excluded.fee_delta,
+          reconciled_net_profit   = excluded.reconciled_net_profit,
+          promoted_listing_rate   = excluded.promoted_listing_rate,
+          promoted_listing_active = excluded.promoted_listing_active,
+          finances_api_raw        = excluded.finances_api_raw,
+          reconciled_at           = datetime('now')
+      `).bind(
+        reconId,
+        saleId,
+        userId,
+        ebayOrderId,
+        finalValueFee,
+        promotedListingFee,
+        shippingLabelCost,
+        paymentProcessingFee,
+        regulatoryFee,
+        totalEbayFees,
+        estimatedFees,
+        feeDelta,
+        netProfit,
+        promotedRate,
+        promotedActive ? 1 : 0,
+        buildFinancesSummary(financeData?.raw || [])
+      ).run();
+
+      reconRow = {
+        id: reconId,
+        sale_id: saleId,
+        ebay_order_id: ebayOrderId,
+        final_value_fee: finalValueFee,
+        promoted_listing_fee: promotedListingFee,
+        shipping_label_cost: shippingLabelCost,
+        payment_processing_fee: paymentProcessingFee,
+        regulatory_fee: regulatoryFee,
+        total_ebay_fees: totalEbayFees,
+        reconciled_net_profit: netProfit,
+        fee_delta: feeDelta
+      };
+    }
+
+    // Update auction_items status & pricing
     await env.DB.prepare(`
-      INSERT INTO ebay_fee_reconciliations (
-        id, sale_id, user_id, ebay_order_id,
-        final_value_fee, promoted_listing_fee, shipping_label_cost,
-        payment_processing_fee, regulatory_fee,
-        total_ebay_fees, estimated_fees, fee_delta, reconciled_net_profit,
-        promoted_listing_rate, promoted_listing_active, finances_api_raw,
-        reconciled_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-      ON CONFLICT(sale_id) DO UPDATE SET
-        ebay_order_id           = excluded.ebay_order_id,
-        final_value_fee         = excluded.final_value_fee,
-        promoted_listing_fee    = excluded.promoted_listing_fee,
-        shipping_label_cost     = excluded.shipping_label_cost,
-        payment_processing_fee  = excluded.payment_processing_fee,
-        regulatory_fee          = excluded.regulatory_fee,
-        total_ebay_fees         = excluded.total_ebay_fees,
-        estimated_fees          = excluded.estimated_fees,
-        fee_delta               = excluded.fee_delta,
-        reconciled_net_profit   = excluded.reconciled_net_profit,
-        promoted_listing_rate   = excluded.promoted_listing_rate,
-        promoted_listing_active = excluded.promoted_listing_active,
-        finances_api_raw        = excluded.finances_api_raw,
-        reconciled_at           = datetime('now')
+      UPDATE auction_items SET
+        status = 'Sold',
+        actual_sell_price = ?,
+        date_sold = ?,
+        days_on_market = ?,
+        updated_at = datetime('now')
+      WHERE id = ? AND user_id = ?
     `).bind(
-      reconId,
-      saleId,
-      userId,
-      ebayOrderId,
-      finalValueFee,
-      promotedListingFee,
-      shippingLabelCost,
-      paymentProcessingFee,
-      regulatoryFee,
-      totalEbayFees,
-      estimatedFees,
-      feeDelta,
-      netProfit,
-      promotedRate,
-      promotedActive ? 1 : 0,
-      buildFinancesSummary(financeData?.raw || [])
+      grossSalePrice,
+      saleDate,
+      daysToSell,
+      item.id,
+      userId
     ).run();
-
-    reconRow = {
-      id: reconId,
-      sale_id: saleId,
-      ebay_order_id: ebayOrderId,
-      final_value_fee: finalValueFee,
-      promoted_listing_fee: promotedListingFee,
-      shipping_label_cost: shippingLabelCost,
-      payment_processing_fee: paymentProcessingFee,
-      regulatory_fee: regulatoryFee,
-      total_ebay_fees: totalEbayFees,
-      reconciled_net_profit: netProfit,
-      fee_delta: feeDelta
-    };
+  } catch (postSaleErr) {
+    console.error(`[reconcileAndSaveEbaySale] Error updating reconciliations or item for item ${item.id}:`, postSaleErr);
+    await env.DB.prepare('DELETE FROM ebay_fee_reconciliations WHERE sale_id = ? AND user_id = ?').bind(saleId, userId).run().catch(() => {});
+    await env.DB.prepare('DELETE FROM auction_sales WHERE id = ? AND user_id = ?').bind(saleId, userId).run().catch(() => {});
+    await env.DB.prepare(`
+      UPDATE auction_items SET
+        status = ?, actual_sell_price = ?, date_sold = ?, days_on_market = ?, updated_at = datetime('now')
+      WHERE id = ? AND user_id = ?
+    `).bind(item.status, item.actual_sell_price, item.date_sold, item.days_on_market, item.id, userId).run().catch(() => {});
+    throw postSaleErr;
   }
-
-  // Update auction_items status & pricing
-  await env.DB.prepare(`
-    UPDATE auction_items SET
-      status = 'Sold',
-      actual_sell_price = ?,
-      date_sold = ?,
-      days_on_market = ?,
-      updated_at = datetime('now')
-    WHERE id = ? AND user_id = ?
-  `).bind(
-    grossSalePrice,
-    saleDate,
-    daysToSell,
-    item.id,
-    userId
-  ).run();
 
   const updatedItem = await env.DB.prepare(
     'SELECT * FROM auction_items WHERE id = ? AND user_id = ?'

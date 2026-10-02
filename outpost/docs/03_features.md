@@ -58,3 +58,28 @@ Spreadsheet-like inline grid editing enables rapid data entry directly within ta
    - Validates numeric inputs against bounds (non-negative numbers).
    - Viewport threshold check (`< 640px`) disables inline editing on small mobile devices, seamlessly delegating to the comprehensive edit modal.
 
+## Backend Data Integrity and Error Handling Audit [ACTION ID: AUDIT-001]
+
+Comprehensive audit and hardening of all serverless API mutation routes (`functions/api/**/*.js`) in Outpost to eliminate orphaned records, unhandled exceptions, and silent failures from incomplete Cloudflare D1 multi-step operations.
+
+### Key Capabilities
+1. **Compensating Rollback Handlers**:
+   - Multi-step database operations that cannot be batched in a single atomic SQL call are protected by dedicated try/catch compensating logic.
+   - If secondary inserts or external updates fail, compensating rollback SQL is executed (e.g., purging newly created records, rolling back item statuses from `'Sold'` to previous states, restoring pre-proration invoice state, or purging partial batches).
+2. **Atomic Batch Mutations (`env.DB.batch`)**:
+   - Replaced fragile sequential D1 queries with atomic `env.DB.batch(...)` calls for cascading operations:
+     - `DELETE /api/sales/:id`: Atomically purges linked `ebay_fee_reconciliations`, deletes `auction_sales`, and reverts item status back to `'Listed'` or `'Available'`.
+     - `DELETE /api/items/:id`: Atomically deletes associated `auction_comps` and the `auction_items` record.
+     - `DELETE /api/invoices/:id`: Atomically deletes comps, items, and invoice records.
+     - `POST /api/platforms` & `PUT /api/platforms/:id`: Atomically unsets default platform flags when setting a new default.
+     - Password reset token invalidation and verification.
+3. **Orphaned State Prevention in Batch & External Ingestion**:
+   - `outpost/functions/api/import/batch.js`: Failure during replacement strategy now triggers `cleanupBatch`, which purges imported items/invoices and reverts any orphaned sold items back to `'Available'`, returning HTTP 500 instead of silent 200.
+   - `outpost/functions/api/ebay/reconcile.js`: Injects compensating deletion and field restoration if reconciliation persistence fails.
+   - `outpost/functions/api/sync/vinescout-catalog.js` & `outpost/functions/api/ebay/match-sold-vinescout.js`: Injects snapshot rollback of `auction_items` status and attributes if sales creation fails.
+   - `outpost/functions/api/import/amazon.js` & `outpost/functions/api/import/amazon-url.js`: Deletes created `auction_invoices` if downstream item creation fails.
+   - `outpost/functions/api/auth/register.js`: Purges created user and default platform rows if verification token generation fails.
+4. **Standardized Error Handling & Response Sanitization**:
+   - All failure paths return standardized JSON payloads `{ error: '...' }` with appropriate HTTP status codes (400, 401, 403, 404, 500) rather than hanging or returning 200 OK with empty/null bodies.
+   - Internal error details and database driver exceptions are sanitized to avoid sensitive system leakage.
+

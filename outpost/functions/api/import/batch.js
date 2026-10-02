@@ -165,25 +165,38 @@ export async function onRequestPost(context) {
     if(statements.length===0)return ok({success:true,imported:{invoices:0,items:0,sales:0,comps:0}});
 
     try{for(let i=0;i<statements.length;i+=CHUNK_SIZE)await env.DB.batch(statements.slice(i,i+CHUNK_SIZE));}
-    catch(e){await cleanupBatch(env.DB,importBatchId);return err('Batch insert failed. No existing data was modified. '+(e.message||''),500);}
+    catch(e){console.error('[batch] insert error:', e); await cleanupBatch(env.DB,importBatchId,userId);return err('Batch insert failed. No existing data was modified.',500);}
 
     try{
       const c=await env.DB.prepare('SELECT (SELECT COUNT(*) FROM auction_invoices WHERE import_batch_id=?) AS ic,(SELECT COUNT(*) FROM auction_items WHERE import_batch_id=?) AS itc,(SELECT COUNT(*) FROM auction_sales WHERE import_batch_id=?) AS sc,(SELECT COUNT(*) FROM auction_comps WHERE import_batch_id=?) AS cc').bind(importBatchId,importBatchId,importBatchId,importBatchId).first();
       if(Number(c?.ic||0)<invoices.length||Number(c?.itc||0)<items.length||Number(c?.sc||0)<sales.length||Number(c?.cc||0)<comps.length){
-        await cleanupBatch(env.DB,importBatchId);return err('Verification failed: incomplete insert. No existing data modified.',500);
+        await cleanupBatch(env.DB,importBatchId,userId);return err('Verification failed: incomplete insert. No existing data modified.',500);
       }
-    }catch(e){await cleanupBatch(env.DB,importBatchId);return err('Verification failed: '+(e.message||''),500);}
+    }catch(e){console.error('[batch] verification error:', e); await cleanupBatch(env.DB,importBatchId,userId);return err('Verification failed: incomplete insert. No existing data modified.',500);}
 
     if(strategy==='replace'){
       try{await env.DB.batch([env.DB.prepare('DELETE FROM auction_sales WHERE user_id=? AND (import_batch_id IS NULL OR import_batch_id!=?)').bind(userId,importBatchId),env.DB.prepare('DELETE FROM auction_comps WHERE user_id=? AND (import_batch_id IS NULL OR import_batch_id!=?)').bind(userId,importBatchId),env.DB.prepare('DELETE FROM auction_items WHERE user_id=? AND (import_batch_id IS NULL OR import_batch_id!=?)').bind(userId,importBatchId),env.DB.prepare('DELETE FROM auction_invoices WHERE user_id=? AND (import_batch_id IS NULL OR import_batch_id!=?)').bind(userId,importBatchId)]);}
-      catch(e){console.error('[batch] post-insert delete failed:',e.message);}
+      catch(e){console.error('[batch] post-insert delete failed:', e); await cleanupBatch(env.DB,importBatchId,userId); return err('Batch replace failed during old records purge. Database rolled back.', 500);}
     }
 
     return ok({success:true,imported:{invoices:invoices.length,items:items.length,sales:sales.length,comps:comps.length}});
   });
 }
 
-async function cleanupBatch(db,batchId){
-  try{await db.batch([db.prepare('DELETE FROM auction_comps WHERE import_batch_id=?').bind(batchId),db.prepare('DELETE FROM auction_sales WHERE import_batch_id=?').bind(batchId),db.prepare('DELETE FROM auction_items WHERE import_batch_id=?').bind(batchId),db.prepare('DELETE FROM auction_invoices WHERE import_batch_id=?').bind(batchId)]);}
+async function cleanupBatch(db,batchId,userId){
+  try{
+    const stmts = [
+      db.prepare('DELETE FROM auction_comps WHERE import_batch_id=?').bind(batchId),
+      db.prepare('DELETE FROM auction_sales WHERE import_batch_id=?').bind(batchId),
+      db.prepare('DELETE FROM auction_items WHERE import_batch_id=?').bind(batchId),
+      db.prepare('DELETE FROM auction_invoices WHERE import_batch_id=?').bind(batchId)
+    ];
+    if (userId) {
+      stmts.push(
+        db.prepare("UPDATE auction_items SET status='Available', date_sold=NULL, actual_sell_price=NULL, updated_at=datetime('now') WHERE user_id=? AND status='Sold' AND id NOT IN (SELECT item_id FROM auction_sales WHERE user_id=? AND item_id IS NOT NULL)").bind(userId, userId)
+      );
+    }
+    await db.batch(stmts);
+  }
   catch(_){}
 }

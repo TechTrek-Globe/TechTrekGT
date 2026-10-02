@@ -282,7 +282,29 @@ export async function onRequestPost(context) {
 
     // If item is sold, automatically reconcile and save sale
     if (isSold) {
-      const saleResult = await reconcileAndSaveEbaySale(env, payload.userId, updatedItem, orderData, financeData);
+      let saleResult;
+      try {
+        saleResult = await reconcileAndSaveEbaySale(env, payload.userId, updatedItem, orderData, financeData);
+      } catch (saleErr) {
+        console.error('[sync-item] Failed to record sold item sale:', saleErr);
+        await env.DB.prepare(`
+          UPDATE auction_items SET
+            status = ?,
+            actual_sell_price = ?,
+            date_sold = ?,
+            days_on_market = ?,
+            updated_at = datetime('now')
+          WHERE id = ? AND user_id = ?
+        `).bind(
+          item.status,
+          item.actual_sell_price,
+          item.date_sold,
+          item.days_on_market,
+          itemId,
+          payload.userId
+        ).run().catch(() => {});
+        return err('Failed to record sold item sale. Item state restored.', 500);
+      }
 
       return ok({
         success: true,

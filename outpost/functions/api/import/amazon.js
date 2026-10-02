@@ -206,34 +206,40 @@ export async function onRequestPost(context) {
   const itemId = `item-${crypto.randomUUID()}`;
   const itemSku = await generateUniqueSku(env.DB, userId, new Date(), 5);
 
-  await env.DB.prepare(`
-    INSERT INTO auction_items (
-      id, user_id, invoice_id, item_name, category, athlete_person,
-      authenticator, cert_number, unit_price, item_base_total,
-      proration_weight, prorated_discount, prorated_shipping, prorated_tax, true_total_cost,
-      status, platform, platform_fee_pct, platform_flat_fee,
-      est_shipping_cost, boost_pct, min_sell_price, suggested_list_price,
-      current_list_price, target_margin_pct, date_acquired, notes, attributes, sku
-    ) VALUES (
-      ?,?,?,?,?,?,
-      ?,?,?,?,
-      ?,?,?,?,?,
-      ?,?,?,?,
-      ?,?,?,?,
-      ?,?,?,?,?,?
-    )
-  `).bind(
-    itemId, userId, invoiceId,
-    title.trim(), resolvedCat, null,
-    null, null, unitPrice, unitPrice,
-    proration.proration_weight, proration.prorated_discount,
-    proration.prorated_shipping, proration.prorated_tax,
-    proration.true_total_cost,
-    'Available', plat.name, plat.fee_pct, plat.flat_fee,
-    0, 0,
-    pricing.min_sell_price, pricing.suggested_list_price,
-    null, DEFAULT_TARGET_MARGIN_PCT, today, itemNotes, attributes, itemSku
-  ).run();
+  try {
+    await env.DB.prepare(`
+      INSERT INTO auction_items (
+        id, user_id, invoice_id, item_name, category, athlete_person,
+        authenticator, cert_number, unit_price, item_base_total,
+        proration_weight, prorated_discount, prorated_shipping, prorated_tax, true_total_cost,
+        status, platform, platform_fee_pct, platform_flat_fee,
+        est_shipping_cost, boost_pct, min_sell_price, suggested_list_price,
+        current_list_price, target_margin_pct, date_acquired, notes, attributes, sku
+      ) VALUES (
+        ?,?,?,?,?,?,
+        ?,?,?,?,
+        ?,?,?,?,?,
+        ?,?,?,?,
+        ?,?,?,?,
+        ?,?,?,?,?,?
+      )
+    `).bind(
+      itemId, userId, invoiceId,
+      title.trim(), resolvedCat, null,
+      null, null, unitPrice, unitPrice,
+      proration.proration_weight, proration.prorated_discount,
+      proration.prorated_shipping, proration.prorated_tax,
+      proration.true_total_cost,
+      'Available', plat.name, plat.fee_pct, plat.flat_fee,
+      0, 0,
+      pricing.min_sell_price, pricing.suggested_list_price,
+      null, DEFAULT_TARGET_MARGIN_PCT, today, itemNotes, attributes, itemSku
+    ).run();
+  } catch (itemErr) {
+    console.error('[amazon-import] Failed to insert item, cleaning up invoice:', itemErr);
+    await env.DB.prepare('DELETE FROM auction_invoices WHERE id = ? AND user_id = ?').bind(invoiceId, userId).run().catch(() => {});
+    return err('Failed to import item. Database state rolled back.', 500);
+  }
 
   return ok({ success: true, item_id: itemId, sku: itemSku, invoice_ref: invoiceRef }, 201);
 }

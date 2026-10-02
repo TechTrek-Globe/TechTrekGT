@@ -118,11 +118,21 @@ export async function onRequestPut(context) {
       );
     }
 
-    if (updateStatements.length > 0) {
-      const CHUNK_SIZE = 50;
-      for (let i = 0; i < updateStatements.length; i += CHUNK_SIZE) {
-        await env.DB.batch(updateStatements.slice(i, i + CHUNK_SIZE));
+    try {
+      if (updateStatements.length > 0) {
+        const CHUNK_SIZE = 50;
+        for (let i = 0; i < updateStatements.length; i += CHUNK_SIZE) {
+          await env.DB.batch(updateStatements.slice(i, i + CHUNK_SIZE));
+        }
       }
+    } catch (reprorateErr) {
+      console.error('[invoices] Failed to re-prorate items, reverting invoice:', reprorateErr);
+      await env.DB.prepare(`
+        UPDATE auction_invoices
+        SET invoice_ref = ?, description = ?, discount = ?, shipping = ?, tax = ?, date_acquired = ?
+        WHERE id = ? AND user_id = ?
+      `).bind(invoice.invoice_ref, invoice.description, invoice.discount, invoice.shipping, invoice.tax, invoice.date_acquired, id, payload.userId).run().catch(() => {});
+      return err('Failed to re-prorate invoice items. Invoice state restored.', 500);
     }
 
     return ok({ success: true, message: `Invoice updated and ${existing.results?.length || 0} items re-prorated.` });
@@ -154,9 +164,31 @@ export async function onRequestDelete(context) {
       return err('Cannot delete an invoice that has recorded sales. Archive items instead.', 409);
     }
 
-    // Delete items first, then invoice (FK cascade may not fire in D1)
-    await env.DB.prepare('DELETE FROM auction_items WHERE invoice_id = ? AND user_id = ?').bind(id, payload.userId).run();
-    await env.DB.prepare('DELETE FROM auction_invoices WHERE id = ? AND user_id = ?').bind(id, payload.userId).run();
+    // Delete comps, items, and invoice atomically in a single batch
+    const deleteCompsStmt = env.DB.prepare(
+      'DELETE FROM auction_comps WHERE user_id = ? AND item_id IN (SELECT id FROM auction_items WHERE invoice_id = ? AND user_id = ?)'
+    ).bind(payload.userId, id, payload.userId);
+
+    const deleteItemsStmt = env.DB.prepare(
+      'DELETE FROM auction_items WHERE invoice_id = ? AND user_id = ?'
+    ).bind(id, payload.userId);
+
+    const deleteInvStmt = env.DB.prepare(
+      'DELETE FROM auction_invoices WHERE id = ? AND user_id = ?'
+    ).bind(id, payload.userId);
+
+    try {
+      if (typeof env.DB.batch === 'function') {
+        await env.DB.batch([deleteCompsStmt, deleteItemsStmt, deleteInvStmt]);
+      } else {
+        await deleteCompsStmt.run();
+        await deleteItemsStmt.run();
+        await deleteInvStmt.run();
+      }
+    } catch (delErr) {
+      console.error('[invoices] Failed to delete invoice and associated items:', delErr);
+      return err('Failed to delete invoice. Database state preserved.', 500);
+    }
 
     return ok({ success: true });
   });

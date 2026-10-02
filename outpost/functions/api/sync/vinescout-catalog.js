@@ -188,12 +188,35 @@ export async function onRequestPost(context) {
       userId
     ).run();
 
-    await markItemSold(env, userId, row, {
-      sale_date: finalSaleDate,
-      gross_sale_price: parsedSalePrice,
-      ebay_order_id: ebay_order_id ? String(ebay_order_id) : null,
-      days_to_sell: daysOnMarket
-    });
+    try {
+      await markItemSold(env, userId, row, {
+        sale_date: finalSaleDate,
+        gross_sale_price: parsedSalePrice,
+        ebay_order_id: ebay_order_id ? String(ebay_order_id) : null,
+        days_to_sell: daysOnMarket
+      });
+    } catch (saleErr) {
+      console.error('[vinescout-catalog] Failed to record sale in Sold Tracker, reverting item:', saleErr);
+      await env.DB.prepare(`
+        UPDATE auction_items SET
+          status = ?,
+          actual_sell_price = ?,
+          date_sold = ?,
+          days_on_market = ?,
+          attributes = ?,
+          updated_at = datetime('now')
+        WHERE id = ? AND user_id = ?
+      `).bind(
+        row.status,
+        row.actual_sell_price,
+        row.date_sold,
+        row.days_on_market,
+        row.attributes,
+        item_id,
+        userId
+      ).run().catch(() => {});
+      return err('Failed to record sale in Sold Tracker. Item state restored.', 500);
+    }
 
     return ok({ success: true, item_id });
   });

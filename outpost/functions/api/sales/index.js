@@ -215,27 +215,33 @@ export async function onRequestPost(context) {
     const savedSale = await upsertSale(env, payload.userId, record);
     const saleId = savedSale.id;
 
-    // Update item status to Sold with sale metadata
-    await env.DB.prepare(`
-      UPDATE auction_items SET
-        status = 'Sold',
-        actual_sell_price = ?,
-        date_sold = ?,
-        days_on_market = ?,
-        updated_at = datetime('now')
-      WHERE id = ? AND user_id = ?
-    `).bind(
-      // T-08 item 5: bind the VALIDATED gross price from the normalized record.
-      // This line previously bound the raw `gross_sale_price` request field,
-      // which could be a numeric string, absent entirely, or a value rejected
-      // by the sale validator - leaving the item row disagreeing with the sale
-      // row about what was actually sold.
-      record.gross_sale_price,
-      record.sale_date,
-      record.days_to_sell ?? null,
-      item_id,
-      payload.userId
-    ).run();
+    try {
+      // Update item status to Sold with sale metadata
+      await env.DB.prepare(`
+        UPDATE auction_items SET
+          status = 'Sold',
+          actual_sell_price = ?,
+          date_sold = ?,
+          days_on_market = ?,
+          updated_at = datetime('now')
+        WHERE id = ? AND user_id = ?
+      `).bind(
+        // T-08 item 5: bind the VALIDATED gross price from the normalized record.
+        // This line previously bound the raw `gross_sale_price` request field,
+        // which could be a numeric string, absent entirely, or a value rejected
+        // by the sale validator - leaving the item row disagreeing with the sale
+        // row about what was actually sold.
+        record.gross_sale_price,
+        record.sale_date,
+        record.days_to_sell ?? null,
+        item_id,
+        payload.userId
+      ).run();
+    } catch (itemErr) {
+      console.error('[sales] Failed to update item status, rolling back sale:', itemErr);
+      await env.DB.prepare('DELETE FROM auction_sales WHERE id = ? AND user_id = ?').bind(saleId, payload.userId).run().catch(() => {});
+      return err('Failed to finalize sale recording. Database state rolled back.', 500);
+    }
 
     return ok({
       success: true,

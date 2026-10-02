@@ -102,8 +102,11 @@ export async function onRequestPost(context) {
     const reconciledRoi = reconciledMetrics.roi_pct;
 
     const reconId = `recon-${crypto.randomUUID()}`;
+    const existingRecon = await env.DB.prepare(
+      'SELECT id FROM ebay_fee_reconciliations WHERE sale_id = ? AND user_id = ?'
+    ).bind(sale_id, payload.userId).first();
 
-    await env.DB.prepare(`
+    const reconStmt = env.DB.prepare(`
       INSERT INTO ebay_fee_reconciliations (
         id, sale_id, user_id, ebay_order_id,
         final_value_fee, promoted_listing_fee, shipping_label_cost,
@@ -137,10 +140,10 @@ export async function onRequestPost(context) {
       promotedListingRate,
       promotedListingActive ? 1 : 0,
       buildFinancesSummary(transactions)
-    ).run();
+    );
 
     // Stamp the sale row with reconciled fees, net proceeds, and profit
-    await env.DB.prepare(`
+    const saleUpdateStmt = env.DB.prepare(`
       UPDATE auction_sales SET
         fee_reconciled_at = datetime('now'),
         ebay_order_id = ?,
@@ -165,7 +168,47 @@ export async function onRequestPost(context) {
       reconciledRoi,
       sale_id,
       payload.userId
-    ).run();
+    );
+
+    try {
+      if (typeof env.DB.batch === 'function') {
+        await env.DB.batch([reconStmt, saleUpdateStmt]);
+      } else {
+        await reconStmt.run();
+        await saleUpdateStmt.run();
+      }
+    } catch (dbErr) {
+      console.error('[reconcile] Database transaction failed:', dbErr);
+      if (!existingRecon) {
+        await env.DB.prepare('DELETE FROM ebay_fee_reconciliations WHERE id = ? AND user_id = ?').bind(reconId, payload.userId).run().catch(() => {});
+      }
+      await env.DB.prepare(`
+        UPDATE auction_sales SET
+          fee_reconciled_at = ?,
+          ebay_order_id = ?,
+          platform_fees_amt = ?,
+          payment_processing_amt = ?,
+          promoted_listing_fee = ?,
+          actual_shipping_cost = ?,
+          net_proceeds = ?,
+          net_profit = ?,
+          roi_pct = ?
+        WHERE id = ? AND user_id = ?
+      `).bind(
+        sale.fee_reconciled_at || null,
+        sale.ebay_order_id || null,
+        sale.platform_fees_amt || null,
+        sale.payment_processing_amt || null,
+        sale.promoted_listing_fee || null,
+        sale.actual_shipping_cost || null,
+        sale.net_proceeds || null,
+        sale.net_profit || null,
+        sale.roi_pct || null,
+        sale_id,
+        payload.userId
+      ).run().catch(() => {});
+      return err('Failed to persist fee reconciliation. Database state restored.', 500);
+    }
 
     return ok({
       reconciled: true,

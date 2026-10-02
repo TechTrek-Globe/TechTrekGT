@@ -2,20 +2,145 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  :root {
+    /* Brand palette */
+    --brand-50: #f0f7ff;
+    --brand-100: #e0effe;
+    --brand-500: #3b82f6;
+    --brand-600: #2563eb;
+    --brand-700: #1d4ed8;
+    --brand-900: #1e3a8a;
+
+    /* Semantic Theme Tokens (Dark Mode Default) */
+    --color-primary: #3b82f6;
+    --color-primary-hover: #2563eb;
+    --color-primary-active: #1d4ed8;
+    --color-primary-foreground: #ffffff;
+
+    --color-secondary: #64748b;
+    --color-secondary-hover: #475569;
+    --color-secondary-foreground: #f8fafc;
+
+    --color-success: #10b981;
+    --color-success-hover: #059669;
+    --color-success-foreground: #ffffff;
+
+    --color-warning: #f59e0b;
+    --color-warning-hover: #d97706;
+    --color-warning-foreground: #ffffff;
+
+    --color-danger: #ef4444;
+    --color-danger-hover: #dc2626;
+    --color-danger-foreground: #ffffff;
+
+    --color-accent: #f59e0b;
+    --color-accent-hover: #d97706;
+    --color-accent-foreground: #ffffff;
+
+    /* Surface & Background */
+    --color-bg-base: #050811;
+    --color-bg-surface: #0f172a;
+    --color-bg-subtle: #1e293b;
+    --color-bg-elevated: #1e293b;
+    --color-bg-overlay: rgba(0, 0, 0, 0.75);
+
+    /* Text Tokens */
+    --color-text-primary: #f8fafc;
+    --color-text-secondary: #94a3b8;
+    --color-text-muted: #64748b;
+    --color-text-inverted: #0f172a;
+
+    /* Border Tokens */
+    --color-border: #1e293b;
+    --color-border-subtle: rgba(255, 255, 255, 0.08);
+    --color-border-focus: #3b82f6;
+
+    /* Glass Panels */
+    --panel-bg: rgba(8, 12, 22, 0.85);
+    --panel-border: rgba(245, 158, 11, 0.16);
+    --panel-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.45);
+    --card-bg: rgba(15, 23, 42, 0.75);
+    --card-border: rgba(245, 158, 11, 0.12);
+  }
+
+  html.light,
+  :root.light {
+    /* Brand palette */
+    --brand-50: #eff6ff;
+    --brand-100: #dbeafe;
+    --brand-500: #3b82f6;
+    --brand-600: #2563eb;
+    --brand-700: #1d4ed8;
+    --brand-900: #1e3a8a;
+
+    /* Semantic Theme Tokens (Light Mode) */
+    --color-primary: #2563eb;
+    --color-primary-hover: #1d4ed8;
+    --color-primary-active: #1e40af;
+    --color-primary-foreground: #ffffff;
+
+    --color-secondary: #64748b;
+    --color-secondary-hover: #475569;
+    --color-secondary-foreground: #ffffff;
+
+    --color-success: #059669;
+    --color-success-hover: #047857;
+    --color-success-foreground: #ffffff;
+
+    --color-warning: #d97706;
+    --color-warning-hover: #b45309;
+    --color-warning-foreground: #ffffff;
+
+    --color-danger: #dc2626;
+    --color-danger-hover: #b91c1c;
+    --color-danger-foreground: #ffffff;
+
+    --color-accent: #2563eb;
+    --color-accent-hover: #1d4ed8;
+    --color-accent-foreground: #ffffff;
+
+    /* Surface & Background */
+    --color-bg-base: #f8fafc;
+    --color-bg-surface: #ffffff;
+    --color-bg-subtle: #f1f5f9;
+    --color-bg-elevated: #ffffff;
+    --color-bg-overlay: rgba(15, 23, 42, 0.5);
+
+    /* Text Tokens */
+    --color-text-primary: #0f172a;
+    --color-text-secondary: #475569;
+    --color-text-muted: #94a3b8;
+    --color-text-inverted: #ffffff;
+
+    /* Border Tokens */
+    --color-border: #cbd5e1;
+    --color-border-subtle: #e2e8f0;
+    --color-border-focus: #2563eb;
+
+    /* Glass Panels */
+    --panel-bg: rgba(255, 255, 255, 0.95);
+    --panel-border: rgba(203, 213, 225, 0.8);
+    --panel-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+    --card-bg: rgba(255, 255, 255, 0.98);
+    --card-border: rgba(226, 232, 240, 0.9);
+  }
+}
+
 @layer utilities {
   /* Glassmorphism panels */
   .glass-panel {
-    background: rgba(8, 12, 22, 0.85);
+    background: var(--panel-bg, rgba(8, 12, 22, 0.85));
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(245, 158, 11, 0.16);
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.45);
+    border: 1px solid var(--panel-border, rgba(245, 158, 11, 0.16));
+    box-shadow: var(--panel-shadow, 0 8px 32px 0 rgba(0, 0, 0, 0.45));
   }
   .glass-card {
-    background: rgba(15, 23, 42, 0.75);
+    background: var(--card-bg, rgba(15, 23, 42, 0.75));
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
-    border: 1px solid rgba(245, 158, 11, 0.12);
+    border: 1px solid var(--card-border, rgba(245, 158, 11, 0.12));
   }
 
   /* Gradient text */

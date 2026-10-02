@@ -83,9 +83,11 @@
 
 ### Cause RC-004: Vite Internal Dev Module Route Handling in `worker.js`
 - **Introducing Task:** Task T-05
-- **File & Line:** [outpost/src/worker.js:507-511](file:///e:/TechTrekGT/outpost/src/worker.js#L507-L511)
-- **Proof:** Suffix check `/\.[a-zA-Z0-9]+$/` sent `/outpost/@vite/client` and `/outpost/@react-refresh` to SPA fallback, returning HTML instead of JS.
-- **Fix Commit Hash:** `9774dc85` (`FIX(worker): support Vite dev module paths and base redirect handling in SPA router [task T-05]`)
+- **File & Line:** [outpost/src/worker.js:464-508](file:///e:/TechTrekGT/outpost/src/worker.js#L464-L508)
+- **Proof:** Suffix check `/\.[a-zA-Z0-9]+$/` sent `/outpost/@vite/client` and `/outpost/@react-refresh` to SPA fallback or stripped `/outpost` from dev asset imports (e.g. `/outpost/src/assets/outpost-ai-cropped.webp?import`), returning 404 from Vite.
+- **Fix Commit Hashes:**
+  - `9774dc85` (`FIX(worker): support Vite dev module paths and base redirect handling in SPA router [task T-05]`)
+  - `eff4b8d2` (`FIX(worker): prioritize Vite dev module paths before direct static asset pattern matching [task T-05]`)
 
 ---
 

@@ -145,3 +145,13 @@ To eliminate cryptographic key reuse between session signing and transient one-t
   - **Authenticated Gate:** Requires a valid authenticated session (`authenticate` with `requireCsrf: true`). Unauthenticated requests are rejected with 401 UNAUTHORIZED before any passcode comparison runs.
   - **Dual Rate Limiting:** Enforces both per-IP rate limiting (5 attempts / 300s) and per-account rate limiting (5 attempts / 300s keyed on `auth.user.id`) to stop distributed brute force attacks against individual accounts.
   - **Constant-Time Verification:** Uses `constantTimeStringEqual` against `SYNC_UNLOCK_CODE`. Fails closed with 503 SERVICE_UNAVAILABLE if `SYNC_UNLOCK_CODE` is unconfigured.
+
+---
+
+## 5. Web Worker Architecture & Spreadsheet Offloading (MED-001)
+
+- **Dedicated Web Worker (`src/workers/spreadsheet.worker.js`):** Heavy SheetJS (`xlsx`) workbook inspection, multi-sheet preview extraction, and row-level normalization run entirely off the browser main thread in a dedicated Web Worker module chunk.
+- **Worker Client Interface (`src/utils/spreadsheetWorkerClient.js`):** Exposes asynchronous promise-based wrappers (`inspectWorkbookAsync`, `parseSingleSheetAsync`, `parseSpreadsheetAsync`, `parseGenericFlatAsync`) that dispatch processing to the background worker and await results without UI stutter or thread freezing.
+- **Graceful Node / SSR Fallback:** When running in non-browser environments (such as Node.js unit tests where `Worker` is undefined), the client falls back to synchronous in-process execution, guaranteeing 100% test compatibility.
+- **Zero Cloudflare Bundle Bloat:** `parseSpreadsheetWorker` exported from `src/worker.js` uses dynamic `import()` to ensure the Cloudflare Worker serverless runtime bundle does not bundle the heavy `xlsx` dependency into its cold-start bundle.
+

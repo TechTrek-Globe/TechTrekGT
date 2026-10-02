@@ -18,9 +18,8 @@ import {
   Sparkles,
   Check
 } from 'lucide-react';
-import * as XLSX from 'xlsx';
-import { parseSpreadsheet } from '../../utils/spreadsheetParser';
-import { detectFileType, parseGenericFlat, autoMatchColumns, applyTransactionMapping } from '../../utils/importer';
+import { parseSpreadsheetAsync, parseGenericFlatAsync, inspectWorkbookAsync } from '../../utils/spreadsheetWorkerClient';
+import { detectFileType, autoMatchColumns, applyTransactionMapping } from '../../utils/importer';
 import { fmtMoney } from '../../utils/formatters';
 import { 
   getPersonBillMonthlyPortionForAccount, 
@@ -183,15 +182,15 @@ export function AccountsPeoplePanel() {
     setIsAccImporting(true);
     try {
       const arrayBuffer = await file.arrayBuffer();
-      const wb = XLSX.read(arrayBuffer, { type: 'array' });
-      const firstSheet = wb.Sheets[wb.SheetNames[0]];
-      const previewRows = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: '' });
+      const inspection = await inspectWorkbookAsync(arrayBuffer, file.name);
+      const firstSheetInfo = inspection.sheetsInfo?.[0];
+      const previewRows = firstSheetInfo?.previewRows || [];
       const firstHeaderRow = previewRows.find(r => r && r.some(c => String(c).toLowerCase().includes('date'))) || [];
       const sampleHeaders = firstHeaderRow.map(c => String(c).trim());
 
-      const detected = detectFileType(file.name, wb.SheetNames, sampleHeaders);
+      const detected = detectFileType(file.name, inspection.sheetNames || [], sampleHeaders);
       if (detected === 'emory_parc') {
-        const res = parseSpreadsheet(arrayBuffer, file.name, budget.bills || []);
+        const res = await parseSpreadsheetAsync(arrayBuffer, file.name, budget.bills || []);
         if (!res.success) throw new Error(res.error || 'Failed to parse workbook.');
         const matchingAcc = res.budget?.accounts?.[0];
         const txns = res.budget?.transactions || [];
@@ -213,7 +212,7 @@ export function AccountsPeoplePanel() {
           count: txns.length,
         });
       } else {
-        const { headers, rows } = parseGenericFlat(arrayBuffer);
+        const { headers, rows } = await parseGenericFlatAsync(arrayBuffer);
         if (headers.length === 0) throw new Error('No valid columns found.');
         const { mapping } = autoMatchColumns(headers, 'transactions');
         const { records, importedLedgerRows } = applyTransactionMapping(rows, mapping);

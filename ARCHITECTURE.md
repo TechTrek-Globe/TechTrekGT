@@ -28,7 +28,7 @@ TechTrekGT is a multi-application platform hosted on `techtrekgt.com`. The repos
 | Styling | Tailwind CSS 3.4 | Utility-first, custom palettes per app (`brand`, `wf-*`, `outpost-*`) |
 | Icons | lucide-react | Consistent icon set across all apps |
 | Charts | Recharts 2.15 | Used in finance and outpost dashboards |
-| Spreadsheets | xlsx | Excel/CSV import/export in finance and outpost |
+| Spreadsheets | xlsx, Web Workers | Excel/CSV import/export in finance (offloaded to dedicated Web Worker, MED-001) and outpost |
 | Drag & drop | @dnd-kit | Dashboard widget reordering (finance) |
 | PDF parsing | pdfjs-dist | Invoice PDF parsing (outpost) |
 

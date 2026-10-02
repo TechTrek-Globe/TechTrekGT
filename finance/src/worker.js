@@ -989,5 +989,14 @@ const worker = {
   }
 };
 
+/**
+ * MED-001: Serverless/Worker-compatible spreadsheet parsing entrypoint.
+ * Offloads heavy CSV/XLSX parsing logic via dynamic import to prevent cold-start bloat.
+ */
+export async function parseSpreadsheetWorker(fileData, fileName = '', existingBills = []) {
+  const { parseSpreadsheet } = await import('./utils/spreadsheetParser.js');
+  return parseSpreadsheet(fileData, fileName, existingBills);
+}
+
 export { addSecurityHeaders, fetchAsset };
 export default worker;

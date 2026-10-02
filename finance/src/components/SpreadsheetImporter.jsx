@@ -7,15 +7,13 @@ import {
   Users, Receipt, CreditCard, Loader2, X, Check, Eye,
   Layers, Table, Sparkles, HelpCircle, ArrowLeft, Radio
 } from 'lucide-react';
-import * as XLSX from 'xlsx';
-import { parseSpreadsheet, parseSingleSheet } from '../utils/spreadsheetParser';
+import { parseSingleSheetAsync, inspectWorkbookAsync } from '../utils/spreadsheetWorkerClient';
 import {
   detectFileType,
   parseGenericFlat,
   autoMatchColumns,
   applyTransactionMapping,
   applyBillMapping,
-  inspectWorkbookSheets,
   detectExtraHeaderRow,
   matchCreditToEarner,
   INTERNAL_TRANSACTION_FIELDS,
@@ -397,9 +395,8 @@ export function SpreadsheetImporter({
 
     try {
       const arrayBuffer = await file.arrayBuffer();
-      // UX-1: Yield to browser so the PARSING spinner paints before synchronous XLSX CPU work begins
-      await new Promise(resolve => setTimeout(resolve, 0));
-      const inspection = inspectWorkbookSheets(arrayBuffer, file.name, budget.accounts || []);
+      // Offload workbook inspection to Web Worker to prevent main thread blocking (MED-001)
+      const inspection = await inspectWorkbookAsync(arrayBuffer, file.name, budget.accounts || []);
 
       if (!inspection.sheetNames || inspection.sheetNames.length === 0) {
         throw new Error('No readable sheets found in the spreadsheet.');
@@ -516,7 +513,7 @@ export function SpreadsheetImporter({
   };
 
   // --- Sheet Wizard Parse Handler (Parses the 1 Selected Sheet) ---
-  const handleParseSelectedSheet = () => {
+  const handleParseSelectedSheet = async () => {
     try {
       const sheetInfo = workbookSheets.find(s => s.name === selectedSheetName);
       if (!sheetInfo) throw new Error(`Sheet "${selectedSheetName}" not found.`);
@@ -535,7 +532,7 @@ export function SpreadsheetImporter({
         targetAccName: targetAcc?.name
       });
 
-      const parsedSheet = parseSingleSheet({
+      const parsedSheet = await parseSingleSheetAsync({
         rawRows: sheetInfo.rawRows || [],
         sheetName: selectedSheetName,
         headerRowIdx: config.headerRowIdx,

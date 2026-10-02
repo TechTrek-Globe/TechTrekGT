@@ -30,6 +30,16 @@ async function bufToHex(buf) {
     .join('');
 }
 
+function timingSafeEqual(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return diff === 0;
+}
+
 /**
  * Validates the HMAC-SHA256 signature on the raw request body.
  * Returns true if valid, false if invalid or missing.
@@ -37,15 +47,40 @@ async function bufToHex(buf) {
 async function validateHmac(rawBody, signatureHeader, secret) {
   if (!signatureHeader || !secret) return false;
   try {
+    const rawBytes = rawBody instanceof ArrayBuffer ? new Uint8Array(rawBody) : rawBody;
     const key = await crypto.subtle.importKey(
       'raw',
       new TextEncoder().encode(secret),
       { name: 'HMAC', hash: 'SHA-256' },
       false,
-      ['verify']
+      ['sign', 'verify']
     );
-    const sigBuf = base64ToArrayBuffer(signatureHeader);
-    return crypto.subtle.verify('HMAC', key, sigBuf, rawBody);
+
+    let candidate = signatureHeader.trim();
+    if (candidate.toLowerCase().startsWith('sha256=')) {
+      candidate = candidate.slice(7).trim();
+    }
+
+    const expectedSigBuf = await crypto.subtle.sign('HMAC', key, rawBytes);
+    const expectedHex = await bufToHex(expectedSigBuf);
+    const expectedB64 = btoa(String.fromCharCode(...new Uint8Array(expectedSigBuf)));
+
+    if (candidate.length === expectedHex.length && timingSafeEqual(candidate.toLowerCase(), expectedHex.toLowerCase())) {
+      return true;
+    }
+    if (candidate.length === expectedB64.length && timingSafeEqual(candidate, expectedB64)) {
+      return true;
+    }
+
+    try {
+      const sigBuf = base64ToArrayBuffer(candidate);
+      if (sigBuf.byteLength === 32) {
+        const verified = await crypto.subtle.verify('HMAC', key, sigBuf, rawBytes);
+        if (verified) return true;
+      }
+    } catch (_) {}
+
+    return false;
   } catch (_) {
     return false;
   }
@@ -217,11 +252,11 @@ export async function onRequestGet(context) {
     );
   }
 
-  const secret = env.EBAY_NOTIFICATION_SECRET;
+  const secret = env.EBAY_WEBHOOK_SECRET || env.EBAY_NOTIFICATION_SECRET;
   const endpointUrl = `${url.origin}/api/ebay/webhook`;
 
   if (!secret) {
-    return new Response('Server misconfiguration', { status: 500 });
+    return new Response('Server misconfiguration: missing webhook secret', { status: 500 });
   }
 
   const challengeResponse = await buildChallengeResponse(challengeCode, secret, endpointUrl);
@@ -240,13 +275,28 @@ export async function onRequestPost(context) {
 
   // Read raw body BEFORE any parsing - signature covers the raw bytes
   const rawBody = await request.arrayBuffer();
-  const signature = request.headers.get('X-EBAY-SIGNATURE') || '';
-  const secret = env.EBAY_NOTIFICATION_SECRET || '';
+  const signature = (
+    request.headers.get('X-EBAY-SIGNATURE') ||
+    request.headers.get('x-ebay-signature') ||
+    request.headers.get('X-Signature') ||
+    request.headers.get('x-signature') ||
+    request.headers.get('X-Hub-Signature-256') ||
+    request.headers.get('x-hub-signature-256') ||
+    request.headers.get('X-Webhook-Signature') ||
+    request.headers.get('x-webhook-signature') ||
+    ''
+  ).trim();
+  const secret = env.EBAY_WEBHOOK_SECRET || env.EBAY_NOTIFICATION_SECRET || '';
+
+  if (!signature) {
+    console.warn('[ebayWebhook] Missing signature header on incoming notification');
+    return new Response('Unauthorized: missing signature header', { status: 401 });
+  }
 
   const isValid = await validateHmac(rawBody, signature, secret);
   if (!isValid) {
     console.warn('[ebayWebhook] HMAC validation failed - rejecting notification');
-    return new Response('Forbidden', { status: 403 });
+    return new Response('Unauthorized: invalid signature', { status: 401 });
   }
 
   let payload;

@@ -39,6 +39,7 @@ import { onRequestPost as ebaySyncAllHandler } from '../functions/api/ebay/sync-
 import { onRequestGet as matchSoldVinescoutGetHandler, onRequestPost as matchSoldVinescoutPostHandler } from '../functions/api/ebay/match-sold-vinescout.js';
 import { onRequestPost as ebayPushSkuHandler } from '../functions/api/ebay/push-sku.js';
 import { onRequestGet as ebayAnalyticsHandler, onRequestPost as ebayAnalyticsIngestHandler } from '../functions/api/ebay/analytics.js';
+import { onRequestGet as ebayWebhookGetHandler, onRequestPost as ebayWebhookPostHandler } from '../functions/api/ebay/webhook.js';
 import { onRequestGet as vinescoutSalesExportHandler } from '../functions/api/export/vinescout-sales.js';
 import { onRequestGet as vinescoutInventoryExportHandler } from '../functions/api/export/vinescout-inventory.js';
 import { onRequestGet as vinescoutCatalogHandler } from '../functions/api/sync/vinescout-catalog.js';
@@ -242,6 +243,8 @@ export const ROUTES = [
   { method: 'GET',    pattern: '/api/ebay/analytics',         handler: ebayAnalyticsHandler,      auth: 'session' },
   { method: 'POST',   pattern: '/api/ebay/analytics/ingest-traffic', handler: ebayAnalyticsIngestHandler, auth: 'session' },
   { method: 'POST',   pattern: '/api/ebay/reconcile',         handler: ebayReconcileHandler,      auth: 'session' },
+  { method: 'GET',    pattern: '/api/ebay/webhook',           handler: ebayWebhookGetHandler,     auth: 'public' },
+  { method: 'POST',   pattern: '/api/ebay/webhook',           handler: ebayWebhookPostHandler,    auth: 'webhook' },
 
   // Export & VineScout Sync (7 routes)
   { method: 'GET',    pattern: '/api/export/vinescout-sales', handler: vinescoutSalesExportHandler, auth: 'bearer_or_secret' },

@@ -69,4 +69,11 @@ describe('Client Bundle & Import Integrity [task T-13]', () => {
 
     assert.deepEqual(undeclaredFound, [], `Found undeclared identifiers in client source: ${JSON.stringify(undeclaredFound)}`);
   });
+
+  it('TaxReportModal uses Blob URL for CSV export rather than fragile data URIs [task T-16]', () => {
+    const taxModalCode = fs.readFileSync(path.resolve('./src/components/TaxReportModal.jsx'), 'utf8');
+    assert.ok(taxModalCode.includes('new Blob(['), 'TaxReportModal must use new Blob for CSV content');
+    assert.ok(taxModalCode.includes('URL.createObjectURL(blob)'), 'TaxReportModal must use URL.createObjectURL for robust CSV download');
+    assert.ok(!taxModalCode.includes('data:text/csv'), 'TaxReportModal must not use data:text/csv data URIs');
+  });
 });

@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   LayoutDashboard, Package, ShoppingCart,
   Settings, LogOut, ChevronRight, ArrowRightLeft,
-  FileSpreadsheet, PanelLeftClose, PanelLeftOpen, Globe, ShieldCheck
+  FileSpreadsheet, PanelLeftClose, PanelLeftOpen, Globe, ShieldCheck,
+  Search, Command
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useCommandPalette } from '../context/CommandPaletteContext';
+import { CommandPalette } from './ui/CommandPalette';
 import { FinanceSyncModal } from './FinanceSyncModal';
 import { TaxReportModal } from './TaxReportModal';
 
@@ -30,6 +33,23 @@ export function AppLayout({ activeView, onNavigate, children }) {
     visibleNavItems.push({ id: 'admin', label: 'Admin', icon: ShieldCheck });
   }
   const [taxReportOpen, setTaxReportOpen] = useState(false);
+  const {
+    isOpen: commandPaletteOpen,
+    openPalette,
+    closePalette,
+    togglePalette
+  } = useCommandPalette();
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        togglePalette();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [togglePalette]);
 
   const [isCollapsed, setIsCollapsed] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -83,6 +103,35 @@ export function AppLayout({ activeView, onNavigate, children }) {
 
         {/* Nav */}
         <nav className={`px-2 py-3 space-y-1 flex-1 ${isCollapsed ? 'flex flex-col items-center' : ''}`}>
+          {/* Quick Command Palette Button */}
+          {isCollapsed ? (
+            <button
+              type="button"
+              id="sidebar-command-palette-btn"
+              onClick={openPalette}
+              title="Command Palette (Cmd+K / Ctrl+K)"
+              className="w-11 h-11 flex items-center justify-center rounded-xl text-slate-400 hover:text-amber-400 hover:bg-slate-800/60 border border-slate-800/80 transition-all mb-2 group"
+            >
+              <Search className="w-5 h-5 text-slate-400 group-hover:text-amber-400" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              id="sidebar-command-palette-btn"
+              onClick={openPalette}
+              title="Command Palette (Cmd+K / Ctrl+K)"
+              className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold text-slate-400 bg-slate-950/50 hover:bg-slate-800/60 hover:text-slate-200 border border-slate-800/80 transition-all group mb-2"
+            >
+              <div className="flex items-center gap-2">
+                <Search className="w-4 h-4 text-slate-400 group-hover:text-amber-400" />
+                <span>Search / Commands</span>
+              </div>
+              <kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold text-slate-400 bg-slate-800/90 border border-slate-700/60 rounded">
+                ⌘K
+              </kbd>
+            </button>
+          )}
+
           {visibleNavItems.map(({ id, label, icon: Icon }) => {
             const isActive = activeView === id;
             if (isCollapsed) {
@@ -266,6 +315,17 @@ export function AppLayout({ activeView, onNavigate, children }) {
             </a>
 
             <button
+              type="button"
+              id="mobile-command-palette-btn"
+              onClick={openPalette}
+              title="Command Palette (Cmd+K)"
+              className="p-1.5 rounded-lg bg-slate-800/80 text-amber-400 border border-slate-700/60 text-xs font-bold flex items-center gap-1"
+            >
+              <Search className="w-3.5 h-3.5" />
+              <span className="text-[10px] font-mono">⌘K</span>
+            </button>
+
+            <button
               onClick={() => setFinanceSyncOpen(true)}
               className="p-1.5 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-xs font-bold flex items-center gap-1"
             >
@@ -305,6 +365,13 @@ export function AppLayout({ activeView, onNavigate, children }) {
       </div>
 
       {/* Global Modals */}
+      <CommandPalette
+        isOpen={commandPaletteOpen}
+        onClose={closePalette}
+        onNavigate={onNavigate}
+        onOpenFinanceSync={() => setFinanceSyncOpen(true)}
+        onOpenTaxReport={() => setTaxReportOpen(true)}
+      />
       <FinanceSyncModal
         isOpen={financeSyncOpen}
         onClose={() => setFinanceSyncOpen(false)}

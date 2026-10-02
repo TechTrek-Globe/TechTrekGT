@@ -32,9 +32,9 @@ export async function onRequestGet(context) {
     if (status) { conditions.push('i.status = ?'); bindings.push(status); }
     if (invoice_id) { conditions.push('i.invoice_id = ?'); bindings.push(invoice_id); }
     if (q) {
-      conditions.push('(i.item_name LIKE ? OR i.athlete_person LIKE ? OR i.category LIKE ?)');
+      conditions.push('(i.item_name LIKE ? OR i.athlete_person LIKE ? OR i.category LIKE ? OR i.sku LIKE ?)');
       const like = `%${q}%`;
-      bindings.push(like, like, like);
+      bindings.push(like, like, like, like);
     }
 
     const whereClause = conditions.join(' AND ');

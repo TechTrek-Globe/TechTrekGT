@@ -7,6 +7,7 @@ import {
   buildEbaySearchUrl,
   normalizeHttps
 } from '../../utils/ebayUtils.js';
+import { checkRateLimit } from '../../utils/rateLimit.js';
 
 // ============================================================
 // GET /api/items/enriched
@@ -32,6 +33,19 @@ export async function onRequestGet(context) {
     const page           = Math.max(1, parseInt(url.searchParams.get('page') || '1'));
     const limit          = Math.min(200, Math.max(1, parseInt(url.searchParams.get('limit') || '50')));
     const offset         = (page - 1) * limit;
+
+    if (q) {
+      const rl = await checkRateLimit(env, `items-search:${payload.userId}`, 60, 60, false);
+      if (!rl.allowed) {
+        return new Response(JSON.stringify({ error: 'Search rate limit exceeded. Please wait a moment before searching again.' }), {
+          status: 429,
+          headers: {
+            'Content-Type': 'application/json',
+            'Retry-After': String(rl.retryAfter || 60)
+          }
+        });
+      }
+    }
 
     // Allowed sort columns (whitelist against SQL injection)
     const SORT_COLUMN_MAP = {

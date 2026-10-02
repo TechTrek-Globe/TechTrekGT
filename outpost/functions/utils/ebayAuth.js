@@ -97,6 +97,9 @@ export async function getEbayUserToken(env, userId) {
     }
     const text = await res.text().catch(() => '');
     console.error(`[ebayAuth] eBay token refresh failed (${res.status}):`, text);
+    if (res.status === 400 || res.status === 401) {
+      await env.DB.prepare('DELETE FROM ebay_oauth_tokens WHERE user_id = ?').bind(userId).run();
+    }
     throw new Error('eBay token refresh failed. Please reconnect your eBay account.');
   }
 

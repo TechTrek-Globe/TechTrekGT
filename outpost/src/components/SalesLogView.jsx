@@ -3,16 +3,17 @@ import {
   TrendingUp, Plus, Search, X, RefreshCw, Loader2, AlertCircle,
   Pencil, Trash2, DollarSign, Calendar, Tag, Package, Percent, Clock, ArrowUpRight, ChevronDown, ChevronUp, ExternalLink, Sparkles
 } from 'lucide-react';
-import { getSales, deleteSale, getPlatforms } from '../utils/auctionApi';
+import { getSales, deleteSale, getPlatforms, updateSale } from '../utils/auctionApi';
 import { getApiUrl } from '../utils/api';
 import { LogSaleModal } from './LogSaleModal';
 import { EditItemModal } from './EditItemModal';
 import { FeeReconciliationPanel } from './FeeReconciliationPanel';
-import { fmtCurrency, fmtPct } from '../utils/formulaPreview';
+import { fmtCurrency, fmtPct, computeSaleMetrics } from '../utils/formulaPreview';
 import { useInventory } from '../context/InventoryContext';
 import { DEFAULT_SALES_COLUMNS, saveUserSettings } from '../utils/userSettings';
 import { ItemImageHoverTooltip } from './inventory/ItemImageHoverTooltip';
 import { SoldEbayVineMatcherModal } from './inventory/SoldEbayVineMatcherModal';
+import { InlineEditableCell } from './ui/InlineEditableCell';
 
 export function SalesLogView() {
   const {
@@ -87,6 +88,8 @@ export function SalesLogView() {
 
   const [hoverTooltip, setHoverTooltip] = useState(null);
   const [imageHoverTarget, setImageHoverTarget] = useState(null);
+  const [savingCellMap, setSavingCellMap] = useState({});
+  const [editingCell, setEditingCell] = useState(null);
 
   const handleItemNameMouseEnter = (sale, e) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -173,6 +176,72 @@ export function SalesLogView() {
     setSaleToEdit(null);
     setModalOpen(true);
   };
+
+  const handleInlineSaleUpdate = useCallback(async (saleId, field, newValue) => {
+    const oldSale = sales.find(s => s.id === saleId);
+    if (!oldSale) return;
+
+    const numVal = parseFloat(newValue) || 0;
+    if (Number(oldSale[field] || 0) === numVal) return;
+
+    // Optimistically compute new sale metrics
+    const updatedSale = {
+      ...oldSale,
+      [field]: numVal
+    };
+    const metrics = computeSaleMetrics(updatedSale);
+    const finalSale = {
+      ...updatedSale,
+      ...metrics
+    };
+
+    // Calculate diffs for summary KPI updates
+    const grossDiff = (finalSale.gross_sale_price || 0) - (oldSale.gross_sale_price || 0);
+    const netProceedsDiff = (finalSale.net_proceeds || 0) - (oldSale.net_proceeds || 0);
+    const netProfitDiff = (finalSale.net_profit || 0) - (oldSale.net_profit || 0);
+
+    const prevSales = [...sales];
+    const prevSummary = { ...summary };
+
+    // Apply optimistic updates to table rows and summary KPIs
+    setSales(prev => prev.map(s => s.id === saleId ? finalSale : s));
+    setSummary(prev => {
+      const nextGross = Math.max(0, (prev.total_gross || 0) + grossDiff);
+      const nextNetProceeds = (prev.total_net_proceeds || 0) + netProceedsDiff;
+      const nextProfit = (prev.total_net_profit || 0) + netProfitDiff;
+      const totalCost = prev.total_cost || 0;
+      const nextRoi = totalCost > 0 ? (nextProfit / totalCost) : 0;
+      return {
+        ...prev,
+        total_gross: nextGross,
+        total_net_proceeds: nextNetProceeds,
+        total_net_profit: nextProfit,
+        blended_roi: nextRoi
+      };
+    });
+
+    const cellKey = `${saleId}-${field}`;
+    setSavingCellMap(prev => ({ ...prev, [cellKey]: true }));
+
+    try {
+      await updateSale(saleId, { [field]: numVal });
+      if (field === 'gross_sale_price' && oldSale.item_id && updateItemLocal) {
+        updateItemLocal(oldSale.item_id, { actual_sell_price: numVal });
+      }
+    } catch (err) {
+      console.error('Failed to update sale inline:', err);
+      setSales(prevSales);
+      setSummary(prevSummary);
+      setError(`Failed to update ${field === 'gross_sale_price' ? 'Gross Sale Price' : 'Shipping Cost'}: ${err.message || 'Server error'}`);
+      throw err;
+    } finally {
+      setSavingCellMap(prev => {
+        const next = { ...prev };
+        delete next[cellKey];
+        return next;
+      });
+    }
+  }, [sales, summary, updateItemLocal]);
 
   const handleEditSale = (sale) => {
     setSaleToEdit(sale);
@@ -486,7 +555,7 @@ export function SalesLogView() {
             <tbody className="divide-y divide-slate-800/40 text-slate-300">
               {loading && sales.length === 0 && (
                 <tr>
-                  <td colSpan={11} className="py-8 text-center text-slate-500">
+                  <td colSpan={DEFAULT_SALES_COLUMNS.length} className="py-8 text-center text-slate-500">
                     <Loader2 className="w-4 h-4 animate-spin mx-auto mb-1 text-amber-400" />
                     <p className="text-[11px]">Loading sales log...</p>
                   </td>
@@ -494,7 +563,7 @@ export function SalesLogView() {
               )}
               {!loading && sales.length === 0 && (
                 <tr>
-                  <td colSpan={11} className="py-8 text-center">
+                  <td colSpan={DEFAULT_SALES_COLUMNS.length} className="py-8 text-center">
                     <TrendingUp className="w-6 h-6 text-slate-700 mx-auto mb-1" />
                     <p className="text-slate-400 font-semibold text-xs">No sales recorded yet</p>
                     <p className="text-slate-600 text-[10px] mt-0.5">Record a sale from this tab or mark an item sold in inventory.</p>
@@ -577,20 +646,60 @@ export function SalesLogView() {
                         )}
                       </td>
 
-                      {/* Gross Sale (with Hover Breakdown) */}
+                      {/* Gross Sale (with Hover Breakdown & Inline Editing) */}
                       <td
-                        onMouseEnter={(e) => showTooltip('gross', sale, e)}
+                        onMouseEnter={(e) => !editingCell && showTooltip('gross', sale, e)}
                         onMouseLeave={hideTooltip}
                         style={{
                           width: `${getColWidth('gross_sale_price')}px`,
                           minWidth: '70px',
                           maxWidth: `${getColWidth('gross_sale_price')}px`
                         }}
-                        className="py-1 px-2 font-mono font-bold text-slate-100 text-right whitespace-nowrap text-xs cursor-help hover:text-amber-300 transition-colors overflow-hidden truncate"
+                        className="py-1 px-1.5 font-mono font-bold text-slate-100 text-right whitespace-nowrap text-xs overflow-hidden"
                       >
-                        <span className="underline decoration-dotted decoration-slate-700 hover:decoration-amber-400">
-                          {fmtCurrency(sale.gross_sale_price)}
-                        </span>
+                        <InlineEditableCell
+                          value={sale.gross_sale_price}
+                          displayValue={fmtCurrency(sale.gross_sale_price)}
+                          onSave={(newVal) => handleInlineSaleUpdate(sale.id, 'gross_sale_price', newVal)}
+                          isSaving={Boolean(savingCellMap[`${sale.id}-gross_sale_price`])}
+                          ariaLabel={`Gross sale price for ${sale.item_name}`}
+                          colHeader="Gross Sale Price"
+                          align="right"
+                          textClassName="font-bold text-slate-100 underline decoration-dotted decoration-slate-700 hover:decoration-amber-400"
+                          onEditStart={() => {
+                            setEditingCell(`${sale.id}-gross_sale_price`);
+                            hideTooltip();
+                          }}
+                          onEditEnd={() => setEditingCell(null)}
+                          onMobileFallback={() => handleEditSale(sale)}
+                        />
+                      </td>
+
+                      {/* Actual Shipping Cost (with Inline Editing) */}
+                      <td
+                        style={{
+                          width: `${getColWidth('actual_shipping_cost')}px`,
+                          minWidth: '65px',
+                          maxWidth: `${getColWidth('actual_shipping_cost')}px`
+                        }}
+                        className="py-1 px-1.5 font-mono text-slate-300 text-right whitespace-nowrap text-xs overflow-hidden"
+                      >
+                        <InlineEditableCell
+                          value={sale.actual_shipping_cost ?? 0}
+                          displayValue={fmtCurrency(sale.actual_shipping_cost ?? 0)}
+                          onSave={(newVal) => handleInlineSaleUpdate(sale.id, 'actual_shipping_cost', newVal)}
+                          isSaving={Boolean(savingCellMap[`${sale.id}-actual_shipping_cost`])}
+                          ariaLabel={`Actual shipping cost for ${sale.item_name}`}
+                          colHeader="Actual Shipping Cost"
+                          align="right"
+                          textClassName="text-slate-300 underline decoration-dotted decoration-slate-700 hover:decoration-amber-400"
+                          onEditStart={() => {
+                            setEditingCell(`${sale.id}-actual_shipping_cost`);
+                            hideTooltip();
+                          }}
+                          onEditEnd={() => setEditingCell(null)}
+                          onMobileFallback={() => handleEditSale(sale)}
+                        />
                       </td>
 
                       {/* Landed Cost (with Hover Breakdown) */}
@@ -741,7 +850,7 @@ export function SalesLogView() {
                     {/* Fee Reconciliation Sub-Row (eBay only) */}
                     {expandedFeeRow === sale.id && (
                       <tr key={`recon-${sale.id}`} className="bg-slate-950/70 border-b border-slate-800">
-                        <td colSpan={11} className="px-3 py-2">
+                        <td colSpan={DEFAULT_SALES_COLUMNS.length} className="px-3 py-2">
                           <FeeReconciliationPanel
                             sale={sale}
                             onReconciled={(updated) => setSales(prev => prev.map(s => s.id === updated.id ? { ...s, ...updated } : s))}

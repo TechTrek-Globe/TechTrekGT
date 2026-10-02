@@ -20,7 +20,7 @@ describe('Client Bundle & Import Integrity [task T-13]', () => {
     'Uint16Array', 'Uint32Array', 'Int8Array', 'Int16Array', 'Int32Array',
     'Float32Array', 'Float64Array', 'DataView', 'performance', 'requestAnimationFrame',
     'cancelAnimationFrame', 'MutationObserver', 'ResizeObserver', 'IntersectionObserver',
-    'PopStateEvent', 'HTMLRewriter'
+    'PopStateEvent', 'HTMLRewriter', 'AbortController'
   ]);
 
   function walk(dir) {

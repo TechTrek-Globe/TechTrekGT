@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { InventoryProvider } from './context/InventoryContext';
+import { CommandPaletteProvider } from './context/CommandPaletteContext';
 import { AuthPage } from './components/AuthPage';
 import { AppLayout } from './components/AppLayout';
 function lazyWithRetry(componentImport) {
@@ -294,7 +295,9 @@ export default function App() {
 
   return (
     <AuthProvider>
-      <MainContent pathname={pathname} navigateTo={navigateTo} />
+      <CommandPaletteProvider>
+        <MainContent pathname={pathname} navigateTo={navigateTo} />
+      </CommandPaletteProvider>
     </AuthProvider>
   );
 }

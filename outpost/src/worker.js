@@ -468,6 +468,10 @@ export default {
         response = env?.ASSETS?.fetch
           ? await env.ASSETS.fetch(new Request(assetUrl.toString(), request))
           : await fetch(new Request(assetUrl.toString(), request));
+        if (!response || response.status === 404) {
+          const fb = env?.ASSETS?.fetch ? await env.ASSETS.fetch(request) : await fetch(request);
+          if (fb && fb.ok) response = fb;
+        }
         if (response && response.headers.get('content-type')?.includes('text/html')) {
           response = new Response('Asset not found', {
             status: 404,
@@ -485,6 +489,10 @@ export default {
         response = env?.ASSETS?.fetch
           ? await env.ASSETS.fetch(new Request(assetUrl.toString(), request))
           : await fetch(new Request(assetUrl.toString(), request));
+        if (!response || response.status === 404) {
+          const fb = env?.ASSETS?.fetch ? await env.ASSETS.fetch(request) : await fetch(request);
+          if (fb && fb.ok) response = fb;
+        }
         if (response && response.headers.get('content-type')?.includes('text/html')) {
           response = new Response('Asset not found', {
             status: 404,
@@ -495,6 +503,10 @@ export default {
             }
           });
         }
+      } else if (url.pathname.startsWith('/outpost/@') || url.pathname.startsWith('/outpost/node_modules/') || url.pathname.startsWith('/outpost/src/')) {
+        response = env?.ASSETS?.fetch
+          ? await env.ASSETS.fetch(request)
+          : await fetch(request);
       } else if (url.pathname === '/outpost' || url.pathname.startsWith('/outpost/')) {
         // SPA fallback - serve index.html for all /outpost/* routes
         const spaUrl = new URL(request.url);
@@ -502,6 +514,13 @@ export default {
         response = env?.ASSETS?.fetch
           ? await env.ASSETS.fetch(new Request(spaUrl.toString(), request))
           : await fetch(new Request(spaUrl.toString(), request));
+        if (response && response.status >= 300 && response.status < 400 && response.headers.get('location')?.includes('/outpost')) {
+          const devSpaUrl = new URL(request.url);
+          devSpaUrl.pathname = '/outpost/';
+          response = env?.ASSETS?.fetch
+            ? await env.ASSETS.fetch(new Request(devSpaUrl.toString(), request))
+            : await fetch(new Request(devSpaUrl.toString(), request));
+        }
       } else if (url.pathname.startsWith('/auction/assets/')) {
         // Rewrite legacy asset requests: /auction/assets/ -> /assets/
         const assetUrl = new URL(request.url);

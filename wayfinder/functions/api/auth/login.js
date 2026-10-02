@@ -83,7 +83,7 @@ export async function onRequestPost(context) {
       `auth_token=${token}`,
       'HttpOnly',
       'Secure',
-      'SameSite=Lax',
+      'SameSite=Strict',
       'Path=/',
       `Max-Age=${maxAge}`
     ].join('; ');

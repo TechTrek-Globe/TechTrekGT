@@ -119,7 +119,7 @@ export function useExchangeRate() {
       }
 
       setRates((prev) => ({ ...prev, loading: true }));
-      const res = await fetch(getApiUrl('/api/wayfinder/exchange-rate'));
+      const res = await fetch(getApiUrl('/api/wayfinder/exchange-rate'), { credentials: 'include' });
       if (!res.ok) throw new Error('Network response failed');
       const data = await res.json();
 

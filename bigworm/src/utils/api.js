@@ -6,3 +6,22 @@
 export function getApiUrl(path) {
   return path;
 }
+
+/**
+ * Standard API fetch wrapper ensuring credentials: 'include' for HttpOnly cookies.
+ * @param {string} endpoint
+ * @param {RequestInit} [options]
+ * @returns {Promise<Response>}
+ */
+export async function apiFetch(endpoint, options = {}) {
+  const url = getApiUrl(endpoint);
+  const extraHeaders = options.headers || {};
+  return fetch(url, {
+    ...options,
+    credentials: options.credentials || 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      ...extraHeaders
+    }
+  });
+}

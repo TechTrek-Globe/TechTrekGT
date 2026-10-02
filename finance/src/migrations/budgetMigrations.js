@@ -114,7 +114,6 @@ export function runBudgetMigrations(budget) {
     );
 
     migrated.schemaVersion = 2;
-    currentVersion = 2;
     wasMigrated = true;
 
     migrationDetails.v2 = {

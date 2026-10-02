@@ -101,7 +101,7 @@ export async function verifyToken(token, secret) {
 }
 
 export function buildAuthCookie(token, maxAge) {
-  return [`auth_token=${token}`, 'HttpOnly', 'Secure', 'SameSite=Lax', 'Path=/', `Max-Age=${maxAge}`].join('; ');
+  return [`auth_token=${token}`, 'HttpOnly', 'Secure', 'SameSite=Strict', 'Path=/', `Max-Age=${maxAge}`].join('; ');
 }
 
 // Dual Authentication Acceptance Path (LOW-1):

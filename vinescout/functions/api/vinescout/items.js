@@ -40,11 +40,13 @@ export async function onRequestGet(context) {
     }
 
     const where = conditions.join(' AND ');
+    const countSql = 'SELECT COUNT(*) as total FROM vine_items WHERE ' + where;
+    const itemsSql = 'SELECT * FROM vine_items WHERE ' + where + ' ORDER BY ' + sort + ' ' + dir + ' LIMIT ? OFFSET ?';
 
     const [countRow, rows] = await Promise.all([
-      env.DB.prepare(`SELECT COUNT(*) as total FROM vine_items WHERE ${where}`)
+      env.DB.prepare(countSql)
         .bind(...bindings).first(),
-      env.DB.prepare(`SELECT * FROM vine_items WHERE ${where} ORDER BY ${sort} ${dir} LIMIT ? OFFSET ?`)
+      env.DB.prepare(itemsSql)
         .bind(...bindings, limit, offset).all()
     ]);
 

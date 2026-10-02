@@ -23,10 +23,11 @@ export async function onRequestGet(context) {
       ? sortParam : 'order_date';
     const dir    = url.searchParams.get('dir') === 'asc' ? 'ASC' : 'DESC';
 
+    const ordersSql = 'SELECT * FROM vine_orders WHERE user_id = ? ORDER BY ' + sort + ' ' + dir + ' LIMIT ? OFFSET ?';
     const [countRow, rows] = await Promise.all([
       env.DB.prepare('SELECT COUNT(*) as total FROM vine_orders WHERE user_id = ?')
         .bind(payload.userId).first(),
-      env.DB.prepare(`SELECT * FROM vine_orders WHERE user_id = ? ORDER BY ${sort} ${dir} LIMIT ? OFFSET ?`)
+      env.DB.prepare(ordersSql)
         .bind(payload.userId, limit, offset).all()
     ]);
 

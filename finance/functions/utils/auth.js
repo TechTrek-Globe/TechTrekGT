@@ -850,11 +850,12 @@ export async function issueOneTimeCode(env, {
     ? env.DB.prepare('UPDATE password_resets SET used = 1 WHERE email = ? AND used = 0').bind(email)
     : env.DB.prepare('UPDATE email_verifications SET used = 1 WHERE user_id = ? AND email = ? AND used = 0').bind(userId, email);
 
-  const insertStmt = env.DB.prepare(
-    `INSERT INTO ${table} (id, user_id, email, token, expires_at, used, attempts, created_at) VALUES (?, ?, ?, ?, ?, 0, 0, ?)`
-  ).bind(verificationId, userId, email, codeHash, now + ttlMs, now);
+  const insertStmt = table === 'password_resets'
+    ? env.DB.prepare('INSERT INTO password_resets (id, user_id, email, token, expires_at, used, attempts, created_at) VALUES (?, ?, ?, ?, ?, 0, 0, ?)')
+    : env.DB.prepare('INSERT INTO email_verifications (id, user_id, email, token, expires_at, used, attempts, created_at) VALUES (?, ?, ?, ?, ?, 0, 0, ?)');
+  const boundInsertStmt = insertStmt.bind(verificationId, userId, email, codeHash, now + ttlMs, now);
 
-  await env.DB.batch([invalidateStmt, insertStmt]);
+  await env.DB.batch([invalidateStmt, boundInsertStmt]);
 
   return { code, verificationId, codeHash };
 }

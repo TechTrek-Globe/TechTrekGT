@@ -113,9 +113,8 @@ export async function onRequestPost(context) {
 
     if (neededPlatforms.length > 0) {
       const placeholders = neededPlatforms.map(() => '?').join(', ');
-      const platRows = await env.DB.prepare(
-        `SELECT name, fee_pct, flat_fee FROM auction_platforms WHERE user_id = ? AND name IN (${placeholders})`
-      ).bind(payload.userId, ...neededPlatforms).all();
+      const platSql = 'SELECT name, fee_pct, flat_fee FROM auction_platforms WHERE user_id = ? AND name IN (' + placeholders + ')';
+      const platRows = await env.DB.prepare(platSql).bind(payload.userId, ...neededPlatforms).all();
 
       for (const plat of (platRows.results || [])) {
         platformMap.set(plat.name, plat);

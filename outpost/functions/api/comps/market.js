@@ -252,9 +252,15 @@ export async function onRequestPut(context) {
     if (!updates.length) return err('No updatable fields provided (is_valid, notes)', 400);
 
     bindings.push(compId, userId);
-    await env.DB.prepare(`
-      UPDATE market_comps SET ${updates.join(', ')} WHERE id = ? AND user_id = ?
-    `).bind(...bindings).run();
+    let updateSql;
+    if (is_valid !== undefined && notes !== undefined) {
+      updateSql = 'UPDATE market_comps SET is_valid = ?, notes = ? WHERE id = ? AND user_id = ?';
+    } else if (is_valid !== undefined) {
+      updateSql = 'UPDATE market_comps SET is_valid = ? WHERE id = ? AND user_id = ?';
+    } else {
+      updateSql = 'UPDATE market_comps SET notes = ? WHERE id = ? AND user_id = ?';
+    }
+    await env.DB.prepare(updateSql).bind(...bindings).run();
 
     const updated = await env.DB.prepare(
       'SELECT * FROM market_comps WHERE id = ?'

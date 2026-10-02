@@ -48,9 +48,10 @@ export async function getEbayUserToken(env, userId) {
     if (wasLegacy && plaintext) {
       try {
         const reencrypted = await encryptToken(plaintext, encKey);
-        await env.DB.prepare(
-          `UPDATE ebay_oauth_tokens SET ${column} = ? WHERE user_id = ?`
-        ).bind(reencrypted, userId).run();
+        const stmt = column === 'access_token'
+          ? env.DB.prepare('UPDATE ebay_oauth_tokens SET access_token = ? WHERE user_id = ?')
+          : env.DB.prepare('UPDATE ebay_oauth_tokens SET refresh_token = ? WHERE user_id = ?');
+        await stmt.bind(reencrypted, userId).run();
         console.log(`[ebayAuth] Migrated legacy ${column} to v2 envelope for user ${userId}`);
       } catch (migrateErr) {
         console.error(`[ebayAuth] Failed to persist migrated ${column}:`, migrateErr);

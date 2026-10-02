@@ -39,23 +39,16 @@ export async function onRequestGet(context) {
 
     const whereClause = conditions.join(' AND ');
 
-    const countRow = await env.DB.prepare(
-      `SELECT COUNT(*) AS total FROM auction_items i WHERE ${whereClause}`
-    ).bind(...bindings).first();
+    const countSql = 'SELECT COUNT(*) AS total FROM auction_items i WHERE ' + whereClause;
+    const countRow = await env.DB.prepare(countSql).bind(...bindings).first();
 
-    const rows = await env.DB.prepare(`
-      SELECT
-        i.*,
-        inv.invoice_ref,
-        inv.discount AS inv_discount,
-        inv.shipping AS inv_shipping,
-        inv.tax      AS inv_tax
-      FROM auction_items i
-      LEFT JOIN auction_invoices inv ON inv.id = i.invoice_id
-      WHERE ${whereClause}
-      ORDER BY i.created_at DESC
-      LIMIT ? OFFSET ?
-    `).bind(...bindings, limit, offset).all();
+    const rowsSql = 'SELECT i.*, inv.invoice_ref, inv.discount AS inv_discount, inv.shipping AS inv_shipping, inv.tax AS inv_tax '
+      + 'FROM auction_items i '
+      + 'LEFT JOIN auction_invoices inv ON inv.id = i.invoice_id '
+      + 'WHERE ' + whereClause + ' '
+      + 'ORDER BY i.created_at DESC '
+      + 'LIMIT ? OFFSET ?';
+    const rows = await env.DB.prepare(rowsSql).bind(...bindings, limit, offset).all();
 
     const cleanedItems = (rows.results || []).map(row => ({
       ...row,

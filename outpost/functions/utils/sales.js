@@ -203,32 +203,6 @@ return {
 // THE ONLY auction_sales WRITE PATH
 // ---------------------------------------------------------------------------
 
-// Plain (overwrite) assignments. Identical for the INSERT, the ON CONFLICT
-// DO UPDATE, and the catch-branch UPDATE fallback, so the three paths can never
-// drift apart.
-const PLAIN_ASSIGNMENTS = `
-  sale_date              = excluded.sale_date,
-  platform               = excluded.platform,
-  gross_sale_price       = excluded.gross_sale_price,
-  buyer_shipping_paid    = excluded.buyer_shipping_paid,
-  actual_shipping_cost   = excluded.actual_shipping_cost,
-  platform_fee_pct       = excluded.platform_fee_pct,
-  platform_flat_fee      = excluded.platform_flat_fee,
-  platform_fees_amt      = excluded.platform_fees_amt,
-  payment_processing_amt = excluded.payment_processing_amt,
-  promoted_listing_fee   = excluded.promoted_listing_fee,
-  net_proceeds           = excluded.net_proceeds,
-  true_total_cost        = excluded.true_total_cost,
-  net_profit             = excluded.net_profit,
-  roi_pct                = excluded.roi_pct,
-  days_to_sell           = excluded.days_to_sell`;
-
-// COALESCE semantics preserved from the original markItemSold copy: supplying
-// null for these three retains whatever the row already held.
-const COALESCE_ASSIGNMENTS = `
-  buyer_handle      = COALESCE(excluded.buyer_handle, auction_sales.buyer_handle),
-  ebay_order_id     = COALESCE(excluded.ebay_order_id, auction_sales.ebay_order_id),
-  fee_reconciled_at = COALESCE(excluded.fee_reconciled_at, auction_sales.fee_reconciled_at)`;
 
 // Bind order shared by all three statements.
 const INSERT_BINDINGS = [
@@ -347,8 +321,24 @@ export async function upsertSale(env, userId, saleRecord) {
           ?, ?, ?, ?
         )
         ON CONFLICT(item_id) DO UPDATE SET
-          ${PLAIN_ASSIGNMENTS},
-          ${COALESCE_ASSIGNMENTS}
+          sale_date              = excluded.sale_date,
+          platform               = excluded.platform,
+          gross_sale_price       = excluded.gross_sale_price,
+          buyer_shipping_paid    = excluded.buyer_shipping_paid,
+          actual_shipping_cost   = excluded.actual_shipping_cost,
+          platform_fee_pct       = excluded.platform_fee_pct,
+          platform_flat_fee      = excluded.platform_flat_fee,
+          platform_fees_amt      = excluded.platform_fees_amt,
+          payment_processing_amt = excluded.payment_processing_amt,
+          promoted_listing_fee   = excluded.promoted_listing_fee,
+          net_proceeds           = excluded.net_proceeds,
+          true_total_cost        = excluded.true_total_cost,
+          net_profit             = excluded.net_profit,
+          roi_pct                = excluded.roi_pct,
+          days_to_sell           = excluded.days_to_sell,
+          buyer_handle      = COALESCE(excluded.buyer_handle, auction_sales.buyer_handle),
+          ebay_order_id     = COALESCE(excluded.ebay_order_id, auction_sales.ebay_order_id),
+          fee_reconciled_at = COALESCE(excluded.fee_reconciled_at, auction_sales.fee_reconciled_at)
         -- The unique index is on item_id ALONE, not (user_id, item_id). Without
         -- this guard, a write for one tenant would UPDATE another tenant's row
         -- whose item_id collided. upsertSale is called with an explicit userId

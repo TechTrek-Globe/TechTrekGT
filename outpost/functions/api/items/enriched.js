@@ -92,38 +92,36 @@ export async function onRequestGet(context) {
 
     const whereClause = conditions.join(' AND ');
 
-    const countRow = await env.DB.prepare(
-      `SELECT COUNT(*) AS total FROM auction_items i WHERE ${whereClause}`
-    ).bind(...bindings).first();
+    const countSql = 'SELECT COUNT(*) AS total FROM auction_items i WHERE ' + whereClause;
+    const countRow = await env.DB.prepare(countSql).bind(...bindings).first();
 
-    const rows = await env.DB.prepare(`
-      SELECT
-        i.*,
-        inv.invoice_ref,
-        inv.discount  AS inv_discount,
-        inv.shipping  AS inv_shipping,
-        inv.tax       AS inv_tax,
-        c.id          AS comp_id,
-        c.comp_1,
-        c.comp_2,
-        c.comp_3,
-        c.manual_avg,
-        c.live_avg,
-        c.active_comp_1,
-        c.active_comp_2,
-        c.active_comp_3,
-        c.active_avg,
-        c.sold_count,
-        c.ebay_search_url AS comp_ebay_search_url,
-        c.recommended_list_price,
-        c.updated_at  AS comp_updated_at
-      FROM auction_items i
-      LEFT JOIN auction_invoices inv ON inv.id = i.invoice_id
-      LEFT JOIN auction_comps c ON i.id = c.item_id AND c.user_id = i.user_id
-      WHERE ${whereClause}
-      ${orderByClause}
-      LIMIT ? OFFSET ?
-    `).bind(...bindings, limit, offset).all();
+    const rowsSql = 'SELECT '
+      + 'i.*, '
+      + 'inv.invoice_ref, '
+      + 'inv.discount AS inv_discount, '
+      + 'inv.shipping AS inv_shipping, '
+      + 'inv.tax AS inv_tax, '
+      + 'c.id AS comp_id, '
+      + 'c.comp_1, '
+      + 'c.comp_2, '
+      + 'c.comp_3, '
+      + 'c.manual_avg, '
+      + 'c.live_avg, '
+      + 'c.active_comp_1, '
+      + 'c.active_comp_2, '
+      + 'c.active_comp_3, '
+      + 'c.active_avg, '
+      + 'c.sold_count, '
+      + 'c.ebay_search_url AS comp_ebay_search_url, '
+      + 'c.recommended_list_price, '
+      + 'c.updated_at AS comp_updated_at '
+      + 'FROM auction_items i '
+      + 'LEFT JOIN auction_invoices inv ON inv.id = i.invoice_id '
+      + 'LEFT JOIN auction_comps c ON i.id = c.item_id AND c.user_id = i.user_id '
+      + 'WHERE ' + whereClause + ' '
+      + orderByClause + ' '
+      + 'LIMIT ? OFFSET ?';
+    const rows = await env.DB.prepare(rowsSql).bind(...bindings, limit, offset).all();
 
     const enrichedItems = (rows.results || []).map(row => {
       const isAmazon = typeof row.invoice_ref === 'string' && row.invoice_ref.startsWith('AMAZON-');

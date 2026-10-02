@@ -36,62 +36,60 @@ export async function onRequestGet(context) {
     const whereClause = conditions.join(' AND ');
 
     // Aggregate statistics across all matching sales
-    const aggRow = await env.DB.prepare(`
-      SELECT
-        COUNT(s.id) AS total_count,
-        COALESCE(SUM(s.gross_sale_price), 0) AS total_gross,
-        COALESCE(SUM(s.net_proceeds), 0) AS total_net_proceeds,
-        COALESCE(SUM(s.true_total_cost), 0) AS total_cost,
-        COALESCE(SUM(s.net_profit), 0) AS total_net_profit,
-        COALESCE(AVG(s.days_to_sell), 0) AS avg_days_to_sell
-      FROM auction_sales s
-      JOIN auction_items i ON i.id = s.item_id
-      WHERE ${whereClause}
-    `).bind(...bindings).first();
+    const aggSql = 'SELECT '
+      + 'COUNT(s.id) AS total_count, '
+      + 'COALESCE(SUM(s.gross_sale_price), 0) AS total_gross, '
+      + 'COALESCE(SUM(s.net_proceeds), 0) AS total_net_proceeds, '
+      + 'COALESCE(SUM(s.true_total_cost), 0) AS total_cost, '
+      + 'COALESCE(SUM(s.net_profit), 0) AS total_net_profit, '
+      + 'COALESCE(AVG(s.days_to_sell), 0) AS avg_days_to_sell '
+      + 'FROM auction_sales s '
+      + 'JOIN auction_items i ON i.id = s.item_id '
+      + 'WHERE ' + whereClause;
+    const aggRow = await env.DB.prepare(aggSql).bind(...bindings).first();
 
     const count = aggRow?.total_count || 0;
     const totalCost = aggRow?.total_cost || 0;
     const totalProfit = aggRow?.total_net_profit || 0;
     const blendedRoi = totalCost > 0 ? totalProfit / totalCost : 0;
 
-    const rows = await env.DB.prepare(`
-      SELECT
-        s.*,
-        i.item_name,
-        i.category,
-        i.athlete_person,
-        i.authenticator,
-        i.cert_number,
-        i.unit_price,
-        i.proration_weight,
-        i.prorated_shipping,
-        i.prorated_tax,
-        i.prorated_discount,
-        i.item_base_total,
-        i.date_acquired,
-        i.date_listed,
-        i.ebay_listing_id,
-        i.attributes,
-        i.notes,
-        i.sku,
-        inv.invoice_ref,
-        inv.base_total AS invoice_subtotal,
-        inv.shipping AS invoice_shipping,
-        inv.tax AS invoice_tax,
-        inv.discount AS invoice_discount,
-        fr.total_ebay_fees,
-        fr.reconciled_net_profit,
-        fr.fee_delta,
-        fr.promoted_listing_active,
-        fr.reconciled_at AS fee_reconciled_at
-      FROM auction_sales s
-      JOIN auction_items i ON i.id = s.item_id
-      LEFT JOIN auction_invoices inv ON inv.id = i.invoice_id
-      LEFT JOIN ebay_fee_reconciliations fr ON fr.sale_id = s.id
-      WHERE ${whereClause}
-      ORDER BY s.sale_date DESC, s.created_at DESC
-      LIMIT ? OFFSET ?
-    `).bind(...bindings, limit, offset).all();
+    const rowsSql = 'SELECT '
+      + 's.*, '
+      + 'i.item_name, '
+      + 'i.category, '
+      + 'i.athlete_person, '
+      + 'i.authenticator, '
+      + 'i.cert_number, '
+      + 'i.unit_price, '
+      + 'i.proration_weight, '
+      + 'i.prorated_shipping, '
+      + 'i.prorated_tax, '
+      + 'i.prorated_discount, '
+      + 'i.item_base_total, '
+      + 'i.date_acquired, '
+      + 'i.date_listed, '
+      + 'i.ebay_listing_id, '
+      + 'i.attributes, '
+      + 'i.notes, '
+      + 'i.sku, '
+      + 'inv.invoice_ref, '
+      + 'inv.base_total AS invoice_subtotal, '
+      + 'inv.shipping AS invoice_shipping, '
+      + 'inv.tax AS invoice_tax, '
+      + 'inv.discount AS invoice_discount, '
+      + 'fr.total_ebay_fees, '
+      + 'fr.reconciled_net_profit, '
+      + 'fr.fee_delta, '
+      + 'fr.promoted_listing_active, '
+      + 'fr.reconciled_at AS fee_reconciled_at '
+      + 'FROM auction_sales s '
+      + 'JOIN auction_items i ON i.id = s.item_id '
+      + 'LEFT JOIN auction_invoices inv ON inv.id = i.invoice_id '
+      + 'LEFT JOIN ebay_fee_reconciliations fr ON fr.sale_id = s.id '
+      + 'WHERE ' + whereClause + ' '
+      + 'ORDER BY s.sale_date DESC, s.created_at DESC '
+      + 'LIMIT ? OFFSET ?';
+    const rows = await env.DB.prepare(rowsSql).bind(...bindings, limit, offset).all();
 
     return ok({
       sales: rows.results || [],

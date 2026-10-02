@@ -599,3 +599,16 @@ export default {
 };
 
 export { addSecurityHeaders };
+
+/**
+ * HIGH-001 / FUNC-001: Serverless/Worker-compatible spreadsheet parsing entrypoint.
+ * Offloads heavy CSV/XLSX parsing logic via dynamic import to prevent cold-start bloat.
+ * @param {ArrayBuffer} buffer
+ * @returns {Promise<Object>}
+ */
+export async function parseAuctionWorkbookWorker(buffer, onProgress) {
+  const { parseAuctionWorkbook } = await import('./utils/spreadsheetParser.js');
+  return parseAuctionWorkbook(buffer, onProgress);
+}
+
+export const parseSpreadsheetWorker = parseAuctionWorkbookWorker;

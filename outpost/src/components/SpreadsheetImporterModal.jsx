@@ -13,6 +13,7 @@ export function SpreadsheetImporterModal({ isOpen, onClose, onImportSuccess }) {
   const [parsedData, setParsedData] = useState(null);
   const [strategy, setStrategy] = useState('append'); // 'append' | 'replace'
   const [isProcessing, setIsProcessing] = useState(false);
+  const [parseProgress, setParseProgress] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [successResult, setSuccessResult] = useState(null);
@@ -39,25 +40,33 @@ export function SpreadsheetImporterModal({ isOpen, onClose, onImportSuccess }) {
     setError('');
     setFile(fileObj);
     setIsProcessing(true);
+    setParseProgress('Reading file...');
     try {
       const buffer = await fileObj.arrayBuffer();
       const isPdf = fileObj.name.toLowerCase().endsWith('.pdf');
       let result;
       if (isPdf) {
+        setParseProgress('Parsing PDF invoice...');
         const { parsePristineAuctionPdf } = await import('../utils/pdfInvoiceParser');
         result = await parsePristineAuctionPdf(buffer);
       } else {
-        const { parseAuctionWorkbook } = await import('../utils/spreadsheetParser');
-        result = await parseAuctionWorkbook(buffer);
+        setParseProgress('Parsing spreadsheet in background worker...');
+        const { parseAuctionWorkbookAsync } = await import('../utils/spreadsheetWorkerClient');
+        result = await parseAuctionWorkbookAsync(buffer, (prog) => {
+          if (typeof prog === 'string') setParseProgress(prog);
+          else if (prog?.message) setParseProgress(prog.message);
+        });
       }
 
       if (!result || !result.items || result.items.length === 0) {
         throw new Error('No valid inventory items found in file. Check sheet structure or PDF content.');
       }
       setParsedData(result);
+      setParseProgress('');
     } catch (err) {
       setError(err.message || 'Failed to parse file.');
       setParsedData(null);
+      setParseProgress('');
     } finally {
       setIsProcessing(false);
     }
@@ -112,6 +121,7 @@ export function SpreadsheetImporterModal({ isOpen, onClose, onImportSuccess }) {
     setFile(null);
     setParsedData(null);
     setError('');
+    setParseProgress('');
     setSuccessResult(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
@@ -206,10 +216,12 @@ export function SpreadsheetImporterModal({ isOpen, onClose, onImportSuccess }) {
                 <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mx-auto mb-3 group-hover:scale-110 transition-transform">
                   {isProcessing ? <Loader2 className="w-6 h-6 animate-spin" /> : <Upload className="w-6 h-6" />}
                 </div>
-                <p className="text-sm font-semibold text-slate-200">
-                  {isProcessing ? 'Parsing file...' : 'Choose or drop your Pristine Tracker workbook or PDF invoice'}
+                <p className="text-sm font-semibold text-slate-200" role="status" aria-live="polite">
+                  {isProcessing ? (parseProgress || 'Parsing file in background worker...') : 'Choose or drop your Pristine Tracker workbook or PDF invoice'}
                 </p>
-                <p className="text-xs text-slate-500 mt-1">Supports .xlsx, .xls, .csv, or .pdf (Pristine Invoices)</p>
+                <p className="text-xs text-slate-500 mt-1">
+                  {isProcessing ? 'Background worker active - UI remains fully responsive' : 'Supports .xlsx, .xls, .csv, or .pdf (Pristine Invoices)'}
+                </p>
               </div>
 
               <div className="p-4 bg-slate-950/60 border border-slate-800 rounded-xl space-y-2">
@@ -396,3 +408,6 @@ export function SpreadsheetImporterModal({ isOpen, onClose, onImportSuccess }) {
     </div>
   );
 }
+
+export { SpreadsheetImporterModal as ImportView };
+export default SpreadsheetImporterModal;

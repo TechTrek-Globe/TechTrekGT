@@ -306,10 +306,13 @@ const NOTES_ALIASES = ['notes', 'note', 'comments', 'comment', 'descriptionnotes
 /**
  * Parse an Excel or CSV file buffer and extract Auction entities
  * @param {ArrayBuffer} buffer
+ * @param {(progress: string | { message: string, progress?: number }) => void} [onProgress]
  * @returns {Promise<{ invoices: any[], items: any[], sales: any[], comps: any[], summary: any }>}
  */
-export async function parseAuctionWorkbook(buffer) {
+export async function parseAuctionWorkbook(buffer, onProgress = null) {
+  onProgress?.('Loading spreadsheet parsing engine...');
   const XLSX = await import('xlsx');
+  onProgress?.('Reading workbook sheets and records...');
   const wb = XLSX.read(buffer, { type: 'array' });
   const sheetNames = wb.SheetNames;
 
@@ -349,6 +352,8 @@ export async function parseAuctionWorkbook(buffer) {
   if (compsSheetName) {
     rawCompsRows = XLSX.utils.sheet_to_json(wb.Sheets[compsSheetName], { header: 1, defval: '' });
   }
+
+  onProgress?.('Extracting inventory and calculating landed costs...');
 
   // Parse Invoices & Items from rawInventoryRows
   const invoiceMap = new Map();
@@ -563,6 +568,8 @@ export async function parseAuctionWorkbook(buffer) {
       }
     }
   }
+
+  onProgress?.('Parsing complete.');
 
   return {
     invoices,

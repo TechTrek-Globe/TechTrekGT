@@ -869,20 +869,57 @@ function DailySpreadsheetMatrix() {
         const customOtherDesc = rawOtherDesc.replace(/^Other\s*\$?\s*\(?(.*?)\)?$/i, '$1').trim();
 
         // 4. Determine Beginning and Ending Balances
-        const tentativeRegEnding = runningRegBeg + totalRegCredits - totalDayBills;
-        const tentativeExtraEnding = runningExtraBeg + dayExtraAdd + otherAmt;
+        const tentativeRegEnding = runningRegBeg + totalRegCredits - totalDayBills + otherAmt;
+        const tentativeExtraEnding = runningExtraBeg + dayExtraAdd;
 
-        let reg = tentativeRegEnding;
-        let extra = tentativeExtraEnding;
+        let customRegEnd;
+        let customExtraEnd;
 
-        if (reg < 0 && extra > 0) {
-          const transfer = Math.min(extra, -reg);
-          reg += transfer;
-          extra -= transfer;
-        } else if (extra < 0 && reg > 0) {
-          const transfer = Math.min(reg, -extra);
-          extra += transfer;
-          reg -= transfer;
+        if (selectedAccountId === 'all') {
+          const allReg = getDailyMatrixCell('all', monthKey, day, 'reg_ending');
+          const allExtra = getDailyMatrixCell('all', monthKey, day, 'extra_ending');
+          if (allReg !== undefined && allReg !== null && allReg !== '') customRegEnd = parseFloat(allReg);
+          if (allExtra !== undefined && allExtra !== null && allExtra !== '') customExtraEnd = parseFloat(allExtra);
+        } else {
+          const accReg = getDailyMatrixCell(selectedAccountId, monthKey, day, 'reg_ending');
+          const accExtra = getDailyMatrixCell(selectedAccountId, monthKey, day, 'extra_ending');
+          if (accReg !== undefined && accReg !== null && accReg !== '') customRegEnd = parseFloat(accReg);
+          if (accExtra !== undefined && accExtra !== null && accExtra !== '') customExtraEnd = parseFloat(accExtra);
+        }
+
+        const impRow = importedRows[isoDate];
+        if (customRegEnd === undefined && isImportMode && impRow !== undefined && !hasDayBillOverride) {
+          if (typeof impRow === 'number') {
+            customRegEnd = impRow;
+          } else if (impRow && typeof impRow === 'object') {
+            const statedEnd = impRow.regEnding ?? impRow.totalEnding ?? null;
+            if (statedEnd !== null && statedEnd !== undefined && !isNaN(statedEnd)) {
+              customRegEnd = statedEnd;
+            }
+          }
+        }
+        if (customExtraEnd === undefined && isImportMode && impRow !== undefined && !hasDayBillOverride) {
+          if (impRow && typeof impRow === 'object') {
+            const statedExtra = impRow.extraEnding ?? null;
+            if (statedExtra !== null && statedExtra !== undefined && !isNaN(statedExtra)) {
+              customExtraEnd = statedExtra;
+            }
+          }
+        }
+
+        let reg = customRegEnd !== undefined && !isNaN(customRegEnd) ? customRegEnd : tentativeRegEnding;
+        let extra = customExtraEnd !== undefined && !isNaN(customExtraEnd) ? customExtraEnd : tentativeExtraEnding;
+
+        if (customRegEnd === undefined && customExtraEnd === undefined) {
+          if (reg < 0 && extra > 0) {
+            const transfer = Math.min(extra, -reg);
+            reg += transfer;
+            extra -= transfer;
+          } else if (extra < 0 && reg > 0) {
+            const transfer = Math.min(reg, -extra);
+            extra += transfer;
+            reg -= transfer;
+          }
         }
 
         const regEnding = Math.round(reg * 100) / 100 || 0;

@@ -14,8 +14,10 @@ export function allocateEarnerCredit(person, accountId, year, month, day, budget
   const c = dailyMatrix[accountId + '_' + mKey + '_' + day + '_credit_' + person.id];
   const ec = dailyMatrix[accountId + '_' + mKey + '_' + day + '_extra_credit_' + person.id];
   const isDepDay = isPersonDepositDay(person, year, month, day);
-  const projectedDeposit = (!options.isLockedDay && isDepDay) ? getPersonDepositAmountForAccount(person, accountId, budget) : 0;
-  const projectedExtra = projectedDeposit > 0 ? getPersonExtraSavingsDepositAmountForAccount(person, accountId, budget) : 0;
+  const projectedPlanDeposit = getPersonDepositAmountForAccount(person, accountId, budget);
+  const projectedPlanExtra = projectedPlanDeposit > 0 ? getPersonExtraSavingsDepositAmountForAccount(person, accountId, budget) : 0;
+  const projectedDeposit = (!options.isLockedDay && isDepDay) ? projectedPlanDeposit : 0;
+  const projectedExtra = projectedDeposit > 0 ? projectedPlanExtra : 0;
   let earnerDeposit, earnerExtra, source;
   if (c !== undefined && c !== null && c !== '') {
     earnerDeposit = parseFloat(c) || 0;
@@ -23,10 +25,9 @@ export function allocateEarnerCredit(person, accountId, year, month, day, budget
       earnerExtra = parseFloat(ec) || 0;
       source = LEDGER_SOURCE.MANUAL;
     } else {
-      // P10: stored credit with no stored extra_credit is treated as purely regular.
-      // Do NOT infer an extra split from projected amounts - that would double-apply
-      // the extra savings deduction on a deposit that was already settled by import.
-      earnerExtra = 0;
+      const billPortion = Math.max(0, projectedPlanDeposit - projectedPlanExtra);
+      const availableForExtra = Math.max(0, earnerDeposit - billPortion);
+      earnerExtra = Math.min(projectedPlanExtra, availableForExtra);
       source = LEDGER_SOURCE.ACTUAL_IMPORT;
     }
   } else {

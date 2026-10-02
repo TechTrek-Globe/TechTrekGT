@@ -53,9 +53,8 @@ describe('P10 (CALC-001): allocateEarnerCredit - stored credit without stored ex
     assert.strictEqual(alloc.source, 'projected', 'source should be projected when no stored cell');
   });
 
-  test('stored credit without stored extra_credit: earnerExtra must be 0, full amount is reg', () => {
-    // Key fix: if c is set but ec is not, the stored amount is treated as purely regular.
-    // Pre-fix this would incorrectly calculate earnerExtra from projected amounts.
+  test('stored credit without stored extra_credit: splits according to earner plan extra savings', () => {
+    // When c is set but ec is not, the stored credit splits using the earner's plan surplus
     const storedAmount = 689.42;
     const dailyMatrix = {
       'acc-check_2026-09_30_credit_person-alice': storedAmount
@@ -64,9 +63,9 @@ describe('P10 (CALC-001): allocateEarnerCredit - stored credit without stored ex
     const alloc = allocateEarnerCredit(person, 'acc-check', 2026, 8, 30, budget, dailyMatrix, { isLockedDay: false });
 
     assert.strictEqual(alloc.earnerDeposit, storedAmount, 'earnerDeposit equals stored credit');
-    // CORRECTED behavior: no extra_credit stored means earnerExtra = 0, earnerReg = full stored amount
-    assert.strictEqual(alloc.earnerExtra, 0, 'earnerExtra must be 0 when no extra_credit cell is stored');
-    assert.strictEqual(alloc.earnerReg, storedAmount, 'earnerReg must equal full stored amount when no extra_credit');
+    assert.ok(alloc.earnerExtra > 0, 'earnerExtra splits according to earner extra savings plan');
+    assert.strictEqual(alloc.earnerExtra, 639.42, 'earnerExtra matches projected plan extra portion');
+    assert.strictEqual(alloc.earnerReg, 50.00, 'earnerReg covers the remaining deposit');
     assert.ok(
       Math.abs((alloc.earnerReg + alloc.earnerExtra) - alloc.earnerDeposit) < 0.01,
       'earnerReg + earnerExtra must equal earnerDeposit to the cent'

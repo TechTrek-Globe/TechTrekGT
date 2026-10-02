@@ -934,6 +934,9 @@ export function getLedgerRunningBalanceAsOfDate({
   // P9: exclude archived bills from the running balance simulation
   const bills = (metadataState.bills || []).filter(b => !b.isArchived && b.accountId === targetAccountId);
 
+  const isImportMode = targetAcc.ledgerMode === 'import' || (targetAcc.importedLedgerRows && Object.keys(targetAcc.importedLedgerRows).length > 0);
+  const importedRows = isImportMode ? (targetAcc.importedLedgerRows || {}) : {};
+
   let runningReg = startReg;
   let runningExtra = startExtra;
 
@@ -943,6 +946,7 @@ export function getLedgerRunningBalanceAsOfDate({
     const m = cur.getMonth();
     const d = cur.getDate();
     const mKey = `${y}-${String(m + 1).padStart(2, '0')}`;
+    const isoDate = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 
     let dayCredits = 0;
     let dayExtraCredits = 0;
@@ -969,20 +973,50 @@ export function getLedgerRunningBalanceAsOfDate({
     const ocVal = dailyMatrix[`${targetAccountId}_${mKey}_${d}_other_credit_amount`];
     const dayOtherCredit = ocVal !== undefined && ocVal !== null && ocVal !== '' ? (parseFloat(ocVal) || 0) : 0;
 
-    const tentativeReg = runningReg + dayCredits - dayBills;
-    const tentativeExtra = runningExtra + dayExtraCredits + dayOtherCredit + dayOther;
+    const tentativeReg = runningReg + dayCredits - dayBills + dayOtherCredit + dayOther;
+    const tentativeExtra = runningExtra + dayExtraCredits;
 
-    let reg = tentativeReg;
-    let extra = tentativeExtra;
+    let customRegEnd;
+    let customExtraEnd;
 
-    if (reg < 0 && extra > 0) {
-      const transfer = Math.min(extra, -reg);
-      reg += transfer;
-      extra -= transfer;
-    } else if (extra < 0 && reg > 0) {
-      const transfer = Math.min(reg, -extra);
-      extra += transfer;
-      reg -= transfer;
+    const customReg = dailyMatrix[`${targetAccountId}_${mKey}_${d}_reg_ending`];
+    const customExtra = dailyMatrix[`${targetAccountId}_${mKey}_${d}_extra_ending`];
+    if (customReg !== undefined && customReg !== null && customReg !== '') customRegEnd = parseFloat(customReg);
+    if (customExtra !== undefined && customExtra !== null && customExtra !== '') customExtraEnd = parseFloat(customExtra);
+
+    const impRow = importedRows[isoDate];
+    if (customRegEnd === undefined && isImportMode && impRow !== undefined && !hasDayBillOverride) {
+      if (typeof impRow === 'number') {
+        customRegEnd = impRow;
+      } else if (impRow && typeof impRow === 'object') {
+        const statedEnd = impRow.regEnding ?? impRow.totalEnding ?? null;
+        if (statedEnd !== null && statedEnd !== undefined && !isNaN(statedEnd)) {
+          customRegEnd = statedEnd;
+        }
+      }
+    }
+    if (customExtraEnd === undefined && isImportMode && impRow !== undefined && !hasDayBillOverride) {
+      if (impRow && typeof impRow === 'object') {
+        const statedExtra = impRow.extraEnding ?? null;
+        if (statedExtra !== null && statedExtra !== undefined && !isNaN(statedExtra)) {
+          customExtraEnd = statedExtra;
+        }
+      }
+    }
+
+    let reg = customRegEnd !== undefined && !isNaN(customRegEnd) ? customRegEnd : tentativeReg;
+    let extra = customExtraEnd !== undefined && !isNaN(customExtraEnd) ? customExtraEnd : tentativeExtra;
+
+    if (customRegEnd === undefined && customExtraEnd === undefined) {
+      if (reg < 0 && extra > 0) {
+        const transfer = Math.min(extra, -reg);
+        reg += transfer;
+        extra -= transfer;
+      } else if (extra < 0 && reg > 0) {
+        const transfer = Math.min(reg, -extra);
+        extra += transfer;
+        reg -= transfer;
+      }
     }
 
     runningReg = Math.round(reg * 100) / 100 || 0;

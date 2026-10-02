@@ -1222,27 +1222,57 @@ export function LedgerDataProvider({ children }) {
         dayBills += amt;
       });
 
-      // 3. Other
+      // 3. Other (consolidated credit and debit affects regular operating balance)
       const customOther = getDailyMatrixCell(accountId, monthKey, day, 'other_amount');
       const customOtherCredit = getDailyMatrixCell(accountId, monthKey, day, 'other_credit_amount');
       let otherAmt = 0;
       if (customOther !== undefined) otherAmt += parseFloat(customOther) || 0;
       if (customOtherCredit !== undefined) otherAmt += parseFloat(customOtherCredit) || 0;
 
-      const tentativeRegEnding = runningRegBeg + dayCredits - dayBills;
-      const tentativeExtraEnding = runningExtraBeg + dayExtraAdd + otherAmt;
+      const tentativeRegEnding = runningRegBeg + dayCredits - dayBills + otherAmt;
+      const tentativeExtraEnding = runningExtraBeg + dayExtraAdd;
 
-      let reg = tentativeRegEnding;
-      let extra = tentativeExtraEnding;
+      let customRegEnd;
+      let customExtraEnd;
 
-      if (reg < 0 && extra > 0) {
-        const transfer = Math.min(extra, -reg);
-        reg += transfer;
-        extra -= transfer;
-      } else if (extra < 0 && reg > 0) {
-        const transfer = Math.min(reg, -extra);
-        extra += transfer;
-        reg -= transfer;
+      const accReg = getDailyMatrixCell(accountId, monthKey, day, 'reg_ending');
+      const accExtra = getDailyMatrixCell(accountId, monthKey, day, 'extra_ending');
+      if (accReg !== undefined && accReg !== null && accReg !== '') customRegEnd = parseFloat(accReg);
+      if (accExtra !== undefined && accExtra !== null && accExtra !== '') customExtraEnd = parseFloat(accExtra);
+
+      const impRow = importedRows[isoDate];
+      if (customRegEnd === undefined && isImportMode && impRow !== undefined && !hasDayBillOverride) {
+        if (typeof impRow === 'number') {
+          customRegEnd = impRow;
+        } else if (impRow && typeof impRow === 'object') {
+          const statedEnd = impRow.regEnding ?? impRow.totalEnding ?? null;
+          if (statedEnd !== null && statedEnd !== undefined && !isNaN(statedEnd)) {
+            customRegEnd = statedEnd;
+          }
+        }
+      }
+      if (customExtraEnd === undefined && isImportMode && impRow !== undefined && !hasDayBillOverride) {
+        if (impRow && typeof impRow === 'object') {
+          const statedExtra = impRow.extraEnding ?? null;
+          if (statedExtra !== null && statedExtra !== undefined && !isNaN(statedExtra)) {
+            customExtraEnd = statedExtra;
+          }
+        }
+      }
+
+      let reg = customRegEnd !== undefined && !isNaN(customRegEnd) ? customRegEnd : tentativeRegEnding;
+      let extra = customExtraEnd !== undefined && !isNaN(customExtraEnd) ? customExtraEnd : tentativeExtraEnding;
+
+      if (customRegEnd === undefined && customExtraEnd === undefined) {
+        if (reg < 0 && extra > 0) {
+          const transfer = Math.min(extra, -reg);
+          reg += transfer;
+          extra -= transfer;
+        } else if (extra < 0 && reg > 0) {
+          const transfer = Math.min(reg, -extra);
+          extra += transfer;
+          reg -= transfer;
+        }
       }
 
       runningRegBeg = Math.round(reg * 100) / 100 || 0;

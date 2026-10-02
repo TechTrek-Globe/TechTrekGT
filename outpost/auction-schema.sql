@@ -579,6 +579,27 @@ ALTER TABLE auction_items ADD COLUMN import_batch_id TEXT;
 ALTER TABLE auction_sales ADD COLUMN import_batch_id TEXT;
 ALTER TABLE auction_comps ADD COLUMN import_batch_id TEXT;
 
+-- ============================================================
+-- AUDIT-003 MIGRATION: SYNC HISTORY & STATUS TRACKING
+-- ============================================================
+CREATE TABLE IF NOT EXISTS outpost_sync_history (
+  id              TEXT PRIMARY KEY,
+  user_id         TEXT NOT NULL,
+  sync_type       TEXT NOT NULL,
+  status          TEXT NOT NULL,
+  items_total     INTEGER NOT NULL DEFAULT 0,
+  items_synced    INTEGER NOT NULL DEFAULT 0,
+  items_failed    INTEGER NOT NULL DEFAULT 0,
+  error_message   TEXT,
+  details         TEXT,
+  started_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  completed_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
 
+CREATE INDEX IF NOT EXISTS idx_sync_history_user ON outpost_sync_history(user_id, started_at DESC);
 
-
+ALTER TABLE outpost_sync_settings ADD COLUMN last_ebay_sync_status TEXT;
+ALTER TABLE outpost_sync_settings ADD COLUMN last_ebay_sync_error TEXT;
+ALTER TABLE outpost_sync_settings ADD COLUMN last_vscout_sync_status TEXT;
+ALTER TABLE outpost_sync_settings ADD COLUMN last_vscout_sync_error TEXT;

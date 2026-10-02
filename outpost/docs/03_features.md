@@ -83,3 +83,41 @@ Comprehensive audit and hardening of all serverless API mutation routes (`functi
    - All failure paths return standardized JSON payloads `{ error: '...' }` with appropriate HTTP status codes (400, 401, 403, 404, 500) rather than hanging or returning 200 OK with empty/null bodies.
    - Internal error details and database driver exceptions are sanitized to avoid sensitive system leakage.
 
+## Authentication and Security State Lifecycle Audit [ACTION ID: AUDIT-002]
+
+Comprehensive audit and hardening of all authentication guards, JWT validation paths, and API integration key lifecycles to eliminate desynchronized security states and ensure immediate invalidation across clients and Cloudflare D1.
+
+### Key Capabilities
+1. **Immediate Invalidation & Client-Side Cookie Scrubbing (`requireAuth`)**:
+   - Outdated `token_version` (incremented on password reset or logout-all) or expired tokens trigger explicit HTTP 401 Unauthorized responses.
+   - 401 responses emit `Set-Cookie: auth_token=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0` to immediately purge dead credentials from the client and prevent endless invalid background retries.
+2. **Strict User Existence & Version Validation in Integration Resolvers (`resolveIntegrationUserId`)**:
+   - Validates presented JWT session tokens against D1 user records, strictly enforcing `token_version` checks before granting access to integration endpoints (`/api/export/vinescout-sales`, `/api/export/vinescout-inventory`, `/api/import/amazon`).
+   - Validates that API integration secrets (`api_integrations`) are not marked revoked (`revoked_at IS NULL`) and that the associated user exists.
+   - Manually revoking an integration key in D1 immediately rejects subsequent requests with HTTP 401.
+3. **Dead Credential Purging for Upstream Integrations**:
+   - When eBay refresh tokens expire (`refreshExp < now`), the dead record is immediately purged from `ebay_oauth_tokens` across `ebayAuth.js` and `tokenHelper.js`, and `GET /api/ebay/oauth-status` returns `{ connected: false }`.
+   - On HTTP 400/401 token refresh failures in `tokenHelper.js`, invalid credentials are automatically scrubbed from D1 to prevent persistent false "Connected" UI states.
+
+## External API Synchronization & Webhook Resilience Audit [ACTION ID: AUDIT-003]
+
+Comprehensive resilience hardening of all outbound platform integrations (eBay Trading/REST/Finances/Marketing APIs and Amazon scraping gateway) and inbound webhook ingestion to eliminate timeout risks, silent sync failures, and unhandled worker crashes.
+
+### Key Capabilities
+1. **Strict Fetch Timeouts (`fetchWithTimeout`)**:
+   - Outbound external requests across eBay APIs, OAuth token refresh, and Amazon URL ingestion enforce a strict 15-second timeout via `AbortSignal.timeout` (or `AbortController` fallback).
+   - Timeout errors are caught and transformed into structured `TimeoutError` exceptions (`statusCode: 504`, `isTimeout: true`) rather than crashing worker isolates or hanging indefinitely.
+2. **Rate Limit (HTTP 429) & Transient Network Protection**:
+   - Rate limiting and transient network errors on token refresh preserve stored credentials, preventing false token purges.
+   - eBay Analytics and Listing sync endpoints catch 429 status codes, cleanly surfacing back-off instructions to the user.
+3. **Conditional Sync Timestamping & Failure Tracking (`outpost_sync_history`)**:
+   - Replaced unconditional updates to `last_ebay_sync_at` in `/api/ebay/sync-all`. The timestamp is updated ONLY upon complete, verified success.
+   - Partial sync runs preserve previous successful sync timestamps, document `last_ebay_sync_status = 'partial'`, and record item-level failure breakdowns in `outpost_sync_history`.
+   - Hard failures mark `last_ebay_sync_status = 'failed'` and record the exact error message.
+4. **Resilient Webhook Ingestion & Malformed Payload Rejection**:
+   - Webhook ingestion (`functions/api/ebay/webhook.js`) safely rejects unparseable raw bodies and unrecognized payload structures with HTTP 400 Bad Request without crashing the worker isolate.
+   - Validated payloads are dispatched safely with fallback event logging (`processed = 2`) on processing errors.
+5. **UI Sync State & Error Surfacing**:
+   - `SettingsView.jsx` and `InventoryContext.jsx` consume `last_ebay_sync_status` and `last_ebay_sync_error`.
+   - Renders distinctive failure and partial warning badges with specific error diagnostics, ensuring users are accurately informed rather than leaving UI components in stuck loading states.
+

@@ -206,13 +206,21 @@ export function InventoryProvider({ children }) {
     if (ebaySyncing) return;
     setEbaySyncing(true);
     try {
-      await syncAllEbayItems();
-      // Refresh last_ebay_sync_at after successful sync
+      const res = await syncAllEbayItems();
       const updated = await getSyncSettings();
       setSyncSettings(updated.settings || updated);
       fetchItems(1);
+      if (res && res.success === false) {
+        throw new Error(res.error || 'eBay sync reported failure');
+      }
+      return res;
     } catch (e) {
       console.warn('[InventoryContext] eBay auto-sync error:', e);
+      try {
+        const updated = await getSyncSettings();
+        setSyncSettings(updated.settings || updated);
+      } catch (_) {}
+      throw e;
     } finally {
       setEbaySyncing(false);
     }

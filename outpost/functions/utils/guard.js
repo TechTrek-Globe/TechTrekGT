@@ -24,20 +24,26 @@ export async function requireAuth(request, env) {
     if (payload && payload.userId) {
       // Validate token_version (tv) claim against D1 user record if DB is available (T-14 / SEC-020)
       if (env.DB) {
-        const user = await env.DB.prepare('SELECT token_version FROM users WHERE id = ?').bind(payload.userId).first();
-        if (user) {
-          const currentTv = user.token_version ?? 1;
-          const tokenTv = payload.tv ?? payload.token_version ?? 1;
-          if (tokenTv < currentTv) {
-            continue; // Token invalidated by token version increment (logout-all or password change)
+        try {
+          const user = await env.DB.prepare('SELECT token_version FROM users WHERE id = ?').bind(payload.userId).first();
+          if (user && user.token_version != null) {
+            const currentTv = user.token_version ?? 1;
+            const tokenTv = payload.tv ?? payload.token_version ?? 1;
+            if (tokenTv < currentTv) {
+              continue; // Token invalidated by token version increment (logout-all or password change)
+            }
           }
-        }
+        } catch (_) {}
       }
       return payload;
     }
   }
   throw new Response(JSON.stringify({ error: 'Unauthorized: invalid or expired token' }), {
-    status: 401, headers: { 'Content-Type': 'application/json' }
+    status: 401,
+    headers: {
+      'Content-Type': 'application/json',
+      'Set-Cookie': 'auth_token=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0'
+    }
   });
 }
 

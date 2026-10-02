@@ -37,6 +37,8 @@ export async function onRequestGet(context) {
               continue; // Token invalidated by token version bump (T-14 / SEC-020)
             }
             dbUser = u;
+          } else {
+            continue; // User does not exist in database; token is invalid
           }
         }
         payload = p;
@@ -44,10 +46,13 @@ export async function onRequestGet(context) {
       }
     }
 
-    if (!payload) {
+    if (!payload || (env.DB && !dbUser)) {
       return new Response(JSON.stringify({ error: 'Unauthorized: Invalid or expired token' }), {
         status: 401,
-        headers: { 'Content-Type': 'application/json' }
+        headers: {
+          'Content-Type': 'application/json',
+          'Set-Cookie': 'auth_token=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0'
+        }
       });
     }
 

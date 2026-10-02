@@ -201,6 +201,7 @@ export async function buildChallengeResponse(challengeCode, secret, endpointUrl)
  */
 export async function dispatchWebhookEvent(eventType, payload, eventId, env) {
   const now = new Date().toISOString();
+  const safePayload = (payload && typeof payload === 'object') ? payload : {};
 
   try {
     if (!env || !env.DB) {
@@ -210,7 +211,7 @@ export async function dispatchWebhookEvent(eventType, payload, eventId, env) {
 
     if (eventType === 'MARKETPLACE_ACCOUNT_DELETION') {
       // GDPR mandatory: delete user OAuth tokens by eBay userId
-      const ebayUserId = payload.userId || payload.UserId || payload.user?.userId;
+      const ebayUserId = safePayload.userId || safePayload.UserId || safePayload.user?.userId;
       if (ebayUserId) {
         await env.DB.prepare(
           'DELETE FROM ebay_oauth_tokens WHERE ebay_user_id = ?'
@@ -224,15 +225,15 @@ export async function dispatchWebhookEvent(eventType, payload, eventId, env) {
 
     // Extract eBay listing ID and order ID from various payload shapes
     const ebayItemId = (
-      payload.ItemID || payload.itemId ||
-      payload.item?.itemId ||
-      payload.notification?.data?.itemId ||
+      safePayload.ItemID || safePayload.itemId ||
+      safePayload.item?.itemId ||
+      safePayload.notification?.data?.itemId ||
       null
     );
     const ebayOrderId = (
-      payload.OrderID || payload.orderId ||
-      payload.order?.orderId ||
-      payload.notification?.data?.orderId ||
+      safePayload.OrderID || safePayload.orderId ||
+      safePayload.order?.orderId ||
+      safePayload.notification?.data?.orderId ||
       null
     );
 
@@ -388,7 +389,12 @@ export async function onRequestPost(context) {
   }
 
   // 3. Read raw body BEFORE any parsing (signature covers raw payload bytes)
-  const rawBody = await request.arrayBuffer();
+  let rawBody;
+  try {
+    rawBody = await request.arrayBuffer();
+  } catch (_) {
+    return err('Bad Request: failed to read payload body', 400);
+  }
 
   // 4. Validate cryptographic signature
   const isValid = await verifyWebhookSignature(rawBody, signature, secret);
@@ -405,6 +411,29 @@ export async function onRequestPost(context) {
     return err('Bad Request: invalid JSON payload', 400);
   }
 
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return err('Bad Request: invalid JSON payload structure', 400);
+  }
+
+  const hasRecognizedShape = Boolean(
+    payload.metadata?.topic ||
+    payload.notification?.data ||
+    payload.eventType ||
+    payload.topic ||
+    payload.ItemID ||
+    payload.itemId ||
+    payload.OrderID ||
+    payload.orderId ||
+    payload.userId ||
+    payload.UserId ||
+    payload.user?.userId
+  );
+
+  if (!hasRecognizedShape) {
+    console.warn('[ebayWebhook] Rejected unrecognized webhook payload shape');
+    return err('Bad Request: unrecognized webhook payload shape', 400);
+  }
+
   const eventType = (
     payload.metadata?.topic ||
     payload.eventType ||
@@ -412,8 +441,8 @@ export async function onRequestPost(context) {
     'UNKNOWN'
   ).toUpperCase().replace(/\./g, '_');
 
-  const ebayItemId = payload.notification?.data?.itemId || payload.ItemID || null;
-  const ebayOrderId = payload.notification?.data?.orderId || payload.OrderID || null;
+  const ebayItemId = payload.notification?.data?.itemId || payload.ItemID || payload.itemId || null;
+  const ebayOrderId = payload.notification?.data?.orderId || payload.OrderID || payload.orderId || null;
   const eventId = crypto.randomUUID();
 
   // 6. Log event to D1 immediately (if DB bound)

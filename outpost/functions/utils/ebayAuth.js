@@ -1,4 +1,5 @@
 import { decryptToken, encryptToken } from './tokenCrypto.js';
+import { fetchWithTimeout } from '../api/ebay/tokenHelper.js';
 
 // Startup-time binding presence log (value is never logged)
 if (typeof console !== 'undefined') {
@@ -39,6 +40,9 @@ export async function getEbayUserToken(env, userId) {
   const refreshExp = new Date(row.refresh_token_exp).getTime();
 
   if (refreshExp < now) {
+    if (env.DB) {
+      await env.DB.prepare('DELETE FROM ebay_oauth_tokens WHERE user_id = ?').bind(userId).run();
+    }
     throw new Error('eBay refresh token has expired. Please reconnect your eBay account in Settings.');
   }
 
@@ -80,14 +84,26 @@ export async function getEbayUserToken(env, userId) {
   const refreshToken = await decryptAndMigrate(row.refresh_token, 'refresh_token');
   const credentials = btoa(`${clientId}:${clientSecret}`);
 
-  const res = await fetch('https://api.ebay.com/identity/v1/oauth2/token', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'Authorization': `Basic ${credentials}`
-    },
-    body: `grant_type=refresh_token&refresh_token=${encodeURIComponent(refreshToken)}`
-  });
+  let res;
+  try {
+    res = await fetchWithTimeout('https://api.ebay.com/identity/v1/oauth2/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': `Basic ${credentials}`
+      },
+      body: `grant_type=refresh_token&refresh_token=${encodeURIComponent(refreshToken)}`
+    }, 15000);
+  } catch (fetchErr) {
+    if (fetchErr.isTimeout || fetchErr.name === 'TimeoutError') {
+      console.error('[ebayAuth] eBay token refresh timed out:', fetchErr);
+      const err = new Error('eBay token refresh timed out. Please try again.');
+      err.isTimeout = true;
+      err.statusCode = 504;
+      throw err;
+    }
+    throw fetchErr;
+  }
 
   if (!res.ok) {
     // If refresh fails but access token is still within validity window, return existing
@@ -97,10 +113,16 @@ export async function getEbayUserToken(env, userId) {
     }
     const text = await res.text().catch(() => '');
     console.error(`[ebayAuth] eBay token refresh failed (${res.status}):`, text);
-    if (res.status === 400 || res.status === 401) {
+    if ((res.status === 400 || res.status === 401) && env.DB) {
       await env.DB.prepare('DELETE FROM ebay_oauth_tokens WHERE user_id = ?').bind(userId).run();
     }
-    throw new Error('eBay token refresh failed. Please reconnect your eBay account.');
+    const err = new Error(
+      res.status === 429
+        ? 'eBay API rate limit exceeded during token refresh. Please try again later.'
+        : 'eBay token refresh failed. Please reconnect your eBay account.'
+    );
+    err.statusCode = res.status === 429 ? 429 : 401;
+    throw err;
   }
 
   const data = await res.json();

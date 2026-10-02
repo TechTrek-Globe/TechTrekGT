@@ -1,5 +1,5 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
-import { getEbayUserToken, getEbayApiBase } from './tokenHelper.js';
+import { getEbayUserToken, getEbayApiBase, fetchWithTimeout } from './tokenHelper.js';
 import { ANALYTICS_CACHE_TTL_HOURS } from '../../utils/constants.js';
 
 /**
@@ -136,15 +136,22 @@ export function ingestListingTraffic(env, userId, itemId, listingId, rangeDays =
 
     let ebayData;
     try {
-      const res = await fetch(analyticsUrl, {
+      const res = await fetchWithTimeout(analyticsUrl, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
           Accept: 'application/json'
         }
-      });
+      }, 15000);
       if (!res.ok) {
         const errText = await res.text().catch(() => '');
         console.error(`[analytics] eBay Analytics API error (${res.status}):`, errText);
+        if (res.status === 429) {
+          return {
+            success: false,
+            error: 'eBay Analytics API rate limit reached. Please try again in a few minutes.',
+            status: 429
+          };
+        }
         if (res.status === 403 || errText.includes('scope') || errText.includes('Unauthorized')) {
           return {
             success: false,
@@ -157,6 +164,9 @@ export function ingestListingTraffic(env, userId, itemId, listingId, rangeDays =
       ebayData = await res.json();
     } catch (e) {
       console.error('[analytics] Failed to fetch daily traffic from eBay:', e);
+      if (e.isTimeout || e.statusCode === 504) {
+        return { success: false, error: 'eBay Analytics request timed out. Please try again later.', status: 504 };
+      }
       return { success: false, error: 'Failed to fetch daily traffic from eBay. Please try again.', status: 500 };
     }
 

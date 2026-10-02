@@ -39,6 +39,50 @@ export const PBKDF2_ITERATIONS = PBKDF2_ITERATIONS_V2;
 
 const _V2_PREFIX = 'v2';
 
+export const DEFAULT_EXTERNAL_TIMEOUT_MS = 15000;
+
+/**
+ * Fetch wrapper that enforces a strict timeout on external requests.
+ * Uses AbortSignal.timeout() when available, with fallback to AbortController.
+ *
+ * @param {string} url
+ * @param {RequestInit} [options={}]
+ * @param {number} [timeoutMs=DEFAULT_EXTERNAL_TIMEOUT_MS]
+ * @returns {Promise<Response>}
+ */
+export async function fetchWithTimeout(url, options = {}, timeoutMs = DEFAULT_EXTERNAL_TIMEOUT_MS) {
+  let timerId;
+  let signal = options.signal;
+
+  if (!signal) {
+    if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
+      signal = AbortSignal.timeout(timeoutMs);
+    } else {
+      const controller = new AbortController();
+      timerId = setTimeout(() => controller.abort(new Error(`Request timed out after ${timeoutMs}ms`)), timeoutMs);
+      signal = controller.signal;
+    }
+  }
+
+  try {
+    const res = await fetch(url, { ...options, signal });
+    return res;
+  } catch (err) {
+    if (err.name === 'TimeoutError' || err.name === 'AbortError' || /timeout|aborted/i.test(err.message)) {
+      let host = 'external service';
+      try { host = new URL(url).hostname; } catch (_) {}
+      const timeoutErr = new Error(`External request to ${host} timed out after ${timeoutMs}ms`);
+      timeoutErr.name = 'TimeoutError';
+      timeoutErr.isTimeout = true;
+      timeoutErr.statusCode = 504;
+      throw timeoutErr;
+    }
+    throw err;
+  } finally {
+    if (timerId) clearTimeout(timerId);
+  }
+}
+
 export async function deriveKey(secret, salt = NEW_SALT, iterations = PBKDF2_ITERATIONS_V2) {
   const raw = await crypto.subtle.importKey(
     'raw',
@@ -221,6 +265,9 @@ export async function getEbayUserToken(env, userId) {
   const refreshExp = new Date(row.refresh_token_exp).getTime();
 
   if (refreshExp < now) {
+    if (env.DB) {
+      await env.DB.prepare('DELETE FROM ebay_oauth_tokens WHERE user_id = ?').bind(userId).run();
+    }
     throw new Error('eBay refresh token has expired. Please reconnect your eBay account in Settings.');
   }
 
@@ -259,19 +306,40 @@ export async function getEbayUserToken(env, userId) {
   const credentials = btoa(`${clientId}:${clientSecret}`);
   const oauthUrl = getEbayOAuthUrl(env);
 
-  const res = await fetch(oauthUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'Authorization': `Basic ${credentials}`
-    },
-    body: `grant_type=refresh_token&refresh_token=${encodeURIComponent(refreshToken)}`
-  });
+  let res;
+  try {
+    res = await fetchWithTimeout(oauthUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': `Basic ${credentials}`
+      },
+      body: `grant_type=refresh_token&refresh_token=${encodeURIComponent(refreshToken)}`
+    }, 15000);
+  } catch (fetchErr) {
+    if (fetchErr.isTimeout || fetchErr.name === 'TimeoutError') {
+      console.error('[tokenHelper] eBay token refresh timed out:', fetchErr);
+      const err = new Error('eBay token refresh timed out. Please try again.');
+      err.isTimeout = true;
+      err.statusCode = 504;
+      throw err;
+    }
+    throw fetchErr;
+  }
 
   if (!res.ok) {
     const text = await res.text().catch(() => '');
     console.error(`[tokenHelper] eBay token refresh failed (${res.status}):`, text);
-    throw new Error('eBay token refresh failed. Please reconnect your eBay account.');
+    if ((res.status === 400 || res.status === 401) && env.DB) {
+      await env.DB.prepare('DELETE FROM ebay_oauth_tokens WHERE user_id = ?').bind(userId).run();
+    }
+    const err = new Error(
+      res.status === 429
+        ? 'eBay API rate limit exceeded during token refresh. Please try again later.'
+        : 'eBay token refresh failed. Please reconnect your eBay account.'
+    );
+    err.statusCode = res.status === 429 ? 429 : 401;
+    throw err;
   }
 
   const data = await res.json();
@@ -325,7 +393,7 @@ export async function fetchEbayActiveSellerListings(env, accessToken) {
   </ActiveList>
 </GetMyeBaySellingRequest>`;
 
-    const tradingRes = await fetch(tradingBase, {
+    const tradingRes = await fetchWithTimeout(tradingBase, {
       method: 'POST',
       headers: {
         'X-EBAY-API-SITEID': '0',
@@ -335,7 +403,7 @@ export async function fetchEbayActiveSellerListings(env, accessToken) {
         'Content-Type': 'text/xml'
       },
       body: xmlReq
-    });
+    }, 15000);
 
     if (tradingRes.ok) {
       const xmlText = await tradingRes.text();
@@ -388,19 +456,22 @@ export async function fetchEbayActiveSellerListings(env, accessToken) {
           });
         }
       }
+    } else {
+      const errText = await tradingRes.text().catch(() => '');
+      console.warn(`[tokenHelper] Trading API GetMyeBaySelling error (${tradingRes.status}):`, errText.slice(0, 200));
     }
   } catch (e) {
-    console.warn('[tokenHelper] Trading API GetMyeBaySelling exception:', e);
+    console.warn('[tokenHelper] Trading API GetMyeBaySelling exception:', e.message || e);
   }
 
   // 2. Also try Sell Inventory API to capture inventory-model listings
   try {
-    const invRes = await fetch(`${restBase}/sell/inventory/v1/inventory_item?limit=100&offset=0`, {
+    const invRes = await fetchWithTimeout(`${restBase}/sell/inventory/v1/inventory_item?limit=100&offset=0`, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json'
       }
-    });
+    }, 10000);
 
     if (invRes.ok) {
       const invData = await invRes.json();
@@ -408,9 +479,10 @@ export async function fetchEbayActiveSellerListings(env, accessToken) {
 
       for (const inv of inventoryItems) {
         try {
-          const offerRes = await fetch(
+          const offerRes = await fetchWithTimeout(
             `${restBase}/sell/inventory/v1/offer?sku=${encodeURIComponent(inv.sku)}&limit=1`,
-            { headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' } }
+            { headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' } },
+            5000
           );
           if (offerRes.ok) {
             const offerData = await offerRes.json();
@@ -492,7 +564,7 @@ export async function fetchSingleEbayListing(env, accessToken, listingId, campai
   <DetailLevel>ReturnAll</DetailLevel>
 </GetItemRequest>`;
 
-    const res = await fetch(tradingBase, {
+    const res = await fetchWithTimeout(tradingBase, {
       method: 'POST',
       headers: {
         'X-EBAY-API-SITEID': '0',
@@ -502,7 +574,7 @@ export async function fetchSingleEbayListing(env, accessToken, listingId, campai
         'Content-Type': 'text/xml'
       },
       body: xmlReq
-    });
+    }, 10000);
 
     if (res.ok) {
       const xmlText = await res.text();
@@ -603,13 +675,13 @@ export async function fetchSingleEbayListing(env, accessToken, listingId, campai
           const browseUrl = isSandbox
             ? `https://api.sandbox.ebay.com/buy/browse/v1/item/v1|${cleanId}|0`
             : `https://api.ebay.com/buy/browse/v1/item/v1|${cleanId}|0`;
-          const browseRes = await fetch(browseUrl, {
+          const browseRes = await fetchWithTimeout(browseUrl, {
             headers: {
               Authorization: `Bearer ${accessToken}`,
               'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
               'Content-Type': 'application/json'
             }
-          });
+          }, 8000);
           if (browseRes.ok) {
             const bData = await browseRes.json();
             if (bData.shippingOptions && bData.shippingOptions.length > 0) {
@@ -634,9 +706,9 @@ export async function fetchSingleEbayListing(env, accessToken, listingId, campai
           const policyUrl = isSandbox
             ? `https://api.sandbox.ebay.com/sell/account/v1/fulfillment_policy?marketplace_id=EBAY_US`
             : `https://api.ebay.com/sell/account/v1/fulfillment_policy?marketplace_id=EBAY_US`;
-          const polRes = await fetch(policyUrl, {
+          const polRes = await fetchWithTimeout(policyUrl, {
             headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' }
-          });
+          }, 8000);
           if (polRes.ok) {
             const polData = await polRes.json();
             const policies = polData.fulfillmentPolicies || [];
@@ -724,13 +796,13 @@ export async function fetchSingleEbayListing(env, accessToken, listingId, campai
             campaigns = campPromise instanceof Promise ? await campPromise : campPromise;
           } else {
             const fetchCamp = (async () => {
-              const campRes = await fetch(`${mktBase}/sell/marketing/v1/ad_campaign?limit=50`, {
+              const campRes = await fetchWithTimeout(`${mktBase}/sell/marketing/v1/ad_campaign?limit=50`, {
                 headers: {
                   Authorization: `Bearer ${accessToken}`,
                   Accept: 'application/json',
                   'Content-Type': 'application/json'
                 }
-              });
+              }, 8000);
 
               if (campRes.ok) {
                 const campData = await campRes.json();
@@ -772,13 +844,13 @@ export async function fetchSingleEbayListing(env, accessToken, listingId, campai
 
                 // 1. Query campaign ads specifically for this listing ID (using singular listing_id query parameter)
                 try {
-                  const adRes = await fetch(`${mktBase}/sell/marketing/v1/ad_campaign/${camp.campaignId}/ad?listing_id=${cleanId}`, {
+                  const adRes = await fetchWithTimeout(`${mktBase}/sell/marketing/v1/ad_campaign/${camp.campaignId}/ad?listing_id=${cleanId}`, {
                     headers: {
                       Authorization: `Bearer ${accessToken}`,
                       Accept: 'application/json',
                       'Content-Type': 'application/json'
                     }
-                  });
+                  }, 8000);
                   if (adRes.ok) {
                     const adData = await adRes.json();
                     const ads = adData.ads || [];
@@ -802,13 +874,13 @@ export async function fetchSingleEbayListing(env, accessToken, listingId, campai
                 // 2. Also check campaign ads collection up to limit 200
                 if (foundRate == null) {
                   try {
-                    const checkAds = await fetch(`${mktBase}/sell/marketing/v1/ad_campaign/${camp.campaignId}/ad?limit=200`, {
+                    const checkAds = await fetchWithTimeout(`${mktBase}/sell/marketing/v1/ad_campaign/${camp.campaignId}/ad?limit=200`, {
                       headers: {
                         Authorization: `Bearer ${accessToken}`,
                         Accept: 'application/json',
                         'Content-Type': 'application/json'
                       }
-                    });
+                    }, 8000);
                     if (checkAds.ok) {
                       const checkData = await checkAds.json();
                       const ads = checkData.ads || [];
@@ -989,7 +1061,7 @@ export async function updateEbayListingSku(env, accessToken, listingId, sku) {
 </${callName}Request>`;
 
   // 1. Try ReviseFixedPriceItem first
-  let res = await fetch(tradingEndpoint, {
+  let res = await fetchWithTimeout(tradingEndpoint, {
     method: 'POST',
     headers: {
       'X-EBAY-API-SITEID': '0',
@@ -999,14 +1071,14 @@ export async function updateEbayListingSku(env, accessToken, listingId, sku) {
       'Content-Type': 'text/xml'
     },
     body: makeXml('ReviseFixedPriceItem')
-  });
+  }, 15000);
 
   let text = await res.text();
   let ack = extractXmlTag(text, 'Ack') || 'Failure';
 
   // 2. If item is an Auction format, try ReviseItem
   if (ack !== 'Success' && ack !== 'Warning') {
-    res = await fetch(tradingEndpoint, {
+    res = await fetchWithTimeout(tradingEndpoint, {
       method: 'POST',
       headers: {
         'X-EBAY-API-SITEID': '0',
@@ -1016,7 +1088,7 @@ export async function updateEbayListingSku(env, accessToken, listingId, sku) {
         'Content-Type': 'text/xml'
       },
       body: makeXml('ReviseItem')
-    });
+    }, 15000);
     text = await res.text();
     ack = extractXmlTag(text, 'Ack') || 'Failure';
   }
@@ -1047,13 +1119,13 @@ export async function fetchEbayRecentOrders(env, accessToken, limit = 100) {
     : 'https://api.ebay.com';
 
   try {
-    const res = await fetch(`${restBase}/sell/fulfillment/v1/order?limit=${limit}`, {
+    const res = await fetchWithTimeout(`${restBase}/sell/fulfillment/v1/order?limit=${limit}`, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
         'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US'
       }
-    });
+    }, 15000);
 
     if (res.ok) {
       const data = await res.json();
@@ -1162,7 +1234,7 @@ export async function fetchEbayOrderForListing(env, accessToken, listingId, sku 
   <DetailLevel>ReturnAll</DetailLevel>
 </GetItemTransactionsRequest>`;
 
-      const tRes = await fetch(tradingBase, {
+      const tRes = await fetchWithTimeout(tradingBase, {
         method: 'POST',
         headers: {
           'X-EBAY-API-SITEID': '0',
@@ -1172,7 +1244,7 @@ export async function fetchEbayOrderForListing(env, accessToken, listingId, sku 
           'Content-Type': 'text/xml'
         },
         body: xmlReq
-      });
+      }, 15000);
 
       if (tRes.ok) {
         const xml = await tRes.text();
@@ -1222,7 +1294,7 @@ export async function fetchEbayOrderForListing(env, accessToken, listingId, sku 
   <DetailLevel>ReturnAll</DetailLevel>
 </GetOrdersRequest>`;
 
-    const oRes = await fetch(tradingBase, {
+    const oRes = await fetchWithTimeout(tradingBase, {
       method: 'POST',
       headers: {
         'X-EBAY-API-SITEID': '0',
@@ -1232,7 +1304,7 @@ export async function fetchEbayOrderForListing(env, accessToken, listingId, sku 
         'Content-Type': 'text/xml'
       },
       body: xmlOrdersReq
-    });
+    }, 15000);
 
     if (oRes.ok) {
       const xml = await oRes.text();
@@ -1303,13 +1375,13 @@ export async function fetchEbayOrderFinances(env, accessToken, orderId) {
     : 'https://apiz.ebay.com';
 
   try {
-    const res = await fetch(`${financesBase}/sell/finances/v1/transaction?filter=orderId:{${encodeURIComponent(cleanOrderId)}}&limit=100`, {
+    const res = await fetchWithTimeout(`${financesBase}/sell/finances/v1/transaction?filter=orderId:{${encodeURIComponent(cleanOrderId)}}&limit=100`, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
         'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US'
       }
-    });
+    }, 15000);
 
     if (!res.ok) {
       const text = await res.text().catch(() => '');
@@ -1319,6 +1391,14 @@ export async function fetchEbayOrderFinances(env, accessToken, orderId) {
           finances_available: false,
           pending_scope_approval: true,
           message: 'eBay Finances API access requires sell.finances scope approval.'
+        };
+      }
+      if (res.status === 429) {
+        console.warn('[tokenHelper] Finances API 429 - rate limit exceeded');
+        return {
+          finances_available: false,
+          rate_limited: true,
+          error: 'eBay Finances API rate limit exceeded. Please try again later.'
         };
       }
       console.warn(`[tokenHelper] Finances API error (${res.status}):`, text);
@@ -1411,6 +1491,10 @@ export async function fetchEbayOrderFinances(env, accessToken, orderId) {
       raw: transactions
     };
   } catch (e) {
+    if (e?.isTimeout || e?.name === 'TimeoutError') {
+      console.warn(`[tokenHelper] Finances API timeout for order ${cleanOrderId}`);
+      return { finances_available: false, timeout: true, error: 'eBay Finances request timed out. Please try again.' };
+    }
     console.warn('[tokenHelper] Finances API exception:', e);
     return { finances_available: false, error: 'Failed to retrieve eBay finances data.' };
   }

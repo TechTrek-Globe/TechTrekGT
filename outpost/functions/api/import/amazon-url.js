@@ -5,6 +5,7 @@ import {
   DEFAULT_PLATFORM_FLAT_FEE,
   DEFAULT_TARGET_MARGIN_PCT
 } from '../../utils/constants.js';
+import { fetchWithTimeout } from '../ebay/tokenHelper.js';
 
 /**
  * POST /api/import/amazon-url
@@ -78,14 +79,14 @@ export async function onRequestPost(context) {
         ? `${reqUrl.protocol}//${reqUrl.hostname}:8787`
         : 'https://techtrekgt.com';
 
-      const gatewayRes = await fetch(`${gatewayBase}/api/amazon/fetch`, {
+      const gatewayRes = await fetchWithTimeout(`${gatewayBase}/api/amazon/fetch`, {
         method:  'POST',
         headers: {
           'Content-Type': 'application/json',
           'Cookie':        request.headers.get('Cookie') || ''
         },
         body: JSON.stringify({ asin: cleanAsin })
-      });
+      }, 15000);
 
       if (gatewayRes.ok) {
         const gwData = await gatewayRes.json().catch(() => ({}));
@@ -103,7 +104,11 @@ export async function onRequestPost(context) {
         console.warn(`[amazon-url] Gateway returned ${gatewayRes.status} for ASIN ${cleanAsin}. Continuing with minimal data.`);
       }
     } catch (e) {
-      console.warn(`[amazon-url] Gateway call failed: ${e.message}. Continuing with minimal data.`);
+      if (e.isTimeout) {
+        console.warn(`[amazon-url] Gateway call timed out after 15s for ASIN ${cleanAsin}. Continuing with minimal data.`);
+      } else {
+        console.warn(`[amazon-url] Gateway call failed: ${e.message}. Continuing with minimal data.`);
+      }
     }
 
     // --- Build attributes JSON blob ---

@@ -70,6 +70,20 @@ export async function resolveIntegrationUserId(rawToken, env) {
     try {
       const payload = await verifyToken(token, env.JWT_SECRET);
       if (payload?.userId) {
+        if (env?.DB) {
+          try {
+            const user = await env.DB.prepare(
+              'SELECT token_version FROM users WHERE id = ?'
+            ).bind(payload.userId).first();
+            if (user && user.token_version != null) {
+              const currentTv = user.token_version ?? 1;
+              const tokenTv = payload.tv ?? payload.token_version ?? 1;
+              if (tokenTv < currentTv) {
+                return null;
+              }
+            }
+          } catch (_) {}
+        }
         return payload.userId;
       }
     } catch (_) {}
@@ -89,6 +103,14 @@ export async function resolveIntegrationUserId(rawToken, env) {
           return null;
         }
         if (integration.user_id) {
+          const user = await env.DB.prepare(
+            'SELECT id FROM users WHERE id = ?'
+          ).bind(integration.user_id).first();
+          if (!user) {
+            // User was deleted/purged; mark integration revoked to clean up dead credentials
+            await env.DB.prepare("UPDATE api_integrations SET revoked_at = datetime('now') WHERE id = ?").bind(integration.id).run();
+            return null;
+          }
           return integration.user_id;
         }
       }

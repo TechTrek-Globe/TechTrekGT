@@ -20,6 +20,10 @@ export async function onRequestGet(context) {
 
     const now = Date.now();
     const refreshExpMs = row.refresh_token_exp ? new Date(row.refresh_token_exp).getTime() : 0;
+    if (refreshExpMs > 0 && refreshExpMs < now) {
+      await env.DB.prepare('DELETE FROM ebay_oauth_tokens WHERE user_id = ?').bind(auth.userId).run();
+      return ok({ connected: false });
+    }
     const daysUntilExpiry = refreshExpMs ? Math.floor((refreshExpMs - now) / (1000 * 60 * 60 * 24)) : 0;
 
     return ok({

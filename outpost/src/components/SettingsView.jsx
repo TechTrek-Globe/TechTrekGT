@@ -902,12 +902,36 @@ export function SettingsView() {
                     />
                     <span className="text-xs text-slate-400">minutes</span>
                   </div>
-                  {syncSettings?.last_ebay_sync_at && (
+                  {syncSettings?.last_ebay_sync_status === 'failed' ? (
+                    <div className="text-[11px] text-rose-400 mt-2 p-2 rounded-lg bg-rose-950/30 border border-rose-500/20 flex items-start gap-1.5">
+                      <AlertCircle className="w-3.5 h-3.5 text-rose-400 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-semibold">Last sync failed:</span> {syncSettings.last_ebay_sync_error || 'Network error or timeout'}
+                        {syncSettings.last_ebay_sync_at && (
+                          <div className="text-[10px] text-slate-400 mt-0.5">
+                            Last successful sync: {new Date(syncSettings.last_ebay_sync_at).toLocaleString()}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : syncSettings?.last_ebay_sync_status === 'partial' ? (
+                    <div className="text-[11px] text-amber-400 mt-2 p-2 rounded-lg bg-amber-950/30 border border-amber-500/20 flex items-start gap-1.5">
+                      <AlertCircle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-semibold">Partial sync:</span> {syncSettings.last_ebay_sync_error || 'Some items failed to sync'}
+                        {syncSettings.last_ebay_sync_at && (
+                          <div className="text-[10px] text-slate-400 mt-0.5">
+                            Last successful sync: {new Date(syncSettings.last_ebay_sync_at).toLocaleString()}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : syncSettings?.last_ebay_sync_at ? (
                     <p className="text-[10px] text-slate-500 mt-1.5 flex items-center gap-1">
                       <CheckCircle2 className="w-3 h-3 text-emerald-500" />
                       Last sync: {new Date(syncSettings.last_ebay_sync_at).toLocaleString()}
                     </p>
-                  )}
+                  ) : null}
                 </div>
                 <div className="flex flex-col gap-2">
                   <button
@@ -973,12 +997,24 @@ export function SettingsView() {
                     />
                     <span className="text-xs text-slate-400">minutes</span>
                   </div>
-                  {syncSettings?.last_vscout_sync_at && (
+                  {syncSettings?.last_vscout_sync_status === 'failed' ? (
+                    <div className="text-[11px] text-rose-400 mt-2 p-2 rounded-lg bg-rose-950/30 border border-rose-500/20 flex items-start gap-1.5">
+                      <AlertCircle className="w-3.5 h-3.5 text-rose-400 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-semibold">Last sync failed:</span> {syncSettings.last_vscout_sync_error || 'Network error'}
+                        {syncSettings.last_vscout_sync_at && (
+                          <div className="text-[10px] text-slate-400 mt-0.5">
+                            Last successful sync: {new Date(syncSettings.last_vscout_sync_at).toLocaleString()}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : syncSettings?.last_vscout_sync_at ? (
                     <p className="text-[10px] text-slate-500 mt-1.5 flex items-center gap-1">
                       <CheckCircle2 className="w-3 h-3 text-emerald-500" />
                       Last sync: {new Date(syncSettings.last_vscout_sync_at).toLocaleString()}
                     </p>
-                  )}
+                  ) : null}
                 </div>
                 <div className="flex flex-col gap-2">
                   <button

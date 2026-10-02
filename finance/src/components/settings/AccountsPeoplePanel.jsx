@@ -530,6 +530,7 @@ export function AccountsPeoplePanel() {
                         onChange={e => setNewAccForm({ ...newAccForm, saveExtraMonthly: parseFloat(e.target.value) || 0 })}
                         className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-emerald-400 font-mono font-bold focus:outline-none focus:border-blue-500"
                       />
+                      <p className="text-[10px] text-slate-500 mt-1">If Funding Goals exist for this account, goal overflow automates savings.</p>
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-slate-400 mb-1">Extra Current Balance ($)</label>

@@ -209,6 +209,13 @@ export function CloudSyncSubPanel() {
           </div>
         ) : (
           <div className="space-y-4 pt-1">
+            <div className="p-3.5 rounded-xl bg-blue-950/30 border border-blue-800/40 text-xs text-blue-300 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-blue-400 shrink-0" />
+                <span>Cloud synchronization is optional. Enable below to replicate your local IndexedDB vault to Cloudflare D1.</span>
+              </div>
+            </div>
+
             {/* Sync on Load Toggle Switch */}
             <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-between hover:border-slate-700/80 transition-colors">
               <div className="space-y-1 pr-3">

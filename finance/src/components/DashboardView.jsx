@@ -892,7 +892,12 @@ export function DashboardView() {
         });
 
         // 2. Group Account Extra Savings
-        (budget?.accounts || []).filter(acc => acc.saveExtraMonthly > 0 && acc.enableExtraSavings !== false).forEach(acc => {
+        // C2: If account already has active funding goals, goal overflow governs savings (avoid double-counting)
+        (budget?.accounts || []).filter(acc => {
+          if (!acc.saveExtraMonthly || acc.saveExtraMonthly <= 0 || acc.enableExtraSavings === false) return false;
+          const hasGoals = (budget?.fundingGoals || []).some(g => g.accountId === acc.id);
+          return !hasGoals || acc.forceExtraSavingsWithGoals === true;
+        }).forEach(acc => {
           const extraAmt = parseFloat(acc.saveExtraMonthly) || 0;
           if (extraAmt <= 0) return;
 

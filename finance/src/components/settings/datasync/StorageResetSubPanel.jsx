@@ -21,7 +21,9 @@ export function StorageResetSubPanel() {
     resetToDefaults,
     clearAllData,
     loadDemoPreset,
-    clearFutureMatrixCredits
+    clearFutureMatrixCredits,
+    pruneGhostMatrixDayKeys,
+    restoreStandardFundingGoals
   } = useLedgerDataDispatch();
 
   // Storage Quota State
@@ -29,6 +31,8 @@ export function StorageResetSubPanel() {
   const [isFlushingCache, setIsFlushingCache] = useState(false);
   const [flushStatus, setFlushStatus] = useState(null);
   const [clearCreditsStatus, setClearCreditsStatus] = useState(null);
+  const [pruneStatus, setPruneStatus] = useState(null);
+  const [restoreGoalsStatus, setRestoreGoalsStatus] = useState(null);
 
   // Danger zone confirmations
   const [confirmClearAll, setConfirmClearAll] = useState(false);
@@ -322,6 +326,90 @@ export function StorageResetSubPanel() {
           {clearCreditsStatus && (
             <div className="text-xs text-emerald-400 bg-emerald-950/40 border border-emerald-800 p-2.5 rounded-lg">
               {clearCreditsStatus}
+            </div>
+          )}
+        </div>
+
+        {/* Prune Ghost Calendar Day Keys (Tier C8) */}
+        <div className="p-5 rounded-xl glass-card border border-cyan-800/60 bg-cyan-950/10 space-y-4 hover:border-cyan-700/80 transition-colors">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-cyan-300 flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-cyan-400" />
+              Prune Orphaned Calendar Day Keys
+            </h3>
+            <span className="text-[10px] font-mono text-cyan-400 bg-cyan-950 px-2.5 py-1 rounded-full border border-cyan-800">
+              Integrity Cleanup
+            </span>
+          </div>
+          <p className="text-xs text-slate-300 leading-relaxed">
+            Scans and removes legacy dailyMatrix cells stored on invalid calendar days (such as Feb 30/31, Apr 31, Jun 31, Sep 31) created by earlier importer scheduling.
+          </p>
+
+          <div className="flex items-center justify-between flex-wrap gap-2 pt-2">
+            <div className="text-xs text-slate-400 font-mono">
+              Safe: Prunes only days exceeding each month's actual length.
+            </div>
+
+            <button
+              type="button"
+              onClick={async () => {
+                if (pruneGhostMatrixDayKeys) {
+                  const res = await pruneGhostMatrixDayKeys();
+                  setPruneStatus(`Pruned ${res?.removedCount || 0} orphaned calendar day keys.`);
+                  setTimeout(() => setPruneStatus(null), 6000);
+                }
+              }}
+              className="px-5 py-2.5 bg-cyan-600/80 hover:bg-cyan-600 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2 cursor-pointer"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>Prune Ghost Keys</span>
+            </button>
+          </div>
+          {pruneStatus && (
+            <div className="text-xs text-cyan-400 bg-cyan-950/40 border border-cyan-800 p-2.5 rounded-lg">
+              {pruneStatus}
+            </div>
+          )}
+        </div>
+
+        {/* Restore Standard Funding Goals (Tier C4) */}
+        <div className="p-5 rounded-xl glass-card border border-emerald-800/60 bg-emerald-950/10 space-y-4 hover:border-emerald-700/80 transition-colors">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-emerald-300 flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+              Restore Standard Funding Goals
+            </h3>
+            <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950 px-2.5 py-1 rounded-full border border-emerald-800">
+              Recovery Helper
+            </span>
+          </div>
+          <p className="text-xs text-slate-300 leading-relaxed">
+            Rebuilds standard clean funding goals (Mortgage & Bills Checking contributions) for active household earners if your goals list was emptied or lost.
+          </p>
+
+          <div className="flex items-center justify-between flex-wrap gap-2 pt-2">
+            <div className="text-xs text-slate-400 font-mono">
+              Auto-maps to your Mortgage and Bills Checking accounts.
+            </div>
+
+            <button
+              type="button"
+              onClick={async () => {
+                if (restoreStandardFundingGoals) {
+                  const res = await restoreStandardFundingGoals();
+                  setRestoreGoalsStatus(`Restored ${res?.count || 0} standard funding goals.`);
+                  setTimeout(() => setRestoreGoalsStatus(null), 6000);
+                }
+              }}
+              className="px-5 py-2.5 bg-emerald-600/80 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2 cursor-pointer"
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              <span>Restore Standard Goals</span>
+            </button>
+          </div>
+          {restoreGoalsStatus && (
+            <div className="text-xs text-emerald-400 bg-emerald-950/40 border border-emerald-800 p-2.5 rounded-lg">
+              {restoreGoalsStatus}
             </div>
           )}
         </div>

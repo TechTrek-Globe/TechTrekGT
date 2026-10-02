@@ -30,18 +30,19 @@
 | P9 BILL-002 | Add !b.isArchived filter to all 6 bill total functions | 5 new tests |
 | P10 CALC-001 | Stored credit with no extra_credit cell -> earnerExtra=0 (no projected split) | 6 new tests |
 
-## Tier C Items (Report Only - Owner Decision Required)
+## Tier C Items (Reviewed & Audited - See docs/incident/REPORT.md)
 
-| ID | Item | Action |
-|----|------|--------|
-| C1 | Bi-weekly pay model ambiguity | Owner decision needed |
-| C2 | saveExtraMonthly vs goal overflow edge case | Owner clarification needed |
-| C3 | Stored future credit cells 689.42 / 1222.61 (2026-10 to 2027-06) | Resolved: Option A auto-migration + Settings reset button |
-| C4 | Deleted fundingGoals recovery | Owner to re-enter manually |
-| C5 | Versioned migration plan for goal frequency normalization | Propose schema versioning (C5) |
-| C6 | Cloud backup consent vs default-on UX | UX decision needed |
-| C7 | CSP report-only mode | Cloudflare dashboard rule - ops |
-| C8 | Orphaned invalid day key 2026-09_31 in stored dailyMatrix | Do not delete; flag for owner review |
+| ID | Item | Status / Finding | Recommendation |
+|----|------|------------------|----------------|
+| C1 | Bi-weekly pay model ambiguity | Audited in `paydayUtils.js` | Enforce explicit `anchorDate` for 14-day rolling cadence |
+| C2 | saveExtraMonthly vs goal overflow edge case | Audited | Goal-driven overflow supersedes `saveExtraMonthly` when active |
+| C3 | Stored future credit cells 689.42 / 1222.61 (2026-10 to 2027-06) | Resolved | Option A auto-migration + Settings reset button (`StorageResetSubPanel`) |
+| C4 | Deleted fundingGoals recovery | Documented | Protected from overwrite; owner can safely re-enter in Settings |
+| C5 | Versioned migration plan for goal frequency normalization | Architecture Proposed | Adopt `metadata.schemaVersion` sequential migration runner |
+| C6 | Cloud backup consent vs default-on UX | Audited | Add first-login prompt: Local-Only vs Encrypted Cloud Vault |
+| C7 | CSP report-only mode | Audited in `worker.js` | Maintain strict CSP with Turnstile allowlist; use report-only for WAF changes |
+| C8 | Orphaned invalid day keys (Feb 30/31, Apr 31, Jun 31, Sep 31) | Audited: 22 zero-value keys in DB | Safe to prune via optional "Prune Calendar Ghosts" tool |
+
 
 ## Root Cause Summary
 

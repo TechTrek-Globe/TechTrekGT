@@ -18,7 +18,8 @@ import {
   generatePaycheckTransactions
 } from '../utils/paydayUtils';
 import { getApiUrl } from '../utils/api';
-import { getBudgetData, getCurrentUserId } from '../utils/indexedDB';
+import { getBudgetData, getCurrentUserId, saveBudgetData } from '../utils/indexedDB';
+import { runBudgetMigrations, CURRENT_BUDGET_SCHEMA_VERSION, pruneInvalidMatrixDayKeys } from '../migrations/budgetMigrations';
 import { ALLOWED_BUDGET_KEYS } from '../worker.js';
 import { 
   getDebugEnabled, 
@@ -193,9 +194,15 @@ export function BudgetMetadataProvider({ children }) {
       try {
         // CRIT-002: Use user-scoped record key if user is authenticated
         const userId = user?.id || getCurrentUserId();
-        const stored = await getBudgetData(userId);
-        if (stored && typeof stored === 'object') {
+        const storedRaw = await getBudgetData(userId);
+        if (storedRaw && typeof storedRaw === 'object') {
+          const { budget: stored, wasMigrated } = runBudgetMigrations(storedRaw);
+          if (wasMigrated) {
+            saveBudgetData(stored, userId).catch(() => {});
+          }
+
           setMetadataState({
+            schemaVersion: stored.schemaVersion || CURRENT_BUDGET_SCHEMA_VERSION,
             accounts: Array.isArray(stored.accounts) ? stored.accounts : initialBudgetData.accounts,
             people: Array.isArray(stored.people) ? stored.people : initialBudgetData.people,
             bills: Array.isArray(stored.bills) ? stored.bills.map(b => {
@@ -235,9 +242,11 @@ export function BudgetMetadataProvider({ children }) {
           // Check for legacy localStorage data
           const legacy = localStorage.getItem(STORAGE_KEY);
           if (legacy) {
-            const parsed = JSON.parse(legacy);
-            if (parsed && typeof parsed === 'object') {
+            const parsedRaw = JSON.parse(legacy);
+            if (parsedRaw && typeof parsedRaw === 'object') {
+              const { budget: parsed } = runBudgetMigrations(parsedRaw);
               setMetadataState({
+                schemaVersion: parsed.schemaVersion || CURRENT_BUDGET_SCHEMA_VERSION,
                 accounts: Array.isArray(parsed.accounts) ? parsed.accounts : initialBudgetData.accounts,
                 people: Array.isArray(parsed.people) ? parsed.people : initialBudgetData.people,
                 bills: Array.isArray(parsed.bills) ? parsed.bills.map(b => {
@@ -283,23 +292,23 @@ export function BudgetMetadataProvider({ children }) {
     initLocalStorageOrIndexedDB();
   }, [user?.id]);
 
-  // Auto Cloud Backup State & Control (defaults to true for authenticated users)
+  // Auto Cloud Backup State & Control (Tier C6: explicit user consent, default false when unset)
   const [isAutoCloudBackupEnabled, setIsAutoCloudBackupEnabled] = useState(() => {
     try {
       const stored = localStorage.getItem('cf_auto_backup_enabled');
-      return stored === null ? true : stored === 'true';
+      return stored === null ? false : stored === 'true';
     } catch {
-      return true;
+      return false;
     }
   });
 
-  // Sync on Load State & Control (defaults to true for authenticated users)
+  // Sync on Load State & Control (Tier C6: explicit user consent, default false when unset)
   const [isSyncOnLoadEnabled, setIsSyncOnLoadEnabled] = useState(() => {
     try {
       const stored = localStorage.getItem('cf_sync_on_load_enabled');
-      return stored === null ? true : stored === 'true';
+      return stored === null ? false : stored === 'true';
     } catch {
-      return true;
+      return false;
     }
   });
 

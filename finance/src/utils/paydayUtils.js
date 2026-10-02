@@ -61,19 +61,43 @@ export function getPersonTargetPayDaysForMonth(person, year, month) {
     const dayNum = parseDayNumber(person.payDay1, daysInMonth) ?? 1;
     payDays.push(new Date(year, month, dayNum));
   } else if (freq === 'semi-monthly' || freq === 'bi-weekly') {
-    const d1 = parseDayNumber(person.payDay1, daysInMonth);
-    const d2 = parseDayNumber(person.payDay2, daysInMonth);
+    // C1: If an explicit anchorDate is provided for true bi-weekly cadence,
+    // calculate every 14 days from the anchor date (supporting 2 or 3 paychecks per month).
+    const rawAnchor = (freq === 'bi-weekly') ? (person.anchorDate || person.payAnchorDate) : null;
+    let handledByAnchor = false;
+    if (rawAnchor) {
+      const anchor = new Date(typeof rawAnchor === 'string' && rawAnchor.length === 10 ? `${rawAnchor}T00:00:00` : rawAnchor);
+      if (!isNaN(anchor.getTime())) {
+        const anchorMidnight = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate()).getTime();
+        const MS_IN_DAY = 86400000;
+        for (let day = 1; day <= daysInMonth; day++) {
+          const d = new Date(year, month, day);
+          const diffDays = Math.round((d.getTime() - anchorMidnight) / MS_IN_DAY);
+          if (diffDays % 14 === 0) {
+            payDays.push(d);
+          }
+        }
+        if (payDays.length > 0) {
+          handledByAnchor = true;
+        }
+      }
+    }
 
-    if (d1 !== null && d2 !== null) {
-      payDays.push(new Date(year, month, d1));
-      payDays.push(new Date(year, month, d2));
-    } else if (d1 !== null) {
-      payDays.push(new Date(year, month, d1));
-      const defaultD2 = d1 === 15 ? daysInMonth : Math.min(d1 + 14, daysInMonth);
-      payDays.push(new Date(year, month, defaultD2));
-    } else {
-      payDays.push(new Date(year, month, 15));
-      payDays.push(new Date(year, month, daysInMonth));
+    if (!handledByAnchor) {
+      const d1 = parseDayNumber(person.payDay1, daysInMonth);
+      const d2 = parseDayNumber(person.payDay2, daysInMonth);
+
+      if (d1 !== null && d2 !== null) {
+        payDays.push(new Date(year, month, d1));
+        payDays.push(new Date(year, month, d2));
+      } else if (d1 !== null) {
+        payDays.push(new Date(year, month, d1));
+        const defaultD2 = d1 === 15 ? daysInMonth : Math.min(d1 + 14, daysInMonth);
+        payDays.push(new Date(year, month, defaultD2));
+      } else {
+        payDays.push(new Date(year, month, 15));
+        payDays.push(new Date(year, month, daysInMonth));
+      }
     }
   } else if (freq === 'weekly') {
     for (let day = 1; day <= daysInMonth; day++) {

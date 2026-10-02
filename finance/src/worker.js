@@ -92,7 +92,11 @@ function addSecurityHeaders(response, options = {}) {
 
   if (isProduction && !isLocalhost) {
     headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
-    headers.set('Content-Security-Policy', buildCsp(nonce));
+    if (opts.cspReportOnly) {
+      headers.set('Content-Security-Policy-Report-Only', buildCsp(nonce));
+    } else {
+      headers.set('Content-Security-Policy', buildCsp(nonce));
+    }
   }
 
   headers.set('X-Content-Type-Options', 'nosniff');
@@ -241,7 +245,8 @@ export const ALLOWED_BUDGET_KEYS = new Set([
   'dashboardWidgets',
   'theme',
   'hideDashboardHeader',
-  'categories'
+  'categories',
+  'schemaVersion'
 ]);
 
 function isObject(val) {
@@ -518,6 +523,13 @@ export function validateBudgetPayloadDetailed(payload) {
       }
     } else {
       return { valid: false, reason: 'categories must be an array or object' };
+    }
+  }
+
+  // 14. schemaVersion (C5)
+  if (payload.schemaVersion !== undefined && payload.schemaVersion !== null) {
+    if (!isFiniteNumber(payload.schemaVersion) || payload.schemaVersion < 1) {
+      return { valid: false, reason: 'schemaVersion must be a positive integer' };
     }
   }
 
@@ -896,7 +908,8 @@ const worker = {
     const requestOrigin = request.headers.get('Origin') || '';
     const nonce = base64UrlEncodeBytes(crypto.getRandomValues(new Uint8Array(16)));
     const effectiveAllowedOrigins = PRODUCTION_ORIGINS.concat(isProduction ? [] : DEV_ORIGINS);
-    const headerOpts = { isLocalhost, isProduction, requestOrigin, nonce, requestPath: url.pathname, allowedOrigins: effectiveAllowedOrigins };
+    const cspReportOnly = env?.CSP_REPORT_ONLY === 'true' || env?.CSP_REPORT_ONLY === true;
+    const headerOpts = { isLocalhost, isProduction, requestOrigin, nonce, requestPath: url.pathname, allowedOrigins: effectiveAllowedOrigins, cspReportOnly };
 
     if (isProduction && !isLocalhost && url.protocol === 'http:') {
       url.protocol = 'https:';

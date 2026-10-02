@@ -404,7 +404,8 @@ export default {
     const context = { request, env, ctx, correlationId };
     request.correlationId = correlationId;
 
-    const isLocalhost = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+    const hostHeader = request.headers.get('host') || request.headers.get('Host') || '';
+    const isLocalhost = url.hostname === 'localhost' || url.hostname === '127.0.0.1' || hostHeader.includes('localhost') || hostHeader.includes('127.0.0.1');
     const requestOrigin = request.headers.get('Origin') || '';
     const nonce = base64UrlEncodeBytes(crypto.getRandomValues(new Uint8Array(16)));
     if (!isLocalhost && (url.protocol === 'http:' || request.headers.get('x-forwarded-proto') === 'http')) {

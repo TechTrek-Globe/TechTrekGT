@@ -5,7 +5,7 @@ import {
   verifyTurnstile, ERROR_CODES, emitMetric, toPublicUser,
   MAX_BODY_AUTH, MAX_NAME_LEN, MAX_EMAIL_LEN, MAX_ANSWER_LEN, MAX_QUESTION_LEN
 } from '../../utils/auth.js';
-import { enforceRateLimit } from '../../utils/rateLimit.js';
+import { enforceRateLimit, getClientIp } from '../../utils/rateLimit.js';
 
 export async function onRequestPost(context) {
   const { request, env, requestId } = context;
@@ -20,7 +20,7 @@ export async function onRequestPost(context) {
     // Turnstile bot verification (cross-reference: CSP challenges.cloudflare.com)
     // Runs before account rate limiting, DB lookups, or password hashing.
     const turnstileToken = body.turnstileToken || body['cf-turnstile-response'];
-    const ip = request.headers?.get('CF-Connecting-IP');
+    const ip = getClientIp(request, env);
     const turnstileCheck = await verifyTurnstile(turnstileToken, env, ip, requestId);
     if (!turnstileCheck.success) {
       return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Security verification failed. Please try again.', requestId);

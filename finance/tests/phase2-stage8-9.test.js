@@ -8,7 +8,8 @@ import { fileURLToPath } from 'node:url';
 import worker from '../src/worker.js';
 import { ERROR_CODES } from '../functions/utils/errorCodes.js';
 import { emitMetric } from '../functions/utils/auth.js';
-import { enforceRateLimit } from '../functions/utils/rateLimit.js';
+import { enforceRateLimit, getClientIp } from '../functions/utils/rateLimit.js';
+import { RateLimiter } from '../src/RateLimiter.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -289,5 +290,165 @@ describe('Phase 2 Stage 8 & 9: Rate Limit Hardening, Request ID Threading & Obse
     } finally {
       console.log = originalLog;
     }
+  });
+
+  // HIGH-001 (FUNC-002): Standardized client IP extraction & Cloudflare proxy context
+  describe('HIGH-001: Cloudflare Proxy IP Extraction & Per-Client Rate Limiting', () => {
+    test('getClientIp prioritizes CF-Connecting-IP over other proxy headers', () => {
+      const req = new Request('https://techtrekgt.com/api/test', {
+        headers: {
+          'CF-Connecting-IP': '198.51.100.42',
+          'x-forwarded-for': '203.0.113.10, 10.0.0.1',
+          'x-real-ip': '203.0.113.99'
+        }
+      });
+      assert.strictEqual(getClientIp(req), '198.51.100.42');
+    });
+
+    test('getClientIp trims whitespace from CF-Connecting-IP', () => {
+      const req = new Request('https://techtrekgt.com/api/test', {
+        headers: { 'CF-Connecting-IP': '  198.51.100.55  ' }
+      });
+      assert.strictEqual(getClientIp(req), '198.51.100.55');
+    });
+
+    test('getClientIp returns null in production when CF-Connecting-IP is absent (rejects spoofed headers)', () => {
+      const req = new Request('https://techtrekgt.com/api/test', {
+        headers: {
+          'cf-ray': 'ray-prod-123',
+          'x-forwarded-for': '203.0.113.10',
+          'x-real-ip': '203.0.113.10'
+        }
+      });
+      assert.strictEqual(getClientIp(req), null);
+
+      const reqEnv = new Request('https://techtrekgt.com/api/test', {
+        headers: { 'x-forwarded-for': '203.0.113.10' }
+      });
+      assert.strictEqual(getClientIp(reqEnv, { ENVIRONMENT: 'production' }), null);
+    });
+
+    test('getClientIp falls back to standard request headers in local development', () => {
+      // 1. X-Forwarded-For fallback (extracts first IP)
+      const reqXff = new Request('http://localhost/api/test', {
+        headers: { 'x-forwarded-for': '203.0.113.88, 10.0.0.1' }
+      });
+      assert.strictEqual(getClientIp(reqXff), '203.0.113.88');
+
+      // 2. X-Real-IP fallback
+      const reqXri = new Request('http://localhost/api/test', {
+        headers: { 'x-real-ip': '203.0.113.77' }
+      });
+      assert.strictEqual(getClientIp(reqXri), '203.0.113.77');
+
+      // 3. X-Client-IP fallback
+      const reqXci = new Request('http://localhost/api/test', {
+        headers: { 'x-client-ip': '203.0.113.66' }
+      });
+      assert.strictEqual(getClientIp(reqXci), '203.0.113.66');
+
+      // 4. Default dev-unknown fallback when no IP headers exist
+      const reqNone = new Request('http://localhost/api/test');
+      assert.strictEqual(getClientIp(reqNone), 'dev-unknown');
+    });
+
+    test('rate limiting triggers individually per actual client IP (acceptance criteria)', async () => {
+      // Setup mock KV storage that records counts per key
+      const kvStore = new Map();
+      const mockKV = {
+        async get(key) {
+          return kvStore.get(key) || null;
+        },
+        async put(key, val) {
+          kvStore.set(key, val);
+        }
+      };
+
+      const testEnv = { ...env, RATE_LIMIT_KV: mockKV };
+      const ipA = '198.51.100.1';
+      const ipB = '198.51.100.2';
+
+      // Client A exhausts its limit (5 requests max)
+      for (let i = 0; i < 5; i++) {
+        const reqA = new Request('http://localhost/api/auth/login', {
+          headers: { 'CF-Connecting-IP': ipA }
+        });
+        const resA = await enforceRateLimit({ request: reqA, env: testEnv }, 'login', 5, 60);
+        assert.strictEqual(resA, null, `Client A request ${i + 1} should be allowed`);
+      }
+
+      // 6th request from Client A must be rate-limited (HTTP 429)
+      const reqA6 = new Request('http://localhost/api/auth/login', {
+        headers: { 'CF-Connecting-IP': ipA }
+      });
+      const resA6 = await enforceRateLimit({ request: reqA6, env: testEnv }, 'login', 5, 60);
+      assert.ok(resA6, 'Client A 6th request must be blocked');
+      assert.strictEqual(resA6.status, 429);
+
+      // Client B with different IP must NOT be blocked
+      const reqB = new Request('http://localhost/api/auth/login', {
+        headers: { 'CF-Connecting-IP': ipB }
+      });
+      const resB = await enforceRateLimit({ request: reqB, env: testEnv }, 'login', 5, 60);
+      assert.strictEqual(resB, null, 'Client B should be allowed despite Client A being rate limited');
+    });
+
+    test('RateLimiter Durable Object safely handles invalid JSON and limits atomically', async () => {
+      let storedState = null;
+      const mockStorage = {
+        async get(key) {
+          return key === 'bucket' ? storedState : null;
+        },
+        async put(key, val) {
+          if (key === 'bucket') storedState = val;
+        }
+      };
+      const mockState = {
+        storage: mockStorage,
+        async blockConcurrencyWhile(fn) {
+          return await fn();
+        }
+      };
+
+      const limiter = new RateLimiter(mockState);
+
+      // 1. Invalid JSON returns 400
+      const badReq = new Request('https://rl/check', {
+        method: 'POST',
+        body: 'invalid-json'
+      });
+      const badRes = await limiter.fetch(badReq);
+      assert.strictEqual(badRes.status, 400);
+
+      // 2. Normal requests within limit return allowed: true
+      const req1 = new Request('https://rl/check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ max: 2, window: 60 })
+      });
+      const res1 = await limiter.fetch(req1);
+      const data1 = await res1.json();
+      assert.strictEqual(data1.allowed, true);
+
+      const req2 = new Request('https://rl/check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ max: 2, window: 60 })
+      });
+      const res2 = await limiter.fetch(req2);
+      const data2 = await res2.json();
+      assert.strictEqual(data2.allowed, true);
+
+      // 3. 3rd request exceeds limit of 2 -> allowed: false
+      const req3 = new Request('https://rl/check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ max: 2, window: 60 })
+      });
+      const res3 = await limiter.fetch(req3);
+      const data3 = await res3.json();
+      assert.strictEqual(data3.allowed, false);
+      assert.ok(data3.retryAfter > 0);
+    });
   });
 });

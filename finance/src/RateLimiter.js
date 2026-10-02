@@ -6,13 +6,28 @@
 //   durable_objects = { bindings = [{ name = "RATE_LIMITER", class_name = "RateLimiter" }] }
 //   migrations = [{ tag = "v1", new_classes = ["RateLimiter"] }]
 
+import { getClientIp } from '../functions/utils/rateLimit.js';
+
+export { getClientIp };
+
 export class RateLimiter {
   constructor(state) {
     this.state = state;
   }
 
   async fetch(request) {
-    const { max, window } = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch (_) {
+      return new Response(JSON.stringify({ allowed: false, error: 'Invalid JSON', retryAfter: 60 }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    const max = Number(body?.max) || 10;
+    const window = Number(body?.window) || 60;
     const now = Math.floor(Date.now() / 1000);
     const bucket = Math.floor(now / window);
     const retryAfter = window - (now % window);

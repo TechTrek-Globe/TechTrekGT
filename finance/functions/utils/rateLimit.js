@@ -59,8 +59,53 @@ export async function checkRateLimit(env, key, maxRequests, windowSeconds, isPro
 import { ERROR_CODES } from './errorCodes.js';
 import { fail } from './auth.js';
 
+// Standardized client IP extraction for Cloudflare proxy context.
+// Prioritizes CF-Connecting-IP from Cloudflare edge proxy.
+// In local development (non-production), falls back to standard request IP headers
+// (X-Forwarded-For, X-Real-IP, X-Client-IP) or connection addresses, defaulting to 'dev-unknown'.
+// In production, never trusts client-spoofable reverse proxy headers.
+export function getClientIp(request, env = null) {
+  const req = request?.request || request;
+  if (!req?.headers) return null;
+
+  // 1. Primary: CF-Connecting-IP (Cloudflare edge proxy header)
+  const cfIp = req.headers.get('CF-Connecting-IP')?.trim();
+  if (cfIp) return cfIp;
+
+  // Check if running in a Cloudflare production environment
+  const environment = env || request?.env;
+  const isProduction = Boolean(req.headers.get('cf-ray')) || environment?.ENVIRONMENT === 'production';
+
+  // In production, do not fall back to spoofable headers
+  if (isProduction) {
+    return null;
+  }
+
+  // 2. Dev environment fallback: standard request IP headers and connection info
+  const xForwardedFor = req.headers.get('x-forwarded-for');
+  if (xForwardedFor) {
+    const firstIp = xForwardedFor.split(',')[0].trim();
+    if (firstIp) return firstIp;
+  }
+
+  const xRealIp = req.headers.get('x-real-ip')?.trim();
+  if (xRealIp) return xRealIp;
+
+  const xClientIp = req.headers.get('x-client-ip')?.trim();
+  if (xClientIp) return xClientIp;
+
+  if (req.socket?.remoteAddress) {
+    return req.socket.remoteAddress;
+  }
+  if (req.connection?.remoteAddress) {
+    return req.connection.remoteAddress;
+  }
+
+  return 'dev-unknown';
+}
+
 // Convenience wrapper used by all handlers.
-// Gets the client IP from CF-Connecting-IP and calls checkRateLimit. (Stage 8.2)
+// Extracts client IP via getClientIp (prioritizing CF-Connecting-IP) and calls checkRateLimit. (Stage 8.2)
 export async function enforceRateLimit(context, prefix, max, windowSeconds, customKey = null) {
   let pfx = prefix;
   let key = customKey;
@@ -69,8 +114,8 @@ export async function enforceRateLimit(context, prefix, max, windowSeconds, cust
     pfx = prefix.slice(0, splitIdx);
     key = prefix.slice(splitIdx + 1);
   }
-  const ip = context.request?.headers?.get('CF-Connecting-IP');
   const isProduction = Boolean(context.request?.headers?.get('cf-ray')) || context.env?.ENVIRONMENT === 'production';
+  const ip = getClientIp(context.request, context.env);
   if (!key && !ip && isProduction) {
     console.error('[rateLimit] CF-Connecting-IP absent in production', context.requestId ? { requestId: context.requestId } : '');
     return fail(ERROR_CODES.SERVICE_UNAVAILABLE, 503, 'Service unavailable.', context.requestId);

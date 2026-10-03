@@ -9,6 +9,8 @@ import { enforceRateLimit, getClientIp } from '../../utils/rateLimit.js';
 
 export async function onRequestPost(context) {
   const { request, env, requestId } = context;
+  let userId = null;
+  let userCreated = false;
 
   const limited = await enforceRateLimit(context, 'register', 5, 60);
   if (limited) return limited;
@@ -75,7 +77,7 @@ export async function onRequestPost(context) {
       return fail(ERROR_CODES.CONFLICT, 409, 'That email address cannot be registered.', requestId);
     }
 
-    const userId = `usr-${crypto.randomUUID()}`;
+    userId = `usr-${crypto.randomUUID()}`;
 
     const [passwordHash, securityAnswerHash] = await Promise.all([
       hashPassword(password),
@@ -87,6 +89,7 @@ export async function onRequestPost(context) {
       // fragile against DDL default removal. (Stage 1.1 / 1.2 / 5.2)
       'INSERT INTO users (id, email, password_hash, name, security_question, security_answer_hash, role, token_version, status, email_verified, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     ).bind(userId, cleanEmail, passwordHash, rawName, cleanQuestion, securityAnswerHash, 'user', 0, 'Active', 0, new Date().toISOString()).run();
+    userCreated = true;
 
     const { code: verificationCode } = await issueOneTimeCode(env, {
       table: 'email_verifications',
@@ -119,6 +122,14 @@ export async function onRequestPost(context) {
     );
 
   } catch (err) {
+    if (userCreated && userId && env?.DB) {
+      try {
+        await env.DB.prepare('DELETE FROM email_verifications WHERE user_id = ?').bind(userId).run().catch(() => {});
+        await env.DB.prepare('DELETE FROM users WHERE id = ?').bind(userId).run().catch(() => {});
+      } catch (cleanupErr) {
+        console.error('[register] rollback error:', cleanupErr && cleanupErr.message);
+      }
+    }
     console.error('[register] handler error:', requestId ? { requestId } : '', err && err.message);
     return fail(ERROR_CODES.INTERNAL_ERROR, 500, 'An internal error occurred. Please try again.', requestId);
   }

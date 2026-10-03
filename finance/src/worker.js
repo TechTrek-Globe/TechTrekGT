@@ -542,6 +542,7 @@ export function validateBudgetPayload(payload) {
 
 async function handleSyncBackup(context) {
   const { request, env } = context;
+  let versionId = null;
   try {
     const auth = await authenticate(context, { requireCsrf: true });
     if (auth.error) return auth.error;
@@ -621,7 +622,7 @@ async function handleSyncBackup(context) {
     }
 
     const now = Math.max(Date.now(), hasBaseVersion ? baseVersion + 1 : 0);
-    const versionId = crypto.randomUUID();
+    versionId = crypto.randomUUID();
 
     const batchResults = await env.DB.batch([
       env.DB.prepare(
@@ -694,6 +695,13 @@ async function handleSyncBackup(context) {
     emitMetric('sync.backup.success', context.requestId);
     return json({ success: true, version: now, timestamp: new Date(now).toISOString() });
   } catch (err) {
+    if (versionId && env?.DB) {
+      try {
+        await env.DB.prepare('DELETE FROM user_backup_versions WHERE id = ?').bind(versionId).run().catch(() => {});
+      } catch (rollbackErr) {
+        console.error('[sync/backup] compensating cleanup error:', rollbackErr && rollbackErr.message);
+      }
+    }
     console.error('[sync/backup] error:', context.requestId ? { requestId: context.requestId } : '', err && err.message);
     return fail(ERROR_CODES.INTERNAL_ERROR, 500, 'Backup failed.', context.requestId);
   }

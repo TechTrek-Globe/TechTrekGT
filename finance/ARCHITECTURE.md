@@ -155,3 +155,14 @@ To eliminate cryptographic key reuse between session signing and transient one-t
 - **Graceful Node / SSR Fallback:** When running in non-browser environments (such as Node.js unit tests where `Worker` is undefined), the client falls back to synchronous in-process execution, guaranteeing 100% test compatibility.
 - **Zero Cloudflare Bundle Bloat:** `parseSpreadsheetWorker` exported from `src/worker.js` uses dynamic `import()` to ensure the Cloudflare Worker serverless runtime bundle does not bundle the heavy `xlsx` dependency into its cold-start bundle.
 
+---
+
+## 6. Backend Data Integrity & Compensating Rollback Architecture (FIN-AUDIT-001)
+
+- **Zero Template Literal SQL Interpolation:** All D1 interactions across `src/worker.js`, `functions/api/`, and `functions/utils/` strictly enforce parameterized SQLite statements via `db.prepare(sql).bind(...)` using `?` placeholders. No dynamic string concatenation or template literal interpolation is permitted in any database query.
+- **Compensating Rollbacks on Mutation Failure:**
+  - **`handleSyncBackup` (`src/worker.js`):** If an unhandled exception or batch interruption occurs during backup persistence, the catch block executes a compensating `DELETE FROM user_backup_versions WHERE id = ?` targeted at the generated `versionId` to ensure no unreferenced or orphaned version snapshots remain in D1.
+  - **User Registration (`functions/api/auth/register.js`):** In multi-step registration flows where a user record is inserted before email verification code generation and session issuance, any downstream failure triggers compensating `DELETE FROM email_verifications WHERE user_id = ?` and `DELETE FROM users WHERE id = ?` queries, preventing orphaned, half-initialized accounts from blocking future registration attempts with HTTP 409 Conflict.
+  - **Profile & Email Change Updates (`functions/api/auth/update-profile.js`):** If an exception occurs when applying user profile updates after an email change verification code has been issued, compensating logic removes the pending verification record from `email_verifications` to eliminate unlinked records.
+
+

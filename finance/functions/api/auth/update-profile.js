@@ -9,6 +9,7 @@ import { enforceRateLimit } from '../../utils/rateLimit.js';
 
 export async function onRequestPost(context) {
   const { request, env } = context;
+  let issuedVerificationId = null;
   const limited = await enforceRateLimit(context, 'profile', 20, 60);
   if (limited) return limited;
 
@@ -93,13 +94,14 @@ export async function onRequestPost(context) {
     const newTokenVersion = Number(user.token_version || 0) + (bumpTokenVersion ? 1 : 0);
 
     if (emailChangeRequested && pendingEmail) {
-      const { code: changeCode } = await issueOneTimeCode(env, {
+      const { code: changeCode, verificationId } = await issueOneTimeCode(env, {
         table: 'email_verifications',
         userId: user.id,
         email: pendingEmail,
         purpose: 'verify',
         ttlMs: ONE_TIME_CODE_TTL_MS
       });
+      issuedVerificationId = verificationId;
 
       await sendVerificationEmail(env, pendingEmail, changeCode, 'change').catch(() => {});
       await sendEmailChangeNotification(env, user.email, pendingEmail).catch(() => {});
@@ -156,6 +158,13 @@ export async function onRequestPost(context) {
       sessionCookies(token, csrf, sexp - now)
     );
   } catch (err) {
+    if (issuedVerificationId && env?.DB) {
+      try {
+        await env.DB.prepare('DELETE FROM email_verifications WHERE id = ?').bind(issuedVerificationId).run().catch(() => {});
+      } catch (cleanupErr) {
+        console.error('[update-profile] compensating cleanup error:', cleanupErr && cleanupErr.message);
+      }
+    }
     console.error('[update-profile] error:', err && err.message);
     return fail(ERROR_CODES.INTERNAL_ERROR, 500, 'An internal error occurred.');
   }

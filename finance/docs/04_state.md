@@ -44,3 +44,16 @@ All D1 SQLite interactions strictly enforce parameterization and rollback safety
   - **`handleSyncBackup`:** If an error occurs during or after backup batch execution, the catch block executes a compensating `DELETE FROM user_backup_versions WHERE id = ?` to prevent orphaned version rows in D1.
   - **`register`:** If an error occurs during verification code generation or session issuance after user insertion, the catch block deletes both the user row and any created verification record, preventing orphaned, locked accounts.
   - **`update-profile`:** If an error occurs during profile updates involving email change requests, any newly issued unlinked `email_verifications` record is rolled back.
+
+## 6. Authentication, Authorization & Session Lifecycle Invariants (FIN-AUDIT-002)
+
+Authentication states strictly reflect backend database authority and maintain zero client-side token storage:
+
+- **HttpOnly Cookie Boundaries:** All authentication relies exclusively on `HttpOnly; Secure; SameSite=Strict` cookies (`auth_token` and `csrf_token`) scoped to `/finance` and `/api`. No JWTs or sensitive credentials are ever persisted in `localStorage` or `sessionStorage`.
+- **Immediate Credential Purging on 401/403:** Failed token validations (expired signatures, malformed tokens, revoked users, or stale `token_version`) instantly emit `Set-Cookie` headers with `Max-Age=0` across `/finance`, `/api`, and `/`, purging invalid cookies from the browser immediately.
+- **Token Version (`token_version`) Invalidation Protocol:**
+  - Password resets (`/api/auth/reset-password`), profile password changes (`/api/auth/update-profile`), email changes (`/api/auth/confirm-email-change`), administrative suspensions (`/api/admin/user-status`), and user logouts (`/api/auth/logout`) atomically increment `token_version` in Cloudflare D1.
+  - The in-memory / KV session cache (`user-session:<id>`) is explicitly invalidated (`invalidateCachedUser`).
+  - Any subsequent request carrying an older JWT with `tv !== token_version` is actively denied with HTTP 401 `SESSION_EXPIRED` and purges cookies on the client.
+- **Multi-Cookie Resolution & Collision Recovery:** `getAllTokensFromRequest` extracts all candidate `auth_token` cookies to prevent sub-path collision (e.g. `/` vs `/finance`). Candidate tokens are evaluated sequentially; requests with conflicting dual credentials (both Cookie and Bearer) are actively rejected with HTTP 400.
+- **Declarative Route Guarding (`requireAuth` / `withAuth`):** Centralized `requireAuth` middleware uniformly rejects unauthenticated and revoked states without leaking database driver details, returning standardized JSON error payloads.

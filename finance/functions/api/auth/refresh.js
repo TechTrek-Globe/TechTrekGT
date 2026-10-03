@@ -3,6 +3,7 @@ import {
   createToken,
   newCsrfToken,
   sessionCookies,
+  clearedCookies,
   withCookies,
   json,
   fail,
@@ -25,7 +26,7 @@ export async function onRequestPost(context) {
       : (typeof payload.exp === 'number' ? payload.exp : 0);
 
     if (sexp <= now) {
-      return fail(ERROR_CODES.SESSION_EXPIRED, 401, 'Session expired. Please sign in again.');
+      return withCookies(fail(ERROR_CODES.SESSION_EXPIRED, 401, 'Session expired. Please sign in again.'), clearedCookies());
     }
 
     // Issues a new access token with the same sexp (session expiry) as before if still valid,

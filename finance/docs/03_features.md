@@ -40,3 +40,11 @@ All serverless API routes execute in Cloudflare Workers ESM format (`src/worker.
 
 - **Strict SQLite Parameterization:** All queries use `db.prepare(sql).bind(...)` with `?` positional parameters. No template literal variable interpolations exist in any API route or utility.
 - **Compensating Rollbacks:** In multi-step database mutations, catch blocks surgically execute compensating D1 statements to delete incomplete, orphaned, or unlinked records on downstream failure.
+
+## 4. Authentication, Authorization & Session Lifecycle (FIN-AUDIT-002)
+
+- **HttpOnly Cookie Standard:** Authentication strictly utilizes `HttpOnly; Secure; SameSite=Strict` cookies (`auth_token` and `csrf_token`) scoped to `/finance` and `/api`. No tokens are accessible to client JavaScript or stored in `localStorage`.
+- **Immediate Credential Purging:** Failed token validations (signature mismatch, expired TTL, revoked session, or suspended account) actively purge invalid credentials via `clearedCookies()` (`Max-Age=0`) alongside explicit HTTP 401/403 responses.
+- **Atomic Session Invalidation:** Password resets (`reset-password.js`), profile password updates (`update-profile.js`), email change confirmations (`confirm-email-change.js`), account suspensions (`admin/user-status.js`), and user logouts (`logout.js`) increment `token_version` in D1 and invalidate the session cache (`invalidateCachedUser`), invalidating all existing JWTs for that account immediately.
+- **Multi-Cookie Resolution:** Handles browser cookie multi-path collisions by evaluating all candidate `auth_token` cookies in sequence (`getAllTokensFromRequest`), preventing subpath cookie shadowing. Rejects mixed-credential requests (Cookie + Bearer) with HTTP 400.
+- **Standardized Route Guards:** Shared `requireAuth` and `withAuth` guards enforce session validity and reject invalid or revoked states with standardized error codes without exposing backend internals.

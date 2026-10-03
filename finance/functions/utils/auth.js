@@ -427,19 +427,66 @@ export function readCookie(request, name) {
   return match && match[1] ? match[1] : null;
 }
 
-// Returns { token, source } so CSRF can be enforced only for cookie auth. (M10)
-export function getTokenFromRequest(request) {
-  const cookieToken = readCookie(request, 'auth_token');
-  if (cookieToken) return { token: cookieToken, source: 'cookie' };
+/**
+ * Extracts all candidate auth tokens from the request.
+ * Supports multiple auth_token cookies (to eliminate sub-path collisions).
+ * Supports Bearer token fallback for non-browser API clients.
+ * Rejects multi-credential requests carrying both cookie and Bearer credentials with HTTP 400.
+ *
+ * @param {Request} request
+ * @returns {string[]}
+ */
+export function getAllTokensFromRequest(request) {
+  const cookieHeader = request.headers.get('Cookie') || '';
+  const cookieTokens = [];
+  const regex = /(?:^|;\s*)auth_token=([^;]+)/g;
+  let match;
+  while ((match = regex.exec(cookieHeader)) !== null) {
+    if (match[1]) cookieTokens.push(match[1]);
+  }
 
+  let bearerToken = null;
   const authHeader = request.headers.get('Authorization');
   if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.slice(7).trim();
-    if (token && token !== 'cookie-active' && token !== 'null' && token !== 'undefined') {
-      return { token, source: 'bearer' };
+    const candidate = authHeader.slice(7).trim();
+    if (candidate && candidate !== 'cookie-active' && candidate !== 'null' && candidate !== 'undefined') {
+      bearerToken = candidate;
     }
   }
-  return { token: null, source: null };
+
+  // Reject multi-credential requests carrying both cookie and Bearer credentials with HTTP 400
+  if (cookieTokens.length > 0 && bearerToken) {
+    throw new Response(JSON.stringify({
+      error: 'Multiple credentials provided. Provide either a session cookie or a Bearer token, not both.'
+    }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  if (cookieTokens.length > 0) {
+    return cookieTokens;
+  }
+
+  if (bearerToken) {
+    return [bearerToken];
+  }
+
+  return [];
+}
+
+// Returns { token, source } so CSRF can be enforced only for cookie auth. (M10)
+export function getTokenFromRequest(request) {
+  let tokens = [];
+  try {
+    tokens = getAllTokensFromRequest(request);
+  } catch (err) {
+    if (err instanceof Response) throw err;
+  }
+  if (tokens.length === 0) return { token: null, source: null };
+  const cookieHeader = request.headers.get('Cookie') || '';
+  const isCookie = /(?:^|;\s*)auth_token=/.test(cookieHeader);
+  return { token: tokens[0], source: isCookie ? 'cookie' : 'bearer' };
 }
 
 export function newCsrfToken() {
@@ -617,45 +664,101 @@ export function clearMemoryUserCache() {
 // Verifies the JWT, then confirms token_version against cache / D1.
 // Checks short-TTL cache first to avoid repetitive D1 read round trips on frequent requests.
 // Strictly excludes password_hash and security_answer_hash from the cache (REM-13/REM-17).
+// Purges invalid, expired, or revoked credentials via Set-Cookie headers on 401/403 responses.
 export async function authenticate(context, { requireCsrf = true, bypassCache = false } = {}) {
   const { request, env } = context;
-  const { token, source } = getTokenFromRequest(request);
-  if (!token) return { error: fail(ERROR_CODES.UNAUTHORIZED, 401, 'Unauthorized') };
+  let tokens = [];
+  try {
+    tokens = getAllTokensFromRequest(request);
+  } catch (err) {
+    if (err instanceof Response) return { error: err };
+    return { error: withCookies(fail(ERROR_CODES.UNAUTHORIZED, 401, 'Unauthorized'), clearedCookies()) };
+  }
 
-  const payload = await verifyToken(token, env?.JWT_SECRET);
-  if (!payload) return { error: fail(ERROR_CODES.UNAUTHORIZED, 401, 'Unauthorized') };
+  if (tokens.length === 0) {
+    return { error: withCookies(fail(ERROR_CODES.UNAUTHORIZED, 401, 'Unauthorized'), clearedCookies()) };
+  }
+
+  const cookieHeader = request.headers.get('Cookie') || '';
+  const source = /(?:^|;\s*)auth_token=/.test(cookieHeader) ? 'cookie' : 'bearer';
 
   if (requireCsrf && !(await csrfOk(request, source))) {
     return { error: fail(ERROR_CODES.CSRF_INVALID, 403, 'Invalid or missing CSRF token') };
   }
 
-  let user = bypassCache ? null : await getCachedUser(payload.userId, env);
+  let hasStaleVersion = false;
 
-  if (!user) {
-    if (!env?.DB) return { error: fail(ERROR_CODES.SERVICE_UNAVAILABLE, 503, 'Service unavailable') };
+  for (const token of tokens) {
+    const payload = await verifyToken(token, env?.JWT_SECRET);
+    if (!payload || !payload.userId) continue;
 
-    const dbUser = await env.DB.prepare(
-      'SELECT id, email, name, role, token_version, status, email_verified, pending_email, security_question, (security_answer_hash IS NOT NULL) AS hasSecurityQuestion FROM users WHERE id = ?'
-    ).bind(payload.userId).first();
+    let user = bypassCache ? null : await getCachedUser(payload.userId, env);
 
-    if (!dbUser) return { error: fail(ERROR_CODES.UNAUTHORIZED, 401, 'Unauthorized') };
+    if (!user) {
+      if (!env?.DB) return { error: fail(ERROR_CODES.SERVICE_UNAVAILABLE, 503, 'Service unavailable') };
 
-    user = toCachedUser(dbUser);
-    await setCachedUser(payload.userId, user, env, USER_CACHE_TTL_SEC);
+      const dbUser = await env.DB.prepare(
+        'SELECT id, email, name, role, token_version, status, email_verified, pending_email, security_question, (security_answer_hash IS NOT NULL) AS hasSecurityQuestion FROM users WHERE id = ?'
+      ).bind(payload.userId).first();
+
+      if (!dbUser) continue;
+
+      user = toCachedUser(dbUser);
+      await setCachedUser(payload.userId, user, env, USER_CACHE_TTL_SEC);
+    }
+
+    if (user.status === 'Suspended') {
+      // REM-21: Distinct code so frontend does not treat suspension as simple login expiration
+      return { error: withCookies(fail(ERROR_CODES.ACCOUNT_SUSPENDED, 403, 'Account suspended. Please contact support.'), clearedCookies()) };
+    }
+
+    const currentVersion = Number(user.token_version || 0);
+    const tokenVersion = Number(payload.tv || 0);
+    if (currentVersion !== tokenVersion) {
+      hasStaleVersion = true;
+      continue;
+    }
+
+    return { payload, user, source, token };
   }
 
-  if (user.status === 'Suspended') {
-    // REM-21: Distinct code so frontend does not treat suspension as simple login expiration
-    return { error: fail(ERROR_CODES.ACCOUNT_SUSPENDED, 403, 'Account suspended. Please contact support.') };
+  if (hasStaleVersion) {
+    return { error: withCookies(fail(ERROR_CODES.SESSION_EXPIRED, 401, 'Session expired. Please sign in again.'), clearedCookies()) };
   }
 
-  const currentVersion = Number(user.token_version || 0);
-  const tokenVersion = Number(payload.tv || 0);
-  if (currentVersion !== tokenVersion) {
-    return { error: fail(ERROR_CODES.SESSION_EXPIRED, 401, 'Session expired. Please sign in again.') };
-  }
+  return { error: withCookies(fail(ERROR_CODES.UNAUTHORIZED, 401, 'Unauthorized'), clearedCookies()) };
+}
 
-  return { payload, user, source };
+/**
+ * Require authenticated session. Throws 401/403 Response on failure, or returns { payload, user, source, token }.
+ * Supports either context object ({ request, env, ... }) or standard (request, env) arguments.
+ */
+export async function requireAuth(contextOrRequest, envOrOptions = {}, maybeOptions = {}) {
+  const context = (contextOrRequest && contextOrRequest.request)
+    ? contextOrRequest
+    : { request: contextOrRequest, env: envOrOptions };
+  const options = (contextOrRequest && contextOrRequest.request)
+    ? (envOrOptions || {})
+    : (maybeOptions || {});
+
+  const auth = await authenticate(context, options);
+  if (auth.error) {
+    throw auth.error;
+  }
+  return auth;
+}
+
+/**
+ * Wraps a handler that may throw a Response directly (for auth errors).
+ */
+export async function withAuth(fn) {
+  try {
+    return await fn();
+  } catch (err) {
+    if (err instanceof Response) return err;
+    console.error('[withAuth] unexpected error:', err && err.stack ? err.stack : err);
+    return fail(ERROR_CODES.INTERNAL_ERROR, 500, 'An internal error occurred. Please try again.');
+  }
 }
 
 /* ------------------------------------------------------------------ */

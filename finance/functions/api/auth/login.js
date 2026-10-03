@@ -1,6 +1,6 @@
 import {
   verifyPassword, hashPassword, needsRehash, readJson, asTrimmedString,
-  json, fail, issueSession, sessionCookies, withCookies, newCsrfToken,
+  json, fail, issueSession, sessionCookies, withCookies, clearedCookies, newCsrfToken,
   verifyTurnstile, ERROR_CODES, emitMetric, toPublicUser, isThreePartHash,
   MAX_BODY_AUTH, MAX_EMAIL_LEN, MAX_PASS_LEN
 } from '../../utils/auth.js';
@@ -58,7 +58,7 @@ export async function onRequestPost(context) {
     // Accounts marked with force_password_reset or legacy non-3-part hashes must reset password.
     if (user.force_password_reset === 1 || !isThreePartHash(user.password_hash)) {
       emitMetric('auth.login.force_password_reset', requestId);
-      return json({
+      return withCookies(json({
         error: 'Password reset required. Your account security credentials must be updated before logging in.',
         code: 'PASSWORD_RESET_REQUIRED',
         forcePasswordReset: true,
@@ -66,18 +66,18 @@ export async function onRequestPost(context) {
         redirectTo: '/reset-password',
         email: user.email,
         ...(requestId ? { requestId } : {})
-      }, 403);
+      }, 403), clearedCookies());
     }
 
     const isValid = await verifyPassword(password, user.password_hash);
     if (!isValid) {
       emitMetric('auth.login.invalid_credentials', requestId);
-      return fail(ERROR_CODES.INVALID_CREDENTIALS, 401, 'Invalid email or password.', requestId);
+      return withCookies(fail(ERROR_CODES.INVALID_CREDENTIALS, 401, 'Invalid email or password.', requestId), clearedCookies());
     }
 
     if (user.status === 'Suspended') {
       // REM-21: Distinct code so frontend distinguishes suspended accounts from unauthenticated sessions
-      return fail(ERROR_CODES.ACCOUNT_SUSPENDED, 403, 'Account suspended. Please contact support.', requestId);
+      return withCookies(fail(ERROR_CODES.ACCOUNT_SUSPENDED, 403, 'Account suspended. Please contact support.', requestId), clearedCookies());
     }
 
     // Transparent rehash on login: upgrades 310k-era or legacy two-part hashes

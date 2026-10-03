@@ -1,4 +1,4 @@
-import { json, fail, withCookies, clearedCookies, getTokenFromRequest, verifyToken, invalidateCachedUser } from '../../utils/auth.js';
+import { json, fail, withCookies, clearedCookies, getTokenFromRequest, getAllTokensFromRequest, verifyToken, invalidateCachedUser } from '../../utils/auth.js';
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -6,16 +6,23 @@ export async function onRequestPost(context) {
   try {
     // Best-effort: bump token_version to revoke all outstanding sessions. (H6)
     // If DB is unavailable we still clear the cookie and return success.
-    const { token } = getTokenFromRequest(request);
-    if (token && env?.DB && env?.JWT_SECRET) {
-      const payload = await verifyToken(token, env.JWT_SECRET);
-      if (payload && payload.userId) {
-        await env.DB.prepare(
-          'UPDATE users SET token_version = COALESCE(token_version, 0) + 1 WHERE id = ?'
-        ).bind(payload.userId).run().catch((e) => {
-          console.error('[logout] token_version bump failed:', e && e.message);
-        });
-        await invalidateCachedUser(payload.userId, env).catch(() => {});
+    let tokens = [];
+    try {
+      tokens = getAllTokensFromRequest(request);
+    } catch {}
+
+    if (tokens.length > 0 && env?.DB && env?.JWT_SECRET) {
+      for (const token of tokens) {
+        const payload = await verifyToken(token, env.JWT_SECRET);
+        if (payload && payload.userId) {
+          await env.DB.prepare(
+            'UPDATE users SET token_version = COALESCE(token_version, 0) + 1 WHERE id = ?'
+          ).bind(payload.userId).run().catch((e) => {
+            console.error('[logout] token_version bump failed:', e && e.message);
+          });
+          await invalidateCachedUser(payload.userId, env).catch(() => {});
+          break;
+        }
       }
     }
   } catch (err) {

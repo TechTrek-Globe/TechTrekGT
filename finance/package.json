@@ -12,7 +12,7 @@
     "lint": "npx eslint src",
     "lint:quiet": "npx eslint src --quiet",
     "typecheck": "npx tsc -p jsconfig.json",
-    "test": "node scripts/check-safe-serialization.js && node --test tests/crit-*.test.js tests/phase2-*.test.js tests/security-hardening.test.js tests/calculation-engine.test.js tests/auth-offline-rejection.test.js tests/user-scoping.test.js tests/restore-round-trip.test.js tests/effective-dueday.test.js tests/tier-b-characterization.test.js tests/tier-c-fixes.test.js tests/med-*.test.js tests/low-*.test.js",
+    "test": "node scripts/check-safe-serialization.js && node --test tests/crit-*.test.js tests/phase2-*.test.js tests/security-hardening.test.js tests/calculation-engine.test.js tests/auth-offline-rejection.test.js tests/user-scoping.test.js tests/restore-round-trip.test.js tests/effective-dueday.test.js tests/tier-b-characterization.test.js tests/tier-c-fixes.test.js tests/med-*.test.js tests/low-*.test.js tests/audit-*.test.js",
     "test:e2e": "node --test tests/live-e2e.test.js"
   },
   "dependencies": {

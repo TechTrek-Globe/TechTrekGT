@@ -8,6 +8,7 @@
 import * as XLSX from 'xlsx';
 import { logDebug, logWarn, logInfo } from './debugLogger.js';
 import { getPersonDepositAmountForAccount } from './paydayUtils.js';
+import { round2, parseMoney } from './formatters.js';
 
 // --- Internal Field Definitions ---
 
@@ -278,10 +279,10 @@ export function applyTransactionMapping(rows, columnMap, defaultAccountId = '') 
 
     // BUG-2: Detect accounting-style negatives like (1,234.56) before stripping non-numeric chars
     const rawAmtStr = String(mapped.amount !== undefined ? mapped.amount : '');
-    const isParenNeg = /^\(.*\)$/.test(rawAmtStr.trim());
+    const isParenNeg = /^\s*\(.*\)\s*$/.test(rawAmtStr.trim());
     const rawAmt = rawAmtStr.replace(/[^0-9.-]+/g, '');
     let amount = parseFloat(isParenNeg && rawAmt !== '' ? `-${rawAmt}` : rawAmt);
-    if (!isNaN(amount)) amount = Math.round(amount * 100) / 100;
+    if (Number.isFinite(amount)) amount = Math.round((amount + (amount >= 0 ? Number.EPSILON : -Number.EPSILON)) * 100) / 100;
     const isoDate = normalizeIsoDate(mapped.date);
 
     if (!isoDate || isNaN(amount)) {
@@ -302,7 +303,7 @@ export function applyTransactionMapping(rows, columnMap, defaultAccountId = '') 
 
     const rawBal = mapped.balance !== undefined && mapped.balance !== '' ? String(mapped.balance).replace(/[^0-9.-]+/g, '') : null;
     let balance = rawBal !== null ? parseFloat(rawBal) : undefined;
-    if (balance !== undefined && !isNaN(balance)) balance = Math.round(balance * 100) / 100;
+    if (balance !== undefined && Number.isFinite(balance)) balance = Math.round((balance + (balance >= 0 ? Number.EPSILON : -Number.EPSILON)) * 100) / 100;
     const desc = (mapped.description || '').trim();
 
     const record = {
@@ -376,8 +377,8 @@ export function applyBillMapping(rows, columnMap, defaultAccountId = '') {
     });
 
     const name = (mapped.name || '').trim();
-    let parsedAmt = parseFloat(String(mapped.amount || '').replace(/[^0-9.-]+/g, ''));
-    if (!isNaN(parsedAmt)) parsedAmt = Math.round(parsedAmt * 100) / 100;
+    let parsedAmt = parseMoney(mapped.amount, NaN);
+    if (Number.isFinite(parsedAmt)) parsedAmt = round2(parsedAmt);
     
     if (!name || isNaN(parsedAmt)) {
       skipped++;
@@ -619,8 +620,8 @@ export function matchCreditToEarner({
 }) {
   if (!amount || !Array.isArray(people) || people.length === 0) return null;
 
-  const rawAmt = Math.abs(parseFloat(amount));
-  if (isNaN(rawAmt) || rawAmt <= 0) return null;
+  const rawAmt = Math.abs(parseMoney(amount, 0));
+  if (!Number.isFinite(rawAmt) || rawAmt <= 0) return null;
 
   // Guard: minimum meaningful earner deposit - ignore tiny bank credits
   // Interest payments, fee reversals, dividend cents, etc. are never earner deposits

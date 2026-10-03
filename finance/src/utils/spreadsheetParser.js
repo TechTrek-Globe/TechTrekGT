@@ -7,7 +7,11 @@ import { matchCreditToEarner } from './importer.js';
  */
 function cleanNum(val, defaultVal = 0) {
   if (val === undefined || val === null || val === '') return defaultVal;
-  if (typeof val === 'number') return isNaN(val) ? defaultVal : Math.round(val * 100) / 100;
+  if (typeof val === 'number') {
+    if (!Number.isFinite(val)) return defaultVal;
+    const rounded = Math.round((val + (val >= 0 ? Number.EPSILON : -Number.EPSILON)) * 100) / 100;
+    return Object.is(rounded, -0) ? 0 : rounded;
+  }
   const str = String(val).trim();
   if (!str) return defaultVal;
   // If the cell contains words or 2+ letters (e.g. "EMORY PARC HOMEO OnlinePay ***********7626", "USAA FUNDS TRANSFER CR", "Transfer")
@@ -15,13 +19,14 @@ function cleanNum(val, defaultVal = 0) {
   if (/[a-zA-Z]{2,}/.test(str)) {
     return defaultVal;
   }
-  const isParenNeg = /^\(.*\)$/.test(str);
+  const isParenNeg = /^\s*\(.*\)\s*$/.test(str);
   const cleaned = str.replace(/[^0-9.-]+/g, '');
   if (!cleaned || cleaned === '-' || cleaned === '.') return defaultVal;
   const num = parseFloat(cleaned);
-  if (isNaN(num)) return defaultVal;
-  const signed = isParenNeg && num > 0 ? -num : num;
-  return Math.round(signed * 100) / 100;
+  if (!Number.isFinite(num)) return defaultVal;
+  const signed = (isParenNeg && num > 0) ? -num : (str.startsWith('-') && num > 0 ? -num : num);
+  const rounded = Math.round((signed + (signed >= 0 ? Number.EPSILON : -Number.EPSILON)) * 100) / 100;
+  return Object.is(rounded, -0) ? 0 : rounded;
 }
 
 /**
@@ -341,18 +346,19 @@ export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
               let amount = 0;
               if (amountColIdx >= 0 && r[amountColIdx] !== undefined && r[amountColIdx] !== null && r[amountColIdx] !== '') {
                 const rawAmtStr = String(r[amountColIdx]).trim();
-                const isParenNeg = /^\(.*\)$/.test(rawAmtStr);
+                const isParenNeg = /^\s*\(.*\)\s*$/.test(rawAmtStr);
                 const cleaned = rawAmtStr.replace(/[^0-9.-]+/g, '');
                 const parsed = parseFloat(cleaned);
-                if (!isNaN(parsed)) {
-                  amount = isParenNeg && parsed > 0 ? -parsed : parsed;
-                  amount = Math.round(amount * 100) / 100;
+                if (Number.isFinite(parsed)) {
+                  const signed = (isParenNeg && parsed > 0) ? -parsed : (rawAmtStr.startsWith('-') && parsed > 0 ? -parsed : parsed);
+                  amount = Math.round((signed + (signed >= 0 ? Number.EPSILON : -Number.EPSILON)) * 100) / 100;
+                  amount = Object.is(amount, -0) ? 0 : amount;
                 }
               } else if (debitColIdx >= 0 || creditColIdx >= 0) {
                 const debitStr = debitColIdx >= 0 ? String(r[debitColIdx] || '').replace(/[^0-9.-]+/g, '') : '';
                 const creditStr = creditColIdx >= 0 ? String(r[creditColIdx] || '').replace(/[^0-9.-]+/g, '') : '';
-                const debit = debitStr ? Math.abs(parseFloat(debitStr) || 0) : 0;
-                const credit = creditStr ? Math.abs(parseFloat(creditStr) || 0) : 0;
+                const debit = debitStr && Number.isFinite(parseFloat(debitStr)) ? Math.abs(parseFloat(debitStr)) : 0;
+                const credit = creditStr && Number.isFinite(parseFloat(creditStr)) ? Math.abs(parseFloat(creditStr)) : 0;
                 amount = Math.round((credit - debit) * 100) / 100;
               }
 
@@ -885,18 +891,19 @@ export function parseSingleSheet({
       let amount = 0;
       if (amountColIdx >= 0 && r[amountColIdx] !== undefined && r[amountColIdx] !== null && r[amountColIdx] !== '') {
         const rawAmtStr = String(r[amountColIdx]).trim();
-        const isParenNeg = /^\(.*\)$/.test(rawAmtStr);
+        const isParenNeg = /^\s*\(.*\)\s*$/.test(rawAmtStr);
         const cleaned = rawAmtStr.replace(/[^0-9.-]+/g, '');
         const parsed = parseFloat(cleaned);
-        if (!isNaN(parsed)) {
-          amount = isParenNeg && parsed > 0 ? -parsed : parsed;
-          amount = Math.round(amount * 100) / 100;
+        if (Number.isFinite(parsed)) {
+          const signed = (isParenNeg && parsed > 0) ? -parsed : (rawAmtStr.startsWith('-') && parsed > 0 ? -parsed : parsed);
+          amount = Math.round((signed + (signed >= 0 ? Number.EPSILON : -Number.EPSILON)) * 100) / 100;
+          amount = Object.is(amount, -0) ? 0 : amount;
         }
       } else if (debitColIdx >= 0 || creditColIdx >= 0) {
         const debitStr = debitColIdx >= 0 ? String(r[debitColIdx] || '').replace(/[^0-9.-]+/g, '') : '';
         const creditStr = creditColIdx >= 0 ? String(r[creditColIdx] || '').replace(/[^0-9.-]+/g, '') : '';
-        const debit = debitStr ? Math.abs(parseFloat(debitStr) || 0) : 0;
-        const credit = creditStr ? Math.abs(parseFloat(creditStr) || 0) : 0;
+        const debit = debitStr && Number.isFinite(parseFloat(debitStr)) ? Math.abs(parseFloat(debitStr)) : 0;
+        const credit = creditStr && Number.isFinite(parseFloat(creditStr)) ? Math.abs(parseFloat(creditStr)) : 0;
         amount = Math.round((credit - debit) * 100) / 100;
       }
 

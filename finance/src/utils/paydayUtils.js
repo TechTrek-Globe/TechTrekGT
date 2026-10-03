@@ -2,6 +2,7 @@
  * Utility functions for calculating and resolving paycheck deposit schedules,
  * target paydays, early deposit offsets, and per-account allocations.
  */
+import { round2, parseMoney } from './formatters.js';
 
 /**
  * Parses a payday string or number into a target day of month (1 to daysInMonth).
@@ -10,20 +11,22 @@
  * @param {number} daysInMonth
  * @returns {number|null}
  */
-export function parseDayNumber(val, daysInMonth) {
+export function parseDayNumber(val, daysInMonth = 31) {
+  const maxDays = Number.isFinite(daysInMonth) && daysInMonth > 0 ? daysInMonth : 31;
   if (val === undefined || val === null || val === '') return null;
   if (typeof val === 'number') {
-    if (isNaN(val)) return null;
-    return Math.min(Math.max(1, Math.floor(val)), daysInMonth);
+    if (!Number.isFinite(val)) return null;
+    return Math.min(Math.max(1, Math.floor(val)), maxDays);
   }
   const str = String(val).toLowerCase().trim();
   if (str.includes('last') || str.includes('end')) {
-    return daysInMonth;
+    return maxDays;
   }
   const match = str.match(/\d+/);
   if (match) {
     const num = parseInt(match[0], 10);
-    return Math.min(Math.max(1, num), daysInMonth);
+    if (!Number.isFinite(num)) return null;
+    return Math.min(Math.max(1, num), maxDays);
   }
   return null;
 }
@@ -174,7 +177,8 @@ export const FREQUENCY_ANNUAL_PERIODS = {
 export function getAnnualAmount(amount, frequency) {
   const norm = String(frequency || 'monthly').toLowerCase().replace(/_/g, '-');
   const periods = FREQUENCY_ANNUAL_PERIODS[norm] ?? 12;
-  return (parseFloat(String(amount)) || 0) * periods;
+  const cleanAmt = parseMoney(amount, 0);
+  return round2(cleanAmt * periods);
 }
 
 /**
@@ -184,7 +188,7 @@ export function getAnnualAmount(amount, frequency) {
  * @returns {number}
  */
 export function getMonthlyAmount(amount, frequency) {
-  return getAnnualAmount(amount, frequency) / 12;
+  return round2(getAnnualAmount(amount, frequency) / 12);
 }
 
 /**
@@ -201,7 +205,7 @@ export function getAmountPerPaycheck(goalAmount, goalFrequency, contributorPayFr
   if (normPayFreq === 'bi-weekly' || normPayFreq === 'biweekly') {
     payPeriods = 24;
   }
-  return Math.round((annual / payPeriods) * 100) / 100;
+  return round2(annual / payPeriods);
 }
 
 // Baseline monthly display periods - bi-weekly treated as 2 paychecks/mo for budgeting
@@ -215,7 +219,7 @@ export const MONTHLY_DISPLAY_PERIODS = {
 
 // Exact deposit per paycheck - the canonical value, read directly from goal
 export function goalPerPay(goal) {
-  return Math.round((parseFloat(goal.amountPerPay) || 0) * 100) / 100;
+  return round2(goal?.amountPerPay, 0);
 }
 
 // Monthly BASELINE display: bi-weekly = amountPerPay * 2 (not * 26/12)
@@ -223,7 +227,7 @@ export function goalPerPay(goal) {
 export function goalMonthlyDisplay(goal, contributorPayFrequency) {
   const freq = String(contributorPayFrequency || 'semi-monthly').toLowerCase();
   const multiplier = MONTHLY_DISPLAY_PERIODS[freq] ?? 2;
-  return Math.round((goalPerPay(goal) * multiplier) * 100) / 100;
+  return round2(goalPerPay(goal) * multiplier);
 }
 
 /**
@@ -239,17 +243,17 @@ export function calculateDashboardTotalsForContributor(contributorId, fundingGoa
   const payFreq = String(contributor?.payFrequency || 'semi-monthly').toLowerCase();
   const personGoals = (fundingGoals || []).filter(g => g.contributorId === contributorId);
 
-  const perPaycheckTotal = personGoals.reduce((sum, g) => sum + goalPerPay(g), 0);
-  const monthlyTotal = personGoals.reduce((sum, g) => sum + goalMonthlyDisplay(g, payFreq), 0);
+  const perPaycheckTotal = personGoals.reduce((sum, g) => round2(sum + goalPerPay(g)), 0);
+  const monthlyTotal = personGoals.reduce((sum, g) => round2(sum + goalMonthlyDisplay(g, payFreq)), 0);
   
   const periods = FREQUENCY_ANNUAL_PERIODS[payFreq.replace(/_/g, '-')] ?? 24;
-  const annualTotal = perPaycheckTotal * periods;
+  const annualTotal = round2(perPaycheckTotal * periods);
 
   return {
     contributorId,
-    monthlyTotal: Math.round(monthlyTotal * 100) / 100,
-    annualTotal: Math.round(annualTotal * 100) / 100,
-    perPaycheckTotal: Math.round(perPaycheckTotal * 100) / 100,
+    monthlyTotal: round2(monthlyTotal),
+    annualTotal: round2(annualTotal),
+    perPaycheckTotal: round2(perPaycheckTotal),
     goals: personGoals
   };
 }
@@ -270,16 +274,16 @@ export function generatePaycheckTransactions(contributor, depositDate, fundingGo
   const accountBreakdown = {};
   accounts.forEach(acc => {
     const accGoals = personGoals.filter(g => g.accountId === acc.id);
-    const totalDeposit = getPersonDepositAmountForAccount(contributor, acc.id, budget);
-    const billPortionPerPay = getPersonBillPerPaycheckPortionForAccount(contributor, acc.id, budget);
-    const surplus = Math.max(0, totalDeposit - billPortionPerPay);
+    const totalDeposit = round2(getPersonDepositAmountForAccount(contributor, acc.id, budget));
+    const billPortionPerPay = round2(getPersonBillPerPaycheckPortionForAccount(contributor, acc.id, budget));
+    const surplus = Math.max(0, round2(totalDeposit - billPortionPerPay));
 
     accountBreakdown[acc.id] = {
       accountId: acc.id,
       accountName: acc.name,
-      totalDeposit: Math.round(totalDeposit * 100) / 100,
-      billPortion: Math.round(billPortionPerPay * 100) / 100,
-      extraSavingsSurplus: Math.round(surplus * 100) / 100,
+      totalDeposit: round2(totalDeposit),
+      billPortion: round2(billPortionPerPay),
+      extraSavingsSurplus: round2(surplus),
       goals: accGoals
     };
   });
@@ -298,7 +302,7 @@ export function generatePaycheckTransactions(contributor, depositDate, fundingGo
 export function getPersonDepositAmountForAccount(person, selectedAccountId = 'all', budget = null) {
   if (!person) return 0;
   if (!selectedAccountId || selectedAccountId === 'all') {
-    return parseFloat(person.netPerPay) || 0;
+    return parseMoney(person.netPerPay, 0);
   }
   
   const targetAcc = (budget?.accounts || []).find(a => a.id === selectedAccountId);
@@ -318,24 +322,24 @@ export function getPersonDepositAmountForAccount(person, selectedAccountId = 'al
     return false;
   });
   if (goals.length > 0) {
-    return Math.round(goals.reduce((sum, g) => sum + goalPerPay(g), 0) * 100) / 100;
+    return round2(goals.reduce((sum, g) => round2(sum + goalPerPay(g)), 0));
   }
 
   // 2. Legacy Account Allocations
   if (person.accountAllocations) {
     if (person.accountAllocations[selectedAccountId] !== undefined && person.accountAllocations[selectedAccountId] !== 'remaining') {
-      return parseFloat(person.accountAllocations[selectedAccountId]);
+      return parseMoney(person.accountAllocations[selectedAccountId], 0);
     }
     for (const [accKey, val] of Object.entries(person.accountAllocations)) {
       if (val === 'remaining') continue;
-      if ((accKey.includes('mortgage') || accKey === 'acc-mortgage-checking') && targetAccName.includes('mortgage')) return parseFloat(val);
-      if ((accKey.includes('hoa') || accKey === 'acc-hoa-savings') && targetAccName.includes('hoa')) return parseFloat(val);
-      if ((accKey.includes('bills') || accKey === 'acc-bills-checking') && targetAccName.includes('bills')) return parseFloat(val);
+      if ((accKey.includes('mortgage') || accKey === 'acc-mortgage-checking') && targetAccName.includes('mortgage')) return parseMoney(val, 0);
+      if ((accKey.includes('hoa') || accKey === 'acc-hoa-savings') && targetAccName.includes('hoa')) return parseMoney(val, 0);
+      if ((accKey.includes('bills') || accKey === 'acc-bills-checking') && targetAccName.includes('bills')) return parseMoney(val, 0);
     }
   }
 
   // 3. Fallback to Dynamic Bill Splitting
-  return getPersonBillPerPaycheckPortionForAccount(person, selectedAccountId, budget);
+  return round2(getPersonBillPerPaycheckPortionForAccount(person, selectedAccountId, budget));
 }
 
 /**
@@ -349,8 +353,8 @@ export function getPersonDepositAmountForAccount(person, selectedAccountId = 'al
 export function getPersonBillMonthlyPortionForAccount(person, accountId, budget) {
   if (!person || !accountId || !budget) return 0;
   const accountBills = (budget.bills || []).filter(b => !b.isArchived && b.accountId === accountId);
-  return accountBills.reduce((sum, b) => {
-    const amt = Math.abs(parseFloat(b.amount) || 0);
+  const total = accountBills.reduce((sum, b) => {
+    const amt = Math.abs(parseMoney(b.amount, 0));
     const period = b.period || 'Monthly';
     let monthlyCost = amt;
     if (period === 'Semi-Annual') monthlyCost = amt / 6;
@@ -361,9 +365,10 @@ export function getPersonBillMonthlyPortionForAccount(person, accountId, budget)
       const count = Array.isArray(b.dueMonths) && b.dueMonths.length > 0 ? b.dueMonths.length : 12;
       monthlyCost = (amt * count) / 12;
     }
-    const pct = parseFloat(b.splits?.[person.id]) || 0;
+    const pct = parseMoney(b.splits?.[person.id], 0);
     return sum + (monthlyCost * pct) / 100;
   }, 0);
+  return round2(total);
 }
 
 /**
@@ -381,14 +386,14 @@ export function getPersonBillPerPaycheckPortionForAccount(person, accountId, bud
 
   const freq = (person.payFrequency || 'bi-weekly').toLowerCase();
   if (freq === 'semi-monthly') {
-    return Math.round((monthlyBills / 2) * 100) / 100;
+    return round2(monthlyBills / 2);
   } else if (freq === 'bi-weekly' || freq === 'biweekly') {
     // Treat bi-weekly as exactly 2 paychecks per month for baseline budgeting
-    return Math.round((monthlyBills / 2) * 100) / 100;
+    return round2(monthlyBills / 2);
   } else if (freq === 'weekly') {
-    return Math.round(((monthlyBills * 12) / 52) * 100) / 100;
+    return round2((monthlyBills * 12) / 52);
   }
-  return Math.round(monthlyBills * 100) / 100;
+  return round2(monthlyBills);
 }
 
 /**
@@ -404,10 +409,10 @@ export function getAccountSaveExtraPersonPortion(account, person, budget) {
   if (!account || !person) return 0;
   const deposit = getPersonDepositAmountForAccount(person, account.id, budget);
   const bills   = getPersonBillPerPaycheckPortionForAccount(person, account.id, budget);
-  const surplusPerPay = Math.max(0, deposit - bills);
+  const surplusPerPay = Math.max(0, round2(deposit - bills));
   const freq = String(person.payFrequency || 'semi-monthly').toLowerCase();
   const multiplier = MONTHLY_DISPLAY_PERIODS[freq] ?? 2;
-  return Math.round((surplusPerPay * multiplier) * 100) / 100;
+  return round2(surplusPerPay * multiplier);
 }
 
 /**
@@ -425,9 +430,10 @@ export function getPersonExtraSavingsDepositAmountForAccount(person, selectedAcc
 
   if (!selectedAccountId || selectedAccountId === 'all') {
     const accounts = budget.accounts || [];
-    return accounts.reduce((sum, acc) => {
+    const total = accounts.reduce((sum, acc) => {
       return sum + getPersonExtraSavingsDepositAmountForAccount(person, acc.id, budget);
     }, 0);
+    return round2(total);
   }
 
   const targetAcc = (budget.accounts || []).find(a => a.id === selectedAccountId);
@@ -435,7 +441,7 @@ export function getPersonExtraSavingsDepositAmountForAccount(person, selectedAcc
 
   const deposit = getPersonDepositAmountForAccount(person, selectedAccountId, budget);
   const bills   = getPersonBillPerPaycheckPortionForAccount(person, selectedAccountId, budget);
-  return Math.max(0, Math.round((deposit - bills) * 100) / 100);
+  return Math.max(0, round2(deposit - bills));
 }
 
 export const MONTH_NAMES = [

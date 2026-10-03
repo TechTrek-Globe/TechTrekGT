@@ -57,3 +57,15 @@ Authentication states strictly reflect backend database authority and maintain z
   - Any subsequent request carrying an older JWT with `tv !== token_version` is actively denied with HTTP 401 `SESSION_EXPIRED` and purges cookies on the client.
 - **Multi-Cookie Resolution & Collision Recovery:** `getAllTokensFromRequest` extracts all candidate `auth_token` cookies to prevent sub-path collision (e.g. `/` vs `/finance`). Candidate tokens are evaluated sequentially; requests with conflicting dual credentials (both Cookie and Bearer) are actively rejected with HTTP 400.
 - **Declarative Route Guarding (`requireAuth` / `withAuth`):** Centralized `requireAuth` middleware uniformly rejects unauthenticated and revoked states without leaking database driver details, returning standardized JSON error payloads.
+
+## 7. Financial Math Engine & State Calculation Invariants (FIN-AUDIT-003)
+
+- **Sanitization on Ingestion & Migration:**
+  - `cleanNum` and `parseMoney` strip non-numeric formatting (currency symbols, commas, trailing whitespace) and convert accounting parentheses into signed numbers before any raw cell or CSV input enters the state tree.
+  - Non-numeric or non-finite inputs (`NaN`, `Infinity`, `null`, `undefined`) are safely coerced to zero (or explicit nulls where required by database schemas), completely blocking silent `NaN` poisoning.
+- **State Calculation Invariants:**
+  - **Running Balance Precision:** `getCalculatedBalanceAsOf`, `getTotalCashOnHand`, and `getTotalMonthEndCashOnHand` accumulate values using `round2` at each step, preventing sub-cent floating-point accumulation drift over 365-day projection horizons.
+  - **Negative Zero Normalization:** Any arithmetic yielding `-0` is automatically converted to `0` by `round2` via `Object.is(val, -0) ? 0 : val`, guaranteeing deterministic state serialization.
+  - **Credit Allocation Conservation:** `allocateEarnerCredit` enforces that total earner distributions strictly equal the earner's deposit (`earnerReg + earnerExtra === earnerDeposit`), preventing balance phantom surpluses or deficits.
+  - **Amortization Schedule Integrity:** `AmortizationView` accumulates interest, principal, and balance reductions with deterministic 2-decimal rounding per monthly period, preventing amortized total interest drift.
+- **Zero Drift Storage Mandate:** All balances stored in IndexedDB or sent to Cloudflare D1 via `/api/sync/backup` are guaranteed to be finite 2-decimal numbers.

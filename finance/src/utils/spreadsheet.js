@@ -3,6 +3,7 @@ import { normalizeIsoDate, mergeBills, mergeTransactions, detectTransactionConfl
 import { logDebug, logWarn, logInfo } from './debugLogger.js';
 import { isPersonDepositDay, getPersonDepositAmountForAccount, getPersonExtraSavingsDepositAmountForAccount } from './paydayUtils.js';
 import { allocateEarnerCredit } from './ledgerEngine.js';
+import { round2, parseMoney } from './formatters.js';
 
 /**
  * Pure utility function to reconcile and apply selective spreadsheet/CSV imports.
@@ -528,7 +529,7 @@ export function processSpreadsheetImport({
         if (matchedPerson) {
           const creditKey = `${accountId}_${monthKey}_${actualDay}_credit_${matchedPerson.id}`;
           const existingCredit = matrixUpdates[creditKey] ?? 0;
-          matrixUpdates[creditKey] = Math.round((existingCredit + actualAmount) * 100) / 100;
+          matrixUpdates[creditKey] = round2(parseMoney(existingCredit, 0) + parseMoney(actualAmount, 0));
 
           logDebug('MATCH', `Matched credit transaction #${txnIdx + 1} to earner "${matchedPerson.name}"`, {
             date: normDate,
@@ -564,7 +565,7 @@ export function processSpreadsheetImport({
           const otherKey = `${accountId}_${monthKey}_${actualDay}_other_amount`;
           const otherDescKey = `${accountId}_${monthKey}_${actualDay}_other_desc`;
           const existingOther = matrixUpdates[otherKey] ?? nextDailyMatrix[otherKey] ?? 0;
-          matrixUpdates[otherKey] = Math.round((parseFloat(existingOther) + actualAmount) * 100) / 100;
+          matrixUpdates[otherKey] = round2(parseMoney(existingOther, 0) + parseMoney(actualAmount, 0));
 
           const cleanDesc = (txn.description || '').replace(/^Other\s*\$?\s*\(?(.*?)\)?$/i, '$1').trim() || txn.description;
           const existingOtherDesc = (matrixUpdates[otherDescKey] ?? nextDailyMatrix[otherDescKey] ?? '').replace(/^Other\s*\$?\s*\(?(.*?)\)?$/i, '$1').trim();
@@ -695,7 +696,7 @@ export function processSpreadsheetImport({
           const bill = nextBills.find(b => b.id === resolvedBillId);
           const billTargetAccId = bill?.accountId || accountId;
           const actualKey = `${billTargetAccId}_${monthKey}_${actualDay}_bill_${resolvedBillId}`;
-          matrixUpdates[actualKey] = Math.round(actualAmount * 100) / 100;
+          matrixUpdates[actualKey] = round2(actualAmount);
 
           logDebug('MATCH', `Debit transaction #${txnIdx + 1} matched to bill "${bill?.name || resolvedBillId}" via ${matchStrategy}`, {
             date: normDate,
@@ -729,7 +730,7 @@ export function processSpreadsheetImport({
           const otherKey = `${accountId}_${monthKey}_${actualDay}_other_amount`;
           const otherDescKey = `${accountId}_${monthKey}_${actualDay}_other_desc`;
           const existingOther = matrixUpdates[otherKey] ?? nextDailyMatrix[otherKey] ?? 0;
-          matrixUpdates[otherKey] = Math.round((parseFloat(existingOther) - Math.abs(actualAmount)) * 100) / 100;
+          matrixUpdates[otherKey] = round2(parseMoney(existingOther, 0) - Math.abs(parseMoney(actualAmount, 0)));
 
           const cleanDesc = (txn.description || '').replace(/^Other\s*\$?\s*\(?(.*?)\)?$/i, '$1').trim() || txn.description;
           const existingOtherDesc = (matrixUpdates[otherDescKey] ?? nextDailyMatrix[otherDescKey] ?? '').replace(/^Other\s*\$?\s*\(?(.*?)\)?$/i, '$1').trim();
@@ -889,13 +890,13 @@ export function getLedgerRunningBalanceAsOfDate({
   if (!targetAcc) return 0;
 
   const showExtra = targetAcc.enableExtraSavings !== false;
-  const startReg = parseFloat(targetAcc.startingBalance) || 0;
-  const startExtra = showExtra ? (parseFloat(targetAcc.extraStartingBalance) || 0) : 0;
+  const startReg = parseMoney(targetAcc.startingBalance, 0);
+  const startExtra = showExtra ? parseMoney(targetAcc.extraStartingBalance, 0) : 0;
 
   const effectiveStartDateStr = targetAcc.balanceAsOfDate || targetAcc.startDate || '2024-01-01';
 
   if (!targetDate) {
-    return Math.round((startReg + startExtra) * 100) / 100;
+    return round2(startReg + startExtra);
   }
 
   const parseIso = (str) => {
@@ -915,8 +916,8 @@ export function getLedgerRunningBalanceAsOfDate({
 
   if (!targetDateObj || targetDateObj < startDateObj) {
     const accTxns = (transactions || []).filter(t => t.accountId === targetAccountId && t.date && t.date <= targetDate);
-    const sum = accTxns.reduce((s, t) => s + (parseFloat(t.amount) || 0), 0);
-    return Math.round((startReg + startExtra + sum) * 100) / 100;
+    const sum = accTxns.reduce((s, t) => s + parseMoney(t.amount, 0), 0);
+    return round2(startReg + startExtra + sum);
   }
 
   const allAccTxnDates = (transactions || [])
@@ -952,8 +953,8 @@ export function getLedgerRunningBalanceAsOfDate({
     let dayExtraCredits = 0;
     people.forEach(p => {
       const alloc = allocateEarnerCredit(p, targetAccountId, y, m, d, { accounts: metadataState.accounts, people: metadataState.people, bills: metadataState.bills, fundingGoals: metadataState.fundingGoals }, dailyMatrix, { isLockedDay: false });
-      dayCredits += alloc.earnerReg;
-      dayExtraCredits += alloc.earnerExtra;
+      dayCredits = round2(dayCredits + alloc.earnerReg);
+      dayExtraCredits = round2(dayExtraCredits + alloc.earnerExtra);
     });
 
     let dayBills = 0;
@@ -963,35 +964,35 @@ export function getLedgerRunningBalanceAsOfDate({
       const bVal = dailyMatrix[`${targetAccountId}_${mKey}_${d}_bill_${b.id}`];
       if (bVal !== undefined && bVal !== null && bVal !== '') {
         hasDayBillOverride = true;
-        dayBills += parseFloat(bVal) || 0;
+        dayBills = round2(dayBills + parseMoney(bVal, 0));
       }
     });
 
     const oVal = dailyMatrix[`${targetAccountId}_${mKey}_${d}_other_amount`];
-    const dayOther = oVal !== undefined && oVal !== null && oVal !== '' ? (parseFloat(oVal) || 0) : 0;
+    const dayOther = (oVal !== undefined && oVal !== null && oVal !== '') ? parseMoney(oVal, 0) : 0;
 
     const ocVal = dailyMatrix[`${targetAccountId}_${mKey}_${d}_other_credit_amount`];
-    const dayOtherCredit = ocVal !== undefined && ocVal !== null && ocVal !== '' ? (parseFloat(ocVal) || 0) : 0;
+    const dayOtherCredit = (ocVal !== undefined && ocVal !== null && ocVal !== '') ? parseMoney(ocVal, 0) : 0;
 
-    const tentativeReg = runningReg + dayCredits - dayBills + dayOtherCredit + dayOther;
-    const tentativeExtra = runningExtra + dayExtraCredits;
+    const tentativeReg = round2(runningReg + dayCredits - dayBills + dayOtherCredit + dayOther);
+    const tentativeExtra = round2(runningExtra + dayExtraCredits);
 
     let customRegEnd;
     let customExtraEnd;
 
     const customReg = dailyMatrix[`${targetAccountId}_${mKey}_${d}_reg_ending`];
     const customExtra = dailyMatrix[`${targetAccountId}_${mKey}_${d}_extra_ending`];
-    if (customReg !== undefined && customReg !== null && customReg !== '') customRegEnd = parseFloat(customReg);
-    if (customExtra !== undefined && customExtra !== null && customExtra !== '') customExtraEnd = parseFloat(customExtra);
+    if (customReg !== undefined && customReg !== null && customReg !== '') customRegEnd = parseMoney(customReg);
+    if (customExtra !== undefined && customExtra !== null && customExtra !== '') customExtraEnd = parseMoney(customExtra);
 
     const impRow = importedRows[isoDate];
     if (customRegEnd === undefined && isImportMode && impRow !== undefined && !hasDayBillOverride) {
       if (typeof impRow === 'number') {
-        customRegEnd = impRow;
+        customRegEnd = parseMoney(impRow);
       } else if (impRow && typeof impRow === 'object') {
         const statedEnd = impRow.regEnding ?? impRow.totalEnding ?? null;
         if (statedEnd !== null && statedEnd !== undefined && !isNaN(statedEnd)) {
-          customRegEnd = statedEnd;
+          customRegEnd = parseMoney(statedEnd);
         }
       }
     }
@@ -999,7 +1000,7 @@ export function getLedgerRunningBalanceAsOfDate({
       if (impRow && typeof impRow === 'object') {
         const statedExtra = impRow.extraEnding ?? null;
         if (statedExtra !== null && statedExtra !== undefined && !isNaN(statedExtra)) {
-          customExtraEnd = statedExtra;
+          customExtraEnd = parseMoney(statedExtra);
         }
       }
     }
@@ -1010,20 +1011,20 @@ export function getLedgerRunningBalanceAsOfDate({
     if (customRegEnd === undefined && customExtraEnd === undefined) {
       if (reg < 0 && extra > 0) {
         const transfer = Math.min(extra, -reg);
-        reg += transfer;
-        extra -= transfer;
+        reg = round2(reg + transfer);
+        extra = round2(extra - transfer);
       } else if (extra < 0 && reg > 0) {
         const transfer = Math.min(reg, -extra);
-        extra += transfer;
-        reg -= transfer;
+        extra = round2(extra + transfer);
+        reg = round2(reg - transfer);
       }
     }
 
-    runningReg = Math.round(reg * 100) / 100 || 0;
-    runningExtra = Math.round(extra * 100) / 100 || 0;
+    runningReg = round2(reg);
+    runningExtra = round2(extra);
 
     cur.setDate(cur.getDate() + 1);
   }
 
-  return Math.round((runningReg + (showExtra ? runningExtra : 0)) * 100) / 100;
+  return round2(runningReg + (showExtra ? runningExtra : 0));
 }

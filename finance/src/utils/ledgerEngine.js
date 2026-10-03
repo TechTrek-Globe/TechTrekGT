@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { isPersonDepositDay, getPersonDepositAmountForAccount, getPersonExtraSavingsDepositAmountForAccount } from './paydayUtils.js';
+import { round2, parseMoney } from './formatters.js';
 
 export const LEDGER_SOURCE = {
   PROJECTED: 'projected',
@@ -14,19 +15,19 @@ export function allocateEarnerCredit(person, accountId, year, month, day, budget
   const c = dailyMatrix[accountId + '_' + mKey + '_' + day + '_credit_' + person.id];
   const ec = dailyMatrix[accountId + '_' + mKey + '_' + day + '_extra_credit_' + person.id];
   const isDepDay = isPersonDepositDay(person, year, month, day);
-  const projectedPlanDeposit = getPersonDepositAmountForAccount(person, accountId, budget);
-  const projectedPlanExtra = projectedPlanDeposit > 0 ? getPersonExtraSavingsDepositAmountForAccount(person, accountId, budget) : 0;
+  const projectedPlanDeposit = round2(getPersonDepositAmountForAccount(person, accountId, budget));
+  const projectedPlanExtra = projectedPlanDeposit > 0 ? round2(getPersonExtraSavingsDepositAmountForAccount(person, accountId, budget)) : 0;
   const projectedDeposit = (!options.isLockedDay && isDepDay) ? projectedPlanDeposit : 0;
   const projectedExtra = projectedDeposit > 0 ? projectedPlanExtra : 0;
   let earnerDeposit, earnerExtra, source;
   if (c !== undefined && c !== null && c !== '') {
-    earnerDeposit = parseFloat(c) || 0;
+    earnerDeposit = parseMoney(c, 0);
     if (ec !== undefined && ec !== null && ec !== '') {
-      earnerExtra = parseFloat(ec) || 0;
+      earnerExtra = parseMoney(ec, 0);
       source = LEDGER_SOURCE.MANUAL;
     } else {
-      const billPortion = Math.max(0, projectedPlanDeposit - projectedPlanExtra);
-      const availableForExtra = Math.max(0, earnerDeposit - billPortion);
+      const billPortion = Math.max(0, round2(projectedPlanDeposit - projectedPlanExtra));
+      const availableForExtra = Math.max(0, round2(earnerDeposit - billPortion));
       earnerExtra = Math.min(projectedPlanExtra, availableForExtra);
       source = LEDGER_SOURCE.ACTUAL_IMPORT;
     }
@@ -36,11 +37,11 @@ export function allocateEarnerCredit(person, accountId, year, month, day, budget
     source = LEDGER_SOURCE.PROJECTED;
   }
   const clampedExtra = Math.min(earnerExtra, earnerDeposit);
-  const earnerReg = Math.max(0, earnerDeposit - clampedExtra);
+  const earnerReg = Math.max(0, round2(earnerDeposit - clampedExtra));
   return {
-    earnerDeposit: Math.round(earnerDeposit * 100) / 100,
-    earnerExtra: Math.round(clampedExtra * 100) / 100,
-    earnerReg: Math.round(earnerReg * 100) / 100,
+    earnerDeposit: round2(earnerDeposit),
+    earnerExtra: round2(clampedExtra),
+    earnerReg: round2(earnerReg),
     source
   };
 }
@@ -73,8 +74,8 @@ export function listFutureCreditOverrideDiagnostics(budget, dailyMatrix = {}) {
         for (let day = 1; day <= daysInMonth; day++) {
           const c = dailyMatrix[acc.id + '_' + mKey + '_' + day + '_credit_' + p.id];
           if (c === undefined || c === null || c === '') continue;
-          const override = parseFloat(c) || 0;
-          const projected = getPersonDepositAmountForAccount(p, acc.id, budget);
+          const override = parseMoney(c, 0);
+          const projected = round2(getPersonDepositAmountForAccount(p, acc.id, budget));
           if (Math.abs(override - projected) > 0.005) {
             results.push({
               accountId: acc.id,
@@ -83,9 +84,9 @@ export function listFutureCreditOverrideDiagnostics(budget, dailyMatrix = {}) {
               day,
               personId: p.id,
               personName: p.name,
-              override: Math.round(override * 100) / 100,
-              projected: Math.round(projected * 100) / 100,
-              diff: Math.round((override - projected) * 100) / 100
+              override: round2(override),
+              projected: round2(projected),
+              diff: round2(override - projected)
             });
           }
         }

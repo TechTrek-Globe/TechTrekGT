@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { fmtMoney } from '../utils/formatters';
+import { fmtMoney, round2, parseMoney } from '../utils/formatters';
 import { useBudgetMetadata } from '../context/BudgetContext';
 import { Calculator, DollarSign, TrendingDown, Clock, ShieldCheck, Sparkles, Plus, Trash2, Edit2, Check, CreditCard, Building, RefreshCw, Layers, Archive, RotateCcw } from 'lucide-react';
 
@@ -42,10 +42,10 @@ export function AmortizationView() {
 
   // Active Loan Inputs
   const loanName = activeLoan.name || activeLoan.description || 'Loan Schedule';
-  const principal = parseFloat(activeLoan.principal) || 0;
-  const interestRate = parseFloat(activeLoan.annualInterestRate) || 0;
-  const termMonths = parseInt(activeLoan.termMonths) || 360;
-  const extraPayment = parseFloat(activeLoan.extraPayment) || 0;
+  const principal = parseMoney(activeLoan.principal, 0);
+  const interestRate = parseMoney(activeLoan.annualInterestRate, 0);
+  const termMonths = parseInt(activeLoan.termMonths, 10) || 360;
+  const extraPayment = parseMoney(activeLoan.extraPayment, 0);
   const linkedAccountId = activeLoan.accountId || '';
 
   // Mode Switches
@@ -118,9 +118,9 @@ export function AmortizationView() {
         actualExtra = Math.max(0, balance - principalPortion);
       }
 
-      const totalPrincipalThisPeriod = principalPortion + actualExtra;
-      const endingBalance = Math.max(0, balance - totalPrincipalThisPeriod);
-      totalInterest += interestForPeriod;
+      const totalPrincipalThisPeriod = round2(principalPortion + actualExtra);
+      const endingBalance = Math.max(0, round2(balance - totalPrincipalThisPeriod));
+      totalInterest = round2(totalInterest + interestForPeriod);
 
       schedule.push({
         period,
@@ -149,7 +149,7 @@ export function AmortizationView() {
   const withExtraResult = useMemo(() => calculateSchedule(true), [calculateSchedule]);
   const withoutExtraResult = useMemo(() => calculateSchedule(false), [calculateSchedule]);
 
-  const interestSaved = Math.max(0, withoutExtraResult.totalInterest - withExtraResult.totalInterest);
+  const interestSaved = Math.max(0, round2(withoutExtraResult.totalInterest - withExtraResult.totalInterest));
   const periodsSaved = Math.max(0, withoutExtraResult.totalPeriods - withExtraResult.totalPeriods);
   const monthsSaved = Math.round(periodsSaved / (periodsPerYear / 12));
 
@@ -169,7 +169,7 @@ export function AmortizationView() {
 
     const billData = {
       name: `${loanName} Payment`,
-      amount: parseFloat(totalMonthlyPayment.toFixed(2)),
+      amount: round2(totalMonthlyPayment),
       period: 'Monthly',
       accountId: linkedAccountId,
       dueDay: 1,

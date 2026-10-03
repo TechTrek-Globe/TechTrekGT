@@ -18,6 +18,7 @@ import {
   generatePaycheckTransactions
 } from '../utils/paydayUtils';
 import { getApiUrl } from '../utils/api';
+import { round2, parseMoney } from '../utils/formatters';
 import { getBudgetData, getCurrentUserId, saveBudgetData } from '../utils/indexedDB';
 import { runBudgetMigrations, CURRENT_BUDGET_SCHEMA_VERSION, pruneInvalidMatrixDayKeys } from '../migrations/budgetMigrations';
 import { ALLOWED_BUDGET_KEYS } from '../worker.js';
@@ -207,7 +208,7 @@ export function BudgetMetadataProvider({ children }) {
             people: Array.isArray(stored.people) ? stored.people : initialBudgetData.people,
             bills: Array.isArray(stored.bills) ? stored.bills.map(b => {
               const raw = b.bankMatchNames !== undefined ? b.bankMatchNames : (b.matchingKey || b.matching_key || '');
-              let amt = parseFloat(b.amount) || 0;
+              let amt = parseMoney(b.amount, 0);
               if (Math.abs(amt - 442.32) < 0.01 || (b.name && b.name.toLowerCase().includes('hoa') && Math.abs(amt - 442.32) < 1.0)) {
                 amt = 444.00;
               }
@@ -251,7 +252,7 @@ export function BudgetMetadataProvider({ children }) {
                 people: Array.isArray(parsed.people) ? parsed.people : initialBudgetData.people,
                 bills: Array.isArray(parsed.bills) ? parsed.bills.map(b => {
                   const raw = b.bankMatchNames !== undefined ? b.bankMatchNames : (b.matchingKey || b.matching_key || '');
-                  let amt = parseFloat(b.amount) || 0;
+                  let amt = parseMoney(b.amount, 0);
                   if (Math.abs(amt - 442.32) < 0.01 || (b.name && b.name.toLowerCase().includes('hoa') && Math.abs(amt - 442.32) < 1.0)) {
                     amt = 444.00;
                   }
@@ -334,7 +335,9 @@ export function BudgetMetadataProvider({ children }) {
       id: accountData.id || `acc-${Date.now()}`,
       name: accountData.name || 'New Account',
       type: accountData.type || 'checking',
-      saveExtraMonthly: parseFloat(accountData.saveExtraMonthly) || 0,
+      startingBalance: round2(accountData.startingBalance, 0),
+      extraStartingBalance: round2(accountData.extraStartingBalance, 0),
+      saveExtraMonthly: parseMoney(accountData.saveExtraMonthly, 0),
       enableExtraSavings: accountData.enableExtraSavings ?? true,
       color: accountData.color || 'blue',
       notes: accountData.notes || '',
@@ -378,8 +381,8 @@ export function BudgetMetadataProvider({ children }) {
       payDay2: personData.payDay2 || 'last',
       payOffsetDays: personData.payOffsetDays ?? 0,
       accountAllocations: personData.accountAllocations || {},
-      grossPerPay: parseFloat(personData.grossPerPay) || 0,
-      netPerPay: parseFloat(personData.netPerPay) || 0,
+      grossPerPay: parseMoney(personData.grossPerPay, 0),
+      netPerPay: parseMoney(personData.netPerPay, 0),
       color: personData.color || 'purple'
     };
     logMatrix('ADD_EARNER', `Added earner: "${newPerson.name}" (${newPerson.payFrequency})`, { person: newPerson });
@@ -436,7 +439,7 @@ export function BudgetMetadataProvider({ children }) {
       const newBill = {
         id: `bill-${Date.now()}`,
         name: billData.name || 'New Bill',
-        amount: parseFloat(billData.amount) || 0,
+        amount: parseMoney(billData.amount, 0),
         period: billData.period || 'Monthly',
         accountId: billData.accountId || prev.accounts[0]?.id || '',
         dueDay: parseInt(billData.dueDay) || 1,
@@ -515,11 +518,11 @@ export function BudgetMetadataProvider({ children }) {
       id: `loan-${Date.now()}`,
       name: loanData?.name || 'New Loan',
       description: loanData?.description || 'Loan Amortization',
-      principal: parseFloat(loanData?.principal) || 250000,
-      annualInterestRate: parseFloat(loanData?.annualInterestRate) || 6.25,
-      termMonths: parseInt(loanData?.termMonths) || 360,
-      monthlyPayment: parseFloat(loanData?.monthlyPayment) || 0,
-      extraPayment: parseFloat(loanData?.extraPayment) || 0,
+      principal: parseMoney(loanData?.principal, 250000),
+      annualInterestRate: parseMoney(loanData?.annualInterestRate, 6.25),
+      termMonths: parseInt(loanData?.termMonths, 10) || 360,
+      monthlyPayment: parseMoney(loanData?.monthlyPayment, 0),
+      extraPayment: parseMoney(loanData?.extraPayment, 0),
       accountId: loanData?.accountId || '',
       isArchived: false,
       startDate: loanData?.startDate || '2024-01-01'
@@ -565,7 +568,7 @@ export function BudgetMetadataProvider({ children }) {
       contributorId: goalData?.contributorId || '',
       accountId: goalData?.accountId || '',
       name: goalData?.name || 'Funding Goal',
-      amountPerPay: parseFloat(goalData?.amountPerPay ?? goalData?.amount) || 0
+      amountPerPay: parseMoney(goalData?.amountPerPay ?? goalData?.amount, 0)
     };
     logMatrix('ADD_FUNDING_GOAL', `Added funding goal for contributor ${newGoal.contributorId} on account ${newGoal.accountId}`, { goal: newGoal });
     setMetadataState(prev => ({
@@ -696,77 +699,77 @@ export function BudgetMetadataProvider({ children }) {
   // Calculation Utilities
   const getMonthlyNetIncome = useCallback((person) => {
     if (!person) return 0;
-    const net = parseFloat(person.netPerPay) || 0;
-    if (person.payFrequency === 'semi-monthly') return net * 2;
-    if (person.payFrequency === 'bi-weekly') return (net * 26) / 12;
-    if (person.payFrequency === 'weekly') return (net * 52) / 12;
-    return net;
+    const net = parseMoney(person.netPerPay, 0);
+    if (person.payFrequency === 'semi-monthly') return round2(net * 2);
+    if (person.payFrequency === 'bi-weekly') return round2((net * 26) / 12);
+    if (person.payFrequency === 'weekly') return round2((net * 52) / 12);
+    return round2(net);
   }, []);
 
   const getMonthlyGrossIncome = useCallback((person) => {
     if (!person) return 0;
-    const gross = parseFloat(person.grossPerPay) || 0;
-    if (person.payFrequency === 'semi-monthly') return gross * 2;
-    if (person.payFrequency === 'bi-weekly') return (gross * 26) / 12;
-    if (person.payFrequency === 'weekly') return (gross * 52) / 12;
-    return gross;
+    const gross = parseMoney(person.grossPerPay, 0);
+    if (person.payFrequency === 'semi-monthly') return round2(gross * 2);
+    if (person.payFrequency === 'bi-weekly') return round2((gross * 26) / 12);
+    if (person.payFrequency === 'weekly') return round2((gross * 52) / 12);
+    return round2(gross);
   }, []);
 
   const getTotalMonthlyNetIncome = useCallback((peopleOverride) => {
     const people = peopleOverride || metadataState.people || [];
-    return people.reduce((sum, p) => sum + getMonthlyNetIncome(p), 0);
+    return round2(people.reduce((sum, p) => sum + getMonthlyNetIncome(p), 0));
   }, [metadataState.people, getMonthlyNetIncome]);
 
   const getTotalMonthlyGrossIncome = useCallback((peopleOverride) => {
     const people = peopleOverride || metadataState.people || [];
-    return people.reduce((sum, p) => sum + getMonthlyGrossIncome(p), 0);
+    return round2(people.reduce((sum, p) => sum + getMonthlyGrossIncome(p), 0));
   }, [metadataState.people, getMonthlyGrossIncome]);
 
   const getBillMonthlyCost = useCallback((bill) => {
     if (!bill) return 0;
-    const amt = Math.abs(parseFloat(bill.amount) || 0);
-    if (bill.period === 'Semi-Annual') return amt / 6;
-    if (bill.period === 'Annual') return amt / 12;
-    if (bill.period === 'Quarterly') return amt / 3;
-    if (bill.period === 'Weekly') return (amt * 52) / 12;
+    const amt = Math.abs(parseMoney(bill.amount, 0));
+    if (bill.period === 'Semi-Annual') return round2(amt / 6);
+    if (bill.period === 'Annual') return round2(amt / 12);
+    if (bill.period === 'Quarterly') return round2(amt / 3);
+    if (bill.period === 'Weekly') return round2((amt * 52) / 12);
     if (bill.period === 'Custom' || bill.period === 'Specific Months') {
       const count = Array.isArray(bill.dueMonths) && bill.dueMonths.length > 0 ? bill.dueMonths.length : 12;
-      return (amt * count) / 12;
+      return round2((amt * count) / 12);
     }
-    return amt;
+    return round2(amt);
   }, []);
 
   const getTotalMonthlyExpenses = useCallback((billsOverride) => {
     const bills = billsOverride || metadataState.bills || [];
     // P9: exclude archived bills from monthly expense total
-    return bills.filter(b => !b.isArchived).reduce((sum, b) => sum + getBillMonthlyCost(b), 0);
+    return round2(bills.filter(b => !b.isArchived).reduce((sum, b) => sum + getBillMonthlyCost(b), 0));
   }, [metadataState.bills, getBillMonthlyCost]);
 
   const getAccountMonthlyExpenses = useCallback((accountId, billsOverride) => {
     const bills = billsOverride || metadataState.bills || [];
-    return bills
+    return round2(bills
       // P9: exclude archived bills from account monthly expense total
       .filter(b => !b.isArchived && b.accountId === accountId)
-      .reduce((sum, b) => sum + getBillMonthlyCost(b), 0);
+      .reduce((sum, b) => sum + getBillMonthlyCost(b), 0));
   }, [metadataState.bills, getBillMonthlyCost]);
 
   const getBillPersonMonthlyPortion = useCallback((bill, personId) => {
     if (!bill) return 0;
     const monthlyCost = getBillMonthlyCost(bill);
-    const pct = parseFloat(bill.splits?.[personId]) || 0;
-    return (monthlyCost * pct) / 100;
+    const pct = parseMoney(bill.splits?.[personId], 0);
+    return round2((monthlyCost * pct) / 100);
   }, [getBillMonthlyCost]);
 
   const getPersonMonthlyTotal = useCallback((personId, stateOverride) => {
     const state = stateOverride || metadataState;
     const person = (state.people || []).find(p => p.id === personId);
     // P9: exclude archived bills from person's monthly obligation total
-    const billsTotal = (state.bills || []).filter(b => !b.isArchived).reduce((sum, b) => sum + getBillPersonMonthlyPortion(b, personId), 0);
+    const billsTotal = round2((state.bills || []).filter(b => !b.isArchived).reduce((sum, b) => sum + getBillPersonMonthlyPortion(b, personId), 0));
     if (!person) return billsTotal;
-    const extraSavingsTotal = (state.accounts || []).reduce((sum, acc) => {
+    const extraSavingsTotal = round2((state.accounts || []).reduce((sum, acc) => {
       return sum + getAccountSaveExtraPersonPortion(acc, person, state);
-    }, 0);
-    return billsTotal + extraSavingsTotal;
+    }, 0));
+    return round2(billsTotal + extraSavingsTotal);
   }, [metadataState, getBillPersonMonthlyPortion]);
 
   const getPersonPerPaycheckTotal = useCallback((personId, stateOverride) => {
@@ -819,9 +822,11 @@ export function BudgetMetadataProvider({ children }) {
         }
       }
       if (!bal) {
-        bal = (parseFloat(acc.startingBalance) || 0) + (acc.enableExtraSavings !== false ? (parseFloat(acc.extraStartingBalance) || 0) : 0);
+        const sReg = parseMoney(acc.startingBalance, 0);
+        const sExtra = acc.enableExtraSavings !== false ? parseMoney(acc.extraStartingBalance, 0) : 0;
+        bal = round2(sReg + sExtra);
       }
-      return sum + bal;
+      return round2(sum + bal);
     }, 0);
   }, [metadataState.accounts]);
 

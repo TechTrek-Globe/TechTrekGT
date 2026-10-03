@@ -3,11 +3,9 @@ import { Copy, DollarSign, Trash2, Pencil, Loader2, Edit3, ShoppingBag, RefreshC
 import { InlineEditCell } from './InlineEditCell';
 import { InlineStatusSelect } from './InlineStatusSelect';
 import { InlineSelectCell } from './InlineSelectCell';
-import { MarginHealthBadge } from './MarginHealthBadge';
 import { cleanItemDescription, cleanAthleteName } from '../../utils/spreadsheetParser';
 import { LISTING_FORMATS } from '../../utils/constants';
 import { fmtCurrency } from '../../utils/formulaPreview';
-import { computeFeeBreakdown } from '../../utils/feeEngine';
 import { getCertVerificationUrl } from '../../utils/certLookup';
 
 export function InventoryGridRow({
@@ -176,26 +174,6 @@ export function InventoryGridRow({
         </td>
       )}
 
-      {/* 3. SKU / Custom Label */}
-      {columnVisibility.sku !== false && (
-        <td
-          style={{
-            width: `${columnWidths.sku || 100}px`,
-            minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'sku')?.minWidth || 80}px`,
-            maxWidth: `${columnWidths.sku || 100}px`
-          }}
-          className="px-3 py-1.5 whitespace-nowrap overflow-hidden text-xs font-mono"
-        >
-          <InlineEditCell
-            value={item.sku}
-            itemId={item.id}
-            field="sku"
-            placeholder="-- SKU --"
-            onUpdated={onUpdateItem}
-          />
-        </td>
-      )}
-
       {/* 4. Status */}
       {columnVisibility.status !== false && (
         <td
@@ -240,106 +218,59 @@ export function InventoryGridRow({
         </td>
       )}
 
-      {/* 6. Net Profit (with Hover Calculation) */}
-      {columnVisibility.net_profit !== false && (
+      {/* 5b. Landed & Floor (unified hover card with List Price) */}
+      {columnVisibility.landed_floor !== false && (
         <td
           style={{
-            width: `${columnWidths.net_profit || 110}px`,
-            minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'net_profit')?.minWidth || 95}px`,
-            maxWidth: `${columnWidths.net_profit || 110}px`
+            width: `${columnWidths.landed_floor || 150}px`,
+            minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'landed_floor')?.minWidth || 130}px`,
+            maxWidth: `${columnWidths.landed_floor || 150}px`
           }}
-          onMouseEnter={(e) => onShowTooltip && onShowTooltip('net_profit', item, e)}
+          onMouseEnter={(e) => onShowTooltip && onShowTooltip('landed_floor', item, e)}
           onMouseLeave={onHideTooltip}
-          className="px-3 py-1.5 whitespace-nowrap overflow-hidden text-xs font-mono font-bold cursor-help"
+          className="px-3 py-1.5 whitespace-nowrap overflow-hidden text-xs font-mono cursor-help"
         >
           {(() => {
-            const hasListPrice = Number(item.current_list_price) > 0 || Number(item.suggested_list_price) > 0;
-            if (!hasListPrice) {
-              return <span className="text-slate-600 font-normal">--</span>;
+            const listVal = Number(item.current_list_price) || 0;
+            const floorVal = Number(item.floor_price || item.min_sell_price) || 0;
+            const landedVal = Number(item.true_total_cost) || 0;
+            let badge = null;
+            if (listVal > 0 && floorVal > 0) {
+              if (listVal < floorVal) {
+                badge = { text: 'Below floor', cls: 'bg-red-500/15 text-red-300 border-red-500/30' };
+              } else if (listVal <= floorVal * 1.05) {
+                badge = { text: 'At floor', cls: 'bg-amber-500/15 text-amber-300 border-amber-500/30' };
+              }
             }
-            const netProfitVal = item._computedNetProfit != null
-              ? Number(item._computedNetProfit)
-              : computeFeeBreakdown(item).netProfit;
-            const isPositive = netProfitVal > 0;
-            const isZero = Math.abs(netProfitVal) < 0.01;
-            const textColor = isPositive ? 'text-emerald-400' : isZero ? 'text-slate-400' : 'text-red-400';
             return (
-              <span className={`${textColor} font-mono font-bold`}>
-                {isPositive ? '+' : ''}{fmtCurrency(netProfitVal)}
-              </span>
+              <div className="flex items-center gap-2">
+                <div className="flex flex-col leading-tight min-w-0">
+                  <span className="text-[10px] text-slate-500 truncate">
+                    Landed {landedVal > 0 ? fmtCurrency(landedVal) : '--'}
+                  </span>
+                  <div className="flex items-center gap-1 text-cyan-400 font-semibold">
+                    <span className="text-[10px] text-slate-500 font-normal">Floor</span>
+                    <InlineEditCell
+                      value={item.floor_price || item.min_sell_price}
+                      itemId={item.id}
+                      field="floor_price"
+                      type="number"
+                      prefix="$"
+                      className="text-cyan-400 font-semibold"
+                      onUpdated={onUpdateItem}
+                    />
+                  </div>
+                </div>
+                {badge && (
+                  <span className={`px-1.5 py-0.5 rounded border text-[9px] font-bold flex-shrink-0 ${badge.cls}`}>
+                    {badge.text}
+                  </span>
+                )}
+              </div>
             );
           })()}
         </td>
       )}
-
-      {/* 7. Margin Health (with Hover Calculation) */}
-      {columnVisibility.margin_health !== false && (
-        <td
-          style={{
-            width: `${columnWidths.margin_health || 110}px`,
-            minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'margin_health')?.minWidth || 95}px`,
-            maxWidth: `${columnWidths.margin_health || 110}px`
-          }}
-          onMouseEnter={(e) => onShowTooltip && onShowTooltip('margin', item, e)}
-          onMouseLeave={onHideTooltip}
-          className="px-3 py-1.5 whitespace-nowrap overflow-hidden text-xs cursor-help"
-        >
-          <MarginHealthBadge marginPct={item._computedMargin} netProfit={item._computedNetProfit} showLabel={false} />
-        </td>
-      )}
-
-      {/* 8. True Landed Cost (COGS - with Hover Calculation) */}
-      {columnVisibility.true_total_cost !== false && (
-        <td
-          style={{
-            width: `${columnWidths.true_total_cost || 110}px`,
-            minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'true_total_cost')?.minWidth || 95}px`,
-            maxWidth: `${columnWidths.true_total_cost || 110}px`
-          }}
-          onMouseEnter={(e) => onShowTooltip && onShowTooltip('cost', item, e)}
-          onMouseLeave={onHideTooltip}
-          className="px-3 py-1.5 whitespace-nowrap overflow-hidden text-xs font-mono cursor-help"
-        >
-          <InlineEditCell
-            value={item.true_total_cost}
-            itemId={item.id}
-            field="true_total_cost"
-            type="number"
-            prefix="$"
-            className="text-slate-300 font-semibold"
-            onUpdated={onUpdateItem}
-          />
-        </td>
-      )}
-
-      {/* 9. Floor Price (with Hover Calculation) */}
-      {columnVisibility.floor_price !== false && (
-        <td
-          style={{
-            width: `${columnWidths.floor_price || 100}px`,
-            minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'floor_price')?.minWidth || 85}px`,
-            maxWidth: `${columnWidths.floor_price || 100}px`
-          }}
-          onMouseEnter={(e) => onShowTooltip && onShowTooltip('floor', item, e)}
-          onMouseLeave={onHideTooltip}
-          className="px-3 py-1.5 whitespace-nowrap overflow-hidden text-xs font-mono cursor-help"
-        >
-          <InlineEditCell
-            // T-10 item 5: display the server-computed floor only. The old expression
-          // preferred item.floor_price, then a client-only _computedFloor from a
-          // second pricing formula, then min_sell_price - three sources, one of
-          // which the server had never seen.
-          value={item.floor_price || item.min_sell_price}
-            itemId={item.id}
-            field="floor_price"
-            type="number"
-            prefix="$"
-            className="text-cyan-400"
-            onUpdated={onUpdateItem}
-          />
-        </td>
-      )}
-
       {/* 10. Suggested List Price (with Hover Calculation) */}
       {columnVisibility.suggested_list_price !== false && (
         <td

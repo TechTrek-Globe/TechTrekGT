@@ -15,8 +15,8 @@ export function allocateEarnerCredit(person, accountId, year, month, day, budget
   const c = dailyMatrix[accountId + '_' + mKey + '_' + day + '_credit_' + person.id];
   const ec = dailyMatrix[accountId + '_' + mKey + '_' + day + '_extra_credit_' + person.id];
   const isDepDay = isPersonDepositDay(person, year, month, day);
-  const projectedPlanDeposit = round2(getPersonDepositAmountForAccount(person, accountId, budget));
-  const projectedPlanExtra = projectedPlanDeposit > 0 ? round2(getPersonExtraSavingsDepositAmountForAccount(person, accountId, budget)) : 0;
+  const projectedPlanDeposit = options.planDeposit !== undefined ? options.planDeposit : round2(getPersonDepositAmountForAccount(person, accountId, budget));
+  const projectedPlanExtra = options.planExtra !== undefined ? options.planExtra : (projectedPlanDeposit > 0 ? round2(getPersonExtraSavingsDepositAmountForAccount(person, accountId, budget)) : 0);
   const projectedDeposit = (!options.isLockedDay && isDepDay) ? projectedPlanDeposit : 0;
   const projectedExtra = projectedDeposit > 0 ? projectedPlanExtra : 0;
   let earnerDeposit, earnerExtra, source;

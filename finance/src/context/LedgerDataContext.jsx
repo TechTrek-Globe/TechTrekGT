@@ -1211,6 +1211,13 @@ export function LedgerDataProvider({ children }) {
     const today = new Date();
     const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
 
+    const earnerPlanCache = new Map();
+    people.forEach(p => {
+      const planDep = round2(getPersonDepositAmountForAccount(p, accountId, metadataStateRef.current));
+      const planExtra = planDep > 0 ? round2(getPersonExtraSavingsDepositAmountForAccount(p, accountId, metadataStateRef.current)) : 0;
+      earnerPlanCache.set(p.id, { planDeposit: planDep, planExtra });
+    });
+
     let cur = new Date(startDateObj);
     while (cur <= target) {
       const year = cur.getFullYear();
@@ -1229,7 +1236,12 @@ export function LedgerDataProvider({ children }) {
       let dayCredits = 0;
       let dayExtraAdd = 0;
       people.forEach(p => {
-        const alloc = allocateEarnerCredit(p, accountId, year, month, day, metadataStateRef.current, dailyMatrixRef.current, { isLockedDay: isLockedDay });
+        const plan = earnerPlanCache.get(p.id);
+        const alloc = allocateEarnerCredit(p, accountId, year, month, day, metadataStateRef.current, dailyMatrixRef.current, {
+          isLockedDay: isLockedDay,
+          planDeposit: plan?.planDeposit,
+          planExtra: plan?.planExtra
+        });
         dayCredits = round2(dayCredits + alloc.earnerReg);
         dayExtraAdd = round2(dayExtraAdd + alloc.earnerExtra);
       });

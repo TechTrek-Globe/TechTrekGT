@@ -26,7 +26,7 @@ import { InlineEdit } from './InlineEdit';
 import { SpreadsheetImporter } from './SpreadsheetImporter';
 import { ColumnHeaderHoverTooltip } from './ColumnHeaderHoverTooltip';
 
-import { fmtMoney, fmtNum } from '../utils/formatters';
+import { fmtMoney, fmtNum, round2 } from '../utils/formatters';
 import { isBillDueInMonth, isPersonDepositDay, effectiveDueDay, getPersonDepositAmountForAccount, getPersonExtraSavingsDepositAmountForAccount } from '../utils/paydayUtils';
 import { allocateEarnerCredit } from '../utils/ledgerEngine';
 import { logTransaction, logMatrix, logLedger } from '../utils/logger';
@@ -209,6 +209,8 @@ const DroppableCellTd = React.memo(function DroppableCellTd({
   className,
   isBillField = false
 }) {
+  const { active } = useDndContext();
+  const isMatchingField = Boolean(active && active.data?.current?.field === field);
   const dropId = `drop-${row.monthKey}-${row.day}-${field}`;
 
   const dropPayload = useMemo(() => ({
@@ -218,12 +220,12 @@ const DroppableCellTd = React.memo(function DroppableCellTd({
     field
   }), [row.rowKey, row.monthKey, row.day, field]);
 
-  const { isOver, setNodeRef, active } = useDroppable({
+  const { isOver, setNodeRef } = useDroppable({
     id: dropId,
-    data: dropPayload
+    data: dropPayload,
+    disabled: !isMatchingField
   });
 
-  const isMatchingField = active?.data?.current?.field === field;
   const activeHighlight = isOver && isMatchingField
     ? isBillField
       ? 'bg-rose-500/30 ring-2 ring-rose-400 ring-inset shadow-[0_0_10px_rgba(244,63,94,0.3)]'
@@ -642,26 +644,17 @@ function DailySpreadsheetMatrix() {
     const curYear = today.getFullYear();
     const minYear = startDateObj ? startDateObj.getFullYear() : curYear;
     return {
-      startYear: Math.max(minYear, curYear - 1),
+      startYear: Math.max(minYear, curYear),
       endYear: curYear + 1
     };
   });
 
-  // Keep startYear constrained if startDateObj changes
-  useEffect(() => {
-    const minYear = startDateObj.getFullYear();
-    setYearRange(prev => {
-      if (prev.startYear < minYear) {
-        return { ...prev, startYear: minYear };
-      }
-      return prev;
-    });
-  }, [startDateObj]);
+  const effectiveStartYear = Math.max(yearRange.startYear, startDateObj.getFullYear());
 
   // Multi-year continuous stream for completely stable, smooth cross-year scrolling
   const monthList = useMemo(() => {
     const list = [];
-    for (let y = yearRange.startYear; y <= yearRange.endYear; y++) {
+    for (let y = effectiveStartYear; y <= yearRange.endYear; y++) {
       for (let m = 0; m < 12; m++) {
         const mKey = `${y}-${String(m + 1).padStart(2, '0')}`;
         const mDays = new Date(y, m + 1, 0).getDate();
@@ -670,12 +663,12 @@ function DailySpreadsheetMatrix() {
           month: m,
           monthKey: mKey,
           daysInMonth: mDays,
-          offset: (y - yearRange.startYear) * 12 + m
+          offset: (y - effectiveStartYear) * 12 + m
         });
       }
     }
     return list;
-  }, [yearRange.startYear, yearRange.endYear]);
+  }, [effectiveStartYear, yearRange.endYear]);
 
   // Compensate scroll position when prepending a previous year above the viewport
   useLayoutEffect(() => {
@@ -752,6 +745,14 @@ function DailySpreadsheetMatrix() {
     let runningRegBeg = initialRegBeg;
     let runningExtraBeg = initialExtraBeg;
 
+    const matrixObj = getDailyMatrix();
+    const earnerPlanCache = new Map();
+    accountPeople.forEach(p => {
+      const planDep = round2(getPersonDepositAmountForAccount(p, selectedAccountId, budget));
+      const planExtra = planDep > 0 ? round2(getPersonExtraSavingsDepositAmountForAccount(p, selectedAccountId, budget)) : 0;
+      earnerPlanCache.set(p.id, { planDeposit: planDep, planExtra });
+    });
+
     monthList.forEach(mItem => {
       const { year, month, monthKey, daysInMonth } = mItem;
 
@@ -781,9 +782,13 @@ function DailySpreadsheetMatrix() {
         let dayExtraAdd = 0;
 
         accountPeople.forEach(p => {
-          const isDepDay = isPersonDepositDay(p, year, month, day);
+          const plan = earnerPlanCache.get(p.id);
 
-          const alloc = allocateEarnerCredit(p, selectedAccountId, year, month, day, budget, getDailyMatrix(), { isLockedDay: isLockedDay });
+          const alloc = allocateEarnerCredit(p, selectedAccountId, year, month, day, budget, matrixObj, {
+            isLockedDay: isLockedDay,
+            planDeposit: plan?.planDeposit,
+            planExtra: plan?.planExtra
+          });
           personCredits[p.id] = alloc.earnerDeposit;
 
           const earnerExtra = alloc.earnerExtra;
@@ -1261,7 +1266,10 @@ function DailySpreadsheetMatrix() {
               value={selectedAccountId}
               onChange={e => {
                 hasUserSelectedAccountRef.current = true;
-                setSelectedAccountId(e.target.value);
+                const nextId = e.target.value;
+                React.startTransition(() => {
+                  setSelectedAccountId(nextId);
+                });
               }}
               className="bg-transparent text-xs font-bold text-slate-100 focus:outline-none cursor-pointer"
             >
@@ -1620,7 +1628,12 @@ function DailySpreadsheetMatrix() {
 
           {/* Matrix Rows (Continuous Multi-Month Stream with Natural In-Flow Month Banners) */}
           {monthGroups.map(group => (
-            <tbody key={group.monthKey} data-month-group={`${group.year}-${group.month}`} className="divide-y divide-slate-800/50 font-mono text-[10px]">
+            <tbody
+              key={group.monthKey}
+              data-month-group={`${group.year}-${group.month}`}
+              style={{ contentVisibility: 'auto', containIntrinsicSize: '1px 950px' }}
+              className="divide-y divide-slate-800/50 font-mono text-[10px]"
+            >
               {/* Natural In-Flow Month Header Row (Non-sticky so it never obscures date rows) */}
               <tr
                 className="bg-slate-950 border-b border-slate-800"

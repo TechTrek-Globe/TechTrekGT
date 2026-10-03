@@ -61,7 +61,7 @@ export function CloudSyncSubPanel() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: passcodeInput })
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (res.ok && data.success) {
         setCloudPasscode(passcodeInput);
         setIsCloudUnlocked(true);
@@ -110,7 +110,7 @@ export function CloudSyncSubPanel() {
     setIsPushing(true);
     setCloudSyncStatus({ type: 'info', message: 'Saving changes locally and syncing with Cloud Vault in background...' });
     try {
-      const res = await pushCloudBackup();
+      const res = await pushCloudBackup(cloudPasscode);
       if (res && res.success) {
         setCloudSyncStatus({ type: 'success', message: `Successfully backed up data to Cloud Vault! (${new Date().toLocaleTimeString()})` });
         loadVersions();
@@ -137,6 +137,8 @@ export function CloudSyncSubPanel() {
         await restoreFromBackup(res.budget);
         setCloudSyncStatus({ type: 'success', message: `Restored snapshot from ${new Date(res.version || Date.now()).toLocaleString()}` });
         await loadVersions();
+      } else {
+        throw new Error(res?.error || 'Version restore failed.');
       }
     } catch (err) {
       setCloudSyncStatus({ type: 'error', message: `Failed to restore version: ${err.message}` });

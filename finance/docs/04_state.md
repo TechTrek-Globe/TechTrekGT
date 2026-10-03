@@ -69,3 +69,19 @@ Authentication states strictly reflect backend database authority and maintain z
   - **Credit Allocation Conservation:** `allocateEarnerCredit` enforces that total earner distributions strictly equal the earner's deposit (`earnerReg + earnerExtra === earnerDeposit`), preventing balance phantom surpluses or deficits.
   - **Amortization Schedule Integrity:** `AmortizationView` accumulates interest, principal, and balance reductions with deterministic 2-decimal rounding per monthly period, preventing amortized total interest drift.
 - **Zero Drift Storage Mandate:** All balances stored in IndexedDB or sent to Cloudflare D1 via `/api/sync/backup` are guaranteed to be finite 2-decimal numbers.
+
+## 8. Frontend State Management & UI Synchronization Invariants (FIN-AUDIT-004)
+
+- **Context Lifecycle & Multi-Account Isolation:**
+  - **Global Sign-Out Reset:** `BudgetMetadataContext` and `LedgerDataContext` listen to `techtrek:user-logout` window events. Upon sign-out, all in-memory React state (`budget`, `dailyMatrix`, `lineItems`, `transactions`, `syncPasscode`, `isSyncUnlocked`, `syncConflict`, `cloudVersion`) and tracking refs (`hasAutoPulledRef`, `isPendingSaveRef`) are instantly reset to default starter structures.
+  - **Strict User-Scoped Storage & Sync Queue:** IndexedDB database access, pending mutation queues (`getPendingSync`, `clearPendingSync`, `flushPendingCloudSync`), and cloud version markers (`tt_budget_cloud_version:${userId}`) are strictly scoped to `userId`, preventing cross-account data contamination across browser sessions.
+- **Asynchronous Error Handling & Rollback Safety:**
+  - **Preserved Retries on Disk Save Failure:** If a disk commit in `flushSaveToIndexedDB` fails, `isPendingSaveRef.current` is preserved as `true` and the error is surfaced to `saveError` state, allowing subsequent user edits to retry writing without silent data loss.
+  - **Resilient Network Parsing:** All network response handlers use safe JSON parsing (`res.json().catch(() => ({}))`) to guard against unformatted 502/504 HTML error gateways crashing component state.
+  - **Conflict Resolution Safety:** `resolveConflictKeepLocal` and `resolveConflictUseCloud` wrap version writes and cloud pulls in guarded `try / catch` blocks to prevent unhandled promise rejections from freezing the sync modal.
+- **Guaranteed Loading State Resets (`finally` Block Mandate):**
+  - All asynchronous mutation workflows (`isSubmitting`, `isProcessing`, `isVerifying`, `isResending`, `isFlushingCache`, `isClearingCredits`, `isPruning`, `isRestoringGoals`) enforce state cleanup inside `finally {}` blocks.
+  - Interactive elements and submission buttons never remain permanently disabled or frozen in loading states following network dropouts or backend rejections.
+- **Admin & Maintenance Route Synchronization:**
+  - `AdminView` user status updates target the canonical POST `/api/admin/user-status` endpoint with structured payloads (`{ userId, status }`), matching backend Cloudflare Worker routing and avoiding 404 route drift.
+

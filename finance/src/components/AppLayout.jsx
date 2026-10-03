@@ -157,6 +157,7 @@ export function AppLayout({ children, onNavigateHome, onNavigateView, activeView
   const [verifyError, setVerifyError] = useState('');
   const [verifySuccess, setVerifySuccess] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
+  const [isResending, setIsResending] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
 
   useEffect(() => {
@@ -168,6 +169,7 @@ export function AppLayout({ children, onNavigateHome, onNavigateView, activeView
   }, [resendCooldown]);
 
   const handleResend = async () => {
+    setIsResending(true);
     try {
       setVerifyError('');
       await resendVerification();
@@ -175,6 +177,8 @@ export function AppLayout({ children, onNavigateHome, onNavigateView, activeView
       setVerifySuccess('A new 8-digit verification code has been sent to your email.');
     } catch (err) {
       setVerifyError(err.message || 'Failed to resend code.');
+    } finally {
+      setIsResending(false);
     }
   };
 
@@ -494,11 +498,11 @@ export function AppLayout({ children, onNavigateHome, onNavigateView, activeView
                 <div className="flex items-center justify-between pt-1">
                   <button
                     type="button"
-                    disabled={resendCooldown > 0 || isVerifying}
+                    disabled={resendCooldown > 0 || isVerifying || isResending}
                     onClick={handleResend}
                     className="text-xs text-amber-400 hover:text-amber-300 disabled:text-slate-500 disabled:cursor-not-allowed transition-colors"
                   >
-                    {resendCooldown > 0 ? `Resend (${resendCooldown}s)` : 'Resend Code'}
+                    {isResending ? 'Sending...' : (resendCooldown > 0 ? `Resend (${resendCooldown}s)` : 'Resend Code')}
                   </button>
 
                   <div className="flex items-center space-x-2">

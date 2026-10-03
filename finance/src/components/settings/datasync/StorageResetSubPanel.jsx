@@ -1,6 +1,6 @@
-// @ts-nocheck
 import React, { useState, useEffect } from 'react';
 import { useBudget, useLedgerDataDispatch } from '../../../context/BudgetContext';
+import { useAuth } from '../../../context/AuthContext';
 import { 
   HardDrive, 
   RotateCcw, 
@@ -11,11 +11,13 @@ import {
   FileSpreadsheet,
   Database,
   RefreshCw,
-  Server
+  Server,
+  Loader2
 } from 'lucide-react';
-import { saveBudgetData } from '../../../utils/indexedDB';
+import { saveBudgetData, getCurrentUserId } from '../../../utils/indexedDB';
 
 export function StorageResetSubPanel() {
+  const { currentUserId } = useAuth();
   const { budget } = useBudget();
   const {
     resetToDefaults,
@@ -28,6 +30,9 @@ export function StorageResetSubPanel() {
 
   // Storage Quota State
   const [storageEstimate, setStorageEstimate] = useState(null);
+  const [isClearingCredits, setIsClearingCredits] = useState(false);
+  const [isPruning, setIsPruning] = useState(false);
+  const [isRestoringGoals, setIsRestoringGoals] = useState(false);
   const [isFlushingCache, setIsFlushingCache] = useState(false);
   const [flushStatus, setFlushStatus] = useState(null);
   const [clearCreditsStatus, setClearCreditsStatus] = useState(null);
@@ -69,7 +74,7 @@ export function StorageResetSubPanel() {
     setIsFlushingCache(true);
     setFlushStatus(null);
     try {
-      await saveBudgetData(budget);
+      await saveBudgetData(budget, currentUserId || getCurrentUserId());
       await checkStorageQuota();
       setFlushStatus({ type: 'success', message: 'Current budget state committed directly to IndexedDB disk storage.' });
     } catch (err) {
@@ -310,17 +315,26 @@ export function StorageResetSubPanel() {
 
             <button
               type="button"
+              disabled={isClearingCredits}
               onClick={async () => {
                 if (clearFutureMatrixCredits) {
-                  const res = await clearFutureMatrixCredits();
-                  setClearCreditsStatus(`Cleared ${res?.removedCount || 0} future credit overrides and synced to Cloud Vault. Live funding goals now govern future months.`);
-                  setTimeout(() => setClearCreditsStatus(null), 6000);
+                  setIsClearingCredits(true);
+                  try {
+                    const res = await clearFutureMatrixCredits();
+                    setClearCreditsStatus(`Cleared ${res?.removedCount || 0} future credit overrides and synced to Cloud Vault. Live funding goals now govern future months.`);
+                    setTimeout(() => setClearCreditsStatus(null), 6000);
+                  } catch (err) {
+                    setClearCreditsStatus(`Failed to reset credits: ${err.message}`);
+                    setTimeout(() => setClearCreditsStatus(null), 6000);
+                  } finally {
+                    setIsClearingCredits(false);
+                  }
                 }
               }}
-              className="px-5 py-2.5 bg-blue-600/80 hover:bg-blue-600 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2 cursor-pointer"
+              className="px-5 py-2.5 bg-blue-600/80 hover:bg-blue-600 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-50"
             >
-              <RefreshCw className="w-4 h-4" />
-              <span>Reset Future Credits</span>
+              <RefreshCw className={`w-4 h-4 ${isClearingCredits ? 'animate-spin' : ''}`} />
+              <span>{isClearingCredits ? 'Resetting Credits...' : 'Reset Future Credits'}</span>
             </button>
           </div>
           {clearCreditsStatus && (
@@ -352,17 +366,26 @@ export function StorageResetSubPanel() {
 
             <button
               type="button"
+              disabled={isPruning}
               onClick={async () => {
                 if (pruneGhostMatrixDayKeys) {
-                  const res = await pruneGhostMatrixDayKeys();
-                  setPruneStatus(`Pruned ${res?.removedCount || 0} orphaned calendar day keys.`);
-                  setTimeout(() => setPruneStatus(null), 6000);
+                  setIsPruning(true);
+                  try {
+                    const res = await pruneGhostMatrixDayKeys();
+                    setPruneStatus(`Pruned ${res?.removedCount || 0} orphaned calendar day keys.`);
+                    setTimeout(() => setPruneStatus(null), 6000);
+                  } catch (err) {
+                    setPruneStatus(`Failed to prune keys: ${err.message}`);
+                    setTimeout(() => setPruneStatus(null), 6000);
+                  } finally {
+                    setIsPruning(false);
+                  }
                 }
               }}
-              className="px-5 py-2.5 bg-cyan-600/80 hover:bg-cyan-600 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2 cursor-pointer"
+              className="px-5 py-2.5 bg-cyan-600/80 hover:bg-cyan-600 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-50"
             >
-              <Trash2 className="w-4 h-4" />
-              <span>Prune Ghost Keys</span>
+              <Trash2 className={`w-4 h-4 ${isPruning ? 'animate-pulse' : ''}`} />
+              <span>{isPruning ? 'Pruning...' : 'Prune Ghost Keys'}</span>
             </button>
           </div>
           {pruneStatus && (
@@ -394,17 +417,26 @@ export function StorageResetSubPanel() {
 
             <button
               type="button"
+              disabled={isRestoringGoals}
               onClick={async () => {
                 if (restoreStandardFundingGoals) {
-                  const res = await restoreStandardFundingGoals();
-                  setRestoreGoalsStatus(`Restored ${res?.count || 0} standard funding goals.`);
-                  setTimeout(() => setRestoreGoalsStatus(null), 6000);
+                  setIsRestoringGoals(true);
+                  try {
+                    const res = await restoreStandardFundingGoals();
+                    setRestoreGoalsStatus(`Restored ${res?.count || 0} standard funding goals.`);
+                    setTimeout(() => setRestoreGoalsStatus(null), 6000);
+                  } catch (err) {
+                    setRestoreGoalsStatus(`Failed to restore goals: ${err.message}`);
+                    setTimeout(() => setRestoreGoalsStatus(null), 6000);
+                  } finally {
+                    setIsRestoringGoals(false);
+                  }
                 }
               }}
-              className="px-5 py-2.5 bg-emerald-600/80 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2 cursor-pointer"
+              className="px-5 py-2.5 bg-emerald-600/80 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-50"
             >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>Restore Standard Goals</span>
+              <CheckCircle2 className={`w-4 h-4 ${isRestoringGoals ? 'animate-pulse' : ''}`} />
+              <span>{isRestoringGoals ? 'Restoring...' : 'Restore Standard Goals'}</span>
             </button>
           </div>
           {restoreGoalsStatus && (

@@ -57,3 +57,12 @@ All serverless API routes execute in Cloudflare Workers ESM format (`src/worker.
 - **Cent-Exact Credit Allocation Invariant:** In `allocateEarnerCredit`, regular operating credits and extra savings deposits adhere strictly to the invariant `earnerReg + earnerExtra <= earnerDeposit`, clamping extra savings to prevent over-allocation and ensuring exact penny preservation.
 - **Safe Arithmetic Helpers:** Shared utilities (`safeAdd`, `safeSub`, `safeMul`, `safeDiv`) guarantee that all arithmetic operations produce normalized 2-decimal numbers with built-in zero-division protection (`safeDiv(val, 0) === 0`).
 - **Synchronized Backend Payload Validation:** Cloudflare Workers endpoints share the deterministic currency parser and validator (`validateNonNegativeMoney`, `round2`), guaranteeing identical math across client state and D1 database persistence.
+
+## 6. Frontend State Management & UI Synchronization (FIN-AUDIT-004)
+
+- **Audit Objective & Scope:** Comprehensive audit of React context providers (`AuthContext`, `BudgetMetadataContext`, `LedgerDataContext`), custom hooks, and component lifecycles to eliminate stale state caching, false-positive success indicators, and unhandled promise rejections.
+- **Multi-Account Context Isolation on Sign-Out:** Implemented the `techtrek:user-logout` global event channel. When a user logs out, all React contexts immediately purge active budget metadata, accounts, earners, bills, daily matrix projections, and historical line items from memory before the new session begins.
+- **Strict User Scoping across Local Storage & Sync Queues:** IndexedDB reads and writes, pending mutation queues (`getPendingSync`, `clearPendingSync`, `flushPendingCloudSync`), and cloud version markers are partitioned strictly by `userId`.
+- **Guaranteed Loading State Resets:** Wrapped all asynchronous UI mutations across the application (email verification, code resend, disk cache flush, matrix cleanup, standard goal restore, admin user status toggle) in `try ... finally` blocks, guaranteeing that loading spinners and disabled button states resolve even if network requests fail or return non-200 responses.
+- **Backend Route Synchronization:** Aligned administrative status modification calls in `AdminView` with Cloudflare Worker routing (`POST /api/admin/user-status`), eliminating 404 URL route drift and ensuring instant UI feedback upon status updates.
+

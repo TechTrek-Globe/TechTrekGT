@@ -70,19 +70,21 @@ export function LedgerDataProvider({ children }) {
 
   const flushSaveToIndexedDB = useCallback(() => {
     if (!isPendingSaveRef.current || !budgetRef.current) return;
+    const savePayload = budgetRef.current;
     isPendingSaveRef.current = false;
-    saveBudgetData(budgetRef.current, currentUserId || getCurrentUserId())
+    saveBudgetData(savePayload, currentUserId || getCurrentUserId())
       .then(() => {
         setSaveError(null);
         logState('INDEXEDDB_FLUSH', 'Flushed pending budget state to IndexedDB', {
           recordKey: budgetRecordKey(currentUserId || getCurrentUserId()),
-          accountsCount: budgetRef.current?.accounts?.length,
-          billsCount: budgetRef.current?.bills?.length,
-          matrixEntriesCount: Object.keys(budgetRef.current?.dailyMatrix || {}).length
+          accountsCount: savePayload?.accounts?.length,
+          billsCount: savePayload?.bills?.length,
+          matrixEntriesCount: Object.keys(savePayload?.dailyMatrix || {}).length
         });
       })
       .catch(err => {
         console.error('Failed to flush budget to IndexedDB:', err);
+        isPendingSaveRef.current = true;
         setSaveError('Local storage save failed. Browser storage quota may be exceeded.');
       });
   }, [setSaveError, currentUserId]);
@@ -107,11 +109,12 @@ export function LedgerDataProvider({ children }) {
     if (typeof window === 'undefined') return;
     const handleUserLogout = async (e) => {
       const userId = e?.detail?.userId;
-      logSync('USER_LOGOUT', 'Clearing user-scoped local budget state', { userId, reason: e?.detail?.reason || 'logout' });
+      const uid = userId || currentUserId || getCurrentUserId();
+      logSync('USER_LOGOUT', 'Clearing user-scoped local budget state', { userId: uid, reason: e?.detail?.reason || 'logout' });
       try { flushSaveToIndexedDB(); } catch {}
       
       // Always clear the pending sync queue and version markers
-      try { await clearPendingSync(userId || currentUserId || getCurrentUserId()); } catch {}
+      try { await clearPendingSync(uid); } catch {}
       
       // CRIT-002: Check "Remove data from this device" setting (defaults to true for shared devices)
       const shouldRemoveData = (() => {
@@ -124,16 +127,37 @@ export function LedgerDataProvider({ children }) {
       })();
       
       if (shouldRemoveData) {
-        try { await clearBudgetData(userId || currentUserId || getCurrentUserId()); } catch {}
+        try { await clearBudgetData(uid); } catch {}
       } else {
-        logSync('USER_LOGOUT', 'Preserving local budget data per user setting', { userId });
+        logSync('USER_LOGOUT', 'Preserving local budget data per user setting', { userId: uid });
       }
       
       try {
+        if (uid) {
+          localStorage.removeItem(`tt_budget_cloud_version:${uid}`);
+          localStorage.removeItem(`tt_budget_last_modified:${uid}`);
+        }
         localStorage.removeItem('tt_budget_cloud_version');
         localStorage.removeItem('tt_budget_last_modified');
       } catch {}
       try { window.sessionStorage.removeItem('tt_signed_in_user_id'); } catch {}
+
+      // Reset React state & refs to clean defaults immediately to eliminate stale cross-user leaks
+      setDailyMatrix(initialBudgetData.dailyMatrix || {});
+      dailyMatrixRef.current = initialBudgetData.dailyMatrix || {};
+      setLineItems(initialBudgetData.lineItems || []);
+      lineItemsRef.current = initialBudgetData.lineItems || [];
+      setTransactions(initialBudgetData.transactions || []);
+      transactionsRef.current = initialBudgetData.transactions || [];
+      setMatrixVersion(v => v + 1);
+      setSyncPasscode('');
+      setIsSyncUnlocked(false);
+      setSyncConflict(null);
+      setCloudVersion(0);
+      cloudVersionRef.current = 0;
+      hasAutoPulledRef.current = false;
+      budgetRef.current = null;
+      isPendingSaveRef.current = false;
     };
     window.addEventListener('techtrek:user-logout', handleUserLogout);
     return () => window.removeEventListener('techtrek:user-logout', handleUserLogout);
@@ -301,7 +325,7 @@ export function LedgerDataProvider({ children }) {
       });
     }
     return result;
-  }, [setLastCloudSyncTime]);
+  }, [setLastCloudSyncTime, currentUserId]);
 
   // Option A self-healing migration: clear legacy future credit cells (> today) from previous spreadsheet workbook
   useEffect(() => {
@@ -316,7 +340,7 @@ export function LedgerDataProvider({ children }) {
       for (const [key] of Object.entries(cleanMatrix)) {
         const match = key.match(creditKeyPattern);
         if (!match) continue;
-        const [, accountId, monthKey, dayStr] = match;
+        const [, , monthKey, dayStr] = match;
         const day = parseInt(dayStr, 10);
         const cellIso = `${monthKey}-${String(day).padStart(2, '0')}`;
 
@@ -407,31 +431,44 @@ export function LedgerDataProvider({ children }) {
     setLineItems(newLineItems);
     setTransactions(newTransactions);
     return true;
-  }, [setMetadataState]);
+  }, [setMetadataState, currentUserId]);
 
   const resolveConflictKeepLocal = useCallback(async () => {
     logSync('CONFLICT_RESOLVE', 'User chose to keep local data (force push to cloud)');
-    const res = await pushCloudBackup(syncPasscode, { force: true });
-    if (res?.success) {
-      setSyncConflict(null);
+    try {
+      const res = await pushCloudBackup(syncPasscode, { force: true });
+      if (res?.success) {
+        setSyncConflict(null);
+      }
+      return res;
+    } catch (err) {
+      logSync('CONFLICT_RESOLVE_ERROR', `Failed to keep local and overwrite cloud: ${err.message}`, { error: err.message }, 'error');
+      throw err;
     }
-    return res;
   }, [pushCloudBackup, syncPasscode]);
 
   const resolveConflictUseCloud = useCallback(async () => {
     if (!syncConflict || !syncConflict.serverData) return;
     logSync('CONFLICT_RESOLVE', 'User chose to use cloud data (restore cloud backup)');
-    await restoreFromBackup(syncConflict.serverData);
-    if (syncConflict.serverVersion) {
-      setCloudVersion(syncConflict.serverVersion);
-      try {
-        localStorage.setItem('tt_budget_cloud_version', String(syncConflict.serverVersion));
-        localStorage.setItem('tt_budget_last_modified', String(syncConflict.serverVersion));
-      } catch {}
+    try {
+      await restoreFromBackup(syncConflict.serverData);
+      if (syncConflict.serverVersion) {
+        setCloudVersion(syncConflict.serverVersion);
+        const uid = currentUserId || getCurrentUserId();
+        const vKey = uid ? `tt_budget_cloud_version:${uid}` : 'tt_budget_cloud_version';
+        const mKey = uid ? `tt_budget_last_modified:${uid}` : 'tt_budget_last_modified';
+        try {
+          localStorage.setItem(vKey, String(syncConflict.serverVersion));
+          localStorage.setItem(mKey, String(syncConflict.serverVersion));
+        } catch {}
+      }
+      setLastCloudSyncTime(new Date().toLocaleTimeString());
+      setSyncConflict(null);
+    } catch (err) {
+      logSync('CONFLICT_RESOLVE_ERROR', `Failed to restore cloud version: ${err.message}`, { error: err.message }, 'error');
+      throw err;
     }
-    setLastCloudSyncTime(new Date().toLocaleTimeString());
-    setSyncConflict(null);
-  }, [syncConflict, restoreFromBackup, setLastCloudSyncTime]);
+  }, [syncConflict, restoreFromBackup, setLastCloudSyncTime, currentUserId]);
 
   // Cloud Vault Pull Restore
   const pullCloudRestore = useCallback(async (passcode) => {
@@ -445,7 +482,7 @@ export function LedgerDataProvider({ children }) {
       method: 'GET',
       headers
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.success || !data.budget) {
       logSync('PULL_FAILED', `Cloud restore failed: ${data.error || res.statusText}`, { status: res.status }, 'error');
       throw new Error(data.error || 'Failed to restore data from Cloud Vault.');
@@ -1443,13 +1480,20 @@ export function LedgerDataProvider({ children }) {
                     type="button"
                     onClick={async () => {
                       try {
-                        await migrateLegacyBudgetToUser(pendingMigrationUserId);
-                        logSync('USER_MIGRATION', 'User confirmed legacy budget migration', { userId: pendingMigrationUserId });
+                        const migrated = await migrateLegacyBudgetToUser(pendingMigrationUserId);
+                        logSync('USER_MIGRATION', 'User confirmed legacy budget migration', { userId: pendingMigrationUserId, migrated });
+                        if (migrated) {
+                          const refreshed = await getBudgetData(pendingMigrationUserId);
+                          if (refreshed && typeof refreshed === 'object') {
+                            await restoreFromBackup(refreshed);
+                          }
+                        }
                       } catch (err) {
                         console.warn('Legacy budget migration failed:', err?.message || err);
+                      } finally {
+                        setShowMigrationConfirm(false);
+                        setPendingMigrationUserId(null);
                       }
-                      setShowMigrationConfirm(false);
-                      setPendingMigrationUserId(null);
                     }}
                     className="px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold transition-all shadow-md cursor-pointer"
                   >

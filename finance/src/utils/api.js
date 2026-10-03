@@ -1,5 +1,6 @@
 import { logSync } from './logger.js';
 import { ERROR_CODES } from './errorCodes.js';
+import { getCurrentUserId } from './indexedDB.js';
 
 /**
  * Resolves an API endpoint path relative to the current subpath context.
@@ -267,7 +268,7 @@ export async function pushCloudBackupOptimistic(passcode, budgetData, options = 
     const data = await res.json().catch(() => ({}));
 
     if (res.ok && data.success) {
-      clearPendingSync();
+      clearPendingSync(userId);
       logSync('PUSH_SUCCESS', 'Cloud backup successfully stored in Cloudflare D1 database', {
         status: res.status,
         timestamp: data.timestamp,
@@ -320,10 +321,13 @@ export async function pushCloudBackupOptimistic(passcode, budgetData, options = 
 
 /**
  * Retries flushing any pending payload in the queue to Cloudflare.
+ * @param {string} [passcode]
+ * @param {string|null} [userId]
  * @returns {Promise<boolean>}
  */
-export async function flushPendingCloudSync(passcode) {
-  const pending = getPendingSync();
+export async function flushPendingCloudSync(passcode, userId = null) {
+  const effectiveUserId = userId || (typeof getCurrentUserId === 'function' ? getCurrentUserId() : null);
+  const pending = getPendingSync(effectiveUserId);
   if (!pending || !pending.payload) return false;
 
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
@@ -342,7 +346,8 @@ export async function flushPendingCloudSync(passcode) {
       headers['X-Sync-Passcode'] = passcode;
     }
 
-    const savedVerStr = typeof localStorage !== 'undefined' ? localStorage.getItem('tt_budget_cloud_version') : null;
+    const vKey = effectiveUserId ? `tt_budget_cloud_version:${effectiveUserId}` : 'tt_budget_cloud_version';
+    const savedVerStr = typeof localStorage !== 'undefined' ? localStorage.getItem(vKey) : null;
     const bodyObj = { budget: pending.payload };
     if (savedVerStr) {
       bodyObj.baseVersion = parseInt(savedVerStr, 10);
@@ -358,9 +363,9 @@ export async function flushPendingCloudSync(passcode) {
 
     const data = await res.json().catch(() => ({}));
     if (res.ok && data.success) {
-      clearPendingSync();
+      clearPendingSync(effectiveUserId);
       if (typeof localStorage !== 'undefined' && data.version) {
-        localStorage.setItem('tt_budget_cloud_version', String(data.version));
+        localStorage.setItem(vKey, String(data.version));
       }
       logSync('FLUSH_SUCCESS', 'Offline sync queue successfully flushed to cloud', { timestamp: data.timestamp });
       return true;

@@ -189,6 +189,32 @@ export function BudgetMetadataProvider({ children }) {
     catch { /* ignore */ }
   }, [selectedPersonId]);
 
+  // Handle user logout and clear stale metadata state
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleLogout = () => {
+      setMetadataState({
+        schemaVersion: CURRENT_BUDGET_SCHEMA_VERSION,
+        accounts: initialBudgetData.accounts || [],
+        people: initialBudgetData.people || [],
+        bills: initialBudgetData.bills || [],
+        loans: initialBudgetData.loans || [],
+        fundingGoals: initialBudgetData.fundingGoals || [],
+        dashboardWidgets: initialBudgetData.dashboardWidgets || DEFAULT_DASHBOARD_WIDGETS,
+        theme: initialBudgetData.theme || 'dark',
+        hideDashboardHeader: Boolean(initialBudgetData.hideDashboardHeader)
+      });
+      setInitialLedgerSeed({
+        dailyMatrix: initialBudgetData.dailyMatrix || {},
+        lineItems: initialBudgetData.lineItems || [],
+        transactions: initialBudgetData.transactions || []
+      });
+      setSaveError(null);
+    };
+    window.addEventListener('techtrek:user-logout', handleLogout);
+    return () => window.removeEventListener('techtrek:user-logout', handleLogout);
+  }, []);
+
   // Load initial data from IndexedDB or legacy localStorage
   useEffect(() => {
     async function initLocalStorageOrIndexedDB() {
@@ -199,7 +225,10 @@ export function BudgetMetadataProvider({ children }) {
         if (storedRaw && typeof storedRaw === 'object') {
           const { budget: stored, wasMigrated } = runBudgetMigrations(storedRaw);
           if (wasMigrated) {
-            saveBudgetData(stored, userId).catch(() => {});
+            saveBudgetData(stored, userId).catch(err => {
+              console.warn('Migration save failed:', err);
+              setSaveError('Migration save failed.');
+            });
           }
 
           setMetadataState({
@@ -281,17 +310,36 @@ export function BudgetMetadataProvider({ children }) {
               });
               localStorage.removeItem(STORAGE_KEY);
             }
+          } else {
+            // Fresh state for unauthenticated or unmigrated user
+            setMetadataState({
+              schemaVersion: CURRENT_BUDGET_SCHEMA_VERSION,
+              accounts: initialBudgetData.accounts || [],
+              people: initialBudgetData.people || [],
+              bills: initialBudgetData.bills || [],
+              loans: initialBudgetData.loans || [],
+              fundingGoals: initialBudgetData.fundingGoals || [],
+              dashboardWidgets: initialBudgetData.dashboardWidgets || DEFAULT_DASHBOARD_WIDGETS,
+              theme: initialBudgetData.theme || 'dark',
+              hideDashboardHeader: Boolean(initialBudgetData.hideDashboardHeader)
+            });
+            setInitialLedgerSeed({
+              dailyMatrix: initialBudgetData.dailyMatrix || {},
+              lineItems: initialBudgetData.lineItems || [],
+              transactions: initialBudgetData.transactions || []
+            });
           }
         }
       } catch (err) {
         console.error('Failed to load metadata from IndexedDB:', err);
+        setSaveError('Failed to load budget metadata from local database.');
       } finally {
         setIsDbLoaded(true);
       }
     }
 
     initLocalStorageOrIndexedDB();
-  }, [user?.id]);
+  }, [user?.id, setSaveError]);
 
   // Auto Cloud Backup State & Control (Tier C6: explicit user consent, default false when unset)
   const [isAutoCloudBackupEnabled, setIsAutoCloudBackupEnabled] = useState(() => {
@@ -973,6 +1021,7 @@ export function BudgetMetadataProvider({ children }) {
     deleteFundingGoal,
     setFundingGoals,
     toggleAutoCloudBackup,
+    toggleSyncOnLoad,
     setDebugMode,
     toggleCategory,
     enableAllCategories,

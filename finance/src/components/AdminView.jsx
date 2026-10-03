@@ -77,10 +77,10 @@ export function AdminView() {
     setUpdatingUserId(targetUser.id);
     setActionError(null);
     try {
-      const res = await apiFetch(`/api/admin/user/${targetUser.id}/status`, {
+      const res = await apiFetch('/api/admin/user-status', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: nextStatus })
+        body: JSON.stringify({ userId: targetUser.id, status: nextStatus })
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {

@@ -1,6 +1,7 @@
 // @ts-nocheck
 import React, { useState, useEffect, useCallback } from 'react';
 import { useBudgetMetadata, useLedgerDataState } from '../../../context/BudgetContext';
+import { useAuth } from '../../../context/AuthContext';
 import { 
   Activity, 
   Wifi, 
@@ -12,26 +13,27 @@ import {
   AlertTriangle, 
   Terminal, 
   Layers, 
-  ArrowRight,
-  Loader2,
-  Check
+  ArrowRight, 
+  Loader2, 
+  Check 
 } from 'lucide-react';
 import { getPendingSync, clearPendingSync, flushPendingCloudSync } from '../../../utils/api';
 import { logSync } from '../../../utils/logger';
 
 export function SyncQueueSubPanel() {
+  const { currentUserId } = useAuth();
   const { lastCloudSyncTime, setSettingsTab } = useBudgetMetadata();
   const { syncPasscode } = useLedgerDataState();
 
   const [isOnline, setIsOnline] = useState(() => (typeof navigator !== 'undefined' ? navigator.onLine : true));
-  const [pendingSync, setPendingSync] = useState(() => getPendingSync());
+  const [pendingSync, setPendingSync] = useState(() => getPendingSync(currentUserId));
   const [isFlushing, setIsFlushing] = useState(false);
   const [actionStatus, setActionStatus] = useState(null);
   const [confirmPurge, setConfirmPurge] = useState(false);
 
   const refreshQueue = useCallback(() => {
-    setPendingSync(getPendingSync());
-  }, []);
+    setPendingSync(getPendingSync(currentUserId));
+  }, [currentUserId]);
 
   // Listen to network status changes
   useEffect(() => {
@@ -59,7 +61,7 @@ export function SyncQueueSubPanel() {
 
     try {
       logSync('MANUAL_FLUSH_TRIGGER', 'User triggered manual flush of pending sync queue');
-      const success = await flushPendingCloudSync(syncPasscode);
+      const success = await flushPendingCloudSync(syncPasscode, currentUserId);
       refreshQueue();
       if (success) {
         setActionStatus({ type: 'success', message: 'Pending sync queue successfully flushed to Cloudflare D1!' });
@@ -74,7 +76,7 @@ export function SyncQueueSubPanel() {
   };
 
   const handlePurgeQueue = () => {
-    clearPendingSync();
+    clearPendingSync(currentUserId);
     refreshQueue();
     setConfirmPurge(false);
     setActionStatus({ type: 'info', message: 'Offline sync queue has been purged.' });

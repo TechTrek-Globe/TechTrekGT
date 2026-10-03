@@ -41,6 +41,12 @@
   --wayfinder-glow:   rgba(56, 189, 248, 0.35);
   --wayfinder-border: rgba(56, 189, 248, 0.3);
 
+  /* Bourbon - rich amber gold */
+  --bourbon-500:      #c97320;
+  --bourbon-400:      #e8b85c;
+  --bourbon-glow:     rgba(201, 115, 32, 0.35);
+  --bourbon-border:   rgba(232, 184, 92, 0.35);
+
   /* Neutrals */
   --text-primary:   #f1f5f9;
   --text-secondary: #94a3b8;
@@ -329,6 +335,14 @@ body {
   box-shadow: 0 20px 60px rgba(56, 189, 248, 0.18), 0 1px 0 rgba(255,255,255,0.05) inset;
 }
 
+.card--bourbon {
+  --card-mouse-color: rgba(201, 115, 32, 0.14);
+}
+.card--bourbon:hover {
+  border-color: var(--bourbon-border);
+  box-shadow: 0 20px 60px rgba(201, 115, 32, 0.22), 0 1px 0 rgba(255,255,255,0.05) inset;
+}
+
 /* Card link - fills entire card */
 .card-link {
   display: flex;
@@ -390,6 +404,9 @@ body {
 .card-glow--wayfinder {
   background: radial-gradient(ellipse at 50% 80%, rgba(56, 189, 248, 0.2) 0%, transparent 65%);
 }
+.card-glow--bourbon {
+  background: radial-gradient(ellipse at 50% 80%, rgba(201, 115, 32, 0.25) 0%, transparent 65%);
+}
 
 /* ---------- CARD BODY ---------- */
 .card-body {
@@ -430,6 +447,11 @@ body {
   background: rgba(56, 189, 248, 0.15);
   color: var(--wayfinder-400);
   border: 1px solid rgba(56, 189, 248, 0.25);
+}
+.card-tag--bourbon {
+  background: rgba(201, 115, 32, 0.18);
+  color: var(--bourbon-400);
+  border: 1px solid rgba(201, 115, 32, 0.3);
 }
 
 .card-title {
@@ -541,6 +563,18 @@ body {
 .site-card:hover .cta-btn--wayfinder {
   transform: translateX(3px);
   box-shadow: 0 6px 28px rgba(56,189,248,0.45);
+}
+
+.cta-btn--bourbon {
+  background: linear-gradient(135deg, rgba(201,115,32,0.9) 0%, rgba(133,67,23,0.95) 100%);
+  color: #fff;
+  box-shadow: 0 4px 20px rgba(201,115,32,0.35);
+  border: 1px solid rgba(232,184,92,0.45);
+}
+.cta-btn--bourbon:hover,
+.site-card:hover .cta-btn--bourbon {
+  transform: translateX(3px);
+  box-shadow: 0 6px 28px rgba(201,115,32,0.5);
 }
 
 .cta-btn svg {

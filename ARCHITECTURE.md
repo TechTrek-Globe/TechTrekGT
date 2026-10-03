@@ -14,6 +14,7 @@ TechTrekGT is a multi-application platform hosted on `techtrekgt.com`. The repos
 | `vinescout/`| Amazon Vine analytics & ETV tax tracker | `techtrekgt.com/vinescout/*` | React 19 + Vite + Cloudflare Workers |
 | `wayfinder/` | Poland Christmas 2026 travel guide | `techtrekgt.com/wayfinder/*` | React 19 + Vite + Cloudflare Workers |
 | `bigworm/` | Secure remote desktop portal (Guacamole) | `bigworm.techtrekgt.com` *(sub-domain)* | React 19 + Vite + Cloudflare Workers |
+| `bourbon/` | Sprig Bourbon Sommelier & Unicorn Finder (Brown Water Society) | `techtrekgt.com/bourbon/*` | React 19 + Vite + Cloudflare Workers |
 
 ---
 

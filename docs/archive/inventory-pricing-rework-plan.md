@@ -1,4 +1,4 @@
-# Inventory & Pricing Tab Rework: Implementation Plan
+# [ARCHIVED] Inventory & Pricing Tab Rework: Implementation Plan
 
 Status: DRAFT, awaiting "Plan approved". No source code has been modified.
 

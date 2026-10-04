@@ -1,4 +1,4 @@
-# Core eBay Sell APIs Reference & Protocol Guide
+# [ARCHIVED] Core eBay Sell APIs Reference & Protocol Guide
 
 This document defines the official reference guide, endpoint architectures, primary functions, and capabilities for the Core eBay Sell APIs used across the TechTrekGT Outpost ecosystem.
 

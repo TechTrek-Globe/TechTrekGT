@@ -1,4 +1,4 @@
-# TechTrekGT Workspace Rule Compliance Audit Report
+# [ARCHIVED] TechTrekGT Workspace Rule Compliance Audit Report
 
 **Date:** 2026-08-23  
 **Audit Scope:** All sub-applications in `TechTrekGT` (`landing`, `finance`, `outpost`, `wayfinder`, `bigworm`)  

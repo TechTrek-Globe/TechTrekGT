@@ -1,4 +1,4 @@
-# VScout Dual-System Platform - Implementation Plan
+# [ARCHIVED] VScout Dual-System Platform - Implementation Plan
 
 ## Overview
 

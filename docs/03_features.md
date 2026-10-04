@@ -131,3 +131,18 @@ Every incoming request handled by a Worker generates a unique correlation identi
 ### 4.2 Structured Logging
 
 All Workers emit low-cardinality structured JSON log events for key lifecycle and security actions (e.g. auth.login.success, auth.login.invalid_credentials, auth.register.duplicate, sync.backup.success), enabling real-time filtering and analysis in Cloudflare Workers Logs.
+
+## 5. Universal Rule Enforcement and Distributed Documentation Suite
+
+### 5.1 Distributed Documentation System
+The platform replaces monolithic legacy documentation with a 4-tier standardized structure per app and at monorepo root:
+- docs/01_identity.md: App purpose, branding, domain boundaries, and tech stack.
+- docs/02_arch.md: Directory layout, component hierarchy, build/deploy pipelines, and worker integrations.
+- docs/03_features.md: Core capabilities, API contracts, error registries, and telemetry specifications.
+- docs/04_state.md: D1 SQLite schema, session state, JWT tokens, cookies, and local storage limits.
+
+### 5.2 Universal Agent Workflow Rules
+- Mandatory Pre-Flight Audit: Agents must read root docs/04_state.md and target app docs/04_state.md before touching any code.
+- Mandatory Post-Flight Synchronization: Agents must update local docs/03_features.md and docs/04_state.md upon completing modifications.
+- Forbidden Legacy File Directive: Searching, reading, or creating ARCHITECTURE.md is strictly forbidden. All architectural context lives in the 01-04 files.
+- Historical Quarantining: Historical incident reports reside in docs/archive/incidents/ with [RESOLVED] prefixes, and legacy implementation plans reside in docs/archive/ with [ARCHIVED] prefixes.

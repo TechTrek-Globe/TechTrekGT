@@ -1,4 +1,4 @@
-# Finance OS Authentication Diagnostic Report
+# [RESOLVED] Finance OS Authentication Diagnostic Report
 
 ## 1. Executive Summary
 

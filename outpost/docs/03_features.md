@@ -143,4 +143,27 @@ Audit and refactor of React context providers, hooks, and component lifecycles t
 6. **Resilient Dependent Views (`DashboardView`)**:
    - Initial data fetch failures replace empty $0.00 zero-value skeleton widgets with an explicit connection error state and a manual retry button.
 
+## Core eBay Sell APIs Reference & Protocol Matrix
 
+The Outpost and Landing ecosystems integrate with the Core 6 eBay Sell API families for real-time inventory management, order fulfillment, payout reconciliation, listing traffic telemetry, and ad campaign margin calculations.
+
+### 1. API Family Reference Matrix
+
+| API Area | Primary Function | Ingestion & Processing Scope | Primary Endpoints & Scopes |
+| :--- | :--- | :--- | :--- |
+| Inventory API | Listings and stock | Pull stock levels, manage inventory records (aspects, condition, images), push custom HTML templates, publish fixed-price or auction offers, sync local SKUs. | /sell/inventory/v1/inventory_item, /sell/inventory/v1/offer. Scopes: sell.inventory, sell.inventory.readonly |
+| Fulfillment API | Post-sale logistics | Ingest buyer shipping addresses, order lines, and payment statuses. Upload tracking numbers and fulfillments. Reconcile sold listings with Outpost sales records. | /sell/fulfillment/v1/order, /sell/fulfillment/v1/order/{id}/shipping_fulfillment. Scopes: sell.fulfillment, sell.fulfillment.readonly |
+| Finances API | Revenue and costs | Ingest fee breakdowns (Final Value Fees, fixed order fees, regulatory operating fees), fetch shipping label costs, reconcile payouts and dispute deductions against COGS. | /sell/finances/v1/transaction, /sell/finances/v1/payout. Scopes: sell.finances, sell.finances.readonly |
+| Analytics API | Performance metrics | Pull traffic reports (impressions, total views, click-through rates, conversion rates), monitor seller standards and customer service metrics. | /sell/analytics/v1/traffic_report, /sell/analytics/v1/customer_service_metric. Scope: sell.analytics.readonly |
+| Account API | Store foundation | Ingest seller fulfillment policies (shipping services, handling time), return policies, and payment preferences. | /sell/account/v1/fulfillment_policy, /sell/account/v1/return_policy, /sell/account/v1/payment_policy. Scopes: sell.account, sell.account.readonly |
+| Marketing API | Promoted listings | Query active Promoted Listings Standard ad rates and campaign IDs. Feed real-time ad fee rates into the Outpost Live Fee Engine to calculate net margins. | /sell/marketing/v1/ad_campaign, /sell/marketing/v1/ad_campaign/{id}/ad. Scopes: sell.marketing, sell.marketing.readonly |
+
+### 2. Analytics API Critical Query Constraints
+- Filter Nesting: The date_range MUST be passed inside the filter parameter: filter=marketplace_ids:{EBAY_US},listing_ids:{ID},date_range:[YYYYMMDD..YYYYMMDD].
+- Pacific Time and Lag: Query date boundaries strictly in Pacific Time (America/Los_Angeles) with a 1-day reporting lag (ending yesterday T-1). Queries referencing current or future dates trigger eBay error 50018.
+- Valid Metric Keys: Supported metric keys include LISTING_IMPRESSION_TOTAL, LISTING_IMPRESSION_SEARCH_RESULTS_PAGE, LISTING_VIEWS_TOTAL, CLICK_THROUGH_RATE, and SALES_CONVERSION_RATE.
+
+### 3. eBay API Protocol and Auth Resolution
+1. Prior to calling eBay Sell APIs, confirm the user token row in ebay_oauth_tokens contains the required scope.
+2. Ensure token refresh requests catch HTTP 429 and transient timeouts without purging valid credentials.
+3. On hard expiration (refreshExp < now) or explicit revocation, immediately clean dead credentials from D1 and set connected: false.

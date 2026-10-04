@@ -1,4 +1,4 @@
-# Incident Diagnosis - Deposit Display Regression and Related Defects
+# [RESOLVED] Incident Diagnosis - Deposit Display Regression and Related Defects
 
 > Branch: hotfix/deposits-and-integrity
 > Baseline: 259 tests pass, 0 fail (commit 498ecae9)

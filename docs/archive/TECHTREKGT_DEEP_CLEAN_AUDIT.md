@@ -1,4 +1,4 @@
-# TechTrekGT Ecosystem - Aggressive Deep-Clean Audit
+# [ARCHIVED] TechTrekGT Ecosystem - Aggressive Deep-Clean Audit
 
 > **Audit Date:** 2026-08-22
 > **Supersedes:** `TECHTREKGT_ORPHAN_AUDIT_PLAN.md` (prior conservative audit)

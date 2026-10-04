@@ -1,4 +1,4 @@
-# Incident Report: Deposit Display Regression & Comprehensive Integrity Remediation
+# [RESOLVED] Incident Report: Deposit Display Regression & Comprehensive Integrity Remediation
 
 > **Incident ID:** INC-2026-10-01-FINANCE  
 > **Status:** Remediation Complete & Verified (Tier A, Tier B, Tier C Reviewed)  

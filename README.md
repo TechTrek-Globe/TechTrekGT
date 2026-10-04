@@ -99,7 +99,8 @@ TechTrekGT/
   outpost/          - Auction Tracker (React 19 + Vite + Cloudflare Worker + D1)
   wayfinder/        - Poland Christmas 2026 travel guide (React 19 + Vite + Cloudflare Worker + D1)
   bigworm/          - Secure remote desktop portal (React 19 + Vite + Cloudflare Worker + Guacamole)
-  ARCHITECTURE.md   - Full system architecture reference
+  bourbon/          - Bourbon tracker (React 19 + Vite + Cloudflare Worker + D1)
+  docs/             - System documentation suite (01_identity.md, 02_arch.md, 03_features.md, 04_state.md)
 ```
 
 ### Shared Infrastructure

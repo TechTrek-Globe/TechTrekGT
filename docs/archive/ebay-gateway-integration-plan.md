@@ -1,4 +1,4 @@
-# eBay API Gateway Integration Plan - Outpost
+# [ARCHIVED] eBay API Gateway Integration Plan - Outpost
 
 **Repository:** TechTrekGT
 **Status:** DRAFT - Awaiting "Plan approved, proceed with implementation"

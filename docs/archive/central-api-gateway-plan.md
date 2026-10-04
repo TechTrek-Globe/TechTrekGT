@@ -1,4 +1,4 @@
-# Central API Gateway - Architecture & Implementation Plan
+# [ARCHIVED] Central API Gateway - Architecture & Implementation Plan
 
 **Repository:** TechTrekGT  
 **Status:** DRAFT - Awaiting approval  

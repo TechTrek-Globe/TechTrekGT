@@ -144,3 +144,21 @@ Set-Cookie: auth_token=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Strict
 ```
 
 This clears dead credentials from the user browser immediately, preventing continuous unauthorized background polling.
+
+## 5. Architectural Documentation Governance and Purge State
+
+### 5.1 Legacy Architecture Purge Record
+All legacy ARCHITECTURE.md files across the monorepo root and all sub-application directories have been permanently deleted. Generation, search, or reliance on ARCHITECTURE.md is strictly forbidden across the codebase.
+
+### 5.2 Historical Artifact Quarantine
+- Incident Archive (docs/archive/incidents/): Contains all resolved historical incident analyses and diagnostic reports with [RESOLVED] headers.
+- Document Archive (docs/archive/): Contains legacy implementation plans, compliance audits, and reference guides with [ARCHIVED] headers.
+
+### 5.3 Authoritative Distributed Documentation Standard
+The distributed 01-04 documentation suite is the sole architectural and state source of truth across the platform:
+- docs/01_identity.md: Application scope, tech stack, and role boundaries.
+- docs/02_arch.md: Architecture, folder structure, routing, and data flow.
+- docs/03_features.md: Implemented features, API endpoints, and user capabilities.
+- docs/04_state.md: Database schema, runtime parameters, auth sessions, and state management.
+
+Every agent MUST inspect root docs/04_state.md and the target app's docs/04_state.md before editing code, and MUST update docs/03_features.md and docs/04_state.md upon task completion.

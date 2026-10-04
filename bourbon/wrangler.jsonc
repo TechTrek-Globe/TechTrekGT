@@ -22,5 +22,12 @@
       "pattern": "techtrekgt.com/bourbon/*",
       "zone_name": "techtrekgt.com"
     }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "personal-budget-db",
+      "database_id": "10f220d4-1c10-49e9-b63e-5d4cb08d599f"
+    }
   ]
 }

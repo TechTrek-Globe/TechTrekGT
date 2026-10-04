@@ -2,13 +2,13 @@
 
 ## 1. Overview
 
-TechTrekGT is a multi-application platform hosted on `techtrekgt.com`. The repository is a collection of five self-contained projects, each deployed independently as a Cloudflare Worker, sharing a common D1 SQLite database and a single sign-on (SSO) JWT secret. There is no root-level workspace manifest; each project manages its own dependencies, build, and deployment.
+TechTrekGT is a multi-application platform hosted on `techtrekgt.com`. The repository is a collection of seven self-contained projects, each deployed independently as a Cloudflare Worker, sharing a single sign-on (SSO) JWT secret. The ecosystem uses strictly isolated monorepo packages without a shared node_modules directory: each project manages its own dependencies, build lifecycle, and deployment configurations independently.
 
-**`landing/` is the primary domain root.** It serves `techtrekgt.com` directly as a static Cloudflare Worker. All other apps are independently deployed Workers mounted at sub-paths or sub-domains and are linked from the landing hub.
+`landing/` is the primary domain root. It serves `techtrekgt.com` directly as a Cloudflare Worker with static asset bindings. It also hosts the central API gateway worker, which routes shared `/api/*` endpoints for external integrations. All other apps are independently deployed Workers mounted at sub-paths or sub-domains and are linked from the landing hub.
 
 | Project | Purpose | Route | Stack |
 |---------|---------|-------|-------|
-| `landing/` | **Primary domain root** - platform hub / marketing page | `techtrekgt.com` *(Main Site)* | Static HTML/CSS/JS |
+| `landing/` | Primary domain root: platform hub, marketing page, and central API gateway | `techtrekgt.com` *(Main Site)* | Static HTML/CSS/JS + Gateway Worker |
 | `finance/` | Personal budget tracker | `techtrekgt.com/finance/*` | React 19 + Vite + Cloudflare Workers |
 | `outpost/` | Resale / auction operations tracker | `techtrekgt.com/outpost/*` | React 19 + Vite + Cloudflare Workers |
 | `vinescout/`| Amazon Vine analytics & ETV tax tracker | `techtrekgt.com/vinescout/*` | React 19 + Vite + Cloudflare Workers |
@@ -38,7 +38,7 @@ TechTrekGT is a multi-application platform hosted on `techtrekgt.com`. The repos
 | Layer | Technology | Notes |
 |-------|-----------|-------|
 | Runtime | Cloudflare Workers (ESM) | Each app ships a `src/worker.js` entry point |
-| Database | Cloudflare D1 (SQLite) | Single shared database: `personal-budget-db` |
+| Database | Cloudflare D1 (SQLite) | Shared database for finance, outpost, vinescout, wayfinder, bigworm: `personal-budget-db` (bourbon binds DB for platform alignment but relies on Google Sheet CSV feed with worker cache) |
 | Auth | Custom JWT (HS256) + PBKDF2-SHA256 | WebCrypto-based, 600k iterations |
 | Sessions | HttpOnly cookies | `credentials: 'include'` on all fetch calls |
 | Deploy | Wrangler 3/4 | `wrangler.jsonc` per project |
@@ -51,12 +51,12 @@ TechTrekGT is a multi-application platform hosted on `techtrekgt.com`. The repos
 |-------|-----------|-------|
 | Frontend | Static HTML5 + CSS3 + vanilla JS | No framework, no build step |
 | Styling | Hand-written CSS with custom properties | Dark space theme with amber accents |
-| **Gateway Worker** | **Cloudflare Workers ESM** | **`src/worker.js` - programmatic Worker entry point; routes `/api/*` before falling back to static ASSETS** |
+| Gateway Worker | Cloudflare Workers ESM | `src/worker.js`: programmatic Worker entry point; routes `/api/*` before falling back to static ASSETS |
 | Deployment | Cloudflare Workers + static assets | `run_worker_first: true`; gateway intercepts API routes, ASSETS serves HTML/CSS/JS |
 
 ### 2.4 External API Integrations, Lookup Services & Dual Verification Standard
 
-> **Central API Gateway (Phase 1 active):** External third-party API calls for eBay and Amazon have been migrated out of `outpost/` and into the `landing/` Central API Gateway (`src/gateway/`). All gateway endpoints require the shared SSO JWT cookie. Sub-apps call the gateway via absolute URL (`https://techtrekgt.com/api/...`) with `credentials: 'include'`.
+> Central API Gateway and Runtime Dependency: External third-party API calls for eBay and Amazon have been migrated out of `outpost/` and into the `landing/` Central API Gateway (`src/gateway/`). All gateway endpoints require the shared SSO JWT cookie. Sub-apps call the gateway via absolute URL (`https://techtrekgt.com/api/...`) with `credentials: 'include'`. Sub-applications have a strict runtime dependency on the Landing Hub worker (`techtrek-landing`) for centralized API proxy routing: un-prefixed `/api/*` requests hit the Landing Gateway directly via Cloudflare route matching (`techtrekgt.com/*`). Application-specific endpoints not registered in the Landing Gateway must be scoped under their application sub-path (such as `/bourbon/api/*` or `/finance/api/*`) to avoid 404 routing errors.
 
 | Service | Gateway / App | Endpoint | Purpose |
 |---------|-------------|----------|---------|
@@ -139,7 +139,11 @@ TechTrekGT is a multi-application platform hosted on `techtrekgt.com`. The repos
 
 ## 3. Directory Structure
 
-### 3.1 Cross-Cutting Project Layout
+### 3.1 Isolated Monorepo Package Architecture
+
+The TechTrekGT repository operates as a collection of strictly isolated monorepo packages. There is no root-level package.json, no shared node_modules directory, and no workspace orchestration tooling (such as npm, yarn, or pnpm workspaces). Each application directory (landing, finance, outpost, vinescout, wayfinder, bigworm, bourbon) functions as an autonomous project containing its own package.json (where applicable), maintaining its own isolated node_modules directory, and defining its own build, lint, and deployment commands. Developers and automated scripts must navigate into the specific project directory before executing npm or wrangler tasks.
+
+### 3.2 Cross-Cutting Project Layout
 
 Every React project follows the same structural convention:
 
@@ -167,7 +171,7 @@ Every React project follows the same structural convention:
     └── utils/                    # auth.js (JWT/PBKDF2), rateLimit.js, guards
 ```
 
-### 3.2 Project-Specific Additions
+### 3.3 Project-Specific Additions
 
 | Project | Unique Directories | Notes |
 |---------|-------------------|-------|
@@ -176,6 +180,7 @@ Every React project follows the same structural convention:
 | `wayfinder/` | `src/components/city/`, `src/data/`, `src/hooks/`, `functions/api/wayfinder/` | 10 city tab sub-components, `data/poland-2026.js` static dataset, `hooks/useExchangeRate.js`, D1 wayfinder APIs |
 | `outpost/` | `functions/api/` (largest) | invoices, items, sales, platforms, comps, reports, sync, import |
 | `bigworm/` | `guacamole-config/` | `guacamole.properties`, `user-mapping.xml` for Docker Guacamole |
+| `bourbon/` | `src/screens/`, `src/data/`, `src/components/`, `src/context/` | Sprig Bourbon Sommelier & Unicorn Finder; Google Sheet CSV feed with worker cache fallback and static catalog seed; standalone React 19 SPA |
 
 ---
 
@@ -249,6 +254,7 @@ Request -> URL normalization -> OPTIONS preflight -> API route matching -> SPA f
 - `outpost/src/worker.js`: same pattern with subpath static asset support plus case-insensitive redirect of `/Outpost` and `/auction` to lowercase `/outpost`.
 - `wayfinder/src/worker.js`: routes `/api/auth/*` and `/api/wayfinder/*` (journeys, itinerary, documents, import-jobs, budget, exchange-rate).
 - `bigworm/src/worker.js`: routes `/api/auth/*`, exchanges JWT for a Guacamole token at `/api/guac-token`, and reverse-proxies `/tunnel/*` to Guacamole after JWT validation.
+- `bourbon/src/worker.js`: strips `/bourbon` prefix, routes `/api/health` and `/api/bourbon/data` (CSV proxy with 5-minute Cloudflare Cache API caching), and falls back to `dist/client` SPA assets.
 
 ### 4.3 API URL Resolution
 
@@ -263,6 +269,15 @@ export function getApiUrl(endpoint) {
   return cleanEndpoint;
 }
 ```
+
+### 4.4 Centralized Gateway Proxy Routing Dependency
+
+The TechTrekGT platform relies on a strict runtime dependency on the Landing Hub worker (`techtrek-landing`) for centralized API proxy routing:
+
+1. Apex and Wildcard Ingress: The Landing Hub worker is bound to both `techtrekgt.com` and `techtrekgt.com/*` in `landing/wrangler.jsonc`.
+2. Cloudflare Route Resolution: Under Cloudflare Workers route matching rules, sub-application workers intercept traffic only when incoming URLs match their specific sub-path patterns (such as `techtrekgt.com/bourbon/*` or `techtrekgt.com/finance/*`).
+3. Central Gateway Role: Requests directed to root-level `/api/*` endpoints bypass sub-application workers entirely and resolve to the Landing Gateway worker. The Landing worker centralizes third-party proxy integrations, including eBay REST services and Amazon scraping proxies.
+4. Routing Isolation Constraint: If a sub-application attempts to dispatch an API call to an un-prefixed `/api/*` path that is not explicitly registered in `landing/src/worker.js`, the Landing Gateway intercepts the request and responds with HTTP 404 (`Gateway endpoint not found`). Sub-applications must explicitly scope internal worker endpoints under their designated sub-path (for example, `/bourbon/api/bourbon/data`) to prevent unintended interception by the Landing Gateway.
 
 ---
 
@@ -586,18 +601,21 @@ To eliminate floating-point currency representation anomalies across financial c
 
 ## 8. Database Architecture
 
-### 8.1 Shared D1 Database
+### 8.1 Shared D1 Database Scope and Bourbon Ingestion Model
 
-All apps (finance, outpost, wayfinder, bigworm) point at the same `personal-budget-db` D1 database:
+Applications requiring relational persistence and user authentication (finance, outpost, vinescout, wayfinder, bigworm) bind the shared `personal-budget-db` D1 database:
 
 ```json
-// wrangler.jsonc (all apps)
+// wrangler.jsonc (finance, outpost, vinescout, wayfinder, bigworm, bourbon)
 "d1_databases": [{
   "binding": "DB",
   "database_name": "personal-budget-db",
   "database_id": "10f220d4-1c10-49e9-b63e-5d4cb08d599f"
 }]
 ```
+
+Bourbon Data Architecture Clarification:
+While `bourbon/wrangler.jsonc` binds `personal-budget-db` (`env.DB`) for platform alignment and potential future integration, Bourbon does not store or read catalog data from D1 SQLite. Bourbon ingests catalog data directly from the Sprig Google Sheet via gviz CSV export, with edge caching in `bourbon/src/worker.js` via the Cloudflare Cache API (`caches.default`, 300-second TTL) at `/bourbon/api/bourbon/data`, and a static fallback to `catalogSeed.json`. Bourbon executes no SQL queries and maintains no tables in D1.
 
 ### 8.2 Schema Ownership
 
@@ -607,6 +625,7 @@ All apps (finance, outpost, wayfinder, bigworm) point at the same `personal-budg
 | `outpost/auction-schema.sql` | outpost | invoices, items, sales, platforms, comps, `market_comps`, supplies, `listing_traffic`, `auction_item_analytics`, `outpost_sync_settings`, `api_integrations`, `email_verifications` |
 | `vinescout/vinescout-schema.sql` | vinescout | `vine_items`, `vine_orders`, `vine_tax_settings`, `vine_asin_cache` |
 | `wayfinder/schema-wayfinder.sql` | wayfinder | journeys, itinerary items, documents, import jobs, budgets |
+| (none) | bourbon | No D1 tables: uses Google Sheet CSV feed with edge caching and static catalog seed |
 
 ### 8.3 Key Design Points
 
@@ -685,6 +704,7 @@ The decision to run all four apps against a single Cloudflare D1 (SQLite) instan
 | vinescout | `techtrekgt.com/vinescout` + `techtrekgt.com/vinescout/*` | `techtrek-vinescout` |
 | wayfinder | `techtrekgt.com/wayfinder` + `techtrekgt.com/wayfinder/*` | `techtrek-wayfinder` |
 | bigworm | `bigworm.techtrekgt.com` (custom domain) | `techtrek-bigworm` |
+| bourbon | `techtrekgt.com/bourbon` + `techtrekgt.com/bourbon/*` | `techtrek-bourbon` |
 
 ### 9.2 Deployment Scripts
 
@@ -879,6 +899,7 @@ Each project reads local secrets from a `.dev.vars` file (git-ignored) that is l
    | `wayfinder/` | `npm run dev` | `http://localhost:5174` |
    | `vinescout/` | `npm run dev` | `http://localhost:5175` |
    | `bigworm/` | `npm run dev` | `http://localhost:5173` |
+   | `bourbon/` | `npm run dev` | `http://localhost:5176` |
 
 2. **Local database**: `wrangler d1 execute personal-budget-db --local` (or `npm run db:migrate:local` in outpost).
 3. **Production deploy**: `npm run deploy` (build + wrangler deploy). Landing uses `wrangler deploy` directly.
@@ -894,4 +915,4 @@ Each project reads local secrets from a `.dev.vars` file (git-ignored) that is l
 - **No state library**: React Context + hooks only.
 - **Deployment**: Cloudflare Workers + D1 + static assets via Wrangler.
 - **API convention**: Pages-Functions-style `onRequest{Verb}` handlers in `functions/api/`.
-- **Auth convention**: shared JWT secret + HttpOnly cookie sessions across all four apps.
+- Auth convention: shared JWT secret + HttpOnly cookie sessions across ecosystem apps.

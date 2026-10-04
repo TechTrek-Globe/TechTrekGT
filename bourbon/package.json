@@ -12,18 +12,17 @@
   },
   "dependencies": {
     "lucide-react": "^1.50.0",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react": "19.0.0",
+    "react-dom": "19.0.0"
   },
   "devDependencies": {
-    "@tailwindcss/vite": "^4.3.3",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
-    "@vitejs/plugin-react": "^6.1.1",
+    "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.6.1",
     "oxlint": "^1.81.0",
-    "tailwindcss": "3.4",
-    "vite": "^8.3.0",
+    "tailwindcss": "3.4.17",
+    "vite": "6.0.7",
     "wrangler": "^4.20.0"
   }
 }

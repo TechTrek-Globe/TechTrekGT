@@ -1,7 +1,7 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
 import { computeItemProration, computePricingFloors, validateNonNegativeMoney } from '../../utils/auction.js';
 import { generateSku, generateUniqueSku } from '../utils/sku.js';
-import { CHUNK_SIZE } from '../../utils/constants.js';
+import { CHUNK_SIZE, DEFAULT_TARGET_MARGIN_PCT } from '../../utils/constants.js';
 
 // ============================================================
 // GET /api/invoices  - list all invoices for authenticated user
@@ -140,7 +140,7 @@ export async function onRequestPost(context) {
 
       const boostPct        = it.boost_pct || 0;
       const estShipping     = it.est_shipping_cost || 0;
-      const targetMarginPct = it.target_margin_pct || 0;
+      const targetMarginPct = it.target_margin_pct ?? DEFAULT_TARGET_MARGIN_PCT;
 
       const pricing = computePricingFloors({
         true_total_cost:  proration.true_total_cost,

@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS auction_items (
   suggested_list_price  REAL NOT NULL DEFAULT 0.0,
   current_list_price    REAL,
   actual_sell_price     REAL,
-  target_margin_pct     REAL NOT NULL DEFAULT 0.0,
+  target_margin_pct     REAL NOT NULL DEFAULT 0.15,
 
   date_acquired         TEXT,
   date_listed           TEXT,

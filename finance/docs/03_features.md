@@ -23,6 +23,7 @@ All serverless API routes execute in Cloudflare Workers ESM format (`src/worker.
 | `/api/verify-sync-code` | POST | Yes (CSRF) | Constant-time validation of cloud vault passcode |
 | `/api/auth/register` | POST | No | User registration with Turnstile verification and compensating rollback |
 | `/api/auth/login` | POST | No | User login with Turnstile verification and transparent password rehashing |
+| `/api/auth/turnstile-config` | GET | No | Returns Turnstile active state and public site key |
 | `/api/auth/me` | GET | Yes | Restores user session state without cookie clobbering |
 | `/api/auth/refresh` | POST | Yes (CSRF) | Renews access tokens within the existing session expiration window |
 | `/api/auth/logout` | POST | No | Revokes sessions by bumping `token_version` and clearing cookies |
@@ -74,4 +75,5 @@ All serverless API routes execute in Cloudflare Workers ESM format (`src/worker.
 - **Guaranteed Loading State Resets:** Wrapped all asynchronous UI mutations across the application (email verification, code resend, disk cache flush, matrix cleanup, standard goal restore, admin user status toggle) in `try ... finally` blocks, guaranteeing that loading spinners and disabled button states resolve even if network requests fail or return non-200 responses.
 - **Backend Route Synchronization:** Aligned administrative status modification calls in `AdminView` with Cloudflare Worker routing (`POST /api/admin/user-status`), eliminating 404 URL route drift and ensuring instant UI feedback upon status updates.
 - **Ownership Verification Return Typing (WP-01):** Updated JSDoc return signature in `pushCloudBackupOptimistic` (`src/utils/api.js`) to document `ownershipConflict?: boolean`, eliminating TS2353 build errors and ensuring full type consistency with `tsc -p jsconfig.json`.
+- **Cloudflare Turnstile Full-Stack Integration (WP-02):** Implemented `GET /api/auth/turnstile-config` endpoint and `TurnstileWidget` component in `AuthModal.jsx` and `AuthPage.jsx`. Authentication contexts dynamically query Turnstile configuration and transmit client-solved `turnstileToken` to `/api/auth/login` and `/api/auth/register`, eliminating bot challenge lockout when `TURNSTILE_SECRET_KEY` is configured in production.
 

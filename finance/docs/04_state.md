@@ -99,4 +99,5 @@ Authentication states strictly reflect backend database authority and maintain z
 
 ## 9. Automated Verification & Typecheck Governance
 - **Zero-Error Typecheck Validation (WP-01):** `npm run typecheck` (`tsc -p jsconfig.json`) passes cleanly with zero errors. The JSDoc signature for `pushCloudBackupOptimistic` in `src/utils/api.js` explicitly includes `ownershipConflict?: boolean` to maintain type safety across ownership verification branches.
+- **Turnstile Bot Verification Active Integration (WP-02):** Full-stack Cloudflare Turnstile token integration is active. `GET /api/auth/turnstile-config` dynamically delivers configuration to `AuthContext`, and `TurnstileWidget` mounts in `AuthModal` and `AuthPage` to transmit user verification tokens during login and registration, preventing lockout when `TURNSTILE_SECRET_KEY` is configured.
 

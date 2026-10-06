@@ -1,5 +1,6 @@
 import { onRequestPost as registerHandler } from '../functions/api/auth/register.js';
 import { onRequestPost as loginHandler } from '../functions/api/auth/login.js';
+import { onRequestGet as turnstileConfigHandler } from '../functions/api/auth/turnstile-config.js';
 import { onRequestGet as meHandler } from '../functions/api/auth/me.js';
 import { onRequestPost as logoutHandler } from '../functions/api/auth/logout.js';
 import { onRequestPost as forgotPasswordHandler } from '../functions/api/auth/forgot-password.js';
@@ -893,6 +894,7 @@ const ROUTES = {
   'POST /api/sync/restore-version': handleSyncRestoreVersion,
   'POST /api/auth/register': registerHandler,
   'POST /api/auth/login': loginHandler,
+  'GET /api/auth/turnstile-config': turnstileConfigHandler,
   'POST /api/auth/forgot-password': forgotPasswordHandler,
   'POST /api/auth/reset-password': resetPasswordHandler,
   'GET /api/auth/security-question': securityQuestionHandler,

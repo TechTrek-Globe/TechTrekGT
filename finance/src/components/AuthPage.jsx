@@ -17,6 +17,7 @@ import {
   ChevronLeft
 } from 'lucide-react';
 import headerLogoDark from '../assets/header-logo-dark.png';
+import { TurnstileWidget } from './TurnstileWidget';
 
 export const PRESET_SECURITY_QUESTIONS = [
   "What was the name of your first pet?",
@@ -33,11 +34,13 @@ export function AuthPage({ onNavigateHome, onAuthSuccess }) {
     register, 
     getSecurityQuestion, 
     forgotPassword, 
-    resetPassword 
+    resetPassword,
+    turnstileConfig 
   } = useAuth();
   
   // mode: 'signin' | 'register' | 'forgot' | 'reset'
   const [mode, setMode] = useState('signin');
+  const [turnstileToken, setTurnstileToken] = useState('');
   
   // Form fields
   const [name, setName] = useState('');
@@ -83,6 +86,7 @@ export function AuthPage({ onNavigateHome, onAuthSuccess }) {
     setInfoMessage('');
     setResetToken('');
     setSecurityAnswer('');
+    setTurnstileToken('');
   };
 
   const handleSubmit = async (e) => {
@@ -98,7 +102,7 @@ export function AuthPage({ onNavigateHome, onAuthSuccess }) {
           setIsSubmitting(false);
           return;
         }
-        await register(name, email, password, securityQuestion, securityAnswer, rememberMe);
+        await register(name, email, password, securityQuestion, securityAnswer, rememberMe, turnstileToken);
         if (rememberMe && email) {
           try { localStorage.setItem('techtrek_saved_email', email); } catch (e) {}
         } else {
@@ -106,7 +110,7 @@ export function AuthPage({ onNavigateHome, onAuthSuccess }) {
         }
         if (onAuthSuccess) onAuthSuccess();
       } else if (mode === 'signin') {
-        await login(email, password, rememberMe);
+        await login(email, password, rememberMe, turnstileToken);
         if (rememberMe && email) {
           try { localStorage.setItem('techtrek_saved_email', email); } catch (e) {}
         } else {
@@ -461,6 +465,14 @@ export function AuthPage({ onNavigateHome, onAuthSuccess }) {
                         Remember me on this browser
                       </label>
                     </div>
+                  )}
+
+                  {turnstileConfig?.enabled && turnstileConfig?.siteKey && (mode === 'signin' || mode === 'register') && (
+                    <TurnstileWidget
+                      siteKey={turnstileConfig.siteKey}
+                      onVerify={(token) => setTurnstileToken(token)}
+                      onExpire={() => setTurnstileToken('')}
+                    />
                   )}
 
                   <button

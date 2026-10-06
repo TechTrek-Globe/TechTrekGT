@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 import { onRequestPost as loginPost } from '../functions/api/auth/login.js';
 import { onRequestPost as registerPost } from '../functions/api/auth/register.js';
+import { onRequestGet as turnstileConfigGet } from '../functions/api/auth/turnstile-config.js';
 import { hashPassword, ERROR_CODES } from '../functions/utils/auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -243,5 +244,26 @@ describe('Phase 2: Cloudflare Turnstile Server-Side Verification Tests', () => {
 
     const res = await loginPost({ request: req, env: envNoSecret, requestId: 'test-ts-skipped' });
     assert.strictEqual(res.status, 200, 'Must allow login when TURNSTILE_SECRET_KEY is not configured');
+  });
+
+  test('GET /api/auth/turnstile-config returns disabled when secrets or siteKey are missing', async () => {
+    const res = await turnstileConfigGet({ env: { TURNSTILE_SECRET_KEY: 'test-secret' } });
+    assert.strictEqual(res.status, 200);
+    const body = await res.json();
+    assert.strictEqual(body.enabled, false);
+    assert.strictEqual(body.siteKey, null);
+  });
+
+  test('GET /api/auth/turnstile-config returns enabled and siteKey when configured', async () => {
+    const res = await turnstileConfigGet({
+      env: {
+        TURNSTILE_SECRET_KEY: 'test-secret',
+        TURNSTILE_SITE_KEY: '0x4AAAAAAA-test-sitekey'
+      }
+    });
+    assert.strictEqual(res.status, 200);
+    const body = await res.json();
+    assert.strictEqual(body.enabled, true);
+    assert.strictEqual(body.siteKey, '0x4AAAAAAA-test-sitekey');
   });
 });

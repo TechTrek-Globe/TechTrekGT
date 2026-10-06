@@ -17,6 +17,21 @@ export function AuthProvider({ children }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [currentUserId, setCurrentUserId] = useState(null);
+  const [turnstileConfig, setTurnstileConfig] = useState({ enabled: false, siteKey: null });
+
+  // Fetch Turnstile bot verification configuration
+  useEffect(() => {
+    let isMounted = true;
+    apiFetch('/api/auth/turnstile-config')
+      .then(res => res.json())
+      .then(data => {
+        if (isMounted && data?.success) {
+          setTurnstileConfig({ enabled: Boolean(data.enabled), siteKey: data.siteKey || null });
+        }
+      })
+      .catch(() => {});
+    return () => { isMounted = false; };
+  }, []);
 
   // CRIT-002: Track the signed-in user id so budget/sync state can be scoped.
   useEffect(() => {
@@ -161,12 +176,16 @@ export function AuthProvider({ children }) {
    * @param {string} password
    * @param {boolean} rememberMe
    */
-  const login = async (email, password, rememberMe = false) => {
+  const login = async (email, password, rememberMe = false, turnstileToken = null) => {
     try {
+      const payload = { email, password, rememberMe };
+      if (turnstileToken) {
+        payload.turnstileToken = turnstileToken;
+      }
       const res = await apiFetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, rememberMe })
+        body: JSON.stringify(payload)
       });
 
       const data = await res.json().catch(() => ({}));
@@ -199,12 +218,16 @@ export function AuthProvider({ children }) {
    * @param {string} securityAnswer
    * @param {boolean} rememberMe
    */
-  const register = async (name, email, password, securityQuestion, securityAnswer, rememberMe = false) => {
+  const register = async (name, email, password, securityQuestion, securityAnswer, rememberMe = false, turnstileToken = null) => {
     try {
+      const payload = { name, email, password, securityQuestion, securityAnswer, rememberMe };
+      if (turnstileToken) {
+        payload.turnstileToken = turnstileToken;
+      }
       const res = await apiFetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password, securityQuestion, securityAnswer, rememberMe })
+        body: JSON.stringify(payload)
       });
 
       const data = await res.json().catch(() => ({}));
@@ -373,7 +396,8 @@ export function AuthProvider({ children }) {
       verifyEmail,
       resendVerification,
       confirmEmailChange,
-      logout
+      logout,
+      turnstileConfig
     }}>
       {children}
     </AuthContext.Provider>

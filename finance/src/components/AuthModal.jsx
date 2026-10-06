@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { X, Lock, Mail, User, ShieldCheck, ArrowRight, Loader2, KeyRound, CheckCircle2, HelpCircle } from 'lucide-react';
+import { TurnstileWidget } from './TurnstileWidget';
 
 export const PRESET_SECURITY_QUESTIONS = [
   "What was the name of your first pet?",
@@ -21,11 +22,13 @@ export default function AuthModal() {
     register, 
     getSecurityQuestion, 
     forgotPassword, 
-    resetPassword 
+    resetPassword,
+    turnstileConfig 
   } = useAuth();
   
   // mode: 'signin' | 'register' | 'forgot' | 'reset'
   const [mode, setMode] = useState('signin');
+  const [turnstileToken, setTurnstileToken] = useState('');
   
   // Form fields
   const [name, setName] = useState('');
@@ -72,6 +75,7 @@ export default function AuthModal() {
     setInfoMessage('');
     setResetToken('');
     setSecurityAnswer('');
+    setTurnstileToken('');
   };
 
   const handleSubmit = async (e) => {
@@ -87,14 +91,14 @@ export default function AuthModal() {
           setIsSubmitting(false);
           return;
         }
-        await register(name, email, password, securityQuestion, securityAnswer, rememberMe);
+        await register(name, email, password, securityQuestion, securityAnswer, rememberMe, turnstileToken);
         if (rememberMe && email) {
           try { localStorage.setItem('techtrek_saved_email', email); } catch (e) {}
         } else {
           try { localStorage.removeItem('techtrek_saved_email'); } catch (e) {}
         }
       } else if (mode === 'signin') {
-        await login(email, password, rememberMe);
+        await login(email, password, rememberMe, turnstileToken);
         if (rememberMe && email) {
           try { localStorage.setItem('techtrek_saved_email', email); } catch (e) {}
         } else {
@@ -369,6 +373,14 @@ export default function AuthModal() {
                 Remember me
               </label>
             </div>
+          )}
+
+          {turnstileConfig?.enabled && turnstileConfig?.siteKey && (mode === 'signin' || mode === 'register') && (
+            <TurnstileWidget
+              siteKey={turnstileConfig.siteKey}
+              onVerify={(token) => setTurnstileToken(token)}
+              onExpire={() => setTurnstileToken('')}
+            />
           )}
 
           <button

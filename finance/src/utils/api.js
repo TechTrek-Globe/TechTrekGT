@@ -216,13 +216,20 @@ export async function pushCloudBackupOptimistic(passcode, budgetData, options = 
     }
   }
 
-  // Ensure dailyMatrix only contains finite numbers (strip any null, undefined, or empty values)
+  // FIX-05: Preserve _desc string annotations; strip null, undefined, NaN, non-finite numbers,
+  // and empty string values. Non-_desc, non-numeric values are also stripped.
   if (uploadPayload.dailyMatrix && typeof uploadPayload.dailyMatrix === 'object') {
     const cleanMatrix = {};
     for (const [k, v] of Object.entries(uploadPayload.dailyMatrix)) {
-      if (typeof v === 'number' && Number.isFinite(v)) {
+      if (k.endsWith('_desc')) {
+        // Keep non-empty strings for desc keys; drop null/undefined/empty
+        if (typeof v === 'string' && v.length > 0) {
+          cleanMatrix[k] = v;
+        }
+      } else if (typeof v === 'number' && Number.isFinite(v)) {
         cleanMatrix[k] = v;
       }
+      // Drop: null, undefined, NaN, Infinity, empty string, objects, arrays
     }
     uploadPayload.dailyMatrix = cleanMatrix;
   }

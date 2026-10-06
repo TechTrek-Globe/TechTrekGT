@@ -229,7 +229,9 @@ export const BUDGET_LIMITS = {
   MAX_ID_LEN: 128,
   MAX_NAME_LEN: 255,
   MAX_TEXT_LEN: 2000,
-  MAX_SHORT_STR_LEN: 100
+  MAX_SHORT_STR_LEN: 100,
+  // FIX-05: Max length for dailyMatrix _desc annotation strings.
+  MAX_DESC_LEN: 500
 };
 
 export const ALLOWED_BUDGET_KEYS = new Set([
@@ -486,7 +488,17 @@ export function validateBudgetPayloadDetailed(payload) {
     for (const k of matrixKeys) {
       if (typeof k !== 'string' || k.length > BUDGET_LIMITS.MAX_ID_LEN) return { valid: false, reason: `dailyMatrix key invalid: ${k}` };
       const v = payload.dailyMatrix[k];
-      if (v !== null && v !== undefined && !isFiniteNumber(v)) return { valid: false, reason: `dailyMatrix[${k}] must be a finite number or null` };
+      // FIX-05: Keys ending in _desc may carry a string annotation (e.g. user memo).
+      // All other matrix keys must be finite numbers or null.
+      if (k.endsWith('_desc')) {
+        if (v !== null && v !== undefined && !isStringUnder(v, BUDGET_LIMITS.MAX_DESC_LEN)) {
+          return { valid: false, reason: `dailyMatrix[${k}] description exceeds max length ${BUDGET_LIMITS.MAX_DESC_LEN}` };
+        }
+      } else {
+        if (v !== null && v !== undefined && !isFiniteNumber(v)) {
+          return { valid: false, reason: `dailyMatrix[${k}] must be a finite number or null` };
+        }
+      }
     }
   }
 

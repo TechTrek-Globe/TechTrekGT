@@ -829,7 +829,8 @@ export function LedgerDataProvider({ children }) {
         isPendingSaveRef.current = true;
         saveBudgetData(budgetRef.current, currentUserId || getCurrentUserId()).catch(() => {});
         if (isAuthenticated) {
-          await pushCloudBackup(syncPasscode, { force: true }).catch(() => {});
+          // FIX-03: Standard CAS push - pruning ghost keys must not force-overwrite cloud.
+          pushCloudBackup(syncPasscode).catch(() => {});
         }
       }
     }
@@ -893,7 +894,8 @@ export function LedgerDataProvider({ children }) {
         isPendingSaveRef.current = true;
         await saveBudgetData(budgetRef.current, currentUserId || getCurrentUserId()).catch(() => {});
         if (isAuthenticated) {
-          await pushCloudBackup(syncPasscode, { force: true }).catch(() => {});
+          // FIX-03: Standard CAS push - restoring funding goals must not force-overwrite cloud.
+          pushCloudBackup(syncPasscode).catch(() => {});
         }
       }
     }

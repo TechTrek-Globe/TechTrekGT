@@ -44,13 +44,13 @@ export function StorageResetSubPanel() {
   const [confirmLoadDemo, setConfirmLoadDemo] = useState(false);
   const [confirmResetDefaults, setConfirmResetDefaults] = useState(false);
   
-  // CRIT-002: Remove data from this device on logout - defaults to true for shared devices
+  // FIX-01: Remove data from this device on explicit sign-out only - defaults to false (personal device)
   const [removeDataOnLogout, setRemoveDataOnLogout] = useState(() => {
     try {
       const stored = localStorage.getItem('tt_remove_data_on_logout');
-      return stored === null ? true : stored === 'true'; // Default true for shared devices
+      return stored === 'true'; // Default false - users must opt in
     } catch {
-      return true;
+      return false;
     }
   });
 
@@ -209,7 +209,7 @@ export function StorageResetSubPanel() {
             <span>Remove Data from This Device on Logout</span>
           </div>
           <div className="text-[11px] text-slate-400 leading-relaxed">
-            When enabled, signing out will delete your user-scoped IndexedDB budget record and pending sync queue from this device. Recommended for shared computers.
+            When enabled, <strong className="text-slate-300">explicit sign-out</strong> will delete your local IndexedDB budget record from this device. Off by default. Session expiry and inactivity timeouts never delete local data regardless of this setting.
           </div>
         </div>
         <button

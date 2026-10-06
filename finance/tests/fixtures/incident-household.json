@@ -44,9 +44,9 @@
       "payFrequency": "semi-monthly",
       "payDay1": 1,
       "payDay2": 15,
-      "netPerPay": 689.00,
+      "netPerPay": 689.42,
       "color": "purple",
-      "accountAllocations": { "acc-mortgage-test": 689.00 }
+      "accountAllocations": { "acc-mortgage-test": 689.42 }
     },
     {
       "id": "person-bob",
@@ -54,16 +54,16 @@
       "role": "Partner",
       "payFrequency": "monthly",
       "payDay1": 25,
-      "netPerPay": 1222.61,
+      "netPerPay": 1378.00,
       "color": "emerald",
-      "accountAllocations": { "acc-mortgage-test": 1222.61 }
+      "accountAllocations": { "acc-mortgage-test": 1378.00 }
     }
   ],
   "bills": [
     {
       "id": "bill-mortgage-test",
       "name": "Test Mortgage Payment",
-      "amount": 2200.00,
+      "amount": 2756.00,
       "period": "Monthly",
       "dueDay": 1,
       "accountId": "acc-mortgage-test",
@@ -97,28 +97,31 @@
       "contributorId": "person-alice",
       "accountId": "acc-mortgage-test",
       "name": "Mortgage Contribution",
-      "amountPerPay": 689.00
+      "amountPerPay": 689.42
     },
     {
       "id": "goal-mortgage-bob",
       "contributorId": "person-bob",
       "accountId": "acc-mortgage-test",
       "name": "Mortgage Contribution",
-      "amountPerPay": 1222.61
+      "amountPerPay": 1378.00
     }
   ],
   "dailyMatrix": {
+    "acc-mortgage-test_2026-01_1_credit_person-alice": 689.42,
+    "acc-mortgage-test_2026-01_15_credit_person-alice": 689.42,
+    "acc-mortgage-test_2026-01_25_credit_person-bob": 1378.00,
+    "acc-mortgage-test_2026-01_1_bill_bill-mortgage": 2756.00,
     "acc-mortgage-test_2026-09_25_credit_person-bob": 1222.61,
     "acc-mortgage-test_2026-09_25_extra_credit_person-bob": 0,
-    "acc-mortgage-test_2026-09_1_credit_person-alice": 689.00,
+    "acc-mortgage-test_2026-09_29_credit_person-alice": 689.42,
     "acc-mortgage-test_2026-09_15_credit_person-alice": 0,
-    "acc-mortgage-test_2026-10_15_credit_person-alice": 0,
     "acc-mortgage-test_2026-09_29_reg_ending": 308.65,
     "acc-mortgage-test_2026-09_30_reg_ending": 393.65,
     "acc-mortgage-test_2026-09_1_other_desc": "Note: opening deposit",
     "acc-mortgage-test_2026-09_15_other_desc": "Note: mid-month reconcile",
-    "acc-mortgage-test_2026-11_25_credit_person-bob": 1222.61,
-    "acc-mortgage-test_2026-11_1_credit_person-alice": 689.00,
+    "acc-mortgage-test_2026-10_13_credit_person-alice": 689.42,
+    "acc-mortgage-test_2026-10_18_credit_person-bob": 1222.61,
     "acc-bills-test_2026-09_1_credit_person-alice": 85.00
   },
   "transactions": [
@@ -143,3 +146,4 @@
   "loans": [],
   "dashboardWidgets": {}
 }
+

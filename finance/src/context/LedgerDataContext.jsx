@@ -102,34 +102,43 @@ export function LedgerDataProvider({ children }) {
     }
   }, [isDbLoaded, initialLedgerSeed]);
 
-  // CRIT-002: On sign-out or session-expiry, flush pending sync, then clear the
-  // signed-in user's local budget record and pending sync queue so the next
-  // signed-in user never inherits another user's data.
+  // FIX-01 / CRIT-002: On sign-out or session-expiry, always flush pending saves and
+  // clear in-memory state so the next user never sees stale data.
+  // IndexedDB deletion is ONLY allowed when the user explicitly signed out (reason 'logout')
+  // AND has opted in via the "Remove data from this device" setting (defaults to false).
+  // Session expiry, inactivity timeouts, and all other automated reasons must NOT delete local data.
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const handleUserLogout = async (e) => {
       const userId = e?.detail?.userId;
       const uid = userId || currentUserId || getCurrentUserId();
-      logSync('USER_LOGOUT', 'Clearing user-scoped local budget state', { userId: uid, reason: e?.detail?.reason || 'logout' });
+      const reason = e?.detail?.reason || 'logout';
+      logSync('USER_LOGOUT', 'Processing logout event', { userId: uid, reason });
+
+      // Always flush any pending in-memory write to IndexedDB first
       try { flushSaveToIndexedDB(); } catch {}
-      
+
       // Always clear the pending sync queue and version markers
       try { await clearPendingSync(uid); } catch {}
-      
-      // CRIT-002: Check "Remove data from this device" setting (defaults to true for shared devices)
-      const shouldRemoveData = (() => {
+
+      // FIX-01: IndexedDB deletion is restricted to explicit user sign-out only.
+      // Session expiry, inactivity timeouts, and all automated reasons preserve local data.
+      const isExplicitLogout = reason === 'logout';
+      const shouldRemoveData = isExplicitLogout && (() => {
         try {
           const stored = localStorage.getItem('tt_remove_data_on_logout');
-          return stored === null ? true : stored === 'true';
+          // Default is false - users must opt in to device wipe on sign-out
+          return stored === 'true';
         } catch {
-          return true;
+          return false;
         }
       })();
-      
+
       if (shouldRemoveData) {
+        logSync('USER_LOGOUT', 'Removing local budget record per user opt-in setting', { userId: uid });
         try { await clearBudgetData(uid); } catch {}
       } else {
-        logSync('USER_LOGOUT', 'Preserving local budget data per user setting', { userId: uid });
+        logSync('USER_LOGOUT', 'Preserving local budget data in IndexedDB', { userId: uid, reason, isExplicitLogout });
       }
       
       try {

@@ -552,6 +552,12 @@ function DailySpreadsheetMatrix() {
     return budget.bills.filter(b => b.accountId === selectedAccountId && !b.isArchived);
   }, [budget.bills, selectedAccountId]);
 
+  // All bills for math (includes archived)
+  const allBillsForMath = useMemo(() => {
+    if (selectedAccountId === 'all') return budget.bills;
+    return budget.bills.filter(b => b.accountId === selectedAccountId);
+  }, [budget.bills, selectedAccountId]);
+
   // Archived bills list for this account
   const archivedBills = useMemo(() => {
     if (selectedAccountId === 'all') return budget.bills.filter(b => b.isArchived);
@@ -807,7 +813,7 @@ function DailySpreadsheetMatrix() {
         // moved/edited bills are reflected in the running balance.
         let hasDayBillOverride = false;
 
-        accountBills.forEach(b => {
+        allBillsForMath.forEach(b => {
           const billAccId = selectedAccountId === 'all' ? b.accountId : selectedAccountId;
           const customBillVal = getDailyMatrixCell(billAccId, monthKey, day, `bill_${b.id}`);
           let amt = 0;
@@ -830,7 +836,7 @@ function DailySpreadsheetMatrix() {
               amt = (expectedBillAmt > 0 && Math.abs(actualAmt - 2 * expectedBillAmt) < 0.02) ? expectedBillAmt : actualAmt;
             } else if (actualAmt !== null) {
               amt = 0;
-            } else if (effectiveDueDay(b, year, month) === day && isBillDueInMonth(b, month, true)) {
+            } else if (!b.isArchived && effectiveDueDay(b, year, month) === day && isBillDueInMonth(b, month, true)) {
               // Tier 3: standard projection for scheduled bills
               amt = expectedBillAmt;
             }
@@ -875,10 +881,10 @@ function DailySpreadsheetMatrix() {
         const customOtherDesc = rawOtherDesc.replace(/^Other\s*\$?\s*\(?(.*?)\)?$/i, '$1').trim();
 
         // 4. Determine Beginning and Ending Balances
-        // FIX-08: ending = round2(beginning + credits - bills + other) every day.
+        // FIX-08: ending = round2(beginning + credits - bills) every day.
         // Never replace it with reg_ending, extra_ending, or importedLedgerRows values.
-        const regEnding = round2(runningRegBeg + totalRegCredits - totalDayBills + otherAmt);
-        const extraEnding = showExtraColumns ? round2(runningExtraBeg + dayExtraAdd) : 0;
+        const regEnding = round2(runningRegBeg + totalRegCredits - totalDayBills);
+        const extraEnding = showExtraColumns ? round2(runningExtraBeg + dayExtraAdd + otherAmt) : 0;
         const totalEnd = round2(regEnding + (showExtraColumns ? extraEnding : 0));
         const isHistoricalLock = isLockedDay;
         const totalBeg = Math.round((runningRegBeg + (showExtraColumns ? runningExtraBeg : 0)) * 100) / 100;
@@ -987,6 +993,7 @@ function DailySpreadsheetMatrix() {
     selectedAccount,
     budget.accounts,
     accountBills,
+    allBillsForMath,
     accountPeople,
     people,
     getDailyMatrixCell,

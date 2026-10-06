@@ -1203,24 +1203,24 @@ export function LedgerDataProvider({ children }) {
             amt = (expectedBillAmt > 0 && Math.abs(actualAmt - 2 * expectedBillAmt) < 0.02) ? expectedBillAmt : actualAmt;
           } else if (actualAmt !== null) {
             amt = 0;
-          } else if (effectiveDueDay(b, year, month) === day && isBillDueInMonth(b, month, true)) {
+          } else if (!b.isArchived && effectiveDueDay(b, year, month) === day && isBillDueInMonth(b, month, true)) {
             amt = expectedBillAmt;
           }
         }
         dayBills = round2(dayBills + amt);
       });
 
-      // 3. Other (consolidated credit and debit affects regular operating balance)
+      // 3. Other (consolidated credit and debit affects extra savings balance)
       const customOther = getDailyMatrixCell(accountId, monthKey, day, 'other_amount');
       const customOtherCredit = getDailyMatrixCell(accountId, monthKey, day, 'other_credit_amount');
       let otherAmt = 0;
       if (customOther !== undefined) otherAmt = round2(otherAmt + parseMoney(customOther, 0));
       if (customOtherCredit !== undefined) otherAmt = round2(otherAmt + parseMoney(customOtherCredit, 0));
 
-      // FIX-08: ending = round2(beginning + credits - bills + other) every day.
+      // FIX-08: ending = round2(beginning + credits - bills) every day.
       // Never replace it with reg_ending, extra_ending, or importedLedgerRows values.
-      runningRegBeg = round2(runningRegBeg + dayCredits - dayBills + otherAmt);
-      runningExtraBeg = showExtra ? round2(runningExtraBeg + dayExtraAdd) : 0;
+      runningRegBeg = round2(runningRegBeg + dayCredits - dayBills);
+      runningExtraBeg = showExtra ? round2(runningExtraBeg + dayExtraAdd + otherAmt) : 0;
 
       cur.setDate(cur.getDate() + 1);
     }

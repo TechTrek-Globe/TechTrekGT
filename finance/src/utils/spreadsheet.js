@@ -983,7 +983,7 @@ export function getLedgerRunningBalanceAsOfDate({
         }
         dayBills = round2(dayBills + amt);
       } else if (!isLockedDay) {
-        if (effectiveDueDay(b, y, m) === d && isBillDueInMonth(b, m, true)) {
+        if (!b.isArchived && effectiveDueDay(b, y, m) === d && isBillDueInMonth(b, m, true)) {
           dayBills = round2(dayBills + expectedBillAmt);
         }
       }
@@ -995,10 +995,10 @@ export function getLedgerRunningBalanceAsOfDate({
     const ocVal = dailyMatrix[`${targetAccountId}_${mKey}_${d}_other_credit_amount`];
     const dayOtherCredit = (ocVal !== undefined && ocVal !== null && ocVal !== '') ? parseMoney(ocVal, 0) : 0;
 
-    // FIX-08: ending = round2(beginning + credits - bills + other) every day.
+    // FIX-08: ending = round2(beginning + credits - bills) every day.
     // Never replace it with reg_ending, extra_ending, or importedLedgerRows values.
-    runningReg = round2(runningReg + dayCredits - dayBills + dayOtherCredit + dayOther);
-    runningExtra = showExtra ? round2(runningExtra + dayExtraCredits) : 0;
+    runningReg = round2(runningReg + dayCredits - dayBills);
+    runningExtra = showExtra ? round2(runningExtra + dayExtraCredits + dayOtherCredit + dayOther) : 0;
 
     cur.setDate(cur.getDate() + 1);
   }

@@ -38,6 +38,16 @@ class ErrorBoundary extends React.Component {
     try {
       localStorage.removeItem('personal_budget_app_data_v1');
       sessionStorage.clear();
+      if (typeof window !== 'undefined' && window.indexedDB) {
+        const req = window.indexedDB.deleteDatabase('TechTrekFinanceDB');
+        req.onsuccess = req.onerror = req.onblocked = () => {
+          window.location.href = window.location.origin + window.location.pathname + '?v=' + Date.now();
+        };
+        setTimeout(() => {
+          window.location.href = window.location.origin + window.location.pathname + '?v=' + Date.now();
+        }, 300);
+        return;
+      }
     } catch (e) {}
     window.location.href = window.location.origin + window.location.pathname + '?v=' + Date.now();
   };

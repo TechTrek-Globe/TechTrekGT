@@ -5,7 +5,7 @@ import { fakeDemoBudgetData } from '../demoPresetData';
 import { useBudgetMetadata } from './BudgetMetadataContext';
 import { useAuth } from './AuthContext';
 import { apiFetch, pushCloudBackupOptimistic, flushPendingCloudSync, savePendingSync, getPendingSync, clearPendingSync, pendingSyncKey } from '../utils/api';
-import { getBudgetData, saveBudgetData, clearAndRestoreBudgetData, clearBudgetData, migrateLegacyBudgetToUser, listBudgetRecordKeys, getCurrentUserId, budgetRecordKey } from '../utils/indexedDB';
+import { getBudgetData, saveBudgetData, clearAndRestoreBudgetData, clearBudgetData, migrateLegacyBudgetToUser, listBudgetRecordKeys, getCurrentUserId, budgetRecordKey, openDB, LEGACY_BUDGET_KEY } from '../utils/indexedDB';
 import { processSpreadsheetImport } from '../utils/spreadsheet';
 import { isBillDueInMonth, effectiveDueDay } from '../utils/paydayUtils';
 import { allocateEarnerCredit } from '../utils/ledgerEngine';
@@ -537,9 +537,9 @@ export function LedgerDataProvider({ children }) {
       // CRIT-002: migrate legacy unkeyed record only when the target user record is empty AND user confirms
       (async () => {
         try {
-          const db = await (await import('../utils/indexedDB.js')).openDB();
-          const legacyKey = (await import('../utils/indexedDB.js')).LEGACY_BUDGET_KEY;
-          const userKey = (await import('../utils/indexedDB.js')).budgetRecordKey(currentUserId);
+          const db = await openDB();
+          const legacyKey = LEGACY_BUDGET_KEY;
+          const userKey = budgetRecordKey(currentUserId);
           
           const tx = db.transaction('app_state', 'readonly');
           const store = tx.objectStore('app_state');

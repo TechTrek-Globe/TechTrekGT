@@ -9,7 +9,7 @@
 const DB_NAME = 'TechTrekFinanceDB';
 const DB_VERSION = 1;
 const STORE_NAME = 'app_state';
-const LEGACY_BUDGET_KEY = 'current_budget';
+export const LEGACY_BUDGET_KEY = 'current_budget';
 
 /**
  * Builds a user-scoped record key for budget persistence.

@@ -97,3 +97,6 @@ Authentication states strictly reflect backend database authority and maintain z
 - **Admin & Maintenance Route Synchronization:**
   - `AdminView` user status updates target the canonical POST `/api/admin/user-status` endpoint with structured payloads (`{ userId, status }`), matching backend Cloudflare Worker routing and avoiding 404 route drift.
 
+## 9. Automated Verification & Typecheck Governance
+- **Zero-Error Typecheck Validation (WP-01):** `npm run typecheck` (`tsc -p jsconfig.json`) passes cleanly with zero errors. The JSDoc signature for `pushCloudBackupOptimistic` in `src/utils/api.js` explicitly includes `ownershipConflict?: boolean` to maintain type safety across ownership verification branches.
+

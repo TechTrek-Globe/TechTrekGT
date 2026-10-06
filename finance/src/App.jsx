@@ -158,7 +158,32 @@ function MainContent({ pathname, navigateTo, onNavigateHome }) {
         {activeView === 'ledger'      && <LedgerView onNavigateView={handleNavigateView} />}
         {activeView === 'amortization'&& <AmortizationView onNavigateView={handleNavigateView} />}
         {activeView === 'settings'    && <SettingsView onNavigateView={handleNavigateView} />}
-        {activeView === 'admin'       && user?.isAdmin && <AdminView />}
+        {activeView === 'admin'       && (
+          user?.isAdmin ? (
+            <AdminView />
+          ) : (
+            <div className="flex flex-col items-center justify-center p-12 text-center min-h-[50vh]">
+              <div className="max-w-md p-8 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-xl space-y-4">
+                <div className="w-12 h-12 mx-auto rounded-full bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400">
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-bold text-slate-100">Access Denied</h3>
+                <p className="text-sm text-slate-400">
+                  Administrator privileges are required to view this section.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => handleNavigateView('dashboard')}
+                  className="w-full py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium text-sm rounded-xl transition-all cursor-pointer"
+                >
+                  Return to Dashboard
+                </button>
+              </div>
+            </div>
+          )
+        )}
         {isSettingsOpen && <SettingsModal />}
         <AuthModal />
       </React.Suspense>

@@ -336,50 +336,6 @@ export function LedgerDataProvider({ children }) {
     return result;
   }, [setLastCloudSyncTime, currentUserId]);
 
-  // Option A self-healing migration: clear legacy future credit cells (> today) from previous spreadsheet workbook
-  useEffect(() => {
-    if (!isDbLoaded) return;
-    try {
-      const today = new Date();
-      const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-      const creditKeyPattern = /^(.+)_(\d{4}-\d{2})_(\d{1,2})_(?:extra_)?credit_(.+)$/;
-      let removedCount = 0;
-      const cleanMatrix = { ...dailyMatrixRef.current };
-
-      for (const [key] of Object.entries(cleanMatrix)) {
-        const match = key.match(creditKeyPattern);
-        if (!match) continue;
-        const [, , monthKey, dayStr] = match;
-        const day = parseInt(dayStr, 10);
-        const cellIso = `${monthKey}-${String(day).padStart(2, '0')}`;
-
-        if (cellIso > todayIso) {
-          delete cleanMatrix[key];
-          removedCount++;
-        }
-      }
-
-      if (removedCount > 0) {
-        dailyMatrixRef.current = cleanMatrix;
-        setDailyMatrix(cleanMatrix);
-        setMatrixVersion(v => v + 1);
-        logLedger('REPAIR_FUTURE_CREDITS', `Auto-cleared ${removedCount} future stored credit cells so live projections take over`, {
-          removedCount,
-          asOfDate: todayIso
-        });
-        if (budgetRef.current) {
-          budgetRef.current.dailyMatrix = cleanMatrix;
-          isPendingSaveRef.current = true;
-          saveBudgetData(budgetRef.current, currentUserId || getCurrentUserId()).catch(() => {});
-          if (isAuthenticated) {
-            pushCloudBackup(syncPasscode, { force: true }).catch(() => {});
-          }
-        }
-      }
-    } catch (err) {
-      console.warn('Failed to check/clear future credit cells:', err);
-    }
-  }, [isDbLoaded, matrixVersion, currentUserId, isAuthenticated, pushCloudBackup, syncPasscode]);
 
   // Restore budget state from imported JSON backup
   const restoreFromBackup = useCallback(async (parsedData) => {
@@ -407,21 +363,11 @@ export function LedgerDataProvider({ children }) {
       }
     }
 
-    const rawDailyMatrix = (parsedData.dailyMatrix && typeof parsedData.dailyMatrix === 'object') ? parsedData.dailyMatrix : {};
-    const today = new Date();
-    const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-    const creditKeyPattern = /^(.+)_(\d{4}-\d{2})_(\d{1,2})_(?:extra_)?credit_(.+)$/;
-    const newDailyMatrix = { ...rawDailyMatrix };
-    for (const [key] of Object.entries(newDailyMatrix)) {
-      const match = key.match(creditKeyPattern);
-      if (!match) continue;
-      const [, , monthKey, dayStr] = match;
-      const day = parseInt(dayStr, 10);
-      const cellIso = `${monthKey}-${String(day).padStart(2, '0')}`;
-      if (cellIso > todayIso) {
-        delete newDailyMatrix[key];
-      }
-    }
+    // FIX-02: Restore dailyMatrix exactly as provided. Future-dated credit cells are
+    // legitimate historical records and must not be silently deleted on restore.
+    const newDailyMatrix = (parsedData.dailyMatrix && typeof parsedData.dailyMatrix === 'object')
+      ? { ...parsedData.dailyMatrix }
+      : {};
     const newLineItems = Array.isArray(parsedData.lineItems) ? parsedData.lineItems : [];
     const newTransactions = Array.isArray(parsedData.transactions) ? parsedData.transactions : [];
 
@@ -859,9 +805,11 @@ export function LedgerDataProvider({ children }) {
       if (budgetRef.current) {
         budgetRef.current.dailyMatrix = cleanMatrix;
         isPendingSaveRef.current = true;
-        saveBudgetData(budgetRef.current, currentUserId || getCurrentUserId()).catch(() => {});
+        await saveBudgetData(budgetRef.current, currentUserId || getCurrentUserId()).catch(() => {});
+        // FIX-02: Standard CAS push only - no force override. Cloud backup is
+        // caller-initiated and must not bypass version conflict detection.
         if (isAuthenticated) {
-          await pushCloudBackup(syncPasscode, { force: true }).catch(() => {});
+          pushCloudBackup(syncPasscode).catch(() => {});
         }
       }
     }

@@ -36,6 +36,9 @@ export function StorageResetSubPanel() {
   const [isFlushingCache, setIsFlushingCache] = useState(false);
   const [flushStatus, setFlushStatus] = useState(null);
   const [clearCreditsStatus, setClearCreditsStatus] = useState(null);
+  // FIX-02: confirmation dialog state for clearFutureMatrixCredits
+  const [confirmClearCredits, setConfirmClearCredits] = useState(false);
+  const [futureCreditCellCount, setFutureCreditCellCount] = useState(0);
   const [pruneStatus, setPruneStatus] = useState(null);
   const [restoreGoalsStatus, setRestoreGoalsStatus] = useState(null);
 
@@ -294,49 +297,120 @@ export function StorageResetSubPanel() {
         </div>
 
         {/* Reset Future Credit Overrides */}
-        <div className="p-5 rounded-xl glass-card border border-blue-800/60 bg-blue-950/10 space-y-4 hover:border-blue-700/80 transition-colors">
+        <div className="p-5 rounded-xl glass-card border border-amber-800/60 bg-amber-950/10 space-y-4 hover:border-amber-700/80 transition-colors">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-blue-300 flex items-center gap-2">
-              <RefreshCw className="w-5 h-5 text-blue-400" />
+            <h3 className="text-sm font-bold text-amber-300 flex items-center gap-2">
+              <RefreshCw className="w-5 h-5 text-amber-400" />
               Reset Future Credit Overrides
             </h3>
-            <span className="text-[10px] font-mono text-blue-400 bg-blue-950 px-2.5 py-1 rounded-full border border-blue-800">
-              Live Projections
+            <span className="text-[10px] font-mono text-amber-400 bg-amber-950 px-2.5 py-1 rounded-full border border-amber-800">
+              Manual Action
             </span>
           </div>
           <p className="text-xs text-slate-300 leading-relaxed">
-            Clears static future matrix credit overrides from legacy spreadsheet imports so that your active Funding Goals automatically project onto your planned paydays without duplicate or outdated entries.
+            Removes stored future credit cells from the daily matrix so live Funding Goals govern future months. This is a destructive operation - take a backup first.
           </p>
 
-          <div className="flex items-center justify-between flex-wrap gap-2 pt-2">
-            <div className="text-xs text-slate-400 font-mono">
-              Safe: Preserves all past history and all bill overrides.
+          {!confirmClearCredits ? (
+            <div className="flex items-center justify-between flex-wrap gap-2 pt-2">
+              <div className="text-xs text-slate-400 font-mono">
+                Preserves all past history and all bill entries.
+              </div>
+              <button
+                id="btn-reset-future-credits-preflight"
+                type="button"
+                disabled={isClearingCredits}
+                onClick={() => {
+                  // Count future credit cells from the live budget matrix
+                  const todayIso = new Date().toISOString().slice(0, 10);
+                  const creditKeyPattern = /^(.+)_(\d{4}-\d{2})_(\d{1,2})_(?:extra_)?credit_(.+)$/;
+                  const count = Object.keys(budget?.dailyMatrix || {}).filter(k => {
+                    const m = k.match(creditKeyPattern);
+                    if (!m) return false;
+                    const cellIso = `${m[2]}-${m[3].padStart(2, '0')}`;
+                    return cellIso > todayIso;
+                  }).length;
+                  setFutureCreditCellCount(count);
+                  setConfirmClearCredits(true);
+                }}
+                className="px-5 py-2.5 bg-amber-700/80 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                <RefreshCw className="w-4 h-4" />
+                <span>Reset Future Credits...</span>
+              </button>
             </div>
-
-            <button
-              type="button"
-              disabled={isClearingCredits}
-              onClick={async () => {
-                if (clearFutureMatrixCredits) {
-                  setIsClearingCredits(true);
-                  try {
-                    const res = await clearFutureMatrixCredits();
-                    setClearCreditsStatus(`Cleared ${res?.removedCount || 0} future credit overrides and synced to Cloud Vault. Live funding goals now govern future months.`);
-                    setTimeout(() => setClearCreditsStatus(null), 6000);
-                  } catch (err) {
-                    setClearCreditsStatus(`Failed to reset credits: ${err.message}`);
-                    setTimeout(() => setClearCreditsStatus(null), 6000);
-                  } finally {
-                    setIsClearingCredits(false);
-                  }
-                }
-              }}
-              className="px-5 py-2.5 bg-blue-600/80 hover:bg-blue-600 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-50"
-            >
-              <RefreshCw className={`w-4 h-4 ${isClearingCredits ? 'animate-spin' : ''}`} />
-              <span>{isClearingCredits ? 'Resetting Credits...' : 'Reset Future Credits'}</span>
-            </button>
-          </div>
+          ) : (
+            <div className="space-y-3 pt-2 border border-amber-700/60 rounded-xl p-4 bg-amber-950/20">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="text-xs font-bold text-amber-300">
+                    {futureCreditCellCount === 0
+                      ? 'No future credit cells found - nothing to remove.'
+                      : `This will permanently delete ${futureCreditCellCount} future credit ${futureCreditCellCount === 1 ? 'cell' : 'cells'} from your matrix.`}
+                  </p>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Download a backup first. The removal will be saved to local storage. A standard cloud sync (not a force-push) will be queued if you are signed in.
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  id="btn-reset-credits-download-backup"
+                  type="button"
+                  onClick={() => {
+                    try {
+                      const data = JSON.stringify(budget, null, 2);
+                      const blob = new Blob([data], { type: 'application/json' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `budget-backup-before-credit-reset-${new Date().toISOString().slice(0, 10)}.json`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    } catch {}
+                  }}
+                  className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer"
+                >
+                  <Database className="w-4 h-4" />
+                  Download Backup
+                </button>
+                <button
+                  id="btn-reset-credits-confirm"
+                  type="button"
+                  disabled={isClearingCredits || futureCreditCellCount === 0}
+                  onClick={async () => {
+                    if (clearFutureMatrixCredits) {
+                      setIsClearingCredits(true);
+                      try {
+                        const res = await clearFutureMatrixCredits();
+                        setClearCreditsStatus(`Removed ${res?.removedCount || 0} future credit ${res?.removedCount === 1 ? 'cell' : 'cells'}. Local storage updated. A cloud sync has been queued.`);
+                        setTimeout(() => setClearCreditsStatus(null), 8000);
+                      } catch (err) {
+                        setClearCreditsStatus(`Failed: ${err.message}`);
+                        setTimeout(() => setClearCreditsStatus(null), 8000);
+                      } finally {
+                        setIsClearingCredits(false);
+                        setConfirmClearCredits(false);
+                      }
+                    }
+                  }}
+                  className="px-4 py-2 bg-rose-700/80 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-4 h-4 ${isClearingCredits ? 'animate-spin' : ''}`} />
+                  <span>{isClearingCredits ? 'Clearing...' : 'Confirm Delete'}</span>
+                </button>
+                <button
+                  id="btn-reset-credits-cancel"
+                  type="button"
+                  onClick={() => setConfirmClearCredits(false)}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
           {clearCreditsStatus && (
             <div className="text-xs text-emerald-400 bg-emerald-950/40 border border-emerald-800 p-2.5 rounded-lg">
               {clearCreditsStatus}

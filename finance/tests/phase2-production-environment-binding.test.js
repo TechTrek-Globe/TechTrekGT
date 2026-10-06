@@ -58,30 +58,30 @@ describe('Phase 2: Explicit Production Environment Binding & Security Headers', 
     assert.ok(res.headers.get('Strict-Transport-Security'), 'HSTS must be present in production with cf-ray');
   });
 
-  // T3: CSP & HSTS omitted in development environment
-  test('T3: CSP and HSTS headers are omitted when ENVIRONMENT is development', async () => {
-    const req = new Request('https://techtrekgt.com/finance', {
+  // T3: CSP & HSTS omitted in development environment on localhost
+  test('T3: CSP and HSTS headers are omitted when ENVIRONMENT is development on localhost', async () => {
+    const req = new Request('http://localhost:5173/finance', {
       method: 'GET'
     });
 
     const res = await worker.fetch(req, devEnv, {});
     assert.strictEqual(res.status, 200);
 
-    assert.strictEqual(res.headers.get('Content-Security-Policy'), null, 'CSP must be omitted in development');
-    assert.strictEqual(res.headers.get('Strict-Transport-Security'), null, 'HSTS must be omitted in development');
+    assert.strictEqual(res.headers.get('Content-Security-Policy'), null, 'CSP must be omitted in development on localhost');
+    assert.strictEqual(res.headers.get('Strict-Transport-Security'), null, 'HSTS must be omitted in development on localhost');
   });
 
-  // T4: CSP & HSTS bypassed on localhost even if ENVIRONMENT is production
-  test('T4: CSP and HSTS headers are bypassed on localhost even if ENVIRONMENT is production', async () => {
+  // T4: CSP & HSTS bypassed on localhost when ENVIRONMENT is development
+  test('T4: CSP and HSTS headers are bypassed on localhost when ENVIRONMENT is development', async () => {
     const req = new Request('http://localhost:3000/finance', {
       method: 'GET'
     });
 
-    const res = await worker.fetch(req, prodEnv, {});
+    const res = await worker.fetch(req, devEnv, {});
     assert.strictEqual(res.status, 200);
 
-    assert.strictEqual(res.headers.get('Content-Security-Policy'), null, 'CSP must be bypassed on localhost');
-    assert.strictEqual(res.headers.get('Strict-Transport-Security'), null, 'HSTS must be bypassed on localhost');
+    assert.strictEqual(res.headers.get('Content-Security-Policy'), null, 'CSP must be bypassed on localhost in development');
+    assert.strictEqual(res.headers.get('Strict-Transport-Security'), null, 'HSTS must be bypassed on localhost in development');
   });
 
   // T5: Missing ENVIRONMENT binding logs a warning when cf-ray is present
@@ -110,32 +110,32 @@ describe('Phase 2: Explicit Production Environment Binding & Security Headers', 
       );
       assert.ok(warningFound, 'Must log visible warning when env.ENVIRONMENT is undefined on cf-ray traffic');
 
-      // CSP and HSTS should not be present because isProduction is false
-      assert.strictEqual(res.headers.get('Content-Security-Policy'), null);
-      assert.strictEqual(res.headers.get('Strict-Transport-Security'), null);
+      // Under FIX-12 fail-closed, CSP and HSTS are applied even when ENVIRONMENT is undefined
+      assert.ok(res.headers.get('Content-Security-Policy'), 'CSP must be present when ENVIRONMENT is unset');
+      assert.ok(res.headers.get('Strict-Transport-Security'), 'HSTS must be present when ENVIRONMENT is unset');
     } finally {
       console.warn = originalWarn;
     }
   });
 
-  // T6: addSecurityHeaders unit test for isProduction and isLocalhost options
-  test('T6: addSecurityHeaders gates CSP/HSTS strictly on isProduction && !isLocalhost', () => {
+  // T6: addSecurityHeaders fails closed unless explicitly development on localhost
+  test('T6: addSecurityHeaders fails closed and applies CSP/HSTS unless explicitly development on localhost', () => {
     const makeRes = () => new Response('test', { status: 200 });
 
     // 1. Production, not localhost -> headers added
-    const res1 = addSecurityHeaders(makeRes(), { isProduction: true, isLocalhost: false });
+    const res1 = addSecurityHeaders(makeRes(), { environment: 'production', isLocalhost: false });
     assert.ok(res1.headers.get('Content-Security-Policy'));
     assert.ok(res1.headers.get('Strict-Transport-Security'));
 
-    // 2. Production, but localhost -> bypassed
-    const res2 = addSecurityHeaders(makeRes(), { isProduction: true, isLocalhost: true });
+    // 2. Explicit development on localhost -> bypassed
+    const res2 = addSecurityHeaders(makeRes(), { environment: 'development', isLocalhost: true });
     assert.strictEqual(res2.headers.get('Content-Security-Policy'), null);
     assert.strictEqual(res2.headers.get('Strict-Transport-Security'), null);
 
-    // 3. Not production, not localhost -> omitted
-    const res3 = addSecurityHeaders(makeRes(), { isProduction: false, isLocalhost: false });
-    assert.strictEqual(res3.headers.get('Content-Security-Policy'), null);
-    assert.strictEqual(res3.headers.get('Strict-Transport-Security'), null);
+    // 3. Environment unset -> fails closed, headers added
+    const res3 = addSecurityHeaders(makeRes(), { isLocalhost: false });
+    assert.ok(res3.headers.get('Content-Security-Policy'));
+    assert.ok(res3.headers.get('Strict-Transport-Security'));
   });
 
   // T7: Origin constants export shape
@@ -145,9 +145,9 @@ describe('Phase 2: Explicit Production Environment Binding & Security Headers', 
     assert.ok(Array.isArray(ALLOWED_ORIGINS), 'ALLOWED_ORIGINS must be an array');
 
     assert.ok(PRODUCTION_ORIGINS.includes('https://techtrekgt.com'));
-    assert.ok(PRODUCTION_ORIGINS.includes('http://techtrekgt.com'));
+    assert.ok(!PRODUCTION_ORIGINS.includes('http://techtrekgt.com'), 'http origin must be removed from PRODUCTION_ORIGINS');
     assert.ok(PRODUCTION_ORIGINS.includes('https://techtrek-budget.pages.dev'));
-    assert.strictEqual(PRODUCTION_ORIGINS.length, 3);
+    assert.strictEqual(PRODUCTION_ORIGINS.length, 2);
 
     assert.ok(DEV_ORIGINS.includes('http://localhost:3000'));
     assert.ok(DEV_ORIGINS.includes('http://localhost:5173'));

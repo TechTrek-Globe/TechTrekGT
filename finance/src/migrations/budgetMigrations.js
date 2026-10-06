@@ -58,20 +58,9 @@ export function normalizeFundingGoals(goals = [], people = [], accounts = []) {
 
     let targetAccountId = g.accountId;
     if (accList.length > 0 && targetAccountId) {
-      const directMatch = accList.find(a => a.id === targetAccountId);
-      if (!directMatch) {
-        let nameMatch = null;
-        const lowTarget = String(targetAccountId).toLowerCase();
-        if (lowTarget.includes('mortgage')) {
-          nameMatch = accList.find(a => a.name && a.name.toLowerCase().includes('mortgage'));
-        } else if (lowTarget.includes('hoa')) {
-          nameMatch = accList.find(a => a.name && a.name.toLowerCase().includes('hoa'));
-        } else if (lowTarget.includes('bills')) {
-          nameMatch = accList.find(a => a.name && a.name.toLowerCase().includes('bills'));
-        }
-        if (nameMatch) {
-          targetAccountId = nameMatch.id;
-        }
+      const directMatch = accList.find(a => a.id === targetAccountId || a.name === targetAccountId);
+      if (directMatch) {
+        targetAccountId = directMatch.id;
       }
     }
 
@@ -124,4 +113,43 @@ export function runBudgetMigrations(budget) {
   }
 
   return { budget: migrated, wasMigrated, details: migrationDetails };
+}
+
+/**
+ * Proposed legacy bill amount correction (FIX-14).
+ * Identifies legacy precision drift for explicit owner review and approval.
+ * Does NOT run automatically on real user data during runBudgetMigrations.
+ *
+ * @param {Array} bills
+ * @returns {{ proposedBills: Array, changes: Array }}
+ */
+export function proposeLegacyBillCorrections(bills = []) {
+  if (!Array.isArray(bills)) return { proposedBills: [], changes: [] };
+  const changes = [];
+  const proposedBills = bills.map(b => {
+    const amt = Number(b.amount) || 0;
+    let newAmt = amt;
+    if (Math.abs(amt - 442.32) < 0.01) {
+      newAmt = 444.00;
+      changes.push({
+        billId: b.id,
+        name: b.name,
+        currentAmount: amt,
+        proposedAmount: newAmt,
+        reason: 'Legacy HOA rounding correction (requires owner approval)'
+      });
+    } else if (Math.abs(amt - 2601.45) < 0.01 || Math.abs(amt - 2757.68) < 0.01) {
+      newAmt = 2756.00;
+      changes.push({
+        billId: b.id,
+        name: b.name,
+        currentAmount: amt,
+        proposedAmount: newAmt,
+        reason: 'Legacy Mortgage rounding correction (requires owner approval)'
+      });
+    }
+    return { ...b, amount: newAmt };
+  });
+
+  return { proposedBills, changes };
 }

@@ -723,7 +723,8 @@ function DailySpreadsheetMatrix() {
     selectedAccount,
     budget.accounts,
     monthList,
-    getCalculatedBalanceAsOf
+    getCalculatedBalanceAsOf,
+    matrixVersion
   ]);
 
   // Generate continuous daily matrix rows across monthList (starting on startDateObj with no prior dates)
@@ -874,8 +875,13 @@ function DailySpreadsheetMatrix() {
         const customOtherDesc = rawOtherDesc.replace(/^Other\s*\$?\s*\(?(.*?)\)?$/i, '$1').trim();
 
         // 4. Determine Beginning and Ending Balances
-        const tentativeRegEnding = runningRegBeg + totalRegCredits - totalDayBills + otherAmt;
-        const tentativeExtraEnding = runningExtraBeg + dayExtraAdd;
+        // FIX-08: ending = round2(beginning + credits - bills + other) every day.
+        // Never replace it with reg_ending, extra_ending, or importedLedgerRows values.
+        const regEnding = round2(runningRegBeg + totalRegCredits - totalDayBills + otherAmt);
+        const extraEnding = showExtraColumns ? round2(runningExtraBeg + dayExtraAdd) : 0;
+        const totalEnd = round2(regEnding + (showExtraColumns ? extraEnding : 0));
+        const isHistoricalLock = isLockedDay;
+        const totalBeg = Math.round((runningRegBeg + (showExtraColumns ? runningExtraBeg : 0)) * 100) / 100;
 
         let customRegEnd;
         let customExtraEnd;
@@ -912,27 +918,17 @@ function DailySpreadsheetMatrix() {
           }
         }
 
-        let reg = customRegEnd !== undefined && !isNaN(customRegEnd) ? customRegEnd : tentativeRegEnding;
-        let extra = customExtraEnd !== undefined && !isNaN(customExtraEnd) ? customExtraEnd : tentativeExtraEnding;
-
-        if (customRegEnd === undefined && customExtraEnd === undefined) {
-          if (reg < 0 && extra > 0) {
-            const transfer = Math.min(extra, -reg);
-            reg += transfer;
-            extra -= transfer;
-          } else if (extra < 0 && reg > 0) {
-            const transfer = Math.min(reg, -extra);
-            extra += transfer;
-            reg -= transfer;
-          }
+        // Stored bank balance for comparison only (never replaces calculated ending balance)
+        let bankBalance = null;
+        if (customRegEnd !== undefined && !isNaN(customRegEnd)) {
+          bankBalance = round2(customRegEnd);
+        } else if (customExtraEnd !== undefined && !isNaN(customExtraEnd) && showExtraColumns) {
+          bankBalance = round2(customExtraEnd);
         }
 
-        const regEnding = Math.round(reg * 100) / 100 || 0;
-        const extraEnding = Math.round(extra * 100) / 100 || 0;
-
-        const totalEnd = Math.round((regEnding + (showExtraColumns ? extraEnding : 0)) * 100) / 100;
-        const isHistoricalLock = isLockedDay;
-        const totalBeg = Math.round((runningRegBeg + (showExtraColumns ? runningExtraBeg : 0)) * 100) / 100;
+        const variance = bankBalance !== null ? round2(regEnding - bankBalance) : 0;
+        const hasBankDiff = bankBalance !== null && Math.abs(variance) > 0.01;
+        const bankDiffText = hasBankDiff ? `Differs from bank by ${fmtMoney(Math.abs(variance))}` : '';
 
         const isStartRow = (
           dateObj.getFullYear() === startDateObj.getFullYear() &&
@@ -966,8 +962,16 @@ function DailySpreadsheetMatrix() {
           regEnding,
           extraEnding,
           totalEnd,
+          reg: regEnding,
+          extra: extraEnding,
+          total: totalEnd,
           isDeficit: totalEnd < 0,
-          isHistoricalLock
+          isHistoricalLock,
+          bankBalance,
+          variance,
+          bankVariance: variance,
+          hasBankDiff,
+          bankDiffText
         });
 
         // Carry ending balances forward as the next day's opening
@@ -1610,7 +1614,7 @@ function DailySpreadsheetMatrix() {
               </th>
 
               {/* Ending Balances */}
-              <th className="px-1.5 h-10 text-right min-w-[72px] text-purple-300 bg-slate-900 align-middle sticky top-[24px] z-20 border-b border-slate-700 border-r border-slate-800 font-bold" title="Click any row cell below to edit Regular Ending Balance">
+              <th className="px-1.5 h-10 text-right min-w-[130px] text-purple-300 bg-slate-900 align-middle sticky top-[24px] z-20 border-b border-slate-700 border-r border-slate-800 font-bold" title="Regular Ending Balance">
                 <span className="block text-[11px] leading-tight">Reg<br/>End</span>
               </th>
               {showExtraColumns && (
@@ -1910,7 +1914,7 @@ function DailySpreadsheetMatrix() {
                       </td>
 
                       {/* Regular Ending Balance (Pure calculated value) */}
-                      <td className={`p-1 text-right font-bold min-w-[72px] ${
+                      <td className={`p-1 text-right font-bold min-w-[130px] ${
                         isSelected && !row.isToday ? 'text-blue-100 bg-blue-950/40' : (row.regEnding < 0 ? 'text-rose-400' : 'text-slate-200')
                       }`}>
                         <span
@@ -1924,6 +1928,16 @@ function DailySpreadsheetMatrix() {
                         >
                           {fmtMoney(row.regEnding)}
                         </span>
+                        {row.hasBankDiff && (
+                          <div
+                            className="inline-flex items-center justify-end gap-1 text-[9px] text-amber-400 font-normal whitespace-nowrap mt-0.5"
+                            title={`Bank statement: ${fmtMoney(row.bankBalance)} (diff: ${fmtMoney(row.variance)})`}
+                            data-testid="bank-variance-indicator"
+                          >
+                            <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0" aria-hidden="true" />
+                            <span>{row.bankDiffText}</span>
+                          </div>
+                        )}
                       </td>
 
                       {/* Extra Ending Balance (Pure calculated value) */}
@@ -2002,7 +2016,7 @@ function DailySpreadsheetMatrix() {
               <td className="p-1 bg-slate-900 border-r border-slate-800 min-w-[120px]">&mdash;</td>
 
               {/* Ending Balances Subtotals */}
-              <td className="p-1 text-right font-mono text-slate-200 bg-slate-900 min-w-[72px]">&mdash;</td>
+              <td className="p-1 text-right font-mono text-slate-200 bg-slate-900 min-w-[130px]">&mdash;</td>
               {showExtraColumns && (
                 <td className="p-1 text-right font-mono text-slate-200 bg-slate-900 border-r border-slate-800 min-w-[72px]">&mdash;</td>
               )}

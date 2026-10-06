@@ -10,6 +10,10 @@ import { logDebug, logWarn, logInfo } from './debugLogger.js';
 import { getPersonDepositAmountForAccount } from './paydayUtils.js';
 import { round2, parseMoney } from './formatters.js';
 
+// Enforce maximum file size (15 MB) and row count (50,000 rows) before parsing (FIX-11)
+export const MAX_SPREADSHEET_FILE_SIZE = 15 * 1024 * 1024; // 15 MB
+export const MAX_SPREADSHEET_ROW_COUNT = 50000; // 50,000 rows
+
 // --- Internal Field Definitions ---
 
 export const INTERNAL_TRANSACTION_FIELDS = [
@@ -113,7 +117,7 @@ export function normalizeIsoDate(rawDate) {
 export function detectFileType(fileName, sheetNames = [], sampleHeaders = []) {
   const isMatrixHeader = Array.isArray(sampleHeaders) && sampleHeaders.some(h => {
     const s = String(h || '').toLowerCase().trim();
-    return s.includes('beg balance') || s.includes('ending balance') || s.includes('extra beg') || s.includes('regular beg') || s.includes('jon credit') || s.includes('ronnie credit');
+    return s.includes('beg balance') || s.includes('ending balance') || s.includes('extra beg') || s.includes('regular beg') || s.includes('credit');
   });
 
   if (isMatrixHeader) {
@@ -145,10 +149,21 @@ export function detectFileType(fileName, sheetNames = [], sampleHeaders = []) {
  * @returns {{ headers: string[], rows: Record<string, string>[], rawRows: any[][] }}
  */
 export function parseGenericFlat(arrayBuffer) {
+  const byteLen = arrayBuffer?.byteLength ?? (typeof arrayBuffer === 'string' ? arrayBuffer.length : 0);
+  if (byteLen > MAX_SPREADSHEET_FILE_SIZE) {
+    throw new Error(`File size (${Math.round(byteLen / (1024 * 1024))}MB) exceeds maximum limit of 15MB.`);
+  }
   logDebug('PARSER', 'Parsing generic flat spreadsheet / CSV buffer', { byteLength: arrayBuffer?.byteLength });
   const workbook = XLSX.read(arrayBuffer, { type: 'array', raw: true, cellDates: false });
   const sheetName = workbook.SheetNames[0];
   const sheet = workbook.Sheets[sheetName];
+  if (sheet && sheet['!ref']) {
+    const range = XLSX.utils.decode_range(sheet['!ref']);
+    const totalRows = range.e.r - range.s.r + 1;
+    if (totalRows > MAX_SPREADSHEET_ROW_COUNT) {
+      throw new Error(`Sheet contains ${totalRows} rows, exceeding maximum limit of ${MAX_SPREADSHEET_ROW_COUNT}.`);
+    }
+  }
   const rawRows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
 
   if (!rawRows || rawRows.length < 2) {
@@ -466,8 +481,8 @@ export function detectTransactionConflicts(existing = [], incoming = []) {
       const exDesc = (ex.description || '').toLowerCase().trim();
       const exAmt = parseFloat(ex.amount) || 0;
 
-      const cleanInc = incDesc.replace(/\b(usaa|zelle|ach|deposit|transfer|payment|funds)\b/gi, '').trim();
-      const cleanEx = exDesc.replace(/\b(usaa|zelle|ach|deposit|transfer|payment|funds)\b/gi, '').trim();
+      const cleanInc = incDesc.replace(/\b(zelle|ach|deposit|transfer|payment|funds)\b/gi, '').trim();
+      const cleanEx = exDesc.replace(/\b(zelle|ach|deposit|transfer|payment|funds)\b/gi, '').trim();
       const descMatch = incDesc === exDesc || 
         (cleanInc.length >= 3 && cleanEx.length >= 3 && (cleanInc.includes(cleanEx) || cleanEx.includes(cleanInc))) ||
         (incDesc.length >= 5 && exDesc.length >= 5 && (incDesc.includes(exDesc) || exDesc.includes(incDesc)));
@@ -648,8 +663,8 @@ export function matchCreditToEarner({
   if (NON_EARNER_DESC_PATTERNS.some(p => descLower.includes(p) || notesLower.includes(p))) return null;
 
   // Tier 1: Direct Name or Alias text match
-  // Strategy: A direct earner NAME in the description (e.g. "Ronnie Payroll") is
-  // unambiguous and returns immediately. However, ALIAS matches (e.g. "usaa transfer")
+  // Strategy: A direct earner NAME in the description (e.g. "Payroll") is
+  // unambiguous and returns immediately. However, ALIAS matches (e.g. "bank transfer")
   // can be generic descriptors shared across multiple earners' bank transfers.
   // When an alias matches, we validate it against known per-paycheck allocation amounts.
   // If another earner has a direct allocation that closely matches the transaction amount,
@@ -681,7 +696,7 @@ export function matchCreditToEarner({
 
   // If Tier 1 found an alias match, cross-validate: does another earner have a
   // per-paycheck allocation that is a much closer amount match than the alias holder?
-  // This prevents "USAA Transfer" aliased to Jon from stealing Ronnie's $1,378 deposit.
+  // This prevents a generic transfer alias from displacing an earner's direct deposit.
   if (tier1AliasMatch) {
     const aliasPersonId = tier1AliasMatch.person.id;
 
@@ -761,8 +776,8 @@ export function matchCreditToEarner({
     // The incoming credit amount is matched against what each person is expected to deposit
     // into ANY of their configured accounts - not just the target import account.
     //
-    // Rationale: A credit of $689.42 into "Bills Checking" should match Jon because $689.00
-    // is his per-paycheck allocation to "Mortgage Checking". The bank may consolidate transfers
+    // Rationale: A credit into an account should match the contributor because of
+    // their per-paycheck allocation to a configured account. The bank may consolidate transfers
     // across accounts, or the CSV may not precisely reflect which sub-account received the money.
     //
     // Priority: target account is tested first (score boost via lower delta floor),
@@ -794,8 +809,7 @@ export function matchCreditToEarner({
         // IMPORTANT: A monthly-doubled value is a derived/computed match, not a direct
         // per-paycheck allocation. Apply a synthetic confidence penalty of $0.50 so that
         // a direct per-paycheck allocation for any earner (even processed later in the loop)
-        // always beats a monthly-double tie. This prevents Jon's $689*2=$1,378 monthly
-        // computation from displacing Ronnie's direct $1,378 per-paycheck allocation.
+        // always beats a monthly-double tie.
         const isBiOrSemi = p.payFrequency === 'semi-monthly' || p.payFrequency === 'bi-weekly';
         if (isBiOrSemi) {
           const monthlyAlloc = Math.round(allocAmt * 2 * 100) / 100;
@@ -1049,40 +1063,35 @@ export function detectExtraHeaderRow(rawRows = []) {
  * @returns {{ isWorkbook: boolean, sheetNames: string[], sheetsInfo: any[] }}
  */
 export function inspectWorkbookSheets(arrayBuffer, fileName = '', existingAccounts = []) {
+  const byteLen = arrayBuffer?.byteLength ?? (typeof arrayBuffer === 'string' ? arrayBuffer.length : 0);
+  if (byteLen > MAX_SPREADSHEET_FILE_SIZE) {
+    throw new Error(`File size (${Math.round(byteLen / (1024 * 1024))}MB) exceeds maximum limit of 15MB.`);
+  }
   const workbook = XLSX.read(arrayBuffer, { type: 'array', raw: true, cellDates: false });
   const sheetNames = workbook.SheetNames || [];
 
   const sheetsInfo = sheetNames.map(name => {
     const sheet = workbook.Sheets[name];
+    if (sheet && sheet['!ref']) {
+      const range = XLSX.utils.decode_range(sheet['!ref']);
+      const totalRows = range.e.r - range.s.r + 1;
+      if (totalRows > MAX_SPREADSHEET_ROW_COUNT) {
+        throw new Error(`Sheet "${name}" contains ${totalRows} rows, exceeding maximum limit of ${MAX_SPREADSHEET_ROW_COUNT}.`);
+      }
+    }
     const rawRows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
     const rowCount = rawRows.length;
     const previewRows = rawRows.slice(0, 5);
 
     const headerDetection = detectExtraHeaderRow(previewRows);
 
-    // Suggest a matching existing account with priority for specific account keywords
+    // Match existing account by explicit ID or exact name match (no keyword heuristics)
     const lowerName = name.toLowerCase();
-    const lowerFileName = (fileName || '').toLowerCase();
-    
-    let matchedAccount = existingAccounts.find(acc => {
-      const accNorm = acc.name.toLowerCase();
-      if (accNorm.includes(lowerName) || lowerName.includes(accNorm)) return true;
-      if (lowerName.includes('mortgage') && accNorm.includes('mortgage')) return true;
-      if (lowerName.includes('hoa') && accNorm.includes('hoa')) return true;
-      if (lowerName.includes('bills') && accNorm.includes('bills')) return true;
-      return false;
+    const matchedAccount = existingAccounts.find(acc => {
+      const accNorm = (acc.name || '').toLowerCase();
+      const accId = (acc.id || '').toLowerCase();
+      return accId === lowerName || accNorm === lowerName;
     });
-
-    if (!matchedAccount) {
-      matchedAccount = existingAccounts.find(acc => {
-        const accNorm = acc.name.toLowerCase();
-        if (lowerName.includes('checking') && accNorm.includes('checking')) return true;
-        if (lowerName.includes('sav') && accNorm.includes('sav')) return true;
-        if (lowerFileName.includes('mortgage') && accNorm.includes('mortgage')) return true;
-        if (lowerFileName.includes('hoa') && accNorm.includes('hoa')) return true;
-        return false;
-      });
-    }
 
     return {
       name,

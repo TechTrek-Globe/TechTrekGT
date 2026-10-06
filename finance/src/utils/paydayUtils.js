@@ -438,6 +438,7 @@ export function getPersonExtraSavingsDepositAmountForAccount(person, selectedAcc
 
   const targetAcc = (budget.accounts || []).find(a => a.id === selectedAccountId);
   if (!targetAcc) return 0;
+  if (targetAcc.enableExtraSavings === false) return 0;
 
   const deposit = getPersonDepositAmountForAccount(person, selectedAccountId, budget);
   const bills   = getPersonBillPerPaycheckPortionForAccount(person, selectedAccountId, budget);

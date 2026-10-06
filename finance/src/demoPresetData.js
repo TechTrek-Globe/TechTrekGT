@@ -21,10 +21,10 @@ export const fakeDemoBudgetData = {
       saveExtraMonthly: 0,
       enableExtraSavings: true,
       overflowSplits: {
-        'person-jon': 100
+        'person-alex': 100
       },
       saveExtraSplits: {
-        'person-jon': 100
+        'person-alex': 100
       },
       color: 'blue',
       notes: 'Primary household operating and recurring bills account'
@@ -37,12 +37,12 @@ export const fakeDemoBudgetData = {
       saveExtraMonthly: 0,
       enableExtraSavings: true,
       overflowSplits: {
-        'person-jon': 50,
-        'person-ronnie': 50
+        'person-alex': 50,
+        'person-sam': 50
       },
       saveExtraSplits: {
-        'person-jon': 50,
-        'person-ronnie': 50
+        'person-alex': 50,
+        'person-sam': 50
       },
       color: 'emerald',
       notes: 'Dedicated mortgage escrow and P&I payment account'
@@ -55,12 +55,12 @@ export const fakeDemoBudgetData = {
       saveExtraMonthly: 0,
       enableExtraSavings: true,
       overflowSplits: {
-        'person-jon': 50,
-        'person-ronnie': 50
+        'person-alex': 50,
+        'person-sam': 50
       },
       saveExtraSplits: {
-        'person-jon': 50,
-        'person-ronnie': 50
+        'person-alex': 50,
+        'person-sam': 50
       },
       color: 'purple',
       notes: 'HOA reserve and community dues savings account'
@@ -69,8 +69,8 @@ export const fakeDemoBudgetData = {
 
   people: [
     {
-      id: 'person-jon',
-      name: 'Jon',
+      id: 'person-alex',
+      name: 'Alex',
       role: 'Primary Earner',
       payFrequency: 'semi-monthly',
       payDay1: 15,
@@ -81,8 +81,8 @@ export const fakeDemoBudgetData = {
       color: 'purple'
     },
     {
-      id: 'person-ronnie',
-      name: 'Ronnie',
+      id: 'person-sam',
+      name: 'Sam',
       role: 'Partner / Earner',
       payFrequency: 'monthly',
       payDay1: 1,
@@ -92,8 +92,8 @@ export const fakeDemoBudgetData = {
       color: 'emerald'
     },
     {
-      id: 'person-gym',
-      name: 'Gym',
+      id: 'person-taylor',
+      name: 'Taylor',
       role: 'Secondary Earner',
       payFrequency: 'bi-weekly',
       payDay1: 15,
@@ -107,50 +107,50 @@ export const fakeDemoBudgetData = {
 
   fundingGoals: [
     {
-      id: 'goal-bills-jon-1',
-      contributorId: 'person-jon',
+      id: 'goal-bills-alex-1',
+      contributorId: 'person-alex',
       accountId: 'acc-bills-checking',
       name: 'Bills Checking Base (Semi-Monthly)',
       amountPerPay: 85.00
     },
     {
-      id: 'goal-bills-jon-2',
-      contributorId: 'person-jon',
+      id: 'goal-bills-alex-2',
+      contributorId: 'person-alex',
       accountId: 'acc-bills-checking',
       name: 'Bills Checking Buffer (Monthly)',
       amountPerPay: 78.08
     },
     {
-      id: 'goal-bills-gym-1',
-      contributorId: 'person-gym',
+      id: 'goal-bills-taylor-1',
+      contributorId: 'person-taylor',
       accountId: 'acc-bills-checking',
-      name: 'Gym Membership Share',
+      name: 'Shared Activity Share',
       amountPerPay: 11.25
     },
     {
-      id: 'goal-mortgage-jon',
-      contributorId: 'person-jon',
+      id: 'goal-mortgage-alex',
+      contributorId: 'person-alex',
       accountId: 'acc-mortgage-checking',
       name: 'Mortgage Contribution',
       amountPerPay: 689.00
     },
     {
-      id: 'goal-mortgage-ronnie',
-      contributorId: 'person-ronnie',
+      id: 'goal-mortgage-sam',
+      contributorId: 'person-sam',
       accountId: 'acc-mortgage-checking',
       name: 'Mortgage Contribution',
       amountPerPay: 1378.00
     },
     {
-      id: 'goal-hoa-jon',
-      contributorId: 'person-jon',
+      id: 'goal-hoa-alex',
+      contributorId: 'person-alex',
       accountId: 'acc-hoa-savings',
       name: 'HOA Reserve Contribution',
       amountPerPay: 111.00
     },
     {
-      id: 'goal-hoa-ronnie',
-      contributorId: 'person-ronnie',
+      id: 'goal-hoa-sam',
+      contributorId: 'person-sam',
       accountId: 'acc-hoa-savings',
       name: 'HOA Reserve Contribution',
       amountPerPay: 222.00
@@ -169,8 +169,8 @@ export const fakeDemoBudgetData = {
       notes: 'Suburban home mortgage auto-debit',
       matchingKey: 'MORTGAGE, ESCROW, CHASE MORTGAGE',
       splits: {
-        'person-jon': 50,
-        'person-ronnie': 50
+        'person-alex': 50,
+        'person-sam': 50
       }
     },
     {
@@ -184,8 +184,8 @@ export const fakeDemoBudgetData = {
       notes: 'Community dues and master maintenance',
       matchingKey: 'HOA DUES, HOA ASSESSMENT',
       splits: {
-        'person-jon': 50,
-        'person-ronnie': 50
+        'person-alex': 50,
+        'person-sam': 50
       }
     },
     {
@@ -199,9 +199,9 @@ export const fakeDemoBudgetData = {
       notes: 'City power grid utility bill',
       matchingKey: 'METRO ELECTRIC, GA POWER, POWER BILL',
       splits: {
-        'person-jon': 100,
-        'person-ronnie': 0,
-        'person-gym': 0
+        'person-alex': 100,
+        'person-sam': 0,
+        'person-taylor': 0
       }
     },
     {
@@ -215,15 +215,15 @@ export const fakeDemoBudgetData = {
       notes: 'High-speed 1Gbps fiber broadband',
       matchingKey: 'FIBER GIGABIT, COMCAST, XFINITY',
       splits: {
-        'person-jon': 100,
-        'person-ronnie': 0,
-        'person-gym': 0
+        'person-alex': 100,
+        'person-sam': 0,
+        'person-taylor': 0
       }
     },
     {
       id: 'bill-gym-dues',
       accountId: 'acc-bills-checking',
-      name: 'Gym Club Assessment',
+      name: 'Fitness Center Assessment',
       amount: 22.50,
       period: 'Monthly',
       dueDay: 5,
@@ -231,9 +231,9 @@ export const fakeDemoBudgetData = {
       notes: 'Shared athletic facility monthly fee',
       matchingKey: 'GYM CLUB, FITNESS, DUES',
       splits: {
-        'person-jon': 0,
-        'person-ronnie': 0,
-        'person-gym': 100
+        'person-alex': 0,
+        'person-sam': 0,
+        'person-taylor': 100
       }
     }
   ],

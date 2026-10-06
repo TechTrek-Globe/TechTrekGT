@@ -19,7 +19,7 @@ import {
   Check
 } from 'lucide-react';
 import { parseSpreadsheetAsync, parseGenericFlatAsync, inspectWorkbookAsync } from '../../utils/spreadsheetWorkerClient';
-import { detectFileType, autoMatchColumns, applyTransactionMapping } from '../../utils/importer';
+import { detectFileType, autoMatchColumns, applyTransactionMapping, MAX_SPREADSHEET_FILE_SIZE } from '../../utils/importer';
 import { fmtMoney } from '../../utils/formatters';
 import { 
   getPersonBillMonthlyPortionForAccount, 
@@ -178,6 +178,10 @@ export function AccountsPeoplePanel() {
   const handleAccFileUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (file.size > MAX_SPREADSHEET_FILE_SIZE) {
+      setAccImportError(`File size (${Math.round(file.size / (1024 * 1024))}MB) exceeds maximum allowed limit of 15MB.`);
+      return;
+    }
     setAccImportError('');
     setIsAccImporting(true);
     try {
@@ -460,7 +464,7 @@ export function AccountsPeoplePanel() {
                 <input
                   type="text"
                   required
-                  placeholder="e.g. USAA Bills Checking - 7071"
+                  placeholder="e.g. Primary Checking"
                   value={newAccForm.name}
                   onChange={e => setNewAccForm({ ...newAccForm, name: e.target.value })}
                   className="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-blue-500"
@@ -1051,18 +1055,15 @@ export function AccountsPeoplePanel() {
           const payFreq = allocEditingPerson.payFrequency || 'semi-monthly';
           const goalsForPerson = (budget.fundingGoals || []).filter(g => g.contributorId === allocEditingPerson.id);
 
-          // Verification for Mortgage & HOA ($1,600/mo check)
-          const mortgageGoals = goalsForPerson.filter(g => {
-            const acc = budget.accounts.find(a => a.id === g.accountId);
-            return acc && (acc.id === 'acc-mortgage-checking' || acc.name.toLowerCase().includes('mortgage'));
-          });
-          const hoaGoals = goalsForPerson.filter(g => {
-            const acc = budget.accounts.find(a => a.id === g.accountId);
-            return acc && (acc.id === 'acc-hoa-savings' || acc.name.toLowerCase().includes('hoa'));
-          });
-          const mortgageMonthly = mortgageGoals.reduce((sum, g) => sum + goalMonthlyDisplay(g, payFreq), 0);
-          const hoaMonthly = hoaGoals.reduce((sum, g) => sum + goalMonthlyDisplay(g, payFreq), 0);
-          const isMortgageHoaVerified = Math.round((mortgageMonthly + hoaMonthly) * 100) / 100 === 1600;
+          // Generic goals-versus-bills coverage indicator
+          const totalBillsMonthlyForPerson = (budget.accounts || []).reduce((sum, acc) => {
+            return sum + getPersonBillMonthlyPortionForAccount(allocEditingPerson, acc.id, budget);
+          }, 0);
+          const totalGoalsMonthly = personTotals.monthlyTotal || 0;
+          const isCoverageAdequate = totalBillsMonthlyForPerson > 0 && totalGoalsMonthly >= totalBillsMonthlyForPerson;
+          const coveragePct = totalBillsMonthlyForPerson > 0
+            ? Math.round((totalGoalsMonthly / totalBillsMonthlyForPerson) * 100)
+            : 100;
 
           return (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-4 overflow-y-auto">
@@ -1115,15 +1116,23 @@ export function AccountsPeoplePanel() {
                   </div>
                 </div>
 
-                {/* Verification Check for Mortgage & HOA */}
-                {isMortgageHoaVerified && (
-                  <div className="p-2.5 rounded-xl bg-emerald-950/50 border border-emerald-800/60 flex items-center justify-between text-xs font-mono text-emerald-200">
+                {/* Generic Goals-versus-Bills Coverage Indicator */}
+                {totalBillsMonthlyForPerson > 0 && (
+                  <div className={`p-2.5 rounded-xl border flex items-center justify-between text-xs font-mono ${
+                    isCoverageAdequate
+                      ? 'bg-emerald-950/50 border-emerald-800/60 text-emerald-200'
+                      : 'bg-amber-950/50 border-amber-800/60 text-amber-200'
+                  }`}>
                     <span className="flex items-center gap-1.5 font-sans font-semibold">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                      Mortgage &amp; HOA Goals Verified:
+                      {isCoverageAdequate ? (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                      ) : (
+                        <AlertTriangle className="w-4 h-4 text-amber-400" />
+                      )}
+                      Goals vs. Bills Coverage ({coveragePct}%):
                     </span>
-                    <span className="font-bold text-emerald-300">
-                      $1,600.00 / mo (${(payFreq === 'semi-monthly' ? 800 : payFreq === 'bi-weekly' ? (1600*12/26).toFixed(2) : 1600)} / pay)
+                    <span className={`font-bold ${isCoverageAdequate ? 'text-emerald-300' : 'text-amber-300'}`}>
+                      {fmtMoney(totalGoalsMonthly)} / mo goals vs. {fmtMoney(totalBillsMonthlyForPerson)} / mo bills
                     </span>
                   </div>
                 )}

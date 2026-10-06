@@ -1,7 +1,6 @@
 // @ts-nocheck
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { initialBudgetData, DEFAULT_DASHBOARD_WIDGETS } from '../initialData';
-import { fakeDemoBudgetData } from '../demoPresetData';
 import { useAuth } from './AuthContext';
 import { 
   isPersonDepositDay, 
@@ -261,13 +260,7 @@ export function BudgetMetadataProvider({ children }) {
             people: Array.isArray(stored.people) ? stored.people : initialBudgetData.people,
             bills: Array.isArray(stored.bills) ? stored.bills.map(b => {
               const raw = b.bankMatchNames !== undefined ? b.bankMatchNames : (b.matchingKey || b.matching_key || '');
-              let amt = parseMoney(b.amount, 0);
-              if (Math.abs(amt - 442.32) < 0.01 || (b.name && b.name.toLowerCase().includes('hoa') && Math.abs(amt - 442.32) < 1.0)) {
-                amt = 444.00;
-              }
-              if (b.name && b.name.toLowerCase().includes('mortgage') && (Math.abs(amt - 2601.45) < 1.0 || Math.abs(amt - 2757.68) < 2.0)) {
-                amt = 2756.00;
-              }
+              const amt = parseMoney(b.amount, 0);
               return { ...b, amount: amt, matchingKey: b.matchingKey ?? raw, bankMatchNames: b.bankMatchNames ?? raw };
             }) : initialBudgetData.bills,
             loans: Array.isArray(stored.loans) ? stored.loans : initialBudgetData.loans,
@@ -317,13 +310,7 @@ export function BudgetMetadataProvider({ children }) {
                 people: Array.isArray(parsed.people) ? parsed.people : initialBudgetData.people,
                 bills: Array.isArray(parsed.bills) ? parsed.bills.map(b => {
                   const raw = b.bankMatchNames !== undefined ? b.bankMatchNames : (b.matchingKey || b.matching_key || '');
-                  let amt = parseMoney(b.amount, 0);
-                  if (Math.abs(amt - 442.32) < 0.01 || (b.name && b.name.toLowerCase().includes('hoa') && Math.abs(amt - 442.32) < 1.0)) {
-                    amt = 444.00;
-                  }
-                  if (b.name && b.name.toLowerCase().includes('mortgage') && (Math.abs(amt - 2601.45) < 1.0 || Math.abs(amt - 2757.68) < 2.0)) {
-                    amt = 2756.00;
-                  }
+                  const amt = parseMoney(b.amount, 0);
                   return { ...b, amount: amt, matchingKey: b.matchingKey ?? raw, bankMatchNames: b.bankMatchNames ?? raw };
                 }) : initialBudgetData.bills,
                 loans: Array.isArray(parsed.loans) ? parsed.loans : initialBudgetData.loans,

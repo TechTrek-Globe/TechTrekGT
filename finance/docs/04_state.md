@@ -17,8 +17,14 @@ State is partitioned into four primary layers in the component tree:
 
 - **`AuthProvider` (`src/context/AuthContext.jsx`):** Manages user session state, authentication claims, and CSRF tokens. Backed by HttpOnly `SameSite=Strict` cookies (`auth_token` and `csrf_token`).
 - **`BudgetMetadataProvider` (`src/context/BudgetMetadataContext.jsx`):** Manages accounts, people/earners, bills, funding goals, loans, and categories.
-- **`LedgerDataProvider` (`src/context/LedgerDataContext.jsx`):** Manages historical transactions, imported ledger rows, daily matrix balances, and cash-flow projections.
+- **`LedgerDataProvider` (`src/context/LedgerDataContext.jsx`):** Manages historical transactions, imported ledger rows, daily matrix balances, and cash-flow projections. `dailyMatrixRef.current` is synchronized on render to prevent stale matrix reads following database seeding.
 - **`useBudget()` hook:** Composes metadata and ledger data via memoization for consumer components.
+- **Daily Matrix & Credit Resolution:** `allocateEarnerCredit` supports both account-specific resolution and multi-account aggregation for 'all' accounts view, ensuring stored non-zero credits display their exact values while stored zeros display "$ -".
+- **Ending Balance Calculation & Bank Variance Invariant (FIX-08):** In `matrixData`, `getCalculatedBalanceAsOf`, and `getLedgerRunningBalanceAsOfDate`, ending balances strictly follow `ending = round2(beginning + credits - bills + other)` every day without replacement from stored bank ending values (`reg_ending`, `extra_ending`, `importedLedgerRows`). Stored values are preserved for statement variance checks (`|calculated - bank| > 0.01`).
+- **Unified Credit Lock & Pay Period Deduplication (FIX-09):** All three engines (`LedgerView`, `getCalculatedBalanceAsOf`, `getLedgerRunningBalanceAsOfDate`) enforce the exact same lock boundary: `lock end = min(last imported date, today)`. Past locked dates show only stored/imported credits. Imported bank credits land on the bank date. If an imported credit exists within an earner's pay period, the scheduled payday projection is suppressed to eliminate duplicate credits.
+- **Bank Import Ending Balance Separation (FIX-10):** Bank imports via `processSpreadsheetImport` never write or overwrite `reg_ending` keys in `dailyMatrix`. Stated bank running balances are stored exclusively in `account.importedLedgerRows` for statement discrepancy tracking. Existing `reg_ending` cells are preserved untouched.
+- **Zero Household Data & Generic Ingestion (FIX-13):** No hardcoded household account names, digits, earner IDs, or default balances exist in source code or default state. Generic CSV imports create zero hardcoded accounts or earners. Goals-versus-bills coverage is generic and dynamic.
+- **Immutable Stored Bill Amounts (FIX-14):** Bill amounts are preserved exactly as configured and stored. Magic-number rewrites (e.g., 442.32 and 2601.45 / 2757.68) have been removed from context hydration; reloads never mutate stored bill values.
 
 ## 3. Storage & Offline-First Strategy
 
@@ -57,6 +63,7 @@ Authentication states strictly reflect backend database authority and maintain z
   - Any subsequent request carrying an older JWT with `tv !== token_version` is actively denied with HTTP 401 `SESSION_EXPIRED` and purges cookies on the client.
 - **Multi-Cookie Resolution & Collision Recovery:** `getAllTokensFromRequest` extracts all candidate `auth_token` cookies to prevent sub-path collision (e.g. `/` vs `/finance`). Candidate tokens are evaluated sequentially; requests with conflicting dual credentials (both Cookie and Bearer) are actively rejected with HTTP 400.
 - **Declarative Route Guarding (`requireAuth` / `withAuth`):** Centralized `requireAuth` middleware uniformly rejects unauthenticated and revoked states without leaking database driver details, returning standardized JSON error payloads.
+- **Fail-Closed Security Headers (FIX-12):** All responses enforce fail-closed security headers (HSTS and CSP) unless `ENVIRONMENT` is explicitly `'development'` and the request hostname is `localhost` or `127.0.0.1`. Requests bearing ports no longer default to localhost classification (`Boolean(url.port)` stripped), and `http://techtrekgt.com` is omitted from `PRODUCTION_ORIGINS` to deny unencrypted HTTP origin access.
 
 ## 7. Financial Math Engine & State Calculation Invariants (FIN-AUDIT-003)
 
@@ -67,6 +74,11 @@ Authentication states strictly reflect backend database authority and maintain z
   - **Running Balance Precision:** `getCalculatedBalanceAsOf`, `getTotalCashOnHand`, and `getTotalMonthEndCashOnHand` accumulate values using `round2` at each step, preventing sub-cent floating-point accumulation drift over 365-day projection horizons.
   - **Negative Zero Normalization:** Any arithmetic yielding `-0` is automatically converted to `0` by `round2` via `Object.is(val, -0) ? 0 : val`, guaranteeing deterministic state serialization.
   - **Credit Allocation Conservation:** `allocateEarnerCredit` enforces that total earner distributions strictly equal the earner's deposit (`earnerReg + earnerExtra === earnerDeposit`), preventing balance phantom surpluses or deficits.
+  - **Ending Balance Row Calculation Invariant:** Every ledger row strictly maintains `ending = round2(beginning + credits - bills + other)`. Stored bank statement balances (`reg_ending`, `extra_ending`, `importedLedgerRows`) are preserved purely for statement discrepancy comparisons and never override row cash-flow math.
+  - **Bank Import Ending Balance Separation (FIX-10):** Bank imports via `processSpreadsheetImport` never write or overwrite `reg_ending` keys in `dailyMatrix`. Stated bank running balances are stored exclusively in `account.importedLedgerRows` for statement discrepancy tracking. Existing `reg_ending` cells are preserved untouched.
+  - **Spreadsheet Ingestion Bounds (FIX-11):** Upgraded `xlsx` to pinned official SheetJS release (`https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz`). File size is strictly clamped to `MAX_SPREADSHEET_FILE_SIZE = 15MB` and worksheet row count is capped at `MAX_SPREADSHEET_ROW_COUNT = 50,000` prior to parsing in `spreadsheet.worker.js` and client utilities.
+  - **Zero Household Data & Generic Ingestion (FIX-13):** Eliminates hardcoded accounts, digits, earner names/IDs, and default balances. Generic CSV imports instantiate zero hardcoded accounts or people.
+  - **Preserved Bill Amounts & Zero Silent Rewrites (FIX-14):** Bill amounts remain immutable across reloads. Silent amount rewrites (442.32 / 2601.45 / 2757.68) have been eliminated.
   - **Amortization Schedule Integrity:** `AmortizationView` accumulates interest, principal, and balance reductions with deterministic 2-decimal rounding per monthly period, preventing amortized total interest drift.
 - **Zero Drift Storage Mandate:** All balances stored in IndexedDB or sent to Cloudflare D1 via `/api/sync/backup` are guaranteed to be finite 2-decimal numbers.
 

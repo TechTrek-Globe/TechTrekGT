@@ -5,7 +5,7 @@
  * off the main UI thread. Seamlessly falls back to synchronous in-thread processing in
  * Node.js / test environments where Web Workers are unavailable.
  */
-import { inspectWorkbookSheets, parseGenericFlat } from './importer.js';
+import { inspectWorkbookSheets, parseGenericFlat, MAX_SPREADSHEET_FILE_SIZE, MAX_SPREADSHEET_ROW_COUNT } from './importer.js';
 import { parseSpreadsheet, parseSingleSheet } from './spreadsheetParser.js';
 
 let workerInstance = null;
@@ -52,6 +52,23 @@ function getWorker() {
 }
 
 function callWorker(type, payload) {
+  // Pre-validate file size and row count before processing or dispatching to worker (FIX-11)
+  if (payload?.arrayBuffer) {
+    const len = payload.arrayBuffer.byteLength || 0;
+    if (len > MAX_SPREADSHEET_FILE_SIZE) {
+      return Promise.reject(new Error(`File size (${Math.round(len / (1024 * 1024))}MB) exceeds maximum limit of 15MB.`));
+    }
+  }
+  if (payload?.fileData) {
+    const len = typeof payload.fileData === 'string' ? payload.fileData.length : (payload.fileData?.byteLength || 0);
+    if (len > MAX_SPREADSHEET_FILE_SIZE) {
+      return Promise.reject(new Error(`File size (${Math.round(len / (1024 * 1024))}MB) exceeds maximum limit of 15MB.`));
+    }
+  }
+  if (payload?.rawRows && payload.rawRows.length > MAX_SPREADSHEET_ROW_COUNT) {
+    return Promise.reject(new Error(`Sheet contains ${payload.rawRows.length} rows, exceeding maximum limit of ${MAX_SPREADSHEET_ROW_COUNT}.`));
+  }
+
   const worker = getWorker();
   if (!worker) {
     return Promise.resolve().then(() => {

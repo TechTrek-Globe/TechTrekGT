@@ -10,7 +10,7 @@ Finance OS is architected as a pure JavaScript single-page application built on 
 - Auxiliary Visualization & Processing Libraries:
   - Recharts (^2.15.0): Composable charting library utilized in DashboardView for 365-day balance trajectories and cash flow velocity charts.
   - dnd-kit (^6.3.1): Drag-and-drop toolkit (@dnd-kit/core, @dnd-kit/sortable, @dnd-kit/utilities) powering custom dashboard widget reordering.
-  - SheetJS (xlsx ^0.18.5): Spreadsheet parser executed in a dedicated Web Worker (spreadsheet.worker.js) to offload heavy CSV/XLSX parsing off the browser UI thread.
+  - SheetJS (xlsx 0.20.3 pinned via official distribution https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz): Spreadsheet parser executed in a dedicated Web Worker (spreadsheet.worker.js) to offload heavy CSV/XLSX parsing off the browser UI thread. Input constraints enforce a maximum file size of 15MB and a maximum sheet row count of 50,000.
   - Lucide React (^0.469.0): Platform-wide SVG iconography system.
 
 ## 2. Client-Side Routing & Navigation Model
@@ -46,8 +46,9 @@ The serverless backend executes as an ECMAScript Module (ESM) Worker inside the 
   - Enforces Strict-Transport-Security (HSTS), X-Content-Type-Options: nosniff, X-Frame-Options: DENY, and strict Referrer-Policy.
   - Script source policy: script-src 'self' 'nonce-...' 'strict-dynamic' https://challenges.cloudflare.com.
 - CORS Origin Gating:
-  - Production Origins: https://techtrekgt.com, http://techtrekgt.com, https://techtrek-budget.pages.dev.
+  - Production Origins: https://techtrekgt.com, https://techtrek-budget.pages.dev.
   - Development Origins: localhost and 127.0.0.1 on ports 5173, 3000, and 8787.
+  - Fail-Closed Security Headers: CSP and HSTS are applied by default across all requests unless ENVIRONMENT is explicitly 'development' and the request hostname is localhost or 127.0.0.1 (arbitrary port matching removed).
   - Emits Vary: Origin and rejects unauthorized cross-origin mutations with HTTP 403 Forbidden.
 
 ## 4. Serverless API Routing & Function Architecture

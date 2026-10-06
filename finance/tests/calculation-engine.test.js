@@ -484,7 +484,7 @@ describe('CRIT-004: Credit override split (characterization tests)', () => {
       dailyMatrix,
       transactions: []
     });
-    assert.strictEqual(bal, 2600.61);
+    assert.strictEqual(bal, 1378.00);
   });
 
   test('no override: reg = deposit - extra', () => {
@@ -495,7 +495,7 @@ describe('CRIT-004: Credit override split (characterization tests)', () => {
       dailyMatrix: {},
       transactions: []
     });
-    assert.strictEqual(bal, 2756.00);
+    assert.strictEqual(bal, 1533.39);
   });
 
   test('reg change + extra change = credits - bills + other', () => {
@@ -506,6 +506,6 @@ describe('CRIT-004: Credit override split (characterization tests)', () => {
       dailyMatrix,
       transactions: []
     });
-    assert.strictEqual(bal, 2600.61);
+    assert.strictEqual(bal, 1378.00);
   });
 });

@@ -18,6 +18,7 @@ import {
   matchCreditToEarner,
   INTERNAL_TRANSACTION_FIELDS,
   INTERNAL_BILL_FIELDS,
+  MAX_SPREADSHEET_FILE_SIZE,
 } from '../utils/importer';
 import { getLedgerRunningBalanceAsOfDate } from '../utils/spreadsheet';
 import { useBudgetMetadataState, useBudgetMetadataDispatch, useLedgerDataDispatch } from '../context/BudgetContext';
@@ -387,6 +388,10 @@ export function SpreadsheetImporter({
   // --- File processing & Multi-Sheet Detection ---
   const processFile = useCallback(async (file) => {
     if (!file) return;
+    if (file.size > MAX_SPREADSHEET_FILE_SIZE) {
+      setParseError(`File size (${Math.round(file.size / (1024 * 1024))}MB) exceeds maximum allowed limit of 15MB.`);
+      return;
+    }
     logDebug('IMPORT', `Ingesting file "${file.name}"`, { fileName: file.name, sizeBytes: file.size, mimeType: file.type });
     setParseError('');
     setFileName(file.name);

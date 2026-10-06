@@ -54,6 +54,7 @@ export function LedgerDataProvider({ children }) {
   const [pendingMigrationUserId, setPendingMigrationUserId] = useState(null);
 
   const dailyMatrixRef = useRef(dailyMatrix);
+  dailyMatrixRef.current = dailyMatrix;
   const [matrixVersion, setMatrixVersion] = useState(0);
 
   const metadataStateRef = useRef(metadataState);
@@ -1103,10 +1104,11 @@ export function LedgerDataProvider({ children }) {
 
   // Calculates true running balance from start date to target date using matrix simulation rules
   const getCalculatedBalanceAsOf = useCallback((accountId, targetDateObj) => {
-    if (!accountId || !targetDateObj) return { regEnding: 0, extraEnding: 0, totalEnd: 0 };
+    if (!accountId || !targetDateObj) return { regEnding: 0, extraEnding: 0, totalEnd: 0, reg: 0, extra: 0, total: 0 };
     const acc = (metadataStateRef.current.accounts || []).find(a => a.id === accountId);
-    if (!acc) return { regEnding: 0, extraEnding: 0, totalEnd: 0 };
+    if (!acc) return { regEnding: 0, extraEnding: 0, totalEnd: 0, reg: 0, extra: 0, total: 0 };
 
+    const showExtra = acc.enableExtraSavings !== false;
     const startDateStr = acc.balanceAsOfDate || acc.startDate || '2026-01-01';
     const [sy, sm, sd] = startDateStr.split('-');
     const startDateObj = new Date(parseInt(sy), parseInt(sm) - 1, parseInt(sd));
@@ -1116,11 +1118,15 @@ export function LedgerDataProvider({ children }) {
     
     if (target < startDateObj) {
         const sReg = parseMoney(acc.startingBalance, 0);
-        const sExtra = parseMoney(acc.extraStartingBalance, 0);
+        const sExtra = showExtra ? parseMoney(acc.extraStartingBalance, 0) : 0;
+        const total = round2(sReg + sExtra);
         return { 
           regEnding: sReg, 
           extraEnding: sExtra, 
-          totalEnd: round2(sReg + sExtra) 
+          totalEnd: total,
+          reg: sReg,
+          extra: sExtra,
+          total
         };
     }
 
@@ -1130,7 +1136,7 @@ export function LedgerDataProvider({ children }) {
     const maxImportDateStr = importedDatesList.length > 0 ? importedDatesList.reduce((a, b) => a > b ? a : b) : null;
 
     let runningRegBeg = parseMoney(acc.startingBalance, 0);
-    let runningExtraBeg = parseMoney(acc.extraStartingBalance, 0);
+    let runningExtraBeg = showExtra ? parseMoney(acc.extraStartingBalance, 0) : 0;
 
     const allPeople = metadataStateRef.current.people || [];
     const people = (acc.enabledEarners && Array.isArray(acc.enabledEarners))
@@ -1211,62 +1217,23 @@ export function LedgerDataProvider({ children }) {
       if (customOther !== undefined) otherAmt = round2(otherAmt + parseMoney(customOther, 0));
       if (customOtherCredit !== undefined) otherAmt = round2(otherAmt + parseMoney(customOtherCredit, 0));
 
-      const tentativeRegEnding = round2(runningRegBeg + dayCredits - dayBills + otherAmt);
-      const tentativeExtraEnding = round2(runningExtraBeg + dayExtraAdd);
-
-      let customRegEnd;
-      let customExtraEnd;
-
-      const accReg = getDailyMatrixCell(accountId, monthKey, day, 'reg_ending');
-      const accExtra = getDailyMatrixCell(accountId, monthKey, day, 'extra_ending');
-      if (accReg !== undefined && accReg !== null && accReg !== '') customRegEnd = parseMoney(accReg, null);
-      if (accExtra !== undefined && accExtra !== null && accExtra !== '') customExtraEnd = parseMoney(accExtra, null);
-
-      const impRow = importedRows[isoDate];
-      if (customRegEnd === undefined && isImportMode && impRow !== undefined && !hasDayBillOverride) {
-        if (typeof impRow === 'number') {
-          customRegEnd = round2(impRow);
-        } else if (impRow && typeof impRow === 'object') {
-          const statedEnd = impRow.regEnding ?? impRow.totalEnding ?? null;
-          if (statedEnd !== null && statedEnd !== undefined && Number.isFinite(Number(statedEnd))) {
-            customRegEnd = round2(statedEnd);
-          }
-        }
-      }
-      if (customExtraEnd === undefined && isImportMode && impRow !== undefined && !hasDayBillOverride) {
-        if (impRow && typeof impRow === 'object') {
-          const statedExtra = impRow.extraEnding ?? null;
-          if (statedExtra !== null && statedExtra !== undefined && Number.isFinite(Number(statedExtra))) {
-            customExtraEnd = round2(statedExtra);
-          }
-        }
-      }
-
-      let reg = customRegEnd !== undefined && Number.isFinite(customRegEnd) ? customRegEnd : tentativeRegEnding;
-      let extra = customExtraEnd !== undefined && Number.isFinite(customExtraEnd) ? customExtraEnd : tentativeExtraEnding;
-
-      if (customRegEnd === undefined && customExtraEnd === undefined) {
-        if (reg < 0 && extra > 0) {
-          const transfer = Math.min(extra, -reg);
-          reg = round2(reg + transfer);
-          extra = round2(extra - transfer);
-        } else if (extra < 0 && reg > 0) {
-          const transfer = Math.min(reg, -extra);
-          extra = round2(extra + transfer);
-          reg = round2(reg - transfer);
-        }
-      }
-
-      runningRegBeg = round2(reg);
-      runningExtraBeg = round2(extra);
+      // FIX-08: ending = round2(beginning + credits - bills + other) every day.
+      // Never replace it with reg_ending, extra_ending, or importedLedgerRows values.
+      runningRegBeg = round2(runningRegBeg + dayCredits - dayBills + otherAmt);
+      runningExtraBeg = showExtra ? round2(runningExtraBeg + dayExtraAdd) : 0;
 
       cur.setDate(cur.getDate() + 1);
     }
 
+    const extraEnding = showExtra ? runningExtraBeg : 0;
+    const totalEnd = round2(runningRegBeg + extraEnding);
     return {
       regEnding: runningRegBeg,
-      extraEnding: runningExtraBeg,
-      totalEnd: round2(runningRegBeg + runningExtraBeg)
+      extraEnding,
+      totalEnd,
+      reg: runningRegBeg,
+      extra: extraEnding,
+      total: totalEnd
     };
   }, [getDailyMatrixCell, getActualAmount, isPersonDepositDay, getPersonDepositAmountForAccount, getPersonExtraSavingsDepositAmountForAccount]);
 

@@ -34,7 +34,6 @@ export { RateLimiter } from './RateLimiter.js';
 
 export const PRODUCTION_ORIGINS = [
   'https://techtrekgt.com',
-  'http://techtrekgt.com',
   'https://techtrek-budget.pages.dev'
 ];
 
@@ -84,13 +83,21 @@ class NonceInjector {
 
 function addSecurityHeaders(response, options = {}) {
   const opts = typeof options === 'object' && options !== null ? options : { isLocalhost: Boolean(options) };
-  const { isLocalhost = false, isProduction = false, requestOrigin = '', nonce = '', requestPath: rawRequestPath = '' } = opts;
+  const { isLocalhost = false, isProduction = false, environment = '', hostname = '', requestOrigin = '', nonce = '', requestPath: rawRequestPath = '' } = opts;
   const rawPath = rawRequestPath || opts.path || opts.pathname || (opts.url ? new URL(opts.url, 'http://localhost').pathname : '') || (response.url ? new URL(response.url).pathname : '');
   const requestPath = rawPath ? rawPath.split('?')[0].split('#')[0] : '';
   const headers = new Headers(response.headers);
   const effectiveAllowedOrigins = opts.allowedOrigins || PRODUCTION_ORIGINS.concat(isProduction ? [] : DEV_ORIGINS);
 
-  if (isProduction && !isLocalhost) {
+  // Apply CSP and HSTS unless ENVIRONMENT is explicitly 'development' and the hostname is localhost or 127.0.0.1 (FIX-12 fail closed)
+  const isExplicitDevLocal = (environment === 'development' || (opts.isDevelopment && isLocalhost)) &&
+    (isLocalhost || hostname === 'localhost' || hostname === '127.0.0.1');
+
+  const shouldApplySecurityHeaders = opts.applySecurityHeaders !== undefined
+    ? Boolean(opts.applySecurityHeaders)
+    : !isExplicitDevLocal;
+
+  if (shouldApplySecurityHeaders) {
     headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
     if (opts.cspReportOnly) {
       headers.set('Content-Security-Policy-Report-Only', buildCsp(nonce));
@@ -924,14 +931,29 @@ const worker = {
       console.warn('[worker] WARNING: env.ENVIRONMENT is undefined on request with cf-ray present. Production security headers (CSP/HSTS) may be disabled.');
     }
     const isProduction = env?.ENVIRONMENT === 'production';
-    const isLocalhost = !isProduction || url.hostname === 'localhost' || url.hostname === '127.0.0.1' || host.includes('localhost') || host.includes('127.0.0.1') || Boolean(url.port);
+    // Remove Boolean(url.port) from the isLocalhost test (FIX-12)
+    const isLocalhost = url.hostname === 'localhost' || url.hostname === '127.0.0.1' || host === 'localhost' || host === '127.0.0.1' || host.startsWith('localhost:') || host.startsWith('127.0.0.1:');
+    // Apply CSP and HSTS unless ENVIRONMENT is explicitly 'development' and the hostname is localhost or 127.0.0.1 (FIX-12 fail closed)
+    const isExplicitDevLocal = env?.ENVIRONMENT === 'development' && (url.hostname === 'localhost' || url.hostname === '127.0.0.1');
+    const applySecurityHeaders = !isExplicitDevLocal;
     const requestOrigin = request.headers.get('Origin') || '';
     const nonce = base64UrlEncodeBytes(crypto.getRandomValues(new Uint8Array(16)));
     const effectiveAllowedOrigins = PRODUCTION_ORIGINS.concat(isProduction ? [] : DEV_ORIGINS);
     const cspReportOnly = env?.CSP_REPORT_ONLY === 'true' || env?.CSP_REPORT_ONLY === true;
-    const headerOpts = { isLocalhost, isProduction, requestOrigin, nonce, requestPath: url.pathname, allowedOrigins: effectiveAllowedOrigins, cspReportOnly };
+    const headerOpts = {
+      isLocalhost,
+      isProduction,
+      environment: env?.ENVIRONMENT,
+      hostname: url.hostname,
+      applySecurityHeaders,
+      requestOrigin,
+      nonce,
+      requestPath: url.pathname,
+      allowedOrigins: effectiveAllowedOrigins,
+      cspReportOnly
+    };
 
-    if (isProduction && !isLocalhost && url.protocol === 'http:') {
+    if (applySecurityHeaders && !isLocalhost && url.protocol === 'http:') {
       url.protocol = 'https:';
       return Response.redirect(url.toString(), 301);
     }

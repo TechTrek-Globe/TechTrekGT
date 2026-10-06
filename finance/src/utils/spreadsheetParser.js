@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
 import { logDebug, logWarn, logError } from './debugLogger.js';
-import { matchCreditToEarner } from './importer.js';
+import { matchCreditToEarner, MAX_SPREADSHEET_FILE_SIZE, MAX_SPREADSHEET_ROW_COUNT } from './importer.js';
 
 /**
  * Clean currency/number values from Excel strings or cells
@@ -14,7 +14,7 @@ function cleanNum(val, defaultVal = 0) {
   }
   const str = String(val).trim();
   if (!str) return defaultVal;
-  // If the cell contains words or 2+ letters (e.g. "EMORY PARC HOMEO OnlinePay ***********7626", "USAA FUNDS TRANSFER CR", "Transfer")
+  // If the cell contains words or 2+ letters (e.g. "OnlinePay ***********1234", "FUNDS TRANSFER CR", "Transfer")
   // it is text, not a currency/numeric cell.
   if (/[a-zA-Z]{2,}/.test(str)) {
     return defaultVal;
@@ -47,14 +47,11 @@ const RESERVED_COLS = new Set([
   'total monthly income', 'total monthly expenses', 'subtotal', 'total expenses',
   'total all accounts', 'account summary', 'key metrics & insights', 'simple budget worksheet',
   'totals', 'total', 'monthly savings rate', 'total cash on hand', 'how much can i save?',
-  'amount to usaa bill checking - 7071', 'amount to usaa mortgage checking - 3223',
-  'amount to usaa hoa savings - 9575', 'usaa bills checking - 7071',
-  'usaa mortgage checking - 3223', 'usaa hoa savings - 9575', 'bi-weekly #1', 'bi-weekly #2',
+  'bi-weekly #1', 'bi-weekly #2',
   'bi-weekly #1 - regular pay', 'bi-weekly #2 - income', 'income source',
   'expense/income item', 'current account balances (live)', 'current regular balance',
   'extra balance', 'total current balance', 'next 5 upcoming payments', 'where do i want to put my savings?',
-  'income', 'debt payoff', 'other goals', 'amount to usaa bill checking', 'amount to usaa mortgage checking',
-  'amount to usaa hoa savings'
+  'income', 'debt payoff', 'other goals'
 ]);
 
 /**
@@ -62,12 +59,27 @@ const RESERVED_COLS = new Set([
  */
 export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
   try {
+    const byteLen = typeof fileData === 'string' ? fileData.length : (fileData?.byteLength || 0);
+    if (byteLen > MAX_SPREADSHEET_FILE_SIZE) {
+      throw new Error(`File size (${Math.round(byteLen / (1024 * 1024))}MB) exceeds maximum limit of 15MB.`);
+    }
     logDebug('PARSER', `Starting Emory Parc workbook parsing: "${fileName}"`, { fileName });
     const workbook = typeof fileData === 'string'
       ? XLSX.read(fileData, { type: 'string', cellFormula: true })
       : XLSX.read(fileData, { type: 'array', cellFormula: true });
 
     logDebug('PARSER', `Workbook loaded with ${workbook.SheetNames.length} sheets`, { sheetNames: workbook.SheetNames });
+
+    for (const sheetName of workbook.SheetNames) {
+      const sheet = workbook.Sheets[sheetName];
+      if (sheet && sheet['!ref']) {
+        const range = XLSX.utils.decode_range(sheet['!ref']);
+        const sheetRows = range.e.r - range.s.r + 1;
+        if (sheetRows > MAX_SPREADSHEET_ROW_COUNT) {
+          throw new Error(`Sheet "${sheetName}" contains ${sheetRows} rows, exceeding maximum limit of ${MAX_SPREADSHEET_ROW_COUNT}.`);
+        }
+      }
+    }
 
     const accountsMap = new Map();
     const peopleMap = new Map();
@@ -77,9 +89,7 @@ export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
     // GAP-4: monotonic counter prevents duplicate IDs when multiple txns are produced in the same ms
     let txnIdCounter = 0;
 
-    // Pre-populate Jon Kemp's known earners if detected
-    const defaultJonId = 'person-jon';
-    const defaultRonnieId = 'person-ronnie';
+
 
     // Track accounts by normalized search key
     function getOrCreateAccount(rawName, type = 'checking', balance = 0) {
@@ -90,12 +100,7 @@ export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
 
       // Check existing accounts
       for (const [key, acc] of accountsMap.entries()) {
-        if (
-          key.includes(norm) || norm.includes(key) ||
-          (norm.includes('bills') && key.includes('bills')) ||
-          (norm.includes('mortgage') && key.includes('mortgage')) ||
-          (norm.includes('hoa') && key.includes('hoa'))
-        ) {
+        if (key === norm || key.includes(norm) || norm.includes(key)) {
           return acc.id;
         }
       }
@@ -127,8 +132,9 @@ export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
       if (!clean) return;
       const key = clean.toLowerCase();
       if (!peopleMap.has(key)) {
+        const slug = key.replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
         peopleMap.set(key, {
-          id: key === 'jon' ? defaultJonId : key === 'ronnie' ? defaultRonnieId : `person-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          id: `person-${slug || Date.now()}`,
           name: clean,
           role,
           payFrequency: 'bi-weekly',
@@ -149,36 +155,33 @@ export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
 
       const lowerSheet = sheetName.toLowerCase().trim();
 
-      // --- SECTION A: Scan for Jon Kemp "Dashboard" or "Main Budget" Layout ---
+      // --- SECTION A: Scan for "Dashboard" or "Main Budget" Layout ---
       if (lowerSheet.includes('budget') || lowerSheet.includes('dashboard') || lowerSheet.includes('main')) {
-        let currentAccountName = 'USAA Bills Checking';
+        let currentAccountName = 'Checking';
 
         for (let i = 0; i < rows.length; i++) {
           const row = rows[i].map(c => cleanText(c));
           const rowText = row.join(' ').toLowerCase();
 
           // Detect Account Header Sections
-          if (rowText.includes('bills checking expenses')) currentAccountName = 'USAA Bills Checking - 7071';
-          if (rowText.includes('mortgage checking expenses')) currentAccountName = 'USAA Mortgage Checking - 3223';
-          if (rowText.includes('hoa savings expenses')) currentAccountName = 'USAA HOA Savings - 9575';
+          if (rowText.includes('checking expenses')) currentAccountName = 'Checking';
+          if (rowText.includes('savings expenses')) currentAccountName = 'Savings';
 
           // Detect Account Balances in Account Summary table
-          if (rowText.includes('usaa bills checking') || rowText.includes('bills checking -')) {
+          if (rowText.includes('checking -') || rowText.includes('checking summary')) {
             const bal = cleanNum(row.find(cell => cleanNum(cell) > 0));
-            getOrCreateAccount('USAA Bills Checking - 7071', 'checking', bal);
+            getOrCreateAccount('Checking', 'checking', bal);
           }
-          if (rowText.includes('usaa mortgage checking') || rowText.includes('mortgage checking -')) {
+          if (rowText.includes('savings -') || rowText.includes('savings summary')) {
             const bal = cleanNum(row.find(cell => cleanNum(cell) > 0));
-            getOrCreateAccount('USAA Mortgage Checking - 3223', 'checking', bal);
-          }
-          if (rowText.includes('usaa hoa savings') || rowText.includes('hoa savings -')) {
-            const bal = cleanNum(row.find(cell => cleanNum(cell) > 0));
-            getOrCreateAccount('USAA HOA Savings - 9575', 'savings', bal);
+            getOrCreateAccount('Savings', 'savings', bal);
           }
 
           // Detect People/Earners from headers
-          if (rowText.includes('jon portion') || rowText.includes('per paycheck allocation (jon)')) addPerson('Jon', 'Primary', 0, 0, 'purple');
-          if (rowText.includes('ronnie portion')) addPerson('Ronnie', 'Partner', 0, 0, 'emerald');
+          const earnerMatch = rowText.match(/per paycheck allocation \(([^)]+)\)/i) || rowText.match(/([a-z0-9_-]+) portion/i);
+          if (earnerMatch && earnerMatch[1] && !['subtotal', 'total', 'bills'].includes(earnerMatch[1].toLowerCase())) {
+            addPerson(earnerMatch[1], 'Member', 0, 0, 'purple');
+          }
 
           // Detect Bill Rows
           const col0 = row[0] || row[1] || '';
@@ -207,7 +210,7 @@ export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
             if (dayCell) dueDay = parseInt(dayCell) || 15;
 
             // Target Account
-            const accCell = row.find(c => c.toLowerCase().includes('usaa') || c.toLowerCase().includes('checking') || c.toLowerCase().includes('savings'));
+            const accCell = row.find(c => c.toLowerCase().includes('checking') || c.toLowerCase().includes('savings'));
             const targetAccName = accCell || currentAccountName;
             const accountId = getOrCreateAccount(targetAccName);
 
@@ -233,10 +236,7 @@ export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
                 matchingKey: matchingKey || billName,
                 bankMatchNames: matchingKey || billName,
                 notes,
-                splits: {
-                  [defaultJonId]: 50,
-                  [defaultRonnieId]: 50
-                }
+                splits: {}
               });
             }
           }
@@ -260,11 +260,7 @@ export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
           const balanceRegex = /\b(beg|beginning|end|ending|balance|subtotal|total)\b/i;
 
           // Map sheet to target account
-          const lowerFileName = (fileName || '').toLowerCase();
-          let sheetAccName = 'USAA Bills Checking - 7071';
-          if (lowerSheet.includes('mortgage') || lowerFileName.includes('mortgage')) sheetAccName = 'USAA Mortgage Checking - 3223';
-          else if (lowerSheet.includes('hoa') || lowerSheet.includes('sav') || lowerFileName.includes('hoa') || lowerFileName.includes('sav')) sheetAccName = 'USAA HOA Savings - 9575';
-
+          const sheetAccName = cleanText(sheetName) || 'Checking';
           const targetAccountId = getOrCreateAccount(sheetAccName);
 
           // Safe date parsing helper
@@ -295,8 +291,7 @@ export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
             h.includes('total beg') ||
             h.includes('beginning balance') ||
             h.includes('beg balance') ||
-            h.includes('jon credit') ||
-            h.includes('ronnie credit')
+            h.includes('credit')
           );
           const amountColIdx = lowerHeaders.findIndex(h => h === 'amount' || h === 'amt' || h === 'transaction amount');
           const debitColIdx = lowerHeaders.findIndex(h => h === 'debit' || h === 'withdrawal' || h === 'outflow' || h === 'payments' || h === 'paid out' || h === 'charge');
@@ -597,10 +592,7 @@ export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
                               paymentSource: 'Auto Pay',
                               matchingKey: lowerH.includes('insurance') ? 'PROGRESSIVE, AUTO INSURANCE, GEICO, INSURANCE, VEHICLE' : h,
                               notes: `Discovered from column ${h}`,
-                              splits: {
-                                [defaultJonId]: 50,
-                                [defaultRonnieId]: 50
-                              }
+                              splits: {}
                             };
                             billsList.push(discovered);
                           }
@@ -697,18 +689,7 @@ export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
       }
     });
 
-    // Ensure default earners exist if none parsed
-    if (peopleMap.size === 0) {
-      addPerson('Jon', 'Primary', 3000, 2200, 'purple');
-      addPerson('Ronnie', 'Partner', 3000, 2200, 'emerald');
-    }
 
-    // Ensure accounts exist if none parsed
-    if (accountsMap.size === 0) {
-      getOrCreateAccount('USAA Bills Checking - 7071', 'checking', 257.50);
-      getOrCreateAccount('USAA Mortgage Checking - 3223', 'checking', 200.00);
-      getOrCreateAccount('USAA HOA Savings - 9575', 'savings', 0.00);
-    }
 
     const accounts = Array.from(accountsMap.values());
     const people = Array.from(peopleMap.values());
@@ -769,6 +750,10 @@ export function parseSingleSheet({
     return { transactions: [], importedLedgerRows: {}, discoveredBills: [], discoveredPeople: [] };
   }
 
+  if (rawRows.length > MAX_SPREADSHEET_ROW_COUNT) {
+    throw new Error(`Sheet contains ${rawRows.length} rows, exceeding maximum limit of ${MAX_SPREADSHEET_ROW_COUNT}.`);
+  }
+
   const rawHeaders = rawRows[headerRowIdx] || [];
   const headers = rawHeaders.map(h => cleanText(h));
   const dateColIdx = headers.findIndex(h => h.toLowerCase().includes('date'));
@@ -819,8 +804,7 @@ export function parseSingleSheet({
     h.includes('total beg') ||
     h.includes('beginning balance') ||
     h.includes('beg balance') ||
-    h.includes('jon credit') ||
-    h.includes('ronnie credit')
+    h.includes('credit')
   );
 
   // Check for flat bank statement markers:

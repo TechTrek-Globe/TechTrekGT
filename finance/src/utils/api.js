@@ -176,7 +176,7 @@ function pendingSyncSyncKey(userId) {
  * @param {string} passcode 
  * @param {Object} budgetData 
  * @param {string|null} userId - The signed-in user id for ownership verification
- * @returns {Promise<{success: boolean, status: string, error?: string, data?: Object}>}
+ * @returns {Promise<{success: boolean, status: string, error?: string, ownershipConflict?: boolean, data?: Object}>}
  */
 export async function pushCloudBackupOptimistic(passcode, budgetData, options = {}, userId = null) {
   // CRIT-002: Ownership verification - check if budgetData has an owner_id that matches the signed-in user

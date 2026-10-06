@@ -26,6 +26,8 @@ export function LedgerDataProvider({ children }) {
     metadataState,
     setMetadataState,
     isDbLoaded,
+    dbLoadError,
+    loadedRecordKeyRef,
     setSaveError,
     initialLedgerSeed,
     getBillMonthlyCost,
@@ -70,13 +72,21 @@ export function LedgerDataProvider({ children }) {
 
   const flushSaveToIndexedDB = useCallback(() => {
     if (!isPendingSaveRef.current || !budgetRef.current) return;
+    // FIX-04: Never write under a key different from the one loaded.
+    // This prevents a race where currentUserId changes mid-session.
+    const saveUid = currentUserId || getCurrentUserId();
+    const loadedKey = loadedRecordKeyRef?.current;
+    if (loadedKey && saveUid && saveUid !== loadedKey) {
+      console.warn('[FIX-04] Blocked flush: save key', saveUid, 'differs from loaded key', loadedKey);
+      return;
+    }
     const savePayload = budgetRef.current;
     isPendingSaveRef.current = false;
-    saveBudgetData(savePayload, currentUserId || getCurrentUserId())
+    saveBudgetData(savePayload, saveUid)
       .then(() => {
         setSaveError(null);
         logState('INDEXEDDB_FLUSH', 'Flushed pending budget state to IndexedDB', {
-          recordKey: budgetRecordKey(currentUserId || getCurrentUserId()),
+          recordKey: budgetRecordKey(saveUid),
           accountsCount: savePayload?.accounts?.length,
           billsCount: savePayload?.bills?.length,
           matrixEntriesCount: Object.keys(savePayload?.dailyMatrix || {}).length
@@ -87,7 +97,7 @@ export function LedgerDataProvider({ children }) {
         isPendingSaveRef.current = true;
         setSaveError('Local storage save failed. Browser storage quota may be exceeded.');
       });
-  }, [setSaveError, currentUserId]);
+  }, [setSaveError, currentUserId, loadedRecordKeyRef]);
 
   // Sync initial seed loaded from IndexedDB by BudgetMetadataProvider
   useEffect(() => {
@@ -243,15 +253,41 @@ export function LedgerDataProvider({ children }) {
   // Silently save combined budget to IndexedDB whenever metadata or ledger state changes (debounced 500ms)
   useEffect(() => {
     if (!isDbLoaded) return;
+    // FIX-04: Block autosave when a load error is active - prevents blank starter from
+    // overwriting a real record that failed to load.
+    if (dbLoadError) return;
+    // FIX-04: For authenticated users, require currentUserId to be settled before saving.
+    if (isAuthenticated && !currentUserId) return;
+    // FIX-04: Never save a blank budget over a non-empty record.
+    // A save is considered blank when all substantive arrays are empty AND dailyMatrix is empty.
+    const budget = budgetRef.current;
+    if (budget && loadedRecordKeyRef?.current) {
+      const isBlank = (
+        (!budget.accounts || budget.accounts.length === 0) &&
+        (!budget.people || budget.people.length === 0) &&
+        (!budget.bills || budget.bills.length === 0) &&
+        (!budget.fundingGoals || budget.fundingGoals.length === 0) &&
+        (!budget.dailyMatrix || Object.keys(budget.dailyMatrix).length === 0)
+      );
+      if (isBlank) {
+        // Starter/blank data - do not auto-save over an existing record.
+        // The user must take an explicit action (restore, import, clear) first.
+        return;
+      }
+    }
+    // FIX-04: Verify save key matches loaded key.
+    const saveUid = currentUserId || getCurrentUserId();
+    const loadedKey = loadedRecordKeyRef?.current;
+    if (loadedKey && saveUid && saveUid !== loadedKey) return;
     isPendingSaveRef.current = true;
     const timer = setTimeout(() => {
       if (isPendingSaveRef.current && budgetRef.current) {
         isPendingSaveRef.current = false;
-        saveBudgetData(budgetRef.current, currentUserId || getCurrentUserId())
+        saveBudgetData(budgetRef.current, saveUid)
           .then(() => {
             setSaveError(null);
             logState('INDEXEDDB_AUTO_SAVE', 'Debounced budget auto-save to IndexedDB complete', {
-              recordKey: budgetRecordKey(currentUserId || getCurrentUserId())
+              recordKey: budgetRecordKey(saveUid)
             });
           })
           .catch(err => {
@@ -261,7 +297,7 @@ export function LedgerDataProvider({ children }) {
       }
     }, 500);
     return () => clearTimeout(timer);
-  }, [budgetForUI, matrixVersion, isDbLoaded, setSaveError, currentUserId]);
+  }, [budgetForUI, matrixVersion, isDbLoaded, dbLoadError, isAuthenticated, setSaveError, currentUserId, loadedRecordKeyRef]);
 
   // Flush pending save on tab close, page hide, or visibility change
   useEffect(() => {

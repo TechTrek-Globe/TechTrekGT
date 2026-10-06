@@ -95,7 +95,7 @@ function migrateFundingGoals(goals, people, accounts) {
 }
 
 export function BudgetMetadataProvider({ children }) {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, isLoading: isAuthLoading } = useAuth();
   const [selectedPersonId, setSelectedPersonId] = useState(() => {
     try { return localStorage.getItem('trekledger_selected_person_id') || 'all'; }
     catch { return 'all'; }
@@ -119,7 +119,11 @@ export function BudgetMetadataProvider({ children }) {
   });
 
   const [isDbLoaded, setIsDbLoaded] = useState(false);
+  const [dbLoadError, setDbLoadError] = useState(null);
   const [saveError, setSaveError] = useState(null);
+  // FIX-04: Track the IndexedDB key used for the successful load so saves always
+  // go to the same slot, even if auth state changes mid-session.
+  const loadedRecordKeyRef = useRef(null);
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState('accounts');
@@ -216,13 +220,33 @@ export function BudgetMetadataProvider({ children }) {
   }, []);
 
   // Load initial data from IndexedDB or legacy localStorage
+  // FIX-04: Do not run until AuthContext has resolved (isAuthLoading === false).
+  // If authenticated, require user.id - never fall back to the legacy key.
   useEffect(() => {
+    if (isAuthLoading) return; // Wait for /api/auth/me to complete
+
     async function initLocalStorageOrIndexedDB() {
       try {
+        // FIX-04: For authenticated users, require a real user.id.
+        // Never use the legacy anonymous key for a signed-in user.
+        let userId;
+        if (isAuthenticated) {
+          if (!user?.id) {
+            // Auth resolved but user.id is missing - do not load or mark ready.
+            setDbLoadError('Authenticated user id is missing. Please sign out and sign in again.');
+            return;
+          }
+          userId = user.id;
+        } else {
+          // Unauthenticated: use session cookie fallback (anonymous / offline mode)
+          userId = getCurrentUserId();
+        }
+
         // CRIT-002: Use user-scoped record key if user is authenticated
-        const userId = user?.id || getCurrentUserId();
         const storedRaw = await getBudgetData(userId);
         if (storedRaw && typeof storedRaw === 'object') {
+          // Record found - track the exact key so saves always go here.
+          loadedRecordKeyRef.current = userId;
           const { budget: stored, wasMigrated } = runBudgetMigrations(storedRaw);
           if (wasMigrated) {
             saveBudgetData(stored, userId).catch(err => {
@@ -268,8 +292,20 @@ export function BudgetMetadataProvider({ children }) {
             lineItems: Array.isArray(stored.lineItems) ? stored.lineItems : [],
             transactions: Array.isArray(stored.transactions) ? stored.transactions : []
           });
+          setIsDbLoaded(true);
+        } else if (isAuthenticated) {
+          // FIX-04: Authenticated user has no IndexedDB record.
+          // Do NOT set isDbLoaded=true; doing so would allow a blank starter to be
+          // saved over a record that may exist on the server or be in transit.
+          // Show a clear error and keep isDbLoaded=false until the user resolves it.
+          setDbLoadError(
+            'Your account data could not be loaded from local storage. ' +
+            'This can happen after clearing browser data. ' +
+            'Restore from a backup or sync from Cloud Vault to recover your data.'
+          );
+          // Do not call setIsDbLoaded(true) here.
         } else {
-          // Check for legacy localStorage data
+          // Unauthenticated: check for legacy localStorage data
           const legacy = localStorage.getItem(STORAGE_KEY);
           if (legacy) {
             const parsedRaw = JSON.parse(legacy);
@@ -309,9 +345,11 @@ export function BudgetMetadataProvider({ children }) {
                 transactions: Array.isArray(parsed.transactions) ? parsed.transactions : []
               });
               localStorage.removeItem(STORAGE_KEY);
+              setIsDbLoaded(true);
             }
           } else {
-            // Fresh state for unauthenticated or unmigrated user
+            // Fresh state for unauthenticated user with no stored data
+            loadedRecordKeyRef.current = userId;
             setMetadataState({
               schemaVersion: CURRENT_BUDGET_SCHEMA_VERSION,
               accounts: initialBudgetData.accounts || [],
@@ -328,18 +366,18 @@ export function BudgetMetadataProvider({ children }) {
               lineItems: initialBudgetData.lineItems || [],
               transactions: initialBudgetData.transactions || []
             });
+            setIsDbLoaded(true);
           }
         }
       } catch (err) {
         console.error('Failed to load metadata from IndexedDB:', err);
         setSaveError('Failed to load budget metadata from local database.');
-      } finally {
-        setIsDbLoaded(true);
+        // Do not set isDbLoaded=true on error - prevents blank save overwriting real data.
       }
     }
 
     initLocalStorageOrIndexedDB();
-  }, [user?.id, setSaveError]);
+  }, [isAuthLoading, isAuthenticated, user?.id, setSaveError]);
 
   // Auto Cloud Backup State & Control (Tier C6: explicit user consent, default false when unset)
   const [isAutoCloudBackupEnabled, setIsAutoCloudBackupEnabled] = useState(() => {
@@ -894,6 +932,8 @@ export function BudgetMetadataProvider({ children }) {
     settingsTab,
     isDbLoaded,
     saveError,
+    dbLoadError,
+    loadedRecordKeyRef,
     initialLedgerSeed,
     isAutoCloudBackupEnabled,
     isSyncOnChangeEnabled: isAutoCloudBackupEnabled,
@@ -911,6 +951,7 @@ export function BudgetMetadataProvider({ children }) {
     settingsTab,
     isDbLoaded,
     saveError,
+    dbLoadError,
     initialLedgerSeed,
     isAutoCloudBackupEnabled,
     isSyncOnLoadEnabled,

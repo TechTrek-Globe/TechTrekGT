@@ -873,71 +873,6 @@ export function LedgerDataProvider({ children }) {
     return { success: true, removedCount, removedKeys };
   }, [currentUserId, isAuthenticated, pushCloudBackup, syncPasscode]);
 
-  // C4: Restores standard clean funding goals (Mortgage & Bills Checking) if deleted or empty
-  const restoreStandardFundingGoals = useCallback(async () => {
-    const accounts = metadataStateRef.current?.accounts || [];
-    const people = metadataStateRef.current?.people || [];
-
-    const mortgageAcc = accounts.find(a => a.name && a.name.toLowerCase().includes('mortgage')) || accounts.find(a => a.id.includes('mortgage'));
-    const billsAcc = accounts.find(a => a.name && a.name.toLowerCase().includes('bills')) || accounts.find(a => a.id.includes('bills')) || accounts[0];
-
-    const standardGoals = [];
-    people.forEach(p => {
-      const pName = p.name ? p.name.toLowerCase() : '';
-      if (mortgageAcc) {
-        if (pName.includes('ronnie')) {
-          standardGoals.push({
-            id: `goal-mortgage-${p.id}`,
-            contributorId: p.id,
-            accountId: mortgageAcc.id,
-            name: 'Mortgage Contribution',
-            amountPerPay: 1378.00
-          });
-        } else if (pName.includes('jon')) {
-          standardGoals.push({
-            id: `goal-mortgage-${p.id}`,
-            contributorId: p.id,
-            accountId: mortgageAcc.id,
-            name: 'Mortgage Contribution',
-            amountPerPay: 689.00
-          });
-        }
-      }
-      if (billsAcc && pName.includes('jon')) {
-        standardGoals.push({
-          id: `goal-bills-${p.id}-base`,
-          contributorId: p.id,
-          accountId: billsAcc.id,
-          name: 'Bills Checking Base (Semi-Monthly)',
-          amountPerPay: 85.00
-        });
-        standardGoals.push({
-          id: `goal-bills-${p.id}-buffer`,
-          contributorId: p.id,
-          accountId: billsAcc.id,
-          name: 'Bills Checking Buffer (Monthly)',
-          amountPerPay: 78.08
-        });
-      }
-    });
-
-    if (standardGoals.length > 0) {
-      if (metadata.setFundingGoals) {
-        metadata.setFundingGoals(standardGoals);
-      }
-      if (budgetRef.current) {
-        budgetRef.current.fundingGoals = standardGoals;
-        isPendingSaveRef.current = true;
-        await saveBudgetData(budgetRef.current, currentUserId || getCurrentUserId()).catch(() => {});
-        if (isAuthenticated) {
-          // FIX-03: Standard CAS push - restoring funding goals must not force-overwrite cloud.
-          pushCloudBackup(syncPasscode).catch(() => {});
-        }
-      }
-    }
-    return { success: true, count: standardGoals.length, goals: standardGoals };
-  }, [currentUserId, isAuthenticated, metadata, pushCloudBackup, syncPasscode]);
-
   // Selective per-namespace spreadsheet import
   const importSpreadsheetSelective = useCallback(({ namespaces, strategies, data, dryRun = false, resolutions = {} }) => {
     const result = processSpreadsheetImport({
@@ -1399,8 +1334,7 @@ export function LedgerDataProvider({ children }) {
     resolveConflictKeepLocal,
     resolveConflictUseCloud,
     clearFutureMatrixCredits,
-    pruneGhostMatrixDayKeys,
-    restoreStandardFundingGoals
+    pruneGhostMatrixDayKeys
   }), [
     getDailyMatrix,
     getDailyMatrixCell,
@@ -1425,7 +1359,6 @@ export function LedgerDataProvider({ children }) {
     clearAccountTransactions,
     clearFutureMatrixCredits,
     pruneGhostMatrixDayKeys,
-    restoreStandardFundingGoals,
     importSpreadsheetSelective,
     exportBackupJson,
     restoreFromBackup,

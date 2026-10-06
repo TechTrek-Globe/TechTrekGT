@@ -48,10 +48,10 @@ describe('FIX-03: force:true appears only in user-confirmed paths', () => {
     assert.ok(!body.includes('force: true'), 'pruneGhostMatrixDayKeys must not use force:true');
   });
 
-  it('restoreStandardFundingGoals does not use force:true', () => {
+  it('restoreStandardFundingGoals is fully removed (FIX-06 supersedes FIX-03 here)', () => {
+    // FIX-06 deleted this function entirely. Absence is stronger than "no force:true".
     const body = extractFnBody(source, 'restoreStandardFundingGoals');
-    assert.ok(body, 'restoreStandardFundingGoals must exist');
-    assert.ok(!body.includes('force: true'), 'restoreStandardFundingGoals must not use force:true');
+    assert.ok(!body, 'restoreStandardFundingGoals must NOT exist - deleted by FIX-06');
   });
 
   it('clearFutureMatrixCredits does not use force:true', () => {

@@ -24,23 +24,20 @@ export function StorageResetSubPanel() {
     clearAllData,
     loadDemoPreset,
     clearFutureMatrixCredits,
-    pruneGhostMatrixDayKeys,
-    restoreStandardFundingGoals
+    pruneGhostMatrixDayKeys
   } = useLedgerDataDispatch();
 
   // Storage Quota State
   const [storageEstimate, setStorageEstimate] = useState(null);
   const [isClearingCredits, setIsClearingCredits] = useState(false);
   const [isPruning, setIsPruning] = useState(false);
-  const [isRestoringGoals, setIsRestoringGoals] = useState(false);
+  const [pruneStatus, setPruneStatus] = useState(null);
   const [isFlushingCache, setIsFlushingCache] = useState(false);
   const [flushStatus, setFlushStatus] = useState(null);
   const [clearCreditsStatus, setClearCreditsStatus] = useState(null);
   // FIX-02: confirmation dialog state for clearFutureMatrixCredits
   const [confirmClearCredits, setConfirmClearCredits] = useState(false);
   const [futureCreditCellCount, setFutureCreditCellCount] = useState(0);
-  const [pruneStatus, setPruneStatus] = useState(null);
-  const [restoreGoalsStatus, setRestoreGoalsStatus] = useState(null);
 
   // Danger zone confirmations
   const [confirmClearAll, setConfirmClearAll] = useState(false);
@@ -468,58 +465,6 @@ export function StorageResetSubPanel() {
             </div>
           )}
         </div>
-
-        {/* Restore Standard Funding Goals (Tier C4) */}
-        <div className="p-5 rounded-xl glass-card border border-emerald-800/60 bg-emerald-950/10 space-y-4 hover:border-emerald-700/80 transition-colors">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-emerald-300 flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-              Restore Standard Funding Goals
-            </h3>
-            <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950 px-2.5 py-1 rounded-full border border-emerald-800">
-              Recovery Helper
-            </span>
-          </div>
-          <p className="text-xs text-slate-300 leading-relaxed">
-            Rebuilds standard clean funding goals (Mortgage & Bills Checking contributions) for active household earners if your goals list was emptied or lost.
-          </p>
-
-          <div className="flex items-center justify-between flex-wrap gap-2 pt-2">
-            <div className="text-xs text-slate-400 font-mono">
-              Auto-maps to your Mortgage and Bills Checking accounts.
-            </div>
-
-            <button
-              type="button"
-              disabled={isRestoringGoals}
-              onClick={async () => {
-                if (restoreStandardFundingGoals) {
-                  setIsRestoringGoals(true);
-                  try {
-                    const res = await restoreStandardFundingGoals();
-                    setRestoreGoalsStatus(`Restored ${res?.count || 0} standard funding goals.`);
-                    setTimeout(() => setRestoreGoalsStatus(null), 6000);
-                  } catch (err) {
-                    setRestoreGoalsStatus(`Failed to restore goals: ${err.message}`);
-                    setTimeout(() => setRestoreGoalsStatus(null), 6000);
-                  } finally {
-                    setIsRestoringGoals(false);
-                  }
-                }
-              }}
-              className="px-5 py-2.5 bg-emerald-600/80 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-50"
-            >
-              <CheckCircle2 className={`w-4 h-4 ${isRestoringGoals ? 'animate-pulse' : ''}`} />
-              <span>{isRestoringGoals ? 'Restoring...' : 'Restore Standard Goals'}</span>
-            </button>
-          </div>
-          {restoreGoalsStatus && (
-            <div className="text-xs text-emerald-400 bg-emerald-950/40 border border-emerald-800 p-2.5 rounded-lg">
-              {restoreGoalsStatus}
-            </div>
-          )}
-        </div>
-
         {/* Load Demo Dataset */}
         <div className="p-5 rounded-xl glass-card border border-indigo-800/60 bg-indigo-950/10 space-y-4 hover:border-indigo-700/80 transition-colors">
           <div className="flex items-center justify-between">

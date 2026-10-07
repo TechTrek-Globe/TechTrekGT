@@ -109,13 +109,30 @@ function computeLedgerViewRows(account, budget, startDateStr, endDateStr) {
 
     // Stored bank balance for comparison only (never replaces calculated ending balance)
     let bankBalance = null;
-    if (customRegEnd !== undefined && !isNaN(customRegEnd)) {
-      bankBalance = round2(customRegEnd);
-    } else if (customExtraEnd !== undefined && !isNaN(customExtraEnd) && showExtraColumns) {
-      bankBalance = round2(customExtraEnd);
+    if (impRow !== undefined) {
+      if (typeof impRow === 'number') {
+        bankBalance = round2(impRow);
+      } else if (impRow && typeof impRow === 'object') {
+        const statedTotal = impRow.totalEnding ?? (
+          impRow.regEnding !== undefined && impRow.extraEnding !== undefined
+            ? round2((parseFloat(impRow.regEnding) || 0) + (parseFloat(impRow.extraEnding) || 0))
+            : (impRow.regEnding ?? null)
+        );
+        if (statedTotal !== null && statedTotal !== undefined && !isNaN(statedTotal)) {
+          bankBalance = round2(parseFloat(statedTotal));
+        }
+      }
+    }
+    if (bankBalance === null) {
+      if (customRegEnd !== undefined && !isNaN(customRegEnd)) {
+        const extraPart = (customExtraEnd !== undefined && !isNaN(customExtraEnd) && showExtraColumns) ? customExtraEnd : 0;
+        bankBalance = round2(customRegEnd + extraPart);
+      } else if (customExtraEnd !== undefined && !isNaN(customExtraEnd) && showExtraColumns) {
+        bankBalance = round2(customExtraEnd);
+      }
     }
 
-    const variance = bankBalance !== null ? round2(regEnding - bankBalance) : 0;
+    const variance = bankBalance !== null ? round2(totalEnd - bankBalance) : 0;
     const hasBankDiff = bankBalance !== null && Math.abs(variance) > 0.01;
     const bankDiffText = hasBankDiff ? `Differs from bank by ${fmtMoney(Math.abs(variance))}` : '';
 
@@ -246,5 +263,39 @@ describe('FIX-08: Ending balance formula and bank variance indicators', () => {
     const smallVariance = 0.005;
     const hasDiff = Math.abs(smallVariance) > 0.01;
     assert.equal(hasDiff, false, 'No indicator for differences <= 0.01');
+  });
+
+  it('bank variance relates to totalEnd rather than regEnding when extra savings is enabled', () => {
+    // Scenario: user bank has $449.89. Total End is $449.89 (Reg End $349.89 + Extra End $100.00).
+    // Variance must be 0 and hasBankDiff must be false.
+    const testAccount = {
+      id: 'acc-split-bank',
+      name: 'Checking With Extra Savings',
+      startingBalance: 349.89,
+      extraStartingBalance: 100.00,
+      balanceAsOfDate: '2026-10-07',
+      startDate: '2026-10-07',
+      enableExtraSavings: true,
+      ledgerMode: 'import',
+      importedLedgerRows: {
+        '2026-10-07': 449.89
+      }
+    };
+    const testBudget = {
+      accounts: [testAccount],
+      people: [],
+      bills: [],
+      dailyMatrix: {}
+    };
+
+    const rows = computeLedgerViewRows(testAccount, testBudget, '2026-10-07', '2026-10-07');
+    const todayRow = rows[0];
+
+    assert.equal(todayRow.regEnding, 349.89, 'Reg End is $349.89');
+    assert.equal(todayRow.extraEnding, 100.00, 'Extra End is $100.00');
+    assert.equal(todayRow.totalEnd, 449.89, 'Total End is $449.89');
+    assert.equal(todayRow.bankBalance, 449.89, 'Bank balance is $449.89');
+    assert.equal(todayRow.variance, 0, 'Variance against Total End is 0');
+    assert.equal(todayRow.hasBankDiff, false, 'No bank difference flag when Total End matches bank');
   });
 });

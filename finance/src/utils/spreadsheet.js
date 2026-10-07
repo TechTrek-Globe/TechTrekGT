@@ -782,11 +782,20 @@ export function processSpreadsheetImport({
         });
       }
 
-      if (Array.isArray(data.transactions)) {
+      if (Array.isArray(data.transactions) && data.transactions.length > 0) {
+        let isOldestFirst = false;
+        const validDateTxns = data.transactions.filter(t => t.date);
+        if (validDateTxns.length >= 2) {
+          const firstDate = normalizeIsoDate(validDateTxns[0].date);
+          const lastDate = normalizeIsoDate(validDateTxns[validDateTxns.length - 1].date);
+          if (firstDate && lastDate && firstDate < lastDate) {
+            isOldestFirst = true;
+          }
+        }
         data.transactions.forEach(t => {
           if (t.date && t.balance !== undefined && t.balance !== null && !isNaN(parseFloat(t.balance))) {
             const bal = Math.round(parseFloat(t.balance) * 100) / 100;
-            if (!incomingRows[t.date]) {
+            if (incomingRows[t.date] === undefined || isOldestFirst) {
               incomingRows[t.date] = { regEnding: bal, extraEnding: 0, totalEnding: bal };
             }
           }

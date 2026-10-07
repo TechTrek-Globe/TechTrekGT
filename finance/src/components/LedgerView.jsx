@@ -898,50 +898,59 @@ function DailySpreadsheetMatrix() {
         const isHistoricalLock = isLockedDay;
         const totalBeg = Math.round((runningRegBeg + (showExtraColumns ? runningExtraBeg : 0)) * 100) / 100;
 
-        let customRegEnd;
-        let customExtraEnd;
-
-        if (selectedAccountId === 'all') {
-          const allReg = getDailyMatrixCell('all', monthKey, day, 'reg_ending');
-          const allExtra = getDailyMatrixCell('all', monthKey, day, 'extra_ending');
-          if (allReg !== undefined && allReg !== null && allReg !== '') customRegEnd = parseFloat(allReg);
-          if (allExtra !== undefined && allExtra !== null && allExtra !== '') customExtraEnd = parseFloat(allExtra);
-        } else {
-          const accReg = getDailyMatrixCell(selectedAccountId, monthKey, day, 'reg_ending');
-          const accExtra = getDailyMatrixCell(selectedAccountId, monthKey, day, 'extra_ending');
-          if (accReg !== undefined && accReg !== null && accReg !== '') customRegEnd = parseFloat(accReg);
-          if (accExtra !== undefined && accExtra !== null && accExtra !== '') customExtraEnd = parseFloat(accExtra);
-        }
-
-        const impRow = importedRows[isoDate];
-        if (customRegEnd === undefined && isImportMode && impRow !== undefined && !hasDayBillOverride) {
-          if (typeof impRow === 'number') {
-            customRegEnd = impRow;
-          } else if (impRow && typeof impRow === 'object') {
-            const statedEnd = impRow.regEnding ?? impRow.totalEnding ?? null;
-            if (statedEnd !== null && statedEnd !== undefined && !isNaN(statedEnd)) {
-              customRegEnd = statedEnd;
-            }
-          }
-        }
-        if (customExtraEnd === undefined && isImportMode && impRow !== undefined && !hasDayBillOverride) {
-          if (impRow && typeof impRow === 'object') {
-            const statedExtra = impRow.extraEnding ?? null;
-            if (statedExtra !== null && statedExtra !== undefined && !isNaN(statedExtra)) {
-              customExtraEnd = statedExtra;
-            }
-          }
-        }
-
         // Stored bank balance for comparison only (never replaces calculated ending balance)
         let bankBalance = null;
-        if (customRegEnd !== undefined && !isNaN(customRegEnd)) {
-          bankBalance = round2(customRegEnd);
-        } else if (customExtraEnd !== undefined && !isNaN(customExtraEnd) && showExtraColumns) {
-          bankBalance = round2(customExtraEnd);
+        const impRow = isImportMode ? importedRows[isoDate] : undefined;
+
+        if (impRow !== undefined) {
+          if (typeof impRow === 'number') {
+            bankBalance = round2(impRow);
+          } else if (impRow && typeof impRow === 'object') {
+            const statedTotal = impRow.totalEnding ?? (
+              impRow.regEnding !== undefined && impRow.extraEnding !== undefined
+                ? round2((parseFloat(impRow.regEnding) || 0) + (parseFloat(impRow.extraEnding) || 0))
+                : (impRow.regEnding ?? null)
+            );
+            if (statedTotal !== null && statedTotal !== undefined && !isNaN(statedTotal)) {
+              bankBalance = round2(parseFloat(statedTotal));
+            }
+          }
         }
 
-        const variance = bankBalance !== null ? round2(regEnding - bankBalance) : 0;
+        // If not in imported rows, check transactions for account ending running balance on this date
+        if (bankBalance === null && selectedAccountId !== 'all' && Array.isArray(transactions) && transactions.length > 0) {
+          const dayTxns = transactions.filter(t => t.accountId === selectedAccountId && t.date === isoDate && t.balance !== undefined && t.balance !== null && !isNaN(parseFloat(t.balance)));
+          if (dayTxns.length > 0) {
+            const lastTxn = dayTxns[dayTxns.length - 1];
+            bankBalance = round2(parseFloat(lastTxn.balance));
+          }
+        }
+
+        // If not found in statement or transactions, check legacy dailyMatrix stored ending cells
+        if (bankBalance === null) {
+          let cellTotal;
+          let cellReg;
+          let cellExtra;
+          if (selectedAccountId === 'all') {
+            cellTotal = getDailyMatrixCell('all', monthKey, day, 'total_ending');
+            cellReg = getDailyMatrixCell('all', monthKey, day, 'reg_ending');
+            cellExtra = getDailyMatrixCell('all', monthKey, day, 'extra_ending');
+          } else {
+            cellTotal = getDailyMatrixCell(selectedAccountId, monthKey, day, 'total_ending');
+            cellReg = getDailyMatrixCell(selectedAccountId, monthKey, day, 'reg_ending');
+            cellExtra = getDailyMatrixCell(selectedAccountId, monthKey, day, 'extra_ending');
+          }
+          if (cellTotal !== undefined && cellTotal !== null && cellTotal !== '' && !isNaN(parseFloat(cellTotal))) {
+            bankBalance = round2(parseFloat(cellTotal));
+          } else if (cellReg !== undefined && cellReg !== null && cellReg !== '' && !isNaN(parseFloat(cellReg))) {
+            const regPart = parseFloat(cellReg) || 0;
+            const extraPart = (cellExtra !== undefined && cellExtra !== null && cellExtra !== '' && showExtraColumns) ? (parseFloat(cellExtra) || 0) : 0;
+            bankBalance = round2(regPart + extraPart);
+          }
+        }
+
+        // Variance compares the real bank balance to Total End (never Reg End alone)
+        const variance = bankBalance !== null ? round2(totalEnd - bankBalance) : 0;
         const hasBankDiff = bankBalance !== null && Math.abs(variance) > 0.01;
         const bankDiffText = hasBankDiff ? `Differs from bank by ${fmtMoney(Math.abs(variance))}` : '';
 
@@ -1016,7 +1025,8 @@ function DailySpreadsheetMatrix() {
     getPersonDepositAmountForAccount,
     getPersonExtraSavingsDepositAmountForAccount,
     matrixVersion,
-    lineItems
+    lineItems,
+    transactions
   ]);
 
   // Group matrix rows by month so each month gets its own tbody with a sticky month banner
@@ -1498,7 +1508,7 @@ function DailySpreadsheetMatrix() {
               <th colSpan={showExtraColumns ? 2 : 1} className="px-2 h-6 text-center border-r border-slate-800 bg-purple-950 text-purple-300 font-black sticky top-0 z-20 align-middle">Ending Balances</th>
               
               {/* Total End Banner Container */}
-              <th className="p-0 h-6 min-w-[76px] w-[76px] max-w-[76px] bg-slate-950 border-l border-slate-700 sticky right-0 top-0 z-30 shadow-[-4px_0_8px_rgba(0,0,0,0.5)]"></th>
+              <th className="p-0 h-6 min-w-[125px] w-[125px] max-w-[125px] bg-slate-950 border-l border-slate-700 sticky right-0 top-0 z-30 shadow-[-4px_0_8px_rgba(0,0,0,0.5)]"></th>
             </tr>
 
             {/* Header Row 2: Individual Columns (2-Line Responsive Headers, Full Legibility) */}
@@ -1630,7 +1640,7 @@ function DailySpreadsheetMatrix() {
               </th>
 
               {/* Ending Balances */}
-              <th className="px-1.5 h-10 text-right min-w-[130px] text-purple-300 bg-slate-900 align-middle sticky top-[24px] z-20 border-b border-slate-700 border-r border-slate-800 font-bold" title="Regular Ending Balance">
+              <th className="px-1.5 h-10 text-right min-w-[76px] text-purple-300 bg-slate-900 align-middle sticky top-[24px] z-20 border-b border-slate-700 border-r border-slate-800 font-bold" title="Regular Ending Balance">
                 <span className="block text-[11px] leading-tight">Reg<br/>End</span>
               </th>
               {showExtraColumns && (
@@ -1640,7 +1650,7 @@ function DailySpreadsheetMatrix() {
               )}
 
               {/* Total End Subheader */}
-              <th className="px-1.5 h-10 min-w-[76px] w-[76px] max-w-[76px] bg-slate-950 text-blue-300 font-black sticky right-0 top-[24px] z-30 align-middle text-right border-b border-slate-700 border-l border-slate-700 shadow-[-4px_0_8px_rgba(0,0,0,0.5)]">
+              <th className="px-1.5 h-10 min-w-[125px] w-[125px] max-w-[125px] bg-slate-950 text-blue-300 font-black sticky right-0 top-[24px] z-30 align-middle text-right border-b border-slate-700 border-l border-slate-700 shadow-[-4px_0_8px_rgba(0,0,0,0.5)]">
                 <span className="block text-[11px] leading-tight">Total<br/>End</span>
               </th>
             </tr>
@@ -1930,8 +1940,8 @@ function DailySpreadsheetMatrix() {
                       </td>
 
                       {/* Regular Ending Balance (Pure calculated value) */}
-                      <td className={`p-1 text-right font-bold min-w-[130px] ${
-                        isSelected && !row.isToday ? 'text-blue-100 bg-blue-950/40' : (row.regEnding < 0 ? 'text-rose-400' : 'text-slate-200')
+                      <td className={`p-1 text-right border-r border-slate-700 min-w-[76px] ${
+                        isSelected && !row.isToday ? 'bg-blue-950/40 text-blue-100' : (row.regEnding < 0 ? 'text-rose-400' : 'text-slate-200')
                       }`}>
                         <span
                           className={`font-mono text-[10px] font-bold block ${
@@ -1944,16 +1954,6 @@ function DailySpreadsheetMatrix() {
                         >
                           {fmtMoney(row.regEnding)}
                         </span>
-                        {row.hasBankDiff && (
-                          <div
-                            className="inline-flex items-center justify-end gap-1 text-[9px] text-amber-400 font-normal whitespace-nowrap mt-0.5"
-                            title={`Bank statement: ${fmtMoney(row.bankBalance)} (diff: ${fmtMoney(row.variance)})`}
-                            data-testid="bank-variance-indicator"
-                          >
-                            <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0" aria-hidden="true" />
-                            <span>{row.bankDiffText}</span>
-                          </div>
-                        )}
                       </td>
 
                       {/* Extra Ending Balance (Pure calculated value) */}
@@ -1976,7 +1976,7 @@ function DailySpreadsheetMatrix() {
                       )}
 
                       {/* Total End Balance (Sticky Right) */}
-                      <td className={`p-1 min-w-[76px] w-[76px] max-w-[76px] text-right font-extrabold sticky right-0 z-20 border-l border-slate-700 shadow-[-4px_0_8px_rgba(0,0,0,0.5)] ${
+                      <td className={`p-1 min-w-[125px] w-[125px] max-w-[125px] text-right font-extrabold sticky right-0 z-20 border-l border-slate-700 shadow-[-4px_0_8px_rgba(0,0,0,0.5)] ${
                         row.isToday
                           ? 'bg-amber-950 text-amber-100 border-y border-y-amber-400/80'
                           : isSelected
@@ -1985,7 +1985,19 @@ function DailySpreadsheetMatrix() {
                               ? 'bg-slate-900 text-rose-400 animate-pulse'
                               : 'bg-slate-900 text-blue-300'
                       }`}>
-                        {fmtMoney(row.totalEnd)}
+                        <span className="font-mono text-[10px] block">
+                          {fmtMoney(row.totalEnd)}
+                        </span>
+                        {row.hasBankDiff && (
+                          <div
+                            className="inline-flex items-center justify-end gap-1 text-[9px] text-amber-400 font-normal whitespace-nowrap mt-0.5"
+                            title={`Bank statement: ${fmtMoney(row.bankBalance)} (diff: ${fmtMoney(row.variance)})`}
+                            data-testid="bank-variance-indicator"
+                          >
+                            <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0" aria-hidden="true" />
+                            <span>{row.bankDiffText}</span>
+                          </div>
+                        )}
                       </td>
                     </tr>
                 );
@@ -2032,12 +2044,12 @@ function DailySpreadsheetMatrix() {
               <td className="p-1 bg-slate-900 border-r border-slate-800 min-w-[120px]">&mdash;</td>
 
               {/* Ending Balances Subtotals */}
-              <td className="p-1 text-right font-mono text-slate-200 bg-slate-900 min-w-[130px]">&mdash;</td>
+              <td className="p-1 text-right font-mono text-slate-200 bg-slate-900 min-w-[76px]">&mdash;</td>
               {showExtraColumns && (
                 <td className="p-1 text-right font-mono text-slate-200 bg-slate-900 border-r border-slate-800 min-w-[72px]">&mdash;</td>
               )}
               {/* Sticky Right Total End Footer */}
-              <td className="p-1 text-right font-mono text-blue-400 font-black bg-slate-950 border-l border-slate-700 sticky right-0 z-40 shadow-[-4px_0_8px_rgba(0,0,0,0.5)] min-w-[76px] w-[76px] max-w-[76px]">
+              <td className="p-1 text-right font-mono text-blue-400 font-black bg-slate-950 border-l border-slate-700 sticky right-0 z-40 shadow-[-4px_0_8px_rgba(0,0,0,0.5)] min-w-[125px] w-[125px] max-w-[125px]">
                 {fmtMoney(finalEndingBalance)}
               </td>
             </tr>

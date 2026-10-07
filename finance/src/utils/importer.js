@@ -276,6 +276,19 @@ export function applyTransactionMapping(rows, columnMap, defaultAccountId = '') 
   const skippedDetails = [];
   let earliestDate = null;
 
+  let isOldestFirst = false;
+  if (rows.length >= 2) {
+    const dateEntry = Object.entries(columnMap).find(([, destKey]) => destKey === 'date');
+    const dateSrcCol = dateEntry ? dateEntry[0] : null;
+    if (dateSrcCol) {
+      const d1 = normalizeIsoDate(rows[0]?.[dateSrcCol]);
+      const d2 = normalizeIsoDate(rows[rows.length - 1]?.[dateSrcCol]);
+      if (d1 && d2 && d1 < d2) {
+        isOldestFirst = true;
+      }
+    }
+  }
+
   rows.forEach((row, idx) => {
     const mapped = {};
     Object.entries(columnMap).forEach(([srcCol, destKey]) => {
@@ -336,8 +349,12 @@ export function applyTransactionMapping(rows, columnMap, defaultAccountId = '') 
     records.push(record);
 
     if (balance !== undefined && !isNaN(balance)) {
-      // The balance recorded on a transaction row represents the post-transaction running balance
-      importedLedgerRows[isoDate] = balance;
+      // The balance recorded on a transaction row represents the post-transaction running balance.
+      // If transactions are oldest-first, later rows update the date's balance.
+      // If transactions are newest-first, the first seen row is the day's ending balance.
+      if (importedLedgerRows[isoDate] === undefined || isOldestFirst) {
+        importedLedgerRows[isoDate] = balance;
+      }
 
       if (earliestDate === null || isoDate < earliestDate) {
         earliestDate = isoDate;

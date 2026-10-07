@@ -1217,10 +1217,23 @@ export function LedgerDataProvider({ children }) {
       if (customOther !== undefined) otherAmt = round2(otherAmt + parseMoney(customOther, 0));
       if (customOtherCredit !== undefined) otherAmt = round2(otherAmt + parseMoney(customOtherCredit, 0));
 
-      // FIX-08: ending = round2(beginning + credits - bills) every day.
+      // FIX-08 / FIX-16: ending = round2(beginning + credits - bills + other) every day.
+      // Other $ belongs to regular operating deductions/credits.
       // Never replace it with reg_ending, extra_ending, or importedLedgerRows values.
-      runningRegBeg = round2(runningRegBeg + dayCredits - dayBills);
-      runningExtraBeg = showExtra ? round2(runningExtraBeg + dayExtraAdd + otherAmt) : 0;
+      let regEnding = round2(runningRegBeg + dayCredits - dayBills + otherAmt);
+      let extraEnding = showExtra ? round2(runningExtraBeg + dayExtraAdd) : 0;
+      if (extraEnding < 0 && regEnding > 0) {
+        const transfer = Math.min(regEnding, -extraEnding);
+        extraEnding = round2(extraEnding + transfer);
+        regEnding = round2(regEnding - transfer);
+      } else if (regEnding < 0 && extraEnding > 0) {
+        const transfer = Math.min(extraEnding, -regEnding);
+        regEnding = round2(regEnding + transfer);
+        extraEnding = round2(extraEnding - transfer);
+      }
+
+      runningRegBeg = regEnding;
+      runningExtraBeg = extraEnding;
 
       cur.setDate(cur.getDate() + 1);
     }

@@ -75,8 +75,16 @@ export function allocateEarnerCredit(person, accountId, year, month, day, budget
     earnerExtra = finalProjected > 0 ? projectedExtra : 0;
     source = LEDGER_SOURCE.PROJECTED;
   }
-  const clampedExtra = showExtra ? Math.min(earnerExtra, earnerDeposit) : 0;
-  const earnerReg = Math.max(0, round2(earnerDeposit - clampedExtra));
+  
+  // Fix offset regression: negative extra savings should not mathematically inflate regular deposits
+  const effectiveExtraToSubtract = Math.max(0, earnerExtra);
+  const clampedExtraToSubtract = showExtra ? Math.min(effectiveExtraToSubtract, Math.max(0, earnerDeposit)) : 0;
+  
+  // earnerExtra preserves its true negative value if it's a deduction,
+  // but we only subtract positive extra savings from the regular deposit.
+  const clampedExtra = showExtra ? (earnerExtra < 0 ? earnerExtra : clampedExtraToSubtract) : 0;
+  const earnerReg = Math.max(0, round2(earnerDeposit - clampedExtraToSubtract));
+  
   return {
     earnerDeposit: round2(earnerDeposit),
     earnerExtra: round2(clampedExtra),

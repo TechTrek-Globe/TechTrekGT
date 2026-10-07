@@ -3,7 +3,9 @@
  * Ensures deterministic, schema-tracked transformations across client and cloud storage.
  */
 
-export const CURRENT_BUDGET_SCHEMA_VERSION = 2;
+import { round2 } from '../utils/formatters.js';
+
+export const CURRENT_BUDGET_SCHEMA_VERSION = 3;
 
 /**
  * Prunes orphaned matrix keys that reference nonexistent calendar days (Tier C8).
@@ -36,6 +38,83 @@ export function pruneInvalidMatrixDayKeys(dailyMatrix) {
   }
 
   return { cleanedMatrix, removedCount: removedKeys.length, removedKeys };
+}
+
+/**
+ * Heals corrupted ledger rows and accounts where extra savings ending or beginning
+ * balance was forced negative (Tier C / FIX-16).
+ * Reallocates the negative offset back to the regular operating balance.
+ *
+ * @param {Array} accounts
+ * @returns {{ healedAccounts: Array, modifiedCount: number }}
+ */
+export function healCorruptedLedgerRows(accounts = []) {
+  if (!Array.isArray(accounts)) return { healedAccounts: [], modifiedCount: 0 };
+  let modifiedCount = 0;
+  const healedAccounts = accounts.map(acc => {
+    let accModified = false;
+    let newStartingBalance = acc.startingBalance;
+    let newExtraStartingBalance = acc.extraStartingBalance;
+
+    if (acc.extraStartingBalance !== undefined && acc.extraStartingBalance !== null && Number(acc.extraStartingBalance) < 0) {
+      const neg = Number(acc.extraStartingBalance);
+      newStartingBalance = round2((Number(newStartingBalance) || 0) + neg);
+      newExtraStartingBalance = 0;
+      accModified = true;
+    }
+
+    let newImportedRows = acc.importedLedgerRows;
+    if (acc.importedLedgerRows && typeof acc.importedLedgerRows === 'object') {
+      newImportedRows = { ...acc.importedLedgerRows };
+      for (const [dateKey, row] of Object.entries(newImportedRows)) {
+        if (!row || typeof row !== 'object') continue;
+        let rowModified = false;
+        let rRegEnd = row.regEnding;
+        let rExtraEnd = row.extraEnding;
+        let rRegBeg = row.regBeg;
+        let rExtraBeg = row.extraBeg;
+
+        if (rExtraEnd !== undefined && rExtraEnd !== null && Number(rExtraEnd) < 0) {
+          const neg = Number(rExtraEnd);
+          rRegEnd = round2((Number(rRegEnd) || 0) + neg);
+          rExtraEnd = 0;
+          rowModified = true;
+        }
+        if (rExtraBeg !== undefined && rExtraBeg !== null && Number(rExtraBeg) < 0) {
+          const neg = Number(rExtraBeg);
+          rRegBeg = round2((Number(rRegBeg) || 0) + neg);
+          rExtraBeg = 0;
+          rowModified = true;
+        }
+
+        if (rowModified) {
+          newImportedRows[dateKey] = {
+            ...row,
+            regEnding: rRegEnd,
+            extraEnding: rExtraEnd,
+            regBeg: rRegBeg,
+            extraBeg: rExtraBeg,
+            totalEnding: round2(rRegEnd + rExtraEnd),
+            totalBeg: round2(rRegBeg + rExtraBeg)
+          };
+          accModified = true;
+        }
+      }
+    }
+
+    if (accModified) {
+      modifiedCount++;
+      return {
+        ...acc,
+        startingBalance: newStartingBalance,
+        extraStartingBalance: newExtraStartingBalance,
+        importedLedgerRows: newImportedRows
+      };
+    }
+    return acc;
+  });
+
+  return { healedAccounts, modifiedCount };
 }
 
 /**
@@ -110,6 +189,23 @@ export function runBudgetMigrations(budget) {
       removedKeys,
       goalsNormalized: (migrated.fundingGoals || []).length
     };
+    currentVersion = 2;
+  }
+
+  // Migration V2 -> V3: Heal corrupted ledger rows with negative extraEnding / extraBeg (FIX-16)
+  if (currentVersion < 3) {
+    const { healedAccounts, modifiedCount } = healCorruptedLedgerRows(migrated.accounts || []);
+    if (modifiedCount > 0) {
+      migrated.accounts = healedAccounts;
+    }
+
+    migrated.schemaVersion = 3;
+    wasMigrated = true;
+
+    migrationDetails.v3 = {
+      healedAccountsCount: modifiedCount
+    };
+    currentVersion = 3;
   }
 
   return { budget: migrated, wasMigrated, details: migrationDetails };

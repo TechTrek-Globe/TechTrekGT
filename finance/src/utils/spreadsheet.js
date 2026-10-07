@@ -995,10 +995,23 @@ export function getLedgerRunningBalanceAsOfDate({
     const ocVal = dailyMatrix[`${targetAccountId}_${mKey}_${d}_other_credit_amount`];
     const dayOtherCredit = (ocVal !== undefined && ocVal !== null && ocVal !== '') ? parseMoney(ocVal, 0) : 0;
 
-    // FIX-08: ending = round2(beginning + credits - bills) every day.
+    // FIX-08 / FIX-16: ending = round2(beginning + credits - bills + other) every day.
+    // Other $ belongs to regular operating deductions/credits.
     // Never replace it with reg_ending, extra_ending, or importedLedgerRows values.
-    runningReg = round2(runningReg + dayCredits - dayBills);
-    runningExtra = showExtra ? round2(runningExtra + dayExtraCredits + dayOtherCredit + dayOther) : 0;
+    let regEnding = round2(runningReg + dayCredits - dayBills + dayOtherCredit + dayOther);
+    let extraEnding = showExtra ? round2(runningExtra + dayExtraCredits) : 0;
+    if (extraEnding < 0 && regEnding > 0) {
+      const transfer = Math.min(regEnding, -extraEnding);
+      extraEnding = round2(extraEnding + transfer);
+      regEnding = round2(regEnding - transfer);
+    } else if (regEnding < 0 && extraEnding > 0) {
+      const transfer = Math.min(extraEnding, -regEnding);
+      regEnding = round2(regEnding + transfer);
+      extraEnding = round2(extraEnding - transfer);
+    }
+
+    runningReg = regEnding;
+    runningExtra = extraEnding;
 
     cur.setDate(cur.getDate() + 1);
   }

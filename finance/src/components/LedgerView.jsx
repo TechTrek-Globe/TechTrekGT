@@ -880,11 +880,20 @@ function DailySpreadsheetMatrix() {
 
         const customOtherDesc = rawOtherDesc.replace(/^Other\s*\$?\s*\(?(.*?)\)?$/i, '$1').trim();
 
-        // 4. Determine Beginning and Ending Balances
-        // FIX-08: ending = round2(beginning + credits - bills) every day.
-        // Never replace it with reg_ending, extra_ending, or importedLedgerRows values.
-        const regEnding = round2(runningRegBeg + totalRegCredits - totalDayBills);
-        const extraEnding = showExtraColumns ? round2(runningExtraBeg + dayExtraAdd + otherAmt) : 0;
+        // FIX-08 / FIX-16: ending = round2(beginning + credits - bills + other) every day.
+        // Other $ belongs to regular operating deductions/credits.
+        // Never replace calculated ending with stored bank ending values.
+        let regEnding = round2(runningRegBeg + totalRegCredits - totalDayBills + otherAmt);
+        let extraEnding = showExtraColumns ? round2(runningExtraBeg + dayExtraAdd) : 0;
+        if (extraEnding < 0 && regEnding > 0) {
+          const transfer = Math.min(regEnding, -extraEnding);
+          extraEnding = round2(extraEnding + transfer);
+          regEnding = round2(regEnding - transfer);
+        } else if (regEnding < 0 && extraEnding > 0) {
+          const transfer = Math.min(extraEnding, -regEnding);
+          regEnding = round2(regEnding + transfer);
+          extraEnding = round2(extraEnding - transfer);
+        }
         const totalEnd = round2(regEnding + (showExtraColumns ? extraEnding : 0));
         const isHistoricalLock = isLockedDay;
         const totalBeg = Math.round((runningRegBeg + (showExtraColumns ? runningExtraBeg : 0)) * 100) / 100;

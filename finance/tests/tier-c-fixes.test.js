@@ -109,7 +109,7 @@ describe('Tier C Remediation Verification Tests', () => {
       assert.strictEqual(cleanedMatrix['acc-1_2026-09_31_credit_person-1'], undefined);
     });
 
-    test('runBudgetMigrations upgrades budget to v2 and prunes ghost keys', () => {
+    test('runBudgetMigrations upgrades budget to v3 and prunes ghost keys', () => {
       const legacyBudget = {
         dailyMatrix: {
           'acc-1_2026-09_30_credit_p1': 500,
@@ -124,7 +124,7 @@ describe('Tier C Remediation Verification Tests', () => {
 
       assert.strictEqual(wasMigrated, true);
       assert.strictEqual(budget.schemaVersion, CURRENT_BUDGET_SCHEMA_VERSION);
-      assert.strictEqual(budget.schemaVersion, 2);
+      assert.strictEqual(budget.schemaVersion, 3);
       assert.strictEqual(details.v2.prunedGhostDayKeys, 1);
       assert.strictEqual(budget.dailyMatrix['acc-1_2026-09_31_credit_p1'], undefined);
       assert.strictEqual(budget.dailyMatrix['acc-1_2026-09_30_credit_p1'], 500);
@@ -132,16 +132,47 @@ describe('Tier C Remediation Verification Tests', () => {
       assert.strictEqual(budget.fundingGoals[0].amount, undefined);
     });
 
+    test('runBudgetMigrations v3 heals corrupted negative extra ledger rows', () => {
+      const corruptedBudget = {
+        schemaVersion: 2,
+        accounts: [
+          {
+            id: 'acc-test',
+            name: 'Corrupted Checking',
+            startingBalance: 100,
+            extraStartingBalance: -25,
+            importedLedgerRows: {
+              '2026-07-28': {
+                regEnding: 0,
+                extraEnding: -281.38,
+                regBeg: 105.11,
+                extraBeg: 6.92
+              }
+            }
+          }
+        ]
+      };
+
+      const { budget, wasMigrated, details } = runBudgetMigrations(corruptedBudget);
+      assert.strictEqual(wasMigrated, true);
+      assert.strictEqual(budget.schemaVersion, 3);
+      assert.strictEqual(details.v3.healedAccountsCount, 1);
+      assert.strictEqual(budget.accounts[0].startingBalance, 75);
+      assert.strictEqual(budget.accounts[0].extraStartingBalance, 0);
+      assert.strictEqual(budget.accounts[0].importedLedgerRows['2026-07-28'].regEnding, -281.38);
+      assert.strictEqual(budget.accounts[0].importedLedgerRows['2026-07-28'].extraEnding, 0);
+    });
+
     test('runBudgetMigrations is idempotent when already at latest schemaVersion', () => {
       const modernBudget = {
-        schemaVersion: 2,
+        schemaVersion: 3,
         dailyMatrix: { 'acc-1_2026-01_15_credit_p1': 400 },
         fundingGoals: [{ id: 'g1', accountId: 'acc-1', amountPerPay: 400 }]
       };
 
       const { budget, wasMigrated } = runBudgetMigrations(modernBudget);
       assert.strictEqual(wasMigrated, false);
-      assert.strictEqual(budget.schemaVersion, 2);
+      assert.strictEqual(budget.schemaVersion, 3);
     });
   });
 

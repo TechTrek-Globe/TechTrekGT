@@ -343,33 +343,10 @@ export function processSpreadsheetImport({
     });
 
     if (strategies.transactions === 'override') {
-      if (data.targetAccountId) {
-        if (minImportDate && maxImportDate) {
-          // Date-scoped override: ONLY replace transactions for THIS target account that fall within [minImportDate, maxImportDate].
-          // Historical transactions prior to minImportDate and future projected transactions after maxImportDate are strictly preserved.
-          const preservedTransactions = nextTransactions.filter(t => {
-            if (t.accountId !== data.targetAccountId) return true;
-            const tDate = normalizeIsoDate(t.date);
-            if (!tDate) return true;
-            return tDate < minImportDate || tDate > maxImportDate;
-          });
-          nextTransactions = [...preservedTransactions, ...stampedTransactions];
-        } else {
-          const otherAccTransactions = nextTransactions.filter(t => t.accountId !== data.targetAccountId);
-          nextTransactions = [...otherAccTransactions, ...stampedTransactions];
-        }
-      } else {
-        if (minImportDate && maxImportDate) {
-          const preservedTransactions = nextTransactions.filter(t => {
-            const tDate = normalizeIsoDate(t.date);
-            if (!tDate) return true;
-            return tDate < minImportDate || tDate > maxImportDate;
-          });
-          nextTransactions = [...preservedTransactions, ...stampedTransactions];
-        } else {
-          nextTransactions = stampedTransactions;
-        }
-      }
+      // FULL-CLEAR OVERRIDE: the imported Credits/Debits rows ARE the new ledger truth.
+      // Any preserved legacy rows (other accounts, dates outside the import window, etc.)
+      // double-count against the imported statement and break the bank balance check.
+      nextTransactions = stampedTransactions;
       transactionsChanged = true;
     } else {
       if (dryRun) {
@@ -393,81 +370,11 @@ export function processSpreadsheetImport({
   if (namespaces.transactions && Array.isArray(data.transactions)) {
     logDebug('RECONCILE', `Reconciling ${data.transactions.length} actual transactions against projected bills/deposits`);
     
-    // If Overriding transactions, clean out existing matrix cells and line items for this account only within the imported date range
+    // If Overriding transactions, clear the existing matrix cells and line items entirely so
+    // the grid is rebuilt only from the imported Credits/Debits rows.
     if (strategies.transactions === 'override') {
-      if (data.targetAccountId) {
-        if (minImportDate && maxImportDate) {
-          const nextCleanMatrix = {};
-          Object.entries(nextDailyMatrix).forEach(([k, v]) => {
-            if (!k.startsWith(`${data.targetAccountId}_`)) {
-              nextCleanMatrix[k] = v;
-              return;
-            }
-            const parts = k.split('_');
-            const mKey = parts[1];
-            if (!mKey || mKey < minImportMonth || mKey > maxImportMonth) {
-              nextCleanMatrix[k] = v;
-              return;
-            }
-            const rawDay = parseInt(parts[2], 10);
-            if (!isNaN(rawDay)) {
-              const keyDate = `${mKey}-${String(rawDay).padStart(2, '0')}`;
-              if (keyDate < minImportDate || keyDate > maxImportDate) {
-                nextCleanMatrix[k] = v;
-                return;
-              }
-            }
-          });
-          nextDailyMatrix = nextCleanMatrix;
-
-          const accountBillIds = new Set(nextBills.filter(b => b.accountId === data.targetAccountId).map(b => b.id));
-          nextLineItems = nextLineItems.filter(li => {
-            if (!accountBillIds.has(li.billId)) return true;
-            if (!li.monthKey) return true;
-            return li.monthKey < minImportMonth || li.monthKey > maxImportMonth;
-          });
-        } else {
-          const nextCleanMatrix = {};
-          Object.entries(nextDailyMatrix).forEach(([k, v]) => {
-            if (!k.startsWith(`${data.targetAccountId}_`)) {
-              nextCleanMatrix[k] = v;
-            }
-          });
-          nextDailyMatrix = nextCleanMatrix;
-
-          const accountBillIds = new Set(nextBills.filter(b => b.accountId === data.targetAccountId).map(b => b.id));
-          nextLineItems = nextLineItems.filter(li => !accountBillIds.has(li.billId));
-        }
-      } else {
-        if (minImportDate && maxImportDate) {
-          const nextCleanMatrix = {};
-          Object.entries(nextDailyMatrix).forEach(([k, v]) => {
-            const parts = k.split('_');
-            const mKey = parts[1];
-            if (!mKey || mKey < minImportMonth || mKey > maxImportMonth) {
-              nextCleanMatrix[k] = v;
-              return;
-            }
-            const rawDay = parseInt(parts[2], 10);
-            if (!isNaN(rawDay)) {
-              const keyDate = `${mKey}-${String(rawDay).padStart(2, '0')}`;
-              if (keyDate < minImportDate || keyDate > maxImportDate) {
-                nextCleanMatrix[k] = v;
-                return;
-              }
-            }
-          });
-          nextDailyMatrix = nextCleanMatrix;
-
-          nextLineItems = nextLineItems.filter(li => {
-            if (!li.monthKey) return true;
-            return li.monthKey < minImportMonth || li.monthKey > maxImportMonth;
-          });
-        } else {
-          nextDailyMatrix = {};
-          nextLineItems = [];
-        }
-      }
+      nextDailyMatrix = {};
+      nextLineItems = [];
       matrixChanged = true;
       lineItemsChanged = true;
     }

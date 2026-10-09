@@ -466,16 +466,64 @@ export function applyBillMapping(rows, columnMap, defaultAccountId = '') {
 
 // --- Merge / Deduplication Helpers ---
 
+// Bank posted dates can drift from the ledger's scheduled date (pending vs posted,
+// weekend/holiday posts, early/late ACH). We widen the auto-match window so a re-import
+// matches the SAME logical transaction and updates its payment date instead of appending a
+// duplicate. 31 days covers any monthly bill/credit that moved within its cycle without
+// bleeding into the next cycle (~32-36 days apart).
+const MERGE_DATE_WINDOW_DAYS = 31;
+
+const GENERIC_TXN_WORDS = /\b(zelle|ach|deposit|transfer|payment|funds)\b/gi;
+
+function descriptionsMatch(incDescRaw = '', exDescRaw = '') {
+  const incDesc = (incDescRaw || '').toLowerCase().trim();
+  const exDesc = (exDescRaw || '').toLowerCase().trim();
+  if (!incDesc || !exDesc) return false;
+  if (incDesc === exDesc) return true;
+  const cleanInc = incDesc.replace(GENERIC_TXN_WORDS, '').trim();
+  const cleanEx = exDesc.replace(GENERIC_TXN_WORDS, '').trim();
+  if (cleanInc.length >= 3 && cleanEx.length >= 3 && (cleanInc.includes(cleanEx) || cleanEx.includes(cleanInc))) return true;
+  if (incDesc.length >= 5 && exDesc.length >= 5 && (incDesc.includes(exDesc) || exDesc.includes(incDesc))) return true;
+  return false;
+}
+
+function dayDiff(isoA, isoB) {
+  if (!isoA || !isoB) return 999;
+  return Math.abs(new Date(isoA) - new Date(isoB)) / 86400000;
+}
+
+// Single source of truth for "this incoming row is the same logical transaction as this
+// existing row". A same-description match within the date window pairs them whether or not
+// the amount agrees; amount disagreement is surfaced as a conflict (review), amount
+// agreement is an auto-merge (payment date updated to the bank's posted date).
+function isSameLogicalTransaction(inc, ex) {
+  if (!inc || !ex) return false;
+  if (ex.id && inc.id && ex.id === inc.id) return true;
+  if (ex.accountId && inc.accountId && ex.accountId !== inc.accountId) return false;
+  const incDate = normalizeIsoDate(inc.date);
+  const exDate = normalizeIsoDate(ex.date);
+  if (!incDate || !exDate) return false;
+  const incAmt = parseFloat(inc.amount) || 0;
+  const exAmt = parseFloat(ex.amount) || 0;
+  const amtMatch = Math.abs(incAmt - exAmt) < 0.01;
+  const descMatch = descriptionsMatch(inc.description, ex.description);
+  if (dayDiff(incDate, exDate) > MERGE_DATE_WINDOW_DAYS) return false;
+  // Exact date + amount is a match regardless of description (already posted identically).
+  if (incDate === exDate && amtMatch) return true;
+  // Otherwise require a description match so we never pair two unrelated rows that merely
+  // share a date or a round-dollar amount.
+  return descMatch;
+}
+
 export function detectTransactionConflicts(existing = [], incoming = []) {
   const conflicts = [];
+  const claimed = new Set();
   
   incoming.forEach(inc => {
     const incDate = normalizeIsoDate(inc.date);
-    const incDesc = (inc.description || '').toLowerCase().trim();
     const incAmt = parseFloat(inc.amount) || 0;
 
-    // If an incoming transaction already matches an existing entry (same account, same date, same amount),
-    // it matches what is there in the ledger and should be automatically ignored / deduplicated - not a conflict.
+    // Exact duplicates (same date + amount) already in the ledger are deduplicated silently.
     const alreadyMatches = existing.some(ex => {
       if (ex.accountId && inc.accountId && ex.accountId !== inc.accountId) return false;
       const exDate = normalizeIsoDate(ex.date);
@@ -489,39 +537,36 @@ export function detectTransactionConflicts(existing = [], incoming = []) {
       return;
     }
 
-    // Only flag true ambiguities as conflicts (e.g. same date and payee with a mismatched amount, or close date within 2 days with same amount)
-    const matches = existing.filter(ex => {
-      if (ex.id && inc.id && ex.id === inc.id) return true;
-      if (ex.accountId && inc.accountId && ex.accountId !== inc.accountId) return false;
-
-      const exDate = normalizeIsoDate(ex.date);
-      const exDesc = (ex.description || '').toLowerCase().trim();
-      const exAmt = parseFloat(ex.amount) || 0;
-
-      const cleanInc = incDesc.replace(/\b(zelle|ach|deposit|transfer|payment|funds)\b/gi, '').trim();
-      const cleanEx = exDesc.replace(/\b(zelle|ach|deposit|transfer|payment|funds)\b/gi, '').trim();
-      const descMatch = incDesc === exDesc || 
-        (cleanInc.length >= 3 && cleanEx.length >= 3 && (cleanInc.includes(cleanEx) || cleanEx.includes(cleanInc))) ||
-        (incDesc.length >= 5 && exDesc.length >= 5 && (incDesc.includes(exDesc) || exDesc.includes(incDesc)));
-      const dateMatch = incDate && exDate && incDate === exDate;
-      const amtMatch = Math.abs(incAmt - exAmt) < 0.01;
-      const dateDiff = (incDate && exDate) ? Math.abs(new Date(incDate) - new Date(exDate)) / 86400000 : 999;
-
-      // Case 1: Same date and matching description, but mismatched amount
-      if (dateMatch && descMatch && !amtMatch) return true;
-
-      // Case 2: Close date (1-2 days diff, e.g. pending vs posted date) with matching amount and description
-      if (dateDiff > 0 && dateDiff <= 2 && amtMatch && descMatch) return true;
-
-      return false;
+    // Pair this incoming row with its best unclaimed existing counterpart (nearest date wins).
+    // If the amount disagrees with that counterpart, it is a review-required conflict.
+    let bestIdx = -1;
+    let bestDiff = Infinity;
+    existing.forEach((ex, idx) => {
+      if (claimed.has(idx)) return;
+      if (!isSameLogicalTransaction(inc, ex)) return;
+      const d = dayDiff(incDate, normalizeIsoDate(ex.date));
+      if (d < bestDiff) { bestDiff = d; bestIdx = idx; }
     });
 
-    if (matches.length > 0) {
-      conflicts.push({
-        incoming: inc,
-        matches: matches
-      });
+    if (bestIdx < 0) return;
+
+    const ex = existing[bestIdx];
+    const exAmt = parseFloat(ex.amount) || 0;
+    const amtMatch = Math.abs(incAmt - exAmt) < 0.01;
+
+    if (amtMatch) {
+      // Same logical transaction, same amount - payment-date shift only. Auto-merges
+      // (payment date updated to the bank date) so it does not need user review.
+      claimed.add(bestIdx);
+      return;
     }
+
+    // Amount mismatch: flag for explicit user review instead of silently adding a duplicate.
+    claimed.add(bestIdx);
+    conflicts.push({
+      incoming: inc,
+      matches: [ex]
+    });
   });
 
   return conflicts;
@@ -537,6 +582,7 @@ export function detectTransactionConflicts(existing = [], incoming = []) {
  */
 export function mergeTransactions(existing = [], incoming = [], resolutions = {}) {
   const result = existing.map(e => ({ ...e }));
+  const claimedResultIdx = new Set();
 
   incoming.forEach(inc => {
     const res = resolutions[inc.id];
@@ -546,42 +592,24 @@ export function mergeTransactions(existing = [], incoming = [], resolutions = {}
       return;
     }
 
-    const incDate = normalizeIsoDate(inc.date);
-    const incDesc = (inc.description || '').toLowerCase().trim();
-    const incAmt = parseFloat(inc.amount) || 0;
-
     let matchIdx = -1;
     if (res && res.action === 'merge' && res.targetId) {
       matchIdx = result.findIndex(ex => ex.id === res.targetId);
     } else if (!res) {
-      // Fallback heuristic: check if transaction matches an existing ledger record
-      matchIdx = result.findIndex(ex => {
-        if (ex.id && inc.id && ex.id === inc.id) return true;
-        if (ex.accountId && inc.accountId && ex.accountId !== inc.accountId) return false;
-
-        const exDate = normalizeIsoDate(ex.date);
-        const exDesc = (ex.description || '').toLowerCase().trim();
-        const exAmt = parseFloat(ex.amount) || 0;
-
-        const descMatch = incDesc === exDesc || (incDesc.length >= 3 && exDesc.includes(incDesc)) || (exDesc.length >= 3 && incDesc.includes(exDesc));
-        const dateMatch = incDate && exDate && incDate === exDate;
-        const amtMatch = Math.abs(incAmt - exAmt) < 0.01;
-        const dateDiff = (incDate && exDate) ? Math.abs(new Date(incDate) - new Date(exDate)) / 86400000 : 999;
-
-        // Exact match on date and amount (already in ledger)
-        if (dateMatch && amtMatch) return true;
-
-        // Same date and matching description
-        if (dateMatch && descMatch) return true;
-
-        // Pending vs posted within 2 days with exact amount and matching description
-        if (dateDiff <= 2 && amtMatch && descMatch) return true;
-
-        return false;
+      // Fallback heuristic: pair with the nearest unclaimed existing ledger record using the
+      // same logical-transaction matcher as conflict detection. This updates the payment date
+      // to the bank's posted date when the amount agrees and avoids duplicate rows.
+      let bestDiff = Infinity;
+      result.forEach((ex, idx) => {
+        if (claimedResultIdx.has(idx)) return;
+        if (!isSameLogicalTransaction(inc, ex)) return;
+        const d = dayDiff(normalizeIsoDate(inc.date), normalizeIsoDate(ex.date));
+        if (d < bestDiff) { bestDiff = d; matchIdx = idx; }
       });
     }
 
     if (matchIdx >= 0) {
+      claimedResultIdx.add(matchIdx);
       const ex = result[matchIdx];
       let mergedNotes = ex.notes || '';
       if (inc.notes && inc.notes.trim()) {

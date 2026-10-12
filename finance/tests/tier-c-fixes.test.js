@@ -124,7 +124,6 @@ describe('Tier C Remediation Verification Tests', () => {
 
       assert.strictEqual(wasMigrated, true);
       assert.strictEqual(budget.schemaVersion, CURRENT_BUDGET_SCHEMA_VERSION);
-      assert.strictEqual(budget.schemaVersion, 3);
       assert.strictEqual(details.v2.prunedGhostDayKeys, 1);
       assert.strictEqual(budget.dailyMatrix['acc-1_2026-09_31_credit_p1'], undefined);
       assert.strictEqual(budget.dailyMatrix['acc-1_2026-09_30_credit_p1'], 500);
@@ -155,7 +154,7 @@ describe('Tier C Remediation Verification Tests', () => {
 
       const { budget, wasMigrated, details } = runBudgetMigrations(corruptedBudget);
       assert.strictEqual(wasMigrated, true);
-      assert.strictEqual(budget.schemaVersion, 3);
+      assert.strictEqual(budget.schemaVersion, CURRENT_BUDGET_SCHEMA_VERSION);
       assert.strictEqual(details.v3.healedAccountsCount, 1);
       assert.strictEqual(budget.accounts[0].startingBalance, 75);
       assert.strictEqual(budget.accounts[0].extraStartingBalance, 0);
@@ -165,14 +164,14 @@ describe('Tier C Remediation Verification Tests', () => {
 
     test('runBudgetMigrations is idempotent when already at latest schemaVersion', () => {
       const modernBudget = {
-        schemaVersion: 3,
+        schemaVersion: CURRENT_BUDGET_SCHEMA_VERSION,
         dailyMatrix: { 'acc-1_2026-01_15_credit_p1': 400 },
         fundingGoals: [{ id: 'g1', accountId: 'acc-1', amountPerPay: 400 }]
       };
 
       const { budget, wasMigrated } = runBudgetMigrations(modernBudget);
       assert.strictEqual(wasMigrated, false);
-      assert.strictEqual(budget.schemaVersion, 3);
+      assert.strictEqual(budget.schemaVersion, CURRENT_BUDGET_SCHEMA_VERSION);
     });
   });
 

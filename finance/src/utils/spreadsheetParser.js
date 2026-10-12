@@ -37,6 +37,70 @@ function cleanText(val, defaultVal = '') {
   return String(val).trim().replace(/[\r\n]+/g, ' ');
 }
 
+/**
+ * Tiered bill matcher ensuring exact name and alias matches precede fuzzy keyword fallbacks
+ */
+export function findMatchingBill(desc, notes, bills) {
+  if (!desc || !Array.isArray(bills) || bills.length === 0) return null;
+  const lowerDesc = desc.toLowerCase().trim();
+  const lowerNotes = (notes || '').toLowerCase().trim();
+
+  // Tier 1: Exact bill name match
+  const exactName = bills.find(b => !b.isArchived && (b.name || '').toLowerCase().trim() === lowerDesc);
+  if (exactName) return exactName;
+
+  // Tier 2: Exact alias / bankMatchNames match
+  const exactAlias = bills.find(b => {
+    if (b.isArchived) return false;
+    const bKey = (b.bankMatchNames || b.matchingKey || '').toLowerCase();
+    const aliases = bKey.split(/[,;\n\r|]+/).map(k => k.trim()).filter(Boolean);
+    return aliases.some(a => a === lowerDesc);
+  });
+  if (exactAlias) return exactAlias;
+
+  // Tier 3: Alias contained in description/notes
+  const aliasContained = bills.find(b => {
+    if (b.isArchived) return false;
+    const bKey = (b.bankMatchNames || b.matchingKey || '').toLowerCase();
+    const aliases = bKey.split(/[,;\n\r|]+/).map(k => k.trim()).filter(Boolean);
+    return aliases.some(a => a.length >= 2 && (lowerDesc.includes(a) || (lowerNotes && lowerNotes.includes(a))));
+  });
+  if (aliasContained) return aliasContained;
+
+  // Tier 4: Substring bill name match (prioritizing longer matching bill names)
+  const matchingSubstrings = bills.filter(b => {
+    if (b.isArchived) return false;
+    const bName = (b.name || '').toLowerCase().trim();
+    return bName.length >= 3 && (lowerDesc.includes(bName) || bName.includes(lowerDesc));
+  });
+  if (matchingSubstrings.length > 0) {
+    matchingSubstrings.sort((a, b) => (b.name || '').length - (a.name || '').length);
+    return matchingSubstrings[0];
+  }
+
+  // Tier 5: Generic keyword matches (only if not a generic bank fee unless bill has fee in name)
+  const isGenericFee = (lowerDesc.includes('fee') || lowerNotes.includes('fee'));
+  const candidateBills = isGenericFee
+    ? bills.filter(b => !b.isArchived && (b.name || '').toLowerCase().includes('fee'))
+    : bills.filter(b => !b.isArchived);
+
+  return candidateBills.find(b => {
+    const bName = (b.name || '').toLowerCase();
+    return (
+      ((lowerDesc.includes('hoa') || lowerDesc.includes('homeo') || lowerDesc.includes('emory')) && (bName.includes('hoa') || bName.includes('dues') || bName.includes('emory'))) ||
+      (lowerDesc.includes('mortgage') && bName.includes('mortgage')) ||
+      (lowerDesc.includes('water') && bName.includes('water')) ||
+      (lowerDesc.includes('power') && (bName.includes('power') || bName.includes('electric'))) ||
+      (lowerDesc.includes('electric') && (bName.includes('power') || bName.includes('electric'))) ||
+      ((lowerDesc.includes('gas') || lowerDesc.includes('energy') || lowerDesc.includes('geo')) && bName.includes('gas')) ||
+      (lowerDesc.includes('insurance') && (bName.includes('insurance') || bName.includes('vehicle') || bName.includes('auto'))) ||
+      (lowerDesc.includes('cell') && (bName.includes('cell') || bName.includes('phone'))) ||
+      (lowerDesc.includes('phone') && (bName.includes('cell') || bName.includes('phone'))) ||
+      (lowerDesc.includes('gym') && (bName.includes('gym') || bName.includes('membership')))
+    );
+  }) || null;
+}
+
 // System reserved matrix column names to ignore when extracting bill names
 const RESERVED_COLS = new Set([
   'date', 'beg balance', 'regular beg balance', 'extra beg balance', 'total beg balance',
@@ -361,31 +425,9 @@ export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
 
               let billId = null;
               if (amount < 0) {
-                const lowerDesc = description.toLowerCase();
-                const lowerNotes = notes.toLowerCase();
-                const isFee = lowerDesc.includes('fee') || lowerNotes.includes('fee');
-                if (!isFee) {
-                  const matchedBill = existingBills.find(b => {
-                    const bName = (b.name || '').toLowerCase();
-                    const bKey = (b.bankMatchNames || b.matchingKey || '').toLowerCase();
-                    return (
-                      (bKey && (lowerDesc.includes(bKey) || bKey.includes(lowerDesc) || (lowerNotes && lowerNotes.includes(bKey)))) ||
-                      bName.includes(lowerDesc) ||
-                      lowerDesc.includes(bName) ||
-                      (lowerDesc.includes('hoa') && bName.includes('hoa')) ||
-                      (lowerDesc.includes('mortgage') && bName.includes('mortgage')) ||
-                      (lowerDesc.includes('water') && bName.includes('water')) ||
-                      (lowerDesc.includes('power') && bName.includes('power')) ||
-                      (lowerDesc.includes('gas') && bName.includes('gas')) ||
-                      (lowerDesc.includes('electric') && bName.includes('electric')) ||
-                      (lowerDesc.includes('insurance') && (bName.includes('insurance') || bName.includes('vehicle') || bName.includes('auto'))) ||
-                      (lowerDesc.includes('cell') && (bName.includes('cell') || bName.includes('phone'))) ||
-                      (lowerDesc.includes('gym') && bName.includes('gym'))
-                    );
-                  });
-                  if (matchedBill) {
-                    billId = matchedBill.id;
-                  }
+                const matchedBill = findMatchingBill(description, notes, existingBills);
+                if (matchedBill) {
+                  billId = matchedBill.id;
                 }
               }
 
@@ -896,37 +938,9 @@ export function parseSingleSheet({
       // 5. Match bill if debit
       let billId = null;
       if (amount < 0) {
-        const lowerDesc = description.toLowerCase();
-        const lowerNotes = notes.toLowerCase();
-        const isFee = lowerDesc.includes('fee') || lowerNotes.includes('fee');
-        if (!isFee) {
-          const matchedBill = existingBills.find(b => {
-            if (b.isArchived) return false;
-            const bName = (b.name || '').toLowerCase();
-            const bKey = (b.bankMatchNames || b.matchingKey || '').toLowerCase();
-            const aliases = bKey ? bKey.split(/[,;\n\r|]+/).map(k => k.trim()).filter(Boolean) : [];
-            const aliasMatch = aliases.some(alias =>
-              alias.length >= 2 && (lowerDesc.includes(alias) || (lowerNotes && lowerNotes.includes(alias)))
-            );
-            if (aliasMatch) return true;
-            return (
-              bName.includes(lowerDesc) ||
-              (lowerDesc.length >= 3 && lowerDesc.includes(bName)) ||
-              (lowerDesc.includes('hoa') && bName.includes('hoa')) ||
-              (lowerDesc.includes('mortgage') && bName.includes('mortgage')) ||
-              (lowerDesc.includes('water') && bName.includes('water')) ||
-              (lowerDesc.includes('power') && bName.includes('power')) ||
-              ((lowerDesc.includes('gas') || lowerDesc.includes('energy') || lowerDesc.includes('geo')) && bName.includes('gas')) ||
-              (lowerDesc.includes('energy inc') && (bName.includes('gas') || bName.includes('energy'))) ||
-              (lowerDesc.includes('electric') && bName.includes('electric')) ||
-              (lowerDesc.includes('insurance') && (bName.includes('insurance') || bName.includes('vehicle') || bName.includes('auto'))) ||
-              (lowerDesc.includes('cell') && (bName.includes('cell') || bName.includes('phone'))) ||
-              (lowerDesc.includes('gym') && bName.includes('gym'))
-            );
-          });
-          if (matchedBill) {
-            billId = matchedBill.id;
-          }
+        const matchedBill = findMatchingBill(description, notes, existingBills);
+        if (matchedBill) {
+          billId = matchedBill.id;
         }
       }
 
@@ -1139,27 +1153,7 @@ export function parseSingleSheet({
         // Match bill
         let billId = null;
         if (!isCredit && !isOtherCol) {
-          const matchedBill = existingBills.find(b => {
-            const bName = b.name.toLowerCase();
-            const bKey = (b.bankMatchNames || b.matchingKey || '').toLowerCase();
-            return (
-              (bKey && (lowerH.includes(bKey) || bKey.includes(lowerH))) ||
-              bName.includes(lowerH) ||
-              lowerH.includes(bName) ||
-              (lowerH.includes('insurance') && (bName.includes('insurance') || bName.includes('vehicle') || bName.includes('auto'))) ||
-              (lowerH.includes('cell') && (bName.includes('cell') || bName.includes('phone'))) ||
-              (lowerH.includes('phone') && (bName.includes('cell') || bName.includes('phone'))) ||
-              (lowerH.includes('gym') && (bName.includes('gym') || bName.includes('membership'))) ||
-              (lowerH.includes('water') && bName.includes('water')) ||
-              (lowerH.includes('power') && (bName.includes('power') || bName.includes('electric'))) ||
-              (lowerH.includes('electric') && (bName.includes('power') || bName.includes('electric'))) ||
-              (lowerH.includes('gas') && bName.includes('gas')) ||
-              (lowerH.includes('hoa') && bName.includes('hoa')) ||
-              (lowerH.includes('mortgage') && bName.includes('mortgage')) ||
-              (lowerH.includes('comcast') && (bName.includes('comcast') || bName.includes('internet') || bName.includes('xfinity'))) ||
-              (lowerH.includes('youtube') && bName.includes('youtube'))
-            );
-          });
+          const matchedBill = findMatchingBill(h, null, existingBills);
           if (matchedBill) {
             billId = matchedBill.id;
           } else if (!RESERVED_COLS.has(lowerH)) {

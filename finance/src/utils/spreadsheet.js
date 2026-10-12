@@ -1,7 +1,8 @@
 // @ts-nocheck
 import { normalizeIsoDate, mergeBills, mergeTransactions, detectTransactionConflicts, matchCreditToEarner } from './importer.js';
+import { findMatchingBill } from './spreadsheetParser.js';
 import { logDebug, logWarn, logInfo } from './debugLogger.js';
-import { isPersonDepositDay, getPersonDepositAmountForAccount, getPersonExtraSavingsDepositAmountForAccount, effectiveDueDay, isBillDueInMonth } from './paydayUtils.js';
+import { isPersonDepositDay, getPersonDepositAmountForAccount, getPersonExtraSavingsDepositAmountForAccount, getPersonTargetPayDaysForMonth, effectiveDueDay, isBillDueInMonth } from './paydayUtils.js';
 import { allocateEarnerCredit } from './ledgerEngine.js';
 import { round2, parseMoney } from './formatters.js';
 
@@ -137,8 +138,8 @@ export function processSpreadsheetImport({
         nextAccounts = nextAccounts.map(a => {
           if (a.id === data.targetAccountId) {
             const importedRows = incomingTargetAcc?.importedLedgerRows || data.importedLedgerRows || {};
-            // Never wipe earlier historical ledger rows: merge incoming on top of existing
-            const mergedRows = { ...(a.importedLedgerRows || {}), ...importedRows };
+            const isFullOverride = strategies.accounts === 'override' || strategies.transactions === 'override';
+            const mergedRows = isFullOverride ? importedRows : { ...(a.importedLedgerRows || {}), ...importedRows };
             let newStartingBalance = a.startingBalance;
             let newExtraStarting = a.extraStartingBalance || 0;
             
@@ -146,8 +147,8 @@ export function processSpreadsheetImport({
             let newBalanceAsOfDate = a.balanceAsOfDate;
             if (strategies.transactions === 'override') {
               const dates = Object.keys(mergedRows).sort();
-              // Only adopt earliest date/balance if account has no prior startDate or if dates[0] is earlier than existing startDate
-              if (dates.length > 0 && (!a.startDate || dates[0] < a.startDate)) {
+              // Force adopt earliest date/balance if we are overriding the entire ledger
+              if (dates.length > 0) {
                 const earliestRow = mergedRows[dates[0]];
                 const rawReg = earliestRow.regBeg ?? earliestRow.totalBeg ?? newStartingBalance;
                 const rawExtra = earliestRow.extraBeg ?? (newExtraStarting ?? 0);
@@ -213,7 +214,7 @@ export function processSpreadsheetImport({
             
             if (strategies.transactions === 'override') {
               const dates = Object.keys(incomingAcc.importedLedgerRows).sort();
-              if (dates.length > 0 && (!match.startDate || dates[0] < match.startDate)) {
+              if (dates.length > 0) {
                 const earliestRow = incomingAcc.importedLedgerRows[dates[0]];
                 const rawReg = earliestRow.regBeg ?? earliestRow.totalBeg ?? match.startingBalance;
                 const rawExtra = earliestRow.extraBeg ?? (match.extraStartingBalance || 0);
@@ -262,12 +263,14 @@ export function processSpreadsheetImport({
       if (acc.id === data.targetAccountId) {
         const patches = {};
         if (data.importedLedgerRows && Object.keys(data.importedLedgerRows).length > 0) {
-          patches.importedLedgerRows = { ...(acc.importedLedgerRows || {}), ...data.importedLedgerRows };
+          patches.importedLedgerRows = strategies.transactions === 'override'
+            ? data.importedLedgerRows
+            : { ...(acc.importedLedgerRows || {}), ...data.importedLedgerRows };
           patches.ledgerMode = 'import';
           
           if (strategies.transactions === 'override') {
             const dates = Object.keys(data.importedLedgerRows).sort();
-            if (dates.length > 0 && (!acc.startDate || dates[0] < acc.startDate)) {
+            if (dates.length > 0) {
               const earliestRow = data.importedLedgerRows[dates[0]];
               const rawReg = earliestRow.regBeg ?? earliestRow.totalBeg ?? acc.startingBalance;
               const rawExtra = earliestRow.extraBeg ?? (acc.extraStartingBalance || 0);
@@ -288,6 +291,11 @@ export function processSpreadsheetImport({
               patches.balanceAsOfDate = dates[0];
             }
           }
+        } else if (strategies.transactions === 'override') {
+          // If overriding transactions without incoming statement rows, purge stale future/phantom importedLedgerRows
+          // so obsolete ending balance markers do not cause false-positive statement difference warnings
+          patches.importedLedgerRows = {};
+          patches.ledgerMode = 'import';
         }
         if (data.targetAccount && typeof data.targetAccount === 'object') {
           Object.assign(patches, data.targetAccount);
@@ -326,6 +334,8 @@ export function processSpreadsheetImport({
     }
   }
 
+  const importWarnings = [];
+
   // 4. Process Transactions
   if (namespaces.transactions && Array.isArray(data.transactions)) {
     logDebug('RECONCILE', 'Reconciling transactions namespace', { strategy: strategies.transactions, incomingCount: data.transactions.length, existingCount: nextTransactions.length });
@@ -343,9 +353,6 @@ export function processSpreadsheetImport({
     });
 
     if (strategies.transactions === 'override') {
-      // FULL-CLEAR OVERRIDE: the imported Credits/Debits rows ARE the new ledger truth.
-      // Any preserved legacy rows (other accounts, dates outside the import window, etc.)
-      // double-count against the imported statement and break the bank balance check.
       nextTransactions = stampedTransactions;
       transactionsChanged = true;
     } else {
@@ -370,18 +377,32 @@ export function processSpreadsheetImport({
   if (namespaces.transactions && Array.isArray(data.transactions)) {
     logDebug('RECONCILE', `Reconciling ${data.transactions.length} actual transactions against projected bills/deposits`);
     
-    // If Overriding transactions, clear the existing matrix cells and line items entirely so
-    // the grid is rebuilt only from the imported Credits/Debits rows.
+    // If Overriding transactions, clear target account's transaction matrix cells and line items,
+    // while strictly preserving all user comments (other_desc / other_credit_desc) and other accounts.
     if (strategies.transactions === 'override') {
-      nextDailyMatrix = {};
-      nextLineItems = [];
+      const preservedMatrix = {};
+      Object.entries(nextDailyMatrix).forEach(([key, val]) => {
+        const isTargetAcc = !data.targetAccountId || key.startsWith(`${data.targetAccountId}_`);
+        const isComment = key.endsWith('_other_desc') || key.endsWith('_other_credit_desc');
+        if (!isTargetAcc || isComment) {
+          preservedMatrix[key] = val;
+        }
+      });
+      nextDailyMatrix = preservedMatrix;
+      if (data.targetAccountId) {
+        nextLineItems = nextLineItems.filter(li => {
+          const b = nextBills.find(bill => bill.id === li.billId);
+          return b && b.accountId !== data.targetAccountId;
+        });
+      } else {
+        nextLineItems = [];
+      }
       matrixChanged = true;
       lineItemsChanged = true;
     }
 
     const lineItemUpdates = [];
     const matrixUpdates = {};
-    const matrixNoteShifts = [];
 
     data.transactions.forEach((txn, txnIdx) => {
       if (!txn.date || txn.amount === undefined) return;
@@ -408,87 +429,142 @@ export function processSpreadsheetImport({
 
       const descLower = (txn.description || '').toLowerCase();
       const notesLower = (txn.notes || '').toLowerCase();
+      const isInterest = descLower.includes('interest') || notesLower.includes('interest') || (txn.category && txn.category.toLowerCase().includes('interest'));
 
       if (isCredit) {
-        // Check earner deposit match
-        let matchedPerson;
-        if (txn.personId) {
-          matchedPerson = nextPeople.find(p => p.id === txn.personId);
-        } else {
-          const match = matchCreditToEarner({
-            amount: actualAmount,
-            description: txn.description,
-            notes: txn.notes,
-            category: txn.category,
-            targetAccountId: accountId,
-            people: nextPeople,
-            bills: nextBills,
-            accounts: nextAccounts
-          });
-          if (match) {
-            matchedPerson = match.person;
-          } else {
-            // Last-resort literal name scan (only fires if matchCreditToEarner returned null)
-            matchedPerson = nextPeople.find(p => p.name && descLower.includes(p.name.toLowerCase()));
-          }
-        }
-
-        if (matchedPerson) {
-          const creditKey = `${accountId}_${monthKey}_${actualDay}_credit_${matchedPerson.id}`;
-          const existingCredit = matrixUpdates[creditKey] ?? 0;
-          matrixUpdates[creditKey] = round2(parseMoney(existingCredit, 0) + parseMoney(actualAmount, 0));
-
-          logDebug('MATCH', `Matched credit transaction #${txnIdx + 1} to earner "${matchedPerson.name}"`, {
-            date: normDate,
-            desc: txn.description,
-            amount: actualAmount,
-            personId: matchedPerson.id,
-            creditKey
-          });
-
-          // Zero out the scheduled payday in this half of the month so it isn't duplicated.
-          // P7: clamp to daysInMonth so we never write keys like '2026-09_31_credit_...' in
-          // a 30-day month. new Date(y, m, 0) returns the last day of month m-1 in JS.
-          const txnYear = parseInt(parts[0], 10);
-          const txnMonthOneBased = parseInt(parts[1], 10); // 1-12
-          const daysInTxnMonth = new Date(txnYear, txnMonthOneBased, 0).getDate();
-
-          const targetPayDay = actualDay <= 15
-            ? (matchedPerson.payDay1 || 15)
-            : (matchedPerson.payDay2 === 'last' ? daysInTxnMonth : (matchedPerson.payDay2 || daysInTxnMonth));
-          const rawNumericPayDay = typeof targetPayDay === 'number'
-            ? targetPayDay
-            : parseInt(targetPayDay) || (actualDay <= 15 ? 15 : daysInTxnMonth);
-          const numericPayDay = Math.min(rawNumericPayDay, daysInTxnMonth);
-
-          if (numericPayDay !== actualDay) {
-            const schedCreditKey = `${accountId}_${monthKey}_${numericPayDay}_credit_${matchedPerson.id}`;
-            if (matrixUpdates[schedCreditKey] === undefined) {
-              matrixUpdates[schedCreditKey] = 0;
-            }
-          }
-        } else {
-          // Unmatched credit: accumulate into consolidated other_amount (positive) and other_desc
+        if (isInterest) {
+          // Interest credit: periodic bank earning that routes directly into Other $ without requiring review
           const otherKey = `${accountId}_${monthKey}_${actualDay}_other_amount`;
           const otherDescKey = `${accountId}_${monthKey}_${actualDay}_other_desc`;
-          const existingOther = matrixUpdates[otherKey] ?? nextDailyMatrix[otherKey] ?? 0;
+          const existingOther = matrixUpdates[otherKey] ?? 0;
           matrixUpdates[otherKey] = round2(parseMoney(existingOther, 0) + parseMoney(actualAmount, 0));
 
-          const cleanDesc = (txn.description || '').replace(/^Other\s*\$?\s*\(?(.*?)\)?$/i, '$1').trim() || txn.description;
-          const existingOtherDesc = (matrixUpdates[otherDescKey] ?? nextDailyMatrix[otherDescKey] ?? '').replace(/^Other\s*\$?\s*\(?(.*?)\)?$/i, '$1').trim();
-          if (existingOtherDesc && cleanDesc && !existingOtherDesc.includes(cleanDesc)) {
-            matrixUpdates[otherDescKey] = `${existingOtherDesc} | ${cleanDesc}`;
-          } else if (!existingOtherDesc) {
-            matrixUpdates[otherDescKey] = cleanDesc || '';
+          const priorUserDesc = (nextDailyMatrix[otherDescKey] ?? '').replace(/^Other\s*\$?\s*\(?(.*?)\)?$/i, '$1').trim();
+          matrixUpdates[otherDescKey] = priorUserDesc || matrixUpdates[otherDescKey] || 'Interest Credit';
+
+          logDebug('MATCH', `Credit transaction #${txnIdx + 1} recognized as Interest Credit; routed to Other $`, {
+            date: normDate,
+            amount: actualAmount,
+            otherKey
+          });
+        } else {
+          // Check earner deposit match
+          let matchedPerson;
+          if (txn.personId) {
+            matchedPerson = nextPeople.find(p => p.id === txn.personId);
+          } else {
+            const match = matchCreditToEarner({
+              amount: actualAmount,
+              description: txn.description,
+              notes: txn.notes,
+              category: txn.category,
+              targetAccountId: accountId,
+              people: nextPeople,
+              bills: nextBills,
+              accounts: nextAccounts
+            });
+            if (match) {
+              matchedPerson = match.person;
+            } else {
+              // Last-resort literal name scan (only fires if matchCreditToEarner returned null)
+              matchedPerson = nextPeople.find(p => p.name && descLower.includes(p.name.toLowerCase()));
+            }
           }
 
-          logDebug('MATCH', `Credit transaction #${txnIdx + 1} unmatched to known earner; routed to other_amount`, {
-            date: normDate,
-            desc: txn.description,
-            amount: actualAmount,
-            otherKey,
-            otherDescKey
-          });
+          if (matchedPerson) {
+            // Auto-persist manual earner mapping alias so future imports remember it
+            if (txn.personId && txn.description) {
+              const cleanDesc = txn.description.trim();
+              const existingRaw = matchedPerson.bankMatchNames || matchedPerson.matchingKey || '';
+              const existingList = existingRaw.split(/[,;\n\r|]+/).map(a => a.trim().toLowerCase());
+              if (!existingList.includes(cleanDesc.toLowerCase()) && !matchedPerson.name.toLowerCase().includes(cleanDesc.toLowerCase())) {
+                const updatedAliases = existingRaw ? `${existingRaw}, ${cleanDesc}` : cleanDesc;
+                matchedPerson.bankMatchNames = updatedAliases;
+                matchedPerson.matchingKey = updatedAliases;
+                metadataChanged = true;
+              }
+            }
+
+            const creditKey = `${accountId}_${monthKey}_${actualDay}_credit_${matchedPerson.id}`;
+            const existingCredit = matrixUpdates[creditKey] ?? 0;
+            matrixUpdates[creditKey] = round2(parseMoney(existingCredit, 0) + parseMoney(actualAmount, 0));
+
+            logDebug('MATCH', `Matched credit transaction #${txnIdx + 1} to earner "${matchedPerson.name}"`, {
+              date: normDate,
+              desc: txn.description,
+              amount: actualAmount,
+              personId: matchedPerson.id,
+              creditKey
+            });
+
+            // Zero out the corresponding scheduled payday for this pay cycle so it is not duplicated.
+            const txnYear = parseInt(parts[0], 10);
+            const txnMonthOneBased = parseInt(parts[1], 10); // 1-12
+            const daysInTxnMonth = new Date(txnYear, txnMonthOneBased, 0).getDate();
+
+            const personPayDays = getPersonTargetPayDaysForMonth(matchedPerson, txnYear, txnMonthOneBased - 1);
+            let targetDayToSuppress = null;
+
+            if (personPayDays.length > 0) {
+              let minDiff = Infinity;
+              personPayDays.forEach(pDate => {
+                const pDay = pDate.getDate();
+                const diff = Math.abs(pDay - actualDay);
+                if (diff < minDiff) {
+                  minDiff = diff;
+                  targetDayToSuppress = pDay;
+                }
+              });
+            }
+
+            if (targetDayToSuppress === null) {
+              const targetPayDay = actualDay <= 15
+                ? (matchedPerson.payDay1 || 15)
+                : (matchedPerson.payDay2 === 'last' ? daysInTxnMonth : (matchedPerson.payDay2 || daysInTxnMonth));
+              const rawNumericPayDay = typeof targetPayDay === 'number'
+                ? targetPayDay
+                : parseInt(targetPayDay) || (actualDay <= 15 ? 15 : daysInTxnMonth);
+              targetDayToSuppress = Math.min(rawNumericPayDay, daysInTxnMonth);
+            }
+
+            if (targetDayToSuppress !== null && targetDayToSuppress !== actualDay) {
+              const schedCreditKey = `${accountId}_${monthKey}_${targetDayToSuppress}_credit_${matchedPerson.id}`;
+              if (matrixUpdates[schedCreditKey] === undefined) {
+                matrixUpdates[schedCreditKey] = 0;
+              }
+            }
+          } else {
+            importWarnings.push({
+              kind: 'unmatched',
+              message: `${normDate}: credit $${actualAmount.toFixed(2)} "${txn.description || ''}" matched no earner and was placed in Other $.`
+            });
+            // Unmatched credit: accumulate into consolidated other_amount (positive) and other_desc
+            const otherKey = `${accountId}_${monthKey}_${actualDay}_other_amount`;
+            const otherDescKey = `${accountId}_${monthKey}_${actualDay}_other_desc`;
+            const existingOther = matrixUpdates[otherKey] ?? 0;
+            matrixUpdates[otherKey] = round2(parseMoney(existingOther, 0) + parseMoney(actualAmount, 0));
+
+            const cleanDesc = (txn.description || '').replace(/^Other\s*\$?\s*\(?(.*?)\)?$/i, '$1').trim() || txn.description;
+            const priorUserDesc = (nextDailyMatrix[otherDescKey] ?? '').replace(/^Other\s*\$?\s*\(?(.*?)\)?$/i, '$1').trim();
+            if (priorUserDesc) {
+              // Strictly preserve existing user comment / description
+              matrixUpdates[otherDescKey] = priorUserDesc;
+            } else if (matrixUpdates[otherDescKey]) {
+              if (cleanDesc && !matrixUpdates[otherDescKey].includes(cleanDesc)) {
+                matrixUpdates[otherDescKey] = `${matrixUpdates[otherDescKey]} | ${cleanDesc}`;
+              }
+            } else {
+              matrixUpdates[otherDescKey] = cleanDesc || '';
+            }
+
+            logDebug('MATCH', `Credit transaction #${txnIdx + 1} unmatched to known earner; routed to other_amount`, {
+              date: normDate,
+              desc: txn.description,
+              amount: actualAmount,
+              otherKey,
+              otherDescKey
+            });
+          }
         }
       } else {
         // Debit / Expense: resolve bill
@@ -500,92 +576,20 @@ export function processSpreadsheetImport({
           resolvedBillId = null;
         }
 
-        // Tier 1: Match by Bank Match Names (Statement Aliases) - Highest priority
-        if (!resolvedBillId && !txn.isOther && (descLower || notesLower)) {
-          // Check bills assigned to target account first
+        // Tier 1: Match using unified findMatchingBill (exact name, exact alias, alias substring, name substring, keyword)
+        if (!resolvedBillId && !txn.isOther) {
           const accountBills = nextBills.filter(b => !b.isArchived && (!b.accountId || b.accountId === accountId));
-          let bestMatch = null;
-          let longestMatchLen = 0;
-
-          for (const b of accountBills) {
-            const aliases = getBillMatchAliases(b);
-            for (const alias of aliases) {
-              if (alias.length < 2) continue;
-              const inDesc = descLower && descLower.includes(alias);
-              const inNotes = notesLower && notesLower.includes(alias);
-              if (inDesc || inNotes) {
-                if (alias.length > longestMatchLen) {
-                  bestMatch = { bill: b, alias };
-                  longestMatchLen = alias.length;
-                }
-              }
-            }
-          }
-
-          // If no match on target account, check other accounts
-          if (!bestMatch) {
-            const otherBills = nextBills.filter(b => !b.isArchived && b.accountId && b.accountId !== accountId);
-            for (const b of otherBills) {
-              const aliases = getBillMatchAliases(b);
-              for (const alias of aliases) {
-                if (alias.length < 2) continue;
-                const inDesc = descLower && descLower.includes(alias);
-                const inNotes = notesLower && notesLower.includes(alias);
-                if (inDesc || inNotes) {
-                  if (alias.length > longestMatchLen) {
-                    bestMatch = { bill: b, alias };
-                    longestMatchLen = alias.length;
-                  }
-                }
-              }
-            }
-          }
-
-          if (bestMatch) {
-            resolvedBillId = bestMatch.bill.id;
-            matchStrategy = `bank_match_alias ("${bestMatch.alias}" -> ${bestMatch.bill.name})`;
-          }
-        }
-
-        // Tier 2 (Fallback): Heuristics (Bill Name similarity, domain synonyms, expected dollar amount)
-        if (!resolvedBillId && !txn.isOther && descLower) {
-          // 2A: Bill Name & Domain synonyms - Check target account bills first, then other accounts
-          const candidateBills = [
-            ...nextBills.filter(b => !b.isArchived && (!b.accountId || b.accountId === accountId)),
-            ...nextBills.filter(b => !b.isArchived && b.accountId && b.accountId !== accountId)
-          ];
-          const matchedHeuristic = candidateBills.find(b => {
-            const bName = (b.name || '').toLowerCase().trim();
-
-            if (bName && (descLower.includes(bName) || bName.includes(descLower))) return true;
-            if ((descLower.includes('insurance') || descLower.includes('progressive') || descLower.includes('geico') || descLower.includes('allstate')) &&
-                (bName.includes('insurance') || bName.includes('vehicle') || bName.includes('auto'))) return true;
-            if ((descLower.includes('cell') || descLower.includes('phone') || descLower.includes('verizon') || descLower.includes('t-mobile') || descLower.includes('att')) &&
-                (bName.includes('cell') || bName.includes('phone') || bName.includes('wireless'))) return true;
-            if ((descLower.includes('gym') || descLower.includes('planet fitness') || descLower.includes('la fitness')) &&
-                (bName.includes('gym') || bName.includes('fitness') || bName.includes('membership'))) return true;
-            if (descLower.includes('wells fargo') && (bName.includes('cell') || bName.includes('wells'))) return true;
-            if (descLower.includes('bank of america') && (bName.includes('gym') || bName.includes('america'))) return true;
-            if ((descLower.includes('power') || descLower.includes('electric') || descLower.includes('georgia power')) &&
-                (bName.includes('power') || bName.includes('electric') || bName.includes('utility'))) return true;
-            if (descLower.includes('water') && bName.includes('water')) return true;
-            if ((descLower.includes('gas') || descLower.includes('energy') || descLower.includes('geo')) && bName.includes('gas')) return true;
-            if (descLower.includes('energy inc') && (bName.includes('gas') || bName.includes('energy'))) return true;
-            if (descLower.includes('hoa') && bName.includes('hoa')) return true;
-            if (descLower.includes('mortgage') && bName.includes('mortgage')) return true;
-            if ((descLower.includes('comcast') || descLower.includes('xfinity') || descLower.includes('spectrum')) &&
-                (bName.includes('comcast') || bName.includes('internet') || bName.includes('xfinity') || bName.includes('cable'))) return true;
-            if (descLower.includes('youtube') && bName.includes('youtube')) return true;
-            if (descLower.includes('netflix') && bName.includes('netflix')) return true;
-
-            return false;
-          });
-
-          if (matchedHeuristic) {
-            resolvedBillId = matchedHeuristic.id;
-            matchStrategy = `heuristic_name (${matchedHeuristic.name})`;
+          const matched = findMatchingBill(txn.description, txn.notes, accountBills) ||
+                          findMatchingBill(txn.description, txn.notes, nextBills.filter(b => !b.isArchived));
+          if (matched) {
+            resolvedBillId = matched.id;
+            matchStrategy = `findMatchingBill (${matched.name})`;
           } else {
-            // 2B: Expected Dollar Amount Match
+            // Tier 2: Expected Dollar Amount Match
+            const candidateBills = [
+              ...accountBills,
+              ...nextBills.filter(b => !b.isArchived && b.accountId && b.accountId !== accountId)
+            ];
             const matchedByAmount = candidateBills.find(b => {
               const billAmt = Math.abs(parseFloat(b.amount || 0));
               return Math.abs(billAmt - actualAmount) < 0.01;
@@ -602,8 +606,28 @@ export function processSpreadsheetImport({
           lineItemUpdates.push({ billId: resolvedBillId, monthKey, actualAmount });
           const bill = nextBills.find(b => b.id === resolvedBillId);
           const billTargetAccId = bill?.accountId || accountId;
+
+          // Auto-persist manual bill mapping alias so future imports remember it
+          if (bill && matchStrategy === 'explicit_bill_id' && txn.description) {
+            const cleanDesc = txn.description.trim();
+            const existingRaw = bill.bankMatchNames || bill.matchingKey || '';
+            const existingList = existingRaw.split(/[,;\n\r|]+/).map(a => a.trim().toLowerCase());
+            if (!existingList.includes(cleanDesc.toLowerCase()) && !bill.name.toLowerCase().includes(cleanDesc.toLowerCase())) {
+              const updatedAliases = existingRaw ? `${existingRaw}, ${cleanDesc}` : cleanDesc;
+              bill.bankMatchNames = updatedAliases;
+              bill.matchingKey = updatedAliases;
+              metadataChanged = true;
+            }
+          }
+
+          if (bill?.accountId && bill.accountId !== accountId) {
+            importWarnings.push({
+              kind: 'cross_account',
+              message: `${normDate}: debit $${actualAmount.toFixed(2)} "${txn.description || ''}" matched bill "${bill.name}", which belongs to a different account. It will not appear in this account's ledger.`
+            });
+          }
           const actualKey = `${billTargetAccId}_${monthKey}_${actualDay}_bill_${resolvedBillId}`;
-          matrixUpdates[actualKey] = round2(actualAmount);
+          matrixUpdates[actualKey] = round2(parseMoney(matrixUpdates[actualKey] || 0) + actualAmount);
 
           logDebug('MATCH', `Debit transaction #${txnIdx + 1} matched to bill "${bill?.name || resolvedBillId}" via ${matchStrategy}`, {
             date: normDate,
@@ -614,37 +638,75 @@ export function processSpreadsheetImport({
             actualKey
           });
 
-          // If this bill previously had a recorded day in this month in nextDailyMatrix that differs from actualDay, zero it out so it cleanly moves to the new day
+          // Zero out any prior recorded cell for this bill within 35 days (e.g. moved from prior month end or adjacent day)
           Object.keys(nextDailyMatrix).forEach(k => {
-            if (k.startsWith(`${billTargetAccId}_${monthKey}_`) && k.endsWith(`_bill_${resolvedBillId}`)) {
-              const dayStr = k.replace(`${billTargetAccId}_${monthKey}_`, '').replace(`_bill_${resolvedBillId}`, '');
-              const oldDay = parseInt(dayStr, 10);
-              if (oldDay !== actualDay && matrixUpdates[k] === undefined) {
-                matrixUpdates[k] = 0;
+            if (k.includes(`_bill_${resolvedBillId}`)) {
+              const match = k.match(/^(.+)_(\d{4}-\d{2})_(\d+)_bill_(.+)$/);
+              if (match) {
+                const [_, kAccId, kMonthKey, kDayStr, kBillId] = match;
+                if (kAccId === billTargetAccId && kBillId === resolvedBillId) {
+                  const kDateStr = `${kMonthKey}-${String(kDayStr).padStart(2, '0')}`;
+                  if (kDateStr !== normDate) {
+                    const diffDays = Math.abs(new Date(kDateStr) - new Date(normDate)) / 86400000;
+                    if (diffDays <= 35 && matrixUpdates[k] === undefined) {
+                      matrixUpdates[k] = 0;
+                    }
+                  }
+                }
               }
             }
           });
 
+          if (txn.previousDate && txn.previousDate !== normDate) {
+            const prevParts = txn.previousDate.split('-');
+            if (prevParts.length === 3) {
+              const prevMonthKey = `${prevParts[0]}-${prevParts[1]}`;
+              const prevDay = parseInt(prevParts[2], 10);
+              const prevKey = `${billTargetAccId}_${prevMonthKey}_${prevDay}_bill_${resolvedBillId}`;
+              if (matrixUpdates[prevKey] === undefined) {
+                matrixUpdates[prevKey] = 0;
+              }
+            }
+          }
+
           if (bill && bill.dueDay !== actualDay) {
             const projKey = `${billTargetAccId}_${monthKey}_${bill.dueDay}_bill_${resolvedBillId}`;
             if (matrixUpdates[projKey] === undefined) matrixUpdates[projKey] = 0;
-            const projNoteKey = `${billTargetAccId}_${monthKey}_${bill.dueDay}_other_desc`;
-            const actualNoteKey = `${billTargetAccId}_${monthKey}_${actualDay}_other_desc`;
-            matrixNoteShifts.push({ projNoteKey, actualNoteKey });
           }
         } else {
+          importWarnings.push({
+            kind: 'unmatched',
+            message: `${normDate}: debit $${actualAmount.toFixed(2)} "${txn.description || ''}" matched no bill and was placed in Other $.`
+          });
           // Unmatched debit -> Other expense (negative in consolidated other_amount)
           const otherKey = `${accountId}_${monthKey}_${actualDay}_other_amount`;
           const otherDescKey = `${accountId}_${monthKey}_${actualDay}_other_desc`;
-          const existingOther = matrixUpdates[otherKey] ?? nextDailyMatrix[otherKey] ?? 0;
+          const existingOther = matrixUpdates[otherKey] ?? 0;
           matrixUpdates[otherKey] = round2(parseMoney(existingOther, 0) - Math.abs(parseMoney(actualAmount, 0)));
 
           const cleanDesc = (txn.description || '').replace(/^Other\s*\$?\s*\(?(.*?)\)?$/i, '$1').trim() || txn.description;
-          const existingOtherDesc = (matrixUpdates[otherDescKey] ?? nextDailyMatrix[otherDescKey] ?? '').replace(/^Other\s*\$?\s*\(?(.*?)\)?$/i, '$1').trim();
-          if (existingOtherDesc && cleanDesc && !existingOtherDesc.includes(cleanDesc)) {
-            matrixUpdates[otherDescKey] = `${existingOtherDesc} | ${cleanDesc}`;
+          const priorUserDesc = (nextDailyMatrix[otherDescKey] ?? '').replace(/^Other\s*\$?\s*\(?(.*?)\)?$/i, '$1').trim();
+          if (priorUserDesc) {
+            // Strictly preserve existing user comment / description
+            matrixUpdates[otherDescKey] = priorUserDesc;
+          } else if (matrixUpdates[otherDescKey]) {
+            if (cleanDesc && !matrixUpdates[otherDescKey].includes(cleanDesc)) {
+              matrixUpdates[otherDescKey] = `${matrixUpdates[otherDescKey]} | ${cleanDesc}`;
+            }
           } else {
-            matrixUpdates[otherDescKey] = existingOtherDesc || cleanDesc;
+            matrixUpdates[otherDescKey] = cleanDesc || '';
+          }
+
+          if (txn.previousDate && txn.previousDate !== normDate) {
+            const prevParts = txn.previousDate.split('-');
+            if (prevParts.length === 3) {
+              const prevMonthKey = `${prevParts[0]}-${prevParts[1]}`;
+              const prevDay = parseInt(prevParts[2], 10);
+              const prevKey = `${accountId}_${prevMonthKey}_${prevDay}_other_amount`;
+              if (matrixUpdates[prevKey] === undefined) {
+                matrixUpdates[prevKey] = 0;
+              }
+            }
           }
 
           logWarn('MATCH', `Debit transaction #${txnIdx + 1} routed to Other Expense`, {
@@ -709,7 +771,22 @@ export function processSpreadsheetImport({
         });
       }
 
-      if (Object.keys(incomingRows).length > 0) {
+      if (strategies.transactions === 'override') {
+        // OVERRIDE: fully replace target account's importedLedgerRows with incoming statement rows.
+        // If the imported file has no running balance column, purge stale ledger rows so phantom bank diffs are not retained.
+        const hasTxns = Array.isArray(data.transactions) && data.transactions.length > 0;
+        nextAccounts = nextAccounts.map(acc => {
+          if (acc.id === accIdForImport || acc.name === accIdForImport || (!data.targetAccountId && nextAccounts.length === 1)) {
+            metadataChanged = true;
+            return {
+              ...acc,
+              importedLedgerRows: incomingRows,
+              ledgerMode: (Object.keys(incomingRows).length > 0 || hasTxns) ? 'import' : acc.ledgerMode
+            };
+          }
+          return acc;
+        });
+      } else if (Object.keys(incomingRows).length > 0) {
         nextAccounts = nextAccounts.map(acc => {
           if (acc.id === accIdForImport) {
             const merged = { ...(acc.importedLedgerRows || {}), ...incomingRows };
@@ -725,22 +802,8 @@ export function processSpreadsheetImport({
       }
     }
 
-    if (Object.keys(matrixUpdates).length > 0 || matrixNoteShifts.length > 0) {
-      const next = { ...nextDailyMatrix, ...matrixUpdates };
-
-      matrixNoteShifts.forEach(({ projNoteKey, actualNoteKey }) => {
-        const existingProjNote = nextDailyMatrix[projNoteKey];
-        const existingActualNote = next[actualNoteKey] || nextDailyMatrix[actualNoteKey] || '';
-        if (existingProjNote) {
-          if (!existingActualNote) {
-            next[actualNoteKey] = existingProjNote;
-          } else if (!existingActualNote.includes(existingProjNote)) {
-            next[actualNoteKey] = `${existingActualNote} | ${existingProjNote}`;
-          }
-          next[projNoteKey] = '';
-        }
-      });
-      nextDailyMatrix = next;
+    if (Object.keys(matrixUpdates).length > 0) {
+      nextDailyMatrix = { ...nextDailyMatrix, ...matrixUpdates };
       matrixChanged = true;
     }
   }
@@ -768,7 +831,8 @@ export function processSpreadsheetImport({
     metadataState: updatedMetadataState,
     lineItems: lineItemsChanged ? nextLineItems : lineItems,
     dailyMatrix: matrixChanged ? nextDailyMatrix : dailyMatrix,
-    transactions: transactionsChanged ? nextTransactions : transactions
+    transactions: transactionsChanged ? nextTransactions : transactions,
+    importWarnings
   };
 }
 
@@ -848,13 +912,16 @@ export function getLedgerRunningBalanceAsOfDate({
   // P9: exclude archived bills from the running balance simulation
   const bills = (metadataState.bills || []).filter(b => !b.isArchived && b.accountId === targetAccountId);
 
-  const isImportMode = targetAcc.ledgerMode === 'import' || (targetAcc.importedLedgerRows && Object.keys(targetAcc.importedLedgerRows).length > 0);
+  const accTxns = (transactions || []).filter(t => t.accountId === targetAccountId && t.date);
+  const maxTxnDate = accTxns.length > 0 ? accTxns.map(t => t.date).sort().pop() : null;
+  const isImportMode = targetAcc.ledgerMode === 'import' || (targetAcc.importedLedgerRows && Object.keys(targetAcc.importedLedgerRows).length > 0) || accTxns.length > 0;
   const importedRows = isImportMode ? (targetAcc.importedLedgerRows || {}) : {};
   const importedDatesList = Object.keys(importedRows);
   const maxImportDateStr = importedDatesList.length > 0 ? importedDatesList.reduce((a, b) => a > b ? a : b) : null;
+  const maxDataDate = [maxImportDateStr, maxTxnDate].filter(Boolean).sort().pop() || null;
   const today = new Date();
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-  const effectiveLockEnd = maxImportDateStr && maxImportDateStr < todayStr ? maxImportDateStr : todayStr;
+  const effectiveLockEnd = maxDataDate && maxDataDate < todayStr ? maxDataDate : todayStr;
 
   const earnerPlanCache = new Map();
   people.forEach(p => {
@@ -873,7 +940,7 @@ export function getLedgerRunningBalanceAsOfDate({
     const d = cur.getDate();
     const mKey = `${y}-${String(m + 1).padStart(2, '0')}`;
     const isoDate = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    const isLockedDay = Boolean(isImportMode && maxImportDateStr && isoDate <= effectiveLockEnd);
+    const isLockedDay = Boolean(isImportMode && maxDataDate && isoDate <= effectiveLockEnd);
 
     let dayCredits = 0;
     let dayExtraCredits = 0;
@@ -893,10 +960,7 @@ export function getLedgerRunningBalanceAsOfDate({
       const bVal = dailyMatrix[`${targetAccountId}_${mKey}_${d}_bill_${b.id}`];
       const expectedBillAmt = round2(b.amount, 0);
       if (bVal !== undefined && bVal !== null && bVal !== '') {
-        let amt = parseMoney(bVal, 0);
-        if (expectedBillAmt > 0 && Math.abs(amt - 2 * expectedBillAmt) < 0.02) {
-          amt = expectedBillAmt;
-        }
+        const amt = parseMoney(bVal, 0);
         dayBills = round2(dayBills + amt);
       } else if (!isLockedDay) {
         if (!b.isArchived && effectiveDueDay(b, y, m) === d && isBillDueInMonth(b, m, true)) {

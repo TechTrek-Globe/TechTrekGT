@@ -642,31 +642,43 @@ async function handleSyncBackup(context) {
     }
 
     const now = Math.max(Date.now(), hasBaseVersion ? baseVersion + 1 : 0);
-    versionId = crypto.randomUUID();
+    const isManual = body.manual === true || (body.manual === undefined && !body.auto);
+    versionId = isManual ? crypto.randomUUID() : null;
 
-    const batchResults = await env.DB.batch([
-      env.DB.prepare(
-        `INSERT INTO user_backup_versions (id, user_id, data, saved_at)
-         SELECT ?, ?, ?, ?
-         WHERE NOT EXISTS (SELECT 1 FROM user_backups WHERE id = ?)
-            OR EXISTS (
-              SELECT 1 FROM user_backups
-               WHERE id = ?
-                 AND (? = 1 OR updated_at_ms IS NULL OR updated_at_ms <= ?)
-            )`
-      ).bind(versionId, userId, dataStr, now, userId, userId, force ? 1 : 0, hasBaseVersion ? baseVersion : 0),
+    const queries = [];
 
-      env.DB.prepare(
-        `DELETE FROM user_backup_versions
-         WHERE user_id = ?
-           AND id NOT IN (
-             SELECT id FROM user_backup_versions
-              WHERE user_id = ?
-              ORDER BY saved_at DESC, rowid DESC
-              LIMIT 10
-           )`
-      ).bind(userId, userId),
+    // Only create a snapshot in user_backup_versions if this is a manual backup
+    if (isManual) {
+      queries.push(
+        env.DB.prepare(
+          `INSERT INTO user_backup_versions (id, user_id, data, saved_at)
+           SELECT ?, ?, ?, ?
+           WHERE NOT EXISTS (SELECT 1 FROM user_backups WHERE id = ?)
+              OR EXISTS (
+                SELECT 1 FROM user_backups
+                 WHERE id = ?
+                   AND (? = 1 OR updated_at_ms IS NULL OR updated_at_ms <= ?)
+              )`
+        ).bind(versionId, userId, dataStr, now, userId, userId, force ? 1 : 0, hasBaseVersion ? baseVersion : 0)
+      );
 
+      // Keep only the last 4 manual syncs
+      queries.push(
+        env.DB.prepare(
+          `DELETE FROM user_backup_versions
+           WHERE user_id = ?
+             AND id NOT IN (
+               SELECT id FROM user_backup_versions
+                WHERE user_id = ?
+                ORDER BY saved_at DESC, rowid DESC
+                LIMIT 4
+             )`
+        ).bind(userId, userId)
+      );
+    }
+
+    // Always update the ongoing single sync in user_backups
+    queries.push(
       env.DB.prepare(
         `INSERT INTO user_backups (id, data, data_byte_length, updated_at, updated_at_ms)
          VALUES (?, ?, ?, datetime('now'), ?)
@@ -677,9 +689,11 @@ async function handleSyncBackup(context) {
            updated_at_ms = excluded.updated_at_ms
          WHERE (? = 1 OR user_backups.updated_at_ms IS NULL OR user_backups.updated_at_ms <= ?)`
       ).bind(userId, dataStr, dataByteLength, now, force ? 1 : 0, hasBaseVersion ? baseVersion : 0)
-    ]);
+    );
 
-    const backupResult = batchResults && batchResults[2];
+    const batchResults = await env.DB.batch(queries);
+
+    const backupResult = batchResults && batchResults[batchResults.length - 1];
     const changes = backupResult?.meta?.changes ?? backupResult?.changes ?? 0;
 
     if (changes === 0 && !force) {
@@ -794,13 +808,22 @@ async function handleSyncVersions(context) {
       `SELECT id, saved_at FROM user_backup_versions
        WHERE user_id = ?
        ORDER BY saved_at DESC, rowid DESC
-       LIMIT 10`
+       LIMIT 4`
     ).bind(userId).all();
+
+    const ongoingRow = await env.DB.prepare(
+      'SELECT updated_at, updated_at_ms FROM user_backups WHERE id = ?'
+    ).bind(userId).first();
 
     const versions = (rows?.results || []).map(r => ({
       id: r.id,
       savedAt: Number(r.saved_at)
     }));
+
+    const ongoingSync = ongoingRow ? {
+      updatedAt: ongoingRow.updated_at_ms ? new Date(Number(ongoingRow.updated_at_ms)).toISOString() : ongoingRow.updated_at,
+      updatedAtMs: ongoingRow.updated_at_ms ? Number(ongoingRow.updated_at_ms) : (ongoingRow.updated_at ? new Date(ongoingRow.updated_at).getTime() : 0)
+    } : null;
 
     const latestSavedAt = versions.length > 0 ? versions[0].savedAt : 0;
     const etag = `"versions-${latestSavedAt}-${versions.length}"`;
@@ -816,7 +839,7 @@ async function handleSyncVersions(context) {
       });
     }
 
-    return json({ success: true, versions }, 200, {
+    return json({ success: true, versions, ongoingSync }, 200, {
       'ETag': etag,
       'Cache-Control': 'no-store'
     });
@@ -910,11 +933,13 @@ const ROUTES = {
 };
 
 async function fetchAsset(env, request, pathname) {
-  const assetUrl = new URL(request.url);
-  assetUrl.pathname = pathname;
-  const assetRequest = new Request(assetUrl.toString(), request);
-  if (env?.ASSETS?.fetch) return env.ASSETS.fetch(assetRequest);
-  return fetch(assetRequest);
+  if (env?.ASSETS?.fetch) {
+    const assetUrl = new URL(request.url);
+    assetUrl.pathname = pathname;
+    const assetRequest = new Request(assetUrl.toString(), request);
+    return env.ASSETS.fetch(assetRequest);
+  }
+  return fetch(request);
 }
 
 const worker = {

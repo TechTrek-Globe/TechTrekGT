@@ -115,6 +115,8 @@ export function getColumnRecentTransactions({
   const colNameLower = (column.name || '').toLowerCase();
   const aliases = getColumnAliases(column, type).map(a => a.toLowerCase());
 
+  const seenTxnDates = new Set();
+
   // 1. Scan transactions array (strictly prior to cutoff date)
   if (Array.isArray(transactions)) {
     for (const t of transactions) {
@@ -153,11 +155,30 @@ export function getColumnRecentTransactions({
       }
 
       if (isMatch) {
-        const amt = Math.abs(parseFloat(t.amount) || 0);
+        let amt = Math.abs(parseFloat(t.amount) || 0);
+        // If dailyMatrix has an explicit recorded bill cell for this date, align amt with dailyMatrix cell
+        if (type === 'bill' && dailyMatrix && typeof dailyMatrix === 'object') {
+          const accId = t.accountId || column.accountId;
+          const parts = ymd.split('-');
+          if (parts.length === 3 && accId) {
+            const mKey = `${parts[0]}-${parts[1]}`;
+            const day = parseInt(parts[2], 10);
+            const matrixKey = `${accId}_${mKey}_${day}_bill_${colId}`;
+            const cellVal = dailyMatrix[matrixKey];
+            if (cellVal !== undefined && cellVal !== null && cellVal !== '') {
+              const parsedCell = Math.abs(parseFloat(cellVal) || 0);
+              if (parsedCell > 0 && Math.abs(amt - parsedCell) > 0.009) {
+                amt = parsedCell;
+              }
+            }
+          }
+        }
+
         if (amt > 0) {
           const dedupKey = `${ymd}_${amt.toFixed(2)}`;
           if (!seenKeys.has(dedupKey)) {
             seenKeys.add(dedupKey);
+            seenTxnDates.add(ymd);
             results.push({
               id: t.id || `txn-${dedupKey}`,
               date: ymd,
@@ -188,7 +209,7 @@ export function getColumnRecentTransactions({
           if (selectedAccountId === 'all' || accId === selectedAccountId) {
             const dateStr = `${monthKey}-${String(day).padStart(2, '0')}`;
             const ymd = toYmd(dateStr);
-            if (!ymd || ymd > cutoffYmd) {
+            if (!ymd || ymd > cutoffYmd || seenTxnDates.has(ymd)) {
               continue;
             }
 

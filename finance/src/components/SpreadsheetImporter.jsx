@@ -34,6 +34,7 @@ const STAGE = {
   SELECTING: 'selecting',
   RECONCILIATION: 'reconciliation',
   BALANCE_CHECK: 'balance_check',
+  REVIEW_ISSUES: 'review_issues',
   DONE: 'done',
 };
 
@@ -144,6 +145,7 @@ export function SpreadsheetImporter({
   const [conflicts, setConflicts] = useState([]);
   const [resolutions, setResolutions] = useState({});
   const [balanceDetails, setBalanceDetails] = useState({ stated: 0, calculated: 0, delta: 0, maxImportDate: null });
+  const [importIssues, setImportIssues] = useState([]);
 
   // --- Resolve helpers ---
   const resolveAccountName = (accountId) => {
@@ -216,8 +218,13 @@ export function SpreadsheetImporter({
   const handleTransactionMappingChange = useCallback((txnId, newSelectVal) => {
     setParsedPayload(prev => {
       if (!prev || !prev.transactions) return prev;
+      let matchedDesc = '';
+      let targetType = null;
+      let targetId = null;
+
       const updatedTxns = prev.transactions.map(t => {
         if (t.id !== txnId) return t;
+        matchedDesc = t.description || '';
         if (!newSelectVal) {
           return {
             ...t,
@@ -229,6 +236,8 @@ export function SpreadsheetImporter({
         if (newSelectVal.startsWith('bill:')) {
           const bId = newSelectVal.replace('bill:', '');
           const targetBill = (budget?.bills || []).find(b => b.id === bId);
+          targetType = 'bill';
+          targetId = bId;
           return {
             ...t,
             billId: bId,
@@ -239,6 +248,8 @@ export function SpreadsheetImporter({
         }
         if (newSelectVal.startsWith('person:')) {
           const pId = newSelectVal.replace('person:', '');
+          targetType = 'person';
+          targetId = pId;
           return {
             ...t,
             personId: pId,
@@ -249,9 +260,15 @@ export function SpreadsheetImporter({
         }
         return t;
       });
+
+      // Automatically remember and save this match/alias for all future imports
+      if (targetType && targetId && matchedDesc) {
+        handleSaveAlias(targetType, targetId, matchedDesc);
+      }
+
       return { ...prev, transactions: updatedTxns };
     });
-  }, [budget?.bills]);
+  }, [budget?.bills, handleSaveAlias]);
 
   const renderCell = (rec, col, nsKey = null) => {
     const val = rec[col];
@@ -663,6 +680,46 @@ export function SpreadsheetImporter({
     }
   };
 
+  // --- Import-time review: collect problems the user should see before committing ---
+  const collectImportIssues = (projected, payload, accId) => {
+    const issues = [...(projected.importWarnings || [])];
+    const txns = (payload.transactions || []).filter(t => t.date && t.balance !== undefined && t.balance !== null && !isNaN(parseFloat(t.balance)));
+    if (txns.length > 0) {
+      const oldestFirst = txns[0].date <= txns[txns.length - 1].date;
+      const bankByDate = {};
+      txns.forEach(t => {
+        if (bankByDate[t.date] === undefined || oldestFirst) {
+          bankByDate[t.date] = Math.round(parseFloat(t.balance) * 100) / 100;
+        }
+      });
+      const dates = Object.keys(bankByDate).sort();
+      let firstBad = null;
+      let badCount = 0;
+      dates.forEach(d => {
+        const calc = getLedgerRunningBalanceAsOfDate({
+          targetAccountId: accId,
+          targetDate: d,
+          metadataState: projected.metadataState || { accounts: budget.accounts, people: budget.people, bills: budget.bills },
+          dailyMatrix: projected.dailyMatrix || {},
+          transactions: projected.transactions || []
+        });
+        const delta = Math.round((calc - bankByDate[d]) * 100) / 100;
+        if (Math.abs(delta) > 0.01) {
+          badCount += 1;
+          if (!firstBad) firstBad = { date: d, bank: bankByDate[d], calc, delta };
+        }
+      });
+      if (firstBad) {
+        const dayTxns = txns.filter(t => t.date === firstBad.date).map(t => `${t.description || ''} (${parseFloat(t.amount).toFixed(2)})`).join('; ');
+        issues.unshift({
+          kind: 'balance',
+          message: `First day the ledger differs from the bank balance in the file: ${firstBad.date}. Bank $${firstBad.bank.toFixed(2)}, ledger $${firstBad.calc.toFixed(2)}, difference $${Math.abs(firstBad.delta).toFixed(2)}. ${badCount} day(s) differ in total. Transactions that day: ${dayTxns || 'none'}.`
+        });
+      }
+    }
+    return issues;
+  };
+
   // --- Final import commit ---
   const handleApplyImport = () => {
     if (!parsedPayload) return;
@@ -676,20 +733,29 @@ export function SpreadsheetImporter({
       sheetName: selectedSheetName
     });
 
-    // Ensure all detected conflicts have at least the default resolution ('skip') populated
+    // Default detected conflicts to 'merge' (update to actual file amount) if a match exists
     const effectiveResolutions = { ...resolutions };
     (conflicts || []).forEach(c => {
       if (!effectiveResolutions[c.incoming.id]) {
-        effectiveResolutions[c.incoming.id] = { action: 'skip', targetId: null };
+        const matchId = c.matches?.[0]?.id || null;
+        effectiveResolutions[c.incoming.id] = matchId
+          ? { action: 'merge', targetId: matchId }
+          : { action: 'new', targetId: null };
       }
     });
+
+    const activeTargetAccId = parsedPayload.targetAccountId || targetAccountId || selectedTargetAccountId || budget?.accounts?.[0]?.id || '';
+    const payloadWithTarget = {
+      ...parsedPayload,
+      targetAccountId: activeTargetAccId
+    };
 
     if (stage === STAGE.SELECTING || stage === STAGE.RECONCILIATION) {
       logDebug('IMPORT', 'Running dry-run reconciliation check');
       const dryResult = importSpreadsheetSelective({
         namespaces: nsEnabled,
         strategies: nsStrategy,
-        data: parsedPayload,
+        data: payloadWithTarget,
         dryRun: true,
         resolutions: effectiveResolutions
       });
@@ -697,7 +763,10 @@ export function SpreadsheetImporter({
       if (dryResult.requiresResolution) {
         const initialResolutions = {};
         (dryResult.conflicts || []).forEach(c => {
-          initialResolutions[c.incoming.id] = { action: 'skip', targetId: null };
+          const matchId = c.matches?.[0]?.id || null;
+          initialResolutions[c.incoming.id] = matchId
+            ? { action: 'merge', targetId: matchId }
+            : { action: 'new', targetId: null };
         });
         setResolutions(prev => ({ ...initialResolutions, ...prev }));
         setConflicts(dryResult.conflicts);
@@ -787,8 +856,19 @@ export function SpreadsheetImporter({
         });
 
         if (delta > 0.01 && stated !== null && typeof stated === 'number') {
-          setBalanceDetails({ stated, calculated, delta, maxImportDate });
-          setStage(STAGE.BALANCE_CHECK);
+          if (nsStrategy.transactions !== 'override') {
+            setBalanceDetails({ stated, calculated, delta, maxImportDate });
+            setStage(STAGE.BALANCE_CHECK);
+            return;
+          }
+        }
+      }
+
+      if (dryResult.projected) {
+        const issues = collectImportIssues(dryResult.projected, payloadWithTarget, activeTargetAccId);
+        if (issues.length > 0) {
+          setImportIssues(issues);
+          setStage(STAGE.REVIEW_ISSUES);
           return;
         }
       }
@@ -797,7 +877,7 @@ export function SpreadsheetImporter({
     const result = importSpreadsheetSelective({
       namespaces: nsEnabled,
       strategies: nsStrategy,
-      data: parsedPayload,
+      data: payloadWithTarget,
       resolutions: effectiveResolutions
     });
 
@@ -1501,8 +1581,13 @@ export function SpreadsheetImporter({
                           className="mt-0.5 accent-indigo-500"
                         />
                         <div>
-                          <p className="text-xs text-slate-300">{ex.date} • {ex.description}</p>
-                          <p className="text-[11px] text-emerald-500/70 font-mono">${parseFloat(ex.amount).toFixed(2)}</p>
+                          <p className="text-xs text-slate-300">
+                            <strong>Update existing:</strong> {ex.date} • {ex.description}
+                          </p>
+                          <p className="text-[11px] font-mono">
+                            <span className="text-slate-500 line-through mr-1.5">${parseFloat(ex.amount).toFixed(2)}</span>
+                            <span className="text-emerald-400 font-bold">➔ ${parseFloat(inc.amount).toFixed(2)} (on {inc.date})</span>
+                          </p>
                         </div>
                       </label>
                     ))}
@@ -1547,6 +1632,39 @@ export function SpreadsheetImporter({
             >
               Confirm Resolutions & Continue
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ---- STAGE: REVIEW_ISSUES ---- */}
+      {stage === STAGE.REVIEW_ISSUES && (
+        <div className="space-y-4 animate-fade-in">
+          <div className="p-5 bg-amber-950/40 border border-amber-800/60 rounded-xl space-y-3">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-400" />
+              <h3 className="font-bold text-sm text-amber-200">Review Before Importing ({importIssues.length})</h3>
+            </div>
+            <ul className="space-y-1.5 max-h-72 overflow-y-auto text-xs text-amber-100">
+              {importIssues.slice(0, 100).map((issue, i) => (
+                <li key={i} className="p-2 bg-black/30 rounded-lg">{issue.message}</li>
+              ))}
+            </ul>
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setStage(STAGE.SELECTING)}
+                className="px-4 py-2 text-xs text-slate-300 bg-slate-800 hover:bg-slate-700 rounded-lg font-medium"
+              >
+                Go Back
+              </button>
+              <button
+                type="button"
+                onClick={handleApplyImport}
+                className="px-4 py-2 text-xs text-white bg-amber-700 hover:bg-amber-600 rounded-lg font-bold"
+              >
+                Import Anyway
+              </button>
+            </div>
           </div>
         </div>
       )}

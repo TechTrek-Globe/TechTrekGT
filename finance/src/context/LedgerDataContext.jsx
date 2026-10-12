@@ -10,7 +10,7 @@ import { processSpreadsheetImport } from '../utils/spreadsheet';
 import { isBillDueInMonth, effectiveDueDay } from '../utils/paydayUtils';
 import { allocateEarnerCredit } from '../utils/ledgerEngine';
 import { round2, parseMoney } from '../utils/formatters';
-import { pruneInvalidMatrixDayKeys } from '../migrations/budgetMigrations';
+import { pruneInvalidMatrixDayKeys, runBudgetMigrations, CURRENT_BUDGET_SCHEMA_VERSION } from '../migrations/budgetMigrations';
 import { logSync, logTransaction, logMatrix, logLedger, logState } from '../utils/logger';
 import { AlertTriangle } from 'lucide-react';
 import { ALLOWED_BUDGET_KEYS } from '../worker.js';
@@ -183,52 +183,6 @@ export function LedgerDataProvider({ children }) {
     return () => window.removeEventListener('techtrek:user-logout', handleUserLogout);
   }, [flushSaveToIndexedDB, currentUserId]);
 
-  // Self-healing: continuously correct bill matrix cells and line items doubled by prior import accumulation bug
-  useEffect(() => {
-    if (!isDbLoaded) return;
-    const bills = metadataState.bills || [];
-    if (bills.length === 0) return;
-
-    const billAmtMap = {};
-    bills.forEach(b => {
-      if (b.id) billAmtMap[b.id] = round2(b.amount);
-    });
-
-    const billKeyPattern = /_\d{4}-\d{2}_\d{1,2}_bill_(.+)$/;
-    let matrixChanged = false;
-    for (const [key, value] of Object.entries(dailyMatrixRef.current || {})) {
-      const m = key.match(billKeyPattern);
-      if (!m) continue;
-      const expected = billAmtMap[m[1]];
-      if (!expected || expected <= 0) continue;
-      const stored = round2(value);
-      if (stored > 0 && Math.abs(stored - 2 * expected) < 0.02) {
-        dailyMatrixRef.current[key] = expected;
-        matrixChanged = true;
-      }
-    }
-    if (matrixChanged) {
-      setDailyMatrix({ ...dailyMatrixRef.current });
-      setMatrixVersion(v => v + 1);
-      logLedger('REPAIR_BILL_DOUBLE', 'Healed doubled bill matrix cells in dailyMatrix');
-    }
-
-    let lineItemsChanged = false;
-    const currentLineItems = lineItemsRef.current || [];
-    const nextLineItems = currentLineItems.map(li => {
-      const expected = billAmtMap[li.billId];
-      if (expected && expected > 0 && Math.abs(li.actualAmount - 2 * expected) < 0.02) {
-        lineItemsChanged = true;
-        return { ...li, actualAmount: expected };
-      }
-      return li;
-    });
-    if (lineItemsChanged) {
-      lineItemsRef.current = nextLineItems;
-      setLineItems(nextLineItems);
-      logLedger('REPAIR_BILL_DOUBLE', 'Healed doubled bill line items');
-    }
-  }, [isDbLoaded, metadataState.bills]);
 
 
   // Combined full budget object representation for compatibility and persistence
@@ -380,10 +334,17 @@ export function LedgerDataProvider({ children }) {
       throw new Error('Invalid backup file format.');
     }
 
+    const dataToRestore = {
+      ...parsedData,
+      schemaVersion: parsedData.schemaVersion || CURRENT_BUDGET_SCHEMA_VERSION
+    };
+    const { budget: migratedData } = runBudgetMigrations(dataToRestore);
+    const effectiveData = migratedData || dataToRestore;
+
     // CRIT-003: Build merged metadata using ALLOWED_BUDGET_KEYS so every persisted key round-trips
     const mergedMetadata = {};
     for (const key of ALLOWED_BUDGET_KEYS) {
-      const value = parsedData[key];
+      const value = effectiveData[key];
       if (Array.isArray(value)) {
         mergedMetadata[key] = value;
       } else if (key === 'theme') {
@@ -402,13 +363,19 @@ export function LedgerDataProvider({ children }) {
 
     // FIX-02: Restore dailyMatrix exactly as provided. Future-dated credit cells are
     // legitimate historical records and must not be silently deleted on restore.
-    const newDailyMatrix = (parsedData.dailyMatrix && typeof parsedData.dailyMatrix === 'object')
-      ? { ...parsedData.dailyMatrix }
+    const newDailyMatrix = (effectiveData.dailyMatrix && typeof effectiveData.dailyMatrix === 'object')
+      ? { ...effectiveData.dailyMatrix }
       : {};
-    const newLineItems = Array.isArray(parsedData.lineItems) ? parsedData.lineItems : [];
-    const newTransactions = Array.isArray(parsedData.transactions) ? parsedData.transactions : [];
+    const newLineItems = Array.isArray(effectiveData.lineItems) ? effectiveData.lineItems : [];
+    const newTransactions = Array.isArray(effectiveData.transactions) ? effectiveData.transactions : [];
 
-    const fullMerged = { ...mergedMetadata, dailyMatrix: newDailyMatrix, lineItems: newLineItems, transactions: newTransactions };
+    const fullMerged = {
+      ...mergedMetadata,
+      dailyMatrix: newDailyMatrix,
+      lineItems: newLineItems,
+      transactions: newTransactions,
+      schemaVersion: CURRENT_BUDGET_SCHEMA_VERSION
+    };
 
     await clearAndRestoreBudgetData(fullMerged, currentUserId || getCurrentUserId());
     dailyMatrixRef.current = newDailyMatrix;
@@ -653,7 +620,7 @@ export function LedgerDataProvider({ children }) {
             }
           } else if (localTime > savedCloudVersion && cloudTime <= savedCloudVersion) {
             // Local changed offline: push local
-            await pushCloudBackup(syncPasscode, { baseVersion: savedCloudVersion });
+            await pushCloudBackup(syncPasscode, { baseVersion: savedCloudVersion, auto: true });
           } else if (cloudTime !== localTime && savedCloudVersion === 0) {
             // First time syncing with both local and cloud populated: Prompt user
             setSyncConflict({
@@ -687,7 +654,7 @@ export function LedgerDataProvider({ children }) {
     const timer = setTimeout(async () => {
       try {
         logSync('AUTO_BACKUP_TRIGGER', '5-second debounce expired; triggering auto cloud backup');
-        await pushCloudBackup(syncPasscode);
+        await pushCloudBackup(syncPasscode, { auto: true });
       } catch (err) {
         logSync('AUTO_BACKUP_ERROR', `Auto cloud backup failed: ${err.message}`, { error: err.message }, 'error');
         console.error('Auto cloud backup failed:', err);
@@ -846,7 +813,7 @@ export function LedgerDataProvider({ children }) {
         // FIX-02: Standard CAS push only - no force override. Cloud backup is
         // caller-initiated and must not bypass version conflict detection.
         if (isAuthenticated) {
-          pushCloudBackup(syncPasscode).catch(() => {});
+          pushCloudBackup(syncPasscode, { auto: true }).catch(() => {});
         }
       }
     }
@@ -867,7 +834,7 @@ export function LedgerDataProvider({ children }) {
         saveBudgetData(budgetRef.current, currentUserId || getCurrentUserId()).catch(() => {});
         if (isAuthenticated) {
           // FIX-03: Standard CAS push - pruning ghost keys must not force-overwrite cloud.
-          pushCloudBackup(syncPasscode).catch(() => {});
+          pushCloudBackup(syncPasscode, { auto: true }).catch(() => {});
         }
       }
     }
@@ -1130,10 +1097,13 @@ export function LedgerDataProvider({ children }) {
         };
     }
 
-    const isImportMode = acc.ledgerMode === 'import' || (acc.importedLedgerRows && Object.keys(acc.importedLedgerRows).length > 0);
+    const accTxns = (transactionsRef.current || []).filter(t => t.accountId === acc.id && t.date);
+    const maxTxnDate = accTxns.length > 0 ? accTxns.map(t => t.date).sort().pop() : null;
+    const isImportMode = acc.ledgerMode === 'import' || (acc.importedLedgerRows && Object.keys(acc.importedLedgerRows).length > 0) || accTxns.length > 0;
     const importedRows = isImportMode ? (acc.importedLedgerRows || {}) : {};
     const importedDatesList = Object.keys(importedRows);
     const maxImportDateStr = importedDatesList.length > 0 ? importedDatesList.reduce((a, b) => a > b ? a : b) : null;
+    const maxDataDate = [maxImportDateStr, maxTxnDate].filter(Boolean).sort().pop() || null;
 
     let runningRegBeg = parseMoney(acc.startingBalance, 0);
     let runningExtraBeg = showExtra ? parseMoney(acc.extraStartingBalance, 0) : 0;
@@ -1164,8 +1134,8 @@ export function LedgerDataProvider({ children }) {
       
       // P6: clamp import lock boundary to today so future dates project normally.
       const todayLockStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-      const effectiveLockEnd = maxImportDateStr && maxImportDateStr < todayLockStr ? maxImportDateStr : todayLockStr;
-      const isLockedDay = isImportMode && maxImportDateStr && isoDate <= effectiveLockEnd;
+      const effectiveLockEnd = maxDataDate && maxDataDate < todayLockStr ? maxDataDate : todayLockStr;
+      const isLockedDay = Boolean(isImportMode && maxDataDate && isoDate <= effectiveLockEnd);
 
 
       // 1. Credits
@@ -1194,13 +1164,10 @@ export function LedgerDataProvider({ children }) {
         if (customBill !== undefined) {
           hasDayBillOverride = true;
           amt = parseMoney(customBill, 0);
-          if (expectedBillAmt > 0 && Math.abs(amt - 2 * expectedBillAmt) < 0.02) {
-            amt = expectedBillAmt;
-          }
         } else if (!isLockedDay) {
           const actualAmt = getActualAmount(b.id, monthKey);
           if (actualAmt !== null && effectiveDueDay(b, year, month) === day && isBillDueInMonth(b, month, true)) {
-            amt = (expectedBillAmt > 0 && Math.abs(actualAmt - 2 * expectedBillAmt) < 0.02) ? expectedBillAmt : actualAmt;
+            amt = actualAmt;
           } else if (actualAmt !== null) {
             amt = 0;
           } else if (!b.isArchived && effectiveDueDay(b, year, month) === day && isBillDueInMonth(b, month, true)) {

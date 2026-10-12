@@ -738,9 +738,12 @@ function DailySpreadsheetMatrix() {
     const rows = [];
     if (monthList.length === 0) return rows;
 
+    const accTxns = (transactions || []).filter(t => t.accountId === selectedAccountId && t.date);
+    const maxTxnDate = accTxns.length > 0 ? accTxns.map(t => t.date).sort().pop() : null;
+
     // Rule A: single-account import mode only - 'all' view always projects
     const isImportMode = selectedAccountId !== 'all'
-      && (selectedAccount?.ledgerMode === 'import' || (selectedAccount?.importedLedgerRows && Object.keys(selectedAccount.importedLedgerRows).length > 0));
+      && (selectedAccount?.ledgerMode === 'import' || (selectedAccount?.importedLedgerRows && Object.keys(selectedAccount.importedLedgerRows).length > 0) || accTxns.length > 0);
 
     const importedRows = isImportMode
       ? (selectedAccount?.importedLedgerRows || {})
@@ -748,6 +751,7 @@ function DailySpreadsheetMatrix() {
 
     const importedDatesList = Object.keys(importedRows);
     const maxImportDateStr = importedDatesList.length > 0 ? importedDatesList.reduce((a,b) => a > b ? a : b) : null;
+    const maxDataDate = [maxImportDateStr, maxTxnDate].filter(Boolean).sort().pop() || null;
 
     let runningRegBeg = initialRegBeg;
     let runningExtraBeg = initialExtraBeg;
@@ -780,8 +784,8 @@ function DailySpreadsheetMatrix() {
         // Historical dates (isoDate <= todayStr) keep the import lock.
         // Stored credit cells on future dates still win via allocateEarnerCredit.
         const todayStr = `${todayObj.getFullYear()}-${String(todayObj.getMonth() + 1).padStart(2, '0')}-${String(todayObj.getDate()).padStart(2, '0')}`;
-        const effectiveLockEnd = maxImportDateStr && maxImportDateStr < todayStr ? maxImportDateStr : todayStr;
-        const isLockedDay = isImportMode && maxImportDateStr && isoDate <= effectiveLockEnd;
+        const effectiveLockEnd = maxDataDate && maxDataDate < todayStr ? maxDataDate : todayStr;
+        const isLockedDay = Boolean(isImportMode && maxDataDate && isoDate <= effectiveLockEnd);
 
         // 1. Credits (Deposits) for enabled account earners
         const personCredits = {};
@@ -823,17 +827,12 @@ function DailySpreadsheetMatrix() {
             // Tier 1: manual dailyMatrix override (drag-drop, inline edit, or actual transaction) wins outright
             hasDayBillOverride = true;
             amt = parseFloat(customBillVal) || 0;
-            // P11-a: display-only correction - do not call updateDailyMatrixCell inside render (useMemo).
-            // The self-heal effect in LedgerDataContext already corrects doubled cells.
-            if (expectedBillAmt > 0 && Math.abs(amt - 2 * expectedBillAmt) < 0.02) {
-              amt = expectedBillAmt;
-            }
           } else if (!isLockedDay) {
             // Tier 2: month-scoped actual amount from import reconciliation
             const actualAmt = getActualAmount(b.id, monthKey);
             // P8: use effectiveDueDay to clamp day 29/30/31 to the real last day of shorter months
             if (actualAmt !== null && effectiveDueDay(b, year, month) === day && isBillDueInMonth(b, month, true)) {
-              amt = (expectedBillAmt > 0 && Math.abs(actualAmt - 2 * expectedBillAmt) < 0.02) ? expectedBillAmt : actualAmt;
+              amt = actualAmt;
             } else if (actualAmt !== null) {
               amt = 0;
             } else if (!b.isArchived && effectiveDueDay(b, year, month) === day && isBillDueInMonth(b, month, true)) {
@@ -898,62 +897,6 @@ function DailySpreadsheetMatrix() {
         const isHistoricalLock = isLockedDay;
         const totalBeg = Math.round((runningRegBeg + (showExtraColumns ? runningExtraBeg : 0)) * 100) / 100;
 
-        // Stored bank balance for comparison only (never replaces calculated ending balance)
-        let bankBalance = null;
-        const impRow = isImportMode ? importedRows[isoDate] : undefined;
-
-        if (impRow !== undefined) {
-          if (typeof impRow === 'number') {
-            bankBalance = round2(impRow);
-          } else if (impRow && typeof impRow === 'object') {
-            const statedTotal = impRow.totalEnding ?? (
-              impRow.regEnding !== undefined && impRow.extraEnding !== undefined
-                ? round2((parseFloat(impRow.regEnding) || 0) + (parseFloat(impRow.extraEnding) || 0))
-                : (impRow.regEnding ?? null)
-            );
-            if (statedTotal !== null && statedTotal !== undefined && !isNaN(statedTotal)) {
-              bankBalance = round2(parseFloat(statedTotal));
-            }
-          }
-        }
-
-        // If not in imported rows, check transactions for account ending running balance on this date
-        if (bankBalance === null && selectedAccountId !== 'all' && Array.isArray(transactions) && transactions.length > 0) {
-          const dayTxns = transactions.filter(t => t.accountId === selectedAccountId && t.date === isoDate && t.balance !== undefined && t.balance !== null && !isNaN(parseFloat(t.balance)));
-          if (dayTxns.length > 0) {
-            const lastTxn = dayTxns[dayTxns.length - 1];
-            bankBalance = round2(parseFloat(lastTxn.balance));
-          }
-        }
-
-        // If not found in statement or transactions, check legacy dailyMatrix stored ending cells
-        if (bankBalance === null) {
-          let cellTotal;
-          let cellReg;
-          let cellExtra;
-          if (selectedAccountId === 'all') {
-            cellTotal = getDailyMatrixCell('all', monthKey, day, 'total_ending');
-            cellReg = getDailyMatrixCell('all', monthKey, day, 'reg_ending');
-            cellExtra = getDailyMatrixCell('all', monthKey, day, 'extra_ending');
-          } else {
-            cellTotal = getDailyMatrixCell(selectedAccountId, monthKey, day, 'total_ending');
-            cellReg = getDailyMatrixCell(selectedAccountId, monthKey, day, 'reg_ending');
-            cellExtra = getDailyMatrixCell(selectedAccountId, monthKey, day, 'extra_ending');
-          }
-          if (cellTotal !== undefined && cellTotal !== null && cellTotal !== '' && !isNaN(parseFloat(cellTotal))) {
-            bankBalance = round2(parseFloat(cellTotal));
-          } else if (cellReg !== undefined && cellReg !== null && cellReg !== '' && !isNaN(parseFloat(cellReg))) {
-            const regPart = parseFloat(cellReg) || 0;
-            const extraPart = (cellExtra !== undefined && cellExtra !== null && cellExtra !== '' && showExtraColumns) ? (parseFloat(cellExtra) || 0) : 0;
-            bankBalance = round2(regPart + extraPart);
-          }
-        }
-
-        // Variance compares the real bank balance to Total End (never Reg End alone)
-        const variance = bankBalance !== null ? round2(totalEnd - bankBalance) : 0;
-        const hasBankDiff = bankBalance !== null && Math.abs(variance) > 0.01;
-        const bankDiffText = hasBankDiff ? `Differs from bank by ${fmtMoney(Math.abs(variance))}` : '';
-
         const isStartRow = (
           dateObj.getFullYear() === startDateObj.getFullYear() &&
           dateObj.getMonth() === startDateObj.getMonth() &&
@@ -990,12 +933,7 @@ function DailySpreadsheetMatrix() {
           extra: extraEnding,
           total: totalEnd,
           isDeficit: totalEnd < 0,
-          isHistoricalLock,
-          bankBalance,
-          variance,
-          bankVariance: variance,
-          hasBankDiff,
-          bankDiffText
+          isHistoricalLock
         });
 
         // Carry ending balances forward as the next day's opening
@@ -1496,10 +1434,16 @@ function DailySpreadsheetMatrix() {
           <thead>
             {/* Header Row 1: Category Banners & Spanning Headers */}
             <tr className="bg-slate-950 text-slate-300 uppercase font-extrabold text-[9px] tracking-wider h-6">
-              {/* Date, Day & Total Beg Sticky Frozen Left Headers (Individually pinned to lock alignment when scrolling) */}
-              <th className="p-0 h-6 min-w-[80px] w-[80px] max-w-[80px] bg-slate-950 sticky left-0 top-0 z-30 shadow-[2px_0_5px_rgba(0,0,0,0.5)]"></th>
-              <th className="p-0 h-6 min-w-[46px] w-[46px] max-w-[46px] bg-slate-950 sticky left-[80px] top-0 z-30"></th>
-              <th className="p-0 h-6 min-w-[76px] w-[76px] max-w-[76px] bg-slate-950 border-r border-slate-700 sticky left-[126px] top-0 z-30 shadow-[4px_0_8px_rgba(0,0,0,0.5)]"></th>
+              {/* Date, Day & Total Beg Sticky Frozen Left Headers (Pinned at top-0 z-40 to prevent bleed-through) */}
+              <th className="px-1 h-6 min-w-[80px] w-[80px] max-w-[80px] bg-slate-950 text-slate-200 font-bold text-center align-middle sticky left-0 top-0 z-40 border-b border-slate-800 shadow-[2px_0_5px_rgba(0,0,0,0.5)]">
+                Date
+              </th>
+              <th className="px-1 h-6 min-w-[46px] w-[46px] max-w-[46px] bg-slate-950 text-slate-200 font-bold text-center align-middle sticky left-[80px] top-0 z-40 border-b border-slate-800">
+                Day
+              </th>
+              <th className="px-1.5 h-6 min-w-[76px] w-[76px] max-w-[76px] bg-slate-950 text-blue-300 font-black text-right align-middle sticky left-[126px] top-0 z-40 border-b border-slate-800 border-r border-slate-700 shadow-[4px_0_8px_rgba(0,0,0,0.5)]" title="Total Beginning Balance">
+                <span className="block text-[10px] leading-tight font-black">Total Beg</span>
+              </th>
 
               {/* Beg Balances Banner */}
               <th colSpan={showExtraColumns ? 2 : 1} className="px-2 h-6 text-center border-r-2 border-blue-600 bg-blue-950 text-blue-200 font-black sticky top-0 z-20 align-middle">Beg Balances</th>
@@ -1507,22 +1451,22 @@ function DailySpreadsheetMatrix() {
               <th colSpan={accountBills.length + 2} className="px-2 h-6 text-center border-r border-slate-800 bg-rose-950 text-rose-300 font-black sticky top-0 z-20 align-middle">Bills &amp; Deductions</th>
               <th colSpan={showExtraColumns ? 2 : 1} className="px-2 h-6 text-center border-r border-slate-800 bg-purple-950 text-purple-300 font-black sticky top-0 z-20 align-middle">Ending Balances</th>
               
-              {/* Total End Banner Container */}
-              <th className="p-0 h-6 min-w-[125px] w-[125px] max-w-[125px] bg-slate-950 border-l border-slate-700 sticky right-0 top-0 z-30 shadow-[-4px_0_8px_rgba(0,0,0,0.5)]"></th>
+              {/* Total End Banner Container (Pinned at top-0 z-40 to prevent bleed-through) */}
+              <th className="px-1.5 h-6 min-w-[125px] w-[125px] max-w-[125px] bg-slate-950 text-blue-300 font-black sticky right-0 top-0 z-40 align-middle text-right border-b border-slate-800 border-l border-slate-700 shadow-[-4px_0_8px_rgba(0,0,0,0.5)]">
+                <span className="block text-[10px] leading-tight font-black">Total End</span>
+              </th>
             </tr>
 
             {/* Header Row 2: Individual Columns (2-Line Responsive Headers, Full Legibility) */}
             <tr className="bg-slate-900 text-slate-300 font-bold text-xs h-10">
-              {/* Date & Day Subheaders */}
-              <th className="px-1 h-10 min-w-[80px] w-[80px] max-w-[80px] bg-slate-950 text-slate-200 font-bold text-center align-middle sticky left-0 top-[24px] z-30 border-b border-slate-700 shadow-[2px_0_5px_rgba(0,0,0,0.5)]">
-                Date
+              {/* Date, Day & Total Beg in Row 2 (Pinned at top-[24px] z-40 to eliminate any gap) */}
+              <th className="px-1 h-10 min-w-[80px] w-[80px] max-w-[80px] bg-slate-900 text-slate-400 font-bold text-center align-middle sticky left-0 top-[24px] z-40 border-b border-slate-700 shadow-[2px_0_5px_rgba(0,0,0,0.5)]">
+                <span className="block text-[11px] leading-tight text-slate-400">Date</span>
               </th>
-              <th className="px-1 h-10 min-w-[46px] w-[46px] max-w-[46px] bg-slate-950 text-slate-200 font-bold text-center align-middle sticky left-[80px] top-[24px] z-30 border-b border-slate-700">
-                Day
+              <th className="px-1 h-10 min-w-[46px] w-[46px] max-w-[46px] bg-slate-900 text-slate-400 font-bold text-center align-middle sticky left-[80px] top-[24px] z-40 border-b border-slate-700">
+                <span className="block text-[11px] leading-tight text-slate-400">Day</span>
               </th>
-
-              {/* Total Beg (Sticky Frozen Left) */}
-              <th className="px-1.5 h-10 min-w-[76px] w-[76px] max-w-[76px] bg-slate-950 text-blue-300 font-black text-right align-middle sticky left-[126px] top-[24px] z-30 border-b border-slate-700 border-r border-slate-700 shadow-[4px_0_8px_rgba(0,0,0,0.5)]" title="Total Beginning Balance. Click the first row (e.g. 12/31/2025) to edit starting balance.">
+              <th className="px-1.5 h-10 min-w-[76px] w-[76px] max-w-[76px] bg-slate-900 text-blue-300 font-black text-right align-middle sticky left-[126px] top-[24px] z-40 border-b border-slate-700 border-r border-slate-700 shadow-[4px_0_8px_rgba(0,0,0,0.5)]" title="Total Beginning Balance. Click the first row (e.g. 12/31/2025) to edit starting balance.">
                 <span className="block text-[11px] leading-tight">Total<br/>Beg</span>
               </th>
 
@@ -1649,9 +1593,9 @@ function DailySpreadsheetMatrix() {
                 </th>
               )}
 
-              {/* Total End Subheader */}
-              <th className="px-1.5 h-10 min-w-[125px] w-[125px] max-w-[125px] bg-slate-950 text-blue-300 font-black sticky right-0 top-[24px] z-30 align-middle text-right border-b border-slate-700 border-l border-slate-700 shadow-[-4px_0_8px_rgba(0,0,0,0.5)]">
-                <span className="block text-[11px] leading-tight">Total<br/>End</span>
+              {/* Total End in Row 2 (Pinned at top-[24px] z-40 to eliminate any gap or bleed-through) */}
+              <th className="px-1.5 h-10 min-w-[125px] w-[125px] max-w-[125px] bg-slate-900 text-blue-300 font-black sticky right-0 top-[24px] z-40 align-middle text-right border-b border-slate-700 border-l border-slate-700 shadow-[-4px_0_8px_rgba(0,0,0,0.5)]" title="Total Ending Balance">
+                <span className="block text-[11px] leading-tight font-black">Total<br/>End</span>
               </th>
             </tr>
           </thead>
@@ -1976,7 +1920,7 @@ function DailySpreadsheetMatrix() {
                       )}
 
                       {/* Total End Balance (Sticky Right) */}
-                      <td className={`p-1 min-w-[125px] w-[125px] max-w-[125px] text-right font-extrabold sticky right-0 z-20 border-l border-slate-700 shadow-[-4px_0_8px_rgba(0,0,0,0.5)] ${
+                      <td className={`p-1 min-w-[125px] w-[125px] max-w-[125px] overflow-hidden text-right font-extrabold sticky right-0 z-20 border-l border-slate-700 shadow-[-4px_0_8px_rgba(0,0,0,0.5)] ${
                         row.isToday
                           ? 'bg-amber-950 text-amber-100 border-y border-y-amber-400/80'
                           : isSelected
@@ -1988,16 +1932,6 @@ function DailySpreadsheetMatrix() {
                         <span className="font-mono text-[10px] block">
                           {fmtMoney(row.totalEnd)}
                         </span>
-                        {row.hasBankDiff && (
-                          <div
-                            className="inline-flex items-center justify-end gap-1 text-[9px] text-amber-400 font-normal whitespace-nowrap mt-0.5"
-                            title={`Bank statement: ${fmtMoney(row.bankBalance)} (diff: ${fmtMoney(row.variance)})`}
-                            data-testid="bank-variance-indicator"
-                          >
-                            <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0" aria-hidden="true" />
-                            <span>{row.bankDiffText}</span>
-                          </div>
-                        )}
                       </td>
                     </tr>
                 );

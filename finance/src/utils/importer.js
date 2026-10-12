@@ -537,6 +537,15 @@ export function detectTransactionConflicts(existing = [], incoming = []) {
       return;
     }
 
+    const isInterest = (inc.description && /interest/i.test(inc.description)) ||
+                       (inc.notes && /interest/i.test(inc.notes)) ||
+                       (inc.category && /interest/i.test(inc.category));
+    if (isInterest) {
+      // Interest credits are periodic bank earnings with natural penny variance ($0.01, $0.02, etc.).
+      // They route directly into Other and should never trigger conflict prompts against past interest events.
+      return;
+    }
+
     // Pair this incoming row with its best unclaimed existing counterpart (nearest date wins).
     // If the amount disagrees with that counterpart, it is a review-required conflict.
     let bestIdx = -1;
@@ -628,11 +637,13 @@ export function mergeTransactions(existing = [], incoming = [], resolutions = {}
         id: ex.id || inc.id,
         date: inc.date || ex.date,
         amount: inc.amount !== undefined ? inc.amount : ex.amount,
+        description: ex.description || inc.description,
         notes: mergedNotes,
         accountId: inc.accountId || ex.accountId,
         category: inc.category || ex.category || '',
         billId: inc.billId || ex.billId || null,
-        personId: inc.personId || ex.personId || null
+        personId: inc.personId || ex.personId || null,
+        previousDate: ex.date !== inc.date ? ex.date : (ex.previousDate || undefined)
       };
     } else {
       result.push({ ...inc });

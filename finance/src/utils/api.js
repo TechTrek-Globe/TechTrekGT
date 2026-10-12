@@ -207,7 +207,7 @@ export async function pushCloudBackupOptimistic(passcode, budgetData, options = 
   const ALLOWED_KEYS = [
     'accounts', 'people', 'bills', 'transactions', 'lineItems',
     'fundingGoals', 'loans', 'loan', 'dailyMatrix', 'dashboardWidgets',
-    'theme', 'hideDashboardHeader', 'categories'
+    'theme', 'hideDashboardHeader', 'categories', 'schemaVersion'
   ];
   const uploadPayload = {};
   for (const key of ALLOWED_KEYS) {
@@ -215,9 +215,12 @@ export async function pushCloudBackupOptimistic(passcode, budgetData, options = 
       uploadPayload[key] = budgetData[key];
     }
   }
+  if (!uploadPayload.schemaVersion) {
+    uploadPayload.schemaVersion = budgetData?.schemaVersion || 8;
+  }
 
   // FIX-05: Preserve _desc string annotations; strip null, undefined, NaN, non-finite numbers,
-  // and empty string values. Non-_desc, non-numeric values are also stripped.
+  // and empty string values. Convert numeric strings to finite numbers.
   if (uploadPayload.dailyMatrix && typeof uploadPayload.dailyMatrix === 'object') {
     const cleanMatrix = {};
     for (const [k, v] of Object.entries(uploadPayload.dailyMatrix)) {
@@ -228,6 +231,8 @@ export async function pushCloudBackupOptimistic(passcode, budgetData, options = 
         }
       } else if (typeof v === 'number' && Number.isFinite(v)) {
         cleanMatrix[k] = v;
+      } else if (typeof v === 'string' && v.trim() !== '' && !isNaN(Number(v))) {
+        cleanMatrix[k] = Number(v);
       }
       // Drop: null, undefined, NaN, Infinity, empty string, objects, arrays
     }
@@ -240,6 +245,12 @@ export async function pushCloudBackupOptimistic(passcode, budgetData, options = 
   }
   if (force) {
     requestBody.force = true;
+  }
+  if (options?.manual) {
+    requestBody.manual = true;
+  }
+  if (options?.auto) {
+    requestBody.auto = true;
   }
 
   const serializedBody = JSON.stringify(requestBody);
@@ -392,7 +403,9 @@ export async function fetchBackupVersions() {
   });
   const data = await res.json().catch(() => ({}));
   if (res.ok && data.success) {
-    return data.versions || [];
+    const list = data.versions || [];
+    list.ongoingSync = data.ongoingSync || null;
+    return list;
   }
   throw new Error(data.error || 'Failed to fetch backup versions');
 }

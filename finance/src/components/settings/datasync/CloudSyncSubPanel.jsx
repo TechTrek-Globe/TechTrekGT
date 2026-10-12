@@ -84,6 +84,7 @@ export function CloudSyncSubPanel() {
   };
 
   const [versions, setVersions] = useState([]);
+  const [ongoingSyncInfo, setOngoingSyncInfo] = useState(null);
   const [isLoadingVersions, setIsLoadingVersions] = useState(false);
   const [restoringVersionId, setRestoringVersionId] = useState(null);
 
@@ -93,6 +94,9 @@ export function CloudSyncSubPanel() {
     try {
       const vers = await fetchBackupVersions();
       setVersions(vers);
+      if (vers.ongoingSync) {
+        setOngoingSyncInfo(vers.ongoingSync);
+      }
     } catch (err) {
       console.warn('Failed to load backup versions:', err);
     } finally {
@@ -108,12 +112,12 @@ export function CloudSyncSubPanel() {
 
   const handlePushCloudBackup = async () => {
     setIsPushing(true);
-    setCloudSyncStatus({ type: 'info', message: 'Saving changes locally and syncing with Cloud Vault in background...' });
+    setCloudSyncStatus({ type: 'info', message: 'Saving manual backup snapshot to Cloud Vault...' });
     try {
-      const res = await pushCloudBackup(cloudPasscode);
+      const res = await pushCloudBackup(cloudPasscode, { manual: true, force: true });
       if (res && res.success) {
-        setCloudSyncStatus({ type: 'success', message: `Successfully backed up data to Cloud Vault! (${new Date().toLocaleTimeString()})` });
-        loadVersions();
+        setCloudSyncStatus({ type: 'success', message: `Manual backup saved to Cloud Vault! (${new Date().toLocaleTimeString()})` });
+        await loadVersions();
       } else if (res?.conflict) {
         setCloudSyncStatus({ type: 'warning', message: 'Sync conflict: Cloud has newer changes from another device.' });
       } else if (res?.suspicious) {
@@ -128,14 +132,17 @@ export function CloudSyncSubPanel() {
     }
   };
 
-  const handleRestoreVersion = async (versionId) => {
+  const handleRestoreVersion = async (versionId, savedAt) => {
     if (!versionId) return;
     setRestoringVersionId(versionId);
     try {
       const res = await restoreBackupVersion(versionId);
       if (res && res.budget) {
         await restoreFromBackup(res.budget);
-        setCloudSyncStatus({ type: 'success', message: `Restored snapshot from ${new Date(res.version || Date.now()).toLocaleString()}` });
+        setCloudSyncStatus({
+          type: 'success',
+          message: `Full ledger restored from snapshot (${new Date(savedAt || res.version || Date.now()).toLocaleString()})! All accounts, bills, and transactions refreshed.`
+        });
         await loadVersions();
       } else {
         throw new Error(res?.error || 'Version restore failed.');
@@ -152,8 +159,11 @@ export function CloudSyncSubPanel() {
     setIsCloudSyncing(true);
     try {
       await pullCloudRestore();
-      setCloudSyncStatus({ type: 'success', message: 'Successfully restored data from Cloud Vault! Database and UI state refreshed.' });
-      loadVersions();
+      setCloudSyncStatus({
+        type: 'success',
+        message: 'Full ledger restored from Ongoing Cloud Sync! All accounts, bills, and transactions refreshed.'
+      });
+      await loadVersions();
     } catch (err) {
       setCloudSyncStatus({ type: 'error', message: `Cloud restore failed: ${err.message}` });
     } finally {
@@ -314,34 +324,54 @@ export function CloudSyncSubPanel() {
               </div>
             )}
 
-            {/* Manual Sync Trigger Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-              <button
-                type="button"
-                disabled={isPushing}
-                onClick={handlePushCloudBackup}
-                className="py-3 px-4 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
-              >
-                {isPushing ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowUpRight className="w-4 h-4" />}
-                <span>Push Backup to Cloud D1</span>
-              </button>
-              <button
-                type="button"
-                disabled={isCloudSyncing}
-                onClick={handlePullCloudRestore}
-                className="py-3 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 disabled:opacity-50 rounded-xl text-xs font-bold border border-slate-700 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
-              >
-                {isCloudSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowDownLeft className="w-4 h-4 text-purple-400" />}
-                <span>Restore from Cloud D1</span>
-              </button>
+            {/* Ongoing Cloud Sync Card */}
+            <div className="p-4 rounded-xl bg-slate-900/90 border border-purple-800/50 space-y-3">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <Cloud className="w-4 h-4 text-purple-400" />
+                  <span className="text-xs font-bold text-slate-100">Ongoing Single Sync (Current Cloud State)</span>
+                </div>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-950 text-purple-300 border border-purple-800">
+                  Continuous Live State
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400">
+                Automatically updated in the background as you work. Restoring this recovers your latest ongoing ledger.
+              </p>
+              <div className="flex items-center justify-between flex-wrap gap-3 pt-1 border-t border-slate-800/80">
+                <div className="text-[11px] text-slate-300 font-mono flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Last synced: {ongoingSyncInfo?.updatedAt ? new Date(ongoingSyncInfo.updatedAt).toLocaleString() : (lastCloudSyncTime || 'Pending first sync')}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={isPushing}
+                    onClick={handlePushCloudBackup}
+                    className="py-1.5 px-3 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white rounded-lg text-[11px] font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+                  >
+                    {isPushing ? <Loader2 className="w-3 h-3 animate-spin" /> : <ArrowUpRight className="w-3 h-3" />}
+                    <span>Save Manual Backup Now</span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isCloudSyncing}
+                    onClick={handlePullCloudRestore}
+                    className="py-1.5 px-3 bg-slate-800 hover:bg-slate-700 text-purple-300 border border-purple-800/70 disabled:opacity-50 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                  >
+                    {isCloudSyncing ? <Loader2 className="w-3 h-3 animate-spin" /> : <RotateCcw className="w-3 h-3 text-purple-400" />}
+                    <span>Restore Ongoing Sync</span>
+                  </button>
+                </div>
+              </div>
             </div>
 
-            {/* Version History Card */}
+            {/* Prior Manual Backups (Last 4 Versions) */}
             <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-xs font-bold text-slate-200">
                   <History className="w-4 h-4 text-purple-400" />
-                  <span>Cloud Vault Snapshots (Last 10 Versions)</span>
+                  <span>Prior Manual Backups (Last 4 Syncs)</span>
                 </div>
                 <button
                   type="button"
@@ -353,15 +383,20 @@ export function CloudSyncSubPanel() {
                   <span>Refresh</span>
                 </button>
               </div>
+              <p className="text-[11px] text-slate-400">
+                Permanent snapshots created whenever you click &quot;Save Manual Backup Now&quot;. Never overwritten by auto-sync.
+              </p>
               {versions.length === 0 ? (
-                <p className="text-[11px] text-slate-500 italic">No historical snapshots saved yet.</p>
+                <div className="p-3 rounded-lg bg-slate-950/40 border border-slate-800/60 text-[11px] text-slate-500 italic">
+                  No manual snapshots saved yet. Click &quot;Save Manual Backup Now&quot; above to preserve a dedicated rollback point.
+                </div>
               ) : (
-                <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                <div className="space-y-1.5">
                   {versions.map((ver, idx) => (
-                    <div key={ver.id} className="p-2.5 rounded-lg bg-slate-950/60 border border-slate-800/80 flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">
-                          #{idx + 1}
+                    <div key={ver.id} className="p-2.5 rounded-lg bg-slate-950/60 border border-slate-800/80 flex items-center justify-between text-xs hover:border-purple-800/60 transition-colors">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-950 text-purple-300 border border-purple-800/80 font-bold">
+                          Manual #{idx + 1}
                         </span>
                         <span className="text-slate-300 font-mono text-[11px]">
                           {new Date(ver.savedAt).toLocaleString()}
@@ -370,15 +405,15 @@ export function CloudSyncSubPanel() {
                       <button
                         type="button"
                         disabled={restoringVersionId === ver.id}
-                        onClick={() => handleRestoreVersion(ver.id)}
-                        className="px-2.5 py-1 bg-purple-950 hover:bg-purple-900 text-purple-300 border border-purple-800 rounded-md text-[11px] font-semibold flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-50"
+                        onClick={() => handleRestoreVersion(ver.id, ver.savedAt)}
+                        className="px-3 py-1 bg-purple-950 hover:bg-purple-900 text-purple-200 border border-purple-700 rounded-md text-[11px] font-bold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
                       >
                         {restoringVersionId === ver.id ? (
                           <Loader2 className="w-3 h-3 animate-spin" />
                         ) : (
-                          <RotateCcw className="w-3 h-3" />
+                          <RotateCcw className="w-3 h-3 text-purple-400" />
                         )}
-                        <span>Restore</span>
+                        <span>Restore Full Ledger</span>
                       </button>
                     </div>
                   ))}

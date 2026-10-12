@@ -76,7 +76,7 @@ export const fakeDemoBudgetData = {
       payDay1: 15,
       payDay2: 'last',
       grossPerPay: 4200.00,
-      netPerPay: 963.08,
+      netPerPay: 885.00,
       accountAllocations: {},
       color: 'purple'
     },
@@ -112,13 +112,6 @@ export const fakeDemoBudgetData = {
       accountId: 'acc-bills-checking',
       name: 'Bills Checking Base (Semi-Monthly)',
       amountPerPay: 85.00
-    },
-    {
-      id: 'goal-bills-alex-2',
-      contributorId: 'person-alex',
-      accountId: 'acc-bills-checking',
-      name: 'Bills Checking Buffer (Monthly)',
-      amountPerPay: 78.08
     },
     {
       id: 'goal-bills-taylor-1',

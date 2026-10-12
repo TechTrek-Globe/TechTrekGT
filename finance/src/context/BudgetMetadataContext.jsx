@@ -836,9 +836,17 @@ export function BudgetMetadataProvider({ children }) {
   const getPersonMonthlyTotal = useCallback((personId, stateOverride) => {
     const state = stateOverride || metadataState;
     const person = (state.people || []).find(p => p.id === personId);
-    // P9: exclude archived bills from person's monthly obligation total
-    const billsTotal = round2((state.bills || []).filter(b => !b.isArchived).reduce((sum, b) => sum + getBillPersonMonthlyPortion(b, personId), 0));
-    if (!person) return billsTotal;
+    if (!person) {
+      return round2((state.bills || []).filter(b => !b.isArchived).reduce((sum, b) => sum + getBillPersonMonthlyPortion(b, personId), 0));
+    }
+    const validAccountIds = new Set((state.accounts || []).map(a => a.id));
+    const accountBillsTotal = (state.accounts || []).reduce((sum, acc) => {
+      return sum + getPersonBillMonthlyPortionForAccount(person, acc.id, state);
+    }, 0);
+    const unassignedBillsTotal = (state.bills || []).filter(b => !b.isArchived && (!b.accountId || !validAccountIds.has(b.accountId))).reduce((sum, b) => {
+      return sum + getBillPersonMonthlyPortion(b, personId);
+    }, 0);
+    const billsTotal = round2(accountBillsTotal + unassignedBillsTotal);
     const extraSavingsTotal = round2((state.accounts || []).reduce((sum, acc) => {
       return sum + getAccountSaveExtraPersonPortion(acc, person, state);
     }, 0));
@@ -850,14 +858,15 @@ export function BudgetMetadataProvider({ children }) {
     const person = (state.people || []).find(p => p.id === personId);
     if (!person) return 0;
     const monthlyTotal = getPersonMonthlyTotal(personId, state);
-    if (person.payFrequency === 'semi-monthly') {
-      return monthlyTotal / 2;
-    } else if (person.payFrequency === 'bi-weekly') {
-      return (monthlyTotal * 12) / 26;
-    } else if (person.payFrequency === 'weekly') {
-      return (monthlyTotal * 12) / 52;
-    }
-    return monthlyTotal;
+    // Invert MONTHLY_DISPLAY_PERIODS (the same factor used to build the monthly total):
+    //   bi-weekly = 2 paychecks/mo baseline  -> divide by 2
+    //   semi-monthly = 2 paychecks/mo exact  -> divide by 2
+    //   weekly = 4 weeks/mo baseline          -> divide by 4
+    //   monthly = 1                           -> return as-is
+    if (person.payFrequency === 'semi-monthly') return round2(monthlyTotal / 2);
+    if (person.payFrequency === 'bi-weekly')    return round2(monthlyTotal / 2);
+    if (person.payFrequency === 'weekly')       return round2(monthlyTotal / 4);
+    return round2(monthlyTotal);
   }, [metadataState, getPersonMonthlyTotal]);
 
   const getUpcomingBills = useCallback((limit = 5, stateOverride) => {

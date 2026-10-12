@@ -407,12 +407,12 @@ export function getPersonBillPerPaycheckPortionForAccount(person, accountId, bud
  */
 export function getAccountSaveExtraPersonPortion(account, person, budget) {
   if (!account || !person) return 0;
-  const deposit = getPersonDepositAmountForAccount(person, account.id, budget);
-  const bills   = getPersonBillPerPaycheckPortionForAccount(person, account.id, budget);
-  const surplusPerPay = Math.max(0, round2(deposit - bills));
   const freq = String(person.payFrequency || 'semi-monthly').toLowerCase();
   const multiplier = MONTHLY_DISPLAY_PERIODS[freq] ?? 2;
-  return round2(surplusPerPay * multiplier);
+  const deposit = getPersonDepositAmountForAccount(person, account.id, budget);
+  const monthlyDeposit = round2(deposit * multiplier);
+  const monthlyBills = getPersonBillMonthlyPortionForAccount(person, account.id, budget);
+  return Math.max(0, round2(monthlyDeposit - monthlyBills));
 }
 
 /**

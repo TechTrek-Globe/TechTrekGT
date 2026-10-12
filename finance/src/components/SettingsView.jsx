@@ -49,7 +49,7 @@ export function SettingsView({ onNavigateView }) {
     },
     { 
       id: 'data', 
-      label: 'Data & Sync', 
+      label: 'Backup & Sync', 
       icon: Archive, 
       desc: 'Backup, Restore & Sync', 
       badge: null 

@@ -53,7 +53,7 @@ export function SettingsModal() {
     },
     { 
       id: 'data', 
-      label: 'Data', 
+      label: 'Backup & Sync', 
       icon: Archive, 
       desc: 'Backup, Restore & Sync', 
       badge: null 

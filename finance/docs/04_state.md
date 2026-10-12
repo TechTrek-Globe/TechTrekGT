@@ -121,4 +121,14 @@ Authentication states strictly reflect backend database authority and maintain z
 - **Client Route Guarding & Fallback State (WP-03):** `/finance/admin` route access is guarded by user permission checks; unauthenticated or non-admin attempts render an explicit access-denied state with navigation actions back to the dashboard, preventing blank screen states.
 - **ErrorBoundary Persistence Purge (WP-04):** `ErrorBoundary.handleReset` triggers `window.indexedDB.deleteDatabase('TechTrekFinanceDB')` on reset requests to ensure corrupt local schemas or state blobs do not prevent client recovery.
 - **Vite Clean-Bundle Chunk Splitting (WP-05):** Zero dynamic import chunk collision warnings exist across Vite builds. `indexedDB.js` methods are imported statically across contexts, guaranteeing clean and deterministic asset generation.
+- **Sidebar Views Navigation Taxonomy (UI-NAV-01):** The left sidebar views navigation menu in `AppLayout.jsx` maps `{ id: 'settings', label: 'Settings & Setup' }`, ensuring consistent labeling across views and settings sections.
+- **Settings Section Navigation Taxonomy (UI-NAV-02):** The settings section navigation in `SettingsView.jsx` and `SettingsModal.jsx` maps `{ id: 'data', label: 'Backup & Sync' }`, establishing consistent label semantics across settings hubs.
+- **Per Paycheck Target Calculation Invariant (FIX-24):** `getPersonPerPaycheckTotal` inverts `MONTHLY_DISPLAY_PERIODS` baseline factors (`bi-weekly: round2(monthlyTotal / 2)`, `semi-monthly: round2(monthlyTotal / 2)`, `weekly: round2(monthlyTotal / 4)`, `monthly: round2(monthlyTotal)`), preserving round-trip symmetry with `getPersonMonthlyTotal` and preventing fractional penny drift across pay periods.
+- **Shortfall Tooltip & Breakdown State (UI-SHORTFALL-01):** `DashboardView` manages `shortfallTooltipOpen` local state to toggle an accessible breakdown panel (`#shortfall-info-panel`) displaying real-time per-earner net income, obligation totals, and balance indicators.
+- **Demo Preset Data Allocation Invariant (FIX-25):** `fakeDemoBudgetData` in `demoPresetData.js` strictly aligns funding goals directly to earner net pay without redundant buffer goals, ensuring demo seed states maintain 100% goals-versus-net-pay coverage and zero artificial shortfall.
+- **Earner Monthly Obligation Invariant (FIX-26):** `getPersonMonthlyTotal` sums earner obligations strictly through `getPersonBillMonthlyPortionForAccount` and `getAccountSaveExtraPersonPortion` across accounts, guaranteeing that total monthly obligations for fully-funded accounts strictly equal the earner's monthly deposit without premature sub-cent division rounding drift.
+
+
+
+
 

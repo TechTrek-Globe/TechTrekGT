@@ -18,10 +18,11 @@ import {
   X,
   Users,
   AlertCircle,
-  Info
+  Info,
+  HelpCircle
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis } from 'recharts';
-import { fmtMoney, fmtPct } from '../utils/formatters';
+import { fmtMoney, fmtPct, round2 } from '../utils/formatters';
 import {
   DndContext,
   closestCenter,
@@ -286,6 +287,7 @@ export function DashboardView() {
   const [resizingSizes, setResizingSizes] = useState({});
   const [activeWidgetId, setActiveWidgetId] = useState(null);
   const [pinnedSplitTooltip, setPinnedSplitTooltip] = useState(null);
+  const [shortfallTooltipOpen, setShortfallTooltipOpen] = useState(false);
 
   useEffect(() => {
     if (!pinnedSplitTooltip) return;
@@ -701,20 +703,110 @@ export function DashboardView() {
         return (
           <div className="space-y-3">
             {peopleList.length > 0 && Math.abs(totalSurplusMonthly) >= 0.01 && (
-              <div className={`p-2.5 rounded-xl flex items-center justify-between font-mono text-xs ${
-                totalSurplusMonthly > 0 
-                  ? 'bg-emerald-950/50 border border-emerald-800/60 text-emerald-200' 
-                  : 'bg-rose-950/50 border border-rose-800/60 text-rose-200'
-              }`}>
-                <span className="font-sans font-semibold text-slate-300">
-                  {totalSurplusMonthly > 0 ? 'Total Household Available for Savings:' : 'Household Budget Shortfall:'}
-                </span>
-                <span className="font-bold text-sm">
-                  {totalSurplusMonthly > 0 ? `+${fmtMoney(totalSurplusMonthly)}` : fmtMoney(totalSurplusMonthly)}
-                  <span className="text-[10px] font-normal text-slate-400 ml-1">/ mo</span>
-                </span>
+              <div className="space-y-2">
+                <div className={`p-2.5 rounded-xl flex items-center justify-between font-mono text-xs ${
+                  totalSurplusMonthly > 0
+                    ? 'bg-emerald-950/50 border border-emerald-800/60 text-emerald-200'
+                    : 'bg-rose-950/50 border border-rose-800/60 text-rose-200'
+                }`}>
+                  <span className="font-sans font-semibold text-slate-300 flex items-center gap-1.5">
+                    {totalSurplusMonthly > 0 ? 'Total Household Available for Savings:' : 'Household Budget Shortfall:'}
+                    <button
+                      id="shortfall-info-btn"
+                      type="button"
+                      aria-label="Show budget shortfall explanation"
+                      aria-expanded={shortfallTooltipOpen}
+                      aria-controls="shortfall-info-panel"
+                      onClick={() => setShortfallTooltipOpen(v => !v)}
+                      className="text-slate-400 hover:text-blue-300 focus:outline-none focus:ring-1 focus:ring-blue-500 rounded transition-colors"
+                    >
+                      <HelpCircle size={13} />
+                    </button>
+                  </span>
+                  <span className="font-bold text-sm">
+                    {totalSurplusMonthly > 0 ? `+${fmtMoney(totalSurplusMonthly)}` : fmtMoney(totalSurplusMonthly)}
+                    <span className="text-[10px] font-normal text-slate-400 ml-1">/ mo</span>
+                  </span>
+                </div>
+
+                {shortfallTooltipOpen && (
+                  <div
+                    id="shortfall-info-panel"
+                    role="region"
+                    aria-label="Budget shortfall explanation"
+                    className="rounded-xl border border-slate-700 bg-slate-900 p-3 text-[11px] text-slate-300 space-y-2.5 shadow-xl"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-slate-200 font-sans">Household Budget Breakdown</span>
+                      <button
+                        type="button"
+                        aria-label="Close explanation"
+                        onClick={() => setShortfallTooltipOpen(false)}
+                        className="text-slate-500 hover:text-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500 rounded"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+
+                    <div className="space-y-1 font-mono">
+                      <div className="flex justify-between">
+                        <span className="text-slate-400 font-sans">Total Monthly Net Income:</span>
+                        <span className="text-emerald-400 font-bold">{fmtMoney(totalNetMonthly)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400 font-sans">Total Monthly Obligations:</span>
+                        <span className="text-purple-300 font-bold">{fmtMoney(totalTargetMonthly)}</span>
+                      </div>
+                      <div className={`flex justify-between border-t border-slate-700 pt-1 font-bold ${totalSurplusMonthly >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        <span className="font-sans">Net Household Balance:</span>
+                        <span>{totalSurplusMonthly >= 0 ? '+' : ''}{fmtMoney(totalSurplusMonthly)} / mo</span>
+                      </div>
+                    </div>
+
+                    <div className="border-t border-slate-700 pt-2 space-y-1.5">
+                      <span className="font-sans font-semibold text-slate-300 block">Earner Breakdown:</span>
+                      {peopleList.map(p => {
+                        const inc = getMonthlyNetIncome(p);
+                        const obl = getPersonMonthlyTotal(p.id);
+                        const pct = inc > 0 ? (obl / inc) * 100 : 0;
+                        const bal = round2(inc - obl);
+                        return (
+                          <div key={p.id} className="bg-slate-800/60 rounded-lg p-2 space-y-0.5 font-mono">
+                            <div className="flex justify-between items-center">
+                              <span className="font-sans font-semibold text-slate-200">{p.name}</span>
+                              <span className="text-[10px] text-slate-500 font-sans capitalize">{p.payFrequency}</span>
+                            </div>
+                            <div className="flex justify-between text-[10px]">
+                              <span className="text-slate-400 font-sans">Net / Month:</span>
+                              <span className="text-emerald-400">{fmtMoney(inc)}</span>
+                            </div>
+                            <div className="flex justify-between text-[10px]">
+                              <span className="text-slate-400 font-sans">Obligations:</span>
+                              <span className="text-purple-300">{fmtMoney(obl)} ({fmtPct(pct)})</span>
+                            </div>
+                            <div className={`flex justify-between text-[10px] border-t border-slate-700/60 pt-0.5 font-bold ${bal >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                              <span className="font-sans">Individual Balance:</span>
+                              <span>{bal >= 0 ? '+' : ''}{fmtMoney(bal)}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {totalSurplusMonthly < 0 && (
+                      <div className="border-t border-slate-700 pt-2 text-[10px] text-slate-400 font-sans leading-relaxed">
+                        <span className="text-amber-400 font-semibold">Note: </span>
+                        This shortfall reflects an earner-level allocation imbalance - one or more
+                        earners have assigned obligations exceeding their individual monthly net income.
+                        Check individual earner balances above to identify over-allocated earners and
+                        rebalance bill splits or savings contributions in Settings.
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
+
 
             <div className={`grid gap-3 ${isCompact ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2'}`}>
               {peopleList.map(p => {

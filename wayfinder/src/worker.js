@@ -13,6 +13,7 @@ import { onRequestPost as resetPasswordHandler } from '../functions/api/auth/res
 import { onRequestPost as securityQuestionHandler } from '../functions/api/auth/security-question.js';
 import { handleJourneys }   from '../functions/api/wayfinder/journeys.js';
 import { handleItinerary }  from '../functions/api/wayfinder/itinerary.js';
+import { handleAccommodations } from '../functions/api/wayfinder/accommodations.js';
 import { handleDocuments }  from '../functions/api/wayfinder/documents.js';
 import { handleImportJobs } from '../functions/api/wayfinder/import-jobs.js';
 import { handleBudget }     from '../functions/api/wayfinder/budget.js';
@@ -122,6 +123,7 @@ export default {
 
       if (apiPath.startsWith('/api/wayfinder/journeys'))    return handleJourneys(context, url, method);
       if (apiPath.startsWith('/api/wayfinder/itinerary'))   return handleItinerary(context, url, method);
+      if (apiPath.startsWith('/api/wayfinder/accommodations')) return handleAccommodations(context, url, method);
       if (apiPath.startsWith('/api/wayfinder/documents'))   return handleDocuments(context, url, method);
       if (apiPath.startsWith('/api/wayfinder/import-jobs')) return handleImportJobs(context, url, method);
       if (apiPath.startsWith('/api/wayfinder/budget'))      return handleBudget(context, url, method);

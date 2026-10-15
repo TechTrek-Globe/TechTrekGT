@@ -8,6 +8,7 @@ export function WayfinderProvider({ children }) {
   const { isAuthenticated } = useAuth();
   
   const [itinerary, setItinerary] = useState([]);
+  const [accommodations, setAccommodations] = useState([]);
   const [documents, setDocuments] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -23,6 +24,19 @@ export function WayfinderProvider({ children }) {
       }
     } catch (err) {
       console.error('Failed to fetch itinerary:', err);
+    }
+  }, [isAuthenticated]);
+
+  const fetchAccommodations = useCallback(async (journeyId = 'poland-christmas-2026') => {
+    if (!isAuthenticated) return;
+    try {
+      const res = await fetch(getApiUrl(`/api/wayfinder/accommodations?journey_id=${journeyId}`), { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        setAccommodations(data.accommodations || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch accommodations:', err);
     }
   }, [isAuthenticated]);
 
@@ -142,23 +156,27 @@ export function WayfinderProvider({ children }) {
   useEffect(() => {
     if (isAuthenticated) {
       fetchItinerary();
+      fetchAccommodations();
       fetchDocuments();
       fetchJobs();
     } else {
       setItinerary([]);
+      setAccommodations([]);
       setDocuments([]);
       setJobs([]);
     }
-  }, [isAuthenticated, fetchItinerary, fetchDocuments, fetchJobs]);
+  }, [isAuthenticated, fetchItinerary, fetchAccommodations, fetchDocuments, fetchJobs]);
 
   return (
     <WayfinderContext.Provider value={{
       itinerary,
+      accommodations,
       documents,
       jobs,
       isLoading,
       error,
       fetchItinerary,
+      fetchAccommodations,
       fetchDocuments,
       fetchJobs,
       uploadDocument,

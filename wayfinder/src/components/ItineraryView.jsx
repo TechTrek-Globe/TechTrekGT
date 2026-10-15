@@ -60,6 +60,7 @@ function PrivateBookingCard({ item }) {
   if (item.confirmation_number) footerPills.push({ label: 'Conf', value: item.confirmation_number, mono: true });
   if (item.passengers)          footerPills.push({ label: 'Pax', value: item.passengers, mono: false });
   if (item.guests || item.party_size) footerPills.push({ label: 'Guests', value: item.guests || item.party_size, mono: false });
+  if (item.guest_name) footerPills.push({ label: 'Guest', value: item.guest_name, mono: false });
   if (item.tickets)             footerPills.push({ label: 'Tickets', value: item.tickets, mono: false });
   if (item.check_in_date)       footerPills.push({ label: 'Check-in', value: item.check_in_date, mono: true });
   if (item.check_out_date)      footerPills.push({ label: 'Check-out', value: item.check_out_date, mono: true });
@@ -114,6 +115,14 @@ function PrivateBookingCard({ item }) {
           <p className="text-xs sm:text-sm text-slate-200 leading-relaxed font-medium">{item.description}</p>
         )}
 
+        {(item.website_url || item.phone || item.email) && (
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+            {item.website_url && <a href={item.website_url} target="_blank" rel="noopener noreferrer" className="text-emerald-300 hover:text-white underline">Website</a>}
+            {item.phone && <a href={`tel:${item.phone}`} className="text-emerald-300 hover:text-white underline">{item.phone}</a>}
+            {item.email && <a href={`mailto:${item.email}`} className="text-emerald-300 hover:text-white underline">{item.email}</a>}
+          </div>
+        )}
+
         {/* Metadata footer pills */}
         {footerPills.length > 0 && (
           <div className={`pt-2 border-t ${theme.footer} flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px]`}>
@@ -131,7 +140,7 @@ function PrivateBookingCard({ item }) {
 }
 
 export function ItineraryView() {
-  const { itinerary: privateItems = [], isLoading } = useWayfinder();
+  const { itinerary: privateItems = [], accommodations = [] } = useWayfinder();
   const [selectedCity, setSelectedCity] = useState('all');
   const [selectedDay, setSelectedDay] = useState('all');
 
@@ -144,7 +153,7 @@ export function ItineraryView() {
   const publicDays = polandJourney.itinerary || [];
 
   const filteredDays = publicDays.filter((dayItem) => {
-    const matchesCity = selectedCity === 'all' || dayItem.cityId === selectedCity || (selectedCity === 'torun' && (dayItem.cityId === 'torun' || dayItem.cityName.includes('Toruń')));
+    const matchesCity = selectedCity === 'all' || dayItem.cityId === selectedCity || dayItem.cityIds?.includes(selectedCity) || (selectedCity === 'torun' && dayItem.cityName.includes('Toruń'));
     const matchesDay = selectedDay === 'all' || dayItem.day.toString() === selectedDay.toString();
     return matchesCity && matchesDay;
   });
@@ -194,6 +203,8 @@ export function ItineraryView() {
       return d && d.toString().startsWith(dayDate);
     });
   };
+
+  const getAccommodationsForDay = (dayDate) => accommodations.filter(item => item.check_in_date === dayDate);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 w-full space-y-8 animate-fade-in">
@@ -422,6 +433,9 @@ export function ItineraryView() {
                 {/* Private D1-synced booking cards for this day */}
                 {getPrivateItemsForDay(dayItem.date).map((pItem, pIdx) => (
                   <PrivateBookingCard key={`priv-${dayItem.day}-${pIdx}`} item={pItem} />
+                ))}
+                {getAccommodationsForDay(dayItem.date).map((booking) => (
+                  <PrivateBookingCard key={booking.id} item={booking} />
                 ))}
                 {dayItem.schedule.map((event, idx) => (
                   <div key={idx} className="relative group">

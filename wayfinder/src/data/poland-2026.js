@@ -2435,11 +2435,11 @@ export const polandJourney = {
     {
       "id": "poznan",
       "name": "Poznań",
-      "nights": 2,
-      "itineraryDates": "Dec 9 - Dec 11, 2026",
-      "travelDays": "Days 6-7",
+      "nights": 1,
+      "itineraryDates": "Dec 9 - Dec 10, 2026",
+      "travelDays": "Day 6",
       "startDate": "2026-12-09",
-      "endDate": "2026-12-11",
+      "endDate": "2026-12-10",
       "base": "Old Town / Stare Miasto",
       "focus": "Efficient midpoint: compact historic core, Cathedral Island, markets, cafés, and easy rail positioning.",
       "marketStrategy": "First Poznań market evening. Seasonal displays, possible ice-sculpture or market events.",
@@ -3134,10 +3134,10 @@ export const polandJourney = {
       "id": "torun",
       "name": "Toruń",
       "nights": 0,
-      "itineraryDates": "Dec 11, 2026",
-      "travelDays": "Day 8 (Day Stop)",
-      "startDate": "2026-12-11",
-      "endDate": "2026-12-11",
+      "itineraryDates": "Dec 10, 2026",
+      "travelDays": "Day 7 (Day Stop)",
+      "startDate": "2026-12-10",
+      "endDate": "2026-12-10",
       "base": "Day Stop Only (4-6 Hours)",
       "focus": "Time-boxed medieval break: station luggage lockers, Copernicus highlights, Rynek Staromiejski, quick lunch, and onward train.",
       "marketStrategy": "Maximize 4-6 hours: walk straight from the bus/station to Rynek Staromiejski, try authentic Toruń gingerbread, and grab lunch at a nearby spot.",
@@ -3495,10 +3495,10 @@ export const polandJourney = {
     {
       "id": "gdansk",
       "name": "Gdańsk",
-      "nights": 2,
-      "itineraryDates": "Dec 11 - Dec 13, 2026",
-      "travelDays": "Days 8-10",
-      "startDate": "2026-12-11",
+      "nights": 3,
+      "itineraryDates": "Dec 10 - Dec 13, 2026",
+      "travelDays": "Days 7-10",
+      "startDate": "2026-12-10",
       "endDate": "2026-12-13",
       "base": "Old Town, Waterfront, or Granary Island",
       "focus": "Coastal finale: Motława waterfront, amber, Hanseatic streets, and final Christmas market night.",
@@ -4887,10 +4887,10 @@ export const polandJourney = {
           "badge": "1st Class Rail"
         },
         {
-          "time": "14:45",
+          "time": "15:00",
           "itemType": "hotel",
-          "title": "Check-in to Chosen Base (Rynek or Cathedral Island)",
-          "description": "Settle into your chosen lodging base near the historic Market Square or on gaslit Cathedral Island (Ostrów Tumski).",
+          "title": "Hotel Check-in (from 15:00)",
+          "description": "Check in to your Wrocław lodging base near the historic Market Square or Cathedral Island. Confirmed booking particulars are available in the private booking card.",
           "location": "Rynek / Ostrów Tumski Base, Wrocław",
           "badge": "Recommended Base Zone"
         },
@@ -5028,69 +5028,26 @@ export const polandJourney = {
       "day": 7,
       "date": "2026-12-10",
       "displayDate": "Thursday, Dec 10, 2026",
-      "cityId": "poznan",
-      "cityName": "Poznań",
-      "theme": "Cradle of Poland & Cultural Discovery",
-      "base": "Recommended Base: Stare Miasto / Plac Wolności",
-      "highlights": ["Poznań Cathedral Island", "Porta Posnania Heritage Hub", "Stary Browar Arts Center", "Market Evening at Stary Rynek"],
-      "schedule": [
-        {
-          "time": "09:30",
-          "itemType": "sight",
-          "title": "Morning Highlight: Ostrów Tumski & Poznań Cathedral",
-          "description": "Visit Poland's oldest cathedral, containing the Golden Chapel and tombs of Poland's first Christian rulers, Duke Mieszko I and King Bolesław the Brave.",
-          "location": "Ostrów Tumski 17, Poznań",
-          "badge": "Suggested Sight"
-        },
-        {
-          "time": "11:30",
-          "itemType": "sight",
-          "title": "Midday Highlight: Porta Posnania Heritage Centre",
-          "description": "Award-winning architectural center narrating the thousand-year story of Cathedral Island via multimedia exhibits.",
-          "location": "ul. Gdańska 2, Poznań",
-          "badge": "Suggested Sight"
-        },
-        {
-          "time": "14:30",
-          "itemType": "sight",
-          "title": "Afternoon Activity: Stary Browar Arts & Architecture Center",
-          "description": "Explore the beautifully converted 19th-century red-brick brewery housing contemporary art installations, cafés, and boutique shopping.",
-          "location": "ul. Półwiejska 42, Poznań",
-          "badge": "Suggested Activity"
-        },
-        {
-          "time": "17:30",
-          "itemType": "market",
-          "title": "Evening Market: Stary Rynek Stroll & Market Chalets",
-          "description": "Stroll through illuminated Renaissance Town Hall arcades, enjoy roasted nuts and hot honey wine.",
-          "location": "Stary Rynek, Poznań",
-          "badge": "Evening Market"
-        },
-        {
-          "time": "19:30",
-          "itemType": "food",
-          "title": "Dinner Idea: Bamberka or Wiejskie Jadło",
-          "description": "Authentic regional Greater Poland dishes including Pyry z gzikiem (baked potatoes with seasoned curd cheese) and braised beef roulade.",
-          "location": "Stary Rynek 55, Poznań",
-          "badge": "Dining Option"
-        }
-      ]
-    },
-    {
-      "day": 8,
-      "date": "2026-12-11",
-      "displayDate": "Friday, Dec 11, 2026",
       "cityId": "torun",
+      "cityIds": ["torun", "gdansk"],
       "cityName": "Toruń & Gdańsk",
-      "theme": "Medieval Gingerbread in Toruń & Baltic Coastal Arrival",
-      "base": "Recommended Base: Waterfront / Granary Island (Gdańsk)",
-      "highlights": ["Toruń UNESCO Old Town", "Copernicus House", "Living Gingerbread Museum", "Gdańsk Targ Węglowy Market"],
+      "theme": "Medieval Gingerbread Stop & Baltic Coastal Transfer",
+      "base": "Day Stop in Toruń; Overnight in Gdańsk",
+      "highlights": ["Poznań Check-out", "Toruń UNESCO Old Town", "Toruń to Gdańsk Rail", "Gdańsk Check-in"],
       "schedule": [
+        {
+          "time": "07:45",
+          "itemType": "hotel",
+          "title": "Check out of Poznań Base",
+          "description": "Check out after the one-night Poznań stay and head to Poznań Główny with luggage for the Toruń day stop.",
+          "location": "Poznań Główny",
+          "badge": "Departure"
+        },
         {
           "time": "08:30",
           "itemType": "rail",
           "title": "Morning Rail: Poznań Główny to Toruń Główny",
-          "description": "Depart Poznań on morning train to Toruń. Store luggage in Toruń Główny station lockers and take short bus across the Vistula River.",
+          "description": "Depart Poznań for Toruń. Store luggage in Toruń Główny station lockers and take a short bus across the Vistula River.",
           "location": "PKP Intercity (08:30 - 10:15)",
           "badge": "Morning Rail"
         },
@@ -5098,7 +5055,7 @@ export const polandJourney = {
           "time": "10:30",
           "itemType": "sight",
           "title": "Day Stop Highlight: Toruń UNESCO Old Town & Copernicus House",
-          "description": "Walk through pristine red-brick Gothic streets untouched by WWII. Visit the birthplace of astronomer Nicolaus Copernicus and the 13th-century Old Town Hall.",
+          "description": "Walk through pristine red-brick Gothic streets and visit the birthplace of Nicolaus Copernicus and the 13th-century Old Town Hall.",
           "location": "ul. Kopernika 15/17, Toruń",
           "badge": "Day Stop (4-6 hrs)"
         },
@@ -5106,7 +5063,7 @@ export const polandJourney = {
           "time": "12:00",
           "itemType": "sight",
           "title": "Activity Idea: Living Museum of Gingerbread Workshop",
-          "description": "Interactive hands-on workshop kneading spices, pressing historic wooden molds, and baking authentic Toruń gingerbread according to 16th-century recipes.",
+          "description": "Join an interactive workshop kneading spices, pressing historic wooden molds, and baking Toruń gingerbread.",
           "location": "ul. Rabiańska 9, Toruń",
           "badge": "Hands-on Workshop"
         },
@@ -5114,7 +5071,7 @@ export const polandJourney = {
           "time": "13:30",
           "itemType": "food",
           "title": "Lunch Idea: Karczma Spichrz 18th-Century Granary",
-          "description": "Rustic feast inside a preserved 18th-century granary overlooking the Vistula defensive walls.",
+          "description": "Lunch inside a preserved 18th-century granary overlooking the Vistula defensive walls.",
           "location": "ul. Mostowa 1, Toruń",
           "badge": "Lunch Option"
         },
@@ -5122,15 +5079,15 @@ export const polandJourney = {
           "time": "15:45",
           "itemType": "rail",
           "title": "Afternoon Rail: Toruń Główny to Gdańsk Główny",
-          "description": "Collect luggage from station lockers and board direct train northward to the Baltic coast.",
+          "description": "Collect luggage from station lockers and board the direct train north to the Baltic coast.",
           "location": "PKP Intercity (15:45 - 17:30)",
           "badge": "Coastal Rail"
         },
         {
           "time": "18:00",
           "itemType": "hotel",
-          "title": "Check-in to Chosen Base (Waterfront or Granary Island)",
-          "description": "Check in to your chosen lodging base on Granary Island (Wyspa Spichrzów) or along the historic Motława riverfront.",
+          "title": "Check in to Gdańsk Base",
+          "description": "Check in to your lodging base on Granary Island or along the historic Motława riverfront.",
           "location": "Wyspa Spichrzów / Old Town, Gdańsk",
           "badge": "Recommended Base Zone"
         },
@@ -5138,9 +5095,61 @@ export const polandJourney = {
           "time": "19:00",
           "itemType": "market",
           "title": "Evening Market: Gdańsk Christmas Market at Targ Węglowy",
-          "description": "Experience one of Europe's top-voted Christmas markets. Greet the Talking Moose Lucek, ride the Venetian carousel, and sip Grzaniec Gdański along the illuminated Coal Market.",
+          "description": "Explore the illuminated Coal Market, greet the Talking Moose Lucek, and try hot spiced Grzaniec Gdański.",
           "location": "Targ Węglowy, 80-836 Gdańsk",
           "badge": "Market Anchor"
+        }
+      ]
+    },
+    {
+      "day": 8,
+      "date": "2026-12-11",
+      "displayDate": "Friday, Dec 11, 2026",
+      "cityId": "gdansk",
+      "cityName": "Gdańsk",
+      "theme": "Hanseatic Grandeur & Amber Coastline",
+      "base": "Recommended Base: Waterfront / Granary Island (Gdańsk)",
+      "highlights": ["Royal Way & Long Market", "St. Mary's Church Tower", "Mariacka Amber Street", "Targ Węglowy Market"],
+      "schedule": [
+        {
+          "time": "09:30",
+          "itemType": "sight",
+          "title": "Morning Highlight: The Royal Way & Długi Targ",
+          "description": "Walk beneath the Golden Gate, past Dutch Mannerist merchant townhouses, Neptune's Fountain, and the Main Town Hall to the Green Gate.",
+          "location": "Długi Targ, Gdańsk",
+          "badge": "Suggested Sight"
+        },
+        {
+          "time": "11:30",
+          "itemType": "sight",
+          "title": "Midday Highlight: St. Mary's Basilica & Astronomical Clock",
+          "description": "Tour the world's largest brick church and climb the bell tower for views across the Motława River and Baltic shipyards.",
+          "location": "ul. Podkramarska 5, Gdańsk",
+          "badge": "Suggested Sight"
+        },
+        {
+          "time": "14:00",
+          "itemType": "sight",
+          "title": "Afternoon Highlight: Mariacka Street & Harbor Crane",
+          "description": "Explore amber jewelers along Gdańsk's atmospheric Mariacka Street and continue to the medieval harbor Crane.",
+          "location": "ul. Mariacka / Szeroka, Gdańsk",
+          "badge": "Suggested Sight"
+        },
+        {
+          "time": "16:30",
+          "itemType": "market",
+          "title": "Evening Market: Targ Węglowy Christmas Market",
+          "description": "Enjoy the market's illuminated stalls, local Baltic food, and hot spiced cider.",
+          "location": "Targ Węglowy, Gdańsk",
+          "badge": "Market Evening"
+        },
+        {
+          "time": "19:30",
+          "itemType": "food",
+          "title": "Dinner Idea: Kubicki or Gdański Bowke",
+          "description": "Try traditional Polish dishes at a historic waterfront restaurant.",
+          "location": "Motława Waterfront, Gdańsk",
+          "badge": "Dining Option"
         }
       ]
     },
@@ -5150,39 +5159,31 @@ export const polandJourney = {
       "displayDate": "Saturday, Dec 12, 2026",
       "cityId": "gdansk",
       "cityName": "Gdańsk",
-      "theme": "Hanseatic Grandeur & Amber Coastline",
+      "theme": "Baltic Coast Excursion & Market Finale",
       "base": "Recommended Base: Waterfront / Granary Island (Gdańsk)",
-      "highlights": ["Royal Way & Long Market", "St. Mary's Church Tower", "Mariacka Amber Street", "Targ Węglowy Market Finale"],
+      "highlights": ["Optional Sopot & Baltic Coast", "Gdańsk Waterfront", "Targ Węglowy Market Finale"],
       "schedule": [
         {
           "time": "09:30",
-          "itemType": "sight",
-          "title": "Morning Highlight: The Royal Way & Długi Targ",
-          "description": "Walk beneath the Golden Gate, past Dutch Mannerist merchant townhouses, Neptune's Fountain, and the magnificent Main Town Hall to the Green Gate.",
-          "location": "Długi Targ, Gdańsk",
-          "badge": "Suggested Sight"
+          "itemType": "rail",
+          "title": "Optional Morning Excursion: Sopot and the Baltic Coast",
+          "description": "Use the SKM rail connection for an optional coastal morning, or enjoy a relaxed start in Gdańsk.",
+          "location": "Gdańsk Główny to Sopot",
+          "badge": "Optional Excursion"
         },
         {
-          "time": "11:30",
+          "time": "13:30",
           "itemType": "sight",
-          "title": "Midday Highlight: St. Mary's Basilica & Astronomical Clock",
-          "description": "Tour the largest brick church in the world. Climb the 400-step bell tower for panoramic views across the Motława River and Baltic shipyards.",
-          "location": "ul. Podkramarska 5, Gdańsk",
-          "badge": "Suggested Sight"
-        },
-        {
-          "time": "14:00",
-          "itemType": "sight",
-          "title": "Afternoon Highlight: Mariacka Street Amber Chalets & Harbor Crane",
-          "description": "Explore Gdańsk's most atmospheric cobblestone street lined with gargoyle rain gutters and master amber jewelers, leading out to the medieval harbor Crane (Żuraw).",
-          "location": "ul. Mariacka / Szeroka, Gdańsk",
-          "badge": "Suggested Sight"
+          "title": "Afternoon at the Motława Waterfront",
+          "description": "Return to Gdańsk for a flexible afternoon along the waterfront and historic center.",
+          "location": "Motława Waterfront, Gdańsk",
+          "badge": "Flexible Plan"
         },
         {
           "time": "16:30",
           "itemType": "market",
           "title": "Evening Market: Grand Finale at Targ Węglowy Christmas Market",
-          "description": "Final festive market evening: sample smoked Baltic salmon, hot apple cider, gourmet pierogi, and purchase last-minute hand-blown Polish glass ornaments.",
+          "description": "Final festive market evening: sample Baltic specialties, hot cider, and gourmet pierogi before the trip ends.",
           "location": "Targ Węglowy, Gdańsk",
           "badge": "Market Finale"
         },
@@ -5221,14 +5222,6 @@ export const polandJourney = {
           "description": "Savor single-origin filter coffee, avocado sourdough toast, and fresh warm cinnamon buns on Mariacka Street.",
           "location": "ul. Mariacka 36, Gdańsk",
           "badge": "Breakfast Option"
-        },
-        {
-          "time": "11:30",
-          "itemType": "hotel",
-          "title": "Final Check-out & Airport Transfer",
-          "description": "Final bag packing and 25-minute taxi or direct SKM commuter train transfer to Gdańsk Lech Wałęsa Airport (GDN).",
-          "location": "Gdańsk Airport (GDN)",
-          "badge": "Airport Transfer"
         },
         {
           "time": "04:30",

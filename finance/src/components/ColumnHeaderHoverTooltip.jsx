@@ -2,243 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ReceiptText, Users, Tag, History, Calendar, Pencil, Plus, X } from 'lucide-react';
 import { fmtMoney } from '../utils/formatters';
+import { matchCreditToEarner } from '../utils/importer';
+export { formatTxnDate, getColumnAliases, toYmd, getColumnRecentTransactions } from '../utils/columnTooltipUtils';
+import { formatTxnDate, getColumnAliases, toYmd, getColumnRecentTransactions } from '../utils/columnTooltipUtils';
 
-/**
- * Format raw date strings into MM/DD/YYYY cleanly without timezone drift.
- * @param {string|number|Date} rawDate
- * @returns {string}
- */
-function formatTxnDate(rawDate) {
-  if (!rawDate) return '--/--/----';
-  const str = String(rawDate).trim();
-  // If already MM/DD/YYYY
-  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(str)) {
-    const [m, d, y] = str.split('/');
-    return `${m.padStart(2, '0')}/${d.padStart(2, '0')}/${y}`;
-  }
-  // If YYYY-MM-DD or YYYY/MM/DD
-  const mYmd = str.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
-  if (mYmd) {
-    const [, y, m, d] = mYmd;
-    return `${m.padStart(2, '0')}/${d.padStart(2, '0')}/${y}`;
-  }
-  // Fallback to native Date parser
-  const parsed = new Date(str);
-  if (!isNaN(parsed.getTime())) {
-    const m = String(parsed.getMonth() + 1).padStart(2, '0');
-    const d = String(parsed.getDate()).padStart(2, '0');
-    const y = parsed.getFullYear();
-    return `${m}/${d}/${y}`;
-  }
-  return str;
-}
-
-/**
- * Normalizes statement aliases into an array of strings.
- * @param {Object} column
- * @param {string} type
- * @returns {string[]}
- */
-export function getColumnAliases(column, type = 'bill') {
-  if (!column) return [];
-  const raw = (column.bankMatchNames !== undefined && column.bankMatchNames !== '')
-    ? column.bankMatchNames
-    : (column.matchingKey || column.matching_key || '');
-  if (Array.isArray(raw)) {
-    return raw.map(k => String(k).trim()).filter(Boolean);
-  }
-  if (typeof raw === 'string' && raw.trim()) {
-    return raw
-      .split(/[,;\n\r|]+/)
-      .map(k => k.trim())
-      .filter(Boolean);
-  }
-  return [];
-}
-
-/**
- * Normalizes any date representation (YYYY-MM-DD, MM/DD/YYYY, Date instance) into a comparable 'YYYY-MM-DD' string.
- * @param {string|number|Date} rawDate
- * @returns {string}
- */
-export function toYmd(rawDate) {
-  if (!rawDate) return '';
-  if (rawDate instanceof Date) {
-    const y = rawDate.getFullYear();
-    const m = String(rawDate.getMonth() + 1).padStart(2, '0');
-    const d = String(rawDate.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
-  }
-  const str = String(rawDate).trim();
-  const mYmd = str.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
-  if (mYmd) {
-    return `${mYmd[1]}-${String(mYmd[2]).padStart(2, '0')}-${String(mYmd[3]).padStart(2, '0')}`;
-  }
-  const mMdy = str.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})/);
-  if (mMdy) {
-    return `${mMdy[3]}-${String(mMdy[1]).padStart(2, '0')}-${String(mMdy[2]).padStart(2, '0')}`;
-  }
-  const parsed = new Date(str);
-  if (!isNaN(parsed.getTime())) {
-    const y = parsed.getFullYear();
-    const m = String(parsed.getMonth() + 1).padStart(2, '0');
-    const d = String(parsed.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
-  }
-  return str;
-}
-
-/**
- * Gathers up to the last 10 transactions for a column from both the
- * transactions array (imports/ledger) and dailyMatrix cell entries.
- * Strictly limits results to prior transactions (dates on or before today / asOfDate).
- * @param {Object} params
- * @returns {Array<{ id: string, date: string, amount: number, description: string }>}
- */
-export function getColumnRecentTransactions({
-  column,
-  type = 'bill',
-  transactions = [],
-  dailyMatrix = {},
-  selectedAccountId = 'all',
-  asOfDate = null
-}) {
-  if (!column) return [];
-  const results = [];
-  const seenKeys = new Set();
-
-  const now = new Date();
-  const todayYmd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  const cutoffYmd = asOfDate ? toYmd(asOfDate) : todayYmd;
-
-  const colId = column.id;
-  const colNameLower = (column.name || '').toLowerCase();
-  const aliases = getColumnAliases(column, type).map(a => a.toLowerCase());
-
-  const seenTxnDates = new Set();
-
-  // 1. Scan transactions array (strictly prior to cutoff date)
-  if (Array.isArray(transactions)) {
-    for (const t of transactions) {
-      if (!t) continue;
-      if (selectedAccountId !== 'all' && t.accountId && t.accountId !== selectedAccountId) {
-        continue;
-      }
-
-      const dStr = t.date || '';
-      const ymd = toYmd(dStr);
-      if (!ymd || ymd > cutoffYmd) {
-        continue;
-      }
-
-      let isMatch = false;
-      if (type === 'bill') {
-        if (t.billId === colId) {
-          isMatch = true;
-        } else if (!t.billId && !t.personId) {
-          const descLower = (t.description || '').toLowerCase();
-          const notesLower = (t.notes || '').toLowerCase();
-          const aliasMatch = aliases.some(a => a.length >= 2 && (descLower.includes(a) || notesLower.includes(a)));
-          const nameMatch = colNameLower && (descLower.includes(colNameLower) || notesLower.includes(colNameLower));
-          if (aliasMatch || nameMatch) isMatch = true;
-        }
-      } else if (type === 'person') {
-        if (t.personId === colId) {
-          isMatch = true;
-        } else if (!t.billId && !t.personId) {
-          const descLower = (t.description || '').toLowerCase();
-          const notesLower = (t.notes || '').toLowerCase();
-          const aliasMatch = aliases.some(a => a.length >= 2 && (descLower.includes(a) || notesLower.includes(a)));
-          const nameMatch = colNameLower && (descLower.includes(colNameLower) || notesLower.includes(colNameLower));
-          if (aliasMatch || nameMatch) isMatch = true;
-        }
-      }
-
-      if (isMatch) {
-        let amt = Math.abs(parseFloat(t.amount) || 0);
-        // If dailyMatrix has an explicit recorded bill cell for this date, align amt with dailyMatrix cell
-        if (type === 'bill' && dailyMatrix && typeof dailyMatrix === 'object') {
-          const accId = t.accountId || column.accountId;
-          const parts = ymd.split('-');
-          if (parts.length === 3 && accId) {
-            const mKey = `${parts[0]}-${parts[1]}`;
-            const day = parseInt(parts[2], 10);
-            const matrixKey = `${accId}_${mKey}_${day}_bill_${colId}`;
-            const cellVal = dailyMatrix[matrixKey];
-            if (cellVal !== undefined && cellVal !== null && cellVal !== '') {
-              const parsedCell = Math.abs(parseFloat(cellVal) || 0);
-              if (parsedCell > 0 && Math.abs(amt - parsedCell) > 0.009) {
-                amt = parsedCell;
-              }
-            }
-          }
-        }
-
-        if (amt > 0) {
-          const dedupKey = `${ymd}_${amt.toFixed(2)}`;
-          if (!seenKeys.has(dedupKey)) {
-            seenKeys.add(dedupKey);
-            seenTxnDates.add(ymd);
-            results.push({
-              id: t.id || `txn-${dedupKey}`,
-              date: ymd,
-              amount: amt,
-              description: t.description || column.name
-            });
-          }
-        }
-      }
-    }
-  }
-
-  // 2. Scan dailyMatrix for recorded non-zero cell entries (strictly prior to cutoff date)
-  if (dailyMatrix && typeof dailyMatrix === 'object') {
-    const targetSuffix = type === 'bill' ? `_bill_${colId}` : `_credit_${colId}`;
-    for (const [key, val] of Object.entries(dailyMatrix)) {
-      const numVal = parseFloat(val);
-      if (!numVal || numVal === 0 || isNaN(numVal)) continue;
-
-      if (key.endsWith(targetSuffix)) {
-        const prefix = key.slice(0, -targetSuffix.length);
-        const parts = prefix.split('_');
-        if (parts.length >= 3) {
-          const accId = parts.slice(0, parts.length - 2).join('_');
-          const monthKey = parts[parts.length - 2];
-          const day = parts[parts.length - 1];
-
-          if (selectedAccountId === 'all' || accId === selectedAccountId) {
-            const dateStr = `${monthKey}-${String(day).padStart(2, '0')}`;
-            const ymd = toYmd(dateStr);
-            if (!ymd || ymd > cutoffYmd || seenTxnDates.has(ymd)) {
-              continue;
-            }
-
-            const amt = Math.abs(numVal);
-            const dedupKey = `${ymd}_${amt.toFixed(2)}`;
-            if (!seenKeys.has(dedupKey)) {
-              seenKeys.add(dedupKey);
-              results.push({
-                id: `matrix-${key}`,
-                date: ymd,
-                amount: amt,
-                description: column.name
-              });
-            }
-          }
-        }
-      }
-    }
-  }
-
-  // Sort descending by date (most recent prior first)
-  results.sort((a, b) => {
-    const ymdA = toYmd(a.date);
-    const ymdB = toYmd(b.date);
-    return ymdB.localeCompare(ymdA);
-  });
-
-  return results.slice(0, 10);
-}
 
 /**
  * Floating dark-mode tooltip rendered via React Portal directly into document.body.
@@ -252,6 +19,8 @@ export function ColumnHeaderHoverTooltip({
   dailyMatrix = {},
   selectedAccountId = 'all',
   asOfDate = null,
+  people = [],
+  accounts = [],
   onUpdateAliases,
   onUpdateName,
   onMouseEnter,
@@ -276,7 +45,9 @@ export function ColumnHeaderHoverTooltip({
     transactions,
     dailyMatrix,
     selectedAccountId,
-    asOfDate
+    asOfDate,
+    people,
+    accounts
   });
 
   const isAnyInputActive = editingAliasIdx !== null || isAddingAlias || isEditingName;

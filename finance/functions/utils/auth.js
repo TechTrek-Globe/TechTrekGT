@@ -571,7 +571,7 @@ export async function getCachedUser(userId, env) {
   const key = `user-session:${userId}`;
 
   // 1. Try KV binding if present
-  const kv = env?.USER_CACHE || env?.RATE_LIMIT_KV;
+  const kv = env?.GATEWAY_KV || env?.USER_CACHE || env?.RATE_LIMIT_KV;
   if (kv && typeof kv.get === 'function') {
     try {
       const val = await kv.get(key, 'json');
@@ -608,7 +608,7 @@ export async function setCachedUser(userId, userData, env, ttlSeconds = USER_CAC
   const safeData = toCachedUser(userData);
 
   // 1. KV if bound
-  const kv = env?.USER_CACHE || env?.RATE_LIMIT_KV;
+  const kv = env?.GATEWAY_KV || env?.USER_CACHE || env?.RATE_LIMIT_KV;
   if (kv && typeof kv.put === 'function') {
     try {
       await kv.put(key, JSON.stringify(safeData), { expirationTtl: Math.max(ttlSeconds, 60) });
@@ -640,7 +640,7 @@ export async function invalidateCachedUser(userId, env) {
   if (!userId) return;
   const key = `user-session:${userId}`;
 
-  const kv = env?.USER_CACHE || env?.RATE_LIMIT_KV;
+  const kv = env?.GATEWAY_KV || env?.USER_CACHE || env?.RATE_LIMIT_KV;
   if (kv && typeof kv.delete === 'function') {
     try {
       await kv.delete(key);

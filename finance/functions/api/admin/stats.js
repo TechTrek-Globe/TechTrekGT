@@ -27,9 +27,31 @@ export async function onRequestGet(context) {
     ).all();
     const backupsResult = await env.DB.prepare('SELECT id, updated_at FROM user_backups LIMIT 1000').all();
 
+    let versionsResult = { results: [] };
+    try {
+      versionsResult = await env.DB.prepare(
+        'SELECT user_id, COUNT(*) as count, MAX(saved_at) as last_saved FROM user_backup_versions GROUP BY user_id LIMIT ?'
+      ).bind(1000).all();
+    } catch {
+      // Fallback if table not present in test runner
+    }
+
     const backupMap = {};
     for (const row of backupsResult.results || []) {
       backupMap[row.id] = { backupCount: 1, lastBackupAt: row.updated_at };
+    }
+
+    for (const row of versionsResult.results || []) {
+      const uid = row.user_id;
+      const count = Number(row.count) || 0;
+      if (!backupMap[uid]) {
+        backupMap[uid] = {
+          backupCount: count,
+          lastBackupAt: row.last_saved ? new Date(Number(row.last_saved)).toISOString() : null
+        };
+      } else {
+        backupMap[uid].backupCount = count;
+      }
     }
 
     const users = (usersResult.results || []).map((u) => ({

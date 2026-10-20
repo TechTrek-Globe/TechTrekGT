@@ -310,7 +310,7 @@ export function applyTransactionMapping(rows, columnMap, defaultAccountId = '') 
     const isParenNeg = /^\s*\(.*\)\s*$/.test(rawAmtStr.trim());
     const rawAmt = rawAmtStr.replace(/[^0-9.-]+/g, '');
     let amount = parseFloat(isParenNeg && rawAmt !== '' ? `-${rawAmt}` : rawAmt);
-    if (Number.isFinite(amount)) amount = Math.round((amount + (amount >= 0 ? Number.EPSILON : -Number.EPSILON)) * 100) / 100;
+    if (Number.isFinite(amount)) amount = round2(amount);
     const isoDate = normalizeIsoDate(mapped.date);
 
     if (!isoDate || isNaN(amount)) {
@@ -331,7 +331,7 @@ export function applyTransactionMapping(rows, columnMap, defaultAccountId = '') 
 
     const rawBal = mapped.balance !== undefined && mapped.balance !== '' ? String(mapped.balance).replace(/[^0-9.-]+/g, '') : null;
     let balance = rawBal !== null ? parseFloat(rawBal) : undefined;
-    if (balance !== undefined && Number.isFinite(balance)) balance = Math.round((balance + (balance >= 0 ? Number.EPSILON : -Number.EPSILON)) * 100) / 100;
+    if (balance !== undefined && Number.isFinite(balance)) balance = round2(balance);
     const desc = (mapped.description || '').trim();
 
     const record = {
@@ -775,7 +775,7 @@ export function matchCreditToEarner({
         // Monthly equivalent for semi-monthly/bi-weekly earners (penalized)
         const freq = (tier1AliasMatch.person.payFrequency || '').toLowerCase();
         if (freq === 'semi-monthly' || freq === 'bi-weekly') {
-          const monthlyD = Math.abs(Math.round(allocAmt * 2 * 100) / 100 - rawAmt) + MONTHLY_DOUBLE_PENALTY;
+          const monthlyD = Math.abs(round2(allocAmt * 2) - rawAmt) + MONTHLY_DOUBLE_PENALTY;
           if (monthlyD < aliasHolderBestDelta) aliasHolderBestDelta = monthlyD;
         }
       }
@@ -794,7 +794,7 @@ export function matchCreditToEarner({
           if (d < rivalBestDelta) { rivalBestDelta = d; rivalPerson = p; }
           const freq = (p.payFrequency || '').toLowerCase();
           if (freq === 'semi-monthly' || freq === 'bi-weekly') {
-            const monthlyD = Math.abs(Math.round(allocAmt * 2 * 100) / 100 - rawAmt) + MONTHLY_DOUBLE_PENALTY;
+            const monthlyD = Math.abs(round2(allocAmt * 2) - rawAmt) + MONTHLY_DOUBLE_PENALTY;
             if (monthlyD < rivalBestDelta) { rivalBestDelta = monthlyD; rivalPerson = p; }
           }
         }
@@ -868,7 +868,7 @@ export function matchCreditToEarner({
         // always beats a monthly-double tie.
         const isBiOrSemi = p.payFrequency === 'semi-monthly' || p.payFrequency === 'bi-weekly';
         if (isBiOrSemi) {
-          const monthlyAlloc = Math.round(allocAmt * 2 * 100) / 100;
+          const monthlyAlloc = round2(allocAmt * 2);
           const deltaMonthly = Math.abs(monthlyAlloc - rawAmt);
           // Penalize the effective delta for a derived monthly-double to preserve ranking
           // priority for direct per-paycheck matches from any earner processed later.
@@ -919,9 +919,9 @@ export function matchCreditToEarner({
     })();
 
     // Scope A: account-specific bills only
-    const monthlyA = Math.round((calcMonthlyPortion(accountBills) + extraPortion) * 100) / 100;
+    const monthlyA = round2(calcMonthlyPortion(accountBills) + extraPortion);
     // Scope B: ALL bills (person's full monthly obligation - what they deposit into the bills account)
-    const monthlyB = Math.round((calcMonthlyPortion(activeBills) + extraPortion) * 100) / 100;
+    const monthlyB = round2(calcMonthlyPortion(activeBills) + extraPortion);
 
     // Try both scopes; use the one that produces the better (smaller delta) match
     for (const { totalMonthly, scopeLabel } of [{ totalMonthly: monthlyA, scopeLabel: 'Account' }, { totalMonthly: monthlyB, scopeLabel: 'Total' }]) {
@@ -929,12 +929,12 @@ export function matchCreditToEarner({
       if (totalMonthly < MIN_EARNER_AMOUNT) continue;
 
       const perPaycheck = p.payFrequency === 'semi-monthly'
-        ? Math.round((totalMonthly / 2) * 100) / 100
+        ? round2(totalMonthly / 2)
         : p.payFrequency === 'bi-weekly'
-        ? Math.round(((totalMonthly * 12) / 26) * 100) / 100
+        ? round2((totalMonthly * 12) / 26)
         : p.payFrequency === 'weekly'
-        ? Math.round(((totalMonthly * 12) / 52) * 100) / 100
-        : totalMonthly;
+        ? round2((totalMonthly * 12) / 52)
+        : round2(totalMonthly);
 
       const deltaMonthly = Math.abs(totalMonthly - rawAmt);
       const deltaPaycheck = Math.abs(perPaycheck - rawAmt);
@@ -964,7 +964,7 @@ export function matchCreditToEarner({
       // Monthly net (two paychecks for semi-monthly / bi-weekly)
       const isBiOrSemi = p.payFrequency === 'semi-monthly' || p.payFrequency === 'bi-weekly';
       if (isBiOrSemi) {
-        const netMonthly = Math.round(netPay * 2 * 100) / 100;
+        const netMonthly = round2(netPay * 2);
         const deltaNetMonthly = Math.abs(netMonthly - rawAmt);
         if (deltaNetMonthly <= tolerance && deltaNetMonthly < minDelta) {
           minDelta = deltaNetMonthly;

@@ -56,12 +56,7 @@ export async function onRequestPost(context) {
       });
     }
 
-    // Query household membership
-    const member = await env.DB.prepare(
-      'SELECT household_id FROM household_members WHERE user_id = ?'
-    ).bind(user.id).first();
-
-    const householdId = member ? member.household_id : null;
+    const householdId = null;
 
     if (!env.JWT_SECRET) {
       return new Response(JSON.stringify({ error: 'Server misconfiguration: missing JWT_SECRET' }), {

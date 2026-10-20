@@ -1,32 +1,13 @@
 import * as XLSX from 'xlsx';
 import { logDebug, logWarn, logError } from './debugLogger.js';
 import { matchCreditToEarner, MAX_SPREADSHEET_FILE_SIZE, MAX_SPREADSHEET_ROW_COUNT } from './importer.js';
+import { round2 } from './formatters.js';
 
 /**
  * Clean currency/number values from Excel strings or cells
  */
 function cleanNum(val, defaultVal = 0) {
-  if (val === undefined || val === null || val === '') return defaultVal;
-  if (typeof val === 'number') {
-    if (!Number.isFinite(val)) return defaultVal;
-    const rounded = Math.round((val + (val >= 0 ? Number.EPSILON : -Number.EPSILON)) * 100) / 100;
-    return Object.is(rounded, -0) ? 0 : rounded;
-  }
-  const str = String(val).trim();
-  if (!str) return defaultVal;
-  // If the cell contains words or 2+ letters (e.g. "OnlinePay ***********1234", "FUNDS TRANSFER CR", "Transfer")
-  // it is text, not a currency/numeric cell.
-  if (/[a-zA-Z]{2,}/.test(str)) {
-    return defaultVal;
-  }
-  const isParenNeg = /^\s*\(.*\)\s*$/.test(str);
-  const cleaned = str.replace(/[^0-9.-]+/g, '');
-  if (!cleaned || cleaned === '-' || cleaned === '.') return defaultVal;
-  const num = parseFloat(cleaned);
-  if (!Number.isFinite(num)) return defaultVal;
-  const signed = (isParenNeg && num > 0) ? -num : (str.startsWith('-') && num > 0 ? -num : num);
-  const rounded = Math.round((signed + (signed >= 0 ? Number.EPSILON : -Number.EPSILON)) * 100) / 100;
-  return Object.is(rounded, -0) ? 0 : rounded;
+  return round2(val, defaultVal);
 }
 
 /**
@@ -410,15 +391,14 @@ export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
                 const parsed = parseFloat(cleaned);
                 if (Number.isFinite(parsed)) {
                   const signed = (isParenNeg && parsed > 0) ? -parsed : (rawAmtStr.startsWith('-') && parsed > 0 ? -parsed : parsed);
-                  amount = Math.round((signed + (signed >= 0 ? Number.EPSILON : -Number.EPSILON)) * 100) / 100;
-                  amount = Object.is(amount, -0) ? 0 : amount;
+                  amount = round2(signed);
                 }
               } else if (debitColIdx >= 0 || creditColIdx >= 0) {
                 const debitStr = debitColIdx >= 0 ? String(r[debitColIdx] || '').replace(/[^0-9.-]+/g, '') : '';
                 const creditStr = creditColIdx >= 0 ? String(r[creditColIdx] || '').replace(/[^0-9.-]+/g, '') : '';
                 const debit = debitStr && Number.isFinite(parseFloat(debitStr)) ? Math.abs(parseFloat(debitStr)) : 0;
                 const credit = creditStr && Number.isFinite(parseFloat(creditStr)) ? Math.abs(parseFloat(creditStr)) : 0;
-                amount = Math.round((credit - debit) * 100) / 100;
+                amount = round2(credit - debit);
               }
 
               if (amount === 0 && (!description || description === 'Transaction')) continue;
@@ -500,8 +480,8 @@ export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
                 parsedExtraEnd += transfer;
                 parsedRegEnd -= transfer;
               }
-              parsedRegEnd = Math.round(parsedRegEnd * 100) / 100 || 0;
-              parsedExtraEnd = Math.round(parsedExtraEnd * 100) / 100 || 0;
+              parsedRegEnd = round2(parsedRegEnd);
+              parsedExtraEnd = round2(parsedExtraEnd);
 
               let parsedRegBeg = rRegBeg;
               let parsedExtraBeg = rExtraBeg;
@@ -514,13 +494,13 @@ export function parseSpreadsheet(fileData, fileName = '', existingBills = []) {
                 parsedExtraBeg += transfer;
                 parsedRegBeg -= transfer;
               }
-              parsedRegBeg = Math.round(parsedRegBeg * 100) / 100 || 0;
-              parsedExtraBeg = Math.round(parsedExtraBeg * 100) / 100 || 0;
+              parsedRegBeg = round2(parsedRegBeg);
+              parsedExtraBeg = round2(parsedExtraBeg);
 
               importedLedgerRows[dateStr] = {
                 regEnding: parsedRegEnd,
                 extraEnding: parsedExtraEnd,
-                totalEnding: rTotalEnd !== null ? rTotalEnd : Math.round((parsedRegEnd + parsedExtraEnd) * 100) / 100,
+                totalEnding: rTotalEnd !== null ? rTotalEnd : round2(parsedRegEnd + parsedExtraEnd),
                 regBeg: parsedRegBeg,
                 extraBeg: parsedExtraBeg,
                 totalBeg: rTotalBeg
@@ -922,15 +902,14 @@ export function parseSingleSheet({
         const parsed = parseFloat(cleaned);
         if (Number.isFinite(parsed)) {
           const signed = (isParenNeg && parsed > 0) ? -parsed : (rawAmtStr.startsWith('-') && parsed > 0 ? -parsed : parsed);
-          amount = Math.round((signed + (signed >= 0 ? Number.EPSILON : -Number.EPSILON)) * 100) / 100;
-          amount = Object.is(amount, -0) ? 0 : amount;
+          amount = round2(signed);
         }
       } else if (debitColIdx >= 0 || creditColIdx >= 0) {
         const debitStr = debitColIdx >= 0 ? String(r[debitColIdx] || '').replace(/[^0-9.-]+/g, '') : '';
         const creditStr = creditColIdx >= 0 ? String(r[creditColIdx] || '').replace(/[^0-9.-]+/g, '') : '';
         const debit = debitStr && Number.isFinite(parseFloat(debitStr)) ? Math.abs(parseFloat(debitStr)) : 0;
         const credit = creditStr && Number.isFinite(parseFloat(creditStr)) ? Math.abs(parseFloat(creditStr)) : 0;
-        amount = Math.round((credit - debit) * 100) / 100;
+        amount = round2(credit - debit);
       }
 
       if (amount === 0 && (!description || description === 'Transaction')) continue;
@@ -991,7 +970,7 @@ export function parseSingleSheet({
       if (balanceColIdx >= 0 && r[balanceColIdx] !== undefined && r[balanceColIdx] !== null && r[balanceColIdx] !== '') {
         const parsedBal = parseFloat(String(r[balanceColIdx]).replace(/[^0-9.-]+/g, ''));
         if (!isNaN(parsedBal)) {
-          parsedBalance = Math.round(parsedBal * 100) / 100;
+          parsedBalance = round2(parsedBal);
           if (importedLedgerRows[dateStr] === undefined || isOldestFirst) {
             importedLedgerRows[dateStr] = {
               regEnding: parsedBalance,
@@ -1072,8 +1051,8 @@ export function parseSingleSheet({
         parsedExtraEnd += transfer;
         parsedRegEnd -= transfer;
       }
-      parsedRegEnd = Math.round(parsedRegEnd * 100) / 100 || 0;
-      parsedExtraEnd = Math.round(parsedExtraEnd * 100) / 100 || 0;
+      parsedRegEnd = round2(parsedRegEnd);
+      parsedExtraEnd = round2(parsedExtraEnd);
 
       let parsedRegBeg = rRegBeg;
       let parsedExtraBeg = rExtraBeg;
@@ -1086,13 +1065,13 @@ export function parseSingleSheet({
         parsedExtraBeg += transfer;
         parsedRegBeg -= transfer;
       }
-      parsedRegBeg = Math.round(parsedRegBeg * 100) / 100 || 0;
-      parsedExtraBeg = Math.round(parsedExtraBeg * 100) / 100 || 0;
+      parsedRegBeg = round2(parsedRegBeg);
+      parsedExtraBeg = round2(parsedExtraBeg);
 
       importedLedgerRows[dateStr] = {
         regEnding: parsedRegEnd,
         extraEnding: parsedExtraEnd,
-        totalEnding: rTotalEnd !== null ? rTotalEnd : Math.round((parsedRegEnd + parsedExtraEnd) * 100) / 100,
+        totalEnding: rTotalEnd !== null ? rTotalEnd : round2(parsedRegEnd + parsedExtraEnd),
         regBeg: parsedRegBeg,
         extraBeg: parsedExtraBeg,
         totalBeg: rTotalBeg

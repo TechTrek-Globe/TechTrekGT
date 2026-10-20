@@ -85,7 +85,7 @@ function migrateFundingGoals(goals, people, accounts) {
     const migrated = {
       ...g,
       accountId: targetAccountId,
-      amountPerPay: Math.round(amountPerPay * 100) / 100
+      amountPerPay: round2(amountPerPay)
     };
     delete migrated.amount;
     delete migrated.frequency;

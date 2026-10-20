@@ -163,8 +163,8 @@ export function processSpreadsheetImport({
                   startExtra += transfer;
                   startReg -= transfer;
                 }
-                newStartingBalance = Math.round(startReg * 100) / 100 || 0;
-                newExtraStarting = Math.round(startExtra * 100) / 100 || 0;
+                newStartingBalance = round2(startReg);
+                newExtraStarting = round2(startExtra);
                 newStartDate = dates[0];
                 newBalanceAsOfDate = dates[0];
               }
@@ -229,8 +229,8 @@ export function processSpreadsheetImport({
                   startExtra += transfer;
                   startReg -= transfer;
                 }
-                patches.startingBalance = Math.round(startReg * 100) / 100 || 0;
-                patches.extraStartingBalance = Math.round(startExtra * 100) / 100 || 0;
+                patches.startingBalance = round2(startReg);
+                patches.extraStartingBalance = round2(startExtra);
                 patches.startDate = dates[0];
                 patches.balanceAsOfDate = dates[0];
               }
@@ -285,8 +285,8 @@ export function processSpreadsheetImport({
                 startExtra += transfer;
                 startReg -= transfer;
               }
-              patches.startingBalance = Math.round(startReg * 100) / 100 || 0;
-              patches.extraStartingBalance = Math.round(startExtra * 100) / 100 || 0;
+              patches.startingBalance = round2(startReg);
+              patches.extraStartingBalance = round2(startExtra);
               patches.startDate = dates[0];
               patches.balanceAsOfDate = dates[0];
             }
@@ -763,7 +763,7 @@ export function processSpreadsheetImport({
         }
         data.transactions.forEach(t => {
           if (t.date && t.balance !== undefined && t.balance !== null && !isNaN(parseFloat(t.balance))) {
-            const bal = Math.round(parseFloat(t.balance) * 100) / 100;
+            const bal = round2(t.balance);
             if (incomingRows[t.date] === undefined || isOldestFirst) {
               incomingRows[t.date] = { regEnding: bal, extraEnding: 0, totalEnding: bal };
             }

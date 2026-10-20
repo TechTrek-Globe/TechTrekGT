@@ -5,6 +5,7 @@ import { LedgerDataProvider } from './context/LedgerDataContext';
 import { useBudgetMetadataState } from './context/BudgetContext';
 import { AppLayout } from './components/AppLayout';
 import { LandingPage } from './components/LandingPage';
+import { logState } from './utils/logger';
 
 const SettingsModal = React.lazy(() => import('./components/SettingsModal').then(m => ({ default: m.SettingsModal })));
 const SettingsView = React.lazy(() => import('./components/SettingsView').then(m => ({ default: m.SettingsView })));
@@ -200,8 +201,6 @@ function MainContent({ pathname, navigateTo, onNavigateHome }) {
     </AppLayout>
   );
 }
-
-import { logState } from './utils/logger';
 
 function getRouteFromPathname(pathname) {
   const path = (pathname || '').toLowerCase().replace(/\/$/, '');

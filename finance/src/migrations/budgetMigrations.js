@@ -540,7 +540,6 @@ export function runBudgetMigrations(budget) {
     migrationDetails.v8 = {
       healedHoaBankStatementCount: healCount
     };
-    currentVersion = 8;
   }
 
   return { budget: migrated, wasMigrated, details: migrationDetails };

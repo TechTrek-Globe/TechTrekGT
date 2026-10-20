@@ -87,10 +87,10 @@ export function AmortizationView() {
   }, [principal, periodInterestRate, totalPeriods, paymentType]);
 
   // Normalize monthly equivalent payment for display & budgeting
-  const monthlyEquivalentPayment = scheduledPaymentPerPeriod * (periodsPerYear / 12);
-  const extraPaymentPerPeriod = extraPayment / (periodsPerYear / 12);
-  const totalPeriodPayment = scheduledPaymentPerPeriod + extraPaymentPerPeriod;
-  const totalMonthlyPayment = monthlyEquivalentPayment + extraPayment;
+  const monthlyEquivalentPayment = round2(scheduledPaymentPerPeriod * (periodsPerYear / 12));
+  const extraPaymentPerPeriod = round2(extraPayment / (periodsPerYear / 12));
+  const totalPeriodPayment = round2(scheduledPaymentPerPeriod + extraPaymentPerPeriod);
+  const totalMonthlyPayment = round2(monthlyEquivalentPayment + extraPayment);
 
   // Generate Amortization Schedule with and without extra payments
   const calculateSchedule = useCallback((withExtra = true) => {
@@ -101,13 +101,13 @@ export function AmortizationView() {
     const extra = withExtra ? extraPaymentPerPeriod : 0;
 
     while (balance > 0.01 && period <= 1200) {
-      const interestForPeriod = balance * periodInterestRate;
+      const interestForPeriod = round2(balance * periodInterestRate);
       let principalPortion;
 
       if (paymentType === 'interest_only') {
         principalPortion = 0;
       } else {
-        principalPortion = scheduledPaymentPerPeriod - interestForPeriod;
+        principalPortion = round2(scheduledPaymentPerPeriod - interestForPeriod);
         if (balance < principalPortion) {
           principalPortion = balance;
         }
@@ -115,7 +115,7 @@ export function AmortizationView() {
 
       let actualExtra = extra;
       if (balance - principalPortion < actualExtra) {
-        actualExtra = Math.max(0, balance - principalPortion);
+        actualExtra = Math.max(0, round2(balance - principalPortion));
       }
 
       const totalPrincipalThisPeriod = round2(principalPortion + actualExtra);
@@ -125,10 +125,10 @@ export function AmortizationView() {
       schedule.push({
         period,
         monthEquivalent: Math.ceil(period / (periodsPerYear / 12)),
-        beginningBalance: balance,
-        scheduledPayment: scheduledPaymentPerPeriod,
+        beginningBalance: round2(balance),
+        scheduledPayment: round2(scheduledPaymentPerPeriod),
         extraPayment: actualExtra,
-        totalPayment: principalPortion + interestForPeriod + actualExtra,
+        totalPayment: round2(principalPortion + interestForPeriod + actualExtra),
         principalPortion: totalPrincipalThisPeriod,
         interestPortion: interestForPeriod,
         endingBalance
@@ -159,7 +159,7 @@ export function AmortizationView() {
   const payoffDate = new Date(startDate.getFullYear(), startDate.getMonth() + payoffMonths, 1);
 
   // Check if a bill exists matching this loan name and account
-  const matchingBill = budget.bills.find(b => b.name.toLowerCase().includes(loanName.toLowerCase()) || (linkedAccountId && b.accountId === linkedAccountId && b.amount === Math.round(totalMonthlyPayment)));
+  const matchingBill = budget.bills.find(b => b.name.toLowerCase().includes(loanName.toLowerCase()) || (linkedAccountId && b.accountId === linkedAccountId && round2(b.amount) === round2(totalMonthlyPayment)));
 
   // Sync / Link payment as a bill to the chosen bank account
   const handleSyncBillToAccount = () => {

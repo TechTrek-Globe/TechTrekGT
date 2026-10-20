@@ -14,8 +14,8 @@ const __dirname = path.dirname(__filename);
 // -------------------------------------------------------------------------
 // The pruning logic that was removed from restoreFromBackup (for comparison)
 // -------------------------------------------------------------------------
-function oldPruneLogic(matrix) {
-  const today = new Date();
+function oldPruneLogic(matrix, referenceDate = new Date('2026-10-01T00:00:00Z')) {
+  const today = referenceDate;
   const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   const creditKeyPattern = /^(.+)_(\d{4}-\d{2})_(\d{1,2})_(?:extra_)?credit_(.+)$/;
   const result = { ...matrix };

@@ -442,7 +442,7 @@ function DailySpreadsheetMatrix() {
 
     if (field === 'total') {
       if (targetAcc.enableExtraSavings !== false && newExtraStartingBalance > 0) {
-        newStartingBalance = Math.round((numVal - newExtraStartingBalance) * 100) / 100;
+        newStartingBalance = round2(numVal - newExtraStartingBalance);
       } else {
         newStartingBalance = numVal;
       }
@@ -477,8 +477,8 @@ function DailySpreadsheetMatrix() {
       // Calculate delta relative to what was originally in the imported sheet (or previous starting balance)
       const currentReg = parseFloat(targetAcc.startingBalance) || 0;
       const currentExtra = parseFloat(targetAcc.extraStartingBalance) || 0;
-      const deltaReg = Math.round((newStartingBalance - currentReg) * 100) / 100;
-      const deltaExtra = Math.round((newExtraStartingBalance - currentExtra) * 100) / 100;
+      const deltaReg = round2(newStartingBalance - currentReg);
+      const deltaExtra = round2(newExtraStartingBalance - currentExtra);
 
       const updatedImportRows = {};
       for (const [dKey, rData] of Object.entries(targetAcc.importedLedgerRows)) {
@@ -491,26 +491,26 @@ function DailySpreadsheetMatrix() {
             ...rData,
             regBeg: newStartingBalance,
             extraBeg: newExtraStartingBalance,
-            totalBeg: Math.round((newStartingBalance + newExtraStartingBalance) * 100) / 100,
-            regEnding: Math.round(((rData.regEnding ?? newStartingBalance) + deltaReg) * 100) / 100,
-            extraEnding: Math.round(((rData.extraEnding ?? newExtraStartingBalance) + deltaExtra) * 100) / 100,
-            totalEnding: Math.round((((rData.regEnding ?? newStartingBalance) + deltaReg) + (targetAcc.enableExtraSavings !== false ? ((rData.extraEnding ?? newExtraStartingBalance) + deltaExtra) : 0)) * 100) / 100
+            totalBeg: round2(newStartingBalance + newExtraStartingBalance),
+            regEnding: round2((rData.regEnding ?? newStartingBalance) + deltaReg),
+            extraEnding: round2((rData.extraEnding ?? newExtraStartingBalance) + deltaExtra),
+            totalEnding: round2(((rData.regEnding ?? newStartingBalance) + deltaReg) + (targetAcc.enableExtraSavings !== false ? ((rData.extraEnding ?? newExtraStartingBalance) + deltaExtra) : 0))
           };
           updatedImportRows[dKey] = updatedFirstRow;
         } else {
           // For all subsequent dates, shift by deltaReg and deltaExtra
-          const nextRegBeg = rData.regBeg !== undefined ? Math.round((rData.regBeg + deltaReg) * 100) / 100 : rData.regBeg;
-          const nextExtraBeg = rData.extraBeg !== undefined ? Math.round((rData.extraBeg + deltaExtra) * 100) / 100 : rData.extraBeg;
-          const nextRegEnd = rData.regEnding !== undefined ? Math.round((rData.regEnding + deltaReg) * 100) / 100 : rData.regEnding;
-          const nextExtraEnd = rData.extraEnding !== undefined ? Math.round((rData.extraEnding + deltaExtra) * 100) / 100 : rData.extraEnding;
+          const nextRegBeg = rData.regBeg !== undefined ? round2(rData.regBeg + deltaReg) : rData.regBeg;
+          const nextExtraBeg = rData.extraBeg !== undefined ? round2(rData.extraBeg + deltaExtra) : rData.extraBeg;
+          const nextRegEnd = rData.regEnding !== undefined ? round2(rData.regEnding + deltaReg) : rData.regEnding;
+          const nextExtraEnd = rData.extraEnding !== undefined ? round2(rData.extraEnding + deltaExtra) : rData.extraEnding;
           updatedImportRows[dKey] = {
             ...rData,
             regBeg: nextRegBeg,
             extraBeg: nextExtraBeg,
-            totalBeg: (nextRegBeg !== undefined && nextExtraBeg !== undefined) ? Math.round((nextRegBeg + nextExtraBeg) * 100) / 100 : rData.totalBeg,
+            totalBeg: (nextRegBeg !== undefined && nextExtraBeg !== undefined) ? round2(nextRegBeg + nextExtraBeg) : rData.totalBeg,
             regEnding: nextRegEnd,
             extraEnding: nextExtraEnd,
-            totalEnding: (nextRegEnd !== undefined && nextExtraEnd !== undefined) ? Math.round((nextRegEnd + nextExtraEnd) * 100) / 100 : rData.totalEnding
+            totalEnding: (nextRegEnd !== undefined && nextExtraEnd !== undefined) ? round2(nextRegEnd + nextExtraEnd) : rData.totalEnding
           };
         }
       }
@@ -521,12 +521,12 @@ function DailySpreadsheetMatrix() {
     const existingCustomReg = getDailyMatrixCell(selectedAccountId, row.monthKey, row.day, 'reg_ending');
     if (existingCustomReg !== undefined && existingCustomReg !== null && existingCustomReg !== '') {
       const deltaReg = newStartingBalance - (parseFloat(targetAcc.startingBalance) || 0);
-      updateDailyMatrixCell(selectedAccountId, row.monthKey, row.day, 'reg_ending', Math.round((parseFloat(existingCustomReg) + deltaReg) * 100) / 100);
+      updateDailyMatrixCell(selectedAccountId, row.monthKey, row.day, 'reg_ending', round2(parseFloat(existingCustomReg) + deltaReg));
     }
     const existingCustomExtra = getDailyMatrixCell(selectedAccountId, row.monthKey, row.day, 'extra_ending');
     if (existingCustomExtra !== undefined && existingCustomExtra !== null && existingCustomExtra !== '') {
       const deltaExtra = newExtraStartingBalance - (parseFloat(targetAcc.extraStartingBalance) || 0);
-      updateDailyMatrixCell(selectedAccountId, row.monthKey, row.day, 'extra_ending', Math.round((parseFloat(existingCustomExtra) + deltaExtra) * 100) / 100);
+      updateDailyMatrixCell(selectedAccountId, row.monthKey, row.day, 'extra_ending', round2(parseFloat(existingCustomExtra) + deltaExtra));
     }
 
     updateAccount(selectedAccountId, patches);
@@ -545,6 +545,15 @@ function DailySpreadsheetMatrix() {
   const todayObj = useMemo(() => new Date(), []);
   const isCurrentMonthView = todayObj.getMonth() === selectedMonth && todayObj.getFullYear() === selectedYear;
   const currentDayNum = todayObj.getDate();
+
+  // Tooltip as-of cutoff date: clamp to end of viewed month if past month, otherwise todayObj
+  const tooltipCutoffDate = useMemo(() => {
+    const isPastMonth = selectedYear < todayObj.getFullYear() || (selectedYear === todayObj.getFullYear() && selectedMonth < todayObj.getMonth());
+    if (isPastMonth) {
+      return new Date(selectedYear, selectedMonth + 1, 0);
+    }
+    return todayObj;
+  }, [selectedYear, selectedMonth, todayObj]);
 
   // Relevant active bills assigned to this account
   const accountBills = useMemo(() => {
@@ -713,8 +722,8 @@ function DailySpreadsheetMatrix() {
         totalExtra += balObj.extraEnding || 0;
       });
       return {
-        initialRegBeg: Math.round(totalReg * 100) / 100,
-        initialExtraBeg: Math.round(totalExtra * 100) / 100
+        initialRegBeg: round2(totalReg),
+        initialExtraBeg: round2(totalExtra)
       };
     } else {
       if (!selectedAccount) return { initialRegBeg: 0, initialExtraBeg: 0 };
@@ -821,7 +830,7 @@ function DailySpreadsheetMatrix() {
           const billAccId = selectedAccountId === 'all' ? b.accountId : selectedAccountId;
           const customBillVal = getDailyMatrixCell(billAccId, monthKey, day, `bill_${b.id}`);
           let amt = 0;
-          const expectedBillAmt = Math.round((parseFloat(b.amount) || 0) * 100) / 100;
+          const expectedBillAmt = round2(parseFloat(b.amount) || 0);
 
           if (customBillVal !== undefined) {
             // Tier 1: manual dailyMatrix override (drag-drop, inline edit, or actual transaction) wins outright
@@ -895,7 +904,7 @@ function DailySpreadsheetMatrix() {
         }
         const totalEnd = round2(regEnding + (showExtraColumns ? extraEnding : 0));
         const isHistoricalLock = isLockedDay;
-        const totalBeg = Math.round((runningRegBeg + (showExtraColumns ? runningExtraBeg : 0)) * 100) / 100;
+        const totalBeg = round2(runningRegBeg + (showExtraColumns ? runningExtraBeg : 0));
 
         const isStartRow = (
           dateObj.getFullYear() === startDateObj.getFullYear() &&
@@ -919,12 +928,12 @@ function DailySpreadsheetMatrix() {
           isPayday,
           isToday,
           totalBeg,
-          regBeg: Math.round(runningRegBeg * 100) / 100,
-          extraBeg: Math.round(runningExtraBeg * 100) / 100,
+          regBeg: round2(runningRegBeg),
+          extraBeg: round2(runningExtraBeg),
           personCredits,
           totalRegCredits,
           billValues,
-          otherAmt: Math.round(otherAmt * 100) / 100,
+          otherAmt: round2(otherAmt),
           otherDesc: customOtherDesc,
           regEnding,
           extraEnding,
@@ -1202,8 +1211,9 @@ function DailySpreadsheetMatrix() {
       totals.totalRegCredits += r.totalRegCredits;
     });
 
-    totals.other = Math.round(totals.other * 100) / 100;
-    totals.totalBills = Object.values(totals.bills).reduce((s, v) => s + v, 0);
+    totals.other = round2(totals.other);
+    totals.totalRegCredits = round2(totals.totalRegCredits);
+    totals.totalBills = round2(Object.values(totals.bills).reduce((s, v) => s + v, 0));
 
     return totals;
   }, [matrixData, selectedMonth, selectedYear, accountPeople, accountBills]);
@@ -2058,7 +2068,9 @@ function DailySpreadsheetMatrix() {
           transactions={transactions || budget.transactions || []}
           dailyMatrix={getDailyMatrix ? getDailyMatrix() : {}}
           selectedAccountId={selectedAccountId}
-          asOfDate={todayObj}
+          asOfDate={tooltipCutoffDate}
+          people={budget.people || []}
+          accounts={budget.accounts || []}
           onUpdateAliases={handleUpdateAliases}
           onUpdateName={handleUpdateColumnName}
           onMouseEnter={() => {

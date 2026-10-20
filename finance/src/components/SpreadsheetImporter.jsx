@@ -23,6 +23,7 @@ import {
 import { getLedgerRunningBalanceAsOfDate } from '../utils/spreadsheet';
 import { useBudgetMetadataState, useBudgetMetadataDispatch, useLedgerDataDispatch } from '../context/BudgetContext';
 import { logDebug, logInfo, logWarn, logError } from '../utils/debugLogger';
+import { round2 } from '../utils/formatters';
 
 // --- Stage constants ---
 const STAGE = {
@@ -415,6 +416,7 @@ export function SpreadsheetImporter({
     setStage(STAGE.PARSING);
     setCompletedSheetNames([]);
 
+    let transitioned = false;
     try {
       const arrayBuffer = await file.arrayBuffer();
       // Offload workbook inspection to Web Worker to prevent main thread blocking (MED-001)
@@ -443,17 +445,24 @@ export function SpreadsheetImporter({
         const defaultSheet = inspection.sheetsInfo.find(s => !s.name.toLowerCase().includes('instruction') && !s.name.toLowerCase().includes('readme')) || inspection.sheetsInfo[0];
         setSelectedSheetName(defaultSheet.name);
         setStage(STAGE.SHEET_SELECT);
+        transitioned = true;
       } else {
         // Single sheet or CSV -> go straight to sheet wizard
         logDebug('IMPORT', `Single sheet / CSV detected: "${inspection.sheetNames[0]}"`, { sheet: inspection.sheetNames[0] });
         setSelectedSheetName(inspection.sheetNames[0]);
         setStage(STAGE.SHEET_WIZARD);
+        transitioned = true;
       }
 
     } catch (err) {
       logError('IMPORT', `File inspection failed: ${err.message}`, { error: err.message, stack: err.stack });
       setParseError(err.message || 'Failed to parse file.');
       setStage(STAGE.IDLE);
+    } finally {
+      setIsDragging(false);
+      if (!transitioned) {
+        setStage(STAGE.IDLE);
+      }
     }
   }, [budget.accounts, targetAccountId, selectedTargetAccountId]);
 
@@ -499,7 +508,7 @@ export function SpreadsheetImporter({
       id: `txn-${Date.now()}-adj`,
       date: adjDate,
       description: 'Reconciliation Adjustment',
-      amount: Math.round((balanceDetails.stated - balanceDetails.calculated) * 100) / 100,
+      amount: round2(balanceDetails.stated - balanceDetails.calculated),
       accountId: targetAccId,
       category: 'Adjustment',
       notes: `Auto-generated to match file balance as of ${adjDate}`
@@ -689,7 +698,7 @@ export function SpreadsheetImporter({
       const bankByDate = {};
       txns.forEach(t => {
         if (bankByDate[t.date] === undefined || oldestFirst) {
-          bankByDate[t.date] = Math.round(parseFloat(t.balance) * 100) / 100;
+          bankByDate[t.date] = round2(t.balance);
         }
       });
       const dates = Object.keys(bankByDate).sort();
@@ -703,7 +712,7 @@ export function SpreadsheetImporter({
           dailyMatrix: projected.dailyMatrix || {},
           transactions: projected.transactions || []
         });
-        const delta = Math.round((calc - bankByDate[d]) * 100) / 100;
+        const delta = round2(calc - bankByDate[d]);
         if (Math.abs(delta) > 0.01) {
           badCount += 1;
           if (!firstBad) firstBad = { date: d, bank: bankByDate[d], calc, delta };
@@ -812,7 +821,7 @@ export function SpreadsheetImporter({
         }
 
         if (stated !== null && stated !== undefined && !isNaN(stated)) {
-          stated = Math.round(stated * 100) / 100;
+          stated = round2(stated);
           if (!parsedPayload.importedLedgerRows) parsedPayload.importedLedgerRows = {};
           if (maxImportDate) {
             parsedPayload.importedLedgerRows[maxImportDate] = {
@@ -842,10 +851,10 @@ export function SpreadsheetImporter({
           const extraBal = projAcc?.enableExtraSavings !== false ? (projAcc?.extraStartingBalance || 0) : 0;
           const projTxns = (dryResult.projected.transactions || []).filter(t => t.accountId === targetAccId);
           const sumTxns = projTxns.reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
-          calculated = Math.round((startingBal + extraBal + sumTxns) * 100) / 100;
+          calculated = round2(startingBal + extraBal + sumTxns);
         }
 
-        const delta = stated !== null ? Math.round(Math.abs(calculated - stated) * 100) / 100 : 0;
+        const delta = stated !== null ? round2(Math.abs(calculated - stated)) : 0;
 
         logDebug('RECONCILE', `Balance check as of import date "${maxImportDate || 'all'}"`, {
           maxImportDate,

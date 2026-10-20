@@ -13,7 +13,11 @@
     "lint:quiet": "npx eslint src --quiet",
     "typecheck": "npx tsc -p jsconfig.json",
     "test": "node scripts/check-safe-serialization.js && node --test tests/crit-*.test.js tests/phase2-*.test.js tests/security-hardening.test.js tests/calculation-engine.test.js tests/auth-offline-rejection.test.js tests/user-scoping.test.js tests/restore-round-trip.test.js tests/effective-dueday.test.js tests/tier-b-characterization.test.js tests/tier-c-fixes.test.js tests/med-*.test.js tests/low-*.test.js tests/audit-*.test.js tests/fix-*.test.js",
-    "test:e2e": "node --test tests/live-e2e.test.js"
+    "test:e2e": "node --test tests/live-e2e.test.js",
+    "test:unit": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:playwright": "playwright test",
+    "test:all": "npm test && npm run test:unit"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -28,6 +32,7 @@
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.50.0",
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.64.1",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
     "eslint": "^10.11.0",
@@ -37,6 +42,7 @@
     "tailwindcss": "^3.4.17",
     "typescript": "^7.0.2",
     "vite": "^6.0.7",
+    "vitest": "^5.0.5",
     "wrangler": "^4.118.0"
   }
 }

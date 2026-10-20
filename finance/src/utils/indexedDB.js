@@ -6,6 +6,8 @@
  * migrated to the first user who signs in only after explicit confirmation.
  */
 
+import { logState } from './logger.js';
+
 const DB_NAME = 'TechTrekFinanceDB';
 const DB_VERSION = 1;
 const STORE_NAME = 'app_state';
@@ -67,8 +69,6 @@ export function openDB() {
     };
   });
 }
-
-import { logState } from './logger.js';
 
 /**
  * Loads the application budget state from IndexedDB.

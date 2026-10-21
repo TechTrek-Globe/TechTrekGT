@@ -153,13 +153,16 @@ const MatrixCell = React.memo(function MatrixCell({
       title={draggable ? 'Drag to move to a different date line, or click to edit' : undefined}
     >
       {draggable && (
-        <span
-          className="opacity-0 group-hover/matrix:opacity-80 p-0.5 text-slate-500 transition-opacity absolute left-0.5 top-1/2 -translate-y-1/2 pointer-events-none"
+        <button
+          type="button"
+          data-drag-handle="true"
+          className="opacity-0 group-hover/matrix:opacity-80 hover:opacity-100 hover:text-blue-400 p-0.5 text-slate-500 transition-opacity absolute left-0.5 top-1/2 -translate-y-1/2 cursor-grab active:cursor-grabbing z-10"
           title="Drag amount to move date"
-          aria-hidden="true"
+          aria-label="Drag handle"
+          tabIndex={-1}
         >
-          <GripVertical className="w-2.5 h-2.5" />
-        </span>
+          <GripVertical className="w-2.5 h-2.5 pointer-events-none" />
+        </button>
       )}
       {Boolean(value && value !== 0) && !isTotal && (
         <button
@@ -2116,7 +2119,7 @@ function DailySpreadsheetMatrix() {
       </div>
 
       {/* Floating Drag Overlay */}
-      <DragOverlay dropAnimation={null}>
+      <DragOverlay dropAnimation={{ duration: 180, easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)' }}>
         <MatrixDragOverlay />
       </DragOverlay>
 

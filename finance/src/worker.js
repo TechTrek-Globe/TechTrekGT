@@ -662,7 +662,7 @@ async function handleSyncBackup(context) {
         ).bind(versionId, userId, dataStr, now, userId, userId, force ? 1 : 0, hasBaseVersion ? baseVersion : 0)
       );
 
-      // Keep only the last 4 manual syncs
+      // Keep only the last 10 manual syncs
       queries.push(
         env.DB.prepare(
           `DELETE FROM user_backup_versions
@@ -671,7 +671,7 @@ async function handleSyncBackup(context) {
                SELECT id FROM user_backup_versions
                 WHERE user_id = ?
                 ORDER BY saved_at DESC, rowid DESC
-                LIMIT 4
+                LIMIT 10
              )`
         ).bind(userId, userId)
       );
@@ -808,7 +808,7 @@ async function handleSyncVersions(context) {
       `SELECT id, saved_at FROM user_backup_versions
        WHERE user_id = ?
        ORDER BY saved_at DESC, rowid DESC
-       LIMIT 4`
+       LIMIT 10`
     ).bind(userId).all();
 
     const ongoingRow = await env.DB.prepare(

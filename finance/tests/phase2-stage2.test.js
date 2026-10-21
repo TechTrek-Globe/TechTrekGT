@@ -219,10 +219,10 @@ describe('Phase 2 Stage 2: Stop losing user data (Sync Concurrency & Versioning)
     assert.deepStrictEqual(JSON.parse(row.data), v1Budget);
   });
 
-  // S2T5: Version table prunes to 4 manual syncs, oldest pruned first.
-  test('S2T5: version table prunes to 4 most recent manual syncs, oldest pruned first', async () => {
-    // Push 6 versions sequentially with slight timestamp offsets
-    for (let i = 1; i <= 6; i++) {
+  // S2T5: Version table prunes to 10 manual syncs, oldest pruned first.
+  test('S2T5: version table prunes to 10 most recent manual syncs, oldest pruned first', async () => {
+    // Push 12 versions sequentially with slight timestamp offsets
+    for (let i = 1; i <= 12; i++) {
       const req = new Request('http://localhost/api/sync/backup', {
         method: 'POST',
         headers: makeAuthHeaders(tokenA, csrfTokenA),
@@ -240,13 +240,13 @@ describe('Phase 2 Stage 2: Stop losing user data (Sync Concurrency & Versioning)
       'SELECT id, data, saved_at FROM user_backup_versions WHERE user_id = ? ORDER BY saved_at ASC, rowid ASC'
     ).all('user-a');
 
-    assert.strictEqual(versions.length, 4, 'Must have pruned to exactly 4 versions');
+    assert.strictEqual(versions.length, 10, 'Must have pruned to exactly 10 versions');
     // First version in table should have count: 3 (1 and 2 were pruned)
     const oldestRemaining = JSON.parse(versions[0].data);
     assert.strictEqual(oldestRemaining.accounts[0].name, 'Snapshot 3', 'Oldest versions (1 and 2) must be pruned first');
 
     const newestRemaining = JSON.parse(versions[versions.length - 1].data);
-    assert.strictEqual(newestRemaining.accounts[0].name, 'Snapshot 6', 'Newest version (6) must be present');
+    assert.strictEqual(newestRemaining.accounts[0].name, 'Snapshot 12', 'Newest version (12) must be present');
   });
 
   // S2T6: Payload at 5% of stored size is rejected (SYNC_SUSPICIOUS).

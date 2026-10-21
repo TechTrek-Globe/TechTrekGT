@@ -44,13 +44,19 @@ export async function onRequestGet(context) {
     for (const row of versionsResult.results || []) {
       const uid = row.user_id;
       const count = Number(row.count) || 0;
+      const versionLastSaved = row.last_saved ? new Date(Number(row.last_saved)).toISOString() : null;
       if (!backupMap[uid]) {
         backupMap[uid] = {
           backupCount: count,
-          lastBackupAt: row.last_saved ? new Date(Number(row.last_saved)).toISOString() : null
+          lastBackupAt: versionLastSaved
         };
       } else {
-        backupMap[uid].backupCount = count;
+        backupMap[uid].backupCount += count;
+        if (versionLastSaved) {
+          if (!backupMap[uid].lastBackupAt || new Date(versionLastSaved) > new Date(backupMap[uid].lastBackupAt)) {
+            backupMap[uid].lastBackupAt = versionLastSaved;
+          }
+        }
       }
     }
 

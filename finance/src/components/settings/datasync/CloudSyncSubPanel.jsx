@@ -366,12 +366,12 @@ export function CloudSyncSubPanel() {
               </div>
             </div>
 
-            {/* Prior Manual Backups (Last 4 Versions) */}
+            {/* Prior Manual Backups (Last 10 Versions) */}
             <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-xs font-bold text-slate-200">
                   <History className="w-4 h-4 text-purple-400" />
-                  <span>Prior Manual Backups (Last 4 Syncs)</span>
+                  <span>Prior Manual Backups (Last 10 Syncs)</span>
                 </div>
                 <button
                   type="button"

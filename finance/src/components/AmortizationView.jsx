@@ -77,13 +77,13 @@ export function AmortizationView() {
   // Calculate scheduled payment per period
   const scheduledPaymentPerPeriod = useMemo(() => {
     if (paymentType === 'interest_only') {
-      return principal * periodInterestRate;
+      return round2(principal * periodInterestRate);
     }
 
     if (periodInterestRate > 0) {
-      return (principal * periodInterestRate * Math.pow(1 + periodInterestRate, totalPeriods)) / (Math.pow(1 + periodInterestRate, totalPeriods) - 1);
+      return round2((principal * periodInterestRate * Math.pow(1 + periodInterestRate, totalPeriods)) / (Math.pow(1 + periodInterestRate, totalPeriods) - 1));
     }
-    return principal / totalPeriods;
+    return round2(principal / totalPeriods);
   }, [principal, periodInterestRate, totalPeriods, paymentType]);
 
   // Normalize monthly equivalent payment for display & budgeting

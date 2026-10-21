@@ -980,26 +980,29 @@ export function LedgerDataProvider({ children }) {
   const updateDailyMatrixCell = useCallback((accountId, monthKey, day, field, value) => {
     const key = `${accountId}_${monthKey}_${day}_${field}`;
     
+    const isTextField = field.endsWith('_desc');
+    const cleanValue = isTextField ? (value || '') : (value === '' || value === null || value === undefined ? '' : round2(value));
+
     const currentVal = dailyMatrixRef.current[key];
-    if (currentVal === value) return;
-    if ((currentVal === undefined || currentVal === null || currentVal === '') && (value === undefined || value === null || value === '')) {
+    if (currentVal === cleanValue) return;
+    if ((currentVal === undefined || currentVal === null || currentVal === '') && (cleanValue === undefined || cleanValue === null || cleanValue === '')) {
       return;
     }
 
     const prevNum = parseMoney(currentVal, 0);
-    const newNum = parseMoney(value, 0);
-    logTransaction('UPDATE_CELL_AMOUNT', `Matrix cell amount updated: ${key} = ${value}`, {
+    const newNum = parseMoney(cleanValue, 0);
+    logTransaction('UPDATE_CELL_AMOUNT', `Matrix cell amount updated: ${key} = ${cleanValue}`, {
       accountId,
       monthKey,
       day,
       field,
       previousValue: currentVal,
-      newValue: value,
+      newValue: cleanValue,
       diff: round2(newNum - prevNum)
     });
     
     // Mutate ref and sync state for reactive components and persistence
-    dailyMatrixRef.current[key] = value;
+    dailyMatrixRef.current[key] = cleanValue;
     setDailyMatrix({ ...dailyMatrixRef.current });
     setMatrixVersion(v => v + 1);
   }, []);
@@ -1023,49 +1026,78 @@ export function LedgerDataProvider({ children }) {
     }
   }, []);
 
-  const moveDailyMatrixCell = useCallback((accountId, sourceMonthKey, sourceDay, targetMonthKey, targetDay, field, value, extraData = {}) => {
+  const moveDailyMatrixCell = useCallback((accountId, sourceMonthKey, sourceDay, targetMonthKey, targetDay, field, value, extraData = {}, targetField) => {
+    const resolvedTargetField = targetField || field;
     const sourceKey = `${accountId}_${sourceMonthKey}_${sourceDay}_${field}`;
-    const targetKey = `${accountId}_${targetMonthKey}_${targetDay}_${field}`;
+    const targetKey = `${accountId}_${targetMonthKey}_${targetDay}_${resolvedTargetField}`;
+    // FIN-AUDIT-004: Bail if source and target resolve to the same matrix key
+    if (sourceKey === targetKey) return;
+    const cleanValue = round2(value);
 
-    logTransaction('MOVE_CELL_DATE', `Relocated cell [${field}] from ${sourceMonthKey}-${sourceDay} to ${targetMonthKey}-${targetDay}`, {
-      accountId,
-      sourceDate: `${sourceMonthKey}-${sourceDay}`,
-      targetDate: `${targetMonthKey}-${targetDay}`,
-      field,
-      value,
-      extraData
-    });
+    // Snapshot prior state for optimistic rollback
+    const prevSourceValue = dailyMatrixRef.current[sourceKey];
+    const prevTargetValue = dailyMatrixRef.current[targetKey];
+    const sourceDescKey = field === 'other_amount'
+      ? `${accountId}_${sourceMonthKey}_${sourceDay}_other_desc`
+      : field === 'other_credit_amount'
+        ? `${accountId}_${sourceMonthKey}_${sourceDay}_other_credit_desc`
+        : null;
+    const targetDescKey = resolvedTargetField === 'other_amount'
+      ? `${accountId}_${targetMonthKey}_${targetDay}_other_desc`
+      : resolvedTargetField === 'other_credit_amount'
+        ? `${accountId}_${targetMonthKey}_${targetDay}_other_credit_desc`
+        : null;
+    const prevSourceDesc = sourceDescKey ? dailyMatrixRef.current[sourceDescKey] : undefined;
+    const prevTargetDesc = targetDescKey ? dailyMatrixRef.current[targetDescKey] : undefined;
 
-    let hasChanges = false;
-    if (dailyMatrixRef.current[sourceKey] !== 0) {
-      dailyMatrixRef.current[sourceKey] = 0;
-      hasChanges = true;
-    }
-    if (dailyMatrixRef.current[targetKey] !== value) {
-      dailyMatrixRef.current[targetKey] = value;
-      hasChanges = true;
-    }
+    try {
+      logTransaction('MOVE_CELL_DATE', `Relocated cell [${field}] from ${sourceMonthKey}-${sourceDay} to ${targetMonthKey}-${targetDay}`, {
+        accountId,
+        sourceDate: `${sourceMonthKey}-${sourceDay}`,
+        targetDate: `${targetMonthKey}-${targetDay}`,
+        field,
+        targetField: resolvedTargetField,
+        value: cleanValue,
+        extraData
+      });
 
-    if (field === 'other_amount') {
-      const sourceDescKey = `${accountId}_${sourceMonthKey}_${sourceDay}_other_desc`;
-      const targetDescKey = `${accountId}_${targetMonthKey}_${targetDay}_other_desc`;
-      const sourceDesc = extraData.otherDesc ?? (dailyMatrixRef.current[sourceDescKey] || '');
-      dailyMatrixRef.current[sourceDescKey] = '';
-      dailyMatrixRef.current[targetDescKey] = sourceDesc;
-      hasChanges = true;
-    } else if (field === 'other_credit_amount') {
-      // BUG-3 full fix: move paired other_credit_desc alongside other_credit_amount
-      const sourceDescKey = `${accountId}_${sourceMonthKey}_${sourceDay}_other_credit_desc`;
-      const targetDescKey = `${accountId}_${targetMonthKey}_${targetDay}_other_credit_desc`;
-      const sourceDesc = extraData.otherCreditDesc ?? (dailyMatrixRef.current[sourceDescKey] || '');
-      dailyMatrixRef.current[sourceDescKey] = '';
-      dailyMatrixRef.current[targetDescKey] = sourceDesc;
-      hasChanges = true;
-    }
+      let hasChanges = false;
+      if (dailyMatrixRef.current[sourceKey] !== 0) {
+        dailyMatrixRef.current[sourceKey] = 0;
+        hasChanges = true;
+      }
+      if (dailyMatrixRef.current[targetKey] !== cleanValue) {
+        dailyMatrixRef.current[targetKey] = cleanValue;
+        hasChanges = true;
+      }
 
-    if (hasChanges) {
+      if (field === 'other_amount') {
+        const sourceDesc = extraData.otherDesc ?? (dailyMatrixRef.current[sourceDescKey] || '');
+        dailyMatrixRef.current[sourceDescKey] = '';
+        dailyMatrixRef.current[targetDescKey] = sourceDesc;
+        hasChanges = true;
+      } else if (field === 'other_credit_amount') {
+        // BUG-3 full fix: move paired other_credit_desc alongside other_credit_amount
+        const sourceDesc = extraData.otherCreditDesc ?? (dailyMatrixRef.current[sourceDescKey] || '');
+        dailyMatrixRef.current[sourceDescKey] = '';
+        dailyMatrixRef.current[targetDescKey] = sourceDesc;
+        hasChanges = true;
+      }
+
+      if (hasChanges) {
+        setDailyMatrix({ ...dailyMatrixRef.current });
+        setMatrixVersion(v => v + 1);
+      }
+    } catch (err) {
+      // Optimistic state rollback upon failure
+      dailyMatrixRef.current[sourceKey] = prevSourceValue;
+      dailyMatrixRef.current[targetKey] = prevTargetValue;
+      if (sourceDescKey && prevSourceDesc !== undefined) dailyMatrixRef.current[sourceDescKey] = prevSourceDesc;
+      if (targetDescKey && prevTargetDesc !== undefined) dailyMatrixRef.current[targetDescKey] = prevTargetDesc;
       setDailyMatrix({ ...dailyMatrixRef.current });
       setMatrixVersion(v => v + 1);
+      console.error('Failed to move matrix cell, rolled back state:', err);
+      throw err;
     }
   }, []);
 

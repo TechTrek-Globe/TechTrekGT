@@ -60,6 +60,22 @@ function fmtGrid(val) {
   return fmtMoney(val);
 }
 
+// Hardened PointerSensor that suppresses drag initiation on interactive inputs or action buttons
+class MatrixPointerSensor extends PointerSensor {
+  static activators = [
+    {
+      eventName: 'onPointerDown',
+      handler: ({ nativeEvent: event }) => {
+        if (!event.isPrimary || event.button !== 0) return false;
+        const target = event.target;
+        if (target.closest('input, textarea, select, [contenteditable="true"]')) return false;
+        if (target.closest('button[aria-label="Clear amount"], [data-no-dnd="true"]')) return false;
+        return true;
+      }
+    }
+  ];
+}
+
 // Inline cell editor for matrix cells with @dnd-kit Draggable capability
 const MatrixCell = React.memo(function MatrixCell({
   value,
@@ -80,7 +96,8 @@ const MatrixCell = React.memo(function MatrixCell({
   const isZero = !value || value === 0;
 
   const commitHandler = useCallback((val) => {
-    if (onCommit) onCommit(monthKey, day, field, val, selectedAccountId);
+    const cleanVal = round2(val);
+    if (onCommit) onCommit(monthKey, day, field, cleanVal, selectedAccountId);
   }, [onCommit, monthKey, day, field, selectedAccountId]);
 
   const cellId = `${monthKey}-${day}-${field}`;
@@ -106,22 +123,48 @@ const MatrixCell = React.memo(function MatrixCell({
     disabled: !draggable
   });
 
+  const dragEndedAtRef = useRef(0);
+  const wasDraggingRef = useRef(false);
+
+  useEffect(() => {
+    if (isDragging) {
+      wasDraggingRef.current = true;
+    } else if (wasDraggingRef.current) {
+      wasDraggingRef.current = false;
+      dragEndedAtRef.current = Date.now();
+    }
+  }, [isDragging]);
+
   return (
     <div
       ref={setNodeRef}
+      data-matrix-cell="true"
       {...(draggable ? attributes : {})}
       {...(draggable ? listeners : {})}
+      onClickCapture={(e) => {
+        if (Date.now() - dragEndedAtRef.current < 250) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      }}
       className={`group/matrix relative flex items-center justify-end w-full ${
         draggable ? 'cursor-grab active:cursor-grabbing select-none' : ''
       } ${isDragging ? 'opacity-30 scale-90' : ''}`}
       title={draggable ? 'Drag to move to a different date line, or click to edit' : undefined}
     >
       {draggable && (
-        <GripVertical className="w-2.5 h-2.5 text-slate-500 opacity-0 group-hover/matrix:opacity-70 transition-opacity absolute left-0.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+        <span
+          className="opacity-0 group-hover/matrix:opacity-80 p-0.5 text-slate-500 transition-opacity absolute left-0.5 top-1/2 -translate-y-1/2 pointer-events-none"
+          title="Drag amount to move date"
+          aria-hidden="true"
+        >
+          <GripVertical className="w-2.5 h-2.5" />
+        </span>
       )}
       {Boolean(value && value !== 0) && !isTotal && (
         <button
           type="button"
+          data-no-dnd="true"
           onMouseDown={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -184,18 +227,72 @@ const MatrixCell = React.memo(function MatrixCell({
 // Custom matrix collision detection:
 // 1. Filters droppable containers to only those matching the dragged item's field
 // 2. Uses exact pointer coordinates (pointerWithin) for pixel-perfect drop targeting under the cursor
-// 3. Falls back to closestCenter among the valid column cells if cursor is on cell boundaries
+// 3. For earner credit cross-column drags: column-scoped closestCenter so the source column's
+//    nearby rows cannot out-compete the destination column on centroid distance
+// 4. Falls back to standard closestCenter for non-earner (bill/other) fields
 const matrixCollisionDetection = (args) => {
   const activeField = args.active?.data?.current?.field;
+  if (!activeField) return [];
+
+  const isEarnerCredit = activeField.startsWith('credit_');
+
   const filteredContainers = activeField
-    ? args.droppableContainers.filter(c => c.data?.current?.field === activeField)
+    ? args.droppableContainers.filter(c => {
+        const cField = c.data?.current?.field;
+        if (!cField) return false;
+        if (isEarnerCredit) return cField.startsWith('credit_');
+        return cField === activeField;
+      })
     : args.droppableContainers;
+
+  if (filteredContainers.length === 0) return [];
 
   const filteredArgs = activeField ? { ...args, droppableContainers: filteredContainers } : args;
 
   const pointerCollisions = pointerWithin(filteredArgs);
   if (pointerCollisions.length > 0) {
     return pointerCollisions;
+  }
+
+  // For earner credit drags: run closestCenter scoped to whichever earner column's
+  // X-range contains the pointer. Prevents the source column's vertically-adjacent
+  // rows from winning on centroid distance when dragging horizontally.
+  if (isEarnerCredit) {
+    const pointerX = args.pointerCoordinates?.x;
+    if (pointerX != null) {
+      const TOLERANCE = 20;
+      const columnGroups = {};
+      for (const c of filteredContainers) {
+        const f = c.data?.current?.field;
+        if (!f) continue;
+        if (!columnGroups[f]) columnGroups[f] = [];
+        columnGroups[f].push(c);
+      }
+      let matchingContainers = null;
+      let bestDist = Infinity;
+      for (const group of Object.values(columnGroups)) {
+        let colLeft = Infinity;
+        let colRight = -Infinity;
+        for (const c of group) {
+          const rect = c.rect?.current;
+          if (!rect) continue;
+          if (rect.left < colLeft) colLeft = rect.left;
+          if (rect.right > colRight) colRight = rect.right;
+        }
+        if (colLeft === Infinity) continue;
+        if (pointerX >= colLeft - TOLERANCE && pointerX <= colRight + TOLERANCE) {
+          const dist = Math.abs(pointerX - (colLeft + colRight) / 2);
+          if (dist < bestDist) {
+            bestDist = dist;
+            matchingContainers = group;
+          }
+        }
+      }
+      if (matchingContainers) {
+        return closestCenter({ ...args, droppableContainers: matchingContainers });
+      }
+    }
+    return [];
   }
 
   return closestCenter(filteredArgs);
@@ -209,8 +306,6 @@ const DroppableCellTd = React.memo(function DroppableCellTd({
   className,
   isBillField = false
 }) {
-  const { active } = useDndContext();
-  const isMatchingField = Boolean(active && active.data?.current?.field === field);
   const dropId = `drop-${row.monthKey}-${row.day}-${field}`;
 
   const dropPayload = useMemo(() => ({
@@ -220,13 +315,20 @@ const DroppableCellTd = React.memo(function DroppableCellTd({
     field
   }), [row.rowKey, row.monthKey, row.day, field]);
 
-  const { isOver, setNodeRef } = useDroppable({
+  const { isOver, active, setNodeRef } = useDroppable({
     id: dropId,
-    data: dropPayload,
-    disabled: !isMatchingField
+    data: dropPayload
   });
 
-  const activeHighlight = isOver && isMatchingField
+  const activeField = active?.data?.current?.field;
+  const isEarnerCredit = activeField?.startsWith('credit_');
+  const isValidField = activeField
+    ? (isEarnerCredit ? field.startsWith('credit_') : activeField === field)
+    : false;
+
+  const isCellOver = Boolean(active && isOver && isValidField);
+
+  const activeHighlight = isCellOver
     ? isBillField
       ? 'bg-rose-500/30 ring-2 ring-rose-400 ring-inset shadow-[0_0_10px_rgba(244,63,94,0.3)]'
       : 'bg-emerald-500/30 ring-2 ring-emerald-400 ring-inset shadow-[0_0_10px_rgba(16,185,129,0.3)]'
@@ -385,9 +487,9 @@ function DailySpreadsheetMatrix() {
 
   // Drag and drop sensor configuration
   const sensors = useSensors(
-    useSensor(PointerSensor, {
+    useSensor(MatrixPointerSensor, {
       activationConstraint: {
-        distance: 4
+        distance: 8
       }
     }),
     useSensor(KeyboardSensor)
@@ -398,8 +500,13 @@ function DailySpreadsheetMatrix() {
     const activeData = active?.data?.current;
     const overData = over?.data?.current;
 
-    if (activeData && overData && overData.field === activeData.field) {
-      if (activeData.sourceMonthKey !== overData.monthKey || activeData.sourceDay !== overData.day) {
+    if (activeData && overData) {
+      const isSameField = overData.field === activeData.field;
+      const isCrossEarnerDrop = activeData.field?.startsWith('credit_') && overData.field?.startsWith('credit_') && !isSameField;
+      const isValidDrop = isSameField || isCrossEarnerDrop;
+      const hasMovedDate = activeData.sourceMonthKey !== overData.monthKey || activeData.sourceDay !== overData.day;
+
+      if (isValidDrop && (hasMovedDate || isCrossEarnerDrop)) {
         logTransaction('UI_DRAG_MOVE', `User dragged ${activeData.label || activeData.field} from ${activeData.sourceMonthKey}-${activeData.sourceDay} to ${overData.monthKey}-${overData.day}`, {
           activeData,
           overData
@@ -412,20 +519,26 @@ function DailySpreadsheetMatrix() {
           overData.day,
           activeData.field,
           activeData.value,
-          activeData.extraData
+          activeData.extraData,
+          isCrossEarnerDrop ? overData.field : undefined
         );
       }
     }
   }, [moveDailyMatrixCell, selectedAccountId]);
 
+  const handleDragCancel = useCallback(() => {
+    logTransaction('UI_DRAG_CANCEL', 'User cancelled cell drag interaction');
+  }, []);
+
   const handleCellCommit = useCallback((monthKey, day, field, val, cellAccountId) => {
     const targetAccId = (cellAccountId && cellAccountId !== 'all') ? cellAccountId : (selectedAccountId === 'all' ? (budget.accounts[0]?.id || 'all') : selectedAccountId);
-    const numVal = typeof val === 'number' ? val : (parseFloat(val) || 0);
-    logTransaction('UI_CELL_COMMIT', `User committed ${field} on ${monthKey}-${day}: ${val}`, { targetAccId, monthKey, day, field, val });
-    updateDailyMatrixCell(targetAccId, monthKey, day, field, val);
+    const isTextField = field.endsWith('_desc');
+    const cleanVal = isTextField ? (val || '') : round2(val);
+    logTransaction('UI_CELL_COMMIT', `User committed ${field} on ${monthKey}-${day}: ${cleanVal}`, { targetAccId, monthKey, day, field, val: cleanVal });
+    updateDailyMatrixCell(targetAccId, monthKey, day, field, cleanVal);
 
     // If clearing out an other amount (val === 0 or ''), automatically clear associated other description
-    if ((field === 'other_amount' || field === 'other_credit_amount') && (!val || numVal === 0)) {
+    if ((field === 'other_amount' || field === 'other_credit_amount') && (!val || round2(val) === 0)) {
       updateDailyMatrixCell(targetAccId, monthKey, day, 'other_desc', '');
       updateDailyMatrixCell(targetAccId, monthKey, day, 'other_credit_desc', '');
     }
@@ -1231,6 +1344,7 @@ function DailySpreadsheetMatrix() {
       sensors={sensors}
       collisionDetection={matrixCollisionDetection}
       onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
     >
       <div className="flex-1 min-h-0 flex flex-col overflow-hidden rounded-2xl border border-slate-800 glass-panel shadow-2xl">
 
@@ -1615,7 +1729,6 @@ function DailySpreadsheetMatrix() {
             <tbody
               key={group.monthKey}
               data-month-group={`${group.year}-${group.month}`}
-              style={{ contentVisibility: 'auto', containIntrinsicSize: '1px 950px' }}
               className="divide-y divide-slate-800/50 font-mono text-[10px]"
             >
               {/* Natural In-Flow Month Header Row (Non-sticky so it never obscures date rows) */}
@@ -1647,9 +1760,10 @@ function DailySpreadsheetMatrix() {
                     data-year={row.year}
                     data-rowkey={row.rowKey}
                     onClick={(e) => {
-                      if (e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT') {
-                        setSelectedRowKey(prev => prev === row.rowKey ? null : row.rowKey);
+                      if (e.target.closest('button, input, select, textarea, [data-drag-handle="true"], [data-matrix-cell="true"]')) {
+                        return;
                       }
+                      setSelectedRowKey(prev => prev === row.rowKey ? null : row.rowKey);
                     }}
                     className={`transition-colors cursor-pointer ${
                       row.isToday && isSelected

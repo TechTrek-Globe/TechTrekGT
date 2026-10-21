@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Pencil, Check, X, Trash2 } from 'lucide-react';
+import { round2 } from '../utils/formatters';
 
 /**
  * InlineEdit - universal click-to-edit primitive.
@@ -98,6 +99,7 @@ export function InlineEdit({
       }
       if (min !== undefined) parsed = Math.max(min, parsed);
       if (max !== undefined) parsed = Math.min(max, parsed);
+      if (type === 'currency') parsed = round2(parsed);
     } else if (type === 'integer') {
       if (str === '') {
         parsed = 0;
@@ -138,6 +140,7 @@ export function InlineEdit({
           value={draft}
           autoFocus
           aria-label="Edit value"
+          onPointerDown={e => e.stopPropagation()}
           onChange={e => setDraft(e.target.value)}
           onKeyDown={onKeyDown}
           onBlur={commit}
@@ -145,6 +148,8 @@ export function InlineEdit({
         />
         {suffix && <span className="text-slate-500 text-xs">{suffix}</span>}
         <button
+          type="button"
+          onPointerDown={e => e.stopPropagation()}
           onMouseDown={e => { e.preventDefault(); commit(); }}
           aria-label="Save changes"
           className="p-0.5 text-emerald-400 hover:text-emerald-300 transition-colors"
@@ -153,6 +158,8 @@ export function InlineEdit({
           <Check className="w-3 h-3" />
         </button>
         <button
+          type="button"
+          onPointerDown={e => e.stopPropagation()}
           onMouseDown={e => { e.preventDefault(); handleClear(); }}
           aria-label="Clear value ($0)"
           className="p-0.5 text-slate-400 hover:text-rose-400 transition-colors"
@@ -161,6 +168,8 @@ export function InlineEdit({
           <Trash2 className="w-3 h-3" />
         </button>
         <button
+          type="button"
+          onPointerDown={e => e.stopPropagation()}
           onMouseDown={e => { e.preventDefault(); cancel(); }}
           aria-label="Cancel editing"
           className="p-0.5 text-slate-400 hover:text-rose-400 transition-colors"
@@ -174,6 +183,7 @@ export function InlineEdit({
 
   return (
     <button
+      type="button"
       onClick={open}
       aria-label={`Edit value, current value is ${formatted}`}
       className={`group/ie flex items-center justify-end w-full hover:opacity-90 transition-opacity relative ${className}`}

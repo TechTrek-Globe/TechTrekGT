@@ -107,6 +107,18 @@ All persistence and calculation state invariants are verified via an automated t
   - The `techtrek:user-logout` global window event triggers synchronous state purges in `BudgetMetadataContext` and `LedgerDataContext`, unmounting private financial models and clearing storage markers.
 - **Continuous Validation Suite:**
   - `npm run test:unit`: Executes 10 test suites covering financial math, hostile payload sanitization, CAS concurrency, 10-snapshot retention, auth invalidation, and D1 parameterization via Vitest.
-  - `npm run test`: Executes 511 regression tests via Node 24 test runner.
+  - `npm run test`: Executes 520 regression tests via Node 24 test runner.
   - `npm run test:all`: Executes the complete test battery.
+
+---
+
+## 9. Transactions Grid State Mutation & Rollback Governance (FIX-GRID)
+
+- **Atomic Pre-Mutation Snapshotting:** In `LedgerDataContext.jsx`, `moveDailyMatrixCell` snapshots prior values of `sourceKey`, `targetKey`, and paired description keys (`other_desc`, `other_credit_desc`) before applying in-memory mutations.
+- **Compensating In-Memory Rollback:** If an unhandled error or rejected transaction occurs during cell relocation, the `catch` block restores the pre-mutation snapshot atomically, triggers `setDailyMatrix`, and increments `matrixVersion` to heal the React component tree and IndexedDB cache.
+- **Deterministic Currency Invariant:** All matrix mutations (`updateDailyMatrixCell`, `moveDailyMatrixCell`, `InlineEdit.onCommit`, `handleCellCommit`) normalize values through `round2(val)` with `Number.EPSILON` boundary preservation and `-0` elimination prior to ref assignment and reactive state propagation.
+- **Linked Metadata Lifecycle:** Clearing an `other_amount` or `other_credit_amount` cell to `$0.00` automatically resets its corresponding description cell (`other_desc`, `other_credit_desc`) to an empty string, preventing orphaned note metadata.
+- **Droppable Highlight Lifecycle Guard:** In `DroppableCellTd`, `isCellOver` strictly requires active pointer dragging and field family compatibility (`Boolean(active && isOver && isValidField)`), and `DragOverlay` sets `dropAnimation={null}`, preventing stale or orphaned drop target highlight classes (e.g., green/rose rectangular backgrounds) from persisting in the DOM post-drop.
+- **Same-Key No-Op Guard (FIN-AUDIT-004):** In `moveDailyMatrixCell`, after `sourceKey` and `targetKey` are derived from `resolvedTargetField`, an early `if (sourceKey === targetKey) return;` guard exits before any snapshot or ref mutation. Prevents phantom state writes in edge-case same-field, same-date, same-column drops that bypass the `handleDragEnd` guard.
+
 

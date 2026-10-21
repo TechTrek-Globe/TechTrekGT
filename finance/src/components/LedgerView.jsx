@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useRef, useEffect, useLayoutEffect } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect, useLayoutEffect, useContext } from 'react';
 import { useBudget } from '../context/BudgetContext';
 import {
   Wallet,
@@ -76,8 +76,81 @@ class MatrixPointerSensor extends PointerSensor {
   ];
 }
 
-// Inline cell editor for matrix cells with @dnd-kit Draggable capability
-const MatrixCell = React.memo(function MatrixCell({
+// Pure static inline cell editor for matrix cells without drag-and-drop overhead
+const StaticMatrixCell = React.memo(function StaticMatrixCell({
+  value,
+  onCommit,
+  monthKey,
+  day,
+  field,
+  isCredit = false,
+  isBill = false,
+  isOther = false,
+  isTotal = false,
+  isNegative = false,
+  selectedAccountId
+}) {
+  const isZero = !value || value === 0;
+
+  const commitHandler = useCallback((val) => {
+    const cleanVal = round2(val);
+    if (onCommit) onCommit(monthKey, day, field, cleanVal, selectedAccountId);
+  }, [onCommit, monthKey, day, field, selectedAccountId]);
+
+  return (
+    <div
+      data-matrix-cell="true"
+      className="group/matrix relative flex items-center justify-end w-full"
+    >
+      {Boolean(value && value !== 0) && !isTotal && (
+        <button
+          type="button"
+          data-no-dnd="true"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            commitHandler(0);
+          }}
+          className="opacity-0 group-hover/matrix:opacity-100 p-0.5 text-slate-500 hover:text-rose-400 transition-all absolute left-3 top-1/2 -translate-y-1/2 z-10 cursor-pointer"
+          title="Clear amount ($0)"
+          aria-label="Clear amount"
+        >
+          <Trash2 className="w-2.5 h-2.5" />
+        </button>
+      )}
+      <InlineEdit
+        value={value || 0}
+        type="currency"
+        onCommit={commitHandler}
+        displayFn={() => (
+          <span
+            className={`font-mono text-[10px] ${
+              isTotal
+                ? isNegative ? 'text-rose-400 font-bold' : 'text-slate-100 font-bold'
+                : isOther
+                  ? isZero
+                    ? 'text-slate-600'
+                    : value > 0
+                      ? 'text-emerald-400 font-semibold'
+                      : 'text-rose-300 font-semibold'
+                  : isCredit
+                    ? isZero ? 'text-slate-600' : 'text-emerald-400 font-semibold'
+                    : isBill
+                      ? isZero ? 'text-slate-600' : 'text-rose-300 font-semibold'
+                      : isZero ? 'text-slate-600' : 'text-slate-300'
+            }`}
+          >
+            {fmtGrid(value)}
+          </span>
+        )}
+        className="justify-end w-full"
+      />
+    </div>
+  );
+});
+
+// Inline cell editor for matrix cells with active @dnd-kit Draggable capability
+const DraggableMatrixCell = React.memo(function DraggableMatrixCell({
   value,
   onCommit,
   monthKey,
@@ -209,6 +282,14 @@ const MatrixCell = React.memo(function MatrixCell({
       />
     </div>
   );
+});
+
+// Router cell component: bypasses useDraggable entirely if not draggable
+const MatrixCell = React.memo(function MatrixCell(props) {
+  if (!props.draggable) {
+    return <StaticMatrixCell {...props} />;
+  }
+  return <DraggableMatrixCell {...props} />;
 }, (prevProps, nextProps) => {
   return (
     prevProps.value === nextProps.value &&
@@ -301,8 +382,10 @@ const matrixCollisionDetection = (args) => {
   return closestCenter(filteredArgs);
 };
 
-// Droppable Table Cell TD Wrapper for Matrix
-const DroppableCellTd = React.memo(function DroppableCellTd({
+const ActiveDragContext = React.createContext(null);
+
+// Active droppable container: mounted ONLY while drag interaction is active and compatible
+const ActiveDroppableCellTdInner = React.memo(function ActiveDroppableCellTdInner({
   row,
   field,
   children,
@@ -344,6 +427,40 @@ const DroppableCellTd = React.memo(function DroppableCellTd({
     >
       {children}
     </td>
+  );
+});
+
+// Droppable Table Cell TD Wrapper for Matrix:
+// Mounts useDroppable ONLY while a drag is actively in progress for a compatible column.
+const DroppableCellTd = React.memo(function DroppableCellTd({
+  row,
+  field,
+  children,
+  className,
+  isBillField = false
+}) {
+  const activeDragField = useContext(ActiveDragContext);
+
+  if (!activeDragField) {
+    return <td className={className}>{children}</td>;
+  }
+
+  const isEarnerCredit = activeDragField.startsWith('credit_');
+  const isCompatible = isEarnerCredit ? field.startsWith('credit_') : activeDragField === field;
+
+  if (!isCompatible) {
+    return <td className={className}>{children}</td>;
+  }
+
+  return (
+    <ActiveDroppableCellTdInner
+      row={row}
+      field={field}
+      className={className}
+      isBillField={isBillField}
+    >
+      {children}
+    </ActiveDroppableCellTdInner>
   );
 });
 
@@ -457,6 +574,7 @@ function DailySpreadsheetMatrix() {
   const [selectedRowKey, setSelectedRowKey] = useState(null);
   const [hoveredHeader, setHoveredHeader] = useState(null);
   const hoverTimeoutRef = useRef(null);
+  const [activeDragField, setActiveDragField] = useState(null);
 
   // Alias and Column Name update handlers for ColumnHeaderHoverTooltip
   const handleUpdateAliases = useCallback((column, type, newAliases) => {
@@ -498,7 +616,13 @@ function DailySpreadsheetMatrix() {
     useSensor(KeyboardSensor)
   );
 
+  const handleDragStart = useCallback((event) => {
+    const field = event.active?.data?.current?.field;
+    setActiveDragField(field || null);
+  }, []);
+
   const handleDragEnd = useCallback((event) => {
+    setActiveDragField(null);
     const { active, over } = event;
     const activeData = active?.data?.current;
     const overData = over?.data?.current;
@@ -530,6 +654,7 @@ function DailySpreadsheetMatrix() {
   }, [moveDailyMatrixCell, selectedAccountId]);
 
   const handleDragCancel = useCallback(() => {
+    setActiveDragField(null);
     logTransaction('UI_DRAG_CANCEL', 'User cancelled cell drag interaction');
   }, []);
 
@@ -1346,9 +1471,11 @@ function DailySpreadsheetMatrix() {
     <DndContext
       sensors={sensors}
       collisionDetection={matrixCollisionDetection}
+      onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
     >
+      <ActiveDragContext.Provider value={activeDragField}>
       <div className="flex-1 min-h-0 flex flex-col overflow-hidden rounded-2xl border border-slate-800 glass-panel shadow-2xl">
 
       {/* Compact Fixed Toolbar Header - Scooted to Left for Maximum Workspace */}
@@ -1362,6 +1489,12 @@ function DailySpreadsheetMatrix() {
               onChange={e => {
                 hasUserSelectedAccountRef.current = true;
                 const nextId = e.target.value;
+                const curYear = selectedYear || today.getFullYear();
+                const minYear = startDateObj ? startDateObj.getFullYear() : curYear;
+                setYearRange({
+                  startYear: Math.max(minYear, curYear),
+                  endYear: curYear + 1
+                });
                 React.startTransition(() => {
                   setSelectedAccountId(nextId);
                 });
@@ -2204,6 +2337,7 @@ function DailySpreadsheetMatrix() {
         />
       )}
     </div>
+      </ActiveDragContext.Provider>
     </DndContext>
   );
 }

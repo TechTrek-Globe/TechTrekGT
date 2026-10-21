@@ -173,7 +173,10 @@ function addSecurityHeaders(response, options = {}) {
   });
 
   if (isHtml && nonce && response.body && typeof HTMLRewriter !== 'undefined') {
-    return new HTMLRewriter().on('script', new NonceInjector(nonce)).transform(rewritten);
+    return new HTMLRewriter()
+      .on('script', new NonceInjector(nonce))
+      .on('meta[property="csp-nonce"]', new NonceInjector(nonce))
+      .transform(rewritten);
   }
   return rewritten;
 }

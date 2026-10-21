@@ -204,4 +204,19 @@ describe('ColumnHeaderHoverTooltip Ledger Synchronization & Discrepancy Fixes', 
     assert.strictEqual(mortgageResults[0].date, '2026-08-10');
     assert.strictEqual(mortgageResults[0].amount, 2036.51);
   });
+
+  it('ignores stale personId stamp: Jon does not show Aug 18 once ledger assigns it to Ronnie', () => {
+    const stamped = transactions.map(t => (t.id === 'txn-aug-18' ? { ...t, personId: 'person-jon' } : t));
+    const jonResults = getColumnRecentTransactions({
+      column: personJon,
+      type: 'person',
+      transactions: stamped,
+      dailyMatrix,
+      selectedAccountId: accountId,
+      asOfDate: '2026-08-31',
+      people,
+      accounts
+    });
+    assert.strictEqual(jonResults.some(r => r.date === '2026-08-18'), false);
+  });
 });

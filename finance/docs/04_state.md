@@ -112,6 +112,10 @@ Authentication states strictly reflect backend database authority and maintain z
 - **Guaranteed Loading State Resets (`finally` Block Mandate):**
   - All asynchronous mutation workflows (`isSubmitting`, `isProcessing`, `isVerifying`, `isResending`, `isFlushingCache`, `isClearingCredits`, `isPruning`, `isRestoringGoals`) enforce state cleanup inside `finally {}` blocks.
   - Interactive elements and submission buttons never remain permanently disabled or frozen in loading states following network dropouts or backend rejections.
+  - In `SpreadsheetImporter.jsx`, `processFile` guarantees `setIsDragging(false)` and resets `stage` inside a `finally` block to prevent lingering drag highlights or locked parsing spinners.
+- **Dynamic Chunk Lifecycle & CSP Nonce State (FIX-CHUNK-CSP):**
+  - `<meta property="csp-nonce" />` in `index.html` receives runtime cryptographic nonces via Cloudflare Worker `HTMLRewriter`, enabling Vite's `__vitePreload` helper to attach valid nonces to dynamic module preload links under CSP `'strict-dynamic'`.
+  - `lazyWithRetry` in `App.jsx` and `window.addEventListener('vite:preloadError')` in `main.jsx` track reload attempts via `sessionStorage` (`last_chunk_reload`, `last_vite_preload_reload`), preventing infinite reload loops while transparently healing chunk hash drift upon new production deployments.
 - **Admin & Maintenance Route Synchronization:**
   - `AdminView` user status updates target the canonical POST `/api/admin/user-status` endpoint with structured payloads (`{ userId, status }`), matching backend Cloudflare Worker routing and avoiding 404 route drift.
 
@@ -133,3 +137,5 @@ Authentication states strictly reflect backend database authority and maintain z
 
 
 
+- **Recent Activity Ledger Authority (FIX-RECENT-STALE):** The `dailyMatrix` is authoritative over stale `personId`/`billId` stamps on transactions when resolving header tooltip Recent Activity; covered by `tests/fix-tooltip-ledger-sync.test.js`.
+- **Transactions Grid Lifecycle & Account Switch Optimization (FIX-PERF-ACCOUNT-SWITCH):** In `LedgerView.jsx`, `ActiveDragContext` holds `activeDragField` (null when idle; set on `handleDragStart`, cleared on `handleDragEnd` and `handleDragCancel`). `DroppableCellTd` mounts `useDroppable` dynamically inside `ActiveDroppableCellTdInner` only when an active drag is in progress and compatible, reducing droppable hook unmount/remount churn to zero during account switches. `MatrixCell` routes to `StaticMatrixCell` whenever `!props.draggable`, eliminating `useDraggable` registration overhead across empty and zero-value cells. Switching accounts resets `yearRange` to the active 2-year window (`{ startYear: Math.max(minYear, curYear), endYear: curYear + 1 }`), preventing accumulated multi-year scroll range rows from stalling React re-renders.

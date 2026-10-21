@@ -7,15 +7,36 @@ import { AppLayout } from './components/AppLayout';
 import { LandingPage } from './components/LandingPage';
 import { logState } from './utils/logger';
 
-const SettingsModal = React.lazy(() => import('./components/SettingsModal').then(m => ({ default: m.SettingsModal })));
-const SettingsView = React.lazy(() => import('./components/SettingsView').then(m => ({ default: m.SettingsView })));
-const DashboardView = React.lazy(() => import('./components/DashboardView').then(m => ({ default: m.DashboardView })));
-const MainBudgetView = React.lazy(() => import('./components/MainBudgetView').then(m => ({ default: m.MainBudgetView })));
-const LedgerView = React.lazy(() => import('./components/LedgerView').then(m => ({ default: m.LedgerView })));
-const AmortizationView = React.lazy(() => import('./components/AmortizationView').then(m => ({ default: m.AmortizationView })));
-const AuthPage = React.lazy(() => import('./components/AuthPage').then(m => ({ default: m.AuthPage })));
-const AuthModal = React.lazy(() => import('./components/AuthModal'));
-const AdminView = React.lazy(() => import('./components/AdminView').then(m => ({ default: m.AdminView })));
+function lazyWithRetry(componentImport) {
+  return React.lazy(async () => {
+    try {
+      return await componentImport();
+    } catch (error) {
+      const isChunkError =
+        error?.message?.includes('Failed to fetch dynamically imported module') ||
+        error?.message?.includes('Loading chunk') ||
+        error?.name === 'ChunkLoadError';
+      const lastRetry = typeof window !== 'undefined' ? Number(sessionStorage.getItem('last_chunk_reload') || 0) : 0;
+      const now = Date.now();
+      if (isChunkError && (now - lastRetry > 10000)) {
+        sessionStorage.setItem('last_chunk_reload', String(now));
+        window.location.reload();
+        return new Promise(() => {});
+      }
+      throw error;
+    }
+  });
+}
+
+const SettingsModal = lazyWithRetry(() => import('./components/SettingsModal').then(m => ({ default: m.SettingsModal })));
+const SettingsView = lazyWithRetry(() => import('./components/SettingsView').then(m => ({ default: m.SettingsView })));
+const DashboardView = lazyWithRetry(() => import('./components/DashboardView').then(m => ({ default: m.DashboardView })));
+const MainBudgetView = lazyWithRetry(() => import('./components/MainBudgetView').then(m => ({ default: m.MainBudgetView })));
+const LedgerView = lazyWithRetry(() => import('./components/LedgerView').then(m => ({ default: m.LedgerView })));
+const AmortizationView = lazyWithRetry(() => import('./components/AmortizationView').then(m => ({ default: m.AmortizationView })));
+const AuthPage = lazyWithRetry(() => import('./components/AuthPage').then(m => ({ default: m.AuthPage })));
+const AuthModal = lazyWithRetry(() => import('./components/AuthModal'));
+const AdminView = lazyWithRetry(() => import('./components/AdminView').then(m => ({ default: m.AdminView })));
 
 class ErrorBoundary extends React.Component {
   constructor(props) {

@@ -196,7 +196,7 @@ export function getColumnRecentTransactions({
       let isMatch = false;
       if (type === 'bill') {
         if (t.billId === colId) {
-          isMatch = true;
+          isMatch = !(mKey && day && !(getMatrixCell(ymdAccId, mKey, day, 'bill', colId)?.val > 0) && hasOtherMatrixCell(ymdAccId, mKey, day, 'bill', colId));
         } else if (!t.billId && !t.personId) {
           if (mKey && day) {
             const myCell = getMatrixCell(ymdAccId, mKey, day, 'bill', colId);
@@ -221,7 +221,7 @@ export function getColumnRecentTransactions({
         }
       } else if (type === 'person') {
         if (t.personId === colId) {
-          isMatch = true;
+          isMatch = !(mKey && day && !(getMatrixCell(ymdAccId, mKey, day, 'credit', colId)?.val > 0) && hasOtherMatrixCell(ymdAccId, mKey, day, 'credit', colId));
         } else if (!t.billId && !t.personId) {
           if (mKey && day) {
             const myCell = getMatrixCell(ymdAccId, mKey, day, 'credit', colId);

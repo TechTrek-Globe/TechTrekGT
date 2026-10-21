@@ -105,6 +105,9 @@ All persistence and calculation state invariants are verified via an automated t
 - **Client Partitioning & Session Purge (FIN-AUDIT-004):**
   - Storage partitions are strictly keyed by `userId`: `current_budget:${userId}` for IndexedDB records, `cf_pending_sync:${userId}` for offline mutation queues, and `tt_budget_cloud_version:${userId}` for version markers.
   - The `techtrek:user-logout` global window event triggers synchronous state purges in `BudgetMetadataContext` and `LedgerDataContext`, unmounting private financial models and clearing storage markers.
+  - Async import lifecycle cleanup safety in `SpreadsheetImporter.jsx`: `processFile` guarantees `setIsDragging(false)` and resets `setStage(STAGE.IDLE)` within a structured `finally` block on parsing interruption or error.
+  - Clean ESM import hoisting: Top-level static import hoisting in `App.jsx` and `indexedDB.js` eliminates mid-file static import statements (BUG-009).
+  - Dynamic chunk preload and CSP nonce propagation (FIX-CHUNK-CSP): Cloudflare Worker `HTMLRewriter` injects runtime cryptographic nonces into `<meta property="csp-nonce">` in `index.html`, allowing Vite's `__vitePreload` helper to attach nonces to dynamic module preload links under CSP `'strict-dynamic'`. `lazyWithRetry` in `App.jsx` and `vite:preloadError` in `main.jsx` prevent chunk drift crashes on deployment transitions.
 - **Continuous Validation Suite:**
   - `npm run test:unit`: Executes 10 test suites covering financial math, hostile payload sanitization, CAS concurrency, 10-snapshot retention, auth invalidation, and D1 parameterization via Vitest.
   - `npm run test`: Executes 520 regression tests via Node 24 test runner.

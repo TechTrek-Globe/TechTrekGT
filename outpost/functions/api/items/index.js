@@ -42,9 +42,13 @@ export async function onRequestGet(context) {
     const countSql = 'SELECT COUNT(*) AS total FROM auction_items i WHERE ' + whereClause;
     const countRow = await env.DB.prepare(countSql).bind(...bindings).first();
 
-    const rowsSql = 'SELECT i.*, inv.invoice_ref, inv.discount AS inv_discount, inv.shipping AS inv_shipping, inv.tax AS inv_tax '
+    const rowsSql = 'SELECT i.*, inv.invoice_ref, inv.discount AS inv_discount, inv.shipping AS inv_shipping, inv.tax AS inv_tax, '
+      + 's.id AS sale_id, s.buyer_handle, s.gross_sale_price, s.buyer_shipping_paid, s.actual_shipping_cost, s.platform_fees_amt, s.promoted_listing_fee, s.net_proceeds, s.net_profit, s.ebay_order_id, s.fee_reconciled_at, '
+      + 'r.final_value_fee AS recon_final_value_fee, r.promoted_listing_fee AS recon_promoted_listing_fee, r.shipping_label_cost AS recon_shipping_label_cost '
       + 'FROM auction_items i '
       + 'LEFT JOIN auction_invoices inv ON inv.id = i.invoice_id '
+      + 'LEFT JOIN auction_sales s ON i.id = s.item_id AND s.user_id = i.user_id '
+      + 'LEFT JOIN ebay_fee_reconciliations r ON s.id = r.sale_id AND r.user_id = i.user_id '
       + 'WHERE ' + whereClause + ' '
       + 'ORDER BY i.created_at DESC '
       + 'LIMIT ? OFFSET ?';

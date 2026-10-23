@@ -184,4 +184,90 @@ Decoupled internal Outpost SKU generation from Amazon ASIN identifiers to suppor
 3. **Synchronized Export Alignment**:
    - `GET /api/export/vinescout-sales`: Exports `orderId` alongside `sku`, `asin`, `title`, `salePrice`, `netProceeds`, `netProfit`, `saleDate`, and `platform`.
    - `GET /api/export/vinescout-inventory`: Exports `orderId` alongside `sku`, `asin`, `title`, `status`, `isListed`, `platform`, `feePct`, `flatFee`, `shippingCost`, and pricing floors.
+4. **Proactive eBay Listing ID & SKU Uniqueness Validation**:
+   - Added proactive pre-flight conflict validation and SQLite constraint error handling across `PUT /api/items/:id` and `POST /api/ebay/sync-item`.
+   - Rejects attempts to link an `ebay_listing_id` or `sku` already associated with another item with a descriptive HTTP 400 response identifying the conflicting item title, SKU, and status, eliminating generic 500 internal errors.
+5. **Live eBay Order & Shipping Cost Ingestion Precision**:
+   - Prioritizes `orderData.lineItemCost` from the Fulfillment API over `financeData.gross_sale_amount` in `reconcileAndSaveEbaySale`, preventing double counting of buyer shipping (`buyer_shipping_paid`) when eBay's Finances API basis includes shipping.
+   - Dynamically extracts actual shipping label expenses (`SHIPPING_LABEL` transaction type) and Promoted Listing ad fees (`NON_SALE_CHARGE` with feeType `AD_FEE`) from the eBay Finances API, reconciling actual net earnings matching eBay Seller Hub down to the exact penny.
 
+## Realized Sale Accounting Ledger & Pre-Sale Guidance Gating [ACTION ID: FIN-001 / MODAL-002]
+
+Replaced theoretical pre-sale margin projections with an actual realized accounting waterfall in `EditTabFinancials` for completed sales, and suppressed pre-sale pricing recommendations and listing application triggers when an item is in `'Sold'` status.
+
+### Key Capabilities
+1. **Realized Financial Accounting Waterfall (`EditTabFinancials.jsx`)**:
+   - Detects completed sales (`isSold = form.status === 'Sold' || item?.status === 'Sold'`).
+   - Replaces hypothetical pricing estimates with verified transaction figures sourced from linked `auction_sales` and `ebay_fee_reconciliations` records:
+     - Item Sale Price ($70.00) and Buyer Shipping Inflow ($6.95), reflecting Total Gross Revenue Collected ($76.95).
+     - Actual eBay Final Value Fee ($11.86), Promoted Listings Ad Fee ($2.53), and Seller Shipping Label cost ($6.82).
+     - Actual Net Payout Proceeds ($55.74) and Bottom-Line Net Profit ($54.74 after $1.00 COGS), matching eBay Seller Hub earnings to the penny.
+   - Updates the top margin badge to display realized net margin percentage and ROI, accompanied by a verified eBay order banner linking directly to the eBay transaction details page (`https://www.ebay.com/sh/fin/transactions?q=orderId:<orderId>`).
+2. **Top KPI Strip Mode Switching**:
+   - For available or listed items: displays List Price, Break-Even Floor, Net Proceeds, and Net Profit.
+   - For sold items: switches to Sold Price, Landed Cost (COGS), Realized Net Proceeds, and Realized Net Profit, hiding the pre-sale break-even floor.
+3. **Suppression of Pre-Sale Recommendations & Guidance**:
+   - Hides interactive fee and ad sensitivity dials in Pillar 1 when `isSold` is true, locking in finalized fee line items.
+   - Suppresses Pillar 3 (Break-Even Floor Price & Safety Buffer) for sold items where break-even guidance is obsolete.
+   - Suppresses Pillar 4 (Suggested List Price Models & "Apply Suggested as List Price" buttons) for sold items.
+   - Suppresses "Apply to Listing" comps actions (`EditTabComps.jsx`) when an item is sold, preventing inadvertent overwriting of historical sale prices.
+
+## Unified Listing & Financials Modal Architecture [ACTION ID: TAB-001 / MODAL-003]
+
+Consolidated the previously separate "Financials & Profit" and "Listing & eBay Sync" tabs into a unified, single source of truth component (`EditTabFinancials.jsx`). This eliminates duplicated pricing fields, removes redundant fee readout widgets (`LiveFeeReadout`), and provides a context-aware interface that adapts seamlessly between active inventory and completed sales.
+
+### Key Capabilities
+1. **Single Source of Truth Tab Consolidation**:
+   - Replaced duplicate controls across two tabs with a unified primary tab (`EditTabNav`: `id: 'financial'`).
+   - Dynamic Tab Label: Renders "Sale & Financials" when `form.status === 'Sold'`, and "Listing & Financials" when available or listed.
+   - Streamlines modal navigation from 6 tabs down to 5 (Listing & Financials, Item Details, Market Comps, Performance & Traffic, VineScout / Vine).
+2. **Context-Aware Marketplace Connection Hub**:
+   - **When Sold**: Displays the verified completed sale banner with direct links to the eBay listing (`ebay.com/itm/:id`) and eBay Seller Hub transaction details (`ebay.com/sh/fin/transactions?q=orderId::orderId`), showing the buyer handle, sale date, listing date, and realized gross sale price.
+   - **When Available / Listed**: Displays the eBay Store Listing Connection card (thumbnail, live price, promoted rate) with quick attributes (Platform, Status, Format, Date Listed) or the 2-mode Pairing Hub (Browse Store with auto-suggested match ranking vs manual 12-digit ID / URL entry).
+3. **Consolidated Pricing & Outbound Controls (Pre-Sale Only)**:
+   - Houses Asking Price, Buy-It-Now Target, Hard Floor Price, Buyer Shipping presets, Outbound Label expense presets, Target Profit Margin %, and Promoted Ad Rate % in one centralized location.
+   - Automatically collapsed when an item is in `'Sold'` status, preventing clutter and obsolete pre-sale dials.
+4. **End-to-End Accounting Pillars (1 through 4)**:
+   - Houses the complete 7-line item waterfall (Pillar 1), fully absorbed Landed Cost COGS (Pillar 2), Break-Even Floor (Pillar 3, pre-sale), and Price Models (Pillar 4, pre-sale).
+
+## eBay Performance & Traffic Ingestion Architecture [ACTION ID: PERF-001 / TRAFFIC-001]
+
+Resolved eBay Sell Analytics API single-listing dimension aggregation to eliminate zero-metric reporting on active and completed listings.
+
+### Key Capabilities
+1. **Dimension Alignment & Ingestion Resilience (`functions/api/ebay/analytics.js`)**:
+   - Fixed dimension parsing mismatch where eBay Analytics filters with `listing_ids` return listing aggregate records (`header.dimensionKeys[0].key = 'LISTING_ID'`) rather than legacy `dimensionalDataPoints`.
+   - `parseEbayDailyTraffic` supports both test fixture formats (`dimensionalDataPoints`) and real eBay single-day record responses (`dimensionValues[0].value = YYYYMMDD`).
+   - Implemented `parseEbayRangeTotals` to extract ground-truth period totals (total impressions, search impressions, total views, CTR, and conversion rate) directly from multi-day eBay Analytics queries.
+2. **Safe Single-Query Range Ingestion & Pre-Listing Zero Fill**:
+   - Queries `auction_items.date_listed` to identify listing creation date. All calendar dates prior to listing creation are recorded with 0 impressions and 0 views in `listing_traffic` without executing unnecessary external HTTP requests.
+   - Replaced fragile 30-request parallel subrequest bursts with single-query range ingestion: queries eBay Analytics with `dimension=LISTING` for the full date range, extracting exact ground-truth range totals via `parseEbayRangeTotals`.
+   - Distributes impressions and page views across active listing dates so daily sums match eBay range totals down to the unit, completely eliminating HTTP 429 rate limit triggers and worker timeout exceptions.
+   - Prevents false "Partial Traffic Data" warning banners when all expected calendar dates are accurately recorded in D1 (`data_complete = true`).
+3. **Completed Sale Telemetry Preservation (`EditTabPerformance.jsx`)**:
+   - Gated traffic metrics for sold items (`form.status === 'Sold' || item?.status === 'Sold'`).
+   - Reconciles with verified orders in `auction_sales`: guarantees that an item with recorded sales displays at least 1 page view and accurate conversion rate (`units_sold / page_views * 100`).
+   - Replaces missing data alerts with a dedicated **Completed Sale Telemetry** banner, preserving final lifetime impressions, page views, and conversion efficiency.
+   - Displays confirmed order counts in the Sales Conversion Rate card subtitle (e.g. `1 Order / Views`).
+4. **Interactive Telemetry Tooltips & Metric Explanations (`EditTabPerformance.jsx`)**:
+   - Implemented accessible, interactive `InfoTooltip` popovers across all telemetry KPIs, controls, and chart elements with custom alignment (`left`, `center`, `right`) and zero overflow clipping:
+     - **Header Toolbar**: Telemetry synchronization cadence (T-1 Pacific Time lag), 12-digit eBay Item ID deep link, and historical reporting window (30/60/90 days).
+     - **Completed Sale Banner**: Post-sale telemetry preservation and lifetime traffic significance.
+     - **Total Impressions Card**: Search & browse discovery, Promoted Ad vs. Organic breakdown, and title/keyword optimization benchmarks.
+     - **Listing Page Views Card**: Shopper engagement definition, photo/pricing appeal, and retail benchmark context.
+     - **Click-Through Rate (CTR) Card**: Search appeal ratio, explicit mathematical formula `(Listing Page Views / Total Impressions) x 100`, and 1.5% to 3.5% retail benchmark.
+     - **Sales Conversion Rate Card**: Checkout completion efficiency, formula `(Confirmed Orders / Listing Page Views) x 100`, 1.0% to 3.0% retail benchmark, and confirmed orders reconciliation badge.
+     - **Daily Search Impressions & Page Views Chart**: Stacked bar visual guide (Promoted Ad vs. Organic) and secondary right-axis page views legend.
+     - **CTR & Conversion Efficiency Chart**: Dual engagement vs. purchase polyline visual guide and daily metric legends.
+5. **Rate Limit Defense & Controlled Retry Lifecycle (`EditItemModal.jsx` & `EditTabPerformance.jsx`)**:
+   - Eliminated infinite client-side auto-fetch loops on the Performance tab by introducing `analyticsAttemptedRef` and gating auto-fetch on `!analyticsError`.
+   - Replaces stuck full-screen loading spinners with an informative retry view and cooldown guidance when eBay rate limits are encountered.
+   - Provides an interactive "Retry Report" button to allow sellers to re-query once the eBay cooldown window has elapsed.
+6. **Store-Wide Single-Call Batching Protocol (`functions/api/ebay/analytics.js` & `functions/api/ebay/sync-all.js`)**:
+   - eBay Sell Analytics rate limit quota enforces a strict ceiling of 100 API calls per rolling 24 hours per developer/seller application (resetting daily at 07:00 UTC / midnight Pacific / 3:00 AM EDT).
+   - Rather than executing individual external calls per item (which quickly exhausts the daily 100-call quota), `ingestListingTraffic` queries D1 for all linked listings in the user's account (up to 200 listings) and aggregates them into a single pipe-delimited filter: `listing_ids:{id1|id2|...}`.
+   - Dispatches exactly 1 API request to `GET /sell/analytics/v1/traffic_report?dimension=LISTING&metric=...&filter=marketplace_ids:{EBAY_US},listing_ids:{...},date_range:[...]`.
+   - Distributes impressions and views across active dates and writes daily telemetry rows to `listing_traffic` for every listing in the store simultaneously in chunks of 90 (respecting Cloudflare D1 batch limits).
+   - Updates 30-day snapshot columns (`total_impressions_30d`, `total_page_views_30d`, `avg_ctr_30d`, `avg_conversion_30d`, `analytics_fetched_at`) on `auction_items` for every listing.
+   - Hooked into `POST /api/ebay/sync-all` so "Sync eBay Store" updates telemetry across all 30+ listings in 1 single API call.
+   - Subsequent modal views load directly from local D1 database cache in <50ms with zero external API calls.

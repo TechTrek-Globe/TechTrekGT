@@ -1615,20 +1615,24 @@ export async function reconcileAndSaveEbaySale(env, userId, item, orderData = nu
   const buyerHandle = orderData?.buyerHandle || '';
   const ebayOrderId = orderData?.orderId || financeData?.order_id || null;
 
+  const buyerShippingPaid = orderData?.deliveryCost != null
+    ? orderData.deliveryCost
+    : (item.buyer_shipping_cost || 0);
+
   let grossSalePrice = 0;
-  if (financeData?.gross_sale_amount && financeData.gross_sale_amount > 0) {
-    grossSalePrice = financeData.gross_sale_amount;
-  } else if (orderData?.lineItemCost && orderData.lineItemCost > 0) {
+  if (orderData?.lineItemCost && orderData.lineItemCost > 0) {
     grossSalePrice = orderData.lineItemCost;
+  } else if (financeData?.gross_sale_amount && financeData.gross_sale_amount > 0) {
+    if (buyerShippingPaid > 0 && financeData.gross_sale_amount > buyerShippingPaid) {
+      grossSalePrice = parseFloat((financeData.gross_sale_amount - buyerShippingPaid).toFixed(2));
+    } else {
+      grossSalePrice = financeData.gross_sale_amount;
+    }
   } else if (item.current_list_price && item.current_list_price > 0) {
     grossSalePrice = item.current_list_price;
   } else if (item.actual_sell_price && item.actual_sell_price > 0) {
     grossSalePrice = item.actual_sell_price;
   }
-
-  const buyerShippingPaid = orderData?.deliveryCost != null
-    ? orderData.deliveryCost
-    : (item.buyer_shipping_cost || 0);
 
   let finalValueFee = 0;
   let promotedListingFee = 0;

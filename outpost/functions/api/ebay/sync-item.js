@@ -56,6 +56,17 @@ export async function onRequestPost(context) {
     if (!item) return err('Item not found', 404);
 
     let targetListingId = body.ebay_listing_id || item.ebay_listing_id;
+    if (targetListingId && targetListingId !== item.ebay_listing_id) {
+      const existingListing = await env.DB.prepare(
+        'SELECT id, sku, item_name, status FROM auction_items WHERE ebay_listing_id = ? AND id != ? LIMIT 1'
+      ).bind(targetListingId, itemId).first();
+      if (existingListing) {
+        return err(
+          `eBay listing #${targetListingId} is already linked to item "${existingListing.item_name}" (${existingListing.sku || existingListing.id}, status: ${existingListing.status}). Please unlink it first.`,
+          400
+        );
+      }
+    }
     
     let accessToken;
     try {
@@ -219,57 +230,65 @@ export async function onRequestPost(context) {
       ).bind(itemId, payload.userId).run().catch(() => {});
     }
 
-    await env.DB.prepare(`
-      UPDATE auction_items SET
-        ebay_listing_id = COALESCE(?, ebay_listing_id),
-        current_list_price = COALESCE(?, current_list_price),
-        date_listed = ?,
-        status = ?,
-        actual_sell_price = ?,
-        date_sold = ?,
-        days_on_market = ?,
-        platform = 'eBay',
-        platform_fee_pct = ?,
-        platform_flat_fee = ?,
-        ebay_promoted_rate = ?,
-        boost_pct = ?,
-        est_shipping_cost = ?,
-        buyer_shipping_cost = ?,
-        athlete_person = COALESCE(?, athlete_person),
-        cert_number = COALESCE(?, cert_number),
-        authenticator = COALESCE(?, authenticator),
-        sport_genre = COALESCE(?, sport_genre),
-        category = COALESCE(?, category),
-        min_sell_price = ?,
-        suggested_list_price = ?,
-        attributes = ?,
-        updated_at = datetime('now')
-      WHERE id = ? AND user_id = ?
-    `).bind(
-      targetListingId || null,
-      newPrice || null,
-      newDateListed,
-      newStatus,
-      nextActualSellPrice,
-      nextDateSold,
-      nextDaysOnMarket,
-      platformFeePct,
-      platformFlatFee,
-      promotedRate,
-      boostPct,
-      estShippingCost,
-      buyerShipping,
-      athlete,
-      certNumber,
-      authenticator,
-      sportGenre,
-      category,
-      pricing.min_sell_price,
-      pricing.suggested_list_price,
-      JSON.stringify(attrs),
-      itemId,
-      payload.userId
-    ).run();
+    try {
+      await env.DB.prepare(`
+        UPDATE auction_items SET
+          ebay_listing_id = COALESCE(?, ebay_listing_id),
+          current_list_price = COALESCE(?, current_list_price),
+          date_listed = ?,
+          status = ?,
+          actual_sell_price = ?,
+          date_sold = ?,
+          days_on_market = ?,
+          platform = 'eBay',
+          platform_fee_pct = ?,
+          platform_flat_fee = ?,
+          ebay_promoted_rate = ?,
+          boost_pct = ?,
+          est_shipping_cost = ?,
+          buyer_shipping_cost = ?,
+          athlete_person = COALESCE(?, athlete_person),
+          cert_number = COALESCE(?, cert_number),
+          authenticator = COALESCE(?, authenticator),
+          sport_genre = COALESCE(?, sport_genre),
+          category = COALESCE(?, category),
+          min_sell_price = ?,
+          suggested_list_price = ?,
+          attributes = ?,
+          updated_at = datetime('now')
+        WHERE id = ? AND user_id = ?
+      `).bind(
+        targetListingId || null,
+        newPrice || null,
+        newDateListed,
+        newStatus,
+        nextActualSellPrice,
+        nextDateSold,
+        nextDaysOnMarket,
+        platformFeePct,
+        platformFlatFee,
+        promotedRate,
+        boostPct,
+        estShippingCost,
+        buyerShipping,
+        athlete,
+        certNumber,
+        authenticator,
+        sportGenre,
+        category,
+        pricing.min_sell_price,
+        pricing.suggested_list_price,
+        JSON.stringify(attrs),
+        itemId,
+        payload.userId
+      ).run();
+    } catch (syncDbErr) {
+      console.error('[sync-item] Failed to update item in D1:', syncDbErr);
+      if (syncDbErr?.message?.includes('UNIQUE constraint failed: auction_items.ebay_listing_id')) {
+        return err(`eBay listing #${targetListingId} is already linked to another item.`, 400);
+      }
+      return err('Failed to sync item with eBay: ' + (syncDbErr?.message || 'Database error'), 500);
+    }
 
     const updatedItem = await env.DB.prepare(
       'SELECT * FROM auction_items WHERE id = ? AND user_id = ?'

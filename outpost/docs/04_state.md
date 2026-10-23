@@ -104,7 +104,44 @@ Outpost uses React Context and standard React hooks (`useState`, `useReducer`, `
     - GPS Wireless Dog Fence (`B0H5VRLRMQ`): Unit 1 (`item-39df6393-65f4-4547-9ab8-03df7656eeb0`, SKU `OP-260914-Q2CV`) restored to status `'Sold'` with $160 sale linked to `inv-cb79f9c4-b568-40a4-8e46-d23c50e2df6b`. Unit 2 (`item-6f1e8a24-9b27-4a41-b844-48f86f80a9d1`, SKU `OP-260914-DF02`) created as status `'Available'` under invoice `inv-77243ab5-6079-4087-a333-7f0d057d4d62` (Order `113-2593337-5812239`) with no attached sale.
     - TUBR Gordo Carry Case (`B0H73Q5W2B` / `B0H4J81NNK`): Unit 1 (`item-8a840c62-283c-4490-afcb-64c87b87a981`, SKU `OP-260820-3Z88`) restored to status `'Sold'` with $19.99 sale linked to `inv-1bf6fefd-b715-434b-94ba-c3f555dd6fb3`. Unit 2 (`item-9c3f4e15-8a21-4d32-9cb1-e87a552bf102`, SKU `OP-260820-MW02`) created as status `'Listed'` with active eBay listing `336816297681` ($75) under invoice `inv-4b82d7a1-260928-b0h73q5w2b` (Order `112-8713304-6992213`).
   - Verified remote D1 invariant: exactly zero desynced sales remain across `auction_items` and `auction_sales`.
-
+- **eBay Listing ID Unique Index Collision Defense (`idx_items_ebay_listing`)**:
+  - D1 enforces unique non-null eBay listing IDs across `auction_items`: `CREATE UNIQUE INDEX idx_items_ebay_listing ON auction_items(ebay_listing_id) WHERE ebay_listing_id IS NOT NULL`.
+  - Cleared stale `ebay_listing_id` from historical Sold unit `item-39df6393-65f4-4547-9ab8-03df7656eeb0` to allow active Unit 2 (`item-6f1e8a24-9b27-4a41-b844-48f86f80a9d1`) to link listing `336766695532`.
+  - Normalized JSON attributes across all decoupled rows to ensure `json_valid(attributes) = 1` for index resolution.
+  - Added proactive conflict pre-checks in `PUT /api/items/:id` and `POST /api/ebay/sync-item` to catch duplicate listing IDs and SKUs before reaching SQLite, returning actionable 400 validation errors.
+- **Live eBay Sale Reconciliation State**:
+  - `reconcileAndSaveEbaySale` synchronizes actual eBay Finances and Fulfillment data into `auction_sales` and `ebay_fee_reconciliations`.
+  - Prioritizes item `lineItemCost` ($70.00) over total fee basis ($76.95), preventing buyer shipping charges from being double counted in net proceeds arithmetic.
+  - Dynamically ingests eBay shipping labels ($6.82) and ad fees ($2.53) directly from Finances API transaction types `SHIPPING_LABEL` and `NON_SALE_CHARGE`.
+- **Realized Sale & Fee Reconciliation Modal State [ACTION ID: FIN-001 / MODAL-002]**:
+  - **Enriched API & Query Joins (`functions/api/items/enriched.js` & `functions/api/items/index.js`)**:
+    - `GET /api/items/enriched` and `GET /api/items` perform a `LEFT JOIN auction_sales s ON i.id = s.item_id` and `LEFT JOIN ebay_fee_reconciliations efr ON s.id = efr.sale_id`.
+    - Exposes realized sale and fee reconciliation columns: `sale_id`, `gross_sale_price`, `buyer_shipping_paid`, `actual_shipping_cost`, `platform_fees_amt`, `promoted_listing_fee`, `net_proceeds`, `net_profit`, `buyer_handle`, `ebay_order_id`, `fee_reconciled_at`, `recon_final_value_fee`, `recon_promoted_listing_fee`, and `recon_shipping_label_cost`.
+    - Column mapping preserves database schema naming (`s.fee_reconciled_at`) to prevent SQLite schema errors.
+  - **Client-Side Modal State Hydration (`EditItemModal.jsx`)**:
+    - Maintains `saleData` and `reconData` local state hooks.
+    - When opening an item in `'Sold'` status or with an existing `sale_id`, if the parent item does not already embed sale or reconciliation objects, `EditItemModal` automatically triggers `getItem(item.id)` to fetch full enriched records.
+    - Passes normalized `sale={saleData || item.sale}` and `reconciliation={reconData || item.reconciliation}` down to `EditTabFinancials`.
+  - **Pre-Sale Action Gating (`isSold`)**:
+    - `isSold = form.status === 'Sold' || item?.status === 'Sold'` acts as an immutable UI guard across edit tabs (`EditTabFinancials`, `EditTabComps`).
+    - Gated elements include pre-sale sensitivity sliders, break-even floor calculation cards, algorithmic price suggestions, and target list price application triggers.
+- **Unified Listing & Financials Tab State [ACTION ID: TAB-001 / MODAL-003]**:
+  - `EditTabNav` maintains a 5-tab registration matrix. `listing_pricing` is consolidated into `financial`.
+  - Transparent route mapping in `EditTabNav` and `EditItemModal`: requests for `activeTab === 'listing_pricing'` (e.g. from table listing badges or external deep links) resolve to `financial`.
+  - `EditTabFinancials` receives full listing props (`allPlatforms`, `onPlatformChange`, `handleSyncWithEbay`, `syncingEbay`, `ebayListings`, `loadingEbayListings`, `ebaySearch`, `setEbaySearch`, `fetchActiveListings`, `handlePairEbayListing`), eliminating separate state containers and duplicate fee calculations.
+- **Performance & Traffic State [ACTION ID: PERF-001 / TRAFFIC-001]**:
+  - `listing_traffic` schema stores atomic daily performance points (`traffic_date`, `impressions_total`, `impressions_search`, `page_views_total`, `click_through_rate`, `sales_conversion_rate`).
+  - Active listing dates missing from D1 are ingested safely via eBay range queries (`dimension=LISTING`), populating daily points in D1 without multi-request storms.
+  - Client-side auto-fetch lifecycle in `EditItemModal` is protected by `analyticsAttemptedRef` and gated on `!analyticsError` to strictly prevent infinite request loops upon 429 or network errors.
+  - Reconciles confirmed sales from `auction_sales` into `onRequestGet`: guarantees `units_sold` is accurately represented, ensures `total_page_views` cannot fall below confirmed orders, and calculates true `sales_conversion_rate` (`(units_sold / total_page_views) * 100`).
+  - `EditTabPerformance` renders a dedicated **Completed Sale Telemetry** banner for sold items and displays real trend sparklines, daily search/organic stacked bars, and conversion efficiency.
+  - Interactive tooltip UI state uses accessible `InfoTooltip` with named `group/tip` Tailwind hover and `group-focus-within/tip` keyboard focus states, directional popover positioning (`align="left|center|right"`), and `pointer-events-none` to prevent hover traps while navigating tabular performance charts.
+  - **Single-Call Store-Wide Telemetry Batching State [ACTION ID: PERF-002 / TRAFFIC-002]**:
+    - `ingestListingTraffic` batches up to 200 listing IDs in a single eBay Analytics request (`filter=listing_ids:{id1|id2|...}`).
+    - Protects the strict eBay Sell Analytics quota of 100 calls per 24 hours (resetting daily at 07:00 UTC / midnight Pacific / 3:00 AM EDT).
+    - Writes all item metrics to `listing_traffic` using 90-statement D1 chunks and writes 30-day snapshot columns (`total_impressions_30d`, `total_page_views_30d`, `avg_ctr_30d`, `avg_conversion_30d`, `analytics_fetched_at`) to `auction_items`.
+    - `POST /api/ebay/sync-all` runs batch traffic ingestion automatically at store sync, updating all 30+ items in 1 single API call.
+    - Subsequent item modal opens serve directly from local D1 database cache in <50ms with 0 API calls.
 
 
 

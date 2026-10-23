@@ -2,8 +2,50 @@ import React from 'react';
 import {
   BarChart2, Eye, TrendingUp, DollarSign, RefreshCw, Loader2,
   AlertTriangle, CheckCircle2, ExternalLink, Zap, ShieldAlert,
-  ArrowUpRight, Info, Calendar, Sparkles
+  ArrowUpRight, Info, Calendar, Sparkles, HelpCircle
 } from 'lucide-react';
+
+/**
+ * Interactive Explanatory Tooltip Component
+ */
+function InfoTooltip({ title, children, formula, benchmark, position = 'top', align = 'center' }) {
+  const alignClasses = {
+    center: 'left-1/2 -translate-x-1/2',
+    left: 'left-0',
+    right: 'right-0'
+  }[align] || 'left-1/2 -translate-x-1/2';
+
+  const positionClasses = position === 'bottom'
+    ? 'top-full mt-2'
+    : 'bottom-full mb-2';
+
+  return (
+    <span className="relative inline-flex items-center group/tip cursor-help select-none" tabIndex={0} role="tooltip">
+      <HelpCircle className="w-3.5 h-3.5 text-slate-500 hover:text-amber-400 focus:text-amber-400 transition-colors ml-1 flex-shrink-0" />
+      <span className={`absolute ${positionClasses} ${alignClasses} hidden group-hover/tip:flex group-focus-within/tip:flex flex-col w-64 sm:w-72 p-3 bg-slate-950/95 border border-slate-700/80 rounded-xl shadow-2xl backdrop-blur-md z-50 pointer-events-none text-left transition-opacity duration-150`}>
+        {title && (
+          <span className="text-[11px] font-bold text-amber-300 pb-1 mb-1 border-b border-slate-800 flex items-center gap-1.5">
+            <Info className="w-3 h-3 text-amber-400 flex-shrink-0" />
+            <span>{title}</span>
+          </span>
+        )}
+        <span className="text-[11px] leading-relaxed text-slate-300 font-normal whitespace-normal">
+          {children}
+        </span>
+        {formula && (
+          <span className="mt-2 pt-1.5 border-t border-slate-800/80 text-[10px] font-mono text-cyan-300 bg-slate-900/60 px-2 py-1 rounded">
+            <strong>Formula:</strong> {formula}
+          </span>
+        )}
+        {benchmark && (
+          <span className="mt-1.5 text-[10px] text-slate-400 leading-normal">
+            <span className="text-emerald-400 font-semibold">Benchmark:</span> {benchmark}
+          </span>
+        )}
+      </span>
+    </span>
+  );
+}
 
 /**
  * Pure SVG Sparkline Component
@@ -412,38 +454,61 @@ export function EditTabPerformance({
       {/* 1. Header Toolbar & Range Filter */}
       <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <BarChart2 className="w-4 h-4 text-amber-400" />
             <span className="text-xs font-bold text-white uppercase tracking-wider">
               eBay Listing Traffic & Conversion
             </span>
+            <InfoTooltip
+              title="eBay Telemetry Synchronization"
+              position="bottom"
+              align="left"
+            >
+              Official seller performance data ingested from eBay's Sell Analytics REST API. Reports search visibility, buyer page visits, and conversion rates with a 1-day reporting lag (T-1) in Pacific Time.
+            </InfoTooltip>
           </div>
 
-          <span className="text-[11px] font-mono text-emerald-400 font-semibold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-            Listing #{form.ebay_listing_id}
+          <span className="inline-flex items-center gap-1 text-[11px] font-mono text-emerald-400 font-semibold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+            <span>Listing #{form.ebay_listing_id}</span>
+            <InfoTooltip
+              title="eBay Listing ID"
+              position="bottom"
+              align="center"
+            >
+              The 12-digit eBay store item number. Telemetry queries filter directly by this ID to isolate metrics for this exact inventory unit.
+            </InfoTooltip>
           </span>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
           {/* Time Range Selector */}
-          <div className="flex items-center bg-slate-950 p-1 rounded-lg border border-slate-800 text-xs">
-            {[30, 60, 90].map(r => (
-              <button
-                key={r}
-                type="button"
-                onClick={() => {
-                  setAnalyticsRange(r);
-                  onFetchAnalytics(r, false);
-                }}
-                className={`px-2.5 py-1 rounded font-bold transition-all ${
-                  analyticsRange === r
-                    ? 'bg-amber-500 text-slate-950 shadow-sm'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                {r} Days
-              </button>
-            ))}
+          <div className="flex items-center gap-1.5">
+            <div className="flex items-center bg-slate-950 p-1 rounded-lg border border-slate-800 text-xs">
+              {[30, 60, 90].map(r => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => {
+                    setAnalyticsRange(r);
+                    onFetchAnalytics(r, false);
+                  }}
+                  className={`px-2.5 py-1 rounded font-bold transition-all ${
+                    analyticsRange === r
+                      ? 'bg-amber-500 text-slate-950 shadow-sm'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {r} Days
+                </button>
+              ))}
+            </div>
+            <InfoTooltip
+              title="Reporting Window"
+              position="bottom"
+              align="right"
+            >
+              Aggregates metrics over rolling 30, 60, or 90 calendar days ending yesterday (T-1). Dates before listing creation are recorded as 0 activity.
+            </InfoTooltip>
           </div>
 
           {/* Force Refresh Button */}
@@ -479,8 +544,46 @@ export function EditTabPerformance({
         </div>
       )}
 
-      {/* Partial / Missing Traffic Data Banner */}
-      {analytics && analytics.data_complete === false && (analytics.missing_dates || []).length > 0 && (
+      {/* 2b. Completed Sale Telemetry Banner */}
+      {(form.status === 'Sold' || item?.status === 'Sold') && analytics && (
+        <div className="p-3.5 rounded-xl bg-emerald-950/30 border border-emerald-500/30 flex items-center justify-between flex-wrap gap-2 text-xs">
+          <div className="flex items-center gap-2 text-emerald-300">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+            <span className="font-bold flex items-center gap-1">
+              <span>Completed Sale Telemetry</span>
+              <InfoTooltip
+                title="Completed Listing Telemetry"
+                position="bottom"
+                align="left"
+              >
+                Because this inventory piece has been sold, metrics represent the final lifetime search impressions, visitor views, and conversion efficiency from when it was active on eBay. Historical telemetry is preserved for post-sale performance review.
+              </InfoTooltip>
+            </span>
+            <span className="text-slate-300 font-normal">
+              Final lifetime listing traffic preserved ({analytics.total_impressions || 0} impressions, {analytics.total_page_views || 0} views, {analytics.units_sold || 1} confirmed order).
+            </span>
+          </div>
+          <span className="text-[11px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+            {((analytics.sales_conversion_rate || 0)).toFixed(2)}% Conversion
+          </span>
+        </div>
+      )}
+
+      {/* 2c. eBay Daily Quota Notice Banner */}
+      {analytics && analytics.quota_limited && (
+        <div className="p-3.5 rounded-xl bg-amber-950/40 border border-amber-500/40 flex items-start gap-3">
+          <Info className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+          <div className="text-xs space-y-1">
+            <span className="font-bold text-amber-300">eBay Daily Analytics Quota Reached (100 Calls / Day)</span>
+            <p className="text-slate-300">
+              {analytics.quota_warning || 'eBay Sell Analytics API limits queries to 100 calls per 24 hours. The quota resets at midnight Pacific Time (07:00 UTC / 3:00 AM EDT). Baseline telemetry is active until the quota resets.'}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Partial / Missing Traffic Data Banner (Active listings only, not shown if quota notice active) */}
+      {!(form.status === 'Sold' || item?.status === 'Sold') && analytics && !analytics.quota_limited && analytics.data_complete === false && (analytics.missing_dates || []).length > 0 && (
         <div className="p-3.5 rounded-xl bg-amber-950/30 border border-amber-500/30 flex items-start gap-2.5">
           <Info className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
           <div className="text-xs space-y-1">
@@ -494,10 +597,21 @@ export function EditTabPerformance({
 
       {/* 3. Error Banner */}
       {analyticsError && !needsReauth && (
-        <div className="p-4 rounded-xl bg-red-950/40 border border-red-500/30 space-y-2">
-          <div className="flex items-center gap-2 text-xs text-red-300">
-            <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0" />
-            <span className="font-semibold">{analyticsError}</span>
+        <div className="p-4 rounded-xl bg-red-950/40 border border-red-500/30 space-y-3">
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2 text-xs text-red-300">
+              <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0" />
+              <span className="font-semibold">{analyticsError}</span>
+            </div>
+            <button
+              type="button"
+              disabled={loadingAnalytics}
+              onClick={() => onFetchAnalytics(analyticsRange, true)}
+              className="px-2.5 py-1 rounded bg-red-900/60 hover:bg-red-800/80 border border-red-500/40 text-xs text-red-200 font-bold flex items-center gap-1.5 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className="w-3 h-3" />
+              <span>Retry</span>
+            </button>
           </div>
           {(analyticsError.toLowerCase().includes('unauthorized') || analyticsError.toLowerCase().includes('token')) && (
             <div className="text-xs text-slate-300 pt-1 space-y-1.5 border-t border-red-500/20">
@@ -521,6 +635,31 @@ export function EditTabPerformance({
         </div>
       )}
 
+      {/* 4b. Empty / Error Retry State */}
+      {!analytics && !loadingAnalytics && analyticsError && (
+        <div className="p-8 rounded-2xl bg-slate-900/60 border border-slate-800 text-center space-y-4">
+          <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 mx-auto flex items-center justify-center">
+            <AlertTriangle className="w-6 h-6" />
+          </div>
+          <div className="space-y-1.5">
+            <h4 className="text-sm font-bold text-white">Traffic Telemetry Temporarily Paused</h4>
+            <p className="text-xs text-slate-400 max-w-md mx-auto">
+              {analyticsError.includes('rate limit')
+                ? 'eBay restricts traffic report queries to protect API stability. Please allow 1 to 2 minutes for the cooldown window before retrying.'
+                : 'Unable to retrieve traffic telemetry for this listing at this time. Click retry to query eBay again.'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => onFetchAnalytics(analyticsRange, true)}
+            className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs inline-flex items-center gap-2 shadow-lg transition-all"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>Retry Report</span>
+          </button>
+        </div>
+      )}
+
       {/* 5. Analytics KPI Cards Grid */}
       {analytics && (
         <>
@@ -528,8 +667,28 @@ export function EditTabPerformance({
             {/* Total Impressions Card */}
             <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2">
               <div className="flex items-center justify-between text-xs text-slate-400">
-                <span className="font-semibold uppercase tracking-wider text-[10px]">Total Impressions</span>
-                <span className="text-amber-400 font-mono text-[10px]">Search & Ads</span>
+                <span className="font-semibold uppercase tracking-wider text-[10px] flex items-center gap-0.5">
+                  <span>Total Impressions</span>
+                  <InfoTooltip
+                    title="Total Search & Browse Impressions"
+                    position="top"
+                    align="left"
+                    benchmark="Higher impressions mean greater search discovery. Optimize keywords, item specifics, and titles to boost search ranking."
+                  >
+                    The total number of times your listing appeared to shoppers across eBay search results, category browse pages, and related item recommendation carousels.
+                  </InfoTooltip>
+                </span>
+                <span className="text-amber-400 font-mono text-[10px] flex items-center gap-0.5">
+                  <span>Search &amp; Ads</span>
+                  <InfoTooltip
+                    title="Promoted vs. Organic Impressions"
+                    position="top"
+                    align="left"
+                  >
+                    • Ad (Promoted): Impressions driven by eBay Promoted Listings Standard ad placements.
+                    • Org (Organic): Natural impressions driven by keyword relevance, item specifics, and eBay Best Match ranking without ad fees.
+                  </InfoTooltip>
+                </span>
               </div>
               <div className="flex items-baseline justify-between">
                 <span className="text-xl font-black text-white font-mono">
@@ -551,15 +710,33 @@ export function EditTabPerformance({
             {/* Total Page Views Card */}
             <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2">
               <div className="flex items-center justify-between text-xs text-slate-400">
-                <span className="font-semibold uppercase tracking-wider text-[10px]">Listing Page Views</span>
+                <span className="font-semibold uppercase tracking-wider text-[10px] flex items-center gap-0.5">
+                  <span>Listing Page Views</span>
+                  <InfoTooltip
+                    title="Shopper Listing Visits"
+                    position="top"
+                    align="center"
+                    formula="Total buyer visits / page clicks"
+                    benchmark="High page views relative to impressions indicate that your primary photo, title clarity, and search price are compelling."
+                  >
+                    The number of times shoppers clicked into your listing from search results or direct links to inspect full photos, read descriptions, verify shipping, or check specifications.
+                  </InfoTooltip>
+                </span>
                 <Eye className="w-3.5 h-3.5 text-sky-400" />
               </div>
               <div className="flex items-baseline justify-between">
                 <span className="text-xl font-black text-sky-400 font-mono">
                   {(analytics.total_page_views || 0).toLocaleString()}
                 </span>
-                <span className="text-[10px] text-slate-500">
-                  {analytics.range_days || 30}d Total
+                <span className="text-[10px] text-slate-500 flex items-center gap-0.5">
+                  <span>{analytics.range_days || 30}d Total</span>
+                  <InfoTooltip
+                    title="Period Aggregate Views"
+                    position="top"
+                    align="center"
+                  >
+                    Cumulative buyer page visits recorded during the selected {analytics.range_days || 30}-day date window.
+                  </InfoTooltip>
                 </span>
               </div>
               <MiniSparkline data={analytics.page_views} color="#38bdf8" />
@@ -568,15 +745,26 @@ export function EditTabPerformance({
             {/* Click-Through Rate (CTR) Card */}
             <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2">
               <div className="flex items-center justify-between text-xs text-slate-400">
-                <span className="font-semibold uppercase tracking-wider text-[10px]">Click-Through Rate</span>
+                <span className="font-semibold uppercase tracking-wider text-[10px] flex items-center gap-0.5">
+                  <span>Click-Through Rate</span>
+                  <InfoTooltip
+                    title="Click-Through Rate (CTR)"
+                    position="top"
+                    align="center"
+                    formula="(Listing Page Views / Total Impressions) x 100"
+                    benchmark="1.5% to 3.5% is typical on eBay. Rates above 4.0% indicate exceptional primary photo appeal and competitive pricing."
+                  >
+                    The percentage of search impressions that prompted a shopper to click and open your listing page. Measures how effectively your primary photo, title, and asking price stand out against competitors in search.
+                  </InfoTooltip>
+                </span>
                 <TrendingUp className="w-3.5 h-3.5 text-purple-400" />
               </div>
               <div className="flex items-baseline justify-between">
                 <span className="text-xl font-black text-purple-300 font-mono">
                   {(analytics.click_through_rate || 0).toFixed(2)}%
                 </span>
-                <span className="text-[10px] text-slate-500">
-                  Views / Impressions
+                <span className="text-[10px] text-slate-500 flex items-center gap-0.5">
+                  <span>Views / Impressions</span>
                 </span>
               </div>
               <MiniSparkline data={(analytics.ctr_series || []).map(v => v * 100)} color="#a855f7" />
@@ -585,15 +773,33 @@ export function EditTabPerformance({
             {/* Sales Conversion Rate Card */}
             <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2">
               <div className="flex items-center justify-between text-xs text-slate-400">
-                <span className="font-semibold uppercase tracking-wider text-[10px]">Sales Conversion Rate</span>
+                <span className="font-semibold uppercase tracking-wider text-[10px] flex items-center gap-0.5">
+                  <span>Sales Conversion Rate</span>
+                  <InfoTooltip
+                    title="Sales Conversion Rate"
+                    position="top"
+                    align="right"
+                    formula="(Confirmed Orders / Listing Page Views) x 100"
+                    benchmark="1.0% to 3.0% is average on eBay. For 1-of-1 items, a completed sale equals 100% / Total Page Views."
+                  >
+                    The percentage of shoppers who viewed this item and completed checkout. Measures the persuasiveness of your description, photo gallery, item condition, shipping options, and return policy.
+                  </InfoTooltip>
+                </span>
                 <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
               </div>
               <div className="flex items-baseline justify-between">
                 <span className="text-xl font-black text-emerald-400 font-mono">
                   {(analytics.sales_conversion_rate || 0).toFixed(2)}%
                 </span>
-                <span className="text-[10px] text-slate-500">
-                  Orders / Views
+                <span className="text-[10px] text-slate-500 flex items-center gap-0.5">
+                  <span>{analytics.units_sold ? `${analytics.units_sold} Order${analytics.units_sold === 1 ? '' : 's'} / Views` : 'Orders / Views'}</span>
+                  <InfoTooltip
+                    title="Confirmed Orders Basis"
+                    position="top"
+                    align="right"
+                  >
+                    Reconciled from confirmed eBay sales. Ensures that completed transactions are accurately reflected in conversion efficiency calculations.
+                  </InfoTooltip>
                 </span>
               </div>
               <MiniSparkline data={(analytics.conversion_series || []).map(v => v * 100)} color="#10b981" />
@@ -606,6 +812,13 @@ export function EditTabPerformance({
               <div className="space-y-0.5">
                 <h5 className="text-xs font-bold text-white flex items-center gap-2">
                   <span>Daily Search Impressions &amp; Page Views</span>
+                  <InfoTooltip
+                    title="Search Discovery vs. Shopper Visits"
+                    position="bottom"
+                    align="left"
+                  >
+                    Visualizes daily buyer discovery versus page visits. Stacked bars illustrate Promoted ad impressions (amber) versus Organic search impressions (slate), while the sky blue polyline tracks shopper page views on the right vertical axis.
+                  </InfoTooltip>
                   <span className="text-[10px] text-slate-500 font-normal">({analytics.period_start} to {analytics.period_end})</span>
                 </h5>
               </div>
@@ -615,14 +828,23 @@ export function EditTabPerformance({
                 <div className="flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 rounded-sm bg-amber-500" />
                   <span className="text-slate-300">Promoted Ad</span>
+                  <InfoTooltip title="Promoted Ad Impressions" position="bottom" align="center">
+                    Daily impressions driven by eBay Promoted Listings Standard ad campaigns.
+                  </InfoTooltip>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 rounded-sm bg-slate-600" />
                   <span className="text-slate-300">Organic</span>
+                  <InfoTooltip title="Organic Search Impressions" position="bottom" align="center">
+                    Natural search and browse impressions from eBay Best Match ranking without ad fees.
+                  </InfoTooltip>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="w-2.5 h-0.5 bg-sky-400" />
                   <span className="text-sky-400">Page Views (Right Axis)</span>
+                  <InfoTooltip title="Daily Page Views" position="bottom" align="right">
+                    Shopper visits to this listing page, measured on the right vertical axis.
+                  </InfoTooltip>
                 </div>
               </div>
             </div>
@@ -640,16 +862,30 @@ export function EditTabPerformance({
             <div className="flex items-center justify-between flex-wrap gap-2">
               <h5 className="text-xs font-bold text-white flex items-center gap-2">
                 <span>Click-Through Rate (CTR) &amp; Buyer Conversion Efficiency</span>
+                <InfoTooltip
+                  title="Engagement & Purchase Efficiency"
+                  position="bottom"
+                  align="left"
+                  benchmark="Spikes in conversion rate pinpoint the exact calendar dates when buyer orders were completed."
+                >
+                  Compares search click-through interest (purple) against checkout conversion (emerald) over time.
+                </InfoTooltip>
               </h5>
 
               <div className="flex items-center gap-4 text-[11px] font-semibold">
                 <div className="flex items-center gap-1.5">
                   <span className="w-2.5 h-0.5 bg-purple-400" />
                   <span className="text-purple-400">CTR (%)</span>
+                  <InfoTooltip title="Daily CTR (%)" position="bottom" align="center">
+                    Daily percentage of search impressions that converted into page visits (purple line).
+                  </InfoTooltip>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="w-2.5 h-0.5 bg-emerald-400" />
                   <span className="text-emerald-400">Conversion Rate (%)</span>
+                  <InfoTooltip title="Daily Conversion Rate (%)" position="bottom" align="right">
+                    Daily percentage of page visitors who completed a purchase (emerald line).
+                  </InfoTooltip>
                 </div>
               </div>
             </div>

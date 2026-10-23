@@ -364,7 +364,7 @@ export function InventoryHubView({ onNavigate }) {
             onOpenQuickEdit={(it) => { setEditModalTab('financial'); setEditModalItem(it); }}
             onOpenCopyModal={setCopyModalItem}
             onOpenSaleModal={handleMarkSold}
-            onOpenListingIdModal={(it) => { setEditModalTab('listing_pricing'); setEditModalItem(it); }}
+            onOpenListingIdModal={(it) => { setEditModalTab('financial'); setEditModalItem(it); }}
             onMarkSold={handleMarkSold}
             onOpenInvoiceModal={(ref, id) => setViewingInvoice({ invoiceRef: ref, invoiceId: id })}
             onUpdateItemSync={handleUpdateItemSync}
@@ -383,7 +383,7 @@ export function InventoryHubView({ onNavigate }) {
             onItemUpdated={updateItemLocal}
             onOpenQuickEdit={(it) => { setEditModalTab('financial'); setEditModalItem(it); }}
             onOpenEditModal={(it) => { setEditModalTab('financial'); setEditModalItem(it); }}
-            onOpenListingIdModal={(it) => { setEditModalTab('listing_pricing'); setEditModalItem(it); }}
+            onOpenListingIdModal={(it) => { setEditModalTab('financial'); setEditModalItem(it); }}
           />
         )}
       </div>

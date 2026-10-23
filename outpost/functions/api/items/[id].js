@@ -65,7 +65,21 @@ export async function onRequestGet(context) {
     `).bind(id, payload.userId).first();
 
     if (!item) return err('Item not found', 404);
-    return ok({ item });
+
+    let sale = null;
+    let reconciliation = null;
+    if (item.status === 'Sold') {
+      sale = await env.DB.prepare(
+        'SELECT * FROM auction_sales WHERE item_id = ? AND user_id = ?'
+      ).bind(id, payload.userId).first();
+      if (sale) {
+        reconciliation = await env.DB.prepare(
+          'SELECT * FROM ebay_fee_reconciliations WHERE sale_id = ? AND user_id = ?'
+        ).bind(sale.id, payload.userId).first();
+      }
+    }
+
+    return ok({ item, sale, reconciliation });
   });
 }
 
@@ -192,6 +206,29 @@ export async function onRequestPut(context) {
       buy_it_now_price:           body.buy_it_now_price     !== undefined ? round2Nullable(body.buy_it_now_price)     : round2Nullable(item.buy_it_now_price),
       buyer_shipping_cost:        body.buyer_shipping_cost  !== undefined ? round2Nullable(body.buyer_shipping_cost)  : round2Nullable(item.buyer_shipping_cost)
     };
+
+    // Guard against unique constraint collision on ebay_listing_id
+    if (updated.ebay_listing_id && updated.ebay_listing_id !== item.ebay_listing_id) {
+      const existingListing = await env.DB.prepare(
+        'SELECT id, sku, item_name, status FROM auction_items WHERE ebay_listing_id = ? AND id != ? LIMIT 1'
+      ).bind(updated.ebay_listing_id, id).first();
+      if (existingListing) {
+        return err(
+          `eBay listing #${updated.ebay_listing_id} is already linked to item "${existingListing.item_name}" (${existingListing.sku || existingListing.id}, status: ${existingListing.status}). Please unlink it first.`,
+          400
+        );
+      }
+    }
+
+    // Guard against unique constraint collision on sku
+    if (updated.sku && updated.sku !== item.sku) {
+      const existingSku = await env.DB.prepare(
+        'SELECT id, sku, item_name FROM auction_items WHERE sku = ? AND id != ? LIMIT 1'
+      ).bind(updated.sku, id).first();
+      if (existingSku) {
+        return err(`SKU "${updated.sku}" is already assigned to item "${existingSku.item_name}".`, 400);
+      }
+    }
 
     // If platform changed, auto-lookup fees from auction_platforms
     if (body.platform && body.platform !== item.platform && !body.platform_fee_pct) {
@@ -340,41 +377,52 @@ export async function onRequestPut(context) {
 
     const attributesJson = JSON.stringify(nextAttrs);
 
-    await env.DB.prepare(`
-      UPDATE auction_items SET
-        item_name = ?, category = ?, sport_genre = ?, athlete_person = ?,
-        authenticator = ?, cert_number = ?,
-        unit_price = ?, true_total_cost = ?,
-        status = ?, platform = ?, platform_fee_pct = ?, platform_flat_fee = ?,
-        est_shipping_cost = ?, boost_pct = ?, target_margin_pct = ?,
-        min_sell_price = ?, suggested_list_price = ?,
-        current_list_price = ?, actual_sell_price = ?,
-        date_acquired = ?, date_listed = ?, date_sold = ?, days_on_market = ?,
-        notes = ?, best_listing_window = ?,
-        ebay_listing_id = ?, cert_verification_url = ?,
-        other_platform_listing_ids = ?, ebay_promoted_rate = ?,
-        sku = ?, listing_format = ?, listing_status = ?,
-        quantity = ?, purchase_date = ?, floor_price = ?, buy_it_now_price = ?,
-        buyer_shipping_cost = ?, attributes = ?,
-        updated_at = datetime('now')
-      WHERE id = ? AND user_id = ?
-    `).bind(
-      updated.item_name, updated.category, updated.sport_genre, updated.athlete_person,
-      updated.authenticator, updated.cert_number,
-      updated.unit_price, updated.true_total_cost,
-      updated.status, updated.platform, updated.platform_fee_pct, updated.platform_flat_fee,
-      updated.est_shipping_cost, updated.boost_pct, updated.target_margin_pct,
-      pricing.min_sell_price, pricing.suggested_list_price,
-      updated.current_list_price, updated.actual_sell_price,
-      updated.date_acquired, updated.date_listed, updated.date_sold, days_on_market,
-      updated.notes, updated.best_listing_window,
-      updated.ebay_listing_id, updated.cert_verification_url,
-      updated.other_platform_listing_ids, updated.ebay_promoted_rate,
-      updated.sku, updated.listing_format, updated.listing_status,
-      updated.quantity, updated.purchase_date, updated.floor_price, updated.buy_it_now_price,
-      updated.buyer_shipping_cost, attributesJson,
-      id, payload.userId
-    ).run();
+    try {
+      await env.DB.prepare(`
+        UPDATE auction_items SET
+          item_name = ?, category = ?, sport_genre = ?, athlete_person = ?,
+          authenticator = ?, cert_number = ?,
+          unit_price = ?, true_total_cost = ?,
+          status = ?, platform = ?, platform_fee_pct = ?, platform_flat_fee = ?,
+          est_shipping_cost = ?, boost_pct = ?, target_margin_pct = ?,
+          min_sell_price = ?, suggested_list_price = ?,
+          current_list_price = ?, actual_sell_price = ?,
+          date_acquired = ?, date_listed = ?, date_sold = ?, days_on_market = ?,
+          notes = ?, best_listing_window = ?,
+          ebay_listing_id = ?, cert_verification_url = ?,
+          other_platform_listing_ids = ?, ebay_promoted_rate = ?,
+          sku = ?, listing_format = ?, listing_status = ?,
+          quantity = ?, purchase_date = ?, floor_price = ?, buy_it_now_price = ?,
+          buyer_shipping_cost = ?, attributes = ?,
+          updated_at = datetime('now')
+        WHERE id = ? AND user_id = ?
+      `).bind(
+        updated.item_name, updated.category, updated.sport_genre, updated.athlete_person,
+        updated.authenticator, updated.cert_number,
+        updated.unit_price, updated.true_total_cost,
+        updated.status, updated.platform, updated.platform_fee_pct, updated.platform_flat_fee,
+        updated.est_shipping_cost, updated.boost_pct, updated.target_margin_pct,
+        pricing.min_sell_price, pricing.suggested_list_price,
+        updated.current_list_price, updated.actual_sell_price,
+        updated.date_acquired, updated.date_listed, updated.date_sold, days_on_market,
+        updated.notes, updated.best_listing_window,
+        updated.ebay_listing_id, updated.cert_verification_url,
+        updated.other_platform_listing_ids, updated.ebay_promoted_rate,
+        updated.sku, updated.listing_format, updated.listing_status,
+        updated.quantity, updated.purchase_date, updated.floor_price, updated.buy_it_now_price,
+        updated.buyer_shipping_cost, attributesJson,
+        id, payload.userId
+      ).run();
+    } catch (updateErr) {
+      console.error('[items] Failed to update item record in D1:', updateErr);
+      if (updateErr?.message?.includes('UNIQUE constraint failed: auction_items.ebay_listing_id')) {
+        return err(`eBay listing #${updated.ebay_listing_id} is already linked to another item.`, 400);
+      }
+      if (updateErr?.message?.includes('UNIQUE constraint failed: auction_items.sku')) {
+        return err(`SKU "${updated.sku}" is already assigned to another item.`, 400);
+      }
+      return err('Failed to update item: ' + (updateErr?.message || 'Database error'), 500);
+    }
 
     // Auto-sync Sold Tracker (auction_sales table)
     // T-11 item 6 transition guard: the ONLY sanctioned way out of Sold is the

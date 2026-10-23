@@ -73,6 +73,7 @@ export function EditTabComps({
   const floorSpread = compsDraft.recommended_list_price && effectiveFloor
     ? Number(compsDraft.recommended_list_price) - effectiveFloor
     : null;
+  const isSold = form.status === 'Sold';
 
   const activeSearchQuery = searchQuery.trim() || defaultStructuredQuery;
   const ebaySearchUrl = `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(activeSearchQuery)}&LH_Sold=1&LH_Complete=1`;
@@ -576,19 +577,21 @@ export function EditTabComps({
             {compsDraft.saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Save Comps'}
           </button>
 
-          <button
-            type="button"
-            disabled={compsDraft.saving || (!compsDraft.recommended_list_price && !soldAvg && !activeAvg)}
-            onClick={() => handleSaveComps(true)}
-            className={`px-3.5 py-2 text-xs rounded-xl font-bold transition-all flex items-center gap-1.5 disabled:opacity-50 flex-shrink-0 cursor-pointer ${
-              compsDraft.applied
-                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                : 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-md shadow-amber-500/20'
-            }`}
-          >
-            {compsDraft.applied ? <CheckCircle2 className="w-3.5 h-3.5" /> : <ArrowUpRight className="w-3.5 h-3.5" />}
-            <span>{compsDraft.applied ? 'Applied to Item!' : 'Apply to Listing'}</span>
-          </button>
+          {!isSold && (
+            <button
+              type="button"
+              disabled={compsDraft.saving || (!compsDraft.recommended_list_price && !soldAvg && !activeAvg)}
+              onClick={() => handleSaveComps(true)}
+              className={`px-3.5 py-2 text-xs rounded-xl font-bold transition-all flex items-center gap-1.5 disabled:opacity-50 flex-shrink-0 cursor-pointer ${
+                compsDraft.applied
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                  : 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-md shadow-amber-500/20'
+              }`}
+            >
+              {compsDraft.applied ? <CheckCircle2 className="w-3.5 h-3.5" /> : <ArrowUpRight className="w-3.5 h-3.5" />}
+              <span>{compsDraft.applied ? 'Applied to Item!' : 'Apply to Listing'}</span>
+            </button>
+          )}
         </div>
       </div>
 

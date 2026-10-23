@@ -910,7 +910,7 @@ export function EditTabListingPricing({
                 <DollarSign className="w-4 h-4 text-amber-400" />
                 <span className="text-xs font-bold text-white uppercase tracking-wider">Pricing Strategy</span>
               </div>
-              {targetAskingPrice > 0 && (
+              {targetAskingPrice > 0 && !isSold && (
                 <button
                   type="button"
                   onClick={() => updateField('current_list_price', targetAskingPrice.toFixed(2))}

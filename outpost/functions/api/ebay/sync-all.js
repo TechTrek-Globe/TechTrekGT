@@ -14,6 +14,7 @@ import { computePricingFloors } from '../../utils/auction.js';
 import { DEFAULT_TARGET_MARGIN_PCT, MAX_SINGLE_ENRICH } from '../../utils/constants.js';
 import { setCachedEbayListings } from './listingsCache.js';
 import { recordSyncRun } from '../../utils/syncLogger.js';
+import { ingestListingTraffic } from './analytics.js';
 
 function parseAttributes(attrSrc) {
   if (!attrSrc) return {};
@@ -452,6 +453,13 @@ export async function onRequestPost(context) {
 
     if (activePromises.length > 0) {
       await Promise.all(activePromises);
+    }
+
+    // Ingest 30-day traffic analytics for all active store listings in ONE single batch eBay call
+    try {
+      await ingestListingTraffic(env, payload.userId, null, null, 30);
+    } catch (trafficErr) {
+      console.warn('[sync-all] Batch traffic sync note:', trafficErr?.message || trafficErr);
     }
 
     const totalItems = items.length;

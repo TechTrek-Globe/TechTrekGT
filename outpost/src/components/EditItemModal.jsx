@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { updateItem, saveComp, getComps, fetchLiveComps, getActiveEbayListings, syncEbayItem, fetchEbayItemAnalytics, fetchEbayItemDetail } from '../utils/auctionApi';
+import { getItem, updateItem, saveComp, getComps, fetchLiveComps, getActiveEbayListings, syncEbayItem, fetchEbayItemAnalytics, fetchEbayItemDetail } from '../utils/auctionApi';
 import { computeFeeBreakdown } from '../utils/feeEngine';
 import { roundPrice, round2 } from '../utils/formulaPreview';
 import {
@@ -15,7 +15,6 @@ import { EditModalFooter } from './edit/EditModalFooter';
 import { EditTabNav } from './edit/EditTabNav';
 import { EditTabFinancials } from './edit/EditTabFinancials';
 import { EditTabDetails } from './edit/EditTabDetails';
-import { EditTabListingPricing } from './edit/EditTabListingPricing';
 import { EditTabComps } from './edit/EditTabComps';
 import { EditTabPerformance } from './edit/EditTabPerformance';
 import { EditTabVineScout } from './edit/EditTabVineScout';
@@ -96,7 +95,7 @@ export function EditItemModal({
   onOpenCopyModal,
   initialTab = 'financial'
 }) {
-  const [activeTab, setActiveTab] = useState(initialTab || 'financial');
+  const [activeTab, setActiveTab] = useState(initialTab === 'listing_pricing' ? 'financial' : (initialTab || 'financial'));
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [error, setError] = useState('');
@@ -131,6 +130,10 @@ export function EditItemModal({
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
   const [analyticsError, setAnalyticsError] = useState('');
   const [analyticsRange, setAnalyticsRange] = useState(30);
+
+  // Completed sale & reconciled fee ledger state
+  const [saleData, setSaleData] = useState(null);
+  const [reconData, setReconData] = useState(null);
 
   // Auto-saving state for immediate seller assumption synchronization
   const [autoSaving, setAutoSaving] = useState(false);
@@ -287,15 +290,49 @@ export function EditItemModal({
       });
 
       // Reset Analytics on item change
+      analyticsAttemptedRef.current = {};
       setAnalytics(null);
       setLoadingAnalytics(false);
       setAnalyticsError('');
       setAnalyticsRange(30);
-      setActiveTab(initialTab || 'financial');
+      setActiveTab(initialTab === 'listing_pricing' ? 'financial' : (initialTab || 'financial'));
 
       // Start search empty so all active store listings are visible immediately
       setEbaySearch('');
       fetchActiveListings();
+
+      // Initialize sale & reconciliation data from item props or fetch fresh
+      const initialSale = item.sale || (item.sale_id ? {
+        id: item.sale_id,
+        gross_sale_price: item.gross_sale_price,
+        buyer_shipping_paid: item.buyer_shipping_paid,
+        actual_shipping_cost: item.actual_shipping_cost,
+        platform_fees_amt: item.platform_fees_amt,
+        promoted_listing_fee: item.promoted_listing_fee,
+        net_proceeds: item.net_proceeds,
+        net_profit: item.net_profit,
+        buyer_handle: item.buyer_handle,
+        ebay_order_id: item.ebay_order_id,
+        fee_reconciled: item.fee_reconciled
+      } : null);
+
+      const initialRecon = item.reconciliation || (item.recon_final_value_fee != null ? {
+        final_value_fee: item.recon_final_value_fee,
+        promoted_listing_fee: item.recon_promoted_listing_fee,
+        shipping_label_cost: item.recon_shipping_label_cost
+      } : null);
+
+      setSaleData(initialSale);
+      setReconData(initialRecon);
+
+      if (item.status === 'Sold' || item.sale_id || populated.status === 'Sold') {
+        getItem(item.id).then(res => {
+          if (res?.sale) setSaleData(res.sale);
+          if (res?.reconciliation) setReconData(res.reconciliation);
+        }).catch(err => {
+          console.warn('[EditItemModal] Failed to fetch sale details:', err);
+        });
+      }
 
       setError('');
       setSuccess('');
@@ -601,9 +638,13 @@ export function EditItemModal({
     }
   };
 
+  const analyticsAttemptedRef = useRef({});
+
   // eBay Listing Performance Analytics fetch handler
   const handleFetchAnalytics = useCallback(async (range = 30, force = false) => {
     if (!item?.id || !form.ebay_listing_id) return;
+    const fetchKey = `${item.id}_${form.ebay_listing_id}_${range}`;
+    analyticsAttemptedRef.current[fetchKey] = true;
     setLoadingAnalytics(true);
     setAnalyticsError('');
     try {
@@ -623,10 +664,12 @@ export function EditItemModal({
 
   // Auto-fetch analytics when navigating to the Performance tab
   useEffect(() => {
-    if (activeTab === 'performance' && !analytics && !loadingAnalytics && form.ebay_listing_id) {
+    if (activeTab !== 'performance' || !form.ebay_listing_id || !item?.id) return;
+    const fetchKey = `${item.id}_${form.ebay_listing_id}_${analyticsRange}`;
+    if (!analytics && !loadingAnalytics && !analyticsError && !analyticsAttemptedRef.current[fetchKey]) {
       handleFetchAnalytics(analyticsRange, false);
     }
-  }, [activeTab, analytics, loadingAnalytics, form.ebay_listing_id, analyticsRange, handleFetchAnalytics]);
+  }, [activeTab, analytics, loadingAnalytics, analyticsError, form.ebay_listing_id, analyticsRange, handleFetchAnalytics, item?.id]);
 
 
   const handleFetchLiveComps = async (customQuery = null) => {
@@ -869,7 +912,7 @@ export function EditItemModal({
           onSubmit={handleSubmit}
           className="p-5 sm:p-6 overflow-y-auto flex-1 space-y-4 scrollbar-thin scrollbar-thumb-slate-800"
         >
-          {activeTab === 'financial' && (
+          {(activeTab === 'financial' || activeTab === 'listing_pricing') && (
             <EditTabFinancials
               form={form}
               updateField={updateField}
@@ -877,22 +920,8 @@ export function EditItemModal({
               liveFees={liveFees}
               compsDraft={compsDraft}
               handleSaveComps={handleSaveComps}
-            />
-          )}
-
-          {activeTab === 'details' && (
-            <EditTabDetails
-              form={form}
-              updateField={updateField}
-              allCategories={allCategories}
-              item={item}
-            />
-          )}
-
-          {activeTab === 'listing_pricing' && (
-            <EditTabListingPricing
-              form={form}
-              updateField={updateField}
+              sale={saleData || item.sale}
+              reconciliation={reconData || item.reconciliation}
               allPlatforms={allPlatforms}
               onPlatformChange={handlePlatformChange}
               handleSyncWithEbay={handleSyncWithEbay}
@@ -901,9 +930,16 @@ export function EditItemModal({
               loadingEbayListings={loadingEbayListings}
               ebaySearch={ebaySearch}
               setEbaySearch={setEbaySearch}
-              liveFees={liveFees}
               fetchActiveListings={fetchActiveListings}
               handlePairEbayListing={handlePairEbayListing}
+            />
+          )}
+
+          {activeTab === 'details' && (
+            <EditTabDetails
+              form={form}
+              updateField={updateField}
+              allCategories={allCategories}
               item={item}
             />
           )}

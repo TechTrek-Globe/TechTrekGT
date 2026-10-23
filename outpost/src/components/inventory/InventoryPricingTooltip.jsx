@@ -56,9 +56,14 @@ export function InventoryPricingTooltip({ item, rect }) {
   const flatAndFva = f.finalValueFee + f.platformFlatFee;
 
   const above = rect.top - 10 > 380;
+  const isLeft = rect.left < 400;
+  const leftPos = isLeft
+    ? Math.min(window.innerWidth - 340, Math.max(10, rect.right + 10))
+    : Math.min(window.innerWidth - 340, Math.max(10, rect.right - 320));
+
   const style = {
-    top: above ? rect.top - 8 : Math.max(10, Math.min(window.innerHeight - 400, rect.bottom + 8)),
-    left: Math.min(window.innerWidth - 340, Math.max(10, rect.right - 320)),
+    top: above ? Math.max(10, rect.top - 8) : Math.max(10, Math.min(window.innerHeight - 400, rect.bottom + 8)),
+    left: leftPos,
     transform: above ? 'translateY(-100%)' : 'none'
   };
 

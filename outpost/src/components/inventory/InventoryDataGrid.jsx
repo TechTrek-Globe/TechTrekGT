@@ -5,7 +5,7 @@ import { ItemImageHoverTooltip } from './ItemImageHoverTooltip';
 import { InventoryPricingTooltip } from './InventoryPricingTooltip';
 
 export const DEFAULT_COLUMNS = [
-  { key: 'actions', label: 'Actions', minWidth: 140 },
+  { key: 'actions', label: 'Actions', minWidth: 195 },
   { key: 'item_name', label: 'Item / Description', minWidth: 160 },
   { key: 'status', label: 'Status', minWidth: 100 },
   { key: 'current_list_price', label: 'List Price', minWidth: 95 },
@@ -51,7 +51,7 @@ export function InventoryDataGrid({
   const [hoverTooltip, setHoverTooltip] = useState(null);
   const tableRef = useRef(null);
 
-  const actionsWidth = columnWidths.actions || 120;
+  const actionsWidth = Math.max(195, columnWidths.actions || 195);
   const visibleColCount = DEFAULT_COLUMNS.filter(c => columnVisibility[c.key] !== false).length;
 
   const showTooltip = (type, item, e) => {
@@ -277,7 +277,7 @@ export function InventoryDataGrid({
       )}
 
       {/* Unified Pricing Tooltip (List Price + Landed & Floor) */}
-      {hoverTooltip && (hoverTooltip.type === 'list' || hoverTooltip.type === 'landed_floor') && (
+      {hoverTooltip && (hoverTooltip.type === 'list' || hoverTooltip.type === 'landed_floor' || hoverTooltip.type === 'pricing_details') && (
         <InventoryPricingTooltip item={hoverTooltip.item} rect={hoverTooltip.rect} />
       )}
     </div>

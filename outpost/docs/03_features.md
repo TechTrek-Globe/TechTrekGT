@@ -271,3 +271,22 @@ Resolved eBay Sell Analytics API single-listing dimension aggregation to elimina
    - Updates 30-day snapshot columns (`total_impressions_30d`, `total_page_views_30d`, `avg_ctr_30d`, `avg_conversion_30d`, `analytics_fetched_at`) on `auction_items` for every listing.
    - Hooked into `POST /api/ebay/sync-all` so "Sync eBay Store" updates telemetry across all 30+ listings in 1 single API call.
    - Subsequent modal views load directly from local D1 database cache in <50ms with zero external API calls.
+
+## Inventory Table Pricing Tooltip & Left-Side Action Ergonomics [ACTION ID: UI-005 / GRID-002]
+
+Refactored the pricing and cost breakdown telemetry hover experience within the inventory data grid to prevent interference with inline cell editing and table scanning.
+
+### Key Capabilities
+1. **Right-Side Price Hover Decoupling (`InventoryGridRow.jsx`)**:
+   - Removed the intrusive `InventoryPricingTooltip` hover popover triggers (`onMouseEnter` / `onMouseLeave`) from the `Current List Price` and `Landed & Floor` table cells on the right side.
+   - Eliminates layout obstruction and prevents popovers from obscuring the `Click to edit` inline editor or neighbouring status tags while navigating numbers.
+2. **Dedicated Left-Side Action Icon (`InventoryGridRow.jsx`)**:
+   - Added a dedicated amber `CircleDollarSign` button to the sticky left `ACTIONS` toolbar, placed at the end of the action button cluster immediately adjacent to the item description boundary.
+   - Styled with subtle amber accent borders (`border-amber-500/25 bg-amber-500/20 text-amber-400 hover:text-amber-300`) and `cursor-help`.
+   - Displays the complete pricing breakdown on hover (`onMouseEnter={() => onShowTooltip('pricing_details', item, e)}`), and opens the item's financial dials modal on click (`onClick={() => onOpenEditModal(item)}`).
+3. **Adaptive Tooltip Viewport Positioning (`InventoryPricingTooltip.jsx`)**:
+   - Updated coordinate placement to distinguish left-side triggers from right-side triggers: when triggered from the left side (`rect.left < 400`), anchors the popover cleanly to the right of the icon (`rect.right + 10`) rather than overflowing left offscreen or covering the actions column.
+   - Automatically maintains `translateY(-100%)` flip when approaching the bottom of the browser viewport.
+4. **Synchronized Sticky Column Geometry (`InventoryDataGrid.jsx` & `userSettings.js`)**:
+   - Expanded default and minimum width for the sticky `actions` column from 140px to 195px (`Math.max(195, columnWidths.actions || 195)`).
+   - Enforces identical sticky offsets between the table header and body rows, guaranteeing that all 7 operational action buttons remain visible and aligned without horizontal clipping or scroll drift.

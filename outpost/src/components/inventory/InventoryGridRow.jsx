@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Copy, DollarSign, Trash2, Pencil, Loader2, Edit3, ShoppingBag, RefreshCw, Shield, ShieldCheck, ExternalLink } from 'lucide-react';
+import { Copy, DollarSign, Trash2, Pencil, Loader2, Edit3, ShoppingBag, RefreshCw, Shield, ShieldCheck, ExternalLink, CircleDollarSign } from 'lucide-react';
 import { InlineEditCell } from './InlineEditCell';
 import { InlineStatusSelect } from './InlineStatusSelect';
 import { InlineSelectCell } from './InlineSelectCell';
@@ -39,7 +39,7 @@ export function InventoryGridRow({
   const isEven = index % 2 === 0;
   const rowBg = isEven ? 'bg-[#0b101d]' : 'bg-[#141d30]';
   const stickyBg = isEven ? 'bg-[#0b101d]' : 'bg-[#141d30]';
-  const actionsWidth = columnWidths.actions || 140;
+  const actionsWidth = Math.max(195, columnWidths.actions || 195);
 
   // Detect if item was imported via VScout / Amazon Vine
   const isVineItem = Boolean(
@@ -136,6 +136,18 @@ export function InventoryGridRow({
             >
               {deleting === item.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
             </button>
+
+            {/* Pricing & Profit Breakdown Hover Icon */}
+            <button
+              type="button"
+              onMouseEnter={(e) => onShowTooltip && onShowTooltip('pricing_details', item, e)}
+              onMouseLeave={onHideTooltip}
+              onClick={() => onOpenEditModal && onOpenEditModal(item)}
+              title="Pricing & cost breakdown (hover for details, click to edit)"
+              className="w-6 h-6 rounded flex items-center justify-center text-amber-400 hover:text-amber-300 hover:bg-amber-500/20 border border-amber-500/25 shadow-sm transition-all cursor-help"
+            >
+              <CircleDollarSign className="w-3.5 h-3.5" />
+            </button>
           </div>
         </td>
       )}
@@ -194,7 +206,7 @@ export function InventoryGridRow({
         </td>
       )}
 
-      {/* 5. Current List Price (with Hover Calculation) */}
+      {/* 5. Current List Price */}
       {columnVisibility.current_list_price !== false && (
         <td
           style={{
@@ -202,9 +214,7 @@ export function InventoryGridRow({
             minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'current_list_price')?.minWidth || 95}px`,
             maxWidth: `${columnWidths.current_list_price || 110}px`
           }}
-          onMouseEnter={(e) => onShowTooltip && onShowTooltip('list', item, e)}
-          onMouseLeave={onHideTooltip}
-          className="px-3 py-1.5 whitespace-nowrap overflow-hidden text-xs font-mono font-bold cursor-help"
+          className="px-3 py-1.5 whitespace-nowrap overflow-hidden text-xs font-mono font-bold"
         >
           <InlineEditCell
             value={item.current_list_price}
@@ -218,7 +228,7 @@ export function InventoryGridRow({
         </td>
       )}
 
-      {/* 5b. Landed & Floor (unified hover card with List Price) */}
+      {/* 5b. Landed & Floor */}
       {columnVisibility.landed_floor !== false && (
         <td
           style={{
@@ -226,9 +236,7 @@ export function InventoryGridRow({
             minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'landed_floor')?.minWidth || 130}px`,
             maxWidth: `${columnWidths.landed_floor || 150}px`
           }}
-          onMouseEnter={(e) => onShowTooltip && onShowTooltip('landed_floor', item, e)}
-          onMouseLeave={onHideTooltip}
-          className="px-3 py-1.5 whitespace-nowrap overflow-hidden text-xs font-mono cursor-help"
+          className="px-3 py-1.5 whitespace-nowrap overflow-hidden text-xs font-mono"
         >
           {(() => {
             const listVal = Number(item.current_list_price) || 0;

@@ -142,6 +142,11 @@ Outpost uses React Context and standard React hooks (`useState`, `useReducer`, `
     - Writes all item metrics to `listing_traffic` using 90-statement D1 chunks and writes 30-day snapshot columns (`total_impressions_30d`, `total_page_views_30d`, `avg_ctr_30d`, `avg_conversion_30d`, `analytics_fetched_at`) to `auction_items`.
     - `POST /api/ebay/sync-all` runs batch traffic ingestion automatically at store sync, updating all 30+ items in 1 single API call.
     - Subsequent item modal opens serve directly from local D1 database cache in <50ms with 0 API calls.
+  - **Left-Side Pricing Breakdown Hover & Table Column State [ACTION ID: UI-005 / GRID-002]**:
+    - Hover popover triggers removed from right-side price columns (`current_list_price` and `landed_floor`) to eliminate interference with inline editing and click-to-edit targets.
+    - Sticky `ACTIONS` column toolbar hosts dedicated `CircleDollarSign` button (`pricing_details` tooltip type) with amber border and styling.
+    - `InventoryPricingTooltip` detects left-side viewport triggers (`rect.left < 400`) and anchors the floating card to the right (`rect.right + 10`), avoiding actions occlusion.
+    - Synchronized column minWidth and defaultWidth for `actions` set to 195px (`Math.max(195, columnWidths.actions || 195)`) across header and row cells.
 
 
 

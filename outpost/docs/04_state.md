@@ -99,6 +99,11 @@ Outpost uses React Context and standard React hooks (`useState`, `useReducer`, `
   - Ingestion deduplication is anchored on Amazon Order IDs rather than product ASINs.
   - Accelerated via expression index: `CREATE INDEX idx_auction_items_user_order_id ON auction_items(user_id, json_extract(attributes, '$.order_id')) WHERE attributes IS NOT NULL AND json_valid(attributes)`.
   - Re-importing an existing order updates mutable fields idempotently without altering SKU or duplicating rows. Distinct orders for identical ASINs receive separate SKUs and independent inventory records.
+- **Historical Data Decoupling & Database Repair**:
+  - Audited live Cloudflare D1 database (`personal-budget-db`) and decoupled collapsed historical rows:
+    - GPS Wireless Dog Fence (`B0H5VRLRMQ`): Unit 1 (`item-39df6393-65f4-4547-9ab8-03df7656eeb0`, SKU `OP-260914-Q2CV`) restored to status `'Sold'` with $160 sale linked to `inv-cb79f9c4-b568-40a4-8e46-d23c50e2df6b`. Unit 2 (`item-6f1e8a24-9b27-4a41-b844-48f86f80a9d1`, SKU `OP-260914-DF02`) created as status `'Available'` under invoice `inv-77243ab5-6079-4087-a333-7f0d057d4d62` (Order `113-2593337-5812239`) with no attached sale.
+    - TUBR Gordo Carry Case (`B0H73Q5W2B` / `B0H4J81NNK`): Unit 1 (`item-8a840c62-283c-4490-afcb-64c87b87a981`, SKU `OP-260820-3Z88`) restored to status `'Sold'` with $19.99 sale linked to `inv-1bf6fefd-b715-434b-94ba-c3f555dd6fb3`. Unit 2 (`item-9c3f4e15-8a21-4d32-9cb1-e87a552bf102`, SKU `OP-260820-MW02`) created as status `'Listed'` with active eBay listing `336816297681` ($75) under invoice `inv-4b82d7a1-260928-b0h73q5w2b` (Order `112-8713304-6992213`).
+  - Verified remote D1 invariant: exactly zero desynced sales remain across `auction_items` and `auction_sales`.
 
 
 

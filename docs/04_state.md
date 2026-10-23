@@ -48,7 +48,7 @@ To prevent cross-app schema collisions and maintain developer velocity, each app
 
 - Domain Prefixes: Application-specific tables must use explicit domain prefixes (e.g. auction_*, vine_*, wf_*) to avoid naming collisions within the shared SQLite catalog.
 - Foreign Key Indexing: All domain tables referencing users(id) must maintain an explicit index on user_id (e.g. idx_auction_items_user_id, idx_vine_items_user_id) to ensure optimal query performance and prevent full-table scans.
-- Database-Level Uniqueness Constraints: Critical entity states (such as auction_sales(item_id)) enforce SQLite UNIQUE constraints to eliminate race conditions between concurrent sync and manual creation operations.
+- Database-Level Uniqueness Constraints: Critical entity states (such as auction_sales(item_id) and auction_items(sku)) enforce SQLite UNIQUE constraints to eliminate race conditions, duplicate SKU assignment, and collisions between concurrent sync and manual creation operations. Expression indexing on json_extract(auction_items.attributes, '$.order_id') provides fast, deterministic order-level deduplication for multi-order ingestion.
 
 ### 1.5 D1 Single-Writer Concurrency Governance
 

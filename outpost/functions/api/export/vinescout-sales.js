@@ -80,7 +80,7 @@ export async function onRequestGet({ request, env }) {
           const parsed = typeof row.attributes === 'string' ? JSON.parse(row.attributes) : row.attributes;
           if (parsed && typeof parsed === 'object') {
             if (parsed.asin) asin = String(parsed.asin).trim().toUpperCase();
-            if (parsed.order_id) orderId = String(parsed.order_id).trim();
+            if (parsed.order_id || parsed.orderId) orderId = String(parsed.order_id || parsed.orderId).trim();
             if (parsed.source === 'amazon_vinescout' || parsed.is_vinescout) isVine = true;
           }
         } catch (_) {}
@@ -93,8 +93,13 @@ export async function onRequestGet({ request, env }) {
           if (mAsin) asin = mAsin[1].toUpperCase();
         }
         if (!orderId) {
-          const mOrder = row.notes.match(/\b(\d{3}-\d{7}-\d{7})\b/);
-          if (mOrder) orderId = mOrder[1];
+          const mOrderExact = row.notes.match(/Order ID:\s*([^\s|]+)/i);
+          if (mOrderExact) {
+            orderId = mOrderExact[1].trim();
+          } else {
+            const mOrder = row.notes.match(/\b(\d{3}-\d{7}-\d{7})\b/);
+            if (mOrder) orderId = mOrder[1];
+          }
         }
       }
 

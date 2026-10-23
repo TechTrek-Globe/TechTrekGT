@@ -92,7 +92,11 @@ export async function onRequestPost(context) {
   const taxAmt      = 0;
   const resolvedCat = sellingCategory || amazonCategory || category || 'Other';
   const today       = new Date().toISOString().split('T')[0];
-  const invoiceRef  = `AMAZON-${cleanAsin}-${today}`;
+  const rawOrderId = body.order_id ?? body.orderId ?? body.item?.order_id ?? body.item?.orderId;
+  const cleanOrderId = (rawOrderId !== undefined && rawOrderId !== null)
+    ? String(rawOrderId).trim()
+    : null;
+  const normalizedOrderId = cleanOrderId && cleanOrderId.length > 0 ? cleanOrderId : null;
 
   // Resolve image URL array - prefer arrays, fall back to single strings
   const resolvedImageUrls = Array.isArray(images) && images.length > 0
@@ -101,39 +105,54 @@ export async function onRequestPost(context) {
         ? image_urls
         : (image_url ? [image_url] : (imageUrl ? [imageUrl] : [])));
 
-  // Build structured attributes JSON blob
-  const attributes = JSON.stringify({
-    source:        'amazon_vinescout',
-    asin:          cleanAsin,
-    amazon_url:    page_url || `https://www.amazon.com/dp/${cleanAsin}`,
-    image_urls:    resolvedImageUrls,
-    specs:         (specs && typeof specs === 'object') ? specs : {},
-    etv:           etvAmt,
-    tax_cost:      taxCostAmt,
-    tax_charged:   taxCostAmt,
-    order_id:      order_id || null,
-    vine_program:  true,
-    condition:     condition || 'New',
-    condition_note: ''
-  });
-
-  // Fetch user default platform
+  // Check user default platform
   const plat = await env.DB.prepare(
     `SELECT fee_pct, flat_fee, name FROM auction_platforms WHERE user_id = ? AND is_default = 1 LIMIT 1`
   ).bind(userId).first() || { name: 'eBay', fee_pct: DEFAULT_PLATFORM_FEE_PCT, flat_fee: DEFAULT_PLATFORM_FLAT_FEE };
 
-  // Check if item already exists by ASIN or Order ID to prevent duplicate inventory
-  const existingItem = await env.DB.prepare(`
-    SELECT i.id, i.sku, i.invoice_id 
-    FROM auction_items i
-    LEFT JOIN auction_invoices v ON i.invoice_id = v.id
-    WHERE i.user_id = ? AND (
-      json_extract(i.attributes, '$.asin') = ? 
-      OR i.notes LIKE ?
-      OR v.invoice_ref LIKE ?
-    )
-    LIMIT 1
-  `).bind(userId, cleanAsin, `%ASIN: ${cleanAsin}%`, `AMAZON-${cleanAsin}-%`).first();
+  // Check whether an inventory item with this order_id already exists in D1.
+  // When order_id is absent, each import generates a distinct item and unique SKU.
+  let existingItem = null;
+  if (normalizedOrderId) {
+    existingItem = await env.DB.prepare(`
+      SELECT i.id, i.sku, i.invoice_id, i.attributes, i.notes 
+      FROM auction_items i
+      WHERE i.user_id = ? AND (
+        json_extract(i.attributes, '$.order_id') = ? 
+        OR i.notes LIKE ?
+      )
+      LIMIT 1
+    `).bind(userId, normalizedOrderId, `%Order ID: ${normalizedOrderId}%`).first();
+  }
+
+  // Build structured attributes JSON blob
+  let existingAttrs = {};
+  if (existingItem?.attributes) {
+    try {
+      existingAttrs = typeof existingItem.attributes === 'string'
+        ? JSON.parse(existingItem.attributes)
+        : existingItem.attributes;
+    } catch (_) {}
+  }
+  if (!existingAttrs || typeof existingAttrs !== 'object') {
+    existingAttrs = {};
+  }
+
+  const attributes = JSON.stringify({
+    ...existingAttrs,
+    source:        existingAttrs.source || 'amazon_vinescout',
+    asin:          cleanAsin,
+    amazon_url:    page_url || existingAttrs.amazon_url || `https://www.amazon.com/dp/${cleanAsin}`,
+    image_urls:    resolvedImageUrls.length > 0 ? resolvedImageUrls : (existingAttrs.image_urls || []),
+    specs:         (specs && typeof specs === 'object' && Object.keys(specs).length > 0) ? specs : (existingAttrs.specs || {}),
+    etv:           etvAmt,
+    tax_cost:      taxCostAmt,
+    tax_charged:   taxCostAmt,
+    order_id:      normalizedOrderId,
+    vine_program:  true,
+    condition:     condition || existingAttrs.condition || 'New',
+    condition_note: existingAttrs.condition_note || ''
+  });
 
   // Compute proration + pricing
   const proration = computeItemProration(
@@ -151,14 +170,23 @@ export async function onRequestPost(context) {
 
   // Build legacy notes string (kept for backward compat with existing comps parser)
   const itemNotes = [
-    order_id    ? `Order ID: ${order_id}` : null,
+    normalizedOrderId ? `Order ID: ${normalizedOrderId}` : null,
     `ASIN: ${cleanAsin}`,
     page_url    ? `URL: ${page_url}` : null,
     resolvedImageUrls.length > 0 ? `Image: ${resolvedImageUrls[0]}` : null,
     notes || 'Imported via VineScout'
   ].filter(Boolean).join(' | ');
 
+  const invoiceRef = normalizedOrderId
+    ? `AMAZON-${cleanAsin}-${normalizedOrderId}`
+    : `AMAZON-${cleanAsin}-${today}`;
+
   if (existingItem) {
+    let existingSku = existingItem.sku;
+    if (!existingSku) {
+      existingSku = await generateUniqueSku(env.DB, userId, new Date(), 5);
+    }
+
     // Update existing item attributes and pricing floors
     await env.DB.prepare(`
       UPDATE auction_items 
@@ -170,20 +198,22 @@ export async function onRequestPost(context) {
         min_sell_price = ?,
         suggested_list_price = ?,
         attributes = ?,
-        notes = ?
+        notes = ?,
+        sku = COALESCE(sku, ?)
       WHERE id = ? AND user_id = ?
     `).bind(
       title.trim(),
       unitPrice, unitPrice, proration.true_total_cost,
       pricing.min_sell_price, pricing.suggested_list_price,
       attributes, itemNotes,
+      existingSku,
       existingItem.id, userId
     ).run();
 
     return ok({ 
       success: true, 
       item_id: existingItem.id, 
-      sku: existingItem.sku, 
+      sku: existingSku, 
       is_existing: true,
       min_sell_price: pricing.min_sell_price,
       suggested_list_price: pricing.suggested_list_price

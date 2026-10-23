@@ -90,5 +90,16 @@ Outpost uses React Context and standard React hooks (`useState`, `useReducer`, `
 - **Dependent View Null/Failure States (`DashboardView`)**:
   - If initial dashboard telemetry fails to load (`!data && !loading && error`), `DashboardView` replaces misleading $0.00 zero-value skeleton widgets with an explicit connection error state and a manual retry button.
 
+### Phase 8 Schema & Inventory Decoupling State [ACTION ID: SYNC-001 / INV-002]
+
+- **Global SKU Uniqueness Invariant (`idx_auction_items_sku_unique`)**:
+  - Outpost enforces a database-level partial unique index on non-null, non-empty SKUs: `CREATE UNIQUE INDEX idx_auction_items_sku_unique ON auction_items(sku) WHERE sku IS NOT NULL AND sku != ''`.
+  - `generateUniqueSku` verifies uniqueness globally across all rows in `auction_items` via `SELECT id FROM auction_items WHERE sku = ? LIMIT 1`, regenerating candidates on collision.
+- **Order-Level Ingestion Indexing (`idx_auction_items_user_order_id`)**:
+  - Ingestion deduplication is anchored on Amazon Order IDs rather than product ASINs.
+  - Accelerated via expression index: `CREATE INDEX idx_auction_items_user_order_id ON auction_items(user_id, json_extract(attributes, '$.order_id')) WHERE attributes IS NOT NULL AND json_valid(attributes)`.
+  - Re-importing an existing order updates mutable fields idempotently without altering SKU or duplicating rows. Distinct orders for identical ASINs receive separate SKUs and independent inventory records.
+
+
 
 

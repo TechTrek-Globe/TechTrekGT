@@ -604,3 +604,16 @@ ALTER TABLE outpost_sync_settings ADD COLUMN last_ebay_sync_status TEXT;
 ALTER TABLE outpost_sync_settings ADD COLUMN last_ebay_sync_error TEXT;
 ALTER TABLE outpost_sync_settings ADD COLUMN last_vscout_sync_status TEXT;
 ALTER TABLE outpost_sync_settings ADD COLUMN last_vscout_sync_error TEXT;
+
+-- ============================================================
+-- PHASE 8 MIGRATIONS: SKU DECOUPLING & ORDER DEDUPLICATION
+-- Enforces global SKU uniqueness and indexes order_id for idempotent sync
+-- ============================================================
+CREATE UNIQUE INDEX IF NOT EXISTS idx_auction_items_sku_unique
+  ON auction_items(sku)
+  WHERE sku IS NOT NULL AND sku != '';
+
+CREATE INDEX IF NOT EXISTS idx_auction_items_user_order_id
+  ON auction_items(user_id, json_extract(attributes, '$.order_id'))
+  WHERE attributes IS NOT NULL AND json_valid(attributes);
+

@@ -167,3 +167,21 @@ The Outpost and Landing ecosystems integrate with the Core 6 eBay Sell API famil
 1. Prior to calling eBay Sell APIs, confirm the user token row in ebay_oauth_tokens contains the required scope.
 2. Ensure token refresh requests catch HTTP 429 and transient timeouts without purging valid credentials.
 3. On hard expiration (refreshExp < now) or explicit revocation, immediately clean dead credentials from D1 and set connected: false.
+
+## Decoupled SKU Generation and Order-Level Idempotent Ingestion [ACTION ID: SYNC-001 / INV-002]
+
+Decoupled internal Outpost SKU generation from Amazon ASIN identifiers to support multiple physical units and distinct orders sharing a single ASIN without inventory record or sales status collapse.
+
+### Key Capabilities
+1. **Order-Level Deduplication (`POST /api/import/amazon`)**:
+   - Ingestion extracts `order_id` (or `orderId`) from the incoming request payload.
+   - When `order_id` is present, Outpost checks whether an item with that exact `order_id` already exists in D1 for the user via `json_extract(attributes, '$.order_id')` or legacy notes matching.
+   - If an existing record matches the `order_id`: mutable fields (`title`, `etv`, `taxCost`, `images`, `specs`) are updated idempotently and its existing SKU is returned (`is_existing: true`).
+   - If no matching `order_id` exists, or if `order_id` is absent: a brand new inventory item and invoice are created with a freshly generated, unique Outpost SKU (`OP-YYMMDD-XXXX`).
+2. **ASIN Decoupling**:
+   - Incoming items are never collapsed or matched solely on `asin`. Multiple physical orders for the same ASIN maintain independent inventory rows and distinct SKUs.
+   - When one unit of a shared ASIN sells on eBay or another marketplace, only that specific unit transitions to `'Sold'`, leaving other units with the same ASIN in `'Available'` status.
+3. **Synchronized Export Alignment**:
+   - `GET /api/export/vinescout-sales`: Exports `orderId` alongside `sku`, `asin`, `title`, `salePrice`, `netProceeds`, `netProfit`, `saleDate`, and `platform`.
+   - `GET /api/export/vinescout-inventory`: Exports `orderId` alongside `sku`, `asin`, `title`, `status`, `isListed`, `platform`, `feePct`, `flatFee`, `shippingCost`, and pricing floors.
+

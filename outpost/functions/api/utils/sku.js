@@ -60,10 +60,10 @@ export async function generateUniqueSku(
       return candidate;
     }
 
-    // Query DB for existing item with this SKU for the same user
+    // Query DB for existing item with this SKU globally to enforce global uniqueness
     const existing = await db.prepare(
-      'SELECT id FROM auction_items WHERE user_id = ? AND sku = ? LIMIT 1'
-    ).bind(userId, candidate).first();
+      'SELECT id FROM auction_items WHERE sku = ? LIMIT 1'
+    ).bind(candidate).first();
 
     if (!existing) {
       if (seenSkus) {

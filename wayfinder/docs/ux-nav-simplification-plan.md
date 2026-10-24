@@ -14,7 +14,7 @@ After auditing every component in the navigation tree, the following friction po
 
 The user currently travels through **three layers** before reaching actionable content:
 
-```
+```text
 /wayfinder  (WayfinderLanding - choose a trip)
   -> /wayfinder/poland-christmas-2026  (PolandLanding - hero + city grid)
     -> /wayfinder/poland-christmas-2026/cities/:id  (CityPage)
@@ -26,13 +26,13 @@ The user currently travels through **three layers** before reaching actionable c
 
 The following standalone pages all live at the same routing depth and duplicate content already inside CityPage tabs:
 
-| Route | Page | Overlap |
-|---|---|---|
-| `/markets` | `MarketsPage` | Duplicates CityPage "Christmas Markets" tab |
-| `/stays-and-food` | `StaysAndFoodPage` | Duplicates CityPage "Food" and "Hotels" tabs |
-| `/practical` | `PracticalPage` | Standalone; no equivalent city tab - KEEP |
-| `/route` | `RouteVisualization` | Duplicates route track already on PolandLanding |
-| `/itinerary` | `ItineraryView` | Auth-adjacent; competes with PrivateHub |
+| Route             | Page                 | Overlap                                        |
+| ----------------- | -------------------- | ---------------------------------------------- |
+| `/markets`        | `MarketsPage`        | Duplicates CityPage "Christmas Markets" tab    |
+| `/stays-and-food` | `StaysAndFoodPage`   | Duplicates CityPage "Food" and "Hotels" tabs   |
+| `/practical`      | `PracticalPage`      | Standalone; no equivalent city tab - KEEP      |
+| `/route`          | `RouteVisualization` | Duplicates route track already on PolandLanding |
+| `/itinerary`      | `ItineraryView`      | Auth-adjacent; competes with PrivateHub        |
 
 The PolandLanding "The Strategy" section links to `/markets` and `/rail` - two more exits splitting focus. The result is a star-pattern where users jump from almost any page to almost any other with no clear hierarchy.
 
@@ -65,18 +65,21 @@ Up to **7 horizontal tabs**: Overview, History, Markets, Attractions, Food, Hote
 ### 3.1 Flatten the Entry Funnel
 
 **Before:**
-```
+
+```text
 /wayfinder -> PolandLanding -> CityPage
 ```
 
 **After:**
-```
+
+```text
 /wayfinder  -> redirects immediately to /wayfinder/poland-christmas-2026
 ```
 
 `PolandLanding` becomes the true root. `WayfinderLanding.jsx` is NOT deleted - just no longer the default route. It can be reinstated at `/wayfinder/destinations` when a second trip is added.
 
 **Files affected:**
+
 - `src/App.jsx` - change `/wayfinder` route to render `<PolandLanding />` directly.
 
 ---
@@ -85,15 +88,16 @@ Up to **7 horizontal tabs**: Overview, History, Markets, Attractions, Food, Hote
 
 The following top-level pages are retired as primary navigation destinations. Their routes become redirects to preserve bookmarks.
 
-| Retired Route | Redirect Target | Rationale |
-|---|---|---|
-| `/markets` | `/poland-christmas-2026` | Market content lives in each city's Markets tab |
-| `/stays-and-food` | `/poland-christmas-2026` | Hotel/food content in city Hotels + Food tabs |
-| `/route` | `/poland-christmas-2026` | Route map already exists on PolandLanding |
+| Retired Route     | Redirect Target          | Rationale                                       |
+| ----------------- | ------------------------ | ----------------------------------------------- |
+| `/markets`        | `/poland-christmas-2026` | Market content lives in each city's Markets tab |
+| `/stays-and-food` | `/poland-christmas-2026` | Hotel/food content in city Hotels + Food tabs   |
+| `/route`          | `/poland-christmas-2026` | Route map already exists on PolandLanding       |
 
 `PracticalPage` (`/practical`) is **kept and promoted** - most valuable on-the-ground resource.
 
 **Files affected:**
+
 - `src/App.jsx` - repurpose route blocks for 3 retired pages as redirects.
 
 ---
@@ -104,7 +108,7 @@ The following top-level pages are retired as primary navigation destinations. Th
 
 Replace the hamburger menu with a **5-slot bottom tab bar** pinned above the iOS safe area.
 
-```
+```text
 [ Cities ] [ Schedule ] [ Practical ] [ Currency ] [ Hub ]
  (map pin)  (calendar)   (backpack)    (coins)    (shield)
 ```
@@ -119,13 +123,14 @@ The bottom bar is visible on all screens except modals/overlays.
 
 Simplified to **3-4 items** maximum:
 
-```
+```text
 [Logo] ----spacer---- [Practical Guide] [Currency: zł X.XX] [Sign In / Hub]
 ```
 
 "Destinations", "Poland 2026", and "Itinerary" links are removed from the top bar entirely. On desktop, the PolandLanding city grid IS the navigation.
 
 **Files affected:**
+
 - `src/components/Layout.jsx` - major surgical edit to nav links + add BottomTabBar.
 - New file: `src/components/BottomTabBar.jsx`
 
@@ -143,17 +148,18 @@ Simplified to **3-4 items** maximum:
 
 **Tab consolidation mapping:**
 
-| Old Tab Label | New Label | Change |
-|---|---|---|
-| Overview | Overview | No change |
+| Old Tab Label      | New Label          | Change                                     |
+| ------------------ | ------------------ | ------------------------------------------ |
+| Overview           | Overview           | No change                                  |
 | History & Timeline | (removed from bar) | Moved into Overview as "Read History" card |
-| Christmas Markets | Markets | Label shortened |
-| Must-See Sights | Sights | Label shortened |
-| Food & Drink | Food | Label shortened |
-| Lodging & Stays | Stays | Label shortened |
-| LGBTQ+ Guide | Safe Spaces | Renamed |
+| Christmas Markets  | Markets            | Label shortened                            |
+| Must-See Sights    | Sights             | Label shortened                            |
+| Food & Drink       | Food               | Label shortened                            |
+| Lodging & Stays    | Stays              | Label shortened                            |
+| LGBTQ+ Guide       | Safe Spaces        | Renamed                                    |
 
 **Files affected:**
+
 - `src/components/CityPage.jsx` - tab bar JSX, label strings, activeSubPage normalization.
 - `src/components/city/CityOverviewTab.jsx` - add "Read City History" inline card.
 
@@ -164,12 +170,14 @@ Simplified to **3-4 items** maximum:
 **Current problem:** `/itinerary` linked from header, PolandLanding, and PrivateHub.
 
 **Solution:**
+
 - The bottom bar "Schedule" slot links to `/wayfinder/poland-christmas-2026/private` (PrivateHub gates unauthenticated users gracefully with a Sign In CTA).
 - `/wayfinder/poland-christmas-2026/itinerary` and `/timeline` aliases redirect to `/private`.
 - The PolandLanding "10-Day Itinerary" button updated to link to `/private`.
 - Remove standalone Itinerary link from desktop header.
 
 **Files affected:**
+
 - `src/App.jsx` - redirect `/itinerary` and `/timeline` routes to `/private`.
 - `src/components/PolandLanding.jsx` - update "10-Day Itinerary" href to `/private`.
 - `src/components/Layout.jsx` - remove standalone Itinerary link from desktop nav.
@@ -181,14 +189,15 @@ Simplified to **3-4 items** maximum:
 The "The Strategy" section's two nav links ("Market Timing" -> `/markets`, "Rail Connections" -> `/rail`) navigate to pages being retired. Replace them with **inline static summary text panels** - no navigation required.
 
 **Files affected:**
+
 - `src/components/PolandLanding.jsx` - replace 2 nav link rows with static text cards in the Strategy section.
 
 ---
 
 ## 4. New File to Create
 
-| File | Purpose |
-|---|---|
+| File                              | Purpose                                    |
+| --------------------------------- | ------------------------------------------ |
 | `src/components/BottomTabBar.jsx` | Mobile persistent 5-slot bottom navigation |
 
 No other new files. All changes are surgical edits to existing files.
@@ -197,14 +206,14 @@ No other new files. All changes are surgical edits to existing files.
 
 ## 5. Files to Edit (Summary)
 
-| File | Change | Estimated Scope |
-|---|---|---|
-| `src/App.jsx` | Route redirects + flatten entry | ~20 lines |
-| `src/components/Layout.jsx` | Slim header + add BottomTabBar | ~60 lines |
-| `src/components/PolandLanding.jsx` | Remove Strategy nav links; update itinerary href | ~15 lines |
-| `src/components/CityPage.jsx` | Tab bar labels + remove History tab from bar | ~30 lines |
-| `src/components/city/CityOverviewTab.jsx` | Add "Read City History" card | ~15 lines |
-| `src/components/BottomTabBar.jsx` | New file | ~80 lines |
+| File                                     | Change                                           | Estimated Scope |
+| ---------------------------------------- | ------------------------------------------------ | --------------- |
+| `src/App.jsx`                            | Route redirects + flatten entry                  | ~20 lines       |
+| `src/components/Layout.jsx`              | Slim header + add BottomTabBar                   | ~60 lines       |
+| `src/components/PolandLanding.jsx`       | Remove Strategy nav links; update itinerary href | ~15 lines       |
+| `src/components/CityPage.jsx`            | Tab bar labels + remove History tab from bar     | ~30 lines       |
+| `src/components/city/CityOverviewTab.jsx`| Add "Read City History" card                     | ~15 lines       |
+| `src/components/BottomTabBar.jsx`        | New file                                         | ~80 lines       |
 
 **Total estimated delta:** ~220 lines across 6 files. No files deleted. No data files touched.
 
@@ -229,7 +238,7 @@ No other new files. All changes are surgical edits to existing files.
 
 ### Before (current state)
 
-```
+```text
 Header (desktop): Logo | Launch Pad | Poland 2026 | Itinerary | Currency | Settings | Sign In
 Mobile header:    Logo | Currency button | Hamburger (7-item menu)
 
@@ -249,7 +258,7 @@ Mobile header:    Logo | Currency button | Hamburger (7-item menu)
 
 ### After (proposed state)
 
-```
+```text
 Header (desktop): Logo | Practical Guide | Currency zł X.XX | Hub / Sign In
 Bottom bar (mobile): [ Cities ] [ Schedule ] [ Practical ] [ Currency ] [ Hub ]
 
@@ -273,7 +282,7 @@ Bottom bar (mobile): [ Cities ] [ Schedule ] [ Practical ] [ Currency ] [ Hub ]
 
 ## 8. Mobile Bottom Tab Bar Wireframe
 
-```
+```text
 +--------------------------------------------------+
 |  CONTENT AREA (scrollable)                       |
 |                                                  |
@@ -306,6 +315,7 @@ Bottom bar (mobile): [ Cities ] [ Schedule ] [ Practical ] [ Currency ] [ Hub ]
 ## 10. Post-Flight Documentation Updates (After Code Approval)
 
 After code is merged:
+
 - `wayfinder/docs/02_arch.md` - update View Hierarchy section to reflect new route structure
 - `wayfinder/docs/03_features.md` - update navigation feature descriptions
 - `wayfinder/docs/04_state.md` - note BottomTabBar active state is component-local

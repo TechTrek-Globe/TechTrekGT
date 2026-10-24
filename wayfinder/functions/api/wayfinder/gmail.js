@@ -208,7 +208,12 @@ async function syncGmailMessages(conn, journey, env) {
   });
   if (!listRes.ok) {
     const errText = await listRes.text();
-    throw new Error(`Gmail list failed: ${listRes.status} ${errText}`);
+    let detail = errText;
+    try {
+      const errObj = JSON.parse(errText);
+      detail = errObj.error?.message || errText;
+    } catch {}
+    throw new Error(`Gmail API error (${listRes.status}): ${detail}`);
   }
   const listData  = await listRes.json();
   const messages  = listData.messages || [];
@@ -393,11 +398,22 @@ export async function handleGmail(context, url, method) {
       }
 
       // Fetch Gmail account address to confirm which account was linked
-      const profileRes = await fetch(`${GMAIL_API_BASE}/profile`, {
-        headers: { Authorization: `Bearer ${tokens.access_token}` },
-      });
-      const profile = profileRes.ok ? await profileRes.json() : {};
-      const gmailAddress = profile.emailAddress || 'unknown';
+      let gmailAddress = 'unknown';
+      if (tokens.id_token) {
+        try {
+          const payload = JSON.parse(atob(tokens.id_token.split('.')[1]));
+          if (payload.email) gmailAddress = payload.email;
+        } catch {}
+      }
+      if (gmailAddress === 'unknown') {
+        const profileRes = await fetch(`${GMAIL_API_BASE}/profile`, {
+          headers: { Authorization: `Bearer ${tokens.access_token}` },
+        });
+        if (profileRes.ok) {
+          const profile = await profileRes.json();
+          if (profile.emailAddress) gmailAddress = profile.emailAddress;
+        }
+      }
 
       const encKey    = env.TOKEN_ENCRYPTION_KEY;
       const encAccess = await encryptToken(tokens.access_token,  encKey);
@@ -506,7 +522,7 @@ export async function handleGmail(context, url, method) {
     return json({ error: 'Method not allowed' }, 405);
   } catch (err) {
     console.error('[gmail] error:', err);
-    return json({ error: 'Internal server error' }, 500);
+    return json({ error: err.message || 'Internal server error' }, 500);
   }
 }
 

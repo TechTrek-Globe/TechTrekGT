@@ -41,7 +41,7 @@ To prevent cross-app schema collisions and maintain developer velocity, each app
 - Finance OS (finance/schema.sql): Manages personal accounting tables (accounts, bills, line_items, loans, household_settings, user_backups, user_backup_versions). Note: Legacy relational tables from earlier revisions have been archived into _bak_* tables.
 - Outpost Tracker (outpost/auction-schema.sql): Manages commercial resale tables (invoices, items, sales, platforms, comps, market_comps, supplies, listing_traffic, auction_item_analytics, outpost_sync_settings, api_integrations).
 - VineScout (vinescout/vinescout-schema.sql): Manages Amazon Vine analytics tables (vine_items, vine_orders, vine_tax_settings, vine_asin_cache).
-- Wayfinder (wayfinder/schema-wayfinder.sql): Manages travel coordination tables (journeys, itinerary_items, documents, import_jobs, budgets).
+- Wayfinder (wayfinder/schema-wayfinder.sql): Manages travel coordination tables (journeys, itinerary_items, documents, import_jobs, budgets, wayfinder_email_inboxes, wayfinder_gmail_connections).
 - Bourbon Sommelier: Maintains zero tables in D1. Bourbon ingests catalog data via an external Google Sheet CSV feed with edge caching in Cloudflare Cache API (300-second TTL) and static JSON fallbacks.
 
 ### 1.4 Namespace Isolation and Indexing Conventions
@@ -107,7 +107,7 @@ In a multi-application environment hosted on the same origin (techtrekgt.com), c
 ### 3.3 Session Transport Requirements
 
 - Browser SPA Clients: All client-side fetch requests must include credentials: 'include'. Direct storage of authentication tokens in localStorage or sessionStorage is strictly prohibited.
-- Non-Browser Clients: Automated test runners, CLI tools, and background daemons may authenticate by passing Authorization: Bearer <token>.
+- Non-Browser Clients: Automated test runners, CLI tools, and background daemons may authenticate by passing `Authorization: Bearer <token>`.
 - Single-Credential Invariant: Requests presenting both an auth_token cookie and an Authorization header are rejected with HTTP 400 to prevent ambiguous authentication states.
 
 ## 4. Token Revocation and Invalidation Mechanisms
@@ -148,14 +148,18 @@ This clears dead credentials from the user browser immediately, preventing conti
 ## 5. Architectural Documentation Governance and Purge State
 
 ### 5.1 Legacy Architecture Purge Record
+
 All legacy ARCHITECTURE.md files across the monorepo root and all sub-application directories have been permanently deleted. Generation, search, or reliance on ARCHITECTURE.md is strictly forbidden across the codebase.
 
 ### 5.2 Historical Artifact Quarantine
+
 - Incident Archive (docs/archive/incidents/): Contains all resolved historical incident analyses and diagnostic reports with [RESOLVED] headers.
 - Document Archive (docs/archive/): Contains legacy implementation plans, compliance audits, and reference guides with [ARCHIVED] headers.
 
 ### 5.3 Authoritative Distributed Documentation Standard
+
 The distributed 01-04 documentation suite is the sole architectural and state source of truth across the platform:
+
 - docs/01_identity.md: Application scope, tech stack, and role boundaries.
 - docs/02_arch.md: Architecture, folder structure, routing, and data flow.
 - docs/03_features.md: Implemented features, API endpoints, and user capabilities.

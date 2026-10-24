@@ -86,7 +86,7 @@ Authenticated users can import hotel and attraction booking confirmations throug
 
 ### 7.1 Email Forward Channel
 
-- Unique Trip Inbox Provisioning: Each user receives a unique forwarding address per journey, format `TT<6-digit-token>.<journey-slug>@techtrekgt.com` (e.g. `TT412312.poland2026@techtrekgt.com`). Provisioned via `POST /api/wayfinder/email-inboxes` - idempotent, returns existing address if already created.
+- Unique Trip Inbox Provisioning: Each user receives a unique forwarding address per journey, format `TT<6-digit-token>.<journey-slug>@techtrekgt.com` (e.g. `TT412312.poland2026@techtrekgt.com`). Provisioned via `POST /api/wayfinder/email-inboxes` - idempotent, returns existing address if already created. Resolves journeys where `created_by = user.userId` or `visibility = 'public'` (supporting platform-seeded expeditions like Poland 2026).
 - Cloudflare Email Worker: Worker exports an `email()` handler alongside `fetch()`. When a forwarded email arrives at a recognized inbox address, the worker: (1) looks up the inbox row by `email_address` to resolve `user_id` and `journey_id` (the unique token IS the access control, no sender verification required), (2) parses the MIME stream to extract plain text using a pure-runtime MIME walker with `quoted-printable` and `base64` decoding, (3) infers `item_type` (hotel, flight, train, activity, transport, dining, other) from subject keywords, (4) extracts confirmation number and check-in date via regex, (5) writes atomically to D1 via `env.DB.batch()`.
 - Inbox Stats: `wayfinder_email_inboxes.emails_received` counter and `last_received_at` updated on every successful import.
 - API: `GET /api/wayfinder/email-inboxes?journey_id=` - fetch inbox, `POST /api/wayfinder/email-inboxes` - provision, `DELETE /api/wayfinder/email-inboxes/:id` - deactivate.
@@ -100,3 +100,10 @@ Authenticated users can import hotel and attraction booking confirmations throug
 - Booking Query: Searches for messages from known booking providers (Booking.com, Airbnb, PKP, etc.) matching confirmation-related subjects, bounded by `after:YYYY/MM/DD before:YYYY/MM/DD`.
 - Revocation: `DELETE /api/wayfinder/gmail/:journeyId` calls Google revoke endpoint (best-effort), then zeroes encrypted token fields in D1 and marks `is_active = 0`.
 - API: `GET /api/wayfinder/gmail?journey_id=` - status, `POST /api/wayfinder/gmail/connect` - get auth URL, `POST /api/wayfinder/gmail/callback` - exchange code, `POST /api/wayfinder/gmail/sync` - incremental sync, `DELETE /api/wayfinder/gmail/:journeyId` - revoke.
+
+### 7.3 Booking Import UI Components
+
+- Dedicated Import Channels Card: [wayfinder/src/components/BookingImportChannels.jsx](file:///e:/TechTrekGT/wayfinder/src/components/BookingImportChannels.jsx) is integrated directly into [DocumentCenter.jsx](file:///e:/TechTrekGT/wayfinder/src/components/DocumentCenter.jsx). Surfaces dual-column management:
+  - Email Forwarding Column: Generates unique trip inbox address, 1-click clipboard copy with animated visual feedback, live processed email counters, and supported booking provider tags.
+  - Gmail API Column: Checks Google OAuth credential configuration status, handles connect authorization redirect, displays connected Gmail profile and last sync timestamp, triggers trip-date-scoped sync with immediate itinerary refresh, and allows secure token revocation.
+- Gmail OAuth Callback Receiver: [wayfinder/src/components/GmailCallback.jsx](file:///e:/TechTrekGT/wayfinder/src/components/GmailCallback.jsx) routes `/wayfinder/gmail-callback` to capture OAuth auth codes, verify HMAC state, exchange for encrypted tokens via `/api/wayfinder/gmail/callback`, and automatically redirect back to the Document Center.

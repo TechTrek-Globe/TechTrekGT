@@ -11,8 +11,8 @@ export async function handleBudget(context, url, method) {
 
     // Ownership check
     const journey = await env.DB.prepare(
-      'SELECT id FROM wayfinder_journeys WHERE id = ? AND created_by = ?'
-    ).bind(journeyId, user.userId).first();
+      `SELECT id FROM wayfinder_journeys WHERE (id = ? OR slug = ?) AND (created_by = ? OR visibility = 'public')`
+    ).bind(journeyId, journeyId, user.userId).first();
     if (!journey) return json({ error: 'Journey not found' }, 404);
 
     const expenses = await env.DB.prepare(

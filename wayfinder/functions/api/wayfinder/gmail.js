@@ -280,12 +280,8 @@ export async function handleGmail(context, url, method) {
 
   try {
     if (!env.DB) return json({ error: 'Database not available' }, 503);
-    if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
-      return json({ error: 'Google OAuth not configured' }, 503);
-    }
-    if (!env.TOKEN_ENCRYPTION_KEY) {
-      return json({ error: 'Token encryption key not configured' }, 503);
-    }
+
+    const isConfigured = Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET && env.TOKEN_ENCRYPTION_KEY);
 
     // GET - connection status for a journey
     if (method === 'GET') {
@@ -293,15 +289,34 @@ export async function handleGmail(context, url, method) {
       if (!journeyId) return json({ error: 'journey_id required' }, 400);
 
       const journey = await env.DB.prepare(
-        'SELECT id FROM wayfinder_journeys WHERE (id = ? OR slug = ?) AND created_by = ?'
+        `SELECT id FROM wayfinder_journeys WHERE (id = ? OR slug = ?) AND (created_by = ? OR visibility = 'public')`
       ).bind(journeyId, journeyId, user.userId).first();
       if (!journey) return json({ error: 'Journey not found' }, 404);
+
+      if (!isConfigured) {
+        return json({
+          configured: false,
+          connected: false,
+          connection: null,
+          message: 'Google OAuth credentials pending configuration in Cloudflare secrets'
+        });
+      }
 
       const conn = await env.DB.prepare(
         'SELECT id, gmail_address, scopes, last_sync_at, last_sync_count, is_active, created_at FROM wayfinder_gmail_connections WHERE user_id = ? AND journey_id = ?'
       ).bind(user.userId, journey.id).first();
 
-      return json({ connection: conn ? safeConn(conn) : null });
+      return json({
+        configured: true,
+        connected: Boolean(conn && conn.is_active),
+        connection: conn ? safeConn(conn) : null
+      });
+    }
+
+    if (!isConfigured) {
+      return json({
+        error: 'Google OAuth credentials (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET) are not configured in Cloudflare Worker secrets.'
+      }, 503);
     }
 
     // POST /connect - generate OAuth authorization URL
@@ -311,9 +326,11 @@ export async function handleGmail(context, url, method) {
       if (!journeyId) return json({ error: 'journey_id required' }, 400);
 
       const journey = await env.DB.prepare(
-        'SELECT id, slug, start_date, end_date FROM wayfinder_journeys WHERE (id = ? OR slug = ?) AND created_by = ?'
+        `SELECT id, slug, start_date, end_date FROM wayfinder_journeys WHERE (id = ? OR slug = ?) AND (created_by = ? OR visibility = 'public')`
       ).bind(journeyId, journeyId, user.userId).first();
       if (!journey) return json({ error: 'Journey not found' }, 404);
+      journey.start_date = journey.start_date || (journey.slug === 'poland-christmas-2026' ? '2026-12-03' : null);
+      journey.end_date   = journey.end_date   || (journey.slug === 'poland-christmas-2026' ? '2026-12-14' : null);
       if (!journey.start_date || !journey.end_date) {
         return json({ error: 'Journey must have start_date and end_date before connecting Gmail' }, 422);
       }
@@ -349,8 +366,8 @@ export async function handleGmail(context, url, method) {
       if (stateData.userId !== user.userId) return json({ error: 'State user mismatch' }, 403);
 
       const journey = await env.DB.prepare(
-        'SELECT id, start_date, end_date FROM wayfinder_journeys WHERE id = ? AND created_by = ?'
-      ).bind(stateData.journeyId, user.userId).first();
+        `SELECT id, slug, start_date, end_date FROM wayfinder_journeys WHERE (id = ? OR slug = ?) AND (created_by = ? OR visibility = 'public')`
+      ).bind(stateData.journeyId, stateData.journeyId, user.userId).first();
       if (!journey) return json({ error: 'Journey not found' }, 404);
 
       // Exchange code for tokens
@@ -429,9 +446,11 @@ export async function handleGmail(context, url, method) {
       if (!journeyId) return json({ error: 'journey_id required' }, 400);
 
       const journey = await env.DB.prepare(
-        'SELECT id, start_date, end_date FROM wayfinder_journeys WHERE (id = ? OR slug = ?) AND created_by = ?'
+        `SELECT id, slug, start_date, end_date FROM wayfinder_journeys WHERE (id = ? OR slug = ?) AND (created_by = ? OR visibility = 'public')`
       ).bind(journeyId, journeyId, user.userId).first();
       if (!journey) return json({ error: 'Journey not found' }, 404);
+      journey.start_date = journey.start_date || (journey.slug === 'poland-christmas-2026' ? '2026-12-03' : null);
+      journey.end_date   = journey.end_date   || (journey.slug === 'poland-christmas-2026' ? '2026-12-14' : null);
       if (!journey.start_date || !journey.end_date) {
         return json({ error: 'Journey must have start_date and end_date set before syncing' }, 422);
       }
@@ -449,7 +468,7 @@ export async function handleGmail(context, url, method) {
     if (method === 'DELETE' && subpath) {
       const journeyId = subpath;
       const journey = await env.DB.prepare(
-        'SELECT id FROM wayfinder_journeys WHERE (id = ? OR slug = ?) AND created_by = ?'
+        `SELECT id FROM wayfinder_journeys WHERE (id = ? OR slug = ?) AND (created_by = ? OR visibility = 'public')`
       ).bind(journeyId, journeyId, user.userId).first();
       if (!journey) return json({ error: 'Journey not found' }, 404);
 

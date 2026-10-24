@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useWayfinder } from '../context/WayfinderContext';
 import { saveLocalDocumentFile, getLocalDocumentFile } from '../utils/documentStorage';
+import { BookingImportChannels } from './BookingImportChannels';
 import {
   UploadCloud, File, FileText, Download, Eye, ShieldCheck, Loader2,
   CheckCircle2, AlertTriangle, X, Check, RefreshCw, ArrowRight, Upload,
@@ -358,6 +359,9 @@ export function DocumentCenter() {
 
   return (
     <div className="space-y-8">
+      {/* Automated Booking Importers (Email Forwarding & Gmail Sync) */}
+      <BookingImportChannels />
+
       {/* Upload Header */}
       <div className="glass-panel p-8 rounded-3xl flex flex-col md:flex-row items-center justify-between gap-6">
         <div>

@@ -6,6 +6,7 @@ const PolandLanding = React.lazy(() => import('./components/PolandLanding').then
 const CityPage = React.lazy(() => import('./components/CityPage').then(m => ({ default: m.CityPage })));
 const PracticalPage = React.lazy(() => import('./components/PracticalPage').then(m => ({ default: m.PracticalPage })));
 const PrivateHub = React.lazy(() => import('./components/PrivateHub').then(m => ({ default: m.PrivateHub })));
+const GmailCallback = React.lazy(() => import('./components/GmailCallback').then(m => ({ default: m.GmailCallback })));
 
 // Simple client-side router
 function App() {
@@ -96,6 +97,10 @@ function App() {
 
     if (normalizedPath.startsWith('/wayfinder/poland-christmas-2026/private')) {
       return <PrivateHub currentPath={normalizedPath} />;
+    }
+
+    if (normalizedPath === '/wayfinder/gmail-callback' || normalizedPath === '/wayfinder/gmail-callback/') {
+      return <GmailCallback />;
     }
 
     // Other Poland 2026 routes will go here once built

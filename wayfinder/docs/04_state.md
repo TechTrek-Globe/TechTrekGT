@@ -32,8 +32,8 @@ The core travel guide data lives in the centralized data module [wayfinder/src/d
 Private travel data persists in the shared Cloudflare D1 database (personal-budget-db) governed by [wayfinder/schema-wayfinder.sql](file:///e:/TechTrekGT/wayfinder/schema-wayfinder.sql):
 
 - Table wayfinder_journeys:
-  - Stores journey containers (such as poland-christmas-2026) linked to owning user_id.
-  - Fields: id, user_id, title, destination, start_date, end_date, created_at, updated_at.
+  - Stores journey containers (such as poland-christmas-2026) with ownership and visibility flags.
+  - Fields: id, slug, title, tagline, description, hero_image_url, start_month, start_year, start_date, end_date, status, visibility, created_by, created_at, updated_at.
 - Table wayfinder_itinerary_items:
   - Stores scheduled events and milestones within a journey.
   - Fields: id, journey_id, user_id, title, city, category (transport, hotel, attraction, dining, market), start_time, end_time, location, notes, cost_pln, cost_usd, status.
@@ -63,6 +63,7 @@ Transient edge state is isolated to specific performance and security layers:
 ### 6.1 Email Inbox Table (wayfinder_email_inboxes)
 
 Stores the unique per-user per-journey forwarding address records:
+
 - `id`, `user_id`, `journey_id`: ownership identifiers.
 - `inbox_token`: 6-digit random numeric token used in the local-part of the email address.
 - `email_address`: fully constructed address (e.g. `TT412312.poland2026@techtrekgt.com`). UNIQUE indexed for fast Email Worker lookup.
@@ -72,6 +73,7 @@ Stores the unique per-user per-journey forwarding address records:
 ### 6.2 Gmail Connection Table (wayfinder_gmail_connections)
 
 Stores encrypted OAuth token state for the Gmail import channel:
+
 - `id`, `user_id`, `journey_id`: ownership identifiers.
 - `gmail_address`: confirmed Gmail account address from profile API.
 - `encrypted_access_token`, `encrypted_refresh_token`: AES-256-GCM encrypted (PBKDF2-derived from `TOKEN_ENCRYPTION_KEY`, 100k iterations). Base64-encoded with IV prepended (12 bytes).
@@ -82,11 +84,10 @@ Stores encrypted OAuth token state for the Gmail import channel:
 - `is_active`, `revoked_at`: revocation state. Revocation zeroes both encrypted token fields.
 - Constraints: `UNIQUE(user_id, journey_id)` - one connection per journey.
 
-### 6.3 New Secrets Required
+### 6.3 Secrets Configuration Status
 
-Three new secrets must be provisioned via `wrangler secret put` for the Gmail channel:
-- `TOKEN_ENCRYPTION_KEY` - high-entropy string used as AES-256-GCM key material (PBKDF2 derivation). Also used by Outpost for eBay token encryption.
-- `GOOGLE_CLIENT_ID` - Google Cloud OAuth 2.0 application client ID.
-- `GOOGLE_CLIENT_SECRET` - Google Cloud OAuth 2.0 application client secret.
+- `TOKEN_ENCRYPTION_KEY` - Provisioned in Cloudflare Workers secrets (256-bit AES-GCM key material for token encryption).
+- `GOOGLE_CLIENT_ID` - Provisioned in Cloudflare Workers secrets (Google Cloud OAuth 2.0 application client ID).
+- `GOOGLE_CLIENT_SECRET` - Provisioned in Cloudflare Workers secrets (Google Cloud OAuth 2.0 application client secret).
 
-The Email Forward channel requires no additional secrets - it relies on the existing `DB` binding and the unique inbox token as implicit access control.
+The Email Forward channel requires no additional secrets: it relies on the existing `DB` binding and the unique inbox token as implicit access control.

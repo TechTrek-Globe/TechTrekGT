@@ -35,7 +35,7 @@ export async function handleEmailInboxes(context, url, method) {
       if (!journeyId) return json({ error: 'journey_id required' }, 400);
 
       const journey = await env.DB.prepare(
-        `SELECT id, slug FROM wayfinder_journeys WHERE (id = ? OR slug = ?) AND created_by = ?`
+        `SELECT id, slug FROM wayfinder_journeys WHERE (id = ? OR slug = ?) AND (created_by = ? OR visibility = 'public')`
       ).bind(journeyId, journeyId, user.userId).first();
       if (!journey) return json({ error: 'Journey not found' }, 404);
 
@@ -53,7 +53,7 @@ export async function handleEmailInboxes(context, url, method) {
       if (!journeyId) return json({ error: 'journey_id required' }, 400);
 
       const journey = await env.DB.prepare(
-        `SELECT id, slug FROM wayfinder_journeys WHERE (id = ? OR slug = ?) AND created_by = ?`
+        `SELECT id, slug FROM wayfinder_journeys WHERE (id = ? OR slug = ?) AND (created_by = ? OR visibility = 'public')`
       ).bind(journeyId, journeyId, user.userId).first();
       if (!journey) return json({ error: 'Journey not found' }, 404);
 

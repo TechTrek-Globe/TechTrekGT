@@ -14,6 +14,8 @@ CREATE TABLE IF NOT EXISTS wayfinder_journeys (
   hero_image_url  TEXT,
   start_month     TEXT,
   start_year      INTEGER,
+  start_date      TEXT,
+  end_date        TEXT,
   status          TEXT NOT NULL DEFAULT 'planning',
   visibility      TEXT NOT NULL DEFAULT 'private',
   created_by      TEXT NOT NULL,

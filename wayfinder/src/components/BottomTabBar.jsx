@@ -31,8 +31,23 @@ export function BottomTabBar({ currentPath, onOpenConverter }) {
 
   const isCities = currentPath.startsWith(`${BASE}/cities`) || currentPath === BASE || currentPath === `${BASE}/`;
   const isDocs = currentPath.includes('/documents');
-  const isSchedule = (currentPath.startsWith(`${BASE}/private`) && !isDocs) || currentPath.includes('/itinerary') || currentPath.includes('/timeline');
+  const isSchedule = currentPath.includes('scroll=journey-sequence') || currentPath.includes('#journey-sequence') || (currentPath.startsWith(`${BASE}/private`) && !isDocs);
   const isPractical = currentPath.startsWith(`${BASE}/practical`);
+
+  const handleScheduleClick = (e) => {
+    e.preventDefault();
+    const isMain = currentPath === BASE || currentPath === `${BASE}/` || currentPath === '/wayfinder' || currentPath === '/wayfinder/';
+    if (isMain) {
+      const el = document.getElementById('journey-sequence');
+      if (el) {
+        const yOffset = -80;
+        const y = el.getBoundingClientRect().top + window.pageYOffset + yOffset;
+        window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
+        return;
+      }
+    }
+    pushRoute(e, `${BASE}?scroll=journey-sequence`);
+  };
 
   return (
     <nav
@@ -50,9 +65,9 @@ export function BottomTabBar({ currentPath, onOpenConverter }) {
         <TabItem
           icon={CalendarClock}
           label="Schedule"
-          href={`${BASE}/private`}
+          href={`${BASE}?scroll=journey-sequence`}
           isActive={isSchedule}
-          onClick={(e) => pushRoute(e, `${BASE}/private`)}
+          onClick={handleScheduleClick}
         />
         <TabItem
           icon={Backpack}

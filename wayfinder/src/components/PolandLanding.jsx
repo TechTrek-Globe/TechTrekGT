@@ -1,19 +1,339 @@
-import React from 'react';
-import { Compass, Map, Calendar, Train, Utensils, Bed, ArrowRight, CheckCircle2, MapPin, Plane } from 'lucide-react';
+import React, { useState } from 'react';
+import { 
+  Compass, Map, Calendar, Train, Utensils, Bed, ArrowRight, CheckCircle2, 
+  MapPin, Plane, Clock, Sparkles, Building, Landmark, Coffee, Lock,
+  ChevronDown, ChevronUp, Layers, Eye, ShieldCheck, FileText
+} from 'lucide-react';
 import { polandJourney } from '../data/poland-2026';
 import { cityImages } from '../utils/cityImages';
 import polandMapRouteClean from '../assets/poland-map-route-clean.png';
+import { useAuth } from '../context/AuthContext';
+import { useWayfinder } from '../context/WayfinderContext';
+import { PrivateBookingCard } from './itinerary/PrivateBookingCard';
 
-function CityRouteCard({ city, idx, totalCount, pushRoute }) {
+const stopTransitInfo = {
+  krakow: {
+    arrivalBadge: '✈️ Air Arrival: DL9208 into KRK at 13:30',
+    arrivalSub: 'Delta DL9208 (AMS -> KRK). Clear border control and board direct SKA1 commuter rail into Kraków Główny.',
+    nextTransitTitle: 'PKP Intercity IC Train: Kraków Główny ➔ Wrocław Główny',
+    nextTransitDetails: 'Departs Kraków Główny 11:30 • Arrives Wrocław Główny 14:15 • ~2h 45m in 1st Class',
+    nextTransitNotes: '1st-class carriages with dedicated luggage racks • Scenic Lower Silesian winter route'
+  },
+  wroclaw: {
+    arrivalBadge: '🚆 Direct PKP Intercity IC from Kraków Główny',
+    arrivalSub: 'Arrives Wrocław Główny at 14:15. Settle into lodging base near Market Square or Ostrów Tumski.',
+    nextTransitTitle: 'PKP Intercity IC Train: Wrocław Główny ➔ Poznań Główny',
+    nextTransitDetails: 'Departs Wrocław Główny 10:35 • Arrives Poznań Główny 12:15 • ~1h 40m in 1st Class',
+    nextTransitNotes: 'Northbound rail transition into Greater Poland (Wielkopolska)'
+  },
+  poznan: {
+    arrivalBadge: '🚆 Direct PKP Intercity IC from Wrocław Główny',
+    arrivalSub: 'Arrives Poznań Główny at 12:15. Check into central base near Stary Rynek & Plac Wolności.',
+    nextTransitTitle: 'PKP Morning Rail: Poznań Główny ➔ Toruń Główny (Day Stop)',
+    nextTransitDetails: 'Departs Poznań Główny 08:30 • Arrives Toruń Główny 10:15 • ~1h 45m',
+    nextTransitNotes: 'Store luggage in Toruń Główny station lockers • Short bus across Vistula River'
+  },
+  torun: {
+    arrivalBadge: '🚆 Morning Rail from Poznań for 4-6hr UNESCO Day Stop',
+    arrivalSub: 'Luggage in station lockers. Explore Gothic Old Town, Copernicus House & Living Gingerbread Museum.',
+    nextTransitTitle: 'PKP Coastal Rail: Toruń Główny ➔ Gdańsk Główny',
+    nextTransitDetails: 'Departs Toruń Główny 15:45 • Arrives Gdańsk Główny 17:30 • ~1h 45m',
+    nextTransitNotes: 'Collect luggage from lockers • Direct scenic rail north to the Baltic Coast'
+  },
+  gdansk: {
+    arrivalBadge: '🚆 Coastal Rail Arrival from Toruń onto the Baltic Coast',
+    arrivalSub: 'Arrives Gdańsk Główny at 17:30. Check into waterfront or Granary Island base for 3-night holiday finale.',
+    nextTransitTitle: '✈️ Return Flight: Gdańsk Lech Wałęsa (GDN) ➔ Home',
+    nextTransitDetails: 'Early airport transfer (04:30) for DL9528 departure at 06:45',
+    nextTransitNotes: 'Pre-book taxi or Bolt 35 min to airport • Ample time for international check-in & security'
+  }
+};
+
+function getIconForType(type) {
+  switch (type) {
+    case 'flight': return <Plane className="w-4 h-4" />;
+    case 'rail': return <Train className="w-4 h-4" />;
+    case 'hotel': return <Building className="w-4 h-4" />;
+    case 'market': return <Sparkles className="w-4 h-4" />;
+    case 'sight': return <Landmark className="w-4 h-4" />;
+    case 'food': return <Utensils className="w-4 h-4" />;
+    case 'cafe': return <Coffee className="w-4 h-4" />;
+    default: return <Clock className="w-4 h-4" />;
+  }
+}
+
+function getStyleForType(type) {
+  switch (type) {
+    case 'flight': return 'bg-sky-500/15 text-sky-300 border-sky-500/30';
+    case 'rail': return 'bg-amber-500/15 text-amber-300 border-amber-500/30';
+    case 'hotel': return 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30';
+    case 'market': return 'bg-purple-500/15 text-purple-300 border-purple-500/30';
+    case 'sight': return 'bg-blue-500/15 text-blue-300 border-blue-500/30';
+    case 'food': return 'bg-amber-400/15 text-amber-200 border-amber-400/30';
+    case 'cafe': return 'bg-amber-500/15 text-amber-200 border-amber-500/30';
+    default: return 'bg-white/10 text-white border-white/15';
+  }
+}
+
+function getBadgeForType(type) {
+  switch (type) {
+    case 'flight': return 'bg-sky-500/20 text-sky-300 border-sky-400/40';
+    case 'rail': return 'bg-amber-500/20 text-amber-300 border-amber-400/40';
+    case 'hotel': return 'bg-emerald-500/20 text-emerald-300 border-emerald-400/40';
+    case 'market': return 'bg-purple-500/20 text-purple-300 border-purple-400/40';
+    case 'sight': return 'bg-blue-500/20 text-blue-300 border-blue-400/40';
+    case 'food': return 'bg-amber-400/20 text-amber-200 border-amber-400/40';
+    default: return 'bg-white/10 text-white border-white/20';
+  }
+}
+
+function getDaysForCity(cityId) {
+  return (polandJourney.itinerary || []).filter(dayItem => {
+    if (dayItem.cityId === cityId) return true;
+    if (dayItem.cityIds && dayItem.cityIds.includes(cityId)) return true;
+    if (cityId === 'torun' && dayItem.cityName && dayItem.cityName.includes('Toruń')) return true;
+    return false;
+  }).map(dayItem => {
+    if (dayItem.day === 7) {
+      if (cityId === 'torun') {
+        return {
+          ...dayItem,
+          theme: 'UNESCO Gingerbread Day Stop (Vistula River)',
+          schedule: dayItem.schedule.filter(s => ['07:45', '08:30', '10:30', '12:00', '13:30', '15:45'].includes(s.time))
+        };
+      }
+      if (cityId === 'gdansk') {
+        return {
+          ...dayItem,
+          theme: 'Baltic Coast Arrival & Targ Węglowy Market',
+          schedule: dayItem.schedule.filter(s => ['18:00', '19:00'].includes(s.time))
+        };
+      }
+    }
+    return dayItem;
+  });
+}
+
+function JourneyStopSchedule({
+  city,
+  idx,
+  totalCount,
+  days,
+  privateItems,
+  accommodations,
+  pushRoute,
+  isExpanded,
+  onToggleExpand,
+  transitInfo
+}) {
+  return (
+    <div className="space-y-4">
+      {/* Stop Card */}
+      <div className="glass-panel rounded-3xl border border-amber-500/30 overflow-hidden shadow-2xl bg-gradient-to-br from-wf-navy-mid/95 via-slate-900/90 to-slate-950">
+        {/* Stop Header Banner */}
+        <div className="p-4 sm:p-6 border-b border-white/10 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="flex items-center space-x-3 sm:space-x-4 min-w-0">
+            {/* Thumbnail */}
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl overflow-hidden border-2 border-amber-400 shrink-0 shadow-lg relative bg-slate-950">
+              <img
+                src={cityImages[city.id]}
+                alt={city.name}
+                className="w-full h-full object-cover"
+                loading="lazy"
+              />
+            </div>
+
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-1">
+                <span className="px-2.5 py-0.5 rounded-full bg-amber-500 text-slate-950 font-black text-[10px] sm:text-xs uppercase tracking-wider shadow-sm">
+                  Stop 0{idx + 1}
+                </span>
+                <span className="px-2.5 py-0.5 rounded-full bg-sky-500/20 border border-sky-400/40 text-sky-300 font-bold text-[10px] sm:text-xs">
+                  {city.nights > 0 ? `${city.nights} Nights` : 'Day Stop'}
+                </span>
+                {city.itineraryDates && (
+                  <span className="text-xs font-semibold text-amber-200/90">
+                    {city.itineraryDates}
+                  </span>
+                )}
+              </div>
+
+              <h3 className="text-2xl sm:text-3xl font-black text-white leading-tight truncate">
+                {city.name}
+              </h3>
+
+              {transitInfo?.arrivalBadge && (
+                <div className="text-xs text-sky-300 font-medium mt-1 flex items-center space-x-1.5">
+                  <span className="truncate">{transitInfo.arrivalBadge}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Stop Actions & Guide Links */}
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <a
+              href={`/wayfinder/poland-christmas-2026/cities/${city.id}`}
+              onClick={(e) => pushRoute(e, `/wayfinder/poland-christmas-2026/cities/${city.id}`)}
+              className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center space-x-1.5 transition-all shadow-md hover-lift min-h-[38px]"
+            >
+              <span>{city.name} Guide</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </a>
+            <a
+              href={`/wayfinder/poland-christmas-2026/cities/${city.id}/markets`}
+              onClick={(e) => pushRoute(e, `/wayfinder/poland-christmas-2026/cities/${city.id}/markets`)}
+              className="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 text-xs font-semibold transition-colors min-h-[38px] flex items-center"
+            >
+              <span>Markets</span>
+            </a>
+            <a
+              href={`/wayfinder/poland-christmas-2026/cities/${city.id}/attractions`}
+              onClick={(e) => pushRoute(e, `/wayfinder/poland-christmas-2026/cities/${city.id}/attractions`)}
+              className="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 text-xs font-semibold transition-colors min-h-[38px] flex items-center"
+            >
+              <span>Sights</span>
+            </a>
+            <button
+              onClick={onToggleExpand}
+              className="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/15 text-white text-xs font-bold flex items-center space-x-1.5 transition-colors min-h-[38px]"
+              aria-label={isExpanded ? 'Collapse schedule' : 'Expand schedule'}
+            >
+              <span>{isExpanded ? 'Hide Schedule' : `View ${days.length} Days`}</span>
+              {isExpanded ? <ChevronUp className="w-4 h-4 text-amber-400" /> : <ChevronDown className="w-4 h-4 text-amber-400" />}
+            </button>
+          </div>
+        </div>
+
+        {/* Expandable Schedule Body */}
+        {isExpanded && (
+          <div className="p-4 sm:p-6 space-y-8 animate-fade-in">
+            {days.map((dayItem) => {
+              const dayPrivate = (privateItems || []).filter(p => {
+                const d = p.item_date || p.start_date || p.date || p.booking_date || '';
+                return d && d.toString().startsWith(dayItem.date);
+              });
+              const dayAccommodations = (accommodations || []).filter(a => a.check_in_date === dayItem.date);
+
+              return (
+                <div key={dayItem.day} className="space-y-4">
+                  {/* Day Header Sub-strip */}
+                  <div className="p-3 rounded-2xl bg-slate-950/80 border border-amber-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-inner">
+                    <div className="flex items-center space-x-3">
+                      <span className="px-2.5 py-1 rounded-xl bg-amber-500/20 border border-amber-400/40 text-amber-300 font-black text-xs">
+                        Day 0{dayItem.day}
+                      </span>
+                      <div>
+                        <div className="text-sm font-bold text-white flex items-center space-x-2">
+                          <span>{dayItem.displayDate}</span>
+                          <span className="text-slate-500">•</span>
+                          <span className="text-amber-300 font-medium text-xs">{dayItem.theme}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {dayItem.base && (
+                      <div className="text-xs text-slate-400 flex items-center space-x-1">
+                        <Building className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                        <span className="truncate max-w-[260px]">{dayItem.base}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Day Events Timeline */}
+                  <div className="space-y-3 pl-4 sm:pl-6 border-l-2 border-amber-500/30 ml-3 sm:ml-4">
+                    {/* Private D1 Bookings for this day */}
+                    {dayPrivate.map((pItem, pIdx) => (
+                      <PrivateBookingCard key={`priv-${dayItem.day}-${pIdx}`} item={pItem} />
+                    ))}
+                    {dayAccommodations.map((booking) => (
+                      <PrivateBookingCard key={booking.id} item={booking} />
+                    ))}
+
+                    {/* Standard Scheduled Events */}
+                    {dayItem.schedule.map((event, eIdx) => (
+                      <div key={eIdx} className="relative group">
+                        <div className="absolute -left-[23px] sm:-left-[31px] top-4 w-4 h-4 rounded-full border-2 border-slate-950 bg-amber-400 group-hover:scale-125 transition-transform shadow-[0_0_8px_rgba(245,158,11,0.8)]" />
+                        <div className="glass-panel p-4 rounded-2xl border border-white/10 group-hover:border-amber-500/40 transition-all shadow-md bg-slate-900/90 space-y-2.5">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div className="flex items-center space-x-2.5">
+                              <div className={`p-2 rounded-xl border ${getStyleForType(event.itemType)} shrink-0`}>
+                                {getIconForType(event.itemType)}
+                              </div>
+                              <div>
+                                <h4 className="font-bold text-white text-sm sm:text-base leading-tight group-hover:text-amber-200 transition-colors">
+                                  {event.title}
+                                </h4>
+                                {event.location && (
+                                  <div className="text-xs text-slate-400 flex items-center space-x-1 mt-0.5">
+                                    <MapPin className="w-3 h-3 text-amber-400 shrink-0" />
+                                    <span>{event.location}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center space-x-2 shrink-0 self-start sm:self-center">
+                              {event.badge && (
+                                <span className={`px-2 py-0.5 rounded-full border text-[10px] font-black uppercase tracking-wider ${getBadgeForType(event.itemType)}`}>
+                                  {event.badge}
+                                </span>
+                              )}
+                              <span className="px-2 py-0.5 rounded-lg bg-slate-950 border border-white/10 font-mono font-bold text-xs text-sky-300">
+                                {event.time}
+                              </span>
+                            </div>
+                          </div>
+
+                          <p className="text-xs sm:text-sm text-slate-200 leading-relaxed font-medium">
+                            {event.description}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Transit Connector to Next Stop */}
+      {idx < totalCount - 1 && transitInfo?.nextTransitTitle && (
+        <div className="my-2 p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/25 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md">
+          <div className="flex items-center space-x-3">
+            <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 shrink-0 border border-amber-500/30">
+              <Train className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="text-xs font-bold text-white flex items-center space-x-2">
+                <span>{transitInfo.nextTransitTitle}</span>
+              </div>
+              <div className="text-[11px] text-amber-300/90 font-medium">
+                {transitInfo.nextTransitDetails}
+              </div>
+            </div>
+          </div>
+          <span className="text-[10px] text-slate-400 hidden md:inline">
+            {transitInfo.nextTransitNotes}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CityRouteCard({ city, idx, totalCount, pushRoute, onSelectSchedule }) {
   return (
     <div 
-      className="glass-panel rounded-2xl relative hover-lift cursor-pointer overflow-hidden border border-white/5 hover:border-amber-500/40 transition-colors group" 
+      className="glass-panel rounded-2xl relative hover-lift cursor-pointer overflow-hidden border border-white/5 hover:border-amber-500/40 transition-colors group flex flex-col justify-between" 
       onClick={(e) => pushRoute(e, `/wayfinder/poland-christmas-2026/cities/${city.id}`)}
     >
       {idx < totalCount - 1 && (
         <div className="hidden lg:block absolute top-1/2 -right-4 w-4 h-px bg-white/20 z-10" />
       )}
-      <div className="h-48 sm:h-52 w-full relative overflow-hidden bg-slate-950">
+      <div className="h-44 sm:h-48 w-full relative overflow-hidden bg-slate-950">
         <img 
           src={cityImages[city.id]} 
           alt={city.name} 
@@ -24,24 +344,37 @@ function CityRouteCard({ city, idx, totalCount, pushRoute }) {
         <div className="absolute inset-0 bg-gradient-to-t from-wf-navy via-wf-navy/50 to-transparent"></div>
       </div>
 
-      <div className="p-4 relative z-10">
-        <div className="text-amber-300 text-[10px] font-black uppercase tracking-widest mb-1 drop-shadow-md">
-          Stop 0{idx + 1}
+      <div className="p-4 relative z-10 flex-1 flex flex-col justify-between">
+        <div>
+          <div className="text-amber-300 text-[10px] font-black uppercase tracking-widest mb-1 drop-shadow-md">
+            Stop 0{idx + 1}
+          </div>
+          <h3 className="text-xl font-bold text-white mb-1 drop-shadow-md">{city.name}</h3>
+          <div className="flex items-center justify-between gap-1 mb-2">
+            <p className="text-xs text-amber-100/80 font-medium">
+              {city.nights > 0 ? `${city.nights} nights` : 'Day Stop'}
+            </p>
+            {city.itineraryDates && (
+              <span className="text-[10px] px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
+                {city.itineraryDates.split(',')[0]}
+              </span>
+            )}
+          </div>
+          <div className="text-xs text-wf-cream/80 line-clamp-2 leading-relaxed mb-3">
+            {city.focus}
+          </div>
         </div>
-        <h3 className="text-xl font-bold text-white mb-1 drop-shadow-md">{city.name}</h3>
-        <div className="flex items-center justify-between gap-1 mb-2">
-          <p className="text-xs text-amber-100/80 font-medium">
-            {city.nights > 0 ? `${city.nights} nights` : 'Day Stop'}
-          </p>
-          {city.itineraryDates && (
-            <span className="text-[10px] px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
-              {city.itineraryDates.split(',')[0]}
-            </span>
-          )}
-        </div>
-        <div className="text-xs text-wf-cream/80 line-clamp-2 leading-relaxed">
-          {city.focus}
-        </div>
+
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelectSchedule(city.id);
+          }}
+          className="w-full py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-bold transition-colors flex items-center justify-center space-x-1"
+        >
+          <Calendar className="w-3.5 h-3.5" />
+          <span>View Stop Schedule</span>
+        </button>
       </div>
     </div>
   );
@@ -72,6 +405,36 @@ export function PolandLanding() {
       }
     }
   }, []);
+
+  const { isAuthenticated, user, setIsAuthModalOpen } = useAuth();
+  const { itinerary: privateItems = [], accommodations = [] } = useWayfinder() || {};
+  const [selectedStopFilter, setSelectedStopFilter] = useState('all');
+  const [viewMode, setViewMode] = useState('schedule');
+  const [expandedStops, setExpandedStops] = useState({
+    krakow: true,
+    wroclaw: true,
+    poznan: true,
+    torun: true,
+    gdansk: true
+  });
+
+  const toggleStopExpand = (stopId) => {
+    setExpandedStops(prev => ({ ...prev, [stopId]: !prev[stopId] }));
+  };
+
+  const toggleAllStops = (expand) => {
+    setExpandedStops({
+      krakow: expand,
+      wroclaw: expand,
+      poznan: expand,
+      torun: expand,
+      gdansk: expand
+    });
+  };
+
+  const filteredRoute = selectedStopFilter === 'all'
+    ? polandJourney.route
+    : polandJourney.route.filter(c => c.id === selectedStopFilter);
 
   return (
     <div className="w-full pb-20 space-y-8">
@@ -220,37 +583,171 @@ export function PolandLanding() {
           </div>
         </div>
 
-        {/* Journey Sequence Grid */}
-        <section id="journey-sequence" className="space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <h2 className="text-2xl font-bold text-white flex items-center space-x-3">
-              <Map className="w-6 h-6 text-wf-blue-lt" />
-              <span>Journey Sequence</span>
-            </h2>
-            <div className="flex items-center space-x-2">
-              <a
-                href="/wayfinder/poland-christmas-2026/private"
-                onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026/private')}
-                className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 hover:text-white text-xs font-semibold flex items-center space-x-1.5 transition-colors min-h-[36px]"
-              >
-                <Calendar className="w-3.5 h-3.5 text-amber-400" />
-                <span>10-Day Schedule</span>
-              </a>
+        {/* Journey Sequence Section */}
+        <section id="journey-sequence" className="space-y-6 pt-2">
+          {/* Section Header with Live Schedule Status */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
+            <div>
+              <div className="flex items-center space-x-3">
+                <Map className="w-6 h-6 text-amber-400" />
+                <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                  Journey Sequence & 10-Day Schedule
+                </h2>
+              </div>
+              <p className="text-xs sm:text-sm text-slate-300 mt-1">
+                {isAuthenticated ? (
+                  <span className="text-emerald-400 font-medium flex items-center space-x-1.5">
+                    <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>Signed In as {user?.name || user?.email || 'Traveler'} : Verified expedition schedule active with private confirmations</span>
+                  </span>
+                ) : (
+                  <span>Official 10-day winter itinerary connecting all 5 stops from Kraków to Gdańsk</span>
+                )}
+              </p>
+            </div>
 
+            {/* Quick Actions */}
+            <div className="flex items-center space-x-2 shrink-0">
+              {isAuthenticated ? (
+                <a
+                  href="/wayfinder/poland-christmas-2026/private/documents"
+                  onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026/private/documents')}
+                  className="px-3 py-1.5 rounded-xl bg-wf-navy border border-wf-blue/30 text-wf-blue-lt hover:bg-wf-navy-lt text-xs font-semibold flex items-center space-x-1.5 transition-colors min-h-[36px]"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>Document Vault</span>
+                </a>
+              ) : (
+                <button
+                  onClick={() => setIsAuthModalOpen(true)}
+                  className="px-3 py-1.5 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 border border-sky-400/40 text-sky-300 text-xs font-semibold flex items-center space-x-1.5 transition-colors min-h-[36px]"
+                >
+                  <Lock className="w-3.5 h-3.5" />
+                  <span>Sign In for Private Bookings</span>
+                </button>
+              )}
             </div>
           </div>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4 lg:gap-5">
-            {polandJourney.route.map((city, idx) => (
-              <CityRouteCard
-                key={city.id}
-                city={city}
-                idx={idx}
-                totalCount={polandJourney.route.length}
-                pushRoute={pushRoute}
-              />
-            ))}
+
+          {/* Controls Bar: Stop Filter Pills + View Mode Toggle */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-slate-900/60 p-2.5 rounded-2xl border border-white/5 backdrop-blur-md">
+            {/* Stop Filter Pills */}
+            <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
+              <button
+                onClick={() => setSelectedStopFilter('all')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap min-h-[34px] ${
+                  selectedStopFilter === 'all'
+                    ? 'bg-amber-500 text-slate-950 shadow-md'
+                    : 'text-slate-300 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                All Stops (5)
+              </button>
+              {polandJourney.route.map((city, idx) => (
+                <button
+                  key={city.id}
+                  onClick={() => setSelectedStopFilter(city.id)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap min-h-[34px] flex items-center space-x-1 ${
+                    selectedStopFilter === city.id
+                      ? 'bg-amber-500 text-slate-950 shadow-md'
+                      : 'text-slate-300 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  <span>0{idx + 1}</span>
+                  <span>{city.name}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* View Mode & Expand Controls */}
+            <div className="flex items-center space-x-2 shrink-0 self-end md:self-center">
+              {viewMode === 'schedule' && (
+                <div className="flex items-center space-x-1 bg-slate-950/80 p-0.5 rounded-xl border border-white/10 text-[11px] font-semibold text-slate-300">
+                  <button
+                    onClick={() => toggleAllStops(true)}
+                    className="px-2 py-1 hover:text-white rounded-lg transition-colors"
+                  >
+                    Expand All
+                  </button>
+                  <span className="text-white/20">|</span>
+                  <button
+                    onClick={() => toggleAllStops(false)}
+                    className="px-2 py-1 hover:text-white rounded-lg transition-colors"
+                  >
+                    Collapse
+                  </button>
+                </div>
+              )}
+
+              <div className="flex items-center space-x-1 bg-slate-950/80 p-1 rounded-xl border border-white/10">
+                <button
+                  onClick={() => setViewMode('schedule')}
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center space-x-1.5 transition-colors ${
+                    viewMode === 'schedule'
+                      ? 'bg-amber-500 text-slate-950 shadow-sm'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                  title="Full Schedule Timeline View"
+                >
+                  <Calendar className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Schedule View</span>
+                </button>
+                <button
+                  onClick={() => setViewMode('cards')}
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center space-x-1.5 transition-colors ${
+                    viewMode === 'cards'
+                      ? 'bg-amber-500 text-slate-950 shadow-sm'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                  title="Compact Cards View"
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Cards View</span>
+                </button>
+              </div>
+            </div>
           </div>
+
+          {/* View Body */}
+          {viewMode === 'cards' ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4 lg:gap-5 animate-fade-in">
+              {filteredRoute.map((city) => (
+                <CityRouteCard
+                  key={city.id}
+                  city={city}
+                  idx={polandJourney.route.findIndex(r => r.id === city.id)}
+                  totalCount={polandJourney.route.length}
+                  pushRoute={pushRoute}
+                  onSelectSchedule={(cId) => {
+                    setSelectedStopFilter(cId);
+                    setViewMode('schedule');
+                  }}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-6 animate-fade-in">
+              {filteredRoute.map((city) => {
+                const globalIdx = polandJourney.route.findIndex(r => r.id === city.id);
+                const cityDays = getDaysForCity(city.id);
+                return (
+                  <JourneyStopSchedule
+                    key={city.id}
+                    city={city}
+                    idx={globalIdx}
+                    totalCount={polandJourney.route.length}
+                    days={cityDays}
+                    privateItems={privateItems}
+                    accommodations={accommodations}
+                    pushRoute={pushRoute}
+                    isExpanded={!!expandedStops[city.id]}
+                    onToggleExpand={() => toggleStopExpand(city.id)}
+                    transitInfo={stopTransitInfo[city.id]}
+                  />
+                );
+              })}
+            </div>
+          )}
         </section>
 
         {/* The Strategy */}

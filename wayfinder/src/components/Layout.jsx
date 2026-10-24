@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Compass, User, LogOut, ShieldCheck, Menu, X, Coins, Settings, Backpack, Globe } from 'lucide-react';
+import { Compass, User, LogOut, ShieldCheck, Menu, X, Coins, Settings, Backpack, Globe, Calendar } from 'lucide-react';
 import { CurrencyConverterModal } from './CurrencyConverterModal';
 import { SettingsModal } from './SettingsModal';
 import { BottomTabBar } from './BottomTabBar';
@@ -93,6 +93,27 @@ export function Layout({ children }) {
             >
               <Backpack className="w-3.5 h-3.5 lg:w-4 lg:h-4 text-amber-400" />
               <span className="hidden lg:inline">Practical</span>
+            </a>
+
+            {/* Schedule link */}
+            <a
+              href="/wayfinder/poland-christmas-2026?scroll=journey-sequence"
+              onClick={(e) => {
+                e.preventDefault();
+                const isMain = currentPath === '/wayfinder' || currentPath === '/wayfinder/' || currentPath.startsWith('/wayfinder/poland-christmas-2026');
+                const el = document.getElementById('journey-sequence');
+                if (isMain && el) {
+                  const y = Math.max(0, el.getBoundingClientRect().top + window.pageYOffset - 80);
+                  window.scrollTo({ top: y, behavior: 'smooth' });
+                } else {
+                  pushRoute(e, '/wayfinder/poland-christmas-2026?scroll=journey-sequence');
+                }
+              }}
+              className="flex items-center space-x-1.5 px-2 lg:px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-slate-200 text-xs lg:text-sm font-bold hover:text-white hover:bg-white/10 transition-all shadow-sm min-h-[40px]"
+              title="10-Day Expedition Schedule"
+            >
+              <Calendar className="w-3.5 h-3.5 lg:w-4 lg:h-4 text-amber-400" />
+              <span className="hidden lg:inline">Schedule</span>
             </a>
 
             {/* Currency Converter */}

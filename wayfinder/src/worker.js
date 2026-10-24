@@ -16,8 +16,11 @@ import { handleItinerary }  from '../functions/api/wayfinder/itinerary.js';
 import { handleAccommodations } from '../functions/api/wayfinder/accommodations.js';
 import { handleDocuments }  from '../functions/api/wayfinder/documents.js';
 import { handleImportJobs } from '../functions/api/wayfinder/import-jobs.js';
-import { handleBudget }     from '../functions/api/wayfinder/budget.js';
-import { handleExchangeRate } from '../functions/api/wayfinder/exchange-rate.js';
+import { handleBudget }       from '../functions/api/wayfinder/budget.js';
+import { handleExchangeRate }  from '../functions/api/wayfinder/exchange-rate.js';
+import { handleEmailInboxes }  from '../functions/api/wayfinder/email-inboxes.js';
+import { handleGmail }         from '../functions/api/wayfinder/gmail.js';
+import { handleInboundEmail }  from '../functions/api/wayfinder/email-worker.js';
 
 const ALLOWED_ORIGINS = [
   'https://techtrekgt.com',
@@ -125,8 +128,10 @@ export default {
       if (apiPath.startsWith('/api/wayfinder/itinerary'))   return handleItinerary(context, url, method);
       if (apiPath.startsWith('/api/wayfinder/accommodations')) return handleAccommodations(context, url, method);
       if (apiPath.startsWith('/api/wayfinder/documents'))   return handleDocuments(context, url, method);
-      if (apiPath.startsWith('/api/wayfinder/import-jobs')) return handleImportJobs(context, url, method);
-      if (apiPath.startsWith('/api/wayfinder/budget'))      return handleBudget(context, url, method);
+      if (apiPath.startsWith('/api/wayfinder/import-jobs'))   return handleImportJobs(context, url, method);
+      if (apiPath.startsWith('/api/wayfinder/budget'))         return handleBudget(context, url, method);
+      if (apiPath.startsWith('/api/wayfinder/email-inboxes'))  return handleEmailInboxes(context, url, method);
+      if (apiPath.startsWith('/api/wayfinder/gmail'))          return handleGmail(context, url, method);
 
       return new Response(JSON.stringify({ error: 'Not found' }), {
         status: 404,
@@ -144,5 +149,11 @@ export default {
     }
     const assetResp = await env.ASSETS.fetch(assetReq);
     return addSecurityHeaders(assetResp, isLocal);
+  },
+
+  // Cloudflare Email Routing handler
+  // Receives inbound emails at TT<token>.<journey_slug>@techtrekgt.com
+  async email(message, env, ctx) {
+    return handleInboundEmail(message, env);
   },
 };

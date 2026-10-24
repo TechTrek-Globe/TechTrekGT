@@ -204,3 +204,54 @@ CREATE INDEX IF NOT EXISTS idx_wf_fields_job       ON wayfinder_extracted_fields
 CREATE INDEX IF NOT EXISTS idx_wf_expenses_journey ON wayfinder_expenses(journey_id);
 CREATE INDEX IF NOT EXISTS idx_wf_audit_user       ON wayfinder_audit_events(user_id);
 CREATE INDEX IF NOT EXISTS idx_wf_audit_entity     ON wayfinder_audit_events(entity_type, entity_id);
+
+-- ============================================================
+-- EMAIL INBOXES - Unique per-user/per-journey forwarding addresses
+-- Format: TT<token>.<journey_slug>@techtrekgt.com
+-- ============================================================
+CREATE TABLE IF NOT EXISTS wayfinder_email_inboxes (
+  id              TEXT PRIMARY KEY,
+  user_id         TEXT NOT NULL,
+  journey_id      TEXT NOT NULL,
+  inbox_token     TEXT NOT NULL,        -- short random token used in address local-part
+  email_address   TEXT NOT NULL UNIQUE, -- full address e.g. TT412312.poland2026@techtrekgt.com
+  is_active       INTEGER NOT NULL DEFAULT 1,
+  emails_received INTEGER NOT NULL DEFAULT 0,
+  last_received_at TEXT,
+  created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (user_id)    REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (journey_id) REFERENCES wayfinder_journeys(id) ON DELETE CASCADE,
+  UNIQUE(user_id, journey_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_wf_inboxes_email   ON wayfinder_email_inboxes(email_address);
+CREATE INDEX IF NOT EXISTS idx_wf_inboxes_user    ON wayfinder_email_inboxes(user_id);
+CREATE INDEX IF NOT EXISTS idx_wf_inboxes_journey ON wayfinder_email_inboxes(journey_id);
+
+-- ============================================================
+-- GMAIL CONNECTIONS - Encrypted OAuth tokens per user/journey
+-- Trip-date-scoped: sync only pulls emails within journey dates
+-- ============================================================
+CREATE TABLE IF NOT EXISTS wayfinder_gmail_connections (
+  id                      TEXT PRIMARY KEY,
+  user_id                 TEXT NOT NULL,
+  journey_id              TEXT NOT NULL,
+  gmail_address           TEXT NOT NULL,  -- confirmed Gmail account email
+  encrypted_access_token  TEXT NOT NULL,
+  encrypted_refresh_token TEXT NOT NULL,
+  token_expiry_at         TEXT NOT NULL,  -- ISO timestamp when access token expires
+  scopes                  TEXT NOT NULL,  -- space-delimited granted scopes
+  last_sync_at            TEXT,
+  last_sync_count         INTEGER NOT NULL DEFAULT 0,
+  sync_cursor             TEXT,           -- pageToken for incremental Gmail list pagination
+  is_active               INTEGER NOT NULL DEFAULT 1,
+  revoked_at              TEXT,
+  created_at              TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at              TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (user_id)    REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (journey_id) REFERENCES wayfinder_journeys(id) ON DELETE CASCADE,
+  UNIQUE(user_id, journey_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_wf_gmail_user    ON wayfinder_gmail_connections(user_id);
+CREATE INDEX IF NOT EXISTS idx_wf_gmail_journey ON wayfinder_gmail_connections(journey_id);

@@ -79,3 +79,24 @@ To maximize usability during winter roaming and in-destination field usage, Wayf
 - Public/Private Schedule Harmony: Unauthenticated visitors can view the full 10-day Poland trip itinerary freely, with a discreet invitation to authenticate to reveal private booking confirmations and tickets.
 - Unified Journey Sequence & Schedule Stops: [wayfinder/src/components/PolandLanding.jsx](file:///e:/TechTrekGT/wayfinder/src/components/PolandLanding.jsx) directly integrates the full 10-day itinerary timeline, flight arrivals, PKP rail transfers, daily activities, and authenticated private booking records directly into the 5 Journey Sequence stops (Kraków, Wrocław, Poznań, Toruń, Gdańsk). This unifies the public landing guide and personal schedule into a single, cohesive interface, complete with intercity transit connector cards, stop filter pills, and a Schedule vs. Cards view mode switcher.
 - Shared Private Booking Cards: [wayfinder/src/components/itinerary/PrivateBookingCard.jsx](file:///e:/TechTrekGT/wayfinder/src/components/itinerary/PrivateBookingCard.jsx) renders D1-persisted booking records (flights, hotels, restaurants, excursions, rail) with private lock badges, confirmation numbers, passenger details, and theme badges across both the main journey stops and the dedicated private hub.
+
+## 7. Booking Confirmation Import: Dual-Channel System
+
+Authenticated users can import hotel and attraction booking confirmations through two complementary channels, both landing items into `wayfinder_itinerary_items` with `status = 'imported'` and `verification_status = 'unverified'`:
+
+### 7.1 Email Forward Channel
+
+- Unique Trip Inbox Provisioning: Each user receives a unique forwarding address per journey, format `TT<6-digit-token>.<journey-slug>@techtrekgt.com` (e.g. `TT412312.poland2026@techtrekgt.com`). Provisioned via `POST /api/wayfinder/email-inboxes` - idempotent, returns existing address if already created.
+- Cloudflare Email Worker: Worker exports an `email()` handler alongside `fetch()`. When a forwarded email arrives at a recognized inbox address, the worker: (1) looks up the inbox row by `email_address` to resolve `user_id` and `journey_id` (the unique token IS the access control, no sender verification required), (2) parses the MIME stream to extract plain text using a pure-runtime MIME walker with `quoted-printable` and `base64` decoding, (3) infers `item_type` (hotel, flight, train, activity, transport, dining, other) from subject keywords, (4) extracts confirmation number and check-in date via regex, (5) writes atomically to D1 via `env.DB.batch()`.
+- Inbox Stats: `wayfinder_email_inboxes.emails_received` counter and `last_received_at` updated on every successful import.
+- API: `GET /api/wayfinder/email-inboxes?journey_id=` - fetch inbox, `POST /api/wayfinder/email-inboxes` - provision, `DELETE /api/wayfinder/email-inboxes/:id` - deactivate.
+
+### 7.2 Gmail API Channel
+
+- Trip-Date-Scoped OAuth: Connects a Gmail account via Google OAuth 2.0 (scope: `gmail.readonly`). Sync is strictly bounded to a window of 14 days before `journey.start_date` through `journey.end_date`. Journeys without explicit dates cannot initiate a connection.
+- Token Security: `access_token` and `refresh_token` are AES-256-GCM encrypted (PBKDF2-derived key from `TOKEN_ENCRYPTION_KEY` secret) before storage in `wayfinder_gmail_connections`. Encrypted bytes are stored as base64; IV is prepended.
+- CSRF Defense: OAuth `state` parameter is HMAC-SHA256 signed using `JWT_SECRET`. Callback handler verifies signature and `userId` match before accepting any auth code.
+- Incremental Sync: Uses Gmail `pageToken` cursor stored in `sync_cursor` column for incremental runs. Duplicate detection by `gmail:` prefixed message ID in `notes`.
+- Booking Query: Searches for messages from known booking providers (Booking.com, Airbnb, PKP, etc.) matching confirmation-related subjects, bounded by `after:YYYY/MM/DD before:YYYY/MM/DD`.
+- Revocation: `DELETE /api/wayfinder/gmail/:journeyId` calls Google revoke endpoint (best-effort), then zeroes encrypted token fields in D1 and marks `is_active = 0`.
+- API: `GET /api/wayfinder/gmail?journey_id=` - status, `POST /api/wayfinder/gmail/connect` - get auth URL, `POST /api/wayfinder/gmail/callback` - exchange code, `POST /api/wayfinder/gmail/sync` - incremental sync, `DELETE /api/wayfinder/gmail/:journeyId` - revoke.

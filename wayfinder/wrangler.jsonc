@@ -38,6 +38,13 @@
       "binding": "RATE_LIMIT_KV",
       "id": "12e45afc7ced4359949d1c1ae5537ec8"
     }
+  ],
+  // Cloudflare Email Routing - receives inbound forwarded emails
+  // Configure catch-all or address rule pointing to this worker in Cloudflare dashboard
+  "send_email": [
+    {
+      "name": "SEND_EMAIL"
+    }
   ]
   // R2 bucket (required for document storage - not yet configured):
   // "r2_buckets": [
@@ -47,5 +54,8 @@
   //   }
   // ]
   // Secrets (set via `wrangler secret put`):
-  //   JWT_SECRET  - same value as Finance/Outpost/Bigworm for SSO
+  //   JWT_SECRET             - same value as Finance/Outpost/Bigworm for SSO
+  //   TOKEN_ENCRYPTION_KEY   - AES-256-GCM key for encrypting Gmail OAuth tokens in D1
+  //   GOOGLE_CLIENT_ID       - Google Cloud OAuth 2.0 client ID (gmail.readonly scope)
+  //   GOOGLE_CLIENT_SECRET   - Google Cloud OAuth 2.0 client secret
 }

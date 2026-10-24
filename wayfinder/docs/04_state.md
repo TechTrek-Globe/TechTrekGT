@@ -57,3 +57,36 @@ Transient edge state is isolated to specific performance and security layers:
 - Persistent Navigation State: Handled via popstate events in [wayfinder/src/components/Layout.jsx](file:///e:/TechTrekGT/wayfinder/src/components/Layout.jsx) and synchronized down to [wayfinder/src/components/BottomTabBar.jsx](file:///e:/TechTrekGT/wayfinder/src/components/BottomTabBar.jsx). Active state indicators (isCities, isSchedule, isPractical, isDocs) dynamically evaluate against current window.location.pathname.
 - Unauthenticated View State in PrivateHub: [wayfinder/src/components/PrivateHub.jsx](file:///e:/TechTrekGT/wayfinder/src/components/PrivateHub.jsx) dynamically bifurcates view state between documents (hard auth gated) and the itinerary schedule (public timeline rendered with an overlay sign-in invite), eliminating dead-end navigation loops.
 - PolandLanding Journey Sequence State: [wayfinder/src/components/PolandLanding.jsx](file:///e:/TechTrekGT/wayfinder/src/components/PolandLanding.jsx) manages viewMode ('schedule' vs 'cards'), selectedStopFilter ('all' or individual city IDs), and expandedStops object state. When authenticated, D1 private itinerary items and accommodations fetched via WayfinderContext are merged into matching stop date windows.
+
+## 6. Booking Import State
+
+### 6.1 Email Inbox Table (wayfinder_email_inboxes)
+
+Stores the unique per-user per-journey forwarding address records:
+- `id`, `user_id`, `journey_id`: ownership identifiers.
+- `inbox_token`: 6-digit random numeric token used in the local-part of the email address.
+- `email_address`: fully constructed address (e.g. `TT412312.poland2026@techtrekgt.com`). UNIQUE indexed for fast Email Worker lookup.
+- `is_active`, `emails_received`, `last_received_at`: operational counters.
+- Constraints: `UNIQUE(user_id, journey_id)` - one active inbox per journey.
+
+### 6.2 Gmail Connection Table (wayfinder_gmail_connections)
+
+Stores encrypted OAuth token state for the Gmail import channel:
+- `id`, `user_id`, `journey_id`: ownership identifiers.
+- `gmail_address`: confirmed Gmail account address from profile API.
+- `encrypted_access_token`, `encrypted_refresh_token`: AES-256-GCM encrypted (PBKDF2-derived from `TOKEN_ENCRYPTION_KEY`, 100k iterations). Base64-encoded with IV prepended (12 bytes).
+- `token_expiry_at`: ISO timestamp for proactive refresh (5-minute pre-expiry threshold).
+- `scopes`: space-delimited granted scope string.
+- `sync_cursor`: Gmail `pageToken` for incremental list pagination across sync runs.
+- `last_sync_at`, `last_sync_count`: observability fields.
+- `is_active`, `revoked_at`: revocation state. Revocation zeroes both encrypted token fields.
+- Constraints: `UNIQUE(user_id, journey_id)` - one connection per journey.
+
+### 6.3 New Secrets Required
+
+Three new secrets must be provisioned via `wrangler secret put` for the Gmail channel:
+- `TOKEN_ENCRYPTION_KEY` - high-entropy string used as AES-256-GCM key material (PBKDF2 derivation). Also used by Outpost for eBay token encryption.
+- `GOOGLE_CLIENT_ID` - Google Cloud OAuth 2.0 application client ID.
+- `GOOGLE_CLIENT_SECRET` - Google Cloud OAuth 2.0 application client secret.
+
+The Email Forward channel requires no additional secrets - it relies on the existing `DB` binding and the unique inbox token as implicit access control.

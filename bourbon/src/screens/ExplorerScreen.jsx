@@ -1,4 +1,4 @@
-import { ArrowUpDown, Filter, X, Search, Sparkles, Check, RotateCcw } from 'lucide-react'
+import { ArrowUpDown, Filter, X, Search, RotateCcw, LayoutGrid, Table } from 'lucide-react'
 import { useState } from 'react'
 import BourbonCard from '../components/BourbonCard'
 import PriceSliderBar from '../components/PriceSliderBar'
@@ -30,6 +30,7 @@ export default function ExplorerScreen() {
   } = useBourbon()
 
   const [showAdvanced, setShowAdvanced] = useState(false)
+  const [viewMode, setViewMode] = useState('grid')
 
   const hasActiveFilters =
     filterTier !== 'all' ||
@@ -65,47 +66,74 @@ export default function ExplorerScreen() {
   }
 
   return (
-    <div className="min-h-screen pb-28">
+    <div className="min-h-screen pb-28 md:pb-12">
       {/* Sticky Filter & Search Header */}
-      <div className="sticky top-0 z-20 glass-panel border-b border-smoke-800/60 px-4 pt-12 pb-3">
-        <div className="flex items-center justify-between mb-2">
-          <div>
-            <h1 className="font-display text-lg font-bold text-smoke-100">Bourbon Explorer</h1>
-            <p className="text-smoke-500 text-xs">
-              Showing <span className="text-bourbon-300 font-semibold">{filtered.length}</span> of {data.length} Sprig pours
-            </p>
-          </div>
+      <div className="sticky top-0 z-20 glass-panel border-b border-smoke-800/60 px-4 sm:px-6 lg:px-8 pt-6 md:pt-4 pb-3">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <h1 className="font-display text-lg sm:text-xl font-bold text-smoke-100">Bourbon Explorer</h1>
+              <p className="text-smoke-500 text-xs sm:text-sm">
+                Showing <span className="text-bourbon-300 font-semibold">{filtered.length}</span> of {data.length} Sprig catalog pours
+              </p>
+            </div>
 
-          <div className="flex items-center gap-1.5">
-            {hasActiveFilters && (
-              <button
-                onClick={clearAll}
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-red-500/40 text-red-400 bg-red-950/20 text-xs font-medium active:scale-95 transition-all"
-                title="Clear all filters"
-              >
-                <RotateCcw className="w-3 h-3" />
-                Reset
-              </button>
-            )}
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              {/* Desktop View Mode Switcher (Grid vs Table) */}
+              <div className="hidden md:flex items-center bg-smoke-950/80 p-0.5 rounded-xl border border-smoke-800">
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`p-1.5 rounded-lg transition-all ${
+                    viewMode === 'grid'
+                      ? 'bg-bourbon-500/25 text-bourbon-300 border border-bourbon-500/40 shadow-sm'
+                      : 'text-smoke-500 hover:text-smoke-300'
+                  }`}
+                  title="Multi-column Grid View"
+                >
+                  <LayoutGrid className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setViewMode('table')}
+                  className={`p-1.5 rounded-lg transition-all ${
+                    viewMode === 'table'
+                      ? 'bg-bourbon-500/25 text-bourbon-300 border border-bourbon-500/40 shadow-sm'
+                      : 'text-smoke-500 hover:text-smoke-300'
+                  }`}
+                  title="High-density Data Table"
+                >
+                  <Table className="w-4 h-4" />
+                </button>
+              </div>
 
-            <button
-              id="filter-toggle-btn"
-              onClick={() => setShowAdvanced((v) => !v)}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all duration-200 active:scale-95"
-              style={{
-                borderColor: hasActiveFilters ? 'rgba(201,115,32,0.6)' : 'rgba(107,100,89,0.4)',
-                color: hasActiveFilters ? '#e8b85c' : '#a89f91',
-                background: hasActiveFilters ? 'rgba(201,115,32,0.15)' : 'rgba(26,23,18,0.7)',
-              }}
-            >
-              <Filter className="w-3.5 h-3.5" />
-              Filter
               {hasActiveFilters && (
-                <span className="w-2 h-2 rounded-full bg-bourbon-400 ml-0.5 animate-pulse" />
+                <button
+                  onClick={clearAll}
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-red-500/40 text-red-400 bg-red-950/20 text-xs font-medium active:scale-95 transition-all"
+                  title="Clear all filters"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  Reset
+                </button>
               )}
-            </button>
+
+              <button
+                id="filter-toggle-btn"
+                onClick={() => setShowAdvanced((v) => !v)}
+                className="flex items-center gap-1.5 px-3 py-1.5 min-h-[38px] rounded-xl border text-xs font-semibold transition-all duration-200 active:scale-95"
+                style={{
+                  borderColor: hasActiveFilters ? 'rgba(201,115,32,0.6)' : 'rgba(107,100,89,0.4)',
+                  color: hasActiveFilters ? '#e8b85c' : '#a89f91',
+                  background: hasActiveFilters ? 'rgba(201,115,32,0.15)' : 'rgba(26,23,18,0.7)',
+                }}
+              >
+                <Filter className="w-3.5 h-3.5" />
+                Filter Matrix
+                {hasActiveFilters && (
+                  <span className="w-2 h-2 rounded-full bg-bourbon-400 ml-0.5 animate-pulse" />
+                )}
+              </button>
+            </div>
           </div>
-        </div>
 
         {/* Quick Search inside Explorer */}
         <div className="relative mb-2.5">
@@ -237,11 +265,12 @@ export default function ExplorerScreen() {
             </button>
           ))}
         </div>
+        </div>
       </div>
 
       {/* Advanced Filter Drawer */}
       {showAdvanced && (
-        <div className="mx-4 mt-3 rounded-2xl border border-smoke-800/80 p-4 space-y-4 bg-smoke-900/95 backdrop-blur-md shadow-xl animate-fade-in">
+        <div className="mx-4 sm:mx-6 lg:mx-auto max-w-7xl mt-3 rounded-2xl border border-smoke-800/80 p-4 sm:p-5 space-y-4 bg-smoke-900/95 backdrop-blur-md shadow-xl animate-fade-in">
           <div className="flex items-center justify-between pb-2 border-b border-smoke-800">
             <h3 className="text-xs font-bold text-smoke-200 uppercase tracking-wider">Advanced Filter Matrix</h3>
             <button onClick={clearAll} className="text-xs text-red-400 hover:text-red-300">
@@ -249,88 +278,88 @@ export default function ExplorerScreen() {
             </button>
           </div>
 
-          {/* Value Grade Filter */}
-          <div>
-            <p className="text-[10px] text-smoke-500 uppercase tracking-wide mb-1.5 font-semibold">
-              Value Rating Tier
-            </p>
-            <div className="grid grid-cols-2 gap-1.5 text-xs">
-              {[
-                { id: 'all', label: 'All Ratings' },
-                { id: 'unicorn', label: '🦄 A+ (Steal)' },
-                { id: 'strong', label: '📈 A (Great Value)' },
-                { id: 'fair', label: '⚖️ B / C (Standard/Premium)' },
-                { id: 'weak', label: '📉 D / F (Gouging)' },
-              ].map((tier) => (
-                <button
-                  key={tier.id}
-                  onClick={() => dispatch({ type: 'SET_FILTER', payload: { key: 'filterTier', value: tier.id } })}
-                  className={`p-2 rounded-xl text-left border transition-all ${
-                    filterTier === tier.id
-                      ? 'border-bourbon-500 bg-bourbon-500/20 text-bourbon-200 font-semibold'
-                      : 'border-smoke-800 bg-smoke-950/60 text-smoke-400'
-                  }`}
-                >
-                  {tier.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Price Range Filter */}
-          <div>
-            <p className="text-[10px] text-smoke-500 uppercase tracking-wide mb-1.5 font-semibold">
-              Sprig Pour Price
-            </p>
-            <div className="grid grid-cols-4 gap-1.5 text-xs">
-              {[
-                { id: 'all', label: 'All' },
-                { id: 'under15', label: '≤ $15' },
-                { id: '15to25', label: '$15 - $25' },
-                { id: 'over25', label: '> $25' },
-              ].map((pr) => (
-                <button
-                  key={pr.id}
-                  onClick={() => dispatch({ type: 'SET_FILTER', payload: { key: 'filterPrice', value: pr.id } })}
-                  className={`py-1.5 px-2 rounded-xl text-center border transition-all ${
-                    filterPrice === pr.id
-                      ? 'border-bourbon-500 bg-bourbon-500/20 text-bourbon-200 font-semibold'
-                      : 'border-smoke-800 bg-smoke-950/60 text-smoke-400'
-                  }`}
-                >
-                  {pr.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Whiskey Style */}
-          <div>
-            <p className="text-[10px] text-smoke-500 uppercase tracking-wide mb-1.5 font-semibold">
-              Whiskey Style
-            </p>
-            <div className="flex flex-wrap gap-1.5 text-xs">
-              {['all', 'Wheated', 'Rye', 'Single Barrel', 'Bottled in Bond', 'Barrel Proof', 'Small Batch'].map((t) => {
-                const isSelected = filterType.toLowerCase() === t.toLowerCase()
-                return (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Value Grade Filter */}
+            <div>
+              <p className="text-[10px] text-smoke-500 uppercase tracking-wide mb-1.5 font-semibold">
+                Value Rating Tier
+              </p>
+              <div className="grid grid-cols-2 gap-1.5 text-xs">
+                {[
+                  { id: 'all', label: 'All Ratings' },
+                  { id: 'unicorn', label: '🦄 A+ (Steal)' },
+                  { id: 'strong', label: '📈 A (Great Value)' },
+                  { id: 'fair', label: '⚖️ B / C (Standard)' },
+                  { id: 'weak', label: '📉 D / F (Gouging)' },
+                ].map((tier) => (
                   <button
-                    key={t}
-                    onClick={() => dispatch({ type: 'SET_FILTER', payload: { key: 'filterType', value: t === 'all' ? 'all' : t } })}
-                    className={`px-2.5 py-1 rounded-lg border transition-all ${
-                      isSelected
+                    key={tier.id}
+                    onClick={() => dispatch({ type: 'SET_FILTER', payload: { key: 'filterTier', value: tier.id } })}
+                    className={`p-2 rounded-xl text-left border transition-all ${
+                      filterTier === tier.id
                         ? 'border-bourbon-500 bg-bourbon-500/20 text-bourbon-200 font-semibold'
                         : 'border-smoke-800 bg-smoke-950/60 text-smoke-400'
                     }`}
                   >
-                    {t === 'all' ? 'All Styles' : t}
+                    {tier.label}
                   </button>
-                )
-              })}
+                ))}
+              </div>
             </div>
-          </div>
 
-          {/* Distillery Dropdown */}
-          {distilleries.length > 0 && (
+            {/* Price Range Filter */}
+            <div>
+              <p className="text-[10px] text-smoke-500 uppercase tracking-wide mb-1.5 font-semibold">
+                Sprig Pour Price
+              </p>
+              <div className="grid grid-cols-2 gap-1.5 text-xs">
+                {[
+                  { id: 'all', label: 'All Prices' },
+                  { id: 'under15', label: '≤ $15 ⭐' },
+                  { id: '15to25', label: '$15 - $25' },
+                  { id: 'over25', label: '> $25' },
+                ].map((pr) => (
+                  <button
+                    key={pr.id}
+                    onClick={() => dispatch({ type: 'SET_FILTER', payload: { key: 'filterPrice', value: pr.id } })}
+                    className={`py-2 px-2.5 rounded-xl text-center border transition-all ${
+                      filterPrice === pr.id
+                        ? 'border-bourbon-500 bg-bourbon-500/20 text-bourbon-200 font-semibold'
+                        : 'border-smoke-800 bg-smoke-950/60 text-smoke-400'
+                    }`}
+                  >
+                    {pr.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Whiskey Style */}
+            <div>
+              <p className="text-[10px] text-smoke-500 uppercase tracking-wide mb-1.5 font-semibold">
+                Whiskey Style
+              </p>
+              <div className="flex flex-wrap gap-1.5 text-xs">
+                {['all', 'Wheated', 'Rye', 'Single Barrel', 'Bottled in Bond', 'Barrel Proof', 'Small Batch'].map((t) => {
+                  const isSelected = filterType.toLowerCase() === t.toLowerCase()
+                  return (
+                    <button
+                      key={t}
+                      onClick={() => dispatch({ type: 'SET_FILTER', payload: { key: 'filterType', value: t === 'all' ? 'all' : t } })}
+                      className={`px-2.5 py-1 rounded-lg border transition-all ${
+                        isSelected
+                          ? 'border-bourbon-500 bg-bourbon-500/20 text-bourbon-200 font-semibold'
+                          : 'border-smoke-800 bg-smoke-950/60 text-smoke-400'
+                      }`}
+                    >
+                      {t === 'all' ? 'All Styles' : t}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Distillery Dropdown */}
             <div>
               <p className="text-[10px] text-smoke-500 uppercase tracking-wide mb-1.5 font-semibold">
                 Producer / Distillery
@@ -348,18 +377,18 @@ export default function ExplorerScreen() {
                 ))}
               </select>
             </div>
-          )}
+          </div>
         </div>
       )}
 
       {/* Top Price Slider & Quick Selector */}
-      <div className="px-4 mt-3">
+      <div className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mt-3">
         <PriceSliderBar />
       </div>
 
       {/* Active Filter Notice */}
       {hasActiveFilters && (
-        <div className="mx-4 mt-1 flex items-center justify-between text-xs text-smoke-400 bg-smoke-900/60 py-1.5 px-3 rounded-xl border border-smoke-800/80">
+        <div className="mx-4 sm:mx-6 lg:mx-auto max-w-7xl mt-1 flex items-center justify-between text-xs text-smoke-400 bg-smoke-900/60 py-1.5 px-3 rounded-xl border border-smoke-800/80">
           <span>Active filters &middot; {filtered.length} matching</span>
           <button onClick={clearAll} className="text-bourbon-400 font-semibold underline">
             Reset All
@@ -367,10 +396,106 @@ export default function ExplorerScreen() {
         </div>
       )}
 
-      {/* Results List */}
-      <div className="px-4 mt-3 space-y-2">
+      {/* Results View */}
+      <div className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mt-4">
         {filtered.length > 0 ? (
-          filtered.map((b) => <BourbonCard key={b.id} bourbon={b} />)
+          viewMode === 'table' ? (
+            <>
+              {/* Desktop Data Table */}
+              <div className="hidden md:block overflow-hidden rounded-2xl border border-smoke-800/80 bg-smoke-900/60 shadow-xl backdrop-blur-md">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b border-smoke-800 bg-smoke-950/80 text-smoke-400 font-mono uppercase text-[10px] tracking-wider">
+                        <th className="py-3 px-4">Grade</th>
+                        <th className="py-3 px-4 cursor-pointer hover:text-bourbon-300" onClick={() => dispatch({ type: 'SET_SORT', payload: { field: 'name' } })}>
+                          Bottle & Distillery
+                        </th>
+                        <th className="py-3 px-4">Style & Proof</th>
+                        <th className="py-3 px-4 text-right cursor-pointer hover:text-bourbon-300" onClick={() => dispatch({ type: 'SET_SORT', payload: { field: 'sprigPrice' } })}>
+                          Sprig Pour
+                        </th>
+                        <th className="py-3 px-4 text-right cursor-pointer hover:text-bourbon-300" onClick={() => dispatch({ type: 'SET_SORT', payload: { field: 'fairPrice' } })}>
+                          Fair Bar (3.6x)
+                        </th>
+                        <th className="py-3 px-4 text-right cursor-pointer hover:text-bourbon-300" onClick={() => dispatch({ type: 'SET_SORT', payload: { field: 'msrp' } })}>
+                          Bottle MSRP
+                        </th>
+                        <th className="py-3 px-4 text-right cursor-pointer hover:text-bourbon-300" onClick={() => dispatch({ type: 'SET_SORT', payload: { field: 'valueScore' } })}>
+                          Alpha
+                        </th>
+                        <th className="py-3 px-4 text-center">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-smoke-800/50">
+                      {filtered.map((b) => (
+                        <tr
+                          key={b.id}
+                          onClick={() => dispatch({ type: 'SELECT_BOURBON', payload: b })}
+                          className="hover:bg-bourbon-500/10 cursor-pointer transition-colors group"
+                        >
+                          <td className="py-3 px-4 whitespace-nowrap">
+                            <span className="font-mono font-bold text-xs text-smoke-200">
+                              {b.valueRating || b.tier || 'N/A'}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4">
+                            <p className="font-semibold text-smoke-100 group-hover:text-bourbon-300 transition-colors">
+                              {b.name}
+                            </p>
+                            {b.distillery && (
+                              <p className="text-[11px] text-smoke-500">{b.distillery}</p>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 whitespace-nowrap text-smoke-400 text-[11px]">
+                            <span>{b.type || 'Bourbon'}</span>
+                            {b.proof && <span className="ml-1 text-smoke-500">&middot; {b.proof}°</span>}
+                          </td>
+                          <td className="py-3 px-4 whitespace-nowrap text-right font-mono font-bold text-bourbon-300">
+                            ${b.sprigPrice ? b.sprigPrice.toFixed(2) : '--'}
+                          </td>
+                          <td className="py-3 px-4 whitespace-nowrap text-right font-mono text-smoke-300">
+                            ${b.fairPrice ? b.fairPrice.toFixed(2) : '--'}
+                          </td>
+                          <td className="py-3 px-4 whitespace-nowrap text-right font-mono text-smoke-400">
+                            ${b.msrp ? b.msrp.toFixed(2) : '--'}
+                          </td>
+                          <td className="py-3 px-4 whitespace-nowrap text-right font-mono font-bold">
+                            {b.valueScore !== null ? (
+                              <span className={b.valueScore > 0 ? 'text-green-400' : 'text-red-400'}>
+                                {b.valueScore > 0 ? '+' : ''}{b.valueScore}%
+                              </span>
+                            ) : (
+                              <span className="text-smoke-600">--</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-center whitespace-nowrap">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                dispatch({ type: 'SELECT_BOURBON', payload: b })
+                              }}
+                              className="px-2.5 py-1 min-h-[32px] rounded-lg bg-smoke-800/80 hover:bg-bourbon-500/20 text-smoke-300 hover:text-bourbon-200 border border-smoke-700/60 text-[11px] font-medium transition-colors"
+                            >
+                              Inspect
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              {/* Mobile Card Fallback */}
+              <div className="grid grid-cols-1 gap-2.5 md:hidden">
+                {filtered.map((b) => <BourbonCard key={b.id} bourbon={b} />)}
+              </div>
+            </>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5">
+              {filtered.map((b) => <BourbonCard key={b.id} bourbon={b} />)}
+            </div>
+          )
         ) : (
           <div className="text-center py-16">
             <p className="text-4xl mb-3">🔍</p>

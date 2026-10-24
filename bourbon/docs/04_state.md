@@ -61,3 +61,10 @@ Bourbon Sommelier maintains a resilient relationship with the platform data laye
 
 - Static Seed Resilience: If both live Google Sheets and the worker cache proxy are unavailable, [bourbon/src/data/seedData.js](file:///e:/TechTrekGT/bourbon/src/data/seedData.js) serves as the persistent catalog anchor.
 - D1 Database Alignment: Although [bourbon/wrangler.jsonc](file:///e:/TechTrekGT/bourbon/wrangler.jsonc) configures personal-budget-db as env.DB to maintain platform uniformity, Bourbon avoids unnecessary database reads and writes, keeping edge memory consumption minimal.
+
+## 6. View State and Responsive Presentation Tier
+
+- Viewport Adaptation: Responsive layout state dynamically switches between desktop top navigation (`md:`) and mobile bottom dock (`< md`).
+- Explorer View Mode: Local screen state `viewMode` toggles presentation between responsive card grids (`grid`) and high-density spirits tables (`table`) on desktop, while retaining compact card fallbacks on mobile.
+- Modal Presentation: `selectedBourbon` drives adaptive presentation, resolving as a mobile bottom sheet with safe-area drag handles on mobile and a centered glassmorphism dialog with 4-column economics on desktop viewports.
+

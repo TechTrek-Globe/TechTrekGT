@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Sparkles, Trophy, Compass, Plus, Trash2, ChevronRight, Flame, Wine, DollarSign, Award, Bot, RefreshCw } from 'lucide-react'
+import { Compass, Plus, Trash2, ChevronRight, Wine, Award, Bot } from 'lucide-react'
 import { useBourbon } from '../context/BourbonContext'
 
 const FLAVOR_PROFILES = [
@@ -148,230 +148,246 @@ export default function SommelierScreen() {
   }
 
   return (
-    <div className="min-h-screen pb-32">
+    <div className="min-h-screen pb-28 md:pb-12">
       {/* Top Header */}
-      <div className="glass-panel border-b border-smoke-800/50 px-4 pt-12 pb-4">
-        <div className="flex items-center gap-2 mb-1">
-          <div className="w-8 h-8 rounded-xl bg-bourbon-500/20 border border-bourbon-500/40 flex items-center justify-center">
-            <Award className="w-4 h-4 text-bourbon-400" />
+      <div className="glass-panel border-b border-smoke-800/50 px-4 sm:px-6 lg:px-8 pt-6 md:pt-4 pb-4">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-bourbon-500/20 border border-bourbon-500/40 flex items-center justify-center shadow-inner">
+              <Award className="w-4 h-4 text-bourbon-400" />
+            </div>
+            <div>
+              <h1 className="font-display text-lg sm:text-xl font-bold text-smoke-100">Brown Water Sommelier</h1>
+              <p className="text-smoke-500 text-xs">Mathematical Unicorns, Guided Consultations & Curated Flights</p>
+            </div>
           </div>
-          <div>
-            <h1 className="font-display text-lg font-bold text-smoke-100">Brown Water Sommelier</h1>
-            <p className="text-smoke-500 text-xs">Mathematical Unicorns & Curated Flights</p>
-          </div>
+          <span className="hidden sm:inline-block text-xs font-mono text-smoke-400 bg-smoke-900/60 px-2.5 py-1 rounded-lg border border-smoke-800">
+            {unicorns.length} Unicorns in Stock
+          </span>
         </div>
       </div>
 
-      <div className="px-4 mt-4 space-y-6">
-        {/* Interactive Sommelier Consultation */}
-        <section className="bourbon-card p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Bot className="w-4 h-4 text-bourbon-400" />
-            <h2 className="font-display font-semibold text-sm text-smoke-100">Ask the Data Sommelier</h2>
-          </div>
-          <p className="text-smoke-400 text-xs mb-3">
-            Inquire about unicorn pours, proof profiles, budget alpha, or specific flavor requests.
-          </p>
-
-          <form onSubmit={handleConsultSommelier} className="space-y-2">
-            <div className="relative">
-              <input
-                type="text"
-                value={sommelierPrompt}
-                onChange={(e) => setSommelierPrompt(e.target.value)}
-                placeholder="e.g. 'Show me the best mathematical unicorn' or 'sweet wheated pour under $16'"
-                className="search-input text-xs pr-16"
-              />
-              <button
-                type="submit"
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-bourbon-500 text-smoke-950 active:scale-95 transition-all"
-              >
-                Ask
-              </button>
-            </div>
-          </form>
-
-          {sommelierAnswer && (
-            <div className="mt-3 p-3 rounded-xl bg-smoke-900/90 border border-bourbon-500/30 animate-fade-in">
-              <p className="text-smoke-200 text-xs leading-relaxed mb-2 font-body">
-                {sommelierAnswer.text}
+      <div className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mt-4">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          {/* Left Column on Desktop: Interactive Sommelier & Flight Tray */}
+          <div className="lg:col-span-5 xl:col-span-5 space-y-6">
+            {/* Interactive Sommelier Consultation */}
+            <section className="bourbon-card p-4 sm:p-5">
+              <div className="flex items-center gap-2 mb-2">
+                <Bot className="w-4 h-4 text-bourbon-400" />
+                <h2 className="font-display font-semibold text-sm sm:text-base text-smoke-100">Ask the Data Sommelier</h2>
+              </div>
+              <p className="text-smoke-400 text-xs mb-3">
+                Inquire about unicorn pours, proof profiles, budget alpha, or specific flavor requests.
               </p>
-              {sommelierAnswer.pours.length > 0 && (
-                <div className="space-y-1.5 mt-2 pt-2 border-t border-smoke-800">
-                  {sommelierAnswer.pours.map(b => (
-                    <div
-                      key={b.id}
-                      onClick={() => dispatch({ type: 'SELECT_BOURBON', payload: b })}
-                      className="flex items-center justify-between p-2 rounded-lg bg-smoke-950/60 border border-smoke-800/80 cursor-pointer active:scale-98 transition-all"
-                    >
-                      <div className="min-w-0 pr-2">
-                        <p className="text-xs font-semibold text-smoke-100 truncate">{b.name}</p>
-                        <p className="text-[10px] text-smoke-500">{b.distillery || 'Distillery N/A'} &middot; {b.proof ? `${b.proof}°` : 'Proof N/A'}</p>
-                      </div>
-                      <div className="text-right flex-shrink-0">
-                        <span className="text-xs font-mono font-bold text-bourbon-400">
-                          ${b.sprigPrice ? b.sprigPrice.toFixed(2) : '--'}
-                        </span>
-                        {b.valueScore !== null && (
-                          <p className={`text-[10px] font-mono ${b.valueScore > 0 ? 'text-green-400' : 'text-smoke-500'}`}>
-                            {b.valueScore > 0 ? `+${b.valueScore}%` : `${b.valueScore}%`}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </section>
 
-        {/* Custom 3-Pour Flight Builder */}
-        <section className="bourbon-card p-4">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <Wine className="w-4 h-4 text-bourbon-400" />
-              <h2 className="font-display font-semibold text-sm text-smoke-100">Custom Tasting Flight</h2>
-            </div>
-            <span className="text-[11px] font-mono text-bourbon-400">
-              {flight.length}/4 pours
-            </span>
-          </div>
-          <p className="text-smoke-400 text-xs mb-3">
-            Build a custom flight directly from the Sprig list to analyze combined math, price, and ABV average.
-          </p>
-
-          {flight.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-smoke-800 p-4 text-center">
-              <p className="text-xs text-smoke-500">Your flight tray is empty.</p>
-              <p className="text-[11px] text-smoke-600 mt-1">Tap the "+" button below recommended pours or choose from Explorer.</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {flight.map((b, idx) => (
-                <div key={b.id} className="flex items-center justify-between p-2.5 rounded-xl bg-smoke-900/80 border border-smoke-800">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <span className="w-5 h-5 rounded-full bg-bourbon-500/20 text-bourbon-400 font-mono text-[10px] font-bold flex items-center justify-center flex-shrink-0">
-                      {idx + 1}
-                    </span>
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold text-smoke-100 truncate">{b.name}</p>
-                      <p className="text-[10px] text-smoke-500">{b.proof ? `${b.proof}°` : 'Proof N/A'} &middot; Sprig: ${b.sprigPrice?.toFixed(2) || '?'}</p>
-                    </div>
-                  </div>
+              <form onSubmit={handleConsultSommelier} className="space-y-2">
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={sommelierPrompt}
+                    onChange={(e) => setSommelierPrompt(e.target.value)}
+                    placeholder="e.g. 'Show me the best mathematical unicorn' or 'sweet wheated pour under $16'"
+                    className="search-input text-xs pr-20 py-2.5"
+                  />
                   <button
-                    onClick={() => removeFromFlight(b.id)}
-                    className="p-1.5 text-smoke-500 hover:text-red-400 active:scale-90 transition-colors"
+                    type="submit"
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 px-3 py-1.5 min-h-[34px] rounded-lg text-xs font-semibold bg-bourbon-500 text-smoke-950 active:scale-95 transition-all"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    Ask
                   </button>
                 </div>
-              ))}
+              </form>
 
-              {/* Flight Summary Bar */}
-              <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-smoke-800/80">
-                <div className="stat-box text-center">
-                  <p className="text-[9px] text-smoke-500 uppercase">Total Sprig</p>
-                  <p className="text-xs font-mono font-bold text-bourbon-300 mt-0.5">${flightStats.totalSprig.toFixed(2)}</p>
-                </div>
-                <div className="stat-box text-center">
-                  <p className="text-[9px] text-smoke-500 uppercase">Avg Proof</p>
-                  <p className="text-xs font-mono font-bold text-smoke-200 mt-0.5">{flightStats.avgProof ? `${flightStats.avgProof}°` : '--'}</p>
-                </div>
-                <div className="stat-box text-center">
-                  <p className="text-[9px] text-smoke-500 uppercase">Avg Value</p>
-                  <p className={`text-xs font-mono font-bold mt-0.5 ${flightStats.avgScore > 0 ? 'text-green-400' : 'text-smoke-300'}`}>
-                    {flightStats.avgScore !== null ? `+${flightStats.avgScore}%` : '--'}
+              {sommelierAnswer && (
+                <div className="mt-3 p-3.5 rounded-xl bg-smoke-900/90 border border-bourbon-500/30 animate-fade-in">
+                  <p className="text-smoke-200 text-xs leading-relaxed mb-2 font-body">
+                    {sommelierAnswer.text}
                   </p>
-                </div>
-              </div>
-            </div>
-          )}
-        </section>
-
-        {/* Curated Flavor Journey Archetypes */}
-        <section>
-          <div className="flex items-center gap-1.5 mb-2.5">
-            <Compass className="w-4 h-4 text-bourbon-400" />
-            <h2 className="font-display font-semibold text-sm text-smoke-100">Flavor Archetypes</h2>
-          </div>
-
-          <div className="grid grid-cols-1 gap-2">
-            {FLAVOR_PROFILES.map(prof => {
-              const isSelected = selectedProfile === prof.id
-              return (
-                <div
-                  key={prof.id}
-                  onClick={() => setSelectedProfile(isSelected ? null : prof.id)}
-                  className={`p-3 rounded-2xl border transition-all cursor-pointer ${
-                    isSelected
-                      ? 'border-bourbon-500/60 bg-bourbon-950/40 shadow-lg shadow-bourbon-500/10'
-                      : 'border-smoke-800/60 bg-smoke-900/40 hover:border-smoke-700'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xl">{prof.icon}</span>
-                      <div>
-                        <h3 className="text-xs font-semibold text-smoke-100">{prof.name}</h3>
-                        <p className="text-[11px] text-smoke-500 mt-0.5">{prof.desc}</p>
-                      </div>
-                    </div>
-                    <ChevronRight className={`w-4 h-4 text-smoke-500 transition-transform ${isSelected ? 'rotate-90 text-bourbon-400' : ''}`} />
-                  </div>
-
-                  {/* Expanded matching pours */}
-                  {isSelected && (
-                    <div className="mt-3 pt-3 border-t border-smoke-800/60 space-y-2 animate-fade-in">
-                      <p className="text-[10px] text-bourbon-400 font-semibold uppercase tracking-wider">
-                        Matched Pours from Sprig Inventory ({profileRecommendations.length})
-                      </p>
-                      {profileRecommendations.length > 0 ? (
-                        profileRecommendations.map(b => (
-                          <div
-                            key={b.id}
-                            className="flex items-center justify-between p-2 rounded-xl bg-smoke-950/70 border border-smoke-800"
-                          >
-                            <div
-                              onClick={() => dispatch({ type: 'SELECT_BOURBON', payload: b })}
-                              className="min-w-0 flex-1 cursor-pointer"
-                            >
-                              <p className="text-xs font-semibold text-smoke-100 truncate">{b.name}</p>
-                              <p className="text-[10px] text-smoke-500">{b.distillery || 'Distillery N/A'} &middot; {b.proof ? `${b.proof}°` : 'Proof N/A'}</p>
-                            </div>
-                            <div className="flex items-center gap-2 flex-shrink-0">
-                              <div className="text-right">
-                                <span className="text-xs font-mono font-bold text-bourbon-400">
-                                  ${b.sprigPrice ? b.sprigPrice.toFixed(2) : '--'}
-                                </span>
-                                {b.valueScore !== null && (
-                                  <p className="text-[10px] font-mono text-green-400">+{b.valueScore}%</p>
-                                )}
-                              </div>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  addToFlight(b)
-                                }}
-                                disabled={flight.some(f => f.id === b.id) || flight.length >= 4}
-                                className="w-6 h-6 rounded-lg bg-bourbon-500/20 text-bourbon-300 border border-bourbon-500/40 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed active:scale-90 transition-transform"
-                                title="Add to Flight"
-                              >
-                                <Plus className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
+                  {sommelierAnswer.pours.length > 0 && (
+                    <div className="space-y-1.5 mt-2 pt-2 border-t border-smoke-800">
+                      {sommelierAnswer.pours.map(b => (
+                        <div
+                          key={b.id}
+                          onClick={() => dispatch({ type: 'SELECT_BOURBON', payload: b })}
+                          className="flex items-center justify-between p-2 rounded-lg bg-smoke-950/60 border border-smoke-800/80 cursor-pointer active:scale-98 transition-all hover:border-bourbon-500/40"
+                        >
+                          <div className="min-w-0 pr-2">
+                            <p className="text-xs font-semibold text-smoke-100 truncate">{b.name}</p>
+                            <p className="text-[10px] text-smoke-500">{b.distillery || 'Distillery N/A'} &middot; {b.proof ? `${b.proof}°` : 'Proof N/A'}</p>
                           </div>
-                        ))
-                      ) : (
-                        <p className="text-xs text-smoke-500 italic">No specific pours match this category on current menu.</p>
-                      )}
+                          <div className="text-right flex-shrink-0">
+                            <span className="text-xs font-mono font-bold text-bourbon-400">
+                              ${b.sprigPrice ? b.sprigPrice.toFixed(2) : '--'}
+                            </span>
+                            {b.valueScore !== null && (
+                              <p className={`text-[10px] font-mono ${b.valueScore > 0 ? 'text-green-400' : 'text-smoke-500'}`}>
+                                {b.valueScore > 0 ? `+${b.valueScore}%` : `${b.valueScore}%`}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
-              )
-            })}
+              )}
+            </section>
+
+            {/* Custom Tasting Flight Builder */}
+            <section className="bourbon-card p-4 sm:p-5">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Wine className="w-4 h-4 text-bourbon-400" />
+                  <h2 className="font-display font-semibold text-sm sm:text-base text-smoke-100">Custom Tasting Flight</h2>
+                </div>
+                <span className="text-xs font-mono text-bourbon-400 font-semibold">
+                  {flight.length}/4 pours
+                </span>
+              </div>
+              <p className="text-smoke-400 text-xs mb-3">
+                Build a custom flight directly from the Sprig list to analyze combined math, price, and ABV average.
+              </p>
+
+              {flight.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-smoke-800 p-5 text-center">
+                  <p className="text-xs text-smoke-400">Your flight tray is empty.</p>
+                  <p className="text-[11px] text-smoke-600 mt-1">Tap the "+" button on recommended pours or explore the catalog.</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {flight.map((b, idx) => (
+                    <div key={b.id} className="flex items-center justify-between p-2.5 rounded-xl bg-smoke-900/80 border border-smoke-800">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="w-5 h-5 rounded-full bg-bourbon-500/20 text-bourbon-400 font-mono text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+                          {idx + 1}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-smoke-100 truncate">{b.name}</p>
+                          <p className="text-[10px] text-smoke-500">{b.proof ? `${b.proof}°` : 'Proof N/A'} &middot; Sprig: ${b.sprigPrice?.toFixed(2) || '?'}</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => removeFromFlight(b.id)}
+                        className="p-2 min-w-[36px] min-h-[36px] flex items-center justify-center text-smoke-500 hover:text-red-400 active:scale-90 transition-colors"
+                        title="Remove Pour"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+
+                  {/* Flight Summary Bar */}
+                  <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-smoke-800/80">
+                    <div className="stat-box text-center py-2">
+                      <p className="text-[9px] text-smoke-500 uppercase">Total Sprig</p>
+                      <p className="text-xs font-mono font-bold text-bourbon-300 mt-0.5">${flightStats.totalSprig.toFixed(2)}</p>
+                    </div>
+                    <div className="stat-box text-center py-2">
+                      <p className="text-[9px] text-smoke-500 uppercase">Avg Proof</p>
+                      <p className="text-xs font-mono font-bold text-smoke-200 mt-0.5">{flightStats.avgProof ? `${flightStats.avgProof}°` : '--'}</p>
+                    </div>
+                    <div className="stat-box text-center py-2">
+                      <p className="text-[9px] text-smoke-500 uppercase">Avg Value</p>
+                      <p className={`text-xs font-mono font-bold mt-0.5 ${flightStats.avgScore > 0 ? 'text-green-400' : 'text-smoke-300'}`}>
+                        {flightStats.avgScore !== null ? `+${flightStats.avgScore}%` : '--'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </section>
           </div>
-        </section>
+
+          {/* Right Column on Desktop: Curated Flavor Archetypes */}
+          <div className="lg:col-span-7 xl:col-span-7 space-y-4">
+            <div className="flex items-center gap-1.5 mb-1">
+              <Compass className="w-4 h-4 text-bourbon-400" />
+              <h2 className="font-display font-semibold text-sm sm:text-base text-smoke-100">Curated Flavor Archetypes</h2>
+            </div>
+            <p className="text-smoke-500 text-xs mb-3">
+              Select an archetype to expand matched inventory pours with live value scores and 1-tap flight pairing.
+            </p>
+
+            <div className="grid grid-cols-1 gap-2.5">
+              {FLAVOR_PROFILES.map(prof => {
+                const isSelected = selectedProfile === prof.id
+                return (
+                  <div
+                    key={prof.id}
+                    onClick={() => setSelectedProfile(isSelected ? null : prof.id)}
+                    className={`p-3.5 sm:p-4 rounded-2xl border transition-all cursor-pointer ${
+                      isSelected
+                        ? 'border-bourbon-500/60 bg-bourbon-950/40 shadow-lg shadow-bourbon-500/10'
+                        : 'border-smoke-800/60 bg-smoke-900/40 hover:border-smoke-700'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-2xl">{prof.icon}</span>
+                        <div>
+                          <h3 className="text-xs sm:text-sm font-semibold text-smoke-100">{prof.name}</h3>
+                          <p className="text-[11px] sm:text-xs text-smoke-500 mt-0.5">{prof.desc}</p>
+                        </div>
+                      </div>
+                      <ChevronRight className={`w-4 h-4 text-smoke-500 transition-transform ${isSelected ? 'rotate-90 text-bourbon-400' : ''}`} />
+                    </div>
+
+                    {/* Expanded matching pours: responsive 2-column grid on desktop */}
+                    {isSelected && (
+                      <div className="mt-3 pt-3 border-t border-smoke-800/60 space-y-2 animate-fade-in">
+                        <p className="text-[10px] text-bourbon-400 font-semibold uppercase tracking-wider">
+                          Matched Pours from Sprig Inventory ({profileRecommendations.length})
+                        </p>
+                        {profileRecommendations.length > 0 ? (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {profileRecommendations.map(b => (
+                              <div
+                                key={b.id}
+                                className="flex items-center justify-between p-2.5 rounded-xl bg-smoke-950/70 border border-smoke-800 hover:border-bourbon-500/40 transition-colors"
+                              >
+                                <div
+                                  onClick={() => dispatch({ type: 'SELECT_BOURBON', payload: b })}
+                                  className="min-w-0 flex-1 cursor-pointer pr-1"
+                                >
+                                  <p className="text-xs font-semibold text-smoke-100 truncate">{b.name}</p>
+                                  <p className="text-[10px] text-smoke-500">{b.distillery || 'Distillery N/A'} &middot; {b.proof ? `${b.proof}°` : 'Proof N/A'}</p>
+                                </div>
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  <div className="text-right">
+                                    <span className="text-xs font-mono font-bold text-bourbon-400">
+                                      ${b.sprigPrice ? b.sprigPrice.toFixed(2) : '--'}
+                                    </span>
+                                    {b.valueScore !== null && (
+                                      <p className="text-[10px] font-mono text-green-400">+{b.valueScore}%</p>
+                                    )}
+                                  </div>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      addToFlight(b)
+                                    }}
+                                    disabled={flight.some(f => f.id === b.id) || flight.length >= 4}
+                                    className="w-7 h-7 rounded-lg bg-bourbon-500/20 text-bourbon-300 border border-bourbon-500/40 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed active:scale-90 transition-transform"
+                                    title="Add to Flight"
+                                  >
+                                    <Plus className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-smoke-500 italic">No specific pours match this category on current menu.</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   )

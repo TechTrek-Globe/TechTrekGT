@@ -35,41 +35,42 @@ export default function RadarScreen() {
     <div className="min-h-screen">
       {/* Header */}
       <div
-        className="relative px-4 pt-14 pb-8 overflow-hidden"
+        className="relative px-4 sm:px-6 lg:px-8 pt-8 md:pt-4 pb-6 sm:pb-8 overflow-hidden rounded-b-2xl sm:rounded-b-3xl"
         style={{ background: 'linear-gradient(180deg, #1a0d04 0%, #0d0c09 100%)' }}
       >
         {/* Ambient glow */}
         <div
-          className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-32 rounded-full opacity-20 blur-3xl"
+          className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-36 rounded-full opacity-20 blur-3xl"
           style={{ background: 'radial-gradient(circle, #e8b85c, transparent)' }}
         />
-        <div className="relative">
+        <div className="relative max-w-7xl mx-auto">
           <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <span className="text-2xl">🥃</span>
+            <div className="flex items-center gap-2.5">
+              <span className="text-2xl sm:text-3xl">🥃</span>
               <div>
-                <h1 className="font-display text-xl font-bold text-smoke-50">Brown Water Society</h1>
-                <p className="text-smoke-500 text-[11px]">Sprig Bourbon Sommelier</p>
+                <h1 className="font-display text-xl sm:text-2xl font-bold text-smoke-50">Brown Water Society</h1>
+                <p className="text-smoke-500 text-xs sm:text-sm">Sprig Bourbon Sommelier &middot; Mathematical Valuation Radar</p>
               </div>
             </div>
             <button
               id="refresh-btn"
               onClick={reload}
               disabled={loading}
-              className="w-8 h-8 rounded-full bg-smoke-900/60 border border-smoke-800/60 flex items-center justify-center active:scale-90 transition-transform"
+              className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-full bg-smoke-900/60 border border-smoke-800/60 flex items-center justify-center active:scale-90 transition-transform md:hidden"
+              title="Refresh Catalog Data"
             >
-              <RefreshCw className={`w-3.5 h-3.5 text-smoke-400 ${loading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-4 h-4 text-smoke-400 ${loading ? 'animate-spin' : ''}`} />
             </button>
           </div>
-          <p className="text-smoke-600 text-[10px]">
-            Last sync: {formatTime(lastUpdated)} &middot; {data.length} bourbons indexed
+          <p className="text-smoke-600 text-[11px] sm:text-xs">
+            Last sync: {formatTime(lastUpdated)} &middot; {data.length} bourbons indexed &middot; Live Google Sheets edge pipeline
           </p>
         </div>
       </div>
 
-      <div className="px-4 -mt-4 space-y-6 pb-28">
-        {/* Stats grid */}
-        <div className="grid grid-cols-2 gap-2">
+      <div className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mt-4 space-y-6 pb-28 md:pb-12">
+        {/* Stats grid: 2 cols on mobile, 4 cols on desktop */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
           <StatPill
             icon={Trophy}
             label="Unicorns Found"
@@ -96,34 +97,36 @@ export default function RadarScreen() {
           />
         </div>
 
-        {/* Unicorn section */}
+        {/* Unicorn section: multi-column grid on desktop */}
         {topUnicorns.length > 0 && (
           <section>
-            <div className="flex items-center gap-2 mb-3">
-              <div className="unicorn-badge text-xs px-2.5 py-1">🦄 Mathematical Unicorns</div>
-              <span className="text-smoke-600 text-xs">{unicorns.length} found</span>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <div className="unicorn-badge text-xs px-2.5 py-1">🦄 Mathematical Unicorns</div>
+                <span className="text-smoke-500 text-xs font-mono">{unicorns.length} found</span>
+              </div>
+              {unicorns.length > 5 && (
+                <span className="text-smoke-500 text-xs">
+                  Top 5 highlighted &middot; Explore all in catalog
+                </span>
+              )}
             </div>
-            <div className="space-y-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
               {topUnicorns.map(b => (
                 <BourbonCard key={b.id} bourbon={b} />
               ))}
             </div>
-            {unicorns.length > 5 && (
-              <p className="text-center text-smoke-600 text-xs mt-2">
-                +{unicorns.length - 5} more in Explorer
-              </p>
-            )}
           </section>
         )}
 
-        {/* Top Value section */}
+        {/* Top Value section: multi-column grid on desktop */}
         {topValue.length > 0 && (
           <section>
             <div className="flex items-center gap-2 mb-3">
               <TrendingUp className="w-4 h-4 text-green-400" />
-              <h2 className="text-smoke-200 font-semibold text-sm">Top Value Pours</h2>
+              <h2 className="text-smoke-200 font-semibold text-sm sm:text-base">Top Value Pours (Under Fair Bar Rate)</h2>
             </div>
-            <div className="space-y-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
               {topValue.map(b => (
                 <BourbonCard key={b.id} bourbon={b} />
               ))}

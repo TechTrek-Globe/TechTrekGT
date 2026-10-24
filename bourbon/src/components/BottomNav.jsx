@@ -14,7 +14,7 @@ export default function BottomNav() {
   return (
     <nav
       id="bottom-nav"
-      className="fixed bottom-0 left-0 right-0 z-50 glass-panel border-t border-smoke-800/60 pb-safe"
+      className="fixed bottom-0 left-0 right-0 z-50 glass-panel border-t border-smoke-800/60 pb-safe md:hidden"
     >
       <div className="flex items-center justify-around px-2 pt-1.5 pb-1">
         {TABS.map(({ id, label, icon: Icon }) => {
@@ -24,7 +24,7 @@ export default function BottomNav() {
               key={id}
               id={`nav-${id}`}
               onClick={() => dispatch({ type: 'SET_TAB', payload: id })}
-              className="flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-xl transition-all duration-200 active:scale-90"
+              className="flex flex-col items-center justify-center gap-0.5 px-3 py-1.5 min-h-[44px] min-w-[44px] rounded-xl transition-all duration-200 active:scale-90"
               style={{
                 color: active ? '#e8b85c' : '#6b6459',
               }}

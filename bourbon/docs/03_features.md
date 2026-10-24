@@ -55,3 +55,20 @@ Patrons can dynamically narrow the catalog to their exact requirements:
 - Type Filters: Toggle filters for Wheated, Rye, Barrel Proof, Single Barrel, and Bottled-in-Bond.
 - Distillery Filter: Dropdown selector filtering bottles by specific heritage distilleries.
 - Sorting Options: Instant sorting by valueScore, sprigPrice, fairPrice, bottle name, or MSRP in ascending or descending sequence.
+
+## 6. Responsive Desktop Layout & Multi-Device Ergonomics
+
+Bourbon Sommelier implements a responsive design system adapting seamlessly between mobile handhelds and ultra-wide desktop monitors:
+
+- Container Governance: Outer bounds dynamically expand to `max-w-7xl` with responsive horizontal padding (`px-4 sm:px-6 lg:px-8`), replacing fixed mobile-only constraints.
+- Responsive Navigation Hierarchy:
+  - Desktop Viewports (`md:` and up): Persistent sticky header with brand identity, live sync telemetry, and tab pills with active highlight indicators and badge counts.
+  - Mobile Viewports (`< md`): Bottom dock navigation bar (`md:hidden`) featuring safe-area inset padding and minimum 44px tap targets.
+- Multi-Column Grids & Dual-Mode Explorer:
+  - Multi-Column Grid: Cards render in responsive 1, 2, and 3-column layouts (`grid-cols-1 md:grid-cols-2 xl:grid-cols-3`).
+  - High-Density Data Table: Desktop view toggle allows users to switch between card cards and dense, sortable spirits data tables with mobile fallback.
+- Sommelier Dual-Pane Dashboard:
+  - Converts single-column stack into a 12-column split view (`lg:grid-cols-12`): Left panel (`col-span-5`) hosts AI consultation and Tasting Flight Calculator; Right panel (`col-span-7`) renders Flavor Archetypes and 2-column matched pour cards.
+- Centered Desktop Inspection Modal:
+  - Detail drawer transitions from mobile bottom sheet to a centered glassmorphism dialog (`md:top-1/2 md:left-1/2 md:max-w-3xl`) with a 4-column price economics grid and dual-column technical specs.
+

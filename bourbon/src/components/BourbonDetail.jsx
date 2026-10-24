@@ -106,26 +106,26 @@ export default function BourbonDetail() {
         onClick={close}
       />
 
-      {/* Sheet */}
+      {/* Sheet / Modal */}
       <div
         id="bourbon-detail-sheet"
-        className="fixed bottom-0 left-0 right-0 z-50 animate-slide-up max-w-md mx-auto"
+        className="fixed bottom-0 left-0 right-0 md:bottom-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 z-50 animate-slide-up w-full max-w-md md:max-w-2xl lg:max-w-3xl mx-auto md:p-4"
         style={{ maxHeight: '92dvh' }}
       >
         <div
-          className="rounded-t-3xl border-t border-smoke-800/80 overflow-hidden flex flex-col"
+          className="rounded-t-3xl md:rounded-3xl border-t md:border border-smoke-800/80 overflow-hidden flex flex-col shadow-2xl"
           style={{
             background: 'linear-gradient(160deg, #1c1813, #0d0c09)',
-            maxHeight: '92dvh',
+            maxHeight: '90dvh',
           }}
         >
-          {/* Drag handle */}
-          <div className="flex justify-center pt-3 pb-1">
+          {/* Drag handle (mobile only) */}
+          <div className="flex md:hidden justify-center pt-3 pb-1">
             <div className="w-12 h-1 rounded-full bg-smoke-700" />
           </div>
 
           {/* Scrollable content */}
-          <div className="overflow-y-auto flex-1 px-4 pb-8">
+          <div className="overflow-y-auto flex-1 px-4 sm:px-6 pb-8">
             {/* Header */}
             <div className="flex items-start justify-between gap-3 pt-3 pb-4 border-b border-smoke-800/60">
               <div className="flex-1 min-w-0">
@@ -134,44 +134,44 @@ export default function BourbonDetail() {
                     🦄 Mathematical Unicorn &middot; A+ Steal
                   </div>
                 )}
-                <h2 className="font-display text-xl font-bold text-smoke-50 leading-tight">
+                <h2 className="font-display text-xl sm:text-2xl font-bold text-smoke-50 leading-tight">
                   {name}
                 </h2>
                 {distillery && (
-                  <p className="text-smoke-400 text-xs mt-1">{distillery}</p>
+                  <p className="text-smoke-400 text-xs sm:text-sm mt-1">{distillery}</p>
                 )}
               </div>
               <button
                 id="close-detail-btn"
                 onClick={close}
-                className="w-8 h-8 rounded-full bg-smoke-800/80 flex items-center justify-center flex-shrink-0 active:scale-90 transition-transform"
+                className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-full bg-smoke-800/80 flex items-center justify-center flex-shrink-0 active:scale-90 transition-transform"
               >
-                <X className="w-4 h-4 text-smoke-300" />
+                <X className="w-5 h-5 text-smoke-300" />
               </button>
             </div>
 
             {/* Value rating banner */}
-            <div className="rounded-xl p-3 mt-4 flex items-center justify-between bg-smoke-900/80 border border-bourbon-500/30">
+            <div className="rounded-xl p-3 sm:p-4 mt-4 flex items-center justify-between bg-smoke-900/80 border border-bourbon-500/30">
               <div>
                 <p className="text-smoke-500 text-[10px] uppercase tracking-wider font-semibold">Inventory Grade</p>
-                <p className="text-smoke-100 font-bold text-sm mt-0.5">{valueRating || 'Unclassified'}</p>
+                <p className="text-smoke-100 font-bold text-sm sm:text-base mt-0.5">{valueRating || 'Unclassified'}</p>
               </div>
               {valueScore !== null && (
                 <div className="text-right">
                   <p className="text-[10px] text-smoke-500 uppercase tracking-wider font-semibold">Alpha vs Fair Bar</p>
-                  <p className={`font-bold font-mono text-base ${valueScore > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  <p className={`font-bold font-mono text-base sm:text-lg ${valueScore > 0 ? 'text-green-400' : 'text-red-400'}`}>
                     {valueScore > 0 ? '+' : ''}{valueScore}%
                   </p>
                 </div>
               )}
             </div>
 
-            {/* Price Economics Grid */}
-            <div className="grid grid-cols-2 gap-2 mt-3">
+            {/* Price Economics Grid (4 columns on desktop) */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 mt-3">
               {sprigPrice !== null && (
                 <div className="stat-box">
                   <p className="text-[9px] text-smoke-500 uppercase tracking-wide">Sprig Pour Price</p>
-                  <p className="text-bourbon-300 font-bold font-mono text-xl mt-0.5">${sprigPrice.toFixed(2)}</p>
+                  <p className="text-bourbon-300 font-bold font-mono text-xl sm:text-2xl mt-0.5">${sprigPrice.toFixed(2)}</p>
                   <p className="text-[10px] text-smoke-500 mt-0.5">2oz restaurant pour</p>
                 </div>
               )}
@@ -179,7 +179,7 @@ export default function BourbonDetail() {
               {fairPrice !== null && (
                 <div className="stat-box">
                   <p className="text-[9px] text-smoke-500 uppercase tracking-wide">Fair Bar Price (3.6x)</p>
-                  <p className="text-smoke-200 font-bold font-mono text-xl mt-0.5">${fairPrice.toFixed(2)}</p>
+                  <p className="text-smoke-200 font-bold font-mono text-xl sm:text-2xl mt-0.5">${fairPrice.toFixed(2)}</p>
                   <p className="text-[10px] text-smoke-500 mt-0.5">Industry benchmark pour</p>
                 </div>
               )}
@@ -187,7 +187,7 @@ export default function BourbonDetail() {
               {rawCost !== null && (
                 <div className="stat-box">
                   <p className="text-[9px] text-smoke-500 uppercase tracking-wide">Raw 2oz Cost</p>
-                  <p className="text-smoke-300 font-mono font-semibold text-sm mt-0.5">${rawCost.toFixed(2)}</p>
+                  <p className="text-smoke-300 font-mono font-semibold text-sm sm:text-base mt-0.5">${rawCost.toFixed(2)}</p>
                   <p className="text-[10px] text-smoke-500 mt-0.5">Wholesale cost/pour</p>
                 </div>
               )}
@@ -195,42 +195,45 @@ export default function BourbonDetail() {
               {msrp !== null && (
                 <div className="stat-box">
                   <p className="text-[9px] text-smoke-500 uppercase tracking-wide">Bottle MSRP (750ml)</p>
-                  <p className="text-smoke-300 font-mono font-semibold text-sm mt-0.5">${msrp.toFixed(2)}</p>
+                  <p className="text-smoke-300 font-mono font-semibold text-sm sm:text-base mt-0.5">${msrp.toFixed(2)}</p>
                   <p className="text-[10px] text-smoke-500 mt-0.5">Full bottle retail</p>
                 </div>
               )}
             </div>
 
-            {/* Mathematical Transparency Box */}
-            <div className="rounded-xl p-3 bg-smoke-900/70 border border-smoke-800/80 mt-3 text-xs space-y-1.5">
-              <div className="flex items-center gap-1.5 text-bourbon-400 font-bold text-[10px] uppercase tracking-wider">
-                <Calculator className="w-3.5 h-3.5" />
-                How the Mathematical Rating Works
+            {/* Dual Column on Desktop: Mathematical Transparency + Pour Specs */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+              {/* Mathematical Transparency Box */}
+              <div className="rounded-xl p-3.5 bg-smoke-900/70 border border-smoke-800/80 text-xs space-y-1.5 flex flex-col justify-center">
+                <div className="flex items-center gap-1.5 text-bourbon-400 font-bold text-[10px] uppercase tracking-wider mb-1">
+                  <Calculator className="w-3.5 h-3.5" />
+                  How the Mathematical Rating Works
+                </div>
+                <p className="text-smoke-300 leading-relaxed">
+                  • <strong className="text-smoke-100">Bottle MSRP (${msrp ? `$${msrp.toFixed(2)}` : 'N/A'}):</strong> Sourced from Master Registry for a 750ml bottle.
+                </p>
+                <p className="text-smoke-300 leading-relaxed">
+                  • <strong className="text-smoke-100">Raw Wholesale Cost:</strong> A 750ml bottle yields ~12.7 2-oz pours (~${rawCost ? `$${rawCost.toFixed(2)}` : 'N/A'}/pour).
+                </p>
+                <p className="text-smoke-300 leading-relaxed">
+                  • <strong className="text-smoke-100">Fair Bar Pour Price (3.6x):</strong> Standard bar beverage markup sets fair price at ${fairPrice ? `$${fairPrice.toFixed(2)}` : 'N/A'}.
+                </p>
+                <p className="text-smoke-300 leading-relaxed">
+                  • <strong className="text-smoke-100">Sprig Pricing Verdict:</strong> Sprig charges ${sprigPrice ? `$${sprigPrice.toFixed(2)}` : 'N/A'}, earning it <strong className="text-bourbon-300 font-semibold">{valueRating}</strong>!
+                </p>
               </div>
-              <p className="text-smoke-300 leading-relaxed">
-                • <strong className="text-smoke-100">Bottle MSRP (${msrp ? `$${msrp.toFixed(2)}` : 'N/A'}):</strong> Sourced from your Master Registry for a standard 750ml bottle.
-              </p>
-              <p className="text-smoke-300 leading-relaxed">
-                • <strong className="text-smoke-100">Raw Wholesale Cost:</strong> A 750ml bottle yields ~12.7 2-oz pours, making raw liquid cost ~${rawCost ? `$${rawCost.toFixed(2)}` : 'N/A'} per pour.
-              </p>
-              <p className="text-smoke-300 leading-relaxed">
-                • <strong className="text-smoke-100">Fair Bar Pour Price (3.6x):</strong> Standard restaurant beverage markup sets fair pour price at ${fairPrice ? `$${fairPrice.toFixed(2)}` : 'N/A'}.
-              </p>
-              <p className="text-smoke-300 leading-relaxed">
-                • <strong className="text-smoke-100">Sprig Pricing Verdict:</strong> Sprig charges ${sprigPrice ? `$${sprigPrice.toFixed(2)}` : 'N/A'}, earning it a <strong className="text-bourbon-300 font-semibold">{valueRating}</strong> rating!
-              </p>
-            </div>
 
-            {/* Pour Specs */}
-            <div className="mt-4 rounded-xl overflow-hidden border border-smoke-800/60">
-              <div className="bg-smoke-900/60 px-3 py-2 border-b border-smoke-800/40">
-                <p className="text-[10px] text-smoke-400 uppercase tracking-wide font-semibold">Pour Specs</p>
-              </div>
-              <div className="px-3">
-                <DetailRow icon={FlaskConical} label="Style" value={type} />
-                <DetailRow icon={ChevronDown} label="Age" value={age} />
-                <DetailRow icon={TrendingUp} label="Proof" value={proof ? `${proof}°` : null} />
-                <DetailRow icon={ShieldCheck} label="Sprig Registry Sync" value={syncStatus} />
+              {/* Pour Specs */}
+              <div className="rounded-xl overflow-hidden border border-smoke-800/60 bg-smoke-900/40">
+                <div className="bg-smoke-900/60 px-3 py-2 border-b border-smoke-800/40">
+                  <p className="text-[10px] text-smoke-400 uppercase tracking-wide font-semibold">Pour Specs</p>
+                </div>
+                <div className="px-3">
+                  <DetailRow icon={FlaskConical} label="Style" value={type} />
+                  <DetailRow icon={ChevronDown} label="Age" value={age} />
+                  <DetailRow icon={TrendingUp} label="Proof" value={proof ? `${proof}°` : null} />
+                  <DetailRow icon={ShieldCheck} label="Sprig Registry Sync" value={syncStatus} />
+                </div>
               </div>
             </div>
 

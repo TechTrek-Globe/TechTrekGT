@@ -15,14 +15,16 @@ Wayfinder implements custom client-side history routing in [wayfinder/src/App.js
 
 - Route Synchronization: Listens to window.history.pushState and popstate events, matching browser URL paths against recognized view routes.
 - Base Path Normalization: Automatically strips the /wayfinder base prefix to determine internal view state.
-- View Hierarchy:
-  - Landing Hub: Poland overview, interactive country map, and destination links in [wayfinder/src/components/PolandLanding.jsx](file:///e:/TechTrekGT/wayfinder/src/components/PolandLanding.jsx).
-  - City Pages: Dedicated city drill-downs with multi-tab layouts (Overview, Attractions, Food, Markets, Hotels, History, LGBTQ+ Safe Spaces) in [wayfinder/src/components/CityPage.jsx](file:///e:/TechTrekGT/wayfinder/src/components/CityPage.jsx).
-  - Route Map: Visual travel itinerary connecting the six cities with rail durations in [wayfinder/src/components/RouteVisualization.jsx](file:///e:/TechTrekGT/wayfinder/src/components/RouteVisualization.jsx).
-  - Markets Overview: Comprehensive comparison of all Christmas markets in [wayfinder/src/components/MarketsPage.jsx](file:///e:/TechTrekGT/wayfinder/src/components/MarketsPage.jsx).
-  - Stays and Dining: Unified overview of culinary highlights and accommodations in [wayfinder/src/components/StaysAndFoodPage.jsx](file:///e:/TechTrekGT/wayfinder/src/components/StaysAndFoodPage.jsx).
-  - Practical Guide: Rail navigation, emergency numbers, tipping customs, and weather advice in [wayfinder/src/components/PracticalPage.jsx](file:///e:/TechTrekGT/wayfinder/src/components/PracticalPage.jsx).
-  - Private Hub: Authenticated portal for private travel itineraries, booking documents, and budget logs in [wayfinder/src/components/PrivateHub.jsx](file:///e:/TechTrekGT/wayfinder/src/components/PrivateHub.jsx).
+- Simplified Entry Funnel: Root `/wayfinder` route directly renders PolandLanding, eliminating unnecessary gateway intermediary clicks.
+- Global Navigation Architecture:
+  - Mobile Bottom Tab Bar: Persistent 5-slot thumb-zone navigation [wayfinder/src/components/BottomTabBar.jsx](file:///e:/TechTrekGT/wayfinder/src/components/BottomTabBar.jsx) providing one-tap access to Cities, Schedule, Practical, Currency (Money), and Hub (Documents).
+  - Slim Desktop Header: Clean, distraction-free top navigation in [wayfinder/src/components/Layout.jsx](file:///e:/TechTrekGT/wayfinder/src/components/Layout.jsx) featuring Launch Pad, Practical Guide, live Currency Converter, and Private Hub / Auth.
+- View Hierarchy & Route Redirects:
+  - Primary Journey Hub: Poland overview, interactive route rail map, and city cards in [wayfinder/src/components/PolandLanding.jsx](file:///e:/TechTrekGT/wayfinder/src/components/PolandLanding.jsx).
+  - City Pages: Dedicated city drill-downs in [wayfinder/src/components/CityPage.jsx](file:///e:/TechTrekGT/wayfinder/src/components/CityPage.jsx) featuring a 5-tab streamlined navigation strip (Overview, Markets, Sights, Food, Stays, Safe Spaces) with city history surfaced via an interactive card in [wayfinder/src/components/city/CityOverviewTab.jsx](file:///e:/TechTrekGT/wayfinder/src/components/city/CityOverviewTab.jsx).
+  - Retired Standalone Routes: `/markets`, `/stays-and-food`, and `/route` automatically redirect to `/wayfinder/poland-christmas-2026`, preserving bookmarks while consolidating duplicate content into city tabs.
+  - Practical Guide: Dedicated logistics, train tickets, packing, and emergency advice in [wayfinder/src/components/PracticalPage.jsx](file:///e:/TechTrekGT/wayfinder/src/components/PracticalPage.jsx).
+  - Private Operations Hub & Schedule: Unified portal at `/private` in [wayfinder/src/components/PrivateHub.jsx](file:///e:/TechTrekGT/wayfinder/src/components/PrivateHub.jsx). Unauthenticated visitors view the public 10-day itinerary with an option to sign in; authenticated users access document storage, OCR extraction, and overlaid booking confirmations. Aliases `/itinerary` and `/timeline` redirect here.
 
 ## 3. Serverless Worker Architecture (src/worker.js)
 

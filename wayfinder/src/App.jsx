@@ -4,11 +4,7 @@ import { AuthModal } from './components/AuthModal';
 const WayfinderLanding = React.lazy(() => import('./components/WayfinderLanding').then(m => ({ default: m.WayfinderLanding })));
 const PolandLanding = React.lazy(() => import('./components/PolandLanding').then(m => ({ default: m.PolandLanding })));
 const CityPage = React.lazy(() => import('./components/CityPage').then(m => ({ default: m.CityPage })));
-const RouteVisualization = React.lazy(() => import('./components/RouteVisualization').then(m => ({ default: m.RouteVisualization })));
-const MarketsPage = React.lazy(() => import('./components/MarketsPage').then(m => ({ default: m.MarketsPage })));
 const PracticalPage = React.lazy(() => import('./components/PracticalPage').then(m => ({ default: m.PracticalPage })));
-const StaysAndFoodPage = React.lazy(() => import('./components/StaysAndFoodPage').then(m => ({ default: m.StaysAndFoodPage })));
-const ItineraryView = React.lazy(() => import('./components/ItineraryView').then(m => ({ default: m.ItineraryView })));
 const PrivateHub = React.lazy(() => import('./components/PrivateHub').then(m => ({ default: m.PrivateHub })));
 
 // Simple client-side router
@@ -38,8 +34,13 @@ function App() {
       ? '/wayfinder' 
       : (pathOnly.startsWith('/wayfinder') ? pathOnly : `/wayfinder${pathOnly.startsWith('/') ? pathOnly : '/' + pathOnly}`);
 
-    // Wayfinder Root Landing
+    // Root - go straight to Poland landing (single active journey)
     if (normalizedPath === '/wayfinder' || normalizedPath === '/wayfinder/') {
+      return <PolandLanding />;
+    }
+
+    // Destinations gallery (future use when multiple journeys exist)
+    if (normalizedPath === '/wayfinder/destinations') {
       return <WayfinderLanding />;
     }
 
@@ -47,24 +48,28 @@ function App() {
       return <PolandLanding />;
     }
 
-    if (normalizedPath === '/wayfinder/poland-christmas-2026/route' || normalizedPath === '/wayfinder/poland-christmas-2026/rail') {
-      return <RouteVisualization />;
+    // Retired standalone pages - redirect to PolandLanding
+    if (
+      normalizedPath === '/wayfinder/poland-christmas-2026/route' ||
+      normalizedPath === '/wayfinder/poland-christmas-2026/rail' ||
+      normalizedPath === '/wayfinder/poland-christmas-2026/markets' ||
+      normalizedPath === '/wayfinder/poland-christmas-2026/stays-and-food'
+    ) {
+      window.history.replaceState({}, '', '/wayfinder/poland-christmas-2026');
+      return <PolandLanding />;
     }
 
-    if (normalizedPath === '/wayfinder/poland-christmas-2026/markets') {
-      return <MarketsPage />;
-    }
-
-    if (normalizedPath === '/wayfinder/poland-christmas-2026/stays-and-food') {
-      return <StaysAndFoodPage />;
+    // Itinerary/timeline aliases redirect to PrivateHub
+    if (
+      normalizedPath === '/wayfinder/poland-christmas-2026/itinerary' ||
+      normalizedPath === '/wayfinder/poland-christmas-2026/timeline'
+    ) {
+      window.history.replaceState({}, '', '/wayfinder/poland-christmas-2026/private');
+      return <PrivateHub currentPath="/wayfinder/poland-christmas-2026/private" />;
     }
 
     if (normalizedPath === '/wayfinder/poland-christmas-2026/practical') {
       return <PracticalPage />;
-    }
-
-    if (normalizedPath === '/wayfinder/poland-christmas-2026/itinerary' || normalizedPath === '/wayfinder/poland-christmas-2026/timeline') {
-      return <ItineraryView />;
     }
 
     if (normalizedPath.startsWith('/wayfinder/poland-christmas-2026/cities/')) {

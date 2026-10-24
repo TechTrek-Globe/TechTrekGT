@@ -229,21 +229,14 @@ export function PolandLanding() {
             </h2>
             <div className="flex items-center space-x-2">
               <a
-                href="/wayfinder/poland-christmas-2026/itinerary"
-                onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026/itinerary')}
+                href="/wayfinder/poland-christmas-2026/private"
+                onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026/private')}
                 className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 hover:text-white text-xs font-semibold flex items-center space-x-1.5 transition-colors min-h-[36px]"
               >
                 <Calendar className="w-3.5 h-3.5 text-amber-400" />
-                <span>10-Day Itinerary</span>
+                <span>10-Day Schedule</span>
               </a>
-              <a 
-                href="/wayfinder/poland-christmas-2026/route"
-                onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026/route')}
-                className="px-3 py-1.5 rounded-xl bg-wf-blue/10 hover:bg-wf-blue/20 border border-wf-blue/30 text-wf-blue-lt hover:text-white text-xs font-semibold flex items-center space-x-1 transition-colors min-h-[36px]"
-              >
-                <span>Route Details</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </a>
+
             </div>
           </div>
           
@@ -268,17 +261,20 @@ export function PolandLanding() {
               A balanced approach to winter travel in Poland, optimizing daylight sightseeing and evening market atmosphere.
             </p>
             <div className="space-y-4">
-              <a href="/wayfinder/poland-christmas-2026/markets" onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026/markets')} className="flex items-center space-x-3 p-4 rounded-xl bg-wf-navy-mid border border-white/5 hover:border-wf-blue/50 transition-colors group">
+              <div className="flex items-center space-x-3 p-4 rounded-xl bg-wf-navy-mid border border-white/5">
                 <div className="p-2 rounded-lg bg-wf-blue/20 text-wf-blue-lt"><Calendar className="w-5 h-5" /></div>
-                <div className="flex-1 font-medium text-white group-hover:text-wf-blue-lt transition-colors">Market Timing</div>
-                <ArrowRight className="w-4 h-4 text-wf-muted group-hover:text-wf-blue-lt transition-colors" />
-              </a>
-              <a href="/wayfinder/poland-christmas-2026/rail" onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026/rail')} className="flex items-center space-x-3 p-4 rounded-xl bg-wf-navy-mid border border-white/5 hover:border-wf-blue/50 transition-colors group">
+                <div className="flex-1">
+                  <div className="font-medium text-white text-sm">Evening Anchor Strategy</div>
+                  <div className="text-xs text-wf-muted mt-0.5">Markets open at dusk - plan sightseeing by day, market visits after 4pm.</div>
+                </div>
+              </div>
+              <div className="flex items-center space-x-3 p-4 rounded-xl bg-wf-navy-mid border border-white/5">
                 <div className="p-2 rounded-lg bg-wf-amber/20 text-wf-amber"><Train className="w-5 h-5" /></div>
-                <div className="flex-1 font-medium text-white group-hover:text-wf-amber transition-colors">Rail Connections</div>
-                <ArrowRight className="w-4 h-4 text-wf-muted group-hover:text-wf-amber transition-colors" />
-              </a>
-
+                <div className="flex-1">
+                  <div className="font-medium text-white text-sm">1st-Class PKP Rail Connections</div>
+                  <div className="text-xs text-wf-muted mt-0.5">Book EIP Express InterCity Premium seats at least 7 days ahead.</div>
+                </div>
+              </div>
             </div>
           </div>
           

@@ -346,20 +346,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
             <span>Overview</span>
           </a>
 
-          {city.historyEpochs && city.historyEpochs.length > 0 && (
-            <a
-              href={`${baseUrl}/history`}
-              onClick={(e) => handleSubPageTabClick(e, `${baseUrl}/history`)}
-              className={`px-3 py-2.5 sm:py-2 md:py-2.5 rounded-lg text-xs md:text-sm font-semibold transition-all whitespace-nowrap flex items-center space-x-1.5 shrink-0 min-h-[40px] md:min-h-[42px] ${
-                activeSubPage === 'history'
-                  ? 'bg-amber-500 text-slate-950 shadow-sm font-bold'
-                  : 'text-amber-300 hover:text-amber-100 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30'
-              }`}
-            >
-              <BookOpen className="w-3.5 h-3.5" />
-              <span>History & Timeline</span>
-            </a>
-          )}
+          {/* History tab removed from bar - accessible via Overview card and direct URL */}
 
           {city.markets && city.markets.length > 0 && (
             <a
@@ -372,7 +359,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
               }`}
             >
               <ShoppingBag className="w-3.5 h-3.5" />
-              <span>Christmas Markets</span>
+              <span>Markets</span>
             </a>
           )}
 
@@ -387,7 +374,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
               }`}
             >
               <Sparkles className="w-3.5 h-3.5" />
-              <span>Must-See Sights</span>
+              <span>Sights</span>
             </a>
           )}
 
@@ -402,7 +389,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
               }`}
             >
               <Utensils className="w-3.5 h-3.5" />
-              <span>Food & Drink</span>
+              <span>Food</span>
             </a>
           )}
 
@@ -417,7 +404,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
               }`}
             >
               <Bed className="w-3.5 h-3.5" />
-              <span>Lodging & Stays</span>
+              <span>Stays</span>
             </a>
           )}
 
@@ -432,7 +419,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
               }`}
             >
               <Heart className="w-3.5 h-3.5 text-pink-400 fill-pink-400/30" />
-              <span>LGBTQ+ Guide</span>
+              <span>Safe Spaces</span>
             </a>
           )}
         </div>

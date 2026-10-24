@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Compass, Map, User, LogOut, ShieldCheck, ChevronRight, Menu, X, Coins, ArrowLeftRight, Settings, Calendar, Globe } from 'lucide-react';
+import { Compass, User, LogOut, ShieldCheck, Menu, X, Coins, Settings, Backpack, Globe } from 'lucide-react';
 import { CurrencyConverterModal } from './CurrencyConverterModal';
 import { SettingsModal } from './SettingsModal';
+import { BottomTabBar } from './BottomTabBar';
 import { useExchangeRate } from '../hooks/useExchangeRate';
 import wayfinderHeaderBanner from '../assets/wayfinder-header-banner-new.png';
 
@@ -22,14 +23,8 @@ export function Layout({ children }) {
   }, []);
 
   const pathOnly = (currentPath || '').split('?')[0].toLowerCase();
-  const isMainLanding = pathOnly === '/' || pathOnly === '' || pathOnly === '/wayfinder' || pathOnly === '/wayfinder/' || pathOnly === '/index.html';
-  const showCurrencyConverter = !isMainLanding;
-
-  const navLinks = [
-    { label: 'Destinations', href: '/wayfinder' },
-    { label: 'Poland 2026', href: '/wayfinder/poland-christmas-2026' },
-    { label: 'Itinerary & Timeline', href: '/wayfinder/poland-christmas-2026/itinerary' },
-  ];
+  const isMainLanding = pathOnly === '/' || pathOnly === '' || pathOnly === '/wayfinder' || pathOnly === '/wayfinder/' || pathOnly === '/index.html' || pathOnly === '/wayfinder/poland-christmas-2026' || pathOnly === '/wayfinder/poland-christmas-2026/';
+  const showCurrencyConverter = true;
 
   const pushRoute = (e, path) => {
     e.preventDefault();
@@ -76,8 +71,9 @@ export function Layout({ children }) {
             </a>
           </div>
 
-          <div className="hidden md:flex items-center space-x-1 lg:space-x-2.5 shrink-0">
-            {/* TechTrekGT Launch Pad Return Link */}
+          {/* Desktop right-side actions */}
+          <div className="hidden md:flex items-center space-x-1 lg:space-x-2 shrink-0">
+            {/* TechTrekGT Launch Pad */}
             <a
               href="https://techtrekgt.com"
               className="flex items-center space-x-1.5 px-2 lg:px-3 py-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-700/60 hover:border-wf-blue/50 text-slate-200 hover:text-white text-xs lg:text-sm font-semibold transition-all shadow-sm group min-h-[40px]"
@@ -88,30 +84,30 @@ export function Layout({ children }) {
               <span className="hidden lg:inline xl:hidden">Hub</span>
             </a>
 
-            {/* Quick Itinerary & Currency Converter Trigger (Desktop/Tablet) - Only show when trip is selected */}
+            {/* Practical Guide link */}
+            <a
+              href="/wayfinder/poland-christmas-2026/practical"
+              onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026/practical')}
+              className="flex items-center space-x-1.5 px-2 lg:px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-slate-200 text-xs lg:text-sm font-bold hover:text-white hover:bg-white/10 transition-all shadow-sm min-h-[40px]"
+              title="Practical Guide"
+            >
+              <Backpack className="w-3.5 h-3.5 lg:w-4 lg:h-4 text-amber-400" />
+              <span className="hidden lg:inline">Practical</span>
+            </a>
+
+            {/* Currency Converter */}
             {showCurrencyConverter && (
-              <>
-                <a
-                  href="/wayfinder/poland-christmas-2026/itinerary"
-                  onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026/itinerary')}
-                  className="flex items-center space-x-1.5 px-2 lg:px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-slate-200 text-xs lg:text-sm font-bold hover:text-white hover:bg-white/10 transition-all shadow-sm min-h-[40px]"
-                  title="Itinerary & Timeline"
-                >
-                  <Calendar className="w-3.5 h-3.5 lg:w-4 lg:h-4 text-amber-400" />
-                  <span className="hidden lg:inline">Itinerary</span>
-                </a>
-                <button
-                  onClick={() => setIsConverterOpen(!isConverterOpen)}
-                  className="flex items-center space-x-1.5 px-2 lg:px-2.5 py-2 rounded-xl bg-wf-amber/10 border border-wf-amber/30 text-wf-amber text-xs lg:text-sm font-bold hover:bg-wf-amber/20 transition-all shadow-sm active:scale-95 group min-h-[40px]"
-                  title="Open Currency Converter"
-                >
-                  <Coins className="w-3.5 h-3.5 lg:w-4 lg:h-4 text-wf-amber group-hover:rotate-12 transition-transform" />
-                  <span className="hidden xl:inline">Converter</span>
-                  <span className="text-[10px] lg:text-xs bg-wf-amber/20 px-1.5 py-0.5 rounded-md font-semibold text-wf-cream">
-                    {symbol} {rate.toFixed(2)}
-                  </span>
-                </button>
-              </>
+              <button
+                onClick={() => setIsConverterOpen(!isConverterOpen)}
+                className="flex items-center space-x-1.5 px-2 lg:px-2.5 py-2 rounded-xl bg-wf-amber/10 border border-wf-amber/30 text-wf-amber text-xs lg:text-sm font-bold hover:bg-wf-amber/20 transition-all shadow-sm active:scale-95 group min-h-[40px]"
+                title="Open Currency Converter"
+              >
+                <Coins className="w-3.5 h-3.5 lg:w-4 lg:h-4 text-wf-amber group-hover:rotate-12 transition-transform" />
+                <span className="hidden xl:inline">Converter</span>
+                <span className="text-[10px] lg:text-xs bg-wf-amber/20 px-1.5 py-0.5 rounded-md font-semibold text-wf-cream">
+                  {symbol} {rate.toFixed(2)}
+                </span>
+              </button>
             )}
 
             {isAuthenticated ? (
@@ -124,7 +120,7 @@ export function Layout({ children }) {
                 >
                   <ShieldCheck className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
                   <span className="hidden xl:inline">Private Hub</span>
-                  <span className="hidden lg:inline xl:hidden">Private</span>
+                  <span className="hidden lg:inline xl:hidden">Hub</span>
                 </a>
                 <div className="h-5 lg:h-6 w-px bg-white/10 mx-0.5" />
                 <button
@@ -133,7 +129,6 @@ export function Layout({ children }) {
                   title="Settings"
                 >
                   <Settings className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
-                  <span className="hidden xl:inline">Settings</span>
                 </button>
                 <button
                   onClick={logout}
@@ -152,7 +147,6 @@ export function Layout({ children }) {
                   title="Settings"
                 >
                   <Settings className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
-                  <span className="hidden xl:inline">Settings</span>
                 </button>
                 <button
                   onClick={() => setIsAuthModalOpen(true)}
@@ -166,109 +160,35 @@ export function Layout({ children }) {
             )}
           </div>
 
-          {/* Mobile top bar items: Currency button + Mobile menu button */}
+          {/* Mobile top bar: Currency button + settings shortcut */}
           <div className="md:hidden flex items-center space-x-2">
-            {showCurrencyConverter && (
-              <button
-                onClick={() => setIsConverterOpen(!isConverterOpen)}
-                className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl bg-wf-amber/10 border border-wf-amber/30 text-wf-amber text-xs font-bold active:scale-95"
-                title="Open Currency Converter"
-              >
-                <Coins className="w-4 h-4 text-wf-amber" />
-                <span>Currency Converter</span>
-              </button>
-            )}
-
             <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 rounded-lg text-wf-muted hover:text-white hover:bg-white/5 min-h-[44px] min-w-[44px] flex items-center justify-center"
-              aria-label="Toggle Mobile Menu"
+              onClick={() => setIsConverterOpen(!isConverterOpen)}
+              className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl bg-wf-amber/10 border border-wf-amber/30 text-wf-amber text-xs font-bold active:scale-95"
+              title="Open Currency Converter"
             >
-              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              <Coins className="w-4 h-4 text-wf-amber" />
+              <span className="text-[10px] bg-wf-amber/20 px-1.5 py-0.5 rounded-md font-semibold text-wf-cream">{symbol} {rate.toFixed(2)}</span>
+            </button>
+            <button
+              onClick={() => setIsSettingsOpen(true)}
+              className="p-2 rounded-lg text-wf-muted hover:text-white hover:bg-white/5 min-h-[44px] min-w-[44px] flex items-center justify-center"
+              aria-label="Settings"
+            >
+              <Settings className="w-5 h-5" />
             </button>
           </div>
         </div>
 
-        {/* Mobile menu */}
-        {mobileMenuOpen && (
-          <div className="md:hidden glass-panel border-t border-white/5 py-2 px-4 space-y-1">
-            <a
-              href="https://techtrekgt.com"
-              className="px-3 py-3 sm:py-2 rounded-lg text-base font-semibold text-wf-blue-lt hover:text-white hover:bg-white/5 min-h-[44px] flex items-center space-x-2 border border-wf-blue/20 bg-wf-blue/5 mb-2"
-            >
-              <Globe className="w-5 h-5 text-wf-blue-lt" />
-              <span>TechTrekGT Launch Pad</span>
-            </a>
 
-            {navLinks.map((link) => (
-              <a
-                key={link.href}
-                href={link.href}
-                onClick={(e) => pushRoute(e, link.href)}
-                className="block px-3 py-3 sm:py-2 rounded-lg text-base font-medium text-wf-text hover:text-white hover:bg-white/5 min-h-[44px] flex items-center"
-              >
-                {link.label}
-              </a>
-            ))}
-
-            {showCurrencyConverter && (
-              <button
-                onClick={() => { setIsConverterOpen(true); setMobileMenuOpen(false); }}
-                className="w-full flex items-center justify-between px-3 py-3 sm:py-2 rounded-lg text-base font-medium text-wf-amber hover:bg-white/5 text-left min-h-[44px]"
-              >
-                <span className="flex items-center space-x-2">
-                  <Coins className="w-5 h-5" />
-                  <span>Currency Converter</span>
-                </span>
-                <span className="text-xs bg-wf-amber/20 px-2 py-0.5 rounded-full font-bold">
-                  {symbol} {rate.toFixed(2)}
-                </span>
-              </button>
-            )}
-
-            <button
-              onClick={() => { setIsSettingsOpen(true); setMobileMenuOpen(false); }}
-              className="w-full flex items-center space-x-2 px-3 py-3 sm:py-2 rounded-lg text-base font-medium text-wf-text hover:text-white hover:bg-white/5 text-left min-h-[44px]"
-            >
-              <Settings className="w-5 h-5" />
-              <span>Settings</span>
-            </button>
-
-            <div className="h-px bg-white/10 my-2" />
-            {isAuthenticated ? (
-              <>
-                <a
-                  href="/wayfinder/poland-christmas-2026/private"
-                  onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026/private')}
-                  className="flex items-center space-x-2 px-3 py-3 sm:py-2 rounded-lg text-base font-medium text-wf-blue-lt hover:bg-white/5 min-h-[44px]"
-                >
-                  <ShieldCheck className="w-5 h-5" />
-                  <span>Private Hub</span>
-                </a>
-                <button
-                  onClick={logout}
-                  className="w-full flex items-center space-x-2 px-3 py-3 sm:py-2 rounded-lg text-base font-medium text-wf-muted hover:text-white hover:bg-white/5 text-left min-h-[44px]"
-                >
-                  <LogOut className="w-5 h-5" />
-                  <span>Sign Out</span>
-                </button>
-              </>
-            ) : (
-              <button
-                onClick={() => { setIsAuthModalOpen(true); setMobileMenuOpen(false); }}
-                className="w-full flex items-center space-x-2 px-3 py-3 sm:py-2 rounded-lg text-base font-medium text-white hover:bg-white/5 text-left min-h-[44px]"
-              >
-                <User className="w-5 h-5 text-wf-blue-lt" />
-                <span>Sign In</span>
-              </button>
-            )}
-          </div>
-        )}
       </header>
 
-      <main className="flex-1 relative z-10 w-full max-w-full flex flex-col overflow-x-hidden">
+      <main className="flex-1 relative z-10 w-full max-w-full flex flex-col overflow-x-hidden pb-20 md:pb-0">
         {children}
       </main>
+
+      {/* Mobile persistent bottom tab bar */}
+      <BottomTabBar currentPath={currentPath} onOpenConverter={() => setIsConverterOpen(true)} />
 
       {/* Global Full-Screen Currency Converter Modal */}
       <CurrencyConverterModal

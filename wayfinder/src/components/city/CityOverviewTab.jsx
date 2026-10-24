@@ -69,7 +69,7 @@ export function CityOverviewTab({ city, baseUrl, handleSubPageTabClick, mapUrl, 
               className="inline-flex items-center justify-center space-x-2 px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm transition-all transform hover:scale-[1.02] shadow-lg shadow-amber-500/20 cursor-pointer self-start min-h-[40px]"
             >
               <BookOpen className="w-4 h-4" />
-              <span>View Timeline Tab</span>
+              <span>Read City History</span>
               <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
             </a>
           </div>

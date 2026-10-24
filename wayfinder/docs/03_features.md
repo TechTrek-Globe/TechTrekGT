@@ -63,3 +63,17 @@ Authenticated travelers access a dedicated private management suite:
 - Document Center: Upload and organize PDF travel confirmations, flight tickets, hotel vouchers, and passport copies via [wayfinder/src/components/DocumentCenter.jsx](file:///e:/TechTrekGT/wayfinder/src/components/DocumentCenter.jsx).
 - Automated Extraction: Integration with document import jobs extracting check-in dates, confirmation numbers, and hotel addresses.
 - Travel Budget Tracker: Tracks trip expenses in PLN and USD, comparing estimated travel costs against actual spending across lodging, dining, transit, and activities.
+
+## 6. Mobile-First Navigation Simplification and Bottom Tab Bar
+
+To maximize usability during winter roaming and in-destination field usage, Wayfinder provides a streamlined, thumb-zone optimized navigation architecture:
+
+- Persistent Mobile Bottom Tab Bar: [wayfinder/src/components/BottomTabBar.jsx](file:///e:/TechTrekGT/wayfinder/src/components/BottomTabBar.jsx) anchors 5 key actions at the base of mobile screens (iOS safe-area aware):
+  - Cities: Immediate return to the Poland overview and city catalog.
+  - Schedule: Direct access to the unified 10-day itinerary timeline.
+  - Practical: Instant access to transit guides, tipping rules, and emergency logistics.
+  - Money: One-tap launcher for the full-screen interactive currency converter.
+  - Hub: Direct gateway to the private travel vault and document center.
+- Slim Desktop Header: Replaces cluttered legacy headers with a minimal top bar housing TechTrekGT Launch Pad navigation, the Practical Guide, active PLN exchange rates, and user authentication actions.
+- Consolidated City Drill-Down Tabs: CityPage tabs are streamlined to 5 primary destinations (Overview, Markets, Sights, Food, Stays, and Safe Spaces), avoiding horizontal overflow on small displays while moving in-depth historical chronologies to an engaging highlight card inside Overview.
+- Public/Private Schedule Harmony: Unauthenticated visitors can view the full 10-day Poland trip itinerary freely, with a discreet invitation to authenticate to reveal private booking confirmations and tickets.

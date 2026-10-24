@@ -26,13 +26,13 @@ The user currently travels through **three layers** before reaching actionable c
 
 The following standalone pages all live at the same routing depth and duplicate content already inside CityPage tabs:
 
-| Route             | Page                 | Overlap                                        |
-| ----------------- | -------------------- | ---------------------------------------------- |
-| `/markets`        | `MarketsPage`        | Duplicates CityPage "Christmas Markets" tab    |
-| `/stays-and-food` | `StaysAndFoodPage`   | Duplicates CityPage "Food" and "Hotels" tabs   |
-| `/practical`      | `PracticalPage`      | Standalone; no equivalent city tab - KEEP      |
+| Route             | Page                 | Overlap                                         |
+| ----------------- | -------------------- | ----------------------------------------------- |
+| `/markets`        | `MarketsPage`        | Duplicates CityPage "Christmas Markets" tab     |
+| `/stays-and-food` | `StaysAndFoodPage`   | Duplicates CityPage "Food" and "Hotels" tabs    |
+| `/practical`      | `PracticalPage`      | Standalone; no equivalent city tab - KEEP       |
 | `/route`          | `RouteVisualization` | Duplicates route track already on PolandLanding |
-| `/itinerary`      | `ItineraryView`      | Auth-adjacent; competes with PrivateHub        |
+| `/itinerary`      | `ItineraryView`      | Auth-adjacent; competes with PrivateHub         |
 
 The PolandLanding "The Strategy" section links to `/markets` and `/rail` - two more exits splitting focus. The result is a star-pattern where users jump from almost any page to almost any other with no clear hierarchy.
 

@@ -3,7 +3,7 @@ import { getApiUrl } from '../utils/api';
 import { useWayfinder } from '../context/WayfinderContext';
 import {
   Mail, Inbox, Copy, Check, RefreshCw, ExternalLink,
-  ShieldCheck, AlertCircle, Loader2, Calendar, Sparkles, LogOut, CheckCircle2
+  ShieldCheck, AlertCircle, Loader2, Calendar, Sparkles, LogOut, CheckCircle2, ArrowRight
 } from 'lucide-react';
 
 export function BookingImportChannels() {
@@ -123,7 +123,17 @@ export function BookingImportChannels() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to sync Gmail bookings');
-      setGmailMessage(`Sync complete: ${data.imported_count || 0} confirmations parsed and saved.`);
+      const count = data.imported ?? data.imported_count ?? 0;
+      setGmailMessage(`Sync complete: ${count} confirmations parsed and saved.`);
+      setGmailStatus(prev => prev ? {
+        ...prev,
+        last_synced_at: data.last_synced_at || new Date().toISOString(),
+        connection: prev.connection ? {
+          ...prev.connection,
+          last_sync_at: data.last_synced_at || new Date().toISOString(),
+          last_sync_count: (prev.connection.last_sync_count || 0) + count
+        } : prev.connection
+      } : prev);
       await loadGmailStatus();
       await fetchItinerary('poland-christmas-2026');
       await fetchDocuments('poland-christmas-2026');
@@ -317,9 +327,23 @@ export function BookingImportChannels() {
             )}
 
             {gmailMessage && (
-              <div className="mb-4 p-3 rounded-xl bg-emerald-950/60 border border-emerald-800/80 text-emerald-300 text-xs flex items-center space-x-2">
-                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
-                <span>{gmailMessage}</span>
+              <div className="mb-4 p-3 rounded-xl bg-emerald-950/60 border border-emerald-800/80 text-emerald-300 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-md">
+                <div className="flex items-center space-x-2 min-w-0">
+                  <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+                  <span className="truncate">{gmailMessage}</span>
+                </div>
+                <a
+                  href="/wayfinder/poland-christmas-2026/private"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    window.history.pushState({}, '', '/wayfinder/poland-christmas-2026/private');
+                    window.dispatchEvent(new PopStateEvent('popstate'));
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-[11px] shrink-0 transition-colors flex items-center space-x-1 self-start sm:self-auto"
+                >
+                  <span>View in Itinerary</span>
+                  <ArrowRight className="w-3 h-3" />
+                </a>
               </div>
             )}
 
@@ -328,12 +352,16 @@ export function BookingImportChannels() {
                 <div className="bg-wf-navy-mid/90 border border-white/10 rounded-xl p-3 space-y-2">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-slate-400">Account:</span>
-                    <span className="text-white font-medium">{gmailStatus.connected_email || 'Connected'}</span>
+                    <span className="text-white font-medium">
+                      {gmailStatus.connected_email || gmailStatus.connection?.gmail_address || 'Connected'}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-slate-400">Last Synced:</span>
                     <span className="text-slate-300">
-                      {gmailStatus.last_synced_at ? new Date(gmailStatus.last_synced_at).toLocaleString() : 'Never'}
+                      {(gmailStatus.last_synced_at || gmailStatus.connection?.last_sync_at) 
+                        ? new Date(gmailStatus.last_synced_at || gmailStatus.connection?.last_sync_at).toLocaleString() 
+                        : 'Never'}
                     </span>
                   </div>
                 </div>

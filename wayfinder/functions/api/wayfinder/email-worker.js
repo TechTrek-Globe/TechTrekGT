@@ -105,12 +105,12 @@ function extractBookingFields(subject, body, from) {
   const fullText = subject + ' ' + body;
 
   let item_type = 'other';
-  if (/hotel|inn|hostel|accommodation|check.in|stay/.test(text))   item_type = 'hotel';
-  if (/flight|airline|boarding|departs?/.test(text))                item_type = 'flight';
-  if (/train|rail|intercity|pkp/.test(text))                        item_type = 'train';
-  if (/tour|activity|excursion|ticket|experience/.test(text))        item_type = 'activity';
-  if (/transfer|taxi|shuttle|car.rent/.test(text))                   item_type = 'transport';
-  if (/restaurant|dining|reservation|table/.test(text))              item_type = 'dining';
+  if (/hotel|inn|hostel|accommodation|check.in|stay/.test(text))                     item_type = 'hotel';
+  if (/flight|airline|boarding|departs?/.test(text))                                  item_type = 'flight';
+  if (/train|rail|intercity|pkp/.test(text))                                          item_type = 'rail';
+  if (/tour|activity|excursion|ticket|experience|getyourguide|viator/.test(text))     item_type = 'excursion';
+  if (/transfer|taxi|shuttle|car.rent/.test(text))                                     item_type = 'transport';
+  if (/restaurant|dining|reservation|table/.test(text))                                item_type = 'restaurant';
 
   // Confirmation number extraction
   const confMatch = fullText.match(
@@ -127,12 +127,26 @@ function extractBookingFields(subject, body, from) {
   const providerMatch = from.match(/^([^<]+?)\s*(?:<|$)/);
   const provider = providerMatch ? providerMatch[1].trim() : from;
 
+  // Date extraction
+  let localDate = null;
+  const isoMatch = text.match(/2026-(12)-(0[1-9]|1[0-5])/);
+  if (isoMatch) {
+    localDate = isoMatch[0];
+  } else {
+    const decMatch = text.match(/(?:dec(?:ember)?\.?\s+([1-9]|0[1-9]|1[0-5])(?:st|nd|rd|th)?)|(?:([1-9]|0[1-9]|1[0-5])(?:st|nd|rd|th)?\s+dec(?:ember)?)/i);
+    if (decMatch) {
+      const dayNum = parseInt(decMatch[1] || decMatch[2], 10);
+      localDate = `2026-12-${String(dayNum).padStart(2, '0')}`;
+    }
+  }
+
   return {
     item_type,
     title:               subject.slice(0, 255) || 'Email import',
     provider:            provider || null,
     confirmation_number: confirmationNumber,
     raw_checkin:         checkinMatch ? checkinMatch[1] : null,
+    local_date:          localDate,
     snippet:             body.replace(/\s+/g, ' ').slice(0, 600),
   };
 }
@@ -203,12 +217,14 @@ export async function handleInboundEmail(message, env) {
     await env.DB.batch([
       env.DB.prepare(
         `INSERT INTO wayfinder_itinerary_items
-         (id, journey_id, user_id, item_type, title, provider, notes,
-          status, verification_status, visibility)
-         VALUES (?,?,?,?,?,?,?,'imported','unverified','private')`
+         (id, journey_id, user_id, item_type, title, provider,
+          local_date, notes, status, verification_status, visibility)
+         VALUES (?,?,?,?,?,?,?,?,'imported','unverified','private')`
       ).bind(
         itemId, inbox.journey_id, inbox.user_id,
-        fields.item_type, fields.title, fields.provider || null, notes
+        fields.item_type, fields.title, fields.provider || null,
+        fields.local_date || journey.start_date || '2026-12-03',
+        notes
       ),
       env.DB.prepare(
         `UPDATE wayfinder_email_inboxes

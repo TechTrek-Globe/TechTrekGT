@@ -155,7 +155,7 @@ describe('[MED-2] IP and Per-Account Rate Limiting & Lockout Defense', () => {
       for (let i = 1; i <= 10; i++) {
         const req = new Request('https://techtrekgt.com/api/auth/login', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': `192.0.2.${i}` },
+          headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': `198.51.100.${i}` },
           body: JSON.stringify({ email: victimUser.email, password: 'WrongPassword!' })
         });
         await loginPost({ request: req, env });
@@ -163,7 +163,7 @@ describe('[MED-2] IP and Per-Account Rate Limiting & Lockout Defense', () => {
 
       const blockedReq = new Request('https://techtrekgt.com/api/auth/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': '192.0.2.1' },
+        headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': '198.51.100.99' },
         body: JSON.stringify({ email: victimUser.email, password: victimUser.password })
       });
       const res = await loginPost({ request: blockedReq, env });

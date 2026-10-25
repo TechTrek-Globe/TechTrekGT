@@ -4,7 +4,8 @@
 
 The Global Command Palette provides keyboard-first rapid navigation and fuzzy search across Outpost routes, operational tools, and inventory items by SKU.
 
-### Key Capabilities
+### Command Palette Capabilities
+
 1. **Keyboard-Driven Invocation**:
    - Shortcut: `Cmd+K` (macOS) or `Ctrl+K` (Windows/Linux).
    - Global event listener in `src/components/AppLayout.jsx` with input guards ensuring standard text input (typing 'k') never triggers the palette.
@@ -27,7 +28,8 @@ The Global Command Palette provides keyboard-first rapid navigation and fuzzy se
 
 The brand color palette has been refactored from hardcoded hex constants into root CSS custom properties with full opacity modifier support in Tailwind CSS.
 
-### Key Capabilities
+### Dynamic Design System Capabilities
+
 1. **Root CSS Custom Properties (`src/index.css`)**:
    - The brand amber palette (`50` through `900`) is declared under `:root` as space-separated RGB channel values (`--color-brand-50` through `--color-brand-900`).
    - Global design system tokens can be updated dynamically or overridden for alternate color profiles and theme switching.
@@ -41,7 +43,8 @@ The brand color palette has been refactored from hardcoded hex constants into ro
 
 Spreadsheet-like inline grid editing enables rapid data entry directly within tabular views without requiring modal dialogues.
 
-### Key Capabilities
+### Inline Grid Editing Capabilities
+
 1. **Interactive Triggering & Cell Transformation**:
    - Double-clicking or pressing `Enter` on focused editable cells transforms the cell into an active input field.
    - Smooth layout transition matches exact cell height (22px) and bounds to prevent layout shifts.
@@ -62,7 +65,8 @@ Spreadsheet-like inline grid editing enables rapid data entry directly within ta
 
 Comprehensive audit and hardening of all serverless API mutation routes (`functions/api/**/*.js`) in Outpost to eliminate orphaned records, unhandled exceptions, and silent failures from incomplete Cloudflare D1 multi-step operations.
 
-### Key Capabilities
+### Backend Data Integrity Capabilities
+
 1. **Compensating Rollback Handlers**:
    - Multi-step database operations that cannot be batched in a single atomic SQL call are protected by dedicated try/catch compensating logic.
    - If secondary inserts or external updates fail, compensating rollback SQL is executed (e.g., purging newly created records, rolling back item statuses from `'Sold'` to previous states, restoring pre-proration invoice state, or purging partial batches).
@@ -87,7 +91,8 @@ Comprehensive audit and hardening of all serverless API mutation routes (`functi
 
 Comprehensive audit and hardening of all authentication guards, JWT validation paths, and API integration key lifecycles to eliminate desynchronized security states and ensure immediate invalidation across clients and Cloudflare D1.
 
-### Key Capabilities
+### Authentication Security Capabilities
+
 1. **Immediate Invalidation & Client-Side Cookie Scrubbing (`requireAuth`)**:
    - Outdated `token_version` (incremented on password reset or logout-all) or expired tokens trigger explicit HTTP 401 Unauthorized responses.
    - 401 responses emit `Set-Cookie: auth_token=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0` to immediately purge dead credentials from the client and prevent endless invalid background retries.
@@ -103,7 +108,8 @@ Comprehensive audit and hardening of all authentication guards, JWT validation p
 
 Comprehensive resilience hardening of all outbound platform integrations (eBay Trading/REST/Finances/Marketing APIs and Amazon scraping gateway) and inbound webhook ingestion to eliminate timeout risks, silent sync failures, and unhandled worker crashes.
 
-### Key Capabilities
+### External Synchronization Capabilities
+
 1. **Strict Fetch Timeouts (`fetchWithTimeout`)**:
    - Outbound external requests across eBay APIs, OAuth token refresh, and Amazon URL ingestion enforce a strict 15-second timeout via `AbortSignal.timeout` (or `AbortController` fallback).
    - Timeout errors are caught and transformed into structured `TimeoutError` exceptions (`statusCode: 504`, `isTimeout: true`) rather than crashing worker isolates or hanging indefinitely.
@@ -125,7 +131,8 @@ Comprehensive resilience hardening of all outbound platform integrations (eBay T
 
 Audit and refactor of React context providers, hooks, and component lifecycles to eliminate stale data caching, false-positive success messages, and infinite rendering loops.
 
-### Key Capabilities
+### Frontend State Consistency Capabilities
+
 1. **Centralized API Error Invariant (`auctionApi.js`)**:
    - `apiFetch` throws an Error whenever an API payload contains `{ success: false }`, even if the HTTP response code was 200 OK.
    - Prevents all caller components from assuming successful transactions or displaying false-positive toast confirmations.
@@ -159,11 +166,13 @@ The Outpost and Landing ecosystems integrate with the Core 6 eBay Sell API famil
 | Marketing API | Promoted listings | Query active Promoted Listings Standard ad rates and campaign IDs. Feed real-time ad fee rates into the Outpost Live Fee Engine to calculate net margins. | /sell/marketing/v1/ad_campaign, /sell/marketing/v1/ad_campaign/{id}/ad. Scopes: sell.marketing, sell.marketing.readonly |
 
 ### 2. Analytics API Critical Query Constraints
+
 - Filter Nesting: The date_range MUST be passed inside the filter parameter: filter=marketplace_ids:{EBAY_US},listing_ids:{ID},date_range:[YYYYMMDD..YYYYMMDD].
 - Pacific Time and Lag: Query date boundaries strictly in Pacific Time (America/Los_Angeles) with a 1-day reporting lag (ending yesterday T-1). Queries referencing current or future dates trigger eBay error 50018.
 - Valid Metric Keys: Supported metric keys include LISTING_IMPRESSION_TOTAL, LISTING_IMPRESSION_SEARCH_RESULTS_PAGE, LISTING_VIEWS_TOTAL, CLICK_THROUGH_RATE, and SALES_CONVERSION_RATE.
 
 ### 3. eBay API Protocol and Auth Resolution
+
 1. Prior to calling eBay Sell APIs, confirm the user token row in ebay_oauth_tokens contains the required scope.
 2. Ensure token refresh requests catch HTTP 429 and transient timeouts without purging valid credentials.
 3. On hard expiration (refreshExp < now) or explicit revocation, immediately clean dead credentials from D1 and set connected: false.
@@ -172,7 +181,8 @@ The Outpost and Landing ecosystems integrate with the Core 6 eBay Sell API famil
 
 Decoupled internal Outpost SKU generation from Amazon ASIN identifiers to support multiple physical units and distinct orders sharing a single ASIN without inventory record or sales status collapse.
 
-### Key Capabilities
+### Decoupled Ingestion Capabilities
+
 1. **Order-Level Deduplication (`POST /api/import/amazon`)**:
    - Ingestion extracts `order_id` (or `orderId`) from the incoming request payload.
    - When `order_id` is present, Outpost checks whether an item with that exact `order_id` already exists in D1 for the user via `json_extract(attributes, '$.order_id')` or legacy notes matching.
@@ -195,7 +205,8 @@ Decoupled internal Outpost SKU generation from Amazon ASIN identifiers to suppor
 
 Replaced theoretical pre-sale margin projections with an actual realized accounting waterfall in `EditTabFinancials` for completed sales, and suppressed pre-sale pricing recommendations and listing application triggers when an item is in `'Sold'` status.
 
-### Key Capabilities
+### Realized Accounting Ledger Capabilities
+
 1. **Realized Financial Accounting Waterfall (`EditTabFinancials.jsx`)**:
    - Detects completed sales (`isSold = form.status === 'Sold' || item?.status === 'Sold'`).
    - Replaces hypothetical pricing estimates with verified transaction figures sourced from linked `auction_sales` and `ebay_fee_reconciliations` records:
@@ -216,7 +227,8 @@ Replaced theoretical pre-sale margin projections with an actual realized account
 
 Consolidated the previously separate "Financials & Profit" and "Listing & eBay Sync" tabs into a unified, single source of truth component (`EditTabFinancials.jsx`). This eliminates duplicated pricing fields, removes redundant fee readout widgets (`LiveFeeReadout`), and provides a context-aware interface that adapts seamlessly between active inventory and completed sales.
 
-### Key Capabilities
+### Listing and Financials Modal Capabilities
+
 1. **Single Source of Truth Tab Consolidation**:
    - Replaced duplicate controls across two tabs with a unified primary tab (`EditTabNav`: `id: 'financial'`).
    - Dynamic Tab Label: Renders "Sale & Financials" when `form.status === 'Sold'`, and "Listing & Financials" when available or listed.
@@ -234,7 +246,8 @@ Consolidated the previously separate "Financials & Profit" and "Listing & eBay S
 
 Resolved eBay Sell Analytics API single-listing dimension aggregation to eliminate zero-metric reporting on active and completed listings.
 
-### Key Capabilities
+### Telemetry Ingestion Capabilities
+
 1. **Dimension Alignment & Ingestion Resilience (`functions/api/ebay/analytics.js`)**:
    - Fixed dimension parsing mismatch where eBay Analytics filters with `listing_ids` return listing aggregate records (`header.dimensionKeys[0].key = 'LISTING_ID'`) rather than legacy `dimensionalDataPoints`.
    - `parseEbayDailyTraffic` supports both test fixture formats (`dimensionalDataPoints`) and real eBay single-day record responses (`dimensionValues[0].value = YYYYMMDD`).
@@ -271,12 +284,19 @@ Resolved eBay Sell Analytics API single-listing dimension aggregation to elimina
    - Updates 30-day snapshot columns (`total_impressions_30d`, `total_page_views_30d`, `avg_ctr_30d`, `avg_conversion_30d`, `analytics_fetched_at`) on `auction_items` for every listing.
    - Hooked into `POST /api/ebay/sync-all` so "Sync eBay Store" updates telemetry across all 30+ listings in 1 single API call.
    - Subsequent modal views load directly from local D1 database cache in <50ms with zero external API calls.
+7. **Resilient Multi-Key Metric Parsing, Range Coverage Expansion, and Monotonic Request Tracking [ACTION ID: PERF-003 / TRAFFIC-003]**:
+   - **Multi-Key Metric Parser (`functions/api/ebay/analytics.js`)**: Handles varying eBay Analytics response formats where page views are reported under `LISTING_VIEWS_TOTAL` or `TOTAL_LISTING_VIEWS`, or broken down across source keys (`LISTING_VIEWS_SOURCE_DIRECT`, `LISTING_VIEWS_SOURCE_SEARCH_RESULTS_PAGE`, `LISTING_VIEWS_SOURCE_STORE`, `LISTING_VIEWS_SOURCE_OTHER`). Aggregates granular sources when totals are not provided. Supports both structured objects (`{ value: ... }`) and primitive numeric values in `metricValues`.
+   - **Cache Range Coverage Validation**: Solved the 60-day date hole when transitioning from a 30-day view to a 90-day view. Replaced naive `rows.length === 0` cache check with range coverage check (`oldestRowDate > expectedStartDate`). If existing cache only covers 30 days and the user requests 90 days, ingestion is triggered to fetch the full 90-day window.
+   - **Single-Listing Query Scoping**: When an individual listing modal requests traffic, `ingestListingTraffic` scopes the query filter directly to `listing_ids:{listingId}` rather than batching the entire store catalog, preventing unnecessary processing while store-wide batching remains available during store sync (`sync-all.js`).
+   - **Listing Scope vs Account Scope UI Clarification (`EditTabPerformance.jsx`)**: Updated UI header badge and informational tooltips to clarify that reported metrics reflect the single listing ID, differentiating them from store-wide aggregate metrics displayed in eBay Seller Hub.
+   - **Monotonic Request Tracking (`EditItemModal.jsx`) [AUDIT-004]**: Tracks in-flight analytics requests via `analyticsFetchRequestIdRef` to discard stale out-of-order network responses when toggling between 30d, 60d, and 90d date ranges.
 
 ## Inventory Table Pricing Tooltip & Left-Side Action Ergonomics [ACTION ID: UI-005 / GRID-002]
 
 Refactored the pricing and cost breakdown telemetry hover experience within the inventory data grid to prevent interference with inline cell editing and table scanning.
 
-### Key Capabilities
+### Inventory Pricing Ergonomics Capabilities
+
 1. **Right-Side Price Hover Decoupling (`InventoryGridRow.jsx`)**:
    - Removed the intrusive `InventoryPricingTooltip` hover popover triggers (`onMouseEnter` / `onMouseLeave`) from the `Current List Price` and `Landed & Floor` table cells on the right side.
    - Eliminates layout obstruction and prevents popovers from obscuring the `Click to edit` inline editor or neighbouring status tags while navigating numbers.
@@ -290,3 +310,54 @@ Refactored the pricing and cost breakdown telemetry hover experience within the 
 4. **Synchronized Sticky Column Geometry (`InventoryDataGrid.jsx` & `userSettings.js`)**:
    - Expanded default and minimum width for the sticky `actions` column from 140px to 195px (`Math.max(195, columnWidths.actions || 195)`).
    - Enforces identical sticky offsets between the table header and body rows, guaranteeing that all 7 operational action buttons remain visible and aligned without horizontal clipping or scroll drift.
+
+## Telemetry Tooltip Clipping Resolution & eBay Sell Analytics Quota Tracking [ACTION ID: PERF-004 / QUOTA-001]
+
+Resolved tooltip clipping in modal KPI cards and introduced real-time quota tracking for the eBay Sell Analytics API (100 calls per 24 hours).
+
+### Tooltip Ergonomics & Quota Tracking Capabilities
+
+1. **Interactive Tooltip Clipping Resolution (`EditTabPerformance.jsx`)**:
+   - Solved the layout issue where the top portion of `InfoTooltip` popovers inside KPI metric cards was clipped by the scrollable modal container boundary (`overflow-y-auto`).
+   - Defaulted `position = 'bottom'` (`top-full mt-2`) for all 7 KPI cards tooltips (Total Impressions, Search & Ads, Listing Page Views, 30d Total, Click-Through Rate, Sales Conversion Rate, Confirmed Orders Basis), allowing popovers to expand downward cleanly over the chart area.
+   - Added constrained maximum dimensions (`max-w-[calc(100vw-2rem)]`, `max-h-[85vh]`, `overflow-y-auto`) and elevated z-index (`z-50 shadow-2xl`) to ensure lengthy benchmark explanations remain readable without clipping on all screen sizes.
+2. **Real-Time eBay Sell Analytics Quota Engine (`functions/api/ebay/analytics.js` & `auctionApi.js`)**:
+   - eBay Sell Analytics rate limits developer applications to 100 API calls per rolling 24 hours per developer application, resetting daily at midnight Pacific Time (07:00 UTC / 3:00 AM EDT).
+   - Ingestion logs every live external HTTP request into `outpost_sync_history` via `recordSyncRun` with `sync_type = 'ebay_analytics'` and status (`success`, `quota_limited`, or `failed`).
+   - Added `getPacificDayStartIso(now)` and `getNextPacificResetIso(now)` to dynamically determine exact midnight Pacific Time in UTC ISO format, handling daylight saving (PST/PDT) transitions.
+   - Implemented `getEbayAnalyticsQuota(env, userId)` which queries `outpost_sync_history` for `sync_type = 'ebay_analytics'` and `started_at >= pacificStartIso`, calculating `daily_limit` (100), `used`, `remaining` (max 0, 100 - used), `resets_at`, and `resets_in_hours`.
+   - Endpoint `GET /api/ebay/analytics` supports `?quota_only=1` (or `/api/ebay/analytics/quota`), returning the live quota object without triggering external eBay API requests. The quota object is also attached to all standard analytics payloads.
+3. **Modal Toolbar & Footer Quota Telemetry (`EditTabPerformance.jsx`)**:
+   - Added an **eBay API Quota Pill Badge** in the header toolbar next to the eBay Listing ID badge: `⚡ eBay API: X/100 Used (Y Left)`.
+   - Dynamic threshold styling: Emerald for >30 calls remaining, Amber for <=30 calls, and Rose/pulse for <=10 calls.
+   - Interactive `InfoTooltip` on the quota badge explaining daily call limits, midnight Pacific reset time, and cache benefits.
+   - Added a quota summary readout in the footer bar: `Daily Quota: X/100 used (Y remaining • resets in Zh)`.
+4. **Settings View eBay Quota Management (`SettingsView.jsx`)**:
+   - Added a dedicated **eBay Sell Analytics Daily Quota (100 Calls / Day)** card under `eBay Sales Auto-Sync` in the Integrations tab.
+   - Features a visual progress bar, used count, remaining count, hours until reset, and an interactive "Refresh Quota" button calling `fetchEbayAnalyticsQuota()`.
+
+## 30, 60, and 90-Day Analytics Window Isolation & Ingestion Decoupling [ACTION ID: PERF-005 / RANGE-001]
+
+Resolved identical metric reporting across 30, 60, and 90-day time ranges caused by date_listed cache clamping and artificial zero-out logic.
+
+### Window Isolation & Telemetry Ingestion Capabilities
+
+1. **Root Cause Analysis of Range Identicality**:
+   - During store-wide sync (`POST /api/ebay/sync-all`), Outpost initializes telemetry with a rolling 30-day window (`rangeDays = 30`), populating exactly 30 daily rows in `listing_traffic`.
+   - When users switched to 60 or 90 days in `EditTabPerformance`, `onRequestGet` checked `coversDateRange`:
+     `const expectedStartDate = dateListedYmd && dateListedYmd > startYMD ? dateListedYmd : startYMD;`
+     `if (oldestRowDate <= expectedStartDate) { needsIngestion = false; }`
+     Because `item.date_listed` was frequently recent (e.g. within the last 30 days), `expectedStartDate` was clamped to `dateListedYmd`. Because `rows[0].traffic_date` was already <= `dateListedYmd`, the condition evaluated to true, falsely indicating that the 30 rows in DB covered the entire 60 or 90-day range.
+   - Additionally, `ingestListingTraffic` artificially zeroed out all dates prior to `date_listed` and concentrated all eBay report activity into dates on or after `date_listed`, causing 30, 60, and 90-day aggregations to calculate identical totals.
+2. **Multi-Range Coverage Verification (`functions/api/ebay/analytics.js`)**:
+   - Removed artificial `dateListedYmd` clamping and zero-out logic. eBay Analytics reports real historical traffic for the listing ID across the requested window, irrespective of Outpost's local listing date field.
+   - Updated `coversDateRange` to verify both row count and date boundary: `rows.length >= rangeDays && oldestRowDate <= startYMD`. If fewer than `rangeDays` rows exist in D1 (e.g. only 30 rows exist when requesting 60 or 90 days), ingestion triggers immediately to retrieve the full 60 or 90-day report from eBay.
+3. **Anti-Caching & Payload Freshness (`auctionApi.js` & `worker.js`)**:
+   - Added `cache: 'no-store'` to all client `apiFetch` calls to prevent browser HTTP heuristic caching of JSON responses when changing query parameters.
+   - Enhanced Cloudflare Worker `addSecurityHeaders` to apply `Cache-Control: no-cache, no-store, must-revalidate` to all `application/json` payloads.
+4. **Interactive Range Loading Telemetry (`EditTabPerformance.jsx`)**:
+   - Added inline `Loader2` spinner and disabled state to the active 30/60/90-day buttons while loading.
+   - Updated KPI card subtext to dynamically reflect `{analytics.range_days || analyticsRange || 30}d Total`.
+   - Updated chart header title to display `({analytics.period_start} to {analytics.period_end} • {analytics.range_days || analyticsRange || 30} Days)`.
+
+

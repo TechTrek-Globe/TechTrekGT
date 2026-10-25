@@ -210,7 +210,9 @@ function JourneyStopSchedule({
           <div className="p-4 sm:p-6 space-y-8 animate-fade-in">
             {days.map((dayItem) => {
               const dayPrivate = (privateItems || []).filter(p => {
-                const d = p.item_date || p.start_date || p.date || p.booking_date || '';
+                const d = p.local_date || p.item_date || p.start_date || p.date || p.booking_date || '';
+                if (!d) return dayItem.day === 1;
+                if (dayItem.day === 1 && d <= '2026-12-04') return true;
                 return d && d.toString().startsWith(dayItem.date);
               });
               const dayAccommodations = (accommodations || []).filter(a => a.check_in_date === dayItem.date);

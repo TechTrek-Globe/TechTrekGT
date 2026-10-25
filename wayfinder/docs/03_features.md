@@ -93,17 +93,18 @@ Authenticated users can import hotel and attraction booking confirmations throug
 
 ### 7.2 Gmail API Channel
 
-- Trip-Date-Scoped OAuth: Connects a Gmail account via Google OAuth 2.0 (scope: `gmail.readonly`). Sync is strictly bounded to a window of 14 days before `journey.start_date` through `journey.end_date`. Journeys without explicit dates cannot initiate a connection.
+- Trip-Date-Scoped OAuth: Connects a Gmail account via Google OAuth 2.0 (scope: `gmail.readonly`). Sync queries booking confirmations received since trip planning began (`after:2024/01/01`) matching Poland destinations and December 2026 dates.
 - Token Security: `access_token` and `refresh_token` are AES-256-GCM encrypted (PBKDF2-derived key from `TOKEN_ENCRYPTION_KEY` secret) before storage in `wayfinder_gmail_connections`. Encrypted bytes are stored as base64; IV is prepended.
 - CSRF Defense: OAuth `state` parameter is HMAC-SHA256 signed using `JWT_SECRET`. Callback handler verifies signature and `userId` match before accepting any auth code.
-- Incremental Sync: Uses Gmail `pageToken` cursor stored in `sync_cursor` column for incremental runs. Duplicate detection by `gmail:` prefixed message ID in `notes`.
-- Booking Query: Searches for messages from known booking providers (Booking.com, Airbnb, PKP, etc.) matching confirmation-related subjects, bounded by `after:YYYY/MM/DD before:YYYY/MM/DD`.
+- Deduplication & Sync: Uses permanent message deduplication by checking `gmail:<message_id>` in `wayfinder_itinerary_items.notes`. Parses extracted dates into `local_date` (defaulting to `journey.start_date`) to ensure instant timeline visibility.
+- Booking Query: Searches for messages matching booking keywords (`confirmation`, `reservation`, `e-ticket`, `flight`, `hotel`, etc.) or travel provider domains combined with destination keywords (`Poland`, `Krakow`, `Wroclaw`, `Warsaw`, `Gdansk`, `Poznan`, `Torun`, `KRK`, `WAW`, `WRO`, `Dec 2026`).
 - Revocation: `DELETE /api/wayfinder/gmail/:journeyId` calls Google revoke endpoint (best-effort), then zeroes encrypted token fields in D1 and marks `is_active = 0`.
-- API: `GET /api/wayfinder/gmail?journey_id=` - status, `POST /api/wayfinder/gmail/connect` - get auth URL, `POST /api/wayfinder/gmail/callback` - exchange code, `POST /api/wayfinder/gmail/sync` - incremental sync, `DELETE /api/wayfinder/gmail/:journeyId` - revoke.
+- API: `GET /api/wayfinder/gmail?journey_id=` - status, `POST /api/wayfinder/gmail/connect` - get auth URL, `POST /api/wayfinder/gmail/callback` - exchange code, `POST /api/wayfinder/gmail/sync` - trip sync, `DELETE /api/wayfinder/gmail/:journeyId` - revoke.
 
 ### 7.3 Booking Import UI Components
 
 - Dedicated Import Channels Card: [wayfinder/src/components/BookingImportChannels.jsx](file:///e:/TechTrekGT/wayfinder/src/components/BookingImportChannels.jsx) is integrated directly into [DocumentCenter.jsx](file:///e:/TechTrekGT/wayfinder/src/components/DocumentCenter.jsx). Surfaces dual-column management:
   - Email Forwarding Column: Generates unique trip inbox address, 1-click clipboard copy with animated visual feedback, live processed email counters, and supported booking provider tags.
   - Gmail API Column: Checks Google OAuth credential configuration status, handles connect authorization redirect, displays connected Gmail profile and last sync timestamp, triggers trip-date-scoped sync with immediate itinerary refresh, and allows secure token revocation.
+- Synced Confirmations List: Integrated directly in [DocumentCenter.jsx](file:///e:/TechTrekGT/wayfinder/src/components/DocumentCenter.jsx) right below the import channels card. Displays all D1-persisted booking items with provider names, dates, item type badges, and a direct 1-click link to navigate into the Itinerary timeline.
 - Gmail OAuth Callback Receiver: [wayfinder/src/components/GmailCallback.jsx](file:///e:/TechTrekGT/wayfinder/src/components/GmailCallback.jsx) routes `/wayfinder/gmail-callback` to capture OAuth auth codes, verify HMAC state, exchange for encrypted tokens via `/api/wayfinder/gmail/callback`, and automatically redirect back to the Document Center.

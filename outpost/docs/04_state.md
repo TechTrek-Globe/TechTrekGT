@@ -142,11 +142,38 @@ Outpost uses React Context and standard React hooks (`useState`, `useReducer`, `
     - Writes all item metrics to `listing_traffic` using 90-statement D1 chunks and writes 30-day snapshot columns (`total_impressions_30d`, `total_page_views_30d`, `avg_ctr_30d`, `avg_conversion_30d`, `analytics_fetched_at`) to `auction_items`.
     - `POST /api/ebay/sync-all` runs batch traffic ingestion automatically at store sync, updating all 30+ items in 1 single API call.
     - Subsequent item modal opens serve directly from local D1 database cache in <50ms with 0 API calls.
+  - **Resilient Multi-Key Metric Parsing, Range Coverage Validation, and Monotonic Request Tracking [ACTION ID: PERF-003 / TRAFFIC-003]**:
+    - `extractTotalViews`, `extractTotalImpressions`, and `extractSearchImpressions` in `functions/api/ebay/analytics.js` dynamically resolve metric keys across eBay Sell Analytics schema variants (`LISTING_VIEWS_TOTAL`, `TOTAL_LISTING_VIEWS`, `LISTING_VIEWS_SOURCE_*`), extracting numeric values whether represented as nested value objects (`{ value: n }`) or direct numbers.
+    - `onRequestGet` verifies cache date range coverage by comparing the oldest cached date with `expectedStartDate`. Expanding date range from 30d to 90d automatically triggers ingestion for missing historical dates rather than returning an incomplete 30-day cache.
+    - Single-listing traffic ingestion scopes eBay queries to `listing_ids:{listingId}` for immediate isolation and zero batch overhead during item modal inspections.
+    - `EditItemModal.jsx` manages `analyticsFetchRequestIdRef` monotonic counter per AUDIT-004 to eliminate stale race conditions during rapid time-range toggling.
   - **Left-Side Pricing Breakdown Hover & Table Column State [ACTION ID: UI-005 / GRID-002]**:
     - Hover popover triggers removed from right-side price columns (`current_list_price` and `landed_floor`) to eliminate interference with inline editing and click-to-edit targets.
     - Sticky `ACTIONS` column toolbar hosts dedicated `CircleDollarSign` button (`pricing_details` tooltip type) with amber border and styling.
     - `InventoryPricingTooltip` detects left-side viewport triggers (`rect.left < 400`) and anchors the floating card to the right (`rect.right + 10`), avoiding actions occlusion.
     - Synchronized column minWidth and defaultWidth for `actions` set to 195px (`Math.max(195, columnWidths.actions || 195)`) across header and row cells.
-
+  - **Telemetry Tooltip Positioning & eBay Analytics Quota State [ACTION ID: PERF-004 / QUOTA-001]**:
+    - `InfoTooltip` across all 7 KPI cards in `EditTabPerformance.jsx` uses `position="bottom"` (`top-full mt-2`) with `max-w-[calc(100vw-2rem)]` and `max-h-[85vh]` overflow bounds, preventing top container clipping inside the modal scroll body.
+    - Ingestion in `functions/api/ebay/analytics.js` logs every external call to `outpost_sync_history` with `sync_type = 'ebay_analytics'`.
+    - `getEbayAnalyticsQuota` computes daily Pacific Time usage against the 100-call limit:
+      ```javascript
+      {
+        daily_limit: 100,
+        used: number,
+        remaining: number,
+        resets_at: string, // ISO UTC string of next midnight Pacific Time
+        resets_in_hours: number
+      }
+      ```
+    - Handled via early-return parameter `GET /api/ebay/analytics?quota_only=1` and attached to standard analytics responses (`payload.quota`).
+    - `EditTabPerformance.jsx` consumes `data?.quota` to render dynamic header badge (`⚡ eBay API: X/100 Used (Y Left)`) with threshold coloring (>30 green, <=30 amber, <=10 red pulse) and footer breakdown.
+    - `SettingsView.jsx` maintains `ebayQuota` and `loadingQuota` state, displaying a dedicated progress card under Integrations with on-demand refresh via `fetchEbayAnalyticsQuota()`.
+  - **Analytics Time-Range Cache Invariants & Loading State [ACTION ID: PERF-005 / RANGE-001]**:
+    - `coversDateRange` enforces row count and start date invariant: `rows.length >= rangeDays && oldestRowDate <= startYMD`.
+    - Eliminates false positive cache hits that occurred when `expectedStartDate` was clamped to `item.date_listed`.
+    - Prevents 30-day cached rows from satisfying 60 or 90-day queries.
+    - Removes artificial pre-listing date zeroing in `ingestListingTraffic`, preserving proportional distribution across all dates in requested window.
+    - `apiFetch` in `src/utils/auctionApi.js` enforces `cache: 'no-store'`, and Cloudflare Worker `addSecurityHeaders` sets `no-cache, no-store, must-revalidate` on JSON payloads.
+    - `EditTabPerformance.jsx` tracks inline loading state on range selector buttons and reflects dynamic range days in KPI cards and chart header.
 
 

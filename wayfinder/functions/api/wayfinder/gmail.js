@@ -21,11 +21,10 @@ const GMAIL_API_BASE    = 'https://gmail.googleapis.com/gmail/v1/users/me';
 const GMAIL_SCOPE       = 'https://www.googleapis.com/auth/gmail.readonly openid email';
 const OAUTH_REDIRECT    = 'https://techtrekgt.com/wayfinder/gmail-callback';
 
-// Booking-related search keywords used in Gmail query
-// Scoped to the specific journey date window by the `after:` / `before:` filters
+// Booking-related search keywords and travel providers used in Gmail query
 const BOOKING_QUERY_TERMS = [
-  'subject:(confirmation OR booking OR reservation OR "check-in" OR "check in" OR voucher OR ticket OR itinerary)',
-  'from:(booking.com OR airbnb.com OR hotels.com OR expedia.com OR marriott.com OR hilton.com OR hyatt.com OR accor.com OR kkday.com OR getyourguide.com OR klm.com OR ryanair.com OR wizz.com OR lot.com OR delta.com OR united.com OR amtrak.com OR pkp.pl OR intercity.pl)',
+  '(confirmation OR booking OR reservation OR "check-in" OR "check in" OR voucher OR ticket OR itinerary OR "e-ticket" OR eTicket OR flight OR hotel OR airbnb OR train OR pkp OR LOT',
+  'OR from:(booking.com OR airbnb.com OR hotels.com OR expedia.com OR marriott.com OR hilton.com OR hyatt.com OR accor.com OR getyourguide.com OR viator.com OR vrbo.com OR tripadvisor.com OR klm.com OR ryanair.com OR wizzair.com OR wizz.com OR lot.com OR flylot.com OR delta.com OR united.com OR aa.com OR lufthansa.com OR pkp.pl OR intercity.pl))'
 ].join(' ');
 
 // ============================================================
@@ -131,26 +130,34 @@ function parseBookingFromEmail(message) {
   const from     = headers['from']    || '';
   const dateStr  = headers['date']    || '';
 
-  // Attempt to detect document/item type from subject keywords
+  // Attempt to detect document/item type from subject and snippet keywords
   let item_type = 'other';
-  const subjectLow = subject.toLowerCase();
-  if (/hotel|inn|hostel|accommodation|check.in|stay/.test(subjectLow))   item_type = 'hotel';
-  if (/flight|airline|boarding|depart/.test(subjectLow))                   item_type = 'flight';
-  if (/train|rail|intercity|pkp|pkp.ic/.test(subjectLow))                  item_type = 'train';
-  if (/tour|activity|excursion|ticket|experience/.test(subjectLow))         item_type = 'activity';
-  if (/transfer|taxi|shuttle|car rental/.test(subjectLow))                  item_type = 'transport';
-  if (/restaurant|dining|reservation|table/.test(subjectLow))               item_type = 'dining';
+  const fullText = (subject + ' ' + snippet).toLowerCase();
+  if (/hotel|inn|hostel|accommodation|stay|resort|airbnb|booking\.com/i.test(fullText))       item_type = 'hotel';
+  else if (/flight|airline|boarding|depart|ticket|e-ticket|delta|lot polish|lufthansa|klm|ryanair|wizz/i.test(fullText)) item_type = 'flight';
+  else if (/train|rail|intercity|pkp|station/i.test(fullText))                                item_type = 'rail';
+  else if (/tour|activity|excursion|experience|getyourguide|viator/i.test(fullText))         item_type = 'excursion';
+  else if (/transfer|taxi|shuttle|car rental|hertz|avis|budget/i.test(fullText))              item_type = 'transport';
+  else if (/restaurant|dining|reservation|table/i.test(fullText))                           item_type = 'restaurant';
 
-  // Extract confirmation number - covers most common formats (uppercase alphanum, 6-12 chars)
+  // Extract confirmation number - covers common formats (5-14 chars)
   const confirmMatch = (snippet + ' ' + subject).match(
-    /(?:confirmation|booking|reservation|reference|conf|ref)[^\w]*([A-Z0-9]{5,14})/i
+    /(?:confirmation|booking|reservation|reference|conf|ref|ticket)[#:\s]*([A-Z0-9]{5,14})/i
   );
   const confirmationNumber = confirmMatch ? confirmMatch[1] : null;
 
-  // Extract check-in date if present
-  const checkinMatch = (snippet + ' ' + subject).match(
-    /(?:check.in|arrival|arrives?|from)[:\s]+([A-Za-z]+\s+\d{1,2},?\s+\d{4}|\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i
-  );
+  // Extract date in December 2026 if present
+  let localDate = null;
+  const isoMatch = fullText.match(/2026-(12)-(0[1-9]|1[0-5])/);
+  if (isoMatch) {
+    localDate = isoMatch[0];
+  } else {
+    const decMatch = fullText.match(/(?:dec(?:ember)?\.?\s+([1-9]|0[1-9]|1[0-5])(?:st|nd|rd|th)?)|(?:([1-9]|0[1-9]|1[0-5])(?:st|nd|rd|th)?\s+dec(?:ember)?)/i);
+    if (decMatch) {
+      const dayNum = parseInt(decMatch[1] || decMatch[2], 10);
+      localDate = `2026-12-${String(dayNum).padStart(2, '0')}`;
+    }
+  }
 
   return {
     gmail_message_id: message.id,
@@ -160,7 +167,7 @@ function parseBookingFromEmail(message) {
     notes:   confirmationNumber
                ? `Confirmation: ${confirmationNumber}\n\n${snippet.slice(0, 500)}`
                : snippet.slice(0, 500),
-    raw_date: checkinMatch ? checkinMatch[1] : null,
+    local_date: localDate,
     email_date: dateStr,
   };
 }
@@ -188,20 +195,23 @@ async function syncGmailMessages(conn, journey, env) {
     ).bind(newEncrypted, newExpiry, new Date().toISOString(), conn.id).run();
   }
 
-  // Build date-scoped Gmail query
-  // Pre-trip window: 14 days before journey start to catch early confirmations
-  const startDate = new Date(journey.start_date);
-  startDate.setDate(startDate.getDate() - 14);
-  const endDate = new Date(journey.end_date);
-  endDate.setDate(endDate.getDate() + 1); // inclusive
+  // Build trip-scoped Gmail query
+  // For Poland 2026: Search for booking / confirmation emails mentioning Poland destination cities
+  // or December 2026 dates, received since trip planning began (2024-01-01).
+  // Require booking/confirmation subject keywords to filter out newsletters and promos
+  const bookingSubjectFilter = 'subject:(booking OR confirmation OR confirmed OR reservation OR "e-ticket" OR ticket OR voucher OR itinerary OR receipt)';
 
-  const afterYMD  = startDate.toISOString().slice(0, 10).replace(/-/g, '/');
-  const beforeYMD = endDate.toISOString().slice(0, 10).replace(/-/g, '/');
-  const query     = `${BOOKING_QUERY_TERMS} after:${afterYMD} before:${beforeYMD}`;
+  // Known travel providers and airlines
+  const travelProviders = 'from:(getyourguide.com OR booking.com OR airbnb.com OR hotels.com OR expedia.com OR marriott.com OR hilton.com OR hyatt.com OR accor.com OR viator.com OR vrbo.com OR tripadvisor.com OR lot.com OR flylot.com OR pkp.pl OR intercity.pl OR ryanair.com OR wizzair.com OR wizz.com OR delta.com OR united.com OR aa.com OR lufthansa.com OR klm.com)';
 
-  // Build list URL - use pageToken cursor for incremental sync if available
-  const listParams = new URLSearchParams({ q: query, maxResults: '50' });
-  if (conn.sync_cursor) listParams.set('pageToken', conn.sync_cursor);
+  // Destination keywords for other senders
+  const destinationSignals = '(Poland OR Polska OR Krakow OR Cracow OR Wroclaw OR Warsaw OR Warszawa OR Gdansk OR Poznan OR Torun OR Zakopane OR Auschwitz OR Birkenau OR Wieliczka OR "Salt Mine" OR KRK OR WAW OR WRO OR GDN OR POZ OR "Dec 2026" OR "December 2026" OR "2026-12")';
+
+  // Matches (A) a booking confirmation from a travel provider (e.g. GetYourGuide "Booking GYG... confirmed"), OR (B) a booking confirmation mentioning Poland destinations
+  const query = `${bookingSubjectFilter} (${travelProviders} OR ${destinationSignals}) after:2024/01/01`;
+
+  // Build list URL - query up to 20 matching messages to stay well under Cloudflare's 50 subrequest limit
+  const listParams = new URLSearchParams({ q: query, maxResults: '20' });
 
   const listRes = await fetch(`${GMAIL_API_BASE}/messages?${listParams}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
@@ -217,11 +227,14 @@ async function syncGmailMessages(conn, journey, env) {
   }
   const listData  = await listRes.json();
   const messages  = listData.messages || [];
-  const nextCursor = listData.nextPageToken || null;
 
   let imported = 0;
+  let subrequestsMade = 1;
+  const MAX_SUBREQUESTS = 35; // Strict guardrail well below Cloudflare's 50 subrequest ceiling
 
   for (const msgRef of messages) {
+    if (subrequestsMade >= MAX_SUBREQUESTS) break;
+
     // Check for duplicate import by gmail_message_id in notes prefix
     const dupCheck = await env.DB.prepare(
       `SELECT id FROM wayfinder_itinerary_items
@@ -229,6 +242,7 @@ async function syncGmailMessages(conn, journey, env) {
     ).bind(journey.id, conn.user_id, `%gmail:${msgRef.id}%`).first();
     if (dupCheck) continue;
 
+    subrequestsMade++;
     // Fetch full message metadata (no body download - headers + snippet only)
     const msgRes = await fetch(
       `${GMAIL_API_BASE}/messages/${msgRef.id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date`,
@@ -247,11 +261,12 @@ async function syncGmailMessages(conn, journey, env) {
       env.DB.prepare(
         `INSERT INTO wayfinder_itinerary_items
          (id, journey_id, user_id, item_type, title, provider,
-          notes, status, verification_status, visibility)
-         VALUES (?,?,?,?,?,?,?,'imported','unverified','private')`
+          local_date, notes, status, verification_status, visibility)
+         VALUES (?,?,?,?,?,?,?,?,'imported','unverified','private')`
       ).bind(
         itemId, journey.id, conn.user_id,
         parsed.item_type, parsed.title, parsed.provider || null,
+        parsed.local_date || journey.start_date || '2026-12-03',
         notesWithId
       ),
       env.DB.prepare(
@@ -263,14 +278,15 @@ async function syncGmailMessages(conn, journey, env) {
     imported++;
   }
 
-  // Update connection: last sync, count, and cursor for next incremental run
+  const nowIso = new Date().toISOString();
+  // Update connection: last sync, count
   await env.DB.prepare(
     `UPDATE wayfinder_gmail_connections
-     SET last_sync_at = ?, last_sync_count = last_sync_count + ?, sync_cursor = ?, updated_at = ?
+     SET last_sync_at = ?, last_sync_count = last_sync_count + ?, sync_cursor = NULL, updated_at = ?
      WHERE id = ?`
-  ).bind(new Date().toISOString(), imported, nextCursor, new Date().toISOString(), conn.id).run();
+  ).bind(nowIso, imported, nowIso, conn.id).run();
 
-  return { imported, has_more: !!nextCursor };
+  return { imported, query, last_synced_at: nowIso };
 }
 
 // ============================================================
@@ -314,6 +330,9 @@ export async function handleGmail(context, url, method) {
       return json({
         configured: true,
         connected: Boolean(conn && conn.is_active),
+        connected_email: conn?.gmail_address || null,
+        last_synced_at: conn?.last_sync_at || null,
+        last_sync_count: conn?.last_sync_count || 0,
         connection: conn ? safeConn(conn) : null
       });
     }
@@ -397,6 +416,13 @@ export async function handleGmail(context, url, method) {
         return json({ error: 'No refresh token returned - re-authorize with prompt=consent' }, 422);
       }
 
+      const grantedScopes = tokens.scope || '';
+      if (!grantedScopes.includes('gmail.readonly')) {
+        return json({
+          error: 'Gmail read-only scope was not granted. Please ensure the Gmail permission checkbox is checked during Google authorization.'
+        }, 400);
+      }
+
       // Fetch Gmail account address to confirm which account was linked
       let gmailAddress = 'unknown';
       if (tokens.id_token) {
@@ -475,9 +501,20 @@ export async function handleGmail(context, url, method) {
         'SELECT * FROM wayfinder_gmail_connections WHERE user_id = ? AND journey_id = ? AND is_active = 1'
       ).bind(user.userId, journey.id).first();
       if (!conn) return json({ error: 'No active Gmail connection for this journey' }, 404);
+      if (!conn.scopes || !conn.scopes.includes('gmail.readonly')) {
+        return json({
+          error: 'Gmail read-only scope is missing from this connection. Please click Disconnect and authorize with Gmail message access enabled.'
+        }, 403);
+      }
 
       const result = await syncGmailMessages(conn, journey, env);
-      return json({ success: true, ...result });
+      return json({
+        success: true,
+        imported: result.imported,
+        imported_count: result.imported,
+        last_synced_at: result.last_synced_at,
+        query: result.query
+      });
     }
 
     // DELETE /:journeyId - revoke and remove connection
@@ -527,11 +564,13 @@ export async function handleGmail(context, url, method) {
 }
 
 function safeConn(conn) {
+  const hasGmailScope = Boolean(conn.scopes && conn.scopes.includes('gmail.readonly'));
   return {
     id:              conn.id,
     gmail_address:   conn.gmail_address,
     scopes:          conn.scopes,
-    is_active:       conn.is_active === 1,
+    has_gmail_scope: hasGmailScope,
+    is_active:       conn.is_active === 1 && hasGmailScope,
     last_sync_at:    conn.last_sync_at,
     last_sync_count: conn.last_sync_count,
     created_at:      conn.created_at,

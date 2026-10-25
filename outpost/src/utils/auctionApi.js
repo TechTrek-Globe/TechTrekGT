@@ -39,7 +39,7 @@ function getAuthErrorMessage(status, dataError, path = '') {
 }
 
 async function apiFetch(path, options = {}) {
-  const res = await fetch(getApiUrl(path), { ...OPTS, ...options });
+  const res = await fetch(getApiUrl(path), { ...OPTS, cache: 'no-store', ...options });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const isEbay = (typeof path === 'string' && path.includes('/ebay/')) || (typeof data.error === 'string' && /ebay/i.test(data.error));
@@ -340,6 +340,9 @@ export const syncAllEbayItems = () =>
 // --- eBay Sell Analytics (Traffic & Performance Report) ---
 export const fetchEbayItemAnalytics = (itemId, range = 30, force = false) =>
   apiFetch(`/api/ebay/analytics?item_id=${encodeURIComponent(itemId)}&range=${range}${force ? '&force=true' : ''}`);
+
+export const fetchEbayAnalyticsQuota = () =>
+  apiFetch('/api/ebay/analytics?quota_only=1');
 
 // --- SKU Auto-Assignment & eBay Push Engine ---
 export const autoAssignSkus = () =>

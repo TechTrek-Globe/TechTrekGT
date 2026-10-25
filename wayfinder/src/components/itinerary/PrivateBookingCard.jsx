@@ -38,7 +38,8 @@ export function getBookingLabel(docType) {
 }
 
 export function PrivateBookingCard({ item }) {
-  const docType = item.docType || item.detected_doc_type || 'booking';
+  const rawType = item.docType || item.detected_doc_type || item.item_type || 'booking';
+  const docType = rawType === 'train' ? 'rail' : rawType;
   const theme = getBookingTheme(docType);
 
   // Resolve display-time field from normalized itinerary item

@@ -8,21 +8,21 @@ import {
 /**
  * Interactive Explanatory Tooltip Component
  */
-function InfoTooltip({ title, children, formula, benchmark, position = 'top', align = 'center' }) {
+function InfoTooltip({ title, children, formula, benchmark, position = 'bottom', align = 'center' }) {
   const alignClasses = {
     center: 'left-1/2 -translate-x-1/2',
     left: 'left-0',
     right: 'right-0'
   }[align] || 'left-1/2 -translate-x-1/2';
 
-  const positionClasses = position === 'bottom'
-    ? 'top-full mt-2'
-    : 'bottom-full mb-2';
+  const positionClasses = position === 'top'
+    ? 'bottom-full mb-2'
+    : 'top-full mt-2';
 
   return (
     <span className="relative inline-flex items-center group/tip cursor-help select-none" tabIndex={0} role="tooltip">
       <HelpCircle className="w-3.5 h-3.5 text-slate-500 hover:text-amber-400 focus:text-amber-400 transition-colors ml-1 flex-shrink-0" />
-      <span className={`absolute ${positionClasses} ${alignClasses} hidden group-hover/tip:flex group-focus-within/tip:flex flex-col w-64 sm:w-72 p-3 bg-slate-950/95 border border-slate-700/80 rounded-xl shadow-2xl backdrop-blur-md z-50 pointer-events-none text-left transition-opacity duration-150`}>
+      <span className={`absolute ${positionClasses} ${alignClasses} hidden group-hover/tip:flex group-focus-within/tip:flex flex-col w-64 sm:w-72 max-w-[calc(100vw-2rem)] max-h-[85vh] overflow-y-auto p-3 bg-slate-950/95 border border-slate-700/80 rounded-xl shadow-2xl backdrop-blur-md z-50 pointer-events-none text-left transition-opacity duration-150`}>
         {title && (
           <span className="text-[11px] font-bold text-amber-300 pb-1 mb-1 border-b border-slate-800 flex items-center gap-1.5">
             <Info className="w-3 h-3 text-amber-400 flex-shrink-0" />
@@ -471,13 +471,36 @@ export function EditTabPerformance({
           <span className="inline-flex items-center gap-1 text-[11px] font-mono text-emerald-400 font-semibold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
             <span>Listing #{form.ebay_listing_id}</span>
             <InfoTooltip
-              title="eBay Listing ID"
+              title="eBay Listing Scope"
               position="bottom"
               align="center"
             >
-              The 12-digit eBay store item number. Telemetry queries filter directly by this ID to isolate metrics for this exact inventory unit.
+              The 12-digit eBay store item number. Telemetry queries filter directly by listing_ids to isolate metrics specifically for this single inventory unit, distinct from store-wide Seller Hub totals.
             </InfoTooltip>
           </span>
+
+          {/* eBay Sell Analytics Daily Quota Badge */}
+          {analytics?.quota && (
+            <span className={`inline-flex items-center gap-1.5 text-[11px] font-mono font-semibold px-2.5 py-0.5 rounded-lg border shadow-sm ${
+              analytics.quota.remaining <= 10
+                ? 'bg-rose-500/10 text-rose-300 border-rose-500/30'
+                : analytics.quota.remaining <= 30
+                  ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+                  : 'bg-slate-800/80 text-emerald-300 border-slate-700/80'
+            }`}>
+              <Zap className={`w-3 h-3 ${analytics.quota.remaining <= 10 ? 'text-rose-400 animate-pulse' : 'text-amber-400'}`} />
+              <span>
+                eBay API: <strong className={analytics.quota.remaining <= 10 ? 'text-rose-300' : 'text-white'}>{analytics.quota.used}/100</strong> Used ({analytics.quota.remaining} Left)
+              </span>
+              <InfoTooltip
+                title="eBay Sell Analytics Daily Quota"
+                position="bottom"
+                align="center"
+              >
+                eBay enforces a strict developer quota of 100 calls per 24 hours for the Sell Analytics API. The quota resets daily at midnight Pacific Time (07:00 UTC / 3:00 AM EDT, in {analytics.quota.resets_in_hours}h). You have used {analytics.quota.used} calls with {analytics.quota.remaining} remaining today.
+              </InfoTooltip>
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
@@ -488,17 +511,21 @@ export function EditTabPerformance({
                 <button
                   key={r}
                   type="button"
+                  disabled={loadingAnalytics}
                   onClick={() => {
                     setAnalyticsRange(r);
                     onFetchAnalytics(r, false);
                   }}
-                  className={`px-2.5 py-1 rounded font-bold transition-all ${
+                  className={`px-2.5 py-1 rounded font-bold transition-all inline-flex items-center gap-1 ${
                     analyticsRange === r
                       ? 'bg-amber-500 text-slate-950 shadow-sm'
-                      : 'text-slate-400 hover:text-white'
+                      : 'text-slate-400 hover:text-white disabled:opacity-50'
                   }`}
                 >
-                  {r} Days
+                  {loadingAnalytics && analyticsRange === r && (
+                    <Loader2 className="w-3 h-3 animate-spin text-slate-950 flex-shrink-0" />
+                  )}
+                  <span>{r} Days</span>
                 </button>
               ))}
             </div>
@@ -671,7 +698,7 @@ export function EditTabPerformance({
                   <span>Total Impressions</span>
                   <InfoTooltip
                     title="Total Search & Browse Impressions"
-                    position="top"
+                    position="bottom"
                     align="left"
                     benchmark="Higher impressions mean greater search discovery. Optimize keywords, item specifics, and titles to boost search ranking."
                   >
@@ -682,7 +709,7 @@ export function EditTabPerformance({
                   <span>Search &amp; Ads</span>
                   <InfoTooltip
                     title="Promoted vs. Organic Impressions"
-                    position="top"
+                    position="bottom"
                     align="left"
                   >
                     • Ad (Promoted): Impressions driven by eBay Promoted Listings Standard ad placements.
@@ -714,7 +741,7 @@ export function EditTabPerformance({
                   <span>Listing Page Views</span>
                   <InfoTooltip
                     title="Shopper Listing Visits"
-                    position="top"
+                    position="bottom"
                     align="center"
                     formula="Total buyer visits / page clicks"
                     benchmark="High page views relative to impressions indicate that your primary photo, title clarity, and search price are compelling."
@@ -729,13 +756,13 @@ export function EditTabPerformance({
                   {(analytics.total_page_views || 0).toLocaleString()}
                 </span>
                 <span className="text-[10px] text-slate-500 flex items-center gap-0.5">
-                  <span>{analytics.range_days || 30}d Total</span>
+                  <span>{analytics.range_days || analyticsRange || 30}d Total</span>
                   <InfoTooltip
                     title="Period Aggregate Views"
-                    position="top"
+                    position="bottom"
                     align="center"
                   >
-                    Cumulative buyer page visits recorded during the selected {analytics.range_days || 30}-day date window.
+                    Cumulative buyer page visits recorded during the selected {analytics.range_days || analyticsRange || 30}-day date window.
                   </InfoTooltip>
                 </span>
               </div>
@@ -749,7 +776,7 @@ export function EditTabPerformance({
                   <span>Click-Through Rate</span>
                   <InfoTooltip
                     title="Click-Through Rate (CTR)"
-                    position="top"
+                    position="bottom"
                     align="center"
                     formula="(Listing Page Views / Total Impressions) x 100"
                     benchmark="1.5% to 3.5% is typical on eBay. Rates above 4.0% indicate exceptional primary photo appeal and competitive pricing."
@@ -777,7 +804,7 @@ export function EditTabPerformance({
                   <span>Sales Conversion Rate</span>
                   <InfoTooltip
                     title="Sales Conversion Rate"
-                    position="top"
+                    position="bottom"
                     align="right"
                     formula="(Confirmed Orders / Listing Page Views) x 100"
                     benchmark="1.0% to 3.0% is average on eBay. For 1-of-1 items, a completed sale equals 100% / Total Page Views."
@@ -795,7 +822,7 @@ export function EditTabPerformance({
                   <span>{analytics.units_sold ? `${analytics.units_sold} Order${analytics.units_sold === 1 ? '' : 's'} / Views` : 'Orders / Views'}</span>
                   <InfoTooltip
                     title="Confirmed Orders Basis"
-                    position="top"
+                    position="bottom"
                     align="right"
                   >
                     Reconciled from confirmed eBay sales. Ensures that completed transactions are accurately reflected in conversion efficiency calculations.
@@ -819,7 +846,7 @@ export function EditTabPerformance({
                   >
                     Visualizes daily buyer discovery versus page visits. Stacked bars illustrate Promoted ad impressions (amber) versus Organic search impressions (slate), while the sky blue polyline tracks shopper page views on the right vertical axis.
                   </InfoTooltip>
-                  <span className="text-[10px] text-slate-500 font-normal">({analytics.period_start} to {analytics.period_end})</span>
+                  <span className="text-[10px] text-slate-500 font-normal">({analytics.period_start} to {analytics.period_end} • {analytics.range_days || analyticsRange || 30} Days)</span>
                 </h5>
               </div>
 
@@ -899,7 +926,7 @@ export function EditTabPerformance({
 
           {/* 8. Summary Callout & External Hub Link */}
           <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center justify-between flex-wrap gap-3 text-xs">
-            <div className="flex items-center gap-2 text-slate-400">
+            <div className="flex items-center gap-2 text-slate-400 flex-wrap">
               <Sparkles className="w-4 h-4 text-amber-400 flex-shrink-0" />
               <span>
                 {analytics.cached ? (
@@ -914,6 +941,14 @@ export function EditTabPerformance({
                   <span className="text-slate-400">Optimize title and primary photo to increase CTR.</span>
                 )}
               </span>
+              {analytics.quota && (
+                <>
+                  <span className="text-slate-600">•</span>
+                  <span className="text-slate-300">
+                    Daily Quota: <strong className={analytics.quota.remaining <= 10 ? 'text-rose-300 font-semibold' : 'text-emerald-400 font-semibold'}>{analytics.quota.used}/100</strong> used ({analytics.quota.remaining} remaining • resets in {analytics.quota.resets_in_hours}h)
+                  </span>
+                </>
+              )}
             </div>
 
             <a

@@ -132,10 +132,12 @@ function simulateExtraction(file) {
 
 export function DocumentCenter() {
   const { 
+    itinerary = [],
     documents, 
     jobs, 
     uploadDocument, 
     fetchDocuments, 
+    fetchItinerary,
     getJobFields, 
     saveExtractedFields, 
     approveImportJob, 
@@ -158,6 +160,11 @@ export function DocumentCenter() {
   const fileInputRef = useRef(null);
   const reattachInputRef = useRef(null);
   const localDocBlobs = useRef(new Map());
+
+  // Load itinerary items on mount so synced bookings are visible
+  useEffect(() => {
+    if (fetchItinerary) fetchItinerary('poland-christmas-2026');
+  }, [fetchItinerary]);
 
   // Check URL query for selected doc
   useEffect(() => {
@@ -357,10 +364,87 @@ export function DocumentCenter() {
     }
   };
 
+  const importedItems = (itinerary || []).filter(item => 
+    item.status === 'imported' || (item.notes && (item.notes.includes('gmail:') || item.notes.includes('email-forward')))
+  );
+
   return (
     <div className="space-y-8">
       {/* Automated Booking Importers (Email Forwarding & Gmail Sync) */}
       <BookingImportChannels />
+
+      {/* Synced Bookings & Itinerary Items Section */}
+      {importedItems.length > 0 && (
+        <div className="glass-panel p-6 rounded-3xl border border-emerald-500/30 space-y-4 shadow-xl bg-gradient-to-br from-wf-navy-mid via-slate-900 to-slate-950">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
+            <div className="flex items-center space-x-3">
+              <div className="p-2.5 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                <CheckCircle2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center space-x-2">
+                  <span>Synced Trip Confirmations</span>
+                  <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-xs font-black">
+                    {importedItems.length} Bookings
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Parsed directly from your Gmail connection and forwarding inbox into your private Poland 2026 itinerary.
+                </p>
+              </div>
+            </div>
+
+            <a
+              href="/wayfinder/poland-christmas-2026/private"
+              onClick={(e) => {
+                e.preventDefault();
+                window.history.pushState({}, '', '/wayfinder/poland-christmas-2026/private');
+                window.dispatchEvent(new PopStateEvent('popstate'));
+              }}
+              className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center space-x-1.5 transition-all shadow-md shrink-0 self-start sm:self-auto"
+            >
+              <span>View on Itinerary Timeline</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </a>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+            {importedItems.map((item) => (
+              <div
+                key={item.id}
+                className="p-3.5 rounded-2xl bg-slate-950/70 border border-white/10 hover:border-emerald-500/40 transition-all flex items-start justify-between gap-3"
+              >
+                <div className="min-w-0 flex items-start space-x-3">
+                  <div className="p-2 rounded-xl bg-white/5 border border-white/10 text-emerald-400 shrink-0 mt-0.5">
+                    {item.item_type === 'flight' ? <Plane className="w-4 h-4 text-sky-400" /> :
+                     item.item_type === 'rail' || item.item_type === 'train' ? <Train className="w-4 h-4 text-amber-400" /> :
+                     item.item_type === 'hotel' ? <Building2 className="w-4 h-4 text-emerald-400" /> :
+                     item.item_type === 'dining' || item.item_type === 'restaurant' ? <Utensils className="w-4 h-4 text-orange-400" /> :
+                     <Ticket className="w-4 h-4 text-violet-400" />}
+                  </div>
+                  <div className="min-w-0">
+                    <h4 className="text-xs font-bold text-white truncate leading-tight">
+                      {item.title}
+                    </h4>
+                    <div className="flex flex-wrap items-center gap-2 mt-1.5 text-[11px] text-slate-400">
+                      {item.provider && (
+                        <span className="text-slate-300 font-medium">{item.provider}</span>
+                      )}
+                      <span>•</span>
+                      <span className="text-slate-400 font-mono">{item.local_date || 'Dec 2026'}</span>
+                      {item.status && (
+                        <span className="px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-300 text-[10px] font-semibold border border-emerald-500/30">
+                          {item.status}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Upload Header */}
       <div className="glass-panel p-8 rounded-3xl flex flex-col md:flex-row items-center justify-between gap-6">

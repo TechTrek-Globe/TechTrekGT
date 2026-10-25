@@ -79,8 +79,8 @@ Stores encrypted OAuth token state for the Gmail import channel:
 - `encrypted_access_token`, `encrypted_refresh_token`: AES-256-GCM encrypted (PBKDF2-derived from `TOKEN_ENCRYPTION_KEY`, 100k iterations). Base64-encoded with IV prepended (12 bytes).
 - `token_expiry_at`: ISO timestamp for proactive refresh (5-minute pre-expiry threshold).
 - `scopes`: space-delimited granted scope string.
-- `sync_cursor`: Gmail `pageToken` for incremental list pagination across sync runs.
-- `last_sync_at`, `last_sync_count`: observability fields.
+- `sync_cursor`: Reserved for pagination cursors. Deduplication is enforced by message ID in itinerary item notes.
+- `last_sync_at`, `last_sync_count`: observability fields tracking sync timestamp and total items imported.
 - `is_active`, `revoked_at`: revocation state. Revocation zeroes both encrypted token fields.
 - Constraints: `UNIQUE(user_id, journey_id)` - one connection per journey.
 

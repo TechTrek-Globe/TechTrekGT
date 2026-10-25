@@ -291,6 +291,7 @@ export function EditItemModal({
 
       // Reset Analytics on item change
       analyticsAttemptedRef.current = {};
+      analyticsFetchRequestIdRef.current = 0;
       setAnalytics(null);
       setLoadingAnalytics(false);
       setAnalyticsError('');
@@ -639,16 +640,19 @@ export function EditItemModal({
   };
 
   const analyticsAttemptedRef = useRef({});
+  const analyticsFetchRequestIdRef = useRef(0);
 
-  // eBay Listing Performance Analytics fetch handler
+  // eBay Listing Performance Analytics fetch handler (AUDIT-004 monotonic request tracking)
   const handleFetchAnalytics = useCallback(async (range = 30, force = false) => {
     if (!item?.id || !form.ebay_listing_id) return;
     const fetchKey = `${item.id}_${form.ebay_listing_id}_${range}`;
     analyticsAttemptedRef.current[fetchKey] = true;
+    const requestId = ++analyticsFetchRequestIdRef.current;
     setLoadingAnalytics(true);
     setAnalyticsError('');
     try {
       const data = await fetchEbayItemAnalytics(item.id, range, force);
+      if (requestId !== analyticsFetchRequestIdRef.current) return;
       if (data?.needsReauth) {
         setAnalytics(data);
         setAnalyticsError(data.error || 'eBay Analytics scope approval required.');
@@ -656,9 +660,12 @@ export function EditItemModal({
         setAnalytics(data);
       }
     } catch (e) {
+      if (requestId !== analyticsFetchRequestIdRef.current) return;
       setAnalyticsError(e.message || 'Failed to fetch listing performance data');
     } finally {
-      setLoadingAnalytics(false);
+      if (requestId === analyticsFetchRequestIdRef.current) {
+        setLoadingAnalytics(false);
+      }
     }
   }, [item?.id, form.ebay_listing_id]);
 

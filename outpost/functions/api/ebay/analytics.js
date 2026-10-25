@@ -1,6 +1,91 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
 import { getEbayUserToken, getEbayApiBase, fetchWithTimeout } from './tokenHelper.js';
 import { ANALYTICS_CACHE_TTL_HOURS } from '../../utils/constants.js';
+import { recordSyncRun, ensureSyncHistoryTable } from '../../utils/syncLogger.js';
+
+/**
+ * Calculates start of current Pacific day in UTC ISO format (midnight America/Los_Angeles).
+ * @param {Date} [now=new Date()]
+ * @returns {string}
+ */
+export function getPacificDayStartIso(now = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Los_Angeles',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(now);
+  const y = parts.find(p => p.type === 'year').value;
+  const m = parts.find(p => p.type === 'month').value;
+  const d = parts.find(p => p.type === 'day').value;
+
+  const testDate = new Date(Date.UTC(Number(y), Number(m) - 1, Number(d), 12, 0, 0));
+  const testParts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Los_Angeles',
+    hour: 'numeric',
+    hour12: false
+  }).formatToParts(testDate);
+  const hourInLA = parseInt(testParts.find(p => p.type === 'hour').value, 10);
+  const offsetHours = 12 - hourInLA;
+  return new Date(Date.UTC(Number(y), Number(m) - 1, Number(d), offsetHours, 0, 0)).toISOString();
+}
+
+/**
+ * Calculates next Pacific midnight reset time in UTC ISO format.
+ * @param {Date} [now=new Date()]
+ * @returns {string}
+ */
+export function getNextPacificResetIso(now = new Date()) {
+  const startIso = getPacificDayStartIso(now);
+  return new Date(new Date(startIso).getTime() + 24 * 60 * 60 * 1000).toISOString();
+}
+
+/**
+ * Retrieves current eBay Sell Analytics daily quota metrics for the authenticated user.
+ * @param {object} env
+ * @param {string} userId
+ * @returns {Promise<{ daily_limit: number, used: number, remaining: number, resets_at: string, resets_in_hours: number }>}
+ */
+export async function getEbayAnalyticsQuota(env, userId) {
+  const defaultQuota = {
+    daily_limit: 100,
+    used: 0,
+    remaining: 100,
+    resets_at: getNextPacificResetIso(),
+    resets_in_hours: 24
+  };
+
+  if (!env || !env.DB || !userId) return defaultQuota;
+
+  try {
+    await ensureSyncHistoryTable(env.DB);
+    const pacificStartIso = getPacificDayStartIso();
+    const nextResetIso = getNextPacificResetIso();
+    const resetsInHours = Math.max(0, Math.round((new Date(nextResetIso).getTime() - Date.now()) / (1000 * 60 * 60) * 10) / 10);
+
+    const row = await env.DB.prepare(`
+      SELECT COUNT(*) as calls_today
+      FROM outpost_sync_history
+      WHERE user_id = ?
+        AND sync_type = 'ebay_analytics'
+        AND started_at >= ?
+    `).bind(userId, pacificStartIso).first();
+
+    const used = Number(row?.calls_today || 0);
+    const remaining = Math.max(0, 100 - used);
+
+    return {
+      daily_limit: 100,
+      used,
+      remaining,
+      resets_at: nextResetIso,
+      resets_in_hours: resetsInHours
+    };
+  } catch (err) {
+    console.warn('[analytics] Failed to query eBay analytics quota:', err);
+    return defaultQuota;
+  }
+}
 
 /**
  * Builds YYYYMMDD strings in Pacific Time (America/Los_Angeles) to prevent eBay error 50018.
@@ -33,6 +118,165 @@ export function formatIsoDate(ymdStr) {
 }
 
 /**
+ * Builds a normalized lookup map of metric keys for case-insensitive matching.
+ * @param {Array<{ key: string }>} headerMetrics
+ * @returns {Record<string, number>}
+ */
+export function buildMetricKeyMap(headerMetrics) {
+  const map = {};
+  (headerMetrics || []).forEach((m, idx) => {
+    if (m?.key) {
+      const rawKey = String(m.key).trim();
+      map[rawKey] = idx;
+      map[rawKey.toUpperCase()] = idx;
+      map[rawKey.toUpperCase().replace(/_/g, '')] = idx;
+    }
+  });
+  return map;
+}
+
+/**
+ * Extracts a numeric metric value given candidate key aliases and handles both object and primitive structures.
+ * @param {Record<string, number>} metricKeyMap
+ * @param {Array<object|number|string>} metricValues
+ * @param {string[]} candidateKeys
+ * @returns {number}
+ */
+export function extractMetricValue(metricKeyMap, metricValues, candidateKeys) {
+  if (!metricValues || !metricKeyMap) return 0;
+  for (const key of candidateKeys) {
+    const cleanKey = String(key).trim();
+    const idx = metricKeyMap[cleanKey] ?? metricKeyMap[cleanKey.toUpperCase()] ?? metricKeyMap[cleanKey.toUpperCase().replace(/_/g, '')];
+    if (idx !== undefined && metricValues[idx] !== undefined && metricValues[idx] !== null) {
+      const entry = metricValues[idx];
+      const val = typeof entry === 'object' && entry !== null
+        ? (entry.value ?? entry.val ?? entry.count ?? 0)
+        : entry;
+      const num = parseFloat(val);
+      if (!isNaN(num) && num > 0) return num;
+    }
+  }
+  return 0;
+}
+
+export const SOURCE_VIEW_KEYS = [
+  'LISTING_VIEWS_SOURCE_SEARCH_RESULTS_PAGE',
+  'LISTING_VIEWS_SOURCE_DIRECT',
+  'LISTING_VIEWS_SOURCE_STORE',
+  'LISTING_VIEWS_SOURCE_OTHER_EBAY',
+  'LISTING_VIEWS_SOURCE_OFF_EBAY'
+];
+
+/**
+ * Extracts total listing page views, falling back to summing granular source views.
+ * @param {Record<string, number>} metricKeyMap
+ * @param {Array} metricValues
+ * @returns {number}
+ */
+export function extractTotalViews(metricKeyMap, metricValues) {
+  const directViews = extractMetricValue(metricKeyMap, metricValues, [
+    'LISTING_VIEWS_TOTAL',
+    'TOTAL_LISTING_VIEWS',
+    'LISTING_PAGE_VIEW_TOTAL',
+    'TOTAL_PAGE_VIEWS',
+    'LISTING_VIEWS',
+    'PAGE_VIEWS'
+  ]);
+  if (directViews > 0) return directViews;
+
+  let sourceSum = 0;
+  let foundAny = false;
+  for (const srcKey of SOURCE_VIEW_KEYS) {
+    const val = extractMetricValue(metricKeyMap, metricValues, [srcKey]);
+    if (val > 0) {
+      sourceSum += val;
+      foundAny = true;
+    }
+  }
+  return foundAny ? sourceSum : directViews;
+}
+
+/**
+ * Extracts total impressions with fallbacks across aggregate and search+store sources.
+ * @param {Record<string, number>} metricKeyMap
+ * @param {Array} metricValues
+ * @returns {number}
+ */
+export function extractTotalImpressions(metricKeyMap, metricValues) {
+  const directImp = extractMetricValue(metricKeyMap, metricValues, [
+    'LISTING_IMPRESSION_TOTAL',
+    'TOTAL_IMPRESSION_TOTAL',
+    'TOTAL_IMPRESSIONS',
+    'LISTING_IMPRESSIONS'
+  ]);
+  if (directImp > 0) return directImp;
+
+  const searchImp = extractMetricValue(metricKeyMap, metricValues, [
+    'LISTING_IMPRESSION_SEARCH_RESULTS_PAGE',
+    'SEARCH_IMPRESSIONS'
+  ]);
+  const storeImp = extractMetricValue(metricKeyMap, metricValues, [
+    'LISTING_IMPRESSION_STORE',
+    'STORE_IMPRESSIONS'
+  ]);
+  if (searchImp > 0 || storeImp > 0) return searchImp + storeImp;
+  return directImp;
+}
+
+/**
+ * Extracts search impressions.
+ * @param {Record<string, number>} metricKeyMap
+ * @param {Array} metricValues
+ * @returns {number}
+ */
+export function extractSearchImpressions(metricKeyMap, metricValues) {
+  return extractMetricValue(metricKeyMap, metricValues, [
+    'LISTING_IMPRESSION_SEARCH_RESULTS_PAGE',
+    'SEARCH_IMPRESSIONS'
+  ]);
+}
+
+/**
+ * Extracts Click-Through Rate (CTR) with scaling and mathematical fallback.
+ * @param {Record<string, number>} metricKeyMap
+ * @param {Array} metricValues
+ * @param {number} totalImp
+ * @param {number} totalViews
+ * @returns {number}
+ */
+export function extractCtr(metricKeyMap, metricValues, totalImp, totalViews) {
+  const rawCtr = extractMetricValue(metricKeyMap, metricValues, [
+    'CLICK_THROUGH_RATE',
+    'CTR',
+    'CLICKTHROUGHRATE'
+  ]);
+  if (rawCtr > 0) {
+    return rawCtr <= 1.0 ? parseFloat((rawCtr * 100).toFixed(2)) : parseFloat(rawCtr.toFixed(2));
+  }
+  return totalImp > 0 ? parseFloat(((totalViews / totalImp) * 100).toFixed(2)) : 0.0;
+}
+
+/**
+ * Extracts conversion rate with scaling and mathematical fallback.
+ * @param {Record<string, number>} metricKeyMap
+ * @param {Array} metricValues
+ * @param {number} totalViews
+ * @param {number} [unitsSold=0]
+ * @returns {number}
+ */
+export function extractConversionRate(metricKeyMap, metricValues, totalViews, unitsSold = 0) {
+  const rawConv = extractMetricValue(metricKeyMap, metricValues, [
+    'SALES_CONVERSION_RATE',
+    'CONVERSION_RATE',
+    'SALESCONVERSIONRATE'
+  ]);
+  if (rawConv > 0) {
+    return rawConv <= 1.0 ? parseFloat((rawConv * 100).toFixed(2)) : parseFloat(rawConv.toFixed(2));
+  }
+  return (totalViews > 0 && unitsSold > 0) ? parseFloat(((unitsSold / totalViews) * 100).toFixed(2)) : 0.0;
+}
+
+/**
  * Pure parser: extracts individual daily data points from eBay Analytics dimensionalDataPoints
  * or eBay records array.
  * @param {object} ebayData
@@ -41,19 +285,7 @@ export function formatIsoDate(ymdStr) {
 export function parseEbayDailyTraffic(ebayData) {
   if (!ebayData || typeof ebayData !== 'object') return [];
 
-  const metricKeyMap = {};
-  (ebayData.header?.metrics || []).forEach((m, idx) => {
-    if (m.key) metricKeyMap[m.key] = idx;
-  });
-
-  const getMetricVal = (metricValues, key) => {
-    const idx = metricKeyMap[key];
-    if (idx !== undefined && metricValues && metricValues[idx]) {
-      return parseFloat(metricValues[idx].value) || 0;
-    }
-    return 0;
-  };
-
+  const metricKeyMap = buildMetricKeyMap(ebayData.header?.metrics);
   const parsedPoints = [];
 
   // 1. Support legacy / mock test fixture format: records[0].dimensionalDataPoints
@@ -64,19 +296,19 @@ export function parseEbayDailyTraffic(ebayData) {
       if (!rawDate || !/^\d{8}$/.test(String(rawDate))) continue;
 
       const metricValues = dp.metricValues || [];
-      const impressionsTotal = Math.round(getMetricVal(metricValues, 'LISTING_IMPRESSION_TOTAL'));
-      const impressionsSearch = Math.round(getMetricVal(metricValues, 'LISTING_IMPRESSION_SEARCH_RESULTS_PAGE'));
-      const pageViewsTotal = Math.round(getMetricVal(metricValues, 'LISTING_VIEWS_TOTAL'));
-      const rawCtr = getMetricVal(metricValues, 'CLICK_THROUGH_RATE');
-      const rawConv = getMetricVal(metricValues, 'SALES_CONVERSION_RATE');
+      const impressionsTotal = Math.round(extractTotalImpressions(metricKeyMap, metricValues));
+      const impressionsSearch = Math.round(extractSearchImpressions(metricKeyMap, metricValues));
+      const pageViewsTotal = Math.round(extractTotalViews(metricKeyMap, metricValues));
+      const ctr = extractCtr(metricKeyMap, metricValues, impressionsTotal, pageViewsTotal);
+      const conv = extractConversionRate(metricKeyMap, metricValues, pageViewsTotal);
 
       parsedPoints.push({
         trafficDate: String(rawDate),
         impressionsTotal,
         impressionsSearch,
         pageViewsTotal,
-        clickThroughRate: rawCtr > 0 ? parseFloat(rawCtr.toFixed(4)) : 0.0,
-        salesConversionRate: rawConv > 0 ? parseFloat(rawConv.toFixed(4)) : 0.0
+        clickThroughRate: ctr > 0 ? parseFloat((ctr / 100).toFixed(4)) : 0.0,
+        salesConversionRate: conv > 0 ? parseFloat((conv / 100).toFixed(4)) : 0.0
       });
     }
     return parsedPoints;
@@ -89,19 +321,19 @@ export function parseEbayDailyTraffic(ebayData) {
     if (!rawDim || !/^\d{8}$/.test(String(rawDim))) continue;
 
     const metricValues = rec.metricValues || [];
-    const impressionsTotal = Math.round(getMetricVal(metricValues, 'LISTING_IMPRESSION_TOTAL'));
-    const impressionsSearch = Math.round(getMetricVal(metricValues, 'LISTING_IMPRESSION_SEARCH_RESULTS_PAGE'));
-    const pageViewsTotal = Math.round(getMetricVal(metricValues, 'LISTING_VIEWS_TOTAL'));
-    const rawCtr = getMetricVal(metricValues, 'CLICK_THROUGH_RATE');
-    const rawConv = getMetricVal(metricValues, 'SALES_CONVERSION_RATE');
+    const impressionsTotal = Math.round(extractTotalImpressions(metricKeyMap, metricValues));
+    const impressionsSearch = Math.round(extractSearchImpressions(metricKeyMap, metricValues));
+    const pageViewsTotal = Math.round(extractTotalViews(metricKeyMap, metricValues));
+    const ctr = extractCtr(metricKeyMap, metricValues, impressionsTotal, pageViewsTotal);
+    const conv = extractConversionRate(metricKeyMap, metricValues, pageViewsTotal);
 
     parsedPoints.push({
       trafficDate: String(rawDim),
       impressionsTotal,
       impressionsSearch,
       pageViewsTotal,
-      clickThroughRate: rawCtr > 0 ? parseFloat(rawCtr.toFixed(4)) : 0.0,
-      salesConversionRate: rawConv > 0 ? parseFloat(rawConv.toFixed(4)) : 0.0
+      clickThroughRate: ctr > 0 ? parseFloat((ctr / 100).toFixed(4)) : 0.0,
+      salesConversionRate: conv > 0 ? parseFloat((conv / 100).toFixed(4)) : 0.0
     });
   }
 
@@ -116,35 +348,23 @@ export function parseEbayDailyTraffic(ebayData) {
 export function parseEbayRangeTotals(ebayData) {
   if (!ebayData || typeof ebayData !== 'object') return null;
 
-  const metricKeyMap = {};
-  (ebayData.header?.metrics || []).forEach((m, idx) => {
-    if (m.key) metricKeyMap[m.key] = idx;
-  });
-
+  const metricKeyMap = buildMetricKeyMap(ebayData.header?.metrics);
   const record = ebayData.records?.[0];
   if (!record) return null;
 
   const metricValues = record.metricValues || [];
-  const getVal = (key) => {
-    const idx = metricKeyMap[key];
-    if (idx !== undefined && metricValues[idx]) {
-      return parseFloat(metricValues[idx].value) || 0;
-    }
-    return 0;
-  };
-
-  const impressionsTotal = Math.round(getVal('LISTING_IMPRESSION_TOTAL'));
-  const impressionsSearch = Math.round(getVal('LISTING_IMPRESSION_SEARCH_RESULTS_PAGE'));
-  const pageViewsTotal = Math.round(getVal('LISTING_VIEWS_TOTAL'));
-  const rawCtr = getVal('CLICK_THROUGH_RATE');
-  const rawConv = getVal('SALES_CONVERSION_RATE');
+  const impressionsTotal = Math.round(extractTotalImpressions(metricKeyMap, metricValues));
+  const impressionsSearch = Math.round(extractSearchImpressions(metricKeyMap, metricValues));
+  const pageViewsTotal = Math.round(extractTotalViews(metricKeyMap, metricValues));
+  const clickThroughRate = extractCtr(metricKeyMap, metricValues, impressionsTotal, pageViewsTotal);
+  const salesConversionRate = extractConversionRate(metricKeyMap, metricValues, pageViewsTotal);
 
   return {
     impressionsTotal,
     impressionsSearch,
     pageViewsTotal,
-    clickThroughRate: rawCtr > 0 ? parseFloat((rawCtr * 100).toFixed(2)) : (impressionsTotal > 0 ? parseFloat(((pageViewsTotal / impressionsTotal) * 100).toFixed(2)) : 0.0),
-    salesConversionRate: rawConv > 0 ? parseFloat((rawConv * 100).toFixed(2)) : 0.0
+    clickThroughRate,
+    salesConversionRate
   };
 }
 
@@ -218,12 +438,27 @@ export function ingestListingTraffic(env, userId, itemId, listingId, rangeDays =
       const clean = String(itm.ebay_listing_id).trim();
       if (clean) itemsByListingId.set(clean, itm);
     }
-    if (listingId && itemId && !itemsByListingId.has(listingId)) {
-      itemsByListingId.set(listingId, { id: itemId, ebay_listing_id: listingId });
+
+    const isSingleListing = Boolean(listingId && String(listingId).trim());
+    let idListParam = '';
+    const targetItemsMap = new Map();
+
+    if (isSingleListing) {
+      const cleanSingleId = String(listingId).trim();
+      idListParam = cleanSingleId;
+      const singleItem = itemsByListingId.get(cleanSingleId) || { id: itemId, ebay_listing_id: cleanSingleId };
+      targetItemsMap.set(cleanSingleId, singleItem);
+    } else {
+      const allListingIds = Array.from(itemsByListingId.keys()).slice(0, 200);
+      idListParam = allListingIds.length > 0 ? allListingIds.join('|') : '';
+      for (const [k, v] of itemsByListingId.entries()) {
+        targetItemsMap.set(k, v);
+      }
     }
 
-    const allListingIds = Array.from(itemsByListingId.keys()).slice(0, 200);
-    const idListParam = allListingIds.length > 0 ? allListingIds.join('|') : listingId;
+    if (!idListParam) {
+      return { success: true, rows_upserted: 0, range: `${startYMD}..${endYMD}`, fetched_at: new Date().toISOString() };
+    }
 
     const apiBase = getEbayApiBase(env);
     const metricsParam = 'LISTING_IMPRESSION_TOTAL,LISTING_IMPRESSION_SEARCH_RESULTS_PAGE,LISTING_VIEWS_TOTAL,CLICK_THROUGH_RATE,SALES_CONVERSION_RATE';
@@ -238,6 +473,17 @@ export function ingestListingTraffic(env, userId, itemId, listingId, rangeDays =
           Accept: 'application/json'
         }
       }, 15000);
+
+      // Record live API call to outpost_sync_history for daily quota tracking
+      await recordSyncRun(env, userId, {
+        syncType: 'ebay_analytics',
+        status: res.ok ? 'success' : (res.status === 429 ? 'quota_limited' : 'failed'),
+        itemsTotal: targetItemsMap.size,
+        itemsSynced: res.ok ? targetItemsMap.size : 0,
+        itemsFailed: res.ok ? 0 : targetItemsMap.size,
+        errorMessage: res.ok ? null : (res.status === 429 ? 'eBay Sell Analytics daily quota reached (100 calls/day limit).' : `eBay Analytics HTTP ${res.status}`),
+        details: { listingId: isSingleListing ? idListParam : 'batch', rangeDays }
+      }).catch(err => console.warn('[analytics] Failed to log quota sync run:', err));
       if (!res.ok) {
         const errText = await res.text().catch(() => '');
         console.error(`[analytics] eBay Analytics API error (${res.status}):`, errText);
@@ -306,18 +552,7 @@ export function ingestListingTraffic(env, userId, itemId, listingId, rangeDays =
     }
 
     // Process real eBay multi-listing batch response
-    const metricKeyMap = {};
-    (ebayData.header?.metrics || []).forEach((m, idx) => {
-      if (m.key) metricKeyMap[m.key] = idx;
-    });
-
-    const getVal = (metricValues, key) => {
-      const idx = metricKeyMap[key];
-      if (idx !== undefined && metricValues && metricValues[idx]) {
-        return parseFloat(metricValues[idx].value) || 0;
-      }
-      return 0;
-    };
+    const metricKeyMap = buildMetricKeyMap(ebayData.header?.metrics);
 
     const expectedDates = [];
     for (let d = rangeDays; d >= 1; d--) {
@@ -328,42 +563,22 @@ export function ingestListingTraffic(env, userId, itemId, listingId, rangeDays =
 
     // 1. Process records returned by eBay for all batch listings
     for (const rec of (ebayData.records || [])) {
-      const recListingId = String(rec.dimensionValues?.[0]?.value || '').trim();
+      const recListingId = String(rec.dimensionValues?.[0]?.value || (isSingleListing ? listingId : '')).trim();
       if (!recListingId) continue;
       seenListingIds.add(recListingId);
 
-      const targetItem = itemsByListingId.get(recListingId) || { id: itemId, ebay_listing_id: recListingId };
-      const dateListedYmd = targetItem.date_listed ? targetItem.date_listed.replace(/-/g, '') : null;
-
+      const targetItem = targetItemsMap.get(recListingId) || itemsByListingId.get(recListingId) || { id: itemId, ebay_listing_id: recListingId };
       const metricValues = rec.metricValues || [];
-      const totalImp = Math.round(getVal(metricValues, 'LISTING_IMPRESSION_TOTAL'));
-      const totalSearchImp = Math.round(getVal(metricValues, 'LISTING_IMPRESSION_SEARCH_RESULTS_PAGE'));
-      const totalViews = Math.round(getVal(metricValues, 'LISTING_VIEWS_TOTAL'));
-      const rawCtr = getVal(metricValues, 'CLICK_THROUGH_RATE');
-      const rawConv = getVal(metricValues, 'SALES_CONVERSION_RATE');
-      const ctr = rawCtr > 0 ? parseFloat((rawCtr * 100).toFixed(2)) : (totalImp > 0 ? parseFloat(((totalViews / totalImp) * 100).toFixed(2)) : 0.0);
-      const conv = rawConv > 0 ? parseFloat((rawConv * 100).toFixed(2)) : 0.0;
+      const totalImp = Math.round(extractTotalImpressions(metricKeyMap, metricValues));
+      const totalSearchImp = Math.round(extractSearchImpressions(metricKeyMap, metricValues));
+      const totalViews = Math.round(extractTotalViews(metricKeyMap, metricValues));
+      const ctr = extractCtr(metricKeyMap, metricValues, totalImp, totalViews);
+      const conv = extractConversionRate(metricKeyMap, metricValues, totalViews);
 
-      const activeMissingDates = [];
-      for (const ymd of expectedDates) {
-        if (dateListedYmd && ymd < dateListedYmd) {
-          const rowId = `lt-${crypto.randomUUID()}`;
-          statements.push(env.DB.prepare(`
-            INSERT OR REPLACE INTO listing_traffic (
-              id, item_id, user_id, ebay_listing_id, traffic_date,
-              impressions_total, impressions_search, page_views_total,
-              click_through_rate, sales_conversion_rate, fetched_at
-            ) VALUES (?, ?, ?, ?, ?, 0, 0, 0, 0, 0, ?)
-          `).bind(rowId, targetItem.id, userId, recListingId, ymd, nowIso));
-        } else {
-          activeMissingDates.push(ymd);
-        }
-      }
-
-      const n = activeMissingDates.length;
+      const n = expectedDates.length;
       if (n > 0) {
         if (totalImp === 0 && totalViews === 0) {
-          for (const ymd of activeMissingDates) {
+          for (const ymd of expectedDates) {
             const rowId = `lt-${crypto.randomUUID()}`;
             statements.push(env.DB.prepare(`
               INSERT OR REPLACE INTO listing_traffic (
@@ -382,7 +597,7 @@ export function ingestListingTraffic(env, userId, itemId, listingId, rangeDays =
           const remViews = totalViews % n;
 
           for (let i = 0; i < n; i++) {
-            const ymd = activeMissingDates[i];
+            const ymd = expectedDates[i];
             const isRecentImp = i >= (n - remImp);
             const isRecentSearch = i >= (n - remSearch);
             const isRecentViews = i >= (n - remViews);
@@ -418,7 +633,7 @@ export function ingestListingTraffic(env, userId, itemId, listingId, rangeDays =
     }
 
     // 2. For any linked listings not returned by eBay, fill 0-baseline
-    for (const [cleanId, targetItem] of itemsByListingId.entries()) {
+    for (const [cleanId, targetItem] of targetItemsMap.entries()) {
       if (seenListingIds.has(cleanId)) continue;
       for (const ymd of expectedDates) {
         const rowId = `lt-${crypto.randomUUID()}`;
@@ -454,7 +669,7 @@ export function ingestListingTraffic(env, userId, itemId, listingId, rangeDays =
     return {
       success: true,
       rows_upserted: statements.length,
-      listings_synced: itemsByListingId.size,
+      listings_synced: targetItemsMap.size,
       range: `${startYMD}..${endYMD}`,
       fetched_at: nowIso
     };
@@ -474,6 +689,11 @@ export async function onRequestGet(context) {
     if (!env.DB) return err('Database not available', 500);
 
     const url = new URL(request.url);
+    if (url.pathname.endsWith('/quota') || url.searchParams.get('quota_only') === '1') {
+      const quota = await getEbayAnalyticsQuota(env, payload.userId);
+      return ok({ success: true, quota });
+    }
+
     const itemId = url.searchParams.get('item_id');
     const rangeParam = parseInt(url.searchParams.get('range') || '30', 10);
     const rangeDays = [30, 60, 90].includes(rangeParam) ? rangeParam : 30;
@@ -482,7 +702,7 @@ export async function onRequestGet(context) {
     if (!itemId) return err('item_id parameter is required', 400);
 
     const item = await env.DB.prepare(
-      'SELECT id, item_name, ebay_listing_id, status FROM auction_items WHERE id = ? AND user_id = ?'
+      'SELECT id, item_name, ebay_listing_id, status, date_listed FROM auction_items WHERE id = ? AND user_id = ?'
     ).bind(itemId, payload.userId).first();
 
     if (!item) return err('Item not found', 404);
@@ -522,18 +742,22 @@ export async function onRequestGet(context) {
       rows = firstRes ? [firstRes] : [];
     }
 
-    // Check freshness: if no rows exist or the newest row is older than
-    // ANALYTICS_CACHE_TTL_HOURS (or forceRefresh).
+    // Check freshness and date coverage:
     let needsIngestion = false;
     if (forceRefresh || rows.length === 0) {
       needsIngestion = true;
     } else {
+      const oldestRowDate = String(rows[0].traffic_date);
       const newestFetchedAt = rows.reduce((max, r) => {
         const t = r.fetched_at ? new Date(r.fetched_at).getTime() : 0;
         return t > max ? t : max;
       }, 0);
       const analyticsCacheTtlMs = ANALYTICS_CACHE_TTL_HOURS * 60 * 60 * 1000;
-      if (Date.now() - newestFetchedAt > analyticsCacheTtlMs) {
+
+      // Ensure cache covers the full requested window without missing dates:
+      const coversDateRange = rows.length >= rangeDays && oldestRowDate <= startYMD;
+
+      if (!coversDateRange || (Date.now() - newestFetchedAt > analyticsCacheTtlMs)) {
         needsIngestion = true;
       }
     }
@@ -699,6 +923,8 @@ export async function onRequestGet(context) {
       ).run().catch(() => {});
     }
 
+    const quota = await getEbayAnalyticsQuota(env, payload.userId);
+
     return ok({
       success: true,
       cached: !needsIngestion,
@@ -724,8 +950,9 @@ export async function onRequestGet(context) {
       conversion_series: conversionSeries,
       data_complete,
       missing_dates,
-      quota_limited: quotaLimited,
-      quota_warning: quotaWarning
+      quota,
+      quota_limited: quotaLimited || (quota.remaining <= 0),
+      quota_warning: quotaWarning || (quota.remaining <= 0 ? 'eBay Sell Analytics daily quota reached (100 calls/day limit). Quota resets at midnight Pacific Time (07:00 UTC / 3:00 AM EDT).' : '')
     });
   });
 }

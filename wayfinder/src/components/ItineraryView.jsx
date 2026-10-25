@@ -66,10 +66,12 @@ export function ItineraryView() {
   };
 
   // Match private D1 itinerary items to a given date string (YYYY-MM-DD)
-  const getPrivateItemsForDay = (dayDate) => {
+  const getPrivateItemsForDay = (dayDate, dayNumber) => {
     if (!privateItems || privateItems.length === 0) return [];
     return privateItems.filter(item => {
-      const d = item.item_date || item.start_date || item.date || item.booking_date || '';
+      const d = item.local_date || item.item_date || item.start_date || item.date || item.booking_date || '';
+      if (!d) return dayNumber === 1;
+      if (dayNumber === 1 && d <= '2026-12-04') return true;
       return d && d.toString().startsWith(dayDate);
     });
   };
@@ -301,7 +303,7 @@ export function ItineraryView() {
               {/* Day Schedule Event Cards */}
               <div className="space-y-4 pl-4 sm:pl-6 border-l-2 border-amber-500/30 ml-3 sm:ml-4">
                 {/* Private D1-synced booking cards for this day */}
-                {getPrivateItemsForDay(dayItem.date).map((pItem, pIdx) => (
+                {getPrivateItemsForDay(dayItem.date, dayItem.day).map((pItem, pIdx) => (
                   <PrivateBookingCard key={`priv-${dayItem.day}-${pIdx}`} item={pItem} />
                 ))}
                 {getAccommodationsForDay(dayItem.date).map((booking) => (

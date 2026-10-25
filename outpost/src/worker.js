@@ -137,7 +137,8 @@ function addSecurityHeaders(response, isLocalhostOrOptions = false, maybeRequest
 
   const contentType = newHeaders.get('content-type') || '';
   const isHtml = contentType.includes('text/html');
-  if (isHtml) {
+  const isJson = contentType.includes('application/json');
+  if (isHtml || isJson) {
     newHeaders.set('Cache-Control', 'no-cache, no-store, must-revalidate');
     newHeaders.set('Pragma', 'no-cache');
     newHeaders.set('Expires', '0');

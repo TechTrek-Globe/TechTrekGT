@@ -4,7 +4,7 @@ import {
   CheckCircle2, AlertCircle, Loader2, Save, FileText, Database, ShieldCheck,
   FileSpreadsheet, Upload, ArrowRightLeft, Sparkles, Calculator, LayoutGrid,
   ArrowUp, ArrowDown, Eye, EyeOff, ShoppingCart, Copy, RotateCcw, Plug, User,
-  DollarSign, Package, Layers, Sliders, HardDrive, Key
+  DollarSign, Package, Layers, Sliders, HardDrive, Key, Zap
 } from 'lucide-react';
 import { SpreadsheetImporterModal } from './SpreadsheetImporterModal';
 import { FinanceSyncModal } from './FinanceSyncModal';
@@ -18,7 +18,8 @@ import {
   getItems, getSales, getInvoices, getComps, getApiUrl,
   autoAssignSkus, pushAllSkusToEbay,
   getSyncSettings, updateSyncSettings, syncAllEbayItems, getVineScoutCatalog,
-  getIntegrations, createIntegration, revokeIntegration
+  getIntegrations, createIntegration, revokeIntegration,
+  fetchEbayAnalyticsQuota
 } from '../utils/auctionApi';
 import { fmtCurrency, fmtPct } from '../utils/formulaPreview';
 import { DEFAULT_COLUMNS, DEFAULT_CATEGORIES, getStoredUserSettings, saveUserSettings, resetColumnWidths } from '../utils/userSettings';
@@ -90,20 +91,39 @@ export function SettingsView() {
   const [ebaySyncMsg, setEbaySyncMsg] = useState(null);
   const [vscoutSyncMsg, setVscoutSyncMsg] = useState(null);
 
-  // Auto-fetch API token when visiting the integrations tab
-  useEffect(() => {
-    if (activeTab === 'integrations' && !amazonToken && !hasAmazonToken && !tokenLoading) {
-      setTokenLoading(true);
-      fetch(getApiUrl('/api/import/amazon-token'), { credentials: 'include' })
-        .then(r => r.json())
-        .then(d => {
-          if (d.token) setAmazonToken(d.token);
-          if (d.hasToken) setHasAmazonToken(true);
-        })
-        .catch(err => console.error('Failed to auto-fetch API token:', err))
-        .finally(() => setTokenLoading(false));
+  // eBay Sell Analytics Daily Quota state
+  const [ebayQuota, setEbayQuota] = useState(null);
+  const [loadingQuota, setLoadingQuota] = useState(false);
+
+  const handleRefreshQuota = useCallback(async () => {
+    setLoadingQuota(true);
+    try {
+      const res = await fetchEbayAnalyticsQuota();
+      if (res?.quota) setEbayQuota(res.quota);
+    } catch (err) {
+      console.warn('Failed to fetch eBay analytics quota:', err);
+    } finally {
+      setLoadingQuota(false);
     }
-  }, [activeTab]);
+  }, []);
+
+  // Auto-fetch API token & quota when visiting the integrations tab
+  useEffect(() => {
+    if (activeTab === 'integrations') {
+      handleRefreshQuota();
+      if (!amazonToken && !hasAmazonToken && !tokenLoading) {
+        setTokenLoading(true);
+        fetch(getApiUrl('/api/import/amazon-token'), { credentials: 'include' })
+          .then(r => r.json())
+          .then(d => {
+            if (d.token) setAmazonToken(d.token);
+            if (d.hasToken) setHasAmazonToken(true);
+          })
+          .catch(err => console.error('Failed to auto-fetch API token:', err))
+          .finally(() => setTokenLoading(false));
+      }
+    }
+  }, [activeTab, handleRefreshQuota]);
 
   const showSuccess = (msg) => {
     setSuccessMsg(msg);
@@ -950,6 +970,73 @@ export function SettingsView() {
                       {ebaySyncMsg.msg}
                     </div>
                   )}
+                </div>
+              </div>
+            </div>
+
+            {/* 3b. eBay Sell Analytics Daily Quota Card */}
+            <div className="glass-card rounded-2xl p-6 border border-amber-500/20 space-y-4">
+              <div className="border-b border-slate-800/60 pb-4 flex items-center justify-between gap-3 flex-wrap">
+                <div>
+                  <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
+                    <Zap className="w-4 h-4 text-amber-400" />
+                    eBay Sell Analytics Daily Quota (100 Calls / Day)
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Official rate limit for the eBay Sell Analytics API. The quota resets daily at midnight Pacific Time (07:00 UTC / 3:00 AM EDT).
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleRefreshQuota}
+                  disabled={loadingQuota}
+                  className="px-3 py-1.5 rounded-xl text-xs font-semibold text-amber-300 hover:text-white bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 transition-all flex items-center gap-1.5 disabled:opacity-50"
+                  title="Check latest quota usage"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${loadingQuota ? 'animate-spin' : ''}`} />
+                  <span>{loadingQuota ? 'Checking...' : 'Refresh Quota'}</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="bg-slate-900/80 rounded-xl p-3.5 border border-slate-800">
+                  <p className="text-[11px] text-slate-400 mb-1 font-semibold uppercase tracking-wider">Syncs Used Today</p>
+                  <div className="text-xl font-bold font-mono text-white flex items-baseline gap-1.5">
+                    <span>{ebayQuota ? ebayQuota.used : 0}</span>
+                    <span className="text-xs text-slate-500 font-normal">/ 100</span>
+                  </div>
+                  <div className="w-full bg-slate-950 h-2 rounded-full overflow-hidden mt-2.5 border border-slate-800">
+                    <div
+                      className={`h-full transition-all duration-300 ${
+                        (ebayQuota?.used || 0) >= 90
+                          ? 'bg-rose-500'
+                          : (ebayQuota?.used || 0) >= 70
+                            ? 'bg-amber-500'
+                            : 'bg-emerald-500'
+                      }`}
+                      style={{ width: `${Math.min(100, Math.max(0, (ebayQuota?.used || 0)))}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-slate-900/80 rounded-xl p-3.5 border border-slate-800">
+                  <p className="text-[11px] text-slate-400 mb-1 font-semibold uppercase tracking-wider">Syncs Remaining</p>
+                  <div className={`text-xl font-bold font-mono ${(ebayQuota?.remaining ?? 100) <= 10 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                    {ebayQuota ? ebayQuota.remaining : 100}
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-2">
+                    {(ebayQuota?.remaining ?? 100) > 0 ? 'Calls available until reset' : 'Daily quota exhausted'}
+                  </p>
+                </div>
+
+                <div className="bg-slate-900/80 rounded-xl p-3.5 border border-slate-800">
+                  <p className="text-[11px] text-slate-400 mb-1 font-semibold uppercase tracking-wider">Quota Reset In</p>
+                  <div className="text-xl font-bold font-mono text-amber-300">
+                    {ebayQuota ? `${ebayQuota.resets_in_hours}h` : 'Midnight PT'}
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-2">
+                    Resets at midnight Pacific Time (07:00 UTC)
+                  </p>
                 </div>
               </div>
             </div>

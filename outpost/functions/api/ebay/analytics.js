@@ -182,30 +182,59 @@ export function extractTotalViews(metricKeyMap, metricValues) {
     'LISTING_VIEWS',
     'PAGE_VIEWS'
   ]);
-  if (directViews > 0) return directViews;
 
   let sourceSum = 0;
-  let foundAny = false;
   for (const srcKey of SOURCE_VIEW_KEYS) {
-    const val = extractMetricValue(metricKeyMap, metricValues, [srcKey]);
-    if (val > 0) {
-      sourceSum += val;
-      foundAny = true;
-    }
+    sourceSum += extractMetricValue(metricKeyMap, metricValues, [srcKey]);
   }
-  return foundAny ? sourceSum : directViews;
+  return Math.max(directViews, sourceSum);
+}
+
+/**
+ * Extracts views originating from off-eBay external sources (e.g. search engines, external links).
+ * @param {Record<string, number>} metricKeyMap
+ * @param {Array} metricValues
+ * @returns {number}
+ */
+export function extractOffEbayViews(metricKeyMap, metricValues) {
+  return extractMetricValue(metricKeyMap, metricValues, [
+    'LISTING_VIEWS_SOURCE_OFF_EBAY',
+    'OFF_EBAY_VIEWS',
+    'EXTERNAL_VIEWS'
+  ]);
+}
+
+/**
+ * Extracts views originating within eBay (search, store, other internal flows).
+ * @param {Record<string, number>} metricKeyMap
+ * @param {Array} metricValues
+ * @param {number} [totalViews=0]
+ * @returns {number}
+ */
+export function extractOnEbayViews(metricKeyMap, metricValues, totalViews = 0) {
+  const offEbay = extractOffEbayViews(metricKeyMap, metricValues);
+  if (totalViews > 0 && offEbay > 0) {
+    return Math.max(0, totalViews - offEbay);
+  }
+  return extractMetricValue(metricKeyMap, metricValues, [
+    'LISTING_VIEWS_SOURCE_SEARCH_RESULTS_PAGE',
+    'LISTING_VIEWS_SOURCE_OTHER_EBAY',
+    'LISTING_VIEWS_SOURCE_STORE',
+    'LISTING_VIEWS_SOURCE_DIRECT'
+  ]);
 }
 
 /**
  * Extracts total impressions with fallbacks across aggregate and search+store sources.
+ * Prioritizes TOTAL_IMPRESSION_TOTAL (matching eBay Seller Hub performance metrics).
  * @param {Record<string, number>} metricKeyMap
  * @param {Array} metricValues
  * @returns {number}
  */
 export function extractTotalImpressions(metricKeyMap, metricValues) {
   const directImp = extractMetricValue(metricKeyMap, metricValues, [
-    'LISTING_IMPRESSION_TOTAL',
     'TOTAL_IMPRESSION_TOTAL',
+    'LISTING_IMPRESSION_TOTAL',
     'TOTAL_IMPRESSIONS',
     'LISTING_IMPRESSIONS'
   ]);
@@ -358,11 +387,15 @@ export function parseEbayRangeTotals(ebayData) {
   const pageViewsTotal = Math.round(extractTotalViews(metricKeyMap, metricValues));
   const clickThroughRate = extractCtr(metricKeyMap, metricValues, impressionsTotal, pageViewsTotal);
   const salesConversionRate = extractConversionRate(metricKeyMap, metricValues, pageViewsTotal);
+  const externalViews = Math.round(extractOffEbayViews(metricKeyMap, metricValues));
+  const ebayViews = Math.max(0, pageViewsTotal - externalViews);
 
   return {
     impressionsTotal,
     impressionsSearch,
     pageViewsTotal,
+    ebayViews,
+    externalViews,
     clickThroughRate,
     salesConversionRate
   };
@@ -461,7 +494,20 @@ export function ingestListingTraffic(env, userId, itemId, listingId, rangeDays =
     }
 
     const apiBase = getEbayApiBase(env);
-    const metricsParam = 'LISTING_IMPRESSION_TOTAL,LISTING_IMPRESSION_SEARCH_RESULTS_PAGE,LISTING_VIEWS_TOTAL,CLICK_THROUGH_RATE,SALES_CONVERSION_RATE';
+    const metricsParam = [
+      'TOTAL_IMPRESSION_TOTAL',
+      'LISTING_IMPRESSION_TOTAL',
+      'LISTING_IMPRESSION_SEARCH_RESULTS_PAGE',
+      'LISTING_IMPRESSION_STORE',
+      'LISTING_VIEWS_TOTAL',
+      'LISTING_VIEWS_SOURCE_SEARCH_RESULTS_PAGE',
+      'LISTING_VIEWS_SOURCE_OTHER_EBAY',
+      'LISTING_VIEWS_SOURCE_OFF_EBAY',
+      'LISTING_VIEWS_SOURCE_STORE',
+      'LISTING_VIEWS_SOURCE_DIRECT',
+      'CLICK_THROUGH_RATE',
+      'SALES_CONVERSION_RATE'
+    ].join(',');
     const filterParam = `marketplace_ids:{EBAY_US},listing_ids:{${idListParam}},date_range:[${startYMD}..${endYMD}]`;
     const analyticsUrl = `${apiBase}/sell/analytics/v1/traffic_report?dimension=LISTING&metric=${metricsParam}&filter=${encodeURIComponent(filterParam)}`;
 
@@ -595,17 +641,20 @@ export function ingestListingTraffic(env, userId, itemId, listingId, rangeDays =
           const remSearch = totalSearchImp % n;
           const baseViews = Math.floor(totalViews / n);
           const remViews = totalViews % n;
+          const dayConv = conv > 0 ? parseFloat((conv / 100).toFixed(4)) : 0.0;
 
           for (let i = 0; i < n; i++) {
             const ymd = expectedDates[i];
-            const isRecentImp = i >= (n - remImp);
-            const isRecentSearch = i >= (n - remSearch);
-            const isRecentViews = i >= (n - remViews);
+            // Distribute remainders evenly across the date range rather than clustering in the final days
+            const extraImp = remImp > 0 && (Math.floor(((i + 1) * remImp) / n) - Math.floor((i * remImp) / n) > 0) ? 1 : 0;
+            const extraSearch = remSearch > 0 && (Math.floor(((i + 1) * remSearch) / n) - Math.floor((i * remSearch) / n) > 0) ? 1 : 0;
+            const extraViews = remViews > 0 && (Math.floor(((i + 1) * remViews) / n) - Math.floor((i * remViews) / n) > 0) ? 1 : 0;
 
-            const dayImp = baseImp + (isRecentImp ? 1 : 0);
-            const daySearch = Math.min(dayImp, baseSearch + (isRecentSearch ? 1 : 0));
-            const dayViews = baseViews + (isRecentViews ? 1 : 0);
-            const dayCtr = dayImp > 0 ? parseFloat(((dayViews / dayImp) * 100).toFixed(2)) : 0;
+            const dayImp = baseImp + extraImp;
+            const daySearch = Math.min(dayImp, baseSearch + extraSearch);
+            const dayViews = baseViews + extraViews;
+            // Store as decimal fraction (0.0000 - 1.0000) to align with parseEbayDailyTraffic and chart scale
+            const dayCtr = dayImp > 0 ? parseFloat((dayViews / dayImp).toFixed(4)) : 0.0;
 
             const rowId = `lt-${crypto.randomUUID()}`;
             statements.push(env.DB.prepare(`
@@ -614,7 +663,7 @@ export function ingestListingTraffic(env, userId, itemId, listingId, rangeDays =
                 impressions_total, impressions_search, page_views_total,
                 click_through_rate, sales_conversion_rate, fetched_at
               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `).bind(rowId, targetItem.id, userId, recListingId, ymd, dayImp, daySearch, dayViews, dayCtr, conv, nowIso));
+            `).bind(rowId, targetItem.id, userId, recListingId, ymd, dayImp, daySearch, dayViews, dayCtr, dayConv, nowIso));
           }
         }
       }
@@ -864,8 +913,11 @@ export async function onRequestGet(context) {
         const pImp = Math.max(0, imp - sImp);
         const oImp = sImp > 0 ? sImp : imp;
         const pv = row.page_views_total || 0;
-        const ctr = row.click_through_rate || 0;
-        const conv = row.sales_conversion_rate || 0;
+        const rawCtr = row.click_through_rate || 0;
+        const rawConv = row.sales_conversion_rate || 0;
+        // Defensive normalization: if database row contains legacy pre-scaled percentage (> 1.0), normalize to decimal fraction
+        const ctr = rawCtr > 1.0 ? parseFloat((rawCtr / 100).toFixed(4)) : rawCtr;
+        const conv = rawConv > 1.0 ? parseFloat((rawConv / 100).toFixed(4)) : rawConv;
 
         impressions.push(imp);
         promotedImpressions.push(pImp);

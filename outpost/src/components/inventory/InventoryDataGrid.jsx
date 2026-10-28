@@ -6,6 +6,7 @@ import { InventoryPricingTooltip } from './InventoryPricingTooltip';
 
 export const DEFAULT_COLUMNS = [
   { key: 'actions', label: 'Actions', minWidth: 195 },
+  { key: 'image', label: '', minWidth: 44 },
   { key: 'item_name', label: 'Item / Description', minWidth: 160 },
   { key: 'status', label: 'Status', minWidth: 100 },
   { key: 'current_list_price', label: 'List Price', minWidth: 95 },
@@ -52,6 +53,8 @@ export function InventoryDataGrid({
   const tableRef = useRef(null);
 
   const actionsWidth = Math.max(195, columnWidths.actions || 195);
+  const imageWidth = columnWidths.image || 44;
+  const isImageVisible = columnVisibility.image !== false;
   const visibleColCount = DEFAULT_COLUMNS.filter(c => columnVisibility[c.key] !== false).length;
 
   const showTooltip = (type, item, e) => {
@@ -114,8 +117,14 @@ export function InventoryDataGrid({
               {DEFAULT_COLUMNS.map(({ key, label, minWidth }) => {
                 if (columnVisibility[key] === false) return null;
                 const width = columnWidths[key] || minWidth;
-                const isStickyLeft = key === 'actions' || key === 'item_name';
-                const stickyLeftVal = key === 'actions' ? 0 : key === 'item_name' ? `${actionsWidth}px` : undefined;
+                const isStickyLeft = key === 'actions' || key === 'image' || key === 'item_name';
+                const stickyLeftVal = key === 'actions'
+                  ? 0
+                  : key === 'image'
+                    ? `${actionsWidth}px`
+                    : key === 'item_name'
+                      ? `${actionsWidth + (isImageVisible ? imageWidth : 0)}px`
+                      : undefined;
 
                 return (
                   <th
@@ -126,20 +135,26 @@ export function InventoryDataGrid({
                       maxWidth: `${width}px`,
                       left: stickyLeftVal
                     }}
-                    className={`font-semibold py-2 px-3 border-b border-slate-800 relative select-none text-[11px] ${
+                    className={`font-semibold py-2 ${key === 'image' ? 'px-1' : 'px-3'} border-b border-slate-800 relative select-none text-[11px] ${
                       isStickyLeft ? 'sticky bg-slate-900 shadow-r z-30' : ''
                     }`}
                   >
-                    <div
-                      className="flex items-center gap-1.5 cursor-pointer hover:text-slate-200 transition-colors"
-                      onClick={() => onSort && onSort(key === 'landed_floor' ? 'floor_price' : key)}
-                    >
-                      {label}
-                      {key !== 'actions' && (
-                        <ArrowUpDown className={`w-3 h-3 ${(key === 'landed_floor' ? sortConfig?.key === 'floor_price' : sortConfig?.key === key) ? 'text-amber-400' : 'text-slate-600'}`} />
-                      )}
-                    </div>
-                    {key !== 'actions' && (
+                    {key === 'image' ? (
+                      <div className="flex items-center justify-center">
+                        <span className="sr-only">Photo</span>
+                      </div>
+                    ) : (
+                      <div
+                        className="flex items-center gap-1.5 cursor-pointer hover:text-slate-200 transition-colors"
+                        onClick={() => onSort && onSort(key === 'landed_floor' ? 'floor_price' : key)}
+                      >
+                        {label}
+                        {key !== 'actions' && (
+                          <ArrowUpDown className={`w-3 h-3 ${(key === 'landed_floor' ? sortConfig?.key === 'floor_price' : sortConfig?.key === key) ? 'text-amber-400' : 'text-slate-600'}`} />
+                        )}
+                      </div>
+                    )}
+                    {key !== 'actions' && key !== 'image' && (
                       <div
                         className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-amber-500/50 z-40 transition-colors"
                         onMouseDown={e => handleResizeStart(e, key)}

@@ -168,12 +168,19 @@ Outpost uses React Context and standard React hooks (`useState`, `useReducer`, `
     - Handled via early-return parameter `GET /api/ebay/analytics?quota_only=1` and attached to standard analytics responses (`payload.quota`).
     - `EditTabPerformance.jsx` consumes `data?.quota` to render dynamic header badge (`⚡ eBay API: X/100 Used (Y Left)`) with threshold coloring (>30 green, <=30 amber, <=10 red pulse) and footer breakdown.
     - `SettingsView.jsx` maintains `ebayQuota` and `loadingQuota` state, displaying a dedicated progress card under Integrations with on-demand refresh via `fetchEbayAnalyticsQuota()`.
-  - **Analytics Time-Range Cache Invariants & Loading State [ACTION ID: PERF-005 / RANGE-001]**:
-    - `coversDateRange` enforces row count and start date invariant: `rows.length >= rangeDays && oldestRowDate <= startYMD`.
-    - Eliminates false positive cache hits that occurred when `expectedStartDate` was clamped to `item.date_listed`.
-    - Prevents 30-day cached rows from satisfying 60 or 90-day queries.
-    - Removes artificial pre-listing date zeroing in `ingestListingTraffic`, preserving proportional distribution across all dates in requested window.
-    - `apiFetch` in `src/utils/auctionApi.js` enforces `cache: 'no-store'`, and Cloudflare Worker `addSecurityHeaders` sets `no-cache, no-store, must-revalidate` on JSON payloads.
-    - `EditTabPerformance.jsx` tracks inline loading state on range selector buttons and reflects dynamic range days in KPI cards and chart header.
+  - **eBay Seller Hub Multi-Source Metric Reconciliation State [ACTION ID: PERF-007 / TRAFFIC-004]**:
+    - Prioritizes `TOTAL_IMPRESSION_TOTAL` over `LISTING_IMPRESSION_TOTAL` in `extractTotalImpressions`, ensuring overall marketplace impressions (including category browse and item recommendations) match eBay Seller Hub rather than search-only slots.
+    - Expands `metricsParam` in `ingestListingTraffic` with granular source metrics (`LISTING_VIEWS_SOURCE_OFF_EBAY`, `LISTING_VIEWS_SOURCE_OTHER_EBAY`, `LISTING_VIEWS_SOURCE_SEARCH_RESULTS_PAGE`, `LISTING_VIEWS_SOURCE_STORE`, `LISTING_VIEWS_SOURCE_DIRECT`).
+    - Uses `Math.max(directViews, sourceSum)` in `extractTotalViews` to prevent omitting off-eBay visits or non-search internal views when `LISTING_VIEWS_TOTAL` reflects only search clicks.
+    - Updates Total Impressions state breakdown in `EditTabPerformance.jsx` to `Browse/Ad` and `Search`, aligning with Seller Hub terminology.
+  - **Sticky Inventory Thumbnail Column & Multi-Column Offsets [ACTION ID: UI-006 / THUMB-001]**:
+    - `DEFAULT_COLUMNS` in `src/utils/userSettings.js` and `src/components/inventory/InventoryDataGrid.jsx` includes `{ key: 'image', label: 'Item Photo', defaultVisible: true, minWidth: 44, defaultWidth: 44 }` at index 1 directly between `actions` and `item_name`.
+    - `InventoryDataGrid.jsx` header and `InventoryGridRow.jsx` calculate sticky left positions with dynamic image visibility:
+      - `actions`: `left: 0`
+      - `image`: `left: ${actionsWidth}px`
+      - `item_name`: `left: ${actionsWidth + (isImageVisible ? imageWidth : 0)}px`
+    - Shared `PREVIEW_CACHE` Map exported from `ItemImageHoverTooltip.jsx` stores resolved positive image hits in memory across hovers and thumbnail cells.
+    - `ItemThumbnailCell` resolves images via `resolveItemImage(item, attrs)` and `PREVIEW_CACHE`, providing instant visual rendering, onError fallback to `<Package />`, click-to-edit modal opening, and hover portal tooltip triggering.
+
 
 

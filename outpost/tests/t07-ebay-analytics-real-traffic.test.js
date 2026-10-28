@@ -5,6 +5,8 @@ import {
   parseEbayRangeTotals,
   extractTotalViews,
   extractTotalImpressions,
+  extractOffEbayViews,
+  extractOnEbayViews,
   getPacificYMD,
   formatIsoDate,
   getPacificDayStartIso,
@@ -183,6 +185,46 @@ describe('T-07: Real Persisted Traffic Analytics vs Synthesized Series (CRIT-004
       assert.strictEqual(result[0].impressionsTotal, 200);
       assert.strictEqual(result[0].pageViewsTotal, 10); // 5 + 3 + 2 = 10
       assert.strictEqual(result[0].clickThroughRate, 0.05); // (10 / 200) = 0.05
+    });
+
+    it('prioritizes TOTAL_IMPRESSION_TOTAL over search-only impressions and captures on-eBay and external off-eBay views', () => {
+      // Models real eBay Seller Hub behavior: 1677 total impressions, 57 search impressions, 1 on-eBay view, 2 off-eBay views
+      const headerMetrics = [
+        { key: 'TOTAL_IMPRESSION_TOTAL' },
+        { key: 'LISTING_IMPRESSION_TOTAL' },
+        { key: 'LISTING_IMPRESSION_SEARCH_RESULTS_PAGE' },
+        { key: 'LISTING_VIEWS_TOTAL' },
+        { key: 'LISTING_VIEWS_SOURCE_OFF_EBAY' },
+        { key: 'LISTING_VIEWS_SOURCE_OTHER_EBAY' },
+        { key: 'CLICK_THROUGH_RATE' },
+        { key: 'SALES_CONVERSION_RATE' }
+      ];
+
+      const records = [
+        {
+          dimensionValues: [{ value: '336679216292' }],
+          metricValues: [
+            1677, // TOTAL_IMPRESSION_TOTAL (search + browse + recommendations)
+            57,   // LISTING_IMPRESSION_TOTAL (search + store only)
+            57,   // LISTING_IMPRESSION_SEARCH_RESULTS_PAGE
+            1,    // LISTING_VIEWS_TOTAL (direct/on-eBay view count)
+            2,    // LISTING_VIEWS_SOURCE_OFF_EBAY (external views)
+            1,    // LISTING_VIEWS_SOURCE_OTHER_EBAY (browse/recommendations on eBay)
+            0.001, // CLICK_THROUGH_RATE (0.1%)
+            0.0
+          ]
+        }
+      ];
+
+      const fixture = { header: { metrics: headerMetrics }, records };
+      const rangeTotals = parseEbayRangeTotals(fixture);
+
+      assert.strictEqual(rangeTotals.impressionsTotal, 1677, 'Must prioritize TOTAL_IMPRESSION_TOTAL (1677) over search-only (57)');
+      assert.strictEqual(rangeTotals.impressionsSearch, 57);
+      assert.strictEqual(rangeTotals.pageViewsTotal, 3, 'Must capture all 3 views (1 on-eBay + 2 off-eBay)');
+      assert.strictEqual(rangeTotals.externalViews, 2, 'External off-eBay views must equal 2');
+      assert.strictEqual(rangeTotals.ebayViews, 1, 'On-eBay views must equal 1');
+      assert.strictEqual(rangeTotals.clickThroughRate, 0.1, '0.001 fraction scales to 0.1% CTR matching Seller Hub');
     });
   });
 
@@ -485,6 +527,59 @@ describe('T-07: Real Persisted Traffic Analytics vs Synthesized Series (CRIT-004
       assert.strictEqual(data.quota.used + data.quota.remaining, 100);
       assert.ok(data.quota.resets_at, 'resets_at timestamp should exist');
       assert.ok(data.quota.resets_in_hours >= 0, 'resets_in_hours should be non-negative');
+    });
+
+    it('defensively normalizes legacy pre-scaled percentage CTR (> 1.0) into decimal fractions in ctr_series', async () => {
+      const nowIso = new Date().toISOString();
+      const testListingId = '166889922003';
+      const testItemId = 'itm-legacy-scale-1';
+
+      items.set(testItemId, {
+        id: testItemId,
+        user_id: testUserId,
+        item_name: 'Legacy Scaled CTR Item',
+        ebay_listing_id: testListingId,
+        status: 'Listed',
+        date_listed: null
+      });
+
+      // Seed 30 rows with legacy pre-scaled CTR (e.g. 9.09 representing 9.09%)
+      for (let i = 1; i <= 30; i++) {
+        const d = getPacificYMD(i);
+        trafficRows.set(`${testListingId}_${d}`, {
+          id: `lt-legacy-${i}`,
+          item_id: testItemId,
+          user_id: testUserId,
+          ebay_listing_id: testListingId,
+          traffic_date: d,
+          impressions_total: 11,
+          impressions_search: 11,
+          page_views_total: 1,
+          click_through_rate: 9.09, // Legacy bug: stored as 9.09 instead of 0.0909
+          sales_conversion_rate: 0.0,
+          fetched_at: nowIso
+        });
+      }
+
+      const req = new Request(`https://techtrekgt.com/api/ebay/analytics?item_id=${testItemId}&range=30`, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      });
+
+      const res = await onAnalyticsGet({ request: req, env });
+      assert.strictEqual(res.status, 200);
+      const data = await res.json();
+
+      assert.strictEqual(data.success, true);
+      assert.strictEqual(data.total_page_views, 30);
+      assert.strictEqual(data.total_impressions, 330);
+      // Overall summary CTR is percentage for KPI card (30 / 330 * 100 = 9.09%)
+      assert.strictEqual(data.click_through_rate, 9.09);
+      // All values in ctr_series MUST be normalized to decimal fractions (<= 1.0)
+      assert.ok(data.ctr_series.length === 30);
+      for (const val of data.ctr_series) {
+        assert.ok(val <= 1.0, `val ${val} in ctr_series must be <= 1.0`);
+        assert.strictEqual(val, 0.0909);
+      }
     });
   });
 });

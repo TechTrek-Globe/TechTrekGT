@@ -1,12 +1,44 @@
 import React, { useState } from 'react';
-import { Copy, DollarSign, Trash2, Pencil, Loader2, Edit3, ShoppingBag, RefreshCw, Shield, ShieldCheck, ExternalLink, CircleDollarSign } from 'lucide-react';
+import { Copy, DollarSign, Trash2, Pencil, Loader2, Edit3, ShoppingBag, RefreshCw, Shield, ShieldCheck, ExternalLink, CircleDollarSign, Package } from 'lucide-react';
 import { InlineEditCell } from './InlineEditCell';
 import { InlineStatusSelect } from './InlineStatusSelect';
 import { InlineSelectCell } from './InlineSelectCell';
+import { extractSafeAttributes, resolveItemImage, PREVIEW_CACHE } from './ItemImageHoverTooltip';
 import { cleanItemDescription, cleanAthleteName } from '../../utils/spreadsheetParser';
 import { LISTING_FORMATS } from '../../utils/constants';
 import { fmtCurrency } from '../../utils/formulaPreview';
 import { getCertVerificationUrl } from '../../utils/certLookup';
+
+function ItemThumbnailCell({ item, onShowTooltip, onHideTooltip, onClick }) {
+  const [imgError, setImgError] = useState(false);
+  const attrs = extractSafeAttributes(item);
+  const direct = resolveItemImage(item, attrs);
+  const cacheKey = item?.id || item?.ebay_listing_id || attrs?.asin || item?.asin || item?.item_name;
+  const cached = PREVIEW_CACHE?.get?.(cacheKey);
+  const resolvedUrl = (!imgError && (direct?.imageUrl || cached?.imageUrl)) ? (direct?.imageUrl || cached?.imageUrl) : null;
+
+  return (
+    <div
+      onClick={onClick}
+      onMouseEnter={(e) => onShowTooltip && onShowTooltip('item_image', item, e)}
+      onMouseLeave={() => onHideTooltip && onHideTooltip()}
+      title={resolvedUrl ? 'Click to view details (hover to zoom)' : 'No image available (click to view details)'}
+      className="w-8 h-8 rounded border border-slate-700/60 bg-slate-900/90 overflow-hidden flex items-center justify-center flex-shrink-0 cursor-pointer hover:border-amber-500/60 hover:ring-1 hover:ring-amber-500/40 transition-all shadow-sm group/thumb"
+    >
+      {resolvedUrl ? (
+        <img
+          src={resolvedUrl}
+          alt={item.item_name || 'Item thumbnail'}
+          className="w-full h-full object-cover group-hover/thumb:scale-110 transition-transform duration-200"
+          loading="lazy"
+          onError={() => setImgError(true)}
+        />
+      ) : (
+        <Package className="w-3.5 h-3.5 text-slate-600 group-hover/thumb:text-slate-400 transition-colors" />
+      )}
+    </div>
+  );
+}
 
 export function InventoryGridRow({
   item,
@@ -40,6 +72,8 @@ export function InventoryGridRow({
   const rowBg = isEven ? 'bg-[#0b101d]' : 'bg-[#141d30]';
   const stickyBg = isEven ? 'bg-[#0b101d]' : 'bg-[#141d30]';
   const actionsWidth = Math.max(195, columnWidths.actions || 195);
+  const imageWidth = columnWidths.image || 44;
+  const isImageVisible = columnVisibility.image !== false;
 
   // Detect if item was imported via VScout / Amazon Vine
   const isVineItem = Boolean(
@@ -152,14 +186,36 @@ export function InventoryGridRow({
         </td>
       )}
 
-      {/* 2. Item Name & Thumbnail (Sticky Left next to Actions) */}
+      {/* 2. Item Photo / Thumbnail (Sticky Left between Actions and Item Name) */}
+      {isImageVisible && (
+        <td
+          style={{
+            width: `${imageWidth}px`,
+            minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'image')?.minWidth || 44}px`,
+            maxWidth: `${imageWidth}px`,
+            left: `${actionsWidth}px`
+          }}
+          className={`px-1 py-1 whitespace-nowrap overflow-hidden sticky z-10 border-r border-slate-800/80 shadow-r transition-colors ${stickyBg} group-hover:bg-[#1a263d]`}
+        >
+          <div className="flex items-center justify-center">
+            <ItemThumbnailCell
+              item={item}
+              onShowTooltip={onShowTooltip}
+              onHideTooltip={onHideTooltip}
+              onClick={() => onOpenEditModal ? onOpenEditModal(item) : (onOpenQuickEdit && onOpenQuickEdit(item))}
+            />
+          </div>
+        </td>
+      )}
+
+      {/* 3. Item Name & Description (Sticky Left next to Thumbnail) */}
       {columnVisibility.item_name !== false && (
         <td
           style={{
             width: `${columnWidths.item_name || 220}px`,
             minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'item_name')?.minWidth || 160}px`,
             maxWidth: `${columnWidths.item_name || 220}px`,
-            left: `${actionsWidth}px`
+            left: `${actionsWidth + (isImageVisible ? imageWidth : 0)}px`
           }}
           className={`px-3 py-1.5 border-r border-slate-800/60 transition-colors overflow-hidden text-xs sticky z-10 ${stickyBg} group-hover:bg-[#1a263d] shadow-r cursor-pointer`}
           onMouseEnter={(e) => onShowTooltip && onShowTooltip('item_image', item, e)}

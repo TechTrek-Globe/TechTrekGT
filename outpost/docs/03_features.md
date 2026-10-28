@@ -355,9 +355,47 @@ Resolved identical metric reporting across 30, 60, and 90-day time ranges caused
 3. **Anti-Caching & Payload Freshness (`auctionApi.js` & `worker.js`)**:
    - Added `cache: 'no-store'` to all client `apiFetch` calls to prevent browser HTTP heuristic caching of JSON responses when changing query parameters.
    - Enhanced Cloudflare Worker `addSecurityHeaders` to apply `Cache-Control: no-cache, no-store, must-revalidate` to all `application/json` payloads.
-4. **Interactive Range Loading Telemetry (`EditTabPerformance.jsx`)**:
-   - Added inline `Loader2` spinner and disabled state to the active 30/60/90-day buttons while loading.
-   - Updated KPI card subtext to dynamically reflect `{analytics.range_days || analyticsRange || 30}d Total`.
-   - Updated chart header title to display `({analytics.period_start} to {analytics.period_end} • {analytics.range_days || analyticsRange || 30} Days)`.
+
+## eBay Seller Hub Telemetry Reconciliation, Granular Off-eBay Views, and Total Impressions Priority [ACTION ID: PERF-007 / TRAFFIC-004]
+
+Reconciled Outpost's telemetry engine with native eBay Seller Hub metrics (eliminating the discrepancy where 1,677 Seller Hub impressions and 3 page views were reported as 57 impressions and 0 views in Outpost).
+
+### Seller Hub Reconciliation & Multi-Source Metrics Capabilities
+
+1. **TOTAL_IMPRESSION_TOTAL Resolution (`functions/api/ebay/analytics.js`)**:
+   - In eBay Sell Analytics API, `LISTING_IMPRESSION_TOTAL` accounts only for search result slots and store impressions (e.g. 57 search impressions for listing `336679216292`).
+   - In contrast, `TOTAL_IMPRESSION_TOTAL` aggregates search, browse, category pages, item recommendations, and offsite / Promoted placements (e.g. 1,677 impressions matching Seller Hub).
+   - Reordered candidate resolution in `extractTotalImpressions` to prioritize `TOTAL_IMPRESSION_TOTAL` before `LISTING_IMPRESSION_TOTAL`, guaranteeing exact alignment with eBay Seller Hub top-line impressions.
+2. **Granular Multi-Source View Ingestion (`functions/api/ebay/analytics.js`)**:
+   - eBay Seller Hub splits listing visits into `eBay views` (internal search, store, recommendations) and `External views` (search engines, offsite ads, direct links).
+   - Expanded `metricsParam` in `ingestListingTraffic` to explicitly query `LISTING_VIEWS_TOTAL`, `LISTING_VIEWS_SOURCE_SEARCH_RESULTS_PAGE`, `LISTING_VIEWS_SOURCE_OTHER_EBAY`, `LISTING_VIEWS_SOURCE_OFF_EBAY`, `LISTING_VIEWS_SOURCE_STORE`, and `LISTING_VIEWS_SOURCE_DIRECT`.
+   - Refactored `extractTotalViews` to compute `Math.max(directViews, sourceSum)`: prevents dropping external views (`LISTING_VIEWS_SOURCE_OFF_EBAY`) or non-search internal views (`LISTING_VIEWS_SOURCE_OTHER_EBAY`).
+   - Added `extractOffEbayViews` and `extractOnEbayViews` helpers to verify external vs internal traffic distribution.
+3. **Search vs. Non-Search / Browse UI Labeling (`EditTabPerformance.jsx`)**:
+   - Updated Total Impressions card subtitle and breakdown pill: replaced ambiguous `Ad / Org` with `Browse/Ad` (`promoted_impressions` = total - search) and `Search` (`organic_impressions` = search slot impressions), directly mirroring Seller Hub's `Search slot impressions` and `Non-search impressions` categories.
+   - Updated tooltip explanations to provide clear benchmark definitions for both channels.
+4. **Click-Through Rate (CTR) Concordance**:
+   - Because impressions accurately reflect the full 1,677 count and total views capture all visits (1 eBay view + 2 external views = 3 views), CTR calculates as `(views / impressions) * 100` (~0.12% to 0.18%), matching Seller Hub's rounded `0.1%` rate.
+
+## Sticky Inventory Item Thumbnail & Photo Column [ACTION ID: UI-006 / THUMB-001]
+
+Added a dedicated sticky product thumbnail column positioned directly between `ACTIONS` and `ITEM / DESCRIPTION` in the inventory data grid, rendering a compact visual preview of every item.
+
+### Sticky Thumbnail & Photo Capabilities
+
+1. **Synchronized Multi-Column Sticky Geometry**:
+   - `ACTIONS`: Sticky left offset at `0px` (`actionsWidth = Math.max(195, columnWidths.actions || 195)`).
+   - `IMAGE`: Sticky left offset at `${actionsWidth}px` (`imageWidth = columnWidths.image || 44`).
+   - `ITEM / DESCRIPTION`: Sticky left offset at `${actionsWidth + (isImageVisible ? imageWidth : 0)}px` (`columnWidths.item_name || 220`).
+   - In both `<thead>` and `<tbody>`, horizontal scrolling pins all three columns to the left edge in lockstep without visual collision, overlap, or clipping.
+2. **Compact Visual Presentation & Graceful Fallback**:
+   - 32x32px (`w-8 h-8`) rounded image container (`border border-slate-700/60 bg-slate-900/90`) styled with subtle amber hover ring (`hover:border-amber-500/60 hover:ring-1 hover:ring-amber-500/40`) and hover scale animation.
+   - Synchronously extracts image URLs from `item.image_url`, `item.ebay_image_url`, `attributes.ebay_image_url`, `attributes.image_url`, `attributes.image_urls[0]`, and `notes` regex matching eBay/Amazon media URLs via `resolveItemImage`.
+   - Reads global in-memory cache `PREVIEW_CACHE` to share resolved image previews across components without duplicate queries.
+   - Falls back gracefully to `<Package className="w-3.5 h-3.5 text-slate-600" />` if no photo is available or if the image fails to load.
+3. **Interactive Zoom & Edit Integration**:
+   - Clicking the thumbnail opens the full item editor modal (`onOpenEditModal`).
+   - Hovering over the thumbnail triggers `ItemImageHoverTooltip` (`onShowTooltip('item_image', item, e)`), displaying the high-resolution product photo preview portal.
+
 
 

@@ -6,6 +6,7 @@
 
 export const DEFAULT_COLUMNS = [
   { key: 'actions',              label: 'Actions',          defaultVisible: true, minWidth: 195, defaultWidth: 195 },
+  { key: 'image',                label: 'Item Photo',       defaultVisible: true, minWidth: 44,  defaultWidth: 44 },
   { key: 'item_name',            label: 'Item / Description', defaultVisible: true, minWidth: 160, defaultWidth: 220 },
   { key: 'status',               label: 'Status',           defaultVisible: true, minWidth: 100, defaultWidth: 120 },
   { key: 'current_list_price',   label: 'List Price',       defaultVisible: true, minWidth: 95,  defaultWidth: 110 },

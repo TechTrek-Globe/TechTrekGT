@@ -4,7 +4,7 @@ import { Loader2, ExternalLink, Package, ImageOff, ImageIcon } from 'lucide-reac
 import { getItemImagePreview } from '../../utils/auctionApi';
 
 // Global in-memory cache for positive image hits across hovers
-const PREVIEW_CACHE = new Map();
+export const PREVIEW_CACHE = new Map();
 
 /**
  * Normalizes an image URL to secure HTTPS and handles protocol-relative paths.
@@ -21,7 +21,7 @@ function normalizeHttps(url) {
 /**
  * Safely extracts an attributes object from an item record.
  */
-function extractSafeAttributes(target) {
+export function extractSafeAttributes(target) {
   if (!target?.attributes) return {};
   if (typeof target.attributes === 'object' && target.attributes !== null) {
     return target.attributes;
@@ -41,7 +41,7 @@ function extractSafeAttributes(target) {
  * Synchronously resolves an image directly from the item properties, attributes, or notes.
  * Fully aligned with the extraction hierarchy in EditModalHeader.jsx and EditTabDetails.jsx.
  */
-function resolveItemImage(target, attrs) {
+export function resolveItemImage(target, attrs) {
   let rawImg = target?.image_url || target?.ebay_image_url || target?.imageUrl || null;
   let source = null;
 

@@ -296,6 +296,10 @@ function ImpressionsAndViewsChart({ dates = [], impressions = [], promotedSeries
 function ConversionAndCtrChart({ dates = [], ctrSeries = [], conversionSeries = [] }) {
   if (!dates || dates.length === 0) return null;
 
+  // Defensively ensure series values are decimal fractions (<= 1.0)
+  const safeCtrSeries = (ctrSeries || []).map(v => (v > 1.0 ? v / 100 : v));
+  const safeConversionSeries = (conversionSeries || []).map(v => (v > 1.0 ? v / 100 : v));
+
   const chartWidth = 720;
   const chartHeight = 180;
   const paddingLeft = 45;
@@ -306,21 +310,21 @@ function ConversionAndCtrChart({ dates = [], ctrSeries = [], conversionSeries = 
   const plotHeight = chartHeight - paddingTop - paddingBottom;
 
   const maxRate = Math.max(
-    Math.max(...ctrSeries, 0),
-    Math.max(...conversionSeries, 0),
+    Math.max(...safeCtrSeries, 0),
+    Math.max(...safeConversionSeries, 0),
     0.05
   );
 
   const n = dates.length;
   const slotWidth = plotWidth / n;
 
-  const ctrPoints = ctrSeries.map((val, idx) => {
+  const ctrPoints = safeCtrSeries.map((val, idx) => {
     const x = paddingLeft + idx * slotWidth + slotWidth / 2;
     const y = paddingTop + plotHeight - (val / maxRate) * plotHeight;
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   }).join(' ');
 
-  const convPoints = conversionSeries.map((val, idx) => {
+  const convPoints = safeConversionSeries.map((val, idx) => {
     const x = paddingLeft + idx * slotWidth + slotWidth / 2;
     const y = paddingTop + plotHeight - (val / maxRate) * plotHeight;
     return `${x.toFixed(1)},${y.toFixed(1)}`;
@@ -377,8 +381,8 @@ function ConversionAndCtrChart({ dates = [], ctrSeries = [], conversionSeries = 
           {/* Markers */}
           {dates.map((d, idx) => {
             const cx = paddingLeft + idx * slotWidth + slotWidth / 2;
-            const ctr = ctrSeries[idx] || 0;
-            const conv = conversionSeries[idx] || 0;
+            const ctr = safeCtrSeries[idx] || 0;
+            const conv = safeConversionSeries[idx] || 0;
             const cyCtr = paddingTop + plotHeight - (ctr / maxRate) * plotHeight;
             const cyConv = paddingTop + plotHeight - (conv / maxRate) * plotHeight;
 
@@ -706,14 +710,14 @@ export function EditTabPerformance({
                   </InfoTooltip>
                 </span>
                 <span className="text-amber-400 font-mono text-[10px] flex items-center gap-0.5">
-                  <span>Search &amp; Ads</span>
+                  <span>Search &amp; Browse</span>
                   <InfoTooltip
-                    title="Promoted vs. Organic Impressions"
+                    title="Search vs. Non-Search Impressions"
                     position="bottom"
                     align="left"
                   >
-                    • Ad (Promoted): Impressions driven by eBay Promoted Listings Standard ad placements.
-                    • Org (Organic): Natural impressions driven by keyword relevance, item specifics, and eBay Best Match ranking without ad fees.
+                    • Search: Natural search result slot impressions.
+                    • Browse / Ad: Impressions across category browse pages, item recommendations, and Promoted placements.
                   </InfoTooltip>
                 </span>
               </div>
@@ -723,11 +727,11 @@ export function EditTabPerformance({
                 </span>
                 <div className="flex items-center gap-1.5 text-[10px]">
                   <span className="text-amber-400 font-bold font-mono">
-                    {(analytics.promoted_impressions || 0).toLocaleString()} <span className="text-slate-500 font-normal">Ad</span>
+                    {(analytics.promoted_impressions || 0).toLocaleString()} <span className="text-slate-500 font-normal">Browse/Ad</span>
                   </span>
                   <span className="text-slate-600">•</span>
                   <span className="text-slate-400 font-mono">
-                    {(analytics.organic_impressions || 0).toLocaleString()} <span className="text-slate-500 font-normal">Org</span>
+                    {(analytics.organic_impressions || 0).toLocaleString()} <span className="text-slate-500 font-normal">Search</span>
                   </span>
                 </div>
               </div>
@@ -794,7 +798,7 @@ export function EditTabPerformance({
                   <span>Views / Impressions</span>
                 </span>
               </div>
-              <MiniSparkline data={(analytics.ctr_series || []).map(v => v * 100)} color="#a855f7" />
+              <MiniSparkline data={(analytics.ctr_series || []).map(v => (v > 1.0 ? v : v * 100))} color="#a855f7" />
             </div>
 
             {/* Sales Conversion Rate Card */}
@@ -829,7 +833,7 @@ export function EditTabPerformance({
                   </InfoTooltip>
                 </span>
               </div>
-              <MiniSparkline data={(analytics.conversion_series || []).map(v => v * 100)} color="#10b981" />
+              <MiniSparkline data={(analytics.conversion_series || []).map(v => (v > 1.0 ? v : v * 100))} color="#10b981" />
             </div>
           </div>
 

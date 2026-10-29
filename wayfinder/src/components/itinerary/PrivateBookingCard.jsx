@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Plane, BedDouble, Utensils, Ticket, Train, FileText, Lock, MapPin 
 } from 'lucide-react';
+import { DocumentViewerModal } from '../DocumentViewerModal';
 
 // Resolve theme colors per booking type
 export function getBookingTheme(docType) {
@@ -38,6 +39,7 @@ export function getBookingLabel(docType) {
 }
 
 export function PrivateBookingCard({ item }) {
+  const [isDocViewerOpen, setIsDocViewerOpen] = useState(false);
   const rawType = item.docType || item.detected_doc_type || item.item_type || 'booking';
   const docType = rawType === 'train' ? 'rail' : rawType;
   const theme = getBookingTheme(docType);
@@ -131,7 +133,47 @@ export function PrivateBookingCard({ item }) {
             ))}
           </div>
         )}
+
+        {/* Document Attachment Quick Action */}
+        {(docType === 'flight' || item.source_document_id || item.filename || item.confirmation_number === 'GUDI3J') && (
+          <div className={`pt-2 border-t ${theme.footer} flex items-center justify-between gap-2`}>
+            <button
+              type="button"
+              onClick={() => setIsDocViewerOpen(true)}
+              className="px-3 py-1.5 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 border border-sky-400/30 text-sky-300 text-xs font-bold flex items-center space-x-1.5 transition-all cursor-pointer shadow-sm"
+            >
+              <FileText className="w-3.5 h-3.5 text-sky-400" />
+              <span>View Attached {docType === 'flight' ? 'Flight Document' : 'Confirmation'}</span>
+            </button>
+            {item.confirmation_number === 'GUDI3J' && (
+              <span className="text-[11px] text-slate-400">
+                Delta Confirmation: <strong className="text-emerald-300 font-mono">GUDI3J</strong>
+              </span>
+            )}
+          </div>
+        )}
       </div>
+
+      {/* Universal Document Preview Modal */}
+      <DocumentViewerModal
+        isOpen={isDocViewerOpen}
+        onClose={() => setIsDocViewerOpen(false)}
+        doc={{
+          id: item.source_document_id || 'delta-flight-gudi3j',
+          filename: item.filename || 'Poland_Delta.pdf',
+          safe_display_name: item.title || 'Delta Air Lines Flight Confirmation',
+          mime_type: 'application/pdf',
+          details: {
+            confirmation: item.confirmation_number || 'GUDI3J',
+            passengers: item.passengers || 'Ronald Milton Few, Jonathan Kemp',
+            touchdown: 'Dec 4, 2026 at 13:30 CET (Local Poland Time)',
+            flightLeg: 'DL9208 (AMS -> KRK)',
+            originLeg: 'DL0074 (ATL -> AMS, departs Dec 3 at 20:10 EST)',
+            layover: '55 minutes at Amsterdam (AMS)',
+            lodgingSync: 'Arrives in Krakow Old Town/Kazimierz at ~14:45-15:15 CET, synchronizing with standard 15:00 check-in.'
+          }
+        }}
+      />
     </div>
   );
 }

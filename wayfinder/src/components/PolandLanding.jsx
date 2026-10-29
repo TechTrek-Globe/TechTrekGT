@@ -10,11 +10,12 @@ import polandMapRouteClean from '../assets/poland-map-route-clean.png';
 import { useAuth } from '../context/AuthContext';
 import { useWayfinder } from '../context/WayfinderContext';
 import { PrivateBookingCard } from './itinerary/PrivateBookingCard';
+import { DocumentViewerModal } from './DocumentViewerModal';
 
 const stopTransitInfo = {
   krakow: {
-    arrivalBadge: '✈️ Air Arrival: DL9208 into KRK at 13:30',
-    arrivalSub: 'Delta DL9208 (AMS -> KRK). Clear border control and board direct SKA1 commuter rail into Kraków Główny.',
+    arrivalBadge: '✈️ Air Arrival: DL9208 into KRK at 13:30 CET',
+    arrivalSub: 'Delta DL9208 (AMS -> KRK). Touchdown 13:30 CET (local Poland time). Direct SKA1 commuter rail into Kraków Główny arrives ~14:45-15:15 CET, synchronizing with standard 15:00 hotel check-in.',
     nextTransitTitle: 'PKP Intercity IC Train: Kraków Główny ➔ Wrocław Główny',
     nextTransitDetails: 'Departs Kraków Główny 11:30 • Arrives Wrocław Główny 14:15 • ~2h 45m in 1st Class',
     nextTransitNotes: '1st-class carriages with dedicated luggage racks • Scenic Lower Silesian winter route'
@@ -124,7 +125,8 @@ function JourneyStopSchedule({
   pushRoute,
   isExpanded,
   onToggleExpand,
-  transitInfo
+  transitInfo,
+  onOpenDocViewer
 }) {
   return (
     <div className="space-y-4">
@@ -163,8 +165,19 @@ function JourneyStopSchedule({
               </h3>
 
               {transitInfo?.arrivalBadge && (
-                <div className="text-xs text-sky-300 font-medium mt-1 flex items-center space-x-1.5">
+                <div className="text-xs text-sky-300 font-medium mt-1 flex flex-wrap items-center gap-2">
                   <span className="truncate">{transitInfo.arrivalBadge}</span>
+                  {city.id === 'krakow' && onOpenDocViewer && (
+                    <button
+                      type="button"
+                      onClick={onOpenDocViewer}
+                      className="px-2 py-0.5 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-400/40 text-[10px] font-bold flex items-center space-x-1 cursor-pointer transition-colors"
+                      title="View Delta flight document"
+                    >
+                      <FileText className="w-3 h-3 text-sky-400" />
+                      <span>View Document</span>
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -210,6 +223,7 @@ function JourneyStopSchedule({
           <div className="p-4 sm:p-6 space-y-8 animate-fade-in">
             {days.map((dayItem) => {
               const dayPrivate = (privateItems || []).filter(p => {
+                if (p.notes && p.notes.includes('gmail:')) return false;
                 const d = p.local_date || p.item_date || p.start_date || p.date || p.booking_date || '';
                 if (!d) return dayItem.day === 1;
                 if (dayItem.day === 1 && d <= '2026-12-04') return true;
@@ -412,6 +426,7 @@ export function PolandLanding() {
   const { itinerary: privateItems = [], accommodations = [] } = useWayfinder() || {};
   const [selectedStopFilter, setSelectedStopFilter] = useState('all');
   const [viewMode, setViewMode] = useState('schedule');
+  const [isDocViewerOpen, setIsDocViewerOpen] = useState(false);
   const [expandedStops, setExpandedStops] = useState({
     krakow: true,
     wroclaw: true,
@@ -745,6 +760,7 @@ export function PolandLanding() {
                     isExpanded={!!expandedStops[city.id]}
                     onToggleExpand={() => toggleStopExpand(city.id)}
                     transitInfo={stopTransitInfo[city.id]}
+                    onOpenDocViewer={city.id === 'krakow' ? () => setIsDocViewerOpen(true) : null}
                   />
                 );
               })}
@@ -805,6 +821,11 @@ export function PolandLanding() {
           </div>
         </section>
 
+        {/* Universal Document Preview Modal */}
+        <DocumentViewerModal
+          isOpen={isDocViewerOpen}
+          onClose={() => setIsDocViewerOpen(false)}
+        />
       </div>
     </div>
   );

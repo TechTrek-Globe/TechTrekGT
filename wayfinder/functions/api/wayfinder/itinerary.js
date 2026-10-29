@@ -27,6 +27,7 @@ export async function handleItinerary(context, url, method) {
       const items = await env.DB.prepare(
         `SELECT * FROM wayfinder_itinerary_items
          WHERE (journey_id = ? OR journey_id = ?) AND user_id = ?
+           AND (notes IS NULL OR notes NOT LIKE '%gmail:%')
          ORDER BY local_date, local_time`
       ).bind(journeyId, journey.id, user.userId).all();
 

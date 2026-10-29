@@ -7,6 +7,25 @@ export const polandJourney = {
   "startDate": "2026-12-03",
   "endDate": "2026-12-13",
   "outboundFlightDate": "2026-12-03",
+  "flightArrival": {
+    "airline": "Delta Air Lines",
+    "flightNumber": "DL9208",
+    "carrier": "Delta Air Lines / KLM Partner",
+    "inboundLeg1": "DL0074 ATL ➔ AMS (Departs Dec 3, 20:10 EST | Arrives Dec 4, 10:40 CET)",
+    "layover": "55 minutes layover at Amsterdam Schiphol (AMS)",
+    "inboundLeg2": "DL9208 AMS ➔ KRK (Departs Dec 4, 11:35 CET | Arrives Dec 4, 13:30 CET)",
+    "arrivalDate": "2026-12-04",
+    "arrivalDisplayDate": "Friday, Dec 4, 2026",
+    "arrivalTime": "13:30",
+    "timezone": "CET (Central European Time / UTC+1, Poland Local Time)",
+    "airport": "Kraków John Paul II International Airport (KRK / Balice)",
+    "airportCode": "KRK",
+    "confirmationNumber": "GUDI3J",
+    "passengers": "Ronald Milton Few, Jonathan Kemp",
+    "checkInSync": "Touching down at 13:30 CET allows ~45 mins for passport control and baggage claim, plus a 17-minute direct SKA1 commuter train ride to Kraków Główny. Travelers reach Old Town or Kazimierz accommodations between 14:45 and 15:15 CET, synchronizing with standard 15:00 hotel check-in times.",
+    "documentFilename": "Poland_Delta.pdf",
+    "documentPath": "/Poland-2026/docs/Poland_Delta.pdf"
+  },
   "totalNights": 9,
   "totalDays": 10,
   "culinaryHighlights": [
@@ -209,8 +228,19 @@ export const polandJourney = {
           "description": "Kraków’s 19th-century folk tradition of building intricate, jewel-toned, multi-towered miniature nativity palaces made of colored tin foil and wood. Recognized as UNESCO Intangible Cultural Heritage, these astonishing creations incorporate miniature models of St. Mary’s towers, Sukiennice, and Wawel spires and are exhibited around the Main Square each December."
         }
       ],
+      "flightArrival": {
+        "flightNumber": "DL9208",
+        "airline": "Delta Air Lines",
+        "routing": "ATL ➔ AMS ➔ KRK",
+        "arrivalDate": "2026-12-04",
+        "arrivalTime": "13:30",
+        "timezone": "CET (UTC+1, Poland Local Time)",
+        "airport": "Kraków John Paul II International Airport (KRK / Balice)",
+        "checkInSync": "Landing at 13:30 CET allows ~45m for customs and luggage, followed by the 17-minute direct SKA1 train to Kraków Główny, putting you at your Old Town or Kazimierz hotel between 14:45 and 15:15 CET (aligns with standard 15:00 check-in).",
+        "documentFilename": "Poland_Delta.pdf"
+      },
       "transit": {
-        "airport": "Direct SKA1 train from Kraków Airport (KRK) to Kraków Główny central station runs every 30 mins (17-min journey, ~17 PLN (~$4.50 USD) ticket).",
+        "airport": "Delta DL9208 arrives at Kraków Airport (KRK) at 13:30 CET on Dec 4. Direct SKA1 train from Kraków Airport (KRK) to Kraków Główny central station runs every 30 mins (17-min journey, ~17 PLN (~$4.50 USD) ticket).",
         "cityTransit": "Trams & buses managed by ZTP Kraków. Use 24-hr (~17 PLN (~$4.50 USD)) or 72-hr (~50 PLN (~$13.35 USD)) passes. Trams 1, 3, 8, 13, and 24 connect Old Town directly with Kazimierz.",
         "station": "Kraków Główny train station is directly attached to Galeria Krakowska and is a flat 5-minute walk to the Barbican and Planty Park entry to Old Town."
       },
@@ -4446,6 +4476,8 @@ export const polandJourney = {
       "coordinates": { "lat": 50.0722, "lng": 19.7997 },
       "mapsUrl": "https://www.google.com/maps/search/?api=1&query=Krakow+Airport+Train+Station",
       "badge": "Airport Link (Inbound)",
+      "flightDetails": "Delta Air Lines DL9208 (AMS ➔ KRK). Landing at 13:30 CET on Friday, Dec 4, 2026. Inbound transfer from DL0074 (ATL ➔ AMS). Confirmation: GUDI3J.",
+      "flightTouchdown": "13:30 CET (Local Poland Time / Dec 4, 2026)",
       "platforms": "Covered terminal platform connected directly via covered glass footbridge",
       "walkingFromCenter": "Directly connected to Terminal 1 via escalator/elevator walkway",
       "transitLines": "SKA1 commuter train (Koleje Małopolskie) directly to Kraków Główny central station (17-min journey, ~17 PLN, departures every 30 mins from 5 AM to midnight)",

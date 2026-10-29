@@ -8,11 +8,13 @@ import {
 } from 'lucide-react';
 
 import { PrivateBookingCard } from './itinerary/PrivateBookingCard';
+import { DocumentViewerModal } from './DocumentViewerModal';
 
 export function ItineraryView() {
   const { itinerary: privateItems = [], accommodations = [] } = useWayfinder();
   const [selectedCity, setSelectedCity] = useState('all');
   const [selectedDay, setSelectedDay] = useState('all');
+  const [isDocViewerOpen, setIsDocViewerOpen] = useState(false);
 
   const pushRoute = (e, path) => {
     if (e) e.preventDefault();
@@ -65,16 +67,19 @@ export function ItineraryView() {
     }
   };
 
-  // Match private D1 itinerary items to a given date string (YYYY-MM-DD)
+  // Match private D1 itinerary items to a given date string (YYYY-MM-DD), excluding removed Gmail imports
   const getPrivateItemsForDay = (dayDate, dayNumber) => {
     if (!privateItems || privateItems.length === 0) return [];
     return privateItems.filter(item => {
+      if (item.notes && item.notes.includes('gmail:')) return false;
       const d = item.local_date || item.item_date || item.start_date || item.date || item.booking_date || '';
       if (!d) return dayNumber === 1;
       if (dayNumber === 1 && d <= '2026-12-04') return true;
       return d && d.toString().startsWith(dayDate);
     });
   };
+
+  const validPrivateItems = (privateItems || []).filter(item => !item.notes?.includes('gmail:'));
 
   const getAccommodationsForDay = (dayDate) => accommodations.filter(item => item.check_in_date === dayDate);
 
@@ -220,11 +225,11 @@ export function ItineraryView() {
       </div>
 
       {/* Private Synced Items Overlay (If Authenticated User has Uploaded Bookings) */}
-      {privateItems.length > 0 && (
+      {validPrivateItems.length > 0 && (
         <div className="p-4 rounded-2xl bg-emerald-950/40 border border-emerald-500/30 flex items-center justify-between">
           <div className="flex items-center space-x-3 text-emerald-300 text-xs font-bold">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span>{privateItems.length} Private booking items synced from your Document Center</span>
+            <span>{validPrivateItems.length} Private booking items synced from your Document Center</span>
           </div>
           <a
             href="/wayfinder/poland-christmas-2026/private/documents"
@@ -350,6 +355,23 @@ export function ItineraryView() {
                       <p className="text-xs sm:text-sm text-slate-200 leading-relaxed font-medium">
                         {event.description}
                       </p>
+
+                      {/* Flight Arrival Document Trigger */}
+                      {(event.itemType === 'flight' || event.title?.includes('DL9208')) && (
+                        <div className="pt-2 border-t border-white/5 flex items-center justify-between">
+                          <button
+                            type="button"
+                            onClick={() => setIsDocViewerOpen(true)}
+                            className="px-3 py-1.5 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 border border-sky-400/30 text-sky-300 text-xs font-bold flex items-center space-x-1.5 transition-all cursor-pointer shadow-sm"
+                          >
+                            <FileText className="w-3.5 h-3.5 text-sky-400" />
+                            <span>View Delta Flight Confirmation</span>
+                          </button>
+                          <span className="text-[11px] text-slate-400 font-mono">
+                            Conf: <strong className="text-emerald-300">GUDI3J</strong>
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -387,6 +409,12 @@ export function ItineraryView() {
           </a>
         </div>
       </div>
+
+      {/* Universal Document Preview Modal */}
+      <DocumentViewerModal
+        isOpen={isDocViewerOpen}
+        onClose={() => setIsDocViewerOpen(false)}
+      />
     </div>
   );
 }

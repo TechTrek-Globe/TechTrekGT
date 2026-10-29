@@ -1,6 +1,7 @@
-import React from 'react';
-import { Bed, MapPin, Train, Sparkles, Navigation, Compass, CheckCircle2, Plus, Info } from 'lucide-react';
+import React, { useState } from 'react';
+import { Bed, MapPin, Train, Sparkles, Navigation, Compass, CheckCircle2, Plus, Info, Plane, Clock, FileText } from 'lucide-react';
 import { FormatText } from '../Formatters';
+import { DocumentViewerModal } from '../DocumentViewerModal';
 
 export function CityHotelsTab({ 
   city, 
@@ -8,6 +9,7 @@ export function CityHotelsTab({
   toggleItinerary, 
   isAuthenticated 
 }) {
+  const [isDocViewerOpen, setIsDocViewerOpen] = useState(false);
   const hotelsList = city.hotels && city.hotels.length > 0 
     ? city.hotels 
     : [
@@ -49,6 +51,85 @@ export function CityHotelsTab({
           </div>
         </div>
       </div>
+
+      {/* Flight Arrival & Lodging Check-in Synchronization (for Krakow / Inbound Flight) */}
+      {(city.id === 'krakow' || city.flightArrival) && (
+        <div className="glass-panel p-5 sm:p-6 rounded-3xl border border-sky-500/40 bg-gradient-to-br from-sky-950/60 via-wf-navy-mid to-slate-950 shadow-xl space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3">
+            <div className="flex items-center space-x-2.5">
+              <div className="p-2 bg-sky-500/20 text-sky-300 border border-sky-400/30 rounded-xl">
+                <Plane className="w-5 h-5 text-sky-400" />
+              </div>
+              <div>
+                <div className="flex items-center space-x-2">
+                  <h3 className="text-base sm:text-lg font-black text-white">
+                    Flight Arrival & Lodging Check-in Timing ({city.name})
+                  </h3>
+                  <span className="px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-400/30 text-[10px] font-black uppercase">
+                    Inbound Flight
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300">
+                  Landing flight schedule synchronized with Old Town / Kazimierz accommodation check-in.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsDocViewerOpen(true)}
+              className="px-3.5 py-2 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 border border-sky-400/40 text-sky-300 text-xs font-bold flex items-center space-x-1.5 transition-all cursor-pointer self-start sm:self-auto shrink-0 shadow-sm"
+            >
+              <FileText className="w-3.5 h-3.5 text-sky-400" />
+              <span>View Delta Flight Document</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1 text-xs">
+            {/* Touchdown & Timezone */}
+            <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-white/5 space-y-1.5">
+              <div className="text-sky-300 font-bold uppercase tracking-wider text-[11px] flex items-center space-x-1.5">
+                <Clock className="w-3.5 h-3.5 text-sky-400" />
+                <span>Touchdown & Timezone</span>
+              </div>
+              <div className="text-white font-bold text-sm">
+                Friday, Dec 4, 2026 @ 13:30 CET
+              </div>
+              <p className="text-slate-400 text-[11px] leading-snug">
+                Local Poland Time: Central European Time (CET / UTC+1). 6 hours ahead of US Eastern Time (Atlanta).
+              </p>
+            </div>
+
+            {/* Flight Inbound Routing */}
+            <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-white/5 space-y-1.5">
+              <div className="text-amber-300 font-bold uppercase tracking-wider text-[11px] flex items-center space-x-1.5">
+                <Plane className="w-3.5 h-3.5 text-amber-400" />
+                <span>Delta Flight Details</span>
+              </div>
+              <div className="text-white font-bold text-sm">
+                DL9208 (AMS ➔ KRK)
+              </div>
+              <p className="text-slate-400 text-[11px] leading-snug">
+                Inbound connection from DL0074 (ATL ➔ AMS). Delta Confirmation: <strong className="text-emerald-300 font-mono">GUDI3J</strong>.
+              </p>
+            </div>
+
+            {/* Check-in Guidance */}
+            <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-white/5 space-y-1.5">
+              <div className="text-emerald-300 font-bold uppercase tracking-wider text-[11px] flex items-center space-x-1.5">
+                <Bed className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Lodging Arrival Sync</span>
+              </div>
+              <div className="text-white font-bold text-sm">
+                Estimated Hotel Arrival: ~14:45 - 15:15
+              </div>
+              <p className="text-slate-400 text-[11px] leading-snug">
+                13:30 landing + ~45m customs/bags + 17m direct SKA1 train to Kraków Główny. Directly matches standard 15:00 hotel check-in!
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Base Recommendation & Features Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -159,6 +240,27 @@ export function CityHotelsTab({
           </div>
         </div>
       </div>
+
+      {/* Universal Document Preview Modal */}
+      <DocumentViewerModal
+        isOpen={isDocViewerOpen}
+        onClose={() => setIsDocViewerOpen(false)}
+        doc={{
+          id: 'delta-poland-2026',
+          filename: 'Poland_Delta.pdf',
+          safe_display_name: 'Delta Air Lines: Flight Confirmation (ATL -> AMS -> KRK)',
+          mime_type: 'application/pdf',
+          details: {
+            confirmation: 'GUDI3J',
+            passengers: 'Ronald Milton Few, Jonathan Kemp',
+            touchdown: 'Dec 4, 2026 at 13:30 CET (Local Poland Time)',
+            flightLeg: 'DL9208 (AMS -> KRK)',
+            originLeg: 'DL0074 (ATL -> AMS, departs Dec 3 at 20:10 EST)',
+            layover: '55 minutes at Amsterdam (AMS)',
+            lodgingSync: 'Arrives in Krakow Old Town/Kazimierz at ~14:45-15:15 CET, synchronizing with standard 15:00 check-in.'
+          }
+        }}
+      />
     </div>
   );
 }

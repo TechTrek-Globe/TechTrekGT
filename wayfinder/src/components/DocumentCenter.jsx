@@ -57,7 +57,15 @@ function simulateExtraction(file) {
       fields: [
         { field_name: 'confirmation_number', extracted_value: 'GUDI3J', confidence: 'high' },
         { field_name: 'airline', extracted_value: 'Delta Air Lines', confidence: 'high' },
+        { field_name: 'flight_number', extracted_value: 'DL9208', confidence: 'high' },
         { field_name: 'passengers', extracted_value: 'Ronald Milton Few, Jonathan Kemp', confidence: 'high' },
+        { field_name: 'origin_airport', extracted_value: 'ATL (Atlanta Hartsfield-Jackson)', confidence: 'high' },
+        { field_name: 'destination_airport', extracted_value: 'KRK (Krakow John Paul II)', confidence: 'high' },
+        { field_name: 'departure_date', extracted_value: '2026-12-03', confidence: 'high' },
+        { field_name: 'departure_time', extracted_value: '20:10', confidence: 'high' },
+        { field_name: 'arrival_date', extracted_value: '2026-12-04', confidence: 'high' },
+        { field_name: 'arrival_time', extracted_value: '13:30', confidence: 'high' },
+        { field_name: 'arrival_timezone', extracted_value: 'CET (UTC+1, Poland Local Time)', confidence: 'high' },
         { field_name: 'inbound_leg1_flight', extracted_value: 'DL0074 ATL -> AMS', confidence: 'high' },
         { field_name: 'inbound_leg1_departs', extracted_value: '2026-12-03 20:10 ATL', confidence: 'high' },
         { field_name: 'inbound_leg1_arrives', extracted_value: '2026-12-04 10:40 AMS', confidence: 'high' },
@@ -346,7 +354,12 @@ export function DocumentCenter() {
       }
     }
 
-    const url = cachedBlob || doc.file_url || `/wayfinder/Poland-2026/docs/${fname}`;
+    const baseUrl = import.meta.env.BASE_URL || '/wayfinder/';
+    const normalizedBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+    const staticDocName = (fname.toLowerCase().includes('delta') || fname.toLowerCase().includes('flight')) ? 'Poland_Delta.pdf' : fname;
+    const staticFallback = `${normalizedBase}Poland-2026/docs/${staticDocName}`;
+
+    const url = cachedBlob || doc.file_url || staticFallback;
     setPdfPreviewUrl(url);
     setPdfPreviewDoc(doc);
   };
@@ -365,12 +378,25 @@ export function DocumentCenter() {
   };
 
   const importedItems = (itinerary || []).filter(item => 
-    item.status === 'imported' || (item.notes && (item.notes.includes('gmail:') || item.notes.includes('email-forward')))
+    !item.notes?.includes('gmail:') && (item.status === 'imported' || (item.notes && item.notes.includes('email-forward')))
   );
+
+  const displayDocuments = documents.length > 0 ? documents : [
+    {
+      id: 'bundled-delta-poland-2026',
+      filename: 'Poland_Delta.pdf',
+      safe_display_name: 'Poland_Delta.pdf (Inbound DL9208 Confirmation)',
+      detected_doc_type: 'flight',
+      detected_provider: 'Delta Air Lines',
+      processing_status: 'imported',
+      file_size_bytes: 4157,
+      upload_date: '2026-08-28T17:14:46.000Z'
+    }
+  ];
 
   return (
     <div className="space-y-8">
-      {/* Automated Booking Importers (Email Forwarding & Gmail Sync) */}
+      {/* Automated Booking Importer (Trip Forwarding Inbox) */}
       <BookingImportChannels />
 
       {/* Synced Bookings & Itinerary Items Section */}
@@ -389,7 +415,7 @@ export function DocumentCenter() {
                   </span>
                 </h3>
                 <p className="text-xs text-slate-400">
-                  Parsed directly from your Gmail connection and forwarding inbox into your private Poland 2026 itinerary.
+                  Parsed directly from your forwarding inbox into your private Poland 2026 itinerary.
                 </p>
               </div>
             </div>
@@ -712,6 +738,15 @@ export function DocumentCenter() {
                     </a>
                   </div>
                 </div>
+              ) : ((pdfPreviewDoc.mime_type || '').startsWith('image/') || /\.(png|jpe?g|webp|gif)$/i.test(pdfPreviewDoc.filename || '')) ? (
+                <div className="w-full h-full p-4 flex items-center justify-center overflow-auto">
+                  <img
+                    src={pdfPreviewUrl}
+                    alt={pdfPreviewDoc.safe_display_name || pdfPreviewDoc.filename}
+                    className="max-h-full max-w-full object-contain rounded-xl"
+                    onError={() => setIframeError(true)}
+                  />
+                </div>
               ) : (
                 <object
                   data={pdfPreviewUrl}
@@ -743,7 +778,7 @@ export function DocumentCenter() {
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-bold text-white flex items-center space-x-2">
             <File className="w-5 h-5 text-wf-blue-lt" />
-            <span>Stored Travel Documents ({documents.length})</span>
+            <span>Stored Travel Documents ({displayDocuments.length})</span>
           </h3>
           <button
             onClick={() => fetchDocuments()}
@@ -754,13 +789,8 @@ export function DocumentCenter() {
           </button>
         </div>
         
-        {documents.length === 0 ? (
-          <div className="text-center py-12 text-wf-muted glass-panel rounded-2xl border border-dashed border-white/20">
-            <p>No documents uploaded yet. Upload a flight, train, or hotel booking above to test automatic itinerary ingestion.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {documents.map(doc => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {displayDocuments.map(doc => (
               <div key={doc.id} className="glass-panel p-4 rounded-2xl flex flex-col hover-lift group">
                 <div 
                   className={`w-full h-32 rounded-xl border flex items-center justify-center mb-4 relative overflow-hidden transition-colors cursor-pointer ${
@@ -810,8 +840,7 @@ export function DocumentCenter() {
               </div>
             ))}
           </div>
-        )}
+        </div>
       </div>
-    </div>
-  );
-}
+    );
+  }

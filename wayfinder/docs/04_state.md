@@ -18,6 +18,9 @@ Client state is partitioned into specialized React Context providers:
 - SettingsContext: Declared in [wayfinder/src/context/SettingsContext.jsx](file:///e:/TechTrekGT/wayfinder/src/context/SettingsContext.jsx).
   - State Fields: currency (default PLN or USD), temperatureUnit (Celsius or Fahrenheit), and notificationPreferences.
   - Persistence: Persisted to browser localStorage for instant retrieval across browser sessions.
+- Client Document Storage (IndexedDB): Declared in [wayfinder/src/utils/documentStorage.js](file:///e:/TechTrekGT/wayfinder/src/utils/documentStorage.js).
+  - Store: `WayfinderDocumentDB` (store name: `document_files`).
+  - Capabilities: Persists uploaded booking PDFs and images locally in browser storage, enabling instant previews in [wayfinder/src/components/DocumentViewerModal.jsx](file:///e:/TechTrekGT/wayfinder/src/components/DocumentViewerModal.jsx) even when edge storage (Cloudflare R2) is offline or pending. Falls back to static bundled documents (such as `Poland_Delta.pdf`).
 
 ## 3. Static POI Catalog Memory Model
 
@@ -70,24 +73,10 @@ Stores the unique per-user per-journey forwarding address records:
 - `is_active`, `emails_received`, `last_received_at`: operational counters.
 - Constraints: `UNIQUE(user_id, journey_id)` - one active inbox per journey.
 
-### 6.2 Gmail Connection Table (wayfinder_gmail_connections)
+### 6.2 Retired Legacy Gmail Table (wayfinder_gmail_connections)
 
-Stores encrypted OAuth token state for the Gmail import channel:
+Legacy Gmail OAuth integration has been removed from active ingestion in favor of dedicated email forwarding. Existing D1 queries and API endpoints explicitly filter out any historical items tagged with `gmail:` notes to ensure clean itineraries.
 
-- `id`, `user_id`, `journey_id`: ownership identifiers.
-- `gmail_address`: confirmed Gmail account address from profile API.
-- `encrypted_access_token`, `encrypted_refresh_token`: AES-256-GCM encrypted (PBKDF2-derived from `TOKEN_ENCRYPTION_KEY`, 100k iterations). Base64-encoded with IV prepended (12 bytes).
-- `token_expiry_at`: ISO timestamp for proactive refresh (5-minute pre-expiry threshold).
-- `scopes`: space-delimited granted scope string.
-- `sync_cursor`: Reserved for pagination cursors. Deduplication is enforced by message ID in itinerary item notes.
-- `last_sync_at`, `last_sync_count`: observability fields tracking sync timestamp and total items imported.
-- `is_active`, `revoked_at`: revocation state. Revocation zeroes both encrypted token fields.
-- Constraints: `UNIQUE(user_id, journey_id)` - one connection per journey.
+### 6.3 Email Forward Security
 
-### 6.3 Secrets Configuration Status
-
-- `TOKEN_ENCRYPTION_KEY` - Provisioned in Cloudflare Workers secrets (256-bit AES-GCM key material for token encryption).
-- `GOOGLE_CLIENT_ID` - Provisioned in Cloudflare Workers secrets (Google Cloud OAuth 2.0 application client ID).
-- `GOOGLE_CLIENT_SECRET` - Provisioned in Cloudflare Workers secrets (Google Cloud OAuth 2.0 application client secret).
-
-The Email Forward channel requires no additional secrets: it relies on the existing `DB` binding and the unique inbox token as implicit access control.
+The Email Forward channel relies on the existing `DB` binding and the unique inbox token as implicit access control, requiring no external Google Cloud OAuth dependencies.

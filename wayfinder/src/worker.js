@@ -19,7 +19,6 @@ import { handleImportJobs } from '../functions/api/wayfinder/import-jobs.js';
 import { handleBudget }       from '../functions/api/wayfinder/budget.js';
 import { handleExchangeRate }  from '../functions/api/wayfinder/exchange-rate.js';
 import { handleEmailInboxes }  from '../functions/api/wayfinder/email-inboxes.js';
-import { handleGmail }         from '../functions/api/wayfinder/gmail.js';
 import { handleInboundEmail }  from '../functions/api/wayfinder/email-worker.js';
 
 const ALLOWED_ORIGINS = [
@@ -131,7 +130,6 @@ export default {
       if (apiPath.startsWith('/api/wayfinder/import-jobs'))   return handleImportJobs(context, url, method);
       if (apiPath.startsWith('/api/wayfinder/budget'))         return handleBudget(context, url, method);
       if (apiPath.startsWith('/api/wayfinder/email-inboxes'))  return handleEmailInboxes(context, url, method);
-      if (apiPath.startsWith('/api/wayfinder/gmail'))          return handleGmail(context, url, method);
 
       return new Response(JSON.stringify({ error: 'Not found' }), {
         status: 404,

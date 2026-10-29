@@ -25,9 +25,11 @@ import {
   Bus,
   CreditCard,
   Layers,
-  HelpCircle
+  HelpCircle,
+  FileText
 } from 'lucide-react';
 import { polandJourney } from '../data/poland-2026';
+import { DocumentViewerModal } from './DocumentViewerModal';
 
 function StationDossierModal({ stationKey, onClose }) {
   const station = polandJourney.stationDossiers?.[stationKey];
@@ -296,6 +298,7 @@ function CityTransitSection({ cityId }) {
 export function RouteVisualization() {
   const [activeTab, setActiveTab] = useState('overview'); // 'overview', 'krakow', 'wroclaw', 'poznan', 'torun', 'gdansk', 'all-transit', 'guide'
   const [activeStationModal, setActiveStationModal] = useState(null);
+  const [isDocViewerOpen, setIsDocViewerOpen] = useState(false);
 
   const pushRoute = (e, path) => {
     e.preventDefault();
@@ -417,20 +420,39 @@ export function RouteVisualization() {
                 </div>
 
                 {/* Inbound Flight Transfer */}
-                <div className="p-3 rounded-xl bg-sky-950/40 border border-sky-500/30 flex items-center justify-between">
-                  <div className="flex items-center space-x-2 text-xs">
-                    <Plane className="w-4 h-4 text-sky-400 rotate-45" />
-                    <div>
-                      <span className="font-bold text-white">Air Arrival: </span>
-                      <span className="text-sky-300 font-mono">KRK (Balice)</span>
+                <div className="p-3.5 rounded-2xl bg-gradient-to-r from-sky-950/60 to-slate-900 border border-sky-500/40 space-y-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div className="flex items-center space-x-2 text-xs">
+                      <Plane className="w-4 h-4 text-sky-400 rotate-45 shrink-0" />
+                      <div>
+                        <span className="font-bold text-white">Air Arrival: </span>
+                        <span className="text-sky-300 font-mono font-bold">Delta DL9208 (AMS ➔ KRK)</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2 shrink-0">
+                      <button
+                        onClick={() => setIsDocViewerOpen(true)}
+                        className="px-2.5 py-1 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 text-[10px] font-bold border border-sky-500/40 transition-colors flex items-center space-x-1 cursor-pointer"
+                        title="View Delta flight document"
+                      >
+                        <FileText className="w-3 h-3 text-sky-400" />
+                        <span>View Document</span>
+                      </button>
+                      <button
+                        onClick={() => setActiveStationModal('airport-krk')}
+                        className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white text-[10px] font-bold border border-white/10 transition-colors cursor-pointer"
+                      >
+                        Transfer Dossier
+                      </button>
                     </div>
                   </div>
-                  <button
-                    onClick={() => setActiveStationModal('airport-krk')}
-                    className="px-2 py-1 rounded-md bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 text-[10px] font-bold border border-sky-500/40 transition-colors"
-                  >
-                    Transfer Dossier
-                  </button>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-300 pt-1 border-t border-white/5">
+                    <span className="text-amber-300 font-bold">Touchdown: Dec 4, 2026 @ 13:30 CET</span>
+                    <span className="text-slate-500">•</span>
+                    <span className="text-slate-400">KRK Balice Airport</span>
+                    <span className="text-slate-500">•</span>
+                    <span className="text-emerald-300 font-mono">Conf: GUDI3J</span>
+                  </div>
                 </div>
 
                 {/* Vertical Interactive City Track */}
@@ -776,6 +798,12 @@ export function RouteVisualization() {
           onClose={() => setActiveStationModal(null)}
         />
       )}
+
+      {/* Universal Document Preview Modal */}
+      <DocumentViewerModal
+        isOpen={isDocViewerOpen}
+        onClose={() => setIsDocViewerOpen(false)}
+      />
     </div>
   );
 }

@@ -96,3 +96,32 @@ Authenticated users can import hotel and attraction booking confirmations via de
 
 - Dedicated Import Inbox Card: [wayfinder/src/components/BookingImportChannels.jsx](file:///e:/TechTrekGT/wayfinder/src/components/BookingImportChannels.jsx) is integrated directly into [DocumentCenter.jsx](file:///e:/TechTrekGT/wayfinder/src/components/DocumentCenter.jsx). Generates unique trip inbox address, 1-click clipboard copy with animated visual feedback, live processed email counters, and supported booking provider tags.
 - Synced Confirmations List: Integrated directly in [DocumentCenter.jsx](file:///e:/TechTrekGT/wayfinder/src/components/DocumentCenter.jsx) right below the import inbox card. Displays all D1-persisted booking items with provider names, dates, item type badges, and a direct 1-click link to navigate into the Itinerary timeline. Note: Legacy Gmail sync has been completely removed in favor of reliable email forwarding.
+
+## 8. Key-Free Open-Meteo Winter Weather & Daylight Telemetry
+
+To equip winter travelers for sub-zero Polish conditions and brief winter daylight windows (~8 hours in December), Wayfinder provides real-time and climate-modeled weather telemetry:
+
+- Serverless Open-Meteo Edge Proxy: The worker endpoint `GET /api/wayfinder/weather` in [wayfinder/functions/api/wayfinder/weather.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/weather.js) proxies Open-Meteo forecast and archive endpoints with zero external API key requirements.
+- Dual Operating Modes:
+  - Live 16-Day Forecast: Used when querying current conditions or dates within -1 to +16 days of the request. Returns temperature ranges, WMO weather codes, precipitation probabilities, snowfall accumulation in cm, sunrise, and sunset times.
+  - Historical Climate Baseline: Used for trip planning dates beyond 16 days. Samples prior-year seasonal calendar windows from Open-Meteo Archive API to calculate expected highs, lows, and snow probabilities.
+- Daylight Telemetry: Computes exact daily sunrise, sunset, and total daylight span (e.g. 07:35 to 15:40 CET / 8h 05m). Vital for winter scheduling because Polish Christmas markets peak after dusk while Gothic Old Town photography requires daylight.
+- Freezing & Cold Advisories: Automatically evaluates freezing thresholds and generates actionable winter advisories (thermal base layer recommendations, crampon/traction warnings on icy cobblestones, waterproof footwear).
+- UI Component Integration: [wayfinder/src/components/weather/WeatherWidget.jsx](file:///e:/TechTrekGT/wayfinder/src/components/weather/WeatherWidget.jsx) is embedded into [PolandLanding.jsx](file:///e:/TechTrekGT/wayfinder/src/components/PolandLanding.jsx) stop headers and daily schedule sub-strips, as well as [ItineraryView.jsx](file:///e:/TechTrekGT/wayfinder/src/components/ItineraryView.jsx) day headers. Seamlessly toggles between Celsius and Fahrenheit according to user settings in SettingsContext.
+
+## 9. Client-Side Route & Walking Loop Optimization (2-Opt & Nearest-Neighbor)
+
+To minimize traveler exposure to sub-zero winter temperatures and eliminate criss-crossing backtracking across Polish Old Towns, Wayfinder provides an in-browser route optimization engine:
+
+- Algorithmic Architecture: Implemented in [wayfinder/src/utils/routeOptimizer.js](file:///e:/TechTrekGT/wayfinder/src/utils/routeOptimizer.js) and ported from TREK (`RouteCalculator.ts`). Executes 100% on the client in <2ms with zero network requests or API costs.
+- Two-Stage Optimization:
+  - Nearest-Neighbor Seed: Constructs an initial Hamiltonian path using greedy nearest-neighbor traversal seeded from the traveler's active base anchor (e.g. Main Market Square or central station).
+  - 2-Opt Iterative Edge Untangling: Iteratively evaluates 2-edge swaps by reversing candidate tour sub-segments `[i..j]` whenever the candidate length is strictly shorter by at least 1mm (`len < bestLen - 1e-6`). Eliminates all self-intersecting loops and criss-crossing paths.
+  - Round-Trip Loop Orientation: When `isRoundTrip` is active (`startAnchor === endAnchor`), the loop orientation is oriented to start at the sight closest to the hotel/market base, creating an intuitive walking tour that departs from base, circles through sights, and returns.
+- Geodesic & Winter Telemetry:
+  - Haversine Distance: Uses spherical trigonometry to calculate precise kilometer distances between consecutive stops.
+  - Winter Walking Pace: Calibrated at 4.5 km/h (~13.3 min/km) to account for snowy, icy cobblestones and winter footwear.
+  - Savings Metrics: Directly computes distance saved (e.g. -1.8 km) and minutes saved in freezing weather.
+- City Walk vs. Excursion Partitioning: Sights situated >12 km from the city center (such as Auschwitz-Birkenau ~65 km or Wieliczka Salt Mine ~14 km from Kraków) are partitioned into a dedicated Regional Day-Trip Excursions section so regional transit trips do not distort local Old Town walking loops.
+- Mobile Navigation Integration: Generates native Google Maps multi-stop walking directions URLs linking all sequential waypoints, enabling 1-click navigation directly in iOS/Android Google Maps during winter roaming.
+- UI Component Integration: [wayfinder/src/components/route/WalkingLoopOptimizer.jsx](file:///e:/TechTrekGT/wayfinder/src/components/route/WalkingLoopOptimizer.jsx) is embedded into [CityAttractionsTab.jsx](file:///e:/TechTrekGT/wayfinder/src/components/city/CityAttractionsTab.jsx), offering toggles between curated guide order and 2-opt loop mode, base anchor selection, round-trip toggles, and step-by-step leg distance badges on [MustSeeCard.jsx](file:///e:/TechTrekGT/wayfinder/src/components/MustSeeCard.jsx).

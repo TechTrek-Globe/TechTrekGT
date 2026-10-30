@@ -130,7 +130,10 @@ export function MustSeeCard(props) {
     howToGetThere,
     daysClosed,
     cityName = 'Kraków',
-    onAddToItinerary
+    onAddToItinerary,
+    stepNumber,
+    prevLeg,
+    isExcursion
   } = props;
 
   const cardUrgentAlert = sight?.urgentAlert || null;
@@ -195,8 +198,13 @@ export function MustSeeCard(props) {
         {/* Gradient Scrim for Contrast */}
         <div className="absolute inset-0 bg-gradient-to-t from-wf-navy-mid/95 via-transparent to-black/30 pointer-events-none" />
 
-        {/* Category Pill floating on Image */}
-        <div className="absolute top-3.5 left-3.5 z-10">
+        {/* Category & Step Pill floating on Image */}
+        <div className="absolute top-3.5 left-3.5 z-10 flex items-center space-x-1.5">
+          {stepNumber && (
+            <span className="px-2.5 py-1 rounded-full text-[11px] font-black bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 shadow-md flex items-center space-x-1">
+              <span>#{stepNumber}</span>
+            </span>
+          )}
           <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-slate-950/80 backdrop-blur-md border border-amber-400/30 text-amber-300 shadow-md">
             {cardCategory}
           </span>
@@ -216,6 +224,21 @@ export function MustSeeCard(props) {
           <h3 className="text-xl font-black text-white leading-tight group-hover:text-amber-300 transition-colors">
             {cardTitle}
           </h3>
+
+          {/* Leg distance badge when route optimizer is active */}
+          {prevLeg && (
+            <div className="px-3 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-[11px] text-emerald-300 font-bold flex items-center space-x-1.5 shadow-sm">
+              <span className="text-emerald-400">🚶</span>
+              <span>{prevLeg.walkingMinutes} min walk ({prevLeg.formattedDist}) from {prevLeg.fromName}</span>
+            </div>
+          )}
+
+          {isExcursion && (
+            <div className="px-3 py-1.5 rounded-xl bg-purple-500/15 border border-purple-400/30 text-[11px] text-purple-300 font-bold flex items-center space-x-1.5 shadow-sm">
+              <span className="text-purple-400">🚌</span>
+              <span>Regional Day-Trip ({sight?.formattedDistFromCenter || 'Transit Required'} from center)</span>
+            </div>
+          )}
 
           <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-medium">
             {cardDescription}

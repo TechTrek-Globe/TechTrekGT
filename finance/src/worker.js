@@ -645,7 +645,7 @@ async function handleSyncBackup(context) {
     }
 
     const now = Math.max(Date.now(), hasBaseVersion ? baseVersion + 1 : 0);
-    const isManual = body.manual === true || (body.manual === undefined && !body.auto);
+    const isManual = body.manual === true;
     versionId = isManual ? crypto.randomUUID() : null;
 
     const queries = [];
@@ -700,7 +700,9 @@ async function handleSyncBackup(context) {
     const changes = backupResult?.meta?.changes ?? backupResult?.changes ?? 0;
 
     if (changes === 0 && !force) {
-      await env.DB.prepare('DELETE FROM user_backup_versions WHERE id = ?').bind(versionId).run();
+      if (versionId) {
+        await env.DB.prepare('DELETE FROM user_backup_versions WHERE id = ?').bind(versionId).run();
+      }
 
       const freshRow = await env.DB.prepare(
         'SELECT data, updated_at, updated_at_ms FROM user_backups WHERE id = ?'

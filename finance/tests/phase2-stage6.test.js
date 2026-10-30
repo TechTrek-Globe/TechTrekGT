@@ -355,7 +355,8 @@ describe('Phase 2 Stage 6: Uniform API Error Contract', () => {
             description: 'Cloud state seed transaction'
           }))
         },
-        force: true
+        force: true,
+        manual: true
       })
     });
     const initialRes = await worker.fetch(initialReq, env, {});

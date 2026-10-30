@@ -366,7 +366,7 @@ export async function flushPendingCloudSync(passcode, userId = null) {
 
     const vKey = effectiveUserId ? `tt_budget_cloud_version:${effectiveUserId}` : 'tt_budget_cloud_version';
     const savedVerStr = typeof localStorage !== 'undefined' ? localStorage.getItem(vKey) : null;
-    const bodyObj = { budget: pending.payload };
+    const bodyObj = { budget: pending.payload, auto: true };
     if (savedVerStr) {
       bodyObj.baseVersion = parseInt(savedVerStr, 10);
     } else {

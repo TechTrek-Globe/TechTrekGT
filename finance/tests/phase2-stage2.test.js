@@ -172,7 +172,7 @@ describe('Phase 2 Stage 2: Stop losing user data (Sync Concurrency & Versioning)
     const req1 = new Request('http://localhost/api/sync/backup', {
       method: 'POST',
       headers: makeAuthHeaders(tokenA, csrfTokenA),
-      body: JSON.stringify({ budget: v1Budget, force: true })
+      body: JSON.stringify({ budget: v1Budget, force: true, manual: true })
     });
     const res1 = await worker.fetch(req1, env);
     assert.strictEqual(res1.status, 200);
@@ -183,7 +183,7 @@ describe('Phase 2 Stage 2: Stop losing user data (Sync Concurrency & Versioning)
     const req2 = new Request('http://localhost/api/sync/backup', {
       method: 'POST',
       headers: makeAuthHeaders(tokenA, csrfTokenA),
-      body: JSON.stringify({ budget: v2Budget, baseVersion: body1.version })
+      body: JSON.stringify({ budget: v2Budget, baseVersion: body1.version, manual: true })
     });
     const res2 = await worker.fetch(req2, env);
     assert.strictEqual(res2.status, 200);
@@ -316,7 +316,8 @@ describe('Phase 2 Stage 2: Stop losing user data (Sync Concurrency & Versioning)
       headers: makeAuthHeaders(tokenB, csrfTokenB),
       body: JSON.stringify({
         budget: { accounts: [{ id: 'acc-b', name: 'B secret data' }] },
-        force: true
+        force: true,
+        manual: true
       })
     });
     const resB = await worker.fetch(reqB, env);
@@ -361,7 +362,8 @@ describe('Phase 2 Stage 2: Stop losing user data (Sync Concurrency & Versioning)
       headers: makeAuthHeaders(tokenA, csrfTokenA),
       body: JSON.stringify({
         budget: { accounts: [{ id: 'acc-1', name: 'Device 1' }] },
-        baseVersion: 2000
+        baseVersion: 2000,
+        manual: true
       })
     });
 
@@ -370,7 +372,8 @@ describe('Phase 2 Stage 2: Stop losing user data (Sync Concurrency & Versioning)
       headers: makeAuthHeaders(tokenA, csrfTokenA),
       body: JSON.stringify({
         budget: { accounts: [{ id: 'acc-1', name: 'Device 2' }] },
-        baseVersion: 2000
+        baseVersion: 2000,
+        manual: true
       })
     });
 
@@ -401,5 +404,23 @@ describe('Phase 2 Stage 2: Stop losing user data (Sync Concurrency & Versioning)
     // Only 1 version should be recorded in user_backup_versions
     const versions = mockDb._raw.prepare('SELECT id FROM user_backup_versions WHERE user_id = ?').all('user-a');
     assert.strictEqual(versions.length, 1);
+  });
+
+  // S2T10: Unflagged and auto pushes never create snapshot rows; only manual: true does.
+  test('S2T10: only explicit manual: true pushes create user_backup_versions rows', async () => {
+    const post = async (extra) => {
+      const res = await worker.fetch(new Request('http://localhost/api/sync/backup', {
+        method: 'POST',
+        headers: makeAuthHeaders(tokenA, csrfTokenA),
+        body: JSON.stringify({ budget: { accounts: [{ id: 'acc-1', name: 'N' }] }, force: true, ...extra })
+      }), env);
+      assert.strictEqual(res.status, 200);
+    };
+    const count = () => mockDb._raw.prepare('SELECT COUNT(*) AS c FROM user_backup_versions WHERE user_id = ?').get('user-a').c;
+    await post({});
+    await post({ auto: true });
+    assert.strictEqual(count(), 0);
+    await post({ manual: true });
+    assert.strictEqual(count(), 1);
   });
 });

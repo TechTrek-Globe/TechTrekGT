@@ -176,6 +176,11 @@ export function LedgerDataProvider({ children }) {
       setCloudVersion(0);
       cloudVersionRef.current = 0;
       hasAutoPulledRef.current = false;
+      reconcileUserIdRef.current = null;
+      reconcileInFlightRef.current = false;
+      autoConflictPendingRef.current = false;
+      conflictResolvedAtRef.current = 0;
+      suppressDirtyUntilRef.current = 0;
       budgetRef.current = null;
       isPendingSaveRef.current = false;
     };
@@ -289,6 +294,11 @@ export function LedgerDataProvider({ children }) {
     }
   });
   const cloudVersionRef = useRef(cloudVersion);
+  const reconcileUserIdRef = useRef(null);
+  const reconcileInFlightRef = useRef(false);
+  const autoConflictPendingRef = useRef(false);
+  const conflictResolvedAtRef = useRef(0);
+  const suppressDirtyUntilRef = useRef(0);
   useEffect(() => {
     cloudVersionRef.current = cloudVersion;
   }, [cloudVersion]);
@@ -301,7 +311,9 @@ export function LedgerDataProvider({ children }) {
     const effectiveBaseVersion = options.baseVersion !== undefined ? options.baseVersion : cloudVersionRef.current;
     const result = await pushCloudBackupOptimistic(passcode, budgetRef.current, {
       baseVersion: effectiveBaseVersion,
-      force: options.force
+      force: options.force,
+      auto: options.auto,
+      manual: options.manual
     }, currentUserId || getCurrentUserId());
     if (result.success) {
       if (result.version) {
@@ -311,17 +323,23 @@ export function LedgerDataProvider({ children }) {
         const vKey = uid ? `tt_budget_cloud_version:${uid}` : 'tt_budget_cloud_version';
         const mKey = uid ? `tt_budget_last_modified:${uid}` : 'tt_budget_last_modified';
         try { localStorage.setItem(vKey, String(result.version)); } catch {}
-        try { localStorage.setItem(mKey, String(Date.now())); } catch {}
+        try { localStorage.setItem(mKey, String(result.version)); } catch {}
       }
+      autoConflictPendingRef.current = false;
       setSyncConflict(null);
       setLastCloudSyncTime(new Date().toLocaleTimeString());
     } else if (result.conflict) {
+      if (options.auto) {
+        autoConflictPendingRef.current = true;
+        if (Date.now() - conflictResolvedAtRef.current < 10000) return result;
+      }
       const uid = currentUserId || getCurrentUserId();
       const mKey = uid ? `tt_budget_last_modified:${uid}` : 'tt_budget_last_modified';
-      setSyncConflict({
+      const localTimestamp = parseInt(localStorage.getItem(mKey) || '0', 10) || Date.now();
+      setSyncConflict(prev => (prev && prev.serverVersion === result.serverVersion) ? prev : {
         serverData: result.serverData,
         serverVersion: result.serverVersion,
-        localTimestamp: parseInt(localStorage.getItem(mKey) || '0', 10) || Date.now()
+        localTimestamp
       });
     }
     return result;
@@ -377,7 +395,9 @@ export function LedgerDataProvider({ children }) {
       schemaVersion: CURRENT_BUDGET_SCHEMA_VERSION
     };
 
+    suppressDirtyUntilRef.current = Date.now() + 1500;
     await clearAndRestoreBudgetData(fullMerged, currentUserId || getCurrentUserId());
+    suppressDirtyUntilRef.current = Date.now() + 1500;
     dailyMatrixRef.current = newDailyMatrix;
     metadataStateRef.current = mergedMetadata;
     transactionsRef.current = newTransactions;
@@ -403,6 +423,10 @@ export function LedgerDataProvider({ children }) {
     } catch (err) {
       logSync('CONFLICT_RESOLVE_ERROR', `Failed to keep local and overwrite cloud: ${err.message}`, { error: err.message }, 'error');
       throw err;
+    } finally {
+      conflictResolvedAtRef.current = Date.now();
+      suppressDirtyUntilRef.current = Date.now() + 1500;
+      autoConflictPendingRef.current = false;
     }
   }, [pushCloudBackup, syncPasscode]);
 
@@ -426,6 +450,9 @@ export function LedgerDataProvider({ children }) {
     } catch (err) {
       logSync('CONFLICT_RESOLVE_ERROR', `Failed to restore cloud version: ${err.message}`, { error: err.message }, 'error');
       throw err;
+    } finally {
+      conflictResolvedAtRef.current = Date.now();
+      autoConflictPendingRef.current = false;
     }
   }, [syncConflict, restoreFromBackup, setLastCloudSyncTime, currentUserId]);
 
@@ -483,13 +510,13 @@ export function LedgerDataProvider({ children }) {
       }
     };
 
-    if (isAuthenticated) {
+    if (isAuthenticated && isSyncOnLoadEnabled === false) {
       handleOnlineRetry();
     }
 
     window.addEventListener('online', handleOnlineRetry);
     return () => window.removeEventListener('online', handleOnlineRetry);
-  }, [isAuthenticated, syncPasscode, setLastCloudSyncTime]);
+  }, [isAuthenticated, syncPasscode, setLastCloudSyncTime, isSyncOnLoadEnabled]);
 
   // Initial auto cloud restore / 2-way sync on authenticated load or fresh sign-in
   const hasAutoPulledRef = useRef(false);
@@ -543,15 +570,26 @@ export function LedgerDataProvider({ children }) {
 
   useEffect(() => {
     if (!isAuthenticated || !isDbLoaded || hasAutoPulledRef.current) return;
+    if (!currentUserId || reconcileUserIdRef.current === currentUserId || reconcileInFlightRef.current) return;
     if (isSyncOnLoadEnabled === false) {
       const localData = budgetRef.current;
       const isLocalEmpty = !localData || (!localData.accounts?.length && !localData.bills?.length && !localData.fundingGoals?.length);
       if (!isLocalEmpty) return;
     }
 
+    reconcileUserIdRef.current = currentUserId;
+    reconcileInFlightRef.current = true;
     (async () => {
       try {
         hasAutoPulledRef.current = true;
+        const budgetFingerprint = (b) => {
+          if (!b) return '';
+          const o = {};
+          for (const k of ALLOWED_BUDGET_KEYS) {
+            if (k !== 'schemaVersion' && b[k] !== undefined) o[k] = b[k];
+          }
+          return JSON.stringify(o);
+        };
         const res = await apiFetch('/api/sync/restore', {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' }
@@ -586,6 +624,17 @@ export function LedgerDataProvider({ children }) {
               try {
                 localStorage.setItem(vKey, String(cloudTime));
                 localStorage.setItem(mKey, String(cloudTime));
+              } catch {}
+            }
+          } else if (budgetFingerprint(localData) === budgetFingerprint(cloudData.budget)) {
+            // Identical content: adopt the cloud version silently, never prompt
+            const adopted = Math.max(cloudTime, savedCloudVersion);
+            setCloudVersion(adopted);
+            setLastCloudSyncTime(new Date().toLocaleTimeString());
+            if (adopted > 0) {
+              try {
+                localStorage.setItem(vKey, String(adopted));
+                localStorage.setItem(mKey, String(adopted));
               } catch {}
             }
           } else if (savedCloudVersion > 0 && cloudTime > savedCloudVersion && localTime > savedCloudVersion) {
@@ -633,9 +682,12 @@ export function LedgerDataProvider({ children }) {
       } catch (err) {
         logSync('AUTO_SYNC_CHECK_ERROR', `Initial auto cloud sync check failed: ${err?.message || err}`, { error: String(err) }, 'warn');
         console.info('Initial auto cloud sync check:', err?.message || err);
+      } finally {
+        reconcileInFlightRef.current = false;
+        try { await flushPendingCloudSync(syncPasscode, currentUserId); } catch {}
       }
     })();
-  }, [isAuthenticated, isDbLoaded, isSyncOnLoadEnabled, restoreFromBackup, pushCloudBackup, syncPasscode, setLastCloudSyncTime]);
+  }, [isAuthenticated, isDbLoaded, isSyncOnLoadEnabled, restoreFromBackup, pushCloudBackup, syncPasscode, setLastCloudSyncTime, currentUserId]);
 
   // Debounced Auto Cloud Backup effect (5-second debounce on any data change)
   const isInitialMountRef = useRef(true);
@@ -649,7 +701,10 @@ export function LedgerDataProvider({ children }) {
       return;
     }
 
-    try { localStorage.setItem('tt_budget_last_modified', String(Date.now())); } catch {}
+    if (Date.now() < suppressDirtyUntilRef.current) return;
+    const dirtyUid = currentUserId || getCurrentUserId();
+    try { localStorage.setItem(dirtyUid ? `tt_budget_last_modified:${dirtyUid}` : 'tt_budget_last_modified', String(Date.now())); } catch {}
+    if (syncConflict || reconcileInFlightRef.current || autoConflictPendingRef.current) return;
 
     const timer = setTimeout(async () => {
       try {
@@ -662,7 +717,7 @@ export function LedgerDataProvider({ children }) {
     }, 5000);
 
     return () => clearTimeout(timer);
-  }, [budgetForUI, matrixVersion, isDbLoaded, isAutoCloudBackupEnabled, isAuthenticated, syncPasscode, pushCloudBackup]);
+  }, [budgetForUI, matrixVersion, isDbLoaded, isAutoCloudBackupEnabled, isAuthenticated, syncPasscode, pushCloudBackup, currentUserId, syncConflict]);
 
   // Load 100% Fake Demo Preset Data
   const loadDemoPreset = useCallback(() => {

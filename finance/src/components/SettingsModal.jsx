@@ -6,7 +6,6 @@ import {
   Users, 
   Receipt, 
   LayoutDashboard, 
-  Archive, 
   ShieldCheck, 
   Bug, 
   CheckCircle2, 
@@ -15,7 +14,6 @@ import {
 import { AccountsPeoplePanel } from './settings/AccountsPeoplePanel';
 import { BillsSplitsPanel } from './settings/BillsSplitsPanel';
 import { DashboardSettingsPanel } from './settings/DashboardSettingsPanel';
-import { DataSyncPanel } from './settings/DataSyncPanel';
 import { SecuritySettingsPanel } from './settings/SecuritySettingsPanel';
 import { DebugConsolePanel } from './settings/DebugConsolePanel';
 
@@ -49,13 +47,6 @@ export function SettingsModal() {
       label: 'Dashboard', 
       icon: LayoutDashboard, 
       desc: 'Widgets & Theme', 
-      badge: null 
-    },
-    { 
-      id: 'data', 
-      label: 'Backup & Sync', 
-      icon: Archive, 
-      desc: 'Backup, Restore & Sync', 
       badge: null 
     },
     { 
@@ -251,10 +242,6 @@ export function SettingsModal() {
 
             {activeSection === 'dashboard' && (
               <DashboardSettingsPanel />
-            )}
-
-            {(activeSection === 'data' || settingsTab === 'data') && (
-              <DataSyncPanel />
             )}
 
             {activeSection === 'security' && (

@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState, useEffect, useCallback } from 'react';
-import { apiFetch, fetchBackupVersions, restoreBackupVersion } from '../../../utils/api';
+import { apiFetch, fetchBackupVersions, restoreBackupVersion, deleteBackupVersion } from '../../../utils/api';
 import { useBudgetMetadata, useLedgerDataState, useLedgerDataDispatch } from '../../../context/BudgetContext';
 import { useAuth } from '../../../context/AuthContext';
 import { 
@@ -16,7 +16,8 @@ import {
   ArrowUpRight,
   ArrowDownLeft,
   History,
-  RotateCcw
+  RotateCcw,
+  Trash2
 } from 'lucide-react';
 import { getApiUrl } from '../../../utils/api';
 
@@ -87,6 +88,7 @@ export function CloudSyncSubPanel() {
   const [ongoingSyncInfo, setOngoingSyncInfo] = useState(null);
   const [isLoadingVersions, setIsLoadingVersions] = useState(false);
   const [restoringVersionId, setRestoringVersionId] = useState(null);
+  const [deletingVersionId, setDeletingVersionId] = useState(null);
 
   const loadVersions = useCallback(async () => {
     if (!isAuthenticated) return;
@@ -151,6 +153,23 @@ export function CloudSyncSubPanel() {
       setCloudSyncStatus({ type: 'error', message: `Failed to restore version: ${err.message}` });
     } finally {
       setRestoringVersionId(null);
+    }
+  };
+
+  const handleDeleteVersion = async (versionId, savedAt) => {
+    if (!versionId) return;
+    setDeletingVersionId(versionId);
+    try {
+      await deleteBackupVersion(versionId);
+      setCloudSyncStatus({
+        type: 'success',
+        message: `Saved snapshot (${new Date(savedAt || Date.now()).toLocaleString()}) deleted successfully.`
+      });
+      await loadVersions();
+    } catch (err) {
+      setCloudSyncStatus({ type: 'error', message: `Failed to delete snapshot: ${err.message}` });
+    } finally {
+      setDeletingVersionId(null);
     }
   };
 
@@ -402,19 +421,34 @@ export function CloudSyncSubPanel() {
                           {new Date(ver.savedAt).toLocaleString()}
                         </span>
                       </div>
-                      <button
-                        type="button"
-                        disabled={restoringVersionId === ver.id}
-                        onClick={() => handleRestoreVersion(ver.id, ver.savedAt)}
-                        className="px-3 py-1 bg-purple-950 hover:bg-purple-900 text-purple-200 border border-purple-700 rounded-md text-[11px] font-bold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
-                      >
-                        {restoringVersionId === ver.id ? (
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                        ) : (
-                          <RotateCcw className="w-3 h-3 text-purple-400" />
-                        )}
-                        <span>Restore Full Ledger</span>
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          disabled={restoringVersionId === ver.id || deletingVersionId === ver.id}
+                          onClick={() => handleRestoreVersion(ver.id, ver.savedAt)}
+                          className="px-3 py-1 bg-purple-950 hover:bg-purple-900 text-purple-200 border border-purple-700 rounded-md text-[11px] font-bold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                        >
+                          {restoringVersionId === ver.id ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <RotateCcw className="w-3 h-3 text-purple-400" />
+                          )}
+                          <span>Restore Full Ledger</span>
+                        </button>
+                        <button
+                          type="button"
+                          disabled={deletingVersionId === ver.id || restoringVersionId === ver.id}
+                          onClick={() => handleDeleteVersion(ver.id, ver.savedAt)}
+                          title="Delete this saved snapshot"
+                          className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-950/40 border border-slate-800 hover:border-rose-900/60 rounded-md transition-all cursor-pointer disabled:opacity-50"
+                        >
+                          {deletingVersionId === ver.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-rose-400" />
+                          ) : (
+                            <Trash2 className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>

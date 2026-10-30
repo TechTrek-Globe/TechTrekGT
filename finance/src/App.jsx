@@ -37,6 +37,7 @@ const AmortizationView = lazyWithRetry(() => import('./components/AmortizationVi
 const AuthPage = lazyWithRetry(() => import('./components/AuthPage').then(m => ({ default: m.AuthPage })));
 const AuthModal = lazyWithRetry(() => import('./components/AuthModal'));
 const AdminView = lazyWithRetry(() => import('./components/AdminView').then(m => ({ default: m.AdminView })));
+const BackupSyncView = lazyWithRetry(() => import('./components/BackupSyncView').then(m => ({ default: m.BackupSyncView })));
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -120,6 +121,7 @@ function getViewFromPathname(pathname) {
   if (path === '/finance/ledger') return 'ledger';
   if (path === '/finance/main-budget' || path === '/finance/bills') return 'main_budget';
   if (path === '/finance/amortization') return 'amortization';
+  if (path === '/finance/sync' || path === '/finance/backup-sync' || path === '/finance/backup') return 'sync';
   if (path === '/finance/settings') return 'settings';
   if (path === '/finance/admin') return 'admin';
   return 'dashboard';
@@ -177,6 +179,8 @@ function MainContent({ pathname, navigateTo, onNavigateHome }) {
   const handleNavigateView = (viewId) => {
     if (viewId === 'main_budget') {
       navigateTo('/finance/main-budget');
+    } else if (viewId === 'sync') {
+      navigateTo('/finance/sync');
     } else {
       navigateTo(`/finance/${viewId}`);
     }
@@ -189,6 +193,7 @@ function MainContent({ pathname, navigateTo, onNavigateHome }) {
         {activeView === 'main_budget' && <MainBudgetView onNavigateView={handleNavigateView} />}
         {activeView === 'ledger'      && <LedgerView onNavigateView={handleNavigateView} />}
         {activeView === 'amortization'&& <AmortizationView onNavigateView={handleNavigateView} />}
+        {activeView === 'sync'        && <BackupSyncView onNavigateView={handleNavigateView} />}
         {activeView === 'settings'    && <SettingsView onNavigateView={handleNavigateView} />}
         {activeView === 'admin'       && (
           user?.isAdmin ? (

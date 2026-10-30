@@ -22,7 +22,8 @@ import {
   Mail,
   AlertCircle,
   CheckCircle2,
-  Loader2
+  Loader2,
+  Cloud
 } from 'lucide-react';
 
 import headerLogoDark from '../assets/header-logo-dark.png';
@@ -33,7 +34,8 @@ const NAV_ITEMS = [
   { id: 'ledger',      label: 'Transactions',         icon: TrendingUp,      color: 'text-emerald-400' },
   { id: 'main_budget', label: 'Bills',                icon: ReceiptText,     color: 'text-violet-400' },
   { id: 'amortization',label: 'Loan Amortization',     icon: Calculator,      color: 'text-rose-400' },
-  { id: 'settings',    label: 'Settings & Setup',     icon: Settings, color: 'text-amber-400' },
+  { id: 'sync',        label: 'Backup & Sync',        icon: Cloud,           color: 'text-cyan-400' },
+  { id: 'settings',    label: 'Settings & Setup',     icon: Settings,        color: 'text-amber-400' },
 ];
 
 const SIDEBAR_KEY = 'trekledger_sidebar_collapsed';

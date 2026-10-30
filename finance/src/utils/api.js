@@ -422,3 +422,16 @@ export async function restoreBackupVersion(versionId) {
   }
   throw new Error(data.error || 'Failed to restore backup version');
 }
+
+export async function deleteBackupVersion(versionId) {
+  const res = await apiFetch('/api/sync/delete-version', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ versionId })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (res.ok && data.success) {
+    return data;
+  }
+  throw new Error(data.error || 'Failed to delete backup version');
+}

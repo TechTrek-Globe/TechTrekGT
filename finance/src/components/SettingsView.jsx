@@ -5,7 +5,6 @@ import {
   Users, 
   Receipt, 
   LayoutDashboard, 
-  Archive, 
   ShieldCheck, 
   Bug, 
   CheckCircle2, 
@@ -15,7 +14,6 @@ import {
 import { AccountsPeoplePanel } from './settings/AccountsPeoplePanel';
 import { BillsSplitsPanel } from './settings/BillsSplitsPanel';
 import { DashboardSettingsPanel } from './settings/DashboardSettingsPanel';
-import { DataSyncPanel } from './settings/DataSyncPanel';
 import { SecuritySettingsPanel } from './settings/SecuritySettingsPanel';
 import { DebugConsolePanel } from './settings/DebugConsolePanel';
 
@@ -30,7 +28,7 @@ export function SettingsView({ onNavigateView }) {
   const SETUP_TABS = ['accounts', 'people', 'splits', 'bills'];
   const activeSection = SETUP_TABS.includes(settingsTab) 
     ? 'setup' 
-    : (settingsTab === 'import' || settingsTab === 'sync' ? 'data' : settingsTab);
+    : settingsTab;
 
   const sidebarNav = [
     { 
@@ -45,13 +43,6 @@ export function SettingsView({ onNavigateView }) {
       label: 'Dashboard', 
       icon: LayoutDashboard, 
       desc: 'Widgets & Theme', 
-      badge: null 
-    },
-    { 
-      id: 'data', 
-      label: 'Backup & Sync', 
-      icon: Archive, 
-      desc: 'Backup, Restore & Sync', 
       badge: null 
     },
     { 
@@ -208,10 +199,6 @@ export function SettingsView({ onNavigateView }) {
 
           {activeSection === 'dashboard' && (
             <DashboardSettingsPanel />
-          )}
-
-          {(activeSection === 'data' || settingsTab === 'data' || settingsTab === 'import' || settingsTab === 'sync') && (
-            <DataSyncPanel />
           )}
 
           {activeSection === 'security' && (

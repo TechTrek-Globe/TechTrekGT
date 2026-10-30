@@ -907,6 +907,38 @@ async function handleSyncRestoreVersion(context) {
   }
 }
 
+async function handleSyncDeleteVersion(context) {
+  const { request, env } = context;
+  try {
+    const auth = await authenticate(context, { requireCsrf: true });
+    if (auth.error) return auth.error;
+    const userId = auth.user.id;
+
+    const body = await readJson(request, MAX_BODY_AUTH);
+    const versionId = body && typeof body.versionId === 'string' ? body.versionId.trim() : '';
+    if (!versionId) return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'versionId is required');
+
+    const versionRow = await env.DB.prepare(
+      'SELECT id, user_id FROM user_backup_versions WHERE id = ?'
+    ).bind(versionId).first();
+
+    if (!versionRow) return fail(ERROR_CODES.NOT_FOUND, 404, 'Version not found');
+
+    if (versionRow.user_id !== userId) {
+      return fail(ERROR_CODES.FORBIDDEN, 403, 'Forbidden: cannot delete another user\'s version');
+    }
+
+    await env.DB.prepare(
+      'DELETE FROM user_backup_versions WHERE id = ? AND user_id = ?'
+    ).bind(versionId, userId).run();
+
+    return json({ success: true, deletedVersionId: versionId });
+  } catch (err) {
+    console.error('[sync/delete-version] error:', err && err.message);
+    return fail(ERROR_CODES.INTERNAL_ERROR, 500, 'Delete version failed.');
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /* Router & Dispatch                                                   */
 /* ------------------------------------------------------------------ */
@@ -920,6 +952,7 @@ const ROUTES = {
   'GET /api/sync/restore': handleSyncRestore,
   'GET /api/sync/versions': handleSyncVersions,
   'POST /api/sync/restore-version': handleSyncRestoreVersion,
+  'POST /api/sync/delete-version': handleSyncDeleteVersion,
   'POST /api/auth/register': registerHandler,
   'POST /api/auth/login': loginHandler,
   'GET /api/auth/turnstile-config': turnstileConfigHandler,

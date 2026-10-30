@@ -308,7 +308,14 @@ export function LedgerDataProvider({ children }) {
   // Cloud Vault Push Backup (Optimistic + Fallback Queue)
   const pushCloudBackup = useCallback(async (passcode, options = {}) => {
     logSync('PUSH_DISPATCH', 'Executing pushCloudBackup from LedgerDataContext', { hasPasscode: Boolean(passcode), options });
-    const effectiveBaseVersion = options.baseVersion !== undefined ? options.baseVersion : cloudVersionRef.current;
+    let effectiveBaseVersion = options.baseVersion !== undefined ? options.baseVersion : cloudVersionRef.current;
+    if (!effectiveBaseVersion) {
+      try {
+        const bvUid = currentUserId || getCurrentUserId();
+        const storedBv = parseInt(localStorage.getItem(bvUid ? `tt_budget_cloud_version:${bvUid}` : 'tt_budget_cloud_version') || '0', 10) || 0;
+        if (storedBv > 0) effectiveBaseVersion = storedBv;
+      } catch {}
+    }
     const result = await pushCloudBackupOptimistic(passcode, budgetRef.current, {
       baseVersion: effectiveBaseVersion,
       force: options.force,
@@ -504,8 +511,12 @@ export function LedgerDataProvider({ children }) {
   useEffect(() => {
     const handleOnlineRetry = async () => {
       logSync('ONLINE_RECOVER', 'Browser back online; flushing pending sync queue');
-      const flushed = await flushPendingCloudSync(syncPasscode);
+      const flushed = await flushPendingCloudSync(syncPasscode, currentUserId);
       if (flushed) {
+        try {
+          const fv = parseInt(localStorage.getItem(currentUserId ? `tt_budget_cloud_version:${currentUserId}` : 'tt_budget_cloud_version') || '0', 10) || 0;
+          if (fv > 0) { cloudVersionRef.current = fv; setCloudVersion(fv); }
+        } catch {}
         setLastCloudSyncTime(new Date().toLocaleTimeString());
       }
     };
@@ -516,7 +527,7 @@ export function LedgerDataProvider({ children }) {
 
     window.addEventListener('online', handleOnlineRetry);
     return () => window.removeEventListener('online', handleOnlineRetry);
-  }, [isAuthenticated, syncPasscode, setLastCloudSyncTime, isSyncOnLoadEnabled]);
+  }, [isAuthenticated, syncPasscode, setLastCloudSyncTime, isSyncOnLoadEnabled, currentUserId]);
 
   // Initial auto cloud restore / 2-way sync on authenticated load or fresh sign-in
   const hasAutoPulledRef = useRef(false);
@@ -637,46 +648,22 @@ export function LedgerDataProvider({ children }) {
                 localStorage.setItem(mKey, String(adopted));
               } catch {}
             }
-          } else if (savedCloudVersion > 0 && cloudTime > savedCloudVersion && localTime > savedCloudVersion) {
-            // Both local and cloud changed since last sync: Prompt user
-            setSyncConflict({
-              serverData: cloudData.budget,
-              serverVersion: cloudTime,
-              localTimestamp: localTime
-            });
-          } else if (cloudTime > savedCloudVersion && localTime <= savedCloudVersion) {
-            // Cloud updated elsewhere, local is clean: apply cloud
-            // P3: but never silently overwrite local fundingGoals with empty cloud goals
-            const localGoals = localData?.fundingGoals;
-            const cloudGoals = cloudData.budget?.fundingGoals;
-            if (localGoals?.length > 0 && (!cloudGoals || cloudGoals.length === 0)) {
-              logSync('GOALS_PROTECT', 'Cloud backup has no fundingGoals but local does; showing conflict dialog instead of silent overwrite', { localGoalCount: localGoals.length }, 'warn');
-              setSyncConflict({
-                serverData: cloudData.budget,
-                serverVersion: cloudTime,
-                localTimestamp: localTime
-              });
-            } else {
-              await restoreFromBackup(cloudData.budget);
-              setCloudVersion(cloudTime);
-              setLastCloudSyncTime(new Date().toLocaleTimeString());
-              if (cloudTime > 0) {
-                try {
-                  localStorage.setItem(vKey, String(cloudTime));
-                  localStorage.setItem(mKey, String(cloudTime));
-                } catch {}
-              }
+          } else if (cloudTime > savedCloudVersion || (savedCloudVersion === 0 && cloudTime > localTime)) {
+            // Cloud is more recent than this login's last sync: use cloud without prompting
+            clearPendingSync(uid);
+            await restoreFromBackup(cloudData.budget);
+            cloudVersionRef.current = cloudTime;
+            setCloudVersion(cloudTime);
+            setLastCloudSyncTime(new Date().toLocaleTimeString());
+            if (cloudTime > 0) {
+              try {
+                localStorage.setItem(vKey, String(cloudTime));
+                localStorage.setItem(mKey, String(cloudTime));
+              } catch {}
             }
-          } else if (localTime > savedCloudVersion && cloudTime <= savedCloudVersion) {
-            // Local changed offline: push local
-            await pushCloudBackup(syncPasscode, { baseVersion: savedCloudVersion, auto: true });
-          } else if (cloudTime !== localTime && savedCloudVersion === 0) {
-            // First time syncing with both local and cloud populated: Prompt user
-            setSyncConflict({
-              serverData: cloudData.budget,
-              serverVersion: cloudTime,
-              localTimestamp: localTime
-            });
+          } else if (localTime > savedCloudVersion) {
+            // Local changed since last sync and cloud has nothing newer: push local
+            await pushCloudBackup(syncPasscode, { baseVersion: Math.max(savedCloudVersion, cloudTime), auto: true });
           }
         }
       } catch (err) {
@@ -684,13 +671,20 @@ export function LedgerDataProvider({ children }) {
         console.info('Initial auto cloud sync check:', err?.message || err);
       } finally {
         reconcileInFlightRef.current = false;
-        try { await flushPendingCloudSync(syncPasscode, currentUserId); } catch {}
+        try {
+          if (await flushPendingCloudSync(syncPasscode, currentUserId)) {
+            const fv = parseInt(localStorage.getItem(currentUserId ? `tt_budget_cloud_version:${currentUserId}` : 'tt_budget_cloud_version') || '0', 10) || 0;
+            if (fv > 0) { cloudVersionRef.current = fv; setCloudVersion(fv); }
+          }
+        } catch {}
       }
     })();
   }, [isAuthenticated, isDbLoaded, isSyncOnLoadEnabled, restoreFromBackup, pushCloudBackup, syncPasscode, setLastCloudSyncTime, currentUserId]);
 
   // Debounced Auto Cloud Backup effect (5-second debounce on any data change)
   const isInitialMountRef = useRef(true);
+  const lastSeenDataRef = useRef({ ui: null, mv: null });
+  const autoPushPendingRef = useRef(false);
   useEffect(() => {
     if (!isDbLoaded || !isAuthenticated) return;
     if (isAutoCloudBackupEnabled === false) return;
@@ -698,15 +692,23 @@ export function LedgerDataProvider({ children }) {
     // Skip the initial mount trigger before the first sync check completes
     if (isInitialMountRef.current) {
       isInitialMountRef.current = false;
+      lastSeenDataRef.current = { ui: budgetForUI, mv: matrixVersion };
       return;
     }
 
-    if (Date.now() < suppressDirtyUntilRef.current) return;
-    const dirtyUid = currentUserId || getCurrentUserId();
-    try { localStorage.setItem(dirtyUid ? `tt_budget_last_modified:${dirtyUid}` : 'tt_budget_last_modified', String(Date.now())); } catch {}
+    const dataChanged = lastSeenDataRef.current.ui !== budgetForUI || lastSeenDataRef.current.mv !== matrixVersion;
+    lastSeenDataRef.current = { ui: budgetForUI, mv: matrixVersion };
+    if (dataChanged) {
+      if (Date.now() < suppressDirtyUntilRef.current) return;
+      autoPushPendingRef.current = true;
+      const dirtyUid = currentUserId || getCurrentUserId();
+      try { localStorage.setItem(dirtyUid ? `tt_budget_last_modified:${dirtyUid}` : 'tt_budget_last_modified', String(Date.now())); } catch {}
+    }
+    if (!autoPushPendingRef.current) return;
     if (syncConflict || reconcileInFlightRef.current || autoConflictPendingRef.current) return;
 
     const timer = setTimeout(async () => {
+      autoPushPendingRef.current = false;
       try {
         logSync('AUTO_BACKUP_TRIGGER', '5-second debounce expired; triggering auto cloud backup');
         await pushCloudBackup(syncPasscode, { auto: true });

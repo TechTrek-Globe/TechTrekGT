@@ -127,4 +127,68 @@ describe('BUG-003: Cloud Vault Backup Retention & Snapshot Pruning Edge Tests', 
     expect(body.ongoingSync).toBeDefined();
     expect(body.ongoingSync.updatedAt).toBeDefined();
   });
+
+  it('deletes a saved backup version through POST /api/sync/delete-version', async () => {
+    // 1. Create a manual snapshot
+    const payload = { schemaVersion: 8, accounts: [{ id: 'acc_del', name: 'Delete Me' }] };
+    await worker.fetch(makeBackupRequest({ budget: payload, manual: true, force: true }), env, {});
+
+    // 2. Query versions to get ID
+    const versionsRes = await worker.fetch(makeVersionsRequest(), env, {});
+    const body = await versionsRes.json();
+    expect(body.versions.length).toBeGreaterThan(0);
+    const versionId = body.versions[0].id;
+
+    // 3. Delete the version
+    const delReq = new Request('http://localhost:3000/finance/api/sync/delete-version', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Cookie': validAuthCookie,
+        'X-CSRF-Token': validCsrfToken,
+        'Origin': 'http://localhost:3000'
+      },
+      body: JSON.stringify({ versionId })
+    });
+    const delRes = await worker.fetch(delReq, env, {});
+    expect(delRes.status).toBe(200);
+    const delBody = await delRes.json();
+    expect(delBody.success).toBe(true);
+    expect(delBody.deletedVersionId).toBe(versionId);
+
+    // 4. Verify version is removed from database
+    const checkRow = await db.prepare('SELECT id FROM user_backup_versions WHERE id = ?').bind(versionId).first();
+    expect(checkRow).toBeNull();
+  });
+
+  it('prevents deleting another user\'s backup version (403 Forbidden)', async () => {
+    // 1. Insert a version belonging to another user
+    const otherUserId = 'usr_other_victim';
+    const otherVersionId = 'ver_other_123';
+    await db.prepare(
+      `INSERT INTO users (id, email, password_hash, name, status, role, token_version, email_verified)
+       VALUES (?, ?, 'hash', 'Other User', 'Active', 'user', 1, 1)`
+    ).bind(otherUserId, 'other@example.com').run();
+    await db.prepare(
+      `INSERT INTO user_backup_versions (id, user_id, data, saved_at) VALUES (?, ?, '{"budget":{}}', ?)`
+    ).bind(otherVersionId, otherUserId, Date.now()).run();
+
+    // 2. Attempt deletion as testUser
+    const delReq = new Request('http://localhost:3000/finance/api/sync/delete-version', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Cookie': validAuthCookie,
+        'X-CSRF-Token': validCsrfToken,
+        'Origin': 'http://localhost:3000'
+      },
+      body: JSON.stringify({ versionId: otherVersionId })
+    });
+    const delRes = await worker.fetch(delReq, env, {});
+    expect(delRes.status).toBe(403);
+
+    // Version must still exist
+    const checkRow = await db.prepare('SELECT id FROM user_backup_versions WHERE id = ?').bind(otherVersionId).first();
+    expect(checkRow).not.toBeNull();
+  });
 });

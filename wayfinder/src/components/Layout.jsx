@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useSettings } from '../context/SettingsContext';
 import { Compass, User, LogOut, ShieldCheck, Menu, X, Coins, Settings, Backpack, Globe, Calendar } from 'lucide-react';
 import { CurrencyConverterModal } from './CurrencyConverterModal';
 import { SettingsModal } from './SettingsModal';
@@ -9,9 +10,9 @@ import wayfinderHeaderBanner from '../assets/wayfinder-header-banner-new.png';
 
 export function Layout({ children }) {
   const { user, isAuthenticated, setIsAuthModalOpen, logout } = useAuth();
+  const { isSettingsOpen, setIsSettingsOpen } = useSettings();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isConverterOpen, setIsConverterOpen] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [currentPath, setCurrentPath] = useState(() => window.location.pathname);
   const { activeCurrency } = useExchangeRate();
   const { symbol = 'zł', rate = 3.73 } = activeCurrency || {};

@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Settings, Thermometer, Coins, Map } from 'lucide-react';
+import { X, Settings, Thermometer, Coins, Map, Scale } from 'lucide-react';
 import { useSettings } from '../context/SettingsContext';
 
 export function SettingsModal({ isOpen, onClose }) {
@@ -117,6 +117,40 @@ export function SettingsModal({ isOpen, onClose }) {
                 Miles (mi)
               </button>
             </div>
+            <p className="text-xs text-wf-muted">Converts walking loop distances, Old Town navigation, and excursion radii.</p>
+          </div>
+
+          {/* Weight & Luggage */}
+          <div className="space-y-3">
+            <div className="flex items-center space-x-2 text-purple-400 font-bold text-xs uppercase tracking-wider">
+              <Scale className="w-4 h-4" />
+              <span>Weight & Luggage</span>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => updateSettings({ weight: 'lbs' })}
+                className={`py-2.5 px-3 rounded-xl border font-bold text-sm transition-all flex flex-col items-center justify-center ${
+                  (settings.weight || 'lbs') === 'lbs' 
+                    ? 'bg-purple-500/20 border-purple-500/50 text-purple-300 shadow-inner'
+                    : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
+                }`}
+              >
+                <span>Pounds / Ounces</span>
+                <span className="text-[10px] font-normal text-slate-400 mt-0.5">lbs / oz (50.7 lbs checked)</span>
+              </button>
+              <button
+                onClick={() => updateSettings({ weight: 'kg' })}
+                className={`py-2.5 px-3 rounded-xl border font-bold text-sm transition-all flex flex-col items-center justify-center ${
+                  settings.weight === 'kg' 
+                    ? 'bg-purple-500/20 border-purple-500/50 text-purple-300 shadow-inner'
+                    : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
+                }`}
+              >
+                <span>Kilograms / Grams</span>
+                <span className="text-[10px] font-normal text-slate-400 mt-0.5">kg / g (23.0 kg checked)</span>
+              </button>
+            </div>
+            <p className="text-xs text-wf-muted">Converts suitcase allowance, carry-on weight, and packing checklist gear.</p>
           </div>
 
         </div>

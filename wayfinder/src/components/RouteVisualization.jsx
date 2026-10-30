@@ -30,6 +30,8 @@ import {
 } from 'lucide-react';
 import { polandJourney } from '../data/poland-2026';
 import { DocumentViewerModal } from './DocumentViewerModal';
+import { useSettings } from '../context/SettingsContext';
+import { formatDistance } from './Formatters';
 
 function StationDossierModal({ stationKey, onClose }) {
   const station = polandJourney.stationDossiers?.[stationKey];
@@ -296,6 +298,7 @@ function CityTransitSection({ cityId }) {
 }
 
 export function RouteVisualization() {
+  const { settings } = useSettings();
   const [activeTab, setActiveTab] = useState('overview'); // 'overview', 'krakow', 'wroclaw', 'poznan', 'torun', 'gdansk', 'all-transit', 'guide'
   const [activeStationModal, setActiveStationModal] = useState(null);
   const [isDocViewerOpen, setIsDocViewerOpen] = useState(false);
@@ -527,7 +530,7 @@ export function RouteVisualization() {
             <div className="lg:col-span-7 space-y-5">
               <h2 className="text-xl font-bold text-white flex items-center space-x-2">
                 <Train className="w-5 h-5 text-amber-400" />
-                <span>Intercity Rail Corridor (~745 km)</span>
+                <span>Intercity Rail Corridor (~{formatDistance(745, settings?.distance)})</span>
               </h2>
 
               {polandJourney.railConnections.map((leg) => {
@@ -550,7 +553,7 @@ export function RouteVisualization() {
                         </h3>
                       </div>
                       <div className="text-xs text-amber-300 font-medium">
-                        {leg.distanceKm} km • {leg.duration}
+                        {formatDistance(leg.distanceKm, settings?.distance)} • {leg.duration}
                       </div>
                     </div>
 

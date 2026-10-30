@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { 
-  Backpack, CheckCircle2, Circle, Plus, Trash2, RefreshCw, 
+import {
+  Backpack, CheckCircle2, Circle, Plus, Trash2, RefreshCw,
   Luggage, ShieldAlert, Sparkles, Filter, ChevronDown, ChevronUp,
   Search, Info, CheckSquare, Square, AlertCircle, ShoppingBag,
-  Layers, Lock, Download, Weight, Compass, ArrowRight
+  Layers, Lock, Download, Weight, Compass, ArrowRight, Scale, Settings
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useSettings } from '../../context/SettingsContext';
 import { getApiUrl } from '../../utils/api';
+import { formatWeight } from '../Formatters';
 
 const CATEGORIES = [
   { id: 'clothing', label: 'Thermal Clothing & Layers', icon: '🧥', color: 'amber' },
@@ -28,6 +30,8 @@ const LOCAL_STORAGE_KEY = 'wayfinder_offline_packing_v1';
 
 export function PackingManager() {
   const { isAuthenticated, user, setIsAuthModalOpen } = useAuth();
+  const { settings, updateSettings, openSettings } = useSettings();
+  const isLbs = (settings?.weight || 'lbs') === 'lbs';
   
   const [items, setItems] = useState([]);
   const [backendStats, setBackendStats] = useState(null);
@@ -244,13 +248,18 @@ export function PackingManager() {
     e.preventDefault();
     if (!newItemName.trim()) return;
 
+    const parsedInputWeight = parseFloat(newItemWeight) || 0;
+    const computedGrams = isLbs 
+      ? Math.round(parsedInputWeight * 28.3495) // input in oz converted to grams
+      : Math.max(0, Math.round(parsedInputWeight));
+
     const newItemPayload = {
       journey_id: 'poland-christmas-2026',
       name: newItemName.trim(),
       category: newItemCategory,
       bag_type: newItemBag,
       quantity: Math.max(1, parseInt(newItemQuantity, 10) || 1),
-      weight_grams: Math.max(0, parseInt(newItemWeight, 10) || 0),
+      weight_grams: computedGrams,
       notes: newItemNotes.trim()
     };
 
@@ -347,23 +356,40 @@ export function PackingManager() {
     }
 
     const pct = totalItems > 0 ? Math.round((packedItems / totalItems) * 100) : 0;
+    const checkedLimit = isLbs ? 50.7 : 23.0;
+    const carryonLimit = isLbs ? 17.6 : 8.0;
     const checkedKg = Math.round((checkedWeightG / 1000) * 100) / 100;
     const carryonKg = Math.round((carryonWeightG / 1000) * 100) / 100;
     const totalKg = Math.round((totalWeightG / 1000) * 100) / 100;
+
+    const checkedVal = isLbs ? Math.round((checkedWeightG * 0.00220462) * 10) / 10 : checkedKg;
+    const carryonVal = isLbs ? Math.round((carryonWeightG * 0.00220462) * 10) / 10 : carryonKg;
+    const totalVal = isLbs ? Math.round((totalWeightG * 0.00220462) * 10) / 10 : totalKg;
+    const checkedRemaining = Math.max(0, Math.round((checkedLimit - checkedVal) * 10) / 10);
+    const unitLabel = isLbs ? 'lbs' : 'kg';
 
     return {
       totalItems,
       packedItems,
       pct,
+      checkedWeightG,
+      carryonWeightG,
       checkedKg,
       carryonKg,
       totalKg,
-      checkedLimitKg: 23.0,
-      carryonLimitKg: 8.0,
-      checkedRemainingKg: Math.max(0, Math.round((23.0 - checkedKg) * 100) / 100),
+      checkedVal,
+      carryonVal,
+      totalVal,
+      checkedLimit,
+      carryonLimit,
+      checkedRemaining,
+      unitLabel,
+      isOverChecked: checkedVal > checkedLimit,
+      isNearChecked: checkedVal > (checkedLimit * 0.85),
+      isOverCarryon: carryonVal > carryonLimit,
       byCat
     };
-  }, [items]);
+  }, [items, isLbs]);
 
   // Filter items
   const filteredItems = useMemo(() => {
@@ -446,6 +472,34 @@ export function PackingManager() {
 
           {/* Quick Action Buttons */}
           <div className="flex items-center space-x-2 shrink-0 flex-wrap gap-y-2">
+            {/* Quick Unit Switcher & Settings Shortcut */}
+            <div className="flex items-center bg-slate-950/80 rounded-xl border border-white/10 p-0.5 shadow-sm">
+              <button
+                type="button"
+                onClick={() => updateSettings({ weight: 'lbs' })}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${isLbs ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400 hover:text-white'}`}
+                title="Display weights in pounds and ounces"
+              >
+                lbs / oz
+              </button>
+              <button
+                type="button"
+                onClick={() => updateSettings({ weight: 'kg' })}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${!isLbs ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400 hover:text-white'}`}
+                title="Display weights in kilograms and grams"
+              >
+                kg / g
+              </button>
+              <button
+                type="button"
+                onClick={openSettings}
+                className="p-1.5 ml-0.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                title="Open Travel Preferences & Unit Settings"
+              >
+                <Settings className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
             <button
               onClick={handleApplyPreset}
               disabled={isSaving}
@@ -486,22 +540,22 @@ export function PackingManager() {
                 <Luggage className="w-4 h-4 text-amber-400" />
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-300">Checked Suitcase</span>
               </div>
-              <span className={`text-xs font-black px-2 py-0.5 rounded-full ${stats.checkedKg > 23.0 ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' : stats.checkedKg > 19.0 ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'}`}>
-                {stats.checkedKg} kg / 23.0 kg
+              <span className={`text-xs font-black px-2 py-0.5 rounded-full ${stats.isOverChecked ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' : stats.isNearChecked ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'}`}>
+                {stats.checkedVal} {stats.unitLabel} / {stats.checkedLimit} {stats.unitLabel}
               </span>
             </div>
 
             {/* Progress Bar */}
             <div className="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden my-2 border border-white/5">
               <div 
-                className={`h-full transition-all duration-500 rounded-full ${stats.checkedKg > 23.0 ? 'bg-rose-500' : stats.checkedKg > 19.0 ? 'bg-amber-500' : 'bg-emerald-400'}`}
-                style={{ width: `${Math.min(100, Math.round((stats.checkedKg / 23.0) * 100))}%` }}
+                className={`h-full transition-all duration-500 rounded-full ${stats.isOverChecked ? 'bg-rose-500' : stats.isNearChecked ? 'bg-amber-500' : 'bg-emerald-400'}`}
+                style={{ width: `${Math.min(100, Math.round((stats.checkedVal / stats.checkedLimit) * 100))}%` }}
               />
             </div>
 
             <p className="text-[11px] text-slate-400 flex items-center justify-between">
-              <span>{stats.checkedRemainingKg > 0 ? `${stats.checkedRemainingKg} kg remaining buffer` : '⚠️ Exceeds 23kg transatlantic limit'}</span>
-              <span className="text-amber-300 font-semibold">{Math.round((stats.checkedKg / 23.0) * 100)}% allowance</span>
+              <span>{stats.checkedRemaining > 0 ? `${stats.checkedRemaining} ${stats.unitLabel} remaining buffer` : `⚠️ Exceeds ${stats.checkedLimit} ${stats.unitLabel} airline limit`}</span>
+              <span className="text-amber-300 font-semibold">{Math.round((stats.checkedVal / stats.checkedLimit) * 100)}% allowance</span>
             </p>
           </div>
 
@@ -512,22 +566,22 @@ export function PackingManager() {
                 <ShoppingBag className="w-4 h-4 text-sky-400" />
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-300">Cabin Carry-On</span>
               </div>
-              <span className={`text-xs font-black px-2 py-0.5 rounded-full ${stats.carryonKg > 8.0 ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' : 'bg-sky-500/20 text-sky-300 border border-sky-500/40'}`}>
-                {stats.carryonKg} kg / 8.0 kg
+              <span className={`text-xs font-black px-2 py-0.5 rounded-full ${stats.isOverCarryon ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' : 'bg-sky-500/20 text-sky-300 border border-sky-500/40'}`}>
+                {stats.carryonVal} {stats.unitLabel} / {stats.carryonLimit} {stats.unitLabel}
               </span>
             </div>
 
             {/* Progress Bar */}
             <div className="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden my-2 border border-white/5">
               <div 
-                className={`h-full transition-all duration-500 rounded-full ${stats.carryonKg > 8.0 ? 'bg-rose-500' : 'bg-sky-400'}`}
-                style={{ width: `${Math.min(100, Math.round((stats.carryonKg / 8.0) * 100))}%` }}
+                className={`h-full transition-all duration-500 rounded-full ${stats.isOverCarryon ? 'bg-rose-500' : 'bg-sky-400'}`}
+                style={{ width: `${Math.min(100, Math.round((stats.carryonVal / stats.carryonLimit) * 100))}%` }}
               />
             </div>
 
             <p className="text-[11px] text-slate-400 flex items-center justify-between">
               <span>Lithium batteries & delicate baubles</span>
-              <span className="text-sky-300 font-semibold">{Math.round((stats.carryonKg / 8.0) * 100)}% allowance</span>
+              <span className="text-sky-300 font-semibold">{Math.round((stats.carryonVal / stats.carryonLimit) * 100)}% allowance</span>
             </p>
           </div>
 
@@ -639,15 +693,15 @@ export function PackingManager() {
                 />
               </div>
 
-              {/* Weight in Grams */}
+              {/* Weight in Grams / Ounces */}
               <div>
                 <label className="text-[11px] font-bold text-slate-300 uppercase tracking-wider block mb-1">
-                  Est. Weight (Grams each)
+                  Est. Weight ({isLbs ? 'Ounces each' : 'Grams each'})
                 </label>
                 <input
                   type="number"
                   min="0"
-                  step="10"
+                  step={isLbs ? "0.1" : "10"}
                   value={newItemWeight}
                   onChange={(e) => setNewItemWeight(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-white text-xs focus:outline-none focus:border-sky-400"
@@ -790,7 +844,10 @@ export function PackingManager() {
           const packedCount = catItems.filter(i => i.is_packed).length;
           const totalCount = catItems.length;
           const allPacked = totalCount > 0 && packedCount === totalCount;
-          const catWeightKg = Math.round(catItems.reduce((acc, i) => acc + (Math.max(0, parseInt(i.weight_grams, 10) || 0) * (i.quantity || 1)), 0) / 1000 * 10) / 10;
+          const catWeightG = catItems.reduce((acc, i) => acc + (Math.max(0, parseInt(i.weight_grams, 10) || 0) * (i.quantity || 1)), 0);
+          const catWeightDisplay = isLbs 
+            ? `${(catWeightG * 0.00220462).toFixed(1)} lbs` 
+            : `${(catWeightG / 1000).toFixed(1)} kg`;
 
           return (
             <div 
@@ -814,7 +871,7 @@ export function PackingManager() {
                       )}
                     </h3>
                     <p className="text-xs text-slate-400 mt-0.5">
-                      Subtotal: ~{catWeightKg} kg
+                      Subtotal: ~{catWeightDisplay}
                     </p>
                   </div>
                 </div>
@@ -886,7 +943,7 @@ export function PackingManager() {
                                 </span>
                                 {wt > 0 && (
                                   <span className="text-[10px] text-slate-400 font-mono">
-                                    {wt >= 1000 ? `${(wt / 1000).toFixed(1)}kg` : `${wt}g`}
+                                    {formatWeight(wt, isLbs ? 'lbs' : 'kg')}
                                   </span>
                                 )}
                               </div>

@@ -1,6 +1,8 @@
 import React from 'react';
 import { Route, Footprints, Sparkles, Navigation, ArrowRight, ShieldCheck, MapPin, ExternalLink, RefreshCw } from 'lucide-react';
 import { generateGoogleMapsWalkingUrl } from '../../utils/routeOptimizer';
+import { useSettings } from '../../context/SettingsContext';
+import { formatDistance } from '../Formatters';
 
 /**
  * WalkingLoopOptimizer - Interactive 2-Opt Walking Loop Control Bar
@@ -19,6 +21,9 @@ export function WalkingLoopOptimizer({
   includeExcursions,
   setIncludeExcursions
 }) {
+  const { settings } = useSettings();
+  const isMiles = settings?.distance === 'mi';
+
   const {
     savedKm,
     savedMinutes,
@@ -107,7 +112,7 @@ export function WalkingLoopOptimizer({
             <div className="flex items-center space-x-1.5">
               {isOptimized && hasSavings ? (
                 <span className="text-base sm:text-lg font-black text-emerald-400">
-                  -{savedKm} km ({savedMinutes}m saved)
+                  -{formatDistance(savedKm, settings?.distance)} ({savedMinutes}m saved)
                 </span>
               ) : isOptimized ? (
                 <span className="text-sm sm:text-base font-bold text-amber-300">
@@ -132,7 +137,7 @@ export function WalkingLoopOptimizer({
               Total Distance
             </span>
             <div className="text-base sm:text-lg font-black text-white">
-              {isOptimized ? `${optimizedLengthKm} km` : `${originalLengthKm} km`}
+              {formatDistance(isOptimized ? optimizedLengthKm : originalLengthKm, settings?.distance)}
             </div>
             <p className="text-[10px] text-slate-400">
               {isRoundTrip ? 'Full closed loop' : 'Point-to-point path'}
@@ -149,7 +154,7 @@ export function WalkingLoopOptimizer({
               <span>{isOptimized ? `~${optimizedMinutes} min` : `~${originalMinutes} min`}</span>
             </div>
             <p className="text-[10px] text-slate-400">
-              At 4.5 km/h winter pace
+              {isMiles ? 'At 2.8 mph winter pace' : 'At 4.5 km/h winter pace'}
             </p>
           </div>
 

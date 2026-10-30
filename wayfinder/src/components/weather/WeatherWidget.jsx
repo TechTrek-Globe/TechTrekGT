@@ -13,7 +13,8 @@ import {
   Clock, 
   AlertTriangle,
   Info,
-  X
+  X,
+  Settings
 } from 'lucide-react';
 import { useSettings } from '../../context/SettingsContext';
 
@@ -43,7 +44,7 @@ export function WeatherWidget({
   tooltipAlign = 'left',
   className = ''
 }) {
-  const { settings } = useSettings();
+  const { settings, updateSettings, openSettings } = useSettings();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
@@ -204,10 +205,46 @@ export function WeatherWidget({
                   {locationName || data.city || city || 'Poland Destination'}
                 </span>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-1.5 shrink-0">
                 <span className="text-[9px] uppercase font-extrabold text-cyan-400 tracking-wider px-1.5 py-0.5 rounded bg-cyan-950/70 border border-cyan-800/50">
-                  {data.type === 'climate' ? 'Seasonal Baseline' : 'Live Forecast'}
+                  {data.type === 'climate' ? 'Baseline' : 'Forecast'}
                 </span>
+                {/* Quick °C / °F toggle */}
+                <div className="flex items-center bg-slate-900 border border-slate-700/80 rounded-lg p-0.5 text-[10px] font-bold">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      updateSettings({ temperature: 'C' });
+                    }}
+                    className={`px-1.5 py-0.5 rounded transition-all ${!isFahrenheit ? 'bg-cyan-500 text-slate-950 font-black' : 'text-slate-400 hover:text-white'}`}
+                    title="Display Celsius"
+                  >
+                    °C
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      updateSettings({ temperature: 'F' });
+                    }}
+                    className={`px-1.5 py-0.5 rounded transition-all ${isFahrenheit ? 'bg-cyan-500 text-slate-950 font-black' : 'text-slate-400 hover:text-white'}`}
+                    title="Display Fahrenheit"
+                  >
+                    °F
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openSettings?.();
+                  }}
+                  className="p-1 text-slate-400 hover:text-white hover:bg-slate-800 rounded transition-colors"
+                  title="Travel Preferences"
+                >
+                  <Settings size={13} />
+                </button>
                 <button
                   type="button"
                   onClick={() => setShowTooltip(false)}
@@ -285,16 +322,44 @@ export function WeatherWidget({
           </h4>
         </div>
 
-        <div className="text-right">
+        <div className="text-right flex flex-col items-end">
           <div className="flex items-center justify-end gap-2">
             {getWeatherIcon(data.main, 24)}
             <span className="text-2xl font-extrabold text-slate-100 font-mono">
               {formatTemp(data.temp)}
             </span>
           </div>
-          <span className="text-xs text-slate-400 font-medium">
-            {data.description || data.main}
-          </span>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-xs text-slate-400 font-medium">
+              {data.description || data.main}
+            </span>
+            <div className="flex items-center bg-slate-950/80 border border-slate-700/60 rounded-lg p-0.5 text-[10px] font-bold">
+              <button
+                type="button"
+                onClick={() => updateSettings({ temperature: 'C' })}
+                className={`px-1.5 py-0.5 rounded transition-all ${!isFahrenheit ? 'bg-cyan-500 text-slate-950 font-black' : 'text-slate-400 hover:text-white'}`}
+                title="Display Celsius"
+              >
+                °C
+              </button>
+              <button
+                type="button"
+                onClick={() => updateSettings({ temperature: 'F' })}
+                className={`px-1.5 py-0.5 rounded transition-all ${isFahrenheit ? 'bg-cyan-500 text-slate-950 font-black' : 'text-slate-400 hover:text-white'}`}
+                title="Display Fahrenheit"
+              >
+                °F
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={openSettings}
+              className="p-1 text-slate-400 hover:text-white hover:bg-slate-800 rounded transition-colors"
+              title="Travel Preferences"
+            >
+              <Settings size={13} />
+            </button>
+          </div>
         </div>
       </div>
 

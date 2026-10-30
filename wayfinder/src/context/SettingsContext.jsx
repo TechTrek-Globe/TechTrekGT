@@ -6,20 +6,26 @@ const STORAGE_KEY = 'wayfinder_user_settings';
 
 export function SettingsProvider({ children }) {
   const [settings, setSettings] = useState(() => {
+    const defaults = {
+      currency: 'USD',
+      temperature: 'F',
+      distance: 'mi',
+      weight: 'lbs'
+    };
     try {
       const cached = localStorage.getItem(STORAGE_KEY);
       if (cached) {
-        return JSON.parse(cached);
+        return { ...defaults, ...JSON.parse(cached) };
       }
     } catch {
       // Ignore parse errors
     }
-    return {
-      currency: 'USD',
-      temperature: 'F',
-      distance: 'mi'
-    };
+    return defaults;
   });
+
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const openSettings = () => setIsSettingsOpen(true);
+  const closeSettings = () => setIsSettingsOpen(false);
 
   useEffect(() => {
     try {
@@ -34,7 +40,14 @@ export function SettingsProvider({ children }) {
   };
 
   return (
-    <SettingsContext.Provider value={{ settings, updateSettings }}>
+    <SettingsContext.Provider value={{ 
+      settings, 
+      updateSettings,
+      isSettingsOpen,
+      setIsSettingsOpen,
+      openSettings,
+      closeSettings
+    }}>
       {children}
     </SettingsContext.Provider>
   );

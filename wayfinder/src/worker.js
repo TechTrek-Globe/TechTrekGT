@@ -18,6 +18,7 @@ import { handleDocuments }  from '../functions/api/wayfinder/documents.js';
 import { handleImportJobs } from '../functions/api/wayfinder/import-jobs.js';
 import { handleBudget }       from '../functions/api/wayfinder/budget.js';
 import { handleExchangeRate }  from '../functions/api/wayfinder/exchange-rate.js';
+import { handleWeather }       from '../functions/api/wayfinder/weather.js';
 import { handleEmailInboxes }  from '../functions/api/wayfinder/email-inboxes.js';
 import { handleInboundEmail }  from '../functions/api/wayfinder/email-worker.js';
 
@@ -116,6 +117,9 @@ export default {
     if (apiPath.startsWith('/api/wayfinder/')) {
       if (apiPath === '/api/wayfinder/exchange-rate' && method === 'GET') {
         return handleExchangeRate({ request, env, ctx }, url, method);
+      }
+      if (apiPath === '/api/wayfinder/weather' && method === 'GET') {
+        return handleWeather({ request, env, ctx }, url, method);
       }
 
       const auth = await requireAuth(request, env);

@@ -9,6 +9,7 @@ import {
 
 import { PrivateBookingCard } from './itinerary/PrivateBookingCard';
 import { DocumentViewerModal } from './DocumentViewerModal';
+import { WeatherWidget } from './weather/WeatherWidget';
 
 export function ItineraryView() {
   const { itinerary: privateItems = [], accommodations = [] } = useWayfinder();
@@ -275,6 +276,7 @@ export function ItineraryView() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                  <WeatherWidget city={dayItem.cityId} date={dayItem.date} locationName={dayItem.cityName} />
                   {dayItem.base && (
                     <span className="px-2.5 py-1.5 rounded-lg bg-slate-900 border border-white/10 text-slate-300 flex items-center space-x-1 min-h-[36px] sm:min-h-[38px]">
                       <Building className="w-3 h-3 text-emerald-400" />

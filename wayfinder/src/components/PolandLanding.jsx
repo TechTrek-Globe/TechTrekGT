@@ -11,6 +11,7 @@ import { useAuth } from '../context/AuthContext';
 import { useWayfinder } from '../context/WayfinderContext';
 import { PrivateBookingCard } from './itinerary/PrivateBookingCard';
 import { DocumentViewerModal } from './DocumentViewerModal';
+import { WeatherWidget } from './weather/WeatherWidget';
 
 const stopTransitInfo = {
   krakow: {
@@ -158,6 +159,7 @@ function JourneyStopSchedule({
                     {city.itineraryDates}
                   </span>
                 )}
+                <WeatherWidget city={city.id} date={city.startDate} locationName={city.name} className="shadow-sm" />
               </div>
 
               <h3 className="text-2xl sm:text-3xl font-black text-white leading-tight truncate">
@@ -248,12 +250,15 @@ function JourneyStopSchedule({
                       </div>
                     </div>
 
-                    {dayItem.base && (
-                      <div className="text-xs text-slate-400 flex items-center space-x-1">
-                        <Building className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                        <span className="truncate max-w-[260px]">{dayItem.base}</span>
-                      </div>
-                    )}
+                    <div className="flex items-center space-x-2 self-start sm:self-center">
+                      <WeatherWidget city={city.id} date={dayItem.date} locationName={dayItem.displayDate} />
+                      {dayItem.base && (
+                        <div className="text-xs text-slate-400 flex items-center space-x-1">
+                          <Building className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                          <span className="truncate max-w-[260px]">{dayItem.base}</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Day Events Timeline */}
@@ -425,7 +430,7 @@ export function PolandLanding() {
   const { isAuthenticated, user, setIsAuthModalOpen } = useAuth();
   const { itinerary: privateItems = [], accommodations = [] } = useWayfinder() || {};
   const [selectedStopFilter, setSelectedStopFilter] = useState('all');
-  const [viewMode, setViewMode] = useState('schedule');
+  const [viewMode, setViewMode] = useState('cards');
   const [isDocViewerOpen, setIsDocViewerOpen] = useState(false);
   const [expandedStops, setExpandedStops] = useState({
     krakow: true,

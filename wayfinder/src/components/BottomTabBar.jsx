@@ -31,7 +31,8 @@ export function BottomTabBar({ currentPath, onOpenConverter }) {
 
   const isCities = currentPath.startsWith(`${BASE}/cities`) || currentPath === BASE || currentPath === `${BASE}/`;
   const isDocs = currentPath.includes('/documents');
-  const isSchedule = currentPath.includes('scroll=journey-sequence') || currentPath.includes('#journey-sequence') || (currentPath.startsWith(`${BASE}/private`) && !isDocs);
+  const isPacking = currentPath.includes('/packing');
+  const isSchedule = currentPath.includes('scroll=journey-sequence') || currentPath.includes('#journey-sequence') || (currentPath.startsWith(`${BASE}/private`) && !isDocs && !isPacking);
   const isPractical = currentPath.startsWith(`${BASE}/practical`);
 
   const handleScheduleClick = (e) => {
@@ -88,7 +89,7 @@ export function BottomTabBar({ currentPath, onOpenConverter }) {
           icon={ShieldCheck}
           label="Hub"
           href={`${BASE}/private/documents`}
-          isActive={isDocs}
+          isActive={isDocs || isPacking}
           onClick={(e) => pushRoute(e, `${BASE}/private/documents`)}
           colorActive="text-sky-400"
           bgActive="bg-sky-500/15"

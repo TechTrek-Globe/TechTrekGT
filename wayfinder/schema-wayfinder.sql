@@ -257,3 +257,30 @@ CREATE TABLE IF NOT EXISTS wayfinder_gmail_connections (
 
 CREATE INDEX IF NOT EXISTS idx_wf_gmail_user    ON wayfinder_gmail_connections(user_id);
 CREATE INDEX IF NOT EXISTS idx_wf_gmail_journey ON wayfinder_gmail_connections(journey_id);
+
+-- ============================================================
+-- PACKING ITEMS - Personal & Group Winter Packing Checklist
+-- ============================================================
+CREATE TABLE IF NOT EXISTS wayfinder_packing_items (
+  id              TEXT PRIMARY KEY,
+  journey_id      TEXT NOT NULL,
+  user_id         TEXT NOT NULL,
+  category        TEXT NOT NULL DEFAULT 'clothing', -- clothing, footwear, gear, electronics, documents, toiletries, gifts
+  name            TEXT NOT NULL,
+  quantity        INTEGER NOT NULL DEFAULT 1,
+  weight_grams    INTEGER DEFAULT 0,
+  is_packed       INTEGER NOT NULL DEFAULT 0,
+  is_shared       INTEGER NOT NULL DEFAULT 0,       -- 0: personal item, 1: group item
+  assigned_to     TEXT,                             -- member name/identifier for shared gear
+  bag_type        TEXT NOT NULL DEFAULT 'checked',  -- checked, carryon, personal
+  notes           TEXT,
+  sort_order      INTEGER NOT NULL DEFAULT 0,
+  created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (journey_id)  REFERENCES wayfinder_journeys(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id)     REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_wf_packing_journey ON wayfinder_packing_items(journey_id);
+CREATE INDEX IF NOT EXISTS idx_wf_packing_user    ON wayfinder_packing_items(user_id);
+

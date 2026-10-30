@@ -125,3 +125,18 @@ To minimize traveler exposure to sub-zero winter temperatures and eliminate cris
 - City Walk vs. Excursion Partitioning: Sights situated >12 km from the city center (such as Auschwitz-Birkenau ~65 km or Wieliczka Salt Mine ~14 km from Kraków) are partitioned into a dedicated Regional Day-Trip Excursions section so regional transit trips do not distort local Old Town walking loops.
 - Mobile Navigation Integration: Generates native Google Maps multi-stop walking directions URLs linking all sequential waypoints, enabling 1-click navigation directly in iOS/Android Google Maps during winter roaming.
 - UI Component Integration: [wayfinder/src/components/route/WalkingLoopOptimizer.jsx](file:///e:/TechTrekGT/wayfinder/src/components/route/WalkingLoopOptimizer.jsx) is embedded into [CityAttractionsTab.jsx](file:///e:/TechTrekGT/wayfinder/src/components/city/CityAttractionsTab.jsx), offering toggles between curated guide order and 2-opt loop mode, base anchor selection, round-trip toggles, and step-by-step leg distance badges on [MustSeeCard.jsx](file:///e:/TechTrekGT/wayfinder/src/components/MustSeeCard.jsx).
+
+## 10. Winter Packing Checklist & Luggage Weight Budgeting
+
+To ensure travelers are fully prepared for sub-zero Polish winter weather while strictly respecting international airline baggage allowances, Wayfinder provides an interactive packing manager and baggage weight budget suite:
+
+- Cloudflare D1 Relational Persistence: Manages packing items in `wayfinder_packing_items` with fields for category, quantity, weight in grams, packed status, baggage location (checked, carry-on, personal daypack), and contextual advice notes.
+- Serverless API Engine: [wayfinder/functions/api/wayfinder/packing.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/packing.js) handles item retrieval, item creation, item status mutations (`PUT /api/wayfinder/packing/:id`), bulk clearing of checked items, and preset instantiation (`action: 'apply_preset'`). Includes self-healing table initialization.
+- Real-Time Baggage Weight Budgeting:
+  - Checked Suitcase Limit: Real-time telemetry comparing sum of checked items against standard transatlantic 23.0 kg (50.7 lbs) airline limit, featuring colored utilization meters (emerald <75%, amber 75-95%, red >95%) and remaining gift buffer calculation.
+  - Cabin Carry-On Limit: Tracks cabin baggage against European 8.0 kg limits, ensuring cold-sensitive lithium batteries and delicate holiday market baubles remain safely in cabin baggage.
+  - Overall Readiness Meter: Visual percentage tracker displaying packed items vs total checklist.
+- Curated Poland Winter 2026 Preset: Includes 1-click loading of 37 pre-seeded expedition items across 7 winter categories (thermal base layers, sub-zero down parka, ice grippers for slick cobblestones, Type C/E plug adapters, 10,000mAh cold-resistant power banks, passport sleeves, and emergency Polish złoty cash).
+- Guest & Roaming Resilience: Fully functional in offline and unauthenticated states using browser localStorage persistence, seamlessly syncing with Cloudflare D1 upon user sign-in.
+- UI Component Integration: [wayfinder/src/components/packing/PackingManager.jsx](file:///e:/TechTrekGT/wayfinder/src/components/packing/PackingManager.jsx) is mounted as a dedicated subview tab inside [PrivateHub.jsx](file:///e:/TechTrekGT/wayfinder/src/components/PrivateHub.jsx) at `/wayfinder/poland-christmas-2026/private/packing`, with a primary launcher callout integrated into [PracticalPage.jsx](file:///e:/TechTrekGT/wayfinder/src/components/PracticalPage.jsx) and mobile bottom tab bar integration in [BottomTabBar.jsx](file:///e:/TechTrekGT/wayfinder/src/components/BottomTabBar.jsx).
+

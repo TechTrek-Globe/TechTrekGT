@@ -188,14 +188,15 @@ graph TD
   - Updated `wayfinder/src/components/MustSeeCard.jsx` to render step badges (`#1`, `#2`...) and walking leg distance/time callouts.
   - Deployed to Cloudflare Workers (Version ID: `74fc89e4-1961-4f46-bdb1-2e6239b4f3b3`). Documented in `wayfinder/docs/03_features.md` and `wayfinder/docs/04_state.md`.
 
-### Phase 3: Winter Packing Checklist & Luggage Weight Budget
-- Goal: Deliver an interactive packing checklist pre-loaded with winter Poland gear and luggage weight tracking.
-- Files to Create/Modify:
-  - Add `wayfinder_packing_items` schema to `wayfinder/schema-wayfinder.sql`.
-  - Create `wayfinder/functions/api/wayfinder/packing.js`.
-  - Register route in `wayfinder/src/worker.js`.
-  - Create `wayfinder/src/components/packing/PackingManager.jsx`.
-  - Mount inside `wayfinder/src/components/PrivateHub.jsx` and link from `PracticalPage.jsx`.
+### Phase 3: Winter Packing Checklist & Luggage Weight Budget [COMPLETED]
+- Status: Fully implemented and deployed to production.
+- Deliverables:
+  - Added `wayfinder_packing_items` schema and indexes to `wayfinder/schema-wayfinder.sql`.
+  - Created serverless API handler `wayfinder/functions/api/wayfinder/packing.js` with self-healing table initialization, checked/carryon weight calculations, 37-item curated Poland Winter 2026 preset, and bulk actions (`apply_preset`, `clear_packed`, `toggle_all`).
+  - Registered `/api/wayfinder/packing` route in `wayfinder/src/worker.js`.
+  - Created `wayfinder/src/components/packing/PackingManager.jsx` with real-time baggage allowance meters (checked 23kg / cabin 8kg), category accordions, quantity steppers, item search, and guest-mode offline persistence.
+  - Mounted interactive Packing List tab inside `wayfinder/src/components/PrivateHub.jsx` and added direct launcher callout in `wayfinder/src/components/PracticalPage.jsx`.
+  - Updated mobile navigation in `wayfinder/src/components/BottomTabBar.jsx`.
 
 ### Phase 4: Live iCalendar (.ics) Feed Generator
 - Goal: Enable travelers to subscribe to their Poland 2026 itinerary, trains, and flights directly in their mobile calendars.

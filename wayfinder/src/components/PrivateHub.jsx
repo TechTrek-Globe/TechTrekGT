@@ -1,8 +1,9 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
-import { ShieldCheck, FileText, CalendarClock } from 'lucide-react';
+import { ShieldCheck, FileText, CalendarClock, Backpack } from 'lucide-react';
 import { ItineraryView } from './ItineraryView';
 import { DocumentCenter } from './DocumentCenter';
+import { PackingManager } from './packing/PackingManager';
 
 export function PrivateHub({ currentPath }) {
   const { isAuthenticated, setIsAuthModalOpen } = useAuth();
@@ -14,6 +15,7 @@ export function PrivateHub({ currentPath }) {
   };
 
   const isDocs = currentPath.includes('/documents');
+  const isPacking = currentPath.includes('/packing');
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
@@ -28,19 +30,27 @@ export function PrivateHub({ currentPath }) {
             <p className="text-wf-muted mt-2">Poland Christmas 2026</p>
           </div>
           
-          <div className="flex items-center space-x-2 bg-wf-navy-mid p-1 rounded-xl border border-white/5">
+          <div className="flex items-center space-x-2 bg-wf-navy-mid p-1 rounded-xl border border-white/5 overflow-x-auto">
             <a
               href="/wayfinder/poland-christmas-2026/private"
               onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026/private')}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${!isDocs ? 'bg-wf-blue text-white shadow-md' : 'text-wf-muted hover:text-white hover:bg-white/5'}`}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${!isDocs && !isPacking ? 'bg-wf-blue text-white shadow-md' : 'text-wf-muted hover:text-white hover:bg-white/5'}`}
             >
               <CalendarClock className="w-4 h-4" />
               <span>Itinerary</span>
             </a>
             <a
+              href="/wayfinder/poland-christmas-2026/private/packing"
+              onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026/private/packing')}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${isPacking ? 'bg-wf-blue text-white shadow-md' : 'text-wf-muted hover:text-white hover:bg-white/5'}`}
+            >
+              <Backpack className="w-4 h-4" />
+              <span>Packing List</span>
+            </a>
+            <a
               href="/wayfinder/poland-christmas-2026/private/documents"
               onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026/private/documents')}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isDocs ? 'bg-wf-blue text-white shadow-md' : 'text-wf-muted hover:text-white hover:bg-white/5'}`}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${isDocs ? 'bg-wf-blue text-white shadow-md' : 'text-wf-muted hover:text-white hover:bg-white/5'}`}
             >
               <FileText className="w-4 h-4" />
               <span>Documents</span>
@@ -50,7 +60,9 @@ export function PrivateHub({ currentPath }) {
       </div>
 
       {/* Render Subview */}
-      {isDocs ? (
+      {isPacking ? (
+        <PackingManager />
+      ) : isDocs ? (
         !isAuthenticated ? (
           <div className="flex-1 flex flex-col items-center justify-center p-8 sm:p-12 text-center rounded-2xl glass-panel border border-white/10 animate-fade-in my-8">
             <div className="w-16 h-16 rounded-full bg-wf-navy-mid border border-white/10 flex items-center justify-center mb-6 text-wf-blue-lt">

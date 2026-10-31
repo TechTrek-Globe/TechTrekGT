@@ -2,52 +2,103 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   DollarSign, Receipt, Plus, ArrowRight, CheckCircle2, Trash2, 
   RefreshCw, Users, CreditCard, Sparkles, Plane, Building, Train, 
-  Utensils, ShoppingBag, AlertCircle, ArrowUpRight, ArrowDownLeft
+  Utensils, ShoppingBag, AlertCircle, ArrowUpRight, ArrowDownLeft, RotateCcw
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useSettings } from '../../context/SettingsContext';
+import { getApiUrl } from '../../utils/api';
 import { 
   convertCurrency, formatCurrency, splitEqually, calculateSettleUp, DEFAULT_EXCHANGE_RATES 
 } from '../../utils/expenseLedger';
+
+// Map DB category values to display metadata (including legacy aliases)
+const CATEGORY_MAP = {
+  flight:    { label: 'Flights',    icon: Plane,       badge: 'bg-sky-500/15 text-sky-300 border-sky-500/30' },
+  lodging:   { label: 'Hotels',     icon: Building,    badge: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' },
+  hotel:     { label: 'Hotels',     icon: Building,    badge: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' },
+  transit:   { label: 'Rail/Trans', icon: Train,       badge: 'bg-amber-500/15 text-amber-300 border-amber-500/30' },
+  train:     { label: 'Rail/Trans', icon: Train,       badge: 'bg-amber-500/15 text-amber-300 border-amber-500/30' },
+  rail:      { label: 'Rail/Trans', icon: Train,       badge: 'bg-amber-500/15 text-amber-300 border-amber-500/30' },
+  dining:    { label: 'Dining',     icon: Utensils,    badge: 'bg-orange-500/15 text-orange-300 border-orange-500/30' },
+  restaurant:{ label: 'Dining',     icon: Utensils,    badge: 'bg-orange-500/15 text-orange-300 border-orange-500/30' },
+  market:    { label: 'Markets',    icon: ShoppingBag, badge: 'bg-purple-500/15 text-purple-300 border-purple-500/30' },
+  activity:  { label: 'Activities', icon: ShoppingBag, badge: 'bg-violet-500/15 text-violet-300 border-violet-500/30' },
+  excursion: { label: 'Activities', icon: ShoppingBag, badge: 'bg-violet-500/15 text-violet-300 border-violet-500/30' },
+  tour:      { label: 'Activities', icon: ShoppingBag, badge: 'bg-violet-500/15 text-violet-300 border-violet-500/30' },
+  other:     { label: 'Other',      icon: Receipt,     badge: 'bg-slate-500/15 text-slate-300 border-slate-500/30' }
+};
 
 const CATEGORIES = [
   { id: 'all',       label: 'All Categories' },
   { id: 'flight',    label: 'Flights',    icon: Plane,       badge: 'bg-sky-500/15 text-sky-300 border-sky-500/30' },
   { id: 'lodging',   label: 'Hotels',     icon: Building,    badge: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' },
   { id: 'transit',   label: 'Rail/Trans', icon: Train,       badge: 'bg-amber-500/15 text-amber-300 border-amber-500/30' },
+  { id: 'activity',  label: 'Activities', icon: ShoppingBag, badge: 'bg-violet-500/15 text-violet-300 border-violet-500/30' },
   { id: 'dining',    label: 'Dining',     icon: Utensils,    badge: 'bg-orange-500/15 text-orange-300 border-orange-500/30' },
   { id: 'market',    label: 'Markets',    icon: ShoppingBag, badge: 'bg-purple-500/15 text-purple-300 border-purple-500/30' },
   { id: 'other',     label: 'Other',      icon: Receipt,     badge: 'bg-slate-500/15 text-slate-300 border-slate-500/30' }
 ];
 
+// Normalize category aliases for filtering
+function normalizeCategory(cat) {
+  const c = (cat || 'other').toLowerCase();
+  if (c === 'hotel') return 'lodging';
+  if (c === 'train' || c === 'rail') return 'transit';
+  if (c === 'restaurant') return 'dining';
+  if (c === 'excursion' || c === 'tour') return 'activity';
+  return c;
+}
+
 const CURRENCIES = ['PLN', 'USD', 'EUR', 'GBP'];
+
+const SETTLE_METHOD_MAP = {
+  cash: 'Cash',
+  bank_transfer: 'Bank Transfer',
+  zelle: 'Zelle',
+  venmo: 'Venmo',
+  apple_pay: 'Apple Pay',
+  cash_app: 'Cash App',
+  both_paid_separately: 'Both Paid Separately',
+  paypal: 'PayPal',
+  credit_card_split: 'Credit Card (Split at POS)',
+  revolut_wise: 'Revolut / Wise',
+  other: 'Other',
+  apple_cash: 'Apple Pay',
+  revolut: 'Revolut',
+  blik: 'BLIK',
+  transfer: 'Bank Transfer'
+};
 
 export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
   const { user, isAuthenticated, setIsAuthModalOpen } = useAuth();
+  const { settings, openSettings } = useSettings();
   const [expenses, setExpenses] = useState([]);
   const [settlements, setSettlements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Preference state
-  const [displayCurrency, setDisplayCurrency] = useState('PLN');
+  // Display currency from Settings (user sets it in the global Settings modal)
+  const displayCurrency = settings.currency || 'USD';
   const [selectedCategory, setSelectedCategory] = useState('all');
 
   // Modal states
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isSettleModalOpen, setIsSettleModalOpen] = useState(false);
   const [activeTransferToSettle, setActiveTransferToSettle] = useState(null);
-  const [settleMethod, setSettleMethod] = useState('revolut');
+  const [activeItemToSettle, setActiveItemToSettle] = useState(null); // { expense, split }
+  const [settleMethod, setSettleMethod] = useState('venmo');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form state for new expense
   const [formDesc, setFormDesc] = useState('');
   const [formCategory, setFormCategory] = useState('dining');
   const [formAmount, setFormAmount] = useState('');
-  const [formCurrency, setFormCurrency] = useState('PLN');
+  const [formCurrency, setFormCurrency] = useState(displayCurrency);
   const [formPayer, setFormPayer] = useState('self');
   const [formSplitType, setFormSplitType] = useState('equal'); // 'equal' or 'self'
 
-  const currentUserId = user?.userId || 'usr-jonathan-kemp';
+  // Use real user.id (matches D1 stored user_id), with safe fallback
+  const currentUserId = user?.id || user?.userId || 'usr-jonathan-kemp';
   const currentUserName = user?.name || user?.email?.split('@')[0] || 'Jonathan Kemp';
   const partnerId = 'usr-ronald-few';
   const partnerName = 'Ronald Milton Few';
@@ -62,7 +113,9 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/wayfinder/expenses?journey_id=${journeyId}`);
+      const res = await fetch(getApiUrl(`/api/wayfinder/expenses?journey_id=${journeyId}`), {
+        credentials: 'include'
+      });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setExpenses(data.expenses || []);
@@ -85,7 +138,11 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
   }, [expenses, settlements, displayCurrency]);
 
   const userBalance = useMemo(() => {
-    return balances.find(b => b.id === currentUserId) || { paid: 0, owed: 0, net: 0 };
+    return balances.find(b => 
+      b.id === currentUserId || 
+      b.id === 'usr-1785511589441-3fvgv' || 
+      b.name?.toLowerCase().includes('jon')
+    ) || { paid: 0, owed: 0, net: 0 };
   }, [balances, currentUserId]);
 
   const totalExpeditionInDisplay = useMemo(() => {
@@ -99,16 +156,17 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
   // Filtered expenses
   const filteredExpenses = useMemo(() => {
     if (selectedCategory === 'all') return expenses;
-    return expenses.filter(e => (e.category || 'other').toLowerCase() === selectedCategory);
+    return expenses.filter(e => normalizeCategory(e.category) === selectedCategory);
   }, [expenses, selectedCategory]);
 
   // Handle Preset Seed
   const handleSeedPresets = async () => {
     setIsSubmitting(true);
     try {
-      const res = await fetch('/api/wayfinder/expenses/preset', {
+      const res = await fetch(getApiUrl('/api/wayfinder/expenses/preset'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ journey_id: journeyId })
       });
       if (!res.ok) throw new Error('Preset creation failed');
@@ -141,12 +199,14 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
         splits = [{ userId: payerObj.id, userName: payerObj.name, amountOwed: amt, percentage: 100 }];
       }
 
+      const amtInUsd = convertCurrency(amt, formCurrency, 'USD');
       const payload = {
         journey_id: journeyId,
         description: formDesc.trim(),
         category: formCategory,
         amount_original: amt,
         currency_original: formCurrency,
+        amount_usd: amtInUsd,
         paid_by_name: formPayer === 'self' ? currentUserName : partnerName,
         paid_by_id: formPayer === 'self' ? currentUserId : partnerId,
         splits: splits.map(s => ({
@@ -157,9 +217,10 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
         }))
       };
 
-      const res = await fetch('/api/wayfinder/expenses', {
+      const res = await fetch(getApiUrl('/api/wayfinder/expenses'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(payload)
       });
 
@@ -180,9 +241,10 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
     if (!activeTransferToSettle) return;
     setIsSubmitting(true);
     try {
-      const res = await fetch('/api/wayfinder/expenses/settle', {
+      const res = await fetch(getApiUrl('/api/wayfinder/expenses/settle'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           journey_id: journeyId,
           from_user_id: activeTransferToSettle.fromUserId,
@@ -192,7 +254,7 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
           amount: activeTransferToSettle.amount,
           currency: activeTransferToSettle.currency,
           method: settleMethod,
-          notes: `Settled via ${settleMethod.toUpperCase()}`
+          notes: `Settled via ${SETTLE_METHOD_MAP[settleMethod] || settleMethod}`
         })
       });
 
@@ -207,11 +269,90 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
     }
   };
 
+  // Handle Item-by-Item Settle Submit
+  const handleConfirmItemSettle = async () => {
+    if (!activeItemToSettle) return;
+    const { expense, split } = activeItemToSettle;
+    setIsSubmitting(true);
+    try {
+      const fromUserId = split.user_id;
+      const fromUserName = split.user_name || 'Member';
+      const toUserId = expense.user_id;
+      const toUserName = expense.paid_by_name || 'Member';
+
+      const res = await fetch(getApiUrl('/api/wayfinder/expenses/settle'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          journey_id: journeyId,
+          from_user_id: fromUserId,
+          from_user_name: fromUserName,
+          to_user_id: toUserId,
+          to_user_name: toUserName,
+          amount: split.amount_owed,
+          currency: expense.currency_original || 'USD',
+          method: settleMethod,
+          notes: `Settled ${expense.description}`,
+          expense_id: expense.id,
+          split_id: split.id
+        })
+      });
+
+      if (!res.ok) throw new Error('Failed to record item settlement');
+      setActiveItemToSettle(null);
+      await loadExpenses();
+    } catch (e) {
+      alert('Error settling item: ' + e.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle Undo Settlement for a specific split
+  const handleUndoSplit = async (splitId, desc = 'item') => {
+    if (!window.confirm(`Undo settlement for ${desc} and mark balance as owed?`)) return;
+    setIsSubmitting(true);
+    try {
+      const res = await fetch(getApiUrl(`/api/wayfinder/expenses/settle?split_id=${splitId}`), {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      if (!res.ok) throw new Error('Failed to undo settlement');
+      await loadExpenses();
+    } catch (e) {
+      alert('Error undoing settlement: ' + e.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle Undo / Delete recorded settlement
+  const handleUndoSettlement = async (settlementId) => {
+    if (!window.confirm('Undo and delete this settlement payment record?')) return;
+    setIsSubmitting(true);
+    try {
+      const res = await fetch(getApiUrl(`/api/wayfinder/expenses/settle?settlement_id=${settlementId}`), {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      if (!res.ok) throw new Error('Failed to delete settlement');
+      await loadExpenses();
+    } catch (e) {
+      alert('Error undoing settlement: ' + e.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   // Handle Delete Expense
   const handleDeleteExpense = async (id) => {
     if (!window.confirm('Delete this expense?')) return;
     try {
-      const res = await fetch(`/api/wayfinder/expenses/${id}`, { method: 'DELETE' });
+      const res = await fetch(getApiUrl(`/api/wayfinder/expenses/${id}`), { 
+        method: 'DELETE',
+        credentials: 'include'
+      });
       if (!res.ok) throw new Error('Delete failed');
       setExpenses(prev => prev.filter(e => e.id !== id));
     } catch (e) {
@@ -234,19 +375,17 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
         </div>
 
         <div className="flex items-center space-x-2 self-start sm:self-center">
-          {/* Currency Pill Selector */}
-          <div className="flex items-center space-x-1 bg-slate-950 p-1 rounded-xl border border-white/10 text-xs font-bold">
-            {CURRENCIES.map(cur => (
-              <button
-                key={cur}
-                type="button"
-                onClick={() => setDisplayCurrency(cur)}
-                className={`px-2.5 py-1 rounded-lg transition-all ${displayCurrency === cur ? 'bg-amber-500 text-slate-950 shadow-sm' : 'text-slate-400 hover:text-white'}`}
-              >
-                {cur}
-              </button>
-            ))}
-          </div>
+          {/* Display currency indicator - controlled via Settings */}
+          <button
+            type="button"
+            onClick={openSettings}
+            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-950 border border-amber-500/30 hover:border-amber-400 text-xs text-amber-300 font-bold transition-all cursor-pointer shadow-sm group"
+            title="Click to change base currency in Settings"
+          >
+            <span className="text-slate-400 font-medium">Display:</span>
+            <span className="font-mono text-white group-hover:text-amber-200">{displayCurrency}</span>
+            <span className="text-amber-400/80 group-hover:text-amber-300 underline text-[11px] font-normal ml-0.5">(change in Settings)</span>
+          </button>
 
           <button
             type="button"
@@ -306,7 +445,7 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
               ? `+${formatCurrency(userBalance.net, displayCurrency)}` 
               : userBalance.net < -0.01 
               ? formatCurrency(userBalance.net, displayCurrency) 
-              : '0.00 zł'}
+              : formatCurrency(0, displayCurrency)}
           </div>
           <span className="text-[11px] font-medium text-slate-300">
             {userBalance.net > 0.01 
@@ -323,10 +462,10 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
         <div className="p-5 rounded-2xl glass-panel border border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-slate-900 to-slate-950 shadow-lg space-y-3">
           <div className="flex items-center space-x-2 text-amber-300">
             <Sparkles className="w-5 h-5 text-amber-400" />
-            <h3 className="text-sm sm:text-base font-bold">Simplified Settle-Up Transfers</h3>
+            <h3 className="text-sm sm:text-base font-bold">Total Remaining Net Balance</h3>
           </div>
           <p className="text-xs text-slate-300">
-            Our greedy graph algorithm resolved all group splits into the minimum required transfers:
+            Outstanding balance across all bookings. You can settle individual bookings on each card below, or settle the total remaining balance:
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
@@ -346,7 +485,7 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
                       <span className="text-emerald-400">{tx.toUserName}</span>
                     </div>
                     <div className="text-[11px] text-slate-400 font-mono mt-0.5">
-                      Amount: <strong className="text-white">{formatCurrency(tx.amount, tx.currency)}</strong>
+                      Remaining Total: <strong className="text-white">{formatCurrency(tx.amount, tx.currency)}</strong>
                     </div>
                   </div>
                 </div>
@@ -360,7 +499,7 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
                   className="px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/40 text-emerald-300 font-bold text-xs flex items-center space-x-1 transition-all cursor-pointer"
                 >
                   <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>Settle Up</span>
+                  <span>Settle Total Balance</span>
                 </button>
               </div>
             ))}
@@ -423,7 +562,8 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
       ) : (
         <div className="space-y-3">
           {filteredExpenses.map((exp) => {
-            const catMeta = CATEGORIES.find(c => c.id === exp.category) || CATEGORIES[6];
+            const catKey = normalizeCategory(exp.category);
+            const catMeta = CATEGORY_MAP[catKey] || CATEGORY_MAP.other;
             const Icon = catMeta.icon || Receipt;
             const cur = exp.currency_original || 'PLN';
             const amt = Number(exp.amount_original || 0);
@@ -445,15 +585,75 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
                       <span>Paid by <strong className="text-slate-200">{exp.paid_by_name || 'Member'}</strong></span>
                       <span>•</span>
                       <span className="capitalize">{exp.category || 'expense'}</span>
-                      {exp.splits && exp.splits.length > 0 && (
-                        <>
-                          <span>•</span>
-                          <span className="text-amber-300 font-medium">
-                            Split ({exp.splits.map(s => `${s.user_name?.split(' ')[0]}: ${formatCurrency(s.amount_owed, cur)}`).join(', ')})
-                          </span>
-                        </>
-                      )}
                     </div>
+
+                    {/* Item-by-item split & settlement controls */}
+                    {exp.splits && exp.splits.length > 0 && (
+                      <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                        {exp.splits.map((s) => {
+                          const isPayer = s.user_name === exp.paid_by_name || s.user_id === exp.user_id;
+                          const isSettled = Boolean(s.is_settled);
+                          const firstName = s.user_name?.split(' ')[0] || 'Member';
+
+                          if (isPayer) {
+                            return (
+                              <span 
+                                key={s.id || s.user_id} 
+                                className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-[11px] text-slate-300"
+                              >
+                                <span>{firstName}: {formatCurrency(s.amount_owed, cur)}</span>
+                                <span className="text-slate-500 font-normal">(Paid)</span>
+                              </span>
+                            );
+                          }
+
+                          // Debtor's split
+                          return isSettled ? (
+                            <div 
+                              key={s.id || s.user_id} 
+                              className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-[11px] text-emerald-300"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                              <span className="font-bold">{firstName}: {formatCurrency(s.amount_owed, cur)}</span>
+                              <span className="text-emerald-400 font-medium">
+                                ✓ Settled {s.settle_method ? `via ${SETTLE_METHOD_MAP[s.settle_method] || s.settle_method}` : ''}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleUndoSplit(s.id, exp.description);
+                                }}
+                                className="ml-1 text-slate-400 hover:text-red-300 underline text-[10px] cursor-pointer"
+                                title="Undo settlement for this item"
+                              >
+                                Undo
+                              </button>
+                            </div>
+                          ) : (
+                            <div 
+                              key={s.id || s.user_id} 
+                              className="inline-flex items-center space-x-2 px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/30 text-[11px]"
+                            >
+                              <span className="text-amber-300 font-bold">
+                                {firstName} owes {formatCurrency(s.amount_owed, cur)}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveItemToSettle({ expense: exp, split: s });
+                                }}
+                                className="px-2 py-0.5 rounded-md bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[10px] transition-all cursor-pointer shadow-sm"
+                                title={`Settle ${firstName}'s share of this item`}
+                              >
+                                Settle Item
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -497,14 +697,26 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
                 key={s.id}
                 className="p-3 rounded-xl bg-slate-950/60 border border-white/5 flex items-center justify-between text-xs text-slate-300"
               >
-                <div className="flex items-center space-x-2">
-                  <span className="font-bold text-amber-300">{s.from_user_name}</span>
-                  <span>paid</span>
-                  <span className="font-bold text-emerald-400">{s.to_user_name}</span>
-                  <span className="text-slate-500">via {s.method || 'cash'}</span>
+                <div className="flex items-center space-x-2 min-w-0">
+                  <span className="font-bold text-amber-300 shrink-0">{s.from_user_name}</span>
+                  <span className="shrink-0">{s.method === 'both_paid_separately' ? 'settled with' : 'paid'}</span>
+                  <span className="font-bold text-emerald-400 shrink-0">{s.to_user_name}</span>
+                  <span className="text-slate-500 shrink-0">via {SETTLE_METHOD_MAP[s.method] || s.method || 'Cash'}</span>
+                  {s.notes && <span className="text-slate-400 text-[11px] truncate italic">({s.notes})</span>}
                 </div>
-                <div className="font-mono font-bold text-white">
-                  {formatCurrency(s.amount, s.currency)}
+                <div className="flex items-center space-x-3 shrink-0">
+                  <div className="font-mono font-bold text-white">
+                    {formatCurrency(s.amount, s.currency)}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleUndoSettlement(s.id)}
+                    className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors flex items-center space-x-1 cursor-pointer"
+                    title="Undo this settlement payment"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span className="text-[10px] hidden sm:inline">Undo</span>
+                  </button>
                 </div>
               </div>
             ))}
@@ -569,6 +781,16 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
                 </div>
               </div>
 
+              {/* Live conversion indicator */}
+              {Number(formAmount) > 0 && formCurrency !== displayCurrency && (
+                <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center justify-between">
+                  <span className="text-slate-300">Converts to display currency:</span>
+                  <span className="font-mono font-bold text-white">
+                    ≈ {formatCurrency(convertCurrency(formAmount, formCurrency, displayCurrency), displayCurrency)}
+                  </span>
+                </div>
+              )}
+
               <div>
                 <label className="block font-bold text-slate-300 mb-1">Category</label>
                 <select
@@ -629,23 +851,28 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
         </div>
       )}
 
-      {/* Record Settle-Up Modal */}
+      {/* Record Total Settle-Up Modal */}
       {isSettleModalOpen && activeTransferToSettle && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
           <div className="glass-panel w-full max-w-sm p-6 rounded-3xl border border-emerald-500/30 bg-slate-900 shadow-2xl space-y-4">
-            <h3 className="text-lg font-black text-white flex items-center space-x-2">
-              <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-              <span>Record Debt Settlement</span>
-            </h3>
+            <div>
+              <h3 className="text-base sm:text-lg font-black text-white flex items-center space-x-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                <span>Settle Total Remaining Balance</span>
+              </h3>
+              <p className="text-xs text-slate-400 mt-1">
+                Settles the entire remaining net balance between travelers. To settle a single booking instead, use "Settle Item" on that card.
+              </p>
+            </div>
 
             <div className="p-3.5 rounded-2xl bg-slate-950 border border-white/10 space-y-1">
-              <div className="text-xs text-slate-400">Transfer:</div>
+              <div className="text-xs text-slate-400">Total Balance Transfer:</div>
               <div className="text-sm font-bold text-white flex items-center space-x-2">
                 <span className="text-amber-300">{activeTransferToSettle.fromUserName}</span>
                 <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
                 <span className="text-emerald-400">{activeTransferToSettle.toUserName}</span>
               </div>
-              <div className="text-lg font-black font-mono text-white pt-1">
+              <div className="text-xl font-black font-mono text-white pt-1">
                 {formatCurrency(activeTransferToSettle.amount, activeTransferToSettle.currency)}
               </div>
             </div>
@@ -657,10 +884,17 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
                 onChange={(e) => setSettleMethod(e.target.value)}
                 className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/15 text-white text-xs focus:outline-none focus:border-emerald-400"
               >
-                <option value="revolut">Revolut</option>
-                <option value="blik">BLIK (Poland Phone Pay)</option>
-                <option value="cash">Cash in PLN</option>
-                <option value="transfer">Bank Transfer / Venmo</option>
+                <option value="cash">Cash</option>
+                <option value="bank_transfer">Bank Transfer</option>
+                <option value="zelle">Zelle</option>
+                <option value="venmo">Venmo</option>
+                <option value="apple_pay">Apple Pay</option>
+                <option value="cash_app">Cash App</option>
+                <option value="both_paid_separately">Both Paid Separately</option>
+                <option value="paypal">PayPal</option>
+                <option value="credit_card_split">Credit Card (Split at POS)</option>
+                <option value="revolut_wise">Revolut / Wise</option>
+                <option value="other">Other</option>
               </select>
             </div>
 
@@ -681,7 +915,82 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
                 disabled={isSubmitting}
                 className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shadow-md cursor-pointer disabled:opacity-50"
               >
-                {isSubmitting ? 'Recording...' : 'Confirm Settle-Up'}
+                {isSubmitting ? 'Recording...' : 'Confirm Total Settle'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Record Item-by-Item Settle Modal */}
+      {activeItemToSettle && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
+          <div className="glass-panel w-full max-w-sm p-6 rounded-3xl border border-amber-500/40 bg-slate-900 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <h3 className="text-base sm:text-lg font-black text-white flex items-center space-x-2">
+                <Receipt className="w-5 h-5 text-amber-400" />
+                <span>Settle Item Booking</span>
+              </h3>
+              <button 
+                type="button" 
+                onClick={() => setActiveItemToSettle(null)}
+                className="text-slate-400 hover:text-white text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-slate-950 border border-white/10 space-y-1.5">
+              <div className="text-[11px] text-slate-400 uppercase font-bold tracking-wider">Booking / Item</div>
+              <div className="text-sm font-bold text-white truncate">
+                {activeItemToSettle.expense.description}
+              </div>
+              <div className="flex items-center justify-between pt-1 border-t border-white/5 text-xs">
+                <span className="text-amber-300 font-bold">{activeItemToSettle.split.user_name}</span>
+                <span className="text-slate-400">pays</span>
+                <span className="text-emerald-400 font-bold">{activeItemToSettle.expense.paid_by_name}</span>
+              </div>
+              <div className="text-xl font-black font-mono text-white pt-1">
+                {formatCurrency(activeItemToSettle.split.amount_owed, activeItemToSettle.expense.currency_original || 'USD')}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-300 mb-1">Payment Method</label>
+              <select
+                value={settleMethod}
+                onChange={(e) => setSettleMethod(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/15 text-white text-xs focus:outline-none focus:border-amber-400"
+              >
+                <option value="cash">Cash</option>
+                <option value="bank_transfer">Bank Transfer</option>
+                <option value="zelle">Zelle</option>
+                <option value="venmo">Venmo</option>
+                <option value="apple_pay">Apple Pay</option>
+                <option value="cash_app">Cash App</option>
+                <option value="both_paid_separately">Both Paid Separately</option>
+                <option value="paypal">PayPal</option>
+                <option value="credit_card_split">Credit Card (Split at POS)</option>
+                <option value="revolut_wise">Revolut / Wise</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+
+            <div className="pt-2 flex items-center justify-end space-x-2">
+              <button
+                type="button"
+                onClick={() => setActiveItemToSettle(null)}
+                className="px-3 py-2 rounded-xl text-slate-400 hover:text-white text-xs"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmItemSettle}
+                disabled={isSubmitting}
+                className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md cursor-pointer disabled:opacity-50"
+              >
+                {isSubmitting ? 'Recording...' : `Confirm Settle (${formatCurrency(activeItemToSettle.split.amount_owed, activeItemToSettle.expense.currency_original)})`}
               </button>
             </div>
           </div>

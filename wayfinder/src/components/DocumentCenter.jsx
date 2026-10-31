@@ -382,6 +382,8 @@ export function DocumentCenter() {
       ? 'Poland_Delta.pdf'
       : (fname.toLowerCase().includes('getyourguide') || fname.toLowerCase().includes('gyg') || fname.toLowerCase().includes('auschwitz') || fname.toLowerCase().includes('wieliczka') || fname.toLowerCase().includes('salt'))
       ? 'GetYourGuide_Ticket_GYG7VKK692WY.pdf'
+      : (fname.toLowerCase().includes('altus') || fname.toLowerCase().includes('palace') || fname.toLowerCase().includes('wroclaw') || fname.toLowerCase().includes('hotel'))
+      ? 'Hotel_Altus_Palace_Wroclaw_Confirmation.pdf'
       : fname;
     const staticFallback = `${normalizedBase}Poland-2026/docs/${staticDocName}`;
 
@@ -404,7 +406,12 @@ export function DocumentCenter() {
   };
 
   const importedItems = (itinerary || []).filter(item => 
-    !item.notes?.includes('gmail:') && (item.status === 'imported' || (item.notes && item.notes.includes('email-forward')))
+    !item.notes?.includes('gmail:') && (
+      item.status === 'imported' || 
+      item.status === 'confirmed' || 
+      Boolean(item.source_document_id) || 
+      (item.notes && item.notes.includes('email-forward'))
+    )
   );
 
   const displayDocuments = documents.length > 0 ? documents : [
@@ -417,6 +424,26 @@ export function DocumentCenter() {
       processing_status: 'imported',
       file_size_bytes: 4157,
       upload_date: '2026-08-28T17:14:46.000Z'
+    },
+    {
+      id: 'doc-altus-palace-wroclaw',
+      filename: 'Hotel_Altus_Palace_Wroclaw_Confirmation.pdf',
+      safe_display_name: 'Hotel Altus Palace Wrocław Confirmation (ALT-88421)',
+      detected_doc_type: 'hotel',
+      detected_provider: 'Hotel Altus Palace Wrocław',
+      processing_status: 'imported',
+      file_size_bytes: 2446,
+      upload_date: '2026-10-31T12:00:00.000Z'
+    },
+    {
+      id: 'doc-gyg-7vkk692wy',
+      filename: 'GetYourGuide_Ticket_GYG7VKK692WY.pdf',
+      safe_display_name: 'GetYourGuide Ticket: Auschwitz & Wieliczka Tour (GYG7VKK692WY)',
+      detected_doc_type: 'excursion',
+      detected_provider: 'GetYourGuide',
+      processing_status: 'imported',
+      file_size_bytes: 3966,
+      upload_date: '2026-10-30T17:00:00.000Z'
     }
   ];
 

@@ -157,6 +157,7 @@ Tracks shared expedition costs, member split allocations, and debt settlements i
 - `percentage`: percentage share of total cost (e.g. 50.0).
 - `is_settled`: binary settlement flag (0 or 1).
 - `settled_at`: ISO timestamp of settlement.
+- `settle_method`: payment channel used when settled item-by-item (e.g. `zelle`, `venmo`, `apple_pay`, `cash_app`, `cash`, `bank_transfer`, `split_separately`, `paypal`, `credit_card_pos`, `revolut`, `other`).
 
 ### 9.3 Expense Settlements Table (`wayfinder_expense_settlements`)
 - `id`: settlement transaction identifier (`stl-...`).
@@ -165,8 +166,10 @@ Tracks shared expedition costs, member split allocations, and debt settlements i
 - `to_user_id`, `to_user_name`: creditor who received funds.
 - `amount`, `currency`: payment amount and currency.
 - `settled_date`: date payment occurred.
-- `method`: payment channel (`revolut`, `blik`, `cash`, `transfer`).
+- `method`: payment channel (`cash`, `bank_transfer`, `zelle`, `venmo`, `apple_pay`, `cash_app`, `split_separately`, `paypal`, `credit_card_pos`, `revolut`, `other`).
 - `notes`: settlement transaction memo.
+- `expense_id`: optional foreign key referencing specific parent `wayfinder_expenses(id)` for item-by-item settlements.
+- `split_id`: optional foreign key referencing specific `wayfinder_expense_splits(id)` for item-by-item settlements.
 
 ## 10. Confirmed Excursion State & Timeline Occlusion Architecture
 
@@ -203,4 +206,26 @@ Tracks confirmed private tour bookings, time window parameters, and reconciliati
   - `rawDuration`: Parsed duration (e.g. `11 hours`).
   - `mobileTicketUrl` & `activityDetailsUrl`: Canonical web booking links.
   - `description`: Curated narrative description preventing raw metadata leakage.
+
+---
+
+## 11. Core Lodging & Expedition Expense State Ingestion
+
+Active persistent entities for confirmed trip reservations:
+
+### 11.1 Hotel Altus Palace Wrocław
+- Document Record (`wayfinder_documents`): `id: doc-altus-palace-wroclaw`, `original_filename: Hotel_Altus_Palace_Wroclaw_Confirmation.pdf`, `storage_status: imported`, `processing_status: imported`.
+- Itinerary Record (`wayfinder_itinerary_items`): `id: itin-altus-palace-wroclaw`, `item_type: hotel`, `title: Altus Palace Wrocław 5-Star Stay (Check-in)`, `local_date: 2026-12-07`, `local_time: 15:00`, `end_date: 2026-12-09`, `end_time: 11:00`, `source_document_id: doc-altus-palace-wroclaw`.
+- Expense Record (`wayfinder_expenses`): `id: exp-altus-palace-hotel`, `amount_original: 2400.00`, `currency_original: PLN`, `paid_by_name: Jonathan Kemp`, `category: lodging`, linked to splits `spl-altus-1` and `spl-altus-2` (1,200.00 PLN each).
+
+### 11.2 Inbound Transatlantic Flights
+- Document Record: `ea78634a-eaa9-46e8-b40c-b3703bb6e2ca` (`Poland_Delta.pdf`).
+- Itinerary Record: `471a82a3-2251-4d01-a308-a8f084b6108a` (`Flight: ATL to KRK`).
+- Expense Record: `exp-delta-flight-dl9208`, `amount_original: 1980.00`, `currency_original: USD`, `amount_usd: 1980.00`, linked to splits `spl-flight-jon` and `spl-flight-ronald` ($990.00 USD each).
+
+### 11.3 Auschwitz & Wieliczka Guided Excursion
+- Document Record: `doc-gyg-7vkk692wy` (`GetYourGuide_Ticket_GYG7VKK692WY.pdf`).
+- Itinerary Record: `5263ea74-fc84-4b85-8f9d-9d5179e7f292` (`GetYourGuide: Auschwitz-Birkenau & Wieliczka Salt Mine Tour`).
+- Expense Record: `exp-gyg-7vkk692wy`, `amount_original: 284.76`, `currency_original: USD`, `amount_usd: 284.76`, linked to splits `split-gyg-1` and `split-gyg-2` ($142.38 USD each).
+
 

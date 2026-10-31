@@ -41,12 +41,12 @@ export function SettingsModal({ isOpen, onClose }) {
               <Coins className="w-4 h-4" />
               <span>Base Currency</span>
             </div>
-            <div className="grid grid-cols-3 gap-3">
-              {['USD', 'EUR', 'GBP'].map(curr => (
+            <div className="grid grid-cols-4 gap-2">
+              {['USD', 'EUR', 'GBP', 'PLN'].map(curr => (
                 <button
                   key={curr}
                   onClick={() => updateSettings({ currency: curr })}
-                  className={`py-2 px-3 rounded-xl border font-bold text-sm transition-all ${
+                  className={`py-2 px-2.5 rounded-xl border font-bold text-xs sm:text-sm transition-all ${
                     settings.currency === curr 
                       ? 'bg-wf-amber/20 border-wf-amber/50 text-wf-amber shadow-inner'
                       : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'

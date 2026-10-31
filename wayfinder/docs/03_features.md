@@ -229,13 +229,17 @@ To streamline shared travel costs and eliminate complicated group debt calculati
   - `calculateSettleUp(expenses, settlements, displayCurrency)`: Computes each participant's net balance (`paid - owed`). Separates net creditors from net debtors and greedily pairs maximum debtors with maximum creditors.
   - Generates the theoretical minimum number of direct settlement transfers (e.g. "Ronald pays Jon 420.00 zł" instead of multiple circular payments).
 - Edge API & Settlement Tracking ([expenses.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/expenses.js)):
-  - Endpoints: `GET /api/wayfinder/expenses` (public read fallback, returns expenses, member splits, and settlements), `POST /api/wayfinder/expenses` (records new costs), `DELETE /api/wayfinder/expenses/:id` (removes expense and cascades splits), `POST /api/wayfinder/expenses/settle` (logs settle-up payments via Revolut, BLIK, cash, or bank transfer), and `POST /api/wayfinder/expenses/preset` (seeds realistic Poland 2026 trip expenses).
+  - Endpoints: `GET /api/wayfinder/expenses` (public read fallback, returns expenses, member splits, and settlements), `POST /api/wayfinder/expenses` (records new costs), `DELETE /api/wayfinder/expenses/:id` (removes expense and cascades splits), `POST /api/wayfinder/expenses/settle` (logs settle-up payments via Cash, Bank Transfer, Zelle, Venmo, Apple Pay, Cash App, Both Paid Separately, PayPal, Credit Card Split, or Revolut/Wise), and `POST /api/wayfinder/expenses/preset` (seeds realistic Poland 2026 trip expenses).
 - Document Import & OCR Expense Synchronization ([import-jobs.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/import-jobs.js)):
   - Automated Cost Extraction: Extracts fare and price fields (`total_cost`, `cost`, `price`, `amount`) during document OCR extraction and review in [DocumentCenter.jsx](file:///e:/TechTrekGT/wayfinder/src/components/DocumentCenter.jsx).
   - Atomic Approval Synchronization: When an imported travel document (flights, hotels, PKP rail tickets, tours) is approved via `POST /api/wayfinder/import-jobs/:doc_id/approve`, the edge worker automatically creates both the verified itinerary item in `wayfinder_itinerary_items` AND the linked cost in `wayfinder_expenses` with 50/50 group split allocations in `wayfinder_expense_splits`.
   - Idempotent Protection: Checks for existing expense rows tied to `document_id` before inserting, ensuring re-approvals or edits never duplicate costs in the shared ledger.
 - UI Component Integration:
   - [ExpenseLedger.jsx](file:///e:/TechTrekGT/wayfinder/src/components/budget/ExpenseLedger.jsx): Mounted as a dedicated tab inside [PrivateHub.jsx](file:///e:/TechTrekGT/wayfinder/src/components/PrivateHub.jsx) at `/wayfinder/poland-christmas-2026/private/expenses`, featuring overview metric cards, net balance callouts, simplified settle-up action cards, category filtering, new expense modal, and payment settlement log.
+  - Setting-Driven Currency Preference: Governed directly by `settings.currency` from [SettingsContext.jsx](file:///e:/TechTrekGT/wayfinder/src/context/SettingsContext.jsx) (`USD`, `EUR`, `GBP`, `PLN`) with a 1-click modal opener, eliminating ad-hoc page toggles.
+  - Live Input Currency Conversion Preview: When entering expenses in non-base currencies, renders a real-time conversion preview badge into the user's preferred display currency prior to saving.
+  - Comprehensive Settlement Methods: Supports real-world US traveler channels including Cash, Bank Transfer, Zelle, Venmo, Apple Pay, Cash App, Both Paid Separately, PayPal, Credit Card (Split at POS), and Revolut / Wise.
+  - Subpath-Aware API Resilience: Leverages `getApiUrl` and `credentials: 'include'` for all expense fetch requests, ensuring reliable data communication across subpath routing.
 
 ## 15. Intelligent Excursion Reconciliation, Canonical Booking Deep-Linking & Universal Ticket Viewer
 
@@ -268,6 +272,14 @@ To prevent raw email-dump text, regex bleed-through, and multiline escape sequen
 - Multi-Component Parity:
   - [PrivateBookingCard.jsx](file:///e:/TechTrekGT/wayfinder/src/components/itinerary/PrivateBookingCard.jsx): Uses structured metadata for the main timeline display, eliminating all multiline bleeding.
   - [DocumentCenter.jsx](file:///e:/TechTrekGT/wayfinder/src/components/DocumentCenter.jsx): Powers the `selectedBooking` modal grid and converts escaped newlines in raw email forward notes into properly wrapped paragraphs.
+
+## 17. Official Lodging Document Integration (Hotel Altus Palace Wrocław)
+
+Provides synchronized document verification and offline-capable ticket inspection for trip accommodations:
+
+- Official Voucher Asset: Bundled PDF confirmation [Hotel_Altus_Palace_Wroclaw_Confirmation.pdf](file:///e:/TechTrekGT/wayfinder/public/Poland-2026/docs/Hotel_Altus_Palace_Wroclaw_Confirmation.pdf) documenting confirmation number `ALT-88421`, 2-night stay dates (Dec 7-9, 2026), room tier (Palace Deluxe Double Room), total fare (2,400.00 PLN), hotel phone (+48 71 747 50 00), and email.
+- Relational Document Entity: Registered in `wayfinder_documents` (`doc-altus-palace-wroclaw`) and cross-linked to verified itinerary item `itin-altus-palace-wroclaw` and ledger expense `exp-altus-palace-hotel`.
+- Document Center Parity: Renders within "Synced Trip Confirmations" and the primary document repository in [DocumentCenter.jsx](file:///e:/TechTrekGT/wayfinder/src/components/DocumentCenter.jsx), with seamless 1-click in-app PDF previewing.
 
 
 

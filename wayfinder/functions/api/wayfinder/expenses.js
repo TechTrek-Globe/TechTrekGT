@@ -48,6 +48,7 @@ async function ensureTables(db) {
         percentage      REAL,
         is_settled      INTEGER NOT NULL DEFAULT 0,
         settled_at      TEXT,
+        settle_method   TEXT,
         created_at      TEXT NOT NULL DEFAULT (datetime('now')),
         updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
       )
@@ -57,6 +58,8 @@ async function ensureTables(db) {
       CREATE TABLE IF NOT EXISTS wayfinder_expense_settlements (
         id              TEXT PRIMARY KEY,
         journey_id      TEXT NOT NULL,
+        expense_id      TEXT,
+        split_id        TEXT,
         from_user_id    TEXT NOT NULL,
         from_user_name  TEXT NOT NULL,
         to_user_id      TEXT NOT NULL,
@@ -149,7 +152,9 @@ export async function handleExpenses(context, url, method) {
         amount,
         currency = 'PLN',
         method: payMethod = 'cash',
-        notes = ''
+        notes = '',
+        expense_id = null,
+        split_id = null
       } = body;
 
       if (!from_user_id || !to_user_id || !amount) {
@@ -160,8 +165,8 @@ export async function handleExpenses(context, url, method) {
       await db.prepare(`
         INSERT INTO wayfinder_expense_settlements (
           id, journey_id, from_user_id, from_user_name, to_user_id, to_user_name,
-          amount, currency, settled_date, method, notes, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, date('now'), ?, ?, datetime('now'))
+          amount, currency, settled_date, method, notes, expense_id, split_id, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, date('now'), ?, ?, ?, ?, datetime('now'))
       `).bind(
         settleId,
         journeyId,
@@ -172,10 +177,45 @@ export async function handleExpenses(context, url, method) {
         Number(amount),
         currency.toUpperCase(),
         payMethod,
-        notes
+        notes,
+        expense_id,
+        split_id
       ).run();
 
+      // If tied to a specific split, mark that split as settled
+      if (split_id) {
+        await db.prepare(`
+          UPDATE wayfinder_expense_splits 
+          SET is_settled = 1, settled_at = datetime('now'), settle_method = ?
+          WHERE id = ?
+        `).bind(payMethod, split_id).run();
+      }
+
       return json({ success: true, settlement_id: settleId });
+    }
+
+    // 2b. DELETE /api/wayfinder/expenses/settle - Undo / remove a recorded settlement
+    if (method === 'DELETE' && isSettleAction) {
+      if (!user) return json({ error: 'Authentication required' }, 401);
+      const settleId = url.searchParams.get('settlement_id') || url.searchParams.get('id');
+      const splitId = url.searchParams.get('split_id');
+
+      if (splitId) {
+        await db.prepare('UPDATE wayfinder_expense_splits SET is_settled = 0, settled_at = NULL, settle_method = NULL WHERE id = ?').bind(splitId).run();
+        await db.prepare('DELETE FROM wayfinder_expense_settlements WHERE split_id = ?').bind(splitId).run();
+        return json({ success: true, un_settled_split: splitId });
+      }
+
+      if (settleId) {
+        const stl = await db.prepare('SELECT * FROM wayfinder_expense_settlements WHERE id = ?').bind(settleId).first();
+        if (stl && stl.split_id) {
+          await db.prepare('UPDATE wayfinder_expense_splits SET is_settled = 0, settled_at = NULL, settle_method = NULL WHERE id = ?').bind(stl.split_id).run();
+        }
+        await db.prepare('DELETE FROM wayfinder_expense_settlements WHERE id = ?').bind(settleId).run();
+        return json({ success: true, deleted_settlement: settleId });
+      }
+
+      return json({ error: 'settlement_id or split_id required' }, 400);
     }
 
     // 3. POST /api/wayfinder/expenses/preset - Seed curated trip expenses

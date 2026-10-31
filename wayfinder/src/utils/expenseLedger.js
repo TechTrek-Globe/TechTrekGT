@@ -81,13 +81,13 @@ export function splitEqually(totalAmount, participants = []) {
  * @returns {Object} { balances: Array, transfers: Array, totalSpend: Object }
  */
 export function calculateSettleUp(expenses = [], settlements = [], displayCurrency = 'PLN') {
-  const balances = {}; // userId -> { id, name, paid, owed, net }
+  const balances = {}; // userId -> { id, name, paid, owed, net, settlementsPaid, settlementsReceived }
   const totalSpendByCurrency = { PLN: 0, USD: 0, EUR: 0 };
 
   const ensureUser = (id, name = 'Member') => {
     if (!id) return;
     if (!balances[id]) {
-      balances[id] = { id, name, paid: 0, owed: 0, net: 0 };
+      balances[id] = { id, name, paid: 0, owed: 0, net: 0, settlementsPaid: 0, settlementsReceived: 0 };
     } else if (name && balances[id].name === 'Member' && name !== 'Member') {
       balances[id].name = name;
     }
@@ -111,22 +111,25 @@ export function calculateSettleUp(expenses = [], settlements = [], displayCurren
       balances[payerId].paid += amountInDisplay;
     }
 
-    // Process splits for this expense
+    // Process splits for this expense - EVERY participant owes their split share
     const splits = exp.splits || [];
-    for (const split of splits) {
-      const debtorId = split.user_id || split.userId;
-      const debtorName = split.user_name || split.userName || 'Member';
-      // Skip the payer's own split row - it represents their personal share,
-      // not an external debt. Only non-payer splits represent real money owed.
-      const payerUserId = exp.paid_by_user_id || exp.user_id;
-      if (debtorId === payerUserId) continue;
-      ensureUser(debtorId, debtorName);
+    if (splits.length > 0) {
+      for (const split of splits) {
+        const debtorId = split.user_id || split.userId;
+        const debtorName = split.user_name || split.userName || 'Member';
+        ensureUser(debtorId, debtorName);
 
-      const splitOwed = Number(split.amount_owed || split.amount || 0);
-      const splitInDisplay = convertCurrency(splitOwed, currency, displayCurrency);
+        const splitOwed = Number(split.amount_owed || split.amount || 0);
+        const splitInDisplay = convertCurrency(splitOwed, currency, displayCurrency);
 
-      if (balances[debtorId]) {
-        balances[debtorId].owed += splitInDisplay;
+        if (balances[debtorId]) {
+          balances[debtorId].owed += splitInDisplay;
+        }
+      }
+    } else {
+      // If no split details exist, assume payer pays for own share
+      if (balances[payerId]) {
+        balances[payerId].owed += amountInDisplay;
       }
     }
   }
@@ -144,19 +147,24 @@ export function calculateSettleUp(expenses = [], settlements = [], displayCurren
     ensureUser(fromId, fromName);
     ensureUser(toId, toName);
 
-    // fromUser paid out money, so their debt decreases (net increases)
-    if (balances[fromId]) balances[fromId].paid += inDisplay;
-    // toUser received money, so what they are owed decreases (net decreases)
-    if (balances[toId]) balances[toId].owed += inDisplay;
+    // fromUser transferred money to toUser:
+    // fromUser's net improves (paid debt), toUser's net decreases (reimbursed)
+    if (balances[fromId]) balances[fromId].settlementsPaid += inDisplay;
+    if (balances[toId]) balances[toId].settlementsReceived += inDisplay;
   }
 
   // 3. Compute net balance for each member
+  // Net = (Expenses Paid - Expense Share) + (Settlements Paid - Settlements Received)
   const balanceList = Object.values(balances).map((b) => {
-    const net = Math.round((b.paid - b.owed) * 100) / 100;
+    const rawExpensesPaid = b.paid;
+    const rawExpenseShare = b.owed;
+    const net = Math.round((rawExpensesPaid - rawExpenseShare + b.settlementsPaid - b.settlementsReceived) * 100) / 100;
     return {
       ...b,
-      paid: Math.round(b.paid * 100) / 100,
-      owed: Math.round(b.owed * 100) / 100,
+      paid: Math.round(rawExpensesPaid * 100) / 100,
+      owed: Math.round(rawExpenseShare * 100) / 100,
+      settlementsPaid: Math.round(b.settlementsPaid * 100) / 100,
+      settlementsReceived: Math.round(b.settlementsReceived * 100) / 100,
       net
     };
   });

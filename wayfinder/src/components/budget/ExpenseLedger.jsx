@@ -492,7 +492,12 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
           <div className="text-2xl sm:text-3xl font-black text-white">
             {formatCurrency(userBalance.paid, displayCurrency)}
           </div>
-          <span className="text-[11px] text-slate-400">Direct bookings & purchases</span>
+          <span className="text-[11px] text-slate-400">
+            {userBalance.settlementsPaid > 0
+              ? `Direct bookings (+${formatCurrency(userBalance.settlementsPaid, displayCurrency)} settled)`
+              : 'Direct bookings & purchases'
+            }
+          </span>
         </div>
 
         {/* Your Share Card */}
@@ -677,7 +682,14 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
                                 key={s.id || s.user_id} 
                                 className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-[11px] text-slate-300"
                               >
-                                <span>{firstName}: {formatCurrency(s.amount_owed, cur)}</span>
+                                <span>
+                                  {firstName}: {formatCurrency(s.amount_owed, cur)}
+                                  {cur !== displayCurrency && (
+                                    <span className="text-slate-400 font-normal ml-1">
+                                      (≈ {formatCurrency(convertCurrency(s.amount_owed, cur, displayCurrency), displayCurrency)})
+                                    </span>
+                                  )}
+                                </span>
                                 <span className="text-slate-500 font-normal">(Paid)</span>
                               </span>
                             );
@@ -690,7 +702,14 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
                               className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-[11px] text-emerald-300"
                             >
                               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                              <span className="font-bold">{firstName}: {formatCurrency(s.amount_owed, cur)}</span>
+                              <span className="font-bold">
+                                {firstName}: {formatCurrency(s.amount_owed, cur)}
+                                {cur !== displayCurrency && (
+                                  <span className="text-emerald-400/70 font-normal ml-1">
+                                    (≈ {formatCurrency(convertCurrency(s.amount_owed, cur, displayCurrency), displayCurrency)})
+                                  </span>
+                                )}
+                              </span>
                               <span className="text-emerald-400 font-medium">
                                 ✓ Settled {s.settle_method ? `via ${SETTLE_METHOD_MAP[s.settle_method] || s.settle_method}` : ''}
                               </span>
@@ -716,6 +735,11 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
                                   ? `You owe ${exp.paid_by_name?.split(' ')[0] || 'Payer'}: ${formatCurrency(s.amount_owed, cur)}`
                                   : `${firstName} owes ${formatCurrency(s.amount_owed, cur)}`
                                 }
+                                {cur !== displayCurrency && (
+                                  <span className="text-amber-200/70 font-normal ml-1">
+                                    (≈ {formatCurrency(convertCurrency(s.amount_owed, cur, displayCurrency), displayCurrency)})
+                                  </span>
+                                )}
                               </span>
                               <button
                                 type="button"
@@ -1051,6 +1075,11 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
               </div>
               <div className="text-xl font-black font-mono text-white pt-1">
                 {formatCurrency(activeItemToSettle.split.amount_owed, activeItemToSettle.expense.currency_original || 'USD')}
+                {(activeItemToSettle.expense.currency_original || 'USD') !== displayCurrency && (
+                  <span className="text-xs sm:text-sm text-slate-400 font-normal ml-2">
+                    ≈ {formatCurrency(convertCurrency(activeItemToSettle.split.amount_owed, activeItemToSettle.expense.currency_original || 'USD', displayCurrency), displayCurrency)}
+                  </span>
+                )}
               </div>
             </div>
 

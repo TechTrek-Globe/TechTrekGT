@@ -281,5 +281,43 @@ Provides synchronized document verification and offline-capable ticket inspectio
 - Relational Document Entity: Registered in `wayfinder_documents` (`doc-altus-palace-wroclaw`) and cross-linked to verified itinerary item `itin-altus-palace-wroclaw` and ledger expense `exp-altus-palace-hotel`.
 - Document Center Parity: Renders within "Synced Trip Confirmations" and the primary document repository in [DocumentCenter.jsx](file:///e:/TechTrekGT/wayfinder/src/components/DocumentCenter.jsx), with seamless 1-click in-app PDF previewing.
 
+## 18. Resilient Offline Mutation Queue & Ambient Connection Telemetry
 
+Wayfinder provides seamless offline resilience for travelers moving through cellular dead zones, underground transit tunnels, and high-speed rail corridors across Poland:
 
+- Client-Side IndexedDB Mutation Store ([documentStorage.js](file:///e:/TechTrekGT/wayfinder/src/utils/documentStorage.js)):
+  - Upgraded schema to Database Version 2 (`DB_VERSION = 2`), provisioning the `mutation_queue` object store.
+  - Indexed by `status` (pending, replaying, failed, completed) and `createdAt` timestamp for deterministic FIFO processing.
+  - Stores serializable mutation envelopes containing HTTP method, target URL, payload body, headers, entity metadata, and retry attempt counters.
+- Deterministic Replay Engine & Idempotency Key Protocol ([mutationQueue.js](file:///e:/TechTrekGT/wayfinder/src/utils/mutationQueue.js)):
+  - Cryptographic Idempotency Header: Injects a unique `X-Idempotency-Key` (UUIDv4) into every mutated request, ensuring Cloudflare edge workers and D1 SQLite transactions never execute duplicate operations upon replay.
+  - Transparent `resilientFetch` Wrapper: Intercepts network failures (e.g., `TypeError: Failed to fetch`, offline browser events). Instead of throwing fatal errors to UI components, it serializes the mutation into IndexedDB and returns a synthetic HTTP `202 Accepted` response with `{ queued: true }`.
+  - FIFO Replay Queue: Processes pending offline changes in strict order of capture when connection is restored.
+  - Adaptive Auto-Drain Listeners: Listens to native browser `window.addEventListener('online')` and `window.addEventListener('focus')` events, initiating automatic background queue drain when connectivity resumes.
+  - Global DOM Event Bus: Dispatches `wayfinder:queue-updated`, `wayfinder:sync-start`, `wayfinder:sync-complete`, and `wayfinder:mutation-synced` events to keep active React components in sync without coupling.
+- Ambient Telemetry & Sync Management Pill ([OfflineSyncBadge.jsx](file:///e:/TechTrekGT/wayfinder/src/components/common/OfflineSyncBadge.jsx)):
+  - Unified Status Indicator: Mounted into both the desktop right actions strip and the sticky mobile top bar in [Layout.jsx](file:///e:/TechTrekGT/wayfinder/src/components/Layout.jsx).
+  - Ambient Color Coding: Displays subtle muted green when fully synchronized and online; vibrant amber badge with pending counter when mutations are queued offline; animated spinning blue badge during active synchronization.
+  - Interactive Queue Inspector Modal: Travelers can click the badge to review pending operations (entity type, action, timestamp), view connection details, and trigger manual "Sync Now" flushes.
+- Resilient Mutation Wireup:
+  - [PackingManager.jsx](file:///e:/TechTrekGT/wayfinder/src/components/packing/PackingManager.jsx): Packing item checkboxes, quantity increments, item deletions, and bulk list operations safely persist locally while offline.
+  - [ExpenseLedger.jsx](file:///e:/TechTrekGT/wayfinder/src/components/budget/ExpenseLedger.jsx): Expense additions, category updates, individual split settlements, and undo operations queue transparently when disconnected.
+  - [WayfinderContext.jsx](file:///e:/TechTrekGT/wayfinder/src/context/WayfinderContext.jsx): Extracted field modifications, approval reviews, and document status updates queue safely without user disruption.
+
+## 19. Intelligent Booking Document & Email Parsing Engine (Gemini Structured Outputs)
+
+Replaces brittle regex matching and static simulated filename keywords with a serverless, multi-modal Gemini 2.5 Flash / 3.8 Flash structured output parsing pipeline:
+
+- Gemini Structured Extraction Engine ([gemini-parser.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/gemini-parser.js)):
+  - Schema Enforcement: Leverages `responseMimeType: "application/json"` and strict `responseSchema` definitions, guaranteeing typed outputs for 7 core travel item types: `flight`, `rail`, `hotel`, `excursion`, `restaurant`, `transport`, `other`.
+  - Rich Travel Metadata Normalization: Deterministically extracts start/end dates (ISO YYYY-MM-DD), start/end times (24-hour HH:MM), carrier/provider names, confirmation/booking codes, origin and destination stations, assigned seats, total costs, and ISO currency codes (PLN, USD, EUR, GBP).
+  - Multi-Provider Ingestion Support: Built-in recognition for Polish and European travel providers including PKP Intercity, Delta Air Lines, LOT Polish Airlines, GetYourGuide, Hotel Altus Palace, Accor / The Bridge Wroclaw, Hotel Stary Krakow, and Booking.com.
+  - Strict Privacy and Security Scrubbing: Automatically scrubs credit card numbers, CVVs, and full passport IDs before persistence in Cloudflare D1.
+  - Resilient Zero-Key Heuristic Fallback: In offline local development or when `GEMINI_API_KEY` is not bound, falls back seamlessly to an intelligent serverless heuristic parser, extracting structured metadata without throwing fatal runtime errors.
+- Cloudflare Inbound Email 2-Stage Pipeline ([email-worker.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/email-worker.js)):
+  - Stage 1 Fast Regex Pass: Quickly matches standard GetYourGuide, Delta, and PKP email formats.
+  - Stage 2 Gemini Fallback: Automatically invokes the Gemini parser when regex confidence is low, confirmation code is missing, or dates fail bounds checking.
+- Interactive Document Center Upload Pipeline ([DocumentCenter.jsx](file:///e:/TechTrekGT/wayfinder/src/components/DocumentCenter.jsx)):
+  - Binary and Text Streaming: Reads uploaded PDF vouchers, tickets, or text files and dispatches them to `POST /api/wayfinder/import-jobs/:doc_id/parse`.
+  - Automated Field Population: Automatically populates `wayfinder_extracted_fields` and flags the extraction job as `ready_for_review`.
+  - Review Gate Integration: Opens the verification modal with extracted values highlighted for user approval before landing into `wayfinder_itinerary_items`.

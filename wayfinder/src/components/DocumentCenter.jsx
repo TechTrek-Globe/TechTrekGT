@@ -151,6 +151,7 @@ export function DocumentCenter() {
     fetchDocuments, 
     fetchItinerary,
     getJobFields, 
+    parseDocument,
     saveExtractedFields, 
     approveImportJob, 
     rejectImportJob 
@@ -244,9 +245,21 @@ export function DocumentCenter() {
         await saveLocalDocumentFile(docId, file);
       }
       
-      // 2. Perform intelligent client-side OCR extraction
-      const extraction = simulateExtraction(file);
-      await saveExtractedFields(docId, extraction.fields, extraction.provider, extraction.docType);
+      // 2. Perform intelligent serverless Gemini 2.5 Flash / 3.8 Flash extraction
+      let extractionDone = false;
+      try {
+        const parseRes = await parseDocument(docId, file);
+        if (parseRes && parseRes.success) {
+          extractionDone = true;
+        }
+      } catch (parseErr) {
+        console.warn('[DocumentCenter] Serverless Gemini parse failed, falling back to local heuristic:', parseErr);
+      }
+
+      if (!extractionDone) {
+        const extraction = simulateExtraction(file);
+        await saveExtractedFields(docId, extraction.fields, extraction.provider, extraction.docType);
+      }
       
       if (fileInputRef.current) fileInputRef.current.value = '';
       

@@ -228,5 +228,70 @@ Active persistent entities for confirmed trip reservations:
 - Document Record: `doc-gyg-7vkk692wy` (`GetYourGuide_Ticket_GYG7VKK692WY.pdf`).
 - Itinerary Record: `5263ea74-fc84-4b85-8f9d-9d5179e7f292` (`GetYourGuide: Auschwitz-Birkenau & Wieliczka Salt Mine Tour`).
 - Expense Record: `exp-gyg-7vkk692wy`, `amount_original: 284.76`, `currency_original: USD`, `amount_usd: 284.76`, linked to splits `split-gyg-1` and `split-gyg-2` ($142.38 USD each).
+---
 
+## 12. Offline Mutation Queue State & Idempotency Governance
 
+Governs the state transitions, local storage contracts, and replay guarantees for offline operations:
+
+### 12.1 Client IndexedDB Object Store Schema (`mutation_queue`)
+- Database: `wayfinder_offline_docs`, Version: `2`.
+- Object Store: `mutation_queue` with keyPath `id`.
+- Indexes:
+  - `idx_status`: Bounded lookup for mutations matching `pending`, `replaying`, `failed`, or `completed`.
+  - `idx_createdAt`: Ascending timestamp sort ensuring deterministic First-In-First-Out (FIFO) replay.
+
+### 12.2 Mutation Record Schema
+Each queued mutation record comprises:
+- `id`: Client-generated unique identifier (`mut-<timestamp>-<random>`).
+- `idempotencyKey`: UUIDv4 header value transmitted via `X-Idempotency-Key` to guarantee idempotency across multiple delivery attempts.
+- `url`: Target endpoint URL (e.g. `/api/wayfinder/packing/item-123`).
+- `method`: Mutating HTTP method (`POST`, `PUT`, `DELETE`, `PATCH`).
+- `headers`: Key-value map of outbound HTTP headers.
+- `body`: Serialized JSON payload string or null.
+- `entityType`: Domain identifier (`packing_item`, `expense`, `document_field`, `import_job`).
+- `entityId`: Associated entity identifier for UI display.
+- `action`: Human-readable mutation description (`toggle_packed`, `add_expense`, `update_quantity`).
+- `status`: Lifecycle stage (`pending` -> `replaying` -> `completed` / `failed`).
+- `attempts`: Integer tracking retry attempts (default: 0).
+- `lastError`: Error message captured from failed network response.
+- `createdAt`: ISO 8601 creation timestamp.
+- `syncedAt`: ISO 8601 completion timestamp.
+
+### 12.3 DOM Event Bus Contracts
+- `wayfinder:queue-updated`: Dispatched with `{ count, mutations }` when items are enqueued, removed, or state transitions occur.
+- `wayfinder:sync-start`: Dispatched when the background replay processor begins draining pending items.
+- `wayfinder:sync-complete`: Dispatched with `{ synced, failed, remaining }` upon queue drain completion, triggering automatic component data refreshes.
+- `wayfinder:mutation-synced`: Dispatched with `{ mutation, result }` when an individual mutation is successfully delivered to the Cloudflare edge.
+
+---
+
+## 13. Gemini Extraction Job State & Schema Normalization
+
+Tracks structured extraction metadata, prompt generation, and review validation across both file uploads and inbound forwarded emails:
+
+### 13.1 Extraction Entity Lifecycle
+1. `pending`: Document or email attachment registered in `wayfinder_documents` and `wayfinder_extraction_jobs`.
+2. `processing`: Serverless Gemini 2.5 Flash / 3.8 Flash REST extraction actively running.
+3. `ready_for_review`: Structured fields populated into `wayfinder_extracted_fields` and awaiting traveler confirmation.
+4. `approved`: Fields verified; verified itinerary record written to `wayfinder_itinerary_items` and document status updated to `imported`.
+5. `rejected`: Extraction dismissed; job marked `rejected` without polluting itinerary schedules.
+
+### 13.2 Normalized Extraction Payload
+The structured JSON output produced by `gemini-parser.js` adheres to:
+- `item_type`: enum [`flight`, `rail`, `hotel`, `excursion`, `restaurant`, `transport`, `other`]
+- `title`: String descriptor (e.g. "PKP Intercity 13100: Wrocław Główny -> Poznań Główny")
+- `provider`: Service provider or operator name (e.g. "PKP Intercity", "Delta Air Lines", "Hotel Altus Palace")
+- `confirmation_number`: Booking confirmation code or PNR
+- `start_date`: ISO date `YYYY-MM-DD`
+- `start_time`: 24-hour time `HH:MM`
+- `end_date`: Optional ISO date `YYYY-MM-DD`
+- `end_time`: Optional 24-hour time `HH:MM`
+- `location`: Street address or venue coordinates
+- `origin`: Departure station / airport IATA code
+- `destination`: Arrival station / airport IATA code
+- `price`: Total monetary amount
+- `currency`: ISO 4217 currency code (`PLN`, `USD`, `EUR`, `GBP`)
+- `seat`: Coach, seat number, or platform
+- `notes`: Human-readable summary of cancellation policies, pickup directions, or baggage limits
+- `confidence`: enum [`high`, `medium`, `low`]

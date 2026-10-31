@@ -220,20 +220,25 @@ graph TD
   - Mounted interactive Expense Ledger tab in `wayfinder/src/components/PrivateHub.jsx` at `/wayfinder/poland-christmas-2026/private/expenses`, with route aliases in `wayfinder/src/App.jsx`.
   - Deployed to Cloudflare Workers (Version ID: `68e637b7-15b3-4480-ba7b-0ec06eec4e72`). Documented in `wayfinder/docs/03_features.md` and `wayfinder/docs/04_state.md`.
 
-### Phase 6: Resilient Offline Mutation Queue
-- Goal: Guarantee zero data loss when editing notes, packing items, or expenses during underground train journeys or offline roaming.
-- Files to Create/Modify:
-  - Update `wayfinder/src/utils/documentStorage.js` with `mutation_queue` IndexedDB store.
-  - Create `wayfinder/src/utils/mutationQueue.js`.
-  - Integrate optimistic queue replay into `WayfinderContext.jsx`.
+### Phase 6: Resilient Offline Mutation Queue [COMPLETED]
+- Status: Fully implemented and deployed to production.
+- Deliverables:
+  - Upgraded IndexedDB schema in `wayfinder/src/utils/documentStorage.js` (DB version 2) with `mutation_queue` object store indexed by `status` and `createdAt`.
+  - Created `wayfinder/src/utils/mutationQueue.js` implementing queue enqueuing, UUID idempotency key generation (`X-Idempotency-Key`), FIFO replay execution, automatic window listeners (`online` and `focus`), and the `resilientFetch` transparent wrapper.
+  - Created `wayfinder/src/components/common/OfflineSyncBadge.jsx` rendering ambient connection state, live pending item badges, syncing animations, and an interactive queue inspection modal with manual sync controls.
+  - Mounted `OfflineSyncBadge` into desktop right actions and mobile top bar in `wayfinder/src/components/Layout.jsx`.
+  - Integrated `resilientFetch` into `PackingManager.jsx` (packing item toggle, quantity, delete, create, and bulk clear), `ExpenseLedger.jsx` (expense creation, update, delete, item settlement, and undo), and `WayfinderContext.jsx` (document field updates and job review actions).
+  - Configured Cloudflare Worker CORS headers in `wayfinder/src/worker.js` to explicitly allow `X-Idempotency-Key` on preflight requests.
+  - Documented in `wayfinder/docs/03_features.md` and `wayfinder/docs/04_state.md`.
 
-### Phase 7: Intelligent Booking Document & Email Parsing (Gemini Structured Outputs)
-- Goal: Replace static client-side heuristic simulation and rigid regex date matching with an intelligent, serverless Gemini 2.5 Flash structured parser for PDFs, images, and forwarded booking emails.
-- Files to Create/Modify:
-  - Create `wayfinder/functions/api/wayfinder/gemini-parser.js` (Pure ESM Gemini REST API client with structured JSON schema and prompt builder).
-  - Update `wayfinder/functions/api/wayfinder/email-worker.js` (Add Stage 2 fallback to Gemini when regex confidence is low).
-  - Update `wayfinder/functions/api/wayfinder/import-jobs.js` and `wayfinder/src/worker.js` (Add `POST /api/wayfinder/import-jobs/parse` route).
-  - Update `wayfinder/src/components/DocumentCenter.jsx` (Replace `simulateExtraction(file)` with real backend Gemini extraction call).
+### Phase 7: Intelligent Booking Document & Email Parsing (Gemini Structured Outputs) [COMPLETED]
+- Status: Fully implemented and deployed to production.
+- Deliverables:
+  - Created `wayfinder/functions/api/wayfinder/gemini-parser.js` implementing a pure ESM Gemini REST API client supporting `gemini-2.5-flash` / `gemini-3.8-flash` structured outputs (`responseMimeType: "application/json"`, strict `responseSchema`) with multi-provider recognition (PKP Intercity, Delta, LOT, GetYourGuide, Altus Palace, Accor) and an intelligent zero-key heuristic fallback.
+  - Added `POST /api/wayfinder/import-jobs/:doc_id/parse` and `POST /api/wayfinder/import-jobs/parse` in `wayfinder/functions/api/wayfinder/import-jobs.js` to process document text and base64 binaries, sanitize extracted fields, and set status to `ready_for_review`.
+  - Upgraded inbound email worker `wayfinder/functions/api/wayfinder/email-worker.js` with Stage 2 Gemini fallback when regex confidence is low or confirmation numbers/dates are missing.
+  - Integrated `parseDocument` into `wayfinder/src/context/WayfinderContext.jsx` and updated `wayfinder/src/components/DocumentCenter.jsx` to dispatch real file payloads to the serverless Gemini parsing endpoint before review modal launch.
+  - Documented in `wayfinder/docs/03_features.md` and `wayfinder/docs/04_state.md`.
 
 ---
 

@@ -8,6 +8,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../context/SettingsContext';
 import { getApiUrl } from '../../utils/api';
+import { resilientFetch } from '../../utils/mutationQueue';
 import { formatWeight } from '../Formatters';
 
 const CATEGORIES = [
@@ -105,6 +106,17 @@ export function PackingManager() {
     loadItems();
   }, [loadItems]);
 
+  // Refresh packing list from server when offline mutations complete syncing
+  useEffect(() => {
+    const handleSyncComplete = (e) => {
+      if (isAuthenticated && e.detail?.syncedCount > 0) {
+        loadItems();
+      }
+    };
+    window.addEventListener('wayfinder:sync-complete', handleSyncComplete);
+    return () => window.removeEventListener('wayfinder:sync-complete', handleSyncComplete);
+  }, [isAuthenticated, loadItems]);
+
   // Persist locally for guests
   const updateLocalItems = (newItems) => {
     setItems(newItems);
@@ -161,11 +173,15 @@ export function PackingManager() {
 
     if (isAuthenticated) {
       try {
-        await fetch(getApiUrl(`/api/wayfinder/packing/${item.id}`), {
+        await resilientFetch(getApiUrl(`/api/wayfinder/packing/${item.id}`), {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify({ is_packed: updatedStatus })
+        }, {
+          entityType: 'packing',
+          entityId: item.id,
+          action: `${updatedStatus ? 'Pack' : 'Unpack'} ${item.name}`
         });
       } catch (err) {
         console.error('Failed to toggle packed status:', err);
@@ -183,11 +199,15 @@ export function PackingManager() {
 
     if (isAuthenticated) {
       try {
-        await fetch(getApiUrl(`/api/wayfinder/packing/${item.id}`), {
+        await resilientFetch(getApiUrl(`/api/wayfinder/packing/${item.id}`), {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify({ quantity: newQty })
+        }, {
+          entityType: 'packing',
+          entityId: item.id,
+          action: `Set ${item.name} quantity to ${newQty}`
         });
       } catch (err) {
         console.error('Failed to update quantity:', err);
@@ -204,9 +224,13 @@ export function PackingManager() {
 
     if (isAuthenticated) {
       try {
-        await fetch(getApiUrl(`/api/wayfinder/packing/${itemId}`), {
+        await resilientFetch(getApiUrl(`/api/wayfinder/packing/${itemId}`), {
           method: 'DELETE',
           credentials: 'include'
+        }, {
+          entityType: 'packing',
+          entityId: itemId,
+          action: 'Delete packing item'
         });
       } catch (err) {
         console.error('Failed to delete item:', err);
@@ -224,7 +248,7 @@ export function PackingManager() {
 
     if (isAuthenticated) {
       try {
-        await fetch(getApiUrl('/api/wayfinder/packing'), {
+        await resilientFetch(getApiUrl('/api/wayfinder/packing'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
@@ -234,6 +258,9 @@ export function PackingManager() {
             category: catId,
             is_packed: targetState
           })
+        }, {
+          entityType: 'packing',
+          action: `${targetState ? 'Pack' : 'Unpack'} all items in ${catId}`
         });
       } catch (err) {
         console.error('Failed to bulk toggle category:', err);
@@ -266,15 +293,23 @@ export function PackingManager() {
     if (isAuthenticated) {
       setIsSaving(true);
       try {
-        const res = await fetch(getApiUrl('/api/wayfinder/packing'), {
+        const res = await resilientFetch(getApiUrl('/api/wayfinder/packing'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify(newItemPayload)
+        }, {
+          entityType: 'packing',
+          action: `Add packing item: ${newItemPayload.name}`
         });
         if (res.ok) {
-          const data = await res.json();
-          setItems(prev => [...prev, data.item]);
+          const data = await res.json().catch(() => ({}));
+          const createdItem = data.item || {
+            id: 'opt_' + Date.now(),
+            ...newItemPayload,
+            is_packed: 0
+          };
+          setItems(prev => [...prev, createdItem]);
           setIsAddingItem(false);
           setNewItemName('');
           setNewItemNotes('');
@@ -306,7 +341,7 @@ export function PackingManager() {
 
     if (isAuthenticated) {
       try {
-        await fetch(getApiUrl('/api/wayfinder/packing'), {
+        await resilientFetch(getApiUrl('/api/wayfinder/packing'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
@@ -314,6 +349,9 @@ export function PackingManager() {
             journey_id: 'poland-christmas-2026',
             action: 'clear_packed'
           })
+        }, {
+          entityType: 'packing',
+          action: 'Clear packed items'
         });
       } catch (err) {
         console.error('Failed to clear packed:', err);

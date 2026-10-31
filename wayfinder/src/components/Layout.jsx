@@ -5,6 +5,7 @@ import { Compass, User, LogOut, ShieldCheck, Menu, X, Coins, Settings, Backpack,
 import { CurrencyConverterModal } from './CurrencyConverterModal';
 import { SettingsModal } from './SettingsModal';
 import { BottomTabBar } from './BottomTabBar';
+import { OfflineSyncBadge } from './common/OfflineSyncBadge';
 import { useExchangeRate } from '../hooks/useExchangeRate';
 import wayfinderHeaderBanner from '../assets/wayfinder-header-banner-new.png';
 
@@ -131,6 +132,9 @@ export function Layout({ children }) {
               </button>
             )}
 
+            {/* Offline Mutation Queue & Sync Badge */}
+            <OfflineSyncBadge />
+
             {isAuthenticated ? (
               <div className="flex items-center space-x-1 lg:space-x-2">
                 <a
@@ -180,8 +184,9 @@ export function Layout({ children }) {
             )}
           </div>
 
-          {/* Mobile top bar: Currency button + settings shortcut */}
-          <div className="md:hidden flex items-center space-x-2">
+          {/* Mobile top bar: Offline Sync + Currency button + settings shortcut */}
+          <div className="md:hidden flex items-center space-x-1.5 sm:space-x-2">
+            <OfflineSyncBadge />
             <button
               onClick={() => setIsConverterOpen(!isConverterOpen)}
               className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl bg-wf-amber/10 border border-wf-amber/30 text-wf-amber text-xs font-bold active:scale-95"

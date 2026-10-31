@@ -9,6 +9,7 @@
 // Called from worker.js:  export default { fetch(...) {}, email(...) {} }
 
 import { generateId } from '../../utils/id.js';
+import { parseBookingWithGemini } from './gemini-parser.js';
 
 // ============================================================
 // Minimal MIME text extractor (no npm deps - pure Workers runtime)
@@ -518,7 +519,50 @@ export async function handleInboundEmail(message, env) {
       console.warn('[email-worker] MIME parse fallback - snippet only:', parseErr?.message);
     }
 
-    const fields = extractBookingFields(subject, bodyText, from);
+    let fields = extractBookingFields(subject, bodyText, from);
+
+    // Stage 2: Intelligent Gemini 2.5 Flash / 3.8 Flash fallback
+    // If regex extraction missed the confirmation number, item_type is generic 'other', or date is defaulted
+    const isLowConfidence = !fields.confirmation_number || fields.item_type === 'other' || !fields.local_date;
+    if (isLowConfidence && bodyText.trim().length > 20) {
+      try {
+        const geminiExtraction = await parseBookingWithGemini(env, bodyText, subject, from);
+        if (geminiExtraction) {
+          if (geminiExtraction.item_type && geminiExtraction.item_type !== 'other') {
+            fields.item_type = geminiExtraction.item_type;
+          }
+          if (geminiExtraction.title && geminiExtraction.title !== 'Travel Booking') {
+            fields.title = geminiExtraction.title;
+          }
+          if (geminiExtraction.provider && geminiExtraction.provider !== 'Unknown Provider') {
+            fields.provider = geminiExtraction.provider;
+          }
+          if (geminiExtraction.confirmation_number) {
+            fields.confirmation_number = geminiExtraction.confirmation_number;
+          }
+          if (geminiExtraction.start_date) {
+            fields.local_date = geminiExtraction.start_date;
+          }
+          if (geminiExtraction.start_time) {
+            fields.local_time = geminiExtraction.start_time;
+          }
+          if (geminiExtraction.end_time) {
+            fields.end_time = geminiExtraction.end_time;
+          }
+          if (geminiExtraction.location) {
+            fields.location = geminiExtraction.location;
+          }
+          if (geminiExtraction.price && !fields.cost) {
+            fields.cost = { amount: geminiExtraction.price, currency: geminiExtraction.currency || 'PLN' };
+          }
+          if (geminiExtraction.seat && !fields.tickets) {
+            fields.tickets = geminiExtraction.seat;
+          }
+        }
+      } catch (geminiErr) {
+        console.warn('[email-worker] Gemini Stage 2 fallback error:', geminiErr?.message);
+      }
+    }
 
     const notes = [
       fields.confirmation_number ? `Confirmation: ${fields.confirmation_number}` : null,

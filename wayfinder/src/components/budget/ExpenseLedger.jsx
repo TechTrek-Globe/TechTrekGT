@@ -7,6 +7,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../context/SettingsContext';
 import { getApiUrl } from '../../utils/api';
+import { resilientFetch } from '../../utils/mutationQueue';
 import { 
   convertCurrency, formatCurrency, splitEqually, calculateSettleUp, DEFAULT_EXCHANGE_RATES 
 } from '../../utils/expenseLedger';
@@ -131,6 +132,17 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
 
   useEffect(() => {
     loadExpenses();
+  }, [journeyId]);
+
+  // Refresh expenses from server when offline mutations complete syncing
+  useEffect(() => {
+    const handleSyncComplete = (e) => {
+      if (e.detail?.syncedCount > 0) {
+        loadExpenses();
+      }
+    };
+    window.addEventListener('wayfinder:sync-complete', handleSyncComplete);
+    return () => window.removeEventListener('wayfinder:sync-complete', handleSyncComplete);
   }, [journeyId]);
 
   // Settle-up calculations
@@ -259,11 +271,15 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
         ? getApiUrl(`/api/wayfinder/expenses/${editingExpense.id}`)
         : getApiUrl('/api/wayfinder/expenses');
 
-      const res = await fetch(url, {
+      const res = await resilientFetch(url, {
         method: editingExpense ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify(payload)
+      }, {
+        entityType: 'expense',
+        entityId: editingExpense?.id,
+        action: `${editingExpense ? 'Edit' : 'Add'} expense: ${formDesc.trim()}`
       });
 
       if (!res.ok) throw new Error(`Failed to ${editingExpense ? 'update' : 'record'} expense`);
@@ -284,7 +300,7 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
     if (!activeTransferToSettle) return;
     setIsSubmitting(true);
     try {
-      const res = await fetch(getApiUrl('/api/wayfinder/expenses/settle'), {
+      const res = await resilientFetch(getApiUrl('/api/wayfinder/expenses/settle'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -299,6 +315,9 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
           method: settleMethod,
           notes: `Settled via ${SETTLE_METHOD_MAP[settleMethod] || settleMethod}`
         })
+      }, {
+        entityType: 'settlement',
+        action: `Settle ${formatCurrency(activeTransferToSettle.amount, activeTransferToSettle.currency)} from ${activeTransferToSettle.fromUserName} to ${activeTransferToSettle.toUserName}`
       });
 
       if (!res.ok) throw new Error('Failed to record settlement');
@@ -323,7 +342,7 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
       const toUserId = expense.paid_by_user_id || expense.user_id;
       const toUserName = expense.paid_by_name || 'Member';
 
-      const res = await fetch(getApiUrl('/api/wayfinder/expenses/settle'), {
+      const res = await resilientFetch(getApiUrl('/api/wayfinder/expenses/settle'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -340,6 +359,9 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
           expense_id: expense.id,
           split_id: split.id
         })
+      }, {
+        entityType: 'settlement',
+        action: `Settle item: ${expense.description} (${fromUserName})`
       });
 
       if (!res.ok) throw new Error('Failed to record item settlement');
@@ -357,9 +379,12 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
     if (!window.confirm(`Undo settlement for ${desc} and mark balance as owed?`)) return;
     setIsSubmitting(true);
     try {
-      const res = await fetch(getApiUrl(`/api/wayfinder/expenses/settle?split_id=${splitId}`), {
+      const res = await resilientFetch(getApiUrl(`/api/wayfinder/expenses/settle?split_id=${splitId}`), {
         method: 'DELETE',
         credentials: 'include'
+      }, {
+        entityType: 'settlement',
+        action: `Undo settlement for ${desc}`
       });
       if (!res.ok) throw new Error('Failed to undo settlement');
       await loadExpenses();
@@ -375,9 +400,12 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
     if (!window.confirm('Undo and delete this settlement payment record?')) return;
     setIsSubmitting(true);
     try {
-      const res = await fetch(getApiUrl(`/api/wayfinder/expenses/settle?settlement_id=${settlementId}`), {
+      const res = await resilientFetch(getApiUrl(`/api/wayfinder/expenses/settle?settlement_id=${settlementId}`), {
         method: 'DELETE',
         credentials: 'include'
+      }, {
+        entityType: 'settlement',
+        action: 'Delete settlement record'
       });
       if (!res.ok) throw new Error('Failed to delete settlement');
       await loadExpenses();
@@ -392,9 +420,13 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
   const handleDeleteExpense = async (id) => {
     if (!window.confirm('Delete this expense?')) return;
     try {
-      const res = await fetch(getApiUrl(`/api/wayfinder/expenses/${id}`), { 
+      const res = await resilientFetch(getApiUrl(`/api/wayfinder/expenses/${id}`), { 
         method: 'DELETE',
         credentials: 'include'
+      }, {
+        entityType: 'expense',
+        entityId: id,
+        action: 'Delete expense'
       });
       if (!res.ok) throw new Error('Delete failed');
       setExpenses(prev => prev.filter(e => e.id !== id));

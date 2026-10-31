@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { getApiUrl } from '../utils/api';
+import { resilientFetch } from '../utils/mutationQueue';
 import { useAuth } from './AuthContext';
 
 const WayfinderContext = createContext(null);
@@ -102,11 +103,15 @@ export function WayfinderProvider({ children }) {
   };
 
   const saveExtractedFields = async (docId, fields, provider = null, docType = null) => {
-    const res = await fetch(getApiUrl(`/api/wayfinder/import-jobs/${docId}/fields`), {
+    const res = await resilientFetch(getApiUrl(`/api/wayfinder/import-jobs/${docId}/fields`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       body: JSON.stringify({ fields, provider, doc_type: docType })
+    }, {
+      entityType: 'document',
+      entityId: docId,
+      action: 'Save extracted fields'
     });
     if (!res.ok) {
       const errorData = await res.json();
@@ -119,11 +124,15 @@ export function WayfinderProvider({ children }) {
   };
 
   const approveImportJob = async (docId, journeyId = 'poland-christmas-2026', fieldOverrides = {}) => {
-    const res = await fetch(getApiUrl(`/api/wayfinder/import-jobs/${docId}/approve`), {
+    const res = await resilientFetch(getApiUrl(`/api/wayfinder/import-jobs/${docId}/approve`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       body: JSON.stringify({ journey_id: journeyId, field_overrides: fieldOverrides })
+    }, {
+      entityType: 'document',
+      entityId: docId,
+      action: 'Approve import job to itinerary'
     });
     if (!res.ok) {
       const errorData = await res.json();
@@ -137,11 +146,15 @@ export function WayfinderProvider({ children }) {
   };
 
   const rejectImportJob = async (docId) => {
-    const res = await fetch(getApiUrl(`/api/wayfinder/import-jobs/${docId}/reject`), {
+    const res = await resilientFetch(getApiUrl(`/api/wayfinder/import-jobs/${docId}/reject`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       body: JSON.stringify({})
+    }, {
+      entityType: 'document',
+      entityId: docId,
+      action: 'Reject import job'
     });
     if (!res.ok) {
       const errorData = await res.json();
@@ -167,6 +180,47 @@ export function WayfinderProvider({ children }) {
     }
   }, [isAuthenticated, fetchItinerary, fetchAccommodations, fetchDocuments, fetchJobs]);
 
+  const parseDocument = async (docId, file) => {
+    let base64 = null;
+    let text = null;
+    if (file.type?.includes('text') || file.name.endsWith('.txt') || file.name.endsWith('.eml') || file.name.endsWith('.html')) {
+      text = await file.text();
+    } else {
+      base64 = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(file);
+      });
+    }
+
+    const res = await resilientFetch(getApiUrl(`/api/wayfinder/import-jobs/${docId}/parse`), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        filename: file.name,
+        mimeType: file.type || 'application/pdf',
+        base64,
+        text,
+      })
+    }, {
+      entityType: 'document',
+      entityId: docId,
+      action: 'Parse document with Gemini'
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to parse document with Gemini');
+    }
+
+    const data = await res.json();
+    await fetchDocuments('poland-christmas-2026');
+    await fetchJobs();
+    return data;
+  };
+
   return (
     <WayfinderContext.Provider value={{
       itinerary,
@@ -181,6 +235,7 @@ export function WayfinderProvider({ children }) {
       fetchJobs,
       uploadDocument,
       getJobFields,
+      parseDocument,
       saveExtractedFields,
       approveImportJob,
       rejectImportJob

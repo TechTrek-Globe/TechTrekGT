@@ -1,8 +1,10 @@
+// POST /api/wayfinder/import-jobs/:doc_id/parse  - parse document text or base64 file with Gemini structured output
 // POST /api/wayfinder/import-jobs/:doc_id/fields - save extracted fields from client-side extraction
 // POST /api/wayfinder/import-jobs/:doc_id/approve - approve and create itinerary item
 // GET  /api/wayfinder/import-jobs/:doc_id - get extraction job + fields
 
 import { generateId } from '../../utils/id.js';
+import { parseBookingDocument } from './gemini-parser.js';
 
 // Fields that always require user confirmation before approval
 const CRITICAL_FIELDS = new Set([
@@ -16,11 +18,18 @@ export async function handleImportJobs(context, url, method) {
   const { env, user, request } = context;
   const parts = url.pathname.split('/').filter(Boolean);
   const jobIdx = parts.indexOf('import-jobs');
-  const docId = jobIdx !== -1 ? (parts[jobIdx + 1] || null) : null;
-  const action = jobIdx !== -1 ? (parts[jobIdx + 2] || null) : null;
+  let docId = jobIdx !== -1 ? (parts[jobIdx + 1] || null) : null;
+  let action = jobIdx !== -1 ? (parts[jobIdx + 2] || null) : null;
 
   try {
     if (!env.DB) return json({ error: 'Database not available' }, 503);
+
+    // Support POST /api/wayfinder/import-jobs/parse with docId in payload
+    if (docId === 'parse' && method === 'POST') {
+      const peekBody = await request.clone().json().catch(() => ({}));
+      docId = peekBody.doc_id || peekBody.docId || peekBody.document_id;
+      action = 'parse';
+    }
 
     // --- GET all jobs for user when no docId is specified ---
     if (method === 'GET' && !docId) {
@@ -53,6 +62,78 @@ export async function handleImportJobs(context, url, method) {
         'SELECT * FROM wayfinder_extracted_fields WHERE document_id = ? ORDER BY field_name'
       ).bind(docId).all();
       return json({ job, fields: fields.results });
+    }
+
+    // --- POST parse: parse document with Gemini 2.5 Flash / 3.8 Flash structured outputs ---
+    if (method === 'POST' && action === 'parse') {
+      const body = await request.json().catch(() => ({}));
+      const { text = '', base64 = null, filename = doc.original_filename, mimeType = doc.mime_type } = body;
+
+      const parseResult = await parseBookingDocument({
+        env,
+        text,
+        base64,
+        mimeType: mimeType || doc.mime_type,
+        filename: filename || doc.original_filename,
+      });
+
+      const sanitized = (parseResult.fields || []).map(f => ({
+        ...f,
+        extracted_value: sanitizeText(f.extracted_value),
+        display_value:   sanitizeText(f.display_value || f.extracted_value),
+      }));
+
+      // Delete existing fields and re-insert freshly parsed fields
+      await env.DB.prepare('DELETE FROM wayfinder_extracted_fields WHERE document_id = ?').bind(docId).run();
+
+      const stmts = sanitized.map(f => {
+        const id = generateId();
+        const isCritical = CRITICAL_FIELDS.has(f.field_name);
+        const isSensitive = f.field_name?.includes('passport') || f.field_name?.includes('payment') ? 1 : 0;
+        if (isSensitive) return null;
+        return env.DB.prepare(
+          `INSERT INTO wayfinder_extracted_fields
+           (id, extraction_job_id, document_id, field_name, extracted_value, display_value,
+            confidence, source_page, visibility_class, is_sensitive, requires_confirm)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?)`
+        ).bind(
+          id, job.id, docId, f.field_name, f.extracted_value || null,
+          f.display_value || f.extracted_value || null,
+          f.confidence || 'low',
+          f.source_page || null,
+          'private', isSensitive,
+          (isCritical && (f.confidence === 'low' || f.confidence === 'medium')) ? 1 : 0,
+        );
+      }).filter(Boolean);
+
+      if (stmts.length > 0) {
+        await env.DB.batch(stmts);
+      }
+
+      // Update job status and document metadata
+      await env.DB.prepare(
+        `UPDATE wayfinder_extraction_jobs
+         SET status = 'ready_for_review', completed_at = ?
+         WHERE document_id = ?`
+      ).bind(new Date().toISOString(), docId).run();
+
+      await env.DB.prepare(
+        `UPDATE wayfinder_documents
+         SET detected_provider = ?, detected_doc_type = ?, processing_status = 'needs_review'
+         WHERE id = ?`
+      ).bind(parseResult.provider || null, parseResult.docType || null, docId).run();
+
+      return json({
+        success: true,
+        document_id: docId,
+        job_id: job.id,
+        provider: parseResult.provider,
+        doc_type: parseResult.docType,
+        extraction: parseResult.extraction,
+        fields: sanitized,
+        used_method: parseResult.usedMethod,
+        fields_saved: stmts.length,
+      });
     }
 
     // --- POST fields: save client-side extraction results ---

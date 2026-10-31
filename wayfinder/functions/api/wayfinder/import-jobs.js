@@ -123,7 +123,7 @@ export async function handleImportJobs(context, url, method) {
       const stmts = sanitized.map(f => {
         const id = generateId();
         const isCritical = CRITICAL_FIELDS.has(f.field_name);
-        const isSensitive = f.field_name?.includes('passport') || f.field_name?.includes('payment') ? 1 : 0;
+        const isSensitive = f.field_name?.includes('passport') || (f.field_name?.includes('payment') && !f.field_name?.includes('payment_method')) ? 1 : 0;
         if (isSensitive) return null;
         return env.DB.prepare(
           `INSERT INTO wayfinder_extracted_fields
@@ -298,6 +298,9 @@ export async function handleImportJobs(context, url, method) {
         'SELECT id FROM wayfinder_itinerary_items WHERE source_document_id = ?'
       ).bind(docId).first();
 
+      const purchaseSite = fieldMap.purchase_site || null;
+      const paymentMethod = fieldMap.payment_method || null;
+
       const batchStmts = [
         existingItem
           ? env.DB.prepare(
@@ -305,6 +308,7 @@ export async function handleImportJobs(context, url, method) {
                SET title = ?, provider = ?, local_date = COALESCE(?, local_date),
                    local_time = COALESCE(?, local_time), end_date = COALESCE(?, end_date),
                    end_time = COALESCE(?, end_time), location = COALESCE(?, location),
+                   purchase_site = COALESCE(?, purchase_site), payment_method = COALESCE(?, payment_method),
                    status = 'imported', verification_status = 'user_verified'
                WHERE id = ?`
             ).bind(
@@ -315,13 +319,15 @@ export async function handleImportJobs(context, url, method) {
               fieldMap.arrival_date || fieldMap.check_out_date || fieldMap.end_date || null,
               fieldMap.arrival_time || fieldMap.check_out_time || fieldMap.end_time || null,
               fieldMap.destination_airport || fieldMap.hotel_address || fieldMap.meeting_point || null,
+              purchaseSite,
+              paymentMethod,
               existingItem.id
             )
           : env.DB.prepare(
               `INSERT INTO wayfinder_itinerary_items
                (id, journey_id, user_id, item_type, title, provider, local_date, local_time,
-                end_date, end_time, location, source_document_id, status, verification_status, visibility)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'imported','user_verified','private')`
+                end_date, end_time, location, purchase_site, payment_method, source_document_id, status, verification_status, visibility)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,'imported','user_verified','private')`
             ).bind(
               itemId, finalJourneyId, user.userId, itemType, title,
               fieldMap.airline || fieldMap.hotel_name || fieldMap.carrier || fieldMap.supplier || doc.detected_provider || null,
@@ -330,6 +336,8 @@ export async function handleImportJobs(context, url, method) {
               fieldMap.arrival_date || fieldMap.check_out_date || fieldMap.end_date || null,
               fieldMap.arrival_time || fieldMap.check_out_time || fieldMap.end_time || null,
               fieldMap.destination_airport || fieldMap.hotel_address || fieldMap.meeting_point || null,
+              purchaseSite,
+              paymentMethod,
               docId
             ),
         env.DB.prepare(
@@ -363,8 +371,9 @@ export async function handleImportJobs(context, url, method) {
             env.DB.prepare(
               `INSERT INTO wayfinder_expenses
                (id, journey_id, itinerary_item_id, document_id, user_id, paid_by_name,
-                category, description, amount_original, currency_original, paid_status, verification_status, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', 'verified', ?)`
+                category, description, amount_original, currency_original, paid_status,
+                purchase_site, payment_method, verification_status, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', ?, ?, 'verified', ?)`
             ).bind(
               expenseId,
               finalJourneyId,
@@ -376,6 +385,8 @@ export async function handleImportJobs(context, url, method) {
               title,
               parsedCost.amount,
               parsedCost.currency,
+              purchaseSite,
+              paymentMethod,
               nowIso
             )
           );
@@ -534,6 +545,12 @@ function generateInitialFields(doc, linkedItem) {
   }
   if (costVal) {
     fields.push({ field_name: 'total_cost', extracted_value: costVal, confidence: 'high' });
+  }
+  if (linkedItem?.purchase_site) {
+    fields.push({ field_name: 'purchase_site', extracted_value: linkedItem.purchase_site, confidence: 'high' });
+  }
+  if (linkedItem?.payment_method) {
+    fields.push({ field_name: 'payment_method', extracted_value: linkedItem.payment_method, confidence: 'high' });
   }
 
   return fields;

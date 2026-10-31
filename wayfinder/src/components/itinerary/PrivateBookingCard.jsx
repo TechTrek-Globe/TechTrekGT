@@ -178,6 +178,10 @@ export function PrivateBookingCard({ item }) {
   if (item.check_out_date) footerPills.push({ label: 'Check-out', value: item.check_out_date, mono: true });
   if (item.meeting_point) footerPills.push({ label: 'Meet', value: item.meeting_point, mono: false });
   if (meta.rawDuration)  footerPills.push({ label: 'Duration', value: meta.rawDuration, mono: false });
+  const purchaseSite = item.purchase_site || meta.fields?.['purchase_site'] || meta.fields?.['purchase site'] || meta.fields?.['site'] || meta.fields?.['platform'];
+  const paymentMethod = item.payment_method || meta.fields?.['payment_method'] || meta.fields?.['payment method'] || meta.fields?.['payment'];
+  if (purchaseSite)  footerPills.push({ label: 'Purchased At', value: purchaseSite, mono: false });
+  if (paymentMethod) footerPills.push({ label: 'Payment', value: paymentMethod, mono: false });
 
   // Clean narrative description (never dumps internal metadata fields)
   const displayDescription = item.description || meta.description;

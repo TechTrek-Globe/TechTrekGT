@@ -6,28 +6,32 @@ import { parseBookingMetadata } from './itinerary/PrivateBookingCard';
 import {
   UploadCloud, File, FileText, Download, Eye, ShieldCheck, Loader2,
   CheckCircle2, AlertTriangle, X, Check, RefreshCw, ArrowRight, Upload,
-  Plane, Train, Building2, Utensils, Ticket, Compass, Copy, Calendar, MapPin, ExternalLink
+  Plane, Train, Building2, Utensils, Ticket, Compass, Copy, Calendar, MapPin, ExternalLink,
+  Trash2, ShoppingCart, CreditCard
 } from 'lucide-react';
 
 function simulateExtraction(file) {
   const filename = (file.name || '').toLowerCase();
   
-  if (filename.includes('hotel') || filename.includes('stary') || filename.includes('bridge') || filename.includes('accor') || filename.includes('accommodation')) {
-    const isWroclaw = filename.includes('bridge') || filename.includes('wroclaw');
+  if (filename.includes('hotel') || filename.includes('stary') || filename.includes('bridge') || filename.includes('accor') || filename.includes('altus') || filename.includes('accommodation')) {
+    const isAltus = filename.includes('altus');
+    const isWroclaw = filename.includes('bridge') || filename.includes('wroclaw') || isAltus;
     return {
-      provider: isWroclaw ? 'Accor / The Bridge MGallery' : 'Hotel Stary Krakow',
+      provider: isAltus ? 'Hotel Altus Palace Wrocław' : (isWroclaw ? 'Accor / The Bridge MGallery' : 'Hotel Stary Krakow'),
       docType: 'hotel',
       fields: [
-        { field_name: 'hotel_name', extracted_value: isWroclaw ? 'The Bridge Wroclaw MGallery' : 'Hotel Stary (Krakow)', confidence: 'high' },
-        { field_name: 'hotel_address', extracted_value: isWroclaw ? 'Plac Katedralny 8, Wroclaw' : 'ul. Szczepanska 5, Krakow', confidence: 'high' },
+        { field_name: 'hotel_name', extracted_value: isAltus ? 'Hotel Altus Palace Wrocław' : (isWroclaw ? 'The Bridge Wroclaw MGallery' : 'Hotel Stary (Krakow)'), confidence: 'high' },
+        { field_name: 'hotel_address', extracted_value: isAltus ? 'ul. Wierzbowa 15, 50-056 Wrocław' : (isWroclaw ? 'Plac Katedralny 8, Wroclaw' : 'ul. Szczepanska 5, Krakow'), confidence: 'high' },
         { field_name: 'check_in_date', extracted_value: isWroclaw ? '2026-12-07' : '2026-12-04', confidence: 'high' },
         { field_name: 'check_in_time', extracted_value: '15:00', confidence: 'medium' },
         { field_name: 'check_out_date', extracted_value: isWroclaw ? '2026-12-09' : '2026-12-07', confidence: 'high' },
         { field_name: 'check_out_time', extracted_value: '11:00', confidence: 'medium' },
         { field_name: 'room_type', extracted_value: 'Deluxe Double Room', confidence: 'medium' },
         { field_name: 'guests', extracted_value: '2 Adults', confidence: 'high' },
-        { field_name: 'confirmation_number', extracted_value: isWroclaw ? 'ACCOR-WR9281' : 'STARY-KR4410', confidence: 'high' },
-        { field_name: 'total_cost', extracted_value: isWroclaw ? '1850 PLN' : '2400 PLN', confidence: 'medium' }
+        { field_name: 'confirmation_number', extracted_value: isAltus ? 'ALT-88421' : (isWroclaw ? 'ACCOR-WR9281' : 'STARY-KR4410'), confidence: 'high' },
+        { field_name: 'purchase_site', extracted_value: isAltus ? 'Hotels.com' : 'Booking.com', confidence: 'high' },
+        { field_name: 'payment_method', extracted_value: isAltus ? 'Mastercard' : 'Visa (*4123)', confidence: 'high' },
+        { field_name: 'total_cost', extracted_value: isAltus ? '2400 PLN' : (isWroclaw ? '1850 PLN' : '2400 PLN'), confidence: 'high' }
       ]
     };
   }
@@ -47,6 +51,8 @@ function simulateExtraction(file) {
         { field_name: 'train_number', extracted_value: 'IC 1305 "Slask"', confidence: 'high' },
         { field_name: 'seat', extracted_value: 'Car 3, Seats 24/25 (1st class)', confidence: 'medium' },
         { field_name: 'confirmation_number', extracted_value: 'PKP-772910', confidence: 'high' },
+        { field_name: 'purchase_site', extracted_value: 'PKP Intercity (intercity.pl)', confidence: 'high' },
+        { field_name: 'payment_method', extracted_value: 'Visa', confidence: 'high' },
         { field_name: 'total_cost', extracted_value: '190 PLN', confidence: 'medium' }
       ]
     };
@@ -68,6 +74,8 @@ function simulateExtraction(file) {
         { field_name: 'arrival_date', extracted_value: '2026-12-04', confidence: 'high' },
         { field_name: 'arrival_time', extracted_value: '13:30', confidence: 'high' },
         { field_name: 'arrival_timezone', extracted_value: 'CET (UTC+1, Poland Local Time)', confidence: 'high' },
+        { field_name: 'purchase_site', extracted_value: 'Delta.com', confidence: 'high' },
+        { field_name: 'payment_method', extracted_value: 'Amex Delta SkyMiles', confidence: 'high' },
         { field_name: 'total_cost', extracted_value: '$1,980.00 USD', confidence: 'high' },
         { field_name: 'inbound_leg1_flight', extracted_value: 'DL0074 ATL -> AMS', confidence: 'high' },
         { field_name: 'inbound_leg1_departs', extracted_value: '2026-12-03 20:10 ATL', confidence: 'high' },
@@ -100,6 +108,8 @@ function simulateExtraction(file) {
         { field_name: 'table_type', extracted_value: 'Window table (street view)', confidence: 'medium' },
         { field_name: 'dietary_notes', extracted_value: 'No restrictions noted', confidence: 'low' },
         { field_name: 'confirmation_number', extracted_value: 'RSV-WZK-0512', confidence: 'high' },
+        { field_name: 'purchase_site', extracted_value: 'Direct Table Booking', confidence: 'high' },
+        { field_name: 'payment_method', extracted_value: 'Credit Card on File', confidence: 'high' },
         { field_name: 'deposit_paid', extracted_value: '0 PLN (card held on file)', confidence: 'medium' }
       ]
     };
@@ -121,6 +131,8 @@ function simulateExtraction(file) {
         { field_name: 'tickets', extracted_value: '2 Adults (General Admission)', confidence: 'high' },
         { field_name: 'included', extracted_value: isAuschwitz ? 'Guided tour, transport from Krakow, entrance fee' : 'Guided tour, entrance fee', confidence: 'medium' },
         { field_name: 'confirmation_number', extracted_value: isAuschwitz ? 'AUS-2026-4817' : isWieliczka ? 'WLZ-2026-9032' : `EXC-${Math.floor(100000 + Math.random() * 900000)}`, confidence: 'high' },
+        { field_name: 'purchase_site', extracted_value: 'GetYourGuide', confidence: 'high' },
+        { field_name: 'payment_method', extracted_value: 'Apple Pay', confidence: 'high' },
         { field_name: 'total_cost', extracted_value: isAuschwitz ? '480 PLN' : isWieliczka ? '360 PLN' : '200 PLN', confidence: 'medium' }
       ]
     };
@@ -148,6 +160,7 @@ export function DocumentCenter() {
     documents, 
     jobs, 
     uploadDocument, 
+    deleteDocument,
     fetchDocuments, 
     fetchJobs,
     fetchItinerary,
@@ -165,6 +178,9 @@ export function DocumentCenter() {
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [copiedConf, setCopiedConf] = useState(false);
   
+  const [docToDelete, setDocToDelete] = useState(null);
+  const [isDeletingDoc, setIsDeletingDoc] = useState(false);
+
   const [reviewingJob, setReviewingJob] = useState(null);
   const [reviewFields, setReviewFields] = useState([]);
   const [fieldOverrides, setFieldOverrides] = useState({});
@@ -177,6 +193,32 @@ export function DocumentCenter() {
   const fileInputRef = useRef(null);
   const reattachInputRef = useRef(null);
   const localDocBlobs = useRef(new Map());
+
+  const handleConfirmDeleteDoc = async () => {
+    if (!docToDelete) return;
+    setIsDeletingDoc(true);
+    setUploadError(null);
+    try {
+      if (deleteDocument) {
+        await deleteDocument(docToDelete.id, 'poland-christmas-2026');
+      }
+      if (selectedDoc?.id === docToDelete.id) {
+        setSelectedDoc(null);
+      }
+      if (pdfPreviewDoc?.id === docToDelete.id) {
+        setPdfPreviewDoc(null);
+        setPdfPreviewUrl(null);
+      }
+      setActionSuccessMessage(`Document "${docToDelete.safe_display_name || docToDelete.filename}" and its linked booking have been deleted. You can now re-import a clean copy.`);
+      setTimeout(() => setActionSuccessMessage(null), 5000);
+      setDocToDelete(null);
+    } catch (err) {
+      console.error('[DocumentCenter] delete error:', err);
+      setUploadError('Failed to delete document: ' + (err.message || 'Error occurred'));
+    } finally {
+      setIsDeletingDoc(false);
+    }
+  };
 
   const getDayNumber = (dateStr) => {
     if (!dateStr) return 1;
@@ -460,16 +502,6 @@ export function DocumentCenter() {
       upload_date: '2026-08-28T17:14:46.000Z'
     },
     {
-      id: 'doc-altus-palace-wroclaw',
-      filename: 'Hotel_Altus_Palace_Wroclaw_Confirmation.pdf',
-      safe_display_name: 'Hotel Altus Palace Wrocław Confirmation (ALT-88421)',
-      detected_doc_type: 'hotel',
-      detected_provider: 'Hotel Altus Palace Wrocław',
-      processing_status: 'imported',
-      file_size_bytes: 2446,
-      upload_date: '2026-10-31T12:00:00.000Z'
-    },
-    {
       id: 'doc-gyg-7vkk692wy',
       filename: 'GetYourGuide_Ticket_GYG7VKK692WY.pdf',
       safe_display_name: 'GetYourGuide Ticket: Auschwitz & Wieliczka Tour (GYG7VKK692WY)',
@@ -710,16 +742,24 @@ export function DocumentCenter() {
                 <h3 className="text-white font-medium truncate">{selectedDoc.safe_display_name || selectedDoc.filename}</h3>
                 {getDocStatusBadge(selectedDoc.processing_status)}
               </div>
-              <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-3">
                 <button 
                   onClick={() => openReviewModal(selectedDoc.id)}
-                  className="px-3 py-1.5 bg-wf-blue/20 hover:bg-wf-blue/30 text-wf-blue-lt border border-wf-blue/40 text-xs font-medium rounded-lg transition-colors flex items-center space-x-1.5"
+                  className="px-3 py-1.5 bg-wf-blue/20 hover:bg-wf-blue/30 text-wf-blue-lt border border-wf-blue/40 text-xs font-medium rounded-lg transition-colors flex items-center space-x-1.5 cursor-pointer"
                 >
                   <Eye className="w-3.5 h-3.5" />
                   <span>Review Extracted Fields</span>
                 </button>
+                <button 
+                  onClick={() => setDocToDelete(selectedDoc)}
+                  className="px-3 py-1.5 bg-red-500/15 hover:bg-red-500/25 text-red-400 border border-red-500/30 text-xs font-medium rounded-lg transition-colors flex items-center space-x-1.5 cursor-pointer"
+                  title="Delete this document and purge linked bookings"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Delete</span>
+                </button>
                 <div className="w-px h-5 bg-white/10" />
-                <button onClick={closeViewer} className="text-wf-muted hover:text-white font-medium text-sm transition-colors">
+                <button onClick={closeViewer} className="text-wf-muted hover:text-white font-medium text-sm transition-colors cursor-pointer">
                   Close
                 </button>
               </div>
@@ -1176,34 +1216,89 @@ export function DocumentCenter() {
                     onClick={() => openReviewModal(doc.id)}
                     className="text-[11px] text-wf-blue-lt hover:text-white font-medium flex items-center space-x-1 cursor-pointer"
                   >
-                    <span>Review Extraction</span>
+                    <span>Review</span>
                     <ArrowRight className="w-3 h-3" />
                   </button>
-                  {doc.processing_status === 'pending' && (
+                  <div className="flex items-center space-x-1.5">
+                    {doc.processing_status === 'pending' && (
+                      <button
+                        onClick={async () => {
+                          try {
+                            setIsProcessingJob(true);
+                            await parseDocument(doc.id, null);
+                            await handleRefresh();
+                            openReviewModal(doc.id);
+                          } catch (err) {
+                            setUploadError('Failed to parse: ' + err.message);
+                          } finally {
+                            setIsProcessingJob(false);
+                          }
+                        }}
+                        className="text-[10px] text-amber-300 hover:text-amber-200 font-semibold px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 transition-all cursor-pointer"
+                        title="Run Gemini parser on this document"
+                      >
+                        Reparse
+                      </button>
+                    )}
                     <button
-                      onClick={async () => {
-                        try {
-                          setIsProcessingJob(true);
-                          await parseDocument(doc.id, null);
-                          await handleRefresh();
-                          openReviewModal(doc.id);
-                        } catch (err) {
-                          setUploadError('Failed to parse: ' + err.message);
-                        } finally {
-                          setIsProcessingJob(false);
-                        }
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDocToDelete(doc);
                       }}
-                      className="text-[10px] text-amber-300 hover:text-amber-200 font-semibold px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 transition-all cursor-pointer"
-                      title="Run Gemini parser on this document"
+                      className="p-1 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
+                      title="Delete document and purge linked bookings"
                     >
-                      Reparse
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
-                  )}
+                  </div>
                 </div>
               </div>
             ))}
           </div>
         </div>
+
+        {/* Delete Confirmation Modal */}
+        {docToDelete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
+            <div className="glass-panel w-full max-w-md p-6 rounded-3xl border border-red-500/40 bg-slate-900 shadow-2xl space-y-4">
+              <div className="flex items-center space-x-3 text-red-400 border-b border-white/10 pb-3">
+                <div className="p-2.5 rounded-2xl bg-red-500/10 border border-red-500/30">
+                  <Trash2 className="w-5 h-5 text-red-400" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Delete Document & Booking</h3>
+                  <p className="text-xs text-slate-400">Purge this voucher to re-import a clean copy.</p>
+                </div>
+              </div>
+
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Are you sure you want to delete <strong className="text-white font-mono">{docToDelete.safe_display_name || docToDelete.filename}</strong>? 
+                This will remove the document, its extracted metadata, and any associated itinerary events or financial ledger expenses so you can upload and import it fresh.
+              </p>
+
+              <div className="pt-2 flex items-center justify-end space-x-3">
+                <button
+                  type="button"
+                  disabled={isDeletingDoc}
+                  onClick={() => setDocToDelete(null)}
+                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={isDeletingDoc}
+                  onClick={handleConfirmDeleteDoc}
+                  className="px-4 py-2.5 rounded-xl bg-red-500 hover:bg-red-400 text-white font-bold text-xs flex items-center space-x-2 transition-all shadow-lg shadow-red-500/20 cursor-pointer disabled:opacity-50"
+                >
+                  {isDeletingDoc ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                  <span>{isDeletingDoc ? 'Deleting...' : 'Delete & Purge'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }

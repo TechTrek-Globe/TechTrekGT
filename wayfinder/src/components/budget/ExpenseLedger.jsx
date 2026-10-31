@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   DollarSign, Receipt, Plus, ArrowRight, CheckCircle2, Trash2, Edit2,
   RefreshCw, Users, CreditCard, Sparkles, Plane, Building, Train, 
-  Utensils, ShoppingBag, AlertCircle, ArrowUpRight, ArrowDownLeft, RotateCcw
+  Utensils, ShoppingBag, ShoppingCart, Globe, AlertCircle, ArrowUpRight, ArrowDownLeft, RotateCcw
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../context/SettingsContext';
@@ -98,6 +98,8 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
   const [formCurrency, setFormCurrency] = useState(displayCurrency);
   const [formPayer, setFormPayer] = useState('self');
   const [formSplitType, setFormSplitType] = useState('equal'); // 'equal' or 'self'
+  const [formSite, setFormSite] = useState('');
+  const [formPaymentMethod, setFormPaymentMethod] = useState('');
 
   // Use real user.id (matches D1 stored user_id), with safe fallback
   const currentUserId = user?.id || user?.userId || 'usr-1785511589441-3fvgv';
@@ -201,6 +203,8 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
     setFormCurrency(displayCurrency);
     setFormPayer('self');
     setFormSplitType('equal');
+    setFormSite('');
+    setFormPaymentMethod('');
     setIsAddModalOpen(true);
   };
 
@@ -210,6 +214,8 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
     setFormCategory(normalizeCategory(exp.category || 'dining'));
     setFormAmount(String(exp.amount_original || ''));
     setFormCurrency(exp.currency_original || displayCurrency);
+    setFormSite(exp.purchase_site || '');
+    setFormPaymentMethod(exp.payment_method || '');
 
     // Determine who paid
     const payerId = exp.paid_by_user_id || exp.user_id;
@@ -259,6 +265,8 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
         amount_usd: amtInUsd,
         paid_by_name: formPayer === 'self' ? currentUserName : partnerName,
         paid_by_user_id: formPayer === 'self' ? currentUserId : partnerId,
+        purchase_site: formSite.trim() || null,
+        payment_method: formPaymentMethod.trim() || null,
         splits: splits.map(s => ({
           user_id: s.userId,
           user_name: s.userName,
@@ -665,6 +673,24 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
                       <span>Paid by <strong className="text-slate-200">{exp.paid_by_name || 'Member'}</strong></span>
                       <span>•</span>
                       <span className="capitalize">{exp.category || 'expense'}</span>
+                      {exp.purchase_site && (
+                        <>
+                          <span>•</span>
+                          <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-md bg-sky-500/10 border border-sky-500/20 text-sky-300 text-[11px] font-medium" title="Where purchased / booking site">
+                            <ShoppingCart className="w-3 h-3 text-sky-400" />
+                            <span>{exp.purchase_site}</span>
+                          </span>
+                        </>
+                      )}
+                      {exp.payment_method && (
+                        <>
+                          <span>•</span>
+                          <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[11px] font-medium" title="Payment method">
+                            <CreditCard className="w-3 h-3 text-amber-400" />
+                            <span>{exp.payment_method}</span>
+                          </span>
+                        </>
+                      )}
                     </div>
 
                     {/* Item-by-item split & settlement controls */}
@@ -950,6 +976,68 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
                     <option value="equal">Split Equally (50/50)</option>
                     <option value="self">Paid for Self Only</option>
                   </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div>
+                  <label className="block font-bold text-slate-300 mb-1 flex items-center space-x-1.5">
+                    <ShoppingCart className="w-3.5 h-3.5 text-sky-400" />
+                    <span>Where Purchased? (Site / Vendor)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formSite}
+                    onChange={(e) => setFormSite(e.target.value)}
+                    placeholder="e.g. Booking.com, Hotels.com, Delta.com"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/15 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 text-xs sm:text-sm"
+                  />
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {['Booking.com', 'Hotels.com', 'Delta.com', 'PKP Intercity', 'GetYourGuide', 'On-Site'].map((site) => (
+                      <button
+                        key={site}
+                        type="button"
+                        onClick={() => setFormSite(site)}
+                        className={`px-1.5 py-0.5 rounded text-[10px] border transition-colors cursor-pointer ${
+                          formSite === site 
+                            ? 'bg-sky-500/20 text-sky-300 border-sky-500/50 font-bold' 
+                            : 'bg-white/5 text-slate-400 border-white/10 hover:text-slate-200'
+                        }`}
+                      >
+                        {site}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-300 mb-1 flex items-center space-x-1.5">
+                    <CreditCard className="w-3.5 h-3.5 text-amber-400" />
+                    <span>How was it paid? (Payment Method)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formPaymentMethod}
+                    onChange={(e) => setFormPaymentMethod(e.target.value)}
+                    placeholder="e.g. Visa (*4123), Apple Pay, Mastercard"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/15 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 text-xs sm:text-sm"
+                  />
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {['Visa', 'Mastercard', 'Amex', 'Apple Pay', 'PayPal', 'Cash'].map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => setFormPaymentMethod(m)}
+                        className={`px-1.5 py-0.5 rounded text-[10px] border transition-colors cursor-pointer ${
+                          formPaymentMethod === m 
+                            ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 font-bold' 
+                            : 'bg-white/5 text-slate-400 border-white/10 hover:text-slate-200'
+                        }`}
+                      >
+                        {m}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 

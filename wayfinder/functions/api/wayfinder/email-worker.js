@@ -645,6 +645,27 @@ export async function handleInboundEmail(message, env) {
         ).bind(jobId, docId, nowIso, nowIso, inbox.user_id, nowIso)
       );
 
+      let purchaseSite = fields.purchase_site || null;
+      if (!purchaseSite) {
+        const lowerAll = (subject + ' ' + bodyText + ' ' + from).toLowerCase();
+        if (lowerAll.includes('getyourguide')) purchaseSite = 'GetYourGuide';
+        else if (lowerAll.includes('booking.com')) purchaseSite = 'Booking.com';
+        else if (lowerAll.includes('hotels.com')) purchaseSite = 'Hotels.com';
+        else if (lowerAll.includes('delta')) purchaseSite = 'Delta.com';
+        else if (lowerAll.includes('pkp') || lowerAll.includes('intercity')) purchaseSite = 'PKP Intercity';
+        else if (fields.provider) purchaseSite = fields.provider;
+      }
+
+      let paymentMethod = fields.payment_method || null;
+      if (!paymentMethod) {
+        const lowerAll = (subject + ' ' + bodyText).toLowerCase();
+        if (lowerAll.includes('amex') || lowerAll.includes('american express')) paymentMethod = 'American Express';
+        else if (lowerAll.includes('visa')) paymentMethod = 'Visa';
+        else if (lowerAll.includes('mastercard') || lowerAll.includes('master card')) paymentMethod = 'Mastercard';
+        else if (lowerAll.includes('apple pay')) paymentMethod = 'Apple Pay';
+        else if (lowerAll.includes('paypal')) paymentMethod = 'PayPal';
+      }
+
       // Populate extracted fields so review modal immediately reflects full details
       const extractedEntries = [
         { name: fields.item_type === 'hotel' ? 'hotel_name' : fields.item_type === 'flight' ? 'airline' : 'activity_title', val: fields.title },
@@ -652,7 +673,9 @@ export async function handleInboundEmail(message, env) {
         fields.local_date ? { name: fields.item_type === 'hotel' ? 'check_in_date' : 'start_date', val: fields.local_date } : null,
         fields.local_time ? { name: fields.item_type === 'hotel' ? 'check_in_time' : 'start_time', val: fields.local_time } : null,
         fields.location ? { name: 'location', val: fields.location } : null,
-        fields.cost ? { name: 'total_cost', val: `${fields.cost.amount} ${fields.cost.currency}` } : null
+        fields.cost ? { name: 'total_cost', val: `${fields.cost.amount} ${fields.cost.currency}` } : null,
+        purchaseSite ? { name: 'purchase_site', val: purchaseSite } : null,
+        paymentMethod ? { name: 'payment_method', val: paymentMethod } : null
       ].filter(Boolean);
 
       for (const entry of extractedEntries) {
@@ -672,8 +695,9 @@ export async function handleInboundEmail(message, env) {
         `INSERT INTO wayfinder_itinerary_items
          (id, journey_id, user_id, item_type, title, provider,
           local_date, local_time, end_time, location, source_document_id,
+          purchase_site, payment_method,
           notes, status, verification_status, visibility)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'imported','user_verified','private')`
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,'imported','user_verified','private')`
       ).bind(
         itemId, inbox.journey_id, inbox.user_id,
         fields.item_type, fields.title, fields.provider || null,
@@ -682,6 +706,8 @@ export async function handleInboundEmail(message, env) {
         fields.end_time || null,
         fields.location || null,
         docId,
+        fields.purchase_site || (from?.toLowerCase().includes('getyourguide') ? 'GetYourGuide' : null),
+        fields.payment_method || null,
         notes
       ),
       env.DB.prepare(
@@ -708,12 +734,17 @@ export async function handleInboundEmail(message, env) {
       const expenseCat = mapDocTypeToExpenseCategory(fields.item_type);
       const nowIso = new Date().toISOString();
 
+      const expenseSite = fields.purchase_site || (from?.toLowerCase().includes('getyourguide') ? 'GetYourGuide' : (subject?.toLowerCase().includes('booking.com') ? 'Booking.com' : null));
+      const expensePayMethod = fields.payment_method || null;
+
       batchStmts.push(
         env.DB.prepare(
           `INSERT INTO wayfinder_expenses
            (id, journey_id, itinerary_item_id, document_id, user_id, paid_by_name, paid_by_user_id,
-            category, description, amount_original, currency_original, amount_usd, paid_status, verification_status, created_at)
-           VALUES (?, ?, ?, ?, ?, 'Jonathan Kemp', ?, ?, ?, ?, ?, ?, 'paid', 'verified', ?)`
+            category, description, amount_original, currency_original, amount_usd,
+            purchase_site, payment_method,
+            paid_status, verification_status, created_at)
+           VALUES (?, ?, ?, ?, ?, 'Jonathan Kemp', ?, ?, ?, ?, ?, ?, ?, ?, 'paid', 'verified', ?)`
         ).bind(
           expenseId,
           inbox.journey_id,
@@ -726,6 +757,8 @@ export async function handleInboundEmail(message, env) {
           rawAmt,
           cur,
           amountUsd,
+          expenseSite,
+          expensePayMethod,
           nowIso
         ),
         env.DB.prepare(

@@ -64,6 +64,8 @@ CREATE TABLE IF NOT EXISTS wayfinder_itinerary_items (
   location_address    TEXT,
   notes               TEXT,
   source_document_id  TEXT,
+  purchase_site       TEXT,
+  payment_method      TEXT,
   visibility          TEXT NOT NULL DEFAULT 'private',
   has_conflict        INTEGER NOT NULL DEFAULT 0,
   conflict_notes      TEXT,
@@ -168,12 +170,33 @@ CREATE TABLE IF NOT EXISTS wayfinder_expenses (
   cancellation_deadline TEXT,
   paid_status         TEXT NOT NULL DEFAULT 'unknown',
   verification_status TEXT NOT NULL DEFAULT 'unverified',
+  purchase_site       TEXT,
+  payment_method      TEXT,
   notes               TEXT,
   created_at          TEXT NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY (journey_id)           REFERENCES wayfinder_journeys(id) ON DELETE CASCADE,
   FOREIGN KEY (user_id)              REFERENCES users(id) ON DELETE CASCADE,
   FOREIGN KEY (itinerary_item_id)    REFERENCES wayfinder_itinerary_items(id),
   FOREIGN KEY (document_id)          REFERENCES wayfinder_documents(id)
+);
+
+-- ============================================================
+-- EXPENSE SPLITS - Shared cost allocations
+-- ============================================================
+CREATE TABLE IF NOT EXISTS wayfinder_expense_splits (
+  id              TEXT PRIMARY KEY,
+  expense_id      TEXT NOT NULL,
+  user_id         TEXT NOT NULL,
+  user_name       TEXT,
+  amount_owed     REAL NOT NULL,
+  percentage      REAL,
+  is_settled      INTEGER NOT NULL DEFAULT 0,
+  settled_at      TEXT,
+  settle_method   TEXT,
+  created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (expense_id) REFERENCES wayfinder_expenses(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id)    REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- ============================================================

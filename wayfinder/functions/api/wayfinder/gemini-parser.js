@@ -80,6 +80,14 @@ const BOOKING_SCHEMA = {
       type: 'STRING',
       description: 'Coach, carriage, seat number, cabin, or platform assignment.'
     },
+    purchase_site: {
+      type: 'STRING',
+      description: 'Platform, website, or channel where the booking was purchased (e.g. Booking.com, Hotels.com, Expedia, Agoda, GetYourGuide, Delta.com, PKP Intercity, In-Person / On-Site).'
+    },
+    payment_method: {
+      type: 'STRING',
+      description: 'Payment method or card used (e.g. Visa ending in 4123, Mastercard, Amex, Apple Pay, PayPal, Revolut, BLIK, Cash). Do NOT include full card numbers.'
+    },
     notes: {
       type: 'STRING',
       description: 'Key instructions, cancellation policy, baggage allowance, or voucher notes.'
@@ -291,11 +299,45 @@ export function heuristicParseDocument({ text = '', filename = '', mimeType = ''
     }
   }
 
+  // Detect purchase site / platform
+  let purchase_site = null;
+  if (combined.includes('booking.com')) purchase_site = 'Booking.com';
+  else if (combined.includes('hotels.com')) purchase_site = 'Hotels.com';
+  else if (combined.includes('expedia')) purchase_site = 'Expedia';
+  else if (combined.includes('agoda')) purchase_site = 'Agoda';
+  else if (combined.includes('getyourguide') || combined.includes('gyg')) purchase_site = 'GetYourGuide';
+  else if (combined.includes('delta')) purchase_site = 'Delta.com';
+  else if (combined.includes('pkp') || combined.includes('intercity.pl')) purchase_site = 'PKP Intercity (intercity.pl)';
+  else if (combined.includes('brovaria')) purchase_site = 'Hotel Brovaria Direct';
+  else if (combined.includes('experior') || combined.includes('destigo')) purchase_site = 'Booking.com / Destigo';
+  else if (combined.includes('altus')) purchase_site = 'Hotels.com / Direct';
+  else if (combined.includes('airbnb')) purchase_site = 'Airbnb';
+
+  // Detect payment method (without logging sensitive card credentials)
+  let payment_method = null;
+  const payMatch = cleanText.match(/(?:paid with|charged to|payment method|card ending in|card[:\s]+|paid by|method[:\s]+)(?:[:\s]*)([A-Za-z0-9\s*]{3,30})/i);
+  if (payMatch) {
+    payment_method = payMatch[1].trim();
+  } else if (combined.includes('visa')) {
+    const vMatch = cleanText.match(/visa[\s\w*]*?(?:\*{3,4}|\d{4})/i);
+    payment_method = vMatch ? vMatch[0] : 'Visa';
+  } else if (combined.includes('mastercard') || combined.includes('mc')) {
+    payment_method = 'Mastercard';
+  } else if (combined.includes('amex') || combined.includes('american express')) {
+    payment_method = 'American Express';
+  } else if (combined.includes('apple pay')) {
+    payment_method = 'Apple Pay';
+  } else if (combined.includes('paypal')) {
+    payment_method = 'PayPal';
+  } else if (combined.includes('cash')) {
+    payment_method = 'Cash';
+  }
+
   return {
     item_type,
     title,
     provider,
-    confirmation_number: confirmationNumber || confirmation_number,
+    confirmation_number,
     start_date: start_date || '2026-12-06',
     start_time,
     end_date,
@@ -306,6 +348,8 @@ export function heuristicParseDocument({ text = '', filename = '', mimeType = ''
     price,
     currency,
     seat,
+    purchase_site,
+    payment_method,
     notes,
     confidence
   };
@@ -341,6 +385,8 @@ export function mapExtractionToFields(extraction) {
   add('location', extraction.location, conf);
   add('origin', extraction.origin, conf);
   add('destination', extraction.destination, conf);
+  add('purchase_site', extraction.purchase_site, conf);
+  add('payment_method', extraction.payment_method, conf);
   if (extraction.price !== null) add('total_cost', `${extraction.price} ${extraction.currency || 'PLN'}`, conf);
   add('currency', extraction.currency, conf);
   add('seat', extraction.seat, conf);

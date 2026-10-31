@@ -221,6 +221,35 @@ export function WayfinderProvider({ children }) {
     return data;
   };
 
+  const deleteDocument = async (docId, journeyId = 'poland-christmas-2026') => {
+    const res = await resilientFetch(getApiUrl(`/api/wayfinder/documents/${docId}`), {
+      method: 'DELETE',
+      credentials: 'include'
+    }, {
+      entityType: 'document',
+      entityId: docId,
+      action: 'Delete document'
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.error || errorData.message || 'Failed to delete document');
+    }
+
+    try {
+      const { deleteLocalDocumentFile } = await import('../utils/documentStorage');
+      if (deleteLocalDocumentFile) {
+        await deleteLocalDocumentFile(docId);
+      }
+    } catch (_) {}
+
+    await Promise.all([
+      fetchDocuments(journeyId),
+      fetchJobs(),
+      fetchItinerary(journeyId)
+    ]);
+    return true;
+  };
+
   return (
     <WayfinderContext.Provider value={{
       itinerary,
@@ -234,6 +263,7 @@ export function WayfinderProvider({ children }) {
       fetchDocuments,
       fetchJobs,
       uploadDocument,
+      deleteDocument,
       getJobFields,
       parseDocument,
       saveExtractedFields,

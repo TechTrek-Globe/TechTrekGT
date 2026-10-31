@@ -39,13 +39,13 @@ Private travel data persists in the shared Cloudflare D1 database (personal-budg
   - Fields: id, slug, title, tagline, description, hero_image_url, start_month, start_year, start_date, end_date, status, visibility, created_by, created_at, updated_at.
 - Table wayfinder_itinerary_items:
   - Stores scheduled events and milestones within a journey.
-  - Fields: id, journey_id, user_id, destination_id, item_type (flight, hotel, rail, excursion, restaurant, other), title, provider, status, verification_status, local_date, local_time, end_date, end_time, timezone, location, location_address, notes, source_document_id, visibility, has_conflict, conflict_notes, created_at, updated_at.
+  - Fields: id, journey_id, user_id, destination_id, item_type (flight, hotel, rail, excursion, restaurant, other), title, provider, status, verification_status, local_date, local_time, end_date, end_time, timezone, location, location_address, notes, source_document_id, purchase_site, payment_method, visibility, has_conflict, conflict_notes, created_at, updated_at.
 - Table wayfinder_documents:
   - Stores metadata and references for uploaded booking documents and inbound email attachments.
   - Fields: id, user_id, journey_id, original_filename, safe_display_name, mime_type, file_size_bytes, file_hash, storage_key, storage_status, upload_date, processing_status, detected_provider, detected_doc_type, security_scan_status, extraction_version, retention_status, deleted_at, deleted_by.
 - Table wayfinder_expenses & wayfinder_expense_splits:
   - Tracks trip costs, receipt currencies, and 50/50 participant balance splits.
-  - Fields: id, journey_id, itinerary_item_id, user_id, paid_by_name, category, description, amount_original, currency_original, paid_status, verification_status, created_at.
+  - Fields: id, journey_id, itinerary_item_id, user_id, paid_by_name, paid_by_user_id, category, description, amount_original, currency_original, amount_usd, purchase_site, payment_method, paid_status, verification_status, created_at.
 - Table wayfinder_import_jobs:
   - Tracks asynchronous document field parsing and OCR extraction tasks.
   - Fields: id, document_id, user_id, status (pending, processing, completed, failed), extracted_fields, error_message, created_at, updated_at.
@@ -144,6 +144,8 @@ Tracks shared expedition costs, member split allocations, and debt settlements i
 - `description`: expense title or merchant name.
 - `amount_original`, `currency_original`: raw payment amount and ISO 4217 currency (`PLN`, `USD`, `EUR`, `GBP`).
 - `amount_usd`: calculated USD equivalent at booking exchange rate.
+- `purchase_site`: booking vendor or platform website (e.g. `Booking.com`, `Hotels.com`, `Delta.com`, `PKP Intercity`, `GetYourGuide`, `On-Site`).
+- `payment_method`: method or instrument used for payment (e.g. `American Express`, `Visa`, `Mastercard`, `Apple Pay`, `PayPal`, `Cash`).
 - `paid_status`: payment status (`paid`, `pending`, `reimbursed`).
 - `verification_status`: verification state (`verified`, `unverified`).
 - `notes`: optional receipt or split notes.
@@ -303,5 +305,26 @@ The structured JSON output produced by `gemini-parser.js` adheres to:
 - `price`: Total monetary amount
 - `currency`: ISO 4217 currency code (`PLN`, `USD`, `EUR`, `GBP`)
 - `seat`: Coach, seat number, or platform
+- `purchase_site`: Booking platform or website (e.g. `Booking.com`, `Hotels.com`, `Delta.com`, `PKP Intercity`, `GetYourGuide`, `On-Site`)
+- `payment_method`: Method or card used for payment (e.g. `Visa`, `Mastercard`, `American Express`, `Apple Pay`, `PayPal`, `Cash`)
 - `notes`: Human-readable summary of cancellation policies, pickup directions, or baggage limits
 - `confidence`: enum [`high`, `medium`, `low`]
+
+---
+
+## 14. Document Cascade Deletion & Purge Lifecycle
+
+To allow travelers to remove erroneously imported documents (e.g., incorrect dates, mismatched venues, or botched OCR scans) and re-import cleanly without duplicate file hash collisions:
+
+### 14.1 Cascading Purge Sequence (`DELETE /api/wayfinder/documents/:id`)
+When a document deletion is requested by the document owner or journey participant:
+1. `wayfinder_expense_splits`: Removes all split allocations linked to child expenses of the document (`DELETE FROM wayfinder_expense_splits WHERE expense_id IN (SELECT id FROM wayfinder_expenses WHERE document_id = ?)`).
+2. `wayfinder_expenses`: Deletes all expense ledger records created from this document (`DELETE FROM wayfinder_expenses WHERE document_id = ?`).
+3. `wayfinder_itinerary_items`: Deletes all itinerary bookings generated from this document (`DELETE FROM wayfinder_itinerary_items WHERE source_document_id = ?`).
+4. `wayfinder_extracted_fields`: Clears all parsed field records (`DELETE FROM wayfinder_extracted_fields WHERE document_id = ?`).
+5. `wayfinder_extraction_jobs`: Clears extraction processing jobs (`DELETE FROM wayfinder_extraction_jobs WHERE document_id = ?`).
+6. `wayfinder_documents`: Hard deletes the document row (`DELETE FROM wayfinder_documents WHERE id = ?`).
+7. IndexedDB Binary Purge: Removes the cached PDF or image blob from local browser storage via `documentStorage.deleteDocument(docId)`.
+
+### 14.2 Hash Lock Release & Re-Import Capability
+Because `wayfinder_documents` enforces SHA-256 file hash checks (`file_hash`) to avoid duplicate uploads, hard deletion purges the hash record from D1. This allows the traveler to immediately re-upload the same document or an amended copy with zero "duplicate document" blocks.

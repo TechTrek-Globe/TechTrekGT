@@ -138,24 +138,87 @@ export async function handleDocuments(context, url, method) {
 
     if (method === 'DELETE' && subpath && subpath !== 'register') {
       const docId = subpath;
+      // Allow deletion by document owner or traveler on the journey
       const doc = await env.DB.prepare(
-        'SELECT * FROM wayfinder_documents WHERE id = ? AND user_id = ? AND deleted_at IS NULL'
-      ).bind(docId, user.userId).first();
-      if (!doc) return json({ error: 'Document not found' }, 404);
+        `SELECT * FROM wayfinder_documents 
+         WHERE id = ? 
+           AND (user_id = ? OR journey_id IN (SELECT id FROM wayfinder_journeys WHERE created_by = ? OR visibility = 'public'))
+           AND deleted_at IS NULL`
+      ).bind(docId, user.userId, user.userId).first();
+      if (!doc) return json({ error: 'Document not found or permission denied' }, 404);
 
       const now = new Date().toISOString();
       const auditId = generateId();
 
-      await env.DB.batch([
-        env.DB.prepare(
-          'UPDATE wayfinder_documents SET deleted_at = ?, deleted_by = ?, retention_status = ? WHERE id = ?'
-        ).bind(now, user.userId, 'deleted', docId),
-        env.DB.prepare(
-          'INSERT INTO wayfinder_audit_events (id, user_id, journey_id, entity_type, entity_id, action) VALUES (?,?,?,?,?,?)'
-        ).bind(auditId, user.userId, doc.journey_id, 'document', docId, 'delete')
-      ]);
+      // Find any linked expenses
+      const linkedExpenses = await env.DB.prepare(
+        'SELECT id FROM wayfinder_expenses WHERE document_id = ?'
+      ).bind(docId).all();
+      const expenseIds = (linkedExpenses.results || []).map(e => e.id);
 
-      return json({ success: true });
+      const batchStmts = [];
+
+      // 1. Delete linked expense splits
+      if (expenseIds.length > 0) {
+        for (const expId of expenseIds) {
+          batchStmts.push(
+            env.DB.prepare('DELETE FROM wayfinder_expense_splits WHERE expense_id = ?').bind(expId)
+          );
+        }
+      }
+
+      // 2. Delete linked expenses
+      batchStmts.push(
+        env.DB.prepare('DELETE FROM wayfinder_expenses WHERE document_id = ?').bind(docId)
+      );
+
+      // 3. Delete linked itinerary items
+      batchStmts.push(
+        env.DB.prepare('DELETE FROM wayfinder_itinerary_items WHERE source_document_id = ?').bind(docId)
+      );
+
+      // 4. Delete extracted fields
+      batchStmts.push(
+        env.DB.prepare('DELETE FROM wayfinder_extracted_fields WHERE document_id = ?').bind(docId)
+      );
+
+      // 5. Delete extraction jobs
+      batchStmts.push(
+        env.DB.prepare('DELETE FROM wayfinder_extraction_jobs WHERE document_id = ?').bind(docId)
+      );
+
+      // 6. Delete document record completely to allow clean re-import without hash conflict
+      batchStmts.push(
+        env.DB.prepare('DELETE FROM wayfinder_documents WHERE id = ?').bind(docId)
+      );
+
+      // 7. Audit event
+      batchStmts.push(
+        env.DB.prepare(
+          'INSERT INTO wayfinder_audit_events (id, user_id, journey_id, entity_type, entity_id, action, details) VALUES (?,?,?,?,?,?,?)'
+        ).bind(
+          auditId, 
+          user.userId, 
+          doc.journey_id || null, 
+          'document', 
+          docId, 
+          'delete_cascade',
+          JSON.stringify({
+            filename: doc.original_filename,
+            safe_name: doc.safe_display_name,
+            purged_expenses: expenseIds.length
+          })
+        )
+      );
+
+      await env.DB.batch(batchStmts);
+
+      return json({ 
+        success: true, 
+        deleted_document_id: docId,
+        purged_expenses: expenseIds.length,
+        message: 'Document and linked bookings removed. Ready for re-import.'
+      });
     }
 
     return json({ error: 'Method not allowed' }, 405);

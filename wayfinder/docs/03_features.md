@@ -115,6 +115,12 @@ Authenticated users can import hotel and attraction booking confirmations via de
   - Includes a direct "Jump to Day X Timeline" button that navigates directly to `/wayfinder/poland-christmas-2026/private?day=X`.
   - [ItineraryView.jsx](file:///e:/TechTrekGT/wayfinder/src/components/ItineraryView.jsx) supports deep-linking via `?day=X` URL query parameters with automatic smooth scrolling to the target day container (`#day-X`).
   - [PrivateBookingCard.jsx](file:///e:/TechTrekGT/wayfinder/src/components/itinerary/PrivateBookingCard.jsx) renders the booking on the chronological timeline with confirmation number, provider pill, operator pill, pickup window, bag restrictions, mobile ticket launcher, and clean notes. Note: Legacy Gmail sync has been completely removed in favor of reliable email forwarding.
+- Document Deletion & Cascade Purge Workflow:
+  - Travelers can delete any imported travel document directly from [DocumentCenter.jsx](file:///e:/TechTrekGT/wayfinder/src/components/DocumentCenter.jsx) via trash action buttons on stored document cards and inside the Document Viewer modal header.
+  - Interactive Confirmation Modal: Displays a glassmorphic warning modal listing the filename, journey context, and cascading impact (warning that linked itinerary items, expense ledger records, and extraction jobs will be removed).
+  - Cascading Purge (`DELETE /api/wayfinder/documents/:id` in [documents.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/documents.js)): Broadened permissions allow either document owner, journey creator, or public journey travelers to delete. The endpoint cascades deletion through linked `wayfinder_expense_splits`, `wayfinder_expenses`, `wayfinder_itinerary_items`, `wayfinder_extracted_fields`, `wayfinder_extraction_jobs`, and hard-deletes `wayfinder_documents`.
+  - Hash Conflict Prevention: By purging the document record and file hash from D1, travelers can immediately re-upload and re-parse an updated or corrected file without triggering duplicate hash conflict rejections.
+  - Client-Side Synchronization: Purges the local binary file from IndexedDB via `documentStorage.deleteDocument(docId)` and re-syncs documents, extraction jobs, itinerary items, and expenses across WayfinderContext.
 
 ## 8. Key-Free Open-Meteo Winter Weather & Daylight Telemetry
 
@@ -240,6 +246,11 @@ To streamline shared travel costs and eliminate complicated group debt calculati
   - Live Input Currency Conversion Preview: When entering expenses in non-base currencies, renders a real-time conversion preview badge into the user's preferred display currency prior to saving.
   - Comprehensive Settlement Methods: Supports real-world US traveler channels including Cash, Bank Transfer, Zelle, Venmo, Apple Pay, Cash App, Both Paid Separately, PayPal, Credit Card (Split at POS), and Revolut / Wise.
   - Subpath-Aware API Resilience: Leverages `getApiUrl` and `credentials: 'include'` for all expense fetch requests, ensuring reliable data communication across subpath routing.
+- Purchase Site & Payment Method Tracking:
+  - Schema Support: `wayfinder_expenses` and `wayfinder_itinerary_items` both track `purchase_site` (e.g., Booking.com, Hotels.com, Delta.com, PKP Intercity, GetYourGuide, On-Site) and `payment_method` (e.g., Visa, Mastercard, American Express, Apple Pay, PayPal, Cash).
+  - Multi-Engine Ingestion: Extracted automatically via Gemini Flash (`gemini-parser.js` `BOOKING_SCHEMA` and regex heuristics) and email ingestion worker (`email-worker.js`). Sensitive field whitelisting in `import-jobs.js` preserves payment method descriptions while redacting credit card numbers.
+  - Interactive Expense Ledger ([ExpenseLedger.jsx](file:///e:/TechTrekGT/wayfinder/src/components/budget/ExpenseLedger.jsx)): Add/Edit Expense modal includes dedicated text inputs with 1-click quick suggestion chips for top sites and payment methods. Displays visual badges with `ShoppingCart` and `CreditCard` icons on ledger list items.
+  - Timeline Synchronization ([PrivateBookingCard.jsx](file:///e:/TechTrekGT/wayfinder/src/components/itinerary/PrivateBookingCard.jsx)): Itinerary cards render "Purchased At" and "Payment" metadata pills in the card footer alongside confirmation numbers and ticket links.
 
 ## 15. Intelligent Excursion Reconciliation, Canonical Booking Deep-Linking & Universal Ticket Viewer
 

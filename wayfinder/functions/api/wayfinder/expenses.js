@@ -34,6 +34,8 @@ async function ensureTables(db) {
         cancellation_deadline TEXT,
         paid_status          TEXT NOT NULL DEFAULT 'paid',
         verification_status  TEXT NOT NULL DEFAULT 'unverified',
+        purchase_site        TEXT,
+        payment_method       TEXT,
         notes                TEXT,
         created_at           TEXT NOT NULL DEFAULT (datetime('now'))
       )
@@ -55,10 +57,16 @@ async function ensureTables(db) {
       )
     `).run();
 
-    // Add paid_by_user_id to live tables that were created before this column existed
+    // Add paid_by_user_id, purchase_site, payment_method to live tables if missing
     try {
       await db.prepare(`ALTER TABLE wayfinder_expenses ADD COLUMN paid_by_user_id TEXT`).run();
-    } catch (_) { /* column already exists - safe to ignore */ }
+    } catch (_) { /* column already exists */ }
+    try {
+      await db.prepare(`ALTER TABLE wayfinder_expenses ADD COLUMN purchase_site TEXT`).run();
+    } catch (_) { /* column already exists */ }
+    try {
+      await db.prepare(`ALTER TABLE wayfinder_expenses ADD COLUMN payment_method TEXT`).run();
+    } catch (_) { /* column already exists */ }
 
     await db.prepare(`
       CREATE TABLE IF NOT EXISTS wayfinder_expense_settlements (
@@ -236,6 +244,8 @@ export async function handleExpenses(context, url, method) {
           cur: 'USD',
           paidBy: 'Ronald Milton Few',
           payerId: 'usr-ronald-few',
+          site: 'Delta.com',
+          method: 'Amex Delta SkyMiles',
           splits: [
             { userId: user.userId, userName: 'Jonathan Kemp', amount: 990.00, pct: 50 },
             { userId: 'usr-ronald-few', userName: 'Ronald Milton Few', amount: 990.00, pct: 50 }
@@ -248,6 +258,8 @@ export async function handleExpenses(context, url, method) {
           cur: 'USD',
           paidBy: 'Jonathan Kemp',
           payerId: user.userId,
+          site: 'Booking.com',
+          method: 'Visa (*4123)',
           splits: [
             { userId: user.userId, userName: 'Jonathan Kemp', amount: 183.22, pct: 50 },
             { userId: 'usr-ronald-few', userName: 'Ronald Milton Few', amount: 183.21, pct: 50 }
@@ -260,6 +272,8 @@ export async function handleExpenses(context, url, method) {
           cur: 'PLN',
           paidBy: 'Jonathan Kemp',
           payerId: user.userId,
+          site: 'Hotels.com',
+          method: 'Mastercard',
           splits: [
             { userId: user.userId, userName: 'Jonathan Kemp', amount: 1200.00, pct: 50 },
             { userId: 'usr-ronald-few', userName: 'Ronald Milton Few', amount: 1200.00, pct: 50 }
@@ -272,6 +286,8 @@ export async function handleExpenses(context, url, method) {
           cur: 'PLN',
           paidBy: 'Jonathan Kemp',
           payerId: user.userId,
+          site: 'Brovaria Direct',
+          method: 'Visa',
           splits: [
             { userId: user.userId, userName: 'Jonathan Kemp', amount: 225.00, pct: 50 },
             { userId: 'usr-ronald-few', userName: 'Ronald Milton Few', amount: 225.00, pct: 50 }
@@ -284,6 +300,8 @@ export async function handleExpenses(context, url, method) {
           cur: 'USD',
           paidBy: 'Jonathan Kemp',
           payerId: user.userId,
+          site: 'GetYourGuide',
+          method: 'Apple Pay',
           splits: [
             { userId: user.userId, userName: 'Jonathan Kemp', amount: 142.38, pct: 50 },
             { userId: 'usr-ronald-few', userName: 'Ronald Milton Few', amount: 142.38, pct: 50 }
@@ -296,6 +314,8 @@ export async function handleExpenses(context, url, method) {
           cur: 'PLN',
           paidBy: 'Ronald Milton Few',
           payerId: 'usr-ronald-few',
+          site: 'Wrocław Christmas Market',
+          method: 'Cash (PLN)',
           splits: [
             { userId: user.userId, userName: 'Jonathan Kemp', amount: 70.00, pct: 50 },
             { userId: 'usr-ronald-few', userName: 'Ronald Milton Few', amount: 70.00, pct: 50 }
@@ -310,8 +330,8 @@ export async function handleExpenses(context, url, method) {
         await db.prepare(`
           INSERT INTO wayfinder_expenses (
             id, journey_id, user_id, paid_by_name, paid_by_user_id, category, description,
-            amount_original, currency_original, paid_status, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', datetime('now'))
+            amount_original, currency_original, paid_status, purchase_site, payment_method, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', ?, ?, datetime('now'))
         `).bind(
           newId,
           journeyId,
@@ -321,7 +341,9 @@ export async function handleExpenses(context, url, method) {
           p.cat,
           p.desc,
           p.amount,
-          p.cur
+          p.cur,
+          p.site || null,
+          p.method || null
         ).run();
 
         for (const s of p.splits) {
@@ -349,6 +371,8 @@ export async function handleExpenses(context, url, method) {
         paid_by_name = user.email || 'You',
         paid_by_id,
         paid_by_user_id,
+        purchase_site = null,
+        payment_method = null,
         splits = [],
         notes = ''
       } = body;
@@ -364,8 +388,8 @@ export async function handleExpenses(context, url, method) {
       await db.prepare(`
         INSERT INTO wayfinder_expenses (
           id, journey_id, user_id, paid_by_name, paid_by_user_id, category, description,
-          amount_original, currency_original, paid_status, notes, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', ?, datetime('now'))
+          amount_original, currency_original, paid_status, purchase_site, payment_method, notes, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', ?, ?, ?, datetime('now'))
       `).bind(
         newExpenseId,
         journeyId,
@@ -376,6 +400,8 @@ export async function handleExpenses(context, url, method) {
         description,
         Number(amount_original),
         currency_original.toUpperCase(),
+        purchase_site || null,
+        payment_method || null,
         notes
       ).run();
 
@@ -418,6 +444,8 @@ export async function handleExpenses(context, url, method) {
         paid_by_name,
         paid_by_user_id,
         paid_by_id,
+        purchase_site = null,
+        payment_method = null,
         splits = [],
         notes = ''
       } = body;
@@ -433,6 +461,8 @@ export async function handleExpenses(context, url, method) {
             currency_original = ?,
             paid_by_name = ?,
             paid_by_user_id = ?,
+            purchase_site = ?,
+            payment_method = ?,
             notes = ?
         WHERE id = ?
       `).bind(
@@ -442,6 +472,8 @@ export async function handleExpenses(context, url, method) {
         currency_original.toUpperCase(),
         payerName,
         payerUserId,
+        purchase_site || null,
+        payment_method || null,
         notes,
         targetExpenseId
       ).run();

@@ -19,6 +19,7 @@ async function ensureTables(db) {
         document_id          TEXT,
         user_id              TEXT NOT NULL,
         paid_by_name         TEXT,
+        paid_by_user_id      TEXT,
         category             TEXT NOT NULL DEFAULT 'other',
         description          TEXT NOT NULL,
         amount_original      REAL,
@@ -53,6 +54,11 @@ async function ensureTables(db) {
         updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
       )
     `).run();
+
+    // Add paid_by_user_id to live tables that were created before this column existed
+    try {
+      await db.prepare(`ALTER TABLE wayfinder_expenses ADD COLUMN paid_by_user_id TEXT`).run();
+    } catch (_) { /* column already exists - safe to ignore */ }
 
     await db.prepare(`
       CREATE TABLE IF NOT EXISTS wayfinder_expense_settlements (
@@ -228,32 +234,35 @@ export async function handleExpenses(context, url, method) {
           cat: 'flight',
           amount: 1980.00,
           cur: 'USD',
-          paidBy: 'Jonathan Kemp',
+          paidBy: 'Ronald Milton Few',
+          payerId: 'usr-ronald-few',
           splits: [
             { userId: user.userId, userName: 'Jonathan Kemp', amount: 990.00, pct: 50 },
             { userId: 'usr-ronald-few', userName: 'Ronald Milton Few', amount: 990.00, pct: 50 }
           ]
         },
         {
-          desc: 'Altus Palace Wrocław 5-Star Stay (2 Nights)',
+          desc: 'Altus Palace Hotel Krakow (3 Nights Dec 4-7)',
           cat: 'lodging',
-          amount: 1650.00,
+          amount: 2400.00,
           cur: 'PLN',
           paidBy: 'Jonathan Kemp',
+          payerId: user.userId,
           splits: [
-            { userId: user.userId, userName: 'Jonathan Kemp', amount: 825.00, pct: 50 },
-            { userId: 'usr-ronald-few', userName: 'Ronald Milton Few', amount: 825.00, pct: 50 }
+            { userId: user.userId, userName: 'Jonathan Kemp', amount: 1200.00, pct: 50 },
+            { userId: 'usr-ronald-few', userName: 'Ronald Milton Few', amount: 1200.00, pct: 50 }
           ]
         },
         {
-          desc: 'PKP Intercity 1st Class: Kraków -> Wrocław -> Poznań',
-          cat: 'transit',
-          amount: 380.00,
-          cur: 'PLN',
-          paidBy: 'Ronald Milton Few',
+          desc: 'GetYourGuide: Auschwitz-Birkenau & Wieliczka Salt Mine Tour',
+          cat: 'activity',
+          amount: 284.76,
+          cur: 'USD',
+          paidBy: 'Jonathan Kemp',
+          payerId: user.userId,
           splits: [
-            { userId: user.userId, userName: 'Jonathan Kemp', amount: 190.00, pct: 50 },
-            { userId: 'usr-ronald-few', userName: 'Ronald Milton Few', amount: 190.00, pct: 50 }
+            { userId: user.userId, userName: 'Jonathan Kemp', amount: 142.38, pct: 50 },
+            { userId: 'usr-ronald-few', userName: 'Ronald Milton Few', amount: 142.38, pct: 50 }
           ]
         },
         {
@@ -262,6 +271,7 @@ export async function handleExpenses(context, url, method) {
           amount: 140.00,
           cur: 'PLN',
           paidBy: 'Ronald Milton Few',
+          payerId: 'usr-ronald-few',
           splits: [
             { userId: user.userId, userName: 'Jonathan Kemp', amount: 70.00, pct: 50 },
             { userId: 'usr-ronald-few', userName: 'Ronald Milton Few', amount: 70.00, pct: 50 }
@@ -271,18 +281,19 @@ export async function handleExpenses(context, url, method) {
 
       for (const p of presets) {
         const newId = `exp-preset-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-        const payerId = p.paidBy === 'Jonathan Kemp' ? user.userId : 'usr-ronald-few';
+        const payerId = p.payerId || (p.paidBy === 'Jonathan Kemp' ? user.userId : 'usr-ronald-few');
 
         await db.prepare(`
           INSERT INTO wayfinder_expenses (
-            id, journey_id, user_id, paid_by_name, category, description,
+            id, journey_id, user_id, paid_by_name, paid_by_user_id, category, description,
             amount_original, currency_original, paid_status, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'paid', datetime('now'))
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', datetime('now'))
         `).bind(
           newId,
           journeyId,
           payerId,
           p.paidBy,
+          payerId,
           p.cat,
           p.desc,
           p.amount,
@@ -324,14 +335,15 @@ export async function handleExpenses(context, url, method) {
       const newExpenseId = `exp-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
       await db.prepare(`
         INSERT INTO wayfinder_expenses (
-          id, journey_id, user_id, paid_by_name, category, description,
+          id, journey_id, user_id, paid_by_name, paid_by_user_id, category, description,
           amount_original, currency_original, paid_status, notes, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'paid', ?, datetime('now'))
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', ?, datetime('now'))
       `).bind(
         newExpenseId,
         journeyId,
         paid_by_id,
         paid_by_name,
+        paid_by_id,
         category,
         description,
         Number(amount_original),

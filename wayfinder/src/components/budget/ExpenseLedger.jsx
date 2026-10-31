@@ -208,7 +208,7 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
         currency_original: formCurrency,
         amount_usd: amtInUsd,
         paid_by_name: formPayer === 'self' ? currentUserName : partnerName,
-        paid_by_id: formPayer === 'self' ? currentUserId : partnerId,
+        paid_by_user_id: formPayer === 'self' ? currentUserId : partnerId,
         splits: splits.map(s => ({
           user_id: s.userId,
           user_name: s.userName,
@@ -277,7 +277,7 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
     try {
       const fromUserId = split.user_id;
       const fromUserName = split.user_name || 'Member';
-      const toUserId = expense.user_id;
+      const toUserId = expense.paid_by_user_id || expense.user_id;
       const toUserName = expense.paid_by_name || 'Member';
 
       const res = await fetch(getApiUrl('/api/wayfinder/expenses/settle'), {
@@ -591,7 +591,8 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
                     {exp.splits && exp.splits.length > 0 && (
                       <div className="mt-2.5 flex flex-wrap items-center gap-2">
                         {exp.splits.map((s) => {
-                          const isPayer = s.user_name === exp.paid_by_name || s.user_id === exp.user_id;
+                          const isPayer = s.user_id === (exp.paid_by_user_id || exp.user_id);
+                          const isCurrentUserSplit = s.user_id === currentUserId;
                           const isSettled = Boolean(s.is_settled);
                           const firstName = s.user_name?.split(' ')[0] || 'Member';
 
@@ -636,7 +637,10 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
                               className="inline-flex items-center space-x-2 px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/30 text-[11px]"
                             >
                               <span className="text-amber-300 font-bold">
-                                {firstName} owes {formatCurrency(s.amount_owed, cur)}
+                                {isCurrentUserSplit
+                                  ? `You owe ${exp.paid_by_name?.split(' ')[0] || 'Payer'}: ${formatCurrency(s.amount_owed, cur)}`
+                                  : `${firstName} owes ${formatCurrency(s.amount_owed, cur)}`
+                                }
                               </span>
                               <button
                                 type="button"

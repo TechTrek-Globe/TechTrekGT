@@ -116,6 +116,10 @@ export function calculateSettleUp(expenses = [], settlements = [], displayCurren
     for (const split of splits) {
       const debtorId = split.user_id || split.userId;
       const debtorName = split.user_name || split.userName || 'Member';
+      // Skip the payer's own split row - it represents their personal share,
+      // not an external debt. Only non-payer splits represent real money owed.
+      const payerUserId = exp.paid_by_user_id || exp.user_id;
+      if (debtorId === payerUserId) continue;
       ensureUser(debtorId, debtorName);
 
       const splitOwed = Number(split.amount_owed || split.amount || 0);

@@ -137,8 +137,9 @@ Tracks shared expedition costs, member split allocations, and debt settlements i
 - `journey_id`: associated journey slug (`poland-christmas-2026`).
 - `itinerary_item_id`: optional foreign key referencing linked `wayfinder_itinerary_items(id)`.
 - `document_id`: optional foreign key referencing source `wayfinder_documents(id)`.
-- `user_id`: creator / payer UUID.
-- `paid_by_name`: display name of paying member (e.g. `Jonathan Kemp`, `Ronald Milton Few`).
+- `user_id`: creator UUID (the authenticated user who recorded the expense in D1).
+- `paid_by_name`: display name of the member who actually fronted the payment (e.g. `Jonathan Kemp`, `Ronald Milton Few`).
+- `paid_by_user_id`: UUID of the member who fronted the payment. This is the authoritative payer field used by `calculateSettleUp` in [expenseLedger.js](file:///e:/TechTrekGT/wayfinder/src/utils/expenseLedger.js) to determine net balances. Distinct from `user_id` (which is the row creator). Falls back to `user_id` for legacy rows where this column is null.
 - `category`: categorized domain (`flight`, `lodging`, `transit`, `activity`, `dining`, `market`, `other`).
 - `description`: expense title or merchant name.
 - `amount_original`, `currency_original`: raw payment amount and ISO 4217 currency (`PLN`, `USD`, `EUR`, `GBP`).

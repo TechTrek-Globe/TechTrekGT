@@ -152,6 +152,8 @@ CREATE TABLE IF NOT EXISTS wayfinder_expenses (
   itinerary_item_id   TEXT,
   document_id         TEXT,
   user_id             TEXT NOT NULL,
+  paid_by_name        TEXT,
+  paid_by_user_id     TEXT,
   category            TEXT NOT NULL DEFAULT 'other',
   description         TEXT NOT NULL,
   amount_original     REAL,

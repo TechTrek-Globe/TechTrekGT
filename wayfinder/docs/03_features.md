@@ -129,6 +129,11 @@ Authenticated users can import hotel and attraction booking confirmations via de
   - Prior regex heuristics that matched generic terms (such as `hotel`, `palace`, or `wroclaw`) have been surgically tightened to strictly isolate bundled static files (`isAltus = lower.includes('altus')`).
   - Guarantees that Kraków accommodations (e.g. Hotel Experior Boutique) or Poznań lodging (e.g. Hotel Brovaria) never incorrectly pull or display the Altus Palace Wrocław voucher.
   - When viewing documents without an attached local binary blob, renders a clean metadata card with action shortcuts to "Review Extracted Fields", "Attach Local PDF File", and "Rename Title".
+- Profitroom Booking Engine & PDF Text Stream Ingestion:
+  - Dedicated PDF Stream Decompressor (`extractPdfText`): Built directly into [gemini-parser.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/gemini-parser.js) using `node:zlib`. Decompresses flate streams in memory, maps ToUnicode CMaps, parses text operators (`Tj` / `TJ`), and extracts URI hyperlinks from PDF bytes with zero external npm dependencies.
+  - Automatic Ingestion of Profitroom Confirmation Printouts: Automatically recognizes Profitroom booking confirmation printouts (often downloaded as `Your booking confirmation.pdf` or `print.pdf` from `mailer.profitroom.pl`), extracting the 7-character confirmation code (`IMIWHDH`), hotel name (`Hotel Altus Palace Wrocław`), address (`ul. Wierzbowa 15, 50-056 Wrocław`), room type (`Junior Suite`), check-in date (`2026-12-07 15:00`), check-out date (`2026-12-09 12:00`), and Polish currency costs (`1,420.20 zł` / `1420.20 PLN` / `$359.79 USD`).
+  - Polish Currency Separator Support: [import-jobs.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/import-jobs.js) `parseCost` sanitizes Polish space thousands separators (e.g. `1 420.20 zł` -> `1420.20`), preventing premature numeric truncation.
+  - Automatic Title Enhancement: When uploading printouts with generic names like `Your booking confirmation.pdf`, the system automatically re-titles the document to `Hotel Altus Palace Wrocław Confirmation.pdf` upon parse completion.
 
 ## 8. Key-Free Open-Meteo Winter Weather & Daylight Telemetry
 

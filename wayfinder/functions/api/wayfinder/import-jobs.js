@@ -151,11 +151,20 @@ export async function handleImportJobs(context, url, method) {
          WHERE document_id = ?`
       ).bind(new Date().toISOString(), docId).run();
 
+      // Upgrade safe_display_name if currently generic
+      let updatedSafeName = doc.safe_display_name;
+      const lowerName = (doc.safe_display_name || '').toLowerCase();
+      if (lowerName.includes('booking confirmation') || lowerName.includes('print') || lowerName.includes('uploaded_doc') || lowerName.startsWith('media_')) {
+        if (parseResult.docType === 'hotel' && parseResult.provider) {
+          updatedSafeName = `${parseResult.provider} Confirmation.pdf`;
+        }
+      }
+
       await env.DB.prepare(
         `UPDATE wayfinder_documents
-         SET detected_provider = ?, detected_doc_type = ?, processing_status = 'needs_review'
+         SET detected_provider = ?, detected_doc_type = ?, safe_display_name = ?, processing_status = 'needs_review'
          WHERE id = ?`
-      ).bind(parseResult.provider || null, parseResult.docType || null, docId).run();
+      ).bind(parseResult.provider || null, parseResult.docType || null, updatedSafeName, docId).run();
 
       return json({
         success: true,
@@ -486,8 +495,9 @@ function parseCost(rawCost) {
     currency = 'PLN';
   }
 
-  // Handle European comma decimal (e.g. 450,00 or 1.465,72)
+  // Handle European comma decimal (e.g. 450,00 or 1.465,72) and Polish space thousands separators (e.g. 1 420.20)
   let cleanStr = str;
+  cleanStr = cleanStr.replace(/(\d)\s+(\d)/g, '$1$2');
   if (/,\d{2}(?!\d)/.test(cleanStr)) {
     cleanStr = cleanStr.replace(/\./g, '').replace(',', '.');
   } else {

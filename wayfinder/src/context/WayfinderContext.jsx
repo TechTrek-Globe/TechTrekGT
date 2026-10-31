@@ -186,6 +186,13 @@ export function WayfinderProvider({ children }) {
     if (file.type?.includes('text') || file.name.endsWith('.txt') || file.name.endsWith('.eml') || file.name.endsWith('.html')) {
       text = await file.text();
     } else {
+      try {
+        const rawSlice = await file.slice(0, 100000).text();
+        if (rawSlice && rawSlice.length > 50) {
+          text = rawSlice;
+        }
+      } catch (e) {}
+
       base64 = await new Promise((resolve) => {
         const reader = new FileReader();
         reader.onloadend = () => resolve(reader.result);

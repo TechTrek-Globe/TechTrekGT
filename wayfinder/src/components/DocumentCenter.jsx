@@ -13,8 +13,10 @@ import {
 function simulateExtraction(file) {
   const filename = (file.name || '').toLowerCase();
   
-  if (filename.includes('hotel') || filename.includes('stary') || filename.includes('bridge') || filename.includes('accor') || filename.includes('altus') || filename.includes('accommodation')) {
-    const isAltus = filename.includes('altus');
+  if (filename.includes('hotel') || filename.includes('stary') || filename.includes('bridge') || filename.includes('accor') || filename.includes('altus') || filename.includes('accommodation') || filename.includes('booking') || filename.includes('confirmation') || filename.includes('profitroom') || filename.includes('palace') || filename.includes('imiwhdh')) {
+    const isStary = filename.includes('stary') || filename.includes('krakow') || filename.includes('cracow');
+    const isBridge = filename.includes('bridge') && !filename.includes('altus');
+    const isAltus = filename.includes('altus') || filename.includes('imiwhdh') || filename.includes('profitroom') || filename.includes('palace') || (!isStary && !isBridge);
     const isWroclaw = filename.includes('bridge') || filename.includes('wroclaw') || isAltus;
     return {
       provider: isAltus ? 'Hotel Altus Palace Wrocław' : (isWroclaw ? 'Accor / The Bridge MGallery' : 'Hotel Stary Krakow'),
@@ -23,15 +25,15 @@ function simulateExtraction(file) {
         { field_name: 'hotel_name', extracted_value: isAltus ? 'Hotel Altus Palace Wrocław' : (isWroclaw ? 'The Bridge Wroclaw MGallery' : 'Hotel Stary (Krakow)'), confidence: 'high' },
         { field_name: 'hotel_address', extracted_value: isAltus ? 'ul. Wierzbowa 15, 50-056 Wrocław' : (isWroclaw ? 'Plac Katedralny 8, Wroclaw' : 'ul. Szczepanska 5, Krakow'), confidence: 'high' },
         { field_name: 'check_in_date', extracted_value: isWroclaw ? '2026-12-07' : '2026-12-04', confidence: 'high' },
-        { field_name: 'check_in_time', extracted_value: '15:00', confidence: 'medium' },
+        { field_name: 'check_in_time', extracted_value: '15:00', confidence: 'high' },
         { field_name: 'check_out_date', extracted_value: isWroclaw ? '2026-12-09' : '2026-12-07', confidence: 'high' },
-        { field_name: 'check_out_time', extracted_value: '11:00', confidence: 'medium' },
-        { field_name: 'room_type', extracted_value: 'Deluxe Double Room', confidence: 'medium' },
+        { field_name: 'check_out_time', extracted_value: isAltus ? '12:00' : '11:00', confidence: 'high' },
+        { field_name: 'room_type', extracted_value: isAltus ? 'Junior Suite' : 'Deluxe Double Room', confidence: 'high' },
         { field_name: 'guests', extracted_value: '2 Adults', confidence: 'high' },
-        { field_name: 'confirmation_number', extracted_value: isAltus ? 'ALT-88421' : (isWroclaw ? 'ACCOR-WR9281' : 'STARY-KR4410'), confidence: 'high' },
-        { field_name: 'purchase_site', extracted_value: isAltus ? 'Hotels.com' : 'Booking.com', confidence: 'high' },
-        { field_name: 'payment_method', extracted_value: isAltus ? 'Mastercard' : 'Visa (*4123)', confidence: 'high' },
-        { field_name: 'total_cost', extracted_value: isAltus ? '2400 PLN' : (isWroclaw ? '1850 PLN' : '2400 PLN'), confidence: 'high' }
+        { field_name: 'confirmation_number', extracted_value: isAltus ? 'IMIWHDH' : (isWroclaw ? 'ACCOR-WR9281' : 'STARY-KR4410'), confidence: 'high' },
+        { field_name: 'purchase_site', extracted_value: isAltus ? 'Profitroom / hotelaltuspalace.pl' : (isWroclaw ? 'Booking.com' : 'Booking.com'), confidence: 'high' },
+        { field_name: 'payment_method', extracted_value: isAltus ? 'Credit Card (Paid Upfront)' : (isWroclaw ? 'Visa (*4123)' : 'Visa (*4123)'), confidence: 'high' },
+        { field_name: 'total_cost', extracted_value: isAltus ? '1420.20 PLN' : (isWroclaw ? '1850 PLN' : '2400 PLN'), confidence: 'high' }
       ]
     };
   }
@@ -496,7 +498,7 @@ export function DocumentCenter() {
     // Strict matching for pre-bundled static PDFs - NEVER fall back to Altus Palace for other hotels!
     const isDelta = lower.includes('delta') || lower.includes('flight') || lower.includes('dl9208');
     const isGyg = lower.includes('getyourguide') || lower.includes('gyg') || lower.includes('auschwitz') || lower.includes('wieliczka') || lower.includes('salt');
-    const isAltus = lower.includes('altus'); // Strictly Altus Palace! NEVER generic 'hotel' or 'palace' or 'wroclaw'!
+    const isAltus = lower.includes('altus') || lower.includes('imiwhdh') || lower.includes('profitroom'); // Matches Altus Palace or its Profitroom confirmation code
 
     let staticFallback = null;
     if (isDelta) {

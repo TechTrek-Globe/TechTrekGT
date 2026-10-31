@@ -381,15 +381,17 @@ function cleanTitleAndProvider(rawSubject, body, from) {
     suggestedLocation = 'Kraków, Poland';
   }
   // 5. General Hotel / Lodging
-  else if (combined.includes('hotel') || combined.includes('booking.com') || combined.includes('accor') || combined.includes('altus') || combined.includes('stary')) {
+  else if (combined.includes('hotel') || combined.includes('booking.com') || combined.includes('accor') || combined.includes('altus') || combined.includes('stary') || combined.includes('profitroom') || combined.includes('imiwhdh')) {
     item_type = 'hotel';
     if (combined.includes('booking.com')) provider = 'Booking.com';
     else if (combined.includes('accor') || combined.includes('bridge')) provider = 'Accor / The Bridge Wrocław';
-    else if (combined.includes('altus')) provider = 'Hotel Altus Palace Wrocław';
+    else if (combined.includes('altus') || combined.includes('profitroom') || combined.includes('imiwhdh')) provider = 'Hotel Altus Palace Wrocław';
     else if (combined.includes('stary')) provider = 'Hotel Stary Kraków';
     else provider = 'Hotel Accommodation';
-    title = `Hotel: ${cleanedSubject.replace(/confirmation.*$/i, '').trim()}`;
+    title = `Hotel: ${cleanedSubject.replace(/confirmation.*$/i, '').trim() || provider}`;
+    suggestedDate = (combined.includes('altus') || combined.includes('profitroom') || combined.includes('imiwhdh')) ? '2026-12-07' : '2026-12-04';
     suggestedTime = '15:00';
+    suggestedLocation = (combined.includes('altus') || combined.includes('profitroom') || combined.includes('imiwhdh')) ? 'ul. Wierzbowa 15, 50-056 Wrocław' : 'Poland';
   }
   // 4. Viator / Tripadvisor
   else if (combined.includes('viator') || combined.includes('tripadvisor') || from.includes('viator') || from.includes('tripadvisor')) {

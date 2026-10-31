@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  DollarSign, Receipt, Plus, ArrowRight, CheckCircle2, Trash2, 
+  DollarSign, Receipt, Plus, ArrowRight, CheckCircle2, Trash2, Edit2,
   RefreshCw, Users, CreditCard, Sparkles, Plane, Building, Train, 
   Utensils, ShoppingBag, AlertCircle, ArrowUpRight, ArrowDownLeft, RotateCcw
 } from 'lucide-react';
@@ -83,6 +83,7 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
 
   // Modal states
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [editingExpense, setEditingExpense] = useState(null);
   const [isSettleModalOpen, setIsSettleModalOpen] = useState(false);
   const [activeTransferToSettle, setActiveTransferToSettle] = useState(null);
   const [activeItemToSettle, setActiveItemToSettle] = useState(null); // { expense, split }
@@ -179,8 +180,45 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
     }
   };
 
-  // Handle Add Expense Submit
-  const handleAddExpense = async (e) => {
+  // Modal open handlers
+  const handleOpenAddModal = () => {
+    setEditingExpense(null);
+    setFormDesc('');
+    setFormCategory('dining');
+    setFormAmount('');
+    setFormCurrency(displayCurrency);
+    setFormPayer('self');
+    setFormSplitType('equal');
+    setIsAddModalOpen(true);
+  };
+
+  const handleOpenEditModal = (exp) => {
+    setEditingExpense(exp);
+    setFormDesc(exp.description || '');
+    setFormCategory(normalizeCategory(exp.category || 'dining'));
+    setFormAmount(String(exp.amount_original || ''));
+    setFormCurrency(exp.currency_original || displayCurrency);
+
+    // Determine who paid
+    const payerId = exp.paid_by_user_id || exp.user_id;
+    if (payerId === currentUserId || exp.paid_by_name?.toLowerCase().includes('jon')) {
+      setFormPayer('self');
+    } else {
+      setFormPayer('partner');
+    }
+
+    // Determine split type
+    if (exp.splits && exp.splits.length === 1 && exp.splits[0].percentage === 100) {
+      setFormSplitType('self');
+    } else {
+      setFormSplitType('equal');
+    }
+
+    setIsAddModalOpen(true);
+  };
+
+  // Handle Save Expense Submit (creates new or updates existing)
+  const handleSaveExpense = async (e) => {
     e.preventDefault();
     if (!formDesc || !formAmount || Number(formAmount) <= 0) return;
 
@@ -217,20 +255,25 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
         }))
       };
 
-      const res = await fetch(getApiUrl('/api/wayfinder/expenses'), {
-        method: 'POST',
+      const url = editingExpense
+        ? getApiUrl(`/api/wayfinder/expenses/${editingExpense.id}`)
+        : getApiUrl('/api/wayfinder/expenses');
+
+      const res = await fetch(url, {
+        method: editingExpense ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify(payload)
       });
 
-      if (!res.ok) throw new Error('Failed to record expense');
+      if (!res.ok) throw new Error(`Failed to ${editingExpense ? 'update' : 'record'} expense`);
       setIsAddModalOpen(false);
+      setEditingExpense(null);
       setFormDesc('');
       setFormAmount('');
       await loadExpenses();
     } catch (err) {
-      alert('Error creating expense: ' + err.message);
+      alert(`Error saving expense: ${err.message}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -389,7 +432,7 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
 
           <button
             type="button"
-            onClick={() => setIsAddModalOpen(true)}
+            onClick={handleOpenAddModal}
             className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs flex items-center space-x-1.5 transition-all shadow-md cursor-pointer"
           >
             <Plus className="w-4 h-4" />
@@ -673,14 +716,25 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
                     )}
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteExpense(exp.id)}
-                    className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                    title="Delete expense"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center space-x-1 sm:space-x-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEditModal(exp)}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-amber-500/10 transition-colors cursor-pointer"
+                      title="Edit expense details and who paid"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteExpense(exp.id)}
+                      className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
+                      title="Delete expense"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               </div>
             );
@@ -734,19 +788,28 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
           <div className="glass-panel w-full max-w-md p-6 rounded-3xl border border-amber-500/30 bg-slate-900 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <h3 className="text-lg font-black text-white flex items-center space-x-2">
-                <Receipt className="w-5 h-5 text-amber-400" />
-                <span>Add Trip Expense</span>
+                {editingExpense ? (
+                  <>
+                    <Edit2 className="w-5 h-5 text-amber-400" />
+                    <span>Edit Expense & Payer</span>
+                  </>
+                ) : (
+                  <>
+                    <Receipt className="w-5 h-5 text-amber-400" />
+                    <span>Add Trip Expense</span>
+                  </>
+                )}
               </h3>
               <button 
                 type="button" 
-                onClick={() => setIsAddModalOpen(false)}
+                onClick={() => { setIsAddModalOpen(false); setEditingExpense(null); }}
                 className="text-slate-400 hover:text-white text-sm"
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleAddExpense} className="space-y-4 text-xs sm:text-sm">
+            <form onSubmit={handleSaveExpense} className="space-y-4 text-xs sm:text-sm">
               <div>
                 <label className="block font-bold text-slate-300 mb-1">Description</label>
                 <input
@@ -837,7 +900,7 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
               <div className="pt-2 flex items-center justify-end space-x-2">
                 <button
                   type="button"
-                  onClick={() => setIsAddModalOpen(false)}
+                  onClick={() => { setIsAddModalOpen(false); setEditingExpense(null); }}
                   className="px-4 py-2 rounded-xl text-slate-400 hover:text-white"
                 >
                   Cancel
@@ -847,7 +910,7 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
                   disabled={isSubmitting}
                   className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold shadow-md cursor-pointer disabled:opacity-50"
                 >
-                  {isSubmitting ? 'Saving...' : 'Save Expense'}
+                  {isSubmitting ? 'Saving...' : editingExpense ? 'Update Expense' : 'Save Expense'}
                 </button>
               </div>
             </form>

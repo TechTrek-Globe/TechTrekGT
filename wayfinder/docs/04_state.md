@@ -222,7 +222,7 @@ Active persistent entities for confirmed trip reservations:
 ### 11.2 Inbound Transatlantic Flights
 - Document Record: `ea78634a-eaa9-46e8-b40c-b3703bb6e2ca` (`Poland_Delta.pdf`).
 - Itinerary Record: `471a82a3-2251-4d01-a308-a8f084b6108a` (`Flight: ATL to KRK`).
-- Expense Record: `exp-delta-flight-dl9208`, `amount_original: 1980.00`, `currency_original: USD`, `amount_usd: 1980.00`, linked to splits `spl-flight-jon` and `spl-flight-ronald` ($990.00 USD each).
+- Expense Record: `exp-delta-flight-dl9208`, `amount_original: 1980.00`, `currency_original: USD`, `amount_usd: 1980.00`, `paid_by_name: Ronald Milton Few`, `paid_by_user_id: usr-ronald-few`, linked to splits `spl-flight-jon` (Jonathan owes $990.00 USD) and `spl-flight-ronald` (Ronald paid share of $990.00 USD).
 
 ### 11.3 Auschwitz & Wieliczka Guided Excursion
 - Document Record: `doc-gyg-7vkk692wy` (`GetYourGuide_Ticket_GYG7VKK692WY.pdf`).

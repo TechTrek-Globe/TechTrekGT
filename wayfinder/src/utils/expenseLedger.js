@@ -95,7 +95,7 @@ export function calculateSettleUp(expenses = [], settlements = [], displayCurren
 
   // 1. Process all expenses
   for (const exp of expenses) {
-    const payerId = exp.user_id || exp.payerId;
+    const payerId = exp.paid_by_user_id || exp.user_id || exp.payerId;
     const payerName = exp.paid_by_name || exp.payerName || 'Member';
     const currency = (exp.currency_original || exp.currency || 'PLN').toUpperCase();
     const rawAmount = Number(exp.amount_original || exp.amount || 0);

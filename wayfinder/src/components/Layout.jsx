@@ -81,8 +81,7 @@ export function Layout({ children }) {
               title="Return to TechTrekGT Main Launch Pad"
             >
               <Globe className="w-3.5 h-3.5 lg:w-4 lg:h-4 text-wf-blue-lt group-hover:scale-110 transition-transform" />
-              <span className="hidden xl:inline">Launch Pad</span>
-              <span className="hidden lg:inline xl:hidden">Hub</span>
+              <span className="hidden lg:inline">Launch Pad</span>
             </a>
 
             {/* Practical Guide link */}
@@ -125,7 +124,7 @@ export function Layout({ children }) {
                 title="Open Currency Converter"
               >
                 <Coins className="w-3.5 h-3.5 lg:w-4 lg:h-4 text-wf-amber group-hover:rotate-12 transition-transform" />
-                <span className="hidden xl:inline">Converter</span>
+                <span className="hidden lg:inline">Currency Converter</span>
                 <span className="text-[10px] lg:text-xs bg-wf-amber/20 px-1.5 py-0.5 rounded-md font-semibold text-wf-cream">
                   {symbol} {rate.toFixed(2)}
                 </span>
@@ -141,8 +140,7 @@ export function Layout({ children }) {
                   title="Private Hub"
                 >
                   <ShieldCheck className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
-                  <span className="hidden xl:inline">Private Hub</span>
-                  <span className="hidden lg:inline xl:hidden">Hub</span>
+                  <span className="hidden lg:inline">Private Hub</span>
                 </a>
                 <div className="h-5 lg:h-6 w-px bg-white/10 mx-0.5" />
                 <button

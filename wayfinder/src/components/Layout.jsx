@@ -95,7 +95,7 @@ export function Layout({ children }) {
               <span className="hidden lg:inline">Practical</span>
             </a>
 
-            {/* Schedule link */}
+            {/* Itinerary link */}
             <a
               href="/wayfinder/poland-christmas-2026?scroll=journey-sequence"
               onClick={(e) => {
@@ -110,10 +110,10 @@ export function Layout({ children }) {
                 }
               }}
               className="flex items-center space-x-1.5 px-2 lg:px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-slate-200 text-xs lg:text-sm font-bold hover:text-white hover:bg-white/10 transition-all shadow-sm min-h-[40px]"
-              title="10-Day Expedition Schedule"
+              title="10-Day Expedition Itinerary"
             >
               <Calendar className="w-3.5 h-3.5 lg:w-4 lg:h-4 text-amber-400" />
-              <span className="hidden lg:inline">Schedule</span>
+              <span className="hidden lg:inline">Itinerary</span>
             </a>
 
             {/* Currency Converter */}

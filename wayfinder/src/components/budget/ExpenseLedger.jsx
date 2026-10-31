@@ -99,7 +99,7 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
   const [formSplitType, setFormSplitType] = useState('equal'); // 'equal' or 'self'
 
   // Use real user.id (matches D1 stored user_id), with safe fallback
-  const currentUserId = user?.id || user?.userId || 'usr-jonathan-kemp';
+  const currentUserId = user?.id || user?.userId || 'usr-1785511589441-3fvgv';
   const currentUserName = user?.name || user?.email?.split('@')[0] || 'Jonathan Kemp';
   const partnerId = 'usr-ronald-few';
   const partnerName = 'Ronald Milton Few';

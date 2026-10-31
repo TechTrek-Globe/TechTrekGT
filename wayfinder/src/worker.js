@@ -21,6 +21,8 @@ import { handleExchangeRate }  from '../functions/api/wayfinder/exchange-rate.js
 import { handleWeather }       from '../functions/api/wayfinder/weather.js';
 import { handleEmailInboxes }  from '../functions/api/wayfinder/email-inboxes.js';
 import { handlePacking }       from '../functions/api/wayfinder/packing.js';
+import { handleCalendarExport, handleCalendarFeed, handleCalendarToken } from '../functions/api/wayfinder/calendar.js';
+import { handleExpenses }      from '../functions/api/wayfinder/expenses.js';
 import { handleInboundEmail }  from '../functions/api/wayfinder/email-worker.js';
 
 const ALLOWED_ORIGINS = [
@@ -53,6 +55,7 @@ function addSecurityHeaders(response, isLocal = false) {
       "font-src 'self' data: https://fonts.gstatic.com",
       "frame-src 'self' https://challenges.cloudflare.com https://www.youtube-nocookie.com https://www.youtube.com https://www.openstreetmap.org blob: data:",
       "child-src 'self' https://challenges.cloudflare.com blob: data:",
+      "object-src 'self' blob: data:",
       "frame-ancestors 'self'",
       "form-action 'self'",
       "base-uri 'self'",
@@ -122,6 +125,19 @@ export default {
       if (apiPath === '/api/wayfinder/weather' && method === 'GET') {
         return handleWeather({ request, env, ctx }, url, method);
       }
+      if (apiPath.startsWith('/api/wayfinder/calendar/feed/') && method === 'GET') {
+        return handleCalendarFeed({ request, env, ctx }, url, method);
+      }
+      if (apiPath === '/api/wayfinder/calendar/export.ics' && method === 'GET') {
+        const auth = await requireAuth(request, env);
+        const user = auth.ok ? auth.payload : null;
+        return handleCalendarExport({ request, env, ctx, user }, url, method);
+      }
+      if (apiPath.startsWith('/api/wayfinder/expenses') && method === 'GET') {
+        const auth = await requireAuth(request, env);
+        const user = auth.ok ? auth.payload : null;
+        return handleExpenses({ request, env, ctx, user }, url, method);
+      }
 
       const auth = await requireAuth(request, env);
       if (!auth.ok) return auth.error;
@@ -136,6 +152,8 @@ export default {
       if (apiPath.startsWith('/api/wayfinder/budget'))         return handleBudget(context, url, method);
       if (apiPath.startsWith('/api/wayfinder/email-inboxes'))  return handleEmailInboxes(context, url, method);
       if (apiPath.startsWith('/api/wayfinder/packing'))        return handlePacking(context, url, method);
+      if (apiPath.startsWith('/api/wayfinder/expenses'))       return handleExpenses(context, url, method);
+      if (apiPath.startsWith('/api/wayfinder/calendar'))       return handleCalendarToken(context, url, method);
 
       return new Response(JSON.stringify({ error: 'Not found' }), {
         status: 404,

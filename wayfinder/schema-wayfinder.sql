@@ -284,3 +284,66 @@ CREATE TABLE IF NOT EXISTS wayfinder_packing_items (
 CREATE INDEX IF NOT EXISTS idx_wf_packing_journey ON wayfinder_packing_items(journey_id);
 CREATE INDEX IF NOT EXISTS idx_wf_packing_user    ON wayfinder_packing_items(user_id);
 
+-- ============================================================
+-- CALENDAR SUBSCRIPTION TOKENS - Secure Token-Based iCal Feeds
+-- ============================================================
+CREATE TABLE IF NOT EXISTS wayfinder_calendar_tokens (
+  id              TEXT PRIMARY KEY,
+  user_id         TEXT NOT NULL,
+  journey_id      TEXT NOT NULL,
+  token           TEXT NOT NULL UNIQUE,             -- 32-char crypto random token
+  feed_name       TEXT NOT NULL DEFAULT 'Poland 2026 Schedule',
+  is_active       INTEGER NOT NULL DEFAULT 1,
+  last_polled_at  TEXT,
+  poll_count      INTEGER NOT NULL DEFAULT 0,
+  created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (user_id)    REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (journey_id) REFERENCES wayfinder_journeys(id) ON DELETE CASCADE,
+  UNIQUE(user_id, journey_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_wf_cal_token ON wayfinder_calendar_tokens(token);
+CREATE INDEX IF NOT EXISTS idx_wf_cal_user  ON wayfinder_calendar_tokens(user_id);
+
+-- ============================================================
+-- EXPENSE SPLITS - Individual Member Allocations
+-- ============================================================
+CREATE TABLE IF NOT EXISTS wayfinder_expense_splits (
+  id              TEXT PRIMARY KEY,
+  expense_id      TEXT NOT NULL,
+  user_id         TEXT NOT NULL,
+  user_name       TEXT,
+  amount_owed     REAL NOT NULL,
+  percentage      REAL,
+  is_settled      INTEGER NOT NULL DEFAULT 0,
+  settled_at      TEXT,
+  created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (expense_id) REFERENCES wayfinder_expenses(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id)    REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_wf_splits_expense ON wayfinder_expense_splits(expense_id);
+CREATE INDEX IF NOT EXISTS idx_wf_splits_user    ON wayfinder_expense_splits(user_id);
+
+-- ============================================================
+-- EXPENSE SETTLEMENTS - Log of Debt Settle-Up Payments
+-- ============================================================
+CREATE TABLE IF NOT EXISTS wayfinder_expense_settlements (
+  id              TEXT PRIMARY KEY,
+  journey_id      TEXT NOT NULL,
+  from_user_id    TEXT NOT NULL,
+  from_user_name  TEXT NOT NULL,
+  to_user_id      TEXT NOT NULL,
+  to_user_name    TEXT NOT NULL,
+  amount          REAL NOT NULL,
+  currency        TEXT NOT NULL DEFAULT 'PLN',
+  settled_date    TEXT NOT NULL DEFAULT (date('now')),
+  method          TEXT NOT NULL DEFAULT 'cash', -- cash, revolut, blik, transfer, other
+  notes           TEXT,
+  created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (journey_id) REFERENCES wayfinder_journeys(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_wf_settle_journey ON wayfinder_expense_settlements(journey_id);
+

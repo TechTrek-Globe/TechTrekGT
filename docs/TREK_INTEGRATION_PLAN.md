@@ -198,22 +198,27 @@ graph TD
   - Mounted interactive Packing List tab inside `wayfinder/src/components/PrivateHub.jsx` and added direct launcher callout in `wayfinder/src/components/PracticalPage.jsx`.
   - Updated mobile navigation in `wayfinder/src/components/BottomTabBar.jsx`.
 
-### Phase 4: Live iCalendar (.ics) Feed Generator
-- Goal: Enable travelers to subscribe to their Poland 2026 itinerary, trains, and flights directly in their mobile calendars.
-- Files to Create/Modify:
-  - Add `wayfinder_calendar_tokens` schema to `wayfinder/schema-wayfinder.sql`.
-  - Create `wayfinder/functions/api/wayfinder/calendar.js` (RFC 5545 generator).
-  - Register feed and export routes in `wayfinder/src/worker.js`.
-  - Create `wayfinder/src/components/calendar/CalendarSubscribeModal.jsx`.
-  - Add subscription launcher in `PrivateHub.jsx` and `BottomTabBar.jsx`.
+### Phase 4: Live iCalendar (.ics) Feed Generator [COMPLETED]
+- Status: Fully implemented and deployed to production.
+- Deliverables:
+  - Added `wayfinder_calendar_tokens` schema to `wayfinder/schema-wayfinder.sql` and initialized in remote Cloudflare D1 `personal-budget-db`.
+  - Created `wayfinder/functions/api/wayfinder/calendar.js` implementing RFC 5545 compliant `.ics` generator with 75-octet line folding (`foldLine`), standard character escaping, `Europe/Warsaw` VTIMEZONE definition, 10-day itinerary event mapping, Delta flight DL9208 arrival synchronization, PKP Intercity rail legs, and Altus Palace Wrocław accommodation check-in/out records.
+  - Implemented token-based live calendar feed (`GET /api/wayfinder/calendar/feed/:token.ics`), direct snapshot download (`GET /api/wayfinder/calendar/export.ics`), and token management (`GET`, `POST`, `DELETE` `/api/wayfinder/calendar/token`).
+  - Registered public feed and export routes plus authenticated token handler in `wayfinder/src/worker.js`.
+  - Created `wayfinder/src/components/calendar/CalendarSubscribeModal.jsx` offering 1-click subscription deep-links for Apple Calendar (`webcal://`), Google Calendar, and Outlook 365, plus copyable feed URLs, poll telemetry tracking, and token rotation.
+  - Mounted launcher buttons in `ItineraryView.jsx` header, `PrivateHub.jsx` navigation bar, and `PolandLanding.jsx` Journey Sequence controls.
+  - Deployed to Cloudflare Workers (Version ID: `e4740d2a-6bc9-4df2-b059-1742784de8b2`). Documented in `wayfinder/docs/03_features.md` and `wayfinder/docs/04_state.md`.
 
-### Phase 5: Multi-Currency Group Expense Ledger & Debt Settle-Up
-- Goal: Provide precise cost splitting, currency freezing at booking time, and automated debt settlement recommendations.
-- Files to Create/Modify:
-  - Add `wayfinder_expense_splits` schema to `wayfinder/schema-wayfinder.sql`.
-  - Create `wayfinder/src/utils/expenseLedger.js` (split math & greedy settle-up graph).
-  - Create `wayfinder/functions/api/wayfinder/expense-splits.js`.
-  - Update `wayfinder/src/components/DocumentCenter.jsx` and `PrivateHub.jsx` to render the unified Expense Ledger.
+### Phase 5: Multi-Currency Group Expense Ledger & Debt Settle-Up [COMPLETED]
+- Status: Fully implemented and deployed to production.
+- Deliverables:
+  - Added `wayfinder_expense_splits` and `wayfinder_expense_settlements` schemas to `wayfinder/schema-wayfinder.sql` and initialized in remote Cloudflare D1 `personal-budget-db`.
+  - Created `wayfinder/src/utils/expenseLedger.js` implementing multi-currency normalization (PLN, USD, EUR, GBP), exact-cent equal split distribution, and a greedy bipartite matching algorithm to resolve group debts into the minimum number of settle-up transfers.
+  - Created serverless Cloudflare Worker API module `wayfinder/functions/api/wayfinder/expenses.js` handling expenses, splits, debt settlements, and sample expense presets.
+  - Registered `/api/wayfinder/expenses` in `wayfinder/src/worker.js` with optional public read access and authenticated write protection.
+  - Created `wayfinder/src/components/budget/ExpenseLedger.jsx` featuring dynamic currency toggling (`PLN`, `USD`, `EUR`, `GBP`), total expedition spend meters, user net balances, simplified settle-up action cards, category filtering, new expense modal, and payment settlement log.
+  - Mounted interactive Expense Ledger tab in `wayfinder/src/components/PrivateHub.jsx` at `/wayfinder/poland-christmas-2026/private/expenses`, with route aliases in `wayfinder/src/App.jsx`.
+  - Deployed to Cloudflare Workers (Version ID: `68e637b7-15b3-4480-ba7b-0ec06eec4e72`). Documented in `wayfinder/docs/03_features.md` and `wayfinder/docs/04_state.md`.
 
 ### Phase 6: Resilient Offline Mutation Queue
 - Goal: Guarantee zero data loss when editing notes, packing items, or expenses during underground train journeys or offline roaming.

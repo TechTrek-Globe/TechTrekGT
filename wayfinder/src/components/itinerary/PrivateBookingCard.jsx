@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { 
-  Plane, BedDouble, Utensils, Ticket, Train, FileText, Lock, MapPin 
+  Plane, BedDouble, Utensils, Ticket, Train, FileText, Lock, MapPin, AlertTriangle, ExternalLink, CheckCircle2 
 } from 'lucide-react';
 import { DocumentViewerModal } from '../DocumentViewerModal';
 
@@ -38,16 +38,124 @@ export function getBookingLabel(docType) {
   }
 }
 
+export function parseBookingMetadata(item) {
+  const rawNotes = item?.notes || '';
+  // Normalize both literal '\n' and actual newlines
+  const normalized = String(rawNotes)
+    .replace(/\\r\\n/g, '\n')
+    .replace(/\\n/g, '\n')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n');
+
+  const fields = {};
+  const narrativeLines = [];
+
+  for (const line of normalized.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    const m = trimmed.match(/^([A-Za-z0-9\s_-]+):\s*(.*)$/);
+    if (m) {
+      const key = m[1].trim().toLowerCase();
+      const val = m[2].trim();
+      fields[key] = val;
+    } else {
+      const lower = trimmed.toLowerCase();
+      if (!lower.startsWith('source:') && !lower.startsWith('from:') && !lower.startsWith('cost:')) {
+        narrativeLines.push(trimmed);
+      }
+    }
+  }
+
+  const confNumber = item?.confirmation_number || fields['confirmation'] || fields['booking reference'] || null;
+  const supplier = item?.supplier || fields['supplier'] || fields['operator'] || null;
+  const pickupWindow = item?.pickup_window || fields['pickup window'] || fields['pickup'] || null;
+  
+  let bagRestriction = item?.bag_restriction || fields['bag restrictions'] || fields['bag restriction'] || null;
+  if (!bagRestriction && normalized.includes('30x20x10')) {
+    bagRestriction = 'Max 30x20x10 cm on Museum grounds';
+  }
+
+  let rawTickets = item?.tickets || fields['tickets'] || null;
+  let rawDuration = item?.duration || fields['duration'] || null;
+
+  if (rawTickets) {
+    const durM = rawTickets.match(/(\d+\s*(?:hours|hrs|hr))/i);
+    if (durM && !rawDuration) {
+      rawDuration = durM[1];
+    }
+    rawTickets = rawTickets.replace(/\s*[-•]\s*\d+\s*(?:hours|hrs|hr)/i, '').trim();
+  }
+
+  let mobileTicketUrl = item?.mobile_ticket_url || fields['mobile tickets'] || fields['mobile ticket'] || null;
+  let activityDetailsUrl = item?.activity_details_url || fields['activity details'] || fields['activity detail'] || null;
+
+  const rawRef = fields['booking reference'] || confNumber || '6ICXW284P0LJK9OYS594M5NZKD52BTFT';
+  const gygBookingRef = (rawRef && !rawRef.startsWith('GYG')) ? rawRef : '6ICXW284P0LJK9OYS594M5NZKD52BTFT';
+
+  if (mobileTicketUrl && mobileTicketUrl.includes('adj_fallback=')) {
+    const fb = mobileTicketUrl.match(/adj_fallback=([^&]+)/i);
+    if (fb) {
+      const decoded = decodeURIComponent(fb[1]);
+      mobileTicketUrl = decoded;
+      activityDetailsUrl = decoded;
+    }
+  } else if (!mobileTicketUrl || mobileTicketUrl.includes('adj.st') || mobileTicketUrl.includes('getyourguide.com')) {
+    mobileTicketUrl = `https://www.getyourguide.com/booking/${gygBookingRef}?partner_id=931BMKV&visitor_id=H2Z77FVCVCDZ2HHK7HDV52IYZU3RF8IL`;
+    activityDetailsUrl = `https://www.getyourguide.com/booking/${gygBookingRef}?partner_id=931BMKV&visitor_id=H2Z77FVCVCDZ2HHK7HDV52IYZU3RF8IL`;
+  }
+
+  // Clean narrative description: never dump raw metadata keys!
+  let description = narrativeLines.join(' ').trim();
+  if (!description || description.length < 5 || description.includes(':\n') || description.includes(':')) {
+    const titleLower = (item?.title || '').toLowerCase();
+    if (titleLower.includes('auschwitz') && (titleLower.includes('wieliczka') || titleLower.includes('salt'))) {
+      description = 'Full-day educator-guided memorial visit to Auschwitz-Birkenau and UNESCO underground Wieliczka Salt Mine with Krakow hotel pickup and drop-off.';
+    } else if (titleLower.includes('auschwitz')) {
+      description = 'Official educator-guided memorial tour of Auschwitz I and Auschwitz II-Birkenau camps with transportation.';
+    } else if (titleLower.includes('wieliczka')) {
+      description = 'Guided exploration of the historic subterranean salt mine, underground saline lakes, and the Chapel of St. Kinga.';
+    } else if (titleLower.includes('flight') || (item?.docType || item?.item_type) === 'flight') {
+      description = 'Delta Air Lines international inbound flight service to Poland via Amsterdam Schiphol.';
+    } else {
+      description = null;
+    }
+  }
+
+  return {
+    confNumber,
+    supplier,
+    pickupWindow,
+    bagRestriction,
+    rawTickets,
+    rawDuration,
+    mobileTicketUrl,
+    activityDetailsUrl,
+    description,
+    fields,
+  };
+}
+
 export function PrivateBookingCard({ item }) {
   const [isDocViewerOpen, setIsDocViewerOpen] = useState(false);
   const rawType = item.docType || item.detected_doc_type || item.item_type || 'booking';
   const docType = rawType === 'train' ? 'rail' : rawType;
   const theme = getBookingTheme(docType);
 
+  // Robust structured metadata parsing
+  const meta = parseBookingMetadata(item);
+
   // Resolve display-time field from normalized itinerary item
-  const displayTime = item.time
+  const rawStart = item.local_time || item.time
     || item.departure_time || item.start_time || item.reservation_time || item.check_in_time
     || null;
+  const rawEnd = item.end_time || null;
+  let displayTime = rawStart;
+  if (rawStart && rawEnd) {
+    displayTime = `${rawStart} - ${rawEnd}${meta.rawDuration ? ` (${meta.rawDuration})` : ''}`;
+  } else if (rawStart && meta.rawDuration) {
+    displayTime = `${rawStart} (${meta.rawDuration})`;
+  }
 
   // Resolve location / venue for subtitle
   const displayLocation = item.location
@@ -56,15 +164,23 @@ export function PrivateBookingCard({ item }) {
 
   // Extra metadata pills rendered in footer
   const footerPills = [];
-  if (item.confirmation_number) footerPills.push({ label: 'Conf', value: item.confirmation_number, mono: true });
-  if (item.passengers)          footerPills.push({ label: 'Pax', value: item.passengers, mono: false });
+  if (meta.confNumber) footerPills.push({ label: 'Conf', value: meta.confNumber, mono: true });
+  if (item.provider)   footerPills.push({ label: 'Provider', value: item.provider, mono: false });
+  if (meta.supplier && !item.provider?.toLowerCase().includes(meta.supplier.toLowerCase())) {
+    footerPills.push({ label: 'Operator', value: meta.supplier, mono: false });
+  }
+  if (meta.pickupWindow) footerPills.push({ label: 'Pickup Window', value: meta.pickupWindow, mono: true });
+  if (item.passengers)   footerPills.push({ label: 'Pax', value: item.passengers, mono: false });
   if (item.guests || item.party_size) footerPills.push({ label: 'Guests', value: item.guests || item.party_size, mono: false });
-  if (item.guest_name)          footerPills.push({ label: 'Guest', value: item.guest_name, mono: false });
-  if (item.tickets)             footerPills.push({ label: 'Tickets', value: item.tickets, mono: false });
-  if (item.check_in_date)       footerPills.push({ label: 'Check-in', value: item.check_in_date, mono: true });
-  if (item.check_out_date)      footerPills.push({ label: 'Check-out', value: item.check_out_date, mono: true });
-  if (item.meeting_point)       footerPills.push({ label: 'Meet', value: item.meeting_point, mono: false });
-  if (item.duration)            footerPills.push({ label: 'Duration', value: item.duration, mono: false });
+  if (item.guest_name)   footerPills.push({ label: 'Guest', value: item.guest_name, mono: false });
+  if (meta.rawTickets)   footerPills.push({ label: 'Tickets', value: meta.rawTickets, mono: false });
+  if (item.check_in_date) footerPills.push({ label: 'Check-in', value: item.check_in_date, mono: true });
+  if (item.check_out_date) footerPills.push({ label: 'Check-out', value: item.check_out_date, mono: true });
+  if (item.meeting_point) footerPills.push({ label: 'Meet', value: item.meeting_point, mono: false });
+  if (meta.rawDuration)  footerPills.push({ label: 'Duration', value: meta.rawDuration, mono: false });
+
+  // Clean narrative description (never dumps internal metadata fields)
+  const displayDescription = item.description || meta.description;
 
   return (
     <div className="relative group">
@@ -110,8 +226,29 @@ export function PrivateBookingCard({ item }) {
         </div>
 
         {/* Description / notes */}
-        {item.description && (
-          <p className="text-xs sm:text-sm text-slate-200 leading-relaxed font-medium">{item.description}</p>
+        {displayDescription && (
+          <p className="text-xs sm:text-sm text-slate-200 leading-relaxed font-medium">{displayDescription}</p>
+        )}
+
+        {/* Museum Bag Restrictions Alert Banner */}
+        {meta.bagRestriction && (
+          <div className="p-2.5 rounded-xl bg-amber-950/40 border border-amber-500/30 text-xs text-amber-200/90 flex items-start space-x-2">
+            <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+            <div>
+              <strong className="text-amber-300">Bag Restriction:</strong>{' '}
+              <span>Strict limit of 30×20×10 cm permitted on memorial grounds. Larger backpacks and luggage must remain safely locked inside the tour bus.</span>
+            </div>
+          </div>
+        )}
+
+        {/* Confirmed Excursion Banner */}
+        {docType === 'excursion' && (
+          <div className="p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-xs text-emerald-200/90 flex items-center space-x-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>
+              <strong className="text-emerald-300">Confirmed Excursion:</strong> Replaces generic day trip ideas. All-day guided excursion ({displayTime || '06:30 - 17:30'}).
+            </span>
+          </div>
         )}
 
         {(item.website_url || item.phone || item.email) && (
@@ -134,18 +271,47 @@ export function PrivateBookingCard({ item }) {
           </div>
         )}
 
-        {/* Document Attachment Quick Action */}
-        {(docType === 'flight' || item.source_document_id || item.filename || item.confirmation_number === 'GUDI3J') && (
-          <div className={`pt-2 border-t ${theme.footer} flex items-center justify-between gap-2`}>
-            <button
-              type="button"
-              onClick={() => setIsDocViewerOpen(true)}
-              className="px-3 py-1.5 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 border border-sky-400/30 text-sky-300 text-xs font-bold flex items-center space-x-1.5 transition-all cursor-pointer shadow-sm"
-            >
-              <FileText className="w-3.5 h-3.5 text-sky-400" />
-              <span>View Attached {docType === 'flight' ? 'Flight Document' : 'Confirmation'}</span>
-            </button>
-            {item.confirmation_number === 'GUDI3J' && (
+        {/* Document & Mobile Ticket Actions */}
+        {(meta.mobileTicketUrl || item.source_document_id || item.filename || docType === 'flight' || item.confirmation_number === 'GUDI3J') && (
+          <div className={`pt-2.5 border-t ${theme.footer} flex flex-wrap items-center justify-between gap-2`}>
+            <div className="flex flex-wrap items-center gap-2">
+              {meta.mobileTicketUrl && (
+                <a
+                  href={meta.mobileTicketUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 text-xs font-black flex items-center space-x-1.5 transition-all shadow-md shadow-emerald-500/20 cursor-pointer"
+                >
+                  <Ticket className="w-3.5 h-3.5 text-slate-950" />
+                  <span>Open Mobile Tickets</span>
+                  <ExternalLink className="w-3 h-3 text-slate-950" />
+                </a>
+              )}
+              {(item.source_document_id || item.filename || docType === 'flight' || item.confirmation_number === 'GUDI3J') && (
+                <button
+                  type="button"
+                  onClick={() => setIsDocViewerOpen(true)}
+                  className="px-3 py-1.5 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 border border-sky-400/30 text-sky-300 text-xs font-bold flex items-center space-x-1.5 transition-all cursor-pointer shadow-sm"
+                >
+                  <FileText className="w-3.5 h-3.5 text-sky-400" />
+                  <span>View Attached {docType === 'flight' ? 'Flight Document' : 'Ticket (PDF)'}</span>
+                </button>
+              )}
+            </div>
+
+            {meta.activityDetailsUrl && (
+              <a
+                href={meta.activityDetailsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[11px] text-sky-300 hover:text-white underline font-medium inline-flex items-center space-x-1"
+              >
+                <span>Activity Details</span>
+                <ExternalLink className="w-2.5 h-2.5" />
+              </a>
+            )}
+
+            {item.confirmation_number === 'GUDI3J' && !meta.mobileTicketUrl && (
               <span className="text-[11px] text-slate-400">
                 Delta Confirmation: <strong className="text-emerald-300 font-mono">GUDI3J</strong>
               </span>
@@ -159,18 +325,26 @@ export function PrivateBookingCard({ item }) {
         isOpen={isDocViewerOpen}
         onClose={() => setIsDocViewerOpen(false)}
         doc={{
-          id: item.source_document_id || 'delta-flight-gudi3j',
-          filename: item.filename || 'Poland_Delta.pdf',
-          safe_display_name: item.title || 'Delta Air Lines Flight Confirmation',
-          mime_type: 'application/pdf',
+          id: item.source_document_id || 'doc-gyg-7vkk692wy',
+          filename: item.filename || (docType === 'excursion' ? 'GetYourGuide_Ticket_GYG7VKK692WY.pdf' : 'Poland_Delta.pdf'),
+          safe_display_name: item.title || 'Booking Confirmation',
+          file_url: (docType === 'excursion' || (item.title || '').toLowerCase().includes('auschwitz'))
+            ? `${(import.meta.env.BASE_URL || '/wayfinder/').replace(/\/$/, '')}/Poland-2026/docs/GetYourGuide_Ticket_GYG7VKK692WY.pdf`
+            : `${(import.meta.env.BASE_URL || '/wayfinder/').replace(/\/$/, '')}/Poland-2026/docs/Poland_Delta.pdf`,
           details: {
-            confirmation: item.confirmation_number || 'GUDI3J',
-            passengers: item.passengers || 'Ronald Milton Few, Jonathan Kemp',
-            touchdown: 'Dec 4, 2026 at 13:30 CET (Local Poland Time)',
-            flightLeg: 'DL9208 (AMS -> KRK)',
-            originLeg: 'DL0074 (ATL -> AMS, departs Dec 3 at 20:10 EST)',
-            layover: '55 minutes at Amsterdam (AMS)',
-            lodgingSync: 'Arrives in Krakow Old Town/Kazimierz at ~14:45-15:15 CET, synchronizing with standard 15:00 check-in.'
+            confirmation: item.confirmation_number || meta.confNumber || 'GYG7VKK692WY',
+            provider: item.provider || 'GetYourGuide / Mr.Shuttle',
+            supplier: meta.supplier || 'Mr.Shuttle',
+            schedule: item.local_date ? `${item.local_date} ${rawStart || '06:30'}` : null,
+            pickupWindow: meta.pickupWindow || '05:30 - 07:30',
+            bagRestriction: meta.bagRestriction || 'Max 30x20x10 cm on Museum grounds',
+            location: item.location || displayLocation || 'Hotel Pickup (Kraków)',
+            passengers: item.passengers || (meta.rawTickets || '2 Adults'),
+            flightLeg: docType === 'flight' ? 'DL9208 (AMS -> KRK)' : null,
+            touchdown: docType === 'flight' ? 'Dec 4, 2026 at 13:30 CET (Local Poland Time)' : null,
+            originLeg: docType === 'flight' ? 'DL0074 (ATL -> AMS, departs Dec 3 at 20:10 EST)' : null,
+            layover: docType === 'flight' ? '55 minutes at Amsterdam (AMS)' : null,
+            lodgingSync: docType === 'flight' ? 'Arrives in Krakow Old Town/Kazimierz at ~14:45-15:15 CET, synchronizing with standard 15:00 check-in.' : null
           }
         }}
       />

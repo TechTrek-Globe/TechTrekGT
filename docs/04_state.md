@@ -41,7 +41,7 @@ To prevent cross-app schema collisions and maintain developer velocity, each app
 - Finance OS (finance/schema.sql): Manages personal accounting tables (accounts, bills, line_items, loans, household_settings, user_backups, user_backup_versions). Note: Legacy relational tables from earlier revisions have been archived into _bak_* tables.
 - Outpost Tracker (outpost/auction-schema.sql): Manages commercial resale tables (invoices, items, sales, platforms, comps, market_comps, supplies, listing_traffic, auction_item_analytics, outpost_sync_settings, api_integrations).
 - VineScout (vinescout/vinescout-schema.sql): Manages Amazon Vine analytics tables (vine_items, vine_orders, vine_tax_settings, vine_asin_cache).
-- Wayfinder (wayfinder/schema-wayfinder.sql): Manages travel coordination tables (journeys, itinerary_items, documents, import_jobs, budgets, wayfinder_email_inboxes, wayfinder_gmail_connections).
+- Wayfinder (wayfinder/schema-wayfinder.sql): Manages travel coordination tables (journeys, itinerary_items, documents, import_jobs, budgets, wayfinder_email_inboxes, wayfinder_packing_items, wayfinder_calendar_tokens, wayfinder_expenses, wayfinder_expense_splits, wayfinder_expense_settlements).
 - Bourbon Sommelier: Maintains zero tables in D1. Bourbon ingests catalog data via an external Google Sheet CSV feed with edge caching in Cloudflare Cache API (300-second TTL) and static JSON fallbacks.
 
 ### 1.4 Namespace Isolation and Indexing Conventions
@@ -166,3 +166,13 @@ The distributed 01-04 documentation suite is the sole architectural and state so
 - docs/04_state.md: Database schema, runtime parameters, auth sessions, and state management.
 
 Every agent MUST inspect root docs/04_state.md and the target app's docs/04_state.md before editing code, and MUST update docs/03_features.md and docs/04_state.md upon task completion.
+
+## 6. Shared D1 Database Extensions (personal-budget-db)
+
+The shared Cloudflare D1 database `personal-budget-db` has been extended with the following tables supporting Wayfinder trip utilities:
+
+- `wayfinder_calendar_tokens`: stores 32-character crypto-random subscription tokens for personalized, secure RFC 5545 iCalendar feed delivery (`GET /api/wayfinder/calendar/feed/:token.ics`), with `poll_count` telemetry and instant user-driven revocation.
+- `wayfinder_packing_items`: stores user-curated winter expedition gear and packing checklists, with category groupings, checked states, luggage type flags (`carry-on`, `checked`, `personal`), and weight telemetry in grams.
+- `wayfinder_expense_splits`: stores fractional group cost allocations and participant liabilities tied to `wayfinder_expenses`.
+- `wayfinder_expense_settlements`: logs settle-up debt reimbursement payments between group members across multiple currencies.
+

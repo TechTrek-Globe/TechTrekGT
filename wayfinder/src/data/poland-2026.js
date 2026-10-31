@@ -5237,24 +5237,8 @@ export const polandJourney = {
       "cityName": "Gdańsk",
       "theme": "Baltic Farewell & Return Flight",
       "base": "Departure Day (Gdańsk Airport GDN)",
-      "highlights": ["Motława Morning Walk", "Specialty Coffee at Drukarnia", "Airport Transfer to GDN", "Return Flight Home"],
+      "highlights": ["Early GDN Airport Transfer", "Delta Flight DL9528", "Amsterdam Schiphol Layover", "Homeward Flight DL9227 to Atlanta"],
       "schedule": [
-        {
-          "time": "08:30",
-          "itemType": "sight",
-          "title": "Morning Stroll: Motława Riverfront Walk",
-          "description": "Enjoy the peaceful winter morning mist over the river and the pedestrian footbridge between Old Town and Granary Island.",
-          "location": "Długie Pobrzeże, Gdańsk",
-          "badge": "Morning Ritual"
-        },
-        {
-          "time": "09:30",
-          "itemType": "food",
-          "title": "Breakfast Idea: Coffee & Warm Buns at Drukarnia Café",
-          "description": "Savor single-origin filter coffee, avocado sourdough toast, and fresh warm cinnamon buns on Mariacka Street.",
-          "location": "ul. Mariacka 36, Gdańsk",
-          "badge": "Breakfast Option"
-        },
         {
           "time": "04:30",
           "itemType": "hotel",

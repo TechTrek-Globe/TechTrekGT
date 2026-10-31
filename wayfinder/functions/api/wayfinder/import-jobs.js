@@ -174,7 +174,12 @@ export async function handleImportJobs(context, url, method) {
       const auditId2 = generateId();
       const nowIso = new Date().toISOString();
 
-      await env.DB.batch([
+      // Check for associated expense cost to sync with shared ledger
+      const rawCost = fieldMap.total_cost || fieldMap.cost || fieldMap.price || fieldMap.amount;
+      const parsedCost = parseCost(rawCost);
+      let expenseId = null;
+
+      const batchStmts = [
         env.DB.prepare(
           `INSERT INTO wayfinder_itinerary_items
            (id, journey_id, user_id, item_type, title, provider, local_date, local_time,
@@ -204,9 +209,61 @@ export async function handleImportJobs(context, url, method) {
         env.DB.prepare(
           'INSERT INTO wayfinder_audit_events (id, user_id, journey_id, entity_type, entity_id, action) VALUES (?,?,?,?,?,?)'
         ).bind(auditId2, user.userId, finalJourneyId, 'itinerary_item', itemId, 'create_from_import')
-      ]);
+      ];
 
-      return json({ success: true, itinerary_item_id: itemId });
+      if (parsedCost && parsedCost.amount > 0) {
+        const existingExpense = await env.DB.prepare(
+          'SELECT id FROM wayfinder_expenses WHERE document_id = ?'
+        ).bind(docId).first();
+
+        if (!existingExpense) {
+          expenseId = generateId();
+          const expenseCat = mapDocTypeToExpenseCategory(docType);
+          const payerName = user.name || user.email || 'Jonathan Kemp';
+          const halfAmount = Math.round((parsedCost.amount / 2) * 100) / 100;
+
+          batchStmts.push(
+            env.DB.prepare(
+              `INSERT INTO wayfinder_expenses
+               (id, journey_id, itinerary_item_id, document_id, user_id, paid_by_name,
+                category, description, amount_original, currency_original, paid_status, verification_status, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', 'verified', ?)`
+            ).bind(
+              expenseId,
+              finalJourneyId,
+              itemId,
+              docId,
+              user.userId,
+              payerName,
+              expenseCat,
+              title,
+              parsedCost.amount,
+              parsedCost.currency,
+              nowIso
+            )
+          );
+
+          // Add 50/50 split between Jonathan Kemp and Ronald Milton Few
+          const splitId1 = generateId();
+          const splitId2 = generateId();
+          batchStmts.push(
+            env.DB.prepare(
+              `INSERT INTO wayfinder_expense_splits
+               (id, expense_id, user_id, user_name, amount_owed, percentage, created_at)
+               VALUES (?, ?, ?, ?, ?, 50, ?)`
+            ).bind(splitId1, expenseId, user.userId, payerName, halfAmount, nowIso),
+            env.DB.prepare(
+              `INSERT INTO wayfinder_expense_splits
+               (id, expense_id, user_id, user_name, amount_owed, percentage, created_at)
+               VALUES (?, ?, 'usr-ronald-few', 'Ronald Milton Few', ?, 50, ?)`
+            ).bind(splitId2, expenseId, halfAmount, nowIso)
+          );
+        }
+      }
+
+      await env.DB.batch(batchStmts);
+
+      return json({ success: true, itinerary_item_id: itemId, expense_id: expenseId });
     }
 
     // --- POST reject ---
@@ -252,6 +309,40 @@ function mapDocTypeToItemType(docType) {
     insurance: 'custom', cruise: 'custom',
   };
   return map[docType?.toLowerCase()] || 'custom';
+}
+
+function mapDocTypeToExpenseCategory(docType) {
+  const map = {
+    flight: 'flight',
+    hotel: 'lodging',
+    rail: 'transit',
+    rail_ticket: 'transit',
+    transfer: 'transit',
+    rental_car: 'transit',
+    tour: 'activity',
+    excursion: 'activity',
+    restaurant: 'dining',
+  };
+  return map[docType?.toLowerCase()] || 'other';
+}
+
+function parseCost(rawCost) {
+  if (!rawCost) return null;
+  const str = String(rawCost).trim();
+  let currency = 'PLN';
+  if (str.toUpperCase().includes('USD') || str.includes('$')) {
+    currency = 'USD';
+  } else if (str.toUpperCase().includes('EUR') || str.includes('€')) {
+    currency = 'EUR';
+  } else if (str.toUpperCase().includes('PLN') || str.toUpperCase().includes('ZL')) {
+    currency = 'PLN';
+  }
+
+  const numStr = str.replace(/[^0-9.]/g, '');
+  const amount = parseFloat(numStr);
+  if (isNaN(amount) || amount <= 0) return null;
+
+  return { amount, currency };
 }
 
 function buildTitle(docType, fields, fallback) {

@@ -87,15 +87,34 @@ Authenticated users can import hotel and attraction booking confirmations via de
 
 ### 7.1 Email Forward Channel
 
-- Unique Trip Inbox Provisioning: Each user receives a unique forwarding address per journey, format `TT<6-digit-token>.<journey-slug>@techtrekgt.com` (e.g. `TT412312.poland2026@techtrekgt.com`). Provisioned via `POST /api/wayfinder/email-inboxes` (idempotent, returns existing address if already created). Resolves journeys where `created_by = user.userId` or `visibility = 'public'` (supporting platform-seeded expeditions like Poland 2026).
-- Cloudflare Email Worker: Worker exports an `email()` handler alongside `fetch()`. When a forwarded email arrives at a recognized inbox address, the worker: (1) looks up the inbox row by `email_address` to resolve `user_id` and `journey_id` (the unique token is the access control, no sender verification required), (2) parses the MIME stream to extract plain text using a pure-runtime MIME walker with `quoted-printable` and `base64` decoding, (3) infers `item_type` (hotel, flight, train, activity, transport, dining, other) from subject keywords, (4) extracts confirmation number and check-in date via regex, (5) writes atomically to D1 via `env.DB.batch()`.
+- Unique Trip Inbox Provisioning: Each user receives a unique forwarding address per journey, format `TT<6-digit-token>.<journey-slug>@techtrekgt.com` (e.g. `TT351825.poland-christmas-2026@techtrekgt.com`). Provisioned via `POST /api/wayfinder/email-inboxes` (idempotent, returns existing address if already created). Resolves journeys where `created_by = user.userId` or `visibility = 'public'` (supporting platform-seeded expeditions like Poland 2026).
+- Cloudflare Email Worker ([email-worker.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/email-worker.js)): Worker exports an `email()` handler alongside `fetch()`. When a forwarded email arrives at a recognized inbox address, the worker:
+  - Dual Token & Case-Insensitive Lookup: Matches recipient addresses via 6-digit unguessable token extraction (`inbox_token`) and `COLLATE NOCASE` database matching, eliminating case-sensitivity drops across differing email clients.
+  - Safe Memory Stream & Recursive MIME Extraction: Decodes the raw MIME stream using standard `Response(message.raw).text()` streams. The recursive MIME parser (`extractContentFromMime` and `extractMimeContent`) extracts both normalized plain-text bodies and binary attachment blocks (`application/pdf`, tickets, vouchers), automatically persisting attached documents into `wayfinder_documents` and linking them via `source_document_id`.
+  - Specialized GetYourGuide Connector (`parseGetYourGuideEmail`): When a GetYourGuide email is detected (via sender or content heuristics), a dedicated connector parses the template with high fidelity:
+    - Activity Title: Strips marketing tags (such as `100% guaranteed`) to yield clean titles like `GetYourGuide: Auschwitz-Birkenau & Wieliczka Salt Mine Tour`.
+    - Operator / Supplier Attribution: Captures supplier names (e.g. `Note from Mr.Shuttle`) and renders dedicated operator pills.
+    - Tour Schedule & Hotel Pickup Window: Extracts pickup windows (e.g. `Pickups between 5:30 and 7:30`) and sets normalized `local_time: '06:30'` and `end_time: '17:30'` based on the 11-hour duration.
+    - Direct Mobile Ticket Deep-Links: Extracts GetYourGuide mobile app ticket URLs (`[Open tickets](https://l4ab.adj.st/tickets/booking/...)`) and activity detail links (`[See activity details](https://l4ab.adj.st/bookings/...)`).
+    - Museum Grounds Bag Restrictions: Extracts strict museum luggage rules (`Max 30x20x10 cm on Museum grounds`) and displays prominent warning banners advising guests that large bags can be left on the bus.
+    - Booking & Confirmation References: Maps GYG confirmation codes (e.g. `GYG7VKK692WY`) and alphanumeric booking references (`6ICXW284P0LJK9OYS594M5NZKD52BTFT`).
+  - Multi-Provider Field & Title Extraction: Cleans forwarded email subjects (stripping Fwd/Re artifacts), extracts vendor names (GetYourGuide, Delta Air Lines, PKP Intercity, hotels), and automatically extracts the exact activity/tour name from email MIME bodies to generate clean, descriptive titles.
+  - Automated Expense Synchronization: Parses fare and receipt totals (`extractBookingCost`), automatically creating both the private `wayfinder_itinerary_items` record (with `local_time`, `end_time`, `location`, `source_document_id`) and the linked `wayfinder_expenses` entry with 50/50 group split allocations in `wayfinder_expense_splits`.
+  - Atomicity & Auditing: Writes atomically to D1 via `env.DB.batch()`, updating `emails_received` and logging detailed telemetry in `wayfinder_audit_events`.
 - Inbox Stats: `wayfinder_email_inboxes.emails_received` counter and `last_received_at` updated on every successful import.
 - API: `GET /api/wayfinder/email-inboxes?journey_id=` (fetch inbox), `POST /api/wayfinder/email-inboxes` (provision), `DELETE /api/wayfinder/email-inboxes/:id` (deactivate).
 
 ### 7.2 Booking Import UI Components
 
 - Dedicated Import Inbox Card: [wayfinder/src/components/BookingImportChannels.jsx](file:///e:/TechTrekGT/wayfinder/src/components/BookingImportChannels.jsx) is integrated directly into [DocumentCenter.jsx](file:///e:/TechTrekGT/wayfinder/src/components/DocumentCenter.jsx). Generates unique trip inbox address, 1-click clipboard copy with animated visual feedback, live processed email counters, and supported booking provider tags.
-- Synced Confirmations List: Integrated directly in [DocumentCenter.jsx](file:///e:/TechTrekGT/wayfinder/src/components/DocumentCenter.jsx) right below the import inbox card. Displays all D1-persisted booking items with provider names, dates, item type badges, and a direct 1-click link to navigate into the Itinerary timeline. Note: Legacy Gmail sync has been completely removed in favor of reliable email forwarding.
+- Synced Confirmations List & Interactive Booking Modal: Integrated directly in [DocumentCenter.jsx](file:///e:/TechTrekGT/wayfinder/src/components/DocumentCenter.jsx) right below the import inbox card. Displays all D1-persisted booking items with clean titles, providers, dates, times, and day indicators. Each card is interactive and clickable:
+  - Clicking any card opens a rich `BookingDetailModal` displaying the full booking title, provider, confirmation code (with 1-click clipboard copy), schedule, location, and parsed email notes.
+  - One-Tap Mobile Tickets Action: When a mobile ticket deep-link is present (e.g. GetYourGuide), renders a gradient "Open Mobile Tickets" launcher button that opens tickets directly in the GetYourGuide app or browser.
+  - Document Attachment Launcher: If a linked ticket PDF exists (`source_document_id`), provides a direct "View Attached Ticket (PDF)" button.
+  - Operator & Pickup Banners: Displays the tour operator (`Mr.Shuttle`), pickup time window (`05:30 - 07:30`), and museum luggage restriction warnings (`30x20x10 cm`).
+  - Includes a direct "Jump to Day X Timeline" button that navigates directly to `/wayfinder/poland-christmas-2026/private?day=X`.
+  - [ItineraryView.jsx](file:///e:/TechTrekGT/wayfinder/src/components/ItineraryView.jsx) supports deep-linking via `?day=X` URL query parameters with automatic smooth scrolling to the target day container (`#day-X`).
+  - [PrivateBookingCard.jsx](file:///e:/TechTrekGT/wayfinder/src/components/itinerary/PrivateBookingCard.jsx) renders the booking on the chronological timeline with confirmation number, provider pill, operator pill, pickup window, bag restrictions, mobile ticket launcher, and clean notes. Note: Legacy Gmail sync has been completely removed in favor of reliable email forwarding.
 
 ## 8. Key-Free Open-Meteo Winter Weather & Daylight Telemetry
 
@@ -161,4 +180,94 @@ Wayfinder provides a comprehensive, reactive localization and travel preference 
   - In [wayfinder/src/components/Formatters.jsx](file:///e:/TechTrekGT/wayfinder/src/components/Formatters.jsx), `FormatText` dynamically parses narrative descriptions across city overviews, transit dossiers, and packing guides. It accurately converts Celsius ranges (e.g. `-2°C to 4°C` -> `28°F to 39°F`), sub-zero equipment ratings (`-10°C rated` -> `14°F rated`), baggage weight limits (`23 kg` -> `50.7 lbs`), and distance benchmarks (`12 km` -> `7.5 mi`).
 - Distance & Route Telemetry:
   - [wayfinder/src/components/route/WalkingLoopOptimizer.jsx](file:///e:/TechTrekGT/wayfinder/src/components/route/WalkingLoopOptimizer.jsx) and [wayfinder/src/components/RouteVisualization.jsx](file:///e:/TechTrekGT/wayfinder/src/components/RouteVisualization.jsx) dynamically format walking savings, total route distances, and PKP intercity rail corridor spans in miles or kilometers according to active traveler settings.
+
+## 12. Dynamic iCalendar (.ics) Feed Generator & Subscription Engine
+
+To provide seamless native calendar integration across mobile devices (iOS, Android, macOS, Windows) without manual schedule entry, Wayfinder implements an RFC 5545 compliant calendar subscription and export engine:
+
+- RFC 5545 Standards Compliance:
+  - Generates valid `VCALENDAR` payloads with strict 75-octet line folding (`foldLine`), standard character escaping (`\`, `;`, `,`, `\n`), and explicit `VTIMEZONE` blocks for `Europe/Warsaw` (CET/CEST).
+  - Emits typed `VEVENT` records with deterministic UIDs, UTC creation timestamps (`DTSTAMP`), start/end timestamps (`DTSTART`, `DTEND`), category tags (`FLIGHT`, `TRAIN`, `HOTEL`, `MARKET`, `DINING`, `SIGHTSEEING`), and status flags.
+- Comprehensive Journey Event Coverage:
+  - Daily Expedition Overviews: All-day milestone cards for each of the 10 itinerary days summarizing daily themes, base lodging zones, and top sights.
+  - Inbound Flight DL9208: Dedicated flight arrival event for Delta Air Lines DL9208 touching down at Kraków John Paul II Airport (KRK) on Dec 4, 2026 at 13:30 CET, including passenger names, confirmation code (GUDI3J), layover details, and SKA1 train synchronization notes.
+  - Intercity Rail Transfers: Scheduled PKP Intercity IC/EIP train legs connecting Kraków, Wrocław, Poznań, Toruń, and Gdańsk with carriage classifications, station names, and transit durations.
+  - Curated Accommodations: Synchronized check-in (15:00) and check-out (11:00) events for lodging stays (including Altus Palace Wrocław) with direct contact details, telephone numbers, and reception websites.
+  - User-Authored D1 Bookings: Authenticated users automatically receive their private D1 itinerary records (`wayfinder_itinerary_items`) overlaid directly into their personalized feed.
+- Multi-Platform 1-Click Subscription:
+  - Apple Calendar (iOS, iPadOS, macOS): 1-click `webcal://` deep links triggering native iOS/macOS system prompts to subscribe to live background updates.
+  - Google Calendar (Android & Web): 1-click web subscription link via Google Calendar render URL.
+  - Outlook / Microsoft 365: Direct `webcal://` and web add-from-url links for desktop and cloud Outlook users.
+  - Direct .ics Export: 1-click offline snapshot download (`/api/wayfinder/calendar/export.ics`) providing instant one-time import into any desktop or mobile calendar app.
+- Edge Architecture & Security:
+  - Public Feed Endpoint: `GET /api/wayfinder/calendar/feed/:token.ics` verifies active 32-character crypto random tokens in `wayfinder_calendar_tokens`, incrementing `poll_count` and recording `last_polled_at` timestamps for telemetry. Edge cached for 30 minutes (`max-age=1800, s-maxage=3600`).
+  - Private Token Management: Protected endpoints (`GET`, `POST`, `DELETE` `/api/wayfinder/calendar/token`) allow authenticated users to generate, inspect, and rotate their 32-character feed token if the URL is compromised.
+- UI Component Integration:
+  - [wayfinder/src/components/calendar/CalendarSubscribeModal.jsx](file:///e:/TechTrekGT/wayfinder/src/components/calendar/CalendarSubscribeModal.jsx): Interactive modal featuring 1-click client subscription cards, copyable HTTPS feed links with visual confirmation, poll telemetry meters, private token rotation, and direct offline `.ics` downloads.
+  - Integrated launcher buttons mounted in [ItineraryView.jsx](file:///e:/TechTrekGT/wayfinder/src/components/ItineraryView.jsx) header, [PrivateHub.jsx](file:///e:/TechTrekGT/wayfinder/src/components/PrivateHub.jsx) navigation bar, and [PolandLanding.jsx](file:///e:/TechTrekGT/wayfinder/src/components/PolandLanding.jsx) Journey Sequence controls.
+
+## 13. Unified Chronological Itinerary Ordering & Placeholder Deduplication Engine
+
+To eliminate disjointed schedule rendering, out-of-order cards, and duplicate hotel base recommendations, Wayfinder provides a centralized chronological timeline builder in [wayfinder/src/utils/itineraryTimeline.js](file:///e:/TechTrekGT/wayfinder/src/utils/itineraryTimeline.js):
+
+- Unified Multi-Source Merge: Merges public catalog milestones (`dayItem.schedule`), authenticated user bookings from Cloudflare D1 (`dayPrivate`), and confirmed accommodations (`dayAccommodations`, e.g. Altus Palace Wrocław) into a single cohesive list.
+- Strict Chronological Sorting: Normalizes all event times into absolute minute values (`00:00` = 0, `23:59` = 1439). Sorts every card in ascending chronological order, ensuring travelers experience a logical flow throughout the day (e.g. 10:30 Kraków morning check-out -> 11:30 PKP Intercity IC rail transfer -> 15:00 Wrocław hotel check-in -> 16:30 Fairytale Market -> 19:30 dinner).
+- Automatic Hotel Placeholder Deduplication: Inspects days where a confirmed accommodation or private hotel booking is present. Automatically suppresses generic recommendations (e.g. `Hotel Check-in (from 15:00)` with `Recommended Base Zone` badges), preventing confusing duplicate check-in prompts.
+- Universal Application Harmony:
+  - [PolandLanding.jsx](file:///e:/TechTrekGT/wayfinder/src/components/PolandLanding.jsx): Journey Sequence stop days render the unified chronological timeline directly within expandable stop dossiers.
+  - [ItineraryView.jsx](file:///e:/TechTrekGT/wayfinder/src/components/ItineraryView.jsx): Full 10-day expedition view uses identical unified chronological timeline rendering.
+  - [calendar.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/calendar.js): The RFC 5545 calendar subscription engine applies the same placeholder suppression rules, guaranteeing clean native calendar feeds.
+
+## 14. Multi-Currency Group Expense Ledger & Debt Settle-Up Engine
+
+To streamline shared travel costs and eliminate complicated group debt calculations across international currencies, Wayfinder implements an edge-persisted expense ledger and debt simplification suite:
+
+- Multi-Currency Conversion & Display: Supports Polish Złoty (`PLN`), US Dollar (`USD`), Euro (`EUR`), and British Pound (`GBP`). Travelers can toggle between currencies dynamically, instantly re-evaluating total expedition spending, personal out-of-pocket payments, and member shares.
+- Exact-Cent Splitting Algorithms ([expenseLedger.js](file:///e:/TechTrekGT/wayfinder/src/utils/expenseLedger.js)):
+  - `splitEqually(amount, participants)`: Computes base cent shares and deterministically distributes remainder cents across members, guaranteeing that the sum of split allocations matches the total expense down to the penny with zero rounding leaks.
+- Greedy Bipartite Debt Simplification:
+  - `calculateSettleUp(expenses, settlements, displayCurrency)`: Computes each participant's net balance (`paid - owed`). Separates net creditors from net debtors and greedily pairs maximum debtors with maximum creditors.
+  - Generates the theoretical minimum number of direct settlement transfers (e.g. "Ronald pays Jon 420.00 zł" instead of multiple circular payments).
+- Edge API & Settlement Tracking ([expenses.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/expenses.js)):
+  - Endpoints: `GET /api/wayfinder/expenses` (public read fallback, returns expenses, member splits, and settlements), `POST /api/wayfinder/expenses` (records new costs), `DELETE /api/wayfinder/expenses/:id` (removes expense and cascades splits), `POST /api/wayfinder/expenses/settle` (logs settle-up payments via Revolut, BLIK, cash, or bank transfer), and `POST /api/wayfinder/expenses/preset` (seeds realistic Poland 2026 trip expenses).
+- Document Import & OCR Expense Synchronization ([import-jobs.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/import-jobs.js)):
+  - Automated Cost Extraction: Extracts fare and price fields (`total_cost`, `cost`, `price`, `amount`) during document OCR extraction and review in [DocumentCenter.jsx](file:///e:/TechTrekGT/wayfinder/src/components/DocumentCenter.jsx).
+  - Atomic Approval Synchronization: When an imported travel document (flights, hotels, PKP rail tickets, tours) is approved via `POST /api/wayfinder/import-jobs/:doc_id/approve`, the edge worker automatically creates both the verified itinerary item in `wayfinder_itinerary_items` AND the linked cost in `wayfinder_expenses` with 50/50 group split allocations in `wayfinder_expense_splits`.
+  - Idempotent Protection: Checks for existing expense rows tied to `document_id` before inserting, ensuring re-approvals or edits never duplicate costs in the shared ledger.
+- UI Component Integration:
+  - [ExpenseLedger.jsx](file:///e:/TechTrekGT/wayfinder/src/components/budget/ExpenseLedger.jsx): Mounted as a dedicated tab inside [PrivateHub.jsx](file:///e:/TechTrekGT/wayfinder/src/components/PrivateHub.jsx) at `/wayfinder/poland-christmas-2026/private/expenses`, featuring overview metric cards, net balance callouts, simplified settle-up action cards, category filtering, new expense modal, and payment settlement log.
+
+## 15. Intelligent Excursion Reconciliation, Canonical Booking Deep-Linking & Universal Ticket Viewer
+
+To eliminate redundant day trip suggestions, resolve timeline schedule conflicts, and prevent broken adjust deep-links, Wayfinder provides an automated excursion reconciliation and ticket viewer engine:
+
+- Redundant Excursion Idea Suppression ([itineraryTimeline.js](file:///e:/TechTrekGT/wayfinder/src/utils/itineraryTimeline.js)):
+  - Landmark & Keyword Cross-Referencing: When an authenticated user has a confirmed private excursion booking (such as the 11-hour Auschwitz-Birkenau and Wieliczka Salt Mine tour), the timeline engine cross-references keywords (`auschwitz`, `wieliczka`, `salt mine`, `malbork`, `zakopane`).
+  - Automatic Elimination: Generic placeholder suggestions (such as `Day Trip Idea: Wieliczka Salt Mine or Auschwitz Memorial`) are automatically suppressed from the unified timeline, ensuring travelers never see redundant prompts for tours they have already booked.
+- Time-Window Occlusion & Conflict Resolution:
+  - Daytime Sight Suppression: For excursions spanning four or more hours (e.g. 06:30 to 17:30), generic daytime city sights and walking tours falling within the active excursion window (e.g. 14:00 Kazimierz Jewish Heritage Walk) are automatically suppressed from the active schedule because travelers are physically away on the tour.
+  - Evening Activity Preservation: Late afternoon and evening activities scheduled after the excursion returns (such as 17:00 Plac Wolnica chalets and 19:30 dinner at Plac Nowy Zapiekanki) remain clearly displayed for when travelers return to the base city.
+- Canonical Web URL Resolution & Auto-Authentication:
+  - Elimination of Adjust Tracking Errors: Replaces mobile app tracking links (`https://l4ab.adj.st/...`, which return 404 "URL not found" in desktop web browsers) by extracting and decoding the embedded `adj_fallback` parameter.
+  - Guest Session Deep-Linking: Injects `partner_id` and `visitor_id` query parameters directly into the canonical GetYourGuide web URL (`https://www.getyourguide.com/booking/:ref?partner_id=...&visitor_id=...`), allowing travelers to access their mobile tickets and activity details with zero login barriers.
+- Universal Ticket & PDF Inspection:
+  - Direct Iframe Viewer: Replaces erratic `<object>` tags with CSP-compliant `<iframe src={`${fileUrl}#toolbar=1&view=FitH`}>`, supported by `object-src 'self' blob: data:` in [worker.js](file:///e:/TechTrekGT/wayfinder/src/worker.js).
+  - Quick Actions: Adds direct "Open in New Tab" and "Download Ticket PDF" action buttons in [DocumentViewerModal.jsx](file:///e:/TechTrekGT/wayfinder/src/components/DocumentViewerModal.jsx) and [DocumentCenter.jsx](file:///e:/TechTrekGT/wayfinder/src/components/DocumentCenter.jsx).
+  - Prominent Excursion Banner: Displays a verified confirmation banner and time block pill on [PrivateBookingCard.jsx](file:///e:/TechTrekGT/wayfinder/src/components/itinerary/PrivateBookingCard.jsx) (`06:30 - 17:30 (11h Guided Excursion)`).
+
+## 16. Booking Metadata Sanitization & Linebreak Normalization Engine
+
+To prevent raw email-dump text, regex bleed-through, and multiline escape sequence leaks in itinerary cards and document modals:
+
+- Universal Linebreak Normalization: Standardizes all representations of line breaks (`\\r\\n`, `\\n`, `\r\n`, `\r`) into standard ASCII newlines (`\n`) prior to text splitting or regex evaluation across both SQLite D1 databases and client UI components.
+- Centralized `parseBookingMetadata(item)` ([PrivateBookingCard.jsx](file:///e:/TechTrekGT/wayfinder/src/components/itinerary/PrivateBookingCard.jsx)):
+  - Structured Key-Value Extraction: Iterates normalized lines and extracts known fields (`Confirmation`, `Booking Reference`, `Supplier`, `Pickup Window`, `Tickets`, `Duration`, `Bag Restrictions`, `Mobile Tickets`, `Activity Details`) into a clean dictionary.
+  - Zero Raw Dump Leak: Suppresses internal metadata headers and URLs from being rendered as raw card descriptions. Falls back to curated, context-aware narrative descriptions for tours and flights.
+  - Ticket and Duration Decoupling: Separates participant counts (e.g., `2 Adults (Age 17 - 99) - English`) from trip duration (`11 hours`), rendering clean individual metadata badges.
+  - Museum Bag Restriction Polish: Replaces redundant repetitious text with a clear, concise safety and locker advisory.
+- Multi-Component Parity:
+  - [PrivateBookingCard.jsx](file:///e:/TechTrekGT/wayfinder/src/components/itinerary/PrivateBookingCard.jsx): Uses structured metadata for the main timeline display, eliminating all multiline bleeding.
+  - [DocumentCenter.jsx](file:///e:/TechTrekGT/wayfinder/src/components/DocumentCenter.jsx): Powers the `selectedBooking` modal grid and converts escaped newlines in raw email forward notes into properly wrapped paragraphs.
+
+
 

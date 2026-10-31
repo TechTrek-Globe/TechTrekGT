@@ -12,6 +12,8 @@ import { useWayfinder } from '../context/WayfinderContext';
 import { PrivateBookingCard } from './itinerary/PrivateBookingCard';
 import { DocumentViewerModal } from './DocumentViewerModal';
 import { WeatherWidget } from './weather/WeatherWidget';
+import { CalendarSubscribeModal } from './calendar/CalendarSubscribeModal';
+import { buildUnifiedDayTimeline } from '../utils/itineraryTimeline';
 
 const stopTransitInfo = {
   krakow: {
@@ -263,55 +265,72 @@ function JourneyStopSchedule({
 
                   {/* Day Events Timeline */}
                   <div className="space-y-3 pl-4 sm:pl-6 border-l-2 border-amber-500/30 ml-3 sm:ml-4">
-                    {/* Private D1 Bookings for this day */}
-                    {dayPrivate.map((pItem, pIdx) => (
-                      <PrivateBookingCard key={`priv-${dayItem.day}-${pIdx}`} item={pItem} />
-                    ))}
-                    {dayAccommodations.map((booking) => (
-                      <PrivateBookingCard key={booking.id} item={booking} />
-                    ))}
+                    {buildUnifiedDayTimeline(dayItem, dayPrivate, dayAccommodations).map((timelineItem) => {
+                      if (timelineItem.type === 'accommodation' || timelineItem.type === 'private') {
+                        return (
+                          <PrivateBookingCard key={timelineItem.key} item={timelineItem.data} />
+                        );
+                      }
 
-                    {/* Standard Scheduled Events */}
-                    {dayItem.schedule.map((event, eIdx) => (
-                      <div key={eIdx} className="relative group">
-                        <div className="absolute -left-[23px] sm:-left-[31px] top-4 w-4 h-4 rounded-full border-2 border-slate-950 bg-amber-400 group-hover:scale-125 transition-transform shadow-[0_0_8px_rgba(245,158,11,0.8)]" />
-                        <div className="glass-panel p-4 rounded-2xl border border-white/10 group-hover:border-amber-500/40 transition-all shadow-md bg-slate-900/90 space-y-2.5">
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                            <div className="flex items-center space-x-2.5">
-                              <div className={`p-2 rounded-xl border ${getStyleForType(event.itemType)} shrink-0`}>
-                                {getIconForType(event.itemType)}
+                      const event = timelineItem.data;
+                      return (
+                        <div key={timelineItem.key} className="relative group">
+                          <div className="absolute -left-[23px] sm:-left-[31px] top-4 w-4 h-4 rounded-full border-2 border-slate-950 bg-amber-400 group-hover:scale-125 transition-transform shadow-[0_0_8px_rgba(245,158,11,0.8)]" />
+                          <div className="glass-panel p-4 rounded-2xl border border-white/10 group-hover:border-amber-500/40 transition-all shadow-md bg-slate-900/90 space-y-2.5">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                              <div className="flex items-center space-x-2.5">
+                                <div className={`p-2 rounded-xl border ${getStyleForType(event.itemType)} shrink-0`}>
+                                  {getIconForType(event.itemType)}
+                                </div>
+                                <div>
+                                  <h4 className="font-bold text-white text-sm sm:text-base leading-tight group-hover:text-amber-200 transition-colors">
+                                    {event.title}
+                                  </h4>
+                                  {event.location && (
+                                    <div className="text-xs text-slate-400 flex items-center space-x-1 mt-0.5">
+                                      <MapPin className="w-3 h-3 text-amber-400 shrink-0" />
+                                      <span>{event.location}</span>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
-                              <div>
-                                <h4 className="font-bold text-white text-sm sm:text-base leading-tight group-hover:text-amber-200 transition-colors">
-                                  {event.title}
-                                </h4>
-                                {event.location && (
-                                  <div className="text-xs text-slate-400 flex items-center space-x-1 mt-0.5">
-                                    <MapPin className="w-3 h-3 text-amber-400 shrink-0" />
-                                    <span>{event.location}</span>
-                                  </div>
+
+                              <div className="flex items-center space-x-2 shrink-0 self-start sm:self-center">
+                                {event.badge && (
+                                  <span className={`px-2 py-0.5 rounded-full border text-[10px] font-black uppercase tracking-wider ${getBadgeForType(event.itemType)}`}>
+                                    {event.badge}
+                                  </span>
                                 )}
+                                <span className="px-2 py-0.5 rounded-lg bg-slate-950 border border-white/10 font-mono font-bold text-xs text-sky-300">
+                                  {event.time}
+                                </span>
                               </div>
                             </div>
 
-                            <div className="flex items-center space-x-2 shrink-0 self-start sm:self-center">
-                              {event.badge && (
-                                <span className={`px-2 py-0.5 rounded-full border text-[10px] font-black uppercase tracking-wider ${getBadgeForType(event.itemType)}`}>
-                                  {event.badge}
-                                </span>
-                              )}
-                              <span className="px-2 py-0.5 rounded-lg bg-slate-950 border border-white/10 font-mono font-bold text-xs text-sky-300">
-                                {event.time}
-                              </span>
-                            </div>
-                          </div>
+                            <p className="text-xs sm:text-sm text-slate-200 leading-relaxed font-medium">
+                              {event.description}
+                            </p>
 
-                          <p className="text-xs sm:text-sm text-slate-200 leading-relaxed font-medium">
-                            {event.description}
-                          </p>
+                            {/* Flight Arrival Document Trigger */}
+                            {(event.itemType === 'flight' || event.title?.includes('DL9208')) && onOpenDocViewer && (
+                              <div className="pt-2 border-t border-white/5 flex items-center justify-between">
+                                <button
+                                  type="button"
+                                  onClick={onOpenDocViewer}
+                                  className="px-3 py-1.5 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 border border-sky-400/30 text-sky-300 text-xs font-bold flex items-center space-x-1.5 transition-all cursor-pointer shadow-sm"
+                                >
+                                  <FileText className="w-3.5 h-3.5 text-sky-400" />
+                                  <span>View Delta Flight Confirmation</span>
+                                </button>
+                                <span className="text-[11px] text-slate-400 font-mono">
+                                  Conf: <strong className="text-emerald-300">GUDI3J</strong>
+                                </span>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               );
@@ -432,6 +451,7 @@ export function PolandLanding() {
   const [selectedStopFilter, setSelectedStopFilter] = useState('all');
   const [viewMode, setViewMode] = useState('cards');
   const [isDocViewerOpen, setIsDocViewerOpen] = useState(false);
+  const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
   const [expandedStops, setExpandedStops] = useState({
     krakow: true,
     wroclaw: true,
@@ -630,6 +650,14 @@ export function PolandLanding() {
 
             {/* Quick Actions */}
             <div className="flex items-center space-x-2 shrink-0">
+              <button
+                onClick={() => setIsCalendarModalOpen(true)}
+                className="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/40 text-amber-300 hover:text-white text-xs font-semibold flex items-center space-x-1.5 transition-colors min-h-[36px]"
+                title="Subscribe to live calendar feed or export .ics"
+              >
+                <Calendar className="w-3.5 h-3.5 text-amber-400" />
+                <span>Calendar Sync</span>
+              </button>
               {isAuthenticated ? (
                 <a
                   href="/wayfinder/poland-christmas-2026/private/documents"
@@ -830,6 +858,12 @@ export function PolandLanding() {
         <DocumentViewerModal
           isOpen={isDocViewerOpen}
           onClose={() => setIsDocViewerOpen(false)}
+        />
+
+        {/* Calendar Subscription & Export Modal */}
+        <CalendarSubscribeModal
+          isOpen={isCalendarModalOpen}
+          onClose={() => setIsCalendarModalOpen(false)}
         />
       </div>
     </div>

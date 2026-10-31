@@ -68,6 +68,16 @@ function App() {
       return <PrivateHub currentPath="/wayfinder/poland-christmas-2026/private" />;
     }
 
+    // Expenses / budget aliases redirect to PrivateHub expenses tab
+    if (
+      normalizedPath === '/wayfinder/poland-christmas-2026/expenses' ||
+      normalizedPath === '/wayfinder/poland-christmas-2026/budget' ||
+      normalizedPath === '/wayfinder/poland-christmas-2026/ledger'
+    ) {
+      window.history.replaceState({}, '', '/wayfinder/poland-christmas-2026/private/expenses');
+      return <PrivateHub currentPath="/wayfinder/poland-christmas-2026/private/expenses" />;
+    }
+
     if (normalizedPath === '/wayfinder/poland-christmas-2026/practical') {
       return <PracticalPage />;
     }

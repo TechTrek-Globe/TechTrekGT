@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, Download, ExternalLink, FileText, Plane, Upload, AlertTriangle, 
-  CheckCircle2, Loader2, Sparkles, Clock, ShieldCheck 
+  CheckCircle2, Loader2, Sparkles, Clock, ShieldCheck, Ticket, MapPin 
 } from 'lucide-react';
 import { getLocalDocumentFile, saveLocalDocumentFile } from '../utils/documentStorage';
 
@@ -31,6 +31,8 @@ export function DocumentViewerModal({ isOpen, onClose, doc }) {
 
   const filename = activeDoc.filename || activeDoc.safe_display_name || activeDoc.original_filename || 'Poland_Delta.pdf';
   const isImage = (activeDoc.mime_type || '').startsWith('image/') || /\.(png|jpe?g|webp|gif)$/i.test(filename);
+  const isExcursion = (activeDoc.detected_doc_type === 'excursion' || filename.toLowerCase().includes('getyourguide') || filename.toLowerCase().includes('gyg') || filename.toLowerCase().includes('auschwitz') || filename.toLowerCase().includes('wieliczka'));
+  const isFlight = (filename.toLowerCase().includes('delta') || filename.toLowerCase().includes('flight') || (!isExcursion && activeDoc.details?.flightLeg));
 
   useEffect(() => {
     if (!isOpen) {
@@ -59,8 +61,7 @@ export function DocumentViewerModal({ isOpen, onClose, doc }) {
         const dbFile = (activeDoc.id ? await getLocalDocumentFile(activeDoc.id) : null) ||
                        (await getLocalDocumentFile(filename)) ||
                        (await getLocalDocumentFile(filename.toLowerCase())) ||
-                       (await getLocalDocumentFile('Poland_Delta.pdf')) ||
-                       (await getLocalDocumentFile('poland_delta.pdf'));
+                       (isFlight ? await getLocalDocumentFile('Poland_Delta.pdf') : null);
         if (dbFile && isMounted) {
           const blobUrl = URL.createObjectURL(dbFile);
           setFileUrl(blobUrl);
@@ -74,7 +75,11 @@ export function DocumentViewerModal({ isOpen, onClose, doc }) {
       // 3. Bundled static asset fallback via Vite base URL
       const baseUrl = import.meta.env.BASE_URL || '/wayfinder/';
       const normalizedBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
-      const staticDocPath = `${normalizedBase}Poland-2026/docs/${filename.includes('Delta') || filename.includes('flight') || filename.includes('delta') ? 'Poland_Delta.pdf' : filename}`;
+      const staticDocPath = isExcursion
+        ? `${normalizedBase}Poland-2026/docs/GetYourGuide_Ticket_GYG7VKK692WY.pdf`
+        : isFlight
+        ? `${normalizedBase}Poland-2026/docs/Poland_Delta.pdf`
+        : `${normalizedBase}Poland-2026/docs/${filename}`;
 
       if (isMounted) {
         setFileUrl(activeDoc.file_url || staticDocPath);
@@ -199,8 +204,32 @@ export function DocumentViewerModal({ isOpen, onClose, doc }) {
           </div>
         </div>
 
-        {/* Flight Summary Helper Bar (If Delta/Flight Doc) */}
-        {(filename.toLowerCase().includes('delta') || filename.toLowerCase().includes('flight') || activeDoc.details) && (
+        {/* Helper Bar: Excursion vs Flight */}
+        {isExcursion ? (
+          <div className="bg-gradient-to-r from-emerald-950/70 via-slate-900 to-emerald-950/70 border-b border-emerald-500/20 p-3 px-4 sm:px-6 flex flex-wrap items-center justify-between gap-3 text-xs shrink-0">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-slate-300">
+              <span className="flex items-center space-x-1.5">
+                <Ticket className="w-3.5 h-3.5 text-emerald-400" />
+                <strong className="text-white">Auschwitz & Wieliczka Tour</strong>
+                <span className="text-slate-400">(Mr.Shuttle)</span>
+              </span>
+              <span>:</span>
+              <span className="flex items-center space-x-1.5">
+                <Clock className="w-3.5 h-3.5 text-amber-400" />
+                <span>Pickup:</span>
+                <strong className="text-amber-300">05:30 - 07:30 (Dec 6)</strong>
+                <span className="text-slate-400">(Hotel Pickup)</span>
+              </span>
+              <span>:</span>
+              <span>Conf: <strong className="font-mono text-emerald-300">{activeDoc.details?.confirmation || 'GYG7VKK692WY'}</strong></span>
+            </div>
+
+            <div className="text-[11px] text-amber-300/90 flex items-center space-x-1.5">
+              <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0" />
+              <span>Museum Grounds Bag Limit: 30x20x10 cm max (larger bags stay on bus)</span>
+            </div>
+          </div>
+        ) : isFlight ? (
           <div className="bg-gradient-to-r from-sky-950/70 via-slate-900 to-sky-950/70 border-b border-sky-500/20 p-3 px-4 sm:px-6 flex flex-wrap items-center justify-between gap-3 text-xs shrink-0">
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-slate-300">
               <span className="flex items-center space-x-1.5">
@@ -224,7 +253,7 @@ export function DocumentViewerModal({ isOpen, onClose, doc }) {
               <span>SKA1 airport train connects to Kraków Główny in 17 min (~15:00 check-in match)</span>
             </div>
           </div>
-        )}
+        ) : null}
 
         {attachMessage && (
           <div className="p-2.5 bg-emerald-950/60 border-b border-emerald-500/30 text-emerald-300 text-xs px-6 flex items-center space-x-2">
@@ -253,22 +282,53 @@ export function DocumentViewerModal({ isOpen, onClose, doc }) {
               </div>
 
               {/* Extracted Details Fallback Card */}
-              <div className="w-full text-left p-4 rounded-2xl bg-wf-navy border border-white/10 space-y-2 text-xs">
-                <div className="font-bold text-sky-300 flex items-center space-x-1.5 border-b border-white/10 pb-2">
-                  <Plane className="w-4 h-4" />
-                  <span>Delta Inbound Flight Details (Poland 2026)</span>
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-slate-300 pt-1">
-                  <div>Flight: <strong className="text-white">DL9208 (AMS ➔ KRK)</strong></div>
-                  <div>Touchdown: <strong className="text-amber-300">13:30 CET (Dec 4)</strong></div>
-                  <div>Inbound: <strong className="text-white">DL0074 (ATL ➔ AMS)</strong></div>
-                  <div>Confirmation: <strong className="font-mono text-emerald-300">GUDI3J</strong></div>
-                  <div className="col-span-2">Passengers: <strong className="text-white">Ronald Milton Few, Jonathan Kemp</strong></div>
-                  <div className="col-span-2 text-slate-400 text-[11px] pt-1">
-                    Hotel Check-in Match: SKA1 direct airport train delivers passengers to Old Town/Kazimierz by ~14:45-15:15 CET, perfectly matching standard 15:00 check-in.
+              {isExcursion ? (
+                <div className="w-full text-left p-4 rounded-2xl bg-wf-navy border border-emerald-500/30 space-y-2 text-xs">
+                  <div className="font-bold text-emerald-300 flex items-center justify-between border-b border-white/10 pb-2">
+                    <span className="flex items-center space-x-1.5">
+                      <Ticket className="w-4 h-4 text-emerald-400" />
+                      <span>GetYourGuide Official Excursion Voucher</span>
+                    </span>
+                    <a
+                      href="https://www.getyourguide.com/booking/6ICXW284P0LJK9OYS594M5NZKD52BTFT"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sky-300 hover:text-white underline text-[11px] font-semibold flex items-center space-x-1"
+                    >
+                      <span>Open GetYourGuide Portal</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-slate-300 pt-1">
+                    <div>Activity: <strong className="text-white">Auschwitz & Wieliczka Tour</strong></div>
+                    <div>Pickup Window: <strong className="text-amber-300">05:30 - 07:30 (Dec 6)</strong></div>
+                    <div>Operator: <strong className="text-white">Mr.Shuttle (Poland)</strong></div>
+                    <div>Confirmation: <strong className="font-mono text-emerald-300">GYG7VKK692WY</strong></div>
+                    <div>Participants: <strong className="text-white">2 Adults (English, 11 hours)</strong></div>
+                    <div>Total Cost: <strong className="text-emerald-300">$ 284.76 USD (Paid)</strong></div>
+                    <div className="col-span-2 text-amber-300 text-[11px] pt-1">
+                      Museum Restriction: Maximum bag size 30x20x10 cm on museum grounds. Belongings can remain inside the locked bus.
+                    </div>
                   </div>
                 </div>
-              </div>
+              ) : isFlight ? (
+                <div className="w-full text-left p-4 rounded-2xl bg-wf-navy border border-white/10 space-y-2 text-xs">
+                  <div className="font-bold text-sky-300 flex items-center space-x-1.5 border-b border-white/10 pb-2">
+                    <Plane className="w-4 h-4" />
+                    <span>Delta Inbound Flight Details (Poland 2026)</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-slate-300 pt-1">
+                    <div>Flight: <strong className="text-white">DL9208 (AMS ➔ KRK)</strong></div>
+                    <div>Touchdown: <strong className="text-amber-300">13:30 CET (Dec 4)</strong></div>
+                    <div>Inbound: <strong className="text-white">DL0074 (ATL ➔ AMS)</strong></div>
+                    <div>Confirmation: <strong className="font-mono text-emerald-300">GUDI3J</strong></div>
+                    <div className="col-span-2">Passengers: <strong className="text-white">Ronald Milton Few, Jonathan Kemp</strong></div>
+                    <div className="col-span-2 text-slate-400 text-[11px] pt-1">
+                      Hotel Check-in Match: SKA1 direct airport train delivers passengers to Old Town/Kazimierz by ~14:45-15:15 CET, perfectly matching standard 15:00 check-in.
+                    </div>
+                  </div>
+                </div>
+              ) : null}
 
               <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
                 {fileUrl && (
@@ -311,19 +371,11 @@ export function DocumentViewerModal({ isOpen, onClose, doc }) {
               />
             </div>
           ) : (
-            <object
-              data={fileUrl}
-              type="application/pdf"
+            <iframe
+              src={`${fileUrl}#toolbar=1&view=FitH`}
+              title={filename}
               className="w-full h-full border-0"
-              onError={() => setEmbedError(true)}
-            >
-              <iframe
-                src={fileUrl}
-                title={filename}
-                className="w-full h-full border-0"
-                onError={() => setEmbedError(true)}
-              />
-            </object>
+            />
           )}
         </div>
 

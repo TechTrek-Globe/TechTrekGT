@@ -1,12 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { ShieldCheck, FileText, CalendarClock, Backpack } from 'lucide-react';
+import { ShieldCheck, FileText, CalendarClock, Backpack, Calendar, Receipt } from 'lucide-react';
 import { ItineraryView } from './ItineraryView';
 import { DocumentCenter } from './DocumentCenter';
 import { PackingManager } from './packing/PackingManager';
+import { ExpenseLedger } from './budget/ExpenseLedger';
+import { CalendarSubscribeModal } from './calendar/CalendarSubscribeModal';
 
 export function PrivateHub({ currentPath }) {
   const { isAuthenticated, setIsAuthModalOpen } = useAuth();
+  const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
   
   const pushRoute = (e, path) => {
     e.preventDefault();
@@ -16,6 +19,7 @@ export function PrivateHub({ currentPath }) {
 
   const isDocs = currentPath.includes('/documents');
   const isPacking = currentPath.includes('/packing');
+  const isExpenses = currentPath.includes('/expenses') || currentPath.includes('/budget');
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
@@ -34,7 +38,7 @@ export function PrivateHub({ currentPath }) {
             <a
               href="/wayfinder/poland-christmas-2026/private"
               onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026/private')}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${!isDocs && !isPacking ? 'bg-wf-blue text-white shadow-md' : 'text-wf-muted hover:text-white hover:bg-white/5'}`}
+              className={`flex items-center space-x-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${!isDocs && !isPacking && !isExpenses ? 'bg-wf-blue text-white shadow-md' : 'text-wf-muted hover:text-white hover:bg-white/5'}`}
             >
               <CalendarClock className="w-4 h-4" />
               <span>Itinerary</span>
@@ -42,19 +46,35 @@ export function PrivateHub({ currentPath }) {
             <a
               href="/wayfinder/poland-christmas-2026/private/packing"
               onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026/private/packing')}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${isPacking ? 'bg-wf-blue text-white shadow-md' : 'text-wf-muted hover:text-white hover:bg-white/5'}`}
+              className={`flex items-center space-x-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${isPacking ? 'bg-wf-blue text-white shadow-md' : 'text-wf-muted hover:text-white hover:bg-white/5'}`}
             >
               <Backpack className="w-4 h-4" />
               <span>Packing List</span>
             </a>
             <a
+              href="/wayfinder/poland-christmas-2026/private/expenses"
+              onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026/private/expenses')}
+              className={`flex items-center space-x-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${isExpenses ? 'bg-wf-blue text-white shadow-md' : 'text-wf-muted hover:text-white hover:bg-white/5'}`}
+            >
+              <Receipt className="w-4 h-4 text-amber-400" />
+              <span>Expense Ledger</span>
+            </a>
+            <a
               href="/wayfinder/poland-christmas-2026/private/documents"
               onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026/private/documents')}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${isDocs ? 'bg-wf-blue text-white shadow-md' : 'text-wf-muted hover:text-white hover:bg-white/5'}`}
+              className={`flex items-center space-x-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${isDocs ? 'bg-wf-blue text-white shadow-md' : 'text-wf-muted hover:text-white hover:bg-white/5'}`}
             >
               <FileText className="w-4 h-4" />
               <span>Documents</span>
             </a>
+            <button
+              onClick={() => setIsCalendarModalOpen(true)}
+              className="flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap text-amber-300 hover:text-white hover:bg-amber-500/20 border border-amber-500/30"
+              title="Subscribe or Export Trip Calendar"
+            >
+              <Calendar className="w-4 h-4 text-amber-400" />
+              <span>Sync Calendar</span>
+            </button>
           </div>
         </div>
       </div>
@@ -62,6 +82,8 @@ export function PrivateHub({ currentPath }) {
       {/* Render Subview */}
       {isPacking ? (
         <PackingManager />
+      ) : isExpenses ? (
+        <ExpenseLedger />
       ) : isDocs ? (
         !isAuthenticated ? (
           <div className="flex-1 flex flex-col items-center justify-center p-8 sm:p-12 text-center rounded-2xl glass-panel border border-white/10 animate-fade-in my-8">
@@ -103,6 +125,12 @@ export function PrivateHub({ currentPath }) {
           <ItineraryView />
         </>
       )}
+
+      {/* Calendar Subscription & Export Modal */}
+      <CalendarSubscribeModal
+        isOpen={isCalendarModalOpen}
+        onClose={() => setIsCalendarModalOpen(false)}
+      />
     </div>
   );
 }

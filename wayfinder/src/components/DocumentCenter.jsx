@@ -2,10 +2,11 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useWayfinder } from '../context/WayfinderContext';
 import { saveLocalDocumentFile, getLocalDocumentFile } from '../utils/documentStorage';
 import { BookingImportChannels } from './BookingImportChannels';
+import { parseBookingMetadata } from './itinerary/PrivateBookingCard';
 import {
   UploadCloud, File, FileText, Download, Eye, ShieldCheck, Loader2,
   CheckCircle2, AlertTriangle, X, Check, RefreshCw, ArrowRight, Upload,
-  Plane, Train, Building2, Utensils, Ticket, Compass
+  Plane, Train, Building2, Utensils, Ticket, Compass, Copy, Calendar, MapPin, ExternalLink
 } from 'lucide-react';
 
 function simulateExtraction(file) {
@@ -45,7 +46,8 @@ function simulateExtraction(file) {
         { field_name: 'arrival_time', extracted_value: '14:15', confidence: 'medium' },
         { field_name: 'train_number', extracted_value: 'IC 1305 "Slask"', confidence: 'high' },
         { field_name: 'seat', extracted_value: 'Car 3, Seats 24/25 (1st class)', confidence: 'medium' },
-        { field_name: 'confirmation_number', extracted_value: 'PKP-772910', confidence: 'high' }
+        { field_name: 'confirmation_number', extracted_value: 'PKP-772910', confidence: 'high' },
+        { field_name: 'total_cost', extracted_value: '190 PLN', confidence: 'medium' }
       ]
     };
   }
@@ -66,6 +68,7 @@ function simulateExtraction(file) {
         { field_name: 'arrival_date', extracted_value: '2026-12-04', confidence: 'high' },
         { field_name: 'arrival_time', extracted_value: '13:30', confidence: 'high' },
         { field_name: 'arrival_timezone', extracted_value: 'CET (UTC+1, Poland Local Time)', confidence: 'high' },
+        { field_name: 'total_cost', extracted_value: '$1,980.00 USD', confidence: 'high' },
         { field_name: 'inbound_leg1_flight', extracted_value: 'DL0074 ATL -> AMS', confidence: 'high' },
         { field_name: 'inbound_leg1_departs', extracted_value: '2026-12-03 20:10 ATL', confidence: 'high' },
         { field_name: 'inbound_leg1_arrives', extracted_value: '2026-12-04 10:40 AMS', confidence: 'high' },
@@ -117,7 +120,8 @@ function simulateExtraction(file) {
         { field_name: 'guide_language', extracted_value: 'English (dedicated guide)', confidence: 'high' },
         { field_name: 'tickets', extracted_value: '2 Adults (General Admission)', confidence: 'high' },
         { field_name: 'included', extracted_value: isAuschwitz ? 'Guided tour, transport from Krakow, entrance fee' : 'Guided tour, entrance fee', confidence: 'medium' },
-        { field_name: 'confirmation_number', extracted_value: isAuschwitz ? 'AUS-2026-4817' : isWieliczka ? 'WLZ-2026-9032' : `EXC-${Math.floor(100000 + Math.random() * 900000)}`, confidence: 'high' }
+        { field_name: 'confirmation_number', extracted_value: isAuschwitz ? 'AUS-2026-4817' : isWieliczka ? 'WLZ-2026-9032' : `EXC-${Math.floor(100000 + Math.random() * 900000)}`, confidence: 'high' },
+        { field_name: 'total_cost', extracted_value: isAuschwitz ? '480 PLN' : isWieliczka ? '360 PLN' : '200 PLN', confidence: 'medium' }
       ]
     };
   }
@@ -155,6 +159,8 @@ export function DocumentCenter() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState(null);
   const [selectedDoc, setSelectedDoc] = useState(null);
+  const [selectedBooking, setSelectedBooking] = useState(null);
+  const [copiedConf, setCopiedConf] = useState(false);
   
   const [reviewingJob, setReviewingJob] = useState(null);
   const [reviewFields, setReviewFields] = useState([]);
@@ -168,6 +174,22 @@ export function DocumentCenter() {
   const fileInputRef = useRef(null);
   const reattachInputRef = useRef(null);
   const localDocBlobs = useRef(new Map());
+
+  const getDayNumber = (dateStr) => {
+    if (!dateStr) return 1;
+    const match = String(dateStr).match(/2026-12-(\d{2})/);
+    if (!match) return 1;
+    const d = parseInt(match[1], 10) - 3; // Dec 4 = Day 1
+    return d >= 1 && d <= 10 ? d : 1;
+  };
+
+  const getCityForDate = (dateStr) => {
+    if (!dateStr) return 'Kraków';
+    if (dateStr <= '2026-12-07') return 'Kraków';
+    if (dateStr <= '2026-12-09') return 'Wrocław';
+    if (dateStr <= '2026-12-10') return 'Poznań / Toruń';
+    return 'Gdańsk';
+  };
 
   // Load itinerary items on mount so synced bookings are visible
   useEffect(() => {
@@ -356,7 +378,11 @@ export function DocumentCenter() {
 
     const baseUrl = import.meta.env.BASE_URL || '/wayfinder/';
     const normalizedBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
-    const staticDocName = (fname.toLowerCase().includes('delta') || fname.toLowerCase().includes('flight')) ? 'Poland_Delta.pdf' : fname;
+    const staticDocName = (fname.toLowerCase().includes('delta') || fname.toLowerCase().includes('flight'))
+      ? 'Poland_Delta.pdf'
+      : (fname.toLowerCase().includes('getyourguide') || fname.toLowerCase().includes('gyg') || fname.toLowerCase().includes('auschwitz') || fname.toLowerCase().includes('wieliczka') || fname.toLowerCase().includes('salt'))
+      ? 'GetYourGuide_Ticket_GYG7VKK692WY.pdf'
+      : fname;
     const staticFallback = `${normalizedBase}Poland-2026/docs/${staticDocName}`;
 
     const url = cachedBlob || doc.file_url || staticFallback;
@@ -438,10 +464,11 @@ export function DocumentCenter() {
             {importedItems.map((item) => (
               <div
                 key={item.id}
-                className="p-3.5 rounded-2xl bg-slate-950/70 border border-white/10 hover:border-emerald-500/40 transition-all flex items-start justify-between gap-3"
+                onClick={() => setSelectedBooking(item)}
+                className="p-3.5 rounded-2xl bg-slate-950/70 border border-white/10 hover:border-emerald-500/50 hover:bg-slate-900/90 transition-all flex items-start justify-between gap-3 cursor-pointer group shadow-sm hover:shadow-emerald-500/10"
               >
                 <div className="min-w-0 flex items-start space-x-3">
-                  <div className="p-2 rounded-xl bg-white/5 border border-white/10 text-emerald-400 shrink-0 mt-0.5">
+                  <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-emerald-400 group-hover:border-emerald-500/40 group-hover:bg-emerald-500/10 shrink-0 mt-0.5 transition-colors">
                     {item.item_type === 'flight' ? <Plane className="w-4 h-4 text-sky-400" /> :
                      item.item_type === 'rail' || item.item_type === 'train' ? <Train className="w-4 h-4 text-amber-400" /> :
                      item.item_type === 'hotel' ? <Building2 className="w-4 h-4 text-emerald-400" /> :
@@ -449,7 +476,7 @@ export function DocumentCenter() {
                      <Ticket className="w-4 h-4 text-violet-400" />}
                   </div>
                   <div className="min-w-0">
-                    <h4 className="text-xs font-bold text-white truncate leading-tight">
+                    <h4 className="text-xs sm:text-sm font-bold text-white truncate leading-tight group-hover:text-emerald-300 transition-colors">
                       {item.title}
                     </h4>
                     <div className="flex flex-wrap items-center gap-2 mt-1.5 text-[11px] text-slate-400">
@@ -458,13 +485,34 @@ export function DocumentCenter() {
                       )}
                       <span>•</span>
                       <span className="text-slate-400 font-mono">{item.local_date || 'Dec 2026'}</span>
-                      {item.status && (
-                        <span className="px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-300 text-[10px] font-semibold border border-emerald-500/30">
-                          {item.status}
-                        </span>
+                      {item.local_time && (
+                        <>
+                          <span>•</span>
+                          <span className="text-sky-300 font-mono font-medium">{item.local_time}</span>
+                        </>
                       )}
+                      <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 text-[10px] font-semibold border border-emerald-500/30">
+                        Day {getDayNumber(item.local_date)} ({getCityForDate(item.local_date)})
+                      </span>
                     </div>
                   </div>
+                </div>
+
+                <div className="flex items-center space-x-1.5 shrink-0 self-center">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const day = getDayNumber(item.local_date);
+                      window.history.pushState({}, '', `/wayfinder/poland-christmas-2026/private?day=${day}`);
+                      window.dispatchEvent(new PopStateEvent('popstate'));
+                    }}
+                    className="px-2.5 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500 text-emerald-300 hover:text-slate-950 border border-emerald-500/30 text-[11px] font-bold flex items-center space-x-1 transition-all shadow-sm"
+                    title={`Open on Day ${getDayNumber(item.local_date)} Timeline`}
+                  >
+                    <span>Day {getDayNumber(item.local_date)}</span>
+                    <ArrowRight className="w-3 h-3" />
+                  </button>
                 </div>
               </div>
             ))}
@@ -687,14 +735,26 @@ export function DocumentCenter() {
                   <span className="hidden sm:inline">Review Extracted Fields</span>
                 </button>
                 {pdfPreviewUrl && (
-                  <a
-                    href={pdfPreviewUrl}
-                    download={pdfPreviewDoc.safe_display_name || pdfPreviewDoc.filename}
-                    className="px-3 py-1.5 rounded-lg bg-wf-blue/20 hover:bg-wf-blue/30 border border-wf-blue/40 text-wf-blue-lt text-xs font-medium flex items-center space-x-1.5 transition-colors"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    <span>Download</span>
-                  </a>
+                  <>
+                    <a
+                      href={pdfPreviewUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1.5 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 border border-sky-400/40 text-sky-300 text-xs font-medium flex items-center space-x-1.5 transition-colors"
+                      title="Open in new window or tab"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">New Tab</span>
+                    </a>
+                    <a
+                      href={pdfPreviewUrl}
+                      download={pdfPreviewDoc.safe_display_name || pdfPreviewDoc.filename}
+                      className="px-3 py-1.5 rounded-lg bg-wf-blue/20 hover:bg-wf-blue/30 border border-wf-blue/40 text-wf-blue-lt text-xs font-medium flex items-center space-x-1.5 transition-colors"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Download</span>
+                    </a>
+                  </>
                 )}
                 <button
                   onClick={closePdfPreview}
@@ -748,19 +808,11 @@ export function DocumentCenter() {
                   />
                 </div>
               ) : (
-                <object
-                  data={pdfPreviewUrl}
-                  type="application/pdf"
+                <iframe
+                  src={`${pdfPreviewUrl}#toolbar=1&view=FitH`}
+                  title={pdfPreviewDoc.safe_display_name || pdfPreviewDoc.filename}
                   className="w-full h-full border-0"
-                  onError={() => setIframeError(true)}
-                >
-                  <iframe
-                    src={pdfPreviewUrl}
-                    title={pdfPreviewDoc.safe_display_name || pdfPreviewDoc.filename}
-                    className="w-full h-full border-0"
-                    onError={() => setIframeError(true)}
-                  />
-                </object>
+                />
               )}
             </div>
 
@@ -768,6 +820,233 @@ export function DocumentCenter() {
             <div className="p-3 border-t border-white/10 bg-wf-navy shrink-0 flex items-center justify-between text-[11px] text-wf-muted">
               <span>Uploaded: {new Date(pdfPreviewDoc.upload_date || pdfPreviewDoc.uploaded_at || Date.now()).toLocaleString()}</span>
               <span>Size: {(((pdfPreviewDoc.file_size_bytes || pdfPreviewDoc.file_size || 0)) / 1024).toFixed(1)} KB</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Synced Booking Detail Modal */}
+      {selectedBooking && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
+          <div className="relative w-full max-w-xl bg-slate-900 border border-emerald-500/40 rounded-3xl p-6 sm:p-7 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="flex items-start justify-between gap-4 border-b border-white/10 pb-4">
+              <div className="flex items-center space-x-3.5">
+                <div className="p-3 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shrink-0">
+                  {selectedBooking.item_type === 'flight' ? <Plane className="w-6 h-6 text-sky-400" /> :
+                   selectedBooking.item_type === 'rail' || selectedBooking.item_type === 'train' ? <Train className="w-6 h-6 text-amber-400" /> :
+                   selectedBooking.item_type === 'hotel' ? <Building2 className="w-6 h-6 text-emerald-400" /> :
+                   selectedBooking.item_type === 'dining' || selectedBooking.item_type === 'restaurant' ? <Utensils className="w-6 h-6 text-orange-400" /> :
+                   <Ticket className="w-6 h-6 text-violet-400" />}
+                </div>
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-[10px] uppercase font-black tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                      {selectedBooking.provider || 'Confirmed Booking'}
+                    </span>
+                    <span className="text-[10px] uppercase font-black tracking-wider px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30">
+                      Day {getDayNumber(selectedBooking.local_date)} • {getCityForDate(selectedBooking.local_date)}
+                    </span>
+                  </div>
+                  <h3 className="text-lg sm:text-xl font-bold text-white mt-1 leading-snug">
+                    {selectedBooking.title}
+                  </h3>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedBooking(null)}
+                className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors shrink-0"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Key Booking Details Grid */}
+            {(() => {
+              const meta = parseBookingMetadata(selectedBooking);
+              const mobileTicketUrl = meta.mobileTicketUrl;
+              const activityDetailsUrl = meta.activityDetailsUrl;
+              const supplier = meta.supplier;
+              const pickupWindow = meta.pickupWindow;
+              const bagRestriction = meta.bagRestriction;
+              const ticketsCount = meta.rawTickets;
+
+              return (
+                <>
+                  {/* Primary Direct Action Buttons */}
+                  <div className="flex flex-col sm:flex-row gap-2.5">
+                    {mobileTicketUrl && (
+                      <a
+                        href={mobileTicketUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 py-3 px-4 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:opacity-95 text-slate-950 font-black text-xs sm:text-sm flex items-center justify-center space-x-2 shadow-lg shadow-emerald-500/25 transition-all transform hover:-translate-y-0.5 cursor-pointer"
+                      >
+                        <Ticket className="w-4 h-4 text-slate-950 shrink-0" />
+                        <span>Open Mobile Tickets</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </a>
+                    )}
+                    {selectedBooking.source_document_id && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const docId = selectedBooking.source_document_id;
+                          const baseUrl = (import.meta.env.BASE_URL || '/wayfinder/').replace(/\/$/, '');
+                          const foundDoc = documents.find(d => d.id === docId) || {
+                            id: docId,
+                            filename: 'GetYourGuide_Ticket_GYG7VKK692WY.pdf',
+                            safe_display_name: selectedBooking.title || 'GetYourGuide Ticket: Auschwitz & Wieliczka Tour',
+                            mime_type: 'application/pdf',
+                            file_url: `${baseUrl}/Poland-2026/docs/GetYourGuide_Ticket_GYG7VKK692WY.pdf`
+                          };
+                          setSelectedBooking(null);
+                          openPdfPreview(foundDoc);
+                        }}
+                        className="py-3 px-4 rounded-2xl bg-sky-500/20 hover:bg-sky-500/30 border border-sky-400/40 text-sky-300 font-bold text-xs sm:text-sm flex items-center justify-center space-x-2 transition-all cursor-pointer shadow-md"
+                      >
+                        <FileText className="w-4 h-4 text-sky-400 shrink-0" />
+                        <span>View Attached Ticket (PDF)</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {activityDetailsUrl && (
+                    <div className="text-right">
+                      <a
+                        href={activityDetailsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-sky-400 hover:text-sky-300 underline font-medium inline-flex items-center space-x-1"
+                      >
+                        <span>View Activity Details on GetYourGuide</span>
+                        <ArrowRight className="w-3 h-3" />
+                      </a>
+                    </div>
+                  )}
+
+                  {/* Booking Details Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-white/10">
+                      <div className="text-[10px] uppercase font-bold text-slate-400">Date & Schedule</div>
+                      <div className="text-sm font-bold text-white mt-0.5 flex items-center space-x-1.5">
+                        <Calendar className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                        <span>{selectedBooking.local_date || 'Dec 2026'}</span>
+                        {selectedBooking.local_time && (
+                          <span className="text-xs text-sky-300 font-mono">({selectedBooking.local_time})</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-white/10">
+                      <div className="text-[10px] uppercase font-bold text-slate-400">Confirmation Code</div>
+                      <div className="mt-0.5 flex items-center justify-between">
+                        <span className="font-mono font-black text-emerald-300 text-sm">
+                          {selectedBooking.confirmation_number || meta.confNumber || 'Confirmed on File'}
+                        </span>
+                        {(selectedBooking.confirmation_number || meta.confNumber) && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const code = selectedBooking.confirmation_number || meta.confNumber;
+                              if (code) {
+                                navigator.clipboard.writeText(code);
+                                setCopiedConf(true);
+                                setTimeout(() => setCopiedConf(false), 2000);
+                              }
+                            }}
+                            className="px-2 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 text-[10px] font-bold flex items-center space-x-1 transition-all border border-emerald-500/20"
+                          >
+                            {copiedConf ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                            <span>{copiedConf ? 'Copied' : 'Copy'}</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {supplier && (
+                      <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-white/10">
+                        <div className="text-[10px] uppercase font-bold text-slate-400">Tour Operator / Supplier</div>
+                        <div className="text-sm font-bold text-white mt-0.5">{supplier}</div>
+                      </div>
+                    )}
+
+                    {pickupWindow && (
+                      <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-amber-500/30">
+                        <div className="text-[10px] uppercase font-bold text-amber-400">Hotel Pickup Window</div>
+                        <div className="text-sm font-bold text-amber-300 mt-0.5 font-mono">{pickupWindow}</div>
+                        <div className="text-[10px] text-slate-400 mt-0.5">Exact time confirmed via SMS 12h prior</div>
+                      </div>
+                    )}
+
+                    {ticketsCount && (
+                      <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-white/10">
+                        <div className="text-[10px] uppercase font-bold text-slate-400">Tickets & Participants</div>
+                        <div className="text-xs font-semibold text-slate-200 mt-0.5">{ticketsCount}</div>
+                      </div>
+                    )}
+
+                    {selectedBooking.location && (
+                      <div className="sm:col-span-2 p-3.5 rounded-2xl bg-slate-950/70 border border-white/10">
+                        <div className="text-[10px] uppercase font-bold text-slate-400">Location / Route</div>
+                        <div className="text-xs sm:text-sm font-semibold text-slate-200 mt-0.5 flex items-center space-x-1.5">
+                          <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                          <span>{selectedBooking.location}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Museum Bag Restrictions Banner */}
+                  {bagRestriction && (
+                    <div className="p-3.5 rounded-2xl bg-amber-950/40 border border-amber-500/40 flex items-start space-x-2.5 text-xs text-amber-200">
+                      <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                      <div>
+                        <strong className="font-semibold text-amber-300">Museum Bag Size Restriction:</strong>{' '}
+                        <span>Strict limit of 30×20×10 cm permitted on memorial grounds. Belongings and larger luggage can be left safely locked on the tour bus during the visit.</span>
+                      </div>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
+
+            {/* Email Forward & Notes details */}
+            {selectedBooking.notes && (
+              <div className="space-y-2">
+                <div className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+                  Imported Email Details & Notes
+                </div>
+                <div className="p-4 rounded-2xl bg-slate-950/90 border border-white/10 font-mono text-xs text-slate-300 whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto">
+                  {selectedBooking.notes.replace(/\\r\\n/g, '\n').replace(/\\n/g, '\n')}
+                </div>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="pt-2 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => setSelectedBooking(null)}
+                className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-bold transition-colors"
+              >
+                Close
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const day = getDayNumber(selectedBooking.local_date);
+                  setSelectedBooking(null);
+                  window.history.pushState({}, '', `/wayfinder/poland-christmas-2026/private?day=${day}`);
+                  window.dispatchEvent(new PopStateEvent('popstate'));
+                }}
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center justify-center space-x-2 transition-all shadow-lg shadow-emerald-500/20"
+              >
+                <span>Jump to Day {getDayNumber(selectedBooking.local_date)} Timeline</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
             </div>
           </div>
         </div>

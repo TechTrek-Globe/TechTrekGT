@@ -64,29 +64,34 @@ const POLAND_WINTER_2026_PRESET = [
 ];
 
 async function ensureTable(db) {
-  await db.exec(`
-    CREATE TABLE IF NOT EXISTS wayfinder_packing_items (
-      id              TEXT PRIMARY KEY,
-      journey_id      TEXT NOT NULL,
-      user_id         TEXT NOT NULL,
-      category        TEXT NOT NULL DEFAULT 'clothing',
-      name            TEXT NOT NULL,
-      quantity        INTEGER NOT NULL DEFAULT 1,
-      weight_grams    INTEGER DEFAULT 0,
-      is_packed       INTEGER NOT NULL DEFAULT 0,
-      is_shared       INTEGER NOT NULL DEFAULT 0,
-      assigned_to     TEXT,
-      bag_type        TEXT NOT NULL DEFAULT 'checked',
-      notes           TEXT,
-      sort_order      INTEGER NOT NULL DEFAULT 0,
-      created_at      TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
-      FOREIGN KEY (journey_id)  REFERENCES wayfinder_journeys(id) ON DELETE CASCADE,
-      FOREIGN KEY (user_id)     REFERENCES users(id) ON DELETE CASCADE
-    );
-    CREATE INDEX IF NOT EXISTS idx_wf_packing_journey ON wayfinder_packing_items(journey_id);
-    CREATE INDEX IF NOT EXISTS idx_wf_packing_user    ON wayfinder_packing_items(user_id);
-  `);
+  if (!db) return;
+  try {
+    await db.prepare(`
+      CREATE TABLE IF NOT EXISTS wayfinder_packing_items (
+        id              TEXT PRIMARY KEY,
+        journey_id      TEXT NOT NULL,
+        user_id         TEXT NOT NULL,
+        category        TEXT NOT NULL DEFAULT 'clothing',
+        name            TEXT NOT NULL,
+        quantity        INTEGER NOT NULL DEFAULT 1,
+        weight_grams    INTEGER DEFAULT 0,
+        is_packed       INTEGER NOT NULL DEFAULT 0,
+        is_shared       INTEGER NOT NULL DEFAULT 0,
+        assigned_to     TEXT,
+        bag_type        TEXT NOT NULL DEFAULT 'checked',
+        notes           TEXT,
+        sort_order      INTEGER NOT NULL DEFAULT 0,
+        created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY (journey_id)  REFERENCES wayfinder_journeys(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id)     REFERENCES users(id) ON DELETE CASCADE
+      )
+    `).run();
+    await db.prepare('CREATE INDEX IF NOT EXISTS idx_wf_packing_journey ON wayfinder_packing_items(journey_id)').run();
+    await db.prepare('CREATE INDEX IF NOT EXISTS idx_wf_packing_user ON wayfinder_packing_items(user_id)').run();
+  } catch (err) {
+    console.error('[packing] ensureTable failed:', err);
+  }
 }
 
 function computeStats(items) {

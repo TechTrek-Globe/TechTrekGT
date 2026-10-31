@@ -119,6 +119,7 @@ function sanitizeItem(item) {
     timezone:            item.timezone,
     location:            item.location,
     notes:               item.notes,
+    confirmation_number: item.notes?.match(/confirmation:\s*([A-Za-z0-9]+)/i)?.[1] || null,
     has_conflict:        item.has_conflict,
     conflict_notes:      item.conflict_notes,
     source_document_id:  item.source_document_id,

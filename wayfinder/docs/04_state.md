@@ -328,3 +328,10 @@ When a document deletion is requested by the document owner or journey participa
 
 ### 14.2 Hash Lock Release & Re-Import Capability
 Because `wayfinder_documents` enforces SHA-256 file hash checks (`file_hash`) to avoid duplicate uploads, hard deletion purges the hash record from D1. This allows the traveler to immediately re-upload the same document or an amended copy with zero "duplicate document" blocks.
+
+### 14.3 Document Renaming State Lifecycle (`PUT` / `PATCH /api/wayfinder/documents/:id`)
+Allows travelers to edit the display title of stored travel documents:
+1. Client Mutation: Dispatched via `renameDocument(docId, newTitle, journeyId)` in `WayfinderContext.jsx` with `{ safe_display_name: newTitle }`.
+2. D1 Update: Edge worker updates `wayfinder_documents.safe_display_name` and logs the previous and new title in `wayfinder_audit_events`.
+3. Optimistic State Propagation: Instantly updates local `documents` state in context and triggers background refreshes for all itinerary and document views.
+4. Static Fallback Protection: Strict heuristic boundaries ensure that renaming or viewing documents never causes non-Altus lodging to resolve to `Hotel_Altus_Palace_Wroclaw_Confirmation.pdf`.

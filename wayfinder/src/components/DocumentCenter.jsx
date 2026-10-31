@@ -7,7 +7,7 @@ import {
   UploadCloud, File, FileText, Download, Eye, ShieldCheck, Loader2,
   CheckCircle2, AlertTriangle, X, Check, RefreshCw, ArrowRight, Upload,
   Plane, Train, Building2, Utensils, Ticket, Compass, Copy, Calendar, MapPin, ExternalLink,
-  Trash2, ShoppingCart, CreditCard
+  Trash2, ShoppingCart, CreditCard, Edit2, Pencil
 } from 'lucide-react';
 
 function simulateExtraction(file) {
@@ -161,6 +161,7 @@ export function DocumentCenter() {
     jobs, 
     uploadDocument, 
     deleteDocument,
+    renameDocument,
     fetchDocuments, 
     fetchJobs,
     fetchItinerary,
@@ -180,6 +181,10 @@ export function DocumentCenter() {
   
   const [docToDelete, setDocToDelete] = useState(null);
   const [isDeletingDoc, setIsDeletingDoc] = useState(false);
+
+  const [docToRename, setDocToRename] = useState(null);
+  const [renameInputTitle, setRenameInputTitle] = useState('');
+  const [isRenamingDoc, setIsRenamingDoc] = useState(false);
 
   const [reviewingJob, setReviewingJob] = useState(null);
   const [reviewFields, setReviewFields] = useState([]);
@@ -217,6 +222,38 @@ export function DocumentCenter() {
       setUploadError('Failed to delete document: ' + (err.message || 'Error occurred'));
     } finally {
       setIsDeletingDoc(false);
+    }
+  };
+
+  const handleOpenRename = (doc) => {
+    setDocToRename(doc);
+    setRenameInputTitle(doc.safe_display_name || doc.filename || '');
+  };
+
+  const handleSaveRename = async (e) => {
+    if (e) e.preventDefault();
+    if (!docToRename || !renameInputTitle.trim()) return;
+    setIsRenamingDoc(true);
+    setUploadError(null);
+    try {
+      const trimmed = renameInputTitle.trim();
+      if (renameDocument) {
+        await renameDocument(docToRename.id, trimmed, 'poland-christmas-2026');
+      }
+      if (selectedDoc?.id === docToRename.id) {
+        setSelectedDoc(prev => prev ? { ...prev, safe_display_name: trimmed, filename: trimmed } : null);
+      }
+      if (pdfPreviewDoc?.id === docToRename.id) {
+        setPdfPreviewDoc(prev => prev ? { ...prev, safe_display_name: trimmed, filename: trimmed } : null);
+      }
+      setActionSuccessMessage(`Document renamed to "${trimmed}".`);
+      setTimeout(() => setActionSuccessMessage(null), 4000);
+      setDocToRename(null);
+    } catch (err) {
+      console.error('[DocumentCenter] rename error:', err);
+      setUploadError('Failed to rename document: ' + (err.message || 'Error occurred'));
+    } finally {
+      setIsRenamingDoc(false);
     }
   };
 
@@ -454,16 +491,23 @@ export function DocumentCenter() {
 
     const baseUrl = import.meta.env.BASE_URL || '/wayfinder/';
     const normalizedBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
-    const staticDocName = (fname.toLowerCase().includes('delta') || fname.toLowerCase().includes('flight'))
-      ? 'Poland_Delta.pdf'
-      : (fname.toLowerCase().includes('getyourguide') || fname.toLowerCase().includes('gyg') || fname.toLowerCase().includes('auschwitz') || fname.toLowerCase().includes('wieliczka') || fname.toLowerCase().includes('salt'))
-      ? 'GetYourGuide_Ticket_GYG7VKK692WY.pdf'
-      : (fname.toLowerCase().includes('altus') || fname.toLowerCase().includes('palace') || fname.toLowerCase().includes('wroclaw') || fname.toLowerCase().includes('hotel'))
-      ? 'Hotel_Altus_Palace_Wroclaw_Confirmation.pdf'
-      : fname;
-    const staticFallback = `${normalizedBase}Poland-2026/docs/${staticDocName}`;
+    const lower = fname.toLowerCase();
 
-    const url = cachedBlob || doc.file_url || staticFallback;
+    // Strict matching for pre-bundled static PDFs - NEVER fall back to Altus Palace for other hotels!
+    const isDelta = lower.includes('delta') || lower.includes('flight') || lower.includes('dl9208');
+    const isGyg = lower.includes('getyourguide') || lower.includes('gyg') || lower.includes('auschwitz') || lower.includes('wieliczka') || lower.includes('salt');
+    const isAltus = lower.includes('altus'); // Strictly Altus Palace! NEVER generic 'hotel' or 'palace' or 'wroclaw'!
+
+    let staticFallback = null;
+    if (isDelta) {
+      staticFallback = `${normalizedBase}Poland-2026/docs/Poland_Delta.pdf`;
+    } else if (isGyg) {
+      staticFallback = `${normalizedBase}Poland-2026/docs/GetYourGuide_Ticket_GYG7VKK692WY.pdf`;
+    } else if (isAltus) {
+      staticFallback = `${normalizedBase}Poland-2026/docs/Hotel_Altus_Palace_Wroclaw_Confirmation.pdf`;
+    }
+
+    const url = cachedBlob || doc.file_url || staticFallback || null;
     setPdfPreviewUrl(url);
     setPdfPreviewDoc(doc);
   };
@@ -751,6 +795,14 @@ export function DocumentCenter() {
                   <span>Review Extracted Fields</span>
                 </button>
                 <button 
+                  onClick={() => handleOpenRename(selectedDoc)}
+                  className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-medium rounded-lg transition-colors flex items-center space-x-1.5 cursor-pointer"
+                  title="Rename document title"
+                >
+                  <Edit2 className="w-3.5 h-3.5" />
+                  <span>Rename</span>
+                </button>
+                <button 
                   onClick={() => setDocToDelete(selectedDoc)}
                   className="px-3 py-1.5 bg-red-500/15 hover:bg-red-500/25 text-red-400 border border-red-500/30 text-xs font-medium rounded-lg transition-colors flex items-center space-x-1.5 cursor-pointer"
                   title="Delete this document and purge linked bookings"
@@ -835,6 +887,14 @@ export function DocumentCenter() {
                   <Eye className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">Review Extracted Fields</span>
                 </button>
+                <button
+                  onClick={() => handleOpenRename(pdfPreviewDoc)}
+                  className="px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-medium flex items-center space-x-1.5 transition-colors cursor-pointer"
+                  title="Rename document title"
+                >
+                  <Edit2 className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Rename</span>
+                </button>
                 {pdfPreviewUrl && (
                   <>
                     <a
@@ -869,34 +929,46 @@ export function DocumentCenter() {
 
             {/* PDF Viewer */}
             <div className="flex-1 bg-slate-950 overflow-hidden relative">
-              {iframeError ? (
+              {!pdfPreviewUrl || iframeError ? (
                 <div className="flex flex-col items-center justify-center h-full text-center p-8 space-y-4">
-                  <FileText className="w-16 h-16 text-wf-muted opacity-40" />
-                  <div>
-                    <h4 className="text-white font-semibold mb-1">PDF Preview Unavailable</h4>
-                    <p className="text-xs text-wf-muted max-w-sm">
-                      This document is stored as metadata only or browser embedding is restricted. Download the file or inspect the extracted fields.
+                  <div className="p-4 rounded-3xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                    <Building2 className="w-12 h-12" />
+                  </div>
+                  <div className="max-w-md space-y-2">
+                    <h4 className="text-white font-bold text-base">{pdfPreviewDoc.safe_display_name || pdfPreviewDoc.filename}</h4>
+                    <p className="text-xs text-slate-300">
+                      {pdfPreviewDoc.detected_provider ? `Provider: ${pdfPreviewDoc.detected_provider}` : 'Confirmed Travel Booking Document'}
+                    </p>
+                    <p className="text-xs text-wf-muted">
+                      This document is registered in your travel ledger. Inspect the extracted booking data or attach the local PDF file for in-browser viewing.
                     </p>
                   </div>
-                  <div className="flex items-center space-x-3">
+                  <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
                     <button
                       onClick={() => {
                         const docId = pdfPreviewDoc.id;
                         closePdfPreview();
                         openReviewModal(docId);
                       }}
-                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-xl shadow transition-colors"
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-xl shadow transition-colors flex items-center space-x-1.5 cursor-pointer"
                     >
-                      Review Extracted Fields
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Review Extracted Fields</span>
                     </button>
-                    <a
-                      href={pdfPreviewUrl}
-                      download={pdfPreviewDoc.safe_display_name || pdfPreviewDoc.filename}
-                      className="px-4 py-2 bg-wf-blue hover:bg-wf-blue-lt text-white text-xs font-semibold rounded-xl shadow transition-colors flex items-center space-x-1.5"
+                    <button
+                      onClick={() => reattachInputRef.current?.click()}
+                      className="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold rounded-xl shadow transition-colors flex items-center space-x-1.5 cursor-pointer"
                     >
-                      <Download className="w-3.5 h-3.5" />
-                      <span>Download PDF</span>
-                    </a>
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Attach Local PDF File</span>
+                    </button>
+                    <button
+                      onClick={() => handleOpenRename(pdfPreviewDoc)}
+                      className="px-4 py-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-semibold rounded-xl shadow transition-colors flex items-center space-x-1.5 cursor-pointer"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                      <span>Rename Title</span>
+                    </button>
                   </div>
                 </div>
               ) : ((pdfPreviewDoc.mime_type || '').startsWith('image/') || /\.(png|jpe?g|webp|gif)$/i.test(pdfPreviewDoc.filename || '')) ? (
@@ -1199,9 +1271,22 @@ export function DocumentCenter() {
                   </div>
                 </div>
                 
-                <h4 className="text-white text-sm font-medium truncate mb-1" title={doc.safe_display_name || doc.filename}>
-                  {doc.safe_display_name || doc.filename}
-                </h4>
+                <div className="flex items-center justify-between gap-1 mb-1 group/title">
+                  <h4 className="text-white text-sm font-medium truncate flex-1" title={doc.safe_display_name || doc.filename}>
+                    {doc.safe_display_name || doc.filename}
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleOpenRename(doc);
+                    }}
+                    className="opacity-0 group-hover/title:opacity-100 p-1 rounded-md text-slate-400 hover:text-amber-300 hover:bg-amber-500/10 transition-all cursor-pointer shrink-0"
+                    title="Rename document title"
+                  >
+                    <Edit2 className="w-3 h-3" />
+                  </button>
+                </div>
                 
                 <div className="flex items-center justify-between mt-auto pt-2">
                   <span className="text-xs text-wf-muted">
@@ -1244,6 +1329,17 @@ export function DocumentCenter() {
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
+                        handleOpenRename(doc);
+                      }}
+                      className="p-1 rounded-lg text-slate-400 hover:text-amber-300 hover:bg-amber-500/10 transition-colors cursor-pointer"
+                      title="Rename document title"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
                         setDocToDelete(doc);
                       }}
                       className="p-1 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
@@ -1257,6 +1353,115 @@ export function DocumentCenter() {
             ))}
           </div>
         </div>
+
+        {/* Rename Document Modal */}
+        {docToRename && (
+          <div 
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in"
+            onClick={(e) => { if (e.target === e.currentTarget) setDocToRename(null); }}
+          >
+            <div className="relative w-full max-w-lg bg-slate-900 border border-amber-500/30 rounded-3xl p-6 sm:p-7 shadow-2xl space-y-5">
+              <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2.5 rounded-2xl bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    <Edit2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white">Rename Travel Document</h3>
+                    <p className="text-xs text-slate-400">Give this document a clean, recognizable name.</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDocToRename(null)}
+                  className="p-1.5 text-slate-400 hover:text-white rounded-lg transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveRename} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                    Document Title / Display Name
+                  </label>
+                  <input
+                    type="text"
+                    value={renameInputTitle}
+                    onChange={(e) => setRenameInputTitle(e.target.value)}
+                    placeholder="e.g. Hotel Experior Boutique (Kraków)"
+                    autoFocus
+                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-white/15 focus:border-amber-400 rounded-xl text-white text-sm font-medium focus:outline-none transition-colors"
+                  />
+                  <p className="text-[11px] text-slate-400 mt-1.5">
+                    Original filename: <span className="font-mono text-slate-300">{docToRename.original_filename || docToRename.safe_display_name}</span>
+                  </p>
+                </div>
+
+                {/* Quick Suggestions */}
+                <div className="space-y-1.5">
+                  <span className="text-[11px] font-semibold text-slate-400">Quick Suggestions:</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {docToRename.detected_provider && (
+                      <button
+                        type="button"
+                        onClick={() => setRenameInputTitle(docToRename.detected_provider)}
+                        className="text-[11px] px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 transition-colors"
+                      >
+                        {docToRename.detected_provider}
+                      </button>
+                    )}
+                    {(docToRename.detected_provider?.toLowerCase().includes('experior') || docToRename.safe_display_name?.toLowerCase().includes('experior')) && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setRenameInputTitle('Hotel Experior Boutique (Kraków)')}
+                          className="text-[11px] px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 transition-colors"
+                        >
+                          Hotel Experior Boutique (Kraków)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setRenameInputTitle('Hotel Experior Boutique - Check-in Voucher')}
+                          className="text-[11px] px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 transition-colors"
+                        >
+                          Hotel Experior Boutique - Check-in Voucher
+                        </button>
+                      </>
+                    )}
+                    {(docToRename.detected_provider?.toLowerCase().includes('brovaria') || docToRename.safe_display_name?.toLowerCase().includes('brovaria')) && (
+                      <button
+                        type="button"
+                        onClick={() => setRenameInputTitle('Hotel Brovaria & Microbrewery (Poznań)')}
+                        className="text-[11px] px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 transition-colors"
+                      >
+                        Hotel Brovaria & Microbrewery (Poznań)
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end space-x-3 pt-3 border-t border-white/10">
+                  <button
+                    type="button"
+                    onClick={() => setDocToRename(null)}
+                    className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isRenamingDoc || !renameInputTitle.trim()}
+                    className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs rounded-xl shadow-lg flex items-center space-x-1.5 transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    {isRenamingDoc ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                    <span>{isRenamingDoc ? 'Saving...' : 'Save New Title'}</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
 
         {/* Delete Confirmation Modal */}
         {docToDelete && (

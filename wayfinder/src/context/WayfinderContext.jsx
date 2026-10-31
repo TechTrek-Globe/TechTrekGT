@@ -250,6 +250,30 @@ export function WayfinderProvider({ children }) {
     return true;
   };
 
+  const renameDocument = async (docId, newTitle, journeyId = 'poland-christmas-2026') => {
+    const res = await resilientFetch(getApiUrl(`/api/wayfinder/documents/${docId}`), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ safe_display_name: newTitle.trim() })
+    }, {
+      entityType: 'document',
+      entityId: docId,
+      action: 'Rename document'
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.error || errorData.message || 'Failed to rename document');
+    }
+    const data = await res.json();
+    setDocuments(prev => prev.map(d => d.id === docId ? { ...d, safe_display_name: newTitle.trim(), filename: newTitle.trim() } : d));
+    await Promise.all([
+      fetchDocuments(journeyId),
+      fetchItinerary(journeyId)
+    ]);
+    return data;
+  };
+
   return (
     <WayfinderContext.Provider value={{
       itinerary,
@@ -264,6 +288,7 @@ export function WayfinderProvider({ children }) {
       fetchJobs,
       uploadDocument,
       deleteDocument,
+      renameDocument,
       getJobFields,
       parseDocument,
       saveExtractedFields,

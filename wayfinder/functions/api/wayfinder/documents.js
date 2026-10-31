@@ -136,6 +136,47 @@ export async function handleDocuments(context, url, method) {
       }, 201);
     }
 
+    if ((method === 'PUT' || method === 'PATCH') && subpath && subpath !== 'register') {
+      const docId = subpath;
+      const body = await request.json().catch(() => ({}));
+      const newTitle = (body.safe_display_name || body.title || body.filename || '').trim();
+
+      if (!newTitle) {
+        return json({ error: 'Title or safe_display_name is required' }, 400);
+      }
+
+      // Check existence & permissions
+      const doc = await env.DB.prepare(
+        `SELECT * FROM wayfinder_documents 
+         WHERE id = ? 
+           AND (user_id = ? OR journey_id IN (SELECT id FROM wayfinder_journeys WHERE created_by = ? OR visibility = 'public'))
+           AND deleted_at IS NULL`
+      ).bind(docId, user.userId, user.userId).first();
+
+      if (!doc) return json({ error: 'Document not found or permission denied' }, 404);
+
+      const auditId = generateId();
+      await env.DB.batch([
+        env.DB.prepare(
+          'UPDATE wayfinder_documents SET safe_display_name = ? WHERE id = ?'
+        ).bind(newTitle, docId),
+        env.DB.prepare(
+          'INSERT INTO wayfinder_audit_events (id, user_id, journey_id, entity_type, entity_id, action, details) VALUES (?,?,?,?,?,?,?)'
+        ).bind(
+          auditId,
+          user.userId,
+          doc.journey_id || null,
+          'document',
+          docId,
+          'rename',
+          JSON.stringify({ old_title: doc.safe_display_name, new_title: newTitle })
+        )
+      ]);
+
+      const updated = { ...doc, safe_display_name: newTitle };
+      return json({ success: true, document: safeDoc(updated) });
+    }
+
     if (method === 'DELETE' && subpath && subpath !== 'register') {
       const docId = subpath;
       // Allow deletion by document owner or traveler on the journey

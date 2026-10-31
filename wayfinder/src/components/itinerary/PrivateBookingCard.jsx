@@ -329,12 +329,16 @@ export function PrivateBookingCard({ item }) {
         isOpen={isDocViewerOpen}
         onClose={() => setIsDocViewerOpen(false)}
         doc={{
-          id: item.source_document_id || 'doc-gyg-7vkk692wy',
-          filename: item.filename || (docType === 'excursion' ? 'GetYourGuide_Ticket_GYG7VKK692WY.pdf' : 'Poland_Delta.pdf'),
+          id: item.source_document_id || (docType === 'excursion' ? 'doc-gyg-7vkk692wy' : 'delta-poland-2026'),
+          filename: item.filename || (docType === 'excursion' ? 'GetYourGuide_Ticket_GYG7VKK692WY.pdf' : (docType === 'flight' ? 'Poland_Delta.pdf' : (item.title || 'Booking Voucher'))),
           safe_display_name: item.title || 'Booking Confirmation',
           file_url: (docType === 'excursion' || (item.title || '').toLowerCase().includes('auschwitz'))
             ? `${(import.meta.env.BASE_URL || '/wayfinder/').replace(/\/$/, '')}/Poland-2026/docs/GetYourGuide_Ticket_GYG7VKK692WY.pdf`
-            : `${(import.meta.env.BASE_URL || '/wayfinder/').replace(/\/$/, '')}/Poland-2026/docs/Poland_Delta.pdf`,
+            : (docType === 'flight' || (item.title || '').toLowerCase().includes('delta'))
+            ? `${(import.meta.env.BASE_URL || '/wayfinder/').replace(/\/$/, '')}/Poland-2026/docs/Poland_Delta.pdf`
+            : ((item.title || '').toLowerCase().includes('altus'))
+            ? `${(import.meta.env.BASE_URL || '/wayfinder/').replace(/\/$/, '')}/Poland-2026/docs/Hotel_Altus_Palace_Wroclaw_Confirmation.pdf`
+            : null,
           details: {
             confirmation: item.confirmation_number || meta.confNumber || 'GYG7VKK692WY',
             provider: item.provider || 'GetYourGuide / Mr.Shuttle',

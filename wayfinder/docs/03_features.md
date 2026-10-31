@@ -121,6 +121,14 @@ Authenticated users can import hotel and attraction booking confirmations via de
   - Cascading Purge (`DELETE /api/wayfinder/documents/:id` in [documents.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/documents.js)): Broadened permissions allow either document owner, journey creator, or public journey travelers to delete. The endpoint cascades deletion through linked `wayfinder_expense_splits`, `wayfinder_expenses`, `wayfinder_itinerary_items`, `wayfinder_extracted_fields`, `wayfinder_extraction_jobs`, and hard-deletes `wayfinder_documents`.
   - Hash Conflict Prevention: By purging the document record and file hash from D1, travelers can immediately re-upload and re-parse an updated or corrected file without triggering duplicate hash conflict rejections.
   - Client-Side Synchronization: Purges the local binary file from IndexedDB via `documentStorage.deleteDocument(docId)` and re-syncs documents, extraction jobs, itinerary items, and expenses across WayfinderContext.
+- Document Title Renaming Capability:
+  - Edge API (`PUT` / `PATCH /api/wayfinder/documents/:id` in [documents.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/documents.js)): Allows authenticated travelers to update `safe_display_name` in D1. Updates are verified against ownership or public journey traveler permissions, recorded in `wayfinder_audit_events`, and returned immediately as sanitized document metadata.
+  - Rename Document Modal & Quick Suggestions: [DocumentCenter.jsx](file:///e:/TechTrekGT/wayfinder/src/components/DocumentCenter.jsx) provides a dedicated glassmorphic rename dialog featuring context-aware quick suggestion chips (e.g. "Hotel Experior Boutique (Kraków)", "Hotel Experior Boutique - Check-in Voucher", "Hotel Brovaria & Microbrewery (Poznań)").
+  - Multi-Trigger Access: Rename triggers are placed directly on each document card (inline title hover pencil and action button) and in the Document Viewer modal headers.
+- Strict Static Fallback Resolution & Cross-City Isolation:
+  - Prior regex heuristics that matched generic terms (such as `hotel`, `palace`, or `wroclaw`) have been surgically tightened to strictly isolate bundled static files (`isAltus = lower.includes('altus')`).
+  - Guarantees that Kraków accommodations (e.g. Hotel Experior Boutique) or Poznań lodging (e.g. Hotel Brovaria) never incorrectly pull or display the Altus Palace Wrocław voucher.
+  - When viewing documents without an attached local binary blob, renders a clean metadata card with action shortcuts to "Review Extracted Fields", "Attach Local PDF File", and "Rename Title".
 
 ## 8. Key-Free Open-Meteo Winter Weather & Daylight Telemetry
 

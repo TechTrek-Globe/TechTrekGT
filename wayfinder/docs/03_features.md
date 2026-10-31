@@ -321,3 +321,22 @@ Replaces brittle regex matching and static simulated filename keywords with a se
   - Binary and Text Streaming: Reads uploaded PDF vouchers, tickets, or text files and dispatches them to `POST /api/wayfinder/import-jobs/:doc_id/parse`.
   - Automated Field Population: Automatically populates `wayfinder_extracted_fields` and flags the extraction job as `ready_for_review`.
   - Review Gate Integration: Opens the verification modal with extracted values highlighted for user approval before landing into `wayfinder_itinerary_items`.
+
+## 20. Parser Self-Healing, Inbound Document Ingestion & Lodging Ledger Reconciliation
+
+Provides end-to-end self-healing for forwarded travel confirmations, instant UI feedback, and verified multi-city expense splits:
+
+- Resilient Parser Auto-Healing ([import-jobs.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/import-jobs.js)):
+  - Zero-404 Extraction Recovery: If an extraction job record is missing when inspecting a document, the API automatically provisions a `ready_for_review` job record in `wayfinder_extraction_jobs`.
+  - Automatic Field Population: When a document has no extracted fields, the handler inspects linked itinerary item records and document metadata to populate initial fields (`hotel_name`, `carrier`, `airline`, `confirmation_number`, `dates`, `times`, `location`, `total_cost`) into `wayfinder_extracted_fields`.
+  - Duplicate Itinerary Suppression: Approving an extraction job checks for existing items by `source_document_id`, executing an atomic SQL `UPDATE` instead of creating redundant duplicate bookings.
+  - European Decimal Normalization: Normalizes comma decimal currencies (e.g. `450,00 PLN` -> `450.00 PLN`) and ISO symbol aliases (`zł`, `PLN`, `USD`, `EUR`).
+- Document Center Refresh & Feedback UX ([DocumentCenter.jsx](file:///e:/TechTrekGT/wayfinder/src/components/DocumentCenter.jsx)):
+  - Animated Refresh Indicator: Replaces silent static button with an active spinning icon (`animate-spin`), disabled state during operations, and success toast confirming data synchronization across documents, jobs, and bookings.
+  - Multi-Entity Concurrent Fetch: Executes concurrent background fetches for documents (`fetchDocuments`), extraction jobs (`fetchJobs`), and itinerary timeline items (`fetchItinerary`).
+  - 1-Click Reparse for Pending Documents: Adds a dedicated "Reparse" action on pending cards, allowing users to trigger serverless Gemini extraction directly from the document grid.
+- Multi-City Lodging & Expense Reconciliation ([expenses.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/expenses.js) & Cloudflare D1):
+  - Hotel Experior Boutique Kraków: Reconciled 3-night stay (Dec 4-7, 2026) for $366.43 USD fronted by Jon Kemp, properly attributing the Kraków lodging location and 50/50 member splits ($183.22 / $183.21).
+  - Hotel Altus Palace Wrocław: Reconciled 2-night 5-star palace stay (Dec 7-9, 2026) for 2,400.00 PLN (~$600.00 USD) fronted by Jonathan Kemp, correcting the city to Wrocław and linking to booking voucher `ALT-88421`.
+  - Hotel Brovaria Poznań: Reconciled 1-night Old Market Square microbrewery stay (Dec 9-10, 2026) for 450.00 PLN (~$112.50 USD) fronted by Jonathan Kemp, linking to confirmed receipt attachment.
+

@@ -214,17 +214,27 @@ Tracks confirmed private tour bookings, time window parameters, and reconciliati
 
 Active persistent entities for confirmed trip reservations:
 
-### 11.1 Hotel Altus Palace Wrocław
+### 11.1 Hotel Experior Boutique Kraków
+- Document Record (`wayfinder_documents`): `id: 1b8d5a44-96a7-4ee5-905b-2b0a6e1274b5`, `original_filename: english check-in voucher (for visa application).pdf`, `safe_display_name: Hotel: Your booking at Hotel Experior Boutique - Destigo Hotels has been confirmed-NoReply`, `storage_status: imported`, `processing_status: imported`.
+- Itinerary Record (`wayfinder_itinerary_items`): `id: bffe6e8f-54ce-4211-816b-2fd61ae75697`, `item_type: hotel`, `title: Hotel Experior Boutique Kraków (Check-in)`, `local_date: 2026-12-04`, `local_time: 15:00`, `end_date: 2026-12-07`, `source_document_id: 1b8d5a44-96a7-4ee5-905b-2b0a6e1274b5`.
+- Expense Record (`wayfinder_expenses`): `id: exp-altus-palace-hotel`, `amount_original: 366.43`, `currency_original: USD`, `amount_usd: 366.43`, `paid_by_name: Jon Kemp`, `paid_by_user_id: usr-1785511589441-3fvgv`, `category: lodging`, linked to splits `spl-1793468636871-ioshc` ($183.22 USD) and `spl-1793468636925-hs8y2` ($183.21 USD).
+
+### 11.2 Hotel Altus Palace Wrocław
 - Document Record (`wayfinder_documents`): `id: doc-altus-palace-wroclaw`, `original_filename: Hotel_Altus_Palace_Wroclaw_Confirmation.pdf`, `storage_status: imported`, `processing_status: imported`.
 - Itinerary Record (`wayfinder_itinerary_items`): `id: itin-altus-palace-wroclaw`, `item_type: hotel`, `title: Altus Palace Wrocław 5-Star Stay (Check-in)`, `local_date: 2026-12-07`, `local_time: 15:00`, `end_date: 2026-12-09`, `end_time: 11:00`, `source_document_id: doc-altus-palace-wroclaw`.
-- Expense Record (`wayfinder_expenses`): `id: exp-altus-palace-hotel`, `amount_original: 2400.00`, `currency_original: PLN`, `paid_by_name: Jonathan Kemp`, `category: lodging`, linked to splits `spl-altus-1` and `spl-altus-2` (1,200.00 PLN each).
+- Expense Record (`wayfinder_expenses`): `id: exp-altus-palace-wroclaw-hotel`, `amount_original: 2400.00`, `currency_original: PLN`, `amount_usd: 600.00`, `paid_by_name: Jonathan Kemp`, `category: lodging`, linked to splits `spl-altus-wroc-1` (1,200.00 PLN) and `spl-altus-wroc-2` (1,200.00 PLN).
 
-### 11.2 Inbound Transatlantic Flights
+### 11.3 Hotel Brovaria Poznań
+- Document Record (`wayfinder_documents`): `id: 266f700b-0004-444c-915b-af303a822083`, `original_filename: confirmation of payment.pdf`, `safe_display_name: BROVARIA Room reservation (confirmation of payment.pdf)`, `storage_status: imported`, `processing_status: imported`.
+- Itinerary Record (`wayfinder_itinerary_items`): `id: e7cbb11e-a89d-4546-8f6a-f0675f8f9749`, `item_type: hotel`, `title: Hotel Brovaria Poznań (Room Reservation)`, `local_date: 2026-12-09`, `local_time: 15:00`, `end_date: 2026-12-10`, `source_document_id: 266f700b-0004-444c-915b-af303a822083`.
+- Expense Record (`wayfinder_expenses`): `id: exp-brovaria-hotel-poznan`, `amount_original: 450.00`, `currency_original: PLN`, `amount_usd: 112.50`, `paid_by_name: Jonathan Kemp`, `category: lodging`, linked to splits `spl-brovaria-1` (225.00 PLN) and `spl-brovaria-2` (225.00 PLN).
+
+### 11.4 Inbound Transatlantic Flights
 - Document Record: `ea78634a-eaa9-46e8-b40c-b3703bb6e2ca` (`Poland_Delta.pdf`).
 - Itinerary Record: `471a82a3-2251-4d01-a308-a8f084b6108a` (`Flight: ATL to KRK`).
 - Expense Record: `exp-delta-flight-dl9208`, `amount_original: 1980.00`, `currency_original: USD`, `amount_usd: 1980.00`, `paid_by_name: Ronald Milton Few`, `paid_by_user_id: usr-ronald-few`, linked to splits `spl-flight-jon` (Jonathan owes $990.00 USD) and `spl-flight-ronald` (Ronald paid share of $990.00 USD).
 
-### 11.3 Auschwitz & Wieliczka Guided Excursion
+### 11.5 Auschwitz & Wieliczka Guided Excursion
 - Document Record: `doc-gyg-7vkk692wy` (`GetYourGuide_Ticket_GYG7VKK692WY.pdf`).
 - Itinerary Record: `5263ea74-fc84-4b85-8f9d-9d5179e7f292` (`GetYourGuide: Auschwitz-Birkenau & Wieliczka Salt Mine Tour`).
 - Expense Record: `exp-gyg-7vkk692wy`, `amount_original: 284.76`, `currency_original: USD`, `amount_usd: 284.76`, linked to splits `split-gyg-1` and `split-gyg-2` ($142.38 USD each).

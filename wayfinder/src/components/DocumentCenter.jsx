@@ -149,6 +149,7 @@ export function DocumentCenter() {
     jobs, 
     uploadDocument, 
     fetchDocuments, 
+    fetchJobs,
     fetchItinerary,
     getJobFields, 
     parseDocument,
@@ -158,6 +159,7 @@ export function DocumentCenter() {
   } = useWayfinder();
   
   const [isUploading, setIsUploading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [uploadError, setUploadError] = useState(null);
   const [selectedDoc, setSelectedDoc] = useState(null);
   const [selectedBooking, setSelectedBooking] = useState(null);
@@ -190,6 +192,25 @@ export function DocumentCenter() {
     if (dateStr <= '2026-12-09') return 'Wrocław';
     if (dateStr <= '2026-12-10') return 'Poznań / Toruń';
     return 'Gdańsk';
+  };
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    setUploadError(null);
+    try {
+      await Promise.all([
+        fetchDocuments ? fetchDocuments('poland-christmas-2026') : Promise.resolve(),
+        fetchJobs ? fetchJobs() : Promise.resolve(),
+        fetchItinerary ? fetchItinerary('poland-christmas-2026') : Promise.resolve()
+      ]);
+      setActionSuccessMessage('Refreshed travel documents, extraction jobs, and bookings.');
+      setTimeout(() => setActionSuccessMessage(null), 3500);
+    } catch (err) {
+      console.error('[DocumentCenter] refresh error:', err);
+      setUploadError('Failed to refresh documents: ' + err.message);
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   // Load itinerary items on mount so synced bookings are visible
@@ -1100,11 +1121,14 @@ export function DocumentCenter() {
             <span>Stored Travel Documents ({displayDocuments.length})</span>
           </h3>
           <button
-            onClick={() => fetchDocuments()}
-            className="text-xs text-wf-muted hover:text-white flex items-center space-x-1 transition-colors"
+            type="button"
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="text-xs text-wf-muted hover:text-white flex items-center space-x-1.5 transition-colors cursor-pointer disabled:opacity-60"
+            title="Refresh documents, extraction jobs, and bookings"
           >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span>Refresh</span>
+            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-emerald-400' : ''}`} />
+            <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
           </button>
         </div>
         
@@ -1150,11 +1174,31 @@ export function DocumentCenter() {
                 <div className="mt-3 pt-2 border-t border-white/5 flex items-center justify-between">
                   <button
                     onClick={() => openReviewModal(doc.id)}
-                    className="text-[11px] text-wf-blue-lt hover:text-white font-medium flex items-center space-x-1"
+                    className="text-[11px] text-wf-blue-lt hover:text-white font-medium flex items-center space-x-1 cursor-pointer"
                   >
                     <span>Review Extraction</span>
                     <ArrowRight className="w-3 h-3" />
                   </button>
+                  {doc.processing_status === 'pending' && (
+                    <button
+                      onClick={async () => {
+                        try {
+                          setIsProcessingJob(true);
+                          await parseDocument(doc.id, null);
+                          await handleRefresh();
+                          openReviewModal(doc.id);
+                        } catch (err) {
+                          setUploadError('Failed to parse: ' + err.message);
+                        } finally {
+                          setIsProcessingJob(false);
+                        }
+                      }}
+                      className="text-[10px] text-amber-300 hover:text-amber-200 font-semibold px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 transition-all cursor-pointer"
+                      title="Run Gemini parser on this document"
+                    >
+                      Reparse
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

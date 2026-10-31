@@ -242,7 +242,19 @@ export async function handleExpenses(context, url, method) {
           ]
         },
         {
-          desc: 'Altus Palace Hotel Krakow (3 Nights Dec 4-7)',
+          desc: 'Hotel Experior Boutique Kraków (3 Nights Dec 4-7)',
+          cat: 'lodging',
+          amount: 366.43,
+          cur: 'USD',
+          paidBy: 'Jonathan Kemp',
+          payerId: user.userId,
+          splits: [
+            { userId: user.userId, userName: 'Jonathan Kemp', amount: 183.22, pct: 50 },
+            { userId: 'usr-ronald-few', userName: 'Ronald Milton Few', amount: 183.21, pct: 50 }
+          ]
+        },
+        {
+          desc: 'Hotel Altus Palace Wrocław (2 Nights Dec 7-9)',
           cat: 'lodging',
           amount: 2400.00,
           cur: 'PLN',
@@ -251,6 +263,18 @@ export async function handleExpenses(context, url, method) {
           splits: [
             { userId: user.userId, userName: 'Jonathan Kemp', amount: 1200.00, pct: 50 },
             { userId: 'usr-ronald-few', userName: 'Ronald Milton Few', amount: 1200.00, pct: 50 }
+          ]
+        },
+        {
+          desc: 'Hotel Brovaria Poznań (1 Night Dec 9-10)',
+          cat: 'lodging',
+          amount: 450.00,
+          cur: 'PLN',
+          paidBy: 'Jonathan Kemp',
+          payerId: user.userId,
+          splits: [
+            { userId: user.userId, userName: 'Jonathan Kemp', amount: 225.00, pct: 50 },
+            { userId: 'usr-ronald-few', userName: 'Ronald Milton Few', amount: 225.00, pct: 50 }
           ]
         },
         {

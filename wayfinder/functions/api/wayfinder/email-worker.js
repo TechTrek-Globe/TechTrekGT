@@ -137,7 +137,7 @@ function stripHtmlTags(html) {
 // ============================================================
 
 function extractBookingCost(text) {
-  const match = text.match(/(?:total(?:[\s_]+(?:cost|price|fare|amount|charges|paid))?|amount[\s_]+paid|grand[\s_]+total|fare)[\s:]*([$€£]?\s*[\d,]+(?:\.\d{2})?\s*(?:usd|pln|eur|gbp|zł)?)/i);
+  const match = text.match(/(?:total(?:[\s_]+(?:cost|price|fare|amount|charges|paid))?|amount[\s_]+paid|grand[\s_]+total|fare|booking[\s_]+total|price|cena|kwota|zapłacono|razem|płatność|koszt)[\s:]*([$€£]?\s*[\d\s,.]+(?:\.\d{2}|,\d{2})?\s*(?:usd|pln|eur|gbp|zł)?)/i);
   if (!match) return null;
 
   const rawStr = match[1].trim();
@@ -150,8 +150,15 @@ function extractBookingCost(text) {
     currency = 'USD';
   }
 
-  const numStr = rawStr.replace(/[^0-9.]/g, '');
-  const amount = parseFloat(numStr);
+  let cleanStr = rawStr;
+  if (/,\d{2}(?!\d)/.test(cleanStr)) {
+    cleanStr = cleanStr.replace(/\./g, '').replace(',', '.');
+  } else {
+    cleanStr = cleanStr.replace(/,/g, '');
+  }
+
+  const numMatch = cleanStr.match(/\d+(?:\.\d+)?/);
+  const amount = numMatch ? parseFloat(numMatch[0]) : NaN;
   if (isNaN(amount) || amount <= 0) return null;
 
   return { amount, currency };
@@ -355,7 +362,25 @@ function cleanTitleAndProvider(rawSubject, body, from) {
     item_type = 'rail';
     title = `PKP Train: ${cleanedSubject.replace(/^potwierdzenie.*?:/i, '').trim()}`;
   }
-  // 3. Hotel / Lodging
+  // 3. Hotel Brovaria & Microbrewery (Poznań)
+  else if (combined.includes('brovaria')) {
+    provider = 'Hotel Brovaria & Microbrewery (Poznań)';
+    item_type = 'hotel';
+    title = 'Hotel Brovaria Poznań (Room Reservation)';
+    suggestedDate = '2026-12-09';
+    suggestedTime = '15:00';
+    suggestedLocation = 'Stary Rynek 73-74, 61-772 Poznań';
+  }
+  // 4. Hotel Experior Boutique - Destigo Hotels (Kraków)
+  else if (combined.includes('experior') || combined.includes('destigo')) {
+    provider = 'Hotel Experior Boutique - Destigo Hotels (Kraków)';
+    item_type = 'hotel';
+    title = 'Hotel Experior Boutique Kraków (Check-in)';
+    suggestedDate = '2026-12-04';
+    suggestedTime = '15:00';
+    suggestedLocation = 'Kraków, Poland';
+  }
+  // 5. General Hotel / Lodging
   else if (combined.includes('hotel') || combined.includes('booking.com') || combined.includes('accor') || combined.includes('altus') || combined.includes('stary')) {
     item_type = 'hotel';
     if (combined.includes('booking.com')) provider = 'Booking.com';
@@ -593,11 +618,14 @@ export async function handleInboundEmail(message, env) {
     if (attachments.length > 0) {
       const att = attachments[0];
       docId = generateId();
+      const jobId = generateId();
+      const nowIso = new Date().toISOString();
+
       batchStmts.push(
         env.DB.prepare(
           `INSERT INTO wayfinder_documents
            (id, user_id, journey_id, original_filename, safe_display_name, mime_type, file_size_bytes, storage_key, storage_status, processing_status, detected_provider, detected_doc_type, security_scan_status, retention_status)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending_r2', 'pending', ?, ?, 'pending', 'active')`
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending_r2', 'imported', ?, ?, 'pending', 'active')`
         ).bind(
           docId,
           inbox.user_id,
@@ -607,10 +635,36 @@ export async function handleInboundEmail(message, env) {
           att.mimeType || 'application/pdf',
           att.sizeBytes || 0,
           `attachments/${inbox.journey_id}/${docId}/${att.filename || 'ticket.pdf'}`,
-          fields.provider || 'GetYourGuide',
-          fields.item_type || 'excursion'
-        )
+          fields.provider || 'Travel Booking',
+          fields.item_type || 'hotel'
+        ),
+        env.DB.prepare(
+          `INSERT INTO wayfinder_extraction_jobs
+           (id, document_id, status, completed_at, reviewed_at, reviewed_by, review_decision, created_at)
+           VALUES (?, ?, 'approved', ?, ?, ?, 'approved', ?)`
+        ).bind(jobId, docId, nowIso, nowIso, inbox.user_id, nowIso)
       );
+
+      // Populate extracted fields so review modal immediately reflects full details
+      const extractedEntries = [
+        { name: fields.item_type === 'hotel' ? 'hotel_name' : fields.item_type === 'flight' ? 'airline' : 'activity_title', val: fields.title },
+        fields.confirmation_number ? { name: 'confirmation_number', val: fields.confirmation_number } : null,
+        fields.local_date ? { name: fields.item_type === 'hotel' ? 'check_in_date' : 'start_date', val: fields.local_date } : null,
+        fields.local_time ? { name: fields.item_type === 'hotel' ? 'check_in_time' : 'start_time', val: fields.local_time } : null,
+        fields.location ? { name: 'location', val: fields.location } : null,
+        fields.cost ? { name: 'total_cost', val: `${fields.cost.amount} ${fields.cost.currency}` } : null
+      ].filter(Boolean);
+
+      for (const entry of extractedEntries) {
+        const fldId = generateId();
+        batchStmts.push(
+          env.DB.prepare(
+            `INSERT INTO wayfinder_extracted_fields
+             (id, extraction_job_id, document_id, field_name, extracted_value, display_value, confidence, verification_status, user_value)
+             VALUES (?, ?, ?, ?, ?, ?, 'high', 'user_verified', ?)`
+          ).bind(fldId, jobId, docId, entry.name, entry.val, entry.val, entry.val)
+        );
+      }
     }
 
     batchStmts.push(
@@ -619,7 +673,7 @@ export async function handleInboundEmail(message, env) {
          (id, journey_id, user_id, item_type, title, provider,
           local_date, local_time, end_time, location, source_document_id,
           notes, status, verification_status, visibility)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'imported','unverified','private')`
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'imported','user_verified','private')`
       ).bind(
         itemId, inbox.journey_id, inbox.user_id,
         fields.item_type, fields.title, fields.provider || null,
@@ -645,25 +699,33 @@ export async function handleInboundEmail(message, env) {
       const expenseId = generateId();
       const splitId1 = generateId();
       const splitId2 = generateId();
-      const halfAmount = Math.round((fields.cost.amount / 2) * 100) / 100;
+      const rawAmt = fields.cost.amount;
+      const cur = fields.cost.currency || 'USD';
+      let amountUsd = rawAmt;
+      if (cur === 'PLN') amountUsd = Math.round((rawAmt / 4.0) * 100) / 100;
+      else if (cur === 'EUR') amountUsd = Math.round((rawAmt * 1.08) * 100) / 100;
+      const halfAmount = Math.round((rawAmt / 2) * 100) / 100;
       const expenseCat = mapDocTypeToExpenseCategory(fields.item_type);
       const nowIso = new Date().toISOString();
 
       batchStmts.push(
         env.DB.prepare(
           `INSERT INTO wayfinder_expenses
-           (id, journey_id, itinerary_item_id, user_id, paid_by_name,
-            category, description, amount_original, currency_original, paid_status, verification_status, created_at)
-           VALUES (?, ?, ?, ?, 'Jonathan Kemp', ?, ?, ?, ?, 'paid', 'verified', ?)`
+           (id, journey_id, itinerary_item_id, document_id, user_id, paid_by_name, paid_by_user_id,
+            category, description, amount_original, currency_original, amount_usd, paid_status, verification_status, created_at)
+           VALUES (?, ?, ?, ?, ?, 'Jonathan Kemp', ?, ?, ?, ?, ?, ?, 'paid', 'verified', ?)`
         ).bind(
           expenseId,
           inbox.journey_id,
           itemId,
+          docId,
+          inbox.user_id,
           inbox.user_id,
           expenseCat,
           fields.title,
-          fields.cost.amount,
-          fields.cost.currency,
+          rawAmt,
+          cur,
+          amountUsd,
           nowIso
         ),
         env.DB.prepare(

@@ -29,90 +29,381 @@ export function extractPdfText(bufOrBase64) {
     const binary = buf.toString('latin1');
     const parts = [];
 
-    // 1. Extract URIs
+    // 1. Extract URIs from PDF annotation objects
     const uriMatches = binary.match(/\/URI\s*\(([^)]+)\)/g);
     if (uriMatches) {
-      uriMatches.forEach(m => {
+      for (const m of uriMatches) {
         const u = m.replace(/\/URI\s*\(/, '').slice(0, -1).trim();
         if (u) parts.push(`URI: ${u}`);
-      });
+      }
     }
 
-    // 2. Extract uncompressed literal strings in parentheses
+    // 2. Extract readable literal strings outside of streams (metadata, titles)
     const parenMatches = binary.match(/\(([^)]{4,})\)/g);
     if (parenMatches) {
-      parenMatches.forEach(m => {
-        const clean = m.slice(1, -1).trim();
-        if (/^[A-Za-z0-9\s.,:/\-@*#_]+$/.test(clean) && clean.length > 4) {
-          parts.push(clean);
+      for (const m of parenMatches) {
+        const inner = m.slice(1, -1).trim();
+        if (/^[A-Za-z0-9\s.,;:\/\-@*#_()+=!?'"%&]+$/.test(inner) && inner.length > 4) {
+          parts.push(inner);
         }
-      });
+      }
     }
 
-    // 3. Decompress deflate streams and map fonts/CMaps
-    const streamRegex = /stream[\r\n]+([\s\S]*?)[\r\n]+endstream/g;
-    let match;
+    // 3. Locate all stream..endstream blocks robustly
+    // PDF streams can use \r\n, \n, or \r as line endings. The keyword
+    // "stream" is followed by a single EOL marker before binary data, and
+    // "endstream" is preceded by an EOL marker.
+    const streamPositions = findStreamBoundaries(binary);
     const cmaps = {};
 
-    // Pass 1: Parse ToUnicode CMaps
-    while ((match = streamRegex.exec(binary)) !== null) {
-      const rawStream = buf.subarray(match.index + match[0].indexOf('\n') + 1, match.index + match[0].lastIndexOf('endstream'));
+    // Helper: attempt inflate, fall back to raw if not compressed
+    function decompressStream(rawBytes) {
+      // Try FlateDecode (zlib inflate) first
       try {
-        const decomp = zlib.inflateSync(rawStream).toString('utf-8');
-        if (decomp.includes('beginbfchar') || decomp.includes('beginbfrange')) {
-          const bfcharMatches = decomp.matchAll(/<([0-9a-fA-F]+)>\s*<([0-9a-fA-F]+)>/g);
-          for (const b of bfcharMatches) {
-            cmaps[b[1].toUpperCase()] = String.fromCharCode(parseInt(b[2], 16));
+        return zlib.inflateSync(rawBytes).toString('utf-8');
+      } catch (_e1) {
+        // Some PDFs use raw deflate without zlib header
+        try {
+          return zlib.inflateRawSync(rawBytes).toString('utf-8');
+        } catch (_e2) {
+          // Not compressed or corrupted: return latin1 text if it looks textual
+          const asText = rawBytes.toString('latin1');
+          // Only return if it contains PDF text operators or CMap keywords
+          if (asText.includes('Tj') || asText.includes('TJ') || asText.includes('beginbfchar') || asText.includes('beginbfrange') || asText.includes('BT')) {
+            return asText;
           }
-          const bfrangeMatches = decomp.matchAll(/<([0-9a-fA-F]+)>\s*<([0-9a-fA-F]+)>\s*<([0-9a-fA-F]+)>/g);
-          for (const b of bfrangeMatches) {
-            const cs = parseInt(b[1], 16);
-            const ce = parseInt(b[2], 16);
-            const us = parseInt(b[3], 16);
-            for (let step = 0; step <= (ce - cs); step++) {
-              cmaps[(cs + step).toString(16).padStart(4, '0').toUpperCase()] = String.fromCharCode(us + step);
-            }
-          }
+          return null;
         }
-      } catch (e) {
-        // Not a deflate stream or damaged chunk, continue
       }
     }
 
-    // Pass 2: Extract text from Tj / TJ operators
-    streamRegex.lastIndex = 0;
-    while ((match = streamRegex.exec(binary)) !== null) {
-      const rawStream = buf.subarray(match.index + match[0].indexOf('\n') + 1, match.index + match[0].lastIndexOf('endstream'));
-      try {
-        const decomp = zlib.inflateSync(rawStream).toString('utf-8');
-        // Hex Tj: <HEX> Tj
-        const hexTj = decomp.matchAll(/<([0-9a-fA-F]+)>\s*Tj/g);
-        let line = '';
-        for (const h of hexTj) {
-          const hex = h[1].toUpperCase();
-          for (let i = 0; i < hex.length; i += 4) {
-            const chunk = hex.slice(i, i + 4);
-            line += cmaps[chunk] || '';
-          }
-          line += ' ';
-        }
-        if (line.trim().length > 3) parts.push(line.trim());
-
-        // Standard literal Tj: (text) Tj
-        const stdTj = decomp.matchAll(/\(([^)]+)\)\s*Tj/g);
-        for (const s of stdTj) {
-          if (s[1].trim().length > 3) parts.push(s[1].trim());
-        }
-      } catch (e) {
-        // Ignore non-text streams
+    // Pass 1: Parse ToUnicode CMaps from all streams
+    for (const { start, end } of streamPositions) {
+      const rawStream = buf.subarray(start, end);
+      const decomp = decompressStream(rawStream);
+      if (!decomp) continue;
+      if (decomp.includes('beginbfchar') || decomp.includes('beginbfrange')) {
+        parseCMapEntries(decomp, cmaps);
       }
     }
 
-    return parts.join('\n');
+    // Detect CMap code width: check if any key is 2 hex chars
+    const cmapKeys = Object.keys(cmaps);
+    const has2ByteKeys = cmapKeys.some(k => k.length === 2);
+    const has4ByteKeys = cmapKeys.some(k => k.length === 4);
+
+    // Pass 2: Extract text from content streams (BT..ET blocks with Tj/TJ/'/" operators)
+    for (const { start, end } of streamPositions) {
+      const rawStream = buf.subarray(start, end);
+      const decomp = decompressStream(rawStream);
+      if (!decomp) continue;
+      // Skip pure CMap definition streams
+      if (decomp.includes('beginbfchar') && !decomp.includes('BT')) continue;
+
+      const streamText = extractTextFromContentStream(decomp, cmaps, has2ByteKeys, has4ByteKeys);
+      if (streamText && streamText.trim().length > 2) {
+        parts.push(streamText.trim());
+      }
+    }
+
+    // Deduplicate adjacent identical lines and join
+    const deduped = [];
+    for (const p of parts) {
+      if (deduped.length === 0 || deduped[deduped.length - 1] !== p) {
+        deduped.push(p);
+      }
+    }
+    return deduped.join('\n');
   } catch (err) {
     console.warn('[gemini-parser] extractPdfText failed:', err?.message);
     return '';
   }
+}
+
+/**
+ * Locates all stream..endstream byte boundaries in a PDF binary string.
+ * Returns array of { start, end } byte offsets into the Buffer.
+ */
+function findStreamBoundaries(binary) {
+  const positions = [];
+  let searchFrom = 0;
+  while (searchFrom < binary.length) {
+    // Find "stream" keyword not preceded by "end" (avoid matching "endstream")
+    const streamIdx = binary.indexOf('stream', searchFrom);
+    if (streamIdx === -1) break;
+
+    // Verify this is "stream" and not "endstream"
+    if (streamIdx >= 3 && binary.substring(streamIdx - 3, streamIdx) === 'end') {
+      searchFrom = streamIdx + 6;
+      continue;
+    }
+
+    // Stream data starts after the EOL following "stream"
+    let dataStart = streamIdx + 6; // length of "stream"
+    // Skip \r\n, \n, or \r
+    if (binary.charCodeAt(dataStart) === 0x0D && binary.charCodeAt(dataStart + 1) === 0x0A) {
+      dataStart += 2;
+    } else if (binary.charCodeAt(dataStart) === 0x0A || binary.charCodeAt(dataStart) === 0x0D) {
+      dataStart += 1;
+    }
+
+    // Find matching "endstream"
+    const endIdx = binary.indexOf('endstream', dataStart);
+    if (endIdx === -1) break;
+
+    // Data ends before the EOL preceding "endstream"
+    let dataEnd = endIdx;
+    if (dataEnd > dataStart && binary.charCodeAt(dataEnd - 1) === 0x0A) {
+      dataEnd--;
+      if (dataEnd > dataStart && binary.charCodeAt(dataEnd - 1) === 0x0D) {
+        dataEnd--;
+      }
+    } else if (dataEnd > dataStart && binary.charCodeAt(dataEnd - 1) === 0x0D) {
+      dataEnd--;
+    }
+
+    if (dataEnd > dataStart && (dataEnd - dataStart) > 2) {
+      positions.push({ start: dataStart, end: dataEnd });
+    }
+
+    searchFrom = endIdx + 9; // length of "endstream"
+  }
+  return positions;
+}
+
+/**
+ * Parses beginbfchar and beginbfrange CMap entries from decompressed stream text.
+ */
+function parseCMapEntries(text, cmaps) {
+  // bfchar: <srcCode> <unicodeValue>
+  // Process only lines between beginbfchar and endbfchar
+  const bfcharSections = text.split('beginbfchar');
+  for (let i = 1; i < bfcharSections.length; i++) {
+    const section = bfcharSections[i].split('endbfchar')[0] || '';
+    const entries = section.matchAll(/<([0-9a-fA-F]+)>\s*<([0-9a-fA-F]+)>/g);
+    for (const e of entries) {
+      const srcHex = e[1].toUpperCase();
+      const unicodeHex = e[2];
+      // Handle multi-char unicode values (e.g. ligatures)
+      if (unicodeHex.length <= 4) {
+        cmaps[srcHex] = String.fromCharCode(parseInt(unicodeHex, 16));
+      } else {
+        let chars = '';
+        for (let c = 0; c < unicodeHex.length; c += 4) {
+          chars += String.fromCharCode(parseInt(unicodeHex.slice(c, c + 4), 16));
+        }
+        cmaps[srcHex] = chars;
+      }
+    }
+  }
+
+  // bfrange: <startCode> <endCode> <startUnicode>
+  const bfrangeSections = text.split('beginbfrange');
+  for (let i = 1; i < bfrangeSections.length; i++) {
+    const section = bfrangeSections[i].split('endbfrange')[0] || '';
+    const entries = section.matchAll(/<([0-9a-fA-F]+)>\s*<([0-9a-fA-F]+)>\s*<([0-9a-fA-F]+)>/g);
+    for (const e of entries) {
+      const cs = parseInt(e[1], 16);
+      const ce = parseInt(e[2], 16);
+      const us = parseInt(e[3], 16);
+      const width = e[1].length;
+      for (let step = 0; step <= (ce - cs) && step < 256; step++) {
+        const key = (cs + step).toString(16).padStart(width, '0').toUpperCase();
+        cmaps[key] = String.fromCharCode(us + step);
+      }
+    }
+  }
+}
+
+/**
+ * Extracts text from a decompressed PDF content stream.
+ * Handles Tj (single string), TJ (array of strings/kerning), ' and " operators.
+ */
+function extractTextFromContentStream(decomp, cmaps, has2ByteKeys, has4ByteKeys) {
+  const lines = [];
+  let currentLine = '';
+
+  // Determine hex code width from CMap keys (2 or 4 hex chars per glyph)
+  const codeWidth = has2ByteKeys && !has4ByteKeys ? 2 : 4;
+
+  // Helper: decode a hex string using CMap or direct charCode fallback
+  function decodeHexString(hex) {
+    const upper = hex.toUpperCase();
+    let result = '';
+    for (let i = 0; i < upper.length; i += codeWidth) {
+      const chunk = upper.slice(i, i + codeWidth);
+      if (cmaps[chunk]) {
+        result += cmaps[chunk];
+      } else if (codeWidth === 4) {
+        // Try 2-byte lookup as fallback
+        const short = upper.slice(i, i + 2);
+        if (cmaps[short]) {
+          result += cmaps[short];
+          i -= 2; // adjust since we consumed only 2 chars
+          continue;
+        }
+        // Direct Unicode fallback
+        const cp = parseInt(chunk, 16);
+        if (cp >= 0x20 && cp < 0xFFFE) {
+          result += String.fromCharCode(cp);
+        }
+      } else {
+        // 2-byte: direct fallback
+        const cp = parseInt(chunk, 16);
+        if (cp >= 0x20 && cp < 0xFF) {
+          result += String.fromCharCode(cp);
+        }
+      }
+    }
+    return result;
+  }
+
+  // Helper: decode a literal PDF string, handling escape sequences
+  function decodeLiteralString(raw) {
+    let result = '';
+    for (let i = 0; i < raw.length; i++) {
+      if (raw[i] === '\\' && i + 1 < raw.length) {
+        const next = raw[i + 1];
+        if (next === 'n') { result += '\n'; i++; }
+        else if (next === 'r') { result += '\r'; i++; }
+        else if (next === 't') { result += '\t'; i++; }
+        else if (next === '(' || next === ')' || next === '\\') { result += next; i++; }
+        else if (next >= '0' && next <= '7') {
+          // Octal escape (1-3 digits)
+          let octal = next;
+          if (i + 2 < raw.length && raw[i + 2] >= '0' && raw[i + 2] <= '7') {
+            octal += raw[i + 2]; i++;
+            if (i + 1 < raw.length && raw[i + 1] >= '0' && raw[i + 1] <= '7') {
+              octal += raw[i + 1]; i++;
+            }
+          }
+          result += String.fromCharCode(parseInt(octal, 8));
+          i++;
+        } else {
+          result += next; i++;
+        }
+      } else {
+        result += raw[i];
+      }
+    }
+    return result;
+  }
+
+  // Helper: extract balanced parenthesized string from position after '('
+  // Returns { text, endIdx } where endIdx is the index after closing ')'
+  function extractBalancedString(str, startAfterParen) {
+    let depth = 1;
+    let result = '';
+    let i = startAfterParen;
+    while (i < str.length && depth > 0) {
+      if (str[i] === '\\' && i + 1 < str.length) {
+        result += str[i] + str[i + 1];
+        i += 2;
+        continue;
+      }
+      if (str[i] === '(') depth++;
+      else if (str[i] === ')') { depth--; if (depth === 0) { i++; break; } }
+      result += str[i];
+      i++;
+    }
+    return { text: result, endIdx: i };
+  }
+
+  // Process the content stream line by line, looking for text operators
+  // Strategy: find Tj, TJ, ', " operators and their operands
+  // We process the entire stream as a single string for reliability
+
+  // 1. Hex string Tj: <HEX> Tj
+  const hexTjMatches = decomp.matchAll(/<([0-9a-fA-F]+)>\s*Tj/g);
+  for (const h of hexTjMatches) {
+    const decoded = decodeHexString(h[1]);
+    if (decoded.length > 0) currentLine += decoded;
+  }
+  if (currentLine.trim()) { lines.push(currentLine.trim()); currentLine = ''; }
+
+  // 2. Literal string Tj: (text) Tj - with balanced parenthesis support
+  // Use manual scan to handle nested/escaped parentheses
+  let searchPos = 0;
+  while (searchPos < decomp.length) {
+    const tjIdx = decomp.indexOf('Tj', searchPos);
+    if (tjIdx === -1) break;
+
+    // Look backwards from Tj to find the opening '(' or '<'
+    let scanBack = tjIdx - 1;
+    // Skip whitespace before Tj
+    while (scanBack >= 0 && (decomp[scanBack] === ' ' || decomp[scanBack] === '\t' || decomp[scanBack] === '\n' || decomp[scanBack] === '\r')) scanBack--;
+    if (scanBack >= 0 && decomp[scanBack] === ')') {
+      // Find matching opening paren (balanced)
+      let depth = 1;
+      let parenStart = scanBack - 1;
+      while (parenStart >= 0 && depth > 0) {
+        if (decomp[parenStart] === ')' && (parenStart === 0 || decomp[parenStart - 1] !== '\\')) depth++;
+        else if (decomp[parenStart] === '(' && (parenStart === 0 || decomp[parenStart - 1] !== '\\')) depth--;
+        if (depth > 0) parenStart--;
+      }
+      if (depth === 0 && parenStart >= 0) {
+        const literalRaw = decomp.substring(parenStart + 1, scanBack);
+        const decoded = decodeLiteralString(literalRaw);
+        if (decoded.trim().length > 0) lines.push(decoded.trim());
+      }
+    }
+    searchPos = tjIdx + 2;
+  }
+
+  // 3. TJ array operator: [(string) kern (string) kern ...] TJ
+  const tjArrayRegex = /\[([\s\S]*?)\]\s*TJ/g;
+  let tjMatch;
+  while ((tjMatch = tjArrayRegex.exec(decomp)) !== null) {
+    const arrayContent = tjMatch[1];
+    let assembled = '';
+    let i = 0;
+    while (i < arrayContent.length) {
+      if (arrayContent[i] === '(') {
+        // Literal string element
+        const { text, endIdx } = extractBalancedString(arrayContent, i + 1);
+        assembled += decodeLiteralString(text);
+        i = endIdx;
+      } else if (arrayContent[i] === '<') {
+        // Hex string element
+        const closeAngle = arrayContent.indexOf('>', i);
+        if (closeAngle !== -1) {
+          const hexStr = arrayContent.substring(i + 1, closeAngle).replace(/\s/g, '');
+          if (/^[0-9a-fA-F]+$/.test(hexStr)) {
+            assembled += decodeHexString(hexStr);
+          }
+          i = closeAngle + 1;
+        } else {
+          i++;
+        }
+      } else if (arrayContent[i] === '-' || arrayContent[i] === '+' || (arrayContent[i] >= '0' && arrayContent[i] <= '9') || arrayContent[i] === '.') {
+        // Numeric kerning value: skip it, but large negative values indicate word breaks
+        let numStr = '';
+        while (i < arrayContent.length && (arrayContent[i] === '-' || arrayContent[i] === '+' || arrayContent[i] === '.' || (arrayContent[i] >= '0' && arrayContent[i] <= '9'))) {
+          numStr += arrayContent[i];
+          i++;
+        }
+        const kern = parseFloat(numStr);
+        // Large negative kerning typically indicates a word space
+        if (!isNaN(kern) && kern < -100) {
+          assembled += ' ';
+        }
+      } else {
+        i++;
+      }
+    }
+    if (assembled.trim().length > 0) {
+      lines.push(assembled.trim());
+    }
+  }
+
+  // 4. Single-quote operator: (string) ' (same as T* (string) Tj)
+  const quoteMatches = decomp.matchAll(/\(([^)]*(?:\\.[^)]*)*)\)\s*'/g);
+  for (const q of quoteMatches) {
+    const decoded = decodeLiteralString(q[1]);
+    if (decoded.trim().length > 0) lines.push(decoded.trim());
+  }
+
+  return lines.join('\n');
 }
 
 const SENSITIVE_CC_REGEX = /\b(?:\d[ -]*?){13,19}\b/g;
@@ -427,67 +718,245 @@ export function heuristicParseDocument({ text = '', filename = '', mimeType = ''
   if (confMatch1) {
     confirmation_number = confMatch1[1].toUpperCase();
   } else if (!confirmation_number) {
-    const confMatch2 = cleanText.match(/(?:confirmation|booking|reference|pnr|order)[:\s#]*([A-Z0-9]{5,14})\b/i);
+    const confMatch2 = cleanText.match(/(?:confirmation|booking|reference|pnr|order|voucher|rezerwacj)[:\s#]*([A-Z0-9]{5,14})\b/i);
     if (confMatch2) confirmation_number = confMatch2[1].toUpperCase();
   }
 
-  // Dynamic Arrival date extraction
-  const arrMatch = cleanText.match(/Arrival\s*date[^\n\r]*?([A-Za-z]+)\s*(\d{1,2}),\s*(\d{4})\s*(?:\(from\s*(\d{1,2}:\d{2})\))?/i);
+  // --- Enhanced Multi-Format Date Extraction ---
+
+  // Helper: try to parse a date string into YYYY-MM-DD
+  function tryParseDate(monthName, day, year) {
+    const mNum = parseMonthNameToNum(monthName);
+    if (!mNum) return null;
+    const y = year && year.length === 4 ? year : '2026';
+    return `${y}-${mNum}-${String(day).padStart(2, '0')}`;
+  }
+
+  // Pattern A: "Arrival date: December 7, 2026 (from 15:00)"
+  const arrMatch = cleanText.match(/Arrival\s*date[^\n\r]*?([A-Za-z]+)\s*(\d{1,2}),?\s*(\d{4})?\s*(?:\(from\s*(\d{1,2}:\d{2})\))?/i);
   if (arrMatch) {
-    const mNum = parseMonthNameToNum(arrMatch[1]);
-    if (mNum) {
-      start_date = `${arrMatch[3]}-${mNum}-${arrMatch[2].padStart(2, '0')}`;
-      if (arrMatch[4]) start_time = arrMatch[4];
-    }
+    const d = tryParseDate(arrMatch[1], arrMatch[2], arrMatch[3]);
+    if (d) { start_date = d; if (arrMatch[4]) start_time = arrMatch[4]; }
   }
 
-  // Dynamic Departure date extraction
-  const depMatch = cleanText.match(/Departure\s*date[^\n\r]*?([A-Za-z]+)\s*(\d{1,2}),\s*(\d{4})\s*(?:\(until\s*(\d{1,2}:\d{2})\))?/i);
+  // Pattern B: "Departure date: December 9, 2026 (until 12:00)"
+  const depMatch = cleanText.match(/Departure\s*date[^\n\r]*?([A-Za-z]+)\s*(\d{1,2}),?\s*(\d{4})?\s*(?:\(until\s*(\d{1,2}:\d{2})\))?/i);
   if (depMatch) {
-    const mNum = parseMonthNameToNum(depMatch[1]);
-    if (mNum) {
-      end_date = `${depMatch[3]}-${mNum}-${depMatch[2].padStart(2, '0')}`;
-      if (depMatch[4]) end_time = depMatch[4];
+    const d = tryParseDate(depMatch[1], depMatch[2], depMatch[3]);
+    if (d) { end_date = d; if (depMatch[4]) end_time = depMatch[4]; }
+  }
+
+  // Pattern C: "Check-in: 7 December 2026" or "Check-in: December 7, 2026" or "Check-in: 07.12.2026"
+  if (!start_date) {
+    const cinMatch = cleanText.match(/check[\s-]*in[:\s]*(\d{1,2})[.\s/-]+(\d{1,2}|\w+)[.\s/-]+(\d{4})/i)
+      || cleanText.match(/check[\s-]*in[:\s]*(\w+)\s+(\d{1,2}),?\s*(\d{4})/i);
+    if (cinMatch) {
+      // Detect which group is month vs day
+      const g1 = cinMatch[1], g2 = cinMatch[2], g3 = cinMatch[3];
+      if (/^[A-Za-z]/.test(g1)) {
+        const d = tryParseDate(g1, g2, g3);
+        if (d) start_date = d;
+      } else if (/^[A-Za-z]/.test(g2)) {
+        const d = tryParseDate(g2, g1, g3);
+        if (d) start_date = d;
+      } else {
+        // DD.MM.YYYY or DD/MM/YYYY numeric format
+        const day = parseInt(g1, 10), month = parseInt(g2, 10);
+        if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+          start_date = `${g3}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        }
+      }
     }
   }
 
-  // Dynamic Suite / Room extraction
-  const suiteMatch = cleanText.match(/\b(Junior\s+Suite|Deluxe\s+Room|Standard\s+Room|Executive\s+Suite|Superior\s+Room|Suite)\b/i);
-  if (suiteMatch) {
-    seat = suiteMatch[1];
+  if (!end_date) {
+    const coutMatch = cleanText.match(/check[\s-]*out[:\s]*(\d{1,2})[.\s/-]+(\d{1,2}|\w+)[.\s/-]+(\d{4})/i)
+      || cleanText.match(/check[\s-]*out[:\s]*(\w+)\s+(\d{1,2}),?\s*(\d{4})/i);
+    if (coutMatch) {
+      const g1 = coutMatch[1], g2 = coutMatch[2], g3 = coutMatch[3];
+      if (/^[A-Za-z]/.test(g1)) {
+        const d = tryParseDate(g1, g2, g3);
+        if (d) end_date = d;
+      } else if (/^[A-Za-z]/.test(g2)) {
+        const d = tryParseDate(g2, g1, g3);
+        if (d) end_date = d;
+      } else {
+        const day = parseInt(g1, 10), month = parseInt(g2, 10);
+        if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+          end_date = `${g3}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        }
+      }
+    }
   }
 
-  // Dynamic Paid amount extraction
-  const paidMatch = cleanText.match(/Paid\s*(?:\$\s*([\d.]+)\s*)?(?:\(\s*([\d\s]+[.,]\d{2})\s*z[łlź]\s*\))?/i);
-  if (paidMatch && paidMatch[2]) {
-    price = parseFloat(paidMatch[2].replace(/\s+/g, '').replace(',', '.'));
-    currency = 'PLN';
-  } else if (paidMatch && paidMatch[1]) {
-    price = parseFloat(paidMatch[1]);
-    currency = 'USD';
+  // Pattern D: Generic "DD Month YYYY" or "Month DD, YYYY" anywhere in text
+  if (!start_date) {
+    const genDateA = cleanText.match(/(\d{1,2})\s+(January|February|March|April|May|June|July|August|September|October|November|December|Sty(?:cznia|czeń)?|Lut(?:ego|y)?|Mar(?:ca|zec)?|Kwie(?:tnia|cień)?|Maja?|Czerwca?|Lipca?|Sierpnia?|Wrze(?:śnia|sień)?|Paź(?:dziernika|dziernik)?|Lis(?:topada|topad)?|Gru(?:dnia|dzień)?)\s+(\d{4})/i);
+    if (genDateA) {
+      const d = tryParseDate(genDateA[2], genDateA[1], genDateA[3]);
+      if (d) start_date = d;
+    } else {
+      const genDateB = cleanText.match(/(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2}),?\s+(\d{4})/i);
+      if (genDateB) {
+        const d = tryParseDate(genDateB[1], genDateB[2], genDateB[3]);
+        if (d) start_date = d;
+      }
+    }
+  }
+
+  // Pattern E: DD.MM.YYYY or DD/MM/YYYY (European numeric, first occurrence)
+  if (!start_date) {
+    const euroDate = cleanText.match(/(\d{2})[./-](\d{2})[./-](2026)/);
+    if (euroDate) {
+      const day = parseInt(euroDate[1], 10), month = parseInt(euroDate[2], 10);
+      if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+        start_date = `${euroDate[3]}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      }
+    }
   }
 
   // Fallback ISO date regex
   if (!start_date) {
-    const isoDateMatch = cleanText.match(/\b2026-(?:11|12)-(?:0[1-9]|[12]\d|3[01])\b/);
-    if (isoDateMatch) start_date = isoDateMatch[0];
+    const isoDateMatch = cleanText.match(/\b(2026-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01]))\b/);
+    if (isoDateMatch) start_date = isoDateMatch[1];
   }
 
-  // Fallback price regex
+  // Extract second ISO date for end_date if we found start_date
+  if (start_date && !end_date) {
+    const allIsoDates = [...cleanText.matchAll(/\b(2026-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01]))\b/g)];
+    const unique = [...new Set(allIsoDates.map(m => m[1]))];
+    if (unique.length >= 2) {
+      const sorted = unique.sort();
+      if (sorted[0] === start_date && sorted[1] > start_date) {
+        end_date = sorted[1];
+      } else if (sorted.length > 1) {
+        end_date = sorted[sorted.length - 1] !== start_date ? sorted[sorted.length - 1] : null;
+      }
+    }
+  }
+
+  // --- Enhanced Time Extraction ---
+  if (!start_time) {
+    const timeMatch = cleanText.match(/(?:check[\s-]*in|arrival|from|depart(?:ure)?|pickup|start)\s*(?:time)?[:\s]*(\d{1,2}:\d{2})/i);
+    if (timeMatch) start_time = timeMatch[1];
+  }
+  if (!end_time) {
+    const timeMatch = cleanText.match(/(?:check[\s-]*out|departure|until|return|end)\s*(?:time)?[:\s]*(\d{1,2}:\d{2})/i);
+    if (timeMatch) end_time = timeMatch[1];
+  }
+
+  // Dynamic Suite / Room extraction (expanded patterns)
+  const suiteMatch = cleanText.match(/\b(Junior\s+Suite|Deluxe\s+(?:Room|Suite|Double)|Standard\s+(?:Room|Double|Single|Twin)|Executive\s+Suite|Superior\s+(?:Room|Double)|Premium\s+(?:Room|Suite)|Classic\s+(?:Room|Double)|Studio|Apartment|Family\s+Room|Suite)\b/i);
+  if (suiteMatch) {
+    seat = suiteMatch[1];
+  }
+
+  // --- Dynamic Hotel Name Extraction (for generic/unknown hotels) ---
+  if (item_type === 'hotel' && provider === 'Hotel Accommodation') {
+    // Try "Hotel <Name>" or "<Name> Hotel" patterns
+    const hotelNameMatch = cleanText.match(/\b(Hotel\s+[A-Z][A-Za-zÀ-žśćżźółęąŚĆŻŹÓŁĘĄ\s&'-]{3,40})\b/)
+      || cleanText.match(/\b([A-Z][A-Za-zÀ-žśćżźółęąŚĆŻŹÓŁĘĄ\s&'-]{3,30}\s+Hotel)\b/);
+    if (hotelNameMatch) {
+      const hotelName = hotelNameMatch[1].trim();
+      // Avoid matching generic phrases
+      if (!hotelName.toLowerCase().includes('hotel reservation') && !hotelName.toLowerCase().includes('hotel accommodation')) {
+        provider = hotelName;
+        title = `${hotelName} (Check-in)`;
+      }
+    }
+  }
+
+  // --- Dynamic Address Extraction ---
+  if (!location) {
+    // Polish street patterns: ul. Name 15, 50-056 City or street name + postal code
+    const addrMatch = cleanText.match(/(?:ul\.|ulica|al\.|aleja|pl\.|plac)\s*[A-ZÀ-žśćżźółęąŚĆŻŹÓŁĘĄ][a-zA-ZÀ-žśćżźółęąŚĆŻŹÓŁĘĄ\s]+\d+[A-Za-z]?(?:\s*\/\s*\d+)?[,\s]*\d{2}-\d{3}\s+[A-ZÀ-žŚĆŻŹÓŁĘĄ][a-zA-ZÀ-žśćżźółęąŚĆŻŹÓŁĘĄ\s]+/i);
+    if (addrMatch) {
+      location = addrMatch[0].trim();
+    } else {
+      // Generic address: Number Street, City, PostalCode or City, Country
+      const genAddr = cleanText.match(/\d+\s+[A-Z][a-zA-Z\s]+(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd),?\s*[A-Z][a-zA-Z\s]+/);
+      if (genAddr) location = genAddr[0].trim();
+    }
+  }
+
+  // --- Enhanced Price Extraction ---
+
+  // Dynamic Paid amount extraction (Profitroom / PLN patterns)
+  const paidMatch = cleanText.match(/Paid\s*(?:\$\s*([\d,.]+)\s*)?(?:\(\s*([\d\s]+[.,]\d{2})\s*z[łlź]\s*\))?/i);
+  if (paidMatch && paidMatch[2]) {
+    price = parseFloat(paidMatch[2].replace(/\s+/g, '').replace(',', '.'));
+    currency = 'PLN';
+  } else if (paidMatch && paidMatch[1]) {
+    price = parseFloat(paidMatch[1].replace(/,/g, ''));
+    currency = 'USD';
+  }
+
+  // PLN amount patterns: "1 420,50 zł" or "1420.50 PLN" or "PLN 1,420.50"
   if (price === null) {
-    const priceMatch = cleanText.match(/(?:total|cost|price|amount)[:\s]*([$€£]|PLN)?\s*([\d,]+(?:\.\d{2})?)\s*(PLN|USD|EUR|GBP)?/i);
+    const plnMatch = cleanText.match(/([\d\s]+[.,]\d{2})\s*(?:zł|z[łl]|PLN)/i)
+      || cleanText.match(/PLN\s*([\d\s.,]+\d)/i);
+    if (plnMatch) {
+      const raw = plnMatch[1].replace(/\s+/g, '');
+      // Handle European comma decimal vs period decimal
+      let parsed;
+      if (/,\d{2}$/.test(raw)) {
+        parsed = parseFloat(raw.replace(/\./g, '').replace(',', '.'));
+      } else {
+        parsed = parseFloat(raw.replace(/,/g, ''));
+      }
+      if (!isNaN(parsed) && parsed > 0) { price = parsed; currency = 'PLN'; }
+    }
+  }
+
+  // USD amount patterns: "$1,980.00" or "USD 1980.00" or "1980.00 USD"
+  if (price === null) {
+    const usdMatch = cleanText.match(/\$\s*([\d,]+\.?\d*)/i)
+      || cleanText.match(/USD\s*([\d,]+\.?\d*)/i)
+      || cleanText.match(/([\d,]+\.\d{2})\s*USD/i);
+    if (usdMatch) {
+      const parsed = parseFloat(usdMatch[1].replace(/,/g, ''));
+      if (!isNaN(parsed) && parsed > 0) { price = parsed; currency = 'USD'; }
+    }
+  }
+
+  // EUR amount patterns: "€450.00" or "EUR 450" or "450.00 EUR"
+  if (price === null) {
+    const eurMatch = cleanText.match(/€\s*([\d,]+\.?\d*)/i)
+      || cleanText.match(/EUR\s*([\d,]+\.?\d*)/i)
+      || cleanText.match(/([\d,]+\.\d{2})\s*EUR/i);
+    if (eurMatch) {
+      const parsed = parseFloat(eurMatch[1].replace(/,/g, ''));
+      if (!isNaN(parsed) && parsed > 0) { price = parsed; currency = 'EUR'; }
+    }
+  }
+
+  // Fallback: labeled price (total/cost/price/amount/suma/razem)
+  if (price === null) {
+    const priceMatch = cleanText.match(/(?:total|cost|price|amount|suma|razem|do zapłaty|charge|fee)[:\s]*([$€£]|PLN|USD|EUR|GBP)?\s*([\d\s,]+(?:[.,]\d{2})?)\s*(PLN|USD|EUR|GBP|zł)?/i);
     if (priceMatch) {
-      const amt = parseFloat(priceMatch[2].replace(/,/g, ''));
+      let raw = priceMatch[2].replace(/\s+/g, '');
+      if (/,\d{2}$/.test(raw)) {
+        raw = raw.replace(/\./g, '').replace(',', '.');
+      } else {
+        raw = raw.replace(/,/g, '');
+      }
+      const amt = parseFloat(raw);
       if (!isNaN(amt) && amt > 0) {
         price = amt;
         const cur = priceMatch[1] || priceMatch[3];
         if (cur === '$') currency = 'USD';
         else if (cur === '€') currency = 'EUR';
         else if (cur === '£') currency = 'GBP';
+        else if (cur && cur.toLowerCase().includes('zł')) currency = 'PLN';
         else if (cur && ['PLN', 'USD', 'EUR', 'GBP'].includes(cur.toUpperCase())) currency = cur.toUpperCase();
       }
     }
   }
+
+  // --- Guest Count Extraction ---
+  let guests = null;
+  const guestMatch = cleanText.match(/(\d+)\s*(?:adult|guest|person|travell?er|pax)/i);
+  if (guestMatch) guests = `${guestMatch[1]} Adult${parseInt(guestMatch[1]) > 1 ? 's' : ''}`;
 
   // Detect purchase site / platform
   let purchase_site = null;
@@ -504,6 +973,9 @@ export function heuristicParseDocument({ text = '', filename = '', mimeType = ''
   else if (combined.includes('experior') || combined.includes('destigo')) purchase_site = 'Booking.com / Destigo';
   else if (combined.includes('altus')) purchase_site = 'Profitroom / hotelaltuspalace.pl';
   else if (combined.includes('airbnb')) purchase_site = 'Airbnb';
+  else if (combined.includes('hostelworld')) purchase_site = 'Hostelworld';
+  else if (combined.includes('trivago')) purchase_site = 'Trivago';
+  else if (combined.includes('trip.com') || combined.includes('ctrip')) purchase_site = 'Trip.com';
 
   // Detect payment method (without logging sensitive card credentials)
   let payment_method = null;
@@ -524,7 +996,11 @@ export function heuristicParseDocument({ text = '', filename = '', mimeType = ''
       payment_method = 'Apple Pay';
     } else if (combined.includes('paypal')) {
       payment_method = 'PayPal';
-    } else if (combined.includes('cash')) {
+    } else if (combined.includes('blik')) {
+      payment_method = 'BLIK';
+    } else if (combined.includes('revolut')) {
+      payment_method = 'Revolut';
+    } else if (combined.includes('cash') || combined.includes('gotówk')) {
       payment_method = 'Cash';
     }
   }
@@ -534,7 +1010,7 @@ export function heuristicParseDocument({ text = '', filename = '', mimeType = ''
     title,
     provider,
     confirmation_number,
-    start_date: start_date || '2026-12-06',
+    start_date: start_date || null,
     start_time,
     end_date,
     end_time,

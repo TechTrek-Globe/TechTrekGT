@@ -183,22 +183,48 @@ export function WayfinderProvider({ children }) {
   const parseDocument = async (docId, file) => {
     let base64 = null;
     let text = null;
-    if (file.type?.includes('text') || file.name.endsWith('.txt') || file.name.endsWith('.eml') || file.name.endsWith('.html')) {
-      text = await file.text();
-    } else {
-      try {
-        const rawSlice = await file.slice(0, 100000).text();
-        if (rawSlice && rawSlice.length > 50) {
-          text = rawSlice;
-        }
-      } catch (e) {}
+    let filename = '';
+    let mimeType = 'application/pdf';
 
-      base64 = await new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result);
-        reader.onerror = () => resolve(null);
-        reader.readAsDataURL(file);
-      });
+    if (file) {
+      filename = file.name || '';
+      mimeType = file.type || 'application/pdf';
+
+      if (file.type?.includes('text') || file.name?.endsWith('.txt') || file.name?.endsWith('.eml') || file.name?.endsWith('.html')) {
+        text = await file.text();
+      } else {
+        try {
+          const rawSlice = await file.slice(0, 100000).text();
+          if (rawSlice && rawSlice.length > 50) {
+            text = rawSlice;
+          }
+        } catch (e) {}
+
+        base64 = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.onerror = () => resolve(null);
+          reader.readAsDataURL(file);
+        });
+      }
+    } else {
+      // Re-parse without file: try to recover from IndexedDB
+      try {
+        const { getLocalDocumentFile } = await import('../utils/documentStorage.js');
+        const storedBlob = await getLocalDocumentFile(docId);
+        if (storedBlob && storedBlob.size > 0) {
+          filename = storedBlob.name || `document-${docId}.pdf`;
+          mimeType = storedBlob.type || 'application/pdf';
+          base64 = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = () => resolve(null);
+            reader.readAsDataURL(storedBlob);
+          });
+        }
+      } catch (e) {
+        console.warn('[WayfinderContext] IndexedDB file recovery failed:', e?.message);
+      }
     }
 
     const res = await resilientFetch(getApiUrl(`/api/wayfinder/import-jobs/${docId}/parse`), {
@@ -206,8 +232,8 @@ export function WayfinderProvider({ children }) {
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       body: JSON.stringify({
-        filename: file.name,
-        mimeType: file.type || 'application/pdf',
+        filename,
+        mimeType,
         base64,
         text,
       })
@@ -227,6 +253,7 @@ export function WayfinderProvider({ children }) {
     await fetchJobs();
     return data;
   };
+
 
   const deleteDocument = async (docId, journeyId = 'poland-christmas-2026') => {
     const res = await resilientFetch(getApiUrl(`/api/wayfinder/documents/${docId}`), {

@@ -102,7 +102,13 @@ The Email Forward channel relies on the existing `DB` binding and the unique inb
 ### 6.4 PDF Text Extraction and Profitroom Ingestion State
 
 To process raw booking vouchers without external OCR API dependencies, the import pipeline leverages in-memory stream extraction:
-- `extractPdfText`: Decompresses flate streams with `node:zlib`, resolves font CMaps, and decodes textual operators (`Tj`/`TJ`) alongside uncompressed URI strings.
+- `extractPdfText`: Decompresses flate streams with `node:zlib`, parses variable-width CMaps, and decodes textual operators (`Tj`/`TJ` kerning arrays) alongside uncompressed URI strings.
+  - `findStreamBoundaries`: Scans raw PDF binary buffers using byte offsets to isolate stream payloads across CRLF, LF, and CR delimiters.
+  - `decompressStream`: Sequentially attempts zlib inflate, raw inflate (`inflateRawSync`), and uncompressed ASCII text fallback.
+  - `parseCMapEntries`: Parses `beginbfchar` and `beginbfrange` blocks, supporting variable code lengths (2-byte and 4-byte hex keys) and mapping them to UTF-16BE / UTF-8 characters.
+  - `extractTextFromContentStream`: Decodes literal strings `(text) Tj` with balanced parenthesis handling, hex strings `<hex> Tj`, single-quote newline operators, and array kerning expressions `[(string) kern (string)] TJ` with automatic word-spacing on kerning deltas < -100.
+- Heuristic Parser Enhancements: Multi-pattern date extraction (Arrival/Departure, Check-in/Check-out, Polish month words, European and ISO formats), dynamic hotel/venue title extraction, Polish address matching (`ul. ...`), and multi-currency parsing (PLN/zł, USD/$, EUR/€) with comma decimal normalization.
+- Client-Side Re-Parse Cache Recovery: When document re-parse requests omit a local file reference, `WayfinderContext.jsx` queries IndexedDB via `getLocalDocumentFile` to rehydrate the binary payload before sending to the server.
 - Profitroom Engine Ingestion: Normalizes confirmation numbers (7-letter alphanumeric `IMIWHDH`), hotel name (`Hotel Altus Palace Wrocław`), address (`ul. Wierzbowa 15, 50-056 Wrocław`), room type (`Junior Suite`), check-in/out timestamps (`2026-12-07 15:00` to `2026-12-09 12:00`), and Polish zloty totals (`1,420.20 zł` / `1420.20 PLN` / `$359.79 USD`).
 - Sanitized Thousand Separators: Pre-processes numeric fields to collapse whitespace in Polish currency formats (e.g. `1 420.20` -> `1420.20`), eliminating numeric drop errors.
 - Automatic Title Upgrades: When generic PDF names like `Your booking confirmation.pdf` are parsed, `safe_display_name` in `wayfinder_documents` is automatically upgraded to `${provider} Confirmation.pdf`.

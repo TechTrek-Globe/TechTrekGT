@@ -6,7 +6,6 @@ import { CurrencyConverterModal } from './CurrencyConverterModal';
 import { SettingsModal } from './SettingsModal';
 import { BottomTabBar } from './BottomTabBar';
 import { OfflineSyncBadge } from './common/OfflineSyncBadge';
-import { useExchangeRate } from '../hooks/useExchangeRate';
 import wayfinderHeaderBanner from '../assets/wayfinder-header-banner-new.png';
 
 export function Layout({ children }) {
@@ -15,8 +14,6 @@ export function Layout({ children }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isConverterOpen, setIsConverterOpen] = useState(false);
   const [currentPath, setCurrentPath] = useState(() => window.location.pathname);
-  const { activeCurrency } = useExchangeRate();
-  const { symbol = 'zł', rate = 3.73 } = activeCurrency || {};
 
   React.useEffect(() => {
     const handlePopState = () => setCurrentPath(window.location.pathname);
@@ -37,53 +34,35 @@ export function Layout({ children }) {
   };
 
   return (
-    <div className="min-h-screen flex flex-col font-sans bg-slate-950 w-full max-w-full overflow-x-hidden">
-      {/* --- Full-Width Top Header Banner --- */}
-      <header className="w-full flex-shrink-0 bg-black relative z-[60] border-b border-[#b48214]/30 flex justify-center items-center pb-1 px-4 overflow-hidden safe-pt">
-        <img
-          src={wayfinderHeaderBanner}
-          alt="TechTrek Wayfinder - Plan • Explore • Navigate • Discover"
-          className="h-40 sm:h-52 md:h-60 w-auto max-w-full object-contain block relative -mb-5 sm:-mb-7 md:-mb-8 z-[60] drop-shadow-2xl translate-x-0"
-          fetchPriority="high"
-        />
-      </header>
-
+    <div className="min-h-screen flex flex-col font-sans bg-slate-950 w-full max-w-full overflow-x-clip">
       {/* Background glow effects - Radial gradients instead of CSS blur() for massive iOS performance boost */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
         <div className="absolute top-0 right-0 w-[800px] h-[600px] bg-[radial-gradient(circle_at_center,rgba(45,106,159,0.15)_0%,transparent_70%)] mix-blend-screen transform translate-x-1/3 -translate-y-1/3" />
         <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-[radial-gradient(circle_at_center,rgba(30,92,58,0.15)_0%,transparent_70%)] mix-blend-screen transform -translate-x-1/3 translate-y-1/3" />
       </div>
 
-      <header className="sticky top-0 z-40 glass-panel border-b border-white/5 w-full max-w-full">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-14 flex items-center justify-between min-w-0">
-          <div className="flex items-center space-x-3 sm:space-x-4 shrink-0 min-w-0">
-            <a href="/wayfinder" onClick={(e) => pushRoute(e, '/wayfinder')} className="flex items-center space-x-2 group shrink-0">
-              <div className="p-1.5 rounded-xl bg-gradient-to-br from-wf-blue to-wf-navy-mid border border-wf-blue-lt/30 shadow-lg group-hover:shadow-wf-blue/20 transition-all">
-                <Compass className="w-4 h-4 text-wf-cream" />
-              </div>
-              <div className="min-w-0">
-                <div className="text-sm sm:text-base font-black tracking-tight text-white flex items-center space-x-1">
-                  <span>TechTrek</span>
-                  <span className="gradient-amber">Wayfinder</span>
-                </div>
-                <div className="text-[8px] font-semibold text-wf-muted uppercase tracking-widest -mt-1 hidden sm:block">
-                  Travel Operations
-                </div>
-              </div>
+      {/* Sticky Top Navigation Bar: Locked in view on all pages */}
+      <header className="sticky top-0 z-50 bg-slate-950/95 backdrop-blur-xl border-b border-[#b48214]/30 w-full max-w-full shadow-xl">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between min-w-0">
+          {/* Brand Logo Banner */}
+          <div className="flex items-center shrink-0 min-w-0 py-1">
+            <a
+              href="/wayfinder"
+              onClick={(e) => pushRoute(e, '/wayfinder')}
+              className="flex items-center group shrink-0 focus:outline-none"
+              title="TechTrek Wayfinder - Travel Operations"
+            >
+              <img
+                src={wayfinderHeaderBanner}
+                alt="TechTrek Wayfinder - Plan • Explore • Navigate • Discover"
+                className="h-9 sm:h-11 md:h-12 w-auto max-w-[200px] sm:max-w-[260px] md:max-w-[300px] object-contain block drop-shadow-md group-hover:opacity-95 transition-opacity"
+                fetchPriority="high"
+              />
             </a>
           </div>
 
           {/* Desktop right-side actions */}
           <div className="hidden md:flex items-center space-x-1 lg:space-x-2 shrink-0">
-            {/* TechTrekGT Launch Pad */}
-            <a
-              href="https://techtrekgt.com"
-              className="flex items-center space-x-1.5 px-2 lg:px-3 py-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-700/60 hover:border-wf-blue/50 text-slate-200 hover:text-white text-xs lg:text-sm font-semibold transition-all shadow-sm group min-h-[40px]"
-              title="Return to TechTrekGT Main Launch Pad"
-            >
-              <Globe className="w-3.5 h-3.5 lg:w-4 lg:h-4 text-wf-blue-lt group-hover:scale-110 transition-transform" />
-              <span className="hidden lg:inline">Launch Pad</span>
-            </a>
 
             {/* Practical Guide link */}
             <a
@@ -126,9 +105,6 @@ export function Layout({ children }) {
               >
                 <Coins className="w-3.5 h-3.5 lg:w-4 lg:h-4 text-wf-amber group-hover:rotate-12 transition-transform" />
                 <span className="hidden lg:inline">Currency Converter</span>
-                <span className="text-[10px] lg:text-xs bg-wf-amber/20 px-1.5 py-0.5 rounded-md font-semibold text-wf-cream">
-                  {symbol} {rate.toFixed(2)}
-                </span>
               </button>
             )}
 
@@ -204,7 +180,6 @@ export function Layout({ children }) {
               title="Open Currency Converter"
             >
               <Coins className="w-4 h-4 text-wf-amber" />
-              <span className="text-[10px] bg-wf-amber/20 px-1.5 py-0.5 rounded-md font-semibold text-wf-cream">{symbol} {rate.toFixed(2)}</span>
             </button>
             <button
               onClick={() => setIsSettingsOpen(true)}

@@ -470,5 +470,19 @@ Provides full parity with the TechTrekGT/Finance administration architecture, en
   - Renders a prominent amber Shield "Admin" link in desktop navigation, mobile top bar, and Private Operations Hub when `user.isAdmin` or `user.role === 'admin'`.
   - Client-side routing in `App.jsx` dynamically resolves `/wayfinder/admin` and `/wayfinder/poland-christmas-2026/admin`.
 
+## 24. Viewport Optimization & Unified Sticky Navigation Bar
+
+Refines the navigation architecture in [Layout.jsx](file:///e:/TechTrekGT/wayfinder/src/components/Layout.jsx) to eliminate redundant vertical header elements and lock navigation permanently in view:
+
+- Unified Sticky Header Bar:
+  - Eliminated the separate full-width black banner section above the navbar, reclaiming significant vertical viewport space.
+  - Moved the brand graphic asset (`wayfinderHeaderBanner`) directly into the left side of the primary navigation bar (`h-9 sm:h-11 md:h-12`), replacing the former compass icon and text logo.
+  - Enforced `sticky top-0 z-50 bg-slate-950/95 backdrop-blur-xl border-b border-[#b48214]/30 shadow-xl` without CSS transforms, locking the navigation bar at the top of the viewport across all pages and scroll depths.
+  - Configured `overflow-x-clip` on the layout root container to prevent horizontal scrollbars while preserving native browser `position: sticky` behavior.
+- Streamlined Header Actions:
+  - Removed the standalone "Launch Pad" button from the top navigation bar to prevent horizontal overflow and button wrapping on desktop and laptop displays (retained in the global footer for cross-platform navigation).
+  - Streamlined the "Currency Converter" button across desktop and mobile headers by removing the live rate badge (`zł 3.94`), presenting a clean, compact interactive button that launches the full converter modal on demand.
+
+
 
 

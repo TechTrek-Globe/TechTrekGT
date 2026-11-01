@@ -183,15 +183,21 @@ To ensure travelers are fully prepared for sub-zero Polish winter weather while 
 - Guest & Roaming Resilience: Fully functional in offline and unauthenticated states using browser localStorage persistence, seamlessly syncing with Cloudflare D1 upon user sign-in.
 - UI Component Integration: [wayfinder/src/components/packing/PackingManager.jsx](file:///e:/TechTrekGT/wayfinder/src/components/packing/PackingManager.jsx) is mounted as a dedicated subview tab inside [PrivateHub.jsx](file:///e:/TechTrekGT/wayfinder/src/components/PrivateHub.jsx) at `/wayfinder/poland-christmas-2026/private/packing`, with a primary launcher callout integrated into [PracticalPage.jsx](file:///e:/TechTrekGT/wayfinder/src/components/PracticalPage.jsx) and mobile bottom tab bar integration in [BottomTabBar.jsx](file:///e:/TechTrekGT/wayfinder/src/components/BottomTabBar.jsx).
 
-## 11. Universal Travel Preferences & Unit Conversion Suite (Weight, Temperature, Distance, Currency)
+## 11. Universal Travel Preferences & Unit Conversion Suite (Weight, Temperature, Distance, Currency, Time Format)
 
-Wayfinder provides a comprehensive, reactive localization and travel preference suite covering the 4 core pillars of transatlantic travel:
+Wayfinder provides a comprehensive, reactive localization and travel preference suite covering the core pillars of transatlantic travel:
 
 - Global Travel Preferences Modal: [wayfinder/src/components/SettingsModal.jsx](file:///e:/TechTrekGT/wayfinder/src/components/SettingsModal.jsx) provides a unified preferences interface accessible from the slim desktop navigation bar, mobile bottom bar, and in-context quick buttons across the application:
+  - Time Display Preference: Select between 12-Hour (`12h` with AM/PM indicators) and 24-Hour (`24h` military time).
   - Weight & Luggage Preference: Select between Pounds / Ounces (`lbs / oz`) and Kilograms / Grams (`kg / g`).
   - Temperature Unit: Select between Fahrenheit (`°F`) and Celsius (`°C`).
   - Distance Unit: Select between Miles (`mi`) and Kilometers (`km`).
-  - Base Currency: Select between US Dollar (`USD`), Euro (`EUR`), British Pound (`GBP`), Canadian Dollar (`CAD`), and Polish Złoty (`PLN`).
+  - Base Currency: Select between US Dollar (`USD`), Euro (`EUR`), British Pound (`GBP`), and Polish Złoty (`PLN`).
+- Dynamic Time Formatting & Schedule Telemetry:
+  - Unified Itinerary Stops: In [wayfinder/src/components/PolandLanding.jsx](file:///e:/TechTrekGT/wayfinder/src/components/PolandLanding.jsx) and [wayfinder/src/components/ItineraryView.jsx](file:///e:/TechTrekGT/wayfinder/src/components/ItineraryView.jsx), timeline badge times (e.g. `15:00` or `3:00 PM`) dynamically adapt to the active `timeFormat` preference via `<FormatTime>`.
+  - Booking Vouchers & Private Itinerary Cards: In [wayfinder/src/components/itinerary/PrivateBookingCard.jsx](file:///e:/TechTrekGT/wayfinder/src/components/itinerary/PrivateBookingCard.jsx), start times, end times, duration ranges (e.g. `15:00 - 18:00 (3h)` vs `3:00 PM - 6:00 PM (3h)`), and excursion windows dynamically convert according to user preference.
+  - Daylight & Sunrise/Sunset Telemetry: In [wayfinder/src/components/weather/WeatherWidget.jsx](file:///e:/TechTrekGT/wayfinder/src/components/weather/WeatherWidget.jsx), sunrise and sunset timestamps render in 12-hour AM/PM or 24-hour military clock across compact header badges, tooltips, and expanded forecast cards.
+  - Quick Reference Bars & Narrative Guides: In [wayfinder/src/components/city/QuickReferenceBar.jsx](file:///e:/TechTrekGT/wayfinder/src/components/city/QuickReferenceBar.jsx), daylight and peak market hour summaries reactively adapt via `FormatText`.
 - Dynamic Weight & Luggage Conversion:
   - Baggage Budget Meters: In [wayfinder/src/components/packing/PackingManager.jsx](file:///e:/TechTrekGT/wayfinder/src/components/packing/PackingManager.jsx), telemetry meters dynamically convert between transatlantic 23.0 kg (50.7 lbs) checked baggage limits and European 8.0 kg (17.6 lbs) cabin baggage limits with reactive remaining buffer calculations.
   - Item Weights & Subtotals: Item rows dynamically format between grams/kilograms and ounces/pounds using `formatWeight`. Category headers display live subtotals (e.g. `~12.4 lbs` or `~5.6 kg`).
@@ -201,7 +207,7 @@ Wayfinder provides a comprehensive, reactive localization and travel preference 
   - Open-Meteo Weather Widgets: In [wayfinder/src/components/weather/WeatherWidget.jsx](file:///e:/TechTrekGT/wayfinder/src/components/weather/WeatherWidget.jsx), both compact inline tooltip cards and expanded city overview telemetry cards convert temperatures reactively between Celsius and Fahrenheit.
   - In-Context Quick Switcher: Weather widgets embed 1-click `[ °C | °F ]` pill switches and Settings shortcut buttons directly in their tooltip headers.
 - Universal Text Processor (FormatText):
-  - In [wayfinder/src/components/Formatters.jsx](file:///e:/TechTrekGT/wayfinder/src/components/Formatters.jsx), `FormatText` dynamically parses narrative descriptions across city overviews, transit dossiers, and packing guides. It accurately converts Celsius ranges (e.g. `-2°C to 4°C` -> `28°F to 39°F`), sub-zero equipment ratings (`-10°C rated` -> `14°F rated`), baggage weight limits (`23 kg` -> `50.7 lbs`), and distance benchmarks (`12 km` -> `7.5 mi`).
+  - In [wayfinder/src/components/Formatters.jsx](file:///e:/TechTrekGT/wayfinder/src/components/Formatters.jsx), `FormatText` dynamically parses narrative descriptions across city overviews, transit dossiers, and packing guides. It accurately converts clock times between 12-hour AM/PM and 24-hour military formats, Celsius ranges (e.g. `-2°C to 4°C` -> `28°F to 39°F`), sub-zero equipment ratings (`-10°C rated` -> `14°F rated`), baggage weight limits (`23 kg` -> `50.7 lbs`), and distance benchmarks (`12 km` -> `7.5 mi`).
 - Distance & Route Telemetry:
   - [wayfinder/src/components/route/WalkingLoopOptimizer.jsx](file:///e:/TechTrekGT/wayfinder/src/components/route/WalkingLoopOptimizer.jsx) and [wayfinder/src/components/RouteVisualization.jsx](file:///e:/TechTrekGT/wayfinder/src/components/RouteVisualization.jsx) dynamically format walking savings, total route distances, and PKP intercity rail corridor spans in miles or kilometers according to active traveler settings.
 

@@ -30,7 +30,7 @@ export function QuickReferenceBar({ city }) {
           <span>Daylight & Sunset</span>
         </div>
         <p className="text-xs sm:text-sm text-slate-200 leading-snug font-medium">
-          {quick.daylight}
+          <FormatText text={quick.daylight} />
         </p>
       </div>
 
@@ -40,7 +40,7 @@ export function QuickReferenceBar({ city }) {
           <span>Peak Atmosphere</span>
         </div>
         <p className="text-xs sm:text-sm text-slate-200 leading-snug font-medium">
-          {quick.peakHours}
+          <FormatText text={quick.peakHours} />
         </p>
       </div>
 

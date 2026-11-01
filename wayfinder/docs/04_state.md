@@ -16,8 +16,8 @@ Client state is partitioned into specialized React Context providers:
   - State Fields: user (authenticated profile with id, email, name, is_admin), isAuthenticated, and isLoading.
   - Lifecycle: Inspects /api/auth/me on mount with credentials: 'include'. Coordinates session state across login, registration, and logout actions.
 - SettingsContext: Declared in [wayfinder/src/context/SettingsContext.jsx](file:///e:/TechTrekGT/wayfinder/src/context/SettingsContext.jsx).
-  - State Fields: currency (default PLN or USD), temperatureUnit (Celsius or Fahrenheit), and notificationPreferences.
-  - Persistence: Persisted to browser localStorage for instant retrieval across browser sessions.
+  - State Fields: currency (`USD`, `EUR`, `GBP`, `PLN`), temperature (`F` or `C`), distance (`mi` or `km`), weight (`lbs` or `kg`), and timeFormat (`12h` with AM/PM or `24h` military).
+  - Persistence: Persisted to browser localStorage under `wayfinder_user_settings` for instant retrieval across browser sessions.
 - Client Document Storage (IndexedDB): Declared in [wayfinder/src/utils/documentStorage.js](file:///e:/TechTrekGT/wayfinder/src/utils/documentStorage.js).
   - Store: `WayfinderDocumentDB` (store name: `document_files`).
   - Capabilities: Persists uploaded booking PDFs and images locally in browser storage, enabling instant previews in [wayfinder/src/components/DocumentViewerModal.jsx](file:///e:/TechTrekGT/wayfinder/src/components/DocumentViewerModal.jsx) even when edge storage (Cloudflare R2) is offline or pending. Falls back to static bundled documents (such as `Poland_Delta.pdf`).

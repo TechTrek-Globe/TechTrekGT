@@ -17,6 +17,7 @@ import {
   Settings
 } from 'lucide-react';
 import { useSettings } from '../../context/SettingsContext';
+import { formatTime } from '../Formatters';
 
 const WEATHER_CACHE_PREFIX = 'wf_weather_v3_';
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
@@ -181,10 +182,10 @@ export function WeatherWidget({
         {data.sunrise && data.sunset && (
           <span className="text-[10px] text-amber-300/90 pl-1 border-l border-slate-700/80 hidden md:inline-flex items-center gap-1">
             <Sunrise size={11} className="text-amber-400" />
-            <span>{data.sunrise}</span>
+            <span>{formatTime(data.sunrise, settings?.timeFormat)}</span>
             <span className="text-slate-500">-</span>
             <Sunset size={11} className="text-amber-400" />
-            <span>{data.sunset}</span>
+            <span>{formatTime(data.sunset, settings?.timeFormat)}</span>
           </span>
         )}
 
@@ -282,10 +283,10 @@ export function WeatherWidget({
             {data.sunrise && data.sunset && (
               <div className="flex items-center justify-between text-[11px] text-slate-400 py-0.5">
                 <span className="flex items-center gap-1">
-                  <Sunrise size={11} className="text-amber-400" /> {data.sunrise}
+                  <Sunrise size={11} className="text-amber-400" /> {formatTime(data.sunrise, settings?.timeFormat)}
                 </span>
                 <span className="flex items-center gap-1">
-                  <Sunset size={11} className="text-amber-400" /> {data.sunset}
+                  <Sunset size={11} className="text-amber-400" /> {formatTime(data.sunset, settings?.timeFormat)}
                 </span>
               </div>
             )}
@@ -390,12 +391,12 @@ export function WeatherWidget({
           <div className="flex items-center gap-1.5">
             <Sunrise size={14} className="text-amber-400" />
             <span className="text-slate-400">Sunrise:</span>
-            <span className="font-mono font-medium text-slate-200">{data.sunrise}</span>
+            <span className="font-mono font-medium text-slate-200">{formatTime(data.sunrise, settings?.timeFormat)}</span>
           </div>
           <div className="flex items-center gap-1.5">
             <Sunset size={14} className="text-amber-400" />
             <span className="text-slate-400">Sunset:</span>
-            <span className="font-mono font-medium text-slate-200">{data.sunset}</span>
+            <span className="font-mono font-medium text-slate-200">{formatTime(data.sunset, settings?.timeFormat)}</span>
           </div>
         </div>
       )}

@@ -3,6 +3,8 @@ import {
   Plane, BedDouble, Utensils, Ticket, Train, FileText, Lock, MapPin, AlertTriangle, ExternalLink, CheckCircle2 
 } from 'lucide-react';
 import { DocumentViewerModal } from '../DocumentViewerModal';
+import { useSettings } from '../../context/SettingsContext';
+import { formatTime } from '../Formatters';
 
 // Resolve theme colors per booking type
 export function getBookingTheme(docType) {
@@ -145,16 +147,21 @@ export function PrivateBookingCard({ item }) {
   // Robust structured metadata parsing
   const meta = parseBookingMetadata(item);
 
+  const { settings } = useSettings();
+  const timeFormat = settings?.timeFormat || '12h';
+
   // Resolve display-time field from normalized itinerary item
   const rawStart = item.local_time || item.time
     || item.departure_time || item.start_time || item.reservation_time || item.check_in_time
     || null;
   const rawEnd = item.end_time || null;
-  let displayTime = rawStart;
-  if (rawStart && rawEnd) {
-    displayTime = `${rawStart} - ${rawEnd}${meta.rawDuration ? ` (${meta.rawDuration})` : ''}`;
-  } else if (rawStart && meta.rawDuration) {
-    displayTime = `${rawStart} (${meta.rawDuration})`;
+  const formattedStart = rawStart ? formatTime(rawStart, timeFormat) : null;
+  const formattedEnd = rawEnd ? formatTime(rawEnd, timeFormat) : null;
+  let displayTime = formattedStart;
+  if (formattedStart && formattedEnd) {
+    displayTime = `${formattedStart} - ${formattedEnd}${meta.rawDuration ? ` (${meta.rawDuration})` : ''}`;
+  } else if (formattedStart && meta.rawDuration) {
+    displayTime = `${formattedStart} (${meta.rawDuration})`;
   }
 
   // Resolve location / venue for subtitle
@@ -250,7 +257,7 @@ export function PrivateBookingCard({ item }) {
           <div className="p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-xs text-emerald-200/90 flex items-center space-x-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
             <span>
-              <strong className="text-emerald-300">Confirmed Excursion:</strong> Replaces generic day trip ideas. All-day guided excursion ({displayTime || '06:30 - 17:30'}).
+              <strong className="text-emerald-300">Confirmed Excursion:</strong> Replaces generic day trip ideas. All-day guided excursion ({displayTime || (timeFormat === '24h' ? '06:30 - 17:30' : '6:30 AM - 5:30 PM')}).
             </span>
           </div>
         )}

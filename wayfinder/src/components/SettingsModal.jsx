@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Settings, Thermometer, Coins, Map, Scale } from 'lucide-react';
+import { X, Settings, Thermometer, Coins, Map, Scale, Clock } from 'lucide-react';
 import { useSettings } from '../context/SettingsContext';
 
 export function SettingsModal({ isOpen, onClose }) {
@@ -118,6 +118,41 @@ export function SettingsModal({ isOpen, onClose }) {
               </button>
             </div>
             <p className="text-xs text-wf-muted">Converts walking loop distances, Old Town navigation, and excursion radii.</p>
+          </div>
+
+          {/* Time Display */}
+          <div className="space-y-3">
+            <div className="flex items-center space-x-2 text-cyan-400 font-bold text-xs uppercase tracking-wider">
+              <Clock className="w-4 h-4" />
+              <span>Time Display</span>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => updateSettings({ timeFormat: '12h' })}
+                className={`py-2.5 px-3 rounded-xl border font-bold text-sm transition-all flex flex-col items-center justify-center ${
+                  (settings.timeFormat || '12h') === '12h' 
+                    ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300 shadow-inner'
+                    : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
+                }`}
+              >
+                <span>12-Hour (AM/PM)</span>
+                <span className="text-[10px] font-normal text-slate-400 mt-0.5">e.g. 3:00 PM / 7:30 AM</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => updateSettings({ timeFormat: '24h' })}
+                className={`py-2.5 px-3 rounded-xl border font-bold text-sm transition-all flex flex-col items-center justify-center ${
+                  settings.timeFormat === '24h' 
+                    ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300 shadow-inner'
+                    : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
+                }`}
+              >
+                <span>24-Hour (Military)</span>
+                <span className="text-[10px] font-normal text-slate-400 mt-0.5">e.g. 15:00 / 07:30</span>
+              </button>
+            </div>
+            <p className="text-xs text-wf-muted">Switches schedule stops, booking vouchers, and daylight telemetry between standard 12-hour AM/PM and 24-hour military time.</p>
           </div>
 
           {/* Weight & Luggage */}

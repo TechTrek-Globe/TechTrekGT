@@ -14,6 +14,7 @@ import { DocumentViewerModal } from './DocumentViewerModal';
 import { WeatherWidget } from './weather/WeatherWidget';
 import { CalendarSubscribeModal } from './calendar/CalendarSubscribeModal';
 import { buildUnifiedDayTimeline } from '../utils/itineraryTimeline';
+import { FormatTime, FormatText } from './Formatters';
 
 const stopTransitInfo = {
   krakow: {
@@ -170,7 +171,7 @@ function JourneyStopSchedule({
 
               {transitInfo?.arrivalBadge && (
                 <div className="text-xs text-sky-300 font-medium mt-1 flex flex-wrap items-center gap-2">
-                  <span className="truncate">{transitInfo.arrivalBadge}</span>
+                  <span className="truncate"><FormatText text={transitInfo.arrivalBadge} /></span>
                   {city.id === 'krakow' && onOpenDocViewer && (
                     <button
                       type="button"
@@ -302,7 +303,7 @@ function JourneyStopSchedule({
                                   </span>
                                 )}
                                 <span className="px-2 py-0.5 rounded-lg bg-slate-950 border border-white/10 font-mono font-bold text-xs text-sky-300">
-                                  {event.time}
+                                  <FormatTime time={event.time} />
                                 </span>
                               </div>
                             </div>
@@ -351,7 +352,7 @@ function JourneyStopSchedule({
                 <span>{transitInfo.nextTransitTitle}</span>
               </div>
               <div className="text-[11px] text-amber-300/90 font-medium">
-                {transitInfo.nextTransitDetails}
+                <FormatText text={transitInfo.nextTransitDetails} />
               </div>
             </div>
           </div>

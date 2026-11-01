@@ -31,6 +31,42 @@ export function formatTemperature(celsius, unit = 'F') {
   return `${Math.round(c)}°C`;
 }
 
+// Pure time formatting helper for single time token
+export function formatSingleTime(token, is24h) {
+  if (!token) return '';
+  const match = String(token).trim().match(/^(\d{1,2}):(\d{2})(?::\d{2})?(?:\s*(AM|PM))?$/i);
+  if (!match) return token;
+
+  let hour = parseInt(match[1], 10);
+  const min = match[2];
+  const ampm = match[3] ? match[3].toUpperCase() : null;
+
+  if (ampm) {
+    if (ampm === 'PM' && hour < 12) hour += 12;
+    if (ampm === 'AM' && hour === 12) hour = 0;
+  }
+
+  if (is24h) {
+    const hh = String(hour).padStart(2, '0');
+    return `${hh}:${min}`;
+  } else {
+    const period = hour >= 12 ? 'PM' : 'AM';
+    const h12 = hour % 12 === 0 ? 12 : hour % 12;
+    return `${h12}:${min} ${period}`;
+  }
+}
+
+// Pure formatter: Formats time string or composite time range (e.g. "15:00", "07:38", "15:00 - 18:00 (3h)")
+export function formatTime(valOrTime, format = '12h') {
+  if (valOrTime == null || valOrTime === '') return '--';
+  const str = String(valOrTime).trim();
+  const is24h = format === '24h' || format === 'military';
+
+  return str.replace(/\b(\d{1,2}):(\d{2})(?::\d{2})?(?:\s*(AM|PM))?\b/gi, (match) => {
+    return formatSingleTime(match, is24h);
+  });
+}
+
 // React component: Formats raw weight in grams according to active settings
 export function FormatWeight({ grams }) {
   const { settings } = useSettings();
@@ -43,6 +79,14 @@ export function FormatTemperature({ celsius }) {
   const { settings } = useSettings();
   const unit = settings?.temperature || 'F';
   return <>{formatTemperature(celsius, unit)}</>;
+}
+
+// React component: Formats a time string or range according to active settings
+export function FormatTime({ time, format }) {
+  const { settings } = useSettings();
+  const activeFormat = format || settings?.timeFormat || '12h';
+  if (!time) return null;
+  return <>{formatTime(time, activeFormat)}</>;
 }
 
 // Pure formatter: Formats distance (e.g. "1.4 km", 1.4, "150 m")
@@ -173,6 +217,25 @@ export function FormatText({ text }) {
       } else {
         return `${minPln} PLN (~${baseSymbol}${minBase})${safeSuffix}`;
       }
+    });
+  }
+
+  // 5. Process Times (switch between 12-hour AM/PM and 24-hour military)
+  const is24h = settings?.timeFormat === '24h' || settings?.timeFormat === 'military';
+  if (is24h) {
+    formatted = formatted.replace(/\b(\d{1,2}):(\d{2})\s*(AM|PM)\b/gi, (match, h, m, ampm) => {
+      let hour = parseInt(h, 10);
+      const isPM = ampm.toUpperCase() === 'PM';
+      if (isPM && hour < 12) hour += 12;
+      if (!isPM && hour === 12) hour = 0;
+      return `${String(hour).padStart(2, '0')}:${m}`;
+    });
+  } else {
+    formatted = formatted.replace(/(?<![\d\-/])\b([01]?\d|2[0-3]):([0-5]\d)\b(?!\s*(?:AM|PM|am|pm|[./\-\d]))/g, (match, h, m) => {
+      let hour = parseInt(h, 10);
+      const period = hour >= 12 ? 'PM' : 'AM';
+      const h12 = hour % 12 === 0 ? 12 : hour % 12;
+      return `${h12}:${m} ${period}`;
     });
   }
 

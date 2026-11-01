@@ -12,6 +12,7 @@ import { DocumentViewerModal } from './DocumentViewerModal';
 import { WeatherWidget } from './weather/WeatherWidget';
 import { CalendarSubscribeModal } from './calendar/CalendarSubscribeModal';
 import { buildUnifiedDayTimeline } from '../utils/itineraryTimeline';
+import { FormatTime } from './Formatters';
 
 export function ItineraryView() {
   const { itinerary: privateItems = [], accommodations = [] } = useWayfinder();
@@ -390,7 +391,7 @@ export function ItineraryView() {
                               </span>
                             )}
                             <span className="px-2.5 py-1 rounded-xl bg-slate-950 border border-white/10 font-mono font-bold text-xs text-sky-300">
-                              {event.time}
+                              <FormatTime time={event.time} />
                             </span>
                           </div>
                         </div>

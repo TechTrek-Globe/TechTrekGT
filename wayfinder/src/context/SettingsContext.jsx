@@ -10,7 +10,8 @@ export function SettingsProvider({ children }) {
       currency: 'USD',
       temperature: 'F',
       distance: 'mi',
-      weight: 'lbs'
+      weight: 'lbs',
+      timeFormat: '12h'
     };
     try {
       const cached = localStorage.getItem(STORAGE_KEY);

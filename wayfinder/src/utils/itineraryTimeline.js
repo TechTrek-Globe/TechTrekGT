@@ -115,11 +115,84 @@ export function buildUnifiedDayTimeline(dayItem, dayPrivate = [], dayAccommodati
     (ev) => ev.itemType === 'flight' || (ev.title || '').includes('DL9208') || (ev.title || '').includes('Confirmed Arrival')
   );
 
+  // Filter private D1 bookings:
+  // - Ignore raw PDF attachments (title ending in .pdf or .png)
+  // - Suppress redundant private flight items if confirmed flight arrival milestone is already present on this day
+  // - Deduplicate redundant hotel bookings in private items
+  const seenHotelKeys = new Set();
+  const filteredPrivate = dayPrivate.filter((priv) => {
+    const title = (priv.title || '').trim().toLowerCase();
+    if (title.endsWith('.pdf') || title.endsWith('.png')) {
+      return false;
+    }
+    const type = (priv.item_type || priv.docType || priv.detected_doc_type || '').toLowerCase();
+    const isHotel = type === 'hotel' || type === 'accommodation' || type === 'lodging';
+    if (hasPublicFlightArrival && (type === 'flight' || title.includes('flight: atl to krk') || title.includes('dl9208'))) {
+      return false;
+    }
+    if (isHotel) {
+      const docId = priv.source_document_id || '';
+      const hotelKey = docId ? `doc:${docId}` : (title.includes('altus') ? 'hotel:altus' : `hotel:${title}:${priv.local_date}`);
+      if (seenHotelKeys.has(hotelKey)) {
+        return false;
+      }
+      seenHotelKeys.add(hotelKey);
+    }
+    return true;
+  });
+
+  // Filter static/curated accommodations:
+  // If filteredPrivate already contains a confirmed hotel booking matching the curated accommodation
+  // (e.g. matching Altus Palace Wrocław, or matching hotel name), suppress the static accommodation
+  // to prevent rendering duplicate hotel check-in cards on the timeline!
+  const activeAccommodations = dayAccommodations.filter((acc) => {
+    const accTitle = (acc.hotel_name || acc.title || '').toLowerCase();
+    const alreadyCoveredByPrivate = filteredPrivate.some((priv) => {
+      const privType = (priv.item_type || priv.docType || priv.detected_doc_type || '').toLowerCase();
+      const isHotel = privType === 'hotel' || privType === 'accommodation' || privType === 'lodging';
+      if (!isHotel) return false;
+      const privTitle = (priv.title || priv.hotel_name || priv.provider || '').toLowerCase();
+      return (
+        (accTitle.includes('altus') && privTitle.includes('altus')) ||
+        (accTitle && privTitle.includes(accTitle)) ||
+        (privTitle && accTitle.includes(privTitle))
+      );
+    });
+    return !alreadyCoveredByPrivate;
+  });
+
+  // Enrich private hotel bookings with contact metadata from accommodations if available
+  const enrichedPrivate = filteredPrivate.map((priv) => {
+    const privType = (priv.item_type || priv.docType || priv.detected_doc_type || '').toLowerCase();
+    const isHotel = privType === 'hotel' || privType === 'accommodation' || privType === 'lodging';
+    if (isHotel) {
+      const privTitle = (priv.title || priv.hotel_name || priv.provider || '').toLowerCase();
+      const matchingAcc = dayAccommodations.find((acc) => {
+        const accTitle = (acc.hotel_name || acc.title || '').toLowerCase();
+        return (
+          (accTitle.includes('altus') && privTitle.includes('altus')) ||
+          (accTitle && privTitle.includes(accTitle)) ||
+          (privTitle && accTitle.includes(privTitle))
+        );
+      });
+      if (matchingAcc) {
+        return {
+          ...matchingAcc,
+          ...priv,
+          phone: priv.phone || matchingAcc.phone,
+          email: priv.email || matchingAcc.email,
+          website_url: priv.website_url || matchingAcc.website_url,
+        };
+      }
+    }
+    return priv;
+  });
+
   // 4. Assemble unified items with normalized times
   const items = [];
 
-  // Confirmed Accommodations (e.g. Altus Palace Wrocław)
-  dayAccommodations.forEach((acc, idx) => {
+  // Confirmed Accommodations (not already covered by private bookings)
+  activeAccommodations.forEach((acc, idx) => {
     const time = acc.check_in_time || '15:00';
     items.push({
       type: 'accommodation',
@@ -130,23 +203,8 @@ export function buildUnifiedDayTimeline(dayItem, dayPrivate = [], dayAccommodati
     });
   });
 
-  // Filter private D1 bookings:
-  // - Ignore raw PDF attachments (title ending in .pdf or .png)
-  // - Suppress redundant private flight items if confirmed flight arrival milestone is already present on this day
-  const filteredPrivate = dayPrivate.filter((priv) => {
-    const title = (priv.title || '').trim().toLowerCase();
-    if (title.endsWith('.pdf') || title.endsWith('.png')) {
-      return false;
-    }
-    const type = (priv.item_type || priv.docType || priv.detected_doc_type || '').toLowerCase();
-    if (hasPublicFlightArrival && (type === 'flight' || title.includes('flight: atl to krk') || title.includes('dl9208'))) {
-      return false;
-    }
-    return true;
-  });
-
   // Private D1 Bookings
-  filteredPrivate.forEach((priv, idx) => {
+  enrichedPrivate.forEach((priv, idx) => {
     const time = priv.local_time || priv.time || priv.reservation_time || priv.departure_time || '12:00';
     items.push({
       type: 'private',

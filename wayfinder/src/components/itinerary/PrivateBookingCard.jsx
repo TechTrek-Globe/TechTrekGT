@@ -69,17 +69,23 @@ export function parseBookingMetadata(item) {
     }
   }
 
+  const rawType = (item?.docType || item?.detected_doc_type || item?.item_type || '').toLowerCase();
+  const isHotel = rawType === 'hotel' || rawType === 'accommodation' || rawType === 'lodging';
+
   const confNumber = item?.confirmation_number || fields['confirmation'] || fields['booking reference'] || null;
-  const supplier = item?.supplier || fields['supplier'] || fields['operator'] || null;
-  const pickupWindow = item?.pickup_window || fields['pickup window'] || fields['pickup'] || null;
+  const supplier = isHotel ? null : (item?.supplier || fields['supplier'] || fields['operator'] || null);
+  const pickupWindow = isHotel ? null : (item?.pickup_window || fields['pickup window'] || fields['pickup'] || null);
   
-  let bagRestriction = item?.bag_restriction || fields['bag restrictions'] || fields['bag restriction'] || null;
-  if (!bagRestriction && normalized.includes('30x20x10')) {
-    bagRestriction = 'Max 30x20x10 cm on Museum grounds';
+  let bagRestriction = null;
+  if (!isHotel) {
+    bagRestriction = item?.bag_restriction || fields['bag restrictions'] || fields['bag restriction'] || null;
+    if (!bagRestriction && normalized.includes('30x20x10')) {
+      bagRestriction = 'Max 30x20x10 cm on Museum grounds';
+    }
   }
 
-  let rawTickets = item?.tickets || fields['tickets'] || null;
-  let rawDuration = item?.duration || fields['duration'] || null;
+  let rawTickets = isHotel ? null : (item?.tickets || fields['tickets'] || null);
+  let rawDuration = isHotel ? null : (item?.duration || fields['duration'] || null);
 
   if (rawTickets) {
     const durM = rawTickets.match(/(\d+\s*(?:hours|hrs|hr))/i);
@@ -89,22 +95,45 @@ export function parseBookingMetadata(item) {
     rawTickets = rawTickets.replace(/\s*[-•]\s*\d+\s*(?:hours|hrs|hr)/i, '').trim();
   }
 
-  let mobileTicketUrl = item?.mobile_ticket_url || fields['mobile tickets'] || fields['mobile ticket'] || null;
-  let activityDetailsUrl = item?.activity_details_url || fields['activity details'] || fields['activity detail'] || null;
+  let mobileTicketUrl = null;
+  let activityDetailsUrl = null;
 
-  const rawRef = fields['booking reference'] || confNumber || '6ICXW284P0LJK9OYS594M5NZKD52BTFT';
-  const gygBookingRef = (rawRef && !rawRef.startsWith('GYG')) ? rawRef : '6ICXW284P0LJK9OYS594M5NZKD52BTFT';
+  if (!isHotel) {
+    const isGyg = (item?.provider || '').toLowerCase().includes('getyourguide') ||
+                  (item?.title || '').toLowerCase().includes('getyourguide') ||
+                  normalized.toLowerCase().includes('getyourguide') ||
+                  rawType === 'excursion' ||
+                  (confNumber && confNumber.startsWith('GYG'));
 
-  if (mobileTicketUrl && mobileTicketUrl.includes('adj_fallback=')) {
-    const fb = mobileTicketUrl.match(/adj_fallback=([^&]+)/i);
-    if (fb) {
-      const decoded = decodeURIComponent(fb[1]);
-      mobileTicketUrl = decoded;
-      activityDetailsUrl = decoded;
+    mobileTicketUrl = item?.mobile_ticket_url || fields['mobile tickets'] || fields['mobile ticket'] || null;
+    activityDetailsUrl = item?.activity_details_url || fields['activity details'] || fields['activity detail'] || null;
+
+    if (isGyg) {
+      const rawRef = fields['booking reference'] || (confNumber && !confNumber.startsWith('GYG') ? confNumber : null) || '6ICXW284P0LJK9OYS594M5NZKD52BTFT';
+      const gygBookingRef = rawRef;
+
+      if (mobileTicketUrl && mobileTicketUrl.includes('adj_fallback=')) {
+        const fb = mobileTicketUrl.match(/adj_fallback=([^&]+)/i);
+        if (fb) {
+          const decoded = decodeURIComponent(fb[1]);
+          mobileTicketUrl = decoded;
+          activityDetailsUrl = decoded;
+        }
+      } else if (mobileTicketUrl && (mobileTicketUrl.includes('adj.st') || mobileTicketUrl.includes('getyourguide.com'))) {
+        mobileTicketUrl = `https://www.getyourguide.com/booking/${gygBookingRef}?partner_id=931BMKV&visitor_id=H2Z77FVCVCDZ2HHK7HDV52IYZU3RF8IL`;
+        activityDetailsUrl = `https://www.getyourguide.com/booking/${gygBookingRef}?partner_id=931BMKV&visitor_id=H2Z77FVCVCDZ2HHK7HDV52IYZU3RF8IL`;
+      } else if (!mobileTicketUrl && gygBookingRef) {
+        mobileTicketUrl = `https://www.getyourguide.com/booking/${gygBookingRef}?partner_id=931BMKV&visitor_id=H2Z77FVCVCDZ2HHK7HDV52IYZU3RF8IL`;
+        activityDetailsUrl = `https://www.getyourguide.com/booking/${gygBookingRef}?partner_id=931BMKV&visitor_id=H2Z77FVCVCDZ2HHK7HDV52IYZU3RF8IL`;
+      }
+    } else {
+      if (mobileTicketUrl && (mobileTicketUrl.includes('adj.st') || mobileTicketUrl.includes('getyourguide.com'))) {
+        mobileTicketUrl = null;
+      }
+      if (activityDetailsUrl && (activityDetailsUrl.includes('adj.st') || activityDetailsUrl.includes('getyourguide.com'))) {
+        activityDetailsUrl = null;
+      }
     }
-  } else if (!mobileTicketUrl || mobileTicketUrl.includes('adj.st') || mobileTicketUrl.includes('getyourguide.com')) {
-    mobileTicketUrl = `https://www.getyourguide.com/booking/${gygBookingRef}?partner_id=931BMKV&visitor_id=H2Z77FVCVCDZ2HHK7HDV52IYZU3RF8IL`;
-    activityDetailsUrl = `https://www.getyourguide.com/booking/${gygBookingRef}?partner_id=931BMKV&visitor_id=H2Z77FVCVCDZ2HHK7HDV52IYZU3RF8IL`;
   }
 
   // Clean narrative description: never dump raw metadata keys!
@@ -305,7 +334,7 @@ export function PrivateBookingCard({ item }) {
                   className="px-3 py-1.5 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 border border-sky-400/30 text-sky-300 text-xs font-bold flex items-center space-x-1.5 transition-all cursor-pointer shadow-sm"
                 >
                   <FileText className="w-3.5 h-3.5 text-sky-400" />
-                  <span>View Attached {docType === 'flight' ? 'Flight Document' : 'Ticket (PDF)'}</span>
+                  <span>View Attached {docType === 'flight' ? 'Flight Document' : docType === 'hotel' ? 'Booking Confirmation (PDF)' : 'Ticket (PDF)'}</span>
                 </button>
               )}
             </div>
@@ -347,13 +376,13 @@ export function PrivateBookingCard({ item }) {
             ? `${(import.meta.env.BASE_URL || '/wayfinder/').replace(/\/$/, '')}/Poland-2026/docs/Hotel_Altus_Palace_Wroclaw_Confirmation.pdf`
             : null,
           details: {
-            confirmation: item.confirmation_number || meta.confNumber || 'GYG7VKK692WY',
-            provider: item.provider || 'GetYourGuide / Mr.Shuttle',
-            supplier: meta.supplier || 'Mr.Shuttle',
+            confirmation: item.confirmation_number || meta.confNumber || (docType === 'excursion' ? 'GYG7VKK692WY' : ''),
+            provider: item.provider || (docType === 'excursion' ? 'GetYourGuide / Mr.Shuttle' : item.title),
+            supplier: meta.supplier || (docType === 'excursion' ? 'Mr.Shuttle' : null),
             schedule: item.local_date ? `${item.local_date} ${rawStart || '06:30'}` : null,
-            pickupWindow: meta.pickupWindow || '05:30 - 07:30',
-            bagRestriction: meta.bagRestriction || 'Max 30x20x10 cm on Museum grounds',
-            location: item.location || displayLocation || 'Hotel Pickup (Kraków)',
+            pickupWindow: meta.pickupWindow || (docType === 'excursion' ? '05:30 - 07:30' : null),
+            bagRestriction: meta.bagRestriction || (docType === 'excursion' ? 'Max 30x20x10 cm on Museum grounds' : null),
+            location: item.location || displayLocation || (docType === 'excursion' ? 'Hotel Pickup (Kraków)' : ''),
             passengers: item.passengers || (meta.rawTickets || '2 Adults'),
             flightLeg: docType === 'flight' ? 'DL9208 (AMS -> KRK)' : null,
             touchdown: docType === 'flight' ? 'Dec 4, 2026 at 13:30 CET (Local Poland Time)' : null,

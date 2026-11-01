@@ -296,8 +296,40 @@ async function gatherEvents({ db, journeyId = 'poland-christmas-2026', userId = 
     });
   }
 
-  // 3. Accommodations (Altus Palace Wrocław & Curated Hotels)
+  // 3. Authenticated User's Private D1 Itinerary Items
+  let privateD1Items = [];
+  if (db && userId) {
+    try {
+      const d1Items = await db.prepare(`
+        SELECT * FROM wayfinder_itinerary_items
+        WHERE (journey_id = ? OR journey_id = 'poland-christmas-2026')
+          AND user_id = ?
+          AND (notes IS NULL OR notes NOT LIKE '%gmail:%')
+        ORDER BY local_date ASC, local_time ASC
+      `).bind(journeyId, userId).all();
+      privateD1Items = d1Items.results || [];
+    } catch (e) {
+      console.warn('[calendar] failed to fetch private D1 itinerary items:', e.message);
+    }
+  }
+
+  // 4. Accommodations (Altus Palace Wrocław & Curated Hotels)
+  // Deduplicate against user's private hotel bookings to prevent duplicate calendar check-in events
   for (const acc of CURATED_ACCOMMODATIONS) {
+    const accTitle = (acc.hotel_name || acc.title || '').toLowerCase();
+    const alreadyCoveredByD1 = privateD1Items.some((item) => {
+      const type = (item.item_type || '').toLowerCase();
+      if (type !== 'hotel') return false;
+      const title = (item.title || item.location || '').toLowerCase();
+      return (
+        (accTitle.includes('altus') && title.includes('altus')) ||
+        (accTitle && title.includes(accTitle)) ||
+        (title && accTitle.includes(title))
+      );
+    });
+
+    if (alreadyCoveredByD1) continue;
+
     // Check-in event
     events.push({
       uid: `wf-hotel-checkin-${acc.id}@techtrekgt.com`,
@@ -327,40 +359,26 @@ async function gatherEvents({ db, journeyId = 'poland-christmas-2026', userId = 
     });
   }
 
-  // 4. Authenticated User's Private D1 Itinerary Items
-  if (db && userId) {
-    try {
-      const d1Items = await db.prepare(`
-        SELECT * FROM wayfinder_itinerary_items
-        WHERE (journey_id = ? OR journey_id = 'poland-christmas-2026')
-          AND user_id = ?
-          AND (notes IS NULL OR notes NOT LIKE '%gmail:%')
-        ORDER BY local_date ASC, local_time ASC
-      `).bind(journeyId, userId).all();
+  // 5. Append Private D1 Itinerary Events
+  for (const item of privateD1Items) {
+    if (!item.local_date) continue;
 
-      for (const item of (d1Items.results || [])) {
-        if (!item.local_date) continue;
+    const startTime = item.local_time || '10:00';
+    const endTime = item.end_time || addMinutes(startTime, 90);
+    const endDate = item.end_date || item.local_date;
 
-        const startTime = item.local_time || '10:00';
-        const endTime = item.end_time || addMinutes(startTime, 90);
-        const endDate = item.end_date || item.local_date;
-
-        events.push({
-          uid: `wf-d1-item-${item.id}@techtrekgt.com`,
-          allDay: !item.local_time,
-          startDate: item.local_date,
-          startTime: startTime,
-          endDate: endDate,
-          endTime: endTime,
-          summary: item.title,
-          description: `${item.notes || ''}${item.provider ? `\nProvider: ${item.provider}` : ''}`,
-          location: item.location_address || item.location || '',
-          categories: (item.item_type || 'BOOKING').toUpperCase()
-        });
-      }
-    } catch (e) {
-      console.warn('[calendar] failed to fetch private D1 itinerary items:', e.message);
-    }
+    events.push({
+      uid: `wf-d1-item-${item.id}@techtrekgt.com`,
+      allDay: !item.local_time,
+      startDate: item.local_date,
+      startTime: startTime,
+      endDate: endDate,
+      endTime: endTime,
+      summary: item.title,
+      description: `${item.notes || ''}${item.provider ? `\nProvider: ${item.provider}` : ''}`,
+      location: item.location_address || item.location || '',
+      categories: (item.item_type || 'BOOKING').toUpperCase()
+    });
   }
 
   return events;

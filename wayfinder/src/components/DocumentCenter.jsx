@@ -3,6 +3,7 @@ import { useWayfinder } from '../context/WayfinderContext';
 import { saveLocalDocumentFile, getLocalDocumentFile } from '../utils/documentStorage';
 import { BookingImportChannels } from './BookingImportChannels';
 import { parseBookingMetadata } from './itinerary/PrivateBookingCard';
+import { polandJourney } from '../data/poland-2026';
 import {
   UploadCloud, File, FileText, Download, Eye, ShieldCheck, Loader2,
   CheckCircle2, AlertTriangle, X, Check, RefreshCw, ArrowRight, Upload,
@@ -269,10 +270,14 @@ export function DocumentCenter() {
 
   const getCityForDate = (dateStr) => {
     if (!dateStr) return 'Kraków';
-    if (dateStr <= '2026-12-07') return 'Kraków';
-    if (dateStr <= '2026-12-09') return 'Wrocław';
-    if (dateStr <= '2026-12-10') return 'Poznań / Toruń';
-    return 'Gdańsk';
+    const dayMatch = polandJourney.itinerary?.find(d => d.date === dateStr);
+    if (dayMatch) return dayMatch.cityName;
+    if (dateStr < '2026-12-07') return 'Kraków';
+    if (dateStr <= '2026-12-08') return 'Wrocław';
+    if (dateStr === '2026-12-09') return 'Poznań';
+    if (dateStr === '2026-12-10') return 'Toruń';
+    if (dateStr <= '2026-12-12') return 'Gdańsk';
+    return 'Warszawa';
   };
 
   const handleRefresh = async () => {
@@ -1069,12 +1074,15 @@ export function DocumentCenter() {
                         onClick={() => {
                           const docId = selectedBooking.source_document_id;
                           const baseUrl = (import.meta.env.BASE_URL || '/wayfinder/').replace(/\/$/, '');
+                          const isAltus = (selectedBooking.title || '').toLowerCase().includes('altus');
+                          const isDelta = (selectedBooking.title || '').toLowerCase().includes('delta') || selectedBooking.item_type === 'flight';
+                          const defaultPdf = isAltus ? 'Hotel_Altus_Palace_Wroclaw_Confirmation.pdf' : isDelta ? 'Poland_Delta.pdf' : 'GetYourGuide_Ticket_GYG7VKK692WY.pdf';
                           const foundDoc = documents.find(d => d.id === docId) || {
                             id: docId,
-                            filename: 'GetYourGuide_Ticket_GYG7VKK692WY.pdf',
-                            safe_display_name: selectedBooking.title || 'GetYourGuide Ticket: Auschwitz & Wieliczka Tour',
+                            filename: defaultPdf,
+                            safe_display_name: selectedBooking.title || (isAltus ? 'Hotel Altus Palace Wrocław Confirmation.pdf' : 'Booking Confirmation'),
                             mime_type: 'application/pdf',
-                            file_url: `${baseUrl}/Poland-2026/docs/GetYourGuide_Ticket_GYG7VKK692WY.pdf`
+                            file_url: `${baseUrl}/Poland-2026/docs/${defaultPdf}`
                           };
                           setSelectedBooking(null);
                           openPdfPreview(foundDoc);
@@ -1082,7 +1090,7 @@ export function DocumentCenter() {
                         className="py-3 px-4 rounded-2xl bg-sky-500/20 hover:bg-sky-500/30 border border-sky-400/40 text-sky-300 font-bold text-xs sm:text-sm flex items-center justify-center space-x-2 transition-all cursor-pointer shadow-md"
                       >
                         <FileText className="w-4 h-4 text-sky-400 shrink-0" />
-                        <span>View Attached Ticket (PDF)</span>
+                        <span>View Attached {selectedBooking.item_type === 'flight' ? 'Flight Document' : selectedBooking.item_type === 'hotel' ? 'Booking Confirmation (PDF)' : 'Ticket (PDF)'}</span>
                       </button>
                     )}
                   </div>

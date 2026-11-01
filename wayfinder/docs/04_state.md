@@ -138,6 +138,8 @@ Governs the deterministic chronological rendering and deduplication pipeline acr
 - Time Normalization: parses `HH:MM` strings into absolute minute integers (`parseTimeToMinutes`).
 - Deduplication Predicate: `isGenericHotelPlaceholder(event)` tests for generic hotel recommendation items (`Recommended Base Zone` badge, `Check-in (from 15:00)`, `Settle into chosen base`).
 - Hotel Active Flag: `hasConfirmedHotel` evaluates true whenever curated accommodations or D1 hotel bookings are present for the given day, automatically suppressing generic base suggestions.
+- Cross-Source Accommodation Deduplication: When `dayPrivate` contains a hotel booking matching a curated accommodation (e.g. `Altus Palace Wrocław`), the static accommodation is suppressed to prevent duplicate cards, and the private booking is enriched with `phone`, `email`, and `website_url`.
+- Private Hotel Deduplication: Filters redundant private hotel entries for the same document or hotel key.
 - Tie-Breaker Precedence: identical minute timestamps are resolved by entity priority (Accommodations: 1, Private Bookings: 2, Public Schedule Events: 3).
 
 ---
@@ -216,12 +218,12 @@ Tracks confirmed private tour bookings, time window parameters, and reconciliati
 - Raw Note Storage: In SQLite D1, multiline string values are stored using standard line breaks (`CHAR(10)`). Existing records with escaped string literals (`\\n`) are converted to `CHAR(10)`.
 - Client Runtime Sanitization: `parseBookingMetadata(item)` splits on normalized line breaks (`\n`), populating typed metadata:
   - `confNumber`: Confirmation / booking code.
-  - `supplier`: Tour operator or service provider.
-  - `pickupWindow`: Confirmed pickup timeframe.
-  - `bagRestriction`: Museum size limits.
+  - `supplier`: Tour operator or service provider (strictly null for hotels).
+  - `pickupWindow`: Confirmed pickup timeframe (strictly null for hotels).
+  - `bagRestriction`: Museum size limits (strictly null for hotels).
   - `rawTickets`: Participant and ticket counts with duration decoupled.
   - `rawDuration`: Parsed duration (e.g. `11 hours`).
-  - `mobileTicketUrl` & `activityDetailsUrl`: Canonical web booking links.
+  - `mobileTicketUrl` & `activityDetailsUrl`: Canonical web booking links (strictly null for hotels; only populated for excursions and GetYourGuide bookings).
   - `description`: Curated narrative description preventing raw metadata leakage.
 
 ---

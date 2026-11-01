@@ -243,10 +243,13 @@ To eliminate disjointed schedule rendering, out-of-order cards, and duplicate ho
 - Unified Multi-Source Merge: Merges public catalog milestones (`dayItem.schedule`), authenticated user bookings from Cloudflare D1 (`dayPrivate`), and confirmed accommodations (`dayAccommodations`, e.g. Altus Palace Wrocław) into a single cohesive list.
 - Strict Chronological Sorting: Normalizes all event times into absolute minute values (`00:00` = 0, `23:59` = 1439). Sorts every card in ascending chronological order, ensuring travelers experience a logical flow throughout the day (e.g. 10:30 Kraków morning check-out -> 11:30 PKP Intercity IC rail transfer -> 15:00 Wrocław hotel check-in -> 16:30 Fairytale Market -> 19:30 dinner).
 - Automatic Hotel Placeholder Deduplication: Inspects days where a confirmed accommodation or private hotel booking is present. Automatically suppresses generic recommendations (e.g. `Hotel Check-in (from 15:00)` with `Recommended Base Zone` badges), preventing confusing duplicate check-in prompts.
+- Cross-Source Accommodation Deduplication: When an authenticated user's private D1 itinerary contains a hotel booking covering a curated accommodation (such as `Hotel Altus Palace Wrocław`), `buildUnifiedDayTimeline` and `calendar.js` automatically suppress the duplicate static accommodation entry, while enriching the private booking with reception contact metadata (`phone`, `email`, `website_url`).
+- Strict Domain Metadata Scoping: `parseBookingMetadata` strictly isolates excursion attributes (`mobileTicketUrl`, `activityDetailsUrl`, `pickupWindow`, `bagRestriction`, `supplier`). Hotels never inherit GetYourGuide mobile tickets or activity detail links.
 - Universal Application Harmony:
   - [PolandLanding.jsx](file:///e:/TechTrekGT/wayfinder/src/components/PolandLanding.jsx): Journey Sequence stop days render the unified chronological timeline directly within expandable stop dossiers.
   - [ItineraryView.jsx](file:///e:/TechTrekGT/wayfinder/src/components/ItineraryView.jsx): Full 10-day expedition view uses identical unified chronological timeline rendering.
-  - [calendar.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/calendar.js): The RFC 5545 calendar subscription engine applies the same placeholder suppression rules, guaranteeing clean native calendar feeds.
+  - [DocumentCenter.jsx](file:///e:/TechTrekGT/wayfinder/src/components/DocumentCenter.jsx): Synced booking inspection modals and confirmation cards accurately map itinerary dates to destination cities (Dec 7 to Wrocław) and display contextual labels ("Booking Confirmation (PDF)").
+  - [calendar.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/calendar.js): The RFC 5545 calendar subscription engine applies the same accommodation deduplication rules, guaranteeing clean native calendar feeds.
 
 ## 14. Multi-Currency Group Expense Ledger & Debt Settle-Up Engine
 

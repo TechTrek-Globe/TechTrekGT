@@ -351,3 +351,28 @@ Allows travelers to edit the display title of stored travel documents:
 2. D1 Update: Edge worker updates `wayfinder_documents.safe_display_name` and logs the previous and new title in `wayfinder_audit_events`.
 3. Optimistic State Propagation: Instantly updates local `documents` state in context and triggers background refreshes for all itinerary and document views.
 4. Static Fallback Protection: Strict heuristic boundaries ensure that renaming or viewing documents never causes non-Altus lodging to resolve to `Hotel_Altus_Palace_Wroclaw_Confirmation.pdf`.
+
+## 15. Extraction Job Execution State & Approval Re-Sync
+
+Governs the state transitions, foreign key alignment, and ledger synchronizations when travel confirmation fields are extracted, edited, and approved via [import-jobs.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/import-jobs.js):
+
+### 15.1 Atomic Extracted Fields Mutation State
+- Extracted fields storage in `wayfinder_extracted_fields` executes atomically:
+  - Both `/parse` (serverless extraction) and `/fields` (client-side extraction) combine `DELETE FROM wayfinder_extracted_fields WHERE document_id = ?` and new `INSERT` statements into a single Cloudflare D1 `env.DB.batch([deleteStmt, ...stmts])`.
+  - Guarantees zero orphaned rows or empty states if an error occurs mid-operation.
+  - Sensitive field filtering is normalized (`isSensitiveField`), allowing `payment_method` while stripping card numbers, CVVs, and passport IDs.
+
+### 15.2 Target Item Foreign Key State Alignment
+- Approval route (`action === 'approve'`) checks for existing items by `source_document_id`:
+  - `targetItemId = existingItem ? existingItem.id : generateId();`
+  - Re-approving an already imported document performs an `UPDATE` on `wayfinder_itinerary_items` instead of an `INSERT`.
+  - `targetItemId` is consistently bound to `wayfinder_expenses.itinerary_item_id`, `wayfinder_audit_events`, and the response JSON (`itinerary_item_id: targetItemId`), eliminating detached or phantom foreign keys.
+
+### 15.3 Re-Approval Expense Synchronization & 50/50 Split Rounding
+- When a document includes a parsed cost (`total_cost`, `cost`, `price`, `amount`):
+  - Split rounding avoids penny loss on odd amounts:
+    - `split1 = Math.floor((parsedCost.amount / 2) * 100) / 100` (assigned to user / payer)
+    - `split2 = Number((parsedCost.amount - split1).toFixed(2))` (assigned to Ronald Milton Few)
+    - Invariant: `split1 + split2 === parsedCost.amount` strictly holds across all amounts.
+  - Initial Approval: Inserts `wayfinder_expenses` and two `wayfinder_expense_splits` rows.
+  - Re-Approval: When `existingExpense` exists for the document, an `UPDATE` statement updates `wayfinder_expenses` (`amount_original`, `currency_original`, `description`, `purchase_site`, `payment_method`) and updates both `wayfinder_expense_splits` rows with recalculated split amounts, ensuring traveler price edits propagate to the shared ledger.

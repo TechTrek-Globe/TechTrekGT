@@ -378,3 +378,33 @@ Provides end-to-end self-healing for forwarded travel confirmations, instant UI 
   - Hotel Altus Palace Wrocław: Reconciled 2-night 5-star palace stay (Dec 7-9, 2026) for 2,400.00 PLN (~$600.00 USD) fronted by Jonathan Kemp, correcting the city to Wrocław and linking to booking voucher `ALT-88421`.
   - Hotel Brovaria Poznań: Reconciled 1-night Old Market Square microbrewery stay (Dec 9-10, 2026) for 450.00 PLN (~$112.50 USD) fronted by Jonathan Kemp, linking to confirmed receipt attachment.
 
+## 21. Hardened Document Import Job Handler & PDF/Booking Parser Engine
+
+Hardenings in [import-jobs.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/import-jobs.js) and [gemini-parser.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/gemini-parser.js) resolve data integrity bugs, schema mismatches, and PDF/heuristic parsing edge cases:
+
+- Atomic D1 Batches for Field Mutations:
+  - In both `/parse` and `/fields` endpoints, the deletion of previous fields (`DELETE FROM wayfinder_extracted_fields WHERE document_id = ?`) and insertion of freshly extracted fields are bundled into a single atomic `env.DB.batch([deleteFieldsStmt, ...stmts])` transaction, preventing empty states or orphaned rows during failures.
+- Unified Lowercase-Normalized Sensitive Field Filter (`isSensitiveField`):
+  - Normalizes field names to lowercase before evaluating security filters.
+  - Explicitly permits `payment_method` while strictly redacting sensitive account numbers, CVVs, card numbers, and passport IDs.
+- Target Item ID & Foreign Key Deduplication:
+  - On approval (`action === 'approve'`), queries `existingItem` before generating any new ID and sets `targetItemId = existingItem ? existingItem.id : itemId`.
+  - Consistently binds `targetItemId` across the itinerary insert/update, audit events, `wayfinder_expenses.itinerary_item_id`, and the JSON response.
+- Penny-Loss Prevention & Re-Approval Expense Synchronization:
+  - Calculates 50/50 expense splits using `Math.floor((parsedCost.amount / 2) * 100) / 100` and assigns the remainder penny to Ronald Milton Few via `Number((parsedCost.amount - split1).toFixed(2))`.
+  - On re-approval of an existing document expense, an `else` branch atomically updates `wayfinder_expenses` and both `wayfinder_expense_splits` records to propagate user price overrides.
+- Single-Pass Content Stream Tokenizer with Reading Order & Bracket Scope Tracking:
+  - Replaces four independent scanning passes with a single top-to-bottom tokenizing loop in `extractTextFromContentStream`, preserving natural PDF reading order.
+  - Implements `findMatchingBracket` tracking literal string parens and hex string angles so literal brackets inside PDF strings do not terminate the array scan.
+  - Supports both `'` and `"` text display operators alongside both `pendingHex` and `pendingLit` buffers.
+- Unicode Code Point Safety & CMap Range Expansion:
+  - Uses `String.fromCodePoint` for supplementary Unicode plane mapping and expands `bfrange` step capacity from 256 to 1024.
+- Luhn Validation for Credit Card Redaction:
+  - Verifies candidate numbers against the Luhn algorithm in `scrubSensitiveData`, preventing false-positive redaction of 13-digit airline e-tickets and 11-digit PKP references.
+- Heuristic Execution Ordering & Trigger Tightening:
+  - Runs dynamic regex extractors (confirmation codes, dates, times, room types, hotel names, addresses, price, currency, guests) before applying provider fallbacks via nullish coalescing `??`.
+  - Tightens trigger rules to prevent false matches: Delta flight requires `DL 9208` or explicit Delta keywords (not bare 'dl' in Polish addresses); The Bridge hotel requires 'the bridge' or 'mgallery' (not bare 'bridge'); and Auschwitz/Wieliczka hardcoded titles apply only to explicit tour keywords.
+- Gemini REST API Hardening:
+  - Removes `?key=` query parameters from the endpoint URL, enforcing authentication strictly via the `x-goog-api-key` header.
+  - Enforces `AbortSignal.timeout(20000)` on the serverless `fetch` call to fail fast and fall back gracefully to heuristic parsing if the API stalls.
+

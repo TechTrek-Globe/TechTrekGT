@@ -290,7 +290,11 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
         action: `${editingExpense ? 'Edit' : 'Add'} expense: ${formDesc.trim()}`
       });
 
-      if (!res.ok) throw new Error(`Failed to ${editingExpense ? 'update' : 'record'} expense`);
+      if (!res.ok) {
+        if (res.status === 401) { setIsAuthModalOpen(true); throw new Error('Session expired. Please sign in again.'); }
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Server error (${res.status})`);
+      }
       setIsAddModalOpen(false);
       setEditingExpense(null);
       setFormDesc('');
@@ -328,7 +332,11 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
         action: `Settle ${formatCurrency(activeTransferToSettle.amount, activeTransferToSettle.currency)} from ${activeTransferToSettle.fromUserName} to ${activeTransferToSettle.toUserName}`
       });
 
-      if (!res.ok) throw new Error('Failed to record settlement');
+      if (!res.ok) {
+        if (res.status === 401) { setIsAuthModalOpen(true); throw new Error('Session expired. Please sign in again.'); }
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Server error (${res.status})`);
+      }
       setIsSettleModalOpen(false);
       setActiveTransferToSettle(null);
       await loadExpenses();
@@ -372,7 +380,11 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
         action: `Settle item: ${expense.description} (${fromUserName})`
       });
 
-      if (!res.ok) throw new Error('Failed to record item settlement');
+      if (!res.ok) {
+        if (res.status === 401) { setIsAuthModalOpen(true); throw new Error('Session expired. Please sign in again.'); }
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Server error (${res.status})`);
+      }
       setActiveItemToSettle(null);
       await loadExpenses();
     } catch (e) {
@@ -394,7 +406,11 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
         entityType: 'settlement',
         action: `Undo settlement for ${desc}`
       });
-      if (!res.ok) throw new Error('Failed to undo settlement');
+      if (!res.ok) {
+        if (res.status === 401) { setIsAuthModalOpen(true); throw new Error('Session expired. Please sign in again.'); }
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Server error (${res.status})`);
+      }
       await loadExpenses();
     } catch (e) {
       alert('Error undoing settlement: ' + e.message);
@@ -415,7 +431,11 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
         entityType: 'settlement',
         action: 'Delete settlement record'
       });
-      if (!res.ok) throw new Error('Failed to delete settlement');
+      if (!res.ok) {
+        if (res.status === 401) { setIsAuthModalOpen(true); throw new Error('Session expired. Please sign in again.'); }
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Server error (${res.status})`);
+      }
       await loadExpenses();
     } catch (e) {
       alert('Error undoing settlement: ' + e.message);
@@ -436,7 +456,11 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
         entityId: id,
         action: 'Delete expense'
       });
-      if (!res.ok) throw new Error('Delete failed');
+      if (!res.ok) {
+        if (res.status === 401) { setIsAuthModalOpen(true); throw new Error('Session expired. Please sign in again.'); }
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Server error (${res.status})`);
+      }
       setExpenses(prev => prev.filter(e => e.id !== id));
     } catch (e) {
       alert('Failed to delete expense: ' + e.message);

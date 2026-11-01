@@ -117,13 +117,10 @@ export async function handleImportJobs(context, url, method) {
         display_value:   sanitizeText(f.display_value || f.extracted_value),
       }));
 
-      // Delete existing fields and re-insert freshly parsed fields
-      await env.DB.prepare('DELETE FROM wayfinder_extracted_fields WHERE document_id = ?').bind(docId).run();
-
       const stmts = sanitized.map(f => {
         const id = generateId();
         const isCritical = CRITICAL_FIELDS.has(f.field_name);
-        const isSensitive = f.field_name?.includes('passport') || (f.field_name?.includes('payment') && !f.field_name?.includes('payment_method')) ? 1 : 0;
+        const isSensitive = isSensitiveField(f.field_name) ? 1 : 0;
         if (isSensitive) return null;
         return env.DB.prepare(
           `INSERT INTO wayfinder_extracted_fields
@@ -140,9 +137,8 @@ export async function handleImportJobs(context, url, method) {
         );
       }).filter(Boolean);
 
-      if (stmts.length > 0) {
-        await env.DB.batch(stmts);
-      }
+      const deleteFieldsStmt = env.DB.prepare('DELETE FROM wayfinder_extracted_fields WHERE document_id = ?').bind(docId);
+      await env.DB.batch([deleteFieldsStmt, ...stmts]);
 
       // Update job status and document metadata
       await env.DB.prepare(
@@ -193,13 +189,10 @@ export async function handleImportJobs(context, url, method) {
         display_value:   sanitizeText(f.display_value || f.extracted_value),
       }));
 
-      // Delete existing fields and re-insert
-      await env.DB.prepare('DELETE FROM wayfinder_extracted_fields WHERE document_id = ?').bind(docId).run();
-
       const stmts = sanitized.map(f => {
         const id = generateId();
         const isCritical = CRITICAL_FIELDS.has(f.field_name);
-        const isSensitive = f.field_name?.includes('passport') || f.field_name?.includes('payment') ? 1 : 0;
+        const isSensitive = isSensitiveField(f.field_name) ? 1 : 0;
         // Sensitive fields blocked
         if (isSensitive) return null;
         return env.DB.prepare(
@@ -217,9 +210,8 @@ export async function handleImportJobs(context, url, method) {
         );
       }).filter(Boolean);
 
-      if (stmts.length > 0) {
-        await env.DB.batch(stmts);
-      }
+      const deleteFieldsStmt = env.DB.prepare('DELETE FROM wayfinder_extracted_fields WHERE document_id = ?').bind(docId);
+      await env.DB.batch([deleteFieldsStmt, ...stmts]);
 
       // Update job status and document metadata
       await env.DB.prepare(
@@ -247,7 +239,7 @@ export async function handleImportJobs(context, url, method) {
 
       // Verify journey ownership or public visibility
       const j = await env.DB.prepare(
-        `SELECT id FROM wayfinder_journeys WHERE (id = ? OR slug = ?) AND (created_by = ? OR visibility = 'public')`
+        `SELECT id FROM wayfinder_journeys WHERE (id = ? OR slug = ?) AND created_by = ?`
       ).bind(journey_id, journey_id, user.userId).first();
       if (!j) return json({ error: 'Journey not found' }, 404);
       const finalJourneyId = j.id;
@@ -293,19 +285,21 @@ export async function handleImportJobs(context, url, method) {
       const itemType = mapDocTypeToItemType(docType);
       const title = buildTitle(docType, fieldMap, doc.safe_display_name);
 
-      const itemId = generateId();
       const auditId1 = generateId();
       const auditId2 = generateId();
       const nowIso = new Date().toISOString();
+
+      const existingItem = await env.DB.prepare(
+        'SELECT id FROM wayfinder_itinerary_items WHERE source_document_id = ?'
+      ).bind(docId).first();
+
+      const itemId = generateId();
+      const targetItemId = existingItem ? existingItem.id : itemId;
 
       // Check for associated expense cost to sync with shared ledger
       const rawCost = fieldMap.total_cost || fieldMap.cost || fieldMap.price || fieldMap.amount;
       const parsedCost = parseCost(rawCost);
       let expenseId = null;
-
-      const existingItem = await env.DB.prepare(
-        'SELECT id FROM wayfinder_itinerary_items WHERE source_document_id = ?'
-      ).bind(docId).first();
 
       const purchaseSite = fieldMap.purchase_site || null;
       const paymentMethod = fieldMap.payment_method || null;
@@ -322,12 +316,12 @@ export async function handleImportJobs(context, url, method) {
                WHERE id = ?`
             ).bind(
               title,
-              fieldMap.airline || fieldMap.hotel_name || fieldMap.carrier || fieldMap.supplier || doc.detected_provider || null,
-              fieldMap.departure_date || fieldMap.check_in_date || fieldMap.start_date || null,
-              fieldMap.departure_time || fieldMap.check_in_time || fieldMap.start_time || null,
+              fieldMap.airline || fieldMap.hotel_name || fieldMap.carrier || fieldMap.supplier || fieldMap.provider || doc.detected_provider || null,
+              fieldMap.departure_date || fieldMap.check_in_date || fieldMap.start_date || fieldMap.tour_date || null,
+              fieldMap.departure_time || fieldMap.check_in_time || fieldMap.pickup_time || fieldMap.start_time || null,
               fieldMap.arrival_date || fieldMap.check_out_date || fieldMap.end_date || null,
               fieldMap.arrival_time || fieldMap.check_out_time || fieldMap.end_time || null,
-              fieldMap.destination_airport || fieldMap.hotel_address || fieldMap.meeting_point || null,
+              fieldMap.hotel_address || fieldMap.pickup_location || fieldMap.meeting_point || fieldMap.location || fieldMap.destination_station || fieldMap.destination_airport || fieldMap.destination || null,
               purchaseSite,
               paymentMethod,
               existingItem.id
@@ -339,12 +333,12 @@ export async function handleImportJobs(context, url, method) {
                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,'imported','user_verified','private')`
             ).bind(
               itemId, finalJourneyId, user.userId, itemType, title,
-              fieldMap.airline || fieldMap.hotel_name || fieldMap.carrier || fieldMap.supplier || doc.detected_provider || null,
-              fieldMap.departure_date || fieldMap.check_in_date || fieldMap.start_date || null,
-              fieldMap.departure_time || fieldMap.check_in_time || fieldMap.start_time || null,
+              fieldMap.airline || fieldMap.hotel_name || fieldMap.carrier || fieldMap.supplier || fieldMap.provider || doc.detected_provider || null,
+              fieldMap.departure_date || fieldMap.check_in_date || fieldMap.start_date || fieldMap.tour_date || null,
+              fieldMap.departure_time || fieldMap.check_in_time || fieldMap.pickup_time || fieldMap.start_time || null,
               fieldMap.arrival_date || fieldMap.check_out_date || fieldMap.end_date || null,
               fieldMap.arrival_time || fieldMap.check_out_time || fieldMap.end_time || null,
-              fieldMap.destination_airport || fieldMap.hotel_address || fieldMap.meeting_point || null,
+              fieldMap.hotel_address || fieldMap.pickup_location || fieldMap.meeting_point || fieldMap.location || fieldMap.destination_station || fieldMap.destination_airport || fieldMap.destination || null,
               purchaseSite,
               paymentMethod,
               docId
@@ -362,7 +356,7 @@ export async function handleImportJobs(context, url, method) {
         ).bind(auditId1, user.userId, finalJourneyId, 'document', docId, 'approve'),
         env.DB.prepare(
           'INSERT INTO wayfinder_audit_events (id, user_id, journey_id, entity_type, entity_id, action) VALUES (?,?,?,?,?,?)'
-        ).bind(auditId2, user.userId, finalJourneyId, 'itinerary_item', existingItem ? existingItem.id : itemId, 'create_from_import')
+        ).bind(auditId2, user.userId, finalJourneyId, 'itinerary_item', targetItemId, 'create_from_import')
       ];
 
       if (parsedCost && parsedCost.amount > 0) {
@@ -374,7 +368,8 @@ export async function handleImportJobs(context, url, method) {
           expenseId = generateId();
           const expenseCat = mapDocTypeToExpenseCategory(docType);
           const payerName = user.name || user.email || 'Jonathan Kemp';
-          const halfAmount = Math.round((parsedCost.amount / 2) * 100) / 100;
+          const split1 = Math.floor((parsedCost.amount / 2) * 100) / 100;
+          const split2 = Number((parsedCost.amount - split1).toFixed(2));
 
           batchStmts.push(
             env.DB.prepare(
@@ -386,7 +381,7 @@ export async function handleImportJobs(context, url, method) {
             ).bind(
               expenseId,
               finalJourneyId,
-              itemId,
+              targetItemId,
               docId,
               user.userId,
               payerName,
@@ -408,19 +403,40 @@ export async function handleImportJobs(context, url, method) {
               `INSERT INTO wayfinder_expense_splits
                (id, expense_id, user_id, user_name, amount_owed, percentage, created_at)
                VALUES (?, ?, ?, ?, ?, 50, ?)`
-            ).bind(splitId1, expenseId, user.userId, payerName, halfAmount, nowIso),
+            ).bind(splitId1, expenseId, user.userId, payerName, split1, nowIso),
             env.DB.prepare(
               `INSERT INTO wayfinder_expense_splits
                (id, expense_id, user_id, user_name, amount_owed, percentage, created_at)
                VALUES (?, ?, 'usr-ronald-few', 'Ronald Milton Few', ?, 50, ?)`
-            ).bind(splitId2, expenseId, halfAmount, nowIso)
+            ).bind(splitId2, expenseId, split2, nowIso)
+          );
+        } else {
+          // Re-approval: propagate price changes to existing expense and split rows
+          const split1 = Math.floor((parsedCost.amount / 2) * 100) / 100;
+          const split2 = Number((parsedCost.amount - split1).toFixed(2));
+          expenseId = existingExpense.id;
+          batchStmts.push(
+            env.DB.prepare(
+              `UPDATE wayfinder_expenses
+               SET amount_original = ?, currency_original = ?, description = ?,
+                   purchase_site = ?, payment_method = ?
+               WHERE id = ?`
+            ).bind(parsedCost.amount, parsedCost.currency, title, purchaseSite, paymentMethod, existingExpense.id),
+            env.DB.prepare(
+              `UPDATE wayfinder_expense_splits SET amount_owed = ?
+               WHERE expense_id = ? AND user_id = ?`
+            ).bind(split1, existingExpense.id, user.userId),
+            env.DB.prepare(
+              `UPDATE wayfinder_expense_splits SET amount_owed = ?
+               WHERE expense_id = ? AND user_id = 'usr-ronald-few'`
+            ).bind(split2, existingExpense.id)
           );
         }
       }
 
       await env.DB.batch(batchStmts);
 
-      return json({ success: true, itinerary_item_id: itemId, expense_id: expenseId });
+      return json({ success: true, itinerary_item_id: targetItemId, expense_id: expenseId });
     }
 
     // --- POST reject ---
@@ -458,11 +474,20 @@ function sanitizeText(val) {
   return String(val).replace(/<[^>]*>/g, '').replace(/[<>]/g, '').substring(0, 2000);
 }
 
+function isSensitiveField(fieldName) {
+  const lower = String(fieldName || '').toLowerCase();
+  if (lower === 'payment_method') return false;
+  return lower.includes('passport') ||
+         lower.includes('payment') ||
+         lower.includes('cvv') ||
+         lower.includes('card_number');
+}
+
 function mapDocTypeToItemType(docType) {
   const map = {
     flight: 'flight', hotel: 'hotel', rail: 'rail', rail_ticket: 'rail',
-    tour: 'tour', viator: 'tour', getyourguide: 'tour',
-    transfer: 'transfer', rental_car: 'rental_car', restaurant: 'restaurant',
+    tour: 'tour', viator: 'tour', getyourguide: 'tour', excursion: 'tour',
+    transfer: 'transfer', transport: 'transfer', rental_car: 'rental_car', restaurant: 'restaurant',
     insurance: 'custom', cruise: 'custom',
   };
   return map[docType?.toLowerCase()] || 'custom';
@@ -567,15 +592,26 @@ function generateInitialFields(doc, linkedItem) {
 }
 
 function buildTitle(docType, fields, fallback) {
+  if (fields.title && fields.title !== 'Travel Booking') return fields.title;
   if (docType === 'flight' && fields.origin_airport && fields.destination_airport) {
     return `Flight: ${fields.origin_airport} to ${fields.destination_airport}`;
+  }
+  if (docType === 'flight' && fields.origin && fields.destination) {
+    return `Flight: ${fields.origin} to ${fields.destination}`;
   }
   if (docType === 'hotel' && fields.hotel_name) {
     return `Hotel: ${fields.hotel_name}`;
   }
+  if (docType === 'hotel' && fields.provider) {
+    return `Hotel: ${fields.provider}`;
+  }
   if ((docType === 'rail' || docType === 'rail_ticket') && fields.origin_station && fields.destination_station) {
     return `Train: ${fields.origin_station} to ${fields.destination_station}`;
   }
+  if ((docType === 'rail' || docType === 'rail_ticket') && fields.origin && fields.destination) {
+    return `Train: ${fields.origin} to ${fields.destination}`;
+  }
+  if (fields.tour_title) return fields.tour_title;
   if (fields.activity_title) return fields.activity_title;
   if (fields.experience_title) return fields.experience_title;
   return fallback || 'Imported booking';

@@ -33,6 +33,30 @@ export function CityAttractionsTab({ city }) {
 
   const displayedPlaces = isOptimized ? optimizationResult.orderedPlaces : city.mustSee;
 
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const checkAndScroll = () => {
+      const hash = window.location.hash?.replace('#', '');
+      const params = new URLSearchParams(window.location.search);
+      const targetId = hash || params.get('sight') || params.get('item');
+      if (targetId) {
+        setTimeout(() => {
+          const el = document.getElementById(targetId);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el.classList.add('ring-4', 'ring-amber-400', 'shadow-[0_0_35px_rgba(245,158,11,0.8)]');
+            setTimeout(() => {
+              el.classList.remove('ring-4', 'ring-amber-400', 'shadow-[0_0_35px_rgba(245,158,11,0.8)]');
+            }, 3500);
+          }
+        }, 150);
+      }
+    };
+    checkAndScroll();
+    window.addEventListener('hashchange', checkAndScroll);
+    return () => window.removeEventListener('hashchange', checkAndScroll);
+  }, [displayedPlaces]);
+
   return (
     <div id="attractions-section" className="space-y-6 animate-fade-in scroll-mt-32">
       {/* Header */}

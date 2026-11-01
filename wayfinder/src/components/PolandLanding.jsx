@@ -479,7 +479,7 @@ function JourneyStopSchedule({
                                         )}
                                         {timelineItem.data.location && (
                                           <a
-                                            href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(timelineItem.data.location)}`}
+                                            href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${timelineItem.data.location}, ${city.name || 'Poland'}`)}`}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             onClick={(e) => e.stopPropagation()}
@@ -513,8 +513,8 @@ function JourneyStopSchedule({
                                     {timelineItem.data.description}
                                   </p>
 
-                                  {/* Suggested Food / Must-Have Tile Button */}
-                                  {destination && destination.type === 'food' && (
+                                  {/* Suggested Food / Market / Attraction Guide Tile Button */}
+                                  {destination && (
                                     <div className="pt-2 border-t border-white/5 flex flex-wrap items-center justify-between gap-2">
                                       <a
                                         href={destination.url}
@@ -522,15 +522,29 @@ function JourneyStopSchedule({
                                           e.stopPropagation();
                                           pushRoute(e, destination.url);
                                         }}
-                                        className="px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-400/40 text-amber-300 text-xs font-bold flex items-center space-x-1.5 transition-all cursor-pointer shadow-sm group/btn"
-                                        title="Open Food & Dining Must-Have tile"
+                                        className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center space-x-1.5 transition-all cursor-pointer shadow-sm group/btn ${
+                                          destination.type === 'food'
+                                            ? 'bg-amber-500/15 hover:bg-amber-500/25 border-amber-400/40 text-amber-300'
+                                            : destination.type === 'market'
+                                              ? 'bg-purple-500/15 hover:bg-purple-500/25 border-purple-400/40 text-purple-300'
+                                              : 'bg-sky-500/15 hover:bg-sky-500/25 border-sky-400/40 text-sky-300'
+                                        }`}
+                                        title={`Open ${destination.buttonText}`}
                                       >
-                                        <Utensils className="w-3.5 h-3.5 text-amber-400 group-hover/btn:scale-110 transition-transform" />
+                                        {destination.type === 'food' && (
+                                          <Utensils className="w-3.5 h-3.5 text-amber-400 group-hover/btn:scale-110 transition-transform" />
+                                        )}
+                                        {destination.type === 'market' && (
+                                          <Sparkles className="w-3.5 h-3.5 text-purple-400 group-hover/btn:scale-110 transition-transform" />
+                                        )}
+                                        {destination.type === 'sight' && (
+                                          <Landmark className="w-3.5 h-3.5 text-sky-400 group-hover/btn:scale-110 transition-transform" />
+                                        )}
                                         <span>{destination.buttonText}</span>
-                                        <ArrowRight className="w-3.5 h-3.5 text-amber-400/80 group-hover/btn:translate-x-0.5 transition-transform" />
+                                        <ArrowRight className="w-3.5 h-3.5 opacity-80 group-hover/btn:translate-x-0.5 transition-transform" />
                                       </a>
                                       <span className="text-[11px] text-slate-400 font-medium">
-                                        {city.name} Dining Guide
+                                        {city.name} {destination.type === 'food' ? 'Dining Guide' : destination.type === 'market' ? 'Market Guide' : 'Attractions Guide'}
                                       </span>
                                     </div>
                                   )}

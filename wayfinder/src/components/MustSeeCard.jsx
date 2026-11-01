@@ -183,7 +183,10 @@ export function MustSeeCard(props) {
   const currentImgSrc = getAttractionImage(cardImage, cardTitle, cityName);
 
   return (
-    <article className="glass-panel rounded-3xl border border-white/10 hover:border-amber-500/40 transition-all duration-300 overflow-hidden flex flex-col h-full bg-wf-navy-mid/80 shadow-xl group">
+    <article
+      id={sight?.id || (cardTitle ? cardTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') : null)}
+      className="glass-panel rounded-3xl border border-white/10 hover:border-amber-500/40 transition-all duration-300 overflow-hidden flex flex-col h-full bg-wf-navy-mid/80 shadow-xl group scroll-mt-36"
+    >
       {/* 1. Static Image (Top): Fixed 200px height with #2d3748 fallback */}
       <div className="relative w-full h-[200px] bg-[#2d3748] overflow-hidden shrink-0">
         <img
@@ -268,7 +271,16 @@ export function MustSeeCard(props) {
             {cardTransit && (
               <div className="flex items-start space-x-2 text-[11px] text-slate-300 leading-snug">
                 <MapPin className="w-3.5 h-3.5 text-sky-400 shrink-0 mt-0.5" />
-                <span className="text-slate-300/90">{cardTransit}</span>
+                <a
+                  href={directionsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-slate-300/90 hover:text-amber-300 transition-colors inline-flex items-center gap-1 group/transit"
+                  title={`Directions to ${cardTitle}`}
+                >
+                  <span>{cardTransit}</span>
+                  <ExternalLink className="w-3 h-3 text-slate-400 group-hover/transit:text-amber-300 inline shrink-0" />
+                </a>
               </div>
             )}
             {cardClosed && (

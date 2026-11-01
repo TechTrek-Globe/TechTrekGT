@@ -360,6 +360,7 @@ export const polandJourney = {
       ],
       "mustSee": [
         {
+          "id": "wawel-castle",
           "lat": 50.0619474,
           "lng": 19.9368564,
           "name": "Wawel Royal Castle & Cathedral",
@@ -379,6 +380,7 @@ export const polandJourney = {
           "daysClosed": "Mondays (most exhibitions closed)"
         },
         {
+          "id": "st-marys-basilica",
           "lat": 50.0616547,
           "lng": 19.9394485,
           "name": "St. Mary's Basilica (Kościół Mariacki)",
@@ -398,6 +400,7 @@ export const polandJourney = {
           "daysClosed": "During mass"
         },
         {
+          "id": "cloth-hall",
           "lat": 50.0617012,
           "lng": 19.9373511,
           "name": "Cloth Hall (Sukiennice) & Rynek Underground",
@@ -417,6 +420,7 @@ export const polandJourney = {
           "daysClosed": "Underground closed second Monday of month"
         },
         {
+          "id": "kazimierz-district",
           "lat": 50.051855,
           "lng": 19.9449466,
           "name": "Kazimierz (Historic Jewish Quarter)",
@@ -435,6 +439,7 @@ export const polandJourney = {
           "daysClosed": "Synagogues closed on Saturdays (Shabbat) and Jewish holidays"
         },
         {
+          "id": "planty-park",
           "lat": 50.0602088,
           "lng": 19.9419072,
           "name": "Planty Park & Barbican Fortress",
@@ -476,6 +481,7 @@ export const polandJourney = {
           "address": "Więźniów Oświęcimia 55, 32-600 Oświęcim"
         },
         {
+          "id": "wieliczka-salt-mine",
           "lat": 49.985429,
           "lng": 20.0575731,
           "name": "Wieliczka Salt Mine",
@@ -495,6 +501,7 @@ export const polandJourney = {
           "daysClosed": "Dec 24-25, Jan 1, Easter Sunday"
         },
         {
+          "id": "schindler-factory",
           "lat": 50.0474554,
           "lng": 19.9617094,
           "name": "Oskar Schindler's Enamel Factory",
@@ -514,6 +521,7 @@ export const polandJourney = {
           "daysClosed": "First Tuesday of every month"
         },
         {
+          "id": "chocholow-thermal-baths",
           "lat": 49.3668,
           "lng": 19.8136,
           "name": "Chochołów Thermal Baths (Chochołowskie Termy)",
@@ -533,6 +541,7 @@ export const polandJourney = {
           "daysClosed": "Open 365 days a year (special holiday hours apply)"
         },
         {
+          "id": "krakow-walking-tour",
           "lat": 50.0619474,
           "lng": 19.9368564,
           "name": "Kraków Christmas Markets & Old Town Guided Walking Tour",
@@ -553,6 +562,7 @@ export const polandJourney = {
           "viatorUrl": "https://www.viator.com/searchResults/all?text=Krakow+Christmas+Market+walking+tour"
         },
         {
+          "id": "kazimierz-walking-tour",
           "lat": 50.050269,
           "lng": 19.944256,
           "name": "Kazimierz Jewish Quarter & Schindler's Factory Walking Tour",

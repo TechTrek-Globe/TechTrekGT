@@ -13,6 +13,34 @@ export function CityMarketsTab({
 }) {
   if (!city.markets || city.markets.length === 0) return null;
 
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const checkAndScroll = () => {
+      const hash = window.location.hash?.replace('#', '');
+      const params = new URLSearchParams(window.location.search);
+      const targetId = hash || params.get('market') || params.get('item');
+      if (targetId) {
+        const targetMarket = city.markets?.find(m => m.id === targetId);
+        if (targetMarket) {
+          setActiveMarketTab('all');
+        }
+        setTimeout(() => {
+          const el = document.getElementById(targetId);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el.classList.add('ring-4', 'ring-amber-400', 'shadow-[0_0_35px_rgba(245,158,11,0.8)]');
+            setTimeout(() => {
+              el.classList.remove('ring-4', 'ring-amber-400', 'shadow-[0_0_35px_rgba(245,158,11,0.8)]');
+            }, 3500);
+          }
+        }, 150);
+      }
+    };
+    checkAndScroll();
+    window.addEventListener('hashchange', checkAndScroll);
+    return () => window.removeEventListener('hashchange', checkAndScroll);
+  }, [city.markets]);
+
   return (
     <div id="markets-section" className="space-y-6 animate-fade-in scroll-mt-32">
       {/* Quick Reference Stats Bar */}
@@ -131,7 +159,8 @@ export function CityMarketsTab({
             return (
               <article
                 key={market.id}
-                className="glass-panel rounded-3xl border border-amber-500/30 bg-wf-navy-mid/90 overflow-hidden shadow-xl flex flex-col justify-between group hover:border-amber-400/60 transition-all duration-300"
+                id={market.id}
+                className="glass-panel rounded-3xl border border-amber-500/30 bg-wf-navy-mid/90 overflow-hidden shadow-xl flex flex-col justify-between group hover:border-amber-400/60 transition-all duration-300 scroll-mt-36"
               >
                 <div>
                   {/* Image Header */}
@@ -172,7 +201,16 @@ export function CityMarketsTab({
                       {market.address && (
                         <div className="flex items-center space-x-1.5 text-xs text-slate-400 font-semibold">
                           <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                          <span className="truncate">{market.address}</span>
+                          <a
+                            href={directionsUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="hover:text-amber-300 transition-colors inline-flex items-center gap-1 group/addr truncate"
+                            title={`Directions to ${market.name}`}
+                          >
+                            <span className="truncate">{market.address}</span>
+                            <ExternalLink className="w-3 h-3 text-slate-500 group-hover/addr:text-amber-300 shrink-0" />
+                          </a>
                         </div>
                       )}
                     </div>
@@ -296,7 +334,7 @@ export function CityMarketsTab({
         const isSaved = savedItems.has(currentMarket.id);
 
         return (
-          <div className="glass-panel rounded-3xl border border-amber-500/30 overflow-hidden shadow-2xl bg-amber-500/5 space-y-6 animate-fade-in">
+          <div id={currentMarket.id} className="glass-panel rounded-3xl border border-amber-500/30 overflow-hidden shadow-2xl bg-amber-500/5 space-y-6 animate-fade-in scroll-mt-36">
             {/* Market Specific Picture Header */}
             {marketImg && (
               <div className="w-full h-72 sm:h-96 relative overflow-hidden group bg-slate-950">
@@ -344,7 +382,16 @@ export function CityMarketsTab({
                     <Navigation className="w-5 h-5 text-wf-blue-lt shrink-0 mt-0.5" />
                     <div>
                       <span className="text-wf-blue-lt text-xs font-bold uppercase tracking-wider block mb-0.5">Location & Transit</span>
-                      <span className="text-sm font-medium text-wf-cream">{currentMarket.address}</span>
+                      <a
+                        href={directionsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm font-medium text-wf-cream hover:text-amber-300 transition-colors inline-flex items-center gap-1 group/addr"
+                        title={`Directions to ${currentMarket.name}`}
+                      >
+                        <span>{currentMarket.address}</span>
+                        <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover/addr:text-amber-300 shrink-0" />
+                      </a>
                     </div>
                   </div>
                 )}

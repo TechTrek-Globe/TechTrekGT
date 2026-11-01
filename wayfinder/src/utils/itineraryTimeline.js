@@ -389,18 +389,219 @@ export function getItemDestination(itemData, dayCityId) {
   }
 
   if (type === 'market') {
+    let venueHash = '';
+    let venueName = 'Christmas Market';
+
+    if (city === 'krakow') {
+      if (title.includes('maly rynek') || title.includes('mały rynek')) {
+        venueHash = '#maly-rynek';
+        venueName = 'Mały Rynek Craft Corner';
+      } else if (title.includes('wolnica') || title.includes('bohemian')) {
+        venueHash = '#kazimierz-wolnica';
+        venueName = 'Plac Wolnica Market';
+      } else {
+        venueHash = '#rynek-glowny';
+        venueName = 'Rynek Główny Main Market';
+      }
+    } else if (city === 'wroclaw') {
+      if (title.includes('solny')) {
+        venueHash = '#wroclaw-plac-solny';
+        venueName = 'Plac Solny Christmas Market';
+      } else if (title.includes('swidnicka') || title.includes('świdnicka') || title.includes('olawska') || title.includes('oławska')) {
+        venueHash = '#wroclaw-swidnicka';
+        venueName = 'Świdnicka & Oławska Avenues';
+      } else {
+        venueHash = '#wroclaw-rynek';
+        venueName = 'Wrocław Christmas Market';
+      }
+    } else if (city === 'poznan') {
+      if (title.includes('stary rynek')) {
+        venueHash = '#poznan-stary-rynek';
+        venueName = 'Stary Rynek Old Market Fair';
+      } else if (title.includes('mtp') || title.includes('miedzynarodowe') || title.includes('winter fair')) {
+        venueHash = '#poznan-mtp';
+        venueName = 'MTP Winter Fair';
+      } else {
+        venueHash = '#poznan-plac-wolnosci';
+        venueName = 'Plac Wolności Market';
+      }
+    } else if (city === 'torun') {
+      venueHash = '#torun-rynek-staromiejski';
+      venueName = 'Rynek Staromiejski Market';
+    } else if (city === 'gdansk') {
+      if (title.includes('tkacka') || title.includes('zbrojownia')) {
+        venueHash = '#gdansk-tkacka';
+        venueName = 'Ulica Tkacka Artisans Fair';
+      } else if (title.includes('spichrz') || title.includes('granary island') || title.includes('promenade')) {
+        venueHash = '#gdansk-wyspa-spichrzow';
+        venueName = 'Granary Island Winter Promenade';
+      } else {
+        venueHash = '#gdansk-targ-weglowy';
+        venueName = 'Targ Węglowy Christmas Market';
+      }
+    }
+
     return {
       type: 'market',
-      url: `/wayfinder/poland-christmas-2026/cities/${city}/markets`,
-      buttonText: 'View Christmas Market Guide'
+      venueName,
+      url: `/wayfinder/poland-christmas-2026/cities/${city}/markets${venueHash}`,
+      buttonText: venueName !== 'Christmas Market' ? `View ${venueName} Tile` : 'View Christmas Market Guide'
     };
   }
 
   if (type === 'sight') {
+    let venueHash = '';
+    let venueName = 'Must-See Sight';
+
+    if (city === 'krakow') {
+      if (title.includes('wawel')) {
+        venueHash = '#wawel-castle';
+        venueName = 'Wawel Royal Castle';
+      } else if (title.includes('mary') || title.includes('mariack') || title.includes('hejnał') || title.includes('hejnal')) {
+        venueHash = '#st-marys-basilica';
+        venueName = "St. Mary's Basilica";
+      } else if (title.includes('cloth hall') || title.includes('sukiennice') || title.includes('underground')) {
+        venueHash = '#cloth-hall';
+        venueName = 'Cloth Hall & Underground';
+      } else if (title.includes('kazimierz') || title.includes('jewish')) {
+        venueHash = '#kazimierz-district';
+        venueName = 'Kazimierz Jewish Quarter';
+      } else if (title.includes('wieliczka') || title.includes('salt mine')) {
+        venueHash = '#wieliczka-salt-mine';
+        venueName = 'Wieliczka Salt Mine';
+      } else if (title.includes('auschwitz') || title.includes('birkenau')) {
+        venueHash = '#auschwitz-birkenau';
+        venueName = 'Auschwitz-Birkenau Memorial';
+      } else if (title.includes('schindler')) {
+        venueHash = '#schindler-factory';
+        venueName = "Schindler's Enamel Factory";
+      } else if (title.includes('planty') || title.includes('barbican')) {
+        venueHash = '#planty-park';
+        venueName = 'Planty Park & Barbican';
+      } else if (title.includes('chocholow') || title.includes('thermal')) {
+        venueHash = '#chocholow-thermal-baths';
+        venueName = 'Chochołów Thermal Baths';
+      } else if (title.includes('collegium')) {
+        venueHash = '#collegium-maius';
+        venueName = 'Collegium Maius';
+      } else if (title.includes('czartoryski')) {
+        venueHash = '#czartoryski-museum';
+        venueName = 'Czartoryski Museum';
+      } else if (title.includes('szopki')) {
+        venueHash = '#szopki-competition';
+        venueName = 'Szopki Krakowskie Competition';
+      }
+    } else if (city === 'wroclaw') {
+      if (title.includes('ostrow') || title.includes('ostrów') || title.includes('cathedral island') || title.includes('lantern') || title.includes('st. john')) {
+        venueHash = '#ostrow-tumski';
+        venueName = 'Ostrów Tumski';
+      } else if (title.includes('dwarf') || title.includes('krasnal')) {
+        venueHash = '#wroclaw-dwarfs';
+        venueName = 'Wrocław Dwarfs Scavenger Hunt';
+      } else if (title.includes('panorama') || title.includes('raclawic')) {
+        venueHash = '#panorama-raclawice';
+        venueName = 'Panorama of Racławice';
+      } else if (title.includes('centennial') || title.includes('stulecia')) {
+        venueHash = '#centennial-hall';
+        venueName = 'Centennial Hall (UNESCO)';
+      } else if (title.includes('tumski bridge') || title.includes('lover')) {
+        venueHash = '#tumski-bridge';
+        venueName = 'Tumski Bridge & Oderfront';
+      } else if (title.includes('ratusz') || title.includes('town hall') || title.includes('market square')) {
+        venueHash = '#wroclaw-ratusz';
+        venueName = 'Wrocław Town Hall & Rynek';
+      } else if (title.includes('hydropolis')) {
+        venueHash = '#hydropolis-wroclaw';
+        venueName = 'Hydropolis';
+      } else if (title.includes('national museum') || title.includes('muzeum narodowe')) {
+        venueHash = '#wroclaw-national-museum';
+        venueName = 'National Museum in Wrocław';
+      } else if (title.includes('lumina') || title.includes('topacz')) {
+        venueHash = '#lumina-park-wroclaw';
+        venueName = 'Lumina Park Winter Lights';
+      }
+    } else if (city === 'poznan') {
+      if (title.includes('rogal') || title.includes('croissant')) {
+        venueHash = '#poznan-rogalowe-muzeum';
+        venueName = 'Rogalowe Muzeum Poznania';
+      } else if (title.includes('ratusz') || title.includes('town hall') || title.includes('stary rynek')) {
+        venueHash = '#poznan-ratusz';
+        venueName = 'Poznań Town Hall & Stary Rynek';
+      } else if (title.includes('ostrow') || title.includes('ostrów') || title.includes('cathedral')) {
+        venueHash = '#poznan-ostrow-tumski';
+        venueName = 'Ostrów Tumski & Cathedral';
+      } else if (title.includes('cesarski') || title.includes('imperial castle')) {
+        venueHash = '#poznan-zamek-cesarski';
+        venueName = 'Imperial Castle (Zamek Cesarski)';
+      } else if (title.includes('cytadela') || title.includes('citadel')) {
+        venueHash = '#poznan-park-cytadela';
+        venueName = 'Citadel Park & Fort Winiary';
+      } else if (title.includes('fara')) {
+        venueHash = '#poznan-fara';
+        venueName = 'Poznań Fara Basilica';
+      } else if (title.includes('palmiarnia') || title.includes('palm house')) {
+        venueHash = '#poznan-palmiarnia';
+        venueName = 'Poznań Palm House';
+      } else if (title.includes('applied arts') || title.includes('royal castle')) {
+        venueHash = '#poznan-applied-arts-museum';
+        venueName = 'Applied Arts Museum';
+      } else if (title.includes('ice sculpture')) {
+        venueHash = '#ice-sculpture-festival-poznan';
+        venueName = 'Ice Sculpture Festival';
+      }
+    } else if (city === 'torun') {
+      if (title.includes('gingerbread') || title.includes('piernik') || title.includes('żywe') || title.includes('zywe')) {
+        venueHash = '#torun-zywemu-muzeum-piernika';
+        venueName = 'Living Museum of Gingerbread';
+      } else if (title.includes('kopernik') || title.includes('copernicus')) {
+        venueHash = '#torun-dom-kopernika';
+        venueName = 'Nicolaus Copernicus House';
+      } else if (title.includes('krzywa') || title.includes('leaning tower')) {
+        venueHash = '#torun-krzywa-wieza';
+        venueName = 'Leaning Tower of Toruń';
+      } else if (title.includes('krzyzacki') || title.includes('teutonic')) {
+        venueHash = '#torun-zamek-krzyzacki';
+        venueName = 'Teutonic Castle Ruins';
+      } else {
+        venueHash = '#torun-ratusz-staromiejski';
+        venueName = 'Old Town Hall & Copernicus';
+      }
+    } else if (city === 'gdansk') {
+      if (title.includes('dlugi targ') || title.includes('długi targ') || title.includes('royal way') || title.includes('long market')) {
+        venueHash = '#gdansk-dlugi-targ';
+        venueName = 'Long Market & Main Town Hall';
+      } else if (title.includes('mariack') || title.includes('st. mary')) {
+        venueHash = '#gdansk-bazylika-mariacka';
+        venueName = "St. Mary's Basilica";
+      } else if (title.includes('crane') || title.includes('zuraw') || title.includes('żuraw') || title.includes('motlawa') || title.includes('motława')) {
+        venueHash = '#gdansk-zuraw';
+        venueName = 'Medieval Port Crane & Motława';
+      } else if (title.includes('neptun')) {
+        venueHash = '#gdansk-fontanna-neptuna';
+        venueName = "Neptune's Fountain";
+      } else if (title.includes('ii wojny') || title.includes('second world war') || title.includes('world war')) {
+        venueHash = '#gdansk-muzeum-ii-wojny';
+        venueName = 'Museum of the Second World War';
+      } else if (title.includes('solidar') || title.includes('ecs')) {
+        venueHash = '#gdansk-ecs-solidarnosc';
+        venueName = 'European Solidarity Centre';
+      } else if (title.includes('amber') || title.includes('bursztyn')) {
+        venueHash = '#gdansk-amber-museum';
+        venueName = 'Amber Museum at Great Mill';
+      } else if (title.includes('oliwa') || title.includes('organ')) {
+        venueHash = '#gdansk-katedra-oliwa';
+        venueName = 'Oliwa Cathedral & Organ';
+      } else if (title.includes('sopot') || title.includes('molo') || title.includes('pier')) {
+        venueHash = '#sopot-pier';
+        venueName = 'Sopot Pier & Baltic Coast';
+      }
+    }
+
     return {
       type: 'sight',
-      url: `/wayfinder/poland-christmas-2026/cities/${city}/attractions`,
-      buttonText: 'View Attractions Guide'
+      venueName,
+      url: `/wayfinder/poland-christmas-2026/cities/${city}/attractions${venueHash}`,
+      buttonText: venueName !== 'Must-See Sight' ? `View ${venueName} Tile` : 'View Attractions Guide'
     };
   }
 

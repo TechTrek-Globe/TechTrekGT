@@ -453,6 +453,24 @@ Governs the state invariants, atomic transaction guarantees, and edge lifecycle 
 - Schedule Stop Scope Invariant:
   - `JourneyStopSchedule` resolves `isAuthenticated` from props and context fallback, guaranteeing safe evaluation of `dayPrivate` and `dayAccommodations` across both authenticated and unauthenticated rendering paths with zero undefined reference exceptions.
 
+### 16.8 Deep-Linking, Smooth Auto-Scroll & Navigation State Invariants
+- Deterministic DOM Identifier Invariant:
+  - All sights in `mustSee` and all markets in `markets` across all 5 itinerary cities (Kraków, Wrocław, Poznań, Toruń, Gdańsk) must possess unique, explicit, kebab-case `id` strings matching destination hashtag targets in `itineraryTimeline.js`.
+  - Cards render with `id={sight?.id}` / `id={market.id}` and `scroll-mt-36` to ensure the viewport clears fixed sticky headers (56px navbar + sticky sub-toolbar).
+- Deep-Link Scroll Preemption Invariant:
+  - In `CityPage.jsx`, `useLayoutEffect` strictly checks `if (typeof window !== 'undefined' && window.location.hash) return;`.
+  - Generic sub-page header scroll animations are bypassed whenever a hash is present in the URL, granting exclusive control to the target tab component's smooth scrolling logic.
+- Target Highlight Lifecycle:
+  - When a target hash (`#targetId`) or query parameter (`?sight=...`, `?market=...`) is detected upon mount or `hashchange`, the target DOM node is smoothly scrolled to `block: 'center'`.
+  - The node receives transient highlight styling (`ring-4 ring-amber-400 shadow-[0_0_35px_rgba(245,158,11,0.8)]`).
+  - An unmount/cleanup timer removes the ring after exactly 3500ms to restore default card styling without polluting DOM state.
+- Market Grid Mounting Invariant:
+  - When deep-linking to an individual Christmas market, `CityMarketsTab.jsx` automatically sets `activeMarketTab = 'all'`, ensuring all market articles are rendered into the DOM before `document.getElementById` executes.
+- Geographic Turn-by-Turn Routing Invariant:
+  - All direct navigation anchors (`MustSeeCard`, `CityMarketsTab`, `ItineraryView`, `PolandLanding`) generate Google Maps URL strings with fully qualified query parameters (`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${venueLocation}, ${cityName || 'Poland'}`)}`).
+  - Appending the explicit city name prevents Google Maps from resolving identical street names in foreign jurisdictions.
+
+
 
 
 

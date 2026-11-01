@@ -113,6 +113,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
               : 'overview')))));
 
   useLayoutEffect(() => {
+    if (typeof window !== 'undefined' && window.location.hash) return;
     if (activeSubPage !== 'overview') {
       setTimeout(scrollToSubPageArea, 50);
     } else if (cityHeaderRef.current) {

@@ -149,7 +149,7 @@ export async function handleDocuments(context, url, method) {
       const doc = await env.DB.prepare(
         `SELECT * FROM wayfinder_documents 
          WHERE id = ? 
-           AND (user_id = ? OR journey_id IN (SELECT id FROM wayfinder_journeys WHERE created_by = ? OR visibility = 'public'))
+           AND (user_id = ? OR journey_id IN (SELECT id FROM wayfinder_journeys WHERE created_by = ?))
            AND deleted_at IS NULL`
       ).bind(docId, user.userId, user.userId).first();
 
@@ -183,7 +183,7 @@ export async function handleDocuments(context, url, method) {
       const doc = await env.DB.prepare(
         `SELECT * FROM wayfinder_documents 
          WHERE id = ? 
-           AND (user_id = ? OR journey_id IN (SELECT id FROM wayfinder_journeys WHERE created_by = ? OR visibility = 'public'))
+           AND (user_id = ? OR journey_id IN (SELECT id FROM wayfinder_journeys WHERE created_by = ?))
            AND deleted_at IS NULL`
       ).bind(docId, user.userId, user.userId).first();
       if (!doc) return json({ error: 'Document not found or permission denied' }, 404);

@@ -110,6 +110,7 @@ export async function handleExpenses(context, url, method) {
   try {
     // 1. GET /api/wayfinder/expenses - Fetch all expenses, splits, and settlements
     if (method === 'GET') {
+      if (!user?.userId) return json({ error: 'Authentication required' }, 401);
       const expensesQuery = await db.prepare(`
         SELECT * FROM wayfinder_expenses
         WHERE journey_id = ? OR journey_id = 'poland-christmas-2026'
@@ -176,35 +177,40 @@ export async function handleExpenses(context, url, method) {
       }
 
       const settleId = `stl-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-      await db.prepare(`
-        INSERT INTO wayfinder_expense_settlements (
-          id, journey_id, from_user_id, from_user_name, to_user_id, to_user_name,
-          amount, currency, settled_date, method, notes, expense_id, split_id, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, date('now'), ?, ?, ?, ?, datetime('now'))
-      `).bind(
-        settleId,
-        journeyId,
-        from_user_id,
-        from_user_name,
-        to_user_id,
-        to_user_name,
-        Number(amount),
-        currency.toUpperCase(),
-        payMethod,
-        notes,
-        expense_id,
-        split_id
-      ).run();
+      const settleStmts = [
+        db.prepare(`
+          INSERT INTO wayfinder_expense_settlements (
+            id, journey_id, from_user_id, from_user_name, to_user_id, to_user_name,
+            amount, currency, settled_date, method, notes, expense_id, split_id, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, date('now'), ?, ?, ?, ?, datetime('now'))
+        `).bind(
+          settleId,
+          journeyId,
+          from_user_id,
+          from_user_name,
+          to_user_id,
+          to_user_name,
+          Number(amount),
+          currency.toUpperCase(),
+          payMethod,
+          notes,
+          expense_id,
+          split_id
+        )
+      ];
 
       // If tied to a specific split, mark that split as settled
       if (split_id) {
-        await db.prepare(`
-          UPDATE wayfinder_expense_splits 
-          SET is_settled = 1, settled_at = datetime('now'), settle_method = ?
-          WHERE id = ?
-        `).bind(payMethod, split_id).run();
+        settleStmts.push(
+          db.prepare(`
+            UPDATE wayfinder_expense_splits 
+            SET is_settled = 1, settled_at = datetime('now'), settle_method = ?
+            WHERE id = ?
+          `).bind(payMethod, split_id)
+        );
       }
 
+      await db.batch(settleStmts);
       return json({ success: true, settlement_id: settleId });
     }
 
@@ -215,17 +221,21 @@ export async function handleExpenses(context, url, method) {
       const splitId = url.searchParams.get('split_id');
 
       if (splitId) {
-        await db.prepare('UPDATE wayfinder_expense_splits SET is_settled = 0, settled_at = NULL, settle_method = NULL WHERE id = ?').bind(splitId).run();
-        await db.prepare('DELETE FROM wayfinder_expense_settlements WHERE split_id = ?').bind(splitId).run();
+        await db.batch([
+          db.prepare('UPDATE wayfinder_expense_splits SET is_settled = 0, settled_at = NULL, settle_method = NULL WHERE id = ?').bind(splitId),
+          db.prepare('DELETE FROM wayfinder_expense_settlements WHERE split_id = ?').bind(splitId)
+        ]);
         return json({ success: true, un_settled_split: splitId });
       }
 
       if (settleId) {
         const stl = await db.prepare('SELECT * FROM wayfinder_expense_settlements WHERE id = ?').bind(settleId).first();
+        const delStmts = [];
         if (stl && stl.split_id) {
-          await db.prepare('UPDATE wayfinder_expense_splits SET is_settled = 0, settled_at = NULL, settle_method = NULL WHERE id = ?').bind(stl.split_id).run();
+          delStmts.push(db.prepare('UPDATE wayfinder_expense_splits SET is_settled = 0, settled_at = NULL, settle_method = NULL WHERE id = ?').bind(stl.split_id));
         }
-        await db.prepare('DELETE FROM wayfinder_expense_settlements WHERE id = ?').bind(settleId).run();
+        delStmts.push(db.prepare('DELETE FROM wayfinder_expense_settlements WHERE id = ?').bind(settleId));
+        await db.batch(delStmts);
         return json({ success: true, deleted_settlement: settleId });
       }
 
@@ -323,40 +333,61 @@ export async function handleExpenses(context, url, method) {
         }
       ];
 
-      for (const p of presets) {
+      const existingDescs = await db.prepare(
+        `SELECT description FROM wayfinder_expenses WHERE journey_id = ? OR journey_id = 'poland-christmas-2026'`
+      ).bind(journeyId).all();
+      const existingSet = new Set((existingDescs.results || []).map(r => r.description));
+      const toInsert = presets.filter(p => !existingSet.has(p.desc));
+
+      if (toInsert.length === 0) {
+        return json({ success: true, seeded: 0, message: 'All preset expenses already seeded' });
+      }
+
+      const presetStmts = [];
+      for (const p of toInsert) {
         const newId = `exp-preset-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
         const payerId = p.payerId || (p.paidBy === 'Jonathan Kemp' ? user.userId : 'usr-ronald-few');
 
-        await db.prepare(`
-          INSERT INTO wayfinder_expenses (
-            id, journey_id, user_id, paid_by_name, paid_by_user_id, category, description,
-            amount_original, currency_original, paid_status, purchase_site, payment_method, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', ?, ?, datetime('now'))
-        `).bind(
-          newId,
-          journeyId,
-          payerId,
-          p.paidBy,
-          payerId,
-          p.cat,
-          p.desc,
-          p.amount,
-          p.cur,
-          p.site || null,
-          p.method || null
-        ).run();
+        let amountUsd = p.amount;
+        if (p.cur === 'PLN') amountUsd = Math.round((p.amount / 4.0) * 100) / 100;
+        else if (p.cur === 'EUR') amountUsd = Math.round((p.amount * 1.08) * 100) / 100;
+
+        presetStmts.push(
+          db.prepare(`
+            INSERT INTO wayfinder_expenses (
+              id, journey_id, user_id, paid_by_name, paid_by_user_id, category, description,
+              amount_original, currency_original, amount_usd, paid_status, purchase_site, payment_method, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', ?, ?, datetime('now'))
+          `).bind(
+            newId,
+            journeyId,
+            payerId,
+            p.paidBy,
+            payerId,
+            p.cat,
+            p.desc,
+            p.amount,
+            p.cur,
+            amountUsd,
+            p.site || null,
+            p.method || null
+          )
+        );
 
         for (const s of p.splits) {
           const splitId = `spl-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-          await db.prepare(`
-            INSERT INTO wayfinder_expense_splits (
-              id, expense_id, user_id, user_name, amount_owed, percentage, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
-          `).bind(splitId, newId, s.userId, s.userName, s.amount, s.pct).run();
+          presetStmts.push(
+            db.prepare(`
+              INSERT INTO wayfinder_expense_splits (
+                id, expense_id, user_id, user_name, amount_owed, percentage, created_at
+              ) VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+            `).bind(splitId, newId, s.userId, s.userName, s.amount, s.pct)
+          );
         }
       }
 
-      return json({ success: true, seeded: presets.length });
+      await db.batch(presetStmts);
+      return json({ success: true, seeded: toInsert.length });
     }
 
     // 4. POST /api/wayfinder/expenses - Add new expense
@@ -385,45 +416,55 @@ export async function handleExpenses(context, url, method) {
       const payerName = paid_by_name || user.email || 'You';
       const newExpenseId = `exp-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
 
-      await db.prepare(`
-        INSERT INTO wayfinder_expenses (
-          id, journey_id, user_id, paid_by_name, paid_by_user_id, category, description,
-          amount_original, currency_original, paid_status, purchase_site, payment_method, notes, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', ?, ?, ?, datetime('now'))
-      `).bind(
-        newExpenseId,
-        journeyId,
-        payerUserId,
-        payerName,
-        payerUserId,
-        category,
-        description,
-        Number(amount_original),
-        currency_original.toUpperCase(),
-        purchase_site || null,
-        payment_method || null,
-        notes
-      ).run();
+      let amountUsd = Number(amount_original);
+      if (currency_original.toUpperCase() === 'PLN') amountUsd = Math.round((Number(amount_original) / 4.0) * 100) / 100;
+      else if (currency_original.toUpperCase() === 'EUR') amountUsd = Math.round((Number(amount_original) * 1.08) * 100) / 100;
+
+      const postStmts = [
+        db.prepare(`
+          INSERT INTO wayfinder_expenses (
+            id, journey_id, user_id, paid_by_name, paid_by_user_id, category, description,
+            amount_original, currency_original, amount_usd, paid_status, purchase_site, payment_method, notes, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', ?, ?, ?, datetime('now'))
+        `).bind(
+          newExpenseId,
+          journeyId,
+          payerUserId,
+          payerName,
+          payerUserId,
+          category,
+          description,
+          Number(amount_original),
+          currency_original.toUpperCase(),
+          amountUsd,
+          purchase_site || null,
+          payment_method || null,
+          notes
+        )
+      ];
 
       // Insert splits
       if (Array.isArray(splits) && splits.length > 0) {
         for (const s of splits) {
           const splitId = `spl-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-          await db.prepare(`
-            INSERT INTO wayfinder_expense_splits (
-              id, expense_id, user_id, user_name, amount_owed, percentage, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
-          `).bind(
-            splitId,
-            newExpenseId,
-            s.user_id || s.userId || user.userId,
-            s.user_name || s.userName || 'Member',
-            Number(s.amount_owed || s.amountOwed || 0),
-            Number(s.percentage || 0)
-          ).run();
+          postStmts.push(
+            db.prepare(`
+              INSERT INTO wayfinder_expense_splits (
+                id, expense_id, user_id, user_name, amount_owed, percentage, created_at
+              ) VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+            `).bind(
+              splitId,
+              newExpenseId,
+              s.user_id || s.userId || user.userId,
+              s.user_name || s.userName || 'Member',
+              Number(s.amount_owed || s.amountOwed || 0),
+              Number(s.percentage || 0)
+            )
+          );
         }
       }
 
+      await db.batch(postStmts);
       return json({ success: true, id: newExpenseId });
     }
 
@@ -453,30 +494,38 @@ export async function handleExpenses(context, url, method) {
       const payerUserId = paid_by_user_id || paid_by_id || user.userId;
       const payerName = paid_by_name || user.email || 'You';
 
-      await db.prepare(`
-        UPDATE wayfinder_expenses
-        SET description = ?,
-            category = ?,
-            amount_original = ?,
-            currency_original = ?,
-            paid_by_name = ?,
-            paid_by_user_id = ?,
-            purchase_site = ?,
-            payment_method = ?,
-            notes = ?
-        WHERE id = ?
-      `).bind(
-        description,
-        category,
-        Number(amount_original),
-        currency_original.toUpperCase(),
-        payerName,
-        payerUserId,
-        purchase_site || null,
-        payment_method || null,
-        notes,
-        targetExpenseId
-      ).run();
+      let amountUsd = Number(amount_original);
+      if (currency_original.toUpperCase() === 'PLN') amountUsd = Math.round((Number(amount_original) / 4.0) * 100) / 100;
+      else if (currency_original.toUpperCase() === 'EUR') amountUsd = Math.round((Number(amount_original) * 1.08) * 100) / 100;
+
+      const putStmts = [
+        db.prepare(`
+          UPDATE wayfinder_expenses
+          SET description = ?,
+              category = ?,
+              amount_original = ?,
+              currency_original = ?,
+              amount_usd = ?,
+              paid_by_name = ?,
+              paid_by_user_id = ?,
+              purchase_site = ?,
+              payment_method = ?,
+              notes = ?
+          WHERE id = ?
+        `).bind(
+          description,
+          category,
+          Number(amount_original),
+          currency_original.toUpperCase(),
+          amountUsd,
+          payerName,
+          payerUserId,
+          purchase_site || null,
+          payment_method || null,
+          notes,
+          targetExpenseId
+        )
+      ];
 
       // If splits provided, preserve settlement state where possible, then update splits
       if (Array.isArray(splits) && splits.length > 0) {
@@ -488,7 +537,7 @@ export async function handleExpenses(context, url, method) {
           }
         }
 
-        await db.prepare('DELETE FROM wayfinder_expense_splits WHERE expense_id = ?').bind(targetExpenseId).run();
+        putStmts.push(db.prepare('DELETE FROM wayfinder_expense_splits WHERE expense_id = ?').bind(targetExpenseId));
 
         for (const s of splits) {
           const splitId = `spl-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
@@ -501,24 +550,27 @@ export async function handleExpenses(context, url, method) {
           const settledAt = prevSettled ? prevSettled.settled_at : null;
           const settleMethod = prevSettled ? prevSettled.settle_method : null;
 
-          await db.prepare(`
-            INSERT INTO wayfinder_expense_splits (
-              id, expense_id, user_id, user_name, amount_owed, percentage, is_settled, settled_at, settle_method, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
-          `).bind(
-            splitId,
-            targetExpenseId,
-            uId,
-            uName,
-            amtOwed,
-            pct,
-            isSettled,
-            settledAt,
-            settleMethod
-          ).run();
+          putStmts.push(
+            db.prepare(`
+              INSERT INTO wayfinder_expense_splits (
+                id, expense_id, user_id, user_name, amount_owed, percentage, is_settled, settled_at, settle_method, created_at, updated_at
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+            `).bind(
+              splitId,
+              targetExpenseId,
+              uId,
+              uName,
+              amtOwed,
+              pct,
+              isSettled,
+              settledAt,
+              settleMethod
+            )
+          );
         }
       }
 
+      await db.batch(putStmts);
       return json({ success: true, updated: targetExpenseId });
     }
 
@@ -526,8 +578,10 @@ export async function handleExpenses(context, url, method) {
     if (method === 'DELETE' && expenseId) {
       if (!user) return json({ error: 'Authentication required' }, 401);
 
-      await db.prepare('DELETE FROM wayfinder_expense_splits WHERE expense_id = ?').bind(expenseId).run();
-      await db.prepare('DELETE FROM wayfinder_expenses WHERE id = ?').bind(expenseId).run();
+      await db.batch([
+        db.prepare('DELETE FROM wayfinder_expense_splits WHERE expense_id = ?').bind(expenseId),
+        db.prepare('DELETE FROM wayfinder_expenses WHERE id = ?').bind(expenseId)
+      ]);
 
       return json({ success: true, deleted: expenseId });
     }

@@ -10,7 +10,9 @@ export async function handleExchangeRate(context, url, method) {
   }
 
   try {
-    const apiRes = await fetch('https://open.er-api.com/v6/latest/USD');
+    const apiRes = await fetch('https://open.er-api.com/v6/latest/USD', {
+      signal: AbortSignal.timeout(8000),
+    });
     if (!apiRes.ok) {
       throw new Error('Upstream rates provider error');
     }
@@ -28,6 +30,9 @@ export async function handleExchangeRate(context, url, method) {
         GBP: parseFloat(gbp.toFixed(4)),
       },
       usdToPln: parseFloat(pln.toFixed(2)),
+      eurToPln: parseFloat(eur.toFixed(2)),
+      gbpToPln: parseFloat(gbp.toFixed(2)),
+      plnToUsd: parseFloat((1 / pln).toFixed(4)),
       timestamp: Date.now(),
       lastUpdated: new Date().toISOString(),
     };

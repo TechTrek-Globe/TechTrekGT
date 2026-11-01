@@ -302,7 +302,7 @@ export function parseGetYourGuideEmail(fullText, subject = '', from = '') {
 
   // 10. Date
   let localDate = '2026-12-06';
-  const isoMatch = text.match(/2026-(12)-(0[1-9]|1[0-5])/);
+  const isoMatch = text.match(/2026-(12)-(0[1-9]|[12]\d|3[01])/);
   if (isoMatch) localDate = isoMatch[0];
 
   return {
@@ -409,7 +409,7 @@ function cleanTitleAndProvider(rawSubject, body, from) {
   return { title, provider, item_type, suggestedDate, suggestedTime, suggestedLocation };
 }
 
-function extractBookingFields(subject, body, from) {
+export function extractBookingFields(subject, body, from) {
   const fullText = subject + ' ' + body;
   const lower = fullText.toLowerCase();
 
@@ -440,7 +440,7 @@ function extractBookingFields(subject, body, from) {
 
   // Date extraction
   let localDate = null;
-  const isoMatch = lower.match(/2026-(12)-(0[1-9]|1[0-5])/);
+  const isoMatch = lower.match(/2026-(12)-(0[1-9]|[12]\d|3[01])/);
   if (isoMatch) {
     localDate = isoMatch[0];
   } else {
@@ -453,7 +453,7 @@ function extractBookingFields(subject, body, from) {
       const m = monthMap[mStr] || '12';
       localDate = `2026-${m}-${String(dayNum).padStart(2, '0')}`;
     } else {
-      const decMatch = lower.match(/(?:dec(?:ember)?\.?\s+([1-9]|0[1-9]|1[0-5])(?:st|nd|rd|th)?)|(?:([1-9]|0[1-9]|1[0-5])(?:st|nd|rd|th)?\s+dec(?:ember)?)/i);
+      const decMatch = lower.match(/(?:dec(?:ember)?\.?\s+([12]\d|3[01]|0[1-9]|[1-9])(?:st|nd|rd|th)?)|(?:([12]\d|3[01]|0[1-9]|[1-9])(?:st|nd|rd|th)?\s+dec(?:ember)?)/i);
       if (decMatch) {
         const dayNum = parseInt(decMatch[1] || decMatch[2], 10);
         localDate = `2026-12-${String(dayNum).padStart(2, '0')}`;
@@ -569,6 +569,9 @@ export async function handleInboundEmail(message, env) {
           }
           if (geminiExtraction.start_date) {
             fields.local_date = geminiExtraction.start_date;
+          }
+          if (geminiExtraction.end_date) {
+            fields.end_date = geminiExtraction.end_date;
           }
           if (geminiExtraction.start_time) {
             fields.local_time = geminiExtraction.start_time;
@@ -696,15 +699,16 @@ export async function handleInboundEmail(message, env) {
       env.DB.prepare(
         `INSERT INTO wayfinder_itinerary_items
          (id, journey_id, user_id, item_type, title, provider,
-          local_date, local_time, end_time, location, source_document_id,
+          local_date, local_time, end_date, end_time, location, source_document_id,
           purchase_site, payment_method,
           notes, status, verification_status, visibility)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,'imported','user_verified','private')`
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'imported','user_verified','private')`
       ).bind(
         itemId, inbox.journey_id, inbox.user_id,
         fields.item_type, fields.title, fields.provider || null,
         fields.local_date || journey.start_date || '2026-12-03',
         fields.local_time || null,
+        fields.end_date || null,
         fields.end_time || null,
         fields.location || null,
         docId,
@@ -732,7 +736,8 @@ export async function handleInboundEmail(message, env) {
       let amountUsd = rawAmt;
       if (cur === 'PLN') amountUsd = Math.round((rawAmt / 4.0) * 100) / 100;
       else if (cur === 'EUR') amountUsd = Math.round((rawAmt * 1.08) * 100) / 100;
-      const halfAmount = Math.round((rawAmt / 2) * 100) / 100;
+      const split1 = Math.floor((rawAmt / 2) * 100) / 100;
+      const split2 = Number((rawAmt - split1).toFixed(2));
       const expenseCat = mapDocTypeToExpenseCategory(fields.item_type);
       const nowIso = new Date().toISOString();
 
@@ -767,12 +772,12 @@ export async function handleInboundEmail(message, env) {
           `INSERT INTO wayfinder_expense_splits
            (id, expense_id, user_id, user_name, amount_owed, percentage, created_at)
            VALUES (?, ?, ?, 'Jonathan Kemp', ?, 50, ?)`
-        ).bind(splitId1, expenseId, inbox.user_id, halfAmount, nowIso),
+        ).bind(splitId1, expenseId, inbox.user_id, split1, nowIso),
         env.DB.prepare(
           `INSERT INTO wayfinder_expense_splits
            (id, expense_id, user_id, user_name, amount_owed, percentage, created_at)
            VALUES (?, ?, 'usr-ronald-few', 'Ronald Milton Few', ?, 50, ?)`
-        ).bind(splitId2, expenseId, halfAmount, nowIso)
+        ).bind(splitId2, expenseId, split2, nowIso)
       );
     }
 

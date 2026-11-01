@@ -890,34 +890,35 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
 
       {/* Add Expense Modal */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
-          <div className="glass-panel w-full max-w-md p-6 rounded-3xl border border-amber-500/30 bg-slate-900 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <h3 className="text-lg font-black text-white flex items-center space-x-2">
-                {editingExpense ? (
-                  <>
-                    <Edit2 className="w-5 h-5 text-amber-400" />
-                    <span>Edit Expense & Payer</span>
-                  </>
-                ) : (
-                  <>
-                    <Receipt className="w-5 h-5 text-amber-400" />
-                    <span>Add Trip Expense</span>
-                  </>
-                )}
-              </h3>
-              <button 
-                type="button" 
-                onClick={() => { setIsAddModalOpen(false); setEditingExpense(null); }}
-                className="text-slate-400 hover:text-white text-sm"
-              >
-                ✕
-              </button>
-            </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in overflow-y-auto">
+          <div className="glass-panel w-full max-w-lg max-h-[90vh] flex flex-col rounded-3xl border border-amber-500/30 bg-slate-900 shadow-2xl overflow-hidden my-auto">
+            <form onSubmit={handleSaveExpense} className="flex flex-col max-h-[90vh] h-full text-xs sm:text-sm">
+              <div className="flex items-center justify-between border-b border-white/10 px-5 sm:px-6 py-4 flex-shrink-0 bg-slate-900">
+                <h3 className="text-lg font-black text-white flex items-center space-x-2">
+                  {editingExpense ? (
+                    <>
+                      <Edit2 className="w-5 h-5 text-amber-400" />
+                      <span>Edit Expense & Payer</span>
+                    </>
+                  ) : (
+                    <>
+                      <Receipt className="w-5 h-5 text-amber-400" />
+                      <span>Add Trip Expense</span>
+                    </>
+                  )}
+                </h3>
+                <button 
+                  type="button" 
+                  onClick={() => { setIsAddModalOpen(false); setEditingExpense(null); }}
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+                >
+                  ✕
+                </button>
+              </div>
 
-            <form onSubmit={handleSaveExpense} className="space-y-4 text-xs sm:text-sm">
-              <div>
-                <label className="block font-bold text-slate-300 mb-1">Description</label>
+              <div className="overflow-y-auto px-5 sm:px-6 py-4 space-y-4 flex-1">
+                <div>
+                  <label className="block font-bold text-slate-300 mb-1">Description</label>
                 <input
                   type="text"
                   required
@@ -1065,18 +1066,21 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
                 </div>
               </div>
 
-              <div className="pt-2 flex items-center justify-end space-x-2">
+              </div>
+
+              {/* Pinned Footer with Action Buttons */}
+              <div className="border-t border-white/10 px-5 sm:px-6 py-3.5 bg-slate-900/95 backdrop-blur-sm flex items-center justify-end space-x-2 flex-shrink-0">
                 <button
                   type="button"
                   onClick={() => { setIsAddModalOpen(false); setEditingExpense(null); }}
-                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white"
+                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold shadow-md cursor-pointer disabled:opacity-50"
+                  className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold shadow-md cursor-pointer disabled:opacity-50 transition-colors"
                 >
                   {isSubmitting ? 'Saving...' : editingExpense ? 'Update Expense' : 'Save Expense'}
                 </button>
@@ -1088,8 +1092,8 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
 
       {/* Record Total Settle-Up Modal */}
       {isSettleModalOpen && activeTransferToSettle && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
-          <div className="glass-panel w-full max-w-sm p-6 rounded-3xl border border-emerald-500/30 bg-slate-900 shadow-2xl space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in overflow-y-auto">
+          <div className="glass-panel w-full max-w-sm max-h-[90vh] overflow-y-auto p-6 rounded-3xl border border-emerald-500/30 bg-slate-900 shadow-2xl space-y-4 my-auto">
             <div>
               <h3 className="text-base sm:text-lg font-black text-white flex items-center space-x-2">
                 <CheckCircle2 className="w-5 h-5 text-emerald-400" />
@@ -1159,8 +1163,8 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
 
       {/* Record Item-by-Item Settle Modal */}
       {activeItemToSettle && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
-          <div className="glass-panel w-full max-w-sm p-6 rounded-3xl border border-amber-500/40 bg-slate-900 shadow-2xl space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in overflow-y-auto">
+          <div className="glass-panel w-full max-w-sm max-h-[90vh] overflow-y-auto p-6 rounded-3xl border border-amber-500/40 bg-slate-900 shadow-2xl space-y-4 my-auto">
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <h3 className="text-base sm:text-lg font-black text-white flex items-center space-x-2">
                 <Receipt className="w-5 h-5 text-amber-400" />

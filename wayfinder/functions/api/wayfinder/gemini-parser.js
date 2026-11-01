@@ -464,6 +464,7 @@ const SENSITIVE_PASSPORT_REGEX = /\b(passport(?:\s*(?:no|number|#))?|doc(?:ument
 
 function isLuhnValid(numStr) {
   const digits = numStr.replace(/\D/g, '');
+  if (digits.length < 13 || digits.length > 19) return false;
   let sum = 0;
   let alt = false;
   for (let i = digits.length - 1; i >= 0; i--) {

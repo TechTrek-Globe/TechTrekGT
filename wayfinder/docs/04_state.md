@@ -376,3 +376,27 @@ Governs the state transitions, foreign key alignment, and ledger synchronization
     - Invariant: `split1 + split2 === parsedCost.amount` strictly holds across all amounts.
   - Initial Approval: Inserts `wayfinder_expenses` and two `wayfinder_expense_splits` rows.
   - Re-Approval: When `existingExpense` exists for the document, an `UPDATE` statement updates `wayfinder_expenses` (`amount_original`, `currency_original`, `description`, `purchase_site`, `payment_method`) and updates both `wayfinder_expense_splits` rows with recalculated split amounts, ensuring traveler price edits propagate to the shared ledger.
+
+## 16. Edge API Hardening & State Mutation Invariants
+
+Governs the state invariants, atomic transaction guarantees, and edge lifecycle contracts across Wayfinder backend services:
+
+### 16.1 Shared Journey Resolution & Expense Normalization
+- Journey Lookup Invariant:
+  - Approval and budget queries resolve journeys using `(journey_id = ? OR journey_id = ?)` against both `journey.id` and `journey.slug`, with fallback to the platform default `poland-christmas-2026`.
+- Amount USD Normalization:
+  - Both `import-jobs.js` and `expenses.js` compute and persist `amount_usd` upon creation and edit (`parsedCost.amount` for USD, `Math.round((amount / 4.0) * 100) / 100` for PLN, `Math.round((amount * 1.08) * 100) / 100` for EUR), preventing imported ledger items from classifying as unpriced items in `budget.js`.
+  - Ledger queries in `budget.js` surface shared expenses where the user has an assigned split in `wayfinder_expense_splits`, ensuring companion expenses are accounted for.
+
+### 16.2 Atomic Mutation Batch Invariants
+- All multi-statement write operations across `expenses.js` (`POST /preset`, `POST /expenses`, `PUT /expenses/:id`, `DELETE /expenses/:id`, `DELETE /settle`) execute via atomic `env.DB.batch(stmts)`.
+- Eliminates orphaned split records or partial state transitions on network or database exceptions.
+- Preset seeding checks existing descriptions (`SELECT description FROM wayfinder_expenses WHERE journey_id = ? OR journey_id = 'poland-christmas-2026'`), executing insert batches only for novel entries.
+
+### 16.3 Inbox Lifecycle & Calendar Rollover Invariants
+- Email Inbox State:
+  - When provisioning an inbox via `POST /api/wayfinder/email-inboxes`, existing soft-deleted records (`is_active === 0`) are reactivated to `is_active = 1` in D1, restoring email forwarding without violating the unique `(user_id, journey_id)` database constraint.
+- RFC 5545 Chronological Invariant:
+  - The calendar generator applies `addMinutesWithDate(dateStr, timeStr, minsToAdd)` across scheduled activities, flight arrivals, hotel check-in/out, and private items.
+  - Invariant: `DTEND >= DTSTART` strictly holds even when activities or bookings cross midnight (advancing `endDate` via `addDays(dateStr, Math.floor(total / 1440))`).
+

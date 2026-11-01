@@ -104,6 +104,19 @@ function addMinutes(timeStr, minsToAdd) {
   return `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
 }
 
+// Add minutes to HH:MM time with date rollover support
+export function addMinutesWithDate(dateStr, timeStr, minsToAdd) {
+  const [h, m] = (timeStr || '12:00').split(':').map(Number);
+  const total = h * 60 + m + minsToAdd;
+  const daysToAdd = Math.floor(total / 1440);
+  const remainingMinutes = ((total % 1440) + 1440) % 1440;
+  const endH = Math.floor(remainingMinutes / 60);
+  const endM = remainingMinutes % 60;
+  const endTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+  const endDate = daysToAdd > 0 ? addDays(dateStr, daysToAdd) : dateStr;
+  return { endDate, endTime };
+}
+
 // Add days to YYYY-MM-DD
 function addDays(dateStr, daysToAdd = 1) {
   const parts = dateStr.split('-').map(Number);
@@ -261,14 +274,14 @@ async function gatherEvents({ db, journeyId = 'poland-christmas-2026', userId = 
         }
 
         const startTime = item.time || '12:00';
-        const endTime = addMinutes(startTime, durationMins);
+        const { endDate, endTime } = addMinutesWithDate(day.date, startTime, durationMins);
 
         events.push({
           uid: `wf-poland2026-day${day.day}-item${idx}@techtrekgt.com`,
           allDay: false,
           startDate: day.date,
           startTime: startTime,
-          endDate: day.date,
+          endDate: endDate,
           endTime: endTime,
           summary: item.title,
           description: `${item.description || ''}${item.badge ? `\n[${item.badge}]` : ''}`,
@@ -282,13 +295,16 @@ async function gatherEvents({ db, journeyId = 'poland-christmas-2026', userId = 
   // 2. Flight DL9208 Inbound Touchdown Event
   if (polandJourney.flightArrival) {
     const f = polandJourney.flightArrival;
+    const fArrivalDate = f.arrivalDate || '2026-12-04';
+    const fArrivalTime = f.arrivalTime || '13:30';
+    const { endDate: fEndDate, endTime: fEndTime } = addMinutesWithDate(fArrivalDate, fArrivalTime, 60);
     events.push({
       uid: 'wf-poland2026-flight-dl9208@techtrekgt.com',
       allDay: false,
-      startDate: f.arrivalDate || '2026-12-04',
-      startTime: f.arrivalTime || '13:30',
-      endDate: f.arrivalDate || '2026-12-04',
-      endTime: addMinutes(f.arrivalTime || '13:30', 60),
+      startDate: fArrivalDate,
+      startTime: fArrivalTime,
+      endDate: fEndDate,
+      endTime: fEndTime,
       summary: `Flight Arrival: ${f.flightNumber} (${f.carrier})`,
       description: `Flight: ${f.flightNumber}\nRoute: ${f.inboundLeg2}\nConfirmation: ${f.confirmationNumber}\nPassengers: ${f.passengers}\nLayover: ${f.layover}\n${f.checkInSync}`,
       location: `${f.airport} (${f.airportCode})`,
@@ -331,13 +347,15 @@ async function gatherEvents({ db, journeyId = 'poland-christmas-2026', userId = 
     if (alreadyCoveredByD1) continue;
 
     // Check-in event
+    const checkInTime = acc.check_in_time || '15:00';
+    const { endDate: ciEndDate, endTime: ciEndTime } = addMinutesWithDate(acc.check_in_date, checkInTime, 60);
     events.push({
       uid: `wf-hotel-checkin-${acc.id}@techtrekgt.com`,
       allDay: false,
       startDate: acc.check_in_date,
-      startTime: acc.check_in_time || '15:00',
-      endDate: acc.check_in_date,
-      endTime: addMinutes(acc.check_in_time || '15:00', 60),
+      startTime: checkInTime,
+      endDate: ciEndDate,
+      endTime: ciEndTime,
       summary: `Hotel Check-in: ${acc.title}`,
       description: `Accommodation: ${acc.hotel_name}\nGuest: ${acc.guest_name}\nPhone: ${acc.phone}\nEmail: ${acc.email}\nWeb: ${acc.website_url}`,
       location: acc.location,
@@ -345,15 +363,17 @@ async function gatherEvents({ db, journeyId = 'poland-christmas-2026', userId = 
     });
 
     // Check-out event
+    const checkOutTime = acc.check_out_time || '11:00';
+    const { endDate: coEndDate, endTime: coEndTime } = addMinutesWithDate(acc.check_out_date, checkOutTime, 30);
     events.push({
       uid: `wf-hotel-checkout-${acc.id}@techtrekgt.com`,
       allDay: false,
       startDate: acc.check_out_date,
-      startTime: acc.check_out_time || '11:00',
-      endDate: acc.check_out_date,
-      endTime: addMinutes(acc.check_out_time || '11:00', 30),
+      startTime: checkOutTime,
+      endDate: coEndDate,
+      endTime: coEndTime,
       summary: `Hotel Check-out: ${acc.title}`,
-      description: `Departing ${acc.hotel_name}.\nCheck-out deadline: ${acc.check_out_time || '11:00'}`,
+      description: `Departing ${acc.hotel_name}.\nCheck-out deadline: ${checkOutTime}`,
       location: acc.location,
       categories: 'HOTEL,LODGING'
     });
@@ -364,8 +384,16 @@ async function gatherEvents({ db, journeyId = 'poland-christmas-2026', userId = 
     if (!item.local_date) continue;
 
     const startTime = item.local_time || '10:00';
-    const endTime = item.end_time || addMinutes(startTime, 90);
-    const endDate = item.end_date || item.local_date;
+    let endDate = item.end_date || item.local_date;
+    let endTime = item.end_time;
+
+    if (!endTime) {
+      const timing = addMinutesWithDate(item.local_date, startTime, 90);
+      endDate = item.end_date || timing.endDate;
+      endTime = timing.endTime;
+    } else if (!item.end_date && endTime < startTime) {
+      endDate = addDays(item.local_date, 1);
+    }
 
     events.push({
       uid: `wf-d1-item-${item.id}@techtrekgt.com`,
@@ -389,12 +417,14 @@ function getSubscribeUrls(requestUrl, token) {
   const url = new URL(requestUrl);
   const host = url.host;
   const protocol = url.protocol; // http: or https:
+  const basePath = url.pathname.replace(/\/token\/?$/, '');
+  const feedPath = `${basePath}/feed/${token}.ics`;
 
   // HTTPS direct feed endpoint
-  const feedUrl = `${protocol}//${host}/wayfinder/api/wayfinder/calendar/feed/${token}.ics`;
+  const feedUrl = `${protocol}//${host}${feedPath}`;
 
   // webcal:// URL scheme for native Apple Calendar / Outlook protocol handler
-  const webcalUrl = `webcal://${host}/wayfinder/api/wayfinder/calendar/feed/${token}.ics`;
+  const webcalUrl = `webcal://${host}${feedPath}`;
 
   // Google Calendar 1-click web subscription link
   const googleUrl = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(webcalUrl)}`;

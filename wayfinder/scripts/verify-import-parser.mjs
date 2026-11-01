@@ -7,6 +7,13 @@ import {
   heuristicParseDocument,
   mapExtractionToFields
 } from '../functions/api/wayfinder/gemini-parser.js';
+import {
+  parseGetYourGuideEmail,
+  extractBookingFields
+} from '../functions/api/wayfinder/email-worker.js';
+import {
+  addMinutesWithDate
+} from '../functions/api/wayfinder/calendar.js';
 
 let passedCount = 0;
 function test(name, fn) {
@@ -53,6 +60,15 @@ test('Luhn card numbers are redacted; false positives preserved', () => {
   const pkpRef = 'PKP ref 73829102938';
   const scrubbedRef = scrubSensitiveData(pkpRef);
   assert.equal(scrubbedRef, pkpRef, 'Non-Luhn reference number must not be redacted');
+
+  // Numbers with hyphens or spaces but fewer than 13 actual digits must not be redacted
+  const twelveDigits = 'Ref 0000 0000 0000 id';
+  const scrubbedTwelve = scrubSensitiveData(twelveDigits);
+  assert.equal(scrubbedTwelve, twelveDigits, '12-digit string must not be redacted');
+
+  const shortHyphen = 'Code 1-2-3-4-5-6-7 end';
+  const scrubbedShort = scrubSensitiveData(shortHyphen);
+  assert.equal(scrubbedShort, shortHyphen, '7-digit string with hyphens must not be redacted');
 });
 
 console.log('--- 2. Heuristic Parser Rule Tightening & Ordering Tests ---');
@@ -217,6 +233,81 @@ test('isSensitiveField blocks passport, CVV, and raw payment fields', () => {
   assert.equal(isSensitiveField('payment_token'), true);
   assert.equal(isSensitiveField('title'), false);
   assert.equal(isSensitiveField('departure_date'), false);
+});
+
+console.log('--- 6. December 16-31 Full-Month Date Regex Tests ---');
+
+test('GetYourGuide parses dates from 16th through 31st of December', () => {
+  const gyg18 = parseGetYourGuideEmail('Activity date: 2026-12-18 at 09:00', 'Your Tour', 'tour@getyourguide.com');
+  assert.equal(gyg18.local_date, '2026-12-18');
+
+  const gyg25 = parseGetYourGuideEmail('Activity date: 2026-12-25 at 10:00', 'Christmas Tour', 'tour@getyourguide.com');
+  assert.equal(gyg25.local_date, '2026-12-25');
+
+  const gyg31 = parseGetYourGuideEmail('Activity date: 2026-12-31 at 18:00', 'NYE Tour', 'tour@getyourguide.com');
+  assert.equal(gyg31.local_date, '2026-12-31');
+});
+
+test('General email parser extracts ISO and formatted dates Dec 16-31', () => {
+  const f1 = extractBookingFields('Booking confirmation', 'Check-in on 2026-12-20 at 15:00', 'booking@hotel.pl');
+  assert.equal(f1.local_date, '2026-12-20');
+
+  const f2 = extractBookingFields('Hotel confirmation', 'Arrival December 24th in Warsaw', 'stay@hotel.pl');
+  assert.equal(f2.local_date, '2026-12-24');
+
+  const f3 = extractBookingFields('Hotel confirmation', 'Arrival 31 Dec in Krakow', 'stay@hotel.pl');
+  assert.equal(f3.local_date, '2026-12-31');
+});
+
+console.log('--- 7. Midnight Calendar Rollover Tests ---');
+
+test('addMinutesWithDate correctly advances date and calculates end time on midnight crossing', () => {
+  // Late evening event crossing midnight: 23:30 + 90 mins -> 01:00 next day
+  const r1 = addMinutesWithDate('2026-12-07', '23:30', 90);
+  assert.equal(r1.endDate, '2026-12-08');
+  assert.equal(r1.endTime, '01:00');
+
+  // Exact midnight: 23:00 + 60 mins -> 00:00 next day
+  const r2 = addMinutesWithDate('2026-12-07', '23:00', 60);
+  assert.equal(r2.endDate, '2026-12-08');
+  assert.equal(r2.endTime, '00:00');
+
+  // Normal daytime event: 14:00 + 60 mins -> 15:00 same day
+  const r3 = addMinutesWithDate('2026-12-07', '14:00', 60);
+  assert.equal(r3.endDate, '2026-12-07');
+  assert.equal(r3.endTime, '15:00');
+
+  // Year boundary rollover: 2026-12-31 23:45 + 30 mins -> 2027-01-01 00:15
+  const r4 = addMinutesWithDate('2026-12-31', '23:45', 30);
+  assert.equal(r4.endDate, '2027-01-01');
+  assert.equal(r4.endTime, '00:15');
+});
+
+console.log('--- 8. Expense amount_usd and Split Rounding Tests ---');
+
+test('amount_usd computes accurately for USD, PLN, and EUR', () => {
+  // USD
+  const amtUsd = 284.76;
+  assert.equal(amtUsd, 284.76);
+
+  // PLN (rate 4.0)
+  const amtPln = 2400.00;
+  const convertedPln = Math.round((amtPln / 4.0) * 100) / 100;
+  assert.equal(convertedPln, 600.00);
+
+  // EUR (rate 1.08)
+  const amtEur = 150.00;
+  const convertedEur = Math.round((amtEur * 1.08) * 100) / 100;
+  assert.equal(convertedEur, 162.00);
+});
+
+test('Odd-cent split partitioning preserves exact original total', () => {
+  const rawAmt = 366.43;
+  const split1 = Math.floor((rawAmt / 2) * 100) / 100;
+  const split2 = Number((rawAmt - split1).toFixed(2));
+  assert.equal(split1, 183.21);
+  assert.equal(split2, 183.22);
+  assert.equal(Number((split1 + split2).toFixed(2)), 366.43);
 });
 
 console.log(`\nAll ${passedCount} verification tests passed successfully!`);

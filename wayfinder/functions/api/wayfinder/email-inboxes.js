@@ -57,11 +57,19 @@ export async function handleEmailInboxes(context, url, method) {
       ).bind(journeyId, journeyId, user.userId).first();
       if (!journey) return json({ error: 'Journey not found' }, 404);
 
-      // Idempotent: return existing active inbox if one already exists
+      // Idempotent: return existing active inbox if one already exists (re-activate if soft-deleted)
       const existing = await env.DB.prepare(
         'SELECT * FROM wayfinder_email_inboxes WHERE user_id = ? AND journey_id = ?'
       ).bind(user.userId, journey.id).first();
-      if (existing) return json({ inbox: safeInbox(existing), created: false });
+      if (existing) {
+        if (existing.is_active === 0) {
+          await env.DB.prepare(
+            'UPDATE wayfinder_email_inboxes SET is_active = 1 WHERE id = ?'
+          ).bind(existing.id).run();
+          existing.is_active = 1;
+        }
+        return json({ inbox: safeInbox(existing), created: false });
+      }
 
       // Provision new unique inbox
       const token    = generateInboxToken();

@@ -16,8 +16,11 @@ export async function handleBudget(context, url, method) {
     if (!journey) return json({ error: 'Journey not found' }, 404);
 
     const expenses = await env.DB.prepare(
-      'SELECT * FROM wayfinder_expenses WHERE journey_id = ? AND user_id = ? ORDER BY category, created_at'
-    ).bind(journeyId, user.userId).all();
+      `SELECT * FROM wayfinder_expenses
+       WHERE (journey_id = ? OR journey_id = ?)
+         AND (user_id = ? OR id IN (SELECT expense_id FROM wayfinder_expense_splits WHERE user_id = ?))
+       ORDER BY category, created_at`
+    ).bind(journey.id, journeyId, user.userId, user.userId).all();
 
     // Aggregate by category
     const byCategory = {};

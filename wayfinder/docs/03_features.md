@@ -408,3 +408,40 @@ Hardenings in [import-jobs.js](file:///e:/TechTrekGT/wayfinder/functions/api/way
   - Removes `?key=` query parameters from the endpoint URL, enforcing authentication strictly via the `x-goog-api-key` header.
   - Enforces `AbortSignal.timeout(20000)` on the serverless `fetch` call to fail fast and fall back gracefully to heuristic parsing if the API stalls.
 
+## 22. Cross-File Backend API Hardening & Resilience Protocols
+
+Comprehensive backend hardening across Wayfinder API endpoints ensures zero-loss multi-currency ledger tracking, midnight calendar compliance, and tightened edge security:
+
+- Shared Expedition Approval Resilience ([import-jobs.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/import-jobs.js)):
+  - Journey check in approval workflow matches if created by current user or if matching the shared `'poland-christmas-2026'` expedition (`slug = 'poland-christmas-2026' OR id = 'poland-christmas-2026'`), falling back to `poland-christmas-2026` if journey table row is unseeded.
+  - Computes `amountUsd` from original currencies (1:1 for USD, 4.0 PLN/USD, 1.08 EUR/USD) and binds `paid_by_user_id` and `amount_usd` in both initial expense insertion and re-approval updates.
+  - Maps `transport` documents to `transit` category.
+- Luhn Digit Length Guardrail ([gemini-parser.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/gemini-parser.js)):
+  - Enforces `digits.length >= 13 && digits.length <= 19` in `isLuhnValid`, preventing short character matches with spaces or hyphens from false-positive Luhn validation.
+- Atomic Expense Mutations & Idempotent Preset Seeding ([expenses.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/expenses.js)):
+  - Enforces user authentication check on `GET /api/wayfinder/expenses`.
+  - Replaces sequential `run()` invocations with atomic `db.batch()` across `POST /preset`, `POST /expenses`, `PUT /expenses/:id`, `DELETE /expenses/:id`, and `DELETE /settle`.
+  - Seeds presets idempotently by checking existing descriptions in D1, preventing duplicate ledger entries.
+- Journey Slug Resolution & Companion Visibility ([budget.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/budget.js)):
+  - Resolves expenses using `(journey_id = ? OR journey_id = ?)` bound to `(journey.id, journeyId)`.
+  - Broadens query to include companion expenses where the user has an assigned split in `wayfinder_expense_splits`.
+- Full-Month Inbound Email Parsing & End Date Preservation ([email-worker.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/email-worker.js)):
+  - Expands date regex patterns to match the 16th through 31st of December without defaulting to December 6th.
+  - Preserves `end_date` from Gemini Stage 2 fallback and binds `end_date` into `wayfinder_itinerary_items`.
+  - Partitions odd-cent expense splits using `Math.floor` and remainder difference to prevent penny leaks.
+- Email Inbox Re-activation ([email-inboxes.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/email-inboxes.js)):
+  - Reactivates soft-deleted inboxes (`is_active = 0`) to `is_active = 1` on `POST /api/wayfinder/email-inboxes`.
+- Midnight Calendar Rollover & Dynamic URLs ([calendar.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/calendar.js)):
+  - Implements `addMinutesWithDate(dateStr, timeStr, minsToAdd)` to advance `endDate` whenever total minutes exceed 1440, ensuring `DTEND` is never earlier than `DTSTART`.
+  - Derives feed paths dynamically from `request.url` in `getSubscribeUrls`.
+- Scoped Document Ownership ([documents.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/documents.js)):
+  - Removes `OR visibility = 'public'` from rename and delete handlers to prevent unauthorized modifications on shared journeys.
+- Exchange Rate Timeout & Consistent Conversion Keys ([exchange-rate.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/exchange-rate.js)):
+  - Adds 8-second `AbortSignal.timeout` to upstream rate fetch.
+  - Returns `usdToPln`, `eurToPln`, `gbpToPln`, and `plnToUsd` in 200 JSON payloads.
+- Responsive Expense Modal Viewport & Pinned Action Footer ([ExpenseLedger.jsx](file:///e:/TechTrekGT/wayfinder/src/components/budget/ExpenseLedger.jsx)):
+  - Enforces `max-h-[90vh]` and `flex flex-col` on modal containers across Add/Edit Expense, Total Settle-Up, and Item Settle-Up modals.
+  - Constrains input fields to an inner `overflow-y-auto flex-1` container while pinning the modal header and action footer (`flex-shrink-0 bg-slate-900/95 backdrop-blur-sm`).
+  - Guarantees that "Cancel" and "Save Expense" buttons remain visible and interactive on viewports with constrained vertical height.
+
+

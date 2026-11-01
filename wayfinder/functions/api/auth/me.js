@@ -20,15 +20,26 @@ export async function onRequestGet(context) {
       });
     }
 
-    let userDetails = { id: payload.userId, email: payload.email, name: payload.name };
+    let userDetails = {
+      id: payload.userId,
+      email: payload.email,
+      name: payload.name,
+      role: payload.role || 'user',
+      isAdmin: Boolean(payload.isAdmin || payload.role === 'admin'),
+      apiKeyEnabled: Boolean(payload.apiKeyEnabled || payload.isAdmin || payload.role === 'admin')
+    };
     if (env.DB) {
       try {
-        const dbUser = await env.DB.prepare('SELECT id, email, name, security_question, security_answer_hash FROM users WHERE id = ?').bind(payload.userId).first();
+        const dbUser = await env.DB.prepare('SELECT id, email, name, role, is_admin, api_key_enabled, security_question, security_answer_hash FROM users WHERE id = ?').bind(payload.userId).first();
         if (dbUser) {
+          const isAdmin = Boolean(dbUser.is_admin === 1 || dbUser.role === 'admin');
           userDetails = {
             id: dbUser.id,
             email: dbUser.email,
             name: dbUser.name,
+            role: dbUser.role || 'user',
+            isAdmin,
+            apiKeyEnabled: Boolean(dbUser.api_key_enabled === 1 || isAdmin),
             securityQuestion: dbUser.security_question || null,
             hasSecurityQuestion: Boolean(dbUser.security_question && dbUser.security_answer_hash)
           };

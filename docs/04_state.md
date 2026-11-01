@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS users (
   iterations INTEGER NOT NULL DEFAULT 600000,
   token_version INTEGER NOT NULL DEFAULT 1,
   is_admin INTEGER NOT NULL DEFAULT 0,
+  api_key_enabled INTEGER NOT NULL DEFAULT 0,
   status TEXT NOT NULL DEFAULT 'Active' CHECK(status IN ('Active', 'Suspended')),
   email_verified INTEGER NOT NULL DEFAULT 0,
   email_verified_at TEXT,

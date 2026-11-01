@@ -1250,8 +1250,21 @@ export async function parseBookingDocument({ env = {}, text = '', base64 = null,
   let extraction = null;
   let usedMethod = 'heuristic';
 
-  // Ensure Gemini API calls are only attempted when user is signed in and key is actively present
-  if (apiKey && user?.userId) {
+  // Check whether Gemini API key access is enabled on this account
+  let isAccountEnabled = Boolean(user?.apiKeyEnabled || user?.isAdmin || user?.role === 'admin');
+  if (env.DB && user?.userId && !isAccountEnabled) {
+    try {
+      const userRow = await env.DB.prepare('SELECT api_key_enabled, role, is_admin FROM users WHERE id = ?').bind(user.userId).first();
+      if (userRow) {
+        isAccountEnabled = Boolean(userRow.api_key_enabled === 1 || userRow.role === 'admin' || userRow.is_admin === 1);
+      }
+    } catch {
+      // Keep isAccountEnabled as evaluated from user object
+    }
+  }
+
+  // Ensure Gemini API calls are only attempted when user is signed in, key is present, and API access is enabled on the account
+  if (apiKey && user?.userId && isAccountEnabled) {
     try {
       const parts = [];
 
@@ -1289,6 +1302,8 @@ export async function parseBookingDocument({ env = {}, text = '', base64 = null,
     console.warn('[gemini-parser] Gemini API key is missing or disconnected; bypassing Gemini and falling back to heuristic extraction.');
   } else if (!user?.userId) {
     console.warn('[gemini-parser] Unauthenticated user context; bypassing Gemini and falling back to heuristic extraction.');
+  } else if (!isAccountEnabled) {
+    console.warn(`[gemini-parser] Gemini API access is disabled for user account ${user.userId}; bypassing Gemini and falling back to heuristic extraction.`);
   }
 
   // Graceful heuristic fallback if Gemini was skipped or failed

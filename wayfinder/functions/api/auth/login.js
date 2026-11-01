@@ -67,9 +67,12 @@ export async function onRequestPost(context) {
 
     const maxAge = body.rememberMe ? 30 * 24 * 3600 : 7200;
 
+    const isAdmin = Boolean(user.is_admin === 1 || user.role === 'admin');
+    const apiKeyEnabled = Boolean(user.api_key_enabled === 1 || isAdmin);
+
     // Create JWT token
     const token = await createToken(
-      { userId: user.id, email: user.email, householdId, name: user.name },
+      { userId: user.id, email: user.email, householdId, name: user.name, role: user.role || 'user', isAdmin, apiKeyEnabled },
       env.JWT_SECRET,
       maxAge
     );
@@ -85,7 +88,14 @@ export async function onRequestPost(context) {
 
     return new Response(JSON.stringify({
       success: true,
-      user: { id: user.id, email: user.email, name: user.name },
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role || 'user',
+        isAdmin,
+        apiKeyEnabled
+      },
       householdId
     }), {
       status: 200,

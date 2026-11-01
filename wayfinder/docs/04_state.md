@@ -411,4 +411,18 @@ Governs the state invariants, atomic transaction guarantees, and edge lifecycle 
 - Production Secret Deployment:
   - `GEMINI_API_KEY` is persisted in local development via `.dev.vars` and provisioned to Cloudflare Workers production environment via `wrangler secret put GEMINI_API_KEY`.
 
+### 16.5 Account-Level API Key Entitlements & Administrative Governance
+- Database Column Extension (`users.api_key_enabled`):
+  - Extends the shared platform `users` table with `api_key_enabled INTEGER NOT NULL DEFAULT 0`.
+  - Administrator accounts (`role = 'admin'` or `is_admin = 1`) possess default entitlement to the API key.
+- Parser Entitlement Gating Invariant:
+  - In `gemini-parser.js`, before initiating any Gemini REST API request, the engine validates that the user is authenticated AND `api_key_enabled === 1` in D1 (or `isAdmin` is true).
+  - Unentitled accounts trigger a structured log warning and immediately fall back to local heuristic extraction, preventing unauthorized consumption of Gemini tokens while maintaining flawless user experience.
+- Session Claims & Auth Serialization:
+  - `me.js` and `login.js` query and serialize `isAdmin` and `apiKeyEnabled` into public user payloads and JWT tokens, providing consistent client state across the application lifecycle.
+- Real-Time Admin State Mutation:
+  - `POST /api/wayfinder/admin/user-api-access` updates `api_key_enabled` in D1 with atomic validation.
+  - `POST /api/wayfinder/admin/user-status` updates user status (`Active`/`Suspended`) and bumps `token_version` on suspension to revoke active sessions.
+
+
 

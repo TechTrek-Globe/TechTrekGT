@@ -372,3 +372,7 @@ CREATE TABLE IF NOT EXISTS wayfinder_expense_settlements (
 
 CREATE INDEX IF NOT EXISTS idx_wf_settle_journey ON wayfinder_expense_settlements(journey_id);
 
+-- ============================================================
+-- USERS TABLE EXTENSIONS (Shared Platform personal-budget-db)
+-- ============================================================
+-- ALTER TABLE users ADD COLUMN api_key_enabled INTEGER NOT NULL DEFAULT 0;

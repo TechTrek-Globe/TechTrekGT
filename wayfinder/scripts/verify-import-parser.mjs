@@ -366,5 +366,37 @@ test('parseBookingDocument gracefully falls back to heuristic when API key is mi
   assert.equal(res.docType, 'hotel');
 });
 
+test('parseBookingDocument gracefully falls back to heuristic when user account has apiKeyEnabled: false', async () => {
+  const res = await parseBookingDocument({
+    env: { GEMINI_API_KEY: 'dummy-key' },
+    text: 'Hotel Experior Boutique Krakow check-in 2026-12-04',
+    filename: 'hotel-voucher.pdf',
+    user: { userId: 'usr-standard-user', apiKeyEnabled: false, isAdmin: false }
+  });
+  assert.equal(res.success, true);
+  assert.equal(res.usedMethod, 'heuristic');
+  assert.equal(res.docType, 'hotel');
+});
+
+test('parseBookingDocument checks DB api_key_enabled flag when provided', async () => {
+  const mockDb = {
+    prepare: (query) => ({
+      bind: (...args) => ({
+        first: async () => ({ api_key_enabled: 0, role: 'user', is_admin: 0 })
+      })
+    })
+  };
+
+  const res = await parseBookingDocument({
+    env: { GEMINI_API_KEY: 'dummy-key', DB: mockDb },
+    text: 'Hotel Altus Palace Wroclaw check-in 2026-12-07',
+    filename: 'altus.pdf',
+    user: { userId: 'usr-db-unauthorized' }
+  });
+  assert.equal(res.success, true);
+  assert.equal(res.usedMethod, 'heuristic');
+  assert.equal(res.docType, 'hotel');
+});
+
 await queue;
 console.log(`\nAll ${passedCount} verification tests passed successfully!`);

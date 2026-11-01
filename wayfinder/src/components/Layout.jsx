@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
-import { Compass, User, LogOut, ShieldCheck, Menu, X, Coins, Settings, Backpack, Globe, Calendar } from 'lucide-react';
+import { Compass, User, LogOut, ShieldCheck, Shield, Menu, X, Coins, Settings, Backpack, Globe, Calendar } from 'lucide-react';
 import { CurrencyConverterModal } from './CurrencyConverterModal';
 import { SettingsModal } from './SettingsModal';
 import { BottomTabBar } from './BottomTabBar';
@@ -146,6 +146,17 @@ export function Layout({ children }) {
                   <ShieldCheck className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
                   <span className="hidden lg:inline">Private Hub</span>
                 </a>
+                {(user?.isAdmin || user?.role === 'admin') && (
+                  <a
+                    href="/wayfinder/admin"
+                    onClick={(e) => pushRoute(e, '/wayfinder/admin')}
+                    className="flex items-center space-x-1.5 px-2 lg:px-2.5 py-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs lg:text-sm font-semibold hover:bg-amber-500/20 transition-all min-h-[40px] shadow-sm"
+                    title="System Administration & Key Entitlements"
+                  >
+                    <Shield className="w-3.5 h-3.5 lg:w-4 lg:h-4 text-amber-400" />
+                    <span className="hidden lg:inline">Admin</span>
+                  </a>
+                )}
                 <div className="h-5 lg:h-6 w-px bg-white/10 mx-0.5" />
                 <button
                   onClick={() => setIsSettingsOpen(true)}
@@ -202,6 +213,17 @@ export function Layout({ children }) {
             >
               <Settings className="w-5 h-5" />
             </button>
+            {(user?.isAdmin || user?.role === 'admin') && (
+              <a
+                href="/wayfinder/admin"
+                onClick={(e) => pushRoute(e, '/wayfinder/admin')}
+                className="p-2 rounded-lg text-amber-400 hover:text-amber-300 hover:bg-white/5 min-h-[44px] min-w-[44px] flex items-center justify-center"
+                aria-label="Admin Dashboard"
+                title="Admin Dashboard"
+              >
+                <Shield className="w-5 h-5" />
+              </a>
+            )}
           </div>
         </div>
 

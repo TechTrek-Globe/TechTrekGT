@@ -451,4 +451,24 @@ Comprehensive backend hardening across Wayfinder API endpoints ensures zero-loss
   - Constrains input fields to an inner `overflow-y-auto flex-1` container while pinning the modal header and action footer (`flex-shrink-0 bg-slate-900/95 backdrop-blur-sm`).
   - Guarantees that "Cancel" and "Save Expense" buttons remain visible and interactive on viewports with constrained vertical height.
 
+## 23. System Administration & Account-Level API Key Governance
+
+Provides full parity with the TechTrekGT/Finance administration architecture, enabling system administrators to monitor registered accounts and toggle Gemini AI API Key entitlements per user:
+
+- Account-Level API Key Access Control ([gemini-parser.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/gemini-parser.js)):
+  - Enforces that the serverless Gemini API is only callable when the user is authenticated and their account has `api_key_enabled = 1` in the database (or possesses administrator privileges).
+  - Non-entitled or unauthenticated accounts automatically fall back to heuristic document parsing, preventing unauthorized consumption of Gemini tokens.
+- Administrative API Endpoints ([admin.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/admin.js)):
+  - `GET /api/wayfinder/admin/stats` and `GET /api/admin/stats`: Returns user account counts, active/suspended metrics, API key entitlement counts, Wayfinder operational statistics (journeys, documents, itinerary milestones), and the full user catalog.
+  - `POST /api/wayfinder/admin/user-api-access` and `POST /api/admin/user-api-access`: Toggles `users.api_key_enabled` between 0 and 1 for any specified user account.
+  - `POST /api/wayfinder/admin/user-status` and `POST /api/admin/user-status`: Toggles account status between `Active` and `Suspended` while incrementing `token_version` on suspension to revoke active sessions.
+- Dedicated Admin Dashboard Component ([AdminView.jsx](file:///e:/TechTrekGT/wayfinder/src/components/admin/AdminView.jsx)):
+  - Renders 4 high-level stat cards (Total Accounts, Active Accounts, API Key Enabled, Suspended Accounts) alongside Wayfinder operational counters.
+  - Interactive user table with real-time search filtering, status badges, and one-click toggle actions for both account status and API key entitlements.
+  - Role-based route guard rendering an Access Denied view for non-admin accounts.
+- Navigation Integration ([Layout.jsx](file:///e:/TechTrekGT/wayfinder/src/components/Layout.jsx) & [PrivateHub.jsx](file:///e:/TechTrekGT/wayfinder/src/components/PrivateHub.jsx)):
+  - Renders a prominent amber Shield "Admin" link in desktop navigation, mobile top bar, and Private Operations Hub when `user.isAdmin` or `user.role === 'admin'`.
+  - Client-side routing in `App.jsx` dynamically resolves `/wayfinder/admin` and `/wayfinder/poland-christmas-2026/admin`.
+
+
 

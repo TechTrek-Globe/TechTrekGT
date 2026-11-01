@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { ShieldCheck, FileText, CalendarClock, Backpack, Calendar, Receipt } from 'lucide-react';
+import { ShieldCheck, Shield, FileText, CalendarClock, Backpack, Calendar, Receipt } from 'lucide-react';
 import { ItineraryView } from './ItineraryView';
 import { DocumentCenter } from './DocumentCenter';
 import { PackingManager } from './packing/PackingManager';
@@ -8,7 +8,7 @@ import { ExpenseLedger } from './budget/ExpenseLedger';
 import { CalendarSubscribeModal } from './calendar/CalendarSubscribeModal';
 
 export function PrivateHub({ currentPath }) {
-  const { isAuthenticated, setIsAuthModalOpen } = useAuth();
+  const { user, isAuthenticated, setIsAuthModalOpen } = useAuth();
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
   
   const pushRoute = (e, path) => {
@@ -75,6 +75,17 @@ export function PrivateHub({ currentPath }) {
               <Calendar className="w-4 h-4 text-amber-400" />
               <span>Sync Calendar</span>
             </button>
+            {(user?.isAdmin || user?.role === 'admin') && (
+              <a
+                href="/wayfinder/admin"
+                onClick={(e) => pushRoute(e, '/wayfinder/admin')}
+                className="flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-semibold transition-colors whitespace-nowrap text-amber-300 hover:text-white hover:bg-amber-500/20 border border-amber-500/30 shadow-sm"
+                title="System Administration & Key Entitlements"
+              >
+                <Shield className="w-4 h-4 text-amber-400" />
+                <span>Admin</span>
+              </a>
+            )}
           </div>
         </div>
       </div>

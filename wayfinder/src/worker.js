@@ -24,6 +24,7 @@ import { handlePacking }       from '../functions/api/wayfinder/packing.js';
 import { handleCalendarExport, handleCalendarFeed, handleCalendarToken } from '../functions/api/wayfinder/calendar.js';
 import { handleExpenses }      from '../functions/api/wayfinder/expenses.js';
 import { handleInboundEmail }  from '../functions/api/wayfinder/email-worker.js';
+import { handleAdmin }         from '../functions/api/wayfinder/admin.js';
 
 const ALLOWED_ORIGINS = [
   'https://techtrekgt.com',
@@ -116,6 +117,14 @@ export default {
     if (apiPath === '/api/auth/forgot-password' && method === 'POST') return forgotPasswordHandler({ request, env, ctx });
     if (apiPath === '/api/auth/reset-password' && method === 'POST') return resetPasswordHandler({ request, env, ctx });
     if (apiPath === '/api/auth/security-question' && method === 'POST') return securityQuestionHandler({ request, env, ctx });
+
+    // --- Admin routes ---
+    if (apiPath.startsWith('/api/admin/') || apiPath.startsWith('/api/wayfinder/admin/')) {
+      const auth = await requireAuth(request, env);
+      if (!auth.ok) return auth.error;
+      const context = { request, env, ctx, user: auth.payload };
+      return handleAdmin(context, url, method);
+    }
 
     // --- Protected wayfinder API routes ---
     if (apiPath.startsWith('/api/wayfinder/')) {

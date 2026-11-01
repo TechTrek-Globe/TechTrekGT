@@ -5,7 +5,10 @@ import assert from 'node:assert/strict';
 import {
   scrubSensitiveData,
   heuristicParseDocument,
-  mapExtractionToFields
+  mapExtractionToFields,
+  isApiKeyConnected,
+  callGeminiRestApi,
+  parseBookingDocument
 } from '../functions/api/wayfinder/gemini-parser.js';
 import {
   parseGetYourGuideEmail,
@@ -16,15 +19,18 @@ import {
 } from '../functions/api/wayfinder/calendar.js';
 
 let passedCount = 0;
+let queue = Promise.resolve();
 function test(name, fn) {
-  try {
-    fn();
-    console.log(`[PASS] ${name}`);
-    passedCount++;
-  } catch (err) {
-    console.error(`[FAIL] ${name}:`, err.message);
-    process.exitCode = 1;
-  }
+  queue = queue.then(async () => {
+    try {
+      await fn();
+      console.log(`[PASS] ${name}`);
+      passedCount++;
+    } catch (err) {
+      console.error(`[FAIL] ${name}:`, err.message);
+      process.exitCode = 1;
+    }
+  });
 }
 
 console.log('--- 1. Sensitive Data Scrubbing & Luhn Tests ---');
@@ -310,4 +316,55 @@ test('Odd-cent split partitioning preserves exact original total', () => {
   assert.equal(Number((split1 + split2).toFixed(2)), 366.43);
 });
 
+console.log('--- 9. API Key Connectivity & Authentication Guard Tests ---');
+
+test('isApiKeyConnected returns true for valid env key and false for missing/blank', () => {
+  assert.equal(isApiKeyConnected({ GEMINI_API_KEY: 'test-key-123' }), true);
+  assert.equal(isApiKeyConnected({ GOOGLE_API_KEY: 'test-key-456' }), true);
+  assert.equal(isApiKeyConnected({ GOOGLE_MAPS_API_KEY: 'test-key-789' }), true);
+  assert.equal(isApiKeyConnected({}), false);
+  assert.equal(isApiKeyConnected(null), false);
+  assert.equal(isApiKeyConnected({ GEMINI_API_KEY: '   ' }), false);
+});
+
+test('callGeminiRestApi rejects when apiKey is missing or whitespace', async () => {
+  await assert.rejects(
+    async () => callGeminiRestApi({ apiKey: '', contents: [] }),
+    /Gemini API key is missing or empty/
+  );
+  await assert.rejects(
+    async () => callGeminiRestApi({ apiKey: '   ', contents: [] }),
+    /Gemini API key is missing or empty/
+  );
+  await assert.rejects(
+    async () => callGeminiRestApi({ apiKey: null, contents: [] }),
+    /Gemini API key is missing or empty/
+  );
+});
+
+test('parseBookingDocument gracefully falls back to heuristic when unauthenticated', async () => {
+  const res = await parseBookingDocument({
+    env: { GEMINI_API_KEY: 'dummy-key' },
+    text: 'Hotel Experior Boutique Krakow check-in 2026-12-04',
+    filename: 'hotel-voucher.pdf',
+    user: null // Unauthenticated
+  });
+  assert.equal(res.success, true);
+  assert.equal(res.usedMethod, 'heuristic');
+  assert.equal(res.docType, 'hotel');
+});
+
+test('parseBookingDocument gracefully falls back to heuristic when API key is missing', async () => {
+  const res = await parseBookingDocument({
+    env: {}, // Missing key
+    text: 'Hotel Altus Palace Wroclaw check-in 2026-12-07',
+    filename: 'altus.pdf',
+    user: { userId: 'usr-jonathan' }
+  });
+  assert.equal(res.success, true);
+  assert.equal(res.usedMethod, 'heuristic');
+  assert.equal(res.docType, 'hotel');
+});
+
+await queue;
 console.log(`\nAll ${passedCount} verification tests passed successfully!`);

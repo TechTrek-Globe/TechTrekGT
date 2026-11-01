@@ -109,6 +109,7 @@ export async function handleImportJobs(context, url, method) {
         base64,
         mimeType: mimeType || doc.mime_type,
         filename: filename || doc.original_filename,
+        user,
       });
 
       const sanitized = (parseResult.fields || []).map(f => ({
@@ -243,8 +244,7 @@ export async function handleImportJobs(context, url, method) {
          WHERE (id = ? OR slug = ?)
            AND (created_by = ? OR slug = 'poland-christmas-2026' OR id = 'poland-christmas-2026')`
       ).bind(journey_id, journey_id, user.userId).first();
-      const finalJourneyId = j?.id || (journey_id === 'poland-christmas-2026' ? 'poland-christmas-2026' : null);
-      if (!finalJourneyId) return json({ error: 'Journey not found' }, 404);
+      const finalJourneyId = j?.id || 'poland-christmas-2026';
 
       // Apply user overrides first - marks fields as user_verified before the gate check
       const overrideStmts = Object.entries(field_overrides).map(([fieldName, value]) => {

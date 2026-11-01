@@ -157,7 +157,7 @@ export async function handleExpenses(context, url, method) {
 
     // 2. POST /api/wayfinder/expenses/settle - Record a debt settlement
     if (method === 'POST' && isSettleAction) {
-      if (!user) return json({ error: 'Authentication required' }, 401);
+      if (!user?.userId) return json({ error: 'Authentication required' }, 401);
       const body = await context.request.json().catch(() => ({}));
       const {
         from_user_id,
@@ -216,7 +216,7 @@ export async function handleExpenses(context, url, method) {
 
     // 2b. DELETE /api/wayfinder/expenses/settle - Undo / remove a recorded settlement
     if (method === 'DELETE' && isSettleAction) {
-      if (!user) return json({ error: 'Authentication required' }, 401);
+      if (!user?.userId) return json({ error: 'Authentication required' }, 401);
       const settleId = url.searchParams.get('settlement_id') || url.searchParams.get('id');
       const splitId = url.searchParams.get('split_id');
 
@@ -244,7 +244,7 @@ export async function handleExpenses(context, url, method) {
 
     // 3. POST /api/wayfinder/expenses/preset - Seed curated trip expenses
     if (method === 'POST' && isPresetAction) {
-      if (!user) return json({ error: 'Authentication required' }, 401);
+      if (!user?.userId) return json({ error: 'Authentication required' }, 401);
 
       const presets = [
         {
@@ -392,7 +392,7 @@ export async function handleExpenses(context, url, method) {
 
     // 4. POST /api/wayfinder/expenses - Add new expense
     if (method === 'POST') {
-      if (!user) return json({ error: 'Authentication required' }, 401);
+      if (!user?.userId) return json({ error: 'Authentication required' }, 401);
       const body = await context.request.json().catch(() => ({}));
       const {
         description,
@@ -470,7 +470,7 @@ export async function handleExpenses(context, url, method) {
 
     // 4b. PUT /api/wayfinder/expenses/:id - Update an existing expense and its splits
     if (method === 'PUT') {
-      if (!user) return json({ error: 'Authentication required' }, 401);
+      if (!user?.userId) return json({ error: 'Authentication required' }, 401);
       const body = await context.request.json().catch(() => ({}));
       const targetExpenseId = expenseId || url.searchParams.get('id') || body.id;
       if (!targetExpenseId) {
@@ -576,7 +576,7 @@ export async function handleExpenses(context, url, method) {
 
     // 5. DELETE /api/wayfinder/expenses/:id - Remove an expense
     if (method === 'DELETE' && expenseId) {
-      if (!user) return json({ error: 'Authentication required' }, 401);
+      if (!user?.userId) return json({ error: 'Authentication required' }, 401);
 
       await db.batch([
         db.prepare('DELETE FROM wayfinder_expense_splits WHERE expense_id = ?').bind(expenseId),

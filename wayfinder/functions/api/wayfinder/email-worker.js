@@ -553,7 +553,7 @@ export async function handleInboundEmail(message, env) {
     const isLowConfidence = !fields.confirmation_number || fields.item_type === 'other' || !fields.local_date;
     if (isLowConfidence && bodyText.trim().length > 20) {
       try {
-        const geminiExtraction = await parseBookingWithGemini(env, bodyText, subject, from);
+        const geminiExtraction = await parseBookingWithGemini(env, bodyText, subject, from, { userId: inbox.user_id });
         if (geminiExtraction) {
           if (geminiExtraction.item_type && geminiExtraction.item_type !== 'other') {
             fields.item_type = geminiExtraction.item_type;

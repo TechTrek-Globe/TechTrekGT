@@ -1180,9 +1180,20 @@ export function mapExtractionToFields(extraction) {
 }
 
 /**
+ * Lightweight connectivity check for Gemini / Google API Key
+ */
+export function isApiKeyConnected(env) {
+  const key = env?.GEMINI_API_KEY || env?.GOOGLE_API_KEY || env?.GOOGLE_MAPS_API_KEY;
+  return Boolean(key && typeof key === 'string' && key.trim().length > 0);
+}
+
+/**
  * Serverless Gemini REST API Caller
  */
-export async function callGeminiRestApi({ apiKey, model = 'gemini-2.5-flash', contents }) {
+export async function callGeminiRestApi({ apiKey, model = 'gemini-3.5-flash', contents }) {
+  if (!apiKey || typeof apiKey !== 'string' || !apiKey.trim()) {
+    throw new Error('Gemini API key is missing or empty');
+  }
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
   const payload = {
@@ -1225,9 +1236,10 @@ export async function callGeminiRestApi({ apiKey, model = 'gemini-2.5-flash', co
 /**
  * Main Entry Point: Parse booking document from PDF, image, or text
  */
-export async function parseBookingDocument({ env = {}, text = '', base64 = null, mimeType = 'application/pdf', filename = '' }) {
-  const apiKey = env.GEMINI_API_KEY || env.GOOGLE_API_KEY || env.GOOGLE_MAPS_API_KEY;
-  const model = env.GEMINI_MODEL || 'gemini-2.5-flash';
+export async function parseBookingDocument({ env = {}, text = '', base64 = null, mimeType = 'application/pdf', filename = '', user = null }) {
+  const isConnected = isApiKeyConnected(env);
+  const apiKey = isConnected ? (env.GEMINI_API_KEY || env.GOOGLE_API_KEY || env.GOOGLE_MAPS_API_KEY) : null;
+  const model = env.GEMINI_MODEL || 'gemini-3.5-flash';
 
   // If text is not provided or empty, attempt extraction from PDF binary base64
   let docText = text || '';
@@ -1238,7 +1250,8 @@ export async function parseBookingDocument({ env = {}, text = '', base64 = null,
   let extraction = null;
   let usedMethod = 'heuristic';
 
-  if (apiKey) {
+  // Ensure Gemini API calls are only attempted when user is signed in and key is actively present
+  if (apiKey && user?.userId) {
     try {
       const parts = [];
 
@@ -1272,6 +1285,10 @@ export async function parseBookingDocument({ env = {}, text = '', base64 = null,
     } catch (err) {
       console.warn('[gemini-parser] REST API call failed, falling back to heuristic:', err?.message);
     }
+  } else if (!apiKey) {
+    console.warn('[gemini-parser] Gemini API key is missing or disconnected; bypassing Gemini and falling back to heuristic extraction.');
+  } else if (!user?.userId) {
+    console.warn('[gemini-parser] Unauthenticated user context; bypassing Gemini and falling back to heuristic extraction.');
   }
 
   // Graceful heuristic fallback if Gemini was skipped or failed
@@ -1300,13 +1317,14 @@ export async function parseBookingDocument({ env = {}, text = '', base64 = null,
 /**
  * Email Worker Fallback: Parses inbound email body with Gemini
  */
-export async function parseBookingWithGemini(env = {}, bodyText = '', subject = '', from = '') {
+export async function parseBookingWithGemini(env = {}, bodyText = '', subject = '', from = '', user = null) {
   try {
     const res = await parseBookingDocument({
       env,
       text: `Subject: ${subject}\nFrom: ${from}\n\n${bodyText}`,
       filename: `email-${subject.slice(0, 30)}.eml`,
-      mimeType: 'text/plain'
+      mimeType: 'text/plain',
+      user
     });
     return res.extraction;
   } catch (err) {
@@ -1314,3 +1332,4 @@ export async function parseBookingWithGemini(env = {}, bodyText = '', subject = 
     return null;
   }
 }
+

@@ -439,6 +439,13 @@ Comprehensive backend hardening across Wayfinder API endpoints ensures zero-loss
 - Exchange Rate Timeout & Consistent Conversion Keys ([exchange-rate.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/exchange-rate.js)):
   - Adds 8-second `AbortSignal.timeout` to upstream rate fetch.
   - Returns `usdToPln`, `eurToPln`, `gbpToPln`, and `plnToUsd` in 200 JSON payloads.
+- Gemini API Key Connectivity Validation & Authentication Guard ([gemini-parser.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/gemini-parser.js)):
+  - Implements `isApiKeyConnected(env)` inspecting `GEMINI_API_KEY`, `GOOGLE_API_KEY`, or `GOOGLE_MAPS_API_KEY`.
+  - Upgraded model target to `gemini-3.5-flash` (with `env.GEMINI_MODEL` override) ensuring full compatibility with current Google Generative Language API specifications.
+  - In `callGeminiRestApi`, explicitly validates that `apiKey` is non-empty before initiating `fetch`.
+  - In `parseBookingDocument`, guards Gemini REST calls by verifying both API key presence and authenticated user context (`user?.userId`). If unauthenticated or missing an API key, logs a structured warning and falls back gracefully to `heuristicParseDocument` with zero unhandled exceptions.
+  - In `import-jobs.js` and `email-worker.js`, passes authenticated traveler credentials into the parsing engine.
+  - Production `GEMINI_API_KEY` deployed securely to Cloudflare Workers secrets via `wrangler secret put GEMINI_API_KEY`.
 - Responsive Expense Modal Viewport & Pinned Action Footer ([ExpenseLedger.jsx](file:///e:/TechTrekGT/wayfinder/src/components/budget/ExpenseLedger.jsx)):
   - Enforces `max-h-[90vh]` and `flex flex-col` on modal containers across Add/Edit Expense, Total Settle-Up, and Item Settle-Up modals.
   - Constrains input fields to an inner `overflow-y-auto flex-1` container while pinning the modal header and action footer (`flex-shrink-0 bg-slate-900/95 backdrop-blur-sm`).

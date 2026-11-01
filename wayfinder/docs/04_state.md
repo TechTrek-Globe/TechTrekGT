@@ -400,3 +400,15 @@ Governs the state invariants, atomic transaction guarantees, and edge lifecycle 
   - The calendar generator applies `addMinutesWithDate(dateStr, timeStr, minsToAdd)` across scheduled activities, flight arrivals, hotel check-in/out, and private items.
   - Invariant: `DTEND >= DTSTART` strictly holds even when activities or bookings cross midnight (advancing `endDate` via `addDays(dateStr, Math.floor(total / 1440))`).
 
+### 16.4 API Key Connectivity & Parsing Authentication Invariants
+- API Key Connectivity Invariant:
+  - `isApiKeyConnected(env)` checks `GEMINI_API_KEY`, `GOOGLE_API_KEY`, or `GOOGLE_MAPS_API_KEY` for non-empty string content.
+  - In `callGeminiRestApi`, requests missing a valid API key throw an explicit error before initiating any network `fetch`.
+  - Default model targets `gemini-3.5-flash` with `env.GEMINI_MODEL` override for current Google Generative Language API compatibility.
+- Authenticated Parser Gating:
+  - Gemini extraction in `parseBookingDocument` executes only when both `isApiKeyConnected(env)` and `user?.userId` are present.
+  - If unauthenticated or if the API key is disconnected, Gemini calls are bypassed and execution gracefully falls back to `heuristicParseDocument` with structured warning logs, guaranteeing zero 500 crashes or leaked exceptions to clients.
+- Production Secret Deployment:
+  - `GEMINI_API_KEY` is persisted in local development via `.dev.vars` and provisioned to Cloudflare Workers production environment via `wrangler secret put GEMINI_API_KEY`.
+
+

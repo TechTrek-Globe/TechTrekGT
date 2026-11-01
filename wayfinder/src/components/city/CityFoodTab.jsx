@@ -18,6 +18,34 @@ export function CityFoodTab({
   const hasDetailed = detailedItems.length > 0;
   if (!hasDetailed && (!city.restaurants || city.restaurants.length === 0)) return null;
 
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const checkAndScroll = () => {
+      const hash = window.location.hash?.replace('#', '');
+      const params = new URLSearchParams(window.location.search);
+      const targetId = hash || params.get('venue') || params.get('item');
+      if (targetId) {
+        const targetItem = detailedItems.find(i => i.id === targetId);
+        if (targetItem && restaurantCategoryFilter !== 'all' && restaurantCategoryFilter !== targetItem.category) {
+          setRestaurantCategoryFilter('all');
+        }
+        setTimeout(() => {
+          const el = document.getElementById(targetId);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el.classList.add('ring-4', 'ring-amber-400', 'shadow-[0_0_35px_rgba(245,158,11,0.8)]');
+            setTimeout(() => {
+              el.classList.remove('ring-4', 'ring-amber-400', 'shadow-[0_0_35px_rgba(245,158,11,0.8)]');
+            }, 3500);
+          }
+        }, 150);
+      }
+    };
+    checkAndScroll();
+    window.addEventListener('hashchange', checkAndScroll);
+    return () => window.removeEventListener('hashchange', checkAndScroll);
+  }, [detailedItems]);
+
   return (
     <div id="restaurants-section" className="space-y-4 animate-fade-in scroll-mt-32">
       {/* Header Banner */}
@@ -116,7 +144,8 @@ export function CityFoodTab({
               return (
                 <article
                   key={item.id}
-                  className={`glass-panel rounded-3xl border ${borderStyle} bg-wf-navy-mid/90 overflow-hidden shadow-xl transition-all duration-300 flex flex-col justify-between group`}
+                  id={item.id}
+                  className={`glass-panel rounded-3xl border ${borderStyle} bg-wf-navy-mid/90 overflow-hidden shadow-xl transition-all duration-300 flex flex-col justify-between group scroll-mt-36`}
                 >
                   <div>
                     {/* Image Header */}

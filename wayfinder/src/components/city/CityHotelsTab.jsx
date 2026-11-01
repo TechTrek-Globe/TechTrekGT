@@ -75,14 +75,16 @@ export function CityHotelsTab({
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setIsDocViewerOpen(true)}
-              className="px-3.5 py-2 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 border border-sky-400/40 text-sky-300 text-xs font-bold flex items-center space-x-1.5 transition-all cursor-pointer self-start sm:self-auto shrink-0 shadow-sm"
-            >
-              <FileText className="w-3.5 h-3.5 text-sky-400" />
-              <span>View Delta Flight Document</span>
-            </button>
+            {isAuthenticated && (
+              <button
+                type="button"
+                onClick={() => setIsDocViewerOpen(true)}
+                className="px-3.5 py-2 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 border border-sky-400/40 text-sky-300 text-xs font-bold flex items-center space-x-1.5 transition-all cursor-pointer self-start sm:self-auto shrink-0 shadow-sm"
+              >
+                <FileText className="w-3.5 h-3.5 text-sky-400" />
+                <span>View Delta Flight Document</span>
+              </button>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1 text-xs">
@@ -104,13 +106,17 @@ export function CityHotelsTab({
             <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-white/5 space-y-1.5">
               <div className="text-amber-300 font-bold uppercase tracking-wider text-[11px] flex items-center space-x-1.5">
                 <Plane className="w-3.5 h-3.5 text-amber-400" />
-                <span>Delta Flight Details</span>
+                <span>{isAuthenticated ? 'Delta Flight Details' : 'Airport Transit Details'}</span>
               </div>
               <div className="text-white font-bold text-sm">
-                DL9208 (AMS ➔ KRK)
+                {isAuthenticated ? 'DL9208 (AMS ➔ KRK)' : 'Kraków Airport (KRK)'}
               </div>
               <p className="text-slate-400 text-[11px] leading-snug">
-                Inbound connection from DL0074 (ATL ➔ AMS). Delta Confirmation: <strong className="text-emerald-300 font-mono">GUDI3J</strong>.
+                {isAuthenticated ? (
+                  <>Inbound connection from DL0074 (ATL ➔ AMS). Delta Confirmation: <strong className="text-emerald-300 font-mono">GUDI3J</strong>.</>
+                ) : (
+                  <>Direct 17-minute SKA1 commuter rail from airport terminal into Kraków Główny central station.</>
+                )}
               </p>
             </div>
 

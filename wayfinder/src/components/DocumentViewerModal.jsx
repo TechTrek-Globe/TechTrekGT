@@ -4,8 +4,10 @@ import {
   CheckCircle2, Loader2, Sparkles, Clock, ShieldCheck, Ticket, MapPin 
 } from 'lucide-react';
 import { getLocalDocumentFile, saveLocalDocumentFile } from '../utils/documentStorage';
+import { useAuth } from '../context/AuthContext';
 
 export function DocumentViewerModal({ isOpen, onClose, doc }) {
+  const { isAuthenticated } = useAuth();
   const [fileUrl, setFileUrl] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [embedError, setEmbedError] = useState(false);
@@ -35,9 +37,10 @@ export function DocumentViewerModal({ isOpen, onClose, doc }) {
   const isFlight = (filename.toLowerCase().includes('delta') || filename.toLowerCase().includes('flight') || (!isExcursion && activeDoc.details?.flightLeg));
 
   useEffect(() => {
-    if (!isOpen) {
+    if (!isOpen || !isAuthenticated) {
       setFileUrl(null);
       setEmbedError(false);
+      setIsLoading(false);
       setAttachMessage(null);
       return;
     }
@@ -119,7 +122,7 @@ export function DocumentViewerModal({ isOpen, onClose, doc }) {
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !isAuthenticated) return null;
 
   return (
     <div 

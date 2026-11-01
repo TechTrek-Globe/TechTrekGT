@@ -139,7 +139,8 @@ export default {
       }
       if (apiPath === '/api/wayfinder/calendar/export.ics' && method === 'GET') {
         const auth = await requireAuth(request, env);
-        const user = auth.ok ? auth.payload : null;
+        if (!auth.ok) return auth.error;
+        const user = auth.payload;
         return handleCalendarExport({ request, env, ctx, user }, url, method);
       }
       if (apiPath.startsWith('/api/wayfinder/expenses') && method === 'GET') {

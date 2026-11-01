@@ -167,7 +167,7 @@ export function parseBookingMetadata(item) {
   };
 }
 
-export function PrivateBookingCard({ item }) {
+export function PrivateBookingCard({ item, reorderControls }) {
   const [isDocViewerOpen, setIsDocViewerOpen] = useState(false);
   const rawType = item.docType || item.detected_doc_type || item.item_type || 'booking';
   const docType = rawType === 'train' ? 'rail' : rawType;
@@ -245,10 +245,20 @@ export function PrivateBookingCard({ item }) {
                 </span>
               </div>
               {displayLocation && item.title !== displayLocation && (
-                <div className="text-xs text-slate-400 flex items-center space-x-1 mt-0.5">
-                  <MapPin className="w-3 h-3 text-amber-400 shrink-0" />
-                  <span>{displayLocation}</span>
-                </div>
+                <a
+                  href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(displayLocation)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="text-xs text-slate-400 hover:text-amber-300 flex items-center space-x-1 mt-0.5 transition-colors group/loc cursor-pointer inline-flex max-w-fit"
+                  title="Open navigation directions in Google Maps"
+                >
+                  <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0 group-hover/loc:scale-110 transition-transform" />
+                  <span className="underline decoration-slate-600 hover:decoration-amber-400 underline-offset-2">
+                    {displayLocation}
+                  </span>
+                  <ExternalLink className="w-3 h-3 text-slate-500 group-hover/loc:text-amber-300 opacity-70 ml-0.5 shrink-0" />
+                </a>
               )}
             </div>
           </div>
@@ -262,6 +272,7 @@ export function PrivateBookingCard({ item }) {
                 {displayTime}
               </span>
             )}
+            {reorderControls}
           </div>
         </div>
 

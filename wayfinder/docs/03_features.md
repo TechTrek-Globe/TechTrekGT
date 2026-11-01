@@ -75,11 +75,14 @@ To maximize usability during winter roaming and in-destination field usage, Wayf
   - Practical: Instant access to transit guides, tipping rules, and emergency logistics.
   - Money: One-tap launcher for the full-screen interactive currency converter.
   - Hub: Direct gateway to the private travel vault and document center.
-- Slim Desktop Header: Replaces cluttered legacy headers with a minimal top bar housing TechTrekGT Launch Pad navigation, the Practical Guide, 10-day Itinerary anchor, live Currency Converter (with active PLN exchange rate badge), Private Hub (SSO-gated personal vault), and user authentication actions in [wayfinder/src/components/Layout.jsx](file:///e:/TechTrekGT/wayfinder/src/components/Layout.jsx). Responsive breakpoint labels ensure consistent, unambiguous naming without duplicate labels across screen sizes.
+- Slim Desktop Header & Spill-Over Brand Crest: Features a locked top bar housing the enlarged high-resolution brand banner (`wayfinderHeaderBanner`) which spills over the bottom gold border (`-mb-4 sm:-mb-6 md:-mb-8 lg:-mb-9`) with realistic drop-shadow depth, ensuring full legibility across all viewports. Houses the Practical Guide, 10-day Itinerary anchor, live Currency Converter, Private Hub, and user authentication actions in [wayfinder/src/components/Layout.jsx](file:///e:/TechTrekGT/wayfinder/src/components/Layout.jsx).
+- Docked Private Hub Sub-Toolbar: [wayfinder/src/components/PrivateHub.jsx](file:///e:/TechTrekGT/wayfinder/src/components/PrivateHub.jsx) anchors directly beneath the main navbar as a sticky sub-bar (`sticky top-14 sm:top-16 z-30 bg-slate-900/95 backdrop-blur-xl border-b border-white/10`). Replaces the oversized left-side header block with an elegant, compact inline identity pill (`[ShieldCheck] Private Hub • Poland 2026`) and presents all sub-navigation buttons (Itinerary, Packing List, Expense Ledger, Documents, Sync Calendar, Admin) on a single horizontal row with zero horizontal scroll. Day timeline headers in [wayfinder/src/components/ItineraryView.jsx](file:///e:/TechTrekGT/wayfinder/src/components/ItineraryView.jsx) lock smoothly beneath the dual sticky bars (`top-[104px] sm:top-[112px]`) with synchronized `scroll-mt-32` offsets.
 - Consolidated City Drill-Down Tabs: CityPage tabs are streamlined to 5 primary destinations (Overview, Markets, Sights, Food, Stays, and Safe Spaces), avoiding horizontal overflow on small displays while moving in-depth historical chronologies to an engaging highlight card inside Overview.
 - Public/Private Schedule Harmony: Unauthenticated visitors can view the full 10-day Poland trip itinerary freely, with a discreet invitation to authenticate to reveal private booking confirmations and tickets.
 - Unified Journey Sequence & Schedule Stops: [wayfinder/src/components/PolandLanding.jsx](file:///e:/TechTrekGT/wayfinder/src/components/PolandLanding.jsx) directly integrates the full 10-day itinerary timeline, flight arrivals, PKP rail transfers, daily activities, and authenticated private booking records directly into the 5 Journey Sequence stops (Kraków, Wrocław, Poznań, Toruń, Gdańsk). This unifies the public landing guide and personal schedule into a single, cohesive interface, complete with intercity transit connector cards, stop filter pills, and a Schedule vs. Cards view mode switcher (defaulting to compact Cards view).
 - Shared Private Booking Cards: [wayfinder/src/components/itinerary/PrivateBookingCard.jsx](file:///e:/TechTrekGT/wayfinder/src/components/itinerary/PrivateBookingCard.jsx) renders D1-persisted booking records (flights, hotels, restaurants, excursions, rail) with private lock badges, confirmation numbers, passenger details, and theme badges across both the main journey stops and the dedicated private hub.
+- Interactive Timeline Drag-and-Drop & Reordering: Both [wayfinder/src/components/ItineraryView.jsx](file:///e:/TechTrekGT/wayfinder/src/components/ItineraryView.jsx) and [wayfinder/src/components/PolandLanding.jsx](file:///e:/TechTrekGT/wayfinder/src/components/PolandLanding.jsx) provide full HTML5 drag-and-drop handles (`GripVertical`) and 1-click Up/Down reorder buttons (`ChevronUp`, `ChevronDown`) on every timeline card. Custom ordering is managed dynamically via `buildUnifiedDayTimeline` and `applyCustomTimelineOrder` in [wayfinder/src/utils/itineraryTimeline.js](file:///e:/TechTrekGT/wayfinder/src/utils/itineraryTimeline.js), persists in `localStorage` under `wayfinder_timeline_order_v1`, broadcasts across all views via `wayfinder:timeline-order-changed` events, and provides a 1-click Reset Order action in the day header. Day 1 default order accurately connects flight touchdown (1:30 PM), SKA1 airport commuter rail (2:15 PM), and hotel check-in (3:00 PM). Dragging is isolated strictly to the right-side grip handle, keeping text freely selectable and copyable.
+- Interactive Itinerary Deep-Links & Google Maps Navigation: In both [wayfinder/src/components/ItineraryView.jsx](file:///e:/TechTrekGT/wayfinder/src/components/ItineraryView.jsx) and [wayfinder/src/components/PolandLanding.jsx](file:///e:/TechTrekGT/wayfinder/src/components/PolandLanding.jsx), category icons (fork and knife, landmark, market) are interactive buttons linking directly to the corresponding city guide section. Timeline addresses across public events and [wayfinder/src/components/itinerary/PrivateBookingCard.jsx](file:///e:/TechTrekGT/wayfinder/src/components/itinerary/PrivateBookingCard.jsx) are clickable links opening Google Maps turn-by-turn directions. Suggested dining cards feature dedicated action buttons (e.g. 'View Morskie Oko Tile') that deep-link directly to the restaurant Must-Have tile in [wayfinder/src/components/city/CityFoodTab.jsx](file:///e:/TechTrekGT/wayfinder/src/components/city/CityFoodTab.jsx), scrolling into view and applying an amber highlight ring.
 
 ## 7. Booking Confirmation Import: Email Forwarding System
 
@@ -483,6 +486,50 @@ Refines the navigation architecture in [Layout.jsx](file:///e:/TechTrekGT/wayfin
   - Removed the standalone "Launch Pad" button from the top navigation bar to prevent horizontal overflow and button wrapping on desktop and laptop displays (retained in the global footer for cross-platform navigation).
   - Streamlined the "Currency Converter" button across desktop and mobile headers by removing the live rate badge (`zł 3.94`), presenting a clean, compact interactive button that launches the full converter modal on demand.
 
+## 25. Brand Logo Spill-Over & Zero-Gap Sub-Toolbar Architecture
 
+Refines header brand presentation and eliminates intermediate coordinate displacement gaps:
 
+- Brand Logo Overflow Spill-Over ([Layout.jsx](file:///e:/TechTrekGT/wayfinder/src/components/Layout.jsx)):
+  - Enlarged `wayfinderHeaderBanner` image dimensions across breakpoints (`h-14 sm:h-18 md:h-20 lg:h-22`) with negative margin offsets (`-mb-4 sm:-mb-6 md:-mb-8 lg:-mb-9`).
+  - Allows the graphic explorer emblem and compass badge to gracefully spill over the bottom gold border of the fixed navbar with drop-shadow depth (`drop-shadow-[0_10px_20px_rgba(0,0,0,0.85)]`) while keeping the header row compact (`h-14 sm:h-16`).
+- Zero-Gap Sub-Toolbar In-Flow Docking ([PrivateHub.jsx](file:///e:/TechTrekGT/wayfinder/src/components/PrivateHub.jsx)):
+  - Converted the Private Operations Hub secondary navigation bar from an internal sticky offset to standard in-flow positioning (`relative z-20 w-full bg-slate-900/95 backdrop-blur-xl border-b border-white/10 shadow-lg`).
+  - Eliminates the 64px black void caused by child sticky coordinate calculation within `<main>`, docking the sub-toolbar flush against the main navigation bar bottom border (gap = 0.0px).
+  - Re-spaced the trip summary badges and breadcrumb navigation, ensuring date pills (`[DEC 3 - DEC 13, 2026]`, `[10 DAYS • 9 NIGHTS]`) and "Back to Poland Journey" link remain fully visible without top edge clipping.
+- Timeline Day Header Realignment ([ItineraryView.jsx](file:///e:/TechTrekGT/wayfinder/src/components/ItineraryView.jsx)):
+  - Synchronized sticky day headers (`sticky top-14 sm:top-16 z-20`) and target anchor offsets (`scroll-mt-24`) to dock cleanly beneath the primary navigation bar during deep timeline exploration.
+
+## 26. Unauthenticated Privacy Guardrail & Confirmed Booking Isolation
+
+Enforces strict defense-in-depth privacy isolation between public guide visitors and authenticated travelers:
+
+- Public Catalog Sanitization ([poland-2026.js](file:///e:/TechTrekGT/wayfinder/src/data/poland-2026.js)):
+  - Purged private passenger names (Ronald Milton Few, Jonathan Kemp) and confirmation codes (GUDI3J) from the static public `itinerary` schedule and `flightArrival` dataset.
+  - Day 1 and Day 10 public schedules present generic travel arrival/departure milestones ("Target Arrival: Kraków Airport (KRK)", "Morning Departure: Gdańsk (GDN) -> Amsterdam (AMS)", "Homeward Flight: Amsterdam (AMS) -> Atlanta (ATL)") without "Confirmed Arrival" badges.
+  - Exported private confirmed flight details into `confirmedFlightEvents` for dynamic overlay exclusively upon authentication.
+- Authentication-Gated Timeline Merging ([itineraryTimeline.js](file:///e:/TechTrekGT/wayfinder/src/utils/itineraryTimeline.js)):
+  - `buildUnifiedDayTimeline` accepts `isAuthenticated` boolean parameter.
+  - Unauthenticated requests strictly suppress private D1 bookings and confirmed hotel accommodations (`activeAccommodations = []`, `enrichedPrivate = []`).
+  - Automatically upgrades public flight milestones to confirmed personal flight records and attached vouchers only when `isAuthenticated === true`.
+- Component-Level Document & Badge Gating:
+  - [ItineraryView.jsx](file:///e:/TechTrekGT/wayfinder/src/components/ItineraryView.jsx) & [PolandLanding.jsx](file:///e:/TechTrekGT/wayfinder/src/components/PolandLanding.jsx): Wrapped "View Delta Flight Confirmation" button, `Conf: GUDI3J` badge, and private booking cards in `{isAuthenticated && ...}` checks.
+  - [RouteVisualization.jsx](file:///e:/TechTrekGT/wayfinder/src/components/RouteVisualization.jsx): Gated `Conf: GUDI3J` and "View Document" preview button behind authentication; unauthenticated visitors view generic "Kraków Airport (KRK)" air arrival without confirmation numbers.
+  - [CityHotelsTab.jsx](file:///e:/TechTrekGT/wayfinder/src/components/city/CityHotelsTab.jsx): Suppressed confirmation codes and Delta flight document buttons when unauthenticated, displaying public airport transit details.
+  - [DocumentViewerModal.jsx](file:///e:/TechTrekGT/wayfinder/src/components/DocumentViewerModal.jsx): Enforced strict early return (`if (!isOpen || !isAuthenticated) return null;`), preventing unauthenticated preview of booking PDFs or passenger rosters.
+
+## 27. Schedule View Scope Resolution & Calendar Sync Authentication Gate
+
+Resolves the runtime crash during Schedule View stop expansion and enforces strict authentication gating on all calendar synchronization triggers:
+
+- Schedule View Scope Resolution ([PolandLanding.jsx](file:///e:/TechTrekGT/wayfinder/src/components/PolandLanding.jsx)):
+  - In `JourneyStopSchedule`, added `const { isAuthenticated: contextIsAuth } = useAuth();` and resolved `isAuthenticated` from props with context fallback (`propIsAuth !== undefined ? propIsAuth : contextIsAuth`).
+  - Passed `isAuthenticated={isAuthenticated}` directly from `PolandLanding` to `<JourneyStopSchedule />`.
+  - Eliminates the runtime `ReferenceError: isAuthenticated is not defined` when switching to Schedule View or expanding individual city stops, allowing all 5 destination stop dossiers, weather widgets, and transit connector cards to render cleanly.
+- Universal Calendar Sync Authentication Gate:
+  - Landing Journey Sequence ([PolandLanding.jsx](file:///e:/TechTrekGT/wayfinder/src/components/PolandLanding.jsx)): Wrapped the "Calendar Sync" quick action button in `{isAuthenticated && ...}`, completely hiding it from unauthenticated visitors.
+  - Private Operations Hub ([PrivateHub.jsx](file:///e:/TechTrekGT/wayfinder/src/components/PrivateHub.jsx)): Wrapped the "Sync Calendar" sub-toolbar button in `{isAuthenticated && ...}`.
+  - Full Expedition Timeline ([ItineraryView.jsx](file:///e:/TechTrekGT/wayfinder/src/components/ItineraryView.jsx)): Wrapped the "Sync / Export (.ics)" header button in `{isAuthenticated && ...}`.
+  - Calendar Subscribe Modal ([CalendarSubscribeModal.jsx](file:///e:/TechTrekGT/wayfinder/src/components/calendar/CalendarSubscribeModal.jsx)): Added an early return guard (`if (!isOpen || !isAuthenticated) return null;`) preventing the modal from rendering or executing feed token queries for unauthenticated visitors.
+  - Calendar Snapshot API Route ([src/worker.js](file:///e:/TechTrekGT/wayfinder/src/worker.js)): Enforced authentication checks on `GET /api/wayfinder/calendar/export.ics` (`if (!auth.ok) return auth.error;`), requiring an active authenticated session to download calendar snapshots.
 

@@ -44,18 +44,18 @@ export function Layout({ children }) {
       {/* Sticky Top Navigation Bar: Locked in view on all pages */}
       <header className="sticky top-0 z-50 bg-slate-950/95 backdrop-blur-xl border-b border-[#b48214]/30 w-full max-w-full shadow-xl">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between min-w-0">
-          {/* Brand Logo Banner */}
-          <div className="flex items-center shrink-0 min-w-0 py-1">
+          {/* Brand Logo Banner: enlarged and spills over the bottom border */}
+          <div className="flex items-start shrink-0 min-w-0 self-stretch pt-1 sm:pt-1.5 relative z-30">
             <a
               href="/wayfinder"
               onClick={(e) => pushRoute(e, '/wayfinder')}
-              className="flex items-center group shrink-0 focus:outline-none"
+              className="flex items-start group shrink-0 focus:outline-none relative"
               title="TechTrek Wayfinder - Travel Operations"
             >
               <img
                 src={wayfinderHeaderBanner}
                 alt="TechTrek Wayfinder - Plan • Explore • Navigate • Discover"
-                className="h-9 sm:h-11 md:h-12 w-auto max-w-[200px] sm:max-w-[260px] md:max-w-[300px] object-contain block drop-shadow-md group-hover:opacity-95 transition-opacity"
+                className="h-14 sm:h-18 md:h-20 lg:h-22 w-auto object-contain block drop-shadow-[0_10px_20px_rgba(0,0,0,0.85)] filter group-hover:scale-[1.02] transition-transform duration-200 -mb-4 sm:-mb-6 md:-mb-8 lg:-mb-9 pointer-events-auto origin-top-left"
                 fetchPriority="high"
               />
             </a>
@@ -205,7 +205,7 @@ export function Layout({ children }) {
 
       </header>
 
-      <main className="flex-1 relative z-10 w-full max-w-full flex flex-col overflow-x-hidden pb-20 md:pb-0">
+      <main className="flex-1 relative z-10 w-full max-w-full flex flex-col overflow-x-clip pb-20 md:pb-0">
         {children}
       </main>
 

@@ -96,7 +96,7 @@ export function CalendarSubscribeModal({ isOpen, onClose }) {
     window.location.href = downloadUrl;
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !isAuthenticated) return null;
 
   const urls = tokenData?.urls || {};
   const feedUrl = urls.feed_url || '';

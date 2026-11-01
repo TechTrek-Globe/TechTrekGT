@@ -31,6 +31,7 @@ import {
 import { polandJourney } from '../data/poland-2026';
 import { DocumentViewerModal } from './DocumentViewerModal';
 import { useSettings } from '../context/SettingsContext';
+import { useAuth } from '../context/AuthContext';
 import { formatDistance } from './Formatters';
 
 function StationDossierModal({ stationKey, onClose }) {
@@ -298,6 +299,7 @@ function CityTransitSection({ cityId }) {
 }
 
 export function RouteVisualization() {
+  const { isAuthenticated } = useAuth();
   const { settings } = useSettings();
   const [activeTab, setActiveTab] = useState('overview'); // 'overview', 'krakow', 'wroclaw', 'poznan', 'torun', 'gdansk', 'all-transit', 'guide'
   const [activeStationModal, setActiveStationModal] = useState(null);
@@ -429,18 +431,22 @@ export function RouteVisualization() {
                       <Plane className="w-4 h-4 text-sky-400 rotate-45 shrink-0" />
                       <div>
                         <span className="font-bold text-white">Air Arrival: </span>
-                        <span className="text-sky-300 font-mono font-bold">Delta DL9208 (AMS ➔ KRK)</span>
+                        <span className="text-sky-300 font-mono font-bold">
+                          {isAuthenticated ? 'Delta DL9208 (AMS ➔ KRK)' : 'Kraków Airport (KRK)'}
+                        </span>
                       </div>
                     </div>
                     <div className="flex items-center space-x-2 shrink-0">
-                      <button
-                        onClick={() => setIsDocViewerOpen(true)}
-                        className="px-2.5 py-1 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 text-[10px] font-bold border border-sky-500/40 transition-colors flex items-center space-x-1 cursor-pointer"
-                        title="View Delta flight document"
-                      >
-                        <FileText className="w-3 h-3 text-sky-400" />
-                        <span>View Document</span>
-                      </button>
+                      {isAuthenticated && (
+                        <button
+                          onClick={() => setIsDocViewerOpen(true)}
+                          className="px-2.5 py-1 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 text-[10px] font-bold border border-sky-500/40 transition-colors flex items-center space-x-1 cursor-pointer"
+                          title="View Delta flight document"
+                        >
+                          <FileText className="w-3 h-3 text-sky-400" />
+                          <span>View Document</span>
+                        </button>
+                      )}
                       <button
                         onClick={() => setActiveStationModal('airport-krk')}
                         className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white text-[10px] font-bold border border-white/10 transition-colors cursor-pointer"
@@ -453,8 +459,12 @@ export function RouteVisualization() {
                     <span className="text-amber-300 font-bold">Touchdown: Dec 4, 2026 @ 13:30 CET</span>
                     <span className="text-slate-500">•</span>
                     <span className="text-slate-400">KRK Balice Airport</span>
-                    <span className="text-slate-500">•</span>
-                    <span className="text-emerald-300 font-mono">Conf: GUDI3J</span>
+                    {isAuthenticated && (
+                      <>
+                        <span className="text-slate-500">•</span>
+                        <span className="text-emerald-300 font-mono">Conf: GUDI3J</span>
+                      </>
+                    )}
                   </div>
                 </div>
 

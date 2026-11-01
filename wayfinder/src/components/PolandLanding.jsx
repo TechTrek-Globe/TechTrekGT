@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { 
   Compass, Map, Calendar, Train, Utensils, Bed, ArrowRight, CheckCircle2, 
   MapPin, Plane, Clock, Sparkles, Building, Landmark, Coffee, Lock,
-  ChevronDown, ChevronUp, Layers, Eye, ShieldCheck, FileText
+  ChevronDown, ChevronUp, Layers, Eye, ShieldCheck, FileText,
+  GripVertical, RotateCcw, ExternalLink
 } from 'lucide-react';
 import { polandJourney } from '../data/poland-2026';
 import { cityImages } from '../utils/cityImages';
@@ -13,13 +14,19 @@ import { PrivateBookingCard } from './itinerary/PrivateBookingCard';
 import { DocumentViewerModal } from './DocumentViewerModal';
 import { WeatherWidget } from './weather/WeatherWidget';
 import { CalendarSubscribeModal } from './calendar/CalendarSubscribeModal';
-import { buildUnifiedDayTimeline } from '../utils/itineraryTimeline';
+import { 
+  buildUnifiedDayTimeline, 
+  getCustomTimelineOrder, 
+  saveCustomTimelineOrder, 
+  clearCustomTimelineOrder,
+  getItemDestination
+} from '../utils/itineraryTimeline';
 import { FormatTime, FormatText } from './Formatters';
 
 const stopTransitInfo = {
   krakow: {
-    arrivalBadge: '✈️ Air Arrival: DL9208 into KRK at 13:30 CET',
-    arrivalSub: 'Delta DL9208 (AMS -> KRK). Touchdown 13:30 CET (local Poland time). Direct SKA1 commuter rail into Kraków Główny arrives ~14:45-15:15 CET, synchronizing with standard 15:00 hotel check-in.',
+    arrivalBadge: '✈️ Air Arrival: Kraków Airport (KRK)',
+    arrivalSub: 'Afternoon flight arrival into Kraków John Paul II International Airport (KRK). Direct 17-minute SKA1 commuter rail into Kraków Główny arrives ~14:45-15:15 CET, synchronizing with standard 15:00 hotel check-in.',
     nextTransitTitle: 'PKP Intercity IC Train: Kraków Główny ➔ Wrocław Główny',
     nextTransitDetails: 'Departs Kraków Główny 11:30 • Arrives Wrocław Główny 14:15 • ~2h 45m in 1st Class',
     nextTransitNotes: '1st-class carriages with dedicated luggage racks • Scenic Lower Silesian winter route'
@@ -111,7 +118,7 @@ function getDaysForCity(cityId) {
         return {
           ...dayItem,
           theme: 'Baltic Coast Arrival & Targ Węglowy Market',
-          schedule: dayItem.schedule.filter(s => ['18:00', '19:00'].includes(s.time))
+          schedule: dayItem.schedule.filter(s => ['17:00', '18:30', '19:45', '21:00'].includes(s.time))
         };
       }
     }
@@ -130,8 +137,92 @@ function JourneyStopSchedule({
   isExpanded,
   onToggleExpand,
   transitInfo,
-  onOpenDocViewer
+  onOpenDocViewer,
+  isAuthenticated: propIsAuth
 }) {
+  const { isAuthenticated: contextIsAuth } = useAuth();
+  const isAuthenticated = propIsAuth !== undefined ? propIsAuth : contextIsAuth;
+  const [customOrder, setCustomOrder] = useState(() => getCustomTimelineOrder());
+  const [draggedItem, setDraggedItem] = useState(null);
+  const [dropTarget, setDropTarget] = useState(null);
+
+  React.useEffect(() => {
+    const handleOrderChange = () => {
+      setCustomOrder(getCustomTimelineOrder());
+    };
+    window.addEventListener('wayfinder:timeline-order-changed', handleOrderChange);
+    return () => window.removeEventListener('wayfinder:timeline-order-changed', handleOrderChange);
+  }, []);
+
+  const moveTimelineItem = (dayNumber, fromIndex, direction, currentItems) => {
+    const toIndex = fromIndex + direction;
+    if (toIndex < 0 || toIndex >= currentItems.length) return;
+    const newItems = [...currentItems];
+    const [moved] = newItems.splice(fromIndex, 1);
+    newItems.splice(toIndex, 0, moved);
+    const newKeys = newItems.map(item => item.key);
+    const updatedMap = { ...customOrder, [dayNumber]: newKeys };
+    setCustomOrder(updatedMap);
+    saveCustomTimelineOrder(updatedMap);
+  };
+
+  const handleDragStart = (e, dayNumber, index, key) => {
+    e.stopPropagation();
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', key);
+    const cardEl = e.currentTarget.closest('[data-timeline-card]');
+    if (cardEl && e.dataTransfer.setDragImage) {
+      const rect = cardEl.getBoundingClientRect();
+      const handleRect = e.currentTarget.getBoundingClientRect();
+      const offsetX = handleRect.left - rect.left + handleRect.width / 2;
+      const offsetY = handleRect.top - rect.top + handleRect.height / 2;
+      e.dataTransfer.setDragImage(cardEl, offsetX, offsetY);
+    }
+    setDraggedItem({ day: dayNumber, index, key });
+  };
+
+  const handleDragOver = (e, dayNumber, index) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (!dropTarget || dropTarget.day !== dayNumber || dropTarget.index !== index) {
+      setDropTarget({ day: dayNumber, index });
+    }
+  };
+
+  const handleDrop = (e, dayNumber, targetIndex, currentItems) => {
+    e.preventDefault();
+    if (!draggedItem || draggedItem.day !== dayNumber) {
+      setDraggedItem(null);
+      setDropTarget(null);
+      return;
+    }
+    const sourceIndex = draggedItem.index;
+    if (sourceIndex === targetIndex) {
+      setDraggedItem(null);
+      setDropTarget(null);
+      return;
+    }
+    const newItems = [...currentItems];
+    const [moved] = newItems.splice(sourceIndex, 1);
+    newItems.splice(targetIndex, 0, moved);
+    const newKeys = newItems.map(item => item.key);
+    const updatedMap = { ...customOrder, [dayNumber]: newKeys };
+    setCustomOrder(updatedMap);
+    saveCustomTimelineOrder(updatedMap);
+    setDraggedItem(null);
+    setDropTarget(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedItem(null);
+    setDropTarget(null);
+  };
+
+  const resetDayOrder = (dayNumber) => {
+    clearCustomTimelineOrder(dayNumber);
+    setCustomOrder(getCustomTimelineOrder());
+  };
+
   return (
     <div className="space-y-4">
       {/* Stop Card */}
@@ -179,7 +270,7 @@ function JourneyStopSchedule({
                       className="px-2 py-0.5 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-400/40 text-[10px] font-bold flex items-center space-x-1 cursor-pointer transition-colors"
                       title="View Delta flight document"
                     >
-                      <FileText className="w-3 h-3 text-sky-400" />
+                      <FileText className="w-3.5 h-3.5 text-sky-400" />
                       <span>View Document</span>
                     </button>
                   )}
@@ -227,14 +318,14 @@ function JourneyStopSchedule({
         {isExpanded && (
           <div className="p-4 sm:p-6 space-y-8 animate-fade-in">
             {days.map((dayItem) => {
-              const dayPrivate = (privateItems || []).filter(p => {
+              const dayPrivate = isAuthenticated ? (privateItems || []).filter(p => {
                 if (p.notes && p.notes.includes('gmail:')) return false;
                 const d = p.local_date || p.item_date || p.start_date || p.date || p.booking_date || '';
                 if (!d) return dayItem.day === 1;
                 if (dayItem.day === 1 && d <= '2026-12-04') return true;
                 return d && d.toString().startsWith(dayItem.date);
-              });
-              const dayAccommodations = (accommodations || []).filter(a => a.check_in_date === dayItem.date);
+              }) : [];
+              const dayAccommodations = isAuthenticated ? (accommodations || []).filter(a => a.check_in_date === dayItem.date) : [];
 
               return (
                 <div key={dayItem.day} className="space-y-4">
@@ -261,77 +352,212 @@ function JourneyStopSchedule({
                           <span className="truncate max-w-[260px]">{dayItem.base}</span>
                         </div>
                       )}
+                      {customOrder[dayItem.day] && customOrder[dayItem.day].length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => resetDayOrder(dayItem.day)}
+                          className="px-2 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 text-[10px] font-bold flex items-center space-x-1 transition-colors shrink-0"
+                          title="Reset this day's items to original chronological order"
+                        >
+                          <RotateCcw className="w-3 h-3 text-amber-400" />
+                          <span>Reset</span>
+                        </button>
+                      )}
                     </div>
                   </div>
 
                   {/* Day Events Timeline */}
                   <div className="space-y-3 pl-4 sm:pl-6 border-l-2 border-amber-500/30 ml-3 sm:ml-4">
-                    {buildUnifiedDayTimeline(dayItem, dayPrivate, dayAccommodations).map((timelineItem) => {
-                      if (timelineItem.type === 'accommodation' || timelineItem.type === 'private') {
-                        return (
-                          <PrivateBookingCard key={timelineItem.key} item={timelineItem.data} />
-                        );
-                      }
+                    {(() => {
+                      const dayTimelineItems = buildUnifiedDayTimeline(
+                        dayItem,
+                        dayPrivate,
+                        dayAccommodations,
+                        isAuthenticated,
+                        customOrder[dayItem.day]
+                      );
 
-                      const event = timelineItem.data;
-                      return (
-                        <div key={timelineItem.key} className="relative group">
-                          <div className="absolute -left-[23px] sm:-left-[31px] top-4 w-4 h-4 rounded-full border-2 border-slate-950 bg-amber-400 group-hover:scale-125 transition-transform shadow-[0_0_8px_rgba(245,158,11,0.8)]" />
-                          <div className="glass-panel p-4 rounded-2xl border border-white/10 group-hover:border-amber-500/40 transition-all shadow-md bg-slate-900/90 space-y-2.5">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                              <div className="flex items-center space-x-2.5">
-                                <div className={`p-2 rounded-xl border ${getStyleForType(event.itemType)} shrink-0`}>
-                                  {getIconForType(event.itemType)}
-                                </div>
-                                <div>
-                                  <h4 className="font-bold text-white text-sm sm:text-base leading-tight group-hover:text-amber-200 transition-colors">
-                                    {event.title}
-                                  </h4>
-                                  {event.location && (
-                                    <div className="text-xs text-slate-400 flex items-center space-x-1 mt-0.5">
-                                      <MapPin className="w-3 h-3 text-amber-400 shrink-0" />
-                                      <span>{event.location}</span>
+                      return dayTimelineItems.map((timelineItem, idx) => {
+                        const isDragging = draggedItem?.day === dayItem.day && draggedItem?.index === idx;
+                        const isDropTarget = dropTarget?.day === dayItem.day && dropTarget?.index === idx;
+                        const destination = getItemDestination(timelineItem.data, city.id || dayItem.cityId);
+
+                        const reorderControls = (
+                          <div 
+                            className="flex items-center space-x-0.5 bg-slate-950/80 px-1 py-0.5 rounded-xl border border-white/10 shrink-0 shadow-sm"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => moveTimelineItem(dayItem.day, idx, -1, dayTimelineItems)}
+                              disabled={idx === 0}
+                              className="p-0.5 rounded hover:bg-amber-500/20 text-slate-400 hover:text-amber-300 disabled:opacity-20 disabled:hover:bg-transparent disabled:hover:text-slate-400 transition-colors cursor-pointer"
+                              title="Move up"
+                              aria-label="Move item up"
+                            >
+                              <ChevronUp className="w-3 h-3" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => moveTimelineItem(dayItem.day, idx, 1, dayTimelineItems)}
+                              disabled={idx === dayTimelineItems.length - 1}
+                              className="p-0.5 rounded hover:bg-amber-500/20 text-slate-400 hover:text-amber-300 disabled:opacity-20 disabled:hover:bg-transparent disabled:hover:text-slate-400 transition-colors cursor-pointer"
+                              title="Move down"
+                              aria-label="Move item down"
+                            >
+                              <ChevronDown className="w-3 h-3" />
+                            </button>
+                            <div 
+                              draggable={true}
+                              onDragStart={(e) => handleDragStart(e, dayItem.day, idx, timelineItem.key)}
+                              onDragEnd={handleDragEnd}
+                              className="p-0.5 rounded hover:bg-white/10 text-slate-400 hover:text-amber-300 cursor-grab active:cursor-grabbing transition-colors select-none"
+                              title="Drag handle to reorder (text in tile remains selectable)"
+                              aria-label="Drag handle to reorder"
+                            >
+                              <GripVertical className="w-3 h-3" />
+                            </div>
+                          </div>
+                        );
+
+                        return (
+                          <div
+                            key={timelineItem.key}
+                            data-timeline-card="true"
+                            onDragOver={(e) => handleDragOver(e, dayItem.day, idx)}
+                            onDrop={(e) => handleDrop(e, dayItem.day, idx, dayTimelineItems)}
+                            className={`select-text transition-all duration-150 ${isDragging ? 'opacity-40 scale-[0.98]' : ''}`}
+                          >
+                            {isDropTarget && (
+                              <div className="h-1.5 bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 rounded-full my-2 shadow-[0_0_12px_rgba(245,158,11,0.9)] animate-pulse" />
+                            )}
+                            {timelineItem.type === 'accommodation' || timelineItem.type === 'private' ? (
+                              isAuthenticated ? (
+                                <PrivateBookingCard item={timelineItem.data} reorderControls={reorderControls} />
+                              ) : null
+                            ) : (
+                              <div className="relative group">
+                                <div className="absolute -left-[23px] sm:-left-[31px] top-4 w-4 h-4 rounded-full border-2 border-slate-950 bg-amber-400 group-hover:scale-125 transition-transform shadow-[0_0_8px_rgba(245,158,11,0.8)]" />
+                                <div className="glass-panel p-4 rounded-2xl border border-white/10 group-hover:border-amber-500/40 transition-all shadow-md bg-slate-900/90 space-y-2.5">
+                                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                    <div className="flex items-center space-x-2.5">
+                                      {destination ? (
+                                        <a
+                                          href={destination.url}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            pushRoute(e, destination.url);
+                                          }}
+                                          className={`p-2 rounded-xl border ${getStyleForType(timelineItem.data.itemType)} shrink-0 hover:scale-110 hover:border-amber-400 hover:shadow-[0_0_14px_rgba(245,158,11,0.5)] transition-all cursor-pointer group/icon`}
+                                          title={`${destination.buttonText} - Click to view in guide`}
+                                          aria-label={destination.buttonText}
+                                        >
+                                          {getIconForType(timelineItem.data.itemType)}
+                                        </a>
+                                      ) : (
+                                        <div className={`p-2 rounded-xl border ${getStyleForType(timelineItem.data.itemType)} shrink-0`}>
+                                          {getIconForType(timelineItem.data.itemType)}
+                                        </div>
+                                      )}
+                                      <div>
+                                        {destination ? (
+                                          <a
+                                            href={destination.url}
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              pushRoute(e, destination.url);
+                                            }}
+                                            className="font-bold text-white text-sm sm:text-base leading-tight hover:text-amber-300 transition-colors inline-block cursor-pointer"
+                                            title={`${destination.buttonText} - Click to view in guide`}
+                                          >
+                                            {timelineItem.data.title}
+                                          </a>
+                                        ) : (
+                                          <h4 className="font-bold text-white text-sm sm:text-base leading-tight group-hover:text-amber-200 transition-colors">
+                                            {timelineItem.data.title}
+                                          </h4>
+                                        )}
+                                        {timelineItem.data.location && (
+                                          <a
+                                            href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(timelineItem.data.location)}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            onClick={(e) => e.stopPropagation()}
+                                            className="text-xs text-slate-400 hover:text-amber-300 flex items-center space-x-1 mt-0.5 transition-colors group/loc cursor-pointer inline-flex max-w-fit"
+                                            title="Open navigation directions in Google Maps"
+                                          >
+                                            <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0 group-hover/loc:scale-110 transition-transform" />
+                                            <span className="underline decoration-slate-600 hover:decoration-amber-400 underline-offset-2">
+                                              {timelineItem.data.location}
+                                            </span>
+                                            <ExternalLink className="w-3 h-3 text-slate-500 group-hover/loc:text-amber-300 opacity-70 ml-0.5 shrink-0" />
+                                          </a>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    <div className="flex items-center space-x-2 shrink-0 self-start sm:self-center">
+                                      {timelineItem.data.badge && (
+                                        <span className={`px-2 py-0.5 rounded-full border text-[10px] font-black uppercase tracking-wider ${getBadgeForType(timelineItem.data.itemType)}`}>
+                                          {timelineItem.data.badge}
+                                        </span>
+                                      )}
+                                      <span className="px-2 py-0.5 rounded-lg bg-slate-950 border border-white/10 font-mono font-bold text-xs text-sky-300">
+                                        <FormatTime time={timelineItem.data.time} />
+                                      </span>
+                                      {reorderControls}
+                                    </div>
+                                  </div>
+
+                                  <p className="text-xs sm:text-sm text-slate-200 leading-relaxed font-medium">
+                                    {timelineItem.data.description}
+                                  </p>
+
+                                  {/* Suggested Food / Must-Have Tile Button */}
+                                  {destination && destination.type === 'food' && (
+                                    <div className="pt-2 border-t border-white/5 flex flex-wrap items-center justify-between gap-2">
+                                      <a
+                                        href={destination.url}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          pushRoute(e, destination.url);
+                                        }}
+                                        className="px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-400/40 text-amber-300 text-xs font-bold flex items-center space-x-1.5 transition-all cursor-pointer shadow-sm group/btn"
+                                        title="Open Food & Dining Must-Have tile"
+                                      >
+                                        <Utensils className="w-3.5 h-3.5 text-amber-400 group-hover/btn:scale-110 transition-transform" />
+                                        <span>{destination.buttonText}</span>
+                                        <ArrowRight className="w-3.5 h-3.5 text-amber-400/80 group-hover/btn:translate-x-0.5 transition-transform" />
+                                      </a>
+                                      <span className="text-[11px] text-slate-400 font-medium">
+                                        {city.name} Dining Guide
+                                      </span>
+                                    </div>
+                                  )}
+
+                                  {/* Flight Arrival Document Trigger: ONLY when signed in */}
+                                  {isAuthenticated && (timelineItem.data.itemType === 'flight' || timelineItem.data.title?.includes('DL9208')) && onOpenDocViewer && (
+                                    <div className="pt-2 border-t border-white/5 flex items-center justify-between">
+                                      <button
+                                        type="button"
+                                        onClick={onOpenDocViewer}
+                                        className="px-3 py-1.5 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 border border-sky-400/30 text-sky-300 text-xs font-bold flex items-center space-x-1.5 transition-all cursor-pointer shadow-sm"
+                                      >
+                                        <FileText className="w-3.5 h-3.5 text-sky-400" />
+                                        <span>View Delta Flight Confirmation</span>
+                                      </button>
+                                      <span className="text-[11px] text-slate-400 font-mono">
+                                        Conf: <strong className="text-emerald-300">GUDI3J</strong>
+                                      </span>
                                     </div>
                                   )}
                                 </div>
                               </div>
-
-                              <div className="flex items-center space-x-2 shrink-0 self-start sm:self-center">
-                                {event.badge && (
-                                  <span className={`px-2 py-0.5 rounded-full border text-[10px] font-black uppercase tracking-wider ${getBadgeForType(event.itemType)}`}>
-                                    {event.badge}
-                                  </span>
-                                )}
-                                <span className="px-2 py-0.5 rounded-lg bg-slate-950 border border-white/10 font-mono font-bold text-xs text-sky-300">
-                                  <FormatTime time={event.time} />
-                                </span>
-                              </div>
-                            </div>
-
-                            <p className="text-xs sm:text-sm text-slate-200 leading-relaxed font-medium">
-                              {event.description}
-                            </p>
-
-                            {/* Flight Arrival Document Trigger */}
-                            {(event.itemType === 'flight' || event.title?.includes('DL9208')) && onOpenDocViewer && (
-                              <div className="pt-2 border-t border-white/5 flex items-center justify-between">
-                                <button
-                                  type="button"
-                                  onClick={onOpenDocViewer}
-                                  className="px-3 py-1.5 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 border border-sky-400/30 text-sky-300 text-xs font-bold flex items-center space-x-1.5 transition-all cursor-pointer shadow-sm"
-                                >
-                                  <FileText className="w-3.5 h-3.5 text-sky-400" />
-                                  <span>View Delta Flight Confirmation</span>
-                                </button>
-                                <span className="text-[11px] text-slate-400 font-mono">
-                                  Conf: <strong className="text-emerald-300">GUDI3J</strong>
-                                </span>
-                              </div>
                             )}
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      });
+                    })()}
                   </div>
                 </div>
               );
@@ -651,14 +877,16 @@ export function PolandLanding() {
 
             {/* Quick Actions */}
             <div className="flex items-center space-x-2 shrink-0">
-              <button
-                onClick={() => setIsCalendarModalOpen(true)}
-                className="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/40 text-amber-300 hover:text-white text-xs font-semibold flex items-center space-x-1.5 transition-colors min-h-[36px]"
-                title="Subscribe to live calendar feed or export .ics"
-              >
-                <Calendar className="w-3.5 h-3.5 text-amber-400" />
-                <span>Calendar Sync</span>
-              </button>
+              {isAuthenticated && (
+                <button
+                  onClick={() => setIsCalendarModalOpen(true)}
+                  className="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/40 text-amber-300 hover:text-white text-xs font-semibold flex items-center space-x-1.5 transition-colors min-h-[36px]"
+                  title="Subscribe to live calendar feed or export .ics"
+                >
+                  <Calendar className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Calendar Sync</span>
+                </button>
+              )}
               {isAuthenticated ? (
                 <a
                   href="/wayfinder/poland-christmas-2026/private/documents"
@@ -795,6 +1023,7 @@ export function PolandLanding() {
                     onToggleExpand={() => toggleStopExpand(city.id)}
                     transitInfo={stopTransitInfo[city.id]}
                     onOpenDocViewer={city.id === 'krakow' ? () => setIsDocViewerOpen(true) : null}
+                    isAuthenticated={isAuthenticated}
                   />
                 );
               })}

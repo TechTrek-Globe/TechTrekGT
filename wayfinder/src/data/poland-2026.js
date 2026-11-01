@@ -20,8 +20,6 @@ export const polandJourney = {
     "timezone": "CET (Central European Time / UTC+1, Poland Local Time)",
     "airport": "Kraków John Paul II International Airport (KRK / Balice)",
     "airportCode": "KRK",
-    "confirmationNumber": "GUDI3J",
-    "passengers": "Ronald Milton Few, Jonathan Kemp",
     "checkInSync": "Touching down at 13:30 CET allows ~45 mins for passport control and baggage claim, plus a 17-minute direct SKA1 commuter train ride to Kraków Główny. Travelers reach Old Town or Kazimierz accommodations between 14:45 and 15:15 CET, synchronizing with standard 15:00 hotel check-in times.",
     "documentFilename": "Poland_Delta.pdf",
     "documentPath": "/Poland-2026/docs/Poland_Delta.pdf"
@@ -4476,7 +4474,7 @@ export const polandJourney = {
       "coordinates": { "lat": 50.0722, "lng": 19.7997 },
       "mapsUrl": "https://www.google.com/maps/search/?api=1&query=Krakow+Airport+Train+Station",
       "badge": "Airport Link (Inbound)",
-      "flightDetails": "Delta Air Lines DL9208 (AMS ➔ KRK). Landing at 13:30 CET on Friday, Dec 4, 2026. Inbound transfer from DL0074 (ATL ➔ AMS). Confirmation: GUDI3J.",
+      "flightDetails": "Delta Air Lines DL9208 (AMS ➔ KRK). Landing at 13:30 CET on Friday, Dec 4, 2026. Inbound transfer from DL0074 (ATL ➔ AMS).",
       "flightTouchdown": "13:30 CET (Local Poland Time / Dec 4, 2026)",
       "platforms": "Covered terminal platform connected directly via covered glass footbridge",
       "walkingFromCenter": "Directly connected to Terminal 1 via escalator/elevator walkway",
@@ -4757,13 +4755,13 @@ export const polandJourney = {
         {
           "time": "13:30",
           "itemType": "flight",
-          "title": "Confirmed Arrival: DL9208 Amsterdam (AMS) -> Krakow (KRK)",
-          "description": "Delta flight DL9208 arrives KRK at 13:30 local time. Departed AMS at 11:35. Inbound operated via DL0074 (ATL -> AMS, dep 20:10 Dec 3) with 55-min AMS layover. Confirmation: GUDI3J. Passengers: Ronald Milton Few and Jonathan Kemp. Clear border control (non-Schengen) and collect checked baggage.",
-          "location": "Krakow John Paul II International Airport (KRK)",
-          "badge": "Confirmed Arrival"
+          "title": "Target Arrival: Kraków Airport (KRK)",
+          "description": "Afternoon flight arrival into Kraków John Paul II International Airport (KRK). Clear customs and baggage claim, then proceed to the connected train station for direct SKA1 commuter rail into Kraków Główny.",
+          "location": "Kraków John Paul II International Airport (KRK)",
+          "badge": "Airport Arrival"
         },
         {
-          "time": "15:00",
+          "time": "14:15",
           "itemType": "rail",
           "title": "SKA1 Airport Train to Kraków Główny",
           "description": "Board direct SKA1 commuter rail from airport terminal directly into Kraków Główny central station (17-min journey, ~17 PLN).",
@@ -5250,24 +5248,24 @@ export const polandJourney = {
         {
           "time": "06:45",
           "itemType": "flight",
-          "title": "Confirmed Departure: DL9528 Gdansk (GDN) -> Amsterdam (AMS)",
-          "description": "Delta flight DL9528 departs GDN at 06:45, arrives Amsterdam Schiphol (AMS) at 08:40. Confirmation: GUDI3J. Passengers: Ronald Milton Few and Jonathan Kemp.",
-          "location": "Gdansk Lech Walesa Airport (GDN) -> Amsterdam Schiphol (AMS)",
-          "badge": "Confirmed Flight"
+          "title": "Morning Departure: Gdańsk (GDN) -> Amsterdam (AMS)",
+          "description": "Scheduled morning flight departure from Gdańsk Lech Wałęsa Airport (GDN) to Amsterdam Schiphol (AMS) connecting onward to transatlantic flights.",
+          "location": "Gdańsk Lech Wałęsa Airport (GDN) -> Amsterdam Schiphol (AMS)",
+          "badge": "Morning Flight"
         },
         {
           "time": "08:40",
           "itemType": "rail",
           "title": "AMS Transit: 1h 20min Amsterdam Schiphol Layover",
-          "description": "1 hour 20 minute layover at Amsterdam Schiphol Airport (AMS). Remain in the international transit zone - no customs exit required. Proceed directly to the KLM/Delta transatlantic departure gates (Schengen D/E pier). DL9227 boards at 09:30.",
+          "description": "1 hour 20 minute layover at Amsterdam Schiphol Airport (AMS). Remain in the international transit zone - no customs exit required. Proceed directly to transatlantic departure gates.",
           "location": "Amsterdam Schiphol Airport (AMS) - International Transit",
           "badge": "1h 20m Layover"
         },
         {
           "time": "10:00",
           "itemType": "flight",
-          "title": "Confirmed Departure: DL9227 Amsterdam (AMS) -> Atlanta (ATL)",
-          "description": "Delta flight DL9227 departs AMS at 10:00, arrives Atlanta Hartsfield-Jackson (ATL) at 13:35 local time. Confirmation: GUDI3J. End of an unforgettable Poland Christmas expedition!",
+          "title": "Homeward Flight: Amsterdam (AMS) -> Atlanta (ATL)",
+          "description": "Transatlantic flight from Amsterdam Schiphol (AMS) arriving into Atlanta Hartsfield-Jackson (ATL). End of an unforgettable Poland Christmas expedition!",
           "location": "Amsterdam Schiphol (AMS) -> Atlanta Hartsfield-Jackson (ATL)",
           "badge": "Homeward Flight"
         }
@@ -5275,3 +5273,37 @@ export const polandJourney = {
     }
   ]
 };
+
+// Private confirmed booking overlays (accessible only when authenticated)
+export const confirmedFlightEvents = {
+  day1Arrival: {
+    time: "13:30",
+    itemType: "flight",
+    title: "Confirmed Arrival: DL9208 Amsterdam (AMS) -> Krakow (KRK)",
+    description: "Delta flight DL9208 arrives KRK at 13:30 local time. Departed AMS at 11:35. Inbound operated via DL0074 (ATL -> AMS, dep 20:10 Dec 3) with 55-min AMS layover. Confirmation: GUDI3J. Passengers: Ronald Milton Few and Jonathan Kemp. Clear border control (non-Schengen) and collect checked baggage.",
+    location: "Krakow John Paul II International Airport (KRK)",
+    badge: "Confirmed Arrival",
+    confirmationNumber: "GUDI3J",
+    documentFilename: "Poland_Delta.pdf",
+    hasDocument: true
+  },
+  day10Departure: {
+    time: "06:45",
+    itemType: "flight",
+    title: "Confirmed Departure: DL9528 Gdansk (GDN) -> Amsterdam (AMS)",
+    description: "Delta flight DL9528 departs GDN at 06:45, arrives Amsterdam Schiphol (AMS) at 08:40. Confirmation: GUDI3J. Passengers: Ronald Milton Few and Jonathan Kemp.",
+    location: "Gdansk Lech Walesa Airport (GDN) -> Amsterdam Schiphol (AMS)",
+    badge: "Confirmed Flight",
+    confirmationNumber: "GUDI3J"
+  },
+  day10Homeward: {
+    time: "10:00",
+    itemType: "flight",
+    title: "Confirmed Departure: DL9227 Amsterdam (AMS) -> Atlanta (ATL)",
+    description: "Delta flight DL9227 departs AMS at 10:00, arrives Atlanta Hartsfield-Jackson (ATL) at 13:35 local time. Confirmation: GUDI3J. End of an unforgettable Poland Christmas expedition!",
+    location: "Amsterdam Schiphol (AMS) -> Atlanta Hartsfield-Jackson (ATL)",
+    badge: "Homeward Flight",
+    confirmationNumber: "GUDI3J"
+  }
+};
+

@@ -2,6 +2,8 @@
 // Merges public schedule items, private D1 bookings, and confirmed accommodations into a strict chronological sequence.
 // Suppresses generic hotel placeholder suggestions when a confirmed accommodation exists.
 
+import { confirmedFlightEvents } from '../data/poland-2026.js';
+
 export function parseTimeToMinutes(timeStr) {
   if (!timeStr) return 720; // default midday 12:00
   const match = String(timeStr).match(/(\d{1,2}):(\d{2})/);
@@ -75,29 +77,61 @@ export function isConflictingScheduleItem(event, excursion) {
   return evTimeMin >= startMin + 30 && evTimeMin < endMin - 15;
 }
 
-export function buildUnifiedDayTimeline(dayItem, dayPrivate = [], dayAccommodations = []) {
+export function buildUnifiedDayTimeline(dayItem, dayPrivate = [], dayAccommodations = [], isAuthenticated = false, customOrderKeys = null) {
   if (!dayItem) return [];
+
+  // When unauthenticated, private items and accommodations MUST NOT be displayed
+  const effectiveAccommodations = isAuthenticated ? dayAccommodations : [];
+  const effectivePrivate = isAuthenticated ? dayPrivate : [];
 
   // 1. Detect if any confirmed accommodation or private hotel booking exists for this day
   const hasConfirmedHotel =
-    dayAccommodations.length > 0 ||
-    dayPrivate.some((p) => {
+    effectiveAccommodations.length > 0 ||
+    effectivePrivate.some((p) => {
       const type = (p.item_type || p.docType || p.detected_doc_type || '').toLowerCase();
       return type === 'hotel' || type === 'accommodation' || type === 'lodging';
     });
 
   // 1b. Identify confirmed private excursions or tours for this day
-  const excursions = dayPrivate.filter((p) => {
+  const excursions = effectivePrivate.filter((p) => {
     const type = (p.item_type || p.docType || p.detected_doc_type || '').toLowerCase();
     const title = (p.title || '').toLowerCase();
     return type === 'excursion' || type === 'tour' || type === 'activity' || title.includes('tour') || title.includes('excursion');
   });
 
-  // 2. Filter public schedule:
+  // 2. Filter and adapt public schedule:
+  // - If authenticated, upgrade flight arrival/departure to confirmed flight details
+  // - If unauthenticated, ensure no private confirmed details, passenger names, or confirmation codes are shown
   // - Suppress generic hotel placeholders if confirmed hotel is active
   // - Suppress redundant day trip ideas if confirmed excursion is booked for same destination
-  // - Suppress daytime city sights that collide with an all-day excursion window (e.g. 11h Auschwitz & Wieliczka)
-  const filteredSchedule = (dayItem.schedule || []).filter((event) => {
+  // - Suppress daytime city sights that collide with an all-day excursion window
+  const baseSchedule = (dayItem.schedule || []).map((event) => {
+    if (isAuthenticated) {
+      if (dayItem.day === 1 && (event.itemType === 'flight' || event.title?.includes('Arrival'))) {
+        return confirmedFlightEvents?.day1Arrival || event;
+      }
+      if (dayItem.day === 10 && event.itemType === 'flight' && (event.title?.includes('GDN') || event.title?.includes('Departure'))) {
+        return confirmedFlightEvents?.day10Departure || event;
+      }
+      if (dayItem.day === 10 && event.itemType === 'flight' && (event.title?.includes('Atlanta') || event.title?.includes('Homeward'))) {
+        return confirmedFlightEvents?.day10Homeward || event;
+      }
+      return event;
+    }
+
+    // Unauthenticated sanitization guard: ensure no confirmed titles, passenger names, or confirmation codes leak
+    if (event.itemType === 'flight' || (event.title || '').includes('DL9208') || (event.title || '').includes('Confirmed Arrival')) {
+      return {
+        ...event,
+        title: 'Target Arrival: Kraków Airport (KRK)',
+        description: 'Afternoon flight arrival into Kraków John Paul II International Airport (KRK). Clear customs and baggage claim, then proceed to the connected train station for direct SKA1 commuter rail into Kraków Główny.',
+        badge: 'Airport Arrival'
+      };
+    }
+    return event;
+  });
+
+  const filteredSchedule = baseSchedule.filter((event) => {
     if (hasConfirmedHotel && isGenericHotelPlaceholder(event)) {
       return false;
     }
@@ -120,7 +154,7 @@ export function buildUnifiedDayTimeline(dayItem, dayPrivate = [], dayAccommodati
   // - Suppress redundant private flight items if confirmed flight arrival milestone is already present on this day
   // - Deduplicate redundant hotel bookings in private items
   const seenHotelKeys = new Set();
-  const filteredPrivate = dayPrivate.filter((priv) => {
+  const filteredPrivate = effectivePrivate.filter((priv) => {
     const title = (priv.title || '').trim().toLowerCase();
     if (title.endsWith('.pdf') || title.endsWith('.png')) {
       return false;
@@ -145,7 +179,7 @@ export function buildUnifiedDayTimeline(dayItem, dayPrivate = [], dayAccommodati
   // If filteredPrivate already contains a confirmed hotel booking matching the curated accommodation
   // (e.g. matching Altus Palace Wrocław, or matching hotel name), suppress the static accommodation
   // to prevent rendering duplicate hotel check-in cards on the timeline!
-  const activeAccommodations = dayAccommodations.filter((acc) => {
+  const activeAccommodations = effectiveAccommodations.filter((acc) => {
     const accTitle = (acc.hotel_name || acc.title || '').toLowerCase();
     const alreadyCoveredByPrivate = filteredPrivate.some((priv) => {
       const privType = (priv.item_type || priv.docType || priv.detected_doc_type || '').toLowerCase();
@@ -218,9 +252,10 @@ export function buildUnifiedDayTimeline(dayItem, dayPrivate = [], dayAccommodati
   // Public Schedule Events
   filteredSchedule.forEach((pub, idx) => {
     const time = pub.time || '12:00';
+    const slug = (pub.title || '').replace(/[^a-zA-Z0-9]/g, '_').toLowerCase().slice(0, 30);
     items.push({
       type: 'public',
-      key: `pub-${dayItem.day}-${idx}-${time}`,
+      key: pub.id || `pub-${dayItem.day}-${slug}-${time}`,
       time,
       timeMinutes: parseTimeToMinutes(time),
       data: pub
@@ -237,5 +272,137 @@ export function buildUnifiedDayTimeline(dayItem, dayPrivate = [], dayAccommodati
     return (priority[a.type] || 3) - (priority[b.type] || 3);
   });
 
+  // 5. Apply custom traveler order if present
+  if (customOrderKeys && Array.isArray(customOrderKeys) && customOrderKeys.length > 0) {
+    return applyCustomTimelineOrder(items, customOrderKeys);
+  }
+
   return items;
+}
+
+// Storage key for custom drag-and-drop order
+export const TIMELINE_CUSTOM_ORDER_KEY = 'wayfinder_timeline_order_v1';
+
+export function getCustomTimelineOrder() {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = localStorage.getItem(TIMELINE_CUSTOM_ORDER_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+export function saveCustomTimelineOrder(orderMap) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(TIMELINE_CUSTOM_ORDER_KEY, JSON.stringify(orderMap));
+    window.dispatchEvent(new CustomEvent('wayfinder:timeline-order-changed', { detail: orderMap }));
+  } catch (e) {
+    console.error('Failed to save timeline order:', e);
+  }
+}
+
+export function clearCustomTimelineOrder(day) {
+  if (typeof window === 'undefined') return;
+  try {
+    const current = getCustomTimelineOrder();
+    if (day !== undefined && day !== null) {
+      delete current[day];
+      localStorage.setItem(TIMELINE_CUSTOM_ORDER_KEY, JSON.stringify(current));
+    } else {
+      localStorage.removeItem(TIMELINE_CUSTOM_ORDER_KEY);
+    }
+    window.dispatchEvent(new CustomEvent('wayfinder:timeline-order-changed', { detail: current }));
+  } catch (e) {
+    console.error('Failed to clear timeline order:', e);
+  }
+}
+
+export function applyCustomTimelineOrder(items, orderKeys) {
+  if (!orderKeys || !Array.isArray(orderKeys) || orderKeys.length === 0) {
+    return items;
+  }
+  const keyIndex = new Map();
+  orderKeys.forEach((k, idx) => keyIndex.set(k, idx));
+
+  return [...items].sort((a, b) => {
+    const hasA = keyIndex.has(a.key);
+    const hasB = keyIndex.has(b.key);
+    if (hasA && hasB) {
+      return keyIndex.get(a.key) - keyIndex.get(b.key);
+    }
+    if (hasA) return -1;
+    if (hasB) return 1;
+    return a.timeMinutes - b.timeMinutes;
+  });
+}
+
+// Maps timeline event items to deep links in city guides and specific Must-Have dining tiles
+export function getItemDestination(itemData, dayCityId) {
+  if (!itemData) return null;
+  const type = itemData.itemType || '';
+  const title = (itemData.title || '').toLowerCase();
+  const city = dayCityId || 'krakow';
+
+  if (type === 'food' || type === 'restaurant' || title.includes('dinner') || title.includes('lunch')) {
+    let venueHash = '';
+    let venueName = 'Must-Have Dining';
+    if (title.includes('morskie oko')) {
+      venueHash = '#morskie-oko';
+      venueName = 'Morskie Oko';
+    } else if (title.includes('czarna kaczka')) {
+      venueHash = '#czarna-kaczka';
+      venueName = 'Czarna Kaczka';
+    } else if (title.includes('pod wawelem')) {
+      venueHash = '#pod-wawelem';
+      venueName = 'Pod Wawelem';
+    } else if (title.includes('konspira')) {
+      venueHash = '#konspira';
+      venueName = 'Konspira';
+    } else if (title.includes('piwnica')) {
+      venueHash = '#piwnica-swidnicka';
+      venueName = 'Piwnica Świdnicka';
+    } else if (title.includes('karczma lwowska')) {
+      venueHash = '#karczma-lwowska';
+      venueName = 'Karczma Lwowska';
+    } else if (title.includes('brovaria')) {
+      venueHash = '#brovaria';
+      venueName = 'Brovaria Microbrewery';
+    } else if (title.includes('kubicki')) {
+      venueHash = '#kubicki';
+      venueName = 'Kubicki Waterfront';
+    } else if (title.includes('gdanski bowke') || title.includes('gdański bowke')) {
+      venueHash = '#gdanski-bowke';
+      venueName = 'Gdański Bowke';
+    } else if (title.includes('spichrz')) {
+      venueHash = '#karczma-spichrz';
+      venueName = 'Karczma Spichrz';
+    }
+
+    return {
+      type: 'food',
+      venueName,
+      url: `/wayfinder/poland-christmas-2026/cities/${city}/restaurants${venueHash}`,
+      buttonText: venueName !== 'Must-Have Dining' ? `View ${venueName} Tile` : 'View Must-Have Dining Guide'
+    };
+  }
+
+  if (type === 'market') {
+    return {
+      type: 'market',
+      url: `/wayfinder/poland-christmas-2026/cities/${city}/markets`,
+      buttonText: 'View Christmas Market Guide'
+    };
+  }
+
+  if (type === 'sight') {
+    return {
+      type: 'sight',
+      url: `/wayfinder/poland-christmas-2026/cities/${city}/attractions`,
+      buttonText: 'View Attractions Guide'
+    };
+  }
+
+  return null;
 }

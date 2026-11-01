@@ -21,6 +21,10 @@ Client state is partitioned into specialized React Context providers:
 - Client Document Storage (IndexedDB): Declared in [wayfinder/src/utils/documentStorage.js](file:///e:/TechTrekGT/wayfinder/src/utils/documentStorage.js).
   - Store: `WayfinderDocumentDB` (store name: `document_files`).
   - Capabilities: Persists uploaded booking PDFs and images locally in browser storage, enabling instant previews in [wayfinder/src/components/DocumentViewerModal.jsx](file:///e:/TechTrekGT/wayfinder/src/components/DocumentViewerModal.jsx) even when edge storage (Cloudflare R2) is offline or pending. Falls back to static bundled documents (such as `Poland_Delta.pdf`).
+- Timeline Custom Ordering (localStorage): Governed by [wayfinder/src/utils/itineraryTimeline.js](file:///e:/TechTrekGT/wayfinder/src/utils/itineraryTimeline.js).
+  - Store: `localStorage` key `wayfinder_timeline_order_v1`.
+  - Structure: Record mapping day numbers to ordered arrays of timeline item keys (e.g. `{ "1": ["pub-1-confirmed_arrival...-13:30", "pub-1-ska1_airport...-14:15", "acc-1", ...] }`).
+  - Synchronization: Broadcasts window event `wayfinder:timeline-order-changed` on every reorder or reset, syncing state across [ItineraryView.jsx](file:///e:/TechTrekGT/wayfinder/src/components/ItineraryView.jsx) and [PolandLanding.jsx](file:///e:/TechTrekGT/wayfinder/src/components/PolandLanding.jsx) without page reload.
 
 ## 3. Static POI Catalog Memory Model
 
@@ -423,6 +427,32 @@ Governs the state invariants, atomic transaction guarantees, and edge lifecycle 
 - Real-Time Admin State Mutation:
   - `POST /api/wayfinder/admin/user-api-access` updates `api_key_enabled` in D1 with atomic validation.
   - `POST /api/wayfinder/admin/user-status` updates user status (`Active`/`Suspended`) and bumps `token_version` on suspension to revoke active sessions.
+
+### 16.6 Layout, Navigation & Coordinate Invariants
+- Fixed Navigation Anchor Invariant:
+  - `Layout.jsx` enforces `sticky top-0 z-50 bg-slate-950/95 backdrop-blur-xl border-b border-[#b48214]/30 shadow-xl` without CSS transforms or intermediate overflow scroll contexts, locking navigation to the viewport top across all pages.
+- Overflow Clipping Boundary:
+  - The root layout container applies `overflow-x-clip flex-1` rather than `overflow-x-hidden`. This prevents Blink/WebKit from instantiating an internal scroll container trap that miscalculates child sticky offsets.
+- Sub-Toolbar In-Flow Invariant:
+  - In `PrivateHub.jsx`, the journey sub-toolbar resides directly in document flow (`relative z-20 w-full`) without child `sticky top-14` positioning. This prevents coordinate displacement inside `<main>`, guaranteeing gap = 0.0px directly against the sticky main navbar.
+- Day Header Sticky Realignment:
+  - In `ItineraryView.jsx`, timeline day headers specify `sticky top-14 sm:top-16 z-20` matching the navbar height, ensuring smooth docking beneath the fixed navbar during deep itinerary scrolling.
+
+### 16.7 Public Schedule Isolation & Unauthenticated Data Invariants
+- Public State Boundary:
+  - The static POI catalog (`polandJourney.itinerary`) must never contain personal booking confirmations, passenger identities, or booking reference codes.
+  - Public timeline events for transit arrival and departures describe destination milestones ("Target Arrival: Kraków Airport (KRK)", "Morning Departure: Gdańsk (GDN) -> Amsterdam (AMS)") with public badges.
+- Timeline Overlay State:
+  - `buildUnifiedDayTimeline(dayItem, dayPrivate, dayAccommodations, isAuthenticated)` dynamically upgrades public flight events to confirmed personal itineraries and injects private D1 records only when `isAuthenticated === true`.
+  - When `isAuthenticated === false`, `dayPrivate` and `dayAccommodations` are forced to empty collections (`[]`), ensuring unauthenticated visitors cannot access private reservations.
+- Document Vault Gating Invariant:
+  - `DocumentViewerModal` verifies `isAuthenticated` on mount and enforces an early return (`if (!isOpen || !isAuthenticated) return null;`), preventing unauthenticated preview or transmission of private vouchers and PDF records.
+- Calendar Sync Authentication Gating Invariant:
+  - `CalendarSubscribeModal` requires `isAuthenticated === true` (`if (!isOpen || !isAuthenticated) return null;`), preventing unauthenticated initialization or feed token retrieval.
+  - Cloudflare edge worker route `GET /api/wayfinder/calendar/export.ics` enforces `requireAuth` (`if (!auth.ok) return auth.error;`), restricting .ics snapshot downloads to authenticated sessions.
+- Schedule Stop Scope Invariant:
+  - `JourneyStopSchedule` resolves `isAuthenticated` from props and context fallback, guaranteeing safe evaluation of `dayPrivate` and `dayAccommodations` across both authenticated and unauthenticated rendering paths with zero undefined reference exceptions.
+
 
 
 

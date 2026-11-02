@@ -185,10 +185,10 @@ export function MustSeeCard(props) {
   return (
     <article
       id={sight?.id || (cardTitle ? cardTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') : null)}
-      className="glass-panel rounded-3xl border border-white/10 hover:border-amber-500/40 transition-all duration-300 overflow-hidden flex flex-col h-full bg-wf-navy-mid/80 shadow-xl group scroll-mt-36"
+      className="glass-panel rounded-2xl sm:rounded-3xl border border-white/10 hover:border-amber-500/40 transition-all duration-300 overflow-hidden flex flex-col h-full bg-wf-navy-mid/80 shadow-xl group scroll-mt-36"
     >
-      {/* 1. Static Image (Top): Fixed 200px height with #2d3748 fallback */}
-      <div className="relative w-full h-[200px] bg-[#2d3748] overflow-hidden shrink-0">
+      {/* 1. Static Image (Top): Compact 140px-160px height with #2d3748 fallback */}
+      <div className="relative w-full h-36 sm:h-40 md:h-44 bg-[#2d3748] overflow-hidden shrink-0">
         <img
           src={currentImgSrc}
           alt={cardTitle}
@@ -202,48 +202,48 @@ export function MustSeeCard(props) {
         <div className="absolute inset-0 bg-gradient-to-t from-wf-navy-mid/95 via-transparent to-black/30 pointer-events-none" />
 
         {/* Category & Step Pill floating on Image */}
-        <div className="absolute top-3.5 left-3.5 z-10 flex items-center space-x-1.5">
+        <div className="absolute top-2.5 left-2.5 z-10 flex items-center space-x-1.5">
           {stepNumber && (
-            <span className="px-2.5 py-1 rounded-full text-[11px] font-black bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 shadow-md flex items-center space-x-1">
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 shadow-md flex items-center space-x-1">
               <span>#{stepNumber}</span>
             </span>
           )}
-          <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-slate-950/80 backdrop-blur-md border border-amber-400/30 text-amber-300 shadow-md">
+          <span className="px-2.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-wider bg-slate-950/80 backdrop-blur-md border border-amber-400/30 text-amber-300 shadow-md">
             {cardCategory}
           </span>
         </div>
 
         {/* Winter Exclusive badge floating on Image */}
         {cardIsWinterExclusive && (
-          <div className="absolute top-3.5 right-3.5 z-10">
+          <div className="absolute top-2.5 right-2.5 z-10 scale-90 origin-top-right">
             <WinterExclusive label={cardWinterLabel} />
           </div>
         )}
       </div>
 
-      {/* 2. Content Body (Middle): Flex-column body section with flex-grow: 1 */}
-      <div className="p-5 sm:p-6 flex-1 flex flex-col justify-between space-y-4">
-        <div className="space-y-2.5">
-          <h3 className="text-xl font-black text-white leading-tight group-hover:text-amber-300 transition-colors">
+      {/* 2. Content Body (Middle): Compact padding & spacing */}
+      <div className="p-3.5 sm:p-4.5 flex-1 flex flex-col justify-between space-y-3">
+        <div className="space-y-2">
+          <h3 className="text-base sm:text-lg font-black text-white leading-snug group-hover:text-amber-300 transition-colors line-clamp-2">
             {cardTitle}
           </h3>
 
           {/* Leg distance badge when route optimizer is active */}
           {prevLeg && (
-            <div className="px-3 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-[11px] text-emerald-300 font-bold flex items-center space-x-1.5 shadow-sm">
+            <div className="px-2.5 py-1 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-[10px] text-emerald-300 font-bold flex items-center space-x-1.5 shadow-sm">
               <span className="text-emerald-400">🚶</span>
               <span>{prevLeg.walkingMinutes} min walk ({prevLeg.formattedDist}) from {prevLeg.fromName}</span>
             </div>
           )}
 
           {isExcursion && (
-            <div className="px-3 py-1.5 rounded-xl bg-purple-500/15 border border-purple-400/30 text-[11px] text-purple-300 font-bold flex items-center space-x-1.5 shadow-sm">
+            <div className="px-2.5 py-1 rounded-xl bg-purple-500/15 border border-purple-400/30 text-[10px] text-purple-300 font-bold flex items-center space-x-1.5 shadow-sm">
               <span className="text-purple-400">🚌</span>
-              <span>Regional Day-Trip ({sight?.formattedDistFromCenter || 'Transit Required'} from center)</span>
+              <span>Regional Day-Trip ({sight?.formattedDistFromCenter || 'Transit Required'})</span>
             </div>
           )}
 
-          <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-medium">
+          <p className="text-xs text-slate-300 leading-relaxed font-medium line-clamp-3">
             {cardDescription}
           </p>
 
@@ -252,8 +252,8 @@ export function MustSeeCard(props) {
         </div>
 
         {/* 3. Quick Stats Row (Lower Middle): Exposed vital logistical data */}
-        <div className="pt-3 border-t border-white/10 space-y-2.5">
-          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-xs font-semibold text-amber-300/90">
+        <div className="pt-2 border-t border-white/10 space-y-2">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-semibold text-amber-300/90">
             {quickStats.map((stat, idx) => (
               <React.Fragment key={idx}>
                 <span className="inline-flex items-center space-x-1 whitespace-nowrap">
@@ -267,37 +267,37 @@ export function MustSeeCard(props) {
           </div>
 
           {/* Exposed Logistical Context Badges */}
-          <div className="grid grid-cols-1 gap-1.5 pt-1">
+          <div className="grid grid-cols-1 gap-1 text-[11px]">
             {cardTransit && (
-              <div className="flex items-start space-x-2 text-[11px] text-slate-300 leading-snug">
+              <div className="flex items-start space-x-1.5 text-slate-300 leading-tight">
                 <MapPin className="w-3.5 h-3.5 text-sky-400 shrink-0 mt-0.5" />
                 <a
                   href={directionsUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-slate-300/90 hover:text-amber-300 transition-colors inline-flex items-center gap-1 group/transit"
+                  className="text-slate-300/90 hover:text-amber-300 transition-colors inline-flex items-center gap-1 group/transit line-clamp-1"
                   title={`Directions to ${cardTitle}`}
                 >
-                  <span>{cardTransit}</span>
+                  <span className="truncate">{cardTransit}</span>
                   <ExternalLink className="w-3 h-3 text-slate-400 group-hover/transit:text-amber-300 inline shrink-0" />
                 </a>
               </div>
             )}
             {cardClosed && (
-              <div className="flex items-start space-x-2 text-[11px] text-red-300 leading-snug">
+              <div className="flex items-start space-x-1.5 text-red-300 leading-tight">
                 <CalendarX className="w-3.5 h-3.5 text-red-400 shrink-0 mt-0.5" />
-                <span className="text-red-300/90">Closed: {cardClosed}</span>
+                <span className="text-red-300/90 truncate">Closed: {cardClosed}</span>
               </div>
             )}
           </div>
 
           {/* GetYourGuide & Viator Walking Tour Booking Action Bar */}
-          <div className="pt-2.5 border-t border-white/10 flex items-center justify-between gap-2">
+          <div className="pt-2 border-t border-white/10 flex items-center justify-between gap-2">
             <a
               href={sight?.gygUrl || `https://www.getyourguide.com/s/?q=Krakow+${encodeURIComponent(cardTitle)}+walking+tour`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex-1 py-2 px-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/25 text-amber-300 hover:text-amber-200 border border-amber-500/30 text-[10px] sm:text-[11px] font-black transition-all flex items-center justify-center space-x-1 shadow-sm min-h-[38px] sm:min-h-[40px]"
+              className="flex-1 py-1.5 px-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/25 text-amber-300 hover:text-amber-200 border border-amber-500/30 text-[10px] sm:text-[11px] font-black transition-all flex items-center justify-center space-x-1 shadow-sm min-h-[32px] sm:min-h-[34px]"
               title={`Book ${cardTitle} tour on GetYourGuide`}
             >
               <span>🎟️</span>
@@ -307,7 +307,7 @@ export function MustSeeCard(props) {
               href={sight?.viatorUrl || `https://www.viator.com/searchResults/all?text=Krakow+${encodeURIComponent(cardTitle)}+walking+tour`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex-1 py-2 px-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/25 text-emerald-300 hover:text-emerald-200 border border-emerald-500/30 text-[10px] sm:text-[11px] font-black transition-all flex items-center justify-center space-x-1 shadow-sm min-h-[38px] sm:min-h-[40px]"
+              className="flex-1 py-1.5 px-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/25 text-emerald-300 hover:text-emerald-200 border border-emerald-500/30 text-[10px] sm:text-[11px] font-black transition-all flex items-center justify-center space-x-1 shadow-sm min-h-[32px] sm:min-h-[34px]"
               title={`Book ${cardTitle} tour on Viator`}
             >
               <span>🗺️</span>
@@ -317,46 +317,46 @@ export function MustSeeCard(props) {
         </div>
       </div>
 
-      {/* 4. Action Footer (Bottom): Darker background with responsive grid layout */}
-      <div className={`bg-slate-950/80 border-t border-white/10 p-3 sm:p-4 grid ${isAuthenticated ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'} gap-2 shrink-0 w-full`}>
+      {/* 4. Action Footer (Bottom): 2-Column Responsive Grid that NEVER truncates */}
+      <div className="bg-slate-950/80 border-t border-white/10 p-2.5 sm:p-3 grid grid-cols-2 gap-2 shrink-0 w-full">
         <a
           href={sight?.websiteUrl || sight?.url || `https://www.google.com/search?q=${searchQuery}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="py-2 px-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:border-emerald-500/50 text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn min-h-[38px] sm:min-h-[40px] min-w-0"
+          className="py-1.5 px-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:border-emerald-500/50 text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn min-h-[34px] sm:min-h-[36px] min-w-0"
           title={`Visit ${cardTitle} website`}
         >
           <ExternalLink className="w-3.5 h-3.5 text-emerald-400 group-hover/btn:text-emerald-300 transition-colors shrink-0" />
-          <span className="truncate">Website</span>
+          <span>Website</span>
         </a>
 
         <a
           href={directionsUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="py-2 px-2 rounded-xl bg-white/5 hover:bg-amber-500/20 text-slate-300 hover:text-amber-300 border border-white/10 hover:border-amber-500/40 text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn min-h-[38px] sm:min-h-[40px] min-w-0"
+          className="py-1.5 px-2 rounded-xl bg-white/5 hover:bg-amber-500/20 text-slate-300 hover:text-amber-300 border border-white/10 hover:border-amber-500/40 text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn min-h-[34px] sm:min-h-[36px] min-w-0"
           title={`Get directions to ${cardTitle}`}
         >
           <Navigation className="w-3.5 h-3.5 text-sky-400 group-hover/btn:text-amber-300 transition-colors shrink-0" />
-          <span className="truncate">Directions</span>
+          <span>Directions</span>
         </a>
 
         <a
           href={mapSearchUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="py-2 px-2 rounded-xl bg-white/5 hover:bg-amber-500/20 text-slate-300 hover:text-amber-300 border border-white/10 hover:border-amber-500/40 text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn min-h-[38px] sm:min-h-[40px] min-w-0"
+          className={`py-1.5 px-2 rounded-xl bg-white/5 hover:bg-amber-500/20 text-slate-300 hover:text-amber-300 border border-white/10 hover:border-amber-500/40 text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn min-h-[34px] sm:min-h-[36px] min-w-0 ${!isAuthenticated ? 'col-span-2' : ''}`}
           title={`View ${cardTitle} on Google Maps`}
         >
           <Compass className="w-3.5 h-3.5 text-amber-400 group-hover/btn:text-amber-300 transition-colors shrink-0" />
-          <span className="truncate">View Map</span>
+          <span>View on Map</span>
         </a>
 
         {isAuthenticated && (
           <button
             type="button"
             onClick={handleToggleItinerary}
-            className={`py-2 px-2 rounded-xl text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 border min-h-[38px] sm:min-h-[40px] min-w-0 cursor-pointer ${
+            className={`py-1.5 px-2 rounded-xl text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 border min-h-[34px] sm:min-h-[36px] min-w-0 cursor-pointer ${
               isSaved
                 ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
                 : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30 hover:border-amber-500/50'
@@ -366,12 +366,12 @@ export function MustSeeCard(props) {
             {isSaved ? (
               <>
                 <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                <span className="truncate">Saved</span>
+                <span>Saved</span>
               </>
             ) : (
               <>
                 <Plus className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                <span className="truncate">Itinerary</span>
+                <span>+ Itinerary</span>
               </>
             )}
           </button>

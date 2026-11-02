@@ -210,7 +210,37 @@ export function CityFoodTab({
                   </div>
 
                   {/* Footer Actions */}
-                  <div className={`bg-slate-950/80 border-t border-white/10 p-3 sm:p-4 grid ${isAuthenticated ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'} gap-2 shrink-0 w-full`}>
+                  <div className="bg-slate-950/80 border-t border-white/10 p-2.5 sm:p-3 grid grid-cols-2 gap-2 shrink-0 w-full">
+                    <a
+                      href={item.websiteUrl || `https://www.google.com/search?q=${mapSearchQuery}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="py-1.5 px-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:border-emerald-500/50 text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn min-h-[34px] sm:min-h-[36px] min-w-0"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5 text-emerald-400 group-hover/btn:text-emerald-300 shrink-0" />
+                      <span>Website</span>
+                    </a>
+
+                    <a
+                      href={directionsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="py-1.5 px-2 rounded-xl bg-white/5 hover:bg-amber-500/20 text-slate-300 hover:text-amber-300 border border-white/10 hover:border-amber-500/40 text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn min-h-[34px] sm:min-h-[36px] min-w-0"
+                    >
+                      <Navigation className="w-3.5 h-3.5 text-sky-400 group-hover/btn:text-amber-300 shrink-0" />
+                      <span>Directions</span>
+                    </a>
+
+                    <a
+                      href={mapSearchUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`py-1.5 px-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:border-amber-500/50 text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn min-h-[34px] sm:min-h-[36px] min-w-0 ${!isAuthenticated ? 'col-span-2' : ''}`}
+                    >
+                      <Compass className="w-3.5 h-3.5 text-amber-400 group-hover/btn:text-amber-300 shrink-0" />
+                      <span>View on Map</span>
+                    </a>
+
                     {isAuthenticated && (
                       <button
                         type="button"
@@ -218,7 +248,7 @@ export function CityFoodTab({
                           e.preventDefault();
                           toggleItinerary(item.id);
                         }}
-                        className={`py-2 px-2 rounded-xl text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 border cursor-pointer min-h-[38px] sm:min-h-[40px] min-w-0 ${
+                        className={`py-1.5 px-2 rounded-xl text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 border cursor-pointer min-h-[34px] sm:min-h-[36px] min-w-0 ${
                           savedItems.has(item.id)
                             ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
                             : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30 hover:border-amber-500/50'
@@ -227,46 +257,16 @@ export function CityFoodTab({
                         {savedItems.has(item.id) ? (
                           <>
                             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                            <span className="truncate">Saved</span>
+                            <span>Saved</span>
                           </>
                         ) : (
                           <>
                             <Plus className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                            <span className="truncate">Itinerary</span>
+                            <span>+ Itinerary</span>
                           </>
                         )}
                       </button>
                     )}
-
-                    <a
-                      href={item.websiteUrl || `https://www.google.com/search?q=${mapSearchQuery}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="py-2 px-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:border-emerald-500/50 text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn min-h-[38px] sm:min-h-[40px] min-w-0"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5 text-emerald-400 group-hover/btn:text-emerald-300 shrink-0" />
-                      <span className="truncate">Website</span>
-                    </a>
-
-                    <a
-                      href={directionsUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="py-2 px-2 rounded-xl bg-white/5 hover:bg-amber-500/20 text-slate-300 hover:text-amber-300 border border-white/10 hover:border-amber-500/40 text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn min-h-[38px] sm:min-h-[40px] min-w-0"
-                    >
-                      <Navigation className="w-3.5 h-3.5 text-sky-400 group-hover/btn:text-amber-300 shrink-0" />
-                      <span className="truncate">Directions</span>
-                    </a>
-
-                    <a
-                      href={mapSearchUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="py-2 px-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:border-amber-500/50 text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn min-h-[38px] sm:min-h-[40px] min-w-0"
-                    >
-                      <Compass className="w-3.5 h-3.5 text-amber-400 group-hover/btn:text-amber-300 shrink-0" />
-                      <span className="truncate">View Map</span>
-                    </a>
                   </div>
                 </article>
               );

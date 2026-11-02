@@ -556,3 +556,22 @@ Extends granular venue deep-linking, smooth auto-scroll, amber glow highlight pu
   - Timeline Item Map Directions: Enhanced timeline item location links with city-grounded parameters (`${timelineItem.data.location}, ${cityName || 'Poland'}`), guaranteeing exact geographic context for turn-by-turn navigation in Google Maps.
 - Deep-Link Scroll Protection ([CityPage.jsx](file:///e:/TechTrekGT/wayfinder/src/components/CityPage.jsx)):
   - Added an early return check in `useLayoutEffect` (`if (typeof window !== 'undefined' && window.location.hash) return;`), ensuring sub-page header scroll offsets do not preempt or interrupt tile-level smooth scrolling when navigating to deep-linked venue tiles.
+
+## 29. Compact Tile Architecture & Responsive 2-Column Action Footer
+
+Eliminates excessive vertical tile height and resolves button label truncation across attraction, dining, and venue cards:
+
+- Must-See Card Compact Geometry ([MustSeeCard.jsx](file:///e:/TechTrekGT/wayfinder/src/components/MustSeeCard.jsx)):
+  - Scaled hero image height from fixed `h-[200px]` to `h-36 sm:h-40 md:h-44` (144px-160px).
+  - Streamlined container padding to `p-3.5 sm:p-4.5` and adjusted card titles to `text-base sm:text-lg line-clamp-2`.
+  - Enforced `line-clamp-3` on venue descriptions to prevent unbounded paragraph expansion.
+  - Streamlined GetYourGuide and Viator booking buttons to `min-h-[32px] sm:min-h-[34px]`.
+  - Reclaimed over 180px of vertical card height, ensuring tiles fit comfortably within standard desktop and laptop viewports.
+- 2-Column Responsive Action Footer Parity ([MustSeeCard.jsx](file:///e:/TechTrekGT/wayfinder/src/components/MustSeeCard.jsx), [CityFoodTab.jsx](file:///e:/TechTrekGT/wayfinder/src/components/city/CityFoodTab.jsx), [CityLgbtqTab.jsx](file:///e:/TechTrekGT/wayfinder/src/components/city/CityLgbtqTab.jsx)):
+  - Replaced crowded 4-column inline footers (`sm:grid-cols-4`) with an ergonomic 2-column grid (`grid grid-cols-2 gap-2`).
+  - Removed aggressive text truncation (`truncate`), providing ample width (~140px per button) so labels (`Website`, `Directions`, `View on Map`, `+ Itinerary` / `Saved`) render in full without ellipses.
+  - Set unauthenticated full-width spanning (`col-span-2`) for "View on Map" when itinerary toggles are hidden.
+- Optimized Grid and Optimizer Spacing ([CityAttractionsTab.jsx](file:///e:/TechTrekGT/wayfinder/src/components/city/CityAttractionsTab.jsx), [WalkingLoopOptimizer.jsx](file:///e:/TechTrekGT/wayfinder/src/components/route/WalkingLoopOptimizer.jsx)):
+  - Reduced attractions grid gap from `gap-6` to `gap-4 sm:gap-5` and section spacing to `space-y-4 sm:space-y-5`.
+  - Compacted the Walking Loop Optimizer panel padding to `p-4 sm:p-5` with `p-2.5 sm:p-3` metric cards, preserving valuable vertical screen real estate.
+

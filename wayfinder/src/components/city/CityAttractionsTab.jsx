@@ -58,11 +58,11 @@ export function CityAttractionsTab({ city }) {
   }, [displayedPlaces]);
 
   return (
-    <div id="attractions-section" className="space-y-6 animate-fade-in scroll-mt-32">
+    <div id="attractions-section" className="space-y-4 sm:space-y-5 animate-fade-in scroll-mt-32">
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <h2 className="text-3xl font-black text-white flex items-center space-x-3">
-          <Sparkles className="w-7 h-7 text-amber-400" />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-2xl sm:text-3xl font-black text-white flex items-center space-x-3">
+          <Sparkles className="w-6 h-6 sm:w-7 sm:h-7 text-amber-400" />
           <span>Must-See Attractions in {city.name}</span>
         </h2>
         <span className="text-xs text-wf-muted font-medium">Curated Golden Component template</span>
@@ -83,7 +83,7 @@ export function CityAttractionsTab({ city }) {
       />
 
       {/* Primary Attractions Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 items-stretch">
         {displayedPlaces.map((sight, idx) => (
           <MustSeeCard
             key={sight.id || sight.name || idx}
@@ -106,13 +106,13 @@ export function CityAttractionsTab({ city }) {
 
       {/* Regional Day-Trip Excursions (Out-of-Town Sights > 12km) */}
       {!includeExcursions && optimizationResult.distantExcursions?.length > 0 && (
-        <div className="pt-8 border-t border-white/10 space-y-4">
+        <div className="pt-6 border-t border-white/10 space-y-3">
           <div className="flex items-center space-x-3">
             <div className="p-2 rounded-xl bg-purple-500/20 text-purple-300 border border-purple-400/30">
               <Bus className="w-5 h-5 text-purple-400" />
             </div>
             <div>
-              <h3 className="text-xl font-black text-white">
+              <h3 className="text-lg sm:text-xl font-black text-white">
                 Regional Day-Trip Excursions ({city.name})
               </h3>
               <p className="text-xs text-slate-300">
@@ -121,7 +121,7 @@ export function CityAttractionsTab({ city }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 items-stretch">
             {optimizationResult.distantExcursions.map((sight, idx) => (
               <MustSeeCard
                 key={`excursion-${sight.id || idx}`}

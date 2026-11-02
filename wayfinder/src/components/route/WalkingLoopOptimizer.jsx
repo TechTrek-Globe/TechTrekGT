@@ -52,12 +52,12 @@ export function WalkingLoopOptimizer({
   );
 
   return (
-    <div className="glass-panel p-5 sm:p-6 rounded-3xl border border-amber-500/30 bg-wf-navy-mid/90 relative overflow-hidden shadow-2xl space-y-4">
+    <div className="glass-panel p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-amber-500/30 bg-wf-navy-mid/90 relative overflow-hidden shadow-2xl space-y-3">
       {/* Background Glow */}
       <div className="absolute top-0 right-0 w-80 h-80 bg-gradient-to-bl from-amber-500/10 via-sky-500/5 to-transparent rounded-full blur-3xl pointer-events-none" />
 
       {/* Top Bar: Title & Mode Toggle */}
-      <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-white/10 pb-4">
+      <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-white/10 pb-3">
         <div className="space-y-1 max-w-xl">
           <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 text-xs font-black uppercase tracking-wider shadow-sm">
             <Route className="w-3.5 h-3.5 text-amber-400" />
@@ -101,11 +101,11 @@ export function WalkingLoopOptimizer({
       </div>
 
       {/* Telemetry & Route Configuration Options */}
-      <div className="relative z-10 space-y-4">
+      <div className="relative z-10 space-y-3">
         {/* Metrics Banner */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
           {/* Status / Saved Metric */}
-          <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-white/5 space-y-1">
+          <div className="p-2.5 sm:p-3 rounded-xl sm:rounded-2xl bg-slate-950/70 border border-white/5 space-y-1">
             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
               {isOptimized ? 'Winter Savings' : 'Route Efficiency'}
             </span>
@@ -132,7 +132,7 @@ export function WalkingLoopOptimizer({
           </div>
 
           {/* Total Walking Distance */}
-          <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-white/5 space-y-1">
+          <div className="p-2.5 sm:p-3 rounded-xl sm:rounded-2xl bg-slate-950/70 border border-white/5 space-y-1">
             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
               Total Distance
             </span>
@@ -145,7 +145,7 @@ export function WalkingLoopOptimizer({
           </div>
 
           {/* Estimated Walking Duration */}
-          <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-white/5 space-y-1">
+          <div className="p-2.5 sm:p-3 rounded-xl sm:rounded-2xl bg-slate-950/70 border border-white/5 space-y-1">
             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
               Walking Time
             </span>
@@ -159,7 +159,7 @@ export function WalkingLoopOptimizer({
           </div>
 
           {/* Stops Count & Untangling Certified */}
-          <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-white/5 space-y-1">
+          <div className="p-2.5 sm:p-3 rounded-xl sm:rounded-2xl bg-slate-950/70 border border-white/5 space-y-1">
             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
               Route Geometry
             </span>

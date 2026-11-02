@@ -470,7 +470,11 @@ Governs the state invariants, atomic transaction guarantees, and edge lifecycle 
   - All direct navigation anchors (`MustSeeCard`, `CityMarketsTab`, `ItineraryView`, `PolandLanding`) generate Google Maps URL strings with fully qualified query parameters (`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${venueLocation}, ${cityName || 'Poland'}`)}`).
   - Appending the explicit city name prevents Google Maps from resolving identical street names in foreign jurisdictions.
 
-
-
-
-
+### 16.9 Compact Tile Geometry & Action Footer Invariants
+- Tile Viewport Fitting Invariants:
+  - Attraction card hero images maintain responsive heights (`h-36 sm:h-40 md:h-44`) to cap card vertical dimensions at <= 500px, allowing complete tiles to remain in the active desktop and laptop viewport alongside top navigation and routing tools.
+  - Attraction descriptions are strictly clamped to `line-clamp-3` to prevent variable multiline text from skewing grid row alignment or causing card overflow.
+- 2-Column Action Footer Invariant:
+  - Action button containers across attraction (`MustSeeCard`), dining (`CityFoodTab`), and venue (`CityLgbtqTab`) cards must maintain a 2-column responsive grid layout (`grid grid-cols-2 gap-2`).
+  - Truncation classes (`truncate`) are prohibited on action button labels (`Website`, `Directions`, `View on Map`, `+ Itinerary` / `Saved`), guaranteeing full text visibility without ellipsis clipping across all card widths.
+  - When unauthenticated, the secondary action ("View on Map") spans full width (`col-span-2`) to maintain balanced grid geometry.

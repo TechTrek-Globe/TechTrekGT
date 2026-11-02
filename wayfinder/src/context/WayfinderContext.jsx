@@ -140,6 +140,7 @@ export function WayfinderProvider({ children }) {
     }
     const data = await res.json();
     await fetchItinerary(journeyId);
+    await fetchAccommodations(journeyId);
     await fetchDocuments(journeyId);
     await fetchJobs();
     return data;
@@ -279,7 +280,8 @@ export function WayfinderProvider({ children }) {
     await Promise.all([
       fetchDocuments(journeyId),
       fetchJobs(),
-      fetchItinerary(journeyId)
+      fetchItinerary(journeyId),
+      fetchAccommodations(journeyId)
     ]);
     return true;
   };

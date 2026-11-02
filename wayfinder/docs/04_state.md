@@ -9,9 +9,9 @@ Wayfinder employs a hybrid state management model combining immutable client-sid
 Client state is partitioned into specialized React Context providers:
 
 - WayfinderContext: Declared in [wayfinder/src/context/WayfinderContext.jsx](file:///e:/TechTrekGT/wayfinder/src/context/WayfinderContext.jsx).
-  - State Fields: itinerary (chronological list of travel events), documents (uploaded travel files), jobs (background document extraction tasks), isLoading, and error.
-  - Action Handlers: fetchItinerary, fetchDocuments, fetchJobs, uploadDocument, getJobFields, and saveExtractedFields.
-  - Lifecycle: Automatically triggers data re-fetching upon user authentication and provides optimistic local updates during document intake.
+  - State Fields: itinerary (chronological list of travel events), accommodations (active lodging bookings enriched with check-in/out dates, vouchers, and metadata), documents (uploaded travel files), jobs (background document extraction tasks), isLoading, and error.
+  - Action Handlers: fetchItinerary, fetchAccommodations, fetchDocuments, fetchJobs, uploadDocument, getJobFields, and saveExtractedFields.
+  - Lifecycle: Automatically triggers data re-fetching upon user authentication (including itinerary, accommodations, documents, and import jobs) and provides optimistic local updates during document intake.
 - AuthContext: Declared in [wayfinder/src/context/AuthContext.jsx](file:///e:/TechTrekGT/wayfinder/src/context/AuthContext.jsx).
   - State Fields: user (authenticated profile with id, email, name, is_admin), isAuthenticated, and isLoading.
   - Lifecycle: Inspects /api/auth/me on mount with credentials: 'include'. Coordinates session state across login, registration, and logout actions.

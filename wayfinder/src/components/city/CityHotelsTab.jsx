@@ -1,7 +1,81 @@
 import React, { useState } from 'react';
-import { Bed, MapPin, Train, Sparkles, Navigation, Compass, CheckCircle2, Plus, Info, Plane, Clock, FileText } from 'lucide-react';
+import { 
+  Bed, BedDouble, MapPin, Train, Sparkles, Navigation, Compass, CheckCircle2, 
+  Plus, Info, Plane, Clock, FileText, ExternalLink, Calendar, Users, ShieldCheck, 
+  DollarSign 
+} from 'lucide-react';
 import { FormatText } from '../Formatters';
 import { DocumentViewerModal } from '../DocumentViewerModal';
+import { useWayfinder } from '../../context/WayfinderContext';
+import { parseBookingMetadata } from '../itinerary/PrivateBookingCard';
+
+export function findConfirmedHotelForCity(city, accommodations = [], itinerary = []) {
+  if (!city) return null;
+  const cId = (city.id || '').toLowerCase();
+  const cName = (city.name || '').toLowerCase();
+  const norm = (str) => (str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const targetId = norm(cId);
+  const targetName = norm(cName);
+
+  const candidates = [];
+  for (const acc of accommodations) {
+    if (acc) candidates.push(acc);
+  }
+  for (const item of itinerary) {
+    const rawType = (item?.docType || item?.detected_doc_type || item?.item_type || '').toLowerCase();
+    if (rawType === 'hotel' || rawType === 'accommodation' || rawType === 'lodging') {
+      if (!candidates.some(c => c.id === item.id || (c.source_document_id && c.source_document_id === item.source_document_id))) {
+        candidates.push(item);
+      }
+    }
+  }
+
+  for (const candidate of candidates) {
+    const title = norm(candidate.title || candidate.hotel_name);
+    const loc = norm(candidate.location || candidate.hotel_address);
+    const checkIn = candidate.check_in_date || candidate.local_date || '';
+
+    // Explicit city name in title or location
+    if (loc.includes(targetId) || loc.includes(targetName) || title.includes(targetId) || title.includes(targetName)) {
+      return candidate;
+    }
+
+    // Specific known venues per stop
+    if (targetId.includes('krakow') && (title.includes('experior') || title.includes('destigo') || loc.includes('szewska'))) {
+      return candidate;
+    }
+    if (targetId.includes('wroclaw') && (title.includes('altus') || loc.includes('altus'))) {
+      return candidate;
+    }
+    if (targetId.includes('poznan') && (title.includes('brovaria') || loc.includes('brovaria'))) {
+      return candidate;
+    }
+    if (targetId.includes('gdansk') && (title.includes('radisson') || loc.includes('radisson') || loc.includes('chmielna'))) {
+      return candidate;
+    }
+
+    // Date window match
+    if (city.startDate && city.endDate && checkIn) {
+      if (checkIn >= city.startDate && checkIn < city.endDate) {
+        return candidate;
+      }
+    }
+  }
+
+  return null;
+}
+
+function formatStayDate(dateStr) {
+  if (!dateStr) return '';
+  try {
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+      return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+    }
+  } catch (_) {}
+  return dateStr;
+}
 
 export function CityHotelsTab({ 
   city, 
@@ -9,7 +83,24 @@ export function CityHotelsTab({
   toggleItinerary, 
   isAuthenticated 
 }) {
-  const [isDocViewerOpen, setIsDocViewerOpen] = useState(false);
+  const { itinerary = [], accommodations = [] } = useWayfinder() || {};
+  const [isFlightDocViewerOpen, setIsFlightDocViewerOpen] = useState(false);
+  const [isStayDocViewerOpen, setIsStayDocViewerOpen] = useState(false);
+
+  const confirmedStay = findConfirmedHotelForCity(city, accommodations, itinerary);
+  const meta = confirmedStay ? parseBookingMetadata(confirmedStay) : null;
+  const hotelName = confirmedStay?.hotel_name || confirmedStay?.title || `Hotel in ${city.name}`;
+  const hotelAddress = confirmedStay?.location || confirmedStay?.hotel_address || meta?.fields?.['address'] || meta?.fields?.['hotel_address'] || `${city.base || city.name}, Poland`;
+  const checkInDate = confirmedStay?.check_in_date || confirmedStay?.local_date || meta?.fields?.['check_in_date'] || meta?.fields?.['check_in'] || city.startDate;
+  const checkInTime = confirmedStay?.check_in_time || confirmedStay?.local_time || meta?.fields?.['check_in_time'] || '15:00';
+  const checkOutDate = confirmedStay?.check_out_date || confirmedStay?.end_date || meta?.fields?.['check_out_date'] || meta?.fields?.['check_out'] || city.endDate;
+  const checkOutTime = confirmedStay?.check_out_time || meta?.fields?.['check_out_time'] || '12:00';
+  const confirmationNumber = confirmedStay?.confirmation_number || meta?.confNumber || meta?.fields?.['confirmation'];
+  const roomType = confirmedStay?.room_type || meta?.fields?.['room_type'] || meta?.fields?.['room'] || 'Standard Room';
+  const guests = confirmedStay?.guests || meta?.fields?.['guests'] || meta?.fields?.['party_size'] || '2 Adults';
+  const totalCost = confirmedStay?.total_cost || meta?.fields?.['total_cost'] || meta?.fields?.['cost'];
+  const currency = confirmedStay?.currency || meta?.fields?.['currency'] || 'USD';
+
   const hotelsList = city.hotels && city.hotels.length > 0 
     ? city.hotels 
     : [
@@ -52,6 +143,149 @@ export function CityHotelsTab({
         </div>
       </div>
 
+      {/* Confirmed Hotel Stay Card (Authenticated & Booked) */}
+      {isAuthenticated && confirmedStay && (
+        <div className="glass-panel p-6 sm:p-7 rounded-3xl border border-emerald-500/40 bg-gradient-to-br from-emerald-950/40 via-wf-navy-mid/95 to-slate-950 relative overflow-hidden shadow-2xl space-y-5 animate-fade-in">
+          <div className="absolute top-0 right-0 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+
+          {/* Top Bar: Badge, Title & Navigation Actions */}
+          <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-white/10 pb-4">
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-xs font-black uppercase tracking-wider shadow-sm">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Your Confirmed Stay in {city.name}</span>
+                </span>
+                <span className="px-2.5 py-0.5 rounded-full bg-slate-900/90 border border-emerald-500/30 text-emerald-300 text-[11px] font-mono font-bold">
+                  {city.nights > 0 ? `${city.nights} Nights Reserved` : 'Confirmed Booking'}
+                </span>
+              </div>
+
+              <h3 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center space-x-2.5">
+                <BedDouble className="w-7 h-7 text-emerald-400 shrink-0" />
+                <span>{hotelName}</span>
+              </h3>
+
+              {hotelAddress && (
+                <a
+                  href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${hotelName}, ${hotelAddress}`)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs sm:text-sm text-slate-300 hover:text-amber-300 flex items-center space-x-1.5 transition-colors group/addr inline-flex"
+                  title="Open turn-by-turn directions in Google Maps"
+                >
+                  <MapPin className="w-4 h-4 text-amber-400 shrink-0 group-hover/addr:scale-110 transition-transform" />
+                  <span className="underline decoration-slate-600 hover:decoration-amber-400 underline-offset-2 font-medium">
+                    {hotelAddress}
+                  </span>
+                  <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover/addr:text-amber-300 opacity-80 shrink-0 ml-0.5" />
+                </a>
+              )}
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-wrap items-center gap-2.5 shrink-0 self-start lg:self-center">
+              <button
+                type="button"
+                onClick={() => setIsStayDocViewerOpen(true)}
+                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 text-xs font-black flex items-center space-x-2 transition-all shadow-lg shadow-emerald-500/20 cursor-pointer"
+              >
+                <FileText className="w-4 h-4 text-slate-950" />
+                <span>View Booking Voucher</span>
+              </button>
+
+              <a
+                href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${hotelName}, ${hotelAddress}`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/20 text-slate-200 text-xs font-bold flex items-center space-x-1.5 transition-all"
+              >
+                <Navigation className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Get Directions</span>
+              </a>
+            </div>
+          </div>
+
+          {/* Stay Key Metrics Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+            {/* Check-In */}
+            <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-white/5 space-y-1">
+              <div className="text-emerald-400 font-bold uppercase tracking-wider text-[11px] flex items-center space-x-1.5">
+                <Calendar className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Check-In</span>
+              </div>
+              <div className="text-white font-bold text-sm">
+                {formatStayDate(checkInDate)}
+              </div>
+              <p className="text-slate-400 text-[11px]">
+                From <strong className="text-slate-200">{checkInTime} CET</strong>
+              </p>
+            </div>
+
+            {/* Check-Out */}
+            <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-white/5 space-y-1">
+              <div className="text-sky-400 font-bold uppercase tracking-wider text-[11px] flex items-center space-x-1.5">
+                <Calendar className="w-3.5 h-3.5 text-sky-400" />
+                <span>Check-Out</span>
+              </div>
+              <div className="text-white font-bold text-sm">
+                {formatStayDate(checkOutDate)}
+              </div>
+              <p className="text-slate-400 text-[11px]">
+                Until <strong className="text-slate-200">{checkOutTime} CET</strong> ({city.nights || 3} Nights)
+              </p>
+            </div>
+
+            {/* Room & Guests */}
+            <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-white/5 space-y-1">
+              <div className="text-amber-400 font-bold uppercase tracking-wider text-[11px] flex items-center space-x-1.5">
+                <BedDouble className="w-3.5 h-3.5 text-amber-400" />
+                <span>Accommodation</span>
+              </div>
+              <div className="text-white font-bold text-sm truncate" title={roomType}>
+                {roomType}
+              </div>
+              <p className="text-slate-400 text-[11px] flex items-center space-x-1">
+                <Users className="w-3 h-3 text-slate-400" />
+                <span>{guests}</span>
+              </p>
+            </div>
+
+            {/* Confirmation & Cost */}
+            <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-white/5 space-y-1">
+              <div className="text-emerald-300 font-bold uppercase tracking-wider text-[11px] flex items-center space-x-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Confirmation & Total</span>
+              </div>
+              <div className="text-emerald-300 font-mono font-bold text-sm">
+                {confirmationNumber || 'Verified Booking'}
+              </div>
+              <p className="text-slate-400 text-[11px]">
+                {totalCost ? (
+                  <>Total: <strong className="text-emerald-300 font-semibold">{totalCost} {currency}</strong> (Paid)</>
+                ) : (
+                  <>Booking Confirmed & Synchronized</>
+                )}
+              </p>
+            </div>
+          </div>
+
+          {/* Location Proximity Highlight */}
+          <div className="p-3 px-4 rounded-2xl bg-emerald-950/30 border border-emerald-500/20 text-xs text-emerald-200/90 flex flex-wrap items-center justify-between gap-2">
+            <span className="flex items-center space-x-2">
+              <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>
+                <strong className="text-white">{hotelName}</strong> is positioned directly in <strong className="text-amber-300">{city.base || city.name}</strong> for easy walking access to illuminated Christmas chalets.
+              </span>
+            </span>
+
+            <span className="text-[11px] text-slate-400 font-mono">
+              Active Journey Stop: {city.name}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Flight Arrival & Lodging Check-in Synchronization (for Krakow / Inbound Flight) */}
       {(city.id === 'krakow' || city.flightArrival) && (
         <div className="glass-panel p-5 sm:p-6 rounded-3xl border border-sky-500/40 bg-gradient-to-br from-sky-950/60 via-wf-navy-mid to-slate-950 shadow-xl space-y-4">
@@ -78,7 +312,7 @@ export function CityHotelsTab({
             {isAuthenticated && (
               <button
                 type="button"
-                onClick={() => setIsDocViewerOpen(true)}
+                onClick={() => setIsFlightDocViewerOpen(true)}
                 className="px-3.5 py-2 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 border border-sky-400/40 text-sky-300 text-xs font-bold flex items-center space-x-1.5 transition-all cursor-pointer self-start sm:self-auto shrink-0 shadow-sm"
               >
                 <FileText className="w-3.5 h-3.5 text-sky-400" />
@@ -247,10 +481,40 @@ export function CityHotelsTab({
         </div>
       </div>
 
-      {/* Universal Document Preview Modal */}
+      {/* Confirmed Stay Booking Voucher Modal */}
+      {confirmedStay && (
+        <DocumentViewerModal
+          isOpen={isStayDocViewerOpen}
+          onClose={() => setIsStayDocViewerOpen(false)}
+          doc={{
+            id: confirmedStay.source_document_id || `hotel-${city.id}`,
+            filename: confirmedStay.filename || confirmedStay.original_filename || `${hotelName.replace(/\s+/g, '_')}_Confirmation.pdf`,
+            safe_display_name: `${hotelName} : Booking Confirmation`,
+            mime_type: confirmedStay.mime_type || 'application/pdf',
+            detected_doc_type: 'hotel',
+            item_type: 'hotel',
+            file_url: (city.id === 'wroclaw' || (hotelName || '').toLowerCase().includes('altus'))
+              ? `${(import.meta.env.BASE_URL || '/wayfinder/').replace(/\/$/, '')}/Poland-2026/docs/Hotel_Altus_Palace_Wroclaw_Confirmation.pdf`
+              : null,
+            details: {
+              confirmation: confirmationNumber,
+              hotelName: hotelName,
+              location: hotelAddress,
+              checkIn: `${formatStayDate(checkInDate)} @ ${checkInTime}`,
+              checkOut: `${formatStayDate(checkOutDate)} @ ${checkOutTime}`,
+              roomType: roomType,
+              guests: guests,
+              totalCost: totalCost ? `${totalCost} ${currency}` : null,
+              provider: confirmedStay.provider || 'Direct / Booking.com'
+            }
+          }}
+        />
+      )}
+
+      {/* Delta Flight Document Preview Modal */}
       <DocumentViewerModal
-        isOpen={isDocViewerOpen}
-        onClose={() => setIsDocViewerOpen(false)}
+        isOpen={isFlightDocViewerOpen}
+        onClose={() => setIsFlightDocViewerOpen(false)}
         doc={{
           id: 'delta-poland-2026',
           filename: 'Poland_Delta.pdf',

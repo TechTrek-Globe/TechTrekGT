@@ -396,6 +396,70 @@ Added a dedicated sticky product thumbnail column positioned directly between `A
 3. **Interactive Zoom & Edit Integration**:
    - Clicking the thumbnail opens the full item editor modal (`onOpenEditModal`).
    - Hovering over the thumbnail triggers `ItemImageHoverTooltip` (`onShowTooltip('item_image', item, e)`), displaying the high-resolution product photo preview portal.
+4. **Thumbnail-Exclusive Image Hover Trigger (`InventoryGridRow.jsx`)**:
+   - Decoupled floating image preview tooltip triggers (`onMouseEnter` / `onMouseLeave`) from the item title / description cell.
+   - Image preview modal portal strictly triggers only when hovering directly over the item thumbnail element (`ItemThumbnailCell`).
+   - Preserved browser tooltip (`title="Click to view & edit full item details"`) and click-to-edit action on the item title cell.
+
+## Inventory and Sales Log Separation [ACTION ID: INV-004 / SALES-002]
+
+Decoupled completed sales from the active inventory grid, establishing the dedicated Sales Log (`SalesLogView.jsx`) as the exclusive single source of truth for sold transactions.
+
+### Inventory and Sales Log Capabilities
+
+1. **Active Inventory Table Focus (`InventoryDataGrid.jsx`)**:
+   - Removed the secondary "SOLD ITEMS" divider, accordion, and completed transaction rows from the bottom of `InventoryDataGrid.jsx`.
+   - Grid body strictly iterates over `activeItems`, displaying active, listed, and draft items without appending completed sales.
+   - Preserved empty state handling: renders informative filter message when no active items match the current query.
+2. **Server-Side Non-Sold Filtering (`functions/api/items/enriched.js`)**:
+   - `GET /api/items/enriched`: Injects default SQL filter `i.status != 'Sold'` when no specific status filter is provided.
+   - Prevents completed sales records from being transferred in active inventory payloads or counted against `pagination.total`.
+   - Supports explicit `status` querying and `include_sold=true` query parameters when historical item data is specifically requested.
+3. **Inventory Command Bar Status Filter Alignment (`InventoryCommandBar.jsx`)**:
+   - Filtered out `'Sold'` from the status selection dropdown (`ALL_STATUSES.filter(s => s !== 'Sold')`).
+   - "All Status" counter reflects strictly active and available stock counts.
+   - Header summary badges (COGS, Portfolio Value, and Potential Profit) accurately aggregate active and available inventory.
+4. **Sales Log Single Source of Truth (`SalesLogView.jsx`)**:
+   - Maintained `SalesLogView.jsx` as the standalone interface for all sold transactions, fee reconciliations, and historical profitability reporting.
+   - Verified fallback resolution (`GET /api/items/:id`) for viewing and editing item attributes directly from sales records.
+
+## Segmented Inventory Status Quick Tabs [ACTION ID: UI-007 / TAB-002]
+
+Introduced segmented status quick tabs to the Inventory Command Bar (`InventoryCommandBar.jsx`), allowing instant one-click toggling across the core operational stock statuses: "All", "Listed", "Available", and "Kept for self".
+
+### Segmented Status Tab Capabilities
+
+1. **Quick-Switch Operational Tabs**:
+   - Dedicated tab buttons for "All" (`''`), "Listed" (`'Listed'`), "Available" (`'Available'`), and "Kept for self" (`'Kept for Self'`).
+   - Positioned immediately adjacent to the inventory search box within the unified command bar.
+   - Employs horizontal scroll container (`overflow-x-auto`) for seamless responsiveness across mobile, laptop, and ultra-wide displays without layout shifting.
+2. **Dynamic Live Count Badges**:
+   - Each tab features a monospace pill badge displaying exact real-time item counts (e.g., `Listed (28)`, `Available (10)`, `Kept for self (2)`, `All (40)`).
+   - Ingests server-calculated aggregation from `status_counts` via `GET /api/items/enriched` so counts remain constant and accurate across status switching and pagination.
+3. **Tactical Amber Design Tokens**:
+   - Active Tab: Highlights with amber background tint (`bg-amber-500/20`), amber text (`text-amber-300`), amber border (`border border-amber-500/40`), and subtle ambient glow (`shadow-sm shadow-amber-500/10`).
+   - Inactive Tabs: Subtle tactical muted text (`text-slate-400 hover:text-slate-200 hover:bg-slate-800/40`).
+   - Inner Badge: Contrasting font-mono pill badge (`bg-amber-500/30 text-amber-200 border-amber-500/50` on active; `bg-slate-800/80 text-slate-400 border-slate-700/50` on inactive).
+4. **Bidirectional Two-Way Filter Synchronization**:
+   - Clicking any segmented tab instantly sets `statusFilter` in `InventoryContext`, updating the URL query parameters and re-querying active inventory on page 1.
+   - The secondary status dropdown (`#inventory-status-filter`) stays in lockstep: selecting a status via tab updates the dropdown, and choosing secondary statuses (e.g. `Draft`, `Unsold`, `Returned`) gracefully clears tab highlights while reflecting active state.
+
+## Automated Listed Transition on eBay Item Connection [ACTION ID: SYNC-005 / EBAY-008]
+
+Automated the lifecycle transition from "Available" to "Listed" status whenever an item is connected to an active eBay listing, automatically moving the item to the "Listed" tab.
+
+### eBay Connection Lifecycle Capabilities
+
+1. **Automatic Status & Platform Transition**:
+   - When connecting an eBay listing ID to an "Available" or "Draft" item (via `EbayListingIdModal`, `EditTabFinancials`, `ListingMatchReviewModal`, or `QuickEditDrawer`), Outpost automatically updates the item status to `'Listed'`, assigns platform to `'eBay'`, and records `date_listed`.
+   - `functions/api/ebay/sync-item.js`: Guarantees that syncing or connecting an active eBay listing transitions non-sold items to `'Listed'`.
+   - `functions/api/items/[id].js`: Intercepts `PUT /api/items/:id` containing `ebay_listing_id` on Available/Draft items, auto-applying canonical `'Listed'` status and date.
+2. **Immediate UI Tab Navigation**:
+   - Upon completing an eBay connection, `InventoryHubView` automatically triggers `setStatusFilter('Listed')`.
+   - The UI switches focus directly to the "Listed" status tab, presenting the newly linked item without requiring manual filter adjustments or tab clicking.
+
+
+
 
 
 

@@ -85,7 +85,10 @@ export function InventoryHubView({ onNavigate }) {
   const [delistDismissed, setDelistDismissed] = useState(false);
   const [viewingInvoice, setViewingInvoice] = useState(null); // { invoiceRef, invoiceId }
 
-  const displayItems = sortedItems;
+  const displayItems = useMemo(() =>
+    sortedItems.filter(it => it.status !== 'Sold'),
+    [sortedItems]
+  );
 
   // Header totals & summary calculations
   const activeItems = useMemo(() =>
@@ -227,8 +230,17 @@ export function InventoryHubView({ onNavigate }) {
     if (patch?.status === 'Sold' && !meta?.fromEbaySync && !meta?.sale) {
       const fullItem = items.find(it => it.id === id);
       handleMarkSold(fullItem ? { ...fullItem, ...patch } : { id, ...patch });
+    } else if (patch?.status === 'Listed' && (patch?.ebay_listing_id || meta?.fromEbaySync)) {
+      setStatusFilter('Listed');
     }
-  }, [updateItemLocal, items]);
+  }, [updateItemLocal, items, setStatusFilter]);
+
+  const handleItemLocalUpdate = useCallback((id, patch, meta) => {
+    updateItemLocal(id, patch);
+    if (patch?.status === 'Listed' && (patch?.ebay_listing_id || meta?.fromEbaySync)) {
+      setStatusFilter('Listed');
+    }
+  }, [updateItemLocal, setStatusFilter]);
 
   return (
     <div className="w-full flex-1 flex flex-col min-h-0 space-y-1.5">
@@ -358,7 +370,7 @@ export function InventoryHubView({ onNavigate }) {
             categoryOptions={categoryOptions}
             platformOptions={platformOptions}
             deleting={deleting}
-            onUpdateItem={updateItemLocal}
+            onUpdateItem={handleItemLocalUpdate}
             onDelete={handleDelete}
             onOpenEditModal={(it) => { setEditModalTab('financial'); setEditModalItem(it); }}
             onOpenQuickEdit={(it) => { setEditModalTab('financial'); setEditModalItem(it); }}
@@ -380,7 +392,7 @@ export function InventoryHubView({ onNavigate }) {
             onPageChange={fetchItems}
             onOpenCopyModal={setCopyModalItem}
             onOpenQueryEdit={handleOpenQueryEdit}
-            onItemUpdated={updateItemLocal}
+            onItemUpdated={handleItemLocalUpdate}
             onOpenQuickEdit={(it) => { setEditModalTab('financial'); setEditModalItem(it); }}
             onOpenEditModal={(it) => { setEditModalTab('financial'); setEditModalItem(it); }}
             onOpenListingIdModal={(it) => { setEditModalTab('financial'); setEditModalItem(it); }}
@@ -444,7 +456,7 @@ export function InventoryHubView({ onNavigate }) {
         item={listingIdModalItem}
         onClose={() => setListingIdModalItem(null)}
         onSaved={(id, patch) => {
-          updateItemLocal(id, patch);
+          handleItemLocalUpdate(id, patch);
           setListingIdModalItem(null);
         }}
       />

@@ -267,11 +267,21 @@ export function EditTabFinancials({
         id = listingOrId.listing_id;
         rate = listingOrId.promoted_rate;
         updateField('ebay_listing_id', id);
+        updateField('platform', 'eBay');
+        if (form.status === 'Available' || form.status === 'Draft') {
+          updateField('status', 'Listed');
+          updateField('date_listed', form.date_listed || new Date().toISOString().split('T')[0]);
+        }
         if (listingOrId.price != null) updateField('current_list_price', Number(listingOrId.price).toFixed(2));
         if (listingOrId.sku && !form.sku) updateField('sku', listingOrId.sku);
       } else {
         id = String(listingOrId).trim();
         updateField('ebay_listing_id', id);
+        updateField('platform', 'eBay');
+        if (form.status === 'Available' || form.status === 'Draft') {
+          updateField('status', 'Listed');
+          updateField('date_listed', form.date_listed || new Date().toISOString().split('T')[0]);
+        }
       }
       if (handleSyncWithEbay) await handleSyncWithEbay(id, rate);
     }

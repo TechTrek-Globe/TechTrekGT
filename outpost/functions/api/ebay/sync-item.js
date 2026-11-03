@@ -178,10 +178,9 @@ export async function onRequestPost(context) {
       newStatus = item.status;
     } else if (liveListing?.status === 'Unsold' || liveListing?.raw_status === 'Completed' || liveListing?.raw_status === 'Ended') {
       newStatus = 'Unsold';
-    } else if (liveListing?.status === 'Listed' || liveListing?.raw_status === 'Active') {
-      newStatus = 'Listed';
     } else {
-      newStatus = item.status || 'Available';
+      // Connecting or syncing an active eBay listing transitions Available and Draft items to Listed
+      newStatus = 'Listed';
     }
 
     const nextActualSellPrice = isSold ? item.actual_sell_price : (item.status === 'Sold' ? null : item.actual_sell_price);

@@ -288,7 +288,10 @@ export const saveEbayListingId = (itemId, ebayListingId, certVerificationUrl = n
     body: JSON.stringify({
       ebay_listing_id: ebayListingId || null,
       cert_verification_url: certVerificationUrl || null,
-      ebay_promoted_rate: ebayPromotedRate != null ? parseFloat(ebayPromotedRate) : null
+      ebay_promoted_rate: ebayPromotedRate != null ? parseFloat(ebayPromotedRate) : null,
+      platform: 'eBay',
+      status: 'Listed',
+      date_listed: new Date().toISOString().split('T')[0]
     })
   });
 

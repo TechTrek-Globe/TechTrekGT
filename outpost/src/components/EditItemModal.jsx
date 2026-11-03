@@ -462,7 +462,7 @@ export function EditItemModal({
           platform: 'eBay',
           platform_fee_pct: it.platform_fee_pct != null ? String((it.platform_fee_pct * 100).toFixed(2)) : '13.25',
           platform_flat_fee: it.platform_flat_fee != null ? String(Number(it.platform_flat_fee).toFixed(2)) : '0.40',
-          date_listed: it.date_listed || prev.date_listed,
+          date_listed: it.date_listed || prev.date_listed || new Date().toISOString().split('T')[0],
           est_shipping_cost: it.est_shipping_cost != null ? String(Number(it.est_shipping_cost).toFixed(2)) : prev.est_shipping_cost,
           buyer_shipping_cost: syncBuyerShipping,
           ebay_promoted_rate: syncPromotedRate
@@ -475,7 +475,7 @@ export function EditItemModal({
         } else {
           setSuccess(`Synchronized with live eBay listing #${listingIdToSync} (Price: $${it.current_list_price || '--'}, Ad Rate: ${syncPromotedRate || '0'}%)`);
         }
-        if (onUpdated) onUpdated(item.id, it, { fromEbaySync: true, is_sold: res.is_sold, sale: res.sale });
+        if (onUpdated) onUpdated(item.id, { ...it, status: it.status || (res.is_sold ? 'Sold' : 'Listed'), platform: 'eBay' }, { fromEbaySync: true, is_sold: res.is_sold, sale: res.sale });
       }
     } catch (e) {
       setError(e.message || 'Sync with eBay failed');
@@ -508,6 +508,7 @@ export function EditItemModal({
       ebay_listing_id: id,
       platform: 'eBay',
       status: prev.status === 'Draft' || prev.status === 'Available' ? 'Listed' : prev.status,
+      date_listed: prev.date_listed || new Date().toISOString().split('T')[0],
       current_list_price: price != null && !prev.current_list_price ? Number(price).toFixed(2) : prev.current_list_price,
       sku: sku && !prev.sku ? sku : prev.sku,
       ebay_promoted_rate: rate != null && rate > 0 ? String(rate) : prev.ebay_promoted_rate,

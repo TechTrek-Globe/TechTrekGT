@@ -23,6 +23,7 @@ export async function onRequestGet(context) {
 
     const url = new URL(request.url);
     const status         = url.searchParams.get('status') || '';
+    const includeSold    = url.searchParams.get('include_sold') === 'true' || url.searchParams.get('include_sold') === '1';
     const category       = url.searchParams.get('category') || '';
     const listingFormat  = url.searchParams.get('listing_format') || '';
     const listingStatus  = url.searchParams.get('listing_status') || '';
@@ -84,6 +85,8 @@ export async function onRequestGet(context) {
         conditions.push('i.status = ?');
         bindings.push(status);
       }
+    } else if (!includeSold) {
+      conditions.push("i.status != 'Sold'");
     }
     if (category && category !== 'All') {
       conditions.push('i.category = ?');
@@ -108,6 +111,38 @@ export async function onRequestGet(context) {
 
     const countSql = 'SELECT COUNT(*) AS total FROM auction_items i WHERE ' + whereClause;
     const countRow = await env.DB.prepare(countSql).bind(...bindings).first();
+
+    // Dynamic status counts breakdown across active inventory (matching non-status filters)
+    const statusConditions = ['i.user_id = ?', "i.status != 'Sold'"];
+    const statusBindings = [payload.userId];
+    if (category && category !== 'All') {
+      statusConditions.push('i.category = ?');
+      statusBindings.push(category);
+    }
+    if (listingFormat && listingFormat !== 'All') {
+      statusConditions.push('i.listing_format = ?');
+      statusBindings.push(listingFormat);
+    }
+    if (listingStatus && listingStatus !== 'All') {
+      statusConditions.push('i.listing_status = ?');
+      statusBindings.push(listingStatus);
+    }
+    if (invoice_id) {
+      statusConditions.push('i.invoice_id = ?');
+      statusBindings.push(invoice_id);
+    }
+    if (q) {
+      statusConditions.push('(i.item_name LIKE ? OR i.athlete_person LIKE ? OR i.category LIKE ? OR i.cert_number LIKE ? OR i.authenticator LIKE ? OR i.sku LIKE ?)');
+      const like = `%${q}%`;
+      statusBindings.push(like, like, like, like, like, like);
+    }
+
+    const statusCountsSql = 'SELECT i.status, COUNT(*) AS count FROM auction_items i WHERE ' + statusConditions.join(' AND ') + ' GROUP BY i.status';
+    const statusCountsRows = await env.DB.prepare(statusCountsSql).bind(...statusBindings).all();
+    const statusCounts = {};
+    (statusCountsRows.results || []).forEach(r => {
+      if (r.status) statusCounts[r.status] = r.count;
+    });
 
     const rowsSql = 'SELECT '
       + 'i.*, '
@@ -240,7 +275,8 @@ export async function onRequestGet(context) {
         page,
         limit,
         pages: Math.ceil((countRow?.total || 0) / limit)
-      }
+      },
+      status_counts: statusCounts
     });
   });
 }

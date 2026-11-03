@@ -181,6 +181,25 @@ Outpost uses React Context and standard React hooks (`useState`, `useReducer`, `
       - `item_name`: `left: ${actionsWidth + (isImageVisible ? imageWidth : 0)}px`
     - Shared `PREVIEW_CACHE` Map exported from `ItemImageHoverTooltip.jsx` stores resolved positive image hits in memory across hovers and thumbnail cells.
     - `ItemThumbnailCell` resolves images via `resolveItemImage(item, attrs)` and `PREVIEW_CACHE`, providing instant visual rendering, onError fallback to `<Package />`, click-to-edit modal opening, and hover portal tooltip triggering.
+    - Decoupled `item_image` hover tooltip triggers (`onMouseEnter` / `onMouseLeave`) from the item title/description cell in `InventoryGridRow.jsx`; hover portal triggers strictly on direct interaction with `ItemThumbnailCell`, while title cell retains `title` attribute for native tooltip and click-to-edit navigation.
+  - **Inventory and Sales Log Decoupling State [ACTION ID: INV-004 / SALES-002]**:
+    - `InventoryDataGrid.jsx`: Removed `soldItems` grouping memo and secondary "SOLD ITEMS" completed transactions accordion section. Table rows render strictly from `activeItems` (`(items || []).filter(it => it.status !== 'Sold')`).
+    - `InventoryHubView.jsx`: Wrapped `displayItems` in memoized filter `sortedItems.filter(it => it.status !== 'Sold')`, preventing completed sales from appearing in both Table View and Pricing View.
+    - `InventoryCommandBar.jsx`: Filtered `'Sold'` out of the status dropdown (`ALL_STATUSES.filter(s => s !== 'Sold')`), preventing zero-count or empty sold queries in the active inventory view. "All Status" counter reflects strictly active inventory.
+    - `functions/api/items/enriched.js`: Automatically injects `conditions.push("i.status != 'Sold'")` when no status filter is provided or `status` is empty, keeping `pagination.total` and returned `items` bounded to active stock while supporting `include_sold=true` when explicit historical querying is required.
+  - **Segmented Inventory Status Quick Tabs State [ACTION ID: UI-007 / TAB-002]**:
+    - `InventoryCommandBar.jsx`: Defines `STATUS_TABS` configuration (`[ { id: '', label: 'All', countKey: 'all' }, { id: 'Listed', label: 'Listed', countKey: 'Listed' }, { id: 'Available', label: 'Available', countKey: 'Available' }, { id: 'Kept for Self', label: 'Kept for self', countKey: 'Kept for Self' } ]`).
+    - Tab Selection: Clicking sets `statusFilter` directly in `InventoryContext`, which triggers `fetchItems(1)` to reload page 1 with active query parameters.
+    - Two-Way Dropdown Sync: Dropdown `#inventory-status-filter` synchronizes value with `statusFilter`; selecting a tab highlights the tab and selects the value in dropdown, while selecting secondary statuses in the dropdown (`Draft`, `Unsold`, `Returned`) updates `statusFilter` and clears tab active highlights.
+    - `functions/api/items/enriched.js`: Injects dynamic `statusCountsSql` (`SELECT i.status, COUNT(*) AS count FROM auction_items i WHERE i.user_id = ? AND i.status != 'Sold' ... GROUP BY i.status`) matching non-status active filters (category, format, search) and returns `status_counts` alongside paginated items.
+    - `InventoryContext.jsx`: Maintains `serverStatusCounts` state from `data.status_counts`, preventing count pill collapse or zero-state flicker when toggling between statuses or navigating paginated pages. Optimistically mutates `serverStatusCounts` on `updateItemLocal(id, patch)`.
+  - **Automated Listed Transition State on eBay Connection [ACTION ID: SYNC-005 / EBAY-008]**:
+    - `functions/api/ebay/sync-item.js`: Default status assignment on active non-sold sync set to `'Listed'` (`newStatus = 'Listed'`), transitioning Available/Draft items to Listed status in D1.
+    - `functions/api/items/[id].js`: When `body.ebay_listing_id` is supplied without an explicit status, Available or Draft items automatically transition to `status = 'Listed'`, `platform = 'eBay'`, and `date_listed = now()`.
+    - `InventoryHubView.jsx`: `handleItemLocalUpdate` and `handleModalItemUpdated` inspect patched items for `status === 'Listed'` upon eBay connection, triggering `setStatusFilter('Listed')` to automatically move the active view focus to the "Listed" tab.
+
+
+
 
 
 

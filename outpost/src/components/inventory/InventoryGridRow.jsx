@@ -218,8 +218,6 @@ export function InventoryGridRow({
             left: `${actionsWidth + (isImageVisible ? imageWidth : 0)}px`
           }}
           className={`px-3 py-1.5 border-r border-slate-800/60 transition-colors overflow-hidden text-xs sticky z-10 ${stickyBg} group-hover:bg-[#1a263d] shadow-r cursor-pointer`}
-          onMouseEnter={(e) => onShowTooltip && onShowTooltip('item_image', item, e)}
-          onMouseLeave={() => onHideTooltip && onHideTooltip()}
           onClick={() => onOpenEditModal && onOpenEditModal(item)}
           title="Click to view & edit full item details"
         >

@@ -33,6 +33,7 @@ export function InventoryProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [pendingSaleItem, setPendingSaleItem] = useState(null);
+  const [serverStatusCounts, setServerStatusCounts] = useState({});
 
   // --- User Settings (column visibility, widths, category order) ---
   const [userSettings, setUserSettings] = useState(getStoredUserSettings);
@@ -142,13 +143,16 @@ export function InventoryProvider({ children }) {
 
   // --- Status counts ---
   const statusCounts = useMemo(() => {
+    if (serverStatusCounts && Object.keys(serverStatusCounts).length > 0) {
+      return serverStatusCounts;
+    }
     const counts = {};
     items.forEach(it => {
       const s = it.status || 'Available';
       counts[s] = (counts[s] || 0) + 1;
     });
     return counts;
-  }, [items]);
+  }, [serverStatusCounts, items]);
 
   // --- Data Fetching ---
   const fetchRequestIdRef = useRef(0);
@@ -174,6 +178,9 @@ export function InventoryProvider({ children }) {
       if (reqId === fetchRequestIdRef.current) {
         setItems(data.items || []);
         setPagination(data.pagination || { total: 0, page: 1, pages: 1 });
+        if (data.status_counts) {
+          setServerStatusCounts(data.status_counts);
+        }
       }
     } catch (e) {
       if (reqId === fetchRequestIdRef.current) {
@@ -284,8 +291,20 @@ export function InventoryProvider({ children }) {
 
   // --- Optimistic Local Updates ---
   const updateItemLocal = useCallback((id, patch) => {
+    if (patch?.status) {
+      setServerStatusCounts(prev => {
+        const oldItem = items.find(it => it.id === id);
+        if (!oldItem || oldItem.status === patch.status) return prev;
+        const next = { ...prev };
+        const oldStatus = oldItem.status || 'Available';
+        const newStatus = patch.status;
+        if (next[oldStatus] > 0) next[oldStatus] -= 1;
+        next[newStatus] = (next[newStatus] || 0) + 1;
+        return next;
+      });
+    }
     setItems(prev => prev.map(it => it.id === id ? { ...it, ...patch } : it));
-  }, []);
+  }, [items]);
 
   /**
    * Save a field update to the server and merge the response

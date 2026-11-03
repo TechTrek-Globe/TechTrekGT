@@ -7,6 +7,13 @@ import { SortPresetDropdown } from './SortPresetDropdown';
 import { ALL_STATUSES, LISTING_FORMATS } from '../../utils/constants';
 import { fmtCurrency, formatPercent } from '../../utils/formulaPreview';
 
+const STATUS_TABS = [
+  { id: '', label: 'All', countKey: 'all' },
+  { id: 'Listed', label: 'Listed', countKey: 'Listed' },
+  { id: 'Available', label: 'Available', countKey: 'Available' },
+  { id: 'Kept for Self', label: 'Kept for self', countKey: 'Kept for Self' },
+];
+
 export function InventoryCommandBar({
   viewMode,
   setViewMode,
@@ -53,6 +60,10 @@ export function InventoryCommandBar({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  const allCount = Object.keys(statusCounts).length > 0
+    ? Object.values(statusCounts).reduce((acc, c) => acc + (Number(c) || 0), 0)
+    : totalCount;
+
   return (
     <div className="flex items-center justify-between gap-2 flex-wrap flex-shrink-0 bg-slate-900/70 px-2.5 py-1.5 rounded-xl border border-slate-800/80 backdrop-blur-sm">
       {/* Left: Title + Search + Status Dropdown + Category Dropdown + Format Dropdown + Sort */}
@@ -84,19 +95,51 @@ export function InventoryCommandBar({
           )}
         </div>
 
+        {/* Segmented Status Tabs */}
+        <div className="flex items-center bg-slate-950/90 p-0.5 rounded-lg border border-slate-800/80 text-xs flex-shrink-0 overflow-x-auto">
+          {STATUS_TABS.map(tab => {
+            const isActive = statusFilter === tab.id;
+            const count = tab.id === '' ? allCount : (statusCounts[tab.countKey] || 0);
+
+            return (
+              <button
+                key={tab.label}
+                type="button"
+                onClick={() => setStatusFilter(tab.id)}
+                className={`px-2 py-0.5 rounded-md text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                  isActive
+                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm shadow-amber-500/10'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border border-transparent'
+                }`}
+                title={`Filter inventory by ${tab.label}`}
+              >
+                <span>{tab.label}</span>
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold ${
+                  isActive
+                    ? 'bg-amber-500/30 text-amber-200 border border-amber-500/50'
+                    : 'bg-slate-800/80 text-slate-400 border border-slate-700/50'
+                }`}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
         {/* Status Filter Dropdown */}
         <select
           id="inventory-status-filter"
           value={statusFilter}
           onChange={e => setStatusFilter(e.target.value)}
           className={`bg-slate-950 border rounded-lg py-1 px-2 text-xs outline-none transition-colors cursor-pointer flex-shrink-0 ${
-            statusFilter
+            statusFilter && !STATUS_TABS.some(t => t.id === statusFilter)
               ? 'border-amber-500/50 text-amber-400 font-semibold bg-amber-500/10'
               : 'border-slate-700/80 text-slate-300 focus:border-amber-500'
           }`}
+          title="More status filters"
         >
-          <option value="">All Status ({totalCount})</option>
-          {ALL_STATUSES.map(s => {
+          <option value="">All Status ({allCount})</option>
+          {ALL_STATUSES.filter(s => s !== 'Sold').map(s => {
             const count = statusCounts[s] || 0;
             return (
               <option key={s} value={s}>

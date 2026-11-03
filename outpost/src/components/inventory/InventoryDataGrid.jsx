@@ -66,18 +66,9 @@ export function InventoryDataGrid({
     setHoverTooltip(null);
   };
 
-  // Separate active items and sold items so sold items are grouped at the bottom
-  const { activeItems, soldItems } = useMemo(() => {
-    const active = [];
-    const sold = [];
-    (items || []).forEach(it => {
-      if (it.status === 'Sold') {
-        sold.push(it);
-      } else {
-        active.push(it);
-      }
-    });
-    return { activeItems: active, soldItems: sold };
+  // Active items filter (completed sales belong strictly to the Sales Log)
+  const activeItems = useMemo(() => {
+    return (items || []).filter(it => it.status !== 'Sold');
   }, [items]);
 
   // Column resizing logic
@@ -166,7 +157,7 @@ export function InventoryDataGrid({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/40 text-slate-300">
-            {items.length === 0 ? (
+            {activeItems.length === 0 ? (
               <tr>
                 <td colSpan={visibleColCount} className="px-4 py-12 text-center text-slate-500">
                   <p className="text-sm font-semibold">No inventory items match your current filter criteria.</p>
@@ -174,84 +165,33 @@ export function InventoryDataGrid({
                 </td>
               </tr>
             ) : (
-              <>
-                {/* Active Items */}
-                {activeItems.map((item, i) => (
-                  <InventoryGridRow
-                    key={item.id}
-                    item={item}
-                    index={i}
-                    columnVisibility={columnVisibility}
-                    columnWidths={columnWidths}
-                    DEFAULT_COLUMNS={DEFAULT_COLUMNS}
-                    categoryOptions={categoryOptions}
-                    platformOptions={platformOptions}
-                    deleting={deleting}
-                    onUpdateItem={onUpdateItem}
-                    onDelete={onDelete}
-                    onOpenEditModal={onOpenEditModal}
-                    onOpenQuickEdit={onOpenQuickEdit}
-                    onOpenCopyModal={onOpenCopyModal}
-                    onOpenSaleModal={onOpenSaleModal}
-                    onOpenListingIdModal={onOpenListingIdModal}
-                    onMarkSold={onMarkSold}
-                    onOpenInvoiceModal={onOpenInvoiceModal}
-                    onUpdateItemSync={onUpdateItemSync}
-                    onVerifyCert={onVerifyCert}
-                    onPromptCertVerify={onPromptCertVerify}
-                    onShowTooltip={showTooltip}
-                    onHideTooltip={hideTooltip}
-                  />
-                ))}
-
-                {/* Sold Items Section Divider */}
-                {soldItems.length > 0 && (
-                  <>
-                    {activeItems.length > 0 && (
-                      <tr className="bg-slate-950/80 border-t-2 border-slate-800">
-                        <td colSpan={visibleColCount} className="px-3 py-1.5">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <span className="inline-block w-2 h-2 rounded-full bg-emerald-400"></span>
-                              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                                Sold Items ({soldItems.length})
-                              </span>
-                            </div>
-                            <span className="text-[10px] text-slate-500 font-normal">Completed Transactions</span>
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                    {soldItems.map((item, i) => (
-                      <InventoryGridRow
-                        key={item.id}
-                        item={item}
-                        index={activeItems.length + i}
-                        columnVisibility={columnVisibility}
-                        columnWidths={columnWidths}
-                        DEFAULT_COLUMNS={DEFAULT_COLUMNS}
-                        categoryOptions={categoryOptions}
-                        platformOptions={platformOptions}
-                        deleting={deleting}
-                        onUpdateItem={onUpdateItem}
-                        onDelete={onDelete}
-                        onOpenEditModal={onOpenEditModal}
-                        onOpenQuickEdit={onOpenQuickEdit}
-                        onOpenCopyModal={onOpenCopyModal}
-                        onOpenSaleModal={onOpenSaleModal}
-                        onOpenListingIdModal={onOpenListingIdModal}
-                        onMarkSold={onMarkSold}
-                        onOpenInvoiceModal={onOpenInvoiceModal}
-                        onUpdateItemSync={onUpdateItemSync}
-                        onVerifyCert={onVerifyCert}
-                        onPromptCertVerify={onPromptCertVerify}
-                        onShowTooltip={showTooltip}
-                        onHideTooltip={hideTooltip}
-                      />
-                    ))}
-                  </>
-                )}
-              </>
+              activeItems.map((item, i) => (
+                <InventoryGridRow
+                  key={item.id}
+                  item={item}
+                  index={i}
+                  columnVisibility={columnVisibility}
+                  columnWidths={columnWidths}
+                  DEFAULT_COLUMNS={DEFAULT_COLUMNS}
+                  categoryOptions={categoryOptions}
+                  platformOptions={platformOptions}
+                  deleting={deleting}
+                  onUpdateItem={onUpdateItem}
+                  onDelete={onDelete}
+                  onOpenEditModal={onOpenEditModal}
+                  onOpenQuickEdit={onOpenQuickEdit}
+                  onOpenCopyModal={onOpenCopyModal}
+                  onOpenSaleModal={onOpenSaleModal}
+                  onOpenListingIdModal={onOpenListingIdModal}
+                  onMarkSold={onMarkSold}
+                  onOpenInvoiceModal={onOpenInvoiceModal}
+                  onUpdateItemSync={onUpdateItemSync}
+                  onVerifyCert={onVerifyCert}
+                  onPromptCertVerify={onPromptCertVerify}
+                  onShowTooltip={showTooltip}
+                  onHideTooltip={hideTooltip}
+                />
+              ))
             )}
           </tbody>
         </table>

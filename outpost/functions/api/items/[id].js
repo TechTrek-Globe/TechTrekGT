@@ -158,6 +158,9 @@ export async function onRequestPut(context) {
         return err(invalidStatusError(body.status).error, 400);
       }
       normalizedStatus = canonical;
+    } else if (body.ebay_listing_id && (item.status === 'Available' || item.status === 'Draft')) {
+      // Auto-transition to 'Listed' when an eBay listing ID is connected to an Available/Draft item
+      normalizedStatus = 'Listed';
     }
 
     // Merge only provided fields
@@ -171,7 +174,7 @@ export async function onRequestPut(context) {
       unit_price:         body.unit_price != null ? round2Nullable(body.unit_price) : round2Nullable(item.unit_price),
       true_total_cost:    body.true_total_cost != null ? round2Nullable(body.true_total_cost) : (body.unit_price != null ? round2Nullable(parseFloat(body.unit_price) - (item.prorated_discount || 0) + (item.prorated_shipping || 0) + (item.prorated_tax || 0)) : round2Nullable(item.true_total_cost)),
       status:             normalizedStatus,
-      platform:           body.platform           ?? item.platform,
+      platform:           body.platform           ?? (body.ebay_listing_id && (item.status === 'Available' || item.status === 'Draft') ? 'eBay' : item.platform),
       platform_fee_pct:   body.platform_fee_pct   ?? item.platform_fee_pct,
       platform_flat_fee:  body.platform_flat_fee  ?? item.platform_flat_fee,
       est_shipping_cost:  body.est_shipping_cost != null ? round2Nullable(body.est_shipping_cost) : round2Nullable(item.est_shipping_cost),
@@ -180,7 +183,7 @@ export async function onRequestPut(context) {
       current_list_price: body.current_list_price != null ? round2Nullable(body.current_list_price) : round2Nullable(item.current_list_price),
       actual_sell_price:  body.actual_sell_price  != null ? round2Nullable(body.actual_sell_price) : round2Nullable(item.actual_sell_price),
       date_acquired:      body.date_acquired      !== undefined ? body.date_acquired : item.date_acquired,
-      date_listed:        body.date_listed        ?? item.date_listed,
+      date_listed:        body.date_listed        ?? (normalizedStatus === 'Listed' && !item.date_listed ? new Date().toISOString().split('T')[0] : item.date_listed),
       date_sold:          body.date_sold          ?? item.date_sold,
       notes:              body.notes              ?? item.notes,
       best_listing_window: body.best_listing_window ?? item.best_listing_window,

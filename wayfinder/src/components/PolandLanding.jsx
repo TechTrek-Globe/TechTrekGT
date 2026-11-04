@@ -226,7 +226,7 @@ function JourneyStopSchedule({
   return (
     <div className="space-y-4">
       {/* Stop Card */}
-      <div className="glass-panel rounded-3xl border border-amber-500/30 overflow-hidden shadow-2xl bg-gradient-to-br from-wf-navy-mid/95 via-slate-900/90 to-slate-950">
+      <div className="glass-panel rounded-3xl border border-amber-500/30 shadow-2xl bg-gradient-to-br from-wf-navy-mid/95 via-slate-900/90 to-slate-950">
         {/* Stop Header Banner */}
         <div className="p-4 sm:p-6 border-b border-white/10 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="flex items-center space-x-3 sm:space-x-4 min-w-0">
@@ -328,9 +328,9 @@ function JourneyStopSchedule({
               const dayAccommodations = isAuthenticated ? (accommodations || []).filter(a => a.check_in_date === dayItem.date) : [];
 
               return (
-                <div key={dayItem.day} className="space-y-4">
+                <div key={dayItem.day} className="relative space-y-4">
                   {/* Day Header Sub-strip */}
-                  <div className="p-3 rounded-2xl bg-slate-950/80 border border-amber-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-inner">
+                  <div className="sticky top-14 sm:top-16 z-20 p-3 rounded-2xl bg-slate-950/95 backdrop-blur-md border border-amber-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-lg">
                     <div className="flex items-center space-x-3">
                       <span className="px-2.5 py-1 rounded-xl bg-amber-500/20 border border-amber-400/40 text-amber-300 font-black text-xs">
                         Day 0{dayItem.day}

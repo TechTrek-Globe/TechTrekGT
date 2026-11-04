@@ -436,7 +436,7 @@ Governs the state invariants, atomic transaction guarantees, and edge lifecycle 
 - Sub-Toolbar In-Flow Invariant:
   - In `PrivateHub.jsx`, the journey sub-toolbar resides directly in document flow (`relative z-20 w-full`) without child `sticky top-14` positioning. This prevents coordinate displacement inside `<main>`, guaranteeing gap = 0.0px directly against the sticky main navbar.
 - Day Header Sticky Realignment:
-  - In `ItineraryView.jsx`, timeline day headers specify `sticky top-14 sm:top-16 z-20` matching the navbar height, ensuring smooth docking beneath the fixed navbar during deep itinerary scrolling.
+  - In both `ItineraryView.jsx` and `PolandLanding.jsx` (`JourneyStopSchedule`), daily timeline headers specify `sticky top-14 sm:top-16 z-20 bg-slate-950/95 backdrop-blur-md` matching the main navbar height (`h-14 sm:h-16`). Each day's schedule items are enclosed in a `relative space-y-4` container, and the parent stop card container omits `overflow-hidden`, preserving viewport scroll context and ensuring natural CSS sticky replacement as successive days scroll into view.
 
 ### 16.7 Public Schedule Isolation & Unauthenticated Data Invariants
 - Public State Boundary:

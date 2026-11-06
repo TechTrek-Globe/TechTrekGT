@@ -197,6 +197,14 @@ Outpost uses React Context and standard React hooks (`useState`, `useReducer`, `
     - `functions/api/ebay/sync-item.js`: Default status assignment on active non-sold sync set to `'Listed'` (`newStatus = 'Listed'`), transitioning Available/Draft items to Listed status in D1.
     - `functions/api/items/[id].js`: When `body.ebay_listing_id` is supplied without an explicit status, Available or Draft items automatically transition to `status = 'Listed'`, `platform = 'eBay'`, and `date_listed = now()`.
     - `InventoryHubView.jsx`: `handleItemLocalUpdate` and `handleModalItemUpdated` inspect patched items for `status === 'Listed'` upon eBay connection, triggering `setStatusFilter('Listed')` to automatically move the active view focus to the "Listed" tab.
+  - **Status Priority Hierarchy Sorting State [ACTION ID: INV-005 / SORT-001]**:
+    - `src/utils/constants.js`: Exports `STATUS_PRIORITY_RANK` object (`{ 'listed': 1, 'available': 2, 'kept for self': 3, 'draft': 4, 'unsold': 5, 'returned': 6 }`) and `getStatusRank(status)` helper mapping status strings (with case-insensitive trimming) to numeric ranks, defaulting to 99 for unknown statuses.
+    - `src/context/InventoryContext.jsx`: `sortedItems` computes `isAllStatusView = !statusFilter || statusFilter === 'All'` and `isDefaultSort = sortPreset === 'default' || (sortConfig.key === 'created_at' && sortConfig.direction === 'desc')`.
+    - Primary Sorting: In default All view, sorts by `getStatusRank(a.status) - getStatusRank(b.status)`. When user explicitly sorts by Status (`sortConfig.key === 'status'`), sorts by status rank with respect to `sortConfig.direction`.
+    - Secondary Tie-Breaking: Within items of identical rank, preserves secondary sorting: `created_at` descending, followed by deterministic SKU/ID alphanumeric tie-breaking.
+    - User Sort Preservation: Explicit column sorts (`sortPreset === 'custom'` or non-default presets) and active status-specific filters bypass default status clustering to respect user column sorting across items.
+    - Server-Side D1 Synchronization: `functions/api/items/enriched.js` and `functions/api/items/index.js` apply `STATUS_CASE_SQL` to order SQLite results by status rank ASC and `created_at DESC` when querying all statuses under default sorting, ensuring database pagination partitions items in lockstep with the client hierarchy.
+
 
 
 

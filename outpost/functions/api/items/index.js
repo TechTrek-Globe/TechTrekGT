@@ -42,6 +42,18 @@ export async function onRequestGet(context) {
     const countSql = 'SELECT COUNT(*) AS total FROM auction_items i WHERE ' + whereClause;
     const countRow = await env.DB.prepare(countSql).bind(...bindings).first();
 
+    const orderClause = (!status || status === 'All')
+      ? `ORDER BY CASE LOWER(TRIM(i.status))
+          WHEN 'listed' THEN 1
+          WHEN 'available' THEN 2
+          WHEN 'kept for self' THEN 3
+          WHEN 'draft' THEN 4
+          WHEN 'unsold' THEN 5
+          WHEN 'returned' THEN 6
+          ELSE 7
+        END ASC, i.created_at DESC`
+      : 'ORDER BY i.created_at DESC';
+
     const rowsSql = 'SELECT i.*, inv.invoice_ref, inv.discount AS inv_discount, inv.shipping AS inv_shipping, inv.tax AS inv_tax, '
       + 's.id AS sale_id, s.buyer_handle, s.gross_sale_price, s.buyer_shipping_paid, s.actual_shipping_cost, s.platform_fees_amt, s.promoted_listing_fee, s.net_proceeds, s.net_profit, s.ebay_order_id, s.fee_reconciled_at, '
       + 'r.final_value_fee AS recon_final_value_fee, r.promoted_listing_fee AS recon_promoted_listing_fee, r.shipping_label_cost AS recon_shipping_label_cost '
@@ -50,7 +62,7 @@ export async function onRequestGet(context) {
       + 'LEFT JOIN auction_sales s ON i.id = s.item_id AND s.user_id = i.user_id '
       + 'LEFT JOIN ebay_fee_reconciliations r ON s.id = r.sale_id AND r.user_id = i.user_id '
       + 'WHERE ' + whereClause + ' '
-      + 'ORDER BY i.created_at DESC '
+      + orderClause + ' '
       + 'LIMIT ? OFFSET ?';
     const rows = await env.DB.prepare(rowsSql).bind(...bindings, limit, offset).all();
 

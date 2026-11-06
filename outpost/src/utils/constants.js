@@ -18,3 +18,18 @@ export const ALL_STATUSES = Object.keys(STATUS_META);
 export const LISTING_FORMATS = ['Fixed Price', 'Auction'];
 export const LISTING_STATUSES = ['Draft', 'Active', 'Sold', 'Unsold'];
 
+export const STATUS_PRIORITY_RANK = {
+  'listed': 1,
+  'available': 2,
+  'kept for self': 3,
+  'draft': 4,
+  'unsold': 5,
+  'returned': 6,
+};
+
+export const getStatusRank = (status) => {
+  const key = (status || '').toLowerCase().trim();
+  return STATUS_PRIORITY_RANK[key] ?? 99;
+};
+
+

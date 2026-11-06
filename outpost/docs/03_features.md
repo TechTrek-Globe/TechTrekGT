@@ -458,6 +458,31 @@ Automated the lifecycle transition from "Available" to "Listed" status whenever 
    - Upon completing an eBay connection, `InventoryHubView` automatically triggers `setStatusFilter('Listed')`.
    - The UI switches focus directly to the "Listed" status tab, presenting the newly linked item without requiring manual filter adjustments or tab clicking.
 
+## Status Priority Hierarchy Sorting in Inventory View [ACTION ID: INV-005 / SORT-001]
+
+Enforced automatic primary status sorting across active inventory when viewing all statuses without an active status filter, grouping inventory into a deterministic operational hierarchy.
+
+### Status Priority Sorting Capabilities
+
+1. **Canonical Status Priority Ranking (`src/utils/constants.js`)**:
+   - Defines `STATUS_PRIORITY_RANK` and `getStatusRank(status)` mapping operational lifecycle states to deterministic ranks:
+     - Rank 1: "Listed"
+     - Rank 2: "Available"
+     - Rank 3: "Kept for Self"
+     - Deterministic remaining ranks: Draft (4), Unsold (5), Returned (6), and unrecognized statuses (99).
+   - Case-insensitive trimming ensures consistent ranking regardless of input format.
+2. **Default "All" View Hierarchy (`src/context/InventoryContext.jsx`)**:
+   - When viewing all statuses (`!statusFilter || statusFilter === 'All'`) under default sorting (`sortPreset === 'default'` or `sortConfig.key === 'created_at' && sortConfig.direction === 'desc'`), items are automatically ordered by Status priority rank.
+   - Preserves secondary tie-breaking within identical status ranks: newest acquisition/creation date first (`created_at` descending), followed by deterministic SKU/ID alphanumeric ordering.
+3. **Explicit User Sort & Filter Preservation**:
+   - Toggling an explicit column sort (e.g. List Price, Margin, Format) or selecting an explicit sort preset bypasses status rank clustering to respect direct user column ordering across all items.
+   - When sorting explicitly by the Status column (`sortConfig.key === 'status'`), respects user direction (`asc` or `desc`) based on the canonical status hierarchy rather than arbitrary alphabetical string ordering.
+   - Selecting an individual status filter tab (e.g. "Listed" or "Available") displays only items for that status, respecting user column sorting.
+4. **Backend D1 Pagination Concordance (`functions/api/items/enriched.js` & `functions/api/items/index.js`)**:
+   - Implemented `STATUS_CASE_SQL` in serverless item endpoints: when querying all statuses under default sort, D1 SQLite executes `ORDER BY CASE LOWER(TRIM(i.status)) WHEN 'listed' THEN 1 WHEN 'available' THEN 2 WHEN 'kept for self' THEN 3 WHEN 'draft' THEN 4 WHEN 'unsold' THEN 5 WHEN 'returned' THEN 6 ELSE 7 END ASC, i.created_at DESC`.
+   - Ensures multi-page database pagination (`LIMIT / OFFSET`) partitions active items strictly according to the status hierarchy.
+
+
 
 
 

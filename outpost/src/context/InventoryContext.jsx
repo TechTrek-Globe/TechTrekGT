@@ -3,6 +3,7 @@ import { getEnrichedItems, getPlatforms, updateItem, getSyncSettings, updateSync
 import { getApiUrl } from '../utils/api';
 import { getStoredUserSettings, DEFAULT_CATEGORIES } from '../utils/userSettings';
 import { computeFeeBreakdown } from '../utils/feeEngine';
+import { getStatusRank } from '../utils/constants';
 
 const InventoryContext = createContext();
 
@@ -102,13 +103,22 @@ export function InventoryProvider({ children }) {
   const sortedItems = useMemo(() => {
     if (!sortConfig.key) return enrichedItemsWithMetrics;
 
+    const isAllStatusView = !statusFilter || statusFilter === 'All';
+    const isDefaultSort = sortPreset === 'default' || (sortConfig.key === 'created_at' && sortConfig.direction === 'desc');
+
     return [...enrichedItemsWithMetrics].sort((a, b) => {
-      // Default sort preset: prioritize 'Listed' items at the top on initial page load / default view
-      if (sortPreset === 'default' || (sortConfig.key === 'created_at' && sortConfig.direction === 'desc')) {
-        const isListedA = (a.status || '').toLowerCase() === 'listed' ? 1 : 0;
-        const isListedB = (b.status || '').toLowerCase() === 'listed' ? 1 : 0;
-        if (isListedA !== isListedB) {
-          return isListedB - isListedA;
+      // Primary sort by status hierarchy when viewing 'All' statuses in default view
+      if (isAllStatusView && isDefaultSort) {
+        const rankA = getStatusRank(a.status);
+        const rankB = getStatusRank(b.status);
+        if (rankA !== rankB) {
+          return rankA - rankB;
+        }
+      } else if (sortConfig.key === 'status') {
+        const rankA = getStatusRank(a.status);
+        const rankB = getStatusRank(b.status);
+        if (rankA !== rankB) {
+          return sortConfig.direction === 'asc' ? rankA - rankB : rankB - rankA;
         }
       }
 
@@ -130,16 +140,30 @@ export function InventoryProvider({ children }) {
       if (valB == null) valB = '';
 
       if (typeof valA === 'number' && typeof valB === 'number') {
-        return sortConfig.direction === 'asc' ? valA - valB : valB - valA;
+        if (valA !== valB) {
+          return sortConfig.direction === 'asc' ? valA - valB : valB - valA;
+        }
+      } else {
+        const strA = String(valA).toLowerCase();
+        const strB = String(valB).toLowerCase();
+        if (strA < strB) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (strA > strB) return sortConfig.direction === 'asc' ? 1 : -1;
       }
 
-      const strA = String(valA).toLowerCase();
-      const strB = String(valB).toLowerCase();
-      if (strA < strB) return sortConfig.direction === 'asc' ? -1 : 1;
-      if (strA > strB) return sortConfig.direction === 'asc' ? 1 : -1;
-      return 0;
+      // Secondary tie-breaker within same rank / equal values: created_at desc, then SKU
+      if (sortConfig.key !== 'created_at') {
+        const dateA = a.created_at || '';
+        const dateB = b.created_at || '';
+        if (dateA !== dateB) {
+          return dateB.localeCompare(dateA);
+        }
+      }
+
+      const skuA = String(a.sku || a.id || '');
+      const skuB = String(b.sku || b.id || '');
+      return skuA.localeCompare(skuB);
     });
-  }, [enrichedItemsWithMetrics, sortConfig, sortPreset]);
+  }, [enrichedItemsWithMetrics, sortConfig, sortPreset, statusFilter]);
 
   // --- Status counts ---
   const statusCounts = useMemo(() => {

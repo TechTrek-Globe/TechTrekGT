@@ -70,9 +70,24 @@ export async function onRequestGet(context) {
       'buy_it_now_price': 'i.buy_it_now_price'
     };
     const sortCol = SORT_COLUMN_MAP[sortByParam] || 'i.created_at';
-    const orderByClause = (sortByParam === 'created_at' && sortDirParam === 'DESC')
-      ? "ORDER BY CASE WHEN LOWER(i.status) = 'listed' THEN 0 ELSE 1 END, i.created_at DESC"
-      : `ORDER BY ${sortCol} ${sortDirParam}`;
+    const STATUS_CASE_SQL = `CASE LOWER(TRIM(i.status))
+      WHEN 'listed' THEN 1
+      WHEN 'available' THEN 2
+      WHEN 'kept for self' THEN 3
+      WHEN 'draft' THEN 4
+      WHEN 'unsold' THEN 5
+      WHEN 'returned' THEN 6
+      ELSE 7
+    END`;
+
+    let orderByClause;
+    if (sortByParam === 'status') {
+      orderByClause = `ORDER BY ${STATUS_CASE_SQL} ${sortDirParam}, i.created_at DESC`;
+    } else if (sortByParam === 'created_at' && sortDirParam === 'DESC' && (!status || status === 'All')) {
+      orderByClause = `ORDER BY ${STATUS_CASE_SQL} ASC, i.created_at DESC`;
+    } else {
+      orderByClause = `ORDER BY ${sortCol} ${sortDirParam}`;
+    }
 
     // Build dynamic WHERE clauses
     const conditions = ['i.user_id = ?'];

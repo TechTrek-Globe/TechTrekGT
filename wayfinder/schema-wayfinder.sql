@@ -376,3 +376,34 @@ CREATE INDEX IF NOT EXISTS idx_wf_settle_journey ON wayfinder_expense_settlement
 -- USERS TABLE EXTENSIONS (Shared Platform personal-budget-db)
 -- ============================================================
 -- ALTER TABLE users ADD COLUMN api_key_enabled INTEGER NOT NULL DEFAULT 0;
+
+-- ============================================================
+-- SHARED AGENDA COLLABORATION (invites + shares)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS wayfinder_agenda_invites (
+  id            TEXT PRIMARY KEY,
+  agenda_id     TEXT NOT NULL,
+  invited_email TEXT NOT NULL COLLATE NOCASE,
+  role          TEXT NOT NULL CHECK(role IN ('viewer','editor','admin')),
+  token_hash    TEXT NOT NULL UNIQUE,
+  status        TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','accepted','revoked')),
+  invited_by    TEXT NOT NULL,
+  created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  expires_at    TEXT NOT NULL,
+  accepted_at   TEXT,
+  accepted_by   TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_wf_invites_agenda ON wayfinder_agenda_invites(agenda_id);
+CREATE INDEX IF NOT EXISTS idx_wf_invites_email ON wayfinder_agenda_invites(invited_email);
+
+CREATE TABLE IF NOT EXISTS wayfinder_agenda_shares (
+  id         TEXT PRIMARY KEY,
+  agenda_id  TEXT NOT NULL,
+  user_id    TEXT NOT NULL,
+  role       TEXT NOT NULL CHECK(role IN ('viewer','editor','admin')),
+  invite_id  TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(agenda_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_wf_shares_user ON wayfinder_agenda_shares(user_id);
+CREATE INDEX IF NOT EXISTS idx_wf_shares_agenda ON wayfinder_agenda_shares(agenda_id);

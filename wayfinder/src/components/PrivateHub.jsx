@@ -1,15 +1,43 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { ShieldCheck, Shield, FileText, CalendarClock, Backpack, Calendar, Receipt } from 'lucide-react';
+import { ShieldCheck, Shield, FileText, CalendarClock, Backpack, Calendar, Receipt, Users } from 'lucide-react';
 import { ItineraryView } from './ItineraryView';
 import { DocumentCenter } from './DocumentCenter';
 import { PackingManager } from './packing/PackingManager';
 import { ExpenseLedger } from './budget/ExpenseLedger';
 import { CalendarSubscribeModal } from './calendar/CalendarSubscribeModal';
+import { ShareAgendaModal } from './ShareAgendaModal';
+import { getApiUrl } from '../utils/api';
+
+const AGENDA_REF = 'poland-christmas-2026';
 
 export function PrivateHub({ currentPath }) {
   const { user, isAuthenticated, setIsAuthModalOpen } = useAuth();
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [agendaRole, setAgendaRole] = useState(null);
+
+  // Resolve the caller's role on this agenda (owner/admin/editor/viewer) for permission gates
+  useEffect(() => {
+    let cancelled = false;
+    if (!isAuthenticated) {
+      setAgendaRole(null);
+      return undefined;
+    }
+    (async () => {
+      try {
+        const res = await fetch(getApiUrl(`/api/wayfinder/agendas/${AGENDA_REF}/access`), { credentials: 'include' });
+        const data = await res.json().catch(() => ({}));
+        if (!cancelled) setAgendaRole(res.ok ? (data.role || null) : null);
+      } catch (e) {
+        if (!cancelled) setAgendaRole(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isAuthenticated]);
+
+  const isCollaborator = agendaRole === 'viewer' || agendaRole === 'editor';
+  const canShare = agendaRole === 'owner' || agendaRole === 'admin';
   
   const pushRoute = (e, path) => {
     e.preventDefault();
@@ -35,6 +63,11 @@ export function PrivateHub({ currentPath }) {
             <div className="hidden md:flex items-center gap-2 text-xs text-slate-400 font-medium">
               <span className="text-slate-600">•</span>
               <span>Poland Christmas 2026</span>
+              {agendaRole && agendaRole !== 'owner' && (
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-300 border border-sky-500/25 capitalize font-medium">
+                  {agendaRole}
+                </span>
+              )}
             </div>
           </div>
 
@@ -82,6 +115,16 @@ export function PrivateHub({ currentPath }) {
                 <span><span className="hidden sm:inline">Sync </span>Calendar</span>
               </button>
             )}
+            {canShare && (
+              <button
+                onClick={() => setIsShareModalOpen(true)}
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap text-sky-300 hover:text-white hover:bg-sky-500/20 border border-sky-500/30"
+                title="Invite collaborators to this agenda"
+              >
+                <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-sky-400" />
+                <span>Share</span>
+              </button>
+            )}
             {(user?.isAdmin || user?.role === 'admin') && (
               <a
                 href="/wayfinder/admin"
@@ -103,7 +146,7 @@ export function PrivateHub({ currentPath }) {
         {isPacking ? (
           <PackingManager />
         ) : isExpenses ? (
-          <ExpenseLedger />
+          <ExpenseLedger journeyId={AGENDA_REF} agendaRole={agendaRole} />
         ) : isDocs ? (
           !isAuthenticated ? (
             <div className="flex-1 flex flex-col items-center justify-center p-8 sm:p-12 text-center rounded-2xl glass-panel border border-white/10 animate-fade-in my-8">
@@ -122,7 +165,7 @@ export function PrivateHub({ currentPath }) {
               </button>
             </div>
           ) : (
-            <DocumentCenter />
+            <DocumentCenter journeyId={AGENDA_REF} agendaRole={agendaRole} />
           )
         ) : (
           <>
@@ -146,6 +189,15 @@ export function PrivateHub({ currentPath }) {
           </>
         )}
       </div>
+
+      {canShare && (
+        <ShareAgendaModal
+          isOpen={isShareModalOpen}
+          onClose={() => setIsShareModalOpen(false)}
+          agendaId={AGENDA_REF}
+          agendaTitle="Poland Christmas 2026"
+        />
+      )}
 
       {/* Calendar Subscription & Export Modal */}
       <CalendarSubscribeModal

@@ -5,6 +5,7 @@
 
 import { generateId } from '../../utils/id.js';
 import { parseBookingDocument } from './gemini-parser.js';
+import { resolveAgendaAccess, canEdit } from '../../utils/agendaAccess.js';
 
 // Fields that always require user confirmation before approval
 const CRITICAL_FIELDS = new Set([
@@ -37,19 +38,32 @@ export async function handleImportJobs(context, url, method) {
         `SELECT j.*, d.safe_display_name, d.detected_provider, d.detected_doc_type, d.upload_date, d.journey_id
          FROM wayfinder_extraction_jobs j
          JOIN wayfinder_documents d ON j.document_id = d.id
-         WHERE d.user_id = ? AND d.deleted_at IS NULL
+         WHERE (d.user_id = ? OR d.journey_id IN (SELECT agenda_id FROM wayfinder_agenda_shares WHERE user_id = ?))
+           AND d.deleted_at IS NULL
          ORDER BY j.created_at DESC`
-      ).bind(user.userId).all();
+      ).bind(user.userId, user.userId).all();
       return json({ jobs: jobs.results });
     }
 
     if (!docId) return json({ error: 'document id required' }, 400);
 
-    // Verify document ownership
+    // Verify document access
     const doc = await env.DB.prepare(
-      'SELECT * FROM wayfinder_documents WHERE id = ? AND user_id = ? AND deleted_at IS NULL'
-    ).bind(docId, user.userId).first();
+      `SELECT * FROM wayfinder_documents 
+       WHERE id = ? 
+         AND (user_id = ? OR journey_id IN (SELECT agenda_id FROM wayfinder_agenda_shares WHERE user_id = ?) OR journey_id = 'poland-christmas-2026')
+         AND deleted_at IS NULL`
+    ).bind(docId, user.userId, user.userId).first();
     if (!doc) return json({ error: 'Document not found' }, 404);
+
+    if (action && ['parse', 'fields', 'approve', 'reject'].includes(action)) {
+      if (doc.journey_id) {
+        const access = await resolveAgendaAccess(env, doc.journey_id, user);
+        if (access.role && !canEdit(access.role)) {
+          return json({ error: 'Permission denied: viewers cannot modify extraction jobs' }, 403);
+        }
+      }
+    }
 
     let job = await env.DB.prepare(
       'SELECT * FROM wayfinder_extraction_jobs WHERE document_id = ?'

@@ -1,6 +1,8 @@
 // TechTrek Wayfinder - Multi-Currency Expense Ledger API
 // Manages trip expenses, participant split allocations, and settle-up payments.
 
+import { resolveAgendaAccess, canEdit } from '../../utils/agendaAccess.js';
+
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -108,14 +110,21 @@ export async function handleExpenses(context, url, method) {
   const expenseId = isIdRoute ? lastSegment : null;
 
   try {
+    if (!user?.userId) return json({ error: 'Authentication required' }, 401);
+
+    const access = await resolveAgendaAccess(env, journeyId, user);
+    const journey = access.journey;
+    if (!journey || (!access.role && journey.visibility !== 'public')) {
+      return json({ error: 'Journey not found or permission denied' }, 404);
+    }
+
     // 1. GET /api/wayfinder/expenses - Fetch all expenses, splits, and settlements
     if (method === 'GET') {
-      if (!user?.userId) return json({ error: 'Authentication required' }, 401);
       const expensesQuery = await db.prepare(`
         SELECT * FROM wayfinder_expenses
-        WHERE journey_id = ? OR journey_id = 'poland-christmas-2026'
+        WHERE journey_id = ? OR journey_id = ? OR journey_id = 'poland-christmas-2026'
         ORDER BY created_at DESC
-      `).bind(journeyId).all();
+      `).bind(journeyId, journey.id).all();
 
       const expenses = expensesQuery.results || [];
 
@@ -144,9 +153,9 @@ export async function handleExpenses(context, url, method) {
       // Fetch recorded settlements
       const settlementsQuery = await db.prepare(`
         SELECT * FROM wayfinder_expense_settlements
-        WHERE journey_id = ? OR journey_id = 'poland-christmas-2026'
+        WHERE journey_id = ? OR journey_id = ? OR journey_id = 'poland-christmas-2026'
         ORDER BY settled_date DESC, created_at DESC
-      `).bind(journeyId).all();
+      `).bind(journeyId, journey.id).all();
 
       return json({
         journey_id: journeyId,
@@ -157,7 +166,9 @@ export async function handleExpenses(context, url, method) {
 
     // 2. POST /api/wayfinder/expenses/settle - Record a debt settlement
     if (method === 'POST' && isSettleAction) {
-      if (!user?.userId) return json({ error: 'Authentication required' }, 401);
+      if (access.role && !canEdit(access.role)) {
+        return json({ error: 'Permission denied: viewers have read-only access' }, 403);
+      }
       const body = await context.request.json().catch(() => ({}));
       const {
         from_user_id,
@@ -216,7 +227,9 @@ export async function handleExpenses(context, url, method) {
 
     // 2b. DELETE /api/wayfinder/expenses/settle - Undo / remove a recorded settlement
     if (method === 'DELETE' && isSettleAction) {
-      if (!user?.userId) return json({ error: 'Authentication required' }, 401);
+      if (access.role && !canEdit(access.role)) {
+        return json({ error: 'Permission denied: viewers have read-only access' }, 403);
+      }
       const settleId = url.searchParams.get('settlement_id') || url.searchParams.get('id');
       const splitId = url.searchParams.get('split_id');
 
@@ -244,7 +257,9 @@ export async function handleExpenses(context, url, method) {
 
     // 3. POST /api/wayfinder/expenses/preset - Seed curated trip expenses
     if (method === 'POST' && isPresetAction) {
-      if (!user?.userId) return json({ error: 'Authentication required' }, 401);
+      if (access.role && !canEdit(access.role)) {
+        return json({ error: 'Permission denied: viewers have read-only access' }, 403);
+      }
 
       const presets = [
         {
@@ -392,7 +407,9 @@ export async function handleExpenses(context, url, method) {
 
     // 4. POST /api/wayfinder/expenses - Add new expense
     if (method === 'POST') {
-      if (!user?.userId) return json({ error: 'Authentication required' }, 401);
+      if (access.role && !canEdit(access.role)) {
+        return json({ error: 'Permission denied: viewers have read-only access' }, 403);
+      }
       const body = await context.request.json().catch(() => ({}));
       const {
         description,
@@ -470,7 +487,9 @@ export async function handleExpenses(context, url, method) {
 
     // 4b. PUT /api/wayfinder/expenses/:id - Update an existing expense and its splits
     if (method === 'PUT') {
-      if (!user?.userId) return json({ error: 'Authentication required' }, 401);
+      if (access.role && !canEdit(access.role)) {
+        return json({ error: 'Permission denied: viewers have read-only access' }, 403);
+      }
       const body = await context.request.json().catch(() => ({}));
       const targetExpenseId = expenseId || url.searchParams.get('id') || body.id;
       if (!targetExpenseId) {
@@ -576,7 +595,9 @@ export async function handleExpenses(context, url, method) {
 
     // 5. DELETE /api/wayfinder/expenses/:id - Remove an expense
     if (method === 'DELETE' && expenseId) {
-      if (!user?.userId) return json({ error: 'Authentication required' }, 401);
+      if (access.role && !canEdit(access.role)) {
+        return json({ error: 'Permission denied: viewers have read-only access' }, 403);
+      }
 
       await db.batch([
         db.prepare('DELETE FROM wayfinder_expense_splits WHERE expense_id = ?').bind(expenseId),

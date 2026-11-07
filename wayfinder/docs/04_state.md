@@ -478,3 +478,11 @@ Governs the state invariants, atomic transaction guarantees, and edge lifecycle 
   - Action button containers across attraction (`MustSeeCard`), dining (`CityFoodTab`), and venue (`CityLgbtqTab`) cards must maintain a 2-column responsive grid layout (`grid grid-cols-2 gap-2`).
   - Truncation classes (`truncate`) are prohibited on action button labels (`Website`, `Directions`, `View on Map`, `+ Itinerary` / `Saved`), guaranteeing full text visibility without ellipsis clipping across all card widths.
   - When unauthenticated, the secondary action ("View on Map") spans full width (`col-span-2`) to maintain balanced grid geometry.
+
+
+### 16.10 Shared Agenda Invite & Share State
+
+- Tables (`schema-wayfinder.sql`, also created idempotently at runtime by `ensureShareTables` in `functions/utils/agendaAccess.js`): `wayfinder_agenda_invites` (`id`, `agenda_id`, `invited_email` NOCASE, `role`, `token_hash` UNIQUE, `status` pending|accepted|revoked, `invited_by`, `created_at`, `expires_at`, `accepted_at`, `accepted_by`) and `wayfinder_agenda_shares` (`agenda_id`, `user_id`, `role`, `invite_id`, UNIQUE(`agenda_id`,`user_id`)).
+- Raw invite tokens are never persisted. The client stores a pending token only in `sessionStorage` key `wf_pending_invite` (not an auth token) until claimed.
+- `PrivateHub` state: `agendaRole` (from `GET /agendas/poland-christmas-2026/access`) drives collaborator access across Itinerary, Packing, Expense Ledger, and Documents. Linked collaborator accounts have access to both Documents and Expense Ledger views with role-based mutation guards (viewers have read-only permissions for vouchers and ledger entries). `canShare` (owner/admin) controls collaborator invite modal access.
+- `journeys.js` list/detail also return agendas shared with the caller.

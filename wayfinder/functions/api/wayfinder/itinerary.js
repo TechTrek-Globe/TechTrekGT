@@ -4,6 +4,7 @@
 // DELETE /api/wayfinder/itinerary/:id - soft delete
 
 import { generateId } from '../../utils/id.js';
+import { resolveAgendaAccess, getCollaboratorIds, canEdit } from '../../utils/agendaAccess.js';
 
 export async function handleItinerary(context, url, method) {
   const { env, user, request } = context;
@@ -18,18 +19,28 @@ export async function handleItinerary(context, url, method) {
       const journeyId = url.searchParams.get('journey_id') || url.searchParams.get('journeyId');
       if (!journeyId) return json({ error: 'journey_id required' }, 400);
 
-      // Verify ownership or public visibility
-      const journey = await env.DB.prepare(
-        `SELECT id FROM wayfinder_journeys WHERE (id = ? OR slug = ?) AND (created_by = ? OR visibility = 'public')`
-      ).bind(journeyId, journeyId, user.userId).first();
-      if (!journey) return json({ error: 'Journey not found' }, 404);
+      // Verify ownership, collaborator share, or public visibility
+      const access = await resolveAgendaAccess(env, journeyId, user);
+      const journey = access.journey;
+      if (!journey || (!access.role && journey.visibility !== 'public')) return json({ error: 'Journey not found' }, 404);
 
-      const items = await env.DB.prepare(
-        `SELECT * FROM wayfinder_itinerary_items
-         WHERE (journey_id = ? OR journey_id = ?) AND user_id = ?
-           AND (notes IS NULL OR notes NOT LIKE '%gmail:%')
-         ORDER BY local_date, local_time`
-      ).bind(journeyId, journey.id, user.userId).all();
+      let items;
+      if (access.role) {
+        items = await env.DB.prepare(
+          `SELECT * FROM wayfinder_itinerary_items
+           WHERE (journey_id = ? OR journey_id = ? OR journey_id = 'poland-christmas-2026')
+             AND (notes IS NULL OR notes NOT LIKE '%gmail:%')
+           ORDER BY local_date, local_time`
+        ).bind(journeyId, journey.id).all();
+      } else {
+        items = await env.DB.prepare(
+          `SELECT * FROM wayfinder_itinerary_items
+           WHERE (journey_id = ? OR journey_id = ? OR journey_id = 'poland-christmas-2026')
+             AND visibility = 'public'
+             AND (notes IS NULL OR notes NOT LIKE '%gmail:%')
+           ORDER BY local_date, local_time`
+        ).bind(journeyId, journey.id).all();
+      }
 
       // Strip any fields marked SENSITIVE_BLOCKED from response
       const safeItems = items.results.map(sanitizeItem);
@@ -46,11 +57,11 @@ export async function handleItinerary(context, url, method) {
         return json({ error: 'journey_id, item_type, title required' }, 400);
       }
 
-      // Ownership or public visibility check
-      const journey = await env.DB.prepare(
-        `SELECT id FROM wayfinder_journeys WHERE (id = ? OR slug = ?) AND (created_by = ? OR visibility = 'public')`
-      ).bind(journey_id, journey_id, user.userId).first();
-      if (!journey) return json({ error: 'Journey not found' }, 404);
+      // Ownership, collaborator share (editor+), or public visibility check
+      const access = await resolveAgendaAccess(env, journey_id, user);
+      const journey = access.journey;
+      if (!journey || (!access.role && journey.visibility !== 'public')) return json({ error: 'Journey not found' }, 404);
+      if (access.role && !canEdit(access.role)) return json({ error: 'Viewers cannot modify this agenda' }, 403);
 
       const id = generateId();
       const auditId = generateId();
@@ -77,10 +88,17 @@ export async function handleItinerary(context, url, method) {
     }
 
     if (method === 'DELETE' && itemId) {
-      // Verify ownership
-      const item = await env.DB.prepare(
-        'SELECT * FROM wayfinder_itinerary_items WHERE id = ? AND user_id = ?'
-      ).bind(itemId, user.userId).first();
+      // Verify ownership, or editor+ access on the agenda
+      let item = await env.DB.prepare(
+        'SELECT * FROM wayfinder_itinerary_items WHERE id = ?'
+      ).bind(itemId).first();
+      if (item) {
+        const access = await resolveAgendaAccess(env, item.journey_id, user);
+        const allowed = item.user_id === user.userId
+          ? (!access.role || canEdit(access.role))
+          : canEdit(access.role);
+        if (!allowed) item = null;
+      }
       if (!item) return json({ error: 'Item not found' }, 404);
 
       const auditId = generateId();

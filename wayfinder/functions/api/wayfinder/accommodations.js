@@ -17,6 +17,8 @@ const accommodationByJourney = {
   ]
 };
 
+import { resolveAgendaAccess, getCollaboratorIds } from '../../utils/agendaAccess.js';
+
 export async function handleAccommodations(context, url, method) {
   const { env, user } = context;
   if (!user?.userId) return json({ error: 'Unauthorized' }, 401);
@@ -32,16 +34,21 @@ export async function handleAccommodations(context, url, method) {
   }
 
   try {
+    const access = await resolveAgendaAccess(env, journeyId, user);
+    const journey = access.journey;
+    if (!journey || (!access.role && journey.visibility !== 'public')) {
+      return json({ accommodations: staticList });
+    }
+
     const items = await env.DB.prepare(
       `SELECT i.*, d.original_filename, d.safe_display_name, d.mime_type
        FROM wayfinder_itinerary_items i
        LEFT JOIN wayfinder_documents d ON i.source_document_id = d.id
-       WHERE (i.journey_id = ? OR i.journey_id = 'poland-christmas-2026')
-         AND i.user_id = ?
+       WHERE (i.journey_id = ? OR i.journey_id = ? OR i.journey_id = 'poland-christmas-2026')
          AND i.item_type IN ('hotel', 'accommodation', 'lodging')
          AND (i.notes IS NULL OR i.notes NOT LIKE '%gmail:%')
        ORDER BY i.local_date ASC`
-    ).bind(journeyId, user.userId).all();
+    ).bind(journeyId, journey.id).all();
 
     if (!items?.results || items.results.length === 0) {
       return json({ accommodations: staticList });

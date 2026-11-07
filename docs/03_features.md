@@ -146,3 +146,8 @@ The platform replaces monolithic legacy documentation with a 4-tier standardized
 - Mandatory Post-Flight Synchronization: Agents must update local docs/03_features.md and docs/04_state.md upon completing modifications.
 - Forbidden Legacy File Directive: Searching, reading, or creating ARCHITECTURE.md is strictly forbidden. All architectural context lives in the 01-04 files.
 - Historical Quarantining: Historical incident reports reside in docs/archive/incidents/ with [RESOLVED] prefixes, and legacy implementation plans reside in docs/archive/ with [ARCHIVED] prefixes.
+
+
+## 6. Shared Agenda Collaboration (Wayfinder)
+
+Wayfinder agendas can be shared by email invite with `viewer`/`editor`/`admin` roles (see wayfinder/docs/03_features.md section 30). `/api/auth/register` accepts an optional `inviteToken`.

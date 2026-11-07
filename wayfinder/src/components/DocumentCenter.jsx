@@ -157,7 +157,8 @@ function simulateExtraction(file) {
   };
 }
 
-export function DocumentCenter() {
+export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole = null }) {
+  const isViewer = agendaRole === 'viewer';
   const { 
     itinerary = [],
     documents, 
@@ -566,8 +567,15 @@ export function DocumentCenter() {
 
   return (
     <div className="space-y-8">
+      {isViewer && (
+        <div className="p-3.5 rounded-2xl bg-sky-500/10 border border-sky-500/25 text-sky-300 text-xs flex items-center space-x-2.5 shadow-sm">
+          <ShieldCheck className="w-4 h-4 shrink-0 text-sky-400" />
+          <span>Viewing shared expedition documents, vouchers, and booking confirmations (read-only collaborator access).</span>
+        </div>
+      )}
+
       {/* Automated Booking Importer (Trip Forwarding Inbox) */}
-      <BookingImportChannels />
+      {!isViewer && <BookingImportChannels />}
 
       {/* Synced Bookings & Itinerary Items Section */}
       {importedItems.length > 0 && (
@@ -687,23 +695,25 @@ export function DocumentCenter() {
           )}
         </div>
         
-        <div className="shrink-0 relative">
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            onChange={handleFileChange} 
-            className="hidden" 
-            accept="application/pdf,image/*" 
-          />
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isUploading}
-            className="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-white font-medium flex items-center space-x-2 shadow-lg transition-all disabled:opacity-50 hover-lift cursor-pointer"
-          >
-            {isUploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <UploadCloud className="w-5 h-5" />}
-            <span>{isUploading ? 'Extracting Booking...' : 'Upload Booking Document'}</span>
-          </button>
-        </div>
+        {!isViewer && (
+          <div className="shrink-0 relative">
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              onChange={handleFileChange} 
+              className="hidden" 
+              accept="application/pdf,image/*" 
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading}
+              className="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-white font-medium flex items-center space-x-2 shadow-lg transition-all disabled:opacity-50 hover-lift cursor-pointer"
+            >
+              {isUploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <UploadCloud className="w-5 h-5" />}
+              <span>{isUploading ? 'Extracting Booking...' : 'Upload Booking Document'}</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Review & Approve Modal */}
@@ -801,22 +811,26 @@ export function DocumentCenter() {
                   <Eye className="w-3.5 h-3.5" />
                   <span>Review Extracted Fields</span>
                 </button>
-                <button 
-                  onClick={() => handleOpenRename(selectedDoc)}
-                  className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-medium rounded-lg transition-colors flex items-center space-x-1.5 cursor-pointer"
-                  title="Rename document title"
-                >
-                  <Edit2 className="w-3.5 h-3.5" />
-                  <span>Rename</span>
-                </button>
-                <button 
-                  onClick={() => setDocToDelete(selectedDoc)}
-                  className="px-3 py-1.5 bg-red-500/15 hover:bg-red-500/25 text-red-400 border border-red-500/30 text-xs font-medium rounded-lg transition-colors flex items-center space-x-1.5 cursor-pointer"
-                  title="Delete this document and purge linked bookings"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>Delete</span>
-                </button>
+                {!isViewer && (
+                  <>
+                    <button 
+                      onClick={() => handleOpenRename(selectedDoc)}
+                      className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-medium rounded-lg transition-colors flex items-center space-x-1.5 cursor-pointer"
+                      title="Rename document title"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                      <span>Rename</span>
+                    </button>
+                    <button 
+                      onClick={() => setDocToDelete(selectedDoc)}
+                      className="px-3 py-1.5 bg-red-500/15 hover:bg-red-500/25 text-red-400 border border-red-500/30 text-xs font-medium rounded-lg transition-colors flex items-center space-x-1.5 cursor-pointer"
+                      title="Delete this document and purge linked bookings"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Delete</span>
+                    </button>
+                  </>
+                )}
                 <div className="w-px h-5 bg-white/10" />
                 <button onClick={closeViewer} className="text-wf-muted hover:text-white font-medium text-sm transition-colors cursor-pointer">
                   Close
@@ -1335,28 +1349,32 @@ export function DocumentCenter() {
                         Reparse
                       </button>
                     )}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleOpenRename(doc);
-                      }}
-                      className="p-1 rounded-lg text-slate-400 hover:text-amber-300 hover:bg-amber-500/10 transition-colors cursor-pointer"
-                      title="Rename document title"
-                    >
-                      <Edit2 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setDocToDelete(doc);
-                      }}
-                      className="p-1 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
-                      title="Delete document and purge linked bookings"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    {!isViewer && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenRename(doc);
+                          }}
+                          className="p-1 rounded-lg text-slate-400 hover:text-amber-300 hover:bg-amber-500/10 transition-colors cursor-pointer"
+                          title="Rename document title"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDocToDelete(doc);
+                          }}
+                          className="p-1 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
+                          title="Delete document and purge linked bookings"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>

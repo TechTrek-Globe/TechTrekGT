@@ -25,6 +25,7 @@ import { handleCalendarExport, handleCalendarFeed, handleCalendarToken } from '.
 import { handleExpenses }      from '../functions/api/wayfinder/expenses.js';
 import { handleInboundEmail }  from '../functions/api/wayfinder/email-worker.js';
 import { handleAdmin }         from '../functions/api/wayfinder/admin.js';
+import { handleAgendaShares } from '../functions/api/wayfinder/agenda-shares.js';
 
 const ALLOWED_ORIGINS = [
   'https://techtrekgt.com',
@@ -134,6 +135,9 @@ export default {
       if (apiPath === '/api/wayfinder/weather' && method === 'GET') {
         return handleWeather({ request, env, ctx }, url, method);
       }
+      if (apiPath === '/api/wayfinder/invites/verify' && method === 'GET') {
+        return handleAgendaShares({ request, env, ctx, user: null }, url, method);
+      }
       if (apiPath.startsWith('/api/wayfinder/calendar/feed/') && method === 'GET') {
         return handleCalendarFeed({ request, env, ctx }, url, method);
       }
@@ -154,6 +158,7 @@ export default {
 
       const context = { request, env, ctx, user: auth.payload };
 
+      if (apiPath.startsWith('/api/wayfinder/agendas') || apiPath.startsWith('/api/wayfinder/invites')) return handleAgendaShares(context, url, method);
       if (apiPath.startsWith('/api/wayfinder/journeys'))    return handleJourneys(context, url, method);
       if (apiPath.startsWith('/api/wayfinder/itinerary'))   return handleItinerary(context, url, method);
       if (apiPath.startsWith('/api/wayfinder/accommodations')) return handleAccommodations(context, url, method);

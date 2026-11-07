@@ -575,3 +575,14 @@ Eliminates excessive vertical tile height and resolves button label truncation a
   - Reduced attractions grid gap from `gap-6` to `gap-4 sm:gap-5` and section spacing to `space-y-4 sm:space-y-5`.
   - Compacted the Walking Loop Optimizer panel padding to `p-4 sm:p-5` with `p-2.5 sm:p-3` metric cards, preserving valuable vertical screen real estate.
 
+
+
+## 30. Shared Agenda Collaboration & Email Invitations
+
+- Roles: `owner` (journey `created_by` or agenda creator), `admin`, `editor`, `viewer`. Platform admins resolve to `admin`. Only the owner can grant or modify `admin`.
+- Access boundaries: Collaborators share full access across Itinerary, Accommodations, Packing, Documents, and Expense Ledger. Collaborators on the journey can view all journey documents, vouchers, synced bookings, and trip expense ledgers. Viewers (`role: viewer`) operate in read-only mode with mutations gated (403 on adding/editing/deleting expenses, settlements, document uploads, and document deletions). The Private Hub surfaces role badges and renders full Document Center and Expense Ledger views with contextual read-only indicators for viewers.
+- API (`functions/api/wayfinder/agenda-shares.js`): `POST/GET /api/wayfinder/agendas/:id/invites`, `DELETE .../invites/:inviteId` (revoke), `PUT/DELETE .../shares/:userId`, `GET .../access` (caller role), public `GET /api/wayfinder/invites/verify?token=`, session `POST /api/wayfinder/invites/claim`.
+- Invite creation: 32 random bytes via `crypto.getRandomValues` (base64url), SHA-256 stored as `token_hash`, 7-day expiry, prior pending invites for the same email are revoked. Response returns the raw token and `inviteLink` once for the Copy Link fallback; `SEND_EMAIL` dispatch (`functions/utils/inviteEmail.js`) sends from the canonical platform address `no-reply@techtrekgt.com` (configured via `env.MAIL_FROM`, aligned with Outpost) using the structured Workers Email Sending API with fallback to raw `EmailMessage`, reporting `emailSent` and `emailError`.
+- Claim: requires session email to match `invited_email`; `env.DB.batch` atomically marks the invite accepted, upserts `wayfinder_agenda_shares` (keeps the higher role) and writes an audit event; 409 if the invite was consumed concurrently.
+- Client: `/wayfinder/invite` renders `InviteClaim.jsx` (Case A accept card, Case B inline sign-in then auto-claim, Case C registration with locked email via `inviteToken` then auto-claim; email mismatch offers account switch). `ShareAgendaModal.jsx` (Share button in Private Hub for owner/admin) handles invite, copy link, revoke, role change and removal.
+- Register: `/api/auth/register` accepts optional `inviteToken`; a matching pending invite marks `users.email_verified = 1`.

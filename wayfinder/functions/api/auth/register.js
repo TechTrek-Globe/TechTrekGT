@@ -1,5 +1,6 @@
 import { hashPassword, createToken } from '../../utils/auth.js';
 import { checkRateLimit } from '../../utils/rateLimit.js';
+import { sha256Hex } from '../../utils/agendaAccess.js';
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -79,26 +80,35 @@ export async function onRequestPost(context) {
     }
 
     const userId = `usr-${crypto.randomUUID()}`;
-    const householdId = `hh-${crypto.randomUUID()}`;
     const passwordHash = await hashPassword(password);
     const cleanSecurityQuestion = securityQuestion.trim();
     const cleanSecurityAnswer = securityAnswer.trim().toLowerCase();
     const securityAnswerHash = await hashPassword(cleanSecurityAnswer);
 
-    const memberId = `hm-${crypto.randomUUID()}`;
+    // Invite-link registration: receiving the link proves control of the invited inbox
+    let emailVerified = 0;
+    let emailVerifiedAt = null;
+    if (body.inviteToken && typeof body.inviteToken === 'string') {
+      try {
+        const inviteHash = await sha256Hex(body.inviteToken);
+        const inv = await env.DB.prepare(
+          `SELECT id FROM wayfinder_agenda_invites
+           WHERE token_hash = ? AND invited_email = ? AND status = 'pending' AND expires_at > datetime('now')`
+        ).bind(inviteHash, cleanEmail).first();
+        if (inv) {
+          emailVerified = 1;
+          emailVerifiedAt = new Date().toISOString();
+        }
+      } catch (e) {
+        console.warn('[register] invite verification check skipped:', e?.message);
+      }
+    }
 
-    // Batch insert User, Household, and Household Member
-    await env.DB.batch([
-      env.DB.prepare(
-        'INSERT INTO users (id, email, password_hash, name, security_question, security_answer_hash) VALUES (?, ?, ?, ?, ?, ?)'
-      ).bind(userId, cleanEmail, passwordHash, name.trim(), cleanSecurityQuestion, securityAnswerHash),
-      env.DB.prepare(
-        'INSERT INTO households (id, name) VALUES (?, ?)'
-      ).bind(householdId, `${name.trim()}'s Household`),
-      env.DB.prepare(
-        'INSERT INTO household_members (id, household_id, user_id, role) VALUES (?, ?, ?, ?)'
-      ).bind(memberId, householdId, userId, 'owner')
-    ]);
+    // Insert user into shared users table (households table is deprecated across platform)
+    await env.DB.prepare(
+      `INSERT INTO users (id, email, password_hash, name, security_question, security_answer_hash, role, token_version, status, email_verified, email_verified_at)
+       VALUES (?, ?, ?, ?, ?, ?, 'user', 0, 'Active', ?, ?)`
+    ).bind(userId, cleanEmail, passwordHash, name.trim(), cleanSecurityQuestion, securityAnswerHash, emailVerified, emailVerifiedAt).run();
 
     if (!env.JWT_SECRET) {
       return new Response(JSON.stringify({ error: 'Server misconfiguration: missing JWT_SECRET' }), {
@@ -111,7 +121,7 @@ export async function onRequestPost(context) {
 
     // Create JWT token
     const token = await createToken(
-      { userId, email: cleanEmail, householdId, name: name.trim() },
+      { userId, email: cleanEmail, householdId: null, name: name.trim(), role: 'user', isAdmin: false, apiKeyEnabled: false },
       env.JWT_SECRET,
       maxAge
     );
@@ -127,8 +137,15 @@ export async function onRequestPost(context) {
 
     return new Response(JSON.stringify({
       success: true,
-      user: { id: userId, email: cleanEmail, name: name.trim() },
-      householdId
+      user: {
+        id: userId,
+        email: cleanEmail,
+        name: name.trim(),
+        role: 'user',
+        isAdmin: false,
+        apiKeyEnabled: false
+      },
+      householdId: null
     }), {
       status: 201,
       headers: { 

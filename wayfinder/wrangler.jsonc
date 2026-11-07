@@ -1,7 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "techtrek-wayfinder",
-  "account_id": "a04afaa8d8698ca8c0cd4dc7deaa753e",
   "main": "src/worker.js",
   "compatibility_date": "2026-08-01",
   "observability": {
@@ -46,7 +45,10 @@
     {
       "name": "SEND_EMAIL"
     }
-  ]
+  ],
+  "vars": {
+    "MAIL_FROM": "no-reply@techtrekgt.com"
+  }
   // R2 bucket (required for document storage - not yet configured):
   // "r2_buckets": [
   //   {

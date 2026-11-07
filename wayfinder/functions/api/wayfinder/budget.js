@@ -1,26 +1,28 @@
 // GET /api/wayfinder/budget?journey_id=
 // Returns aggregate expense data for the authenticated user's journey
 
+import { resolveAgendaAccess } from '../../utils/agendaAccess.js';
+
 export async function handleBudget(context, url, method) {
   const { env, user } = context;
-  const journeyId = url.searchParams.get('journey_id') || url.searchParams.get('journeyId');
+  const journeyId = url.searchParams.get('journey_id') || url.searchParams.get('journeyId') || 'poland-christmas-2026';
 
   try {
     if (!env.DB) return json({ error: 'Database not available' }, 503);
-    if (!journeyId) return json({ error: 'journey_id required' }, 400);
+    if (!user?.userId) return json({ error: 'Authentication required' }, 401);
 
-    // Ownership check
-    const journey = await env.DB.prepare(
-      `SELECT id FROM wayfinder_journeys WHERE (id = ? OR slug = ?) AND (created_by = ? OR visibility = 'public')`
-    ).bind(journeyId, journeyId, user.userId).first();
-    if (!journey) return json({ error: 'Journey not found' }, 404);
+    // Verify access (owner, collaborator share, or public visibility)
+    const access = await resolveAgendaAccess(env, journeyId, user);
+    const journey = access.journey;
+    if (!journey || (!access.role && journey.visibility !== 'public')) {
+      return json({ error: 'Journey not found or permission denied' }, 404);
+    }
 
     const expenses = await env.DB.prepare(
       `SELECT * FROM wayfinder_expenses
-       WHERE (journey_id = ? OR journey_id = ?)
-         AND (user_id = ? OR paid_by_user_id = ? OR id IN (SELECT expense_id FROM wayfinder_expense_splits WHERE user_id = ?))
+       WHERE (journey_id = ? OR journey_id = ? OR journey_id = 'poland-christmas-2026')
        ORDER BY category, created_at`
-    ).bind(journey.id, journeyId, user.userId, user.userId, user.userId).all();
+    ).bind(journey.id, journeyId).all();
 
     // Aggregate by category
     const byCategory = {};

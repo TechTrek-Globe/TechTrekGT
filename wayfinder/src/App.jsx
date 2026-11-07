@@ -7,6 +7,7 @@ const CityPage = React.lazy(() => import('./components/CityPage').then(m => ({ d
 const PracticalPage = React.lazy(() => import('./components/PracticalPage').then(m => ({ default: m.PracticalPage })));
 const PrivateHub = React.lazy(() => import('./components/PrivateHub').then(m => ({ default: m.PrivateHub })));
 const AdminView = React.lazy(() => import('./components/admin/AdminView').then(m => ({ default: m.AdminView })));
+const InviteClaim = React.lazy(() => import('./components/InviteClaim').then(m => ({ default: m.InviteClaim })));
 
 // Simple client-side router
 function App() {
@@ -38,6 +39,11 @@ function App() {
     // Root - go straight to Poland landing (single active journey)
     if (normalizedPath === '/wayfinder' || normalizedPath === '/wayfinder/') {
       return <PolandLanding />;
+    }
+
+    // Shared agenda invitation claim
+    if (normalizedPath === '/wayfinder/invite' || normalizedPath === '/wayfinder/invite/') {
+      return <InviteClaim />;
     }
 
     // Destinations gallery (future use when multiple journeys exist)

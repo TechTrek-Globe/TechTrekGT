@@ -1,5 +1,8 @@
 // WebCrypto Authentication & JWT helper utilities for Cloudflare Workers / D1
 
+// Cloudflare Workers WebCrypto rejects PBKDF2 iteration counts above 100000.
+const PBKDF2_ITERATIONS = 100000;
+
 // Generate PBKDF2 Password Hash
 export async function hashPassword(password) {
   const enc = new TextEncoder();
@@ -16,7 +19,7 @@ export async function hashPassword(password) {
     {
       name: 'PBKDF2',
       salt: salt,
-      iterations: 310000,
+      iterations: PBKDF2_ITERATIONS,
       hash: 'SHA-256'
     },
     keyMaterial,
@@ -26,7 +29,7 @@ export async function hashPassword(password) {
   const hashHex = Array.from(new Uint8Array(derivedBits)).map(b => b.toString(16).padStart(2, '0')).join('');
   const saltHex = Array.from(salt).map(b => b.toString(16).padStart(2, '0')).join('');
   
-  return `${saltHex}:310000:${hashHex}`;
+  return `${saltHex}:${PBKDF2_ITERATIONS}:${hashHex}`;
 }
 
 // Verify PBKDF2 Password Hash (HIGH-6 / MED-16)
@@ -59,25 +62,30 @@ export async function verifyPassword(password, storedHash) {
     ['deriveBits']
   );
   
-  const derivedBits = await crypto.subtle.deriveBits(
-    {
-      name: 'PBKDF2',
-      salt: salt,
-      iterations: iterations,
-      hash: 'SHA-256'
-    },
-    keyMaterial,
-    256
-  );
+  try {
+    const derivedBits = await crypto.subtle.deriveBits(
+      {
+        name: 'PBKDF2',
+        salt: salt,
+        iterations: Math.min(iterations, 100000),
+        hash: 'SHA-256'
+      },
+      keyMaterial,
+      256
+    );
 
-  const hashHex = Array.from(new Uint8Array(derivedBits)).map(b => b.toString(16).padStart(2, '0')).join('');
-  
-  if (hashHex.length !== originalHashHex.length) return false;
-  let diff = 0;
-  for (let i = 0; i < hashHex.length; i++) {
-    diff |= hashHex.charCodeAt(i) ^ originalHashHex.charCodeAt(i);
+    const hashHex = Array.from(new Uint8Array(derivedBits)).map(b => b.toString(16).padStart(2, '0')).join('');
+    
+    if (hashHex.length !== originalHashHex.length) return false;
+    let diff = 0;
+    for (let i = 0; i < hashHex.length; i++) {
+      diff |= hashHex.charCodeAt(i) ^ originalHashHex.charCodeAt(i);
+    }
+    return diff === 0;
+  } catch (err) {
+    console.warn('[auth] PBKDF2 verify failed:', err?.message);
+    return false;
   }
-  return diff === 0;
 }
 
 // Helper: Base64URL encoding/decoding

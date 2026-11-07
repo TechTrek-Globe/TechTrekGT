@@ -177,3 +177,8 @@ The shared Cloudflare D1 database `personal-budget-db` has been extended with th
 - `wayfinder_expense_splits`: stores fractional group cost allocations and participant liabilities tied to `wayfinder_expenses`.
 - `wayfinder_expense_settlements`: logs settle-up debt reimbursement payments between group members across multiple currencies.
 
+
+
+## 7. Wayfinder Shared Agenda Tables (personal-budget-db)
+
+New shared-D1 tables owned by Wayfinder: `wayfinder_agenda_invites` (SHA-256 `token_hash` only) and `wayfinder_agenda_shares`. Details in wayfinder/docs/04_state.md section 16.10.

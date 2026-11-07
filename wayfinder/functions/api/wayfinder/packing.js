@@ -177,6 +177,8 @@ function safeItem(row) {
   };
 }
 
+import { resolveAgendaAccess, getCollaboratorIds, canEdit } from '../../utils/agendaAccess.js';
+
 export async function handlePacking(context, url, method) {
   const { env, user, request } = context;
   const parts = url.pathname.split('/').filter(Boolean);
@@ -189,13 +191,21 @@ export async function handlePacking(context, url, method) {
 
     const journeyId = url.searchParams.get('journey_id') || url.searchParams.get('journeyId') || 'poland-christmas-2026';
 
+    // Collaborator scope: owner + accepted collaborators see each other's packing items
+    const access = await resolveAgendaAccess(env, journeyId, user);
+    const scopeIds = access.role ? await getCollaboratorIds(env, access.journey) : [];
+    const scopeSql = scopeIds.length ? ` OR user_id IN (${scopeIds.map(() => '?').join(',')})` : '';
+    if (access.role && method !== 'GET' && !canEdit(access.role)) {
+      return json({ error: 'Viewers cannot modify the packing list' }, 403);
+    }
+
     // --- GET /api/wayfinder/packing ---
     if (method === 'GET') {
       const rows = await env.DB.prepare(
         `SELECT * FROM wayfinder_packing_items 
-         WHERE journey_id = ? AND (user_id = ? OR is_shared = 1)
+         WHERE journey_id = ? AND (user_id = ? OR is_shared = 1${scopeSql})
          ORDER BY sort_order ASC, category ASC, created_at ASC`
-      ).bind(journeyId, user.userId).all();
+      ).bind(journeyId, user.userId, ...scopeIds).all();
 
       const items = (rows.results || []).map(safeItem);
       const stats = computeStats(items);
@@ -246,9 +256,9 @@ export async function handlePacking(context, url, method) {
 
         const freshRows = await env.DB.prepare(
           `SELECT * FROM wayfinder_packing_items 
-           WHERE journey_id = ? AND (user_id = ? OR is_shared = 1)
+           WHERE journey_id = ? AND (user_id = ? OR is_shared = 1${scopeSql})
            ORDER BY sort_order ASC, category ASC, created_at ASC`
-        ).bind(journeyId, user.userId).all();
+        ).bind(journeyId, user.userId, ...scopeIds).all();
 
         const items = (freshRows.results || []).map(safeItem);
         return json({
@@ -267,9 +277,9 @@ export async function handlePacking(context, url, method) {
 
         const freshRows = await env.DB.prepare(
           `SELECT * FROM wayfinder_packing_items 
-           WHERE journey_id = ? AND (user_id = ? OR is_shared = 1)
+           WHERE journey_id = ? AND (user_id = ? OR is_shared = 1${scopeSql})
            ORDER BY sort_order ASC, category ASC, created_at ASC`
-        ).bind(journeyId, user.userId).all();
+        ).bind(journeyId, user.userId, ...scopeIds).all();
 
         const items = (freshRows.results || []).map(safeItem);
         return json({ success: true, items, stats: computeStats(items) });
@@ -294,9 +304,9 @@ export async function handlePacking(context, url, method) {
 
         const freshRows = await env.DB.prepare(
           `SELECT * FROM wayfinder_packing_items 
-           WHERE journey_id = ? AND (user_id = ? OR is_shared = 1)
+           WHERE journey_id = ? AND (user_id = ? OR is_shared = 1${scopeSql})
            ORDER BY sort_order ASC, category ASC, created_at ASC`
-        ).bind(journeyId, user.userId).all();
+        ).bind(journeyId, user.userId, ...scopeIds).all();
 
         const items = (freshRows.results || []).map(safeItem);
         return json({ success: true, items, stats: computeStats(items) });
@@ -331,8 +341,8 @@ export async function handlePacking(context, url, method) {
       const body = await request.json().catch(() => ({}));
 
       const existing = await env.DB.prepare(
-        'SELECT * FROM wayfinder_packing_items WHERE id = ? AND (user_id = ? OR is_shared = 1)'
-      ).bind(pathId, user.userId).first();
+        `SELECT * FROM wayfinder_packing_items WHERE id = ? AND (user_id = ? OR is_shared = 1${scopeSql})`
+      ).bind(pathId, user.userId, ...scopeIds).first();
 
       if (!existing) return json({ error: 'Item not found or permission denied' }, 404);
 
@@ -363,8 +373,8 @@ export async function handlePacking(context, url, method) {
       if (!pathId) return json({ error: 'Item ID required' }, 400);
 
       const existing = await env.DB.prepare(
-        'SELECT * FROM wayfinder_packing_items WHERE id = ? AND (user_id = ? OR is_shared = 1)'
-      ).bind(pathId, user.userId).first();
+        `SELECT * FROM wayfinder_packing_items WHERE id = ? AND (user_id = ? OR is_shared = 1${scopeSql})`
+      ).bind(pathId, user.userId, ...scopeIds).first();
 
       if (!existing) return json({ error: 'Item not found or permission denied' }, 404);
 

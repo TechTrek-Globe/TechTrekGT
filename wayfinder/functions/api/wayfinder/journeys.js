@@ -1,8 +1,11 @@
 // GET /api/wayfinder/journeys - list user's accessible journeys
 // GET /api/wayfinder/journeys/:slug - get single journey with destinations
 
+import { ensureShareTables } from '../../utils/agendaAccess.js';
+
 export async function handleJourneys(context, url, method) {
   const { env, user } = context;
+  try { await ensureShareTables(env.DB); } catch (e) { /* DB unavailable handled below */ }
   const parts = url.pathname.split('/').filter(Boolean);
   const journeyIdx = parts.indexOf('journeys');
   const slug = journeyIdx !== -1 ? (parts[journeyIdx + 1] || null) : null;
@@ -16,8 +19,9 @@ export async function handleJourneys(context, url, method) {
       if (slug) {
         // Single journey by slug - user must own it OR it must be public
         const journey = await env.DB.prepare(
-          `SELECT * FROM wayfinder_journeys WHERE slug = ? AND (created_by = ? OR visibility = 'public')`
-        ).bind(slug, user.userId).first();
+          `SELECT * FROM wayfinder_journeys WHERE slug = ? AND (created_by = ? OR visibility = 'public'
+             OR id IN (SELECT agenda_id FROM wayfinder_agenda_shares WHERE user_id = ?))`
+        ).bind(slug, user.userId, user.userId).first();
 
         if (!journey) return json({ error: 'Journey not found' }, 404);
 
@@ -30,8 +34,9 @@ export async function handleJourneys(context, url, method) {
 
       // List all journeys accessible to this user
       const journeys = await env.DB.prepare(
-        `SELECT * FROM wayfinder_journeys WHERE created_by = ? OR visibility = 'public' ORDER BY created_at DESC`
-      ).bind(user.userId).all();
+        `SELECT * FROM wayfinder_journeys WHERE created_by = ? OR visibility = 'public'
+           OR id IN (SELECT agenda_id FROM wayfinder_agenda_shares WHERE user_id = ?) ORDER BY created_at DESC`
+      ).bind(user.userId, user.userId).all();
 
       return json({ journeys: journeys.results });
     }

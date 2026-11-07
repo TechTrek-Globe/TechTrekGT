@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   DollarSign, Receipt, Plus, ArrowRight, CheckCircle2, Trash2, Edit2,
   RefreshCw, Users, CreditCard, Sparkles, Plane, Building, Train, 
-  Utensils, ShoppingBag, ShoppingCart, Globe, AlertCircle, ArrowUpRight, ArrowDownLeft, RotateCcw
+  Utensils, ShoppingBag, ShoppingCart, Globe, AlertCircle, ArrowUpRight, ArrowDownLeft, RotateCcw, ShieldCheck
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../context/SettingsContext';
@@ -70,9 +70,10 @@ const SETTLE_METHOD_MAP = {
   transfer: 'Bank Transfer'
 };
 
-export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
+export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole = null }) {
   const { user, isAuthenticated, setIsAuthModalOpen } = useAuth();
   const { settings, openSettings } = useSettings();
+  const isViewer = agendaRole === 'viewer';
   const [expenses, setExpenses] = useState([]);
   const [settlements, setSettlements] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -469,6 +470,13 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
 
   return (
     <div className="space-y-8 animate-fade-in">
+      {isViewer && (
+        <div className="p-3.5 rounded-2xl bg-sky-500/10 border border-sky-500/25 text-sky-300 text-xs flex items-center space-x-2.5 shadow-sm">
+          <ShieldCheck className="w-4 h-4 shrink-0 text-sky-400" />
+          <span>Viewing shared expedition ledger with real-time currency conversion and 50/50 balance splits (read-only collaborator access).</span>
+        </div>
+      )}
+
       {/* Top Controls & Currency Switcher */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl glass-panel border border-amber-500/20 bg-slate-900/80">
         <div>
@@ -494,14 +502,16 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
             <span className="text-amber-400/80 group-hover:text-amber-300 underline text-[11px] font-normal ml-0.5">(change in Settings)</span>
           </button>
 
-          <button
-            type="button"
-            onClick={handleOpenAddModal}
-            className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs flex items-center space-x-1.5 transition-all shadow-md cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add Expense</span>
-          </button>
+          {!isViewer && (
+            <button
+              type="button"
+              onClick={handleOpenAddModal}
+              className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs flex items-center space-x-1.5 transition-all shadow-md cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Expense</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -602,17 +612,19 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveTransferToSettle(tx);
-                    setIsSettleModalOpen(true);
-                  }}
-                  className="px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/40 text-emerald-300 font-bold text-xs flex items-center space-x-1 transition-all cursor-pointer"
-                >
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>Settle Total Balance</span>
-                </button>
+                {!isViewer && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTransferToSettle(tx);
+                      setIsSettleModalOpen(true);
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/40 text-emerald-300 font-bold text-xs flex items-center space-x-1 transition-all cursor-pointer"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Settle Total Balance</span>
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -822,25 +834,27 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
                     )}
                   </div>
 
-                  <div className="flex items-center space-x-1 sm:space-x-1.5">
-                    <button
-                      type="button"
-                      onClick={() => handleOpenEditModal(exp)}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-amber-500/10 transition-colors cursor-pointer"
-                      title="Edit expense details and who paid"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
+                  {!isViewer && (
+                    <div className="flex items-center space-x-1 sm:space-x-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEditModal(exp)}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-amber-500/10 transition-colors cursor-pointer"
+                        title="Edit expense details and who paid"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
 
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteExpense(exp.id)}
-                      className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
-                      title="Delete expense"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteExpense(exp.id)}
+                        className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
+                        title="Delete expense"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -872,15 +886,17 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026' }) {
                   <div className="font-mono font-bold text-white">
                     {formatCurrency(s.amount, s.currency)}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleUndoSettlement(s.id)}
-                    className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors flex items-center space-x-1 cursor-pointer"
-                    title="Undo this settlement payment"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    <span className="text-[10px] hidden sm:inline">Undo</span>
-                  </button>
+                  {!isViewer && (
+                    <button
+                      type="button"
+                      onClick={() => handleUndoSettlement(s.id)}
+                      className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors flex items-center space-x-1 cursor-pointer"
+                      title="Undo this settlement payment"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span className="text-[10px] hidden sm:inline">Undo</span>
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

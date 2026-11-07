@@ -307,7 +307,15 @@ Refactored the pricing and cost breakdown telemetry hover experience within the 
 3. **Adaptive Tooltip Viewport Positioning (`InventoryPricingTooltip.jsx`)**:
    - Updated coordinate placement to distinguish left-side triggers from right-side triggers: when triggered from the left side (`rect.left < 400`), anchors the popover cleanly to the right of the icon (`rect.right + 10`) rather than overflowing left offscreen or covering the actions column.
    - Automatically maintains `translateY(-100%)` flip when approaching the bottom of the browser viewport.
-4. **Synchronized Sticky Column Geometry (`InventoryDataGrid.jsx` & `userSettings.js`)**:
+4. **Unified Pricing Engine & Mathematical Formulas (`src/utils/pricingMetrics.js` & `InventoryPricingTooltip.jsx`)**:
+   - Centralized pricing breakdown and floor cost calculations into pure JavaScript module `pricingMetrics.js` (`getItemFloorMetrics`).
+   - True Net Profit: `listPrice - platformFees - adFees - landedCost`.
+   - Margin %: `(True Net Profit / listPrice) * 100`.
+   - ROI %: `(True Net Profit / landedCost) * 100`.
+   - Break-even Floor Price (0% profit): `(landedCost + platformFlatFee + (buyerShipping * platformFeePct)) / (1 - platformFeePct - adFeePct)`.
+   - Min Target Margin Floor: `(landedCost + platformFlatFee + (buyerShipping * platformFeePct)) / (1 - platformFeePct - adFeePct - targetMarginPct)`.
+   - Fully accounts for buyer-paid shipping platform fee burden (`buyerShipping * platformFeePct`) in floor numerators and enforces `round2` monetary precision across all figures.
+5. **Synchronized Sticky Column Geometry (`InventoryDataGrid.jsx` & `userSettings.js`)**:
    - Expanded default and minimum width for the sticky `actions` column from 140px to 195px (`Math.max(195, columnWidths.actions || 195)`).
    - Enforces identical sticky offsets between the table header and body rows, guaranteeing that all 7 operational action buttons remain visible and aligned without horizontal clipping or scroll drift.
 

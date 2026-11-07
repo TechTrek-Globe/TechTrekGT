@@ -152,6 +152,16 @@ Outpost uses React Context and standard React hooks (`useState`, `useReducer`, `
     - Sticky `ACTIONS` column toolbar hosts dedicated `CircleDollarSign` button (`pricing_details` tooltip type) with amber border and styling.
     - `InventoryPricingTooltip` detects left-side viewport triggers (`rect.left < 400`) and anchors the floating card to the right (`rect.right + 10`), avoiding actions occlusion.
     - Synchronized column minWidth and defaultWidth for `actions` set to 195px (`Math.max(195, columnWidths.actions || 195)`) across header and row cells.
+  - **Pricing Breakdown & Floor Metrics Mathematical State [ACTION ID: PRICING-001 / TOOLTIP-002]**:
+    - Isolated calculation engine in `src/utils/pricingMetrics.js` (`getItemFloorMetrics`), consumed directly by `InventoryPricingTooltip.jsx`.
+    - Evaluates exact mathematical formulas:
+      1. True Net Profit: `listPrice - platformFees - adFees - landedCost`
+      2. Margin %: `(True Net Profit / listPrice) * 100`
+      3. ROI %: `(True Net Profit / landedCost) * 100`
+      4. Break-even Floor Price (0% profit): `(landedCost + platformFlatFee + (buyerShipping * platformFeePct)) / (1 - platformFeePct - adFeePct)`
+      5. Min Target Margin Floor: `(landedCost + platformFlatFee + (buyerShipping * platformFeePct)) / (1 - platformFeePct - adFeePct - targetMarginPct)`
+    - Incorporates buyer-paid shipping burden (`buyerShipping * platformFeePct`) into the floor formula numerator when platform fees apply to shipping.
+    - Guards division by zero for $0 acquisitions or zero list prices, formatting missing or un-costed values as `--` and rounding all currency/percent calculations via `round2`.
   - **Telemetry Tooltip Positioning & eBay Analytics Quota State [ACTION ID: PERF-004 / QUOTA-001]**:
     - `InfoTooltip` across all 7 KPI cards in `EditTabPerformance.jsx` uses `position="bottom"` (`top-full mt-2`) with `max-w-[calc(100vw-2rem)]` and `max-h-[85vh]` overflow bounds, preventing top container clipping inside the modal scroll body.
     - Ingestion in `functions/api/ebay/analytics.js` logs every external call to `outpost_sync_history` with `sync_type = 'ebay_analytics'`.

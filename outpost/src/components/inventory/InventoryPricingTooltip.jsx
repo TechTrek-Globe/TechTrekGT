@@ -1,43 +1,8 @@
 import React from 'react';
 import { fmtCurrency } from '../../utils/formulaPreview';
-import { computeFeeBreakdown, computeTargetPriceFromMargin } from '../../utils/feeEngine';
-import { DEFAULT_TARGET_MARGIN_PCT } from '../../../functions/utils/constants.js';
+import { getItemFloorMetrics } from '../../utils/pricingMetrics';
 
-export function getItemFloorMetrics(item) {
-  const feeData = computeFeeBreakdown(item);
-  const trueCost = Number(item.true_total_cost) || 0;
-  const unitPrice = Number(item.unit_price) || 0;
-  const proratedShip = Number(item.prorated_shipping || 0);
-  const proratedTax = Number(item.prorated_tax || 0);
-  const proratedDiscount = Number(item.prorated_discount || 0);
-  const hasProration = proratedShip > 0 || proratedTax > 0 || proratedDiscount > 0;
-  const acquisition = unitPrice > 0
-    ? unitPrice
-    : (hasProration ? Math.max(0, trueCost - proratedShip - proratedTax + proratedDiscount) : trueCost);
-
-  const breakEven = Number(item.floor_price || item.min_sell_price || feeData.breakEvenFloor || 0);
-  const targetRaw = Number(item.target_margin_pct) || DEFAULT_TARGET_MARGIN_PCT;
-  const targetDecimal = targetRaw > 1 ? targetRaw / 100 : targetRaw;
-  const targetFloor = computeTargetPriceFromMargin(
-    feeData.cogs,
-    targetDecimal,
-    feeData.platformFeePct,
-    feeData.promotedDecimal,
-    feeData.shippingCost,
-    feeData.platformFlatFee,
-    feeData.shippingCharged
-  );
-
-  return {
-    feeData,
-    landed: trueCost || feeData.cogs,
-    acquisition,
-    proratedShip,
-    breakEven,
-    targetDecimal,
-    targetFloor
-  };
-}
+export { getItemFloorMetrics };
 
 function Row({ label, value, tone = 'text-slate-200', labelTone = 'text-slate-400' }) {
   return (
@@ -50,10 +15,10 @@ function Row({ label, value, tone = 'text-slate-200', labelTone = 'text-slate-40
 
 export function InventoryPricingTooltip({ item, rect }) {
   const m = getItemFloorMetrics(item);
-  const f = m.feeData;
-  const hasPrice = f.sellPrice > 0;
-  const profitTone = f.netProfit >= 0 ? 'text-emerald-400' : 'text-red-400';
-  const flatAndFva = f.finalValueFee + f.platformFlatFee;
+  if (!m) return null;
+
+  const hasPrice = m.hasPrice;
+  const profitTone = hasPrice ? (m.trueNetProfit >= 0 ? 'text-emerald-400' : 'text-red-400') : 'text-slate-400';
 
   const above = rect.top - 10 > 380;
   const isLeft = rect.left < 400;
@@ -78,25 +43,27 @@ export function InventoryPricingTooltip({ item, rect }) {
           <span className="text-[10px] text-slate-400 font-mono">{item.status || 'Active'}</span>
         </div>
         <div className="space-y-1 mt-1.5 text-[10.5px] font-mono">
-          <Row label="Current List Price:" value={hasPrice ? fmtCurrency(f.sellPrice) : '--'} tone="text-slate-100 font-bold" />
+          <Row label="Current List Price:" value={hasPrice ? fmtCurrency(m.listPrice) : '--'} tone="text-slate-100 font-bold" />
           <Row
-            label={`Platform Fees (${(f.platformFeePct * 100).toFixed(2)}%${f.platformFlatFee > 0 ? ' + flat' : ''}):`}
-            value={`-${fmtCurrency(flatAndFva)}`}
+            label={`Platform Fees (${(m.platformFeePct * 100).toFixed(2)}%${m.platformFlatFee > 0 ? ' + flat' : ''}):`}
+            value={hasPrice ? `-${fmtCurrency(m.platformFees)}` : '--'}
             tone="text-red-300"
             labelTone="text-red-300"
           />
           <Row
-            label={`Promoted Ad Fees (${(f.promotedDecimal * 100).toFixed(1)}%):`}
-            value={f.promotedFee > 0 ? `-${fmtCurrency(f.promotedFee)}` : fmtCurrency(0)}
-            tone={f.promotedFee > 0 ? 'text-red-300' : 'text-slate-500'}
-            labelTone={f.promotedFee > 0 ? 'text-red-300' : 'text-slate-500'}
+            label={`Promoted Ad Fees (${(m.adFeePct * 100).toFixed(1)}%):`}
+            value={hasPrice ? (m.adFees > 0 ? `-${fmtCurrency(m.adFees)}` : fmtCurrency(0)) : '--'}
+            tone={m.adFees > 0 ? 'text-red-300' : 'text-slate-500'}
+            labelTone={m.adFees > 0 ? 'text-red-300' : 'text-slate-500'}
           />
           <div className="flex justify-between gap-3 border-t border-slate-800/80 pt-1 font-bold">
-            <span className={profitTone}>Projected Net Profit:</span>
-            <span className={`${profitTone} tabular-nums`}>{f.netProfit >= 0 ? '+' : ''}{fmtCurrency(f.netProfit)}</span>
+            <span className={profitTone}>True Net Profit:</span>
+            <span className={`${profitTone} tabular-nums`}>
+              {hasPrice ? `${m.trueNetProfit >= 0 ? '+' : ''}${fmtCurrency(m.trueNetProfit)}` : '--'}
+            </span>
           </div>
-          <Row label="Margin %:" value={`${(f.marginPct * 100).toFixed(1)}%`} tone={profitTone} />
-          <Row label="ROI:" value={`${(f.roiPct * 100).toFixed(1)}%`} tone={profitTone} />
+          <Row label="Margin %:" value={hasPrice ? `${m.marginPct.toFixed(1)}%` : '--'} tone={profitTone} />
+          <Row label="ROI %:" value={hasPrice ? `${m.roiPct.toFixed(1)}%` : '--'} tone={profitTone} />
         </div>
       </div>
 
@@ -110,10 +77,10 @@ export function InventoryPricingTooltip({ item, rect }) {
             <span>Total Landed Cost:</span>
             <span className="tabular-nums">{fmtCurrency(m.landed)}</span>
           </div>
-          <Row label="Break-even Floor Price:" value={fmtCurrency(m.breakEven)} tone="text-cyan-300 font-bold" />
+          <Row label="Break-even Floor Price:" value={m.breakEvenFloor > 0 ? fmtCurrency(m.breakEvenFloor) : '--'} tone="text-cyan-300 font-bold" />
           <Row
-            label={`Min Target Margin Floor (${(m.targetDecimal * 100).toFixed(0)}%):`}
-            value={m.targetFloor > 0 ? fmtCurrency(m.targetFloor) : '--'}
+            label={`Min Target Margin Floor (${(m.targetMarginPct * 100).toFixed(0)}%):`}
+            value={m.targetMarginFloor > 0 ? fmtCurrency(m.targetMarginFloor) : '--'}
             tone="text-blue-300 font-bold"
           />
         </div>

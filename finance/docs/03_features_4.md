@@ -15,6 +15,15 @@ Finance OS is the personal budget tracking, financial projection, and cash-flow 
 - **Conflict Modal & Backup Classification Fix (FIX-29):** The Budget Sync Conflict dialog appears at most once per login: reconcile runs once per user, identical local/cloud content never prompts, and silent auto-push 409s are deduped. Only the explicit "Save Manual Backup Now" action creates entries in `user_backup_versions`; auto-sync and offline-queue flushes never do.
 - **Dedicated Left Sidebar Backup & Sync View:** Backup & Sync (`/finance/sync`) is promoted to a dedicated top-level navigation item in the main left sidebar menu (`NAV_ITEMS` in `AppLayout.jsx` with `Cloud` icon), completely decoupled from Settings & Setup. It embeds `DataSyncPanel` with sub-panels for Cloud Sync, Import/Export, Storage & Reset, and Queue & Diagnostics.
 - **Last 10 Manual Syncs & Full Ledger Cloud Restore (FIX-27):** Automated background syncs pass `auto: true` to continuously update `user_backups` (the single ongoing sync) without writing to `user_backup_versions`. Manual backups pass `manual: true` to insert a snapshot row into `user_backup_versions` and prune older records to retain strictly the last 10 manual syncs. In `api.js`, `ALLOWED_KEYS` includes `schemaVersion` and numeric strings in `dailyMatrix` are preserved via `Number(v)`. In `LedgerDataContext.jsx`, `restoreFromBackup` explicitly sets `schemaVersion` to bypass destructive legacy migrations (V2-V8), completely restoring the entire cloud budget (all accounts, transactions, imported ledger rows, bills, people, funding goals, and complete daily matrix with other descriptions).
+- **Shared Ledger Collaboration & Tenant Isolation:** Multi-user ledger sharing and tenant isolation architecture ported from Wayfinder. Enables budget owners to invite collaborators via cryptographically secure links and email dispatch.
+  - **Access Tiers:**
+    - `owner`: Primary budget owner or platform administrator. Full read/write access and share management authority.
+    - `admin`: Shared collaborator with full read/write access plus collaborator invite and role management rights (cannot promote collaborators to admin or modify owner).
+    - `editor`: Read/write access to transactions, daily matrix cells, bills, and budget data (cannot manage collaborator shares or delete historical snapshots).
+    - `viewer`: Read-only access to ledger matrix, balances, and historical versions (cell mutations, moves, and cloud backup writes are strictly blocked client-side and server-side).
+    - `none`: Unaffiliated caller. Fails closed with HTTP 403 Forbidden on all private ledger endpoints.
+  - **Email Invitations & Claim Workflow:** Secure 256-bit random tokens hashed at rest using WebCrypto SHA-256. Public `/finance/invite?token=` verification and atomic claim transactions in D1. Supports 3-tier user onboarding: Case A (authenticated existing user), Case B (unauthenticated existing user), and Case C (new user registration with pre-verified email).
+  - **Tenant Guardrails:** Client-side router presents dedicated `NoAccessPanel` for unlinked users. Top navigation bar features a multi-ledger dropdown selector and viewer role badge.
 
 ---
 
@@ -24,11 +33,21 @@ All serverless API routes execute in Cloudflare Workers ESM format (`src/worker.
 
 | Endpoint | Method | Auth Required | Description |
 | --- | --- | --- | --- |
-| `/api/sync/backup` | POST | Yes (CSRF) | CAS cloud backup save: auto-sync updates single ongoing sync; manual saves record up to 10 historical rollback snapshots |
-| `/api/sync/restore` | GET | Yes | Retrieves current user backup with conditional 304 ETag support |
-| `/api/sync/versions` | GET | Yes | Lists up to 10 stored manual backup versions for the user plus metadata for ongoing single sync |
-| `/api/sync/restore-version` | POST | Yes (CSRF) | Restores a specific historical backup version with full ledger state |
-| `/api/sync/delete-version` | POST | Yes (CSRF) | Deletes a specific historical manual backup version for the authenticated user |
+| `/api/sync/backup` | POST | Yes (CSRF) | CAS cloud backup save: auto-sync updates single ongoing sync; manual saves record up to 10 historical rollback snapshots (hardened with `resolveLedgerAccess` tenant verification) |
+| `/api/sync/restore` | GET | Yes | Retrieves current user backup with conditional 304 ETag support (hardened with `resolveLedgerAccess`) |
+| `/api/sync/versions` | GET | Yes | Lists up to 10 stored manual backup versions for the user plus metadata for ongoing single sync (hardened with `resolveLedgerAccess`) |
+| `/api/sync/restore-version` | POST | Yes (CSRF) | Restores a specific historical backup version with full ledger state (requires editor or higher) |
+| `/api/sync/delete-version` | POST | Yes (CSRF) | Deletes a specific historical manual backup version (requires share admin or owner) |
+| `/api/finance/ledgers` | GET | Yes | Lists caller personal budget and all shared ledgers with active roles |
+| `/api/finance/ledgers/:id/access` | GET | Yes | Returns caller role and permission matrix for targeted ledger |
+| `/api/finance/ledgers/:id/invites` | GET | Yes | Lists pending invitations and active collaborator shares (owner/admin only) |
+| `/api/finance/ledgers/:id/invites` | POST | Yes (CSRF) | Generates cryptographically secure invite token, persists SHA-256 hash, and sends invitation email |
+| `/api/finance/ledgers/:id/invites/:inviteId` | DELETE | Yes (CSRF) | Revokes a pending invitation |
+| `/api/finance/ledgers/:id/shares/:userId` | PUT | Yes (CSRF) | Updates collaborator role (viewer/editor/admin) |
+| `/api/finance/ledgers/:id/shares/:userId` | DELETE | Yes (CSRF) | Removes a collaborator share membership |
+| `/api/finance/invites/verify` | GET | No | Public token verification returning ledger metadata and invitation state |
+| `/api/finance/invites/claim` | POST | Yes (CSRF) | Atomically claims invitation and inserts `ledger_shares` record |
+| `/api/verify-sync-code` | POST | Yes (CSRF) | Constant-time validation of cloud vault passcode |
 | `/api/verify-sync-code` | POST | Yes (CSRF) | Constant-time validation of cloud vault passcode |
 | `/api/auth/register` | POST | No | User registration with Turnstile verification and compensating rollback |
 | `/api/auth/login` | POST | No | User login with Turnstile verification and transparent password rehashing |

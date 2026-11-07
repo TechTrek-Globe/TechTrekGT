@@ -13,6 +13,8 @@ import { onRequestPost as confirmEmailChangeHandler } from '../functions/api/aut
 import { onRequestPost as refreshHandler } from '../functions/api/auth/refresh.js';
 import { onRequestGet as adminStatsHandler } from '../functions/api/admin/stats.js';
 import { onRequestPost as adminUserStatusHandler } from '../functions/api/admin/user-status.js';
+import { resolveLedgerAccess, canEdit, canRead, canManageShares } from '../functions/utils/ledgerAccess.js';
+import { handleLedgerShares } from '../functions/api/finance/ledger-shares.js';
 import {
   authenticate,
   readJson,
@@ -574,6 +576,15 @@ async function handleSyncBackup(context) {
     const body = await readJson(request, MAX_BODY_SYNC);
     if (!body) return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Invalid or oversized request body.');
 
+    const targetLedgerId = (body && typeof body.ledgerId === 'string' && body.ledgerId.trim())
+      || (new URL(request.url).searchParams.get('ledgerId'))
+      || userId;
+
+    const { ledger, role } = await resolveLedgerAccess(env, targetLedgerId, auth.user);
+    if (!ledger || !canEdit(role)) {
+      return fail(ERROR_CODES.FORBIDDEN, 403, 'Forbidden: Write access denied for this ledger.', context.requestId);
+    }
+
     const baseVersion = body.baseVersion;
     const force = Boolean(body.force);
     const hasBaseVersion = typeof baseVersion === 'number' && !isNaN(baseVersion);
@@ -586,13 +597,13 @@ async function handleSyncBackup(context) {
     if (body.budget !== undefined) {
       payload = body.budget;
     } else {
-      const { baseVersion: _bv, force: _fc, ...rest } = body;
+      const { baseVersion: _bv, force: _fc, ledgerId: _lid, ...rest } = body;
       payload = rest;
     }
 
     const validation = validateBudgetPayloadDetailed(payload);
     if (!validation.valid) {
-      console.warn(`[sync.backup] Validation failed for user ${userId}: ${validation.reason}`);
+      console.warn(`[sync.backup] Validation failed for user ${userId} on ledger ${targetLedgerId}: ${validation.reason}`);
       return json({
         code: ERROR_CODES.VALIDATION_ERROR,
         error: 'Invalid backup payload.',
@@ -607,14 +618,14 @@ async function handleSyncBackup(context) {
 
     const row = await env.DB.prepare(
       'SELECT updated_at, updated_at_ms, data_byte_length FROM user_backups WHERE id = ?'
-    ).bind(userId).first();
+    ).bind(targetLedgerId).first();
 
     const storedVersion = row ? (row.updated_at_ms != null ? Number(row.updated_at_ms) : (row.updated_at ? new Date(row.updated_at).getTime() : 0)) : null;
 
     if (row && !force && hasBaseVersion && storedVersion > baseVersion) {
       const dataRow = await env.DB.prepare(
         'SELECT data FROM user_backups WHERE id = ?'
-      ).bind(userId).first();
+      ).bind(targetLedgerId).first();
       let serverData;
       try {
         serverData = dataRow && dataRow.data ? JSON.parse(dataRow.data) : null;
@@ -662,7 +673,7 @@ async function handleSyncBackup(context) {
                  WHERE id = ?
                    AND (? = 1 OR updated_at_ms IS NULL OR updated_at_ms <= ?)
               )`
-        ).bind(versionId, userId, dataStr, now, userId, userId, force ? 1 : 0, hasBaseVersion ? baseVersion : 0)
+        ).bind(versionId, targetLedgerId, dataStr, now, targetLedgerId, targetLedgerId, force ? 1 : 0, hasBaseVersion ? baseVersion : 0)
       );
 
       // Keep only the last 10 manual syncs
@@ -670,13 +681,13 @@ async function handleSyncBackup(context) {
         env.DB.prepare(
           `DELETE FROM user_backup_versions
            WHERE user_id = ?
-             AND id NOT IN (
-               SELECT id FROM user_backup_versions
-                WHERE user_id = ?
-                ORDER BY saved_at DESC, rowid DESC
-                LIMIT 10
-             )`
-        ).bind(userId, userId)
+           AND id NOT IN (
+             SELECT id FROM user_backup_versions
+              WHERE user_id = ?
+              ORDER BY saved_at DESC, rowid DESC
+              LIMIT 10
+           )`
+        ).bind(targetLedgerId, targetLedgerId)
       );
     }
 
@@ -691,7 +702,7 @@ async function handleSyncBackup(context) {
            updated_at = excluded.updated_at,
            updated_at_ms = excluded.updated_at_ms
          WHERE (? = 1 OR user_backups.updated_at_ms IS NULL OR user_backups.updated_at_ms <= ?)`
-      ).bind(userId, dataStr, dataByteLength, now, force ? 1 : 0, hasBaseVersion ? baseVersion : 0)
+      ).bind(targetLedgerId, dataStr, dataByteLength, now, force ? 1 : 0, hasBaseVersion ? baseVersion : 0)
     );
 
     const batchResults = await env.DB.batch(queries);
@@ -706,7 +717,7 @@ async function handleSyncBackup(context) {
 
       const freshRow = await env.DB.prepare(
         'SELECT data, updated_at, updated_at_ms FROM user_backups WHERE id = ?'
-      ).bind(userId).first();
+      ).bind(targetLedgerId).first();
 
       const freshVersion = freshRow
         ? (freshRow.updated_at_ms != null
@@ -752,10 +763,17 @@ async function handleSyncRestore(context) {
     const auth = await authenticate(context, { requireCsrf: false });
     if (auth.error) return auth.error;
     const userId = auth.user.id;
+    const url = new URL(request.url);
+    const targetLedgerId = url.searchParams.get('ledgerId') || userId;
+
+    const { ledger, role } = await resolveLedgerAccess(env, targetLedgerId, auth.user);
+    if (!ledger || !canRead(role)) {
+      return fail(ERROR_CODES.FORBIDDEN, 403, 'Forbidden: Read access denied for this ledger.', context.requestId);
+    }
 
     const row = await env.DB.prepare(
       'SELECT data, updated_at, updated_at_ms FROM user_backups WHERE id = ?'
-    ).bind(userId).first();
+    ).bind(targetLedgerId).first();
 
     if (!row || !row.data) {
       emitMetric('sync.restore.not_found', context.requestId);
@@ -780,7 +798,7 @@ async function handleSyncRestore(context) {
     try {
       parsed = JSON.parse(row.data);
     } catch {
-      console.error('[sync/restore] stored backup is not valid JSON for user', userId);
+      console.error('[sync/restore] stored backup is not valid JSON for ledger', targetLedgerId);
       return fail(ERROR_CODES.INTERNAL_ERROR, 500, 'Stored backup could not be read.', context.requestId);
     }
 
@@ -808,17 +826,24 @@ async function handleSyncVersions(context) {
     const auth = await authenticate(context, { requireCsrf: false });
     if (auth.error) return auth.error;
     const userId = auth.user.id;
+    const url = new URL(request.url);
+    const targetLedgerId = url.searchParams.get('ledgerId') || userId;
+
+    const { ledger, role } = await resolveLedgerAccess(env, targetLedgerId, auth.user);
+    if (!ledger || !canRead(role)) {
+      return fail(ERROR_CODES.FORBIDDEN, 403, 'Forbidden: Read access denied for this ledger.', context.requestId);
+    }
 
     const rows = await env.DB.prepare(
       `SELECT id, saved_at FROM user_backup_versions
        WHERE user_id = ?
        ORDER BY saved_at DESC, rowid DESC
        LIMIT 10`
-    ).bind(userId).all();
+    ).bind(targetLedgerId).all();
 
     const ongoingRow = await env.DB.prepare(
       'SELECT updated_at, updated_at_ms FROM user_backups WHERE id = ?'
-    ).bind(userId).first();
+    ).bind(targetLedgerId).first();
 
     const versions = (rows?.results || []).map(r => ({
       id: r.id,
@@ -871,8 +896,13 @@ async function handleSyncRestoreVersion(context) {
 
     if (!versionRow) return fail(ERROR_CODES.NOT_FOUND, 404, 'Version not found');
 
-    if (versionRow.user_id !== userId) {
-      return fail(ERROR_CODES.FORBIDDEN, 403, 'Forbidden: cannot restore another user\'s version');
+    const targetLedgerId = (body && typeof body.ledgerId === 'string' && body.ledgerId.trim())
+      || versionRow.user_id
+      || userId;
+
+    const { ledger, role } = await resolveLedgerAccess(env, targetLedgerId, auth.user);
+    if (!ledger || !canEdit(role)) {
+      return fail(ERROR_CODES.FORBIDDEN, 403, 'Forbidden: Write access denied for this ledger.');
     }
 
     let parsed;
@@ -893,7 +923,7 @@ async function handleSyncRestoreVersion(context) {
          data_byte_length = excluded.data_byte_length,
          updated_at = excluded.updated_at,
          updated_at_ms = excluded.updated_at_ms`
-    ).bind(userId, versionRow.data, versionByteLength, now).run();
+    ).bind(targetLedgerId, versionRow.data, versionByteLength, now).run();
 
     return json({
       success: true,
@@ -924,13 +954,18 @@ async function handleSyncDeleteVersion(context) {
 
     if (!versionRow) return fail(ERROR_CODES.NOT_FOUND, 404, 'Version not found');
 
-    if (versionRow.user_id !== userId) {
-      return fail(ERROR_CODES.FORBIDDEN, 403, 'Forbidden: cannot delete another user\'s version');
+    const targetLedgerId = (body && typeof body.ledgerId === 'string' && body.ledgerId.trim())
+      || versionRow.user_id
+      || userId;
+
+    const { ledger, role } = await resolveLedgerAccess(env, targetLedgerId, auth.user);
+    if (!ledger || !canManageShares(role)) {
+      return fail(ERROR_CODES.FORBIDDEN, 403, 'Forbidden: Share management access required to delete backup versions.');
     }
 
     await env.DB.prepare(
       'DELETE FROM user_backup_versions WHERE id = ? AND user_id = ?'
-    ).bind(versionId, userId).run();
+    ).bind(versionId, targetLedgerId).run();
 
     return json({ success: true, deletedVersionId: versionId });
   } catch (err) {
@@ -1064,6 +1099,15 @@ const worker = {
           handler = adminUserStatusHandler;
           handlerContext = { ...context, params: { id: decodeURIComponent(userStatusMatch[1]) } };
         }
+      }
+
+      if (!handler && (
+        apiPath.startsWith('/api/ledgers') ||
+        apiPath.startsWith('/api/invites') ||
+        apiPath.startsWith('/api/finance/ledgers') ||
+        apiPath.startsWith('/api/finance/invites')
+      )) {
+        handler = (ctx) => handleLedgerShares(ctx, url, request.method);
       }
 
       if (handler) {

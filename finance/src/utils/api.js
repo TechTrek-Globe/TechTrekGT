@@ -180,7 +180,9 @@ function pendingSyncSyncKey(userId) {
  */
 export async function pushCloudBackupOptimistic(passcode, budgetData, options = {}, userId = null) {
   // CRIT-002: Ownership verification - check if budgetData has an owner_id that matches the signed-in user
-  if (budgetData && budgetData.owner_id && userId && budgetData.owner_id !== userId) {
+  // When options.ledgerId is passed (shared ledger collaboration), allow pushing to the target shared ledger
+  const isSharedLedger = Boolean(options?.ledgerId && options.ledgerId !== userId);
+  if (!isSharedLedger && budgetData && budgetData.owner_id && userId && budgetData.owner_id !== userId) {
     logSync('PUSH_BLOCKED_OWNERSHIP', 'Blocked push: local budget owner does not match signed-in user', { 
       budgetOwnerId: budgetData.owner_id, 
       signedInUserId: userId 
@@ -194,7 +196,7 @@ export async function pushCloudBackupOptimistic(passcode, budgetData, options = 
   }
 
   // Set owner_id on the budget data for future verification
-  if (budgetData && userId) {
+  if (budgetData && userId && !isSharedLedger) {
     budgetData.owner_id = userId;
   }
 
@@ -240,6 +242,9 @@ export async function pushCloudBackupOptimistic(passcode, budgetData, options = 
   }
 
   const requestBody = { budget: uploadPayload };
+  if (options?.ledgerId) {
+    requestBody.ledgerId = options.ledgerId;
+  }
   if (typeof baseVersion === 'number' && !isNaN(baseVersion)) {
     requestBody.baseVersion = baseVersion;
   }

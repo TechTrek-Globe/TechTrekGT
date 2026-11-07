@@ -175,3 +175,51 @@ CREATE INDEX IF NOT EXISTS idx_password_resets_email_token ON password_resets(em
 CREATE INDEX IF NOT EXISTS idx_backup_versions_user ON user_backup_versions(user_id, saved_at DESC);
 CREATE INDEX IF NOT EXISTS idx_email_verifications_user ON email_verifications(user_id, used);
 CREATE INDEX IF NOT EXISTS idx_email_verifications_email ON email_verifications(email, token);
+
+-- ------------------------------------------------------------------
+-- Shared Ledger Collaboration & Tenant Isolation Schema
+-- ------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS finance_ledgers (
+  id          TEXT PRIMARY KEY,
+  owner_id    TEXT NOT NULL,
+  name        TEXT NOT NULL DEFAULT 'Household Budget',
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_finance_ledgers_owner ON finance_ledgers(owner_id);
+
+CREATE TABLE IF NOT EXISTS ledger_invites (
+  id            TEXT PRIMARY KEY,
+  ledger_id     TEXT NOT NULL,
+  invited_email TEXT NOT NULL COLLATE NOCASE,
+  role          TEXT NOT NULL CHECK(role IN ('viewer','editor','admin')),
+  token_hash    TEXT NOT NULL UNIQUE,
+  status        TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','accepted','revoked')),
+  invited_by    TEXT NOT NULL,
+  created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  expires_at    TEXT NOT NULL,
+  accepted_at   TEXT,
+  accepted_by   TEXT,
+  FOREIGN KEY (invited_by) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_ledger_invites_ledger ON ledger_invites(ledger_id);
+CREATE INDEX IF NOT EXISTS idx_ledger_invites_email  ON ledger_invites(invited_email);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ledger_invites_pending
+  ON ledger_invites(ledger_id, invited_email) WHERE status = 'pending';
+
+CREATE TABLE IF NOT EXISTS ledger_shares (
+  id         TEXT PRIMARY KEY,
+  ledger_id  TEXT NOT NULL,
+  user_id    TEXT NOT NULL,
+  role       TEXT NOT NULL CHECK(role IN ('viewer','editor','admin')),
+  invite_id  TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(ledger_id, user_id),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (invite_id) REFERENCES ledger_invites(id) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS idx_ledger_shares_user   ON ledger_shares(user_id);
+CREATE INDEX IF NOT EXISTS idx_ledger_shares_ledger ON ledger_shares(ledger_id);
+

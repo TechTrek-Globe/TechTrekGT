@@ -38,6 +38,8 @@ const AuthPage = lazyWithRetry(() => import('./components/AuthPage').then(m => (
 const AuthModal = lazyWithRetry(() => import('./components/AuthModal'));
 const AdminView = lazyWithRetry(() => import('./components/AdminView').then(m => ({ default: m.AdminView })));
 const BackupSyncView = lazyWithRetry(() => import('./components/BackupSyncView').then(m => ({ default: m.BackupSyncView })));
+const InviteClaim = lazyWithRetry(() => import('./components/InviteClaim').then(m => ({ default: m.InviteClaim })));
+const ShareLedgerModal = lazyWithRetry(() => import('./components/ShareLedgerModal').then(m => ({ default: m.ShareLedgerModal })));
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -118,6 +120,7 @@ class ErrorBoundary extends React.Component {
 
 function getViewFromPathname(pathname) {
   const path = (pathname || '').toLowerCase().replace(/\/$/, '');
+  if (path === '/finance/invite' || path.startsWith('/finance/invite')) return 'invite';
   if (path === '/finance/ledger') return 'ledger';
   if (path === '/finance/main-budget' || path === '/finance/bills') return 'main_budget';
   if (path === '/finance/amortization') return 'amortization';
@@ -130,6 +133,15 @@ function getViewFromPathname(pathname) {
 function MainContent({ pathname, navigateTo, onNavigateHome }) {
   const { isSettingsOpen } = useBudgetMetadataState();
   const { isAuthenticated, isLoading, user } = useAuth();
+  const budgetContext = useBudget();
+  const {
+    activeLedgerId,
+    ledgerRole,
+    isShareModalOpen,
+    setIsShareModalOpen,
+    switchLedger,
+    budget
+  } = budgetContext || {};
 
   const normalized = (pathname || '').toLowerCase().replace(/\/$/, '');
   const activeView = getViewFromPathname(normalized);
@@ -139,7 +151,7 @@ function MainContent({ pathname, navigateTo, onNavigateHome }) {
     if (isLoading) return;
 
     if (!isAuthenticated) {
-      if (normalized.startsWith('/finance') && normalized !== '/finance') {
+      if (normalized.startsWith('/finance') && normalized !== '/finance' && !normalized.startsWith('/finance/invite')) {
         if (typeof window !== 'undefined') {
           window.history.replaceState({}, '', '/finance');
         }
@@ -162,6 +174,15 @@ function MainContent({ pathname, navigateTo, onNavigateHome }) {
           <p className="text-slate-500 text-xs font-mono tracking-widest uppercase">Verifying session...</p>
         </div>
       </div>
+    );
+  }
+
+  // Handle invitation claims regardless of authentication state
+  if (activeView === 'invite') {
+    return (
+      <React.Suspense fallback={<div className="p-4 text-gray-400">Loading view...</div>}>
+        <InviteClaim />
+      </React.Suspense>
     );
   }
 
@@ -189,40 +210,73 @@ function MainContent({ pathname, navigateTo, onNavigateHome }) {
   return (
     <AppLayout activeView={activeView} onNavigateHome={onNavigateHome} onNavigateView={handleNavigateView}>
       <React.Suspense fallback={<div className="p-4 text-gray-400">Loading view...</div>}>
-        {activeView === 'dashboard'   && <DashboardView onNavigateView={handleNavigateView} />}
-        {activeView === 'main_budget' && <MainBudgetView onNavigateView={handleNavigateView} />}
-        {activeView === 'ledger'      && <LedgerView onNavigateView={handleNavigateView} />}
-        {activeView === 'amortization'&& <AmortizationView onNavigateView={handleNavigateView} />}
-        {activeView === 'sync'        && <BackupSyncView onNavigateView={handleNavigateView} />}
-        {activeView === 'settings'    && <SettingsView onNavigateView={handleNavigateView} />}
-        {activeView === 'admin'       && (
-          user?.isAdmin ? (
-            <AdminView />
-          ) : (
-            <div className="flex flex-col items-center justify-center p-12 text-center min-h-[50vh]">
-              <div className="max-w-md p-8 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-xl space-y-4">
-                <div className="w-12 h-12 mx-auto rounded-full bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400">
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-bold text-slate-100">Access Denied</h3>
-                <p className="text-sm text-slate-400">
-                  Administrator privileges are required to view this section.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => handleNavigateView('dashboard')}
-                  className="w-full py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium text-sm rounded-xl transition-all cursor-pointer"
-                >
-                  Return to Dashboard
-                </button>
+        {ledgerRole === 'none' ? (
+          <div className="flex flex-col items-center justify-center p-12 text-center min-h-[50vh]">
+            <div className="max-w-md p-8 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-xl space-y-4">
+              <div className="w-12 h-12 mx-auto rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
               </div>
+              <h3 className="text-lg font-bold text-slate-100">Ledger Access Restricted</h3>
+              <p className="text-sm text-slate-400">
+                You do not have access to this budget ledger or your invitation has not been claimed yet.
+              </p>
+              <button
+                type="button"
+                onClick={() => switchLedger && switchLedger(user?.id)}
+                className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-500 text-white font-medium text-sm rounded-xl transition-all cursor-pointer"
+              >
+                Switch to My Personal Ledger
+              </button>
             </div>
-          )
+          </div>
+        ) : (
+          <>
+            {activeView === 'dashboard'   && <DashboardView onNavigateView={handleNavigateView} />}
+            {activeView === 'main_budget' && <MainBudgetView onNavigateView={handleNavigateView} />}
+            {activeView === 'ledger'      && <LedgerView onNavigateView={handleNavigateView} />}
+            {activeView === 'amortization'&& <AmortizationView onNavigateView={handleNavigateView} />}
+            {activeView === 'sync'        && <BackupSyncView onNavigateView={handleNavigateView} />}
+            {activeView === 'settings'    && <SettingsView onNavigateView={handleNavigateView} />}
+            {activeView === 'admin'       && (
+              user?.isAdmin ? (
+                <AdminView />
+              ) : (
+                <div className="flex flex-col items-center justify-center p-12 text-center min-h-[50vh]">
+                  <div className="max-w-md p-8 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-xl space-y-4">
+                    <div className="w-12 h-12 mx-auto rounded-full bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400">
+                      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                      </svg>
+                    </div>
+                    <h3 className="text-lg font-bold text-slate-100">Access Denied</h3>
+                    <p className="text-sm text-slate-400">
+                      Administrator privileges are required to view this section.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => handleNavigateView('dashboard')}
+                      className="w-full py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium text-sm rounded-xl transition-all cursor-pointer"
+                    >
+                      Return to Dashboard
+                    </button>
+                  </div>
+                </div>
+              )
+            )}
+          </>
         )}
         {isSettingsOpen && <SettingsModal />}
         <AuthModal />
+        {isShareModalOpen && (
+          <ShareLedgerModal
+            isOpen={isShareModalOpen}
+            onClose={() => setIsShareModalOpen && setIsShareModalOpen(false)}
+            ledgerId={activeLedgerId}
+            ledgerTitle={budget?.name || 'Personal Budget'}
+          />
+        )}
       </React.Suspense>
     </AppLayout>
   );

@@ -23,7 +23,9 @@ import {
   AlertCircle,
   CheckCircle2,
   Loader2,
-  Cloud
+  Cloud,
+  Users,
+  Lock
 } from 'lucide-react';
 
 import headerLogoDark from '../assets/header-logo-dark.png';
@@ -149,6 +151,12 @@ export function AppLayout({ children, onNavigateHome, onNavigateView, activeView
     getTotalCashOnHand,
     getTotalMonthEndCashOnHand,
     getCalculatedBalanceAsOf,
+    activeLedgerId,
+    ledgerRole,
+    ledgerPermissions,
+    availableLedgers,
+    switchLedger,
+    setIsShareModalOpen,
   } = useBudget();
 
   const { user, logout, verifyEmail, resendVerification } = useAuth();
@@ -360,8 +368,52 @@ export function AppLayout({ children, onNavigateHome, onNavigateView, activeView
             <span className="text-blue-400 font-semibold">Finance</span>
           </a>
 
+          {/* Ledger Switcher dropdown if collaborator has multiple ledgers */}
+          {availableLedgers && availableLedgers.length > 1 && (
+            <div className="flex items-center gap-1.5 ml-2">
+              <select
+                value={activeLedgerId || user?.id || ''}
+                onChange={(e) => switchLedger && switchLedger(e.target.value)}
+                className={`text-xs px-2.5 py-1.5 rounded-xl border font-medium focus:outline-none cursor-pointer ${
+                  isLight ? 'bg-slate-100 border-slate-300 text-slate-800' : 'bg-slate-900 border-slate-700 text-slate-200'
+                }`}
+                title="Switch active budget ledger"
+              >
+                {availableLedgers.map((l) => (
+                  <option key={l.id} value={l.id} className="bg-slate-900 text-white">
+                    {l.name} {l.isOwner ? '(My Ledger)' : `(${l.role})`}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Read-Only Viewer Status Badge */}
+          {ledgerRole === 'viewer' && (
+            <span className="hidden sm:inline-flex items-center gap-1 ml-2 px-2.5 py-1 rounded-full bg-slate-800 border border-slate-700 text-amber-300 text-[11px] font-medium">
+              <Lock className="w-3 h-3 text-amber-400" /> Read-Only
+            </span>
+          )}
+
           {/* Spacer */}
           <div className="flex-1" />
+
+          {/* Share Ledger Button (Owner / Share Admin) */}
+          {ledgerPermissions?.manageShares && (
+            <button
+              type="button"
+              onClick={() => setIsShareModalOpen && setIsShareModalOpen(true)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
+                isLight
+                  ? 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 shadow-sm'
+                  : 'bg-blue-600/20 border-blue-500/40 text-blue-300 hover:bg-blue-600/30 shadow-sm shadow-blue-900/20'
+              }`}
+              title="Share this budget ledger with collaborators"
+            >
+              <Users className="w-3.5 h-3.5" />
+              <span>Share</span>
+            </button>
+          )}
 
           {/* Top-right: KPI pill + Settings */}
           <div className={`hidden md:flex items-center gap-3 px-4 py-1.5 rounded-full border text-xs ${

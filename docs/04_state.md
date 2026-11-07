@@ -39,7 +39,7 @@ CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
 
 To prevent cross-app schema collisions and maintain developer velocity, each application maintains full ownership of its domain-specific tables through isolated schema files:
 
-- Finance OS (finance/schema.sql): Manages personal accounting tables (accounts, bills, line_items, loans, household_settings, user_backups, user_backup_versions). Note: Legacy relational tables from earlier revisions have been archived into _bak_* tables.
+- Finance OS (finance/schema.sql): Manages personal accounting tables (accounts, bills, line_items, loans, household_settings, user_backups, user_backup_versions, finance_ledgers, ledger_invites, ledger_shares). Note: Legacy relational tables from earlier revisions have been archived into _bak_* tables.
 - Outpost Tracker (outpost/auction-schema.sql): Manages commercial resale tables (invoices, items, sales, platforms, comps, market_comps, supplies, listing_traffic, auction_item_analytics, outpost_sync_settings, api_integrations).
 - VineScout (vinescout/vinescout-schema.sql): Manages Amazon Vine analytics tables (vine_items, vine_orders, vine_tax_settings, vine_asin_cache).
 - Wayfinder (wayfinder/schema-wayfinder.sql): Manages travel coordination tables (journeys, itinerary_items, documents, import_jobs, budgets, wayfinder_email_inboxes, wayfinder_packing_items, wayfinder_calendar_tokens, wayfinder_expenses, wayfinder_expense_splits, wayfinder_expense_settlements).

@@ -140,3 +140,76 @@ Authentication states strictly reflect backend database authority and maintain z
 
 - **Recent Activity Ledger Authority (FIX-RECENT-STALE):** The `dailyMatrix` is authoritative over stale `personId`/`billId` stamps on transactions when resolving header tooltip Recent Activity; covered by `tests/fix-tooltip-ledger-sync.test.js`.
 - **Transactions Grid Lifecycle & Account Switch Optimization (FIX-PERF-ACCOUNT-SWITCH):** In `LedgerView.jsx`, `ActiveDragContext` holds `activeDragField` (null when idle; set on `handleDragStart`, cleared on `handleDragEnd` and `handleDragCancel`). `DroppableCellTd` mounts `useDroppable` dynamically inside `ActiveDroppableCellTdInner` only when an active drag is in progress and compatible, reducing droppable hook unmount/remount churn to zero during account switches. `MatrixCell` routes to `StaticMatrixCell` whenever `!props.draggable`, eliminating `useDraggable` registration overhead across empty and zero-value cells. Switching accounts resets `yearRange` to the active 2-year window (`{ startYear: Math.max(minYear, curYear), endYear: curYear + 1 }`), preventing accumulated multi-year scroll range rows from stalling React re-renders.
+
+---
+
+## 10. Shared Ledger Collaboration & Tenant Isolation State Architecture
+
+Finance OS implements multi-tenant ledger collaboration and access gating ported directly from the Wayfinder platform standard:
+
+### 10.1 Cloudflare D1 Relational Collaboration Schema
+
+```sql
+CREATE TABLE IF NOT EXISTS finance_ledgers (
+  id          TEXT PRIMARY KEY,
+  owner_id    TEXT NOT NULL,
+  name        TEXT NOT NULL DEFAULT 'Household Budget',
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_finance_ledgers_owner ON finance_ledgers(owner_id);
+
+CREATE TABLE IF NOT EXISTS ledger_invites (
+  id            TEXT PRIMARY KEY,
+  ledger_id     TEXT NOT NULL,
+  invited_email TEXT NOT NULL COLLATE NOCASE,
+  role          TEXT NOT NULL CHECK(role IN ('viewer','editor','admin')),
+  token_hash    TEXT NOT NULL UNIQUE,
+  status        TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','accepted','revoked')),
+  invited_by    TEXT NOT NULL,
+  created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  expires_at    TEXT NOT NULL,
+  accepted_at   TEXT,
+  accepted_by   TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_ledger_invites_ledger ON ledger_invites(ledger_id);
+CREATE INDEX IF NOT EXISTS idx_ledger_invites_email  ON ledger_invites(invited_email);
+
+CREATE TABLE IF NOT EXISTS ledger_shares (
+  id         TEXT PRIMARY KEY,
+  ledger_id  TEXT NOT NULL,
+  user_id    TEXT NOT NULL,
+  role       TEXT NOT NULL CHECK(role IN ('viewer','editor','admin')),
+  invite_id  TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(ledger_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_ledger_shares_user   ON ledger_shares(user_id);
+CREATE INDEX IF NOT EXISTS idx_ledger_shares_ledger ON ledger_shares(ledger_id);
+```
+
+### 10.2 Backward Compatibility Invariant
+For every existing user, their personal ledger ID is identical to their user ID (`user.id = ledger_id`), aligning directly with `user_backups.id = user.id`. This guarantees 100% backward compatibility for all existing single-user backup records with zero migrations or data restructuring.
+
+### 10.3 Dynamic Tenant Access Resolver
+- **Resolver Function:** `resolveLedgerAccess(env, ledgerId, user)` evaluates caller permissions against target ledger:
+  - Caller matching `ledger.owner_id` or `ledgerId === user.id` yields `role: 'owner'`.
+  - Active `ledger_shares` row yields caller role (`'admin'`, `'editor'`, or `'viewer'`).
+  - Platform administrator (`user.role === 'admin'`) yields `role: 'admin'`.
+  - Unaffiliated callers yield `role: 'none'`, failing closed with HTTP 403 Forbidden.
+- **Backend Sync Hardening:** All `/api/sync/*` endpoints resolve access dynamically against `targetLedgerId` before executing queries.
+
+### 10.4 Client-Side Collaboration State (`LedgerDataContext.jsx`)
+- **Active Ledger State:**
+  - `activeLedgerId`: ID of currently active ledger (initialized from `sessionStorage` or defaulting to `currentUserId`).
+  - `ledgerRole`: Derived access role (`'owner'`, `'admin'`, `'editor'`, `'viewer'`, or `'none'`).
+  - `ledgerPermissions`: `{ read, edit, manageShares, isOwner, role }`.
+  - `availableLedgers`: List of owned and shared ledgers populated by `GET /api/finance/ledgers`.
+  - `isShareModalOpen`: Boolean controlling `ShareLedgerModal.jsx` presentation.
+- **Client Read-Only Mutation Guards:**
+  - When `ledgerRole === 'viewer'`, mutations in `updateDailyMatrixCell`, `updateDailyMatrixCells`, `moveDailyMatrixCell`, and `pushCloudBackup` exit early without altering refs or queuing sync backups.
+- **Tenant Isolation Gate:**
+  - When `ledgerRole === 'none'`, `App.jsx` restricts access and renders `NoAccessPanel` instead of exposing private budget views.
+- **Session Purge Lifecycle:**
+  - On `techtrek:user-logout` window events, `LedgerDataContext` resets `activeLedgerId`, sets `ledgerRole` to `'owner'`, empties `availableLedgers`, closes modals, and removes `finance_active_ledger_id` from `sessionStorage`.
+

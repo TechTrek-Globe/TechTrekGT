@@ -6,6 +6,7 @@ import {
   MAX_BODY_AUTH, MAX_NAME_LEN, MAX_EMAIL_LEN, MAX_ANSWER_LEN, MAX_QUESTION_LEN
 } from '../../utils/auth.js';
 import { enforceRateLimit, getClientIp } from '../../utils/rateLimit.js';
+import { sha256Hex, ensureLedgerTables } from '../../utils/ledgerAccess.js';
 
 export async function onRequestPost(context) {
   const { request, env, requestId } = context;
@@ -79,27 +80,50 @@ export async function onRequestPost(context) {
 
     userId = `usr-${crypto.randomUUID()}`;
 
+    // Verify optional invite token for pre-verified registration
+    let isInviteVerified = false;
+    const rawInviteToken = typeof body.inviteToken === 'string' ? body.inviteToken.trim() : null;
+    if (rawInviteToken) {
+      try {
+        await ensureLedgerTables(env.DB);
+        const tokenHash = await sha256Hex(rawInviteToken);
+        const inviteRow = await env.DB.prepare(
+          `SELECT id, invited_email FROM ledger_invites
+           WHERE token_hash = ? AND status = 'pending' AND expires_at > datetime('now')`
+        ).bind(tokenHash).first();
+        if (inviteRow && String(inviteRow.invited_email).toLowerCase() === cleanEmail) {
+          isInviteVerified = true;
+        }
+      } catch (tokenCheckErr) {
+        console.warn('[register] inviteToken validation warning:', tokenCheckErr && tokenCheckErr.message);
+      }
+    }
+
     const [passwordHash, securityAnswerHash] = await Promise.all([
       hashPassword(password),
       hashPassword(cleanAnswer.toLowerCase())
     ]);
 
+    const verifiedFlag = isInviteVerified ? 1 : 0;
+    const verifiedAt = isInviteVerified ? new Date().toISOString() : null;
+
     await env.DB.prepare(
-      // created_at, status, and email_verified are written explicitly so this INSERT is not
-      // fragile against DDL default removal. (Stage 1.1 / 1.2 / 5.2)
-      'INSERT INTO users (id, email, password_hash, name, security_question, security_answer_hash, role, token_version, status, email_verified, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-    ).bind(userId, cleanEmail, passwordHash, rawName, cleanQuestion, securityAnswerHash, 'user', 0, 'Active', 0, new Date().toISOString()).run();
+      // created_at, status, email_verified, and email_verified_at written explicitly
+      'INSERT INTO users (id, email, password_hash, name, security_question, security_answer_hash, role, token_version, status, email_verified, email_verified_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    ).bind(userId, cleanEmail, passwordHash, rawName, cleanQuestion, securityAnswerHash, 'user', 0, 'Active', verifiedFlag, verifiedAt, new Date().toISOString()).run();
     userCreated = true;
 
-    const { code: verificationCode } = await issueOneTimeCode(env, {
-      table: 'email_verifications',
-      userId,
-      email: cleanEmail,
-      purpose: 'verify',
-      ttlMs: ONE_TIME_CODE_TTL_MS
-    });
+    if (!isInviteVerified) {
+      const { code: verificationCode } = await issueOneTimeCode(env, {
+        table: 'email_verifications',
+        userId,
+        email: cleanEmail,
+        purpose: 'verify',
+        ttlMs: ONE_TIME_CODE_TTL_MS
+      });
 
-    await sendVerificationEmail(env, cleanEmail, verificationCode, 'register').catch(() => {});
+      await sendVerificationEmail(env, cleanEmail, verificationCode, 'register').catch(() => {});
+    }
 
     const createdUser = {
       id: userId,
@@ -107,7 +131,8 @@ export async function onRequestPost(context) {
       name: rawName,
       role: 'user',
       token_version: 0,
-      email_verified: 0,
+      email_verified: verifiedFlag,
+      email_verified_at: verifiedAt,
       security_question: cleanQuestion,
       security_answer_hash: securityAnswerHash
     };

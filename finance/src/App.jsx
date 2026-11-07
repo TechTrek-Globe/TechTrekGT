@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { BudgetMetadataProvider } from './context/BudgetMetadataContext';
 import { LedgerDataProvider } from './context/LedgerDataContext';
-import { useBudgetMetadataState } from './context/BudgetContext';
+import { useBudget, useBudgetMetadataState } from './context/BudgetContext';
 import { AppLayout } from './components/AppLayout';
 import { LandingPage } from './components/LandingPage';
 import { logState } from './utils/logger';

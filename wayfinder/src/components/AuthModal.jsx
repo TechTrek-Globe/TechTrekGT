@@ -21,7 +21,9 @@ export function AuthModal() {
     register, 
     getSecurityQuestion, 
     forgotPassword, 
-    resetPassword 
+    resetPassword,
+    verifyEmail,
+    resendVerification 
   } = useAuth();
   
   const [mode, setMode] = useState('signin');
@@ -42,6 +44,7 @@ export function AuthModal() {
   
   const [resetToken, setResetToken] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
   
   const [error, setError] = useState('');
   const [infoMessage, setInfoMessage] = useState('');
@@ -55,6 +58,24 @@ export function AuthModal() {
     setInfoMessage('');
     setForgotStep(1);
     setLoadedQuestion('');
+    setVerificationCode('');
+  };
+
+  const handleResendCode = async () => {
+    if (!email) {
+      setError('Please provide your email address.');
+      return;
+    }
+    setError('');
+    setIsSubmitting(true);
+    try {
+      const res = await resendVerification(email);
+      setInfoMessage(res.message || 'A new verification code has been sent to your email.');
+    } catch (err) {
+      setError(err.message || 'Failed to resend verification code.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleFetchQuestion = async (e) => {
@@ -91,19 +112,49 @@ export function AuthModal() {
           setError('Please select a security question and provide an answer.');
           setIsSubmitting(false); return;
         }
-        await register(name, email, password, securityQuestion, securityAnswer, rememberMe);
+        const regRes = await register(name, email, password, securityQuestion, securityAnswer, rememberMe);
+        if (regRes?.requiresVerification) {
+          setMode('verify');
+          if (regRes.warning) {
+            setError(regRes.warning);
+          } else {
+            setInfoMessage(regRes.message || 'Account created! Please enter the 8-digit verification code sent to your email.');
+          }
+          setPassword('');
+          return;
+        }
         if (rememberMe && email) {
           try { localStorage.setItem('wayfinder_saved_email', email); } catch (e) {}
         } else {
           try { localStorage.removeItem('wayfinder_saved_email'); } catch (e) {}
         }
       } else if (mode === 'signin') {
-        await login(email, password, rememberMe);
-        if (rememberMe && email) {
-          try { localStorage.setItem('wayfinder_saved_email', email); } catch (e) {}
-        } else {
-          try { localStorage.removeItem('wayfinder_saved_email'); } catch (e) {}
+        try {
+          await login(email, password, rememberMe);
+          if (rememberMe && email) {
+            try { localStorage.setItem('wayfinder_saved_email', email); } catch (e) {}
+          } else {
+            try { localStorage.removeItem('wayfinder_saved_email'); } catch (e) {}
+          }
+        } catch (loginErr) {
+          if (loginErr?.requiresVerification || loginErr?.code === 'EMAIL_VERIFICATION_REQUIRED') {
+            setMode('verify');
+            setError(loginErr.message || 'Email verification is required before signing in.');
+            return;
+          }
+          throw loginErr;
         }
+      } else if (mode === 'verify') {
+        if (!verificationCode || verificationCode.trim().length !== 8) {
+          setError('Please enter the valid 8-digit verification code.');
+          setIsSubmitting(false);
+          return;
+        }
+        const verRes = await verifyEmail(email, verificationCode.trim());
+        setInfoMessage(verRes.message || 'Email verified successfully! You can now sign in.');
+        setMode('signin');
+        setVerificationCode('');
+        setPassword('');
       } else if (mode === 'forgot') {
         if (forgotStep === 1) { await handleFetchQuestion(); return; }
         const res = await forgotPassword(email, securityAnswer);
@@ -124,29 +175,31 @@ export function AuthModal() {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-wf-navy/90 backdrop-blur-md animate-fade-in overflow-y-auto">
-      <div className="relative w-full max-w-md bg-wf-navy border border-wf-navy-lt rounded-2xl shadow-2xl overflow-hidden text-wf-text max-h-[90vh] overflow-y-auto my-auto glass-card">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6 bg-wf-navy/90 backdrop-blur-md animate-fade-in overflow-y-auto">
+      <div className="relative w-full max-w-md bg-wf-navy border border-wf-navy-lt rounded-2xl shadow-2xl overflow-hidden text-wf-text max-h-[85vh] flex flex-col my-auto glass-card">
         
         {/* Header decoration */}
         <div className="absolute -top-24 -left-24 w-48 h-48 bg-wf-blue/20 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-wf-amber/20 rounded-full blur-3xl pointer-events-none" />
 
         {/* Modal Header */}
-        <div className="relative flex items-center justify-between p-6 border-b border-white/10">
+        <div className="relative flex items-center justify-between p-5 sm:p-6 border-b border-white/10 shrink-0 bg-wf-navy">
           <div className="flex items-center space-x-3">
             <div className="p-2.5 bg-wf-navy-mid border border-wf-navy-lt rounded-xl text-wf-blue-lt shadow-inner">
-              {mode === 'forgot' || mode === 'reset' ? <KeyRound className="w-5 h-5" /> : <ShieldCheck className="w-5 h-5" />}
+              {mode === 'verify' ? <Mail className="w-5 h-5" /> : mode === 'forgot' || mode === 'reset' ? <KeyRound className="w-5 h-5" /> : <ShieldCheck className="w-5 h-5" />}
             </div>
             <div>
               <h3 className="text-lg font-semibold text-white">
                 {mode === 'register' && 'Create Your Account'}
                 {mode === 'signin' && 'Welcome Back'}
+                {mode === 'verify' && 'Verify Your Email'}
                 {mode === 'forgot' && 'Reset Password'}
                 {mode === 'reset' && 'Set New Password'}
               </h3>
               <p className="text-xs text-wf-muted">
                 {mode === 'register' && 'Required: Email, Name & Security Question'}
                 {mode === 'signin' && 'Sign in to access your private itinerary hub'}
+                {mode === 'verify' && 'Enter the 8-digit verification code sent to your inbox'}
                 {mode === 'forgot' && (forgotStep === 1 ? 'Enter your registered email address' : 'Answer your security question')}
                 {mode === 'reset' && 'Enter your reset code and new password'}
               </p>
@@ -155,7 +208,7 @@ export function AuthModal() {
           <button
             type="button"
             onClick={() => setIsAuthModalOpen(false)}
-            className="p-1.5 text-wf-muted hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+            className="p-1.5 text-wf-muted hover:text-white hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
             title="Close modal"
           >
             <X className="w-5 h-5" />
@@ -163,7 +216,7 @@ export function AuthModal() {
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 relative">
+        <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-4 relative overflow-y-auto flex-1">
           {error && (
             <div className="p-3 bg-red-950/60 border border-red-800/80 rounded-xl text-red-300 text-xs flex items-center space-x-2">
               <span className="font-semibold">Error:</span>
@@ -194,7 +247,7 @@ export function AuthModal() {
             </div>
           )}
 
-          {(mode === 'signin' || mode === 'register' || mode === 'forgot' || mode === 'reset') && (
+          {(mode === 'signin' || mode === 'register' || mode === 'forgot' || mode === 'reset' || mode === 'verify') && (
             <div>
               <label className="block text-xs font-medium text-wf-cream mb-1.5">Email Address</label>
               <div className="relative">
@@ -202,12 +255,40 @@ export function AuthModal() {
                 <input
                   type="email"
                   required
-                  disabled={mode === 'forgot' && forgotStep === 2}
+                  disabled={(mode === 'forgot' && forgotStep === 2) || mode === 'verify'}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
                   className="w-full pl-10 pr-4 py-2.5 bg-wf-navy-mid border border-white/10 rounded-xl text-sm text-white placeholder-wf-subtle focus:outline-none focus:border-wf-blue focus:ring-1 focus:ring-wf-blue transition-all disabled:opacity-60"
                 />
+              </div>
+            </div>
+          )}
+
+          {mode === 'verify' && (
+            <div>
+              <label className="block text-xs font-medium text-wf-cream mb-1.5">8-Digit Verification Code</label>
+              <div className="relative">
+                <KeyRound className="absolute left-3.5 top-3 w-4 h-4 text-wf-subtle" />
+                <input
+                  type="text"
+                  required
+                  maxLength={8}
+                  value={verificationCode}
+                  onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ''))}
+                  placeholder="12345678"
+                  className="w-full pl-10 pr-4 py-2.5 bg-wf-navy-mid border border-white/10 rounded-xl text-base text-white text-center font-mono tracking-widest placeholder-wf-subtle focus:outline-none focus:border-wf-blue transition-all"
+                />
+              </div>
+              <div className="flex justify-end mt-1.5">
+                <button
+                  type="button"
+                  onClick={handleResendCode}
+                  disabled={isSubmitting}
+                  className="text-xs text-sky-400 hover:text-white transition-colors cursor-pointer"
+                >
+                  Didn't receive a code? Resend
+                </button>
               </div>
             </div>
           )}
@@ -362,6 +443,7 @@ export function AuthModal() {
                 <span>
                   {mode === 'register' && 'Create Account'}
                   {mode === 'signin' && 'Sign In'}
+                  {mode === 'verify' && 'Verify & Sign In'}
                   {mode === 'forgot' && (forgotStep === 1 ? 'Verify Email' : 'Verify Answer & Reset')}
                   {mode === 'reset' && 'Reset Password'}
                 </span>
@@ -371,12 +453,18 @@ export function AuthModal() {
           </button>
         </form>
 
-        <div className="p-4 bg-wf-navy-mid/30 border-t border-white/5 text-center text-xs text-wf-muted flex items-center justify-center space-x-4">
+        <div className="p-4 bg-wf-navy-mid/30 border-t border-white/5 text-center text-xs text-wf-muted flex items-center justify-center space-x-4 shrink-0">
           {mode === 'register' && (
             <p>Already have an account? <button type="button" onClick={() => switchMode('signin')} className="text-wf-blue-lt font-medium hover:underline ml-1">Sign In</button></p>
           )}
           {mode === 'signin' && (
             <p>Don't have an account yet? <button type="button" onClick={() => switchMode('register')} className="text-wf-blue-lt font-medium hover:underline ml-1">Create Account</button></p>
+          )}
+          {mode === 'verify' && (
+            <div className="flex items-center space-x-4">
+              <button type="button" onClick={() => switchMode('signin')} className="text-wf-blue-lt font-medium hover:underline">Back to Sign In</button>
+              <button type="button" onClick={() => switchMode('register')} className="text-wf-muted hover:text-white hover:underline">Register New Email</button>
+            </div>
           )}
           {(mode === 'forgot' || mode === 'reset') && (
             <div className="flex items-center space-x-4">

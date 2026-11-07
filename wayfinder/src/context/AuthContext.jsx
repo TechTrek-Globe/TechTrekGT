@@ -55,7 +55,11 @@ export function AuthProvider({ children }) {
 
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(data.error || `Login failed (HTTP ${res.status})`);
+        const error = new Error(data.error || `Login failed (HTTP ${res.status})`);
+        error.code = data.code;
+        error.requiresVerification = data.requiresVerification;
+        error.email = data.email || email;
+        throw error;
       }
 
       setIsAuthenticated(true);
@@ -81,6 +85,10 @@ export function AuthProvider({ children }) {
         throw new Error(data.error || `Registration failed (HTTP ${res.status})`);
       }
 
+      if (data.requiresVerification) {
+        return data;
+      }
+
       setIsAuthenticated(true);
       setUser(data.user);
       setIsAuthModalOpen(false);
@@ -88,6 +96,36 @@ export function AuthProvider({ children }) {
     } catch (err) {
       throw err;
     }
+  };
+
+  const verifyEmail = async (email, code) => {
+    const res = await fetch(getApiUrl('/api/auth/verify-email'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ email, code })
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.error || `Verification failed (HTTP ${res.status})`);
+    }
+    return data;
+  };
+
+  const resendVerification = async (email) => {
+    const res = await fetch(getApiUrl('/api/auth/resend-verification'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ email })
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.error || `Failed to resend verification (HTTP ${res.status})`);
+    }
+    return data;
   };
 
   const getSecurityQuestion = async (email) => {
@@ -148,6 +186,30 @@ export function AuthProvider({ children }) {
     } catch (e) {}
   };
 
+  const deleteAccount = async () => {
+    try {
+      const res = await fetch(getApiUrl('/api/auth/delete-account'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include'
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || `Failed to delete account (HTTP ${res.status})`);
+      }
+      sessionStorage.removeItem('wayfinder_last_activity');
+      setIsAuthenticated(false);
+      setUser(null);
+      if (typeof window !== 'undefined') {
+        window.history.pushState({}, '', '/wayfinder/poland-christmas-2026');
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      }
+      return data;
+    } catch (err) {
+      throw err;
+    }
+  };
+
   // Check auth status on load
   useEffect(() => {
     const checkAuth = async () => {
@@ -185,6 +247,9 @@ export function AuthProvider({ children }) {
       getSecurityQuestion,
       forgotPassword,
       resetPassword,
+      verifyEmail,
+      resendVerification,
+      deleteAccount,
       logout
     }}>
       {children}

@@ -1,6 +1,7 @@
-import { hashPassword, createToken } from '../../utils/auth.js';
+import { hashPassword, createToken, hmacHex, generateVerificationCode } from '../../utils/auth.js';
 import { checkRateLimit } from '../../utils/rateLimit.js';
 import { sha256Hex } from '../../utils/agendaAccess.js';
+import { sendVerificationCodeEmail } from '../../utils/inviteEmail.js';
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -110,6 +111,52 @@ export async function onRequestPost(context) {
        VALUES (?, ?, ?, ?, ?, ?, 'user', 0, 'Active', ?, ?)`
     ).bind(userId, cleanEmail, passwordHash, name.trim(), cleanSecurityQuestion, securityAnswerHash, emailVerified, emailVerifiedAt).run();
 
+    // If registering without an invite token, require email verification before signing in
+    if (emailVerified === 0) {
+      const verificationCode = generateVerificationCode();
+      const hmacSecret = env.CODE_HMAC_SECRET || env.JWT_SECRET;
+      const codeHash = await hmacHex(hmacSecret, `verify:${cleanEmail}:${verificationCode}`);
+      const verificationId = `vfy-${crypto.randomUUID()}`;
+      const now = Date.now();
+      const expiresAt = now + 24 * 60 * 60 * 1000; // 24 hours
+
+      await env.DB.prepare(
+        `INSERT INTO email_verifications (id, user_id, email, token, expires_at, used, attempts, created_at)
+         VALUES (?, ?, ?, ?, ?, 0, 0, ?)`
+      ).bind(verificationId, userId, cleanEmail, codeHash, expiresAt, now).run();
+
+      // Dispatch verification email in background
+      const emailResult = await sendVerificationCodeEmail(env, {
+        to: cleanEmail,
+        code: verificationCode,
+        name: name.trim()
+      });
+
+      if (!emailResult.sent) {
+        console.warn(`[register] Verification email dispatch warning for ${cleanEmail}:`, emailResult.error);
+        return new Response(JSON.stringify({
+          success: true,
+          requiresVerification: true,
+          email: cleanEmail,
+          warning: `Account created, but verification email could not be sent: ${emailResult.error || 'Mail dispatch failed'}. Please use Resend on the verification screen.`,
+          message: 'Account created! Please enter the 8-digit verification code sent to your email before signing in.'
+        }), {
+          status: 201,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      return new Response(JSON.stringify({
+        success: true,
+        requiresVerification: true,
+        email: cleanEmail,
+        message: 'Account created! Please enter the 8-digit verification code sent to your email before signing in.'
+      }), {
+        status: 201,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
     if (!env.JWT_SECRET) {
       return new Response(JSON.stringify({ error: 'Server misconfiguration: missing JWT_SECRET' }), {
         status: 500,
@@ -119,7 +166,7 @@ export async function onRequestPost(context) {
 
     const maxAge = body.rememberMe ? 30 * 24 * 3600 : 7200;
 
-    // Create JWT token
+    // Create JWT token (only for pre-verified invite token registrations)
     const token = await createToken(
       { userId, email: cleanEmail, householdId: null, name: name.trim(), role: 'user', isAdmin: false, apiKeyEnabled: false },
       env.JWT_SECRET,

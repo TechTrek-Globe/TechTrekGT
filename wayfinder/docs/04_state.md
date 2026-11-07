@@ -508,3 +508,57 @@ Governs the state invariants, atomic transaction guarantees, and edge lifecycle 
   - If `role === 'none'`, `PrivateHub` renders `NoAccessPanel` and unmounts all private subviews (`ItineraryView`, `DocumentCenter`, `ExpenseLedger`, `PackingManager`).
   - Unpermitted deep link paths are intercepted and replaced with `/private`, rendering an explanatory notice.
 
+### 16.12 Email Verification State & Invariants (`email_verifications`)
+
+- Table Schema (`personal-budget-db`):
+  - `email_verifications` (`id` TEXT PRIMARY KEY, `user_id` TEXT NOT NULL, `email` TEXT NOT NULL, `token` TEXT NOT NULL, `expires_at` INTEGER NOT NULL, `used` INTEGER NOT NULL DEFAULT 0, `attempts` INTEGER NOT NULL DEFAULT 0, `created_at` INTEGER NOT NULL).
+- Verification Token Hashing Invariant:
+  - Tokens are stored as SHA-256 HMAC digests using message format `verify:${cleanEmail}:${verificationCode}` signed with `CODE_HMAC_SECRET || JWT_SECRET`. Plaintext verification codes are never stored.
+- Sign In Gating Invariant:
+  - `POST /api/auth/login` checks `user.email_verified === 1 || Boolean(user.email_verified_at)`.
+  - Accounts with `email_verified = 0` are denied session issuance with HTTP 403 and `code: 'EMAIL_VERIFICATION_REQUIRED'`.
+- Code Lifecycle & Invalidation:
+  - Verification codes expire after exactly 24 hours (`now + 86,400,000ms`).
+  - After 5 invalid attempts, the verification record is marked `used = 1` to prevent brute force discovery.
+  - Resending verification code invalidates all prior unconsumed codes for that user/email before inserting a new record.
+
+### 16.13 Admin Dashboard Trip Collaboration State & Invariants
+
+- Dual Role Invariant:
+  - Platform administrator status is strictly read from `users.role = 'admin'` or `users.is_admin = 1`.
+  - Trip collaborator role is read from `wayfinder_agenda_shares.role` (`viewer`, `editor`, `admin`), or `'owner'` if `wayfinder_journeys.created_by = user.id`.
+  - Administrative endpoints never overwrite platform role when updating trip collaborator membership, nor vice versa.
+- Trip Membership Mutation Invariant (`POST /api/wayfinder/admin/trip-membership`):
+  - Validates `role` in `['viewer', 'editor', 'admin', 'none', 'unaffiliated']`.
+  - When `role` is `'none'` or `'unaffiliated'`, atomically deletes the collaborator from `wayfinder_agenda_shares` and records an `admin_unaffiliate_trip_user` audit event.
+  - Prohibits demoting or altering the permissions of the trip owner (`journey.created_by === userId`).
+  - Upserts into `wayfinder_agenda_shares` with `ON CONFLICT(agenda_id, user_id) DO UPDATE SET role = excluded.role`.
+- Collaborator Disconnection Invariant (`POST /api/wayfinder/admin/trip-membership/remove`):
+  - Deletes matching `(agenda_id, user_id)` from `wayfinder_agenda_shares`.
+  - Prohibits disconnecting the trip owner.
+- Platform Role Modification Invariant (`POST /api/wayfinder/admin/user-role`):
+  - Accepts `role` in `['admin', 'user']` and synchronizes `users.role` and `users.is_admin`.
+  - Strictly prevents callers from demoting their own active platform admin account (`userId === user.userId`).
+
+### 16.14 Account Deletion State & Invariants
+
+- Atomic Cascading Purge (`deleteUserAccount`):
+  - Execution runs strictly inside a single `env.DB.batch(stmts)` array, guaranteeing all statements commit atomically or rollback completely on error.
+  - Clears `wayfinder_agenda_shares`, `wayfinder_agenda_invites`, `email_verifications`, `password_resets`, `wayfinder_calendar_tokens`, `wayfinder_packing_items`, `wayfinder_expense_splits`, `wayfinder_expense_settlements`, `wayfinder_email_inboxes`, `wayfinder_gmail_connections`, `wayfinder_extracted_fields`, `wayfinder_extraction_jobs`, `wayfinder_documents`, and `wayfinder_expenses`.
+  - Preserves Public Guide Continuity: If the deleted user created system journeys (e.g., `poland-christmas-2026`), `wayfinder_journeys.created_by` is safely updated to `'system'` rather than cascaded or deleted, preventing loss of platform-wide itineraries.
+- Session Invalidation Invariant:
+  - Whenever an account is deleted (either via self-service `/api/auth/delete-account` or an administrator deleting their own account via `/api/wayfinder/admin/user-delete`), the response MUST return `Set-Cookie: auth_token=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0`.
+- Audit Logging Invariant:
+  - Account deletion records an immutable audit event in `wayfinder_audit_events` with `action = 'account_deleted'` capturing `deletedUserId`, `deletedEmail`, and `isSelf`.
+
+### 16.15 Transactional Email & Modal Viewport Invariants
+
+- Cloudflare Email Routing Configuration Invariant:
+  - The canonical sender address for Wayfinder transactional emails is bound to `noreply@techtrekgt.com` via `wrangler.jsonc` `MAIL_FROM` variable.
+  - Workers use the `SEND_EMAIL` binding with native `EmailMessage` and base64 RFC 5322 MIME encoding.
+  - Gating endpoints (`/api/auth/register`, `/api/auth/resend-verification`) never suppress mail delivery errors; non-zero delivery failures bubble up as explicit errors or warnings.
+- Viewport & Stacking Invariant:
+  - Authentication modal (`AuthModal.jsx`) maintains an invariant `z-[100]` stacking index, strictly superseding the `sticky top-0 z-50` navigation header.
+  - Modal dialog frame enforces `max-h-[85vh]` with `shrink-0` header/footer anchors and an internal `overflow-y-auto` scroll container, preventing title clipping across all device viewports.
+
+

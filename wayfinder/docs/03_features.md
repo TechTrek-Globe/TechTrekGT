@@ -78,7 +78,7 @@ To maximize usability during winter roaming and in-destination field usage, Wayf
   - Money: One-tap launcher for the full-screen interactive currency converter.
   - Hub: Direct gateway to the private travel vault and document center.
 - Slim Desktop Header & Spill-Over Brand Crest: Features a locked top bar housing the enlarged high-resolution brand banner (`wayfinderHeaderBanner`) which spills over the bottom gold border (`-mb-4 sm:-mb-6 md:-mb-8 lg:-mb-9`) with realistic drop-shadow depth, ensuring full legibility across all viewports. Houses the Practical Guide, 10-day Itinerary anchor, live Currency Converter, Private Hub, and user authentication actions in [wayfinder/src/components/Layout.jsx](file:///e:/TechTrekGT/wayfinder/src/components/Layout.jsx).
-- Docked Private Hub Sub-Toolbar: [wayfinder/src/components/PrivateHub.jsx](file:///e:/TechTrekGT/wayfinder/src/components/PrivateHub.jsx) anchors directly beneath the main navbar as a sticky sub-bar (`sticky top-14 sm:top-16 z-30 bg-slate-900/95 backdrop-blur-xl border-b border-white/10`). Replaces the oversized left-side header block with an elegant, compact inline identity pill (`[ShieldCheck] Private Hub • Poland 2026`) and presents all sub-navigation buttons (Itinerary, Packing List, Expense Ledger, Documents, Sync Calendar, Admin) on a single horizontal row with zero horizontal scroll. Day timeline headers in [wayfinder/src/components/ItineraryView.jsx](file:///e:/TechTrekGT/wayfinder/src/components/ItineraryView.jsx) lock smoothly beneath the dual sticky bars (`top-[104px] sm:top-[112px]`) with synchronized `scroll-mt-32` offsets.
+- Docked Private Hub Sub-Toolbar: [wayfinder/src/components/PrivateHub.jsx](file:///e:/TechTrekGT/wayfinder/src/components/PrivateHub.jsx) anchors directly beneath the main navbar as a sticky sub-bar (`sticky top-14 sm:top-16 z-30 bg-slate-900/95 backdrop-blur-xl border-b border-white/10`). Replaces the oversized left-side header block with an elegant, compact inline identity pill (`[ShieldCheck] Private Hub • Poland 2026`) and presents all sub-navigation buttons (Itinerary, Packing List, Expense Ledger, Documents, Sync Calendar, Share) on a single horizontal row with zero horizontal scroll. Day timeline headers in [wayfinder/src/components/ItineraryView.jsx](file:///e:/TechTrekGT/wayfinder/src/components/ItineraryView.jsx) lock smoothly beneath the dual sticky bars (`top-[104px] sm:top-[112px]`) with synchronized `scroll-mt-32` offsets. Global administrator access is cleanly unified in the top navigation header ([Layout.jsx](file:///e:/TechTrekGT/wayfinder/src/components/Layout.jsx)), eliminating redundant buttons from the trip sub-bar.
 - Consolidated City Drill-Down Tabs: CityPage tabs are streamlined to 5 primary destinations (Overview, Markets, Sights, Food, Stays, and Safe Spaces), avoiding horizontal overflow on small displays while moving in-depth historical chronologies to an engaging highlight card inside Overview.
 - Public/Private Schedule Harmony: Unauthenticated visitors can view the full 10-day Poland trip itinerary freely, with a discreet invitation to authenticate to reveal private booking confirmations and tickets.
 - Unified Journey Sequence & Schedule Stops: [wayfinder/src/components/PolandLanding.jsx](file:///e:/TechTrekGT/wayfinder/src/components/PolandLanding.jsx) directly integrates the full 10-day itinerary timeline, flight arrivals, PKP rail transfers, daily activities, and authenticated private booking records directly into the 5 Journey Sequence stops (Kraków, Wrocław, Poznań, Toruń, Gdańsk). This unifies the public landing guide and personal schedule into a single, cohesive interface, complete with intercity transit connector cards, stop filter pills, and a Schedule vs. Cards view mode switcher (defaulting to compact Cards view). In Schedule view, each day's date header (badge, date, subtitle, live weather, and recommended base) features sticky positioning (`sticky top-14 sm:top-16 z-20 bg-slate-950/95 backdrop-blur-md`) enclosed in bounded day section containers with natural CSS replacement as travelers scroll through each day's events.
@@ -610,4 +610,103 @@ Hardens Wayfinder against cross-tenant data leaks and enforces role-based bounda
   - Sub-Toolbar Tab Pruning: `PrivateHub` dynamically filters sub-toolbar navigation tabs so users only see links to authorized modules (e.g. Documents and Expenses tabs are hidden for editors and viewers).
   - Deep-Link Interception: Attempting to directly navigate to restricted tabs (`/private/documents`, `/private/expenses`) silently redirects the caller back to `/private` via `window.history.replaceState` and displays a contextual permission warning.
   - Mobile Bottom Bar Adaptation (`BottomTabBar.jsx`): Dynamically resolves the Hub tab route to `/private/documents` for administrators and `/private` for non-document roles.
+
+## 32. Mandatory Email Verification for User Registration & Sign In Gating
+
+Enforces email ownership validation before allowing new user accounts to sign in or obtain active platform session credentials:
+
+- Unverified Registration Quarantine (`functions/api/auth/register.js`):
+  - Standard user registration creates the account with `email_verified = 0` and `email_verified_at = NULL`.
+  - Withholds automatic session issuance (no `Set-Cookie` header and no JWT returned).
+  - Automatically generates a cryptographically random 8-digit verification code (`generateVerificationCode()`).
+  - Computes a SHA-256 HMAC digest (`verify:${cleanEmail}:${verificationCode}`) using `CODE_HMAC_SECRET || JWT_SECRET` and persists the record into shared `email_verifications` with a 24-hour expiration window.
+  - Dispatches an email with the 8-digit verification code via `SEND_EMAIL` / `EmailMessage` / Resend API using the platform canonical address `no-reply@techtrekgt.com`.
+  - Returns HTTP 201 with `{ success: true, requiresVerification: true, email }`.
+  - Exception: Registrations carrying a valid, active `inviteToken` prove control of the invited inbox and are marked `email_verified = 1` immediately upon account creation.
+- Login Verification Enforcement (`functions/api/auth/login.js`):
+  - Validates credentials against PBKDF2 password hashes.
+  - Prior to issuing session tokens, verifies `user.email_verified === 1 || Boolean(user.email_verified_at)`.
+  - Unverified accounts are blocked with HTTP 403 Forbidden and `{ error: 'Email verification required...', code: 'EMAIL_VERIFICATION_REQUIRED', requiresVerification: true, email }`, preventing unverified sign ins.
+- Email Verification Endpoint (`POST /api/auth/verify-email`):
+  - Rate limited to 5 attempts per 60 seconds per IP.
+  - Accepts `{ email, code }` and validates 8-digit formatting (`/^\d{8}$/`).
+  - Retrieves active verification records from `email_verifications` where `used = 0`.
+  - Enforces timing attack mitigation via constant-time string comparison (`constantTimeStringEqual`).
+  - Tracks failed attempts (marks code invalid after 5 failed attempts).
+  - Upon successful verification, atomically marks the code as `used = 1` and updates `users` setting `email_verified = 1` and `email_verified_at = datetime('now')`.
+- Resend Verification Code Endpoint (`POST /api/auth/resend-verification`):
+  - Rate limited to 3 attempts per 300 seconds per IP.
+  - Accepts `{ email }`.
+  - Neutral response pattern for non-existent or already verified accounts to prevent user enumeration.
+  - For unverified accounts, invalidates prior codes, generates a fresh 8-digit code, and dispatches a new verification email.
+- Client-Side Verification Flow (`src/components/AuthModal.jsx`, `src/context/AuthContext.jsx`):
+  - `AuthModal` supports `mode = 'verify'` with an 8-digit numeric input, direct "Resend Code" action, and clear guidance.
+  - When standard registration completes, `AuthModal` transitions directly to `mode = 'verify'`.
+  - If an unverified user attempts to sign in, `AuthModal` intercepts the 403 error, transitions to `mode = 'verify'`, and prompts the user to enter their verification code.
+  - Successful verification displays an evergreen confirmation alert and redirects the user to the Sign In screen with their verified email pre-filled.
+
+## 33. Admin Dashboard Trip Collaboration Governance & Role Differentiation
+
+Provides full administrative oversight and interactive control over trips, collaborator groups, and account permissions across the platform:
+
+- Dual Role Representation (Platform Role vs. Trip Role):
+  - Resolves ambiguity between platform-wide administrator status (`users.role = 'admin'` / `is_admin = 1`) and trip-level collaborator permissions (`wayfinder_agenda_shares.role` in `'viewer'`, `'editor'`, `'admin'`).
+  - Both roles are explicitly exposed and modifiable directly within the Admin Dashboard ([AdminView.jsx](file:///e:/TechTrekGT/wayfinder/src/components/admin/AdminView.jsx)).
+- Trips & Collaborator Groups Overview:
+  - Surfaces active trips and journeys discovered in D1 with complete ownership metadata (`owner.name`, `owner.email`, `Owner` badge).
+  - Visualizes tied accounts per trip with real-time collaborator counts, trip roles, and active invitations.
+  - Interactive Trip Role Selector: Admins can dynamically change collaborator permissions (`viewer` <-> `editor` <-> `admin`) directly from the trip card or Registered Accounts table.
+  - Disconnect Action: One-click collaborator detachment with confirmation prompts (`DELETE /api/wayfinder/admin/trip-membership` or `POST .../remove`), immediately revoking Private Hub access.
+  - Unaffiliated Accounts Discovery & Quick-Tie: Explicitly identifies registered users not affiliated with a given trip, offering 1-click role selection and immediate trip affiliation (`POST /api/wayfinder/admin/trip-membership`).
+- Platform Role Governance:
+  - Interactive platform role toggle allows authorized administrators to promote users to Platform Admin or demote them to standard User (`POST /api/wayfinder/admin/user-role`), complete with self-demotion prevention guardrails.
+- Audit Logging:
+  - All admin-initiated trip membership modifications, role updates, and disconnections automatically insert immutable audit entries into `wayfinder_audit_events`.
+
+## 34. Self-Service & Administrative Account Deletion
+
+Empowers both regular users and platform administrators to permanently erase user accounts and scrub associated personal data from the system:
+
+- Self-Service Account Deletion ([SettingsModal.jsx](file:///e:/TechTrekGT/wayfinder/src/components/SettingsModal.jsx)):
+  - Authenticated users access a dedicated "Account & Data Deletion" section in the Preferences modal.
+  - Requires typing the confirmation word `DELETE` to prevent accidental deletion.
+  - Dispatches `POST /api/auth/delete-account` via `AuthContext.deleteAccount()`.
+  - Clears `auth_token` session cookie via `Max-Age=0`, invalidates client authentication state, and redirects to the public guide.
+- Administrative Account Deletion ([AdminView.jsx](file:///e:/TechTrekGT/wayfinder/src/components/admin/AdminView.jsx)):
+  - Registered Accounts table provides a direct `[Delete]` action for both third-party accounts and the active administrator's own account.
+  - Deleting another user permanently scrubs their account and refreshes admin metrics.
+  - Deleting self triggers a critical confirmation alert, executes `POST /api/wayfinder/admin/user-delete`, clears the administrator's session cookie, and signs them out to the public landing page.
+- Comprehensive Relational Data Scrubbing (`functions/utils/deleteAccount.js`):
+  - Atomic batch cleanup across all D1 tables in `personal-budget-db`:
+    - `wayfinder_agenda_shares` (membership rows)
+    - `wayfinder_agenda_invites` (sent, received, or accepted invites)
+    - `email_verifications` & `password_resets` (verification and reset codes)
+    - `wayfinder_calendar_tokens` (personalized calendar feed tokens)
+    - `wayfinder_packing_items` (user gear lists)
+    - `wayfinder_expense_splits` & `wayfinder_expense_settlements` (ledger splits and payments)
+    - `wayfinder_email_inboxes` & `wayfinder_gmail_connections` (forwarding inboxes and OAuth links)
+    - `wayfinder_extracted_fields`, `wayfinder_extraction_jobs`, `wayfinder_documents`, & `wayfinder_expenses`
+    - `wayfinder_itinerary_items` (private user bookings)
+    - `wayfinder_journeys` (reassigns `created_by` to `'system'` to preserve public guide availability)
+    - `users` (primary account row)
+  - Records an immutable `account_deleted` entry in `wayfinder_audit_events`.
+
+## 35. Transactional Email Dispatch via Cloudflare Email Routing & Viewport-Safe Modal Architecture
+
+Ensures reliable transactional email delivery and unobstructed user interaction across authentication workflows:
+
+- Standardized Cloudflare Email Routing (`functions/utils/inviteEmail.js`):
+  - Configures canonical sender address `noreply@techtrekgt.com` via Cloudflare `SEND_EMAIL` binding and `MAIL_FROM` environment variable.
+  - Multi-Strategy Dispatch Pipeline:
+    1. Primary: Native `EmailMessage` from `cloudflare:email` using RFC 5322 MIME multipart standards with UTF-8 base64 encoding (compatible with Cloudflare Workers `nodejs_compat`).
+    2. Fallback 1: Structured parameter object `{ to, from, subject, text, html }`.
+    3. Fallback 2: Array-based recipient object `{ to: [{ email }], from: { email, name }, subject, text, html }`.
+    4. Fallback 3: External Resend API (`api.resend.com/emails`) if `RESEND_API_KEY` is provisioned.
+  - Active Delivery Validation: Gating endpoints (`/api/auth/register`, `/api/auth/resend-verification`) validate delivery status and surface actionable diagnostic errors rather than false success confirmations.
+- Viewport-Safe Auth Modal Stacking & Layout ([AuthModal.jsx](file:///e:/TechTrekGT/wayfinder/src/components/AuthModal.jsx)):
+  - Z-Index Elevation: Modal elevated to `z-[100]`, strictly superseding the sticky navigation bar (`sticky top-0 z-50`) to eliminate title clipping and button obscuration.
+  - Vertical Bounding: Container constrained to `max-h-[85vh]` with `flex flex-col` flexbox distribution.
+  - Fixed Structural Frame: Header and footer configured with `shrink-0`, guaranteeing permanent visibility of modal titles, status descriptions, close button (`X`), and action links.
+  - Scrollable Form Body: Form container configured with `overflow-y-auto flex-1`, ensuring form controls, security questions, and verification inputs remain fully accessible across short mobile viewports and zoomed desktop displays.
+
 

@@ -11,6 +11,9 @@ import { onRequestPost as registerHandler } from '../functions/api/auth/register
 import { onRequestPost as forgotPasswordHandler } from '../functions/api/auth/forgot-password.js';
 import { onRequestPost as resetPasswordHandler } from '../functions/api/auth/reset-password.js';
 import { onRequestPost as securityQuestionHandler } from '../functions/api/auth/security-question.js';
+import { onRequestPost as verifyEmailHandler } from '../functions/api/auth/verify-email.js';
+import { onRequestPost as resendVerificationHandler } from '../functions/api/auth/resend-verification.js';
+import { onRequestPost as deleteAccountHandler } from '../functions/api/auth/delete-account.js';
 import { handleJourneys }   from '../functions/api/wayfinder/journeys.js';
 import { handleItinerary }  from '../functions/api/wayfinder/itinerary.js';
 import { handleAccommodations } from '../functions/api/wayfinder/accommodations.js';
@@ -115,9 +118,16 @@ export default {
     if (apiPath === '/api/auth/logout' && method === 'POST') return logoutHandler({ request, env, ctx });
     if (apiPath === '/api/auth/me'     && method === 'GET')  return meHandler({ request, env, ctx });
     if (apiPath === '/api/auth/register' && method === 'POST') return registerHandler({ request, env, ctx });
+    if (apiPath === '/api/auth/verify-email' && method === 'POST') return verifyEmailHandler({ request, env, ctx });
+    if (apiPath === '/api/auth/resend-verification' && method === 'POST') return resendVerificationHandler({ request, env, ctx });
     if (apiPath === '/api/auth/forgot-password' && method === 'POST') return forgotPasswordHandler({ request, env, ctx });
     if (apiPath === '/api/auth/reset-password' && method === 'POST') return resetPasswordHandler({ request, env, ctx });
     if (apiPath === '/api/auth/security-question' && method === 'POST') return securityQuestionHandler({ request, env, ctx });
+    if (apiPath === '/api/auth/delete-account' && method === 'POST') {
+      const auth = await requireAuth(request, env);
+      if (!auth.ok) return auth.error;
+      return deleteAccountHandler({ request, env, ctx, user: auth.payload });
+    }
 
     // --- Admin routes ---
     if (apiPath.startsWith('/api/admin/') || apiPath.startsWith('/api/wayfinder/admin/')) {

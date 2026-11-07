@@ -1,9 +1,15 @@
-import React from 'react';
-import { X, Settings, Thermometer, Coins, Map, Scale, Clock } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, Settings, Thermometer, Coins, Map, Scale, Clock, Trash2, UserX } from 'lucide-react';
 import { useSettings } from '../context/SettingsContext';
+import { useAuth } from '../context/AuthContext';
 
 export function SettingsModal({ isOpen, onClose }) {
   const { settings, updateSettings } = useSettings();
+  const { user, isAuthenticated, deleteAccount } = useAuth();
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
 
   if (!isOpen) return null;
 
@@ -187,6 +193,97 @@ export function SettingsModal({ isOpen, onClose }) {
             </div>
             <p className="text-xs text-wf-muted">Converts suitcase allowance, carry-on weight, and packing checklist gear.</p>
           </div>
+
+          {/* Account & Data Deletion */}
+          {isAuthenticated && (
+            <div className="pt-4 border-t border-white/10 space-y-3">
+              <div className="flex items-center space-x-2 text-rose-400 font-bold text-xs uppercase tracking-wider">
+                <Trash2 className="w-4 h-4" />
+                <span>Account &amp; Data Deletion</span>
+              </div>
+              <div className="p-4 rounded-2xl bg-rose-950/20 border border-rose-900/40 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-white truncate">{user?.name || 'Account'}</p>
+                    <p className="text-[11px] font-mono text-slate-400 truncate">{user?.email}</p>
+                  </div>
+                  <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-rose-900/40 text-rose-300 border border-rose-800/50">
+                    Active
+                  </span>
+                </div>
+
+                <p className="text-xs text-rose-300/80 leading-relaxed">
+                  Permanently erase your account, travel documents, private booking entries, expense splits, and active sessions. This action is irreversible.
+                </p>
+
+                {deleteError && (
+                  <div className="p-2.5 rounded-xl bg-rose-950/60 border border-rose-800 text-rose-300 text-xs">
+                    {deleteError}
+                  </div>
+                )}
+
+                {!isConfirmingDelete ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsConfirmingDelete(true);
+                      setDeleteError(null);
+                    }}
+                    className="w-full py-2.5 px-3 rounded-xl bg-rose-950/50 hover:bg-rose-900/70 border border-rose-800/60 text-rose-300 text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete My Account</span>
+                  </button>
+                ) : (
+                  <div className="space-y-3 pt-2 border-t border-rose-900/40">
+                    <p className="text-xs font-semibold text-rose-200">
+                      Type <strong className="text-white font-mono uppercase tracking-wider">DELETE</strong> to confirm:
+                    </p>
+                    <input
+                      type="text"
+                      value={deleteConfirmText}
+                      onChange={(e) => setDeleteConfirmText(e.target.value)}
+                      placeholder="Type DELETE"
+                      className="w-full px-3 py-2 text-xs rounded-xl bg-slate-900/90 border border-rose-800/80 text-white placeholder-slate-500 focus:outline-none focus:border-rose-400 font-mono"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        disabled={deleteConfirmText.trim() !== 'DELETE' || isDeleting}
+                        onClick={async () => {
+                          setIsDeleting(true);
+                          setDeleteError(null);
+                          try {
+                            await deleteAccount();
+                            onClose();
+                          } catch (err) {
+                            setDeleteError(err.message || 'Failed to delete account');
+                            setIsDeleting(false);
+                          }
+                        }}
+                        className="flex-1 py-2 px-3 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-40 text-white text-xs font-bold transition-all shadow-md flex items-center justify-center gap-1.5"
+                      >
+                        <UserX className="w-3.5 h-3.5" />
+                        <span>{isDeleting ? 'Deleting...' : 'Confirm Delete'}</span>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isDeleting}
+                        onClick={() => {
+                          setIsConfirmingDelete(false);
+                          setDeleteConfirmText('');
+                          setDeleteError(null);
+                        }}
+                        className="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-all"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
         </div>
 

@@ -139,17 +139,6 @@ export function PrivateHub({ currentPath }) {
                 <span>Share</span>
               </button>
             )}
-            {(user?.isAdmin || user?.role === 'admin') && (
-              <a
-                href="/wayfinder/admin"
-                onClick={(e) => pushRoute(e, '/wayfinder/admin')}
-                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap text-amber-300 hover:text-white hover:bg-amber-500/20 border border-amber-500/30 shadow-sm"
-                title="System Administration & Key Entitlements"
-              >
-                <Shield className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400" />
-                <span>Admin</span>
-              </a>
-            )}
           </div>
         </div>
       </div>

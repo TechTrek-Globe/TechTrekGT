@@ -56,6 +56,19 @@ export async function onRequestPost(context) {
       });
     }
 
+    // Require email verification before issuing session
+    if (user.email_verified !== 1 && !user.email_verified_at) {
+      return new Response(JSON.stringify({
+        error: 'Email verification required. Please verify your email before signing in.',
+        code: 'EMAIL_VERIFICATION_REQUIRED',
+        requiresVerification: true,
+        email: user.email
+      }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
     const householdId = null;
 
     if (!env.JWT_SECRET) {

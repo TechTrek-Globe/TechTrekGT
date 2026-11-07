@@ -47,7 +47,7 @@
     }
   ],
   "vars": {
-    "MAIL_FROM": "no-reply@techtrekgt.com"
+    "MAIL_FROM": "noreply@techtrekgt.com"
   }
   // R2 bucket (required for document storage - not yet configured):
   // "r2_buckets": [

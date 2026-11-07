@@ -4,7 +4,7 @@
 // DELETE /api/wayfinder/itinerary/:id - soft delete
 
 import { generateId } from '../../utils/id.js';
-import { resolveAgendaAccess, getCollaboratorIds, canEdit } from '../../utils/agendaAccess.js';
+import { resolveAgendaAccess, getCollaboratorIds, canEdit, isMember } from '../../utils/agendaAccess.js';
 
 export async function handleItinerary(context, url, method) {
   const { env, user, request } = context;
@@ -19,23 +19,23 @@ export async function handleItinerary(context, url, method) {
       const journeyId = url.searchParams.get('journey_id') || url.searchParams.get('journeyId');
       if (!journeyId) return json({ error: 'journey_id required' }, 400);
 
-      // Verify ownership, collaborator share, or public visibility
+      // Members get the full agenda; unaffiliated users get public items of public journeys only
       const access = await resolveAgendaAccess(env, journeyId, user);
       const journey = access.journey;
-      if (!journey || (!access.role && journey.visibility !== 'public')) return json({ error: 'Journey not found' }, 404);
+      if (!journey || (!isMember(access.role) && journey.visibility !== 'public')) return json({ error: 'Journey not found' }, 404);
 
       let items;
-      if (access.role) {
+      if (isMember(access.role)) {
         items = await env.DB.prepare(
           `SELECT * FROM wayfinder_itinerary_items
-           WHERE (journey_id = ? OR journey_id = ? OR journey_id = 'poland-christmas-2026')
+           WHERE (journey_id = ? OR journey_id = ?)
              AND (notes IS NULL OR notes NOT LIKE '%gmail:%')
            ORDER BY local_date, local_time`
         ).bind(journeyId, journey.id).all();
       } else {
         items = await env.DB.prepare(
           `SELECT * FROM wayfinder_itinerary_items
-           WHERE (journey_id = ? OR journey_id = ? OR journey_id = 'poland-christmas-2026')
+           WHERE (journey_id = ? OR journey_id = ?)
              AND visibility = 'public'
              AND (notes IS NULL OR notes NOT LIKE '%gmail:%')
            ORDER BY local_date, local_time`
@@ -60,8 +60,8 @@ export async function handleItinerary(context, url, method) {
       // Ownership, collaborator share (editor+), or public visibility check
       const access = await resolveAgendaAccess(env, journey_id, user);
       const journey = access.journey;
-      if (!journey || (!access.role && journey.visibility !== 'public')) return json({ error: 'Journey not found' }, 404);
-      if (access.role && !canEdit(access.role)) return json({ error: 'Viewers cannot modify this agenda' }, 403);
+      if (!journey) return json({ error: 'Journey not found' }, 404);
+      if (!canEdit(access.role)) return json({ error: 'You do not have permission to modify this agenda' }, 403);
 
       const id = generateId();
       const auditId = generateId();
@@ -94,9 +94,7 @@ export async function handleItinerary(context, url, method) {
       ).bind(itemId).first();
       if (item) {
         const access = await resolveAgendaAccess(env, item.journey_id, user);
-        const allowed = item.user_id === user.userId
-          ? (!access.role || canEdit(access.role))
-          : canEdit(access.role);
+        const allowed = canEdit(access.role);
         if (!allowed) item = null;
       }
       if (!item) return json({ error: 'Item not found' }, 404);

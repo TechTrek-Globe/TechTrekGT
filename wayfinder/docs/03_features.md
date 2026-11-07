@@ -579,10 +579,35 @@ Eliminates excessive vertical tile height and resolves button label truncation a
 
 ## 30. Shared Agenda Collaboration & Email Invitations
 
-- Roles: `owner` (journey `created_by` or agenda creator), `admin`, `editor`, `viewer`. Platform admins resolve to `admin`. Only the owner can grant or modify `admin`.
-- Access boundaries: Collaborators share full access across Itinerary, Accommodations, Packing, Documents, and Expense Ledger. Collaborators on the journey can view all journey documents, vouchers, synced bookings, and trip expense ledgers. Viewers (`role: viewer`) operate in read-only mode with mutations gated (403 on adding/editing/deleting expenses, settlements, document uploads, and document deletions). The Private Hub surfaces role badges and renders full Document Center and Expense Ledger views with contextual read-only indicators for viewers.
-- API (`functions/api/wayfinder/agenda-shares.js`): `POST/GET /api/wayfinder/agendas/:id/invites`, `DELETE .../invites/:inviteId` (revoke), `PUT/DELETE .../shares/:userId`, `GET .../access` (caller role), public `GET /api/wayfinder/invites/verify?token=`, session `POST /api/wayfinder/invites/claim`.
+- Roles: `owner` (journey `created_by`), `admin` (share admin), `editor`, `viewer`, `none` (unaffiliated). Platform admins resolve to `admin`. Only the owner can grant or modify `admin`.
+- Access boundaries: Collaborators share access across itinerary and packing according to their role. Strict tier separation applies to sensitive modules (Documents, Expenses, Budget, Import Jobs) which are restricted exclusively to `owner` and `admin` (platform admin or share admin). `editor` and `viewer` roles are blocked with HTTP 403 Forbidden from accessing sensitive vaults.
+- API (`functions/api/wayfinder/agenda-shares.js`): `POST/GET /api/wayfinder/agendas/:id/invites`, `DELETE .../invites/:inviteId` (revoke), `PUT/DELETE .../shares/:userId`, `GET .../access` (caller role and permissions object), public `GET /api/wayfinder/invites/verify?token=`, session `POST /api/wayfinder/invites/claim`.
 - Invite creation: 32 random bytes via `crypto.getRandomValues` (base64url), SHA-256 stored as `token_hash`, 7-day expiry, prior pending invites for the same email are revoked. Response returns the raw token and `inviteLink` once for the Copy Link fallback; `SEND_EMAIL` dispatch (`functions/utils/inviteEmail.js`) sends from the canonical platform address `no-reply@techtrekgt.com` (configured via `env.MAIL_FROM`, aligned with Outpost) using the structured Workers Email Sending API with fallback to raw `EmailMessage`, reporting `emailSent` and `emailError`.
 - Claim: requires session email to match `invited_email`; `env.DB.batch` atomically marks the invite accepted, upserts `wayfinder_agenda_shares` (keeps the higher role) and writes an audit event; 409 if the invite was consumed concurrently.
 - Client: `/wayfinder/invite` renders `InviteClaim.jsx` (Case A accept card, Case B inline sign-in then auto-claim, Case C registration with locked email via `inviteToken` then auto-claim; email mismatch offers account switch). `ShareAgendaModal.jsx` (Share button in Private Hub for owner/admin) handles invite, copy link, revoke, role change and removal.
 - Register: `/api/auth/register` accepts optional `inviteToken`; a matching pending invite marks `users.email_verified = 1`.
+
+## 31. Multi-User Tenant Isolation & Gated Private Hub Access Control
+
+Hardens Wayfinder against cross-tenant data leaks and enforces role-based boundaries between public guide exploration, shared itinerary collaboration, and confidential travel document vaults:
+
+- Universal Role Resolution Protocol (`functions/utils/agendaAccess.js`):
+  - Function `resolveAgendaAccess(env, ref, user)` deterministically resolves the caller's relationship to any journey ref (ID or slug) to exactly one of `owner`, `admin`, `editor`, `viewer`, or `none`.
+  - Deprecated and removed implicit ownership assignment to users who created invites (`invited_by`), preventing privilege escalation if a collaborator is demoted or removed.
+  - Generates unified server-side capability matrix via `agendaPermissions(role)` returning `{ itinerary, packing, documents, expenses, share, edit }`.
+- Backend Endpoint Authorization & Scoping (`functions/api/wayfinder/*`):
+  - Elimination of Unscoped Visibility Fallbacks: Removed naive `!access.role && journey.visibility !== 'public'` gates and hardcoded `OR journey_id = 'poland-christmas-2026'` query fragments across `documents.js`, `expenses.js`, `budget.js`, `accommodations.js`, `itinerary.js`, `packing.js`, and `import-jobs.js`.
+  - Sensitive Document & Expense Vaults (`documents.js`, `expenses.js`, `budget.js`): Enforces `canViewSensitive(role)` (`owner` or `admin`). Non-admin collaborators (`editor`, `viewer`) and unaffiliated users (`none`) receive HTTP 403 Forbidden. All ID-based mutation operations (`PUT /expenses/:id`, `DELETE /expenses/:id`, `DELETE /expenses/settle`) enforce relational journey isolation (`WHERE id = ? AND journey_id = ?`) to eliminate cross-journey IDOR vulnerabilities.
+  - Accommodations Security (`accommodations.js`): Gated behind `isMember(role)`. Non-members receive an empty array, and non-sensitive roles have booking costs, currency, and source document links scrubbed from output.
+  - Itinerary Schedule Parity (`itinerary.js`): Authenticated non-members querying the schedule receive only items with `visibility = 'public'`, completely isolating private bookings, confirmation numbers, and internal notes. Mutations require `canEdit(role)`.
+  - Packing List Isolation (`packing.js`): Gated behind `isMember(role)`. Non-members receive HTTP 403 Forbidden on all operations.
+  - Import Jobs & Email Inboxes (`import-jobs.js`, `email-inboxes.js`): Approval and inbox provisioning require `canManage(role)` on the resolved journey.
+- Relational Ownership Migration:
+  - Reassigned `wayfinder_journeys.created_by` for `'poland-christmas-2026'` in D1 from `'system'` to the designated primary account ID (`usr-1785511589441-3fvgv`), establishing cryptographic ownership without heuristic fallbacks.
+- Client-Side Gatekeeping & View Isolation (`src/context/WayfinderContext.jsx`, `src/components/PrivateHub.jsx`, `src/components/BottomTabBar.jsx`):
+  - Shared Context State: `WayfinderContext` fetches and holds `agendaAccess` `{ role, permissions, loaded }` on initial auth load. Data fetchers (`fetchDocuments`, `fetchJobs`) execute only when `permissions.documents` is true, preventing unlinked users from initiating unauthorized requests or polluting IndexedDB.
+  - Unaffiliated Account Gate (`NoAccessPanel`): Authenticated users resolving to `role: 'none'` accessing `/private` are greeted by an unauthorized explanation screen directing them to the public guide or offering an invite claim shortcut. Restricted child components (`ItineraryView`, `DocumentCenter`, `ExpenseLedger`, `PackingManager`) remain completely unmounted.
+  - Sub-Toolbar Tab Pruning: `PrivateHub` dynamically filters sub-toolbar navigation tabs so users only see links to authorized modules (e.g. Documents and Expenses tabs are hidden for editors and viewers).
+  - Deep-Link Interception: Attempting to directly navigate to restricted tabs (`/private/documents`, `/private/expenses`) silently redirects the caller back to `/private` via `window.history.replaceState` and displays a contextual permission warning.
+  - Mobile Bottom Bar Adaptation (`BottomTabBar.jsx`): Dynamically resolves the Hub tab route to `/private/documents` for administrators and `/private` for non-document roles.
+

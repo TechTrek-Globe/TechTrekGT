@@ -179,6 +179,6 @@ The shared Cloudflare D1 database `personal-budget-db` has been extended with th
 
 
 
-## 7. Wayfinder Shared Agenda Tables (personal-budget-db)
+## 7. Wayfinder Shared Agenda Tables & Tenant Isolation (personal-budget-db)
 
-New shared-D1 tables owned by Wayfinder: `wayfinder_agenda_invites` (SHA-256 `token_hash` only) and `wayfinder_agenda_shares`. Details in wayfinder/docs/04_state.md section 16.10.
+New shared-D1 tables owned by Wayfinder: `wayfinder_agenda_invites` (SHA-256 `token_hash` only) and `wayfinder_agenda_shares`. The default journey `poland-christmas-2026` is relationally owned by `usr-1785511589441-3fvgv`. Unaffiliated accounts resolve to `role: 'none'`, preventing cross-tenant document and expense leaks. Details in wayfinder/docs/04_state.md section 16.10 and 16.11.

@@ -3,7 +3,7 @@
 // DELETE /api/wayfinder/documents/:id
 
 import { generateId } from '../../utils/id.js';
-import { resolveAgendaAccess, canEdit, canManage } from '../../utils/agendaAccess.js';
+import { resolveAgendaAccess, canEdit, canManage, canViewSensitive } from '../../utils/agendaAccess.js';
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
 const ALLOWED_MIME  = new Set([
@@ -26,23 +26,23 @@ export async function handleDocuments(context, url, method) {
       const journeyId = url.searchParams.get('journey_id') || url.searchParams.get('journeyId');
       let docs;
       if (journeyId) {
-        // Verify journey ownership, collaborator share, or public visibility
+        // Documents are restricted to owner, share admin and platform admin
         const access = await resolveAgendaAccess(env, journeyId, user);
         const j = access.journey;
-        if (!j || (!access.role && j.visibility !== 'public')) return json({ error: 'Journey not found' }, 404);
+        if (!j) return json({ error: 'Journey not found' }, 404);
+        if (!canViewSensitive(access.role)) return json({ error: 'Forbidden' }, 403);
         docs = await env.DB.prepare(
-          `SELECT * FROM wayfinder_documents 
-           WHERE (journey_id = ? OR journey_id = ? OR journey_id = 'poland-christmas-2026') 
-             AND deleted_at IS NULL 
-           ORDER BY upload_date DESC`
+          'SELECT * FROM wayfinder_documents WHERE (journey_id = ? OR journey_id = ?) AND deleted_at IS NULL ORDER BY upload_date DESC'
         ).bind(journeyId, j.id).all();
       } else {
         docs = await env.DB.prepare(
           `SELECT * FROM wayfinder_documents 
            WHERE deleted_at IS NULL 
-             AND (user_id = ? OR journey_id IN (SELECT agenda_id FROM wayfinder_agenda_shares WHERE user_id = ?) OR journey_id = 'poland-christmas-2026')
+             AND (user_id = ?
+                  OR journey_id IN (SELECT id FROM wayfinder_journeys WHERE created_by = ?)
+                  OR journey_id IN (SELECT agenda_id FROM wayfinder_agenda_shares WHERE user_id = ? AND role = 'admin'))
            ORDER BY upload_date DESC`
-        ).bind(user.userId, user.userId).all();
+        ).bind(user.userId, user.userId, user.userId).all();
       }
       return json({ documents: docs.results.map(safeDoc) });
     }
@@ -106,9 +106,9 @@ export async function handleDocuments(context, url, method) {
       if (journey_id) {
         const access = await resolveAgendaAccess(env, journey_id, user);
         const j = access.journey;
-        if (!j || (!access.role && j.visibility !== 'public')) return json({ error: 'Journey not found' }, 404);
-        if (access.role && !canEdit(access.role)) {
-          return json({ error: 'Viewers cannot upload documents' }, 403);
+        if (!j) return json({ error: 'Journey not found' }, 404);
+        if (!canViewSensitive(access.role)) {
+          return json({ error: 'Forbidden' }, 403);
         }
         journey_id = j.id;
       }
@@ -162,7 +162,7 @@ export async function handleDocuments(context, url, method) {
 
       if (doc.journey_id) {
         const access = await resolveAgendaAccess(env, doc.journey_id, user);
-        const allowed = doc.user_id === user.userId || canEdit(access.role);
+        const allowed = doc.user_id === user.userId || canViewSensitive(access.role);
         if (!allowed) return json({ error: 'Permission denied' }, 403);
       } else if (doc.user_id !== user.userId) {
         return json({ error: 'Permission denied' }, 403);

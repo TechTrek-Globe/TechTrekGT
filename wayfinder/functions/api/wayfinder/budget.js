@@ -1,7 +1,7 @@
 // GET /api/wayfinder/budget?journey_id=
 // Returns aggregate expense data for the authenticated user's journey
 
-import { resolveAgendaAccess } from '../../utils/agendaAccess.js';
+import { resolveAgendaAccess, canViewSensitive } from '../../utils/agendaAccess.js';
 
 export async function handleBudget(context, url, method) {
   const { env, user } = context;
@@ -11,16 +11,19 @@ export async function handleBudget(context, url, method) {
     if (!env.DB) return json({ error: 'Database not available' }, 503);
     if (!user?.userId) return json({ error: 'Authentication required' }, 401);
 
-    // Verify access (owner, collaborator share, or public visibility)
+    // Budget is restricted to owner, share admin and platform admin
     const access = await resolveAgendaAccess(env, journeyId, user);
     const journey = access.journey;
-    if (!journey || (!access.role && journey.visibility !== 'public')) {
-      return json({ error: 'Journey not found or permission denied' }, 404);
+    if (!journey) {
+      return json({ error: 'Journey not found' }, 404);
+    }
+    if (!canViewSensitive(access.role)) {
+      return json({ error: 'Forbidden' }, 403);
     }
 
     const expenses = await env.DB.prepare(
       `SELECT * FROM wayfinder_expenses
-       WHERE (journey_id = ? OR journey_id = ? OR journey_id = 'poland-christmas-2026')
+       WHERE (journey_id = ? OR journey_id = ?)
        ORDER BY category, created_at`
     ).bind(journey.id, journeyId).all();
 

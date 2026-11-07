@@ -5,6 +5,9 @@ import { useAuth } from './AuthContext';
 
 const WayfinderContext = createContext(null);
 
+const AGENDA_ACCESS_REF = 'poland-christmas-2026';
+const NO_PERMISSIONS = { itinerary: false, packing: false, documents: false, expenses: false, share: false, edit: false };
+
 export function WayfinderProvider({ children }) {
   const { isAuthenticated } = useAuth();
   
@@ -14,6 +17,31 @@ export function WayfinderProvider({ children }) {
   const [jobs, setJobs] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  // Server-resolved agenda role: 'owner' | 'admin' | 'editor' | 'viewer' | 'none' | null (unknown)
+  const [agendaAccess, setAgendaAccess] = useState({ role: null, permissions: NO_PERMISSIONS, loaded: false });
+
+  const refreshAgendaAccess = useCallback(async () => {
+    if (!isAuthenticated) {
+      setAgendaAccess({ role: null, permissions: NO_PERMISSIONS, loaded: true });
+      return;
+    }
+    try {
+      const res = await fetch(getApiUrl(`/api/wayfinder/agendas/${AGENDA_ACCESS_REF}/access`), { credentials: 'include' });
+      const data = await res.json().catch(() => ({}));
+      setAgendaAccess({
+        role: res.ok ? (data.role || 'none') : 'none',
+        permissions: res.ok && data.permissions ? data.permissions : NO_PERMISSIONS,
+        loaded: true
+      });
+    } catch (err) {
+      // Network failure: fail closed with unknown role
+      setAgendaAccess({ role: null, permissions: NO_PERMISSIONS, loaded: true });
+    }
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    refreshAgendaAccess();
+  }, [refreshAgendaAccess]);
 
   const fetchItinerary = useCallback(async (journeyId = 'poland-christmas-2026') => {
     if (!isAuthenticated) return;
@@ -168,18 +196,23 @@ export function WayfinderProvider({ children }) {
   };
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && agendaAccess.loaded) {
       fetchItinerary();
       fetchAccommodations();
-      fetchDocuments();
-      fetchJobs();
+      if (agendaAccess.permissions.documents) {
+        fetchDocuments();
+        fetchJobs();
+      } else {
+        setDocuments([]);
+        setJobs([]);
+      }
     } else {
       setItinerary([]);
       setAccommodations([]);
       setDocuments([]);
       setJobs([]);
     }
-  }, [isAuthenticated, fetchItinerary, fetchAccommodations, fetchDocuments, fetchJobs]);
+  }, [isAuthenticated, agendaAccess.loaded, agendaAccess.permissions.documents, fetchItinerary, fetchAccommodations, fetchDocuments, fetchJobs]);
 
   const parseDocument = async (docId, file) => {
     let base64 = null;
@@ -318,6 +351,8 @@ export function WayfinderProvider({ children }) {
       jobs,
       isLoading,
       error,
+      agendaAccess,
+      refreshAgendaAccess,
       fetchItinerary,
       fetchAccommodations,
       fetchDocuments,

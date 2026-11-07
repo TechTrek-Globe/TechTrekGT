@@ -484,5 +484,27 @@ Governs the state invariants, atomic transaction guarantees, and edge lifecycle 
 
 - Tables (`schema-wayfinder.sql`, also created idempotently at runtime by `ensureShareTables` in `functions/utils/agendaAccess.js`): `wayfinder_agenda_invites` (`id`, `agenda_id`, `invited_email` NOCASE, `role`, `token_hash` UNIQUE, `status` pending|accepted|revoked, `invited_by`, `created_at`, `expires_at`, `accepted_at`, `accepted_by`) and `wayfinder_agenda_shares` (`agenda_id`, `user_id`, `role`, `invite_id`, UNIQUE(`agenda_id`,`user_id`)).
 - Raw invite tokens are never persisted. The client stores a pending token only in `sessionStorage` key `wf_pending_invite` (not an auth token) until claimed.
-- `PrivateHub` state: `agendaRole` (from `GET /agendas/poland-christmas-2026/access`) drives collaborator access across Itinerary, Packing, Expense Ledger, and Documents. Linked collaborator accounts have access to both Documents and Expense Ledger views with role-based mutation guards (viewers have read-only permissions for vouchers and ledger entries). `canShare` (owner/admin) controls collaborator invite modal access.
+- `PrivateHub` & `WayfinderContext` state: `agendaAccess` object `{ role, permissions, loaded }` (from `GET /agendas/poland-christmas-2026/access`) drives collaborator access across Itinerary, Packing, Expense Ledger, and Documents. Linked collaborator accounts have access scoped by their capability matrix. `canShare` (owner/admin) controls collaborator invite modal access.
 - `journeys.js` list/detail also return agendas shared with the caller.
+
+### 16.11 Multi-User Tenant Isolation & Access Control Invariants
+
+- Canonical Access Resolution Invariant:
+  - Caller role must resolve deterministically via `resolveAgendaAccess(env, ref, user)` to one of: `owner`, `admin`, `editor`, `viewer`, or `none`.
+  - Unaffiliated authenticated users with no membership row in `wayfinder_agenda_shares` and no ownership of `wayfinder_journeys` resolve strictly to `role: 'none'`.
+- Cryptographic Ownership Invariant:
+  - Implicit ownership by previous inviters (`invited_by`) is strictly prohibited.
+  - Ownership is rooted in `wayfinder_journeys.created_by = user.userId` (or platform administrator status verified via `users.is_admin = 1`).
+  - Journey record `'poland-christmas-2026'` is relationally owned by primary administrator ID `'usr-1785511589441-3fvgv'`.
+- Sensitive Data Boundary Invariant:
+  - Document vaults (`documents.js`), Expense Ledgers (`expenses.js`), Aggregated Budgets (`budget.js`), and Extraction Jobs (`import-jobs.js`) require `canViewSensitive(role)` (`owner` or `admin`).
+  - `editor`, `viewer`, and `none` callers querying sensitive endpoints receive HTTP 403 Forbidden.
+  - Naive fallbacks matching `journey.visibility !== 'public'` or hardcoded `OR journey_id = 'poland-christmas-2026'` are prohibited on all sensitive queries.
+- Accommodations Data Sanitization Invariant:
+  - Accommodations endpoint requires `isMember(role)`. Non-members receive an empty list (`[]`).
+  - For non-sensitive member roles (`editor`, `viewer`), financial costs (`total_cost`, `currency`), and source document metadata (`source_document_id`, `filename`, `safe_display_name`, `mime_type`) are scrubbed to `null`.
+- Client-Side Isolation & Lazy Evaluation Invariant:
+  - `WayfinderContext` state hooks (`fetchDocuments`, `fetchJobs`) are gated on `agendaAccess.permissions.documents`. Unauthorized accounts never query or store private documents in client state.
+  - If `role === 'none'`, `PrivateHub` renders `NoAccessPanel` and unmounts all private subviews (`ItineraryView`, `DocumentCenter`, `ExpenseLedger`, `PackingManager`).
+  - Unpermitted deep link paths are intercepted and replaced with `/private`, rendering an explanatory notice.
+

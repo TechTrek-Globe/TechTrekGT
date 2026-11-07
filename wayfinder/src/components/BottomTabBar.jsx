@@ -1,5 +1,7 @@
 import React from 'react';
 import { MapPin, CalendarClock, Backpack, Coins, ShieldCheck } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { useWayfinder } from '../context/WayfinderContext';
 
 const BASE = '/wayfinder/poland-christmas-2026';
 
@@ -34,6 +36,9 @@ export function BottomTabBar({ currentPath, onOpenConverter }) {
   const isPacking = currentPath.includes('/packing');
   const isSchedule = currentPath.includes('scroll=journey-sequence') || currentPath.includes('#journey-sequence') || (currentPath.startsWith(`${BASE}/private`) && !isDocs && !isPacking);
   const isPractical = currentPath.startsWith(`${BASE}/practical`);
+  const { isAuthenticated } = useAuth();
+  const { agendaAccess } = useWayfinder();
+  const hubPath = (!isAuthenticated || agendaAccess.permissions.documents) ? `${BASE}/private/documents` : `${BASE}/private`;
 
   const handleScheduleClick = (e) => {
     e.preventDefault();
@@ -88,9 +93,9 @@ export function BottomTabBar({ currentPath, onOpenConverter }) {
         <TabItem
           icon={ShieldCheck}
           label="Hub"
-          href={`${BASE}/private/documents`}
+          href={hubPath}
           isActive={isDocs || isPacking}
-          onClick={(e) => pushRoute(e, `${BASE}/private/documents`)}
+          onClick={(e) => pushRoute(e, hubPath)}
           colorActive="text-sky-400"
           bgActive="bg-sky-500/15"
         />

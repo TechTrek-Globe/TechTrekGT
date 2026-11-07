@@ -11,7 +11,7 @@
 import { generateId } from '../../utils/id.js';
 import { checkRateLimit } from '../../utils/rateLimit.js';
 import { sendInviteEmail } from '../../utils/inviteEmail.js';
-import { ensureShareTables, resolveAgendaAccess, canManage, sha256Hex } from '../../utils/agendaAccess.js';
+import { ensureShareTables, resolveAgendaAccess, canManage, sha256Hex, agendaPermissions } from '../../utils/agendaAccess.js';
 
 const ROLES = ['viewer', 'editor', 'admin'];
 const EMAIL_REGEX = /^[^\s@]{1,64}@[^\s@]{1,253}\.[^\s@]{2,}$/;
@@ -141,7 +141,7 @@ export async function handleAgendaShares(context, url, method) {
       if (!journey) return json({ error: 'Agenda not found' }, 404);
 
       if (seg[2] === 'access' && method === 'GET') {
-        return json({ agendaId: journey.id, slug: journey.slug, role });
+        return json({ agendaId: journey.id, slug: journey.slug, role, permissions: agendaPermissions(role) });
       }
 
       if (!canManage(role)) return json({ error: 'Forbidden' }, 403);

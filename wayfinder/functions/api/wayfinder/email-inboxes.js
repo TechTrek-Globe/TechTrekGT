@@ -3,6 +3,7 @@
 // DELETE /api/wayfinder/email-inboxes/:id - deactivate inbox
 
 import { generateId } from '../../utils/id.js';
+import { resolveAgendaAccess, canManage } from '../../utils/agendaAccess.js';
 
 const DOMAIN = 'techtrekgt.com';
 
@@ -34,10 +35,10 @@ export async function handleEmailInboxes(context, url, method) {
       const journeyId = url.searchParams.get('journey_id') || url.searchParams.get('journeyId');
       if (!journeyId) return json({ error: 'journey_id required' }, 400);
 
-      const journey = await env.DB.prepare(
-        `SELECT id, slug FROM wayfinder_journeys WHERE (id = ? OR slug = ?) AND (created_by = ? OR visibility = 'public')`
-      ).bind(journeyId, journeyId, user.userId).first();
+      const inboxAccess = await resolveAgendaAccess(env, journeyId, user);
+      const journey = inboxAccess.journey;
       if (!journey) return json({ error: 'Journey not found' }, 404);
+      if (!canManage(inboxAccess.role)) return json({ error: 'Forbidden' }, 403);
 
       const inbox = await env.DB.prepare(
         'SELECT * FROM wayfinder_email_inboxes WHERE user_id = ? AND journey_id = ?'
@@ -52,10 +53,10 @@ export async function handleEmailInboxes(context, url, method) {
       const journeyId = body.journey_id || body.journeyId;
       if (!journeyId) return json({ error: 'journey_id required' }, 400);
 
-      const journey = await env.DB.prepare(
-        `SELECT id, slug FROM wayfinder_journeys WHERE (id = ? OR slug = ?) AND (created_by = ? OR visibility = 'public')`
-      ).bind(journeyId, journeyId, user.userId).first();
+      const inboxAccess = await resolveAgendaAccess(env, journeyId, user);
+      const journey = inboxAccess.journey;
       if (!journey) return json({ error: 'Journey not found' }, 404);
+      if (!canManage(inboxAccess.role)) return json({ error: 'Forbidden' }, 403);
 
       // Idempotent: return existing active inbox if one already exists (re-activate if soft-deleted)
       const existing = await env.DB.prepare(

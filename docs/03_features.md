@@ -148,6 +148,6 @@ The platform replaces monolithic legacy documentation with a 4-tier standardized
 - Historical Quarantining: Historical incident reports reside in docs/archive/incidents/ with [RESOLVED] prefixes, and legacy implementation plans reside in docs/archive/ with [ARCHIVED] prefixes.
 
 
-## 6. Shared Agenda Collaboration (Wayfinder)
+## 6. Shared Agenda Collaboration & Tenant Isolation (Wayfinder)
 
-Wayfinder agendas can be shared by email invite with `viewer`/`editor`/`admin` roles (see wayfinder/docs/03_features.md section 30). `/api/auth/register` accepts an optional `inviteToken`.
+Wayfinder agendas can be shared by email invite with `viewer`/`editor`/`admin` roles (see wayfinder/docs/03_features.md section 30 and 31). Strict tenant isolation and role-based access control enforces that sensitive document vaults, expense ledgers, and raw booking extractions are restricted exclusively to `owner` and `admin` roles, returning HTTP 403 Forbidden to `editor`, `viewer`, and uninvited authenticated accounts (`role: 'none'`). `/api/auth/register` accepts an optional `inviteToken`.

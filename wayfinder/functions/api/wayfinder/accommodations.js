@@ -17,7 +17,7 @@ const accommodationByJourney = {
   ]
 };
 
-import { resolveAgendaAccess, getCollaboratorIds } from '../../utils/agendaAccess.js';
+import { resolveAgendaAccess, getCollaboratorIds, isMember, canViewSensitive } from '../../utils/agendaAccess.js';
 
 export async function handleAccommodations(context, url, method) {
   const { env, user } = context;
@@ -36,15 +36,16 @@ export async function handleAccommodations(context, url, method) {
   try {
     const access = await resolveAgendaAccess(env, journeyId, user);
     const journey = access.journey;
-    if (!journey || (!access.role && journey.visibility !== 'public')) {
-      return json({ accommodations: staticList });
+    if (!journey || !isMember(access.role)) {
+      return json({ accommodations: [] });
     }
+    const sensitive = canViewSensitive(access.role);
 
     const items = await env.DB.prepare(
       `SELECT i.*, d.original_filename, d.safe_display_name, d.mime_type
        FROM wayfinder_itinerary_items i
        LEFT JOIN wayfinder_documents d ON i.source_document_id = d.id
-       WHERE (i.journey_id = ? OR i.journey_id = ? OR i.journey_id = 'poland-christmas-2026')
+       WHERE (i.journey_id = ? OR i.journey_id = ?)
          AND i.item_type IN ('hotel', 'accommodation', 'lodging')
          AND (i.notes IS NULL OR i.notes NOT LIKE '%gmail:%')
        ORDER BY i.local_date ASC`
@@ -96,13 +97,13 @@ export async function handleAccommodations(context, url, method) {
         confirmation_number: docFields.confirmation_number || item.confirmation_number,
         room_type: docFields.room_type || docFields.seat,
         guests: docFields.guests,
-        total_cost: docFields.total_cost,
-        currency: docFields.currency,
+        total_cost: sensitive ? docFields.total_cost : null,
+        currency: sensitive ? docFields.currency : null,
         notes: item.notes || docFields.notes,
-        source_document_id: item.source_document_id,
-        filename: item.original_filename || item.safe_display_name,
-        safe_display_name: item.safe_display_name,
-        mime_type: item.mime_type,
+        source_document_id: sensitive ? item.source_document_id : null,
+        filename: sensitive ? (item.original_filename || item.safe_display_name) : null,
+        safe_display_name: sensitive ? item.safe_display_name : null,
+        mime_type: sensitive ? item.mime_type : null,
         website_url: matchingStatic?.website_url,
         phone: matchingStatic?.phone,
         email: matchingStatic?.email

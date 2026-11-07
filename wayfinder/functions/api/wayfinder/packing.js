@@ -177,7 +177,7 @@ function safeItem(row) {
   };
 }
 
-import { resolveAgendaAccess, getCollaboratorIds, canEdit } from '../../utils/agendaAccess.js';
+import { resolveAgendaAccess, getCollaboratorIds, canEdit, isMember } from '../../utils/agendaAccess.js';
 
 export async function handlePacking(context, url, method) {
   const { env, user, request } = context;
@@ -193,9 +193,11 @@ export async function handlePacking(context, url, method) {
 
     // Collaborator scope: owner + accepted collaborators see each other's packing items
     const access = await resolveAgendaAccess(env, journeyId, user);
-    const scopeIds = access.role ? await getCollaboratorIds(env, access.journey) : [];
+    if (!access.journey) return json({ error: 'Journey not found' }, 404);
+    if (!isMember(access.role)) return json({ error: 'Forbidden' }, 403);
+    const scopeIds = await getCollaboratorIds(env, access.journey);
     const scopeSql = scopeIds.length ? ` OR user_id IN (${scopeIds.map(() => '?').join(',')})` : '';
-    if (access.role && method !== 'GET' && !canEdit(access.role)) {
+    if (method !== 'GET' && !canEdit(access.role)) {
       return json({ error: 'Viewers cannot modify the packing list' }, 403);
     }
 

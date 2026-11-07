@@ -1,5 +1,5 @@
 // Shared agenda (journey) access control helpers.
-// Roles: owner > admin > editor > viewer. A null role means no explicit access.
+// Roles: owner > admin > editor > viewer > none. A null role means the journey was not found.
 // All queries use positional ? binding.
 
 let tablesReady = false;
@@ -62,14 +62,8 @@ export async function resolveAgendaAccess(env, ref, user) {
   ).bind(journey.id, user.userId).first();
   if (share) return { journey, role: share.role };
 
-  // If caller invited collaborators to this agenda, recognize as owner
-  const inv = await env.DB.prepare(
-    'SELECT 1 AS found FROM wayfinder_agenda_invites WHERE agenda_id = ? AND invited_by = ? LIMIT 1'
-  ).bind(journey.id, user.userId).first();
-  if (inv) return { journey, role: 'owner' };
-
   if (await isPlatformAdmin(env, user)) return { journey, role: 'admin' };
-  return { journey, role: null };
+  return { journey, role: 'none' };
 }
 
 // User ids that share this agenda (owner + accepted collaborators + inviters).
@@ -80,17 +74,25 @@ export async function getCollaboratorIds(env, journey) {
   ).bind(journey.id).all();
   const ids = new Set((rows.results || []).map(r => r.user_id));
   if (journey.created_by && journey.created_by !== 'system') ids.add(journey.created_by);
-  const invRows = await env.DB.prepare(
-    'SELECT DISTINCT invited_by FROM wayfinder_agenda_invites WHERE agenda_id = ?'
-  ).bind(journey.id).all();
-  for (const inv of (invRows.results || [])) {
-    if (inv.invited_by) ids.add(inv.invited_by);
-  }
   return [...ids];
 }
 
 export const canEdit = (role) => role === 'owner' || role === 'admin' || role === 'editor';
 export const canManage = (role) => role === 'owner' || role === 'admin';
+export const isMember = (role) => role === 'owner' || role === 'admin' || role === 'editor' || role === 'viewer';
+// Documents, expenses, budget and import jobs: owner, share admin, platform admin only.
+export const canViewSensitive = (role) => role === 'owner' || role === 'admin';
+
+export function agendaPermissions(role) {
+  return {
+    itinerary: isMember(role),
+    packing: isMember(role),
+    documents: canViewSensitive(role),
+    expenses: canViewSensitive(role),
+    share: canManage(role),
+    edit: canEdit(role)
+  };
+}
 
 export async function sha256Hex(text) {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));

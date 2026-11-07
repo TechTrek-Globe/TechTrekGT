@@ -5,7 +5,7 @@
 
 import { generateId } from '../../utils/id.js';
 import { parseBookingDocument } from './gemini-parser.js';
-import { resolveAgendaAccess, canEdit } from '../../utils/agendaAccess.js';
+import { resolveAgendaAccess, canManage } from '../../utils/agendaAccess.js';
 
 // Fields that always require user confirmation before approval
 const CRITICAL_FIELDS = new Set([
@@ -38,10 +38,12 @@ export async function handleImportJobs(context, url, method) {
         `SELECT j.*, d.safe_display_name, d.detected_provider, d.detected_doc_type, d.upload_date, d.journey_id
          FROM wayfinder_extraction_jobs j
          JOIN wayfinder_documents d ON j.document_id = d.id
-         WHERE (d.user_id = ? OR d.journey_id IN (SELECT agenda_id FROM wayfinder_agenda_shares WHERE user_id = ?))
+         WHERE (d.user_id = ?
+                OR d.journey_id IN (SELECT id FROM wayfinder_journeys WHERE created_by = ?)
+                OR d.journey_id IN (SELECT agenda_id FROM wayfinder_agenda_shares WHERE user_id = ? AND role = 'admin'))
            AND d.deleted_at IS NULL
          ORDER BY j.created_at DESC`
-      ).bind(user.userId, user.userId).all();
+      ).bind(user.userId, user.userId, user.userId).all();
       return json({ jobs: jobs.results });
     }
 
@@ -51,19 +53,12 @@ export async function handleImportJobs(context, url, method) {
     const doc = await env.DB.prepare(
       `SELECT * FROM wayfinder_documents 
        WHERE id = ? 
-         AND (user_id = ? OR journey_id IN (SELECT agenda_id FROM wayfinder_agenda_shares WHERE user_id = ?) OR journey_id = 'poland-christmas-2026')
+         AND (user_id = ?
+              OR journey_id IN (SELECT id FROM wayfinder_journeys WHERE created_by = ?)
+              OR journey_id IN (SELECT agenda_id FROM wayfinder_agenda_shares WHERE user_id = ? AND role = 'admin'))
          AND deleted_at IS NULL`
-    ).bind(docId, user.userId, user.userId).first();
+    ).bind(docId, user.userId, user.userId, user.userId).first();
     if (!doc) return json({ error: 'Document not found' }, 404);
-
-    if (action && ['parse', 'fields', 'approve', 'reject'].includes(action)) {
-      if (doc.journey_id) {
-        const access = await resolveAgendaAccess(env, doc.journey_id, user);
-        if (access.role && !canEdit(access.role)) {
-          return json({ error: 'Permission denied: viewers cannot modify extraction jobs' }, 403);
-        }
-      }
-    }
 
     let job = await env.DB.prepare(
       'SELECT * FROM wayfinder_extraction_jobs WHERE document_id = ?'
@@ -252,13 +247,11 @@ export async function handleImportJobs(context, url, method) {
 
       if (!journey_id) return json({ error: 'journey_id required' }, 400);
 
-      // Verify journey ownership or public visibility
-      const j = await env.DB.prepare(
-        `SELECT id FROM wayfinder_journeys
-         WHERE (id = ? OR slug = ?)
-           AND (created_by = ? OR slug = 'poland-christmas-2026' OR id = 'poland-christmas-2026')`
-      ).bind(journey_id, journey_id, user.userId).first();
-      const finalJourneyId = j?.id || 'poland-christmas-2026';
+      // Verify owner, share admin or platform admin on the target journey
+      const jAccess = await resolveAgendaAccess(env, journey_id, user);
+      if (!jAccess.journey) return json({ error: 'Journey not found' }, 404);
+      if (!canManage(jAccess.role)) return json({ error: 'Forbidden' }, 403);
+      const finalJourneyId = jAccess.journey.id;
 
       // Apply user overrides first - marks fields as user_verified before the gate check
       const overrideStmts = Object.entries(field_overrides).map(([fieldName, value]) => {

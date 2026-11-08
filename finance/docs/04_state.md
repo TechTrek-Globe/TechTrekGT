@@ -234,6 +234,7 @@ For every existing user, their personal ledger ID is identical to their user ID 
 
 ### 11.2 Collaborator Membership Governance (`/api/admin/ledger-membership`)
 - Administrators can manage collaborator permissions (`viewer`, `editor`, `admin`) on Finance household ledgers (`finance_ledgers`), or disconnect collaborators via `POST /api/admin/ledger-membership/remove`.
+- **Automatic Ledger Self-Healing & Backfill:** `GET /api/admin/stats`, `resolveLedgerAccess`, and `GET /api/ledgers` automatically backfill and ensure a corresponding `finance_ledgers` row exists for all existing Finance users (including accounts created prior to ledger collaboration schema introduction).
 
 ### 11.3 Universal Cascading Account Deletion (`deleteUserAccount`)
 - Executed by administrative endpoints `POST /api/admin/user-delete` and `DELETE /api/admin/user`.

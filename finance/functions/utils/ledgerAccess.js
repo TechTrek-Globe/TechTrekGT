@@ -92,9 +92,19 @@ export async function resolveLedgerAccess(env, ledgerId, user) {
 
   // 1. Direct ownership of user's personal ledger (targetId === uid)
   if (uid && targetId === uid) {
-    const existingLedger = await env.DB.prepare(
+    let existingLedger = await env.DB.prepare(
       'SELECT id, owner_id, name, created_at, updated_at FROM finance_ledgers WHERE id = ?'
     ).bind(targetId).first();
+
+    if (!existingLedger) {
+      const defaultName = user.name ? `${user.name}'s Budget` : 'Personal Budget';
+      await env.DB.prepare(
+        'INSERT OR IGNORE INTO finance_ledgers (id, owner_id, name) VALUES (?, ?, ?)'
+      ).bind(targetId, uid, defaultName).run().catch(() => {});
+      existingLedger = await env.DB.prepare(
+        'SELECT id, owner_id, name, created_at, updated_at FROM finance_ledgers WHERE id = ?'
+      ).bind(targetId).first();
+    }
 
     const ledger = existingLedger || {
       id: targetId,

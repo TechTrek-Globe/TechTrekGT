@@ -78,6 +78,17 @@ export async function onRequestGet(context) {
     let ledgerShares = [];
     let ledgerInvites = [];
     try {
+      await env.DB.prepare(`
+        INSERT OR IGNORE INTO finance_ledgers (id, owner_id, name)
+        SELECT u.id, u.id, COALESCE(NULLIF(u.name, '') || '''s Budget', 'Personal Budget')
+        FROM users u
+        WHERE u.id IN (
+          SELECT id FROM user_backups
+          UNION SELECT user_id FROM user_backup_versions
+          UNION SELECT id FROM users WHERE created_app = 'finance' OR role = 'admin'
+        )
+      `).run().catch(() => {});
+
       const lRes = await env.DB.prepare('SELECT id, owner_id, name, created_at FROM finance_ledgers').all();
       financeLedgers = lRes.results || [];
 

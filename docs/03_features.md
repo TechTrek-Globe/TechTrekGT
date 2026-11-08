@@ -151,3 +151,14 @@ The platform replaces monolithic legacy documentation with a 4-tier standardized
 ## 6. Shared Agenda Collaboration & Tenant Isolation (Wayfinder)
 
 Wayfinder agendas can be shared by email invite with `viewer`/`editor`/`admin` roles (see wayfinder/docs/03_features.md sections 30, 31, 32, 33, and 34). Strict tenant isolation and role-based access control enforces that sensitive document vaults, expense ledgers, and raw booking extractions are restricted exclusively to `owner` and `admin` roles, returning HTTP 403 Forbidden to `editor`, `viewer`, and uninvited authenticated accounts (`role: 'none'`). New user sign up strictly requires 8-digit email verification before session issuance or sign in (`/api/auth/verify-email`, `/api/auth/resend-verification`), while invite-link registrations prove inbox ownership via single-use invite tokens. The Wayfinder Admin Dashboard (`/wayfinder/admin`) provides full trip governance, separating platform roles (`ADMIN`/`USER`) from trip collaborator roles (`owner`, `admin`, `editor`, `viewer`), grouping trips with tied accounts and unaffiliated accounts, and enabling 1-click collaborator role updates, trip tie/joining actions, and disconnections. Self-service account deletion (Preferences modal) and administrative account deletion (Admin Panel) allow users and administrators to permanently scrub accounts and related personal records via atomic D1 batch cascades (`deleteUserAccount`).
+
+## 7. Shared Ledger Collaboration & Tenant Isolation (Finance OS)
+
+Finance OS budgets can be shared via email invitations with `viewer`, `editor`, or `admin` access tiers (see finance/docs/03_features.md). The `resolveLedgerAccess` middleware dynamically verifies ownership or active `ledger_shares` records, preventing cross-tenant budget leaks by returning HTTP 403 Forbidden to unaffiliated callers (`role: 'none'`). Public token verification (`/api/finance/invites/verify`) and atomic claim endpoints (`/api/finance/invites/claim`) onboard collaborators with automatic verification.
+
+## 8. Cross-App Account Isolation & Universal Account Deletion
+
+Accounts in the shared D1 database (`personal-budget-db`) enforce strict application tenant isolation:
+- Accounts created in Wayfinder or Outpost are completely isolated and excluded from Finance OS (`/finance/admin`). Finance OS only queries, manages, and displays accounts belonging to Finance.
+- Administrators can govern collaborator permissions (`viewer`, `editor`, `admin`) on Finance household ledgers (`finance_ledgers`) or disconnect them via `POST /api/admin/ledger-membership/remove`.
+- Universal cascading account deletion (`POST /api/admin/user-delete` and `DELETE /api/admin/user`) permanently scrubs account records, credentials, backups, shares, and invitations atomically across all domain tables.

@@ -65,7 +65,7 @@ API routes are registered in a centralized dispatch table (ROUTES) mapping HTTP 
 
 ### 4.2 Authentication & Session Lifecycle Endpoints
 
-- POST /api/auth/register: User account creation with Turnstile verification, PBKDF2-SHA256 password hashing (600,000 iterations), and compensating rollback.
+- POST /api/auth/register: User account creation with Turnstile verification, PBKDF2-SHA256 password hashing (100,000 iterations; Cloudflare Workers runtime limit), and compensating rollback.
 - POST /api/auth/login: User authentication with Turnstile check, session issuance, and transparent password rehashing.
 - GET /api/auth/me: Restores user session state without cookie clobbering.
 - POST /api/auth/refresh: Access token renewal within the valid session window.

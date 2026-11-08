@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS users (
   email TEXT NOT NULL UNIQUE COLLATE NOCASE,
   password_hash TEXT NOT NULL,
   salt TEXT NOT NULL,
-  iterations INTEGER NOT NULL DEFAULT 600000,
+  iterations INTEGER NOT NULL DEFAULT 100000,
   token_version INTEGER NOT NULL DEFAULT 1,
   is_admin INTEGER NOT NULL DEFAULT 0,
   api_key_enabled INTEGER NOT NULL DEFAULT 0,
@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS users (
   email_verified INTEGER NOT NULL DEFAULT 0,
   email_verified_at TEXT,
   pending_email TEXT,
+  created_app TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -182,3 +183,15 @@ The shared Cloudflare D1 database `personal-budget-db` has been extended with th
 ## 7. Wayfinder Shared Agenda Tables & Tenant Isolation (personal-budget-db)
 
 New shared-D1 tables owned by Wayfinder: `wayfinder_agenda_invites` (SHA-256 `token_hash` only) and `wayfinder_agenda_shares`. The default journey `poland-christmas-2026` is relationally owned by `usr-1785511589441-3fvgv`. Unaffiliated accounts resolve to `role: 'none'`, preventing cross-tenant document and expense leaks. Wayfinder writes and validates registration verification codes in `email_verifications`. Admin Dashboard provides complete trip membership governance, platform vs. trip role differentiation, and atomic account deletion cascades (`deleteUserAccount`). Details in wayfinder/docs/04_state.md sections 16.10, 16.11, 16.12, 16.13, and 16.14.
+
+## 8. Finance OS Shared Ledger Tables & Tenant Isolation (personal-budget-db)
+
+Shared-D1 tables owned by Finance OS: `finance_ledgers`, `ledger_invites`, and `ledger_shares`. For backwards compatibility, existing personal ledgers map directly to `user.id = ledger_id`. The `resolveLedgerAccess` middleware resolves caller permissions to `owner`, `admin`, `editor`, `viewer`, or `none`, preventing cross-tenant leaks. Details in finance/docs/04_state.md section 10.
+
+## 9. Cross-App Account Isolation & Cascading Deletion
+
+The shared `users` table serves all TechTrekGT applications. Strict app-level isolation via `GET /api/admin/stats` guarantees zero cross-app visibility:
+- Finance accounts: strictly accounts with rows in `user_backups`, `user_backup_versions`, `finance_ledgers`, or `ledger_shares`, or `users.created_app = 'finance'`. Other platform accounts (Wayfinder, Outpost) are completely omitted from Finance Admin and API responses.
+- Collaborator Governance: `POST /api/admin/ledger-membership/remove` enables administrators to manage or disconnect collaborator memberships on Finance household ledgers.
+- Universal Deletion: `deleteUserAccount` (`POST /api/admin/user-delete` and `DELETE /api/admin/user`) performs atomic cascading cleanups across all domain tables (`ledger_shares`, `ledger_invites`, `user_backups`, `user_backup_versions`, `finance_ledgers`, `email_verifications`, `password_resets`, optional `wayfinder_*` and `auction_*` tables, and `users`).
+

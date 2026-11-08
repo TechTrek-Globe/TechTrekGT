@@ -213,3 +213,29 @@ For every existing user, their personal ledger ID is identical to their user ID 
 - **Session Purge Lifecycle:**
   - On `techtrek:user-logout` window events, `LedgerDataContext` resets `activeLedgerId`, sets `ledgerRole` to `'owner'`, empties `availableLedgers`, closes modals, and removes `finance_active_ledger_id` from `sessionStorage`.
 
+---
+
+## 11. Cross-App Account Isolation & Administration State
+
+### 11.1 Dynamic App Filtering (`GET /api/admin/stats`)
+- Accounts in the shared D1 database (`personal-budget-db`) are strictly filtered so Finance OS has zero awareness of other platforms:
+  - A user is recognized as a Finance user only if they have active rows in `user_backups`, `user_backup_versions`, `finance_ledgers`, or `ledger_shares`, or if their `users.created_app` is `'finance'` or role is `'admin'`.
+  - Accounts belonging exclusively to other platforms (such as Wayfinder or Outpost) are completely omitted from API responses and never rendered in the UI.
+- `totalUsers` and `users` reflect strictly Finance-scoped accounts.
+
+### 11.2 Collaborator Membership Governance (`/api/admin/ledger-membership`)
+- Administrators can manage collaborator permissions (`viewer`, `editor`, `admin`) on Finance household ledgers (`finance_ledgers`), or disconnect collaborators via `POST /api/admin/ledger-membership/remove`.
+
+### 11.3 Universal Cascading Account Deletion (`deleteUserAccount`)
+- Executed by administrative endpoints `POST /api/admin/user-delete` and `DELETE /api/admin/user`.
+- Checks `sqlite_master` for table existence and executes atomic cascading cleanup across all dependent records:
+  - `ledger_shares` (both as collaborator and owner)
+  - `ledger_invites` (both invited email and invited_by)
+  - `user_backups` and `user_backup_versions`
+  - `finance_ledgers`
+  - `email_verifications` and `password_resets`
+  - `wayfinder_*` and `auction_*` tables (if present)
+  - `users` (primary record)
+- If the calling administrator deletes their own account, session cookies are cleared automatically.
+
+

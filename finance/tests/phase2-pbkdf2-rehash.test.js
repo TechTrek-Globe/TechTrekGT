@@ -64,17 +64,16 @@ describe('PBKDF2 Decoupling & Transparent Migration Tests', () => {
     };
   });
 
-  test('PBKDF2 constants are decoupled: target is 600,000 and max ceiling is 2,000,000', () => {
-    assert.strictEqual(PBKDF2_ITERATIONS, 600000, 'PBKDF2_ITERATIONS must be raised to 600,000 (OWASP recommendation)');
-    assert.strictEqual(PBKDF2_MAX_SUPPORTED, 2000000, 'PBKDF2_MAX_SUPPORTED must be decoupled to 2,000,000 ceiling');
-    assert.ok(PBKDF2_MAX_SUPPORTED > PBKDF2_ITERATIONS, 'Ceiling must be strictly greater than target iterations');
+  test('PBKDF2 constants are capped at Cloudflare Workers edge limit of 100,000', () => {
+    assert.strictEqual(PBKDF2_ITERATIONS, 100000, 'PBKDF2_ITERATIONS must be 100,000 (Cloudflare Workers maximum)');
+    assert.strictEqual(PBKDF2_MAX_SUPPORTED, 100000, 'PBKDF2_MAX_SUPPORTED must match 100,000 edge limit');
   });
 
   test('deriveBits fails closed when iteration count exceeds PBKDF2_MAX_SUPPORTED', async () => {
     const salt = new Uint8Array(16);
     await assert.rejects(
       async () => {
-        await deriveBits('TestPass123!', salt, 2000001);
+        await deriveBits('TestPass123!', salt, 100001);
       },
       (err) => {
         assert.strictEqual(err.code, 'UNSUPPORTED_ITERATIONS');
@@ -85,32 +84,32 @@ describe('PBKDF2 Decoupling & Transparent Migration Tests', () => {
   });
 
   test('needsRehash correctly flags older 3-part iteration counts for upgrade', () => {
-    const old100kHash = '0123456789abcdef0123456789abcdef:100000:fedcba9876543210fedcba9876543210';
+    const old50kHash = '0123456789abcdef0123456789abcdef:50000:fedcba9876543210fedcba9876543210';
     const old310kHash = '0123456789abcdef0123456789abcdef:310000:fedcba9876543210fedcba9876543210';
-    const current600kHash = '0123456789abcdef0123456789abcdef:600000:fedcba9876543210fedcba9876543210';
+    const current100kHash = '0123456789abcdef0123456789abcdef:100000:fedcba9876543210fedcba9876543210';
 
-    assert.strictEqual(needsRehash(old100kHash), true, '100k iteration hash must require rehash');
+    assert.strictEqual(needsRehash(old50kHash), true, '50k iteration hash must require rehash');
     assert.strictEqual(needsRehash(old310kHash), true, '310k iteration hash must require rehash');
-    assert.strictEqual(needsRehash(current600kHash), false, '600k iteration hash must NOT require rehash');
+    assert.strictEqual(needsRehash(current100kHash), false, '100k iteration hash must NOT require rehash');
   });
 
-  test('fresh login by existing user with 100,000-iteration hash transparently rehashes to 600,000', async () => {
+  test('fresh login by existing user with 50,000-iteration hash transparently rehashes to 100,000', async () => {
     const password = 'ExistingUserPass123!';
     const salt = crypto.getRandomValues(new Uint8Array(16));
-    const oldBits = await deriveBits(password, salt, 100000);
-    const initialOldHash = `${toHex(salt)}:100000:${toHex(oldBits)}`;
+    const oldBits = await deriveBits(password, salt, 50000);
+    const initialOldHash = `${toHex(salt)}:50000:${toHex(oldBits)}`;
 
-    assert.strictEqual(needsRehash(initialOldHash), true, 'Initial 100k hash must require rehash');
+    assert.strictEqual(needsRehash(initialOldHash), true, 'Initial 50k hash must require rehash');
 
-    // Pre-seed user with old 100,000 iteration hash
+    // Pre-seed user with old 50,000 iteration hash
     await mockDb.prepare(
       'INSERT INTO users (id, email, password_hash, name, role, token_version) VALUES (?, ?, ?, ?, ?, ?)'
-    ).bind('usr-migration-1', 'existing-100k@techtrekgt.com', initialOldHash, 'Existing 100k User', 'user', 0).run();
+    ).bind('usr-migration-1', 'existing-50k@techtrekgt.com', initialOldHash, 'Existing 50k User', 'user', 0).run();
 
     const req = new Request('http://localhost/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'existing-100k@techtrekgt.com', password })
+      body: JSON.stringify({ email: 'existing-50k@techtrekgt.com', password })
     });
 
     const res = await loginPost({ request: req, env, requestId: 'test-migration-req-1' });
@@ -122,12 +121,12 @@ describe('PBKDF2 Decoupling & Transparent Migration Tests', () => {
 
     const parsedUpdated = parseStoredHash(updatedUser.password_hash);
     assert.ok(parsedUpdated, 'Updated hash must be valid 3-part format');
-    assert.strictEqual(parsedUpdated.iterations, 600000, 'Updated hash must use 600,000 iterations');
+    assert.strictEqual(parsedUpdated.iterations, 100000, 'Updated hash must use 100,000 iterations');
     assert.strictEqual(needsRehash(updatedUser.password_hash), false, 'Rehashed record must no longer need rehash');
 
     // Verify password check works against the new hash
     const recheck = await verifyPassword(password, updatedUser.password_hash);
-    assert.strictEqual(recheck, true, 'verifyPassword must validate against the updated 600k hash');
+    assert.strictEqual(recheck, true, 'verifyPassword must validate against the updated 100k hash');
   });
 
   test('login by existing user with legacy 2-part hash is intercepted and redirected to reset-password (HIGH-6)', async () => {

@@ -377,4 +377,39 @@ describe('Shared Ledger Collaboration, Invites, & Access Management Edge Tests',
       expect(userRow.email_verified).toBe(1);
     });
   });
+
+  describe('6. Subpath URL Normalization & Frontend Modal Route Compatibility', () => {
+    it('successfully resolves /finance/api/finance/ledgers/:id/invites from modal', async () => {
+      const req = new Request(`http://localhost:3000/finance/api/finance/ledgers/${ownerId}/invites`, {
+        headers: ownerHeaders
+      });
+      const res = await worker.fetch(req, env, {});
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(Array.isArray(data.invites)).toBe(true);
+      expect(Array.isArray(data.shares)).toBe(true);
+      expect(data.myRole).toBe('owner');
+    });
+
+    it('resolves default alias in /finance/api/finance/ledgers/default/invites to caller ledger', async () => {
+      const req = new Request('http://localhost:3000/finance/api/finance/ledgers/default/invites', {
+        headers: ownerHeaders
+      });
+      const res = await worker.fetch(req, env, {});
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.myRole).toBe('owner');
+    });
+
+    it('successfully resolves /finance/api/finance/ledgers list', async () => {
+      const req = new Request('http://localhost:3000/finance/api/finance/ledgers', {
+        headers: ownerHeaders
+      });
+      const res = await worker.fetch(req, env, {});
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.success).toBe(true);
+      expect(Array.isArray(data.ledgers)).toBe(true);
+    });
+  });
 });

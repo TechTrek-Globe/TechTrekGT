@@ -63,20 +63,26 @@ export async function handleLedgerShares(context, url, method) {
 
   // Normalize path parts
   // Examples:
-  // /api/finance/invites/verify
-  // /finance/api/invites/verify
-  // /api/finance/ledgers/:id/invites
-  // /api/ledgers/:id/invites
+  // /finance/api/finance/ledgers/:id/invites -> /api/ledgers/:id/invites
+  // /finance/api/ledgers/:id/invites         -> /api/ledgers/:id/invites
+  // /api/finance/ledgers/:id/invites         -> /api/ledgers/:id/invites
+  // /api/ledgers/:id/invites                 -> /api/ledgers/:id/invites
   let pathname = url.pathname;
-  if (pathname.startsWith('/finance/api/')) {
+  if (pathname.startsWith('/finance')) {
     pathname = pathname.slice('/finance'.length);
-  } else if (pathname.startsWith('/api/finance/')) {
+  }
+  if (pathname.startsWith('/api/finance/')) {
     pathname = pathname.replace('/api/finance', '/api');
+  } else if (pathname === '/api/finance') {
+    pathname = '/api';
   }
 
   const parts = pathname.split('/').filter(Boolean); // e.g. ['api', 'ledgers', 'usr-1', 'invites']
   const apiIdx = parts.indexOf('api');
-  const seg = apiIdx !== -1 ? parts.slice(apiIdx + 1) : parts;
+  let seg = apiIdx !== -1 ? parts.slice(apiIdx + 1) : parts;
+  if (seg[0] === 'finance') {
+    seg = seg.slice(1);
+  }
 
   // ----------------------------------------------------------------
   // 1. Public: GET /api/invites/verify?token=<TOKEN>

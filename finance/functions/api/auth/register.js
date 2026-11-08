@@ -107,11 +107,23 @@ export async function onRequestPost(context) {
     const verifiedFlag = isInviteVerified ? 1 : 0;
     const verifiedAt = isInviteVerified ? new Date().toISOString() : null;
 
-    await env.DB.prepare(
-      // created_at, status, email_verified, and email_verified_at written explicitly
-      'INSERT INTO users (id, email, password_hash, name, security_question, security_answer_hash, role, token_version, status, email_verified, email_verified_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-    ).bind(userId, cleanEmail, passwordHash, rawName, cleanQuestion, securityAnswerHash, 'user', 0, 'Active', verifiedFlag, verifiedAt, new Date().toISOString()).run();
+    try {
+      await env.DB.prepare(
+        'INSERT INTO users (id, email, password_hash, name, security_question, security_answer_hash, role, token_version, status, email_verified, email_verified_at, created_app, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+      ).bind(userId, cleanEmail, passwordHash, rawName, cleanQuestion, securityAnswerHash, 'user', 0, 'Active', verifiedFlag, verifiedAt, 'finance', new Date().toISOString()).run();
+    } catch {
+      await env.DB.prepare(
+        'INSERT INTO users (id, email, password_hash, name, security_question, security_answer_hash, role, token_version, status, email_verified, email_verified_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+      ).bind(userId, cleanEmail, passwordHash, rawName, cleanQuestion, securityAnswerHash, 'user', 0, 'Active', verifiedFlag, verifiedAt, new Date().toISOString()).run();
+    }
     userCreated = true;
+
+    try {
+      await ensureLedgerTables(env.DB);
+      await env.DB.prepare(
+        'INSERT OR IGNORE INTO finance_ledgers (id, owner_id, name) VALUES (?, ?, ?)'
+      ).bind(userId, userId, `${rawName}'s Budget`).run();
+    } catch {}
 
     if (!isInviteVerified) {
       const { code: verificationCode } = await issueOneTimeCode(env, {

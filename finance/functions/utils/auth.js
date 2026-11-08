@@ -17,14 +17,12 @@ export { ERROR_CODES };
 //   - 600,000 iterations: ~221ms
 //   - 1,000,000 iterations: ~360ms
 //   - 2,000,000 iterations: ~724ms
-// PBKDF2_ITERATIONS is set to 600,000 to meet OWASP's current recommendation
-// for PBKDF2-HMAC-SHA256 while keeping deriveBits execution (~220ms) comfortably
-// within Cloudflare Workers CPU time limits, leaving ample headroom (~256ms total
-// during rehash-on-login) for D1 queries, rate limiting, and response handling.
-// PBKDF2_MAX_SUPPORTED is decoupled as a 2,000,000 sanity ceiling against malicious
-// or corrupted stored hashes forcing CPU exhaustion.
-export const PBKDF2_ITERATIONS = 600000;
-export const PBKDF2_MAX_SUPPORTED = 2000000;
+// Cloudflare Workers WebCrypto limits PBKDF2 iterations to a maximum of 100,000.
+// Setting iteration counts above 100,000 throws:
+// "Pbkdf2 failed: iteration counts above 100000 are not supported (requested ...)".
+// 100,000 is standardized across all TechTrek applications on Cloudflare Workers.
+export const PBKDF2_ITERATIONS = 100000;
+export const PBKDF2_MAX_SUPPORTED = 100000;
 const PBKDF2_HASH = 'SHA-256';
 const PBKDF2_BITS = 256;
 

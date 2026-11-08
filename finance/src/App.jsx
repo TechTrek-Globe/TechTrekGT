@@ -273,7 +273,7 @@ function MainContent({ pathname, navigateTo, onNavigateHome }) {
           <ShareLedgerModal
             isOpen={isShareModalOpen}
             onClose={() => setIsShareModalOpen && setIsShareModalOpen(false)}
-            ledgerId={activeLedgerId}
+            ledgerId={activeLedgerId || user?.id}
             ledgerTitle={budget?.name || 'Personal Budget'}
           />
         )}

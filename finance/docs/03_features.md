@@ -8,7 +8,7 @@ Finance OS is the personal budget tracking and financial projection application 
 - **Ledger Import & Reconciliation:** Dedicated Web Worker (`spreadsheet.worker.js`) offloads heavy SheetJS (`xlsx`) file parsing off the main browser thread to prevent UI freezing.
 - **Budget Metadata Management:** Multi-account checking/savings management, bill scheduling with variable/fixed frequencies, funding goals, and amortized loan tracking.
 - **Cloud Vault & Multi-Version Backup (FIX-27):** Dual-tier cloud persistence against Cloudflare D1: an ongoing single sync (`user_backups`) continuously maintained by automated background saves, and up to 10 historical manual backup snapshots in `user_backup_versions` saved when users explicitly trigger manual backups.
-- **SSO Authentication & Session Management:** WebCrypto HS256 JWT sessions, PBKDF2-SHA256 password hashing (600,000 iterations), double-submit CSRF protection, and HttpOnly `SameSite=Strict` cookies.
+- **SSO Authentication & Session Management:** WebCrypto HS256 JWT sessions, PBKDF2-SHA256 password hashing (100,000 iterations; Cloudflare Workers edge limit), double-submit CSRF protection, and HttpOnly `SameSite=Strict` cookies.
 - **Import-Time Review (replaces ledger Bank Diff):** The ledger no longer compares against bank data after import (no 'Differs from bank' indicator or toggle). `SpreadsheetImporter` stage `REVIEW_ISSUES` lists, before commit: transactions routed to Other $ (no matching bill or earner), debits matched to a bill from a different account (`importWarnings` returned by `processSpreadsheetImport`), and the first date where the projected ledger running balance differs from the file's bank balance. User chooses Go Back or Import Anyway.
 - **Merge Realignment & Persistent Alias Learning (FIX-25):** Merge reconciliation automatically updates date shifts across month boundaries and zeroes prior recorded/scheduled cells within 35 days. Conflict resolution defaults to updating existing entries with imported actual amounts. Manual transaction-to-bill or transaction-to-earner mappings automatically persist the transaction description into `bankMatchNames` for future imports. Interest credits ($0.01, $0.02, etc.) route directly to Other $ without conflict prompts or review warnings. Other $ cells preserve matched descriptions and do not double amounts on re-import.
 - **Other Description & Comment Preservation (FIX-26):** User-authored comments in the "Other Description" column (`other_desc` and `other_credit_desc`) are strictly protected from overwrite or erasure across both merge and override import paths. Override mode retains all comments across all accounts (`key.endsWith('_other_desc') || key.endsWith('_other_credit_desc')`) and only purges transaction cells for the targeted account. Excised legacy `matrixNoteShifts` to ensure date-shifted bills never shift or blank manual comments on scheduled due dates (`next[projNoteKey] = ''`). Unmatched credit and debit ingestion preserves prior user comments (`priorUserDesc`) and joins multiple imported bank descriptions with ` | ` without clobbering existing comments. In `importer.js`, `mergeTransactions` preserves existing transaction descriptions (`ex.description || inc.description`).
@@ -24,6 +24,10 @@ Finance OS is the personal budget tracking and financial projection application 
     - `none`: Unaffiliated caller. Fails closed with HTTP 403 Forbidden on all private ledger endpoints.
   - **Email Invitations & Claim Workflow:** Secure 256-bit random tokens hashed at rest using WebCrypto SHA-256. Public `/finance/invite?token=` verification and atomic claim transactions in D1. Supports 3-tier user onboarding: Case A (authenticated existing user), Case B (unauthenticated existing user), and Case C (new user registration with pre-verified email).
   - **Tenant Guardrails:** Client-side router presents dedicated `NoAccessPanel` for unlinked users. Top navigation bar features a multi-ledger dropdown selector and viewer role badge.
+- **Cross-App Account Isolation & Administration:**
+  - Strict tenant isolation: accounts originating from other applications (Wayfinder, Outpost) are completely excluded from Finance OS. Finance only returns and displays users registered for Finance or collaborating on a Finance ledger.
+  - **Collaborator Management (`/api/admin/ledger-membership`):** Administrative controls enable updating collaborator permissions (`viewer`, `editor`, `admin`) on Finance household ledgers, or disconnecting them.
+  - **Universal Account Deletion (`/api/admin/user-delete`):** Permanent cascading deletion wiping user records, backups, shares, invites, and credentials atomically across SQLite tables.
 
 ## 2. Serverless API Routes
 
@@ -60,8 +64,11 @@ All serverless API routes execute in Cloudflare Workers ESM format (`src/worker.
 | `/api/auth/update-profile` | POST | Yes (CSRF) | Updates profile and handles email change requests with compensating rollback |
 | `/api/auth/confirm-email-change`| POST | Yes (CSRF) | Confirms pending email change with OTP |
 | `/api/auth/security-question` | GET | Yes | Authenticated retrieval of security question |
-| `/api/admin/stats` | GET | Yes (Admin) | Administrative statistics query with pagination ceilings |
+| `/api/admin/stats` | GET | Yes (Admin) | Administrative statistics query classifying Finance accounts vs other platform accounts, and returning active ledgers and collaborators |
 | `/api/admin/user-status` | POST | Yes (Admin) | Updates user active/suspended status with session revocation |
+| `/api/admin/user-delete` | POST | Yes (Admin) | Permanently deletes a user account with complete atomic cascading cleanup across all domain tables |
+| `/api/admin/ledger-membership` | POST | Yes (Admin) | Associates an unaffiliated account into a Finance ledger with specified role (viewer, editor, admin) |
+| `/api/admin/ledger-membership/remove` | POST | Yes (Admin) | Disconnects a collaborator from a Finance ledger |
 
 ## 3. Data Integrity & SQL Parameterization (FIN-AUDIT-001)
 

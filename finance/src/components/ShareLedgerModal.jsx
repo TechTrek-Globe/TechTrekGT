@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { X, Copy, Check, Loader2, Send, Trash2, Users, Shield, ShieldAlert, Mail } from 'lucide-react';
 import { apiFetch } from '../utils/api';
+import { useAuth } from '../context/AuthContext';
 
 async function callLedgerApi(path, options = {}) {
   const res = await apiFetch(path, {
@@ -15,6 +16,7 @@ async function callLedgerApi(path, options = {}) {
 }
 
 export function ShareLedgerModal({ isOpen, onClose, ledgerId, ledgerTitle }) {
+  const { user } = useAuth();
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('viewer');
   const [invites, setInvites] = useState([]);
@@ -25,7 +27,7 @@ export function ShareLedgerModal({ isOpen, onClose, ledgerId, ledgerTitle }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
-  const targetId = ledgerId || 'default';
+  const targetId = ledgerId || user?.id || 'default';
   const basePath = `/api/finance/ledgers/${encodeURIComponent(targetId)}`;
 
   const refresh = useCallback(async () => {

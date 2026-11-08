@@ -87,14 +87,17 @@ export async function resolveLedgerAccess(env, ledgerId, user) {
   await ensureLedgerTables(env.DB);
   const uid = user?.id || user?.userId;
 
-  // 1. Direct ownership of user's personal ledger (ledgerId === uid)
-  if (uid && ledgerId === uid) {
+  // Map 'default' or 'me' aliases to the user's personal ledger
+  const targetId = (ledgerId === 'default' || ledgerId === 'me') && uid ? uid : ledgerId;
+
+  // 1. Direct ownership of user's personal ledger (targetId === uid)
+  if (uid && targetId === uid) {
     const existingLedger = await env.DB.prepare(
       'SELECT id, owner_id, name, created_at, updated_at FROM finance_ledgers WHERE id = ?'
-    ).bind(ledgerId).first();
+    ).bind(targetId).first();
 
     const ledger = existingLedger || {
-      id: ledgerId,
+      id: targetId,
       owner_id: uid,
       name: user.name ? `${user.name}'s Budget` : 'Personal Budget'
     };
@@ -104,13 +107,13 @@ export async function resolveLedgerAccess(env, ledgerId, user) {
   // 2. Query finance_ledgers row
   let ledger = await env.DB.prepare(
     'SELECT id, owner_id, name, created_at, updated_at FROM finance_ledgers WHERE id = ?'
-  ).bind(ledgerId).first();
+  ).bind(targetId).first();
 
-  // 3. Fallback: check if ledgerId is another user's ID
+  // 3. Fallback: check if targetId is another user's ID
   if (!ledger) {
     const ownerUser = await env.DB.prepare(
       'SELECT id, name, email FROM users WHERE id = ?'
-    ).bind(ledgerId).first();
+    ).bind(targetId).first();
 
     if (ownerUser) {
       ledger = {

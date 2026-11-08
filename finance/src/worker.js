@@ -13,6 +13,8 @@ import { onRequestPost as confirmEmailChangeHandler } from '../functions/api/aut
 import { onRequestPost as refreshHandler } from '../functions/api/auth/refresh.js';
 import { onRequestGet as adminStatsHandler } from '../functions/api/admin/stats.js';
 import { onRequestPost as adminUserStatusHandler } from '../functions/api/admin/user-status.js';
+import { handleUserDelete } from '../functions/api/admin/user-delete.js';
+import { handleLedgerMembership } from '../functions/api/admin/ledger-membership.js';
 import { resolveLedgerAccess, canEdit, canRead, canManageShares } from '../functions/utils/ledgerAccess.js';
 import { handleLedgerShares } from '../functions/api/finance/ledger-shares.js';
 import {
@@ -1002,7 +1004,12 @@ const ROUTES = {
   'GET /api/auth/me': meHandler,
   'POST /api/auth/logout': logoutHandler,
   'GET /api/admin/stats': adminStatsHandler,
-  'POST /api/admin/user-status': adminUserStatusHandler
+  'POST /api/admin/user-status': adminUserStatusHandler,
+  'POST /api/admin/user-delete': handleUserDelete,
+  'DELETE /api/admin/user': handleUserDelete,
+  'POST /api/admin/ledger-membership': handleLedgerMembership,
+  'POST /api/admin/ledger-membership/remove': handleLedgerMembership,
+  'DELETE /api/admin/ledger-membership': handleLedgerMembership
 };
 
 async function fetchAsset(env, request, pathname) {

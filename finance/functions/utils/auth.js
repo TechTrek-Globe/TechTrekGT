@@ -858,7 +858,8 @@ export async function sendTransactionalEmail(env, {
           from: env.MAIL_FROM || sender,
           to: recipients,
           subject,
-          text
+          text,
+          html: renderedHtml
         })
       });
       if (!res.ok) {

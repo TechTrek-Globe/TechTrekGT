@@ -202,3 +202,10 @@ The shared `users` table serves all TechTrekGT applications. Strict app-level is
 - Collaborator Governance: `POST /api/admin/ledger-membership/remove` enables administrators to manage or disconnect collaborator memberships on Finance household ledgers.
 - Universal Deletion: `deleteUserAccount` (`POST /api/admin/user-delete` and `DELETE /api/admin/user`) performs atomic cascading cleanups across all domain tables (`ledger_shares`, `ledger_invites`, `user_backups`, `user_backup_versions`, `finance_ledgers`, `email_verifications`, `password_resets`, optional `wayfinder_*` and `auction_*` tables, and `users`).
 
+## 10. Shared D1 Write-Volume Governance & Idempotency State (personal-budget-db)
+
+- Isolate-Scoped DDL Initialization: Runtime schema guards (such as `ensureSyncHistoryTable` in Outpost and `ensureTables` in Finance) cache initialization state in memory (`WeakSet` / module flag) and never execute `ALTER TABLE` statements on request hot paths.
+- Differential Upserts Over Destructive Replace: Tables with multiple secondary indexes (`listing_traffic`, `auction_items`, `vine_items`, `vine_asin_cache`) prohibit unconditional `INSERT OR REPLACE` with random UUIDs on recurring sync paths, using deterministic keys and `ON CONFLICT DO UPDATE ... WHERE` diff guards to prevent index write amplification.
+- Webhook & Multi-Tab Sync Idempotency: `ebay_webhook_events` deduplicates retries via `ebw_${notificationId}` with `INSERT OR IGNORE`, and `POST /api/ebay/sync-all` enforces a 3-minute cooldown for background auto-polls (`manual: false`).
+
+

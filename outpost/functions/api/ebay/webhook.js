@@ -443,13 +443,14 @@ export async function onRequestPost(context) {
 
   const ebayItemId = payload.notification?.data?.itemId || payload.ItemID || payload.itemId || null;
   const ebayOrderId = payload.notification?.data?.orderId || payload.OrderID || payload.orderId || null;
-  const eventId = crypto.randomUUID();
+  const rawNotifId = payload.notification?.notificationId || payload.metadata?.notificationId || payload.notificationId || null;
+  const eventId = rawNotifId ? `ebw_${String(rawNotifId).trim()}` : crypto.randomUUID();
 
-  // 6. Log event to D1 immediately (if DB bound)
+  // 6. Log event to D1 immediately with idempotency check (if DB bound)
   if (env?.DB) {
     try {
-      await env.DB.prepare(`
-        INSERT INTO ebay_webhook_events (id, event_type, ebay_item_id, ebay_order_id, raw_payload)
+      const insertRes = await env.DB.prepare(`
+        INSERT OR IGNORE INTO ebay_webhook_events (id, event_type, ebay_item_id, ebay_order_id, raw_payload)
         VALUES (?, ?, ?, ?, ?)
       `).bind(
         eventId,
@@ -458,6 +459,10 @@ export async function onRequestPost(context) {
         ebayOrderId,
         JSON.stringify(payload).slice(0, 65535)
       ).run();
+
+      if (rawNotifId && insertRes?.meta?.changes === 0) {
+        return ok({ success: true, duplicate: true, eventId, eventType });
+      }
     } catch (e) {
       console.error('[ebayWebhook] failed to log event to D1:', e.message);
     }

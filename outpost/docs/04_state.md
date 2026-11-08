@@ -236,6 +236,13 @@ Outpost uses React Context and standard React hooks (`useState`, `useReducer`, `
     - `src/utils/ebayTemplate.js`: Evaluates `item.aiGeneratedMiddleSection`; if present and non-empty, injects the custom Condition and Key Details cards between Header Banner and What's Included / Authentication cards, falling back to static layout when absent.
     - `src/utils/listingCopyGenerator.js`: Forwards `options.aiGeneratedMiddleSection` to `generateEbayListingHtml` so `insertHtml` and `htmlBody` reflect AI output.
     - `src/components/ListingCopyModal.jsx`: Manages `aiGeneratedMiddleSection`, `generatingAiDetails`, and `aiDetailsMsg` state hooks. Incorporates non-blocking loading state recovery inside `finally {}` blocks per AUDIT-004, interactive "Auto-Generate AI Description" and "Reset to Static" actions, and live preview re-rendering.
+  - **D1 Write-Budget & Differential Synchronization State [ACTION ID: PERF-004 / DB-001]**:
+    - `functions/api/ebay/analytics.js`: `ingestListingTraffic` pre-fetches existing `listing_traffic` rows for `(user_id, startYMD..endYMD)` into `existingTrafficMap` and skips unchanged daily records. Uses deterministic primary keys (`lt-${listingId}-${ymd}`) and conditional `ON CONFLICT(ebay_listing_id, traffic_date) DO UPDATE ... WHERE` clauses so SQLite never rewrites unchanged rows or secondary indexes. `onRequestGet` updates `auction_items` 30-day snapshot columns strictly when `needsIngestion === true`, and backfills missing dates via `INSERT OR IGNORE` on HTTP 429 even when partial range rows exist.
+    - `functions/api/ebay/sync-all.js`: Enforces a 3-minute server-side cooldown on background auto-polls (`manual: false`) using `outpost_sync_settings.last_ebay_sync_at`, gates store-wide `ingestListingTraffic` on `ANALYTICS_CACHE_TTL_HOURS` (12h) across non-sold items, and performs field-level dirty-checking (`isDirty`) before executing `UPDATE auction_items`.
+    - `functions/utils/syncLogger.js`: Tracks initialized D1 bindings per isolate via `initializedDbs = new WeakSet()`, ensuring `CREATE TABLE IF NOT EXISTS outpost_sync_history` runs at most once per isolate lifecycle and eliminating runtime `ALTER TABLE` executions.
+    - `functions/api/ebay/webhook.js`: Uses deterministic `ebw_${notificationId}` keys with `INSERT OR IGNORE INTO ebay_webhook_events` to short-circuit duplicate webhook deliveries (`meta.changes === 0`).
+    - `src/context/InventoryContext.jsx` & `src/components/EditItemModal.jsx`: Background `setInterval` timers check `document.visibilityState !== 'hidden'` and pass `{ manual: false }` to `syncAllEbayItems`. `EditItemModal` skips `fetchActiveListings()` when opening items in `'Sold'` or `'Returned / Refunded'` status.
+
 
 
 

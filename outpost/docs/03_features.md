@@ -553,6 +553,27 @@ Integrated Google Gemini API (`gemini-3.8-flash`) into the Outpost eBay listing 
    - Displays real-time status pill badges: "AI Active" (emerald) when AI cards are rendered versus "Standard Template" (slate).
    - Provides an on-demand **"Reset to Static"** button allowing sellers to revert instantly to the static template at any time.
 
+## D1 Runaway Write Remediation & Differential Sync Architecture [ACTION ID: PERF-004 / DB-001]
+
+Eliminated high-frequency redundant Cloudflare D1 row and index writes across eBay analytics ingestion, background inventory synchronization, webhook handling, and client auto-polling.
+
+### Write Remediation Capabilities
+
+1. **Differential Traffic Upserts & Store-Wide TTL Gating (`functions/api/ebay/analytics.js`, `functions/api/ebay/sync-all.js`)**:
+   - Replaced destructive `INSERT OR REPLACE INTO listing_traffic` (which generated new UUID primary keys and rewrote 4 secondary indexes across all 30 days on every sync) with deterministic row keys (`lt-${listingId}-${ymd}`) and pre-fetched in-memory change detection (`shouldUpsertTrafficRow`) paired with `INSERT ... ON CONFLICT(ebay_listing_id, traffic_date) DO UPDATE ... WHERE`. Unchanged historical days and existing 0-baseline rows execute zero SQLite writes.
+   - Gated store-wide `ingestListingTraffic` inside `POST /api/ebay/sync-all` on `ANALYTICS_CACHE_TTL_HOURS` (12h) across active non-sold listings, preventing routine 30-minute price/order syncs from re-ingesting 30-day traffic reports when telemetry is already fresh.
+   - Removed unconditional `DELETE FROM auction_item_analytics` and cached-read `UPDATE auction_items SET analytics_fetched_at = ...` from `GET /api/ebay/analytics`.
+   - Enhanced HTTP 429 quota fallback in `GET /api/ebay/analytics` to backfill only missing dates (`INSERT OR IGNORE`) when expanding from 30d to 60d/90d, preventing repeated upstream ingestion attempts and sync history writes during quota lockouts.
+2. **Active Item Dirty-Checking & Isolate DDL Caching (`functions/api/ebay/sync-all.js`, `functions/utils/syncLogger.js`)**:
+   - Implemented in-memory field dirty-checking in `sync-all.js` comparing incoming price, status, platform fees, promoted rate, shipping cost, pricing floors, and serialized attributes against the existing `auction_items` row before executing `UPDATE auction_items`.
+   - Removed redundant `UPDATE ebay_oauth_tokens SET last_refreshed_at = datetime('now')` from `sync-all.js` and `find-listings.js` (`tokenHelper.js` updates token timestamps strictly upon actual OAuth refresh).
+   - Added a `WeakSet` isolate-level initialization guard (`initializedDbs`) to `ensureSyncHistoryTable` in `syncLogger.js` and removed 4 hot-path `ALTER TABLE` statements, eliminating 6 redundant DDL queries per `/api/sync/settings` and analytics quota call.
+3. **Multi-Tab Cooldown, Webhook Idempotency & Durable Object Rate Limiting (`sync-all.js`, `webhook.js`, `InventoryContext.jsx`)**:
+   - Added a 3-minute server-side cooldown in `POST /api/ebay/sync-all` for automated background polling (`manual: false`), deduplicating concurrent `setInterval` timers across multiple open browser tabs while allowing manual user syncs (`manual: true`) to run immediately.
+   - Gated client-side `setInterval` auto-polling in `InventoryContext.jsx` on `document.visibilityState !== 'hidden'`, and gated `fetchActiveListings()` in `EditItemModal.jsx` to skip sold/returned items.
+   - Added deterministic notification ID deduplication (`ebw_${notificationId}` with `INSERT OR IGNORE`) in `POST /api/ebay/webhook`, and connected `env?.RATE_LIMIT_DO` to `vinescout-sales.js` and `vinescout-inventory.js`.
+
+
 
 
 

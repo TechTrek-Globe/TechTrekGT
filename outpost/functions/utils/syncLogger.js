@@ -7,13 +7,15 @@
  * can accurately inform the user of sync status.
  */
 
+const initializedDbs = new WeakSet();
+
 /**
- * Ensures the outpost_sync_history table and outpost_sync_settings columns exist.
+ * Ensures the outpost_sync_history table exists once per database instance.
  *
  * @param {object} db - Cloudflare D1 database binding
  */
 export async function ensureSyncHistoryTable(db) {
-  if (!db) return;
+  if (!db || initializedDbs.has(db)) return;
   try {
     await db.prepare(`
       CREATE TABLE IF NOT EXISTS outpost_sync_history (
@@ -34,13 +36,8 @@ export async function ensureSyncHistoryTable(db) {
     await db.prepare(
       'CREATE INDEX IF NOT EXISTS idx_sync_history_user ON outpost_sync_history(user_id, started_at DESC)'
     ).run();
+    initializedDbs.add(db);
   } catch (_) {}
-
-  // Safely ensure status and error columns exist in outpost_sync_settings
-  try { await db.prepare('ALTER TABLE outpost_sync_settings ADD COLUMN last_ebay_sync_status TEXT').run(); } catch (_) {}
-  try { await db.prepare('ALTER TABLE outpost_sync_settings ADD COLUMN last_ebay_sync_error TEXT').run(); } catch (_) {}
-  try { await db.prepare('ALTER TABLE outpost_sync_settings ADD COLUMN last_vscout_sync_status TEXT').run(); } catch (_) {}
-  try { await db.prepare('ALTER TABLE outpost_sync_settings ADD COLUMN last_vscout_sync_error TEXT').run(); } catch (_) {}
 }
 
 /**

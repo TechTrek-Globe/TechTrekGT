@@ -300,7 +300,9 @@ export function EditItemModal({
 
       // Start search empty so all active store listings are visible immediately
       setEbaySearch('');
-      fetchActiveListings();
+      if (item.status !== 'Sold' && item.status !== 'Returned / Refunded') {
+        fetchActiveListings();
+      }
 
       // Initialize sale & reconciliation data from item props or fetch fresh
       const initialSale = item.sale || (item.sale_id ? {

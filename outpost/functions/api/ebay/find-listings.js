@@ -53,11 +53,6 @@ export async function onRequestGet(context) {
 
         await setCachedEbayListings(env.DB, payload.userId, ebayListings);
         fetchedAt = new Date().toISOString();
-
-        // Stamp last_refreshed_at on success
-        await env.DB.prepare(
-          `UPDATE ebay_oauth_tokens SET last_refreshed_at = datetime('now') WHERE user_id = ?`
-        ).bind(payload.userId).run().catch(() => {});
       }
 
     } catch (e) {

@@ -11,7 +11,7 @@ import {
   normalizeHttps
 } from './tokenHelper.js';
 import { computePricingFloors } from '../../utils/auction.js';
-import { DEFAULT_TARGET_MARGIN_PCT, MAX_SINGLE_ENRICH } from '../../utils/constants.js';
+import { DEFAULT_TARGET_MARGIN_PCT, MAX_SINGLE_ENRICH, ANALYTICS_CACHE_TTL_HOURS } from '../../utils/constants.js';
 import { setCachedEbayListings } from './listingsCache.js';
 import { recordSyncRun } from '../../utils/syncLogger.js';
 import { ingestListingTraffic } from './analytics.js';
@@ -40,6 +40,42 @@ export async function onRequestPost(context) {
   return withAuth(async () => {
     const payload = await requireAuth(request, env);
     if (!env.DB) return err('Database not available', 500);
+
+    const url = new URL(request.url);
+    let reqBody = {};
+    try {
+      if (request.headers.get('content-type')?.includes('application/json')) {
+        reqBody = await request.clone().json();
+      }
+    } catch (_) {}
+
+    const isAutoPoll = reqBody?.manual === false || url.searchParams.get('manual') === 'false';
+    const forceAnalytics = reqBody?.force_analytics === true || url.searchParams.get('force_analytics') === '1';
+
+    // Server-side 3-minute cooldown for background auto-polling across multiple open browser tabs
+    if (isAutoPoll) {
+      try {
+        const syncRow = await env.DB.prepare(
+          'SELECT last_ebay_sync_at FROM outpost_sync_settings WHERE user_id = ?'
+        ).bind(payload.userId).first();
+        if (syncRow?.last_ebay_sync_at) {
+          const rawTs = String(syncRow.last_ebay_sync_at).trim();
+          const isoTs = rawTs.endsWith('Z') || rawTs.includes('+') ? rawTs : (rawTs.replace(' ', 'T') + 'Z');
+          const lastSyncMs = new Date(isoTs).getTime();
+          if (!isNaN(lastSyncMs) && (Date.now() - lastSyncMs) < 3 * 60 * 1000) {
+            return ok({
+              success: true,
+              skipped: true,
+              reason: 'cooldown',
+              message: 'Recent eBay sync completed within cooldown window.',
+              total_linked: 0,
+              updated_count: 0,
+              sold_recorded_count: 0
+            });
+          }
+        }
+      } catch (_) {}
+    }
 
     const rows = await env.DB.prepare(`
       SELECT * FROM auction_items
@@ -325,35 +361,56 @@ export async function onRequestPost(context) {
               }
             }
 
-            await env.DB.prepare(`
-              UPDATE auction_items SET
-                current_list_price = ?,
-                status = ?,
-                platform = 'eBay',
-                platform_fee_pct = ?,
-                platform_flat_fee = ?,
-                ebay_promoted_rate = ?,
-                boost_pct = ?,
-                est_shipping_cost = ?,
-                min_sell_price = ?,
-                suggested_list_price = ?,
-                attributes = ?,
-                updated_at = datetime('now')
-              WHERE id = ? AND user_id = ?
-            `).bind(
-              newPrice,
-              newStatus,
-              platformFeePct,
-              platformFlatFee,
-              promotedRate,
-              boostPct,
-              estShippingCost,
-              pricing.min_sell_price,
-              pricing.suggested_list_price,
-              JSON.stringify(attrs),
-              item.id,
-              payload.userId
-            ).run();
+            const serializedAttrs = JSON.stringify(attrs);
+            const existingSerializedAttrs = typeof item.attributes === 'string'
+              ? item.attributes
+              : JSON.stringify(parseAttributes(item.attributes));
+
+            const isDirty = (
+              Number(item.current_list_price ?? -1) !== Number(newPrice ?? -1) ||
+              item.status !== newStatus ||
+              item.platform !== 'eBay' ||
+              Math.abs(Number(item.platform_fee_pct ?? -1) - Number(platformFeePct ?? -1)) > 0.0001 ||
+              Math.abs(Number(item.platform_flat_fee ?? -1) - Number(platformFlatFee ?? -1)) > 0.0001 ||
+              Math.abs(Number(item.ebay_promoted_rate ?? -1) - Number(promotedRate ?? -1)) > 0.0001 ||
+              Math.abs(Number(item.boost_pct ?? -1) - Number(boostPct ?? -1)) > 0.0001 ||
+              Math.abs(Number(item.est_shipping_cost ?? -1) - Number(estShippingCost ?? -1)) > 0.0001 ||
+              Math.abs(Number(item.min_sell_price ?? -1) - Number(pricing.min_sell_price ?? -1)) > 0.0001 ||
+              Math.abs(Number(item.suggested_list_price ?? -1) - Number(pricing.suggested_list_price ?? -1)) > 0.0001 ||
+              serializedAttrs !== existingSerializedAttrs
+            );
+
+            if (isDirty) {
+              await env.DB.prepare(`
+                UPDATE auction_items SET
+                  current_list_price = ?,
+                  status = ?,
+                  platform = 'eBay',
+                  platform_fee_pct = ?,
+                  platform_flat_fee = ?,
+                  ebay_promoted_rate = ?,
+                  boost_pct = ?,
+                  est_shipping_cost = ?,
+                  min_sell_price = ?,
+                  suggested_list_price = ?,
+                  attributes = ?,
+                  updated_at = datetime('now')
+                WHERE id = ? AND user_id = ?
+              `).bind(
+                newPrice,
+                newStatus,
+                platformFeePct,
+                platformFlatFee,
+                promotedRate,
+                boostPct,
+                estShippingCost,
+                pricing.min_sell_price,
+                pricing.suggested_list_price,
+                serializedAttrs,
+                item.id,
+                payload.userId
+              ).run();
+            }
 
             updatedCount++;
           } else if (item.status === 'Listed' && cleanListingId && singleEnrichCount < MAX_SINGLE_ENRICH) {
@@ -455,9 +512,23 @@ export async function onRequestPost(context) {
       await Promise.all(activePromises);
     }
 
-    // Ingest 30-day traffic analytics for all active store listings in ONE single batch eBay call
+    // Ingest 30-day traffic analytics for active store listings ONLY if TTL has expired or force_analytics is requested
     try {
-      await ingestListingTraffic(env, payload.userId, null, null, 30);
+      const ttlMs = (ANALYTICS_CACHE_TTL_HOURS || 12) * 60 * 60 * 1000;
+      const nowMs = Date.now();
+      const activeLinkedItems = items.filter(
+        it => it.ebay_listing_id && String(it.ebay_listing_id).trim() &&
+              it.status !== 'Sold' && it.status !== 'Returned / Refunded'
+      );
+      const needsStoreTrafficSync = forceAnalytics || activeLinkedItems.some(it => {
+        if (!it.analytics_fetched_at) return true;
+        const ts = new Date(it.analytics_fetched_at).getTime();
+        return isNaN(ts) || (nowMs - ts > ttlMs);
+      });
+
+      if (needsStoreTrafficSync && activeLinkedItems.length > 0) {
+        await ingestListingTraffic(env, payload.userId, null, null, 30);
+      }
     } catch (trafficErr) {
       console.warn('[sync-all] Batch traffic sync note:', trafficErr?.message || trafficErr);
     }
@@ -494,13 +565,6 @@ export async function onRequestPost(context) {
       details: failedItems.length > 0 ? failedItems : (fetchErrors.length > 0 ? fetchErrors : null),
       startedAt
     });
-
-    // Stamp last_refreshed_at on tokens if any success or partial success
-    if (syncStatus === 'success' || updatedCount > 0) {
-      await env.DB.prepare(
-        `UPDATE ebay_oauth_tokens SET last_refreshed_at = datetime('now') WHERE user_id = ?`
-      ).bind(payload.userId).run().catch(() => {});
-    }
 
     return ok({
       success: syncStatus !== 'failed',

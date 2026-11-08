@@ -250,14 +250,17 @@ export function InventoryProvider({ children }) {
   }, [debouncedSearch, statusFilter, categoryFilter, listingFormatFilter, listingStatusFilter, sortConfig.key, sortConfig.direction]);
 
   // --- Sync Engine Handlers ---
-  const handleSyncEbay = useCallback(async () => {
+  const handleSyncEbay = useCallback(async (options = { manual: true }) => {
     if (ebaySyncing) return;
     setEbaySyncing(true);
     try {
-      const res = await syncAllEbayItems();
-      const updated = await getSyncSettings();
-      setSyncSettings(updated.settings || updated);
-      fetchItems(1);
+      const isManual = options?.manual !== false;
+      const res = await syncAllEbayItems({ manual: isManual });
+      if (!res?.skipped) {
+        const updated = await getSyncSettings();
+        setSyncSettings(updated.settings || updated);
+        fetchItems(1);
+      }
       if (res && res.success === false) {
         throw new Error(res.error || 'eBay sync reported failure');
       }
@@ -299,11 +302,17 @@ export function InventoryProvider({ children }) {
 
     if (syncSettings.ebay_auto_sync) {
       const ms = (syncSettings.ebay_sync_interval_m || 30) * 60 * 1000;
-      syncIntervalRef.current.push(setInterval(handleSyncEbay, ms));
+      syncIntervalRef.current.push(setInterval(() => {
+        if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+        handleSyncEbay({ manual: false }).catch(() => {});
+      }, ms));
     }
     if (syncSettings.vscout_auto_sync) {
       const ms = (syncSettings.vscout_sync_interval_m || 60) * 60 * 1000;
-      syncIntervalRef.current.push(setInterval(handleSyncVScout, ms));
+      syncIntervalRef.current.push(setInterval(() => {
+        if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+        handleSyncVScout();
+      }, ms));
     }
 
     return () => {
@@ -311,7 +320,8 @@ export function InventoryProvider({ children }) {
       syncIntervalRef.current = [];
     };
   }, [syncSettings?.ebay_auto_sync, syncSettings?.ebay_sync_interval_m,
-      syncSettings?.vscout_auto_sync, syncSettings?.vscout_sync_interval_m]);
+      syncSettings?.vscout_auto_sync, syncSettings?.vscout_sync_interval_m,
+      handleSyncEbay, handleSyncVScout]);
 
   // --- Optimistic Local Updates ---
   const updateItemLocal = useCallback((id, patch) => {

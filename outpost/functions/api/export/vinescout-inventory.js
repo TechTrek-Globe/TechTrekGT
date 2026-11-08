@@ -9,7 +9,7 @@ export async function onRequestGet({ request, env }) {
 
     // Rate limiting: 30 requests per 60 seconds per IP
     const ip = request.headers.get('CF-Connecting-IP') || 'export-unknown';
-    const rl = await checkRateLimit(env?.RATE_LIMIT_KV, `vinescout-inventory:${ip}`, 30, 60, false);
+    const rl = await checkRateLimit(env?.RATE_LIMIT_KV, `vinescout-inventory:${ip}`, 30, 60, false, env?.RATE_LIMIT_DO);
     if (!rl.allowed) {
       return new Response(JSON.stringify({ error: 'Too many requests. Please wait before retrying.' }), {
         status: 429,

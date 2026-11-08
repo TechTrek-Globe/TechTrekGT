@@ -334,10 +334,11 @@ export const syncEbayItem = (itemId, ebayListingId = null, ebayPromotedRate = nu
   });
 
 // --- eBay Batch Sync All Linked Items ---
-export const syncAllEbayItems = () =>
+export const syncAllEbayItems = (options = {}) =>
   apiFetch('/api/ebay/sync-all', {
     method: 'POST',
-    headers: JSON_HEADERS
+    headers: JSON_HEADERS,
+    body: JSON.stringify(options)
   });
 
 // --- eBay Sell Analytics (Traffic & Performance Report) ---

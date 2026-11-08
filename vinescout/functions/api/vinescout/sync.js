@@ -61,6 +61,16 @@ export async function onRequestPost(context) {
             review_written = excluded.review_written,
             rating         = excluded.rating,
             updated_at     = excluded.updated_at
+          WHERE vine_items.title IS NOT excluded.title
+             OR vine_items.etv IS NOT excluded.etv
+             OR (excluded.order_id IS NOT NULL AND vine_items.order_id IS NOT excluded.order_id)
+             OR (excluded.date_added IS NOT NULL AND vine_items.date_added IS NOT excluded.date_added)
+             OR vine_items.vine_category IS NOT excluded.vine_category
+             OR vine_items.category IS NOT excluded.category
+             OR vine_items.marketplace IS NOT excluded.marketplace
+             OR (excluded.image_url IS NOT NULL AND vine_items.image_url IS NOT excluded.image_url)
+             OR vine_items.review_written IS NOT excluded.review_written
+             OR vine_items.rating IS NOT excluded.rating
         `).bind(
           id,
           userId,
@@ -89,6 +99,9 @@ export async function onRequestPost(context) {
               category   = COALESCE(excluded.category, category),
               image_url  = COALESCE(excluded.image_url, image_url),
               fetched_at = excluded.fetched_at
+            WHERE (excluded.title IS NOT NULL AND vine_asin_cache.title IS NOT excluded.title)
+               OR (excluded.category IS NOT NULL AND vine_asin_cache.category IS NOT excluded.category)
+               OR (excluded.image_url IS NOT NULL AND vine_asin_cache.image_url IS NOT excluded.image_url)
           `).bind(
             asin,
             String(item.title || '').slice(0, 500),

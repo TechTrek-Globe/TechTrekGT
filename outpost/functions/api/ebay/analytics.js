@@ -451,7 +451,9 @@ export function ingestListingTraffic(env, userId, itemId, listingId, rangeDays =
     let linkedItems = [];
     try {
       const q = env.DB.prepare(`
-        SELECT id, ebay_listing_id, date_listed FROM auction_items
+        SELECT id, ebay_listing_id, date_listed, status, analytics_fetched_at,
+               total_impressions_30d, total_page_views_30d, avg_ctr_30d, avg_conversion_30d
+        FROM auction_items
         WHERE user_id = ? AND ebay_listing_id IS NOT NULL AND ebay_listing_id != ''
         LIMIT 200
       `).bind(userId);
@@ -482,11 +484,12 @@ export function ingestListingTraffic(env, userId, itemId, listingId, rangeDays =
       const singleItem = itemsByListingId.get(cleanSingleId) || { id: itemId, ebay_listing_id: cleanSingleId };
       targetItemsMap.set(cleanSingleId, singleItem);
     } else {
-      const allListingIds = Array.from(itemsByListingId.keys()).slice(0, 200);
-      idListParam = allListingIds.length > 0 ? allListingIds.join('|') : '';
       for (const [k, v] of itemsByListingId.entries()) {
+        if (v.status === 'Sold' || v.status === 'Returned / Refunded') continue;
         targetItemsMap.set(k, v);
       }
+      const allListingIds = Array.from(targetItemsMap.keys()).slice(0, 200);
+      idListParam = allListingIds.length > 0 ? allListingIds.join('|') : '';
     }
 
     if (!idListParam) {
@@ -565,13 +568,27 @@ export function ingestListingTraffic(env, userId, itemId, listingId, rangeDays =
     if (ebayData.records?.[0]?.dimensionalDataPoints) {
       const fixturePoints = parseEbayDailyTraffic(ebayData);
       for (const point of fixturePoints) {
-        const rowId = `lt-${crypto.randomUUID()}`;
+        const rowId = `lt-${listingId || itemId}-${point.trafficDate}`;
         statements.push(env.DB.prepare(`
-          INSERT OR REPLACE INTO listing_traffic (
+          INSERT INTO listing_traffic (
             id, item_id, user_id, ebay_listing_id, traffic_date,
             impressions_total, impressions_search, page_views_total,
             click_through_rate, sales_conversion_rate, fetched_at
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(ebay_listing_id, traffic_date) DO UPDATE SET
+            item_id = excluded.item_id,
+            user_id = excluded.user_id,
+            impressions_total = excluded.impressions_total,
+            impressions_search = excluded.impressions_search,
+            page_views_total = excluded.page_views_total,
+            click_through_rate = excluded.click_through_rate,
+            sales_conversion_rate = excluded.sales_conversion_rate,
+            fetched_at = excluded.fetched_at
+          WHERE listing_traffic.impressions_total != excluded.impressions_total
+             OR listing_traffic.impressions_search != excluded.impressions_search
+             OR listing_traffic.page_views_total != excluded.page_views_total
+             OR listing_traffic.click_through_rate != excluded.click_through_rate
+             OR listing_traffic.sales_conversion_rate != excluded.sales_conversion_rate
         `).bind(
           rowId,
           itemId,
@@ -596,6 +613,34 @@ export function ingestListingTraffic(env, userId, itemId, listingId, rangeDays =
         fetched_at: nowIso
       };
     }
+
+    // Pre-fetch existing listing_traffic rows for this user and range to avoid writing unchanged historical days
+    const existingTrafficMap = new Map();
+    try {
+      const exQuery = env.DB.prepare(`
+        SELECT ebay_listing_id, traffic_date, impressions_total, impressions_search, page_views_total, click_through_rate, sales_conversion_rate
+        FROM listing_traffic
+        WHERE user_id = ? AND traffic_date >= ? AND traffic_date <= ?
+      `).bind(userId, startYMD, endYMD);
+      if (typeof exQuery?.all === 'function') {
+        const exRes = await exQuery.all();
+        for (const r of (exRes?.results || [])) {
+          existingTrafficMap.set(`${r.ebay_listing_id}_${r.traffic_date}`, r);
+        }
+      }
+    } catch (_) {}
+
+    const shouldUpsertTrafficRow = (lid, ymd, imp, sImp, pv, cRate, sRate) => {
+      const existing = existingTrafficMap.get(`${lid}_${ymd}`);
+      if (!existing) return true;
+      return (
+        Number(existing.impressions_total || 0) !== imp ||
+        Number(existing.impressions_search || 0) !== sImp ||
+        Number(existing.page_views_total || 0) !== pv ||
+        Math.abs(Number(existing.click_through_rate || 0) - cRate) > 0.0001 ||
+        Math.abs(Number(existing.sales_conversion_rate || 0) - sRate) > 0.0001
+      );
+    };
 
     // Process real eBay multi-listing batch response
     const metricKeyMap = buildMetricKeyMap(ebayData.header?.metrics);
@@ -625,13 +670,23 @@ export function ingestListingTraffic(env, userId, itemId, listingId, rangeDays =
       if (n > 0) {
         if (totalImp === 0 && totalViews === 0) {
           for (const ymd of expectedDates) {
-            const rowId = `lt-${crypto.randomUUID()}`;
+            if (!shouldUpsertTrafficRow(recListingId, ymd, 0, 0, 0, 0, 0)) continue;
+            const rowId = `lt-${recListingId}-${ymd}`;
             statements.push(env.DB.prepare(`
-              INSERT OR REPLACE INTO listing_traffic (
+              INSERT INTO listing_traffic (
                 id, item_id, user_id, ebay_listing_id, traffic_date,
                 impressions_total, impressions_search, page_views_total,
                 click_through_rate, sales_conversion_rate, fetched_at
               ) VALUES (?, ?, ?, ?, ?, 0, 0, 0, 0, 0, ?)
+              ON CONFLICT(ebay_listing_id, traffic_date) DO UPDATE SET
+                impressions_total = 0,
+                impressions_search = 0,
+                page_views_total = 0,
+                click_through_rate = 0,
+                sales_conversion_rate = 0,
+                fetched_at = excluded.fetched_at
+              WHERE listing_traffic.impressions_total != 0
+                 OR listing_traffic.page_views_total != 0
             `).bind(rowId, targetItem.id, userId, recListingId, ymd, nowIso));
           }
         } else {
@@ -656,38 +711,62 @@ export function ingestListingTraffic(env, userId, itemId, listingId, rangeDays =
             // Store as decimal fraction (0.0000 - 1.0000) to align with parseEbayDailyTraffic and chart scale
             const dayCtr = dayImp > 0 ? parseFloat((dayViews / dayImp).toFixed(4)) : 0.0;
 
-            const rowId = `lt-${crypto.randomUUID()}`;
+            if (!shouldUpsertTrafficRow(recListingId, ymd, dayImp, daySearch, dayViews, dayCtr, dayConv)) continue;
+            const rowId = `lt-${recListingId}-${ymd}`;
             statements.push(env.DB.prepare(`
-              INSERT OR REPLACE INTO listing_traffic (
+              INSERT INTO listing_traffic (
                 id, item_id, user_id, ebay_listing_id, traffic_date,
                 impressions_total, impressions_search, page_views_total,
                 click_through_rate, sales_conversion_rate, fetched_at
               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              ON CONFLICT(ebay_listing_id, traffic_date) DO UPDATE SET
+                item_id = excluded.item_id,
+                impressions_total = excluded.impressions_total,
+                impressions_search = excluded.impressions_search,
+                page_views_total = excluded.page_views_total,
+                click_through_rate = excluded.click_through_rate,
+                sales_conversion_rate = excluded.sales_conversion_rate,
+                fetched_at = excluded.fetched_at
+              WHERE listing_traffic.impressions_total != excluded.impressions_total
+                 OR listing_traffic.impressions_search != excluded.impressions_search
+                 OR listing_traffic.page_views_total != excluded.page_views_total
+                 OR listing_traffic.click_through_rate != excluded.click_through_rate
+                 OR listing_traffic.sales_conversion_rate != excluded.sales_conversion_rate
             `).bind(rowId, targetItem.id, userId, recListingId, ymd, dayImp, daySearch, dayViews, dayCtr, dayConv, nowIso));
           }
         }
       }
 
       if (rangeDays === 30 && targetItem.id) {
-        statements.push(env.DB.prepare(`
-          UPDATE auction_items SET
-            analytics_fetched_at = ?,
-            total_impressions_30d = ?,
-            total_page_views_30d = ?,
-            avg_ctr_30d = ?,
-            avg_conversion_30d = ?
-          WHERE id = ? AND user_id = ?
-        `).bind(nowIso, totalImp, totalViews, ctr, conv, targetItem.id, userId));
+        const metricsChanged = (
+          Number(targetItem.total_impressions_30d ?? -1) !== totalImp ||
+          Number(targetItem.total_page_views_30d ?? -1) !== totalViews ||
+          Math.abs(Number(targetItem.avg_ctr_30d ?? -1) - ctr) > 0.01 ||
+          Math.abs(Number(targetItem.avg_conversion_30d ?? -1) - conv) > 0.01 ||
+          !targetItem.analytics_fetched_at
+        );
+        if (metricsChanged || isSingleListing) {
+          statements.push(env.DB.prepare(`
+            UPDATE auction_items SET
+              analytics_fetched_at = ?,
+              total_impressions_30d = ?,
+              total_page_views_30d = ?,
+              avg_ctr_30d = ?,
+              avg_conversion_30d = ?
+            WHERE id = ? AND user_id = ?
+          `).bind(nowIso, totalImp, totalViews, ctr, conv, targetItem.id, userId));
+        }
       }
     }
 
-    // 2. For any linked listings not returned by eBay, fill 0-baseline
+    // 2. For any linked listings not returned by eBay, fill 0-baseline only if missing
     for (const [cleanId, targetItem] of targetItemsMap.entries()) {
       if (seenListingIds.has(cleanId)) continue;
       for (const ymd of expectedDates) {
-        const rowId = `lt-${crypto.randomUUID()}`;
+        if (existingTrafficMap.has(`${cleanId}_${ymd}`)) continue;
+        const rowId = `lt-${cleanId}-${ymd}`;
         statements.push(env.DB.prepare(`
-          INSERT OR REPLACE INTO listing_traffic (
+          INSERT OR IGNORE INTO listing_traffic (
             id, item_id, user_id, ebay_listing_id, traffic_date,
             impressions_total, impressions_search, page_views_total,
             click_through_rate, sales_conversion_rate, fetched_at
@@ -695,15 +774,22 @@ export function ingestListingTraffic(env, userId, itemId, listingId, rangeDays =
         `).bind(rowId, targetItem.id, userId, cleanId, ymd, nowIso));
       }
       if (rangeDays === 30 && targetItem.id) {
-        statements.push(env.DB.prepare(`
-          UPDATE auction_items SET
-            analytics_fetched_at = ?,
-            total_impressions_30d = 0,
-            total_page_views_30d = 0,
-            avg_ctr_30d = 0,
-            avg_conversion_30d = 0
-          WHERE id = ? AND user_id = ?
-        `).bind(nowIso, targetItem.id, userId));
+        const needsBaselineItemUpdate = (
+          !targetItem.analytics_fetched_at ||
+          Number(targetItem.total_impressions_30d || 0) !== 0 ||
+          Number(targetItem.total_page_views_30d || 0) !== 0
+        );
+        if (needsBaselineItemUpdate || isSingleListing) {
+          statements.push(env.DB.prepare(`
+            UPDATE auction_items SET
+              analytics_fetched_at = ?,
+              total_impressions_30d = 0,
+              total_page_views_30d = 0,
+              avg_ctr_30d = 0,
+              avg_conversion_30d = 0
+            WHERE id = ? AND user_id = ?
+          `).bind(nowIso, targetItem.id, userId));
+        }
       }
     }
 
@@ -760,14 +846,6 @@ export async function onRequestGet(context) {
     }
 
     const cleanListingId = String(item.ebay_listing_id).trim();
-
-    // Retire and discard legacy synthesized rows in auction_item_analytics
-    const delStmt = env.DB.prepare(
-      'DELETE FROM auction_item_analytics WHERE item_id = ? AND user_id = ?'
-    ).bind(itemId, payload.userId);
-    if (typeof delStmt?.run === 'function') {
-      await delStmt.run().catch(() => {});
-    }
 
     // Compute Pacific Time date range with mandatory T-1 lag
     const endYMD = getPacificYMD(1);
@@ -826,24 +904,20 @@ export async function onRequestGet(context) {
         });
       }
       if (!ingestRes.success) {
-        if (rows.length > 0) {
-          console.warn('[analytics] Upstream refresh failed; serving cached telemetry:', ingestRes.error);
-          if (ingestRes.status === 429) {
-            quotaLimited = true;
-            quotaWarning = ingestRes.error;
-          }
-        } else if (ingestRes.status === 429) {
-          // When eBay daily quota (100 calls/day limit) is reached and no cached rows exist:
-          // Populate baseline rows for the expected range so the seller is not locked out of the UI,
-          // and surface an explicit quota notice with the reset time.
+        if (ingestRes.status === 429) {
+          // When eBay daily quota (100 calls/day limit) is reached (either with 0 rows or partial rows when switching 30d->60d/90d):
+          // Backfill any missing dates in the requested range with 0-baseline rows using INSERT OR IGNORE so the seller is not
+          // locked out of the UI and subsequent 60d/90d views do not repeatedly re-trigger ingestListingTraffic.
           quotaLimited = true;
           quotaWarning = ingestRes.error;
 
+          const existingDatesSet = new Set(rows.map(r => String(r.traffic_date)));
           const fallbackStatements = [];
           const nowIso = new Date().toISOString();
           for (let d = rangeDays; d >= 1; d--) {
             const ymd = getPacificYMD(d);
-            const rowId = `lt-${crypto.randomUUID()}`;
+            if (existingDatesSet.has(ymd)) continue;
+            const rowId = `lt-${cleanListingId}-${ymd}`;
             fallbackStatements.push(env.DB.prepare(`
               INSERT OR IGNORE INTO listing_traffic (
                 id, item_id, user_id, ebay_listing_id, traffic_date,
@@ -852,9 +926,11 @@ export async function onRequestGet(context) {
               ) VALUES (?, ?, ?, ?, ?, 0, 0, 0, 0, 0, ?)
             `).bind(rowId, itemId, payload.userId, cleanListingId, ymd, nowIso));
           }
-          if (fallbackStatements.length > 0) {
+          if (fallbackStatements.length > 0 && typeof env.DB.batch === 'function') {
             await env.DB.batch(fallbackStatements).catch(() => {});
           }
+        } else if (rows.length > 0) {
+          console.warn('[analytics] Upstream refresh failed; serving cached telemetry:', ingestRes.error);
         } else {
           return err(ingestRes.error || 'Failed to fetch traffic report from eBay. Please try again.', ingestRes.status || 500);
         }
@@ -954,8 +1030,8 @@ export async function onRequestGet(context) {
       ? rows[rows.length - 1].fetched_at
       : new Date().toISOString();
 
-    // Update snapshot columns on auction_items if 30-day range
-    if (rangeDays === 30) {
+    // Only update snapshot columns on auction_items if a fresh 30-day ingestion just ran
+    if (rangeDays === 30 && needsIngestion) {
       await env.DB.prepare(`
         UPDATE auction_items SET
           analytics_fetched_at = ?,

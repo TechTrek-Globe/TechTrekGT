@@ -66,6 +66,7 @@ All serverless API routes execute in Cloudflare Workers ESM format (`src/worker.
 | `/api/auth/security-question` | GET | Yes | Authenticated retrieval of security question |
 | `/api/admin/stats` | GET | Yes (Admin) | Administrative statistics query classifying Finance accounts vs other platform accounts, and returning active ledgers and collaborators |
 | `/api/admin/user-status` | POST | Yes (Admin) | Updates user active/suspended status with session revocation |
+| `/api/admin/user-verify` | POST | Yes (Admin) | Manually verifies user email (`email_verified = 1`) with session cache invalidation |
 | `/api/admin/user-delete` | POST | Yes (Admin) | Permanently deletes a user account with complete atomic cascading cleanup across all domain tables |
 | `/api/admin/ledger-membership` | POST | Yes (Admin) | Associates an unaffiliated account into a Finance ledger with specified role (viewer, editor, admin) |
 | `/api/admin/ledger-membership/remove` | POST | Yes (Admin) | Disconnects a collaborator from a Finance ledger |

@@ -68,11 +68,14 @@ export async function onRequestPost(context) {
       ttlMs: ONE_TIME_CODE_TTL_MS
     });
 
-    await sendVerificationEmail(env, targetUser.email, verificationCode, 'verify').catch(() => {});
+    const emailSent = await sendVerificationEmail(env, targetUser.email, verificationCode, 'verify').catch(() => false);
 
     return json({
       success: true,
-      message: 'A new 8-digit verification code has been sent to your email.'
+      emailSent: Boolean(emailSent),
+      message: emailSent
+        ? 'A new 8-digit verification code has been sent to your email.'
+        : 'A new 8-digit verification code was generated, but delivery failed (destination address not verified in Cloudflare Email Routing).'
     });
   } catch (err) {
     console.error('[resend-verification] error:', requestId ? { requestId } : '', err && err.message);

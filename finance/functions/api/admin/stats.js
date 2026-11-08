@@ -28,12 +28,12 @@ export async function onRequestGet(context) {
     let usersResult = { results: [] };
     try {
       usersResult = await env.DB.prepare(
-        'SELECT id, email, name, status, role, is_admin, created_at, created_app FROM users ORDER BY created_at ASC LIMIT 1000'
+        'SELECT id, email, name, status, role, is_admin, email_verified, email_verified_at, created_at, created_app FROM users ORDER BY created_at ASC LIMIT 1000'
       ).all();
     } catch {
       // Fallback if created_app column not present in legacy test fixtures
       usersResult = await env.DB.prepare(
-        'SELECT id, email, name, status, role, is_admin, created_at FROM users ORDER BY created_at ASC LIMIT 1000'
+        'SELECT id, email, name, status, role, is_admin, email_verified, email_verified_at, created_at FROM users ORDER BY created_at ASC LIMIT 1000'
       ).all();
     }
 
@@ -122,6 +122,7 @@ export async function onRequestGet(context) {
         status: u.status || 'Active',
         role: u.role || 'user',
         isAdmin: Boolean(u.is_admin === 1 || u.role === 'admin'),
+        emailVerified: Number(u.email_verified) === 1 || Boolean(u.email_verified_at),
         createdAt: u.created_at,
         createdApp: u.created_app || null,
         backupCount,

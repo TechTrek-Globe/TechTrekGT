@@ -59,6 +59,7 @@ export function AdminView() {
   const [actionSuccess, setActionSuccess] = useState(null);
   const [actionError, setActionError] = useState(null);
   const [updatingUserId, setUpdatingUserId] = useState(null);
+  const [verifyingUserId, setVerifyingUserId] = useState(null);
   const [deletingUserId, setDeletingUserId] = useState(null);
   const [disconnectingUserId, setDisconnectingUserId] = useState(null);
 
@@ -109,6 +110,30 @@ export function AdminView() {
       setActionError(err.message || 'Failed to update user status.');
     } finally {
       setUpdatingUserId(null);
+    }
+  };
+
+  const handleVerifyUser = async (targetUser) => {
+    if (!window.confirm(`Manually verify email address for "${targetUser.email}"?`)) return;
+    setVerifyingUserId(targetUser.id);
+    setActionError(null);
+    setActionSuccess(null);
+    try {
+      const res = await apiFetch('/api/admin/user-verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: targetUser.id })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || `Failed to verify user (HTTP ${res.status})`);
+      }
+      setActionSuccess(`Email verified successfully for ${targetUser.email}.`);
+      await fetchStats();
+    } catch (err) {
+      setActionError(err.message || 'Failed to verify user email.');
+    } finally {
+      setVerifyingUserId(null);
     }
   };
 
@@ -390,29 +415,54 @@ export function AdminView() {
                   <td className={`px-5 py-3.5 text-xs font-mono ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
                     {u.email}
                   </td>
-                  <td className="px-4 py-3.5">
-                    <StatusBadge status={u.status} />
+                  <td className="px-4 py-3.5 space-y-1">
+                    <div>
+                      <StatusBadge status={u.status} />
+                    </div>
+                    <div>
+                      {u.emailVerified ? (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                          <Check className="w-2.5 h-2.5" /> Verified
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                          Unverified
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-3.5">
                     {u.id === user?.id ? (
                       <span className="text-[11px] text-slate-500 italic">Current User</span>
                     ) : (
-                      <button
-                        onClick={() => handleToggleStatus(u)}
-                        disabled={updatingUserId === u.id}
-                        className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-colors ${
-                          (u.status || 'Active') === 'Active'
-                            ? 'bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 border-rose-800/50'
-                            : 'bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-400 border-emerald-800/50'
-                        } disabled:opacity-50`}
-                      >
-                        {updatingUserId === u.id
-                          ? 'Updating...'
-                          : (u.status || 'Active') === 'Active'
-                            ? 'Suspend'
-                            : 'Activate'
-                        }
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleToggleStatus(u)}
+                          disabled={updatingUserId === u.id}
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-colors ${
+                            (u.status || 'Active') === 'Active'
+                              ? 'bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 border-rose-800/50'
+                              : 'bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-400 border-emerald-800/50'
+                          } disabled:opacity-50`}
+                        >
+                          {updatingUserId === u.id
+                            ? 'Updating...'
+                            : (u.status || 'Active') === 'Active'
+                              ? 'Suspend'
+                              : 'Activate'
+                          }
+                        </button>
+                        {!u.emailVerified && (
+                          <button
+                            onClick={() => handleVerifyUser(u)}
+                            disabled={verifyingUserId === u.id}
+                            className="px-2.5 py-1 rounded-lg text-[11px] font-semibold border bg-sky-950/40 hover:bg-sky-900/60 text-sky-400 border-sky-800/50 transition-colors disabled:opacity-50"
+                            title="Manually mark user email verified"
+                          >
+                            {verifyingUserId === u.id ? 'Verifying...' : 'Verify Email'}
+                          </button>
+                        )}
+                      </div>
                     )}
                   </td>
                   <td className="px-4 py-3.5 text-center">

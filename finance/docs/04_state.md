@@ -76,6 +76,7 @@ Authentication states strictly reflect backend database authority and maintain z
   - On subsequent login attempts by unverified accounts (`sign_in_count >= 1 && email_verified !== 1`), `POST /api/auth/login` actively rejects the request with HTTP 403 `EMAIL_VERIFICATION_REQUIRED` and clears cookies.
   - `POST /api/auth/verify-email` supports unauthenticated verification by accepting `{ email, code, rememberMe }`. Upon successful 8-digit OTP validation, it marks `email_verified = 1`, timestamps `email_verified_at`, issues active session cookies (`issueSession`), and returns the public user object so the client immediately enters the dashboard.
   - `POST /api/auth/resend-verification` supports unauthenticated OTP dispatch by accepting `{ email }`, rate-limiting attempts to 3 requests per 300s and delivering a fresh 8-digit verification code.
+  - `POST /api/admin/user-verify` enables platform administrators to manually mark any unverified account as verified (`email_verified = 1`, `email_verified_at = datetime('now')`) directly from the Admin Dashboard.
 - **Workers Email Routing Infrastructure (SEND_EMAIL):**
   - Transactional authentication and invitation emails dispatch natively through Cloudflare Workers Email Routing (`send_email: [{ name: "SEND_EMAIL" }]`) with sender `noreply@techtrekgt.com` via `dispatchEmail` in `functions/utils/inviteEmail.js`.
   - Dispatches multipart MIME with responsive HTML cards containing styled 8-digit verification tokens, with automatic fallback to `RESEND_API_KEY` or dev console output.

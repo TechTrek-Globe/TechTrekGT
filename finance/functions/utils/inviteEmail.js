@@ -83,7 +83,7 @@ export async function dispatchEmail(env, { sender, to, subject, text, html }) {
         // Strategy 3: Object array format
         try {
           await env.SEND_EMAIL.send({
-            to: [{ email: to }],
+            to: [{ email: to, name: to.split('@')[0] }],
             from: { email: sender, name: 'TechTrek Finance OS' },
             subject,
             text,

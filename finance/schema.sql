@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS users (
   amazon_api_token_hash TEXT,
   force_password_reset INTEGER NOT NULL DEFAULT 0,
   created_app          TEXT,
+  sign_in_count        INTEGER NOT NULL DEFAULT 0,
   created_at           TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

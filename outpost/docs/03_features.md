@@ -490,6 +490,32 @@ Enforced automatic primary status sorting across active inventory when viewing a
    - Implemented `STATUS_CASE_SQL` in serverless item endpoints: when querying all statuses under default sort, D1 SQLite executes `ORDER BY CASE LOWER(TRIM(i.status)) WHEN 'listed' THEN 1 WHEN 'available' THEN 2 WHEN 'kept for self' THEN 3 WHEN 'draft' THEN 4 WHEN 'unsold' THEN 5 WHEN 'returned' THEN 6 ELSE 7 END ASC, i.created_at DESC`.
    - Ensures multi-page database pagination (`LIMIT / OFFSET`) partitions active items strictly according to the status hierarchy.
 
+## Advanced Dark-Theme eBay Listing Template Generator [ACTION ID: LST-001 / EBAY-009]
+
+Introduced a modular, dark-theme eBay HTML listing generator (`src/utils/ebayTemplate.js`) and integrated it into the Outpost listing copy generator suite (`src/utils/listingCopyGenerator.js`).
+
+### Template Generator Capabilities
+
+1. **Modular Dark-Theme Card Layout (`src/utils/ebayTemplate.js`)**:
+   - Implements `generateEbayListingHtml(item)` producing a 900px centered responsive card container (`max-width:900px; margin:0 auto; font-family: Arial, Helvetica, sans-serif; color:#ffffff; line-height:1.5;`).
+   - Cards utilize tactical dark charcoal backgrounds (`background-color:rgb(17,17,17)`) and subtle structural borders (`border:1px solid rgb(51,51,51); border-radius:6px; padding:18px; margin-bottom:15px;`).
+   - Accents use Outpost tactical gold and amber typography (`color:rgb(241,193,91)` and `border:1px solid rgb(214,181,109)`).
+2. **Dynamic Outpost Schema & Inventory API Mapping**:
+   - Safely parses stringified JSON `attributes` from Outpost inventory records.
+   - Maps Outpost inventory fields dynamically:
+     - Title: `item.title || item.item_name || attrs.title || 'Authentic Collectible'`
+     - Description: `item.description || item.notes || item.additional_description || attrs.description || ''`
+     - Condition Details: `item.conditionDetails || item.condition_details || item.condition || attrs.conditionDetails || 'Please review all photos carefully for the exact condition, quality, and details.'`
+     - Key Details: Maps array or newline-separated string `features` to `<li>` elements, with graceful fallback to `Brand: ${brand || 'N/A'}` and `Model: ${model || 'N/A'}`.
+     - What's Included: Maps `includedItems`, `included_items`, or `includedInSale` to bulleted list, with fallback to `${title}` and exact item photos.
+3. **Intelligent Conditional Authentication Card**:
+   - Evaluates whether an item is certified or autographed.
+   - If explicit `authentication` object (`{ provider, certNumber, type }`) or Outpost fields (`authenticator`, `cert_number`, `athlete_person`) indicate a certified/autographed piece, the Authentication card renders.
+   - If the item is raw, uncertified, or non-autographed (`authenticator` in `'Raw'`, `'Uncertified'`, `'None'`, `'Other'`, `'N/A'`, or empty), the entire Authentication card block is completely omitted (`''`), maintaining a clean, relevant listing.
+4. **Copy Generator & Modal Integration (`src/utils/listingCopyGenerator.js`)**:
+   - Re-exports `generateEbayListingHtml`.
+   - `generateEbayCopy` builds `insertHtml` and full `htmlBody` using `generateEbayListingHtml`, providing immediate dark-theme HTML code and live preview in `ListingCopyModal`.
+
 
 
 

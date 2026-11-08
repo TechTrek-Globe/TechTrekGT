@@ -23,10 +23,12 @@ export default function AuthModal() {
     getSecurityQuestion, 
     forgotPassword, 
     resetPassword,
+    verifyEmail,
+    resendVerification,
     turnstileConfig 
   } = useAuth();
   
-  // mode: 'signin' | 'register' | 'forgot' | 'reset'
+  // mode: 'signin' | 'register' | 'forgot' | 'reset' | 'verify'
   const [mode, setMode] = useState('signin');
   const [turnstileToken, setTurnstileToken] = useState('');
   
@@ -50,6 +52,9 @@ export default function AuthModal() {
   const [securityQuestion, setSecurityQuestion] = useState(PRESET_SECURITY_QUESTIONS[0]);
   const [securityAnswer, setSecurityAnswer] = useState('');
   
+  // Verification code state
+  const [verificationCode, setVerificationCode] = useState('');
+
   // Reset password state
   const [resetToken, setResetToken] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -74,8 +79,28 @@ export default function AuthModal() {
     setError('');
     setInfoMessage('');
     setResetToken('');
+    setVerificationCode('');
     setSecurityAnswer('');
     setTurnstileToken('');
+  };
+
+  const handleResendVerification = async () => {
+    if (!email) {
+      setError('Please provide your email address.');
+      return;
+    }
+    setError('');
+    setInfoMessage('');
+    setIsSubmitting(true);
+    try {
+      const res = await resendVerification(email);
+      setInfoMessage(res.message || 'A new verification code has been sent to your email.');
+      setResendCooldown(60);
+    } catch (err) {
+      setError(err.message || 'Failed to resend verification code.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -98,11 +123,31 @@ export default function AuthModal() {
           try { localStorage.removeItem('techtrek_saved_email'); } catch (e) {}
         }
       } else if (mode === 'signin') {
-        await login(email, password, rememberMe, turnstileToken);
+        try {
+          await login(email, password, rememberMe, turnstileToken);
+          if (rememberMe && email) {
+            try { localStorage.setItem('techtrek_saved_email', email); } catch (e) {}
+          } else {
+            try { localStorage.removeItem('techtrek_saved_email'); } catch (e) {}
+          }
+        } catch (loginErr) {
+          if (loginErr?.requiresVerification || loginErr?.code === 'EMAIL_VERIFICATION_REQUIRED') {
+            setMode('verify');
+            if (loginErr.email) setEmail(loginErr.email);
+            setError(loginErr.message || 'Email verification is required before signing in.');
+            return;
+          }
+          throw loginErr;
+        }
+      } else if (mode === 'verify') {
+        if (!verificationCode || verificationCode.trim().length !== 8) {
+          setError('Please enter the valid 8-digit verification code.');
+          setIsSubmitting(false);
+          return;
+        }
+        await verifyEmail(verificationCode.trim(), email, rememberMe);
         if (rememberMe && email) {
           try { localStorage.setItem('techtrek_saved_email', email); } catch (e) {}
-        } else {
-          try { localStorage.removeItem('techtrek_saved_email'); } catch (e) {}
         }
       } else if (mode === 'forgot') {
         const res = await forgotPassword(email);
@@ -138,7 +183,9 @@ export default function AuthModal() {
         <div className="relative flex items-center justify-between p-6 border-b border-slate-800/80">
           <div className="flex items-center space-x-3">
             <div className="p-2.5 bg-slate-800/90 border border-slate-700/60 rounded-xl text-emerald-400 shadow-inner">
-              {mode === 'forgot' || mode === 'reset' ? (
+              {mode === 'verify' ? (
+                <Mail className="w-5 h-5" />
+              ) : mode === 'forgot' || mode === 'reset' ? (
                 <KeyRound className="w-5 h-5" />
               ) : (
                 <ShieldCheck className="w-5 h-5" />
@@ -148,12 +195,14 @@ export default function AuthModal() {
               <h3 className="text-lg font-semibold text-slate-100">
                 {mode === 'register' && 'Create Your Account'}
                 {mode === 'signin' && 'Welcome Back'}
+                {mode === 'verify' && 'Verify Your Email'}
                 {mode === 'forgot' && 'Reset Password'}
                 {mode === 'reset' && 'Set New Password'}
               </h3>
               <p className="text-xs text-slate-400">
                 {mode === 'register' && 'Required: Email, Name & Security Question'}
                 {mode === 'signin' && 'Sign in to access your personal dashboard'}
+                {mode === 'verify' && 'Enter the 8-digit verification code sent to your email'}
                 {mode === 'forgot' && 'Enter your registered email address to receive a reset code'}
                 {mode === 'reset' && 'Enter your reset code and new password'}
               </p>
@@ -203,7 +252,7 @@ export default function AuthModal() {
             </div>
           )}
 
-          {(mode === 'signin' || mode === 'register' || mode === 'forgot' || mode === 'reset') && (
+          {(mode === 'signin' || mode === 'register' || mode === 'forgot' || mode === 'reset' || mode === 'verify') && (
             <div>
               <label className="block text-xs font-medium text-slate-300 mb-1.5">Email Address</label>
               <div className="relative">
@@ -211,11 +260,39 @@ export default function AuthModal() {
                 <input
                   type="email"
                   required
-                  disabled={mode === 'reset'}
+                  disabled={mode === 'reset' || mode === 'verify'}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
                   className="w-full pl-10 pr-4 py-2.5 bg-slate-950/80 border border-slate-800 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500/80 focus:ring-1 focus:ring-emerald-500/80 transition-all disabled:opacity-60"
+                />
+              </div>
+            </div>
+          )}
+
+          {mode === 'verify' && (
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-medium text-slate-300">8-Digit Verification Code</label>
+                <button
+                  type="button"
+                  disabled={resendCooldown > 0 || isSubmitting}
+                  onClick={handleResendVerification}
+                  className="text-xs text-emerald-400 hover:text-emerald-300 disabled:text-slate-500 disabled:cursor-not-allowed transition-colors"
+                >
+                  {resendCooldown > 0 ? `Resend Code (${resendCooldown}s)` : 'Resend Code'}
+                </button>
+              </div>
+              <div className="relative">
+                <KeyRound className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+                <input
+                  type="text"
+                  required
+                  maxLength={8}
+                  value={verificationCode}
+                  onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ''))}
+                  placeholder="e.g. 12345678"
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-950/80 border border-slate-800 rounded-xl text-sm text-slate-100 font-mono tracking-wider placeholder-slate-500 focus:outline-none focus:border-emerald-500/80 focus:ring-1 focus:ring-emerald-500/80 transition-all"
                 />
               </div>
             </div>
@@ -359,7 +436,7 @@ export default function AuthModal() {
             </>
           )}
 
-          {(mode === 'signin' || mode === 'register') && (
+          {(mode === 'signin' || mode === 'register' || mode === 'verify') && (
             <div className="flex items-center pt-1">
               <input
                 id="remember_me"
@@ -398,6 +475,7 @@ export default function AuthModal() {
                 <span>
                   {mode === 'register' && 'Create Account'}
                   {mode === 'signin' && 'Sign In'}
+                  {mode === 'verify' && 'Verify Email & Access Dashboard'}
                   {mode === 'forgot' && 'Send Reset Code'}
                   {mode === 'reset' && 'Reset Password'}
                 </span>
@@ -409,6 +487,19 @@ export default function AuthModal() {
 
         {/* Footer Toggle */}
         <div className="p-4 bg-slate-950/40 border-t border-slate-800/80 text-center text-xs text-slate-400 flex items-center justify-center space-x-4">
+          {mode === 'verify' && (
+            <p>
+              Want to sign in with a different account?{' '}
+              <button
+                type="button"
+                onClick={() => switchMode('signin')}
+                className="text-emerald-400 font-medium hover:underline ml-1"
+              >
+                Back to Sign In
+              </button>
+            </p>
+          )}
+
           {mode === 'register' && (
             <p>
               Already have an account?{' '}

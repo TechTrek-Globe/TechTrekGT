@@ -42,9 +42,16 @@ export async function onRequestPost(context) {
     const accountLimited = await enforceRateLimit(context, 'login-account', 10, 300, cleanEmail);
     if (accountLimited) return accountLimited;
 
-    const user = await env.DB.prepare(
-      'SELECT id, email, name, password_hash, role, token_version, security_question, security_answer_hash, status, email_verified, pending_email, force_password_reset FROM users WHERE email = ?'
-    ).bind(cleanEmail).first();
+    let user;
+    try {
+      user = await env.DB.prepare(
+        'SELECT id, email, name, password_hash, role, token_version, security_question, security_answer_hash, status, email_verified, email_verified_at, sign_in_count, pending_email, force_password_reset FROM users WHERE email = ?'
+      ).bind(cleanEmail).first();
+    } catch {
+      user = await env.DB.prepare(
+        'SELECT id, email, name, password_hash, role, token_version, security_question, security_answer_hash, status, email_verified, pending_email, force_password_reset FROM users WHERE email = ?'
+      ).bind(cleanEmail).first();
+    }
 
     // Timing equalization: perform a hash even when the account does not exist
     // so the response time does not reveal whether the address is registered. (H7)
@@ -78,6 +85,26 @@ export async function onRequestPost(context) {
     if (user.status === 'Suspended') {
       // REM-21: Distinct code so frontend distinguishes suspended accounts from unauthenticated sessions
       return withCookies(fail(ERROR_CODES.ACCOUNT_SUSPENDED, 403, 'Account suspended. Please contact support.', requestId), clearedCookies());
+    }
+
+    const signInCount = Number(user.sign_in_count || 0);
+    const isEmailVerified = Number(user.email_verified) === 1 || Boolean(user.email_verified_at);
+
+    if (!isEmailVerified && signInCount >= 1) {
+      emitMetric('auth.login.verification_required', requestId);
+      return withCookies(json({
+        error: 'Email verification required. Please enter the 8-digit verification code sent to your email or request a new one.',
+        code: ERROR_CODES.EMAIL_VERIFICATION_REQUIRED,
+        requiresVerification: true,
+        email: user.email,
+        ...(requestId ? { requestId } : {})
+      }, 403), clearedCookies());
+    }
+
+    try {
+      await env.DB.prepare('UPDATE users SET sign_in_count = COALESCE(sign_in_count, 0) + 1 WHERE id = ?').bind(user.id).run();
+    } catch (countErr) {
+      console.warn('[login] update sign_in_count warning:', countErr && countErr.message);
     }
 
     // Transparent rehash on login: upgrades 310k-era or legacy two-part hashes

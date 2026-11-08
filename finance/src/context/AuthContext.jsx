@@ -190,7 +190,11 @@ export function AuthProvider({ children }) {
 
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(data.error || `Login failed (HTTP ${res.status})`);
+        const error = new Error(data.error || `Login failed (HTTP ${res.status})`);
+        error.code = data.code;
+        error.requiresVerification = data.requiresVerification;
+        error.email = data.email || email;
+        throw error;
       }
 
       setIsAuthenticated(true);
@@ -313,23 +317,43 @@ export function AuthProvider({ children }) {
     return data;
   };
 
-  const verifyEmail = async (code) => {
+  const verifyEmail = async (code, email = null, rememberMe = false) => {
+    const payload = { code };
+    if (email) payload.email = email;
+    if (rememberMe) payload.rememberMe = rememberMe;
     const res = await apiFetch('/api/auth/verify-email', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code })
+      body: JSON.stringify(payload)
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       throw new Error(data.error || `Failed to verify email (HTTP ${res.status})`);
     }
-    setUser(prev => prev ? { ...prev, emailVerified: true } : prev);
+    if (data.user) {
+      setIsAuthenticated(true);
+      setUser(data.user);
+      setCurrentUserId(data.user?.id || null);
+      if (typeof window !== 'undefined') {
+        try { window.sessionStorage.setItem('tt_signed_in_user_id', data.user.id || ''); } catch {}
+      }
+      if (data.csrfToken) {
+        setCsrfTokenState(data.csrfToken);
+        setCsrfToken(data.csrfToken);
+      }
+      setIsAuthModalOpen(false);
+    } else {
+      setUser(prev => prev ? { ...prev, emailVerified: true } : prev);
+    }
     return data;
   };
 
-  const resendVerification = async () => {
+  const resendVerification = async (email = null) => {
+    const payload = email ? { email } : {};
     const res = await apiFetch('/api/auth/resend-verification', {
-      method: 'POST'
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {

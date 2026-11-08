@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS users (
   email_verified INTEGER NOT NULL DEFAULT 0,
   email_verified_at TEXT,
   pending_email TEXT,
+  sign_in_count INTEGER NOT NULL DEFAULT 0,
   created_app TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -30,6 +31,11 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
 ```
+
+### 1.1.1 First-Time Sign-In Exemption & Subsequent Verification Policy
+- First-time access: Upon initial registration (`POST /api/auth/register`), the user is issued active session cookies immediately without upfront email verification (`sign_in_count = 1`). For accounts created without an active session (`sign_in_count = 0`), the first login succeeds and increments `sign_in_count = 1`.
+- Subsequent sign-in gating: Any subsequent login attempt (`POST /api/auth/login`) by an unverified account (`email_verified !== 1 && !email_verified_at` with `sign_in_count >= 1`) is rejected with HTTP 403 `EMAIL_VERIFICATION_REQUIRED` (`requiresVerification: true`).
+- UI verification flow: The sign-in interface switches dynamically to `mode === 'verify'`, prompting for the 8-digit OTP code or offering code resend with a 60-second cooldown timer. Unauthenticated verification via `POST /api/auth/verify-email` marks `email_verified = 1`, issues session cookies, and transitions the user directly into the dashboard.
 
 ### 1.2 Shared Account Lifecycle Tables
 

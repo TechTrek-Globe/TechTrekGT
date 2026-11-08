@@ -1,4 +1,7 @@
 import { getCertVerificationUrl } from './certLookup';
+import { generateEbayListingHtml } from './ebayTemplate';
+
+export { generateEbayListingHtml };
 
 /**
  * Generate multi-channel formatted listing copy for sports cards, memorabilia, and general/Amazon inventory.
@@ -174,140 +177,29 @@ export function generateEbayCopy(item, options = {}) {
         </td>
       </tr>`).join('\n');
 
-  // Middle section (between delimiters) - only this gets copied for HTML description
-  const insertHtml = `<div style="padding: 26px 28px 12px; background-color: rgb(255, 255, 255); color: rgb(17, 17, 17); box-sizing: border-box;">
-  <h1 style="margin: 0px 0px 8px; color: rgb(17, 17, 17); font-size: 30px; line-height: 1.3; text-align: center;">
-    ${titleInput}
-  </h1>
-  ${subtitle ? `<p style="margin: 0px; color: rgb(85, 85, 85); font-size: 17px; line-height: 1.6; text-align: center;">
-    ${subtitle}
-  </p>` : ''}
-</div>
-
-<div style="margin: 10px 28px 22px; padding: 14px 18px; background-color: rgb(247, 242, 232); color: rgb(17, 17, 17); border: 1px solid rgb(214, 181, 109); box-sizing: border-box; text-align: center;">
-  <strong style="color: rgb(138, 92, 13); font-size: 17px; line-height: 1.5;">
-    ${conditionHeader}
-  </strong>
-  <div style="margin-top: 4px; color: rgb(51, 51, 51); font-size: 15px; line-height: 1.5;">
-    ${conditionSubheader}
-  </div>
-</div>
-
-<div style="padding: 0px 28px 22px; background-color: rgb(255, 255, 255); color: rgb(17, 17, 17); box-sizing: border-box;">
-  <h3 style="margin: 0px 0px 10px; color: rgb(17, 17, 17); border-bottom: 2px solid rgb(179, 122, 22); padding-bottom: 6px; font-size: 20px; line-height: 1.4;">
-    Item Description
-  </h3>
-  <p style="margin: 0px 0px 14px; color: rgb(17, 17, 17); font-size: 16px; line-height: 1.7;">
-    ${isAutographed
-      ? `Offered is the exact ${titleInput} shown in the listing photographs${athlete ? `, hand-signed by ${athlete}` : ''}.`
-      : `Offered is the ${condition.toLowerCase()} ${brand ? `${brand} ` : ''}${titleInput} shown in the listing photographs.`}
-  </p>
-  ${additionalDescription ? `<p style="margin: 0px; color: rgb(17, 17, 17); font-size: 16px; line-height: 1.7;">
-    ${additionalDescription}
-  </p>` : ''}
-</div>
-
-<div style="margin: 0px 28px 22px; padding: 18px; background-color: rgb(247, 242, 232); color: rgb(17, 17, 17); border: 1px solid rgb(214, 181, 109); box-sizing: border-box;">
-  <h3 style="margin: 0px 0px 10px; color: rgb(17, 17, 17); border-bottom: 2px solid rgb(179, 122, 22); padding-bottom: 6px; font-size: 20px; line-height: 1.4;">
-    Condition
-  </h3>
-  <p style="margin: 0px 0px 12px; color: rgb(17, 17, 17); font-size: 16px; line-height: 1.7;">
-    ${isAutographed
-      ? 'Authentic piece in excellent condition. Please review all photographs for the precise condition of the item and autograph.'
-      : `${condition}. Item is in original condition, exactly as shown in photographs.`}
-  </p>
-  <p style="margin: 0px; color: rgb(51, 51, 51); font-size: 15px; line-height: 1.6;">
-    Please review all listing photographs for the precise condition of the item and packaging. The buyer will receive the exact item shown in the listing photographs.
-  </p>
-</div>
-
-${compatibility.length > 0 ? `<div style="padding: 0px 28px 22px; background-color: rgb(255, 255, 255); color: rgb(17, 17, 17); box-sizing: border-box;">
-  <h3 style="margin: 0px 0px 10px; color: rgb(17, 17, 17); border-bottom: 2px solid rgb(179, 122, 22); padding-bottom: 6px; font-size: 20px; line-height: 1.4;">
-    Vehicle Compatibility
-  </h3>
-  <table role="presentation" style="width: 100%; border-collapse: collapse; color: rgb(17, 17, 17); font-size: 15px;">
-    <tbody>
-${compatibility.map(c => `      <tr>
-        <td style="width: 34%; padding: 11px; background-color: rgb(247, 242, 232); color: rgb(17, 17, 17); border: 1px solid rgb(214, 181, 109); font-weight: bold; vertical-align: top;">
-          ${c.label}
-        </td>
-        <td style="padding: 11px; background-color: rgb(255, 255, 255); color: rgb(17, 17, 17); border: 1px solid rgb(221, 221, 221); vertical-align: top;">
-          ${c.value}
-        </td>
-      </tr>`).join('\n')}
-    </tbody>
-  </table>
-  <p style="margin: 12px 0px 0px; color: rgb(51, 51, 51); font-size: 15px; line-height: 1.6;">
-    Buyers should confirm the vehicle model and model year before purchase.
-  </p>
-</div>` : ''}
-
-<div style="padding: 0px 28px 22px; background-color: rgb(255, 255, 255); color: rgb(17, 17, 17); box-sizing: border-box;">
-  <h3 style="margin: 0px 0px 10px; color: rgb(17, 17, 17); border-bottom: 2px solid rgb(179, 122, 22); padding-bottom: 6px; font-size: 20px; line-height: 1.4;">
-    Item Details
-  </h3>
-  <table role="presentation" style="width: 100%; border-collapse: collapse; color: rgb(17, 17, 17); font-size: 15px;">
-    <tbody>
-${tableRowsHtml}
-    </tbody>
-  </table>
-</div>
-
-${features.length > 0 ? `<div style="padding: 0px 28px 22px; background-color: rgb(255, 255, 255); color: rgb(17, 17, 17); box-sizing: border-box;">
-  <h3 style="margin: 0px 0px 10px; color: rgb(17, 17, 17); border-bottom: 2px solid rgb(179, 122, 22); padding-bottom: 6px; font-size: 20px; line-height: 1.4;">
-    Product Features
-  </h3>
-  <ul style="margin: 0px 0px 0px 20px; padding: 0px; color: rgb(17, 17, 17); font-size: 16px; line-height: 1.8;">
-${features.map(f => `    <li style="margin-bottom: 5px;">${f}</li>`).join('\n')}
-  </ul>
-</div>` : ''}
-
-${isCertified && certNumber ? `<div style="margin: 0px 28px 22px; padding: 18px; background-color: rgb(247, 242, 232); color: rgb(17, 17, 17); border: 1px solid rgb(214, 181, 109); box-sizing: border-box;">
-  <h3 style="margin: 0px 0px 10px; color: rgb(17, 17, 17); border-bottom: 2px solid rgb(179, 122, 22); padding-bottom: 6px; font-size: 20px; line-height: 1.4;">
-    ${authenticator} Authentication Services
-  </h3>
-  <p style="margin: 0px; color: rgb(17, 17, 17); font-size: 16px; line-height: 1.7;">
-    This item has been authenticated by ${authenticator}. According to the record for <strong>${certNumber}</strong>, the signature is guaranteed genuine. The matching tamper-evident hologram is attached to the item.
-  </p>
-</div>` : ''}
-
-${athlete ? `<div style="padding: 0px 28px 22px; background-color: rgb(255, 255, 255); color: rgb(17, 17, 17); box-sizing: border-box;">
-  <h3 style="margin: 0px 0px 10px; color: rgb(17, 17, 17); border-bottom: 2px solid rgb(179, 122, 22); padding-bottom: 6px; font-size: 20px; line-height: 1.4;">
-    About ${athlete}
-  </h3>
-  <p style="margin: 0px; color: rgb(17, 17, 17); font-size: 16px; line-height: 1.7;">
-    ${additionalDescription || `${athlete} is a renowned athlete and highly sought-after autograph in the hobby.`}
-  </p>
-</div>` : ''}
-
-<div style="margin: 0px 28px 22px; padding: 18px; background-color: rgb(17, 17, 17); color: rgb(255, 255, 255); border: 1px solid rgb(51, 51, 51); box-sizing: border-box;">
-  <h3 style="margin: 0px 0px 10px; color: rgb(241, 193, 91); font-size: 20px; line-height: 1.4;">
-    Included in the Sale
-  </h3>
-  <p style="margin: 0px 0px 10px; color: rgb(255, 255, 255); font-size: 16px; line-height: 1.7;">
-    ${options.includedInSale || (isAutographed
-      ? `One ${titleInput}${athlete ? ` hand-signed by ${athlete}` : ''}${authenticator ? ` with the attached ${authenticator} hologram` : ''}${certNumber ? ` (Cert ${certNumber})` : ''}.`
-      : `One unopened ${brand ? `${brand} ` : ''}${titleInput} package in its original box.`)}
-  </p>
-  <p style="margin: 0px; color: rgb(221, 221, 221); font-size: 15px; line-height: 1.6;">
-    Items are packaged securely with care to ensure safe transit and delivery.
-  </p>
-</div>
-
-<div style="padding: 0px 28px 24px; background-color: rgb(255, 255, 255); color: rgb(17, 17, 17); box-sizing: border-box;">
-  <h3 style="margin: 0px 0px 10px; color: rgb(17, 17, 17); border-bottom: 2px solid rgb(179, 122, 22); padding-bottom: 6px; font-size: 20px; line-height: 1.4;">
-    Returns &amp; Guarantee
-  </h3>
-  <p style="margin: 0px; color: rgb(17, 17, 17); font-size: 16px; line-height: 1.7;">
-    ${returnPolicy || 'This purchase is backed by eBay Money Back Guarantee. Buyers are protected if the item does not arrive, arrives damaged, or does not match the listing description.'}
-  </p>
-</div>`.trim();
+  // Generate modular dark-theme card layout (between delimiters)
+  const insertHtml = generateEbayListingHtml({
+    title: titleInput,
+    description: options.description || additionalDescription,
+    conditionDetails: options.conditionHeader && options.conditionSubheader
+      ? `${options.conditionHeader}: ${options.conditionSubheader}`
+      : (condition ? `${condition}. Please review all photos carefully for the exact condition, quality, and details.` : undefined),
+    brand,
+    model: options.model || (specs.find(s => s.label.toLowerCase() === 'model')?.value || ''),
+    features,
+    authentication: (isCertified && certNumber) ? {
+      provider: authenticator,
+      certNumber,
+      type: authType || (athlete ? `Witnessed (${athlete})` : 'Witnessed')
+    } : null,
+    includedItems: options.includedInSale ? [options.includedInSale] : []
+  });
 
   // Full HTML Preview (includes header banner, delimiters, middle insertHtml, and footer)
-  const htmlBody = `<div style="width:100%;font-family:Arial,Helvetica,sans-serif;">
+  const htmlBody = `<div style="width:100%;font-family:Arial,Helvetica,sans-serif;background-color:#0b0f19;padding:20px 0;">
 
-  <div style="border-bottom: 1px solid rgb(221, 221, 221); box-sizing: border-box;">
-    <img src="https://i.ebayimg.com/images/g/sZwAAeSwMwFqexk1/s-l1600.webp" alt="TechTrek Outpost" width="800" height="200" style="max-width:100%;height:auto;display:block;margin:0 auto;">
+  <div style="max-width:900px;margin:0 auto 20px;border-bottom:1px solid rgb(51,51,51);box-sizing:border-box;">
+    <img src="https://i.ebayimg.com/images/g/sZwAAeSwMwFqexk1/s-l1600.webp" alt="TechTrek Outpost" width="800" height="200" style="max-width:100%;height:auto;display:block;margin:0 auto;border-radius:6px;">
   </div>
 
 <!-- =======================================================
@@ -320,36 +212,36 @@ ${insertHtml}
        END Lising INFO HERE
 ======================================================= -->
 
-  <div style="margin: 0px 28px 22px; padding: 18px; background-color: rgb(17, 17, 17); color: rgb(255, 255, 255); border: 1px solid rgb(51, 51, 51); box-sizing: border-box;">
-    <h3 style="margin: 0px 0px 12px; color: rgb(241, 193, 91); font-size: 22px; line-height: 1.4; text-align: center;">
+  <div style="max-width:900px;margin:20px auto 15px;padding:18px;background-color:rgb(17,17,17);color:rgb(255,255,255);border:1px solid rgb(51,51,51);border-radius:6px;box-sizing:border-box;">
+    <h3 style="margin:0px 0px 12px;color:rgb(241,193,91);font-size:20px;line-height:1.4;text-align:center;">
       Why Buy From TechTrek Outpost?
     </h3>
-    <p style="margin: 0px 0px 14px; color: rgb(255, 255, 255); font-size: 16px; line-height: 1.6; text-align: center;">
+    <p style="margin:0px 0px 14px;color:#e0e0e0;font-size:15px;line-height:1.6;text-align:center;">
       We focus on clear item details, accurate condition information, helpful photographs, and careful packing.
     </p>
-    <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: rgb(17, 17, 17); color: rgb(255, 255, 255); font-size: 15px;">
+    <table role="presentation" style="width:100%;border-collapse:collapse;background-color:rgb(17,17,17);color:#e0e0e0;font-size:14px;">
       <tbody>
         <tr>
-          <td style="width: 50%; padding: 8px; background-color: rgb(17, 17, 17); color: rgb(255, 255, 255); vertical-align: top;">
+          <td style="width:50%;padding:8px;background-color:rgb(17,17,17);color:#e0e0e0;vertical-align:top;">
             &#10003; Clear item descriptions
           </td>
-          <td style="width: 50%; padding: 8px; background-color: rgb(17, 17, 17); color: rgb(255, 255, 255); vertical-align: top;">
+          <td style="width:50%;padding:8px;background-color:rgb(17,17,17);color:#e0e0e0;vertical-align:top;">
             &#10003; Relevant product details provided
           </td>
         </tr>
         <tr>
-          <td style="padding: 8px; background-color: rgb(17, 17, 17); color: rgb(255, 255, 255); vertical-align: top;">
+          <td style="padding:8px;background-color:rgb(17,17,17);color:#e0e0e0;vertical-align:top;">
             &#10003; Condition information clearly stated
           </td>
-          <td style="padding: 8px; background-color: rgb(17, 17, 17); color: rgb(255, 255, 255); vertical-align: top;">
+          <td style="padding:8px;background-color:rgb(17,17,17);color:#e0e0e0;vertical-align:top;">
             &#10003; Included contents identified
           </td>
         </tr>
         <tr>
-          <td style="padding: 8px; background-color: rgb(17, 17, 17); color: rgb(255, 255, 255); vertical-align: top;">
+          <td style="padding:8px;background-color:rgb(17,17,17);color:#e0e0e0;vertical-align:top;">
             &#10003; Exact-item photos when applicable
           </td>
-          <td style="padding: 8px; background-color: rgb(17, 17, 17); color: rgb(255, 255, 255); vertical-align: top;">
+          <td style="padding:8px;background-color:rgb(17,17,17);color:#e0e0e0;vertical-align:top;">
             &#10003; Items carefully packed for shipment
           </td>
         </tr>
@@ -357,21 +249,21 @@ ${insertHtml}
     </table>
   </div>
 
-  <div style="padding: 22px 28px; text-align: center; background-color: rgb(247, 242, 232); color: rgb(17, 17, 17); border-top: 1px solid rgb(214, 181, 109); box-sizing: border-box;">
-    <h3 style="margin: 0px 0px 8px; color: rgb(17, 17, 17); font-size: 20px; line-height: 1.4;">
+  <div style="max-width:900px;margin:0 auto 15px;padding:20px;text-align:center;background-color:rgb(17,17,17);color:#e0e0e0;border:1px solid rgb(214,181,109);border-radius:6px;box-sizing:border-box;">
+    <h3 style="margin:0px 0px 8px;color:rgb(241,193,91);font-size:18px;line-height:1.4;">
       Explore More from TechTrek Outpost
     </h3>
-    <p style="margin: 0px 0px 15px; color: rgb(51, 51, 51); font-size: 15px; line-height: 1.5;">
+    <p style="margin:0px 0px 14px;color:#b0b0b0;font-size:14px;line-height:1.5;">
       Browse our other available items.
     </p>
-    <a href="https://www.ebay.com/usr/tt_globetrotter" target="_blank" rel="noopener noreferrer" style="display: inline-block; padding: 12px 22px; background-color: rgb(179, 122, 22); color: rgb(255, 255, 255); text-decoration: none; font-size: 16px; font-weight: bold; border: 2px solid rgb(138, 92, 13);">
+    <a href="https://www.ebay.com/usr/tt_globetrotter" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:10px 20px;background-color:rgb(179,122,22);color:rgb(255,255,255);text-decoration:none;font-size:15px;font-weight:bold;border-radius:4px;border:1px solid rgb(214,181,109);">
       View Our Other Listings
     </a>
   </div>
 
-  <div style="padding: 16px 24px; text-align: center; background-color: rgb(17, 17, 17); color: rgb(255, 255, 255); font-size: 14px; line-height: 1.5; box-sizing: border-box;">
-    <strong style="color: rgb(241, 193, 91);">TechTrek Outpost</strong>
-    <span style="color: rgb(255, 255, 255);"> | Clear Item Details | Exact-Item Photos | Carefully Packed</span>
+  <div style="max-width:900px;margin:0 auto;padding:14px 20px;text-align:center;background-color:rgb(17,17,17);border:1px solid rgb(51,51,51);border-radius:6px;color:rgb(255,255,255);font-size:13px;line-height:1.5;box-sizing:border-box;">
+    <strong style="color:rgb(241,193,91);">TechTrek Outpost</strong>
+    <span style="color:#b0b0b0;"> | Clear Item Details | Exact-Item Photos | Carefully Packed</span>
   </div>
 
 </div>`.trim();

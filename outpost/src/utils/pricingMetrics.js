@@ -7,9 +7,11 @@
  * 2. Margin %: (True Net Profit / listPrice) * 100
  * 3. ROI %: (True Net Profit / landedCost) * 100
  * 4. Break-even Floor Price (0% profit):
- *    (landedCost + platformFlatFee + (buyerShipping * platformFeePct)) / (1 - platformFeePct - adFeePct)
+ *    (landedCost + estShippingCost + platformFlatFee) / (1 - platformFeePct - adFeePct)
+ *    Matches canonical computePricingFloors from functions/utils/auction.js (T-10 item 1).
+ *    Business rule: buyer-paid shipping does NOT offset or burden the item floor.
  * 5. Min Target Margin Floor:
- *    (landedCost + platformFlatFee + (buyerShipping * platformFeePct)) / (1 - platformFeePct - adFeePct - targetMarginPct)
+ *    (landedCost + estShippingCost + platformFlatFee) / (1 - platformFeePct - adFeePct - targetMarginPct)
  */
 
 import { round2 } from '../../functions/utils/auction.js';
@@ -111,15 +113,21 @@ export function getItemFloorMetrics(item) {
   const roiPct = (hasPrice && landedCost > 0) ? round2((trueNetProfit / landedCost) * 100) : 0;
 
   // 4. Break-even Floor Price (0% profit):
-  //    (landedCost + platformFlatFee + (buyerShipping * platformFeePct)) / (1 - platformFeePct - adFeePct)
-  const floorNumerator = round2(landedCost + platformFlatFee + buyerShippingBurden);
+  //    Matches canonical computePricingFloors from functions/utils/auction.js:
+  //    (landedCost + estShippingCost + platformFlatFee) / (1 - platformFeePct - adFeePct)
+  //    Business rule: buyer-paid shipping does NOT offset or burden the item floor (T-10 item 1).
+  const estShippingCost = Math.max(0, Number(item.est_shipping_cost) || 0);
+  const costBasis = round2(landedCost + platformFlatFee + estShippingCost);
   const breakEvenDivisor = 1 - platformFeePct - adFeePct;
-  const breakEvenFloor = breakEvenDivisor > 0 ? round2(floorNumerator / breakEvenDivisor) : 0;
+  const computedBreakEven = breakEvenDivisor > 0 ? round2(costBasis / breakEvenDivisor) : 0;
+  const breakEvenFloor = Number(item.floor_price || item.min_sell_price) > 0
+    ? round2(Number(item.floor_price || item.min_sell_price))
+    : computedBreakEven;
 
   // 5. Min Target Margin Floor:
-  //    (landedCost + platformFlatFee + (buyerShipping * platformFeePct)) / (1 - platformFeePct - adFeePct - targetMarginPct)
+  //    (landedCost + estShippingCost + platformFlatFee) / (1 - platformFeePct - adFeePct - targetMarginPct)
   const targetMarginDivisor = 1 - platformFeePct - adFeePct - targetMarginPct;
-  const targetMarginFloor = targetMarginDivisor > 0 ? round2(floorNumerator / targetMarginDivisor) : 0;
+  const targetMarginFloor = targetMarginDivisor > 0 ? round2(costBasis / targetMarginDivisor) : 0;
 
   return {
     hasPrice,

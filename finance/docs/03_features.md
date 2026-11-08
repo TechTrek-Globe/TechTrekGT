@@ -59,8 +59,8 @@ All serverless API routes execute in Cloudflare Workers ESM format (`src/worker.
 | `/api/auth/logout` | POST | No | Revokes sessions by bumping `token_version` and clearing cookies |
 | `/api/auth/forgot-password` | POST | No | Sends one-time password reset code via email |
 | `/api/auth/reset-password` | POST | No | Atomic multi-statement password update and token version revocation |
-| `/api/auth/verify-email` | POST | Yes (CSRF) | Verifies email address via 8-digit OTP |
-| `/api/auth/resend-verification`| POST | Yes (CSRF) | Resends email verification code |
+| `/api/auth/verify-email` | POST | Optional | Verifies email address via 8-digit OTP (supports unauthenticated login verification with auto-session issuance) |
+| `/api/auth/resend-verification`| POST | Optional | Resends 8-digit email verification code (supports unauthenticated requests by email) |
 | `/api/auth/update-profile` | POST | Yes (CSRF) | Updates profile and handles email change requests with compensating rollback |
 | `/api/auth/confirm-email-change`| POST | Yes (CSRF) | Confirms pending email change with OTP |
 | `/api/auth/security-question` | GET | Yes | Authenticated retrieval of security question |

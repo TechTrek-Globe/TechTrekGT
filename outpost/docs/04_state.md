@@ -214,6 +214,19 @@ Outpost uses React Context and standard React hooks (`useState`, `useReducer`, `
     - Secondary Tie-Breaking: Within items of identical rank, preserves secondary sorting: `created_at` descending, followed by deterministic SKU/ID alphanumeric tie-breaking.
     - User Sort Preservation: Explicit column sorts (`sortPreset === 'custom'` or non-default presets) and active status-specific filters bypass default status clustering to respect user column sorting across items.
     - Server-Side D1 Synchronization: `functions/api/items/enriched.js` and `functions/api/items/index.js` apply `STATUS_CASE_SQL` to order SQLite results by status rank ASC and `created_at DESC` when querying all statuses under default sorting, ensuring database pagination partitions items in lockstep with the client hierarchy.
+  - **Modular Dark-Theme eBay Listing Generator State [ACTION ID: LST-001 / EBAY-009]**:
+    - `src/utils/ebayTemplate.js`: Pure function `generateEbayListingHtml(item)` generates an inline-styled dark-theme modular card layout (`max-width:900px`, `background-color:rgb(17,17,17)`, `border:1px solid rgb(51,51,51)`).
+    - Dynamic Inventory API Schema State Mapping:
+      - Attributes parsing: Evaluates `typeof item.attributes === 'string'` with safe JSON try-catch parsing.
+      - Core fields: Dynamically falls back across Outpost inventory columns (`item_name`, `notes`, `condition`, `authenticator`, `cert_number`, `athlete_person`).
+      - Key details: Resolves array/newline `features` with fallback to `Brand: ${brand || 'N/A'}` and `Model: ${model || 'N/A'}`.
+      - What's included: Resolves `includedItems`/`includedInSale` with fallback to `${title}` and exact photographs.
+    - Conditional Authentication State:
+      - Evaluates explicit `item.authentication` object or resolves `item.authenticator` against uncertified states (`Raw`, `Uncertified`, `None`, `Other`, `N/A`).
+      - Only renders the Authentication card block when verified certification or autograph metadata is present, rendering an empty string (`''`) for standard retail/non-autographed items.
+    - Generator Integration State:
+      - `src/utils/listingCopyGenerator.js` exports `generateEbayListingHtml` and integrates it into `generateEbayCopy`.
+      - In `generateEbayCopy`, `insertHtml` delegates directly to `generateEbayListingHtml`, and `htmlBody` wraps the modular cards in a matching dark viewport frame (`#0b0f19`) with store branding and trust signals for `ListingCopyModal`.
 
 
 

@@ -33,8 +33,9 @@ Applications hydrate user state on initial page load by querying the GET /api/au
 
 ### 1.4 Account Lifecycle Management
 
-- User Registration (POST /api/auth/register): Creates new records in the shared users table, hashes passwords, and generates email verification records. Supports optional inviteToken parameter to pre-verify email addresses (email_verified = 1) when claiming verified domain invitations.
-- Email Verification (POST /api/auth/verify-email): Consumes single-use 8-digit verification codes hashed with HMAC (verify:${email}:${code}). Validates a 24-hour expiration window before setting email_verified = 1.
+- User Registration (POST /api/auth/register): Creates new records in the shared users table, hashes passwords, generates email verification records, and automatically logs in the user for their initial session without requiring upfront verification (sign_in_count = 1). Supports optional inviteToken parameter to pre-verify email addresses (email_verified = 1) when claiming verified domain invitations.
+- Email Verification (POST /api/auth/verify-email): Consumes single-use 8-digit verification codes hashed with HMAC (verify:${email}:${code}). Validates a 24-hour expiration window before setting email_verified = 1. Supports unauthenticated callers from the sign-in page to verify and automatically issue an active session.
+- First-Time Exemption & Subsequent Sign-In Verification: Users are permitted to sign in for the first time without confirming email. Any subsequent login by an unverified account (sign_in_count >= 1 && email_verified !== 1) is rejected with HTTP 403 EMAIL_VERIFICATION_REQUIRED, prompting for the 8-digit OTP code or requesting a new code with a 60-second cooldown timer.
 - Password Recovery Workflow: Three-step recovery pipeline: requesting an email token, verifying the token alongside a security answer, and establishing a new password. Completing a password reset automatically increments users.token_version, revoking all existing sessions.
 - Email Change Workflow: Dual-notification model. Updates record pending email addresses in email_verifications, dispatches verification tokens to the new address, and sends security advisories to the old address. Confirmation updates the primary email, resets verification status, and bumps token_version.
 

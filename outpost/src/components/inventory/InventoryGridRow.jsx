@@ -177,7 +177,7 @@ export function InventoryGridRow({
               onMouseEnter={(e) => onShowTooltip && onShowTooltip('pricing_details', item, e)}
               onMouseLeave={onHideTooltip}
               onClick={() => onOpenEditModal && onOpenEditModal(item)}
-              title="Pricing & cost breakdown (hover for details, click to edit)"
+              aria-label="Pricing & cost breakdown"
               className="w-6 h-6 rounded flex items-center justify-center text-amber-400 hover:text-amber-300 hover:bg-amber-500/20 border border-amber-500/25 shadow-sm transition-all cursor-help"
             >
               <CircleDollarSign className="w-3.5 h-3.5" />

@@ -1,6 +1,5 @@
 import { authenticate, json, fail, ERROR_CODES } from '../../utils/auth.js';
 import { enforceRateLimit } from '../../utils/rateLimit.js';
-import { ensureLedgerTables } from '../../utils/ledgerAccess.js';
 
 export async function onRequestGet(context) {
   const { env } = context;
@@ -21,8 +20,6 @@ export async function onRequestGet(context) {
     if (!env?.DB) {
       return fail(ERROR_CODES.SERVICE_UNAVAILABLE, 503, 'Database binding not available');
     }
-
-    await ensureLedgerTables(env.DB);
 
     // 1. Fetch all users
     let usersResult = { results: [] };
@@ -73,22 +70,11 @@ export async function onRequestGet(context) {
       }
     }
 
-    // 3. Fetch finance ledgers, collaborator shares, and invites
+    // 3. Fetch finance ledgers, collaborator shares, and invites (strictly read-only on GET)
     let financeLedgers = [];
     let ledgerShares = [];
     let ledgerInvites = [];
     try {
-      await env.DB.prepare(`
-        INSERT OR IGNORE INTO finance_ledgers (id, owner_id, name)
-        SELECT u.id, u.id, COALESCE(NULLIF(u.name, '') || '''s Budget', 'Personal Budget')
-        FROM users u
-        WHERE u.id IN (
-          SELECT id FROM user_backups
-          UNION SELECT user_id FROM user_backup_versions
-          UNION SELECT id FROM users WHERE created_app = 'finance' OR role = 'admin'
-        )
-      `).run().catch(() => {});
-
       const lRes = await env.DB.prepare('SELECT id, owner_id, name, created_at FROM finance_ledgers').all();
       financeLedgers = lRes.results || [];
 
@@ -106,6 +92,21 @@ export async function onRequestGet(context) {
       ledgerInvites = iRes.results || [];
     } catch (collErr) {
       console.warn('[admin/stats] collaboration query fallback:', collErr && collErr.message);
+    }
+
+    const existingLedgerIds = new Set(financeLedgers.map(l => l.id));
+    for (const u of usersResult.results || []) {
+      const hasBackup = Boolean(backupMap[u.id]?.backupCount > 0);
+      const isFinUser = hasBackup || u.created_app === 'finance' || String(u.role || '') === 'admin';
+      if (isFinUser && !existingLedgerIds.has(u.id)) {
+        existingLedgerIds.add(u.id);
+        financeLedgers.push({
+          id: u.id,
+          owner_id: u.id,
+          name: u.name ? `${u.name}'s Budget` : 'Personal Budget',
+          created_at: u.created_at
+        });
+      }
     }
 
     // 4. Build sets of Finance-associated users

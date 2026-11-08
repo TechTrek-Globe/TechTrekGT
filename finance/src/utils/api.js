@@ -200,7 +200,8 @@ export async function pushCloudBackupOptimistic(passcode, budgetData, options = 
     budgetData.owner_id = userId;
   }
 
-  savePendingSync(budgetData, passcode || '', userId);
+  const targetLid = options?.ledgerId || userId;
+  savePendingSync(budgetData, passcode || '', targetLid);
 
   const baseVersion = options?.baseVersion;
   const force = Boolean(options?.force);
@@ -291,7 +292,8 @@ export async function pushCloudBackupOptimistic(passcode, budgetData, options = 
     const data = await res.json().catch(() => ({}));
 
     if (res.ok && data.success) {
-      clearPendingSync(userId);
+      clearPendingSync(targetLid);
+      if (targetLid !== userId) clearPendingSync(userId);
       logSync('PUSH_SUCCESS', 'Cloud backup successfully stored in Cloudflare D1 database', {
         status: res.status,
         timestamp: data.timestamp,
@@ -301,6 +303,8 @@ export async function pushCloudBackupOptimistic(passcode, budgetData, options = 
     }
 
     if (res.status === 409) {
+      clearPendingSync(targetLid);
+      if (targetLid !== userId) clearPendingSync(userId);
       if (data?.conflict || data?.code === ERROR_CODES.SYNC_CONFLICT) {
         logSync('PUSH_CONFLICT', 'Cloud sync conflict detected', { serverVersion: data.serverVersion }, 'warn');
         return /** @type {any} */ ({
@@ -333,6 +337,8 @@ export async function pushCloudBackupOptimistic(passcode, budgetData, options = 
       return { success: false, status: 'queued', error: `Server response status ${res.status}. Retrying later.` };
     }
 
+    clearPendingSync(targetLid);
+    if (targetLid !== userId) clearPendingSync(userId);
     const failureMsg = data?.details ? `${data.error} (${data.details})` : (data?.error || `HTTP ${res.status}: Failed to backup data.`);
     logSync('PUSH_FAILED', `Cloud backup rejected: ${failureMsg}`, { status: res.status, data }, 'error');
     return { success: false, status: 'failed', error: failureMsg };
@@ -371,12 +377,13 @@ export async function flushPendingCloudSync(passcode, userId = null) {
 
     const vKey = effectiveUserId ? `tt_budget_cloud_version:${effectiveUserId}` : 'tt_budget_cloud_version';
     const savedVerStr = typeof localStorage !== 'undefined' ? localStorage.getItem(vKey) : null;
-    const bodyObj = { budget: pending.payload, auto: true };
-    if (savedVerStr) {
-      bodyObj.baseVersion = parseInt(savedVerStr, 10);
-    } else {
-      bodyObj.force = true;
+    const parsedVer = savedVerStr ? parseInt(savedVerStr, 10) : 0;
+    if (!parsedVer) {
+      clearPendingSync(effectiveUserId);
+      logSync('FLUSH_SKIPPED_NO_BASE_VERSION', 'Dropped pending sync queue item without a valid baseVersion to prevent blind force overwrite');
+      return false;
     }
+    const bodyObj = { budget: pending.payload, auto: true, baseVersion: parsedVer };
 
     const res = await apiFetch('/api/sync/backup', {
       method: 'POST',
@@ -392,6 +399,9 @@ export async function flushPendingCloudSync(passcode, userId = null) {
       }
       logSync('FLUSH_SUCCESS', 'Offline sync queue successfully flushed to cloud', { timestamp: data.timestamp });
       return true;
+    }
+    if (res.status === 409 || (res.status >= 400 && res.status < 500 && res.status !== 429)) {
+      clearPendingSync(effectiveUserId);
     }
     logSync('FLUSH_FAILED', `Queue flush rejected: ${data.error || res.statusText}`, { status: res.status }, 'warn');
   } catch (err) {

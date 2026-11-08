@@ -84,7 +84,6 @@ export async function resolveLedgerAccess(env, ledgerId, user) {
     return { ledger: null, role: 'none' };
   }
 
-  await ensureLedgerTables(env.DB);
   const uid = user?.id || user?.userId;
 
   // Map 'default' or 'me' aliases to the user's personal ledger
@@ -92,19 +91,9 @@ export async function resolveLedgerAccess(env, ledgerId, user) {
 
   // 1. Direct ownership of user's personal ledger (targetId === uid)
   if (uid && targetId === uid) {
-    let existingLedger = await env.DB.prepare(
+    const existingLedger = await env.DB.prepare(
       'SELECT id, owner_id, name, created_at, updated_at FROM finance_ledgers WHERE id = ?'
-    ).bind(targetId).first();
-
-    if (!existingLedger) {
-      const defaultName = user.name ? `${user.name}'s Budget` : 'Personal Budget';
-      await env.DB.prepare(
-        'INSERT OR IGNORE INTO finance_ledgers (id, owner_id, name) VALUES (?, ?, ?)'
-      ).bind(targetId, uid, defaultName).run().catch(() => {});
-      existingLedger = await env.DB.prepare(
-        'SELECT id, owner_id, name, created_at, updated_at FROM finance_ledgers WHERE id = ?'
-      ).bind(targetId).first();
-    }
+    ).bind(targetId).first().catch(() => null);
 
     const ledger = existingLedger || {
       id: targetId,

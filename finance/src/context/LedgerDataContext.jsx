@@ -116,8 +116,14 @@ export function LedgerDataProvider({ children }) {
   }, [setSaveError, currentUserId, loadedRecordKeyRef]);
 
   // Sync initial seed loaded from IndexedDB by BudgetMetadataProvider
+  const isSeedHydratedRef = useRef(false);
   useEffect(() => {
-    if (isDbLoaded && initialLedgerSeed) {
+    if (!isDbLoaded) {
+      isSeedHydratedRef.current = false;
+      return;
+    }
+    if (initialLedgerSeed) {
+      suppressDirtyUntilRef.current = Date.now() + 2000;
       if (initialLedgerSeed.dailyMatrix) {
         setDailyMatrix(initialLedgerSeed.dailyMatrix);
         dailyMatrixRef.current = initialLedgerSeed.dailyMatrix;
@@ -126,6 +132,7 @@ export function LedgerDataProvider({ children }) {
       if (initialLedgerSeed.lineItems) setLineItems(initialLedgerSeed.lineItems);
       if (initialLedgerSeed.transactions) setTransactions(initialLedgerSeed.transactions);
     }
+    isSeedHydratedRef.current = true;
   }, [isDbLoaded, initialLedgerSeed]);
 
   // FIX-01 / CRIT-002: On sign-out or session-expiry, always flush pending saves and
@@ -196,6 +203,8 @@ export function LedgerDataProvider({ children }) {
       autoConflictPendingRef.current = false;
       conflictResolvedAtRef.current = 0;
       suppressDirtyUntilRef.current = 0;
+      autoPushPendingRef.current = false;
+      lastSyncedPayloadHashRef.current = null;
       budgetRef.current = null;
       isPendingSaveRef.current = false;
       setActiveLedgerId(null);
@@ -325,6 +334,26 @@ export function LedgerDataProvider({ children }) {
   }, [cloudVersion]);
 
   const [syncConflict, setSyncConflict] = useState(null);
+  const lastSyncedPayloadHashRef = useRef(null);
+
+  const computePayloadFingerprint = useCallback((b) => {
+    if (!b || typeof b !== 'object') return '';
+    try {
+      const o = {};
+      for (const k of ALLOWED_BUDGET_KEYS) {
+        if (k !== 'schemaVersion' && b[k] !== undefined) o[k] = b[k];
+      }
+      const str = JSON.stringify(o);
+      let h = 2166136261;
+      for (let i = 0; i < str.length; i++) {
+        h ^= str.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+      }
+      return `${str.length}:${(h >>> 0).toString(16)}`;
+    } catch {
+      return '';
+    }
+  }, []);
 
   // Cloud Vault Push Backup (Optimistic + Fallback Queue)
   const pushCloudBackup = useCallback(async (passcode, options = {}) => {
@@ -333,6 +362,11 @@ export function LedgerDataProvider({ children }) {
       return { success: true, skipped: true, role: 'viewer' };
     }
     const targetLid = options.ledgerId || activeLedgerId || currentUserId;
+    const payloadHash = computePayloadFingerprint(budgetRef.current);
+    if (options.auto && !options.force && !options.manual && payloadHash && lastSyncedPayloadHashRef.current === `${targetLid}:${payloadHash}`) {
+      logSync('PUSH_SKIPPED_IDENTICAL', 'Skipping auto cloud backup: payload hash unchanged since last sync');
+      return { success: true, skipped: true, unchanged: true, version: cloudVersionRef.current };
+    }
     logSync('PUSH_DISPATCH', 'Executing pushCloudBackup from LedgerDataContext', { hasPasscode: Boolean(passcode), options, targetLid });
     let effectiveBaseVersion = options.baseVersion !== undefined ? options.baseVersion : cloudVersionRef.current;
     if (!effectiveBaseVersion) {
@@ -350,6 +384,9 @@ export function LedgerDataProvider({ children }) {
       ledgerId: targetLid
     }, currentUserId || getCurrentUserId());
     if (result.success) {
+      if (payloadHash) {
+        lastSyncedPayloadHashRef.current = `${targetLid}:${payloadHash}`;
+      }
       if (result.version) {
         setCloudVersion(result.version);
         // P3: scope to target ledger / userId
@@ -367,7 +404,7 @@ export function LedgerDataProvider({ children }) {
         autoConflictPendingRef.current = true;
         if (Date.now() - conflictResolvedAtRef.current < 10000) return result;
       }
-      const uid = currentUserId || getCurrentUserId();
+      const uid = targetLid || currentUserId || getCurrentUserId();
       const mKey = uid ? `tt_budget_last_modified:${uid}` : 'tt_budget_last_modified';
       const localTimestamp = parseInt(localStorage.getItem(mKey) || '0', 10) || Date.now();
       setSyncConflict(prev => (prev && prev.serverVersion === result.serverVersion) ? prev : {
@@ -377,7 +414,7 @@ export function LedgerDataProvider({ children }) {
       });
     }
     return result;
-  }, [setLastCloudSyncTime, currentUserId]);
+  }, [setLastCloudSyncTime, currentUserId, activeLedgerId, ledgerRole, ledgerPermissions, computePayloadFingerprint]);
 
 
   // Restore budget state from imported JSON backup
@@ -429,14 +466,21 @@ export function LedgerDataProvider({ children }) {
       schemaVersion: CURRENT_BUDGET_SCHEMA_VERSION
     };
 
-    suppressDirtyUntilRef.current = Date.now() + 1500;
+    suppressDirtyUntilRef.current = Date.now() + 2000;
+    autoPushPendingRef.current = false;
     await clearAndRestoreBudgetData(fullMerged, currentUserId || getCurrentUserId());
-    suppressDirtyUntilRef.current = Date.now() + 1500;
+    suppressDirtyUntilRef.current = Date.now() + 2000;
+    autoPushPendingRef.current = false;
     dailyMatrixRef.current = newDailyMatrix;
     metadataStateRef.current = mergedMetadata;
     transactionsRef.current = newTransactions;
     lineItemsRef.current = newLineItems;
     budgetRef.current = fullMerged;
+    const targetLid = activeLedgerId || currentUserId || getCurrentUserId();
+    const restoredHash = computePayloadFingerprint(fullMerged);
+    if (restoredHash && targetLid) {
+      lastSyncedPayloadHashRef.current = `${targetLid}:${restoredHash}`;
+    }
 
     setMetadataState(mergedMetadata);
     setDailyMatrix(newDailyMatrix);
@@ -444,7 +488,7 @@ export function LedgerDataProvider({ children }) {
     setLineItems(newLineItems);
     setTransactions(newTransactions);
     return true;
-  }, [setMetadataState, currentUserId]);
+  }, [setMetadataState, currentUserId, activeLedgerId, computePayloadFingerprint]);
 
   const resolveConflictKeepLocal = useCallback(async () => {
     logSync('CONFLICT_RESOLVE', 'User chose to keep local data (force push to cloud)');
@@ -564,6 +608,15 @@ export function LedgerDataProvider({ children }) {
         const data = await res.json().catch(() => ({}));
         if (data?.budget) {
           await restoreFromBackup(data.budget, false);
+          const cloudTime = data.version || (data.updatedAt ? new Date(data.updatedAt).getTime() : 0);
+          if (cloudTime > 0) {
+            cloudVersionRef.current = cloudTime;
+            setCloudVersion(cloudTime);
+            try {
+              localStorage.setItem(`tt_budget_cloud_version:${newLedgerId}`, String(cloudTime));
+              localStorage.setItem(`tt_budget_last_modified:${newLedgerId}`, String(cloudTime));
+            } catch {}
+          }
         }
       }
     } catch (e) {
@@ -688,6 +741,7 @@ export function LedgerDataProvider({ children }) {
     reconcileUserIdRef.current = currentUserId;
     reconcileInFlightRef.current = true;
     (async () => {
+      let shouldFlushPending = true;
       try {
         hasAutoPulledRef.current = true;
         const budgetFingerprint = (b) => {
@@ -725,6 +779,8 @@ export function LedgerDataProvider({ children }) {
           });
 
           if (isLocalEmpty) {
+            shouldFlushPending = false;
+            clearPendingSync(uid);
             await restoreFromBackup(cloudData.budget);
             setCloudVersion(cloudTime);
             setLastCloudSyncTime(new Date().toLocaleTimeString());
@@ -736,7 +792,13 @@ export function LedgerDataProvider({ children }) {
             }
           } else if (budgetFingerprint(localData) === budgetFingerprint(cloudData.budget)) {
             // Identical content: adopt the cloud version silently, never prompt
+            shouldFlushPending = false;
+            clearPendingSync(uid);
             const adopted = Math.max(cloudTime, savedCloudVersion);
+            const syncedHash = computePayloadFingerprint(localData);
+            if (syncedHash && uid) {
+              lastSyncedPayloadHashRef.current = `${uid}:${syncedHash}`;
+            }
             setCloudVersion(adopted);
             setLastCloudSyncTime(new Date().toLocaleTimeString());
             if (adopted > 0) {
@@ -747,6 +809,7 @@ export function LedgerDataProvider({ children }) {
             }
           } else if (cloudTime > savedCloudVersion || (savedCloudVersion === 0 && cloudTime > localTime)) {
             // Cloud is more recent than this login's last sync: use cloud without prompting
+            shouldFlushPending = false;
             clearPendingSync(uid);
             await restoreFromBackup(cloudData.budget);
             cloudVersionRef.current = cloudTime;
@@ -760,6 +823,7 @@ export function LedgerDataProvider({ children }) {
             }
           } else if (localTime > savedCloudVersion) {
             // Local changed since last sync and cloud has nothing newer: push local
+            shouldFlushPending = false;
             await pushCloudBackup(syncPasscode, { baseVersion: Math.max(savedCloudVersion, cloudTime), auto: true });
           }
         }
@@ -768,22 +832,24 @@ export function LedgerDataProvider({ children }) {
         console.info('Initial auto cloud sync check:', err?.message || err);
       } finally {
         reconcileInFlightRef.current = false;
-        try {
-          if (await flushPendingCloudSync(syncPasscode, currentUserId)) {
-            const fv = parseInt(localStorage.getItem(currentUserId ? `tt_budget_cloud_version:${currentUserId}` : 'tt_budget_cloud_version') || '0', 10) || 0;
-            if (fv > 0) { cloudVersionRef.current = fv; setCloudVersion(fv); }
-          }
-        } catch {}
+        if (shouldFlushPending && !autoConflictPendingRef.current) {
+          try {
+            if (await flushPendingCloudSync(syncPasscode, currentUserId)) {
+              const fv = parseInt(localStorage.getItem(currentUserId ? `tt_budget_cloud_version:${currentUserId}` : 'tt_budget_cloud_version') || '0', 10) || 0;
+              if (fv > 0) { cloudVersionRef.current = fv; setCloudVersion(fv); }
+            }
+          } catch {}
+        }
       }
     })();
-  }, [isAuthenticated, isDbLoaded, isSyncOnLoadEnabled, restoreFromBackup, pushCloudBackup, syncPasscode, setLastCloudSyncTime, currentUserId]);
+  }, [isAuthenticated, isDbLoaded, isSyncOnLoadEnabled, restoreFromBackup, pushCloudBackup, syncPasscode, setLastCloudSyncTime, currentUserId, computePayloadFingerprint]);
 
   // Debounced Auto Cloud Backup effect (5-second debounce on any data change)
   const isInitialMountRef = useRef(true);
   const lastSeenDataRef = useRef({ ui: null, mv: null });
   const autoPushPendingRef = useRef(false);
   useEffect(() => {
-    if (!isDbLoaded || !isAuthenticated) return;
+    if (!isDbLoaded || !isSeedHydratedRef.current || !isAuthenticated) return;
     if (isAutoCloudBackupEnabled === false) return;
 
     // Skip the initial mount trigger before the first sync check completes
@@ -796,9 +862,12 @@ export function LedgerDataProvider({ children }) {
     const dataChanged = lastSeenDataRef.current.ui !== budgetForUI || lastSeenDataRef.current.mv !== matrixVersion;
     lastSeenDataRef.current = { ui: budgetForUI, mv: matrixVersion };
     if (dataChanged) {
-      if (Date.now() < suppressDirtyUntilRef.current) return;
+      if (Date.now() < suppressDirtyUntilRef.current) {
+        autoPushPendingRef.current = false;
+        return;
+      }
       autoPushPendingRef.current = true;
-      const dirtyUid = currentUserId || getCurrentUserId();
+      const dirtyUid = activeLedgerId || currentUserId || getCurrentUserId();
       try { localStorage.setItem(dirtyUid ? `tt_budget_last_modified:${dirtyUid}` : 'tt_budget_last_modified', String(Date.now())); } catch {}
     }
     if (!autoPushPendingRef.current) return;
@@ -816,7 +885,7 @@ export function LedgerDataProvider({ children }) {
     }, 5000);
 
     return () => clearTimeout(timer);
-  }, [budgetForUI, matrixVersion, isDbLoaded, isAutoCloudBackupEnabled, isAuthenticated, syncPasscode, pushCloudBackup, currentUserId, syncConflict]);
+  }, [budgetForUI, matrixVersion, isDbLoaded, isAutoCloudBackupEnabled, isAuthenticated, syncPasscode, pushCloudBackup, currentUserId, activeLedgerId, syncConflict]);
 
   // Load 100% Fake Demo Preset Data
   const loadDemoPreset = useCallback(() => {
@@ -1265,7 +1334,7 @@ export function LedgerDataProvider({ children }) {
       console.error('Failed to move matrix cell, rolled back state:', err);
       throw err;
     }
-  }, []);
+  }, [ledgerRole, ledgerPermissions]);
 
   // Calculates true running balance from start date to target date using matrix simulation rules
   const getCalculatedBalanceAsOf = useCallback((accountId, targetDateObj) => {

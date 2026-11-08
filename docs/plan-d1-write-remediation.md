@@ -1,135 +1,187 @@
-# Cloudflare D1 Runaway Write Remediation Plan (`personal-budget-db`)
+# D1 Runaway Write Audit & Remediation Plan: Finance OS (`personal-budget-db`)
 
-**Target Database**: `personal-budget-db` (`10f220d4-1c10-49e9-b63e-5d4cb08d599f`)  
-**Incident Metrics**: 90.45k rows written / 100k daily free tier limit across 16.75k queries in 24 hours.  
-**Stack Compliance**: Pure JavaScript (ESM/JSX, zero TypeScript), positional `?` SQLite parameter bindings, Cloudflare Workers + D1 + KV/DO.
-
----
-
-## 1. Executive Summary & Root Cause Audit
-
-A full-monorepo surgical trace of all `INSERT`, `UPDATE`, `DELETE`, `REPLACE`, `CREATE TABLE`, `ALTER TABLE`, and `DB.batch` operations revealed that the **90.45k rows written** and **16.75k queries** are driven by four compounding write amplifiers rather than a single runaway loop.
-
-In Cloudflare D1 (SQLite), `rows_written` counts **every table row inserted, updated, or deleted PLUS every secondary index entry modified**.
-
-### Primary Write Amplifiers Identified
-
-| Rank | Component / File | Root Cause Mechanism | Write Impact |
-| :--- | :--- | :--- | :--- |
-| **1. CRITICAL** | [analytics.js](file:///e:/TechTrekGT/outpost/functions/api/ebay/analytics.js#L413-L726) (`ingestListingTraffic`) & [sync-all.js](file:///e:/TechTrekGT/outpost/functions/api/ebay/sync-all.js#L458-L463) | `POST /api/ebay/sync-all` unconditionally invokes `ingestListingTraffic(env, payload.userId, null, null, 30)` on **every sync run** without checking `analytics_fetched_at` freshness. Inside `ingestListingTraffic`, it loops over all linked listings (and a 0-baseline loop for non-returned listings) and executes `INSERT OR REPLACE INTO listing_traffic` for all 30 days using a **newly generated primary key** (`'lt-' + crypto.randomUUID()`). In SQLite, `INSERT OR REPLACE` with a new `PRIMARY KEY` on conflict over `UNIQUE(ebay_listing_id, traffic_date)` deletes the existing row, inserts a new row, and rewrites **4 indexes** (`PRIMARY KEY`, `UNIQUE`, `idx_traffic_item_date`, `idx_traffic_ebay_date`, `idx_traffic_user`). It also runs `UPDATE auction_items SET analytics_fetched_at = ...` per item. | **~1,200 - 1,500 SQL statements** and **~4,800 - 7,500 D1 rows written** per single `sync-all` execution (for ~40-50 linked listings). Over 12-15 background syncs/day, this alone burns **60k - 85k row writes/day**. |
-| **2. HIGH** | [analytics.js](file:///e:/TechTrekGT/outpost/functions/api/ebay/analytics.js#L765-L963) (`onRequestGet`) | Every `GET /api/ebay/analytics` request: (a) unconditionally runs `DELETE FROM auction_item_analytics WHERE item_id = ? AND user_id = ?` (line 766); (b) on cache hit (`rangeDays === 30`), unconditionally runs `UPDATE auction_items SET analytics_fetched_at = ?` (line 958); and (c) when a user views 60d/90d while eBay is at HTTP 429 quota and 30d rows already exist (`rows.length > 0`), the fallback `INSERT OR IGNORE` (line 835) is skipped (`if (rows.length > 0)` returns early at line 829), leaving `coversDateRange` (`30 >= 60`) permanently `false` and triggering `ingestListingTraffic` + `recordSyncRun` on every subsequent 60d/90d view. | Unnecessary `UPDATE` + `DELETE` + `outpost_sync_history` inserts on every Performance tab open or range toggle. |
-| **3. HIGH** | [sync-all.js](file:///e:/TechTrekGT/outpost/functions/api/ebay/sync-all.js#L117-L505) & [find-listings.js](file:///e:/TechTrekGT/outpost/functions/api/ebay/find-listings.js#L59) | (a) Line 328: Loops over every active eBay listing and executes `UPDATE auction_items SET current_list_price = ?, status = ?, ... updated_at = datetime('now')` **unconditionally** even when zero fields changed. `auction_items` has 7 indexes, so each no-op `UPDATE` writes multiple index rows. (b) Line 117: Calls `setCachedEbayListings` (`INSERT OR REPLACE INTO ebay_listings_cache`) on every sync. (c) Line 500 & `find-listings.js` line 59: Unconditionally executes `UPDATE ebay_oauth_tokens SET last_refreshed_at = datetime('now')` even when the token was not refreshed. | **~40 - 60 unconditional `UPDATE` statements** (~250+ index/row writes) per sync run even when 0 prices or statuses changed. |
-| **4. HIGH** | [syncLogger.js](file:///e:/TechTrekGT/outpost/functions/utils/syncLogger.js#L15-L44) (`ensureSyncHistoryTable`) | Called on **every** `GET /api/sync/settings`, `PUT /api/sync/settings`, `getEbayAnalyticsQuota`, and `recordSyncRun` with **no in-memory isolate flag**. Each call fires **6 sequential DDL queries**: `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`, and **4 `ALTER TABLE outpost_sync_settings ADD COLUMN ...`** statements that throw duplicate-column errors on every single invocation. | **6 wasted D1 round-trips per call** (hundreds of queries/day across polling, settings loads, and analytics checks). |
-| **5. MEDIUM** | [InventoryContext.jsx](file:///e:/TechTrekGT/outpost/src/context/InventoryContext.jsx#L291-L315) & [EditItemModal.jsx](file:///e:/TechTrekGT/outpost/src/components/EditItemModal.jsx#L303) | (a) `InventoryContext.jsx` runs `setInterval(handleSyncEbay, ms)` and `setInterval(handleSyncVScout, ms)` across every open browser tab without checking `document.visibilityState === 'visible'` or coordinating via `last_ebay_sync_at`. (b) `EditItemModal.jsx` calls `fetchActiveListings()` (`GET /api/ebay/active-listings`) on **every modal open**, even for already-linked or sold items. | Multiplies background sync frequency by the number of open browser tabs/devices. |
-| **6. MEDIUM** | [vinescout/sync.js](file:///e:/TechTrekGT/vinescout/functions/api/vinescout/sync.js#L62-L120) & [webhook.js](file:///e:/TechTrekGT/outpost/functions/api/ebay/webhook.js#L448-L464) | (a) `POST /api/vinescout/sync` executes 2 unconditional `ON CONFLICT DO UPDATE` statements per item (`vine_items` and `vine_asin_cache`, up to 500 items = 1,000 statements/batch) without `WHERE` change-detection guards. (b) `POST /api/ebay/webhook` generates a random `crypto.randomUUID()` for `ebay_webhook_events.id` without deduplicating on eBay's `notification.notificationId`, writing 2 statements (`INSERT` + `UPDATE processed = 1`) on every retry. | Up to **1,000+ row writes per VineScout batch sync** even when 0 items changed; duplicate writes on webhook retries. |
-
-### Verification of Other Audited Subsystems (Confirmed Clean)
-* **Auth & Integration Middleware**: [`requireAuth`](file:///e:/TechTrekGT/outpost/functions/utils/guard.js#L26-L71) and [`resolveIntegrationUserId`](file:///e:/TechTrekGT/outpost/functions/utils/apiIntegrations.js#L13-L61) execute read-only `SELECT` queries during normal operation.
-* **Rate Limiting**: [`checkRateLimit`](file:///e:/TechTrekGT/outpost/functions/utils/rateLimit.js#L51-L97) uses `RATE_LIMIT_DO` and `RATE_LIMIT_KV` (zero D1 writes). *Minor fix identified*: [vinescout-sales.js](file:///e:/TechTrekGT/outpost/functions/api/export/vinescout-sales.js#L12) and [vinescout-inventory.js](file:///e:/TechTrekGT/outpost/functions/api/export/vinescout-inventory.js#L12) omit the 6th argument (`env?.RATE_LIMIT_DO`), falling back to KV `put` instead of the Durable Object.
-* **OAuth Token Helper**: [`getEbayUserToken`](file:///e:/TechTrekGT/outpost/functions/api/ebay/tokenHelper.js#L56-L154) only writes to `ebay_oauth_tokens` when `access_token` is within 5 minutes of expiry (~every 2 hours).
+**Database**: `personal-budget-db` (`10f220d4-1c10-49e9-b63e-5d4cb08d599f`)  
+**Incident Metric**: 90.45k rows written / 100k daily free tier limit across 16.75k queries in 24 hours.  
+**Target Application**: Finance OS (`e:/TechTrekGT/finance`)  
+**Stack Constraints**: Pure JavaScript (React 19, Vite 6, Cloudflare Workers ESM, strictly no TypeScript), positional `?` SQL bindings (`FIN-AUDIT-001`), zero-touch formatting on adjacent code.
 
 ---
 
-## 2. Phased Remediation Strategy
+## 1. Surgical Trace of All Finance OS D1 Write Queries
 
-### Phase 1: Eliminate Analytics Traffic Write Amplification
-**Files**:
-* [outpost/functions/api/ebay/analytics.js](file:///e:/TechTrekGT/outpost/functions/api/ebay/analytics.js)
-* [outpost/functions/api/ebay/sync-all.js](file:///e:/TechTrekGT/outpost/functions/api/ebay/sync-all.js)
+Every `INSERT`, `UPDATE`, `DELETE`, `REPLACE`, and `env.DB.batch` operation across `finance/src/worker.js` and `finance/functions/` has been traced:
 
-**Changes**:
-1. **Gate Store-Wide Traffic Ingestion in `sync-all.js` ([sync-all.js:458-463](file:///e:/TechTrekGT/outpost/functions/api/ebay/sync-all.js#L458-L463))**:
-   * Before calling `ingestListingTraffic(env, payload.userId, null, null, 30)`, query D1 for the most recent successful analytics ingestion timestamp (or check `MIN(analytics_fetched_at)` across active linked items / `outpost_sync_history` where `provider = 'ebay_analytics' AND status = 'success'`).
-   * Only run store-wide `ingestListingTraffic` inside `sync-all` if the last successful store-wide analytics ingestion was more than `ANALYTICS_CACHE_TTL_HOURS` (12 hours) ago (unless `?force_analytics=1` is explicitly passed).
-   * Filter the item candidate query in `ingestListingTraffic` ([analytics.js:433](file:///e:/TechTrekGT/outpost/functions/api/ebay/analytics.js#L433)) so bulk store-wide runs (`!targetListingId`) only query active/listed items (`status NOT IN ('Sold', 'Returned / Refunded')`) or items that have not had analytics fetched within the TTL window.
-2. **Replace Destructive `INSERT OR REPLACE` with Differential Upsert in `ingestListingTraffic` ([analytics.js:638-708](file:///e:/TechTrekGT/outpost/functions/api/ebay/analytics.js#L638-L708))**:
-   * Pre-fetch existing rows from `listing_traffic` for the target `user_id` and date range `[startYMD..endYMD]` into an in-memory `Map` keyed by `${ebay_listing_id}:${traffic_date}`.
-   * For each day in `[startYMD..endYMD]`:
-     * If an existing row in the `Map` already has the exact same metrics (`impressions_total`, `impressions_search`, `page_views_total`, `click_through_rate`, `sales_conversion_rate`, `transactions_count`), **skip the statement completely** (zero D1 query, zero rows written).
-     * For new or changed rows, use a deterministic ID (`lt-${recListingId}-${ymd}`) and `INSERT INTO listing_traffic (...) VALUES (...) ON CONFLICT(ebay_listing_id, traffic_date) DO UPDATE SET ... WHERE listing_traffic.impressions_total != excluded.impressions_total OR listing_traffic.page_views_total != excluded.page_views_total OR listing_traffic.transactions_count != excluded.transactions_count`.
-   * For the 0-baseline loop (listings omitted by eBay, lines 685-708): only insert a 0-metric row if no row exists in the pre-fetched `Map` for that `(ebay_listing_id, ymd)` pair, using `INSERT OR IGNORE INTO listing_traffic`.
-3. **Remove Unconditional Writes on `GET /api/ebay/analytics` ([analytics.js:765-963](file:///e:/TechTrekGT/outpost/functions/api/ebay/analytics.js#L765-L963))**:
-   * Remove the unconditional `DELETE FROM auction_item_analytics WHERE item_id = ? AND user_id = ?` on every GET request (line 766). Legacy table cleanup is already handled or no longer needed on every read.
-   * Remove the unconditional `UPDATE auction_items SET analytics_fetched_at = ?` at line 958 when serving cached data (`ingestListingTraffic` already updates `analytics_fetched_at` when fresh data is actually fetched).
-   * Fix the 429 partial-range fallback (lines 829-858): when `ingestRes.status === 429` and `rows.length < rangeDays` (e.g., user has 30 days cached and clicks 60d or 90d while eBay is rate-limited), backfill the missing days in `[startYMD..endYMD]` with `INSERT OR IGNORE` (or synthesize the zero-padded dates in memory for the response without writing fake rows to D1) so subsequent 60d/90d views do not repeatedly re-trigger `ingestListingTraffic` and `recordSyncRun`.
+| # | File & Function | Endpoint / Trigger | SQL Write Operation(s) | Write Amplification Risk |
+| :--- | :--- | :--- | :--- | :--- |
+| **1** | [`worker.js`](file:///e:/TechTrekGT/finance/src/worker.js#L571-L761) `handleSyncBackup` | `POST /api/sync/backup` | `env.DB.batch`:<br>1. `INSERT INTO user_backups (id, data, data_byte_length, updated_at, updated_at_ms) VALUES (?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET ...`<br>2. *(If `manual === true`)* `INSERT INTO user_backup_versions ...` + `DELETE FROM user_backup_versions WHERE user_id = ? AND id NOT IN (... LIMIT 10)`<br>3. *(On CAS conflict with `versionId`)* `DELETE FROM user_backup_versions WHERE id = ?` | **CRITICAL**: Invoked automatically by client sync loops, initial hydration false-dirty triggers, and stuck offline sync queue flushes. Also lacks a server-side payload equality guard, rewriting the entire JSON blob + index rows even when `excluded.data === user_backups.data`. |
+| **2** | [`ledgerAccess.js`](file:///e:/TechTrekGT/finance/functions/utils/ledgerAccess.js#L9-L53) `ensureLedgerTables` | Called on **every** `/api/sync/*`, `/api/finance/ledgers*`, `/api/admin/stats`, `/api/admin/ledger-membership`, and `/api/auth/register` request when `tablesReady === false` | `db.batch` executing **8 DDL statements** (`3x CREATE TABLE IF NOT EXISTS` + `5x CREATE INDEX IF NOT EXISTS`) on every cold Worker isolate. | **HIGH**: Schema DDL execution on the hot request path across cold Worker isolates. |
+| **3** | [`ledgerAccess.js`](file:///e:/TechTrekGT/finance/functions/utils/ledgerAccess.js#L99-L107) `resolveLedgerAccess` | Called on every `GET /api/sync/restore`, `POST /api/sync/backup`, `GET /api/sync/versions`, `POST /api/sync/restore-version`, and `DELETE /api/sync/versions` | `INSERT OR IGNORE INTO finance_ledgers (id, owner_id, name) VALUES (?, ?, ?)` when `targetId === uid` and no row is found. | **MEDIUM**: Write-on-read behavior during `GET /api/sync/restore` and `GET /api/sync/versions`. |
+| **4** | [`stats.js`](file:///e:/TechTrekGT/finance/functions/api/admin/stats.js#L81-L90) `onRequestGet` | `GET /api/admin/stats` | Unconditional bulk write on every GET poll:<br>`INSERT OR IGNORE INTO finance_ledgers (id, owner_id, name) SELECT u.id, u.id, ... FROM users u WHERE u.id IN (...)` | **HIGH**: Executes a multi-subquery `INSERT OR IGNORE` table scan and write on every admin dashboard read/refresh. |
+| **5** | [`worker.js`](file:///e:/TechTrekGT/finance/src/worker.js#L951-L1009) `handleSyncDeleteVersion` | `DELETE /api/sync/versions` | `DELETE FROM user_backup_versions WHERE id = ? AND user_id = ?` | **LOW**: Manual user action in Cloud Sync modal. |
+| **6** | [`ledger-shares.js`](file:///e:/TechTrekGT/finance/functions/api/finance/ledger-shares.js#L50-L430) `handleLedgerShares` | `GET / POST / PATCH / DELETE /api/finance/ledgers*` | `UPDATE ledger_invites`, `INSERT INTO ledger_shares`, `INSERT OR IGNORE INTO finance_ledgers`, `INSERT INTO user_backups`, `DELETE FROM finance_ledgers/user_backups` | **LOW**: Triggered on explicit ledger creation, sharing, or invite acceptance (except `GET /api/finance/ledgers` which calls `ensureLedgerTables` and `INSERT OR IGNORE INTO finance_ledgers` at line 203). |
+| **7** | [`login.js`](file:///e:/TechTrekGT/finance/functions/api/auth/login.js#L80-L92) `onRequestPost` | `POST /api/auth/login` | `UPDATE users SET last_login = ?, sign_in_count = COALESCE(sign_in_count, 0) + 1 WHERE id = ?` | **LOW**: Fires only on explicit interactive login form submission. |
+| **8** | [`logout.js`](file:///e:/TechTrekGT/finance/functions/api/auth/logout.js#L16-L20) `onRequestPost` | `POST /api/auth/logout` | `UPDATE users SET token_version = COALESCE(token_version, 1) + 1 WHERE id = ?` | **LOW**: Fires only on explicit interactive logout. |
+| **9** | [`register.js`](file:///e:/TechTrekGT/finance/functions/api/auth/register.js), [`verify-email.js`](file:///e:/TechTrekGT/finance/functions/api/auth/verify-email.js), [`forgot-password.js`](file:///e:/TechTrekGT/finance/functions/api/auth/forgot-password.js), [`reset-password.js`](file:///e:/TechTrekGT/finance/functions/api/auth/reset-password.js), [`update-profile.js`](file:///e:/TechTrekGT/finance/functions/api/auth/update-profile.js), [`confirm-email-change.js`](file:///e:/TechTrekGT/finance/functions/api/auth/confirm-email-change.js) | Explicit Auth Flows | `INSERT INTO users`, `UPDATE users`, `INSERT OR IGNORE INTO finance_ledgers` | **LOW**: One-off user account lifecycle actions. |
 
 ---
 
-### Phase 2: Isolate DDL Guards & Dirty-Checking in Sync Loops
-**Files**:
-* [outpost/functions/utils/syncLogger.js](file:///e:/TechTrekGT/outpost/functions/utils/syncLogger.js)
-* [outpost/functions/api/ebay/sync-all.js](file:///e:/TechTrekGT/outpost/functions/api/ebay/sync-all.js)
-* [outpost/functions/api/ebay/find-listings.js](file:///e:/TechTrekGT/outpost/functions/api/ebay/find-listings.js)
-* [outpost/functions/api/ebay/listingsCache.js](file:///e:/TechTrekGT/outpost/functions/api/ebay/listingsCache.js)
+## 2. Root Cause Audit Across All 4 Investigative Scopes
 
-**Changes**:
-1. **In-Memory Isolate Guard for `ensureSyncHistoryTable` ([syncLogger.js:15-44](file:///e:/TechTrekGT/outpost/functions/utils/syncLogger.js#L15-L44))**:
-   * Add a module-scoped `let syncHistoryTableReady = false;` flag in `syncLogger.js`.
-   * Return immediately if `syncHistoryTableReady === true`.
-   * Remove the 4 `ALTER TABLE outpost_sync_settings ADD COLUMN ...` statements from the runtime hot path (those columns are already defined in [auction-schema.sql](file:///e:/TechTrekGT/outpost/auction-schema.sql#L194-L209)), leaving only the `CREATE TABLE IF NOT EXISTS` and `CREATE INDEX IF NOT EXISTS` executed at most once per Worker isolate lifecycle.
-   * Add a pruning guard in `recordSyncRun` ([syncLogger.js:76-97](file:///e:/TechTrekGT/outpost/functions/utils/syncLogger.js#L76-L97)) or keep `outpost_sync_history` bounded so it does not grow indefinitely.
-2. **Dirty-Checking Before `UPDATE auction_items` in `sync-all.js` ([sync-all.js:141-348](file:///e:/TechTrekGT/outpost/functions/api/ebay/sync-all.js#L141-L348))**:
-   * Expand the initial `SELECT` on `auction_items` (line 141) to include `platform_fee_pct, platform_flat_fee, promoted_rate_pct, est_shipping_cost, min_sell_price, suggested_list_price`.
-   * Before executing the active-listing `UPDATE auction_items` at line 328, compare the computed values (`newPrice`, `newStatus`, `ebayId`, `skuToSave`, `platformFeePct`, `platformFlatFee`, `promotedRate`, `estShippingCost`, `pricing.min_sell_price`, `pricing.suggested_list_price`, and serialized `attrs`) against the existing item record in memory.
-   * **Skip the `UPDATE` query entirely** if no column value has changed.
-3. **Remove Redundant `ebay_oauth_tokens` Touch ([sync-all.js:500](file:///e:/TechTrekGT/outpost/functions/api/ebay/sync-all.js#L500) & [find-listings.js:59](file:///e:/TechTrekGT/outpost/functions/api/ebay/find-listings.js#L59))**:
-   * Delete the redundant `UPDATE ebay_oauth_tokens SET last_refreshed_at = datetime('now') WHERE user_id = ?` at the end of `sync-all.js` and `find-listings.js`. `tokenHelper.js` already updates `last_refreshed_at` whenever an actual OAuth token refresh occurs.
-4. **Deduplicate `setCachedEbayListings` Writes ([listingsCache.js:23-39](file:///e:/TechTrekGT/outpost/functions/api/ebay/listingsCache.js#L23-L39))**:
-   * In `setCachedEbayListings(db, userId, listings)`, use `INSERT INTO ebay_listings_cache (user_id, listings_json, fetched_at, item_count) VALUES (?, ?, datetime('now'), ?) ON CONFLICT(user_id) DO UPDATE SET listings_json = excluded.listings_json, fetched_at = excluded.fetched_at, item_count = excluded.item_count` instead of `INSERT OR REPLACE`, and optionally skip or offload to `RATE_LIMIT_KV` when available.
+### Scope 1: Client-to-Cloud Sync Loops (IndexedDB to D1) - **PRIMARY ROOT CAUSE FOUND**
 
----
+Three compounding defects in [`LedgerDataContext.jsx`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx) and [`api.js`](file:///e:/TechTrekGT/finance/src/utils/api.js) create continuous `POST /api/sync/backup` write storms and CAS (`tt_budget_cloud_version:${userId}`) timestamp mismatches:
 
-### Phase 3: Server-Side Sync Cooldown & Webhook Deduplication
-**Files**:
-* [outpost/functions/api/ebay/sync-all.js](file:///e:/TechTrekGT/outpost/functions/api/ebay/sync-all.js)
-* [outpost/functions/api/ebay/webhook.js](file:///e:/TechTrekGT/outpost/functions/api/ebay/webhook.js)
-* [vinescout/functions/api/vinescout/sync.js](file:///e:/TechTrekGT/vinescout/functions/api/vinescout/sync.js)
-* [outpost/functions/api/export/vinescout-sales.js](file:///e:/TechTrekGT/outpost/functions/api/export/vinescout-sales.js)
-* [outpost/functions/api/export/vinescout-inventory.js](file:///e:/TechTrekGT/outpost/functions/api/export/vinescout-inventory.js)
+#### Defect 1A: Initial Seed Hydration False-Dirty Trigger on Every Mount / Reload
+* **Location**: [`LedgerDataContext.jsx`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx#L119-L129) and [`LedgerDataContext.jsx`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx#L785-L819).
+* **Mechanism**:
+  1. When `BudgetMetadataProvider` finishes reading IndexedDB, it sets `isDbLoaded = true` and `initialLedgerSeed = { dailyMatrix, lineItems, transactions }` ([`BudgetMetadataContext.jsx`](file:///e:/TechTrekGT/finance/src/context/BudgetMetadataContext.jsx#L280-L289)).
+  2. On the **first render pass** where `isDbLoaded` becomes `true`, two `useEffect` hooks in `LedgerDataProvider` fire in the same commit:
+     - Effect 1 ([`LedgerDataContext.jsx`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx#L119-L129)) hydrates `dailyMatrix`, `matrixVersion`, `lineItems`, and `transactions` from `initialLedgerSeed` via `setState` calls (which schedule a **second render**).
+     - Effect 2 ([`LedgerDataContext.jsx`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx#L789-L793)) checks `if (isInitialMountRef.current)`, immediately flips `isInitialMountRef.current = false`, captures the **pre-hydrated empty state** in `lastSeenDataRef.current`, and returns.
+  3. On the **second render pass** (when `dailyMatrix`, `matrixVersion`, `lineItems`, and `transactions` actually populate from `initialLedgerSeed`), `isInitialMountRef.current` is already `false`!
+  4. Line 796 evaluates `dataChanged = true` (`lastSeenDataRef.current.ui !== budgetForUI || lastSeenDataRef.current.mv !== matrixVersion`), sets `autoPushPendingRef.current = true`, **overwrites `localStorage.setItem('tt_budget_last_modified:${uid}', String(Date.now()))`**, and starts a 5-second timer to execute `pushCloudBackup(syncPasscode, { auto: true })`.
+  5. **Compounding Reconcile Push**: Because step 4 just stamped `tt_budget_last_modified:${uid} = Date.now()`, when the initial login reconcile `useEffect` ([`LedgerDataContext.jsx`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx#L679-L779)) completes its `GET /api/sync/restore`, it compares `localTime > savedCloudVersion` (line 761). Since `localTime` was just falsified to `Date.now()`, `localTime > savedCloudVersion` evaluates to `true`, triggering an **immediate** `pushCloudBackup` at line 763, followed 5 seconds later by the debounced auto-backup push at line 811!
+  6. Thus, **every single page load, tab open, or refresh unconditionally stamps local data as modified and fires 1 to 2 `POST /api/sync/backup` D1 writes**, even with zero user interaction.
 
-**Changes**:
-1. **Server-Side Cooldown Guard in `POST /api/ebay/sync-all` ([sync-all.js:28-50](file:///e:/TechTrekGT/outpost/functions/api/ebay/sync-all.js#L28-L50))**:
-   * When triggered by background auto-polling (e.g., body/query does not contain `manual: true` or `force: true`), check `outpost_sync_settings.last_ebay_sync_at` for `payload.userId`.
-   * If `last_ebay_sync_at` is within the last **3 minutes** (e.g., another open browser tab just completed a sync), return `{ success: true, skipped: true, reason: 'cooldown' }` immediately with **0 D1 writes** and **0 eBay API calls**.
-2. **Idempotent Webhook Deduplication in `POST /api/ebay/webhook` ([webhook.js:435-465](file:///e:/TechTrekGT/outpost/functions/api/ebay/webhook.js#L435-L465))**:
-   * Extract a deterministic notification ID from the payload (`payload?.notification?.notificationId || payload?.metadata?.notificationId`) or derive a deterministic key from `eventType + ':' + (ebayItemId || '') + ':' + (ebayOrderId || '') + ':' + (payload?.notification?.eventDate || '')`.
-   * Check if `ebay_webhook_events` already has a row with `id = deterministicId` (or use `INSERT OR IGNORE INTO ebay_webhook_events`). If the event was already processed (`changes === 0`), return `200 OK` `{ received: true, duplicate: true }` immediately without re-running `dispatchWebhookEvent` or updating `auction_items`.
-3. **Differential Upsert Guard in `POST /api/vinescout/sync` ([vinescout/sync.js:62-120](file:///e:/TechTrekGT/vinescout/functions/api/vinescout/sync.js#L62-L120))**:
-   * Add a `WHERE` clause to the `ON CONFLICT(user_id, asin) DO UPDATE` on `vine_items` and `ON CONFLICT(asin) DO UPDATE` on `vine_asin_cache` so SQLite only performs a row/index write when at least one field (`title`, `etv`, `order_date`, `status`, `category`, `image_url`, etc.) actually differs from the stored value (`WHERE vine_items.title IS NOT excluded.title OR vine_items.etv IS NOT excluded.etv OR vine_items.status IS NOT excluded.status ...`).
-4. **Pass `RATE_LIMIT_DO` to Export Endpoints ([vinescout-sales.js:12](file:///e:/TechTrekGT/outpost/functions/api/export/vinescout-sales.js#L12) & [vinescout-inventory.js:12](file:///e:/TechTrekGT/outpost/functions/api/export/vinescout-inventory.js#L12))**:
-   * Pass `env?.RATE_LIMIT_DO` as the 6th parameter to `checkRateLimit(...)` so rate-limit state is handled in-memory by the Durable Object rather than writing to KV on every call.
+#### Defect 1B: Stuck Offline Sync Queue (`cf_pending_sync:${userId}`) + Unconditional Force Flush
+* **Location**: [`api.js`](file:///e:/TechTrekGT/finance/src/utils/api.js#L194-L315) (`pushCloudBackupOptimistic`), [`api.js`](file:///e:/TechTrekGT/finance/src/utils/api.js#L350-L413) (`flushPendingCloudSync`), and [`LedgerDataContext.jsx`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx#L770-L778).
+* **Mechanism**:
+  1. In [`pushCloudBackupOptimistic`](file:///e:/TechTrekGT/finance/src/utils/api.js#L203), `savePendingSync(budgetData, passcode || '', userId)` writes the entire serialized budget into `localStorage` (`cf_pending_sync:${userId}`) **before** calling `fetch('/api/sync/backup')`.
+  2. `clearPendingSync(userId)` is **only** called on `res.ok && data.success` ([`api.js`](file:///e:/TechTrekGT/finance/src/utils/api.js#L294)).
+  3. If the server returns **`409 Conflict`** (due to a multi-tab/multi-device CAS mismatch or Defect 1A), `400`, or `403`, `clearPendingSync(userId)` is **never called**. The rejected payload remains permanently trapped in `cf_pending_sync:${userId}`.
+  4. In [`LedgerDataContext.jsx`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx#L771-L776), the login reconcile `finally` block **unconditionally calls `await flushPendingCloudSync(syncPasscode, currentUserId)`**—even when reconcile just pulled newer data from the cloud or hit a `409 Conflict`!
+  5. Worse still, inside [`flushPendingCloudSync`](file:///e:/TechTrekGT/finance/src/utils/api.js#L372-L380):
+     - If `tt_budget_cloud_version:${userId}` is present, it sends `expectedVersion: Number(savedVerStr)`, which hits `409 Conflict` again and leaves the item stuck in `cf_pending_sync:${userId}` to retry on every page load and `online` event.
+     - If `tt_budget_cloud_version:${userId}` is missing or `0`, line 378 sets `bodyObj.force = true`, silently **force-overwriting** D1 `user_backups` with stale offline queue data!
+
+#### Defect 1C: Zero Client or Server Payload Idempotency Guard
+* **Location**: [`worker.js`](file:///e:/TechTrekGT/finance/src/worker.js#L622-L711) and [`LedgerDataContext.jsx`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx#L330-L380).
+* **Mechanism**:
+  - Neither `pushCloudBackup` on the client nor `handleSyncBackup` on the Worker checks whether the serialized budget JSON (`dataStr`) is identical to the currently stored `user_backups.data`.
+  - Even when the payload is byte-for-byte identical, `handleSyncBackup` executes `env.DB.batch` (`INSERT INTO user_backups ... ON CONFLICT(id) DO UPDATE SET data = excluded.data, updated_at_ms = excluded.updated_at_ms`), advancing `updated_at_ms` in D1 and invalidating other open tabs' `tt_budget_cloud_version:${userId}` timestamps.
 
 ---
 
-### Phase 4: Client-Side Polling Visibility & Lazy Fetching Guards
-**Files**:
-* [outpost/src/context/InventoryContext.jsx](file:///e:/TechTrekGT/outpost/src/context/InventoryContext.jsx)
-* [outpost/src/components/EditItemModal.jsx](file:///e:/TechTrekGT/outpost/src/components/EditItemModal.jsx)
-
-**Changes**:
-1. **Tab Visibility & Timestamp Check in `InventoryContext.jsx` ([InventoryContext.jsx:171-315](file:///e:/TechTrekGT/outpost/src/context/InventoryContext.jsx#L171-L315))**:
-   * Distinguish between manual user-initiated sync (`handleSyncEbay({ manual: true })`) and interval-driven auto-sync (`handleSyncEbay({ manual: false })`).
-   * Inside the `setInterval` callback (line 299 and line 311), skip firing `handleSyncEbay` / `handleSyncVScout` when `document.visibilityState === 'hidden'`.
-   * Pass `{ manual: false }` in the `POST /api/ebay/sync-all` request body during interval auto-syncs so the backend 3-minute multi-tab cooldown guard (Phase 3.1) can deduplicate concurrent tabs while still allowing manual "Sync eBay" button clicks (`{ manual: true }`) to execute immediately.
-2. **Conditional `fetchActiveListings` in `EditItemModal.jsx` ([EditItemModal.jsx:301-304](file:///e:/TechTrekGT/outpost/src/components/EditItemModal.jsx#L301-L304))**:
-   * Only auto-fetch `fetchActiveListings()` on modal mount if the item is not `'Sold'` and not `'Returned / Refunded'`, avoiding unnecessary `/api/ebay/active-listings` calls when viewing historical sold items.
+### Scope 2: Web Worker Offloading (`spreadsheet.worker.js`) - **CONFIRMED CLEAN**
+* **Files Audited**: [`spreadsheet.worker.js`](file:///e:/TechTrekGT/finance/src/workers/spreadsheet.worker.js#L1-L41), [`spreadsheetWorkerClient.js`](file:///e:/TechTrekGT/finance/src/utils/spreadsheetWorkerClient.js#L1-L148), and [`SpreadsheetImporter.jsx`](file:///e:/TechTrekGT/finance/src/components/SpreadsheetImporter.jsx#L1-L800).
+* **Findings**:
+  - `spreadsheet.worker.js` is a pure, stateless request-response message handler supporting 4 commands (`INSPECT_WORKBOOK`, `PARSE_SINGLE_SHEET`, `PARSE_SPREADSHEET`, `PARSE_GENERIC_FLAT`).
+  - It is only invoked when a user explicitly drops or selects a file in `SpreadsheetImporter.jsx`, and the worker instance is terminated when `SpreadsheetImporter` unmounts (`terminateSpreadsheetWorker()`).
+  - It does not poll, loop, or mutate React Context state in the background.
 
 ---
 
-## 3. Expected Impact & Verification Plan
+### Scope 3: Auth & Session Token Churn - **CONFIRMED CLEAN (WITH ADMIN / LEDGER GET WRITE SIDE-EFFECTS IDENTIFIED)**
+* **Files Audited**: [`auth.js`](file:///e:/TechTrekGT/finance/functions/utils/auth.js#L1-L1085), [`me.js`](file:///e:/TechTrekGT/finance/functions/api/auth/me.js), [`refresh.js`](file:///e:/TechTrekGT/finance/functions/api/auth/refresh.js), [`login.js`](file:///e:/TechTrekGT/finance/functions/api/auth/login.js), [`logout.js`](file:///e:/TechTrekGT/finance/functions/api/auth/logout.js), [`AuthContext.jsx`](file:///e:/TechTrekGT/finance/src/context/AuthContext.jsx#L1-L437).
+* **Findings**:
+  - [`getAllTokensFromRequest`](file:///e:/TechTrekGT/finance/functions/utils/auth.js#L430-L469) parses `Authorization` and duplicate `Cookie` (`tt_auth`) headers purely in memory and performs **zero** D1 queries.
+  - [`authenticate`](file:///e:/TechTrekGT/finance/functions/utils/auth.js#L504-L607) is strictly read-only (`SELECT ... FROM users WHERE id = ?`) and caches the user profile across KV, Cloudflare Cache API (`caches.default`), and an isolate-local `Map` for `USER_CACHE_TTL_SEC = 60` seconds.
+  - `GET /api/auth/me` and `POST /api/auth/refresh` issue JWTs via WebCrypto without writing to D1. `token_version` is only incremented on explicit `POST /api/auth/logout` or password reset.
+  - **Write-on-GET Side-Effects Found in Adjacent Middleware**:
+    1. [`ensureLedgerTables`](file:///e:/TechTrekGT/finance/functions/utils/ledgerAccess.js#L9-L53) runs an 8-statement DDL `db.batch` on every cold Worker isolate across sync, ledger, and admin routes.
+    2. [`resolveLedgerAccess`](file:///e:/TechTrekGT/finance/functions/utils/ledgerAccess.js#L99-L107) runs `INSERT OR IGNORE INTO finance_ledgers` on read-only `GET /api/sync/restore` and `GET /api/sync/versions` requests.
+    3. [`GET /api/admin/stats`](file:///e:/TechTrekGT/finance/functions/api/admin/stats.js#L81-L90) runs an unconditional bulk `INSERT OR IGNORE INTO finance_ledgers SELECT ...` on every GET request.
 
-| Metric | Before Remediation | After Remediation |
-| :--- | :--- | :--- |
-| **Rows written per routine 30-min `sync-all` (no item changes)** | ~4,800 - 7,500 rows | **2 - 4 rows** (`outpost_sync_settings` + `outpost_sync_history` only) |
-| **Rows written per `ingestListingTraffic` (once every 12h)** | ~4,800 - 7,500 rows (rewrites all 30 days) | **~40 - 150 rows** (only writes today/yesterday where views/impressions changed) |
-| **DDL queries per `/api/sync/settings` or quota check** | 6 queries (4 failing `ALTER TABLE`s) | **0 queries** after initial isolate warm-up |
-| **Rows written on cached `GET /api/ebay/analytics`** | 2+ rows (`DELETE` + `UPDATE`) | **0 rows** |
-| **Rows written per unchanged 250-item VineScout sync** | ~500 - 1,500 rows | **0 rows** (filtered by `ON CONFLICT ... WHERE` diff check) |
-| **Projected Daily D1 Rows Written** | 90,450+ / day (90.5% of free tier) | **< 1,500 / day (< 1.5% of free tier)** |
+---
 
-### Post-Approval Execution Steps
-1. Apply surgical deltas across the target files in `outpost/` and `vinescout/`.
-2. Run unit and integration test suites to verify zero regressions in sync, analytics, and webhook flows.
-3. Update local and root documentation (`outpost/docs/03_features.md`, `outpost/docs/04_state.md`, `docs/03_features.md`, `docs/04_state.md`).
-4. Build and deploy `outpost` (`npm run build` && `npm run deploy`) and `vinescout` (`npm run build` && `npm run deploy`) to Cloudflare Workers.
+### Scope 4: UI Synchronicity & Contexts (`BudgetMetadataContext` & `LedgerDataContext`) - **ISSUES FOUND**
 
+* **Files Audited**: [`BudgetMetadataContext.jsx`](file:///e:/TechTrekGT/finance/src/context/BudgetMetadataContext.jsx#L1-L800), [`LedgerDataContext.jsx`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx#L1-L1600), [`DataSyncPanel.jsx`](file:///e:/TechTrekGT/finance/src/components/settings/DataSyncPanel.jsx#L1-L131).
+* **Findings**:
+  1. **Stale Closures in `pushCloudBackup` & `moveDailyMatrixCell`**:
+     - [`pushCloudBackup`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx#L330-L380) declares dependencies `[setLastCloudSyncTime, currentUserId]`, omitting `activeLedgerId`, `ledgerRole`, and `ledgerPermissions`. When a user switches ledgers or has their role resolved to `'viewer'`, `pushCloudBackup` executes with stale `activeLedgerId` and `ledgerRole` closure values!
+     - [`moveDailyMatrixCell`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx#L1232-L1268) declares `useCallback(..., [])`, omitting `[ledgerRole, ledgerPermissions]`.
+  2. **`restoreFromBackup` Does Not Clear `autoPushPendingRef` or Update `lastSeenDataRef`**:
+     - In [`restoreFromBackup`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx#L432-L446), `suppressDirtyUntilRef.current = Date.now() + 1500` is set, and state setters are called.
+     - However, in the auto-backup `useEffect` ([`LedgerDataContext.jsx`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx#L796-L800)), `lastSeenDataRef.current` is updated *before* checking `if (Date.now() < suppressDirtyUntilRef.current) return;`, and **`autoPushPendingRef.current` is never reset to `false`** when a cloud restore happens. If `autoPushPendingRef.current` was `true` before the restore, the next dependency change after 1500ms pushes the restored cloud backup right back to D1.
+  3. **`switchLedger` Does Not Sync `cloudVersion`**:
+     - In [`switchLedger`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx#L555-L572), calling `restoreFromBackup(data.budget)` when switching to a shared ledger does not update `cloudVersion` / `cloudVersionRef.current` or `tt_budget_cloud_version:${newLedgerId}`, guaranteeing a `409 Conflict` or stale CAS check on the next edit.
+  4. **`pushCloudBackupOptimistic` Pending Queue Key Mismatch on Shared Ledgers**:
+     - In [`LedgerDataContext.jsx`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx#L370), on `409 Conflict`, `mKey` is read from `tt_budget_last_modified:${currentUserId}` instead of `targetLid`.
+  5. **`DataSyncPanel.jsx` Unscoped Polling**:
+     - In [`DataSyncPanel.jsx`](file:///e:/TechTrekGT/finance/src/components/settings/DataSyncPanel.jsx#L37-L45), a 5-second `setInterval` calls `getPendingSync()` without passing `currentUserId`, reading `cf_pending_sync:legacy` instead of `cf_pending_sync:${currentUserId}`.
+  6. **`finally {}` Loading Flag Audit**:
+     - `BudgetMetadataContext.jsx`: `initLocalStorageOrIndexedDB` properly sets `setIsDbLoaded(true)` in `finally {}` (line 288).
+     - `LedgerDataContext.jsx`: `fetchAvailableLedgers` (`setIsLoadingLedgers(false)` at line 513), `switchLedger` (`setIsLoadingLedgers(false)` at line 570), `pullCloudBackup` (`setIsSyncing(false)` at line 424), `pushCloudBackup` (`setIsSyncing(false)` at line 378), and the login reconcile effect (`setIsSyncing(false)` at line 777) all reset loading flags inside `finally {}` blocks.
+
+---
+
+## 3. Phased Remediation Strategy
+
+### Phase 1: Client Sync & React Context Hardening ([`LedgerDataContext.jsx`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx))
+
+1. **Eliminate Initial Seed Hydration False-Dirty Trigger**:
+   - Introduce `isSeedHydratedRef = useRef(false)`.
+   - In the seed hydration `useEffect` ([`LedgerDataContext.jsx`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx#L119-L129)), mark `isSeedHydratedRef.current = true` only after `initialLedgerSeed` has been applied (or immediately if `isDbLoaded && !initialLedgerSeed`), and set `suppressDirtyUntilRef.current = Date.now() + 1500`.
+   - In the auto-backup `useEffect` ([`LedgerDataContext.jsx`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx#L785-L819)), wait until `isDbLoaded && isSeedHydratedRef.current` before initializing `isInitialMountRef.current = false` and capturing `lastSeenDataRef.current = { ui: budgetForUI, mv: matrixVersion }`.
+   - Ensure initial hydration **never** stamps `tt_budget_last_modified:${uid}` or schedules an automatic cloud backup on page load.
+
+2. **Reset Pending Auto-Push & Sync Version on Cloud Restore / Ledger Switch**:
+   - In [`restoreFromBackup`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx#L432-L446), explicitly set `autoPushPendingRef.current = false` and `suppressDirtyUntilRef.current = Date.now() + 2000`.
+   - In the auto-backup `useEffect` ([`LedgerDataContext.jsx`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx#L796-L802)), if `Date.now() < suppressDirtyUntilRef.current`, update `lastSeenDataRef.current = { ui: budgetForUI, mv: matrixVersion }`, set `autoPushPendingRef.current = false`, and return early without stamping `tt_budget_last_modified:${uid}`.
+   - In [`switchLedger`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx#L555-L572), update `cloudVersion` and `tt_budget_cloud_version:${newLedgerId}` using `data.version` from `/api/sync/restore`.
+
+3. **Fix React `useCallback` Dependency Arrays**:
+   - Update [`pushCloudBackup`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx#L380) dependencies to `[setLastCloudSyncTime, currentUserId, activeLedgerId, ledgerRole, ledgerPermissions]`.
+   - Update [`moveDailyMatrixCell`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx#L1268) dependencies to `[ledgerRole, ledgerPermissions]`.
+   - In `pushCloudBackup` conflict handling (line 370), scope `mKey` to `targetLid` (`tt_budget_last_modified:${targetLid}`).
+
+4. **Client-Side Payload Fingerprint Guard (Idempotency)**:
+   - Maintain `lastSyncedPayloadHashRef = useRef(null)` in `LedgerDataContext.jsx`.
+   - Compute a lightweight deterministic string fingerprint (length + DJB2/FNV-1a hash of the serialized `dailyMatrix`, `lineItems`, `transactions`, and metadata) before executing `pushCloudBackup` when `options.auto === true`.
+   - If the fingerprint matches `lastSyncedPayloadHashRef.current`, skip the network request and D1 write entirely. Update `lastSyncedPayloadHashRef.current` on every successful push or pull.
+
+5. **Guard Login Reconcile `finally` Block**:
+   - In the login reconcile `useEffect` ([`LedgerDataContext.jsx`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx#L770-L778)), only call `flushPendingCloudSync` if reconcile did not just restore newer cloud state or enter a `409 Conflict` state.
+
+---
+
+### Phase 2: Offline Sync Queue & CAS Hardening ([`api.js`](file:///e:/TechTrekGT/finance/src/utils/api.js) & [`DataSyncPanel.jsx`](file:///e:/TechTrekGT/finance/src/components/settings/DataSyncPanel.jsx))
+
+1. **Prevent Stuck `409 Conflict` Payloads in `cf_pending_sync:${userId}`**:
+   - In [`pushCloudBackupOptimistic`](file:///e:/TechTrekGT/finance/src/utils/api.js#L194-L315):
+     - Scope `savePendingSync` and `clearPendingSync` to `targetLid = ledgerId || userId`.
+     - If the server responds with `res.status === 409` (CAS version conflict) or `400`/`403` (permanent client/permission rejection), **call `clearPendingSync(targetLid)`** so the rejected payload is not endlessly retried by background queue flushes (conflict resolution is handled via the `syncConflict` UI state and `tt_budget_last_modified:${targetLid}`).
+     - Only retain `cf_pending_sync:${targetLid}` when `!navigator.onLine`, a network/fetch exception occurs, or the server returns a transient error (`5xx` or `429`).
+
+2. **Eliminate Blind `force: true` Overwrites in `flushPendingCloudSync`**:
+   - In [`flushPendingCloudSync`](file:///e:/TechTrekGT/finance/src/utils/api.js#L350-L413):
+     - Never set `bodyObj.force = true` automatically when `savedVerStr` is missing.
+     - If `flushPendingCloudSync` receives a `409 Conflict` or `403 Forbidden`, call `clearPendingSync(userId)` immediately so background `online` / reconcile triggers cannot loop indefinitely.
+
+3. **Fix User-Scoped Queue Check in `DataSyncPanel.jsx`**:
+   - In [`DataSyncPanel.jsx`](file:///e:/TechTrekGT/finance/src/components/settings/DataSyncPanel.jsx#L37-L45), pass `currentUserId` into `getPendingSync(currentUserId)` and include `currentUserId` in the `useEffect` dependency array.
+
+---
+
+### Phase 3: Worker Endpoint Idempotency & Write-on-GET Elimination ([`worker.js`](file:///e:/TechTrekGT/finance/src/worker.js), [`ledgerAccess.js`](file:///e:/TechTrekGT/finance/functions/utils/ledgerAccess.js), [`stats.js`](file:///e:/TechTrekGT/finance/functions/api/admin/stats.js))
+
+1. **Server-Side No-Op Write Suppression in `POST /api/sync/backup` ([`worker.js`](file:///e:/TechTrekGT/finance/src/worker.js#L622-L725))**:
+   - During the pre-check query in `handleSyncBackup`:
+     ```sql
+     SELECT updated_at, updated_at_ms, data_byte_length,
+            CASE WHEN data_byte_length = ? AND data = ? THEN 1 ELSE 0 END AS is_identical
+     FROM user_backups WHERE id = ?
+     ```
+   - Using positional bindings `[dataByteLength, dataStr, targetLedgerId]`, SQLite short-circuits the `data = ?` comparison unless `data_byte_length` matches, avoiding unnecessary large-string comparisons in JS while keeping memory overhead near zero.
+   - If `existing?.is_identical === 1 && !isManual`:
+     - Return `200 OK` immediately with `{ success: true, unchanged: true, timestamp: existing.updated_at, version: existing.updated_at_ms, byteLength: existing.data_byte_length }` and execute **zero `env.DB.batch` writes**.
+
+2. **Remove Unconditional Cold-Isolate DDL Batch & Read-Path Writes ([`ledgerAccess.js`](file:///e:/TechTrekGT/finance/functions/utils/ledgerAccess.js))**:
+   - `finance_ledgers`, `ledger_invites`, and `ledger_shares` are already provisioned in [`schema.sql`](file:///e:/TechTrekGT/finance/schema.sql#L140-L185).
+   - Remove the unconditional `await ensureLedgerTables(env.DB)` call from the hot request path; retain `ensureLedgerTables` only as a lazy recovery helper if a query throws a `no such table` error.
+   - In [`resolveLedgerAccess`](file:///e:/TechTrekGT/finance/functions/utils/ledgerAccess.js#L99-L107), when `targetId === uid` and no row exists in `finance_ledgers`, return the virtual owner access object `{ allowed: true, role: 'owner', permissions: ['read', 'write', 'delete', 'manage'], ledger: { id: uid, owner_id: uid, name: 'Personal Ledger' } }` in memory **without executing `INSERT OR IGNORE INTO finance_ledgers` on every read/sync call**.
+   - Similarly, in [`ledger-shares.js`](file:///e:/TechTrekGT/finance/functions/api/finance/ledger-shares.js#L201-L212) (`GET /api/finance/ledgers`), construct the default personal ledger entry in memory if not yet persisted in `finance_ledgers` instead of writing on GET.
+
+3. **Remove Write-on-GET in `GET /api/admin/stats` ([`stats.js`](file:///e:/TechTrekGT/finance/functions/api/admin/stats.js#L81-L90))**:
+   - Delete the `INSERT OR IGNORE INTO finance_ledgers ... SELECT u.id ...` write statement from `GET /api/admin/stats`.
+   - Synthesize default personal ledger rows in memory for finance users who have a `user_backups` record but do not yet have an explicit row in `finance_ledgers`.
+
+---
+
+## 4. Verification & Post-Flight Checklist
+
+Once approved, implementation will follow this exact sequence:
+1. Apply surgical deltas to [`LedgerDataContext.jsx`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx), [`api.js`](file:///e:/TechTrekGT/finance/src/utils/api.js), [`DataSyncPanel.jsx`](file:///e:/TechTrekGT/finance/src/components/settings/DataSyncPanel.jsx), [`worker.js`](file:///e:/TechTrekGT/finance/src/worker.js), [`ledgerAccess.js`](file:///e:/TechTrekGT/finance/functions/utils/ledgerAccess.js), [`ledger-shares.js`](file:///e:/TechTrekGT/finance/functions/api/finance/ledger-shares.js), and [`stats.js`](file:///e:/TechTrekGT/finance/functions/api/admin/stats.js).
+2. Update [`finance/docs/03_features.md`](file:///e:/TechTrekGT/finance/docs/03_features.md), [`finance/docs/04_state.md`](file:///e:/TechTrekGT/finance/docs/04_state.md), and root [`docs/04_state.md`](file:///e:/TechTrekGT/docs/04_state.md) per the mandatory post-flight documentation rule.
+3. Run `npm run build` and `npm run deploy` inside `e:/TechTrekGT/finance` and verify the live Cloudflare Worker deployment.

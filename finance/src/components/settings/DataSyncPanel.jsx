@@ -1,6 +1,7 @@
 // @ts-nocheck
 import React, { useState, useEffect } from 'react';
 import { useBudgetMetadata } from '../../context/BudgetContext';
+import { useAuth } from '../../context/AuthContext';
 import { 
   Cloud, 
   FileSpreadsheet, 
@@ -18,6 +19,7 @@ import { getPendingSync } from '../../utils/api';
 
 export function DataSyncPanel() {
   const { settingsTab, budget } = useBudgetMetadata();
+  const { currentUserId } = useAuth();
 
   const [activeTab, setActiveTab] = useState(() => {
     if (settingsTab === 'import') return 'import-export';
@@ -36,13 +38,13 @@ export function DataSyncPanel() {
   // Check pending queue badge
   useEffect(() => {
     const checkQueue = () => {
-      const pending = getPendingSync();
+      const pending = getPendingSync(currentUserId);
       setHasPendingQueue(Boolean(pending));
     };
     checkQueue();
     const interval = setInterval(checkQueue, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [currentUserId]);
 
   const SUB_TABS = [
     {

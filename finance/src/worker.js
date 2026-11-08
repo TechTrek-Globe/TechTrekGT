@@ -620,10 +620,20 @@ async function handleSyncBackup(context) {
     if (dataByteLength > MAX_BODY_SYNC) return fail(ERROR_CODES.VALIDATION_ERROR, 413, 'Backup payload is too large.');
 
     const row = await env.DB.prepare(
-      'SELECT updated_at, updated_at_ms, data_byte_length FROM user_backups WHERE id = ?'
-    ).bind(targetLedgerId).first();
+      'SELECT updated_at, updated_at_ms, data_byte_length, CASE WHEN data_byte_length = ? AND data = ? THEN 1 ELSE 0 END AS is_identical FROM user_backups WHERE id = ?'
+    ).bind(dataByteLength, dataStr, targetLedgerId).first();
 
     const storedVersion = row ? (row.updated_at_ms != null ? Number(row.updated_at_ms) : (row.updated_at ? new Date(row.updated_at).getTime() : 0)) : null;
+
+    if (row && Number(row.is_identical) === 1 && body.manual !== true) {
+      emitMetric('sync.backup.unchanged', context.requestId);
+      return json({
+        success: true,
+        unchanged: true,
+        version: storedVersion || Date.now(),
+        timestamp: row.updated_at || new Date().toISOString()
+      });
+    }
 
     if (row && !force && hasBaseVersion && storedVersion > baseVersion) {
       const dataRow = await env.DB.prepare(

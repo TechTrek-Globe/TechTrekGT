@@ -59,7 +59,9 @@ export async function handleLedgerShares(context, url, method) {
     return fail(ERROR_CODES.SERVICE_UNAVAILABLE, 503, 'Database unavailable.', requestId);
   }
 
-  await ensureLedgerTables(env.DB);
+  if (method !== 'GET') {
+    await ensureLedgerTables(env.DB);
+  }
 
   // Normalize path parts
   // Examples:
@@ -194,19 +196,9 @@ export async function handleLedgerShares(context, url, method) {
   // ----------------------------------------------------------------
   if (seg[0] === 'ledgers' && (!seg[1] || seg[1] === '') && method === 'GET') {
     try {
-      let personalLedger = await env.DB.prepare(
+      const personalLedger = await env.DB.prepare(
         'SELECT id, name FROM finance_ledgers WHERE id = ?'
-      ).bind(user.id).first();
-
-      if (!personalLedger) {
-        const defaultName = user.name ? `${user.name}'s Budget` : 'Personal Budget';
-        await env.DB.prepare(
-          'INSERT OR IGNORE INTO finance_ledgers (id, owner_id, name) VALUES (?, ?, ?)'
-        ).bind(user.id, user.id, defaultName).run().catch(() => {});
-        personalLedger = await env.DB.prepare(
-          'SELECT id, name FROM finance_ledgers WHERE id = ?'
-        ).bind(user.id).first();
-      }
+      ).bind(user.id).first().catch(() => null);
 
       const sharedRows = await env.DB.prepare(
         `SELECT s.ledger_id, s.role, s.created_at,

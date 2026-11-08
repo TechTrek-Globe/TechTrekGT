@@ -847,26 +847,40 @@ export async function sendTransactionalEmail(env, {
 
   // Fallback: External Resend API
   if (env?.RESEND_API_KEY) {
-    try {
-      const res = await fetch('https://api.resend.com/emails', {
+    const postResend = async (fromAddr) => {
+      return fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${env.RESEND_API_KEY}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          from: env.MAIL_FROM || sender,
+          from: fromAddr,
           to: recipients,
           subject,
           text,
           html: renderedHtml
         })
       });
-      if (!res.ok) {
-        console.error(`${logPrefix} mail provider returned`, res.status);
-        return false;
+    };
+
+    try {
+      let res = await postResend(env.MAIL_FROM || sender);
+      if (res.ok) return true;
+
+      const resData = await res.json().catch(() => ({}));
+      console.error(`${logPrefix} mail provider returned`, res.status);
+      console.warn(`${logPrefix} Resend details:`, resData);
+
+      // Retry with sandbox sender if domain is not yet verified on Resend
+      if (res.status === 403 && String(resData?.message || '').toLowerCase().includes('domain is not verified')) {
+        console.log(`${logPrefix} Retrying Resend with onboarding@resend.dev sandbox sender...`);
+        const sandboxRes = await postResend('TechTrek Finance OS <onboarding@resend.dev>');
+        if (sandboxRes.ok) return true;
+        const sandboxData = await sandboxRes.json().catch(() => ({}));
+        console.error(`${logPrefix} Resend sandbox retry failed ${sandboxRes.status}:`, sandboxData);
       }
-      return true;
+      return false;
     } catch (err) {
       console.error(`${logPrefix} mail send failed:`, err && err.message);
       return false;

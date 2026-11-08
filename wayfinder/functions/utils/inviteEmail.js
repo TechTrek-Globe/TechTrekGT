@@ -99,24 +99,41 @@ async function dispatchEmail(env, { sender, to, subject, text, html }) {
 
         // Strategy 4: External Resend API fallback if configured
         if (env?.RESEND_API_KEY) {
-          try {
-            const res = await fetch('https://api.resend.com/emails', {
+          const postResend = async (fromAddr) => {
+            return fetch('https://api.resend.com/emails', {
               method: 'POST',
               headers: {
                 Authorization: `Bearer ${env.RESEND_API_KEY}`,
                 'Content-Type': 'application/json'
               },
               body: JSON.stringify({
-                from: `TechTrek Wayfinder <${sender}>`,
+                from: fromAddr,
                 to: [to],
                 subject,
                 text,
                 html
               })
             });
+          };
+
+          try {
+            let res = await postResend(`TechTrek Wayfinder <${sender}>`);
             if (res.ok) {
               console.log(`[email] Successfully sent email to ${to} via Resend`);
               return { sent: true };
+            }
+            const resData = await res.json().catch(() => ({}));
+            console.warn('[email] Resend API rejected dispatch:', res.status, resData);
+
+            if (res.status === 403 && String(resData?.message || '').toLowerCase().includes('domain is not verified')) {
+              console.log('[email] Retrying Resend dispatch with onboarding@resend.dev sandbox sender...');
+              const sandboxRes = await postResend('TechTrek Wayfinder <onboarding@resend.dev>');
+              if (sandboxRes.ok) {
+                console.log(`[email] Successfully sent email to ${to} via Resend sandbox`);
+                return { sent: true };
+              }
+              const sandboxData = await sandboxRes.json().catch(() => ({}));
+              console.warn('[email] Resend sandbox retry rejected:', sandboxRes.status, sandboxData);
             }
           } catch (err4) {
             console.warn('[email] Resend fallback error:', err4?.message);

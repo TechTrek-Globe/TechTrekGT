@@ -100,27 +100,43 @@ export async function dispatchEmail(env, { sender, to, subject, text, html }) {
 
   // Strategy 4: External Resend API fallback if RESEND_API_KEY is configured
   if (env?.RESEND_API_KEY) {
-    try {
-      const res = await fetch('https://api.resend.com/emails', {
+    const postToResend = async (fromAddr) => {
+      return fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${env.RESEND_API_KEY}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          from: `TechTrek Finance OS <${sender}>`,
+          from: fromAddr,
           to: [to],
           subject,
           text,
           html
         })
       });
+    };
+
+    try {
+      let res = await postToResend(`TechTrek Finance OS <${sender}>`);
       if (res.ok) {
-        console.log(`[email] Successfully sent invite email to ${to} via Resend`);
+        console.log(`[email] Successfully sent email to ${to} via Resend`);
         return { sent: true };
       }
       const resData = await res.json().catch(() => ({}));
       console.warn('[email] Resend API rejected dispatch:', res.status, resData);
+
+      // If domain not yet verified in Resend, retry with onboarding sandbox sender
+      if (res.status === 403 && String(resData?.message || '').toLowerCase().includes('domain is not verified')) {
+        console.log('[email] Retrying Resend dispatch with onboarding@resend.dev sandbox sender...');
+        const sandboxRes = await postToResend('TechTrek Finance OS <onboarding@resend.dev>');
+        if (sandboxRes.ok) {
+          console.log(`[email] Successfully sent email to ${to} via Resend sandbox`);
+          return { sent: true };
+        }
+        const sandboxData = await sandboxRes.json().catch(() => ({}));
+        console.warn('[email] Resend sandbox retry rejected:', sandboxRes.status, sandboxData);
+      }
     } catch (err4) {
       console.warn('[email] Resend fallback error:', err4?.message);
     }

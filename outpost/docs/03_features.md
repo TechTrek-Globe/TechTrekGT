@@ -530,6 +530,30 @@ Reconciled the Break-Even Floor Price calculation across the table and pricing h
    - Replaced `title="Pricing & cost breakdown (hover for details, click to edit)"` on the pricing action button with `aria-label="Pricing & cost breakdown"`.
    - Prevents the native browser tooltip box from obscuring table values and overlapping the custom glassmorphic pricing breakdown popover.
 
+## Gemini AI Context-Aware eBay Listing Details Generator [ACTION ID: AI-001 / EBAY-010]
+
+Integrated Google Gemini API (`gemini-3.8-flash`) into the Outpost eBay listing generation pipeline to dynamically produce context-aware, HTML-formatted Condition and Key Details cards based on actual item metadata, specs, and seller notes.
+
+### AI Listing Generator Capabilities
+
+1. **Serverless AI Generation Endpoint (`functions/api/ai/generate-ebay-details.js`)**:
+   - Route: `POST /api/ai/generate-ebay-details` registered in `src/worker.js` with session authentication (`requireAuth` verifying HttpOnly `auth_token` and `users.token_version`).
+   - Ingests item metadata payload (`title`, `brand`, `productType`, `condition`, `conditionHeader`, `conditionSubheader`, `notes`, `specs`, `features`).
+   - Queries Google Gemini API (`gemini-3.8-flash`) using `fetchWithTimeout` enforcing a strict 15-second timeout via `AbortSignal.timeout(15000)` per AUDIT-003.
+   - Dual API Resilience: Prioritizes modern Interactions API (`POST /v1beta/interactions`) with automatic fallback to `generateContent` endpoint if Interactions API is unconfigured.
+   - Strict Output Sanitization: Strips markdown code fences (` ```html `) and strictly enforces the platform zero em-dash rule (replacing any Unicode em or en dashes with standard hyphens).
+2. **Dynamic Template Injection & Fallback Architecture (`src/utils/ebayTemplate.js`)**:
+   - `generateEbayListingHtml(item)` accepts optional `aiGeneratedMiddleSection`.
+   - When provided, seamlessly injects the AI-generated HTML cards directly between the Header Banner and the What's Included / Authentication cards.
+   - When absent, empty, or on generation failure, falls back cleanly to the static Condition and Key Details card layout with zero visual regressions.
+   - Integrated with `generateEbayCopy` in `src/utils/listingCopyGenerator.js` to ensure both `insertHtml` and full `htmlBody` preview render the dynamic middle section.
+3. **Frontend UI State & Dual-Trigger Ergonomics (`src/components/ListingCopyModal.jsx`)**:
+   - Added an amber **"Auto-Generate AI Description"** button with `Sparkles` icon and animated `Loader2` spinner to the eBay tab toolbar and the Collapsible Details Form.
+   - Follows AUDIT-004 resilience guidelines: gates loading flags in `finally {}` blocks to guarantee button recovery, catches `{ success: false }` payloads, and presents non-blocking accessible error alerts without browser `alert()` dialogs.
+   - Displays real-time status pill badges: "AI Active" (emerald) when AI cards are rendered versus "Standard Template" (slate).
+   - Provides an on-demand **"Reset to Static"** button allowing sellers to revert instantly to the static template at any time.
+
+
 
 
 

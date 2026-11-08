@@ -91,16 +91,11 @@ export const generateEbayListingHtml = (item = {}) => {
     ? includedItems.map(i => `<li>${i}</li>`).join('')
     : `<li>${title}</li><li>Exact item shown in the photos</li>`;
 
-  return `
-<div style="font-family: Arial, Helvetica, sans-serif; color:#ffffff; max-width:900px; margin:0 auto; line-height:1.5;">
-
-  <!-- Header Banner -->
-  <div style="background-color:rgb(17,17,17); border:1px solid rgb(214,181,109); padding:18px; margin-bottom:15px; border-radius:6px; text-align:center;">
-    <h2 style="color:rgb(241,193,91); margin-top:0;">${title}</h2>
-    <p style="margin-bottom:0; color:#e0e0e0;">${description}</p>
-  </div>
-
-  <!-- Condition Section -->
+  // Resolve middle section: AI-generated Condition + Key Details cards, with fallback to static cards
+  const hasAiMiddle = typeof item.aiGeneratedMiddleSection === 'string' && item.aiGeneratedMiddleSection.trim().length > 0;
+  const middleSectionHtml = hasAiMiddle
+    ? item.aiGeneratedMiddleSection.trim()
+    : `  <!-- Condition Section -->
   <div style="background-color:rgb(17,17,17); border:1px solid rgb(51,51,51); padding:18px; margin-bottom:15px; border-radius:6px;">
     <h3 style="color:rgb(241,193,91); margin-top:0;">Condition</h3>
     <p style="margin-bottom:0; color:#e0e0e0;">${conditionDetails}</p>
@@ -112,7 +107,18 @@ export const generateEbayListingHtml = (item = {}) => {
     <ul style="margin:0; padding-left:20px; color:#e0e0e0;">
       ${keyDetailsList}
     </ul>
+  </div>`;
+
+  return `
+<div style="font-family: Arial, Helvetica, sans-serif; color:#ffffff; max-width:900px; margin:0 auto; line-height:1.5;">
+
+  <!-- Header Banner -->
+  <div style="background-color:rgb(17,17,17); border:1px solid rgb(214,181,109); padding:18px; margin-bottom:15px; border-radius:6px; text-align:center;">
+    <h2 style="color:rgb(241,193,91); margin-top:0;">${title}</h2>
+    <p style="margin-bottom:0; color:#e0e0e0;">${description}</p>
   </div>
+
+${middleSectionHtml}
 
   ${authBlock}
 

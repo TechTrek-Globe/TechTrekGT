@@ -428,3 +428,12 @@ export const revokeIntegration = (id) =>
     headers: JSON_HEADERS
   });
 
+// --- AI Listing Generator ---
+export const generateAiEbayDetails = (payload) =>
+  apiFetch('/api/ai/generate-ebay-details', {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify(payload)
+  });
+
+

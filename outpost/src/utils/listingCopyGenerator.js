@@ -1,5 +1,5 @@
-import { getCertVerificationUrl } from './certLookup';
-import { generateEbayListingHtml } from './ebayTemplate';
+import { getCertVerificationUrl } from './certLookup.js';
+import { generateEbayListingHtml } from './ebayTemplate.js';
 
 export { generateEbayListingHtml };
 
@@ -192,7 +192,8 @@ export function generateEbayCopy(item, options = {}) {
       certNumber,
       type: authType || (athlete ? `Witnessed (${athlete})` : 'Witnessed')
     } : null,
-    includedItems: options.includedInSale ? [options.includedInSale] : []
+    includedItems: options.includedInSale ? [options.includedInSale] : [],
+    aiGeneratedMiddleSection: options.aiGeneratedMiddleSection || item.aiGeneratedMiddleSection || ''
   });
 
   // Full HTML Preview (includes header banner, delimiters, middle insertHtml, and footer)

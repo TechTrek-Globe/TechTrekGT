@@ -231,6 +231,12 @@ Outpost uses React Context and standard React hooks (`useState`, `useReducer`, `
     - `src/utils/pricingMetrics.js`: `getItemFloorMetrics(item)` computes `breakEvenFloor` using `costBasis = landedCost + platformFlatFee + estShippingCost` and `divisor = 1 - platformFeePct - adFeePct`, eliminating divergent buyer-shipping fee burden from the break-even calculation.
     - Synchronized State Binding: Returns `Number(item.floor_price || item.min_sell_price)` when populated on the item entity, ensuring the `InventoryPricingTooltip` Break-Even Floor Price and the `InventoryGridRow` Landed & Floor cell stay in 100% agreement.
     - Non-Overlapping Tooltip State: `InventoryGridRow.jsx` replaces the native `title` attribute on the pricing breakdown trigger button with `aria-label`, eliminating conflicting browser tooltips that obscured the pricing popover.
+  - **Gemini AI Dynamic Listing Template State [ACTION ID: AI-001 / EBAY-010]**:
+    - `functions/api/ai/generate-ebay-details.js`: Serverless endpoint executing Gemini `gemini-3.8-flash` via Google Interactions API with `fetchWithTimeout` 15-second timeout (AUDIT-003) and sanitization (stripping code fences, zero em dashes).
+    - `src/utils/ebayTemplate.js`: Evaluates `item.aiGeneratedMiddleSection`; if present and non-empty, injects the custom Condition and Key Details cards between Header Banner and What's Included / Authentication cards, falling back to static layout when absent.
+    - `src/utils/listingCopyGenerator.js`: Forwards `options.aiGeneratedMiddleSection` to `generateEbayListingHtml` so `insertHtml` and `htmlBody` reflect AI output.
+    - `src/components/ListingCopyModal.jsx`: Manages `aiGeneratedMiddleSection`, `generatingAiDetails`, and `aiDetailsMsg` state hooks. Incorporates non-blocking loading state recovery inside `finally {}` blocks per AUDIT-004, interactive "Auto-Generate AI Description" and "Reset to Static" actions, and live preview re-rendering.
+
 
 
 

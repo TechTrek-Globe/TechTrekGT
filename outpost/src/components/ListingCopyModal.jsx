@@ -3,7 +3,8 @@ import {
   X, Copy, Check, Sparkles, FileCode,
   FileText, Eye, ChevronDown, ChevronUp,
   Globe, Loader2, AlertCircle, CheckCircle2,
-  SlidersHorizontal, RefreshCw, ExternalLink, ClipboardPaste
+  SlidersHorizontal, RefreshCw, ExternalLink, ClipboardPaste,
+  RotateCcw
 } from 'lucide-react';
 import {
   generateEbayCopy,
@@ -13,7 +14,7 @@ import {
 } from '../utils/listingCopyGenerator';
 import { getApiUrl } from '../utils/api';
 import { parseAmazonProductContent } from '../utils/amazonParser';
-import { fetchEbayItemDetail, fetchAmazonProduct } from '../utils/auctionApi';
+import { fetchEbayItemDetail, fetchAmazonProduct, generateAiEbayDetails } from '../utils/auctionApi';
 
 /**
  * Extracts Order ID or ASIN from an item's notes or invoice_ref.
@@ -59,6 +60,11 @@ export function ListingCopyModal({ isOpen, onClose, item }) {
   const [generatingReport, setGeneratingReport] = useState(false);
   const [conditionMsg, setConditionMsg] = useState(null);
 
+  // Gemini AI Listing Details State
+  const [aiGeneratedMiddleSection, setAiGeneratedMiddleSection] = useState('');
+  const [generatingAiDetails, setGeneratingAiDetails] = useState(false);
+  const [aiDetailsMsg, setAiDetailsMsg] = useState(null);
+
   // Initialize fields when item changes or modal opens
   useEffect(() => {
     if (!item) return;
@@ -81,6 +87,9 @@ export function ListingCopyModal({ isOpen, onClose, item }) {
     setConditionMsg(null);
     setSmartPasteText('');
     setShowSmartPaste(false);
+    setAiGeneratedMiddleSection('');
+    setGeneratingAiDetails(false);
+    setAiDetailsMsg(null);
   }, [item, isOpen]);
 
   // Apply parsed product content to form fields
@@ -239,6 +248,54 @@ export function ListingCopyModal({ isOpen, onClose, item }) {
     }
   };
 
+  // Handle Generating AI eBay Condition & Key Details Cards
+  const handleGenerateAiDetails = async () => {
+    setGeneratingAiDetails(true);
+    setAiDetailsMsg(null);
+    try {
+      const res = await generateAiEbayDetails({
+        title: title || item.item_name || '',
+        brand: brand || '',
+        productType: productType || '',
+        condition: condition || '',
+        conditionHeader: conditionHeader || '',
+        conditionSubheader: conditionSubheader || '',
+        notes: description || item.notes || '',
+        specs: specs || '',
+        features: features || ''
+      });
+
+      if (!res || res.success === false || !res.html) {
+        throw new Error(res?.error || 'Failed to generate AI listing details.');
+      }
+
+      setAiGeneratedMiddleSection(res.html);
+      setAiDetailsMsg({
+        type: 'success',
+        text: 'AI Condition and Key Details cards generated successfully. Preview updated.'
+      });
+      if (format === 'text') {
+        setFormat('html_preview');
+      }
+    } catch (err) {
+      setAiDetailsMsg({
+        type: 'error',
+        text: err.message || 'Failed to generate AI listing details.'
+      });
+    } finally {
+      setGeneratingAiDetails(false);
+    }
+  };
+
+  // Reset AI Generated Content back to standard static template
+  const handleResetAiDetails = () => {
+    setAiGeneratedMiddleSection('');
+    setAiDetailsMsg({
+      type: 'info',
+      text: 'Reverted to standard static listing template.'
+    });
+  };
+
   // Parse Key-Value text blocks
   const parsedSpecs = useMemo(() => {
     if (!specs.trim()) return [];
@@ -275,7 +332,8 @@ export function ListingCopyModal({ isOpen, onClose, item }) {
       description,
       includedInSale,
       shippingPolicy,
-      returnPolicy
+      returnPolicy,
+      aiGeneratedMiddleSection
     };
     const ebay = generateEbayCopy(item, options);
     const whatnot = generateWhatnotCopy(item, options);
@@ -283,7 +341,7 @@ export function ListingCopyModal({ isOpen, onClose, item }) {
     const social = generateSocialCopy(item, options);
 
     return { ebay, whatnot, mercari, social };
-  }, [item, title, brand, productType, subtitle, conditionHeader, conditionSubheader, condition, features, parsedSpecs, parsedCompatibility, description, includedInSale, shippingPolicy, returnPolicy]);
+  }, [item, title, brand, productType, subtitle, conditionHeader, conditionSubheader, condition, features, parsedSpecs, parsedCompatibility, description, includedInSale, shippingPolicy, returnPolicy, aiGeneratedMiddleSection]);
 
   const copyToClipboard = (text, fieldName) => {
     navigator.clipboard.writeText(text);
@@ -534,15 +592,28 @@ export function ListingCopyModal({ isOpen, onClose, item }) {
                     <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                       Condition Banner Headline
                     </label>
-                    <button
-                      type="button"
-                      onClick={handleAutoGenerateCondition}
-                      disabled={generatingReport}
-                      className="text-[10px] text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 bg-amber-950/40 px-2 py-0.5 rounded border border-amber-500/20 disabled:opacity-50"
-                    >
-                      {generatingReport ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-                      Auto-Gen Report
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={handleGenerateAiDetails}
+                        disabled={generatingAiDetails}
+                        className="text-[10px] text-amber-300 hover:text-amber-200 font-bold flex items-center gap-1 bg-amber-500/20 px-2 py-0.5 rounded border border-amber-500/30 disabled:opacity-50"
+                        title="Generate AI Condition & Details Cards"
+                      >
+                        {generatingAiDetails ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                        <span>AI Condition &amp; Details</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleAutoGenerateCondition}
+                        disabled={generatingReport}
+                        className="text-[10px] text-slate-400 hover:text-slate-300 font-bold flex items-center gap-1 bg-slate-800 px-2 py-0.5 rounded border border-slate-700 disabled:opacity-50"
+                        title="Auto-Gen from 12-digit eBay Item ID"
+                      >
+                        {generatingReport ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                        <span>eBay Item Report</span>
+                      </button>
+                    </div>
                   </div>
                   {conditionMsg && (
                     <div className={`text-[10px] p-2 rounded-lg border ${
@@ -700,6 +771,92 @@ export function ListingCopyModal({ isOpen, onClose, item }) {
                 <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-mono text-slate-200 select-all">
                   {curEbay.title}
                 </div>
+              </div>
+
+              {/* Gemini AI Listing Cards Enhancer */}
+              <div className="p-3.5 rounded-xl bg-gradient-to-r from-amber-500/10 via-slate-900/90 to-amber-500/5 border border-amber-500/30 space-y-2.5 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
+                      <Sparkles className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-slate-200">
+                          Gemini AI Listing Enhancer
+                        </span>
+                        {aiGeneratedMiddleSection ? (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                            AI Active
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-800 text-slate-400 border border-slate-700">
+                            Standard Template
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-400">
+                        Dynamically generate tailored Condition and Key Details cards based on item metadata.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {aiGeneratedMiddleSection && (
+                      <button
+                        type="button"
+                        onClick={handleResetAiDetails}
+                        disabled={generatingAiDetails}
+                        className="px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-colors flex items-center gap-1.5"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>Reset to Static</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleGenerateAiDetails}
+                      disabled={generatingAiDetails}
+                      className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-slate-950 bg-gradient-to-r from-amber-400 to-amber-300 hover:from-amber-300 hover:to-amber-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-1.5 shadow-md shadow-amber-500/15"
+                    >
+                      {generatingAiDetails ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-950" />
+                          <span>Generating AI Cards...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-3.5 h-3.5 text-slate-950" />
+                          <span>{aiGeneratedMiddleSection ? 'Regenerate AI Details' : 'Auto-Generate AI Description'}</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {aiDetailsMsg && (
+                  <div className={`p-2.5 rounded-lg text-xs flex items-center gap-2 border ${
+                    aiDetailsMsg.type === 'success'
+                      ? 'bg-emerald-950/40 text-emerald-300 border-emerald-800'
+                      : aiDetailsMsg.type === 'info'
+                        ? 'bg-blue-950/40 text-blue-300 border-blue-800'
+                        : 'bg-rose-950/40 text-rose-300 border-rose-800'
+                  }`}>
+                    {aiDetailsMsg.type === 'success' ? (
+                      <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+                    ) : (
+                      <AlertCircle className="w-4 h-4 shrink-0" />
+                    )}
+                    <span className="flex-1">{aiDetailsMsg.text}</span>
+                    <button
+                      type="button"
+                      onClick={() => setAiDetailsMsg(null)}
+                      className="text-slate-400 hover:text-slate-200 text-xs px-1"
+                    >
+                      ×
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Format Toggle for Description */}

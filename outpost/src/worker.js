@@ -47,6 +47,7 @@ import { onRequestPost as vinescoutCatalogPostHandler } from '../functions/api/s
 import { onRequestGet as syncSettingsGetHandler, onRequestPut as syncSettingsPutHandler } from '../functions/api/sync/settings.js';
 import { onRequestGet as integrationsListHandler, onRequestPost as integrationsCreateHandler } from '../functions/api/integrations/index.js';
 import { onRequestPost as integrationRevokeHandler, onRequestDelete as integrationDeleteHandler } from '../functions/api/integrations/[id].js';
+import { onRequestPost as generateEbayDetailsHandler } from '../functions/api/ai/generate-ebay-details.js';
 
 // Durable Object export - required for wrangler DO binding
 export { RateLimitCounter } from '../functions/utils/RateLimitCounter.js';
@@ -260,7 +261,10 @@ export const ROUTES = [
   { method: 'GET',    pattern: '/api/integrations',           handler: integrationsListHandler,   auth: 'session' },
   { method: 'POST',   pattern: '/api/integrations',           handler: integrationsCreateHandler, auth: 'session' },
   { method: 'POST',   pattern: '/api/integrations/:id/revoke', handler: integrationRevokeHandler, auth: 'session' },
-  { method: 'DELETE', pattern: '/api/integrations/:id',       handler: integrationDeleteHandler,  auth: 'session' }
+  { method: 'DELETE', pattern: '/api/integrations/:id',       handler: integrationDeleteHandler,  auth: 'session' },
+
+  // AI Listing Generation (1 route)
+  { method: 'POST',   pattern: '/api/ai/generate-ebay-details', handler: generateEbayDetailsHandler, auth: 'session' }
 ];
 
 export function compileRoute(entry) {

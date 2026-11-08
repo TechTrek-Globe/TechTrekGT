@@ -227,6 +227,10 @@ Outpost uses React Context and standard React hooks (`useState`, `useReducer`, `
     - Generator Integration State:
       - `src/utils/listingCopyGenerator.js` exports `generateEbayListingHtml` and integrates it into `generateEbayCopy`.
       - In `generateEbayCopy`, `insertHtml` delegates directly to `generateEbayListingHtml`, and `htmlBody` wraps the modular cards in a matching dark viewport frame (`#0b0f19`) with store branding and trust signals for `ListingCopyModal`.
+  - **Pricing Floor Concordance and Tooltip State [ACTION ID: CALC-002 / TOOLTIP-001]**:
+    - `src/utils/pricingMetrics.js`: `getItemFloorMetrics(item)` computes `breakEvenFloor` using `costBasis = landedCost + platformFlatFee + estShippingCost` and `divisor = 1 - platformFeePct - adFeePct`, eliminating divergent buyer-shipping fee burden from the break-even calculation.
+    - Synchronized State Binding: Returns `Number(item.floor_price || item.min_sell_price)` when populated on the item entity, ensuring the `InventoryPricingTooltip` Break-Even Floor Price and the `InventoryGridRow` Landed & Floor cell stay in 100% agreement.
+    - Non-Overlapping Tooltip State: `InventoryGridRow.jsx` replaces the native `title` attribute on the pricing breakdown trigger button with `aria-label`, eliminating conflicting browser tooltips that obscured the pricing popover.
 
 
 

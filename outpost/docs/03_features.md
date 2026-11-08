@@ -516,6 +516,20 @@ Introduced a modular, dark-theme eBay HTML listing generator (`src/utils/ebayTem
    - Re-exports `generateEbayListingHtml`.
    - `generateEbayCopy` builds `insertHtml` and full `htmlBody` using `generateEbayListingHtml`, providing immediate dark-theme HTML code and live preview in `ListingCopyModal`.
 
+## Pricing Floor Reconciliation & Tooltip Deconfliction [ACTION ID: CALC-002 / TOOLTIP-001]
+
+Reconciled the Break-Even Floor Price calculation across the table and pricing hover cards, and removed intrusive native browser tooltip popups from overlapping the UI.
+
+### Pricing Reconciliation Capabilities
+
+1. **Floor Price Concordance (`src/utils/pricingMetrics.js`)**:
+   - Aligned `getItemFloorMetrics(item)` with the canonical formula in `functions/utils/auction.js` (T-10 Item 1).
+   - Removed divergent buyer-paid shipping fee burden from the break-even numerator (`costBasis = landedCost + platformFlatFee + estShippingCost`).
+   - Prioritizes authoritative item database fields `item.floor_price || item.min_sell_price`, ensuring the Break-even Floor Price in `InventoryPricingTooltip` and the `Landed & Floor` table column in `InventoryGridRow` display identical values.
+2. **Native Tooltip Deconfliction (`src/components/inventory/InventoryGridRow.jsx`)**:
+   - Replaced `title="Pricing & cost breakdown (hover for details, click to edit)"` on the pricing action button with `aria-label="Pricing & cost breakdown"`.
+   - Prevents the native browser tooltip box from obscuring table values and overlapping the custom glassmorphic pricing breakdown popover.
+
 
 
 

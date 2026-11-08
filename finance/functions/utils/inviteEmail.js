@@ -30,7 +30,7 @@ function encodeSubject(subject) {
   return `=?UTF-8?B?${btoa(bin)}?=`;
 }
 
-async function dispatchEmail(env, { sender, to, subject, text, html }) {
+export async function dispatchEmail(env, { sender, to, subject, text, html }) {
   // Strategy 1: Cloudflare Workers EmailMessage with raw MIME
   if (env?.SEND_EMAIL && typeof env.SEND_EMAIL.send === 'function') {
     try {

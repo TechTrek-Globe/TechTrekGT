@@ -38,6 +38,7 @@ Applications hydrate user state on initial page load by querying the GET /api/au
 - First-Time Exemption & Subsequent Sign-In Verification: Users are permitted to sign in for the first time without confirming email. Any subsequent login by an unverified account (sign_in_count >= 1 && email_verified !== 1) is rejected with HTTP 403 EMAIL_VERIFICATION_REQUIRED, prompting for the 8-digit OTP code or requesting a new code with a 60-second cooldown timer.
 - Password Recovery Workflow: Three-step recovery pipeline: requesting an email token, verifying the token alongside a security answer, and establishing a new password. Completing a password reset automatically increments users.token_version, revoking all existing sessions.
 - Email Change Workflow: Dual-notification model. Updates record pending email addresses in email_verifications, dispatches verification tokens to the new address, and sends security advisories to the old address. Confirmation updates the primary email, resets verification status, and bumps token_version.
+- Cloudflare Workers Email Routing (SEND_EMAIL): Transactional emails (verification OTPs, password reset codes, and ledger share invitations) are dispatched through Cloudflare Workers Email Routing (`send_email` binding) from `noreply@techtrekgt.com` using standard MIME messages with styled HTML fallback and Resend provider fallback.
 
 ### 1.5 Dual-Layer Rate Limiting and Abuse Prevention
 

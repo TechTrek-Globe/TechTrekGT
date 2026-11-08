@@ -4,6 +4,7 @@
 // the PBKDF2 iteration cap - each maps to a specific security finding.
 
 import { ERROR_CODES } from './errorCodes.js';
+import { dispatchEmail } from './inviteEmail.js';
 export { ERROR_CODES };
 
 /* ------------------------------------------------------------------ */
@@ -807,42 +808,71 @@ export async function sendTransactionalEmail(env, {
   subject,
   bodyLines = [],
   logPrefix = '[email]',
-  devFallbackMessage = ''
+  devFallbackMessage = '',
+  html = null
 }) {
-  if (!env?.RESEND_API_KEY || !env?.MAIL_FROM) {
+  const sender = env?.MAIL_FROM || 'noreply@techtrekgt.com';
+  const recipients = Array.isArray(to) ? to : [to];
+  const text = bodyLines.join('\n');
+  const renderedHtml = html || `<div style="font-family: sans-serif; font-size: 14px; line-height: 1.6; color: #1e293b;">${bodyLines.map(l => l ? `<p style="margin: 8px 0;">${l}</p>` : '<br/>').join('')}</div>`;
+
+  if (!env?.SEND_EMAIL && !env?.RESEND_API_KEY) {
     if (devFallbackMessage) {
       console.error(`${logPrefix} ${devFallbackMessage}`);
     } else {
-      console.error(`${logPrefix} mail delivery is not configured (RESEND_API_KEY / MAIL_FROM); dev notification for ${to}`);
+      console.error(`${logPrefix} mail delivery is not configured (SEND_EMAIL / RESEND_API_KEY); dev notification for ${to}`);
     }
     return false;
   }
 
-  const recipients = Array.isArray(to) ? to : [to];
+  // Cloudflare Workers Email Routing binding (SEND_EMAIL)
+  if (env?.SEND_EMAIL && typeof env.SEND_EMAIL.send === 'function') {
+    try {
+      let sentAny = false;
+      for (const recipient of recipients) {
+        const result = await dispatchEmail(env, {
+          sender,
+          to: recipient,
+          subject,
+          text,
+          html: renderedHtml
+        });
+        if (result.sent) sentAny = true;
+      }
+      if (sentAny) return true;
+    } catch (err) {
+      console.warn(`${logPrefix} SEND_EMAIL dispatch error:`, err?.message);
+    }
+  }
 
-  try {
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${env.RESEND_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        from: env.MAIL_FROM,
-        to: recipients,
-        subject,
-        text: bodyLines.join('\n')
-      })
-    });
-    if (!res.ok) {
-      console.error(`${logPrefix} mail provider returned`, res.status);
+  // Fallback: External Resend API
+  if (env?.RESEND_API_KEY) {
+    try {
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${env.RESEND_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          from: env.MAIL_FROM || sender,
+          to: recipients,
+          subject,
+          text
+        })
+      });
+      if (!res.ok) {
+        console.error(`${logPrefix} mail provider returned`, res.status);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.error(`${logPrefix} mail send failed:`, err && err.message);
       return false;
     }
-    return true;
-  } catch (err) {
-    console.error(`${logPrefix} mail send failed:`, err && err.message);
-    return false;
   }
+
+  return false;
 }
 
 // Reset codes MUST NOT be returned in an HTTP response under any condition. (C1)
@@ -860,10 +890,25 @@ export async function sendResetEmail(env, toEmail, code, securityQuestion) {
   }
   lines.push('', 'If you did not request this, you can ignore this message. No changes have been made.');
 
+  const html = [
+    '<div style="font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; color: #1e293b; background-color: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0;">',
+    '<h2 style="color: #0f172a; margin-top: 0; font-size: 20px;">TechTrek Password Reset</h2>',
+    '<p style="font-size: 15px; line-height: 1.6; color: #334155;">You requested to reset your TechTrek password. Enter the code below to set a new password:</p>',
+    '<div style="background-color: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 12px; padding: 20px 24px; text-align: center; margin: 24px 0;">',
+    `<span style="font-size: 32px; font-weight: 700; letter-spacing: 6px; color: #2563eb; font-family: \'Courier New\', Courier, monospace;">${code}</span>`,
+    '</div>',
+    securityQuestion ? `<p style="font-size: 14px; color: #475569;">You will also be asked your security question: <b>${securityQuestion}</b></p>` : '',
+    '<p style="font-size: 13px; color: #64748b; line-height: 1.5;">This code will expire in 15 minutes and can only be used once.</p>',
+    '<hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;" />',
+    '<p style="font-size: 12px; color: #94a3b8;">If you did not request this password reset, no changes have been made to your account. Sent by TechTrek Finance OS.</p>',
+    '</div>'
+  ].join('\n');
+
   return sendTransactionalEmail(env, {
     to: toEmail,
     subject: 'Your TechTrek password reset code',
     bodyLines: lines,
+    html,
     logPrefix: '[forgot-password]',
     // P14: never log the code or full email - redact in production
     devFallbackMessage: env?.ENVIRONMENT !== 'production'
@@ -876,10 +921,13 @@ export async function sendVerificationEmail(env, toEmail, code, type = 'verify')
   const subject = type === 'change'
     ? 'Verify your new TechTrek email address'
     : 'Verify your TechTrek account email';
+  const greeting = 'Hello,';
+  const actionText = type === 'change'
+    ? 'You requested to change your TechTrek email address.'
+    : 'Thank you for registering with TechTrek.';
+
   const lines = [
-    type === 'change'
-      ? 'You requested to change your TechTrek email address.'
-      : 'Thank you for registering with TechTrek.',
+    actionText,
     '',
     `Your verification code is: ${code}`,
     '',
@@ -888,10 +936,25 @@ export async function sendVerificationEmail(env, toEmail, code, type = 'verify')
     'If you did not request this, you can ignore this message. No changes have been made.'
   ];
 
+  const html = [
+    '<div style="font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; color: #1e293b; background-color: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0;">',
+    '<h2 style="color: #0f172a; margin-top: 0; font-size: 20px;">TechTrek Finance Verification</h2>',
+    `<p style="font-size: 15px; line-height: 1.6; color: #334155;">${greeting}</p>`,
+    `<p style="font-size: 15px; line-height: 1.6; color: #334155;">${actionText}</p>`,
+    '<div style="background-color: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 12px; padding: 20px 24px; text-align: center; margin: 24px 0;">',
+    `<span style="font-size: 32px; font-weight: 700; letter-spacing: 6px; color: #2563eb; font-family: \'Courier New\', Courier, monospace;">${code}</span>`,
+    '</div>',
+    '<p style="font-size: 13px; color: #64748b; line-height: 1.5;">This code will expire in 24 hours and can only be used once.</p>',
+    '<hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;" />',
+    '<p style="font-size: 12px; color: #94a3b8;">If you did not request this verification code, no further action is needed. Sent by TechTrek Finance OS.</p>',
+    '</div>'
+  ].join('\n');
+
   return sendTransactionalEmail(env, {
     to: toEmail,
     subject,
     bodyLines: lines,
+    html,
     logPrefix: '[email-verify]',
     // P14: never log the code or full email in production
     devFallbackMessage: env?.ENVIRONMENT !== 'production'

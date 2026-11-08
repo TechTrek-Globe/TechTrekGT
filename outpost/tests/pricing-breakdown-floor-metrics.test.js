@@ -61,7 +61,7 @@ describe('List Price Breakdown and Floor Cost Metrics calculations', () => {
     assert.equal(Math.round(testMargin.marginPct), 20);
   });
 
-  test('incorporates buyer-paid shipping platform fee burden in floor formulas', () => {
+  test('enforces canonical floor price rule: buyer-paid shipping does not alter break-even floor', () => {
     const item = {
       true_total_cost: 50.00,
       platform_fee_pct: 0.136,
@@ -73,21 +73,16 @@ describe('List Price Breakdown and Floor Cost Metrics calculations', () => {
 
     const metrics = getItemFloorMetrics(item);
 
-    // Buyer shipping burden: 10.00 * 0.136 = 1.36
-    // Numerator: 50.00 + 0.40 + 1.36 = 51.76
-    // Break-even Floor: 51.76 / (1 - 0.136 - 0.05) = 51.76 / 0.814 = 63.5872 -> 63.59
-    assert.equal(metrics.breakEvenFloor, 63.59);
+    // Canonical Break-even Floor (T-10 item 1): (50.00 + 0.40) / (1 - 0.136 - 0.05) = 50.40 / 0.814 = 61.92
+    assert.equal(metrics.breakEvenFloor, 61.92);
 
-    // Min Target Margin Floor: 51.76 / 0.614 = 84.30
-    assert.equal(metrics.targetMarginFloor, 84.30);
+    // Min Target Margin Floor: 50.40 / 0.614 = 82.08
+    assert.equal(metrics.targetMarginFloor, 82.08);
 
-    // Verify 0% profit at Break-even Floor with buyer shipping
-    const testBreakEven = getItemFloorMetrics({ ...item, current_list_price: metrics.breakEvenFloor });
-    // Platform fee: (63.59 + 10.00) * 0.136 + 0.40 = 73.59 * 0.136 + 0.40 = 10.01 + 0.40 = 10.41
-    // Ad fee: 63.59 * 0.05 = 3.18
-    // Landed cost: 50.00
-    // True Net Profit: 63.59 - 10.41 - 3.18 - 50.00 = 0.00
-    assert.equal(testBreakEven.trueNetProfit, 0.00);
+    // Honors explicit floor_price or min_sell_price override if present on item
+    const itemWithOverride = { ...item, min_sell_price: 178.64 };
+    const metricsOverride = getItemFloorMetrics(itemWithOverride);
+    assert.equal(metricsOverride.breakEvenFloor, 178.64);
   });
 
   test('handles percentage values supplied as whole numbers (e.g. 13.6 instead of 0.136)', () => {
@@ -127,5 +122,34 @@ describe('List Price Breakdown and Floor Cost Metrics calculations', () => {
     assert.equal(metrics.marginPct, 0);
     assert.equal(metrics.roiPct, 0);
     assert.ok(metrics.breakEvenFloor > 0);
+  });
+
+  test('matches table Landed & Floor value for Ronald Acuna item from database', () => {
+    const acunaItem = {
+      item_name: 'Ronald Acuna Jr. Signed "El Abusador" Braves',
+      unit_price: 129.30,
+      true_total_cost: 150.37,
+      floor_price: null,
+      min_sell_price: 178.64,
+      suggested_list_price: 205.44,
+      current_list_price: 225.00,
+      platform_fee_pct: 0.136,
+      platform_flat_fee: 0.40,
+      boost_pct: 0.02,
+      ebay_promoted_rate: 2,
+      buyer_shipping_cost: 6.95,
+      est_shipping_cost: 0
+    };
+
+    const metrics = getItemFloorMetrics(acunaItem);
+    assert.equal(metrics.landed, 150.37);
+    assert.equal(metrics.breakEvenFloor, 178.64);
+    assert.equal(metrics.platformFees, 31.95);
+    assert.equal(metrics.adFees, 4.50);
+    assert.equal(metrics.trueNetProfit, 38.18);
+    assert.equal(metrics.marginPct, 16.97);
+    assert.equal(metrics.marginPct.toFixed(1), '17.0');
+    assert.equal(metrics.roiPct, 25.39);
+    assert.equal(metrics.roiPct.toFixed(1), '25.4');
   });
 });

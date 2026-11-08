@@ -380,6 +380,24 @@ describe('REM-09: Dedicated CODE_HMAC_SECRET for One-Time Codes', () => {
         });
         assert.strictEqual(okFail, false);
         assert.ok(errors.some(e => e.includes('[test-fail] mail provider returned 401')));
+
+        // SEND_EMAIL binding verification
+        let cfMsg = null;
+        const okSendEmail = await sendTransactionalEmail({
+          SEND_EMAIL: {
+            send: async (msg) => { cfMsg = msg; }
+          },
+          MAIL_FROM: 'noreply@techtrekgt.com'
+        }, {
+          to: 'cfuser@example.com',
+          subject: 'CF Email Route',
+          bodyLines: ['Hello Cloudflare'],
+          logPrefix: '[test-cf]'
+        });
+        assert.strictEqual(okSendEmail, true);
+        assert.ok(cfMsg);
+        assert.strictEqual(cfMsg.to, 'cfuser@example.com');
+        assert.strictEqual(cfMsg.from, 'noreply@techtrekgt.com');
       } finally {
         globalThis.fetch = originalFetch;
       }

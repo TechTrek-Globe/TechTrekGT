@@ -37,10 +37,11 @@ CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
 - Subsequent sign-in gating: Any subsequent login attempt (`POST /api/auth/login`) by an unverified account (`email_verified !== 1 && !email_verified_at` with `sign_in_count >= 1`) is rejected with HTTP 403 `EMAIL_VERIFICATION_REQUIRED` (`requiresVerification: true`).
 - UI verification flow: The sign-in interface switches dynamically to `mode === 'verify'`, prompting for the 8-digit OTP code or offering code resend with a 60-second cooldown timer. Unauthenticated verification via `POST /api/auth/verify-email` marks `email_verified = 1`, issues session cookies, and transitions the user directly into the dashboard.
 
-### 1.2 Shared Account Lifecycle Tables
+### 1.2 Shared Account Lifecycle Tables & Email Routing Infrastructure
 
 - email_verifications: Manages one-time verification tokens for registrations and email change requests. Tokens are stored as SHA-256 HMAC digests with a 24-hour expiration window.
 - password_resets: Stores single-use tokens and hashed security answers for multi-step password recovery workflows.
+- Workers Email Routing (SEND_EMAIL): Both Wayfinder and Finance OS bind native Cloudflare Workers Email Routing (`send_email: [{ name: "SEND_EMAIL" }]`) with sender `noreply@techtrekgt.com` using `cloudflare:email` `EmailMessage` MIME dispatches, ensuring reliable delivery of verification OTPs, password reset codes, and ledger collaboration invites without external API dependencies.
 
 ### 1.3 Domain Schema Ownership and Migration Separation
 

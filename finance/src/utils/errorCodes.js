@@ -6,6 +6,7 @@ export const ERROR_CODES = {
   // REM-21: Distinct code for suspended accounts so frontend avoids misinterpreting as session expiration/login redirect
   ACCOUNT_SUSPENDED:    'ACCOUNT_SUSPENDED',
   FORBIDDEN:            'FORBIDDEN',
+  EMAIL_VERIFICATION_REQUIRED: 'EMAIL_VERIFICATION_REQUIRED',
   CSRF_INVALID:         'CSRF_INVALID',
   RATE_LIMITED:         'RATE_LIMITED',
   VALIDATION_ERROR:     'VALIDATION_ERROR',

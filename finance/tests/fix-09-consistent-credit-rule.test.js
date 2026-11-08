@@ -425,7 +425,8 @@ describe('FIX-09: One consistent credit rule across all three engines', () => {
         },
         dailyMatrix: fixture.dailyMatrix,
         transactions: fixture.transactions,
-        detailed: true
+        detailed: true,
+        todayStr: '2026-10-05'
       });
 
       assert.equal(lvRow.reg, calcBal.reg, `Reg mismatch on ${isoDate}`);

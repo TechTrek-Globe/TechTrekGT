@@ -23,7 +23,7 @@ Finance OS is the personal budget tracking and financial projection application 
     - `viewer`: Read-only access to ledger matrix, balances, and historical versions (cell mutations, moves, and cloud backup writes are strictly blocked client-side and server-side).
     - `none`: Unaffiliated caller. Fails closed with HTTP 403 Forbidden on all private ledger endpoints.
   - **Email Invitations & Claim Workflow:** Secure 256-bit random tokens hashed at rest using WebCrypto SHA-256. Public `/finance/invite?token=` verification and atomic claim transactions in D1. Supports 3-tier user onboarding: Case A (authenticated existing user), Case B (unauthenticated existing user), and Case C (new user registration with pre-verified email).
-  - **Tenant Guardrails:** Client-side router presents dedicated `NoAccessPanel` for unlinked users. Top navigation bar features a multi-ledger dropdown selector and viewer role badge.
+  - **Tenant Guardrails:** Client-side router presents dedicated `NoAccessPanel` for unlinked users. Top navigation bar features a multi-ledger dropdown selector and viewer role badge (redundant Launch Pad breadcrumb removed from header to preserve top-bar density and declutter layout while retaining dedicated sidebar navigation).
 - **Cross-App Account Isolation & Administration:**
   - Strict tenant isolation: accounts originating from other applications (Wayfinder, Outpost) are completely excluded from Finance OS. Finance only returns and displays users registered for Finance or collaborating on a Finance ledger.
   - **Collaborator Management (`/api/admin/ledger-membership`):** Administrative controls enable updating collaborator permissions (`viewer`, `editor`, `admin`) on Finance household ledgers, or disconnecting them.

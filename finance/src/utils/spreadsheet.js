@@ -854,7 +854,8 @@ export function getLedgerRunningBalanceAsOfDate({
   metadataState = {},
   dailyMatrix = {},
   transactions = [],
-  detailed = false
+  detailed = false,
+  todayStr: customTodayStr = null
 }) {
   const accounts = metadataState.accounts || [];
   const targetAcc = accounts.find(a => a.id === targetAccountId) || accounts[0];
@@ -920,7 +921,7 @@ export function getLedgerRunningBalanceAsOfDate({
   const maxImportDateStr = importedDatesList.length > 0 ? importedDatesList.reduce((a, b) => a > b ? a : b) : null;
   const maxDataDate = [maxImportDateStr, maxTxnDate].filter(Boolean).sort().pop() || null;
   const today = new Date();
-  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  const todayStr = customTodayStr || `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   const effectiveLockEnd = maxDataDate && maxDataDate < todayStr ? maxDataDate : todayStr;
 
   const earnerPlanCache = new Map();

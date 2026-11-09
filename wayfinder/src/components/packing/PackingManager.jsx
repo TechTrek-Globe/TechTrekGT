@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Backpack, CheckCircle2, Circle, Plus, Trash2, RefreshCw,
   Luggage, ShieldAlert, Sparkles, Filter, ChevronDown, ChevronUp,
@@ -39,6 +39,20 @@ export function PackingManager() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState(null);
+  const pendingPutTimersRef = useRef(new Map());
+  const pendingPutPayloadsRef = useRef(new Map());
+
+  useEffect(() => {
+    const timers = pendingPutTimersRef.current;
+    const payloads = pendingPutPayloadsRef.current;
+    return () => {
+      for (const timerId of timers.values()) {
+        clearTimeout(timerId);
+      }
+      timers.clear();
+      payloads.clear();
+    };
+  }, []);
 
   // Filters
   const [statusFilter, setStatusFilter] = useState('all'); // all, open, packed
@@ -165,6 +179,39 @@ export function PackingManager() {
     }
   };
 
+  const scheduleDebouncedItemPut = useCallback((itemId, patch, actionLabel) => {
+    const prevPatch = pendingPutPayloadsRef.current.get(itemId) || {};
+    const mergedPatch = { ...prevPatch, ...patch };
+    pendingPutPayloadsRef.current.set(itemId, mergedPatch);
+
+    const existingTimer = pendingPutTimersRef.current.get(itemId);
+    if (existingTimer) clearTimeout(existingTimer);
+
+    const timerId = setTimeout(async () => {
+      pendingPutTimersRef.current.delete(itemId);
+      const finalPatch = pendingPutPayloadsRef.current.get(itemId);
+      pendingPutPayloadsRef.current.delete(itemId);
+      if (!finalPatch) return;
+
+      try {
+        await resilientFetch(getApiUrl(`/api/wayfinder/packing/${itemId}`), {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(finalPatch)
+        }, {
+          entityType: 'packing',
+          entityId: itemId,
+          action: actionLabel
+        });
+      } catch (err) {
+        console.error('Failed to update packing item:', err);
+      }
+    }, 400);
+
+    pendingPutTimersRef.current.set(itemId, timerId);
+  }, []);
+
   // Toggle item packed state
   const handleTogglePacked = async (item) => {
     const updatedStatus = !item.is_packed;
@@ -172,20 +219,11 @@ export function PackingManager() {
     setItems(optimistic);
 
     if (isAuthenticated) {
-      try {
-        await resilientFetch(getApiUrl(`/api/wayfinder/packing/${item.id}`), {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ is_packed: updatedStatus })
-        }, {
-          entityType: 'packing',
-          entityId: item.id,
-          action: `${updatedStatus ? 'Pack' : 'Unpack'} ${item.name}`
-        });
-      } catch (err) {
-        console.error('Failed to toggle packed status:', err);
-      }
+      scheduleDebouncedItemPut(
+        item.id,
+        { is_packed: updatedStatus },
+        `${updatedStatus ? 'Pack' : 'Unpack'} ${item.name}`
+      );
     } else {
       updateLocalItems(optimistic);
     }
@@ -194,24 +232,16 @@ export function PackingManager() {
   // Update item quantity
   const handleUpdateQuantity = async (item, delta) => {
     const newQty = Math.max(1, (item.quantity || 1) + delta);
+    if (newQty === item.quantity) return;
     const optimistic = items.map(i => i.id === item.id ? { ...i, quantity: newQty } : i);
     setItems(optimistic);
 
     if (isAuthenticated) {
-      try {
-        await resilientFetch(getApiUrl(`/api/wayfinder/packing/${item.id}`), {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ quantity: newQty })
-        }, {
-          entityType: 'packing',
-          entityId: item.id,
-          action: `Set ${item.name} quantity to ${newQty}`
-        });
-      } catch (err) {
-        console.error('Failed to update quantity:', err);
-      }
+      scheduleDebouncedItemPut(
+        item.id,
+        { quantity: newQty },
+        `Set ${item.name} quantity to ${newQty}`
+      );
     } else {
       updateLocalItems(optimistic);
     }
@@ -219,6 +249,11 @@ export function PackingManager() {
 
   // Delete item
   const handleDeleteItem = async (itemId) => {
+    const existingTimer = pendingPutTimersRef.current.get(itemId);
+    if (existingTimer) clearTimeout(existingTimer);
+    pendingPutTimersRef.current.delete(itemId);
+    pendingPutPayloadsRef.current.delete(itemId);
+
     const optimistic = items.filter(i => i.id !== itemId);
     setItems(optimistic);
 

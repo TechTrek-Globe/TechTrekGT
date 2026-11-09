@@ -35,12 +35,7 @@ export function CalendarSubscribeModal({ isOpen, onClose }) {
       });
       if (res.ok) {
         const data = await res.json();
-        if (data.has_token) {
-          setTokenData(data);
-        } else {
-          // Auto-generate initial token for seamless 1-click experience
-          await generateOrRotateToken(false);
-        }
+        setTokenData(data);
       } else {
         setError('Failed to fetch calendar token');
       }
@@ -236,7 +231,23 @@ export function CalendarSubscribeModal({ isOpen, onClose }) {
               isLoading ? (
                 <div className="p-6 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center space-x-2 text-wf-muted text-xs">
                   <RefreshCw className="w-4 h-4 animate-spin text-amber-400" />
-                  <span>Configuring secure feed credentials...</span>
+                  <span>Checking secure feed credentials...</span>
+                </div>
+              ) : !feedUrl ? (
+                <div className="p-4 rounded-2xl bg-white/5 border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-xs sm:text-sm font-bold text-white">Generate Your Private Live Feed</h4>
+                    <p className="text-xs text-slate-300 mt-0.5">
+                      Create a unique subscription token to sync your Poland 2026 itinerary with Apple, Google, or Outlook Calendar.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => generateOrRotateToken(false)}
+                    disabled={isRotating}
+                    className="px-4 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/40 text-amber-300 text-xs font-bold shrink-0 transition-colors"
+                  >
+                    {isRotating ? 'Generating...' : 'Enable Live Feed'}
+                  </button>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

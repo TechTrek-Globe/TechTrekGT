@@ -20,10 +20,10 @@ export function PrivateHub({ currentPath }) {
   const agendaRole = agendaAccess.role;
   const permissions = agendaAccess.permissions;
 
-  // Re-resolve the caller's role on mount so a freshly claimed invite takes effect
+  // Re-resolve the caller's role on mount only if not yet loaded
   useEffect(() => {
-    if (isAuthenticated) refreshAgendaAccess();
-  }, [isAuthenticated, refreshAgendaAccess]);
+    if (isAuthenticated && !agendaAccess.loaded) refreshAgendaAccess();
+  }, [isAuthenticated, agendaAccess.loaded, refreshAgendaAccess]);
 
   const isCollaborator = agendaRole === 'viewer' || agendaRole === 'editor';
   const canShare = agendaRole === 'owner' || agendaRole === 'admin';

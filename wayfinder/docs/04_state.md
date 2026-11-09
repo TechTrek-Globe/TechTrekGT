@@ -561,4 +561,20 @@ Governs the state invariants, atomic transaction guarantees, and edge lifecycle 
   - Authentication modal (`AuthModal.jsx`) maintains an invariant `z-[100]` stacking index, strictly superseding the `sticky top-0 z-50` navigation header.
   - Modal dialog frame enforces `max-h-[85vh]` with `shrink-0` header/footer anchors and an internal `overflow-y-auto` scroll container, preventing title clipping across all device viewports.
 
+### 16.16 D1 Write-Volume Governance & Idempotency Invariants
+
+- Isolate-Scoped DDL Singleton Invariant:
+  - Runtime schema helpers (`ensureTables` in `expenses.js`, `ensureTable` in `packing.js`, `ensureCalendarTable` in `calendar.js`, and `ensureShareTables` in `agendaAccess.js`) cache completion state in isolate-scoped flags (`tablesReady`, `packingTableReady`, `calendarTableReady`) with in-flight promise locks (`tablesInitPromise`, `packingTablePromise`, `calendarTablePromise`, `shareTablesPromise`).
+  - `ALTER TABLE` statements are strictly prohibited on request hot paths.
+  - `GET` handlers never proactively invoke DDL helpers; DDL only executes on write requests (`POST`, `PUT`, `DELETE`) or if a `SELECT` throws `no such table`.
+- Read-Only `GET` Invariant:
+  - `GET /api/wayfinder/import-jobs/:doc_id` never inserts into `wayfinder_extraction_jobs` or `wayfinder_extracted_fields`; missing records are synthesized as virtual preview objects (`virtual-job-*`, `virtual-fld-*`) until a user-initiated `POST` or `PUT` mutation occurs.
+  - `GET /api/wayfinder/calendar/feed/:token.ics` throttles `poll_count` and `last_polled_at` updates to once per 6-hour window per token (`6 * 60 * 60 * 1000` ms).
+- Idempotent Batch & Client Mutation Invariants:
+  - `POST /api/wayfinder/packing` (`action: 'apply_preset'`) deduplicates preset items by `(category, name)` before executing `env.DB.batch`.
+  - `PUT /api/wayfinder/expenses/:id` diffs incoming split allocations against existing `wayfinder_expense_splits` rows and omits `DELETE` + `INSERT` statements when unchanged.
+  - `handleInboundEmail` (`email-worker.js`) deduplicates against `wayfinder_itinerary_items` by `confirmation_number` or `(title, local_date)` prior to executing the 16-row batch insert.
+  - Client-side `PackingManager.jsx` debounces per-item `PUT` updates by 400ms, and `mutationQueue.js` drops failed offline mutations after 5 failed attempts (`nextAttempts >= 5`).
+
+
 

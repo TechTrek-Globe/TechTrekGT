@@ -171,18 +171,30 @@ export async function replayQueue(onProgress) {
           await deleteLocalMutation(item.id);
           failedCount++;
         } else {
-          // Server error 5xx: keep in queue for next retry
-          item.attempts = (item.attempts || 0) + 1;
-          item.lastError = `Server error HTTP ${res.status}`;
-          await saveLocalMutation(item);
+          // Server error 5xx: keep in queue up to MAX_ATTEMPTS (5), then drop poison pill
+          const nextAttempts = (item.attempts || 0) + 1;
+          if (nextAttempts >= 5) {
+            console.warn(`[MutationQueue] Dropping mutation ${item.id} after ${nextAttempts} failed server attempts (HTTP ${res.status}):`, item);
+            await deleteLocalMutation(item.id);
+          } else {
+            item.attempts = nextAttempts;
+            item.lastError = `Server error HTTP ${res.status}`;
+            await saveLocalMutation(item);
+          }
           failedCount++;
         }
       } catch (networkErr) {
         // Network connection dropped mid-queue replay
         console.warn(`[MutationQueue] Network error replaying ${item.id}:`, networkErr.message);
-        item.attempts = (item.attempts || 0) + 1;
-        item.lastError = networkErr.message;
-        await saveLocalMutation(item);
+        const nextAttempts = (item.attempts || 0) + 1;
+        if (nextAttempts >= 5) {
+          console.warn(`[MutationQueue] Dropping mutation ${item.id} after ${nextAttempts} failed network attempts:`, item);
+          await deleteLocalMutation(item.id);
+        } else {
+          item.attempts = nextAttempts;
+          item.lastError = networkErr.message;
+          await saveLocalMutation(item);
+        }
         break; // Stop replaying until connection returns
       }
     }

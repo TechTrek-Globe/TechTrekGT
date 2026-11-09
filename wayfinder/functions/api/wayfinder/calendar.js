@@ -61,31 +61,43 @@ function escapeIcsText(str) {
     .replace(/\r\n|\n|\r/g, '\\n');
 }
 
-// Self-healing database table initialization
+// Self-healing database table initialization (isolate-scoped singleton)
+let calendarTableReady = false;
+let calendarTablePromise = null;
+
 async function ensureCalendarTable(db) {
-  if (!db) return;
-  try {
-    await db.prepare(`
-      CREATE TABLE IF NOT EXISTS wayfinder_calendar_tokens (
-        id              TEXT PRIMARY KEY,
-        user_id         TEXT NOT NULL,
-        journey_id      TEXT NOT NULL,
-        token           TEXT NOT NULL UNIQUE,
-        feed_name       TEXT NOT NULL DEFAULT 'Poland 2026 Schedule',
-        is_active       INTEGER NOT NULL DEFAULT 1,
-        last_polled_at  TEXT,
-        poll_count      INTEGER NOT NULL DEFAULT 0,
-        created_at      TEXT NOT NULL DEFAULT (datetime('now')),
-        FOREIGN KEY (user_id)    REFERENCES users(id) ON DELETE CASCADE,
-        FOREIGN KEY (journey_id) REFERENCES wayfinder_journeys(id) ON DELETE CASCADE,
-        UNIQUE(user_id, journey_id)
-      )
-    `).run();
-    await db.prepare('CREATE INDEX IF NOT EXISTS idx_wf_cal_token ON wayfinder_calendar_tokens(token)').run();
-    await db.prepare('CREATE INDEX IF NOT EXISTS idx_wf_cal_user ON wayfinder_calendar_tokens(user_id)').run();
-  } catch (err) {
-    console.error('[calendar] ensureTable failed:', err);
-  }
+  if (!db || calendarTableReady) return;
+  if (calendarTablePromise) return calendarTablePromise;
+  calendarTablePromise = (async () => {
+    try {
+      await db.batch([
+        db.prepare(`
+          CREATE TABLE IF NOT EXISTS wayfinder_calendar_tokens (
+            id              TEXT PRIMARY KEY,
+            user_id         TEXT NOT NULL,
+            journey_id      TEXT NOT NULL,
+            token           TEXT NOT NULL UNIQUE,
+            feed_name       TEXT NOT NULL DEFAULT 'Poland 2026 Schedule',
+            is_active       INTEGER NOT NULL DEFAULT 1,
+            last_polled_at  TEXT,
+            poll_count      INTEGER NOT NULL DEFAULT 0,
+            created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+            FOREIGN KEY (user_id)    REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (journey_id) REFERENCES wayfinder_journeys(id) ON DELETE CASCADE,
+            UNIQUE(user_id, journey_id)
+          )
+        `),
+        db.prepare('CREATE INDEX IF NOT EXISTS idx_wf_cal_token ON wayfinder_calendar_tokens(token)'),
+        db.prepare('CREATE INDEX IF NOT EXISTS idx_wf_cal_user ON wayfinder_calendar_tokens(user_id)')
+      ]);
+      calendarTableReady = true;
+    } catch (err) {
+      console.error('[calendar] ensureTable failed:', err);
+    } finally {
+      calendarTablePromise = null;
+    }
+  })();
+  return calendarTablePromise;
 }
 
 // Generate 32-character crypto random hex token
@@ -463,13 +475,22 @@ export async function handleCalendarFeed(context, url, method) {
 
   try {
     if (!env.DB) return new Response('Database Unavailable', { status: 503 });
-    await ensureCalendarTable(env.DB);
 
     // Look up token in DB
-    const tokenRow = await env.DB.prepare(`
-      SELECT * FROM wayfinder_calendar_tokens
-      WHERE token = ? AND is_active = 1
-    `).bind(token).first();
+    let tokenRow;
+    try {
+      tokenRow = await env.DB.prepare(`
+        SELECT * FROM wayfinder_calendar_tokens
+        WHERE token = ? AND is_active = 1
+      `).bind(token).first();
+    } catch (lookupErr) {
+      if (String(lookupErr?.message || '').includes('no such table')) {
+        await ensureCalendarTable(env.DB);
+        tokenRow = null;
+      } else {
+        throw lookupErr;
+      }
+    }
 
     if (!tokenRow) {
       return new Response('404 Not Found: Invalid, expired, or revoked calendar feed token', {
@@ -478,14 +499,18 @@ export async function handleCalendarFeed(context, url, method) {
       });
     }
 
-    // Update poll telemetry (poll count + last polled timestamp)
-    context.ctx?.waitUntil?.(
-      env.DB.prepare(`
-        UPDATE wayfinder_calendar_tokens
-        SET poll_count = poll_count + 1, last_polled_at = datetime('now')
-        WHERE id = ?
-      `).bind(tokenRow.id).run()
-    );
+    // Throttle poll telemetry updates to at most once every 6 hours per token
+    const lastPolledMs = tokenRow.last_polled_at ? Date.parse(`${tokenRow.last_polled_at}Z`) : 0;
+    const sixHoursMs = 6 * 60 * 60 * 1000;
+    if (!lastPolledMs || Number.isNaN(lastPolledMs) || Date.now() - lastPolledMs >= sixHoursMs) {
+      context.ctx?.waitUntil?.(
+        env.DB.prepare(`
+          UPDATE wayfinder_calendar_tokens
+          SET poll_count = poll_count + 1, last_polled_at = datetime('now')
+          WHERE id = ?
+        `).bind(tokenRow.id).run()
+      );
+    }
 
     // Assemble personalized feed
     const events = await gatherEvents({
@@ -559,16 +584,28 @@ export async function handleCalendarToken(context, url, method) {
 
   try {
     if (!env.DB) return json({ error: 'Database not available' }, 503);
-    await ensureCalendarTable(env.DB);
+    if (method !== 'GET') {
+      await ensureCalendarTable(env.DB);
+    }
 
     const journeyId = url.searchParams.get('journey_id') || 'poland-christmas-2026';
 
     // GET /api/wayfinder/calendar/token - Fetch active token and subscribe URLs
     if (method === 'GET') {
-      const existing = await env.DB.prepare(`
-        SELECT * FROM wayfinder_calendar_tokens
-        WHERE user_id = ? AND journey_id = ?
-      `).bind(user.userId, journeyId).first();
+      let existing;
+      try {
+        existing = await env.DB.prepare(`
+          SELECT * FROM wayfinder_calendar_tokens
+          WHERE user_id = ? AND journey_id = ?
+        `).bind(user.userId, journeyId).first();
+      } catch (getErr) {
+        if (String(getErr?.message || '').includes('no such table')) {
+          await ensureCalendarTable(env.DB);
+          existing = null;
+        } else {
+          throw getErr;
+        }
+      }
 
       if (!existing || existing.is_active !== 1) {
         return json({

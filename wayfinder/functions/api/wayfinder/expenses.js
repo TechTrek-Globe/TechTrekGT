@@ -10,87 +10,87 @@ function json(data, status = 200) {
   });
 }
 
-// Ensure database tables exist (self-healing)
+// Ensure database tables exist (isolate-scoped self-healing without hot-path ALTER TABLE)
+let tablesReady = false;
+let tablesInitPromise = null;
+
 async function ensureTables(db) {
-  try {
-    await db.prepare(`
-      CREATE TABLE IF NOT EXISTS wayfinder_expenses (
-        id                   TEXT PRIMARY KEY,
-        journey_id           TEXT NOT NULL,
-        itinerary_item_id    TEXT,
-        document_id          TEXT,
-        user_id              TEXT NOT NULL,
-        paid_by_name         TEXT,
-        paid_by_user_id      TEXT,
-        category             TEXT NOT NULL DEFAULT 'other',
-        description          TEXT NOT NULL,
-        amount_original      REAL,
-        currency_original    TEXT DEFAULT 'PLN',
-        amount_usd           REAL,
-        exchange_rate        REAL,
-        exchange_rate_date   TEXT,
-        exchange_rate_source TEXT,
-        is_converted         INTEGER NOT NULL DEFAULT 0,
-        is_refundable        INTEGER NOT NULL DEFAULT 0,
-        refund_status        TEXT NOT NULL DEFAULT 'na',
-        cancellation_deadline TEXT,
-        paid_status          TEXT NOT NULL DEFAULT 'paid',
-        verification_status  TEXT NOT NULL DEFAULT 'unverified',
-        purchase_site        TEXT,
-        payment_method       TEXT,
-        notes                TEXT,
-        created_at           TEXT NOT NULL DEFAULT (datetime('now'))
-      )
-    `).run();
-
-    await db.prepare(`
-      CREATE TABLE IF NOT EXISTS wayfinder_expense_splits (
-        id              TEXT PRIMARY KEY,
-        expense_id      TEXT NOT NULL,
-        user_id         TEXT NOT NULL,
-        user_name       TEXT,
-        amount_owed     REAL NOT NULL,
-        percentage      REAL,
-        is_settled      INTEGER NOT NULL DEFAULT 0,
-        settled_at      TEXT,
-        settle_method   TEXT,
-        created_at      TEXT NOT NULL DEFAULT (datetime('now')),
-        updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
-      )
-    `).run();
-
-    // Add paid_by_user_id, purchase_site, payment_method to live tables if missing
+  if (!db || tablesReady) return;
+  if (tablesInitPromise) return tablesInitPromise;
+  tablesInitPromise = (async () => {
     try {
-      await db.prepare(`ALTER TABLE wayfinder_expenses ADD COLUMN paid_by_user_id TEXT`).run();
-    } catch (_) { /* column already exists */ }
-    try {
-      await db.prepare(`ALTER TABLE wayfinder_expenses ADD COLUMN purchase_site TEXT`).run();
-    } catch (_) { /* column already exists */ }
-    try {
-      await db.prepare(`ALTER TABLE wayfinder_expenses ADD COLUMN payment_method TEXT`).run();
-    } catch (_) { /* column already exists */ }
-
-    await db.prepare(`
-      CREATE TABLE IF NOT EXISTS wayfinder_expense_settlements (
-        id              TEXT PRIMARY KEY,
-        journey_id      TEXT NOT NULL,
-        expense_id      TEXT,
-        split_id        TEXT,
-        from_user_id    TEXT NOT NULL,
-        from_user_name  TEXT NOT NULL,
-        to_user_id      TEXT NOT NULL,
-        to_user_name    TEXT NOT NULL,
-        amount          REAL NOT NULL,
-        currency        TEXT NOT NULL DEFAULT 'PLN',
-        settled_date    TEXT NOT NULL DEFAULT (date('now')),
-        method          TEXT NOT NULL DEFAULT 'cash',
-        notes           TEXT,
-        created_at      TEXT NOT NULL DEFAULT (datetime('now'))
-      )
-    `).run();
-  } catch (err) {
-    console.warn('[expenses] table initialization note:', err.message);
-  }
+      await db.batch([
+        db.prepare(`
+          CREATE TABLE IF NOT EXISTS wayfinder_expenses (
+            id                   TEXT PRIMARY KEY,
+            journey_id           TEXT NOT NULL,
+            itinerary_item_id    TEXT,
+            document_id          TEXT,
+            user_id              TEXT NOT NULL,
+            paid_by_name         TEXT,
+            paid_by_user_id      TEXT,
+            category             TEXT NOT NULL DEFAULT 'other',
+            description          TEXT NOT NULL,
+            amount_original      REAL,
+            currency_original    TEXT DEFAULT 'PLN',
+            amount_usd           REAL,
+            exchange_rate        REAL,
+            exchange_rate_date   TEXT,
+            exchange_rate_source TEXT,
+            is_converted         INTEGER NOT NULL DEFAULT 0,
+            is_refundable        INTEGER NOT NULL DEFAULT 0,
+            refund_status        TEXT NOT NULL DEFAULT 'na',
+            cancellation_deadline TEXT,
+            paid_status          TEXT NOT NULL DEFAULT 'paid',
+            verification_status  TEXT NOT NULL DEFAULT 'unverified',
+            purchase_site        TEXT,
+            payment_method       TEXT,
+            notes                TEXT,
+            created_at           TEXT NOT NULL DEFAULT (datetime('now'))
+          )
+        `),
+        db.prepare(`
+          CREATE TABLE IF NOT EXISTS wayfinder_expense_splits (
+            id              TEXT PRIMARY KEY,
+            expense_id      TEXT NOT NULL,
+            user_id         TEXT NOT NULL,
+            user_name       TEXT,
+            amount_owed     REAL NOT NULL,
+            percentage      REAL,
+            is_settled      INTEGER NOT NULL DEFAULT 0,
+            settled_at      TEXT,
+            settle_method   TEXT,
+            created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
+          )
+        `),
+        db.prepare(`
+          CREATE TABLE IF NOT EXISTS wayfinder_expense_settlements (
+            id              TEXT PRIMARY KEY,
+            journey_id      TEXT NOT NULL,
+            expense_id      TEXT,
+            split_id        TEXT,
+            from_user_id    TEXT NOT NULL,
+            from_user_name  TEXT NOT NULL,
+            to_user_id      TEXT NOT NULL,
+            to_user_name    TEXT NOT NULL,
+            amount          REAL NOT NULL,
+            currency        TEXT NOT NULL DEFAULT 'PLN',
+            settled_date    TEXT NOT NULL DEFAULT (date('now')),
+            method          TEXT NOT NULL DEFAULT 'cash',
+            notes           TEXT,
+            created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+          )
+        `)
+      ]);
+      tablesReady = true;
+    } catch (err) {
+      console.warn('[expenses] table initialization note:', err.message);
+    } finally {
+      tablesInitPromise = null;
+    }
+  })();
+  return tablesInitPromise;
 }
 
 export async function handleExpenses(context, url, method) {
@@ -98,7 +98,9 @@ export async function handleExpenses(context, url, method) {
   const db = env.DB;
   if (!db) return json({ error: 'Database binding not available' }, 503);
 
-  await ensureTables(db);
+  if (method !== 'GET') {
+    await ensureTables(db);
+  }
 
   const journeyId = url.searchParams.get('journey_id') || url.searchParams.get('journeyId') || 'poland-christmas-2026';
   const pathParts = url.pathname.split('/').filter(Boolean);
@@ -553,46 +555,63 @@ export async function handleExpenses(context, url, method) {
         )
       ];
 
-      // If splits provided, preserve settlement state where possible, then update splits
+      // If splits provided, preserve settlement state where possible, and only rewrite splits if changed
       if (Array.isArray(splits) && splits.length > 0) {
         const existingSplits = await db.prepare('SELECT * FROM wayfinder_expense_splits WHERE expense_id = ?').bind(targetExpenseId).all();
+        const existingRows = existingSplits.results || [];
         const settledMap = {};
-        for (const es of (existingSplits.results || [])) {
+        for (const es of existingRows) {
           if (es.is_settled) {
             settledMap[es.user_id] = { is_settled: 1, settled_at: es.settled_at, settle_method: es.settle_method };
           }
         }
 
-        putStmts.push(db.prepare('DELETE FROM wayfinder_expense_splits WHERE expense_id = ?').bind(targetExpenseId));
+        const splitsUnchanged =
+          existingRows.length === splits.length &&
+          splits.every((s) => {
+            const uId = s.user_id || s.userId || user.userId;
+            const amtOwed = Number(s.amount_owed || s.amountOwed || 0);
+            const pct = Number(s.percentage || 0);
+            const match = existingRows.find((r) => r.user_id === uId);
+            return (
+              match &&
+              Math.abs(Number(match.amount_owed || 0) - amtOwed) < 0.01 &&
+              Math.abs(Number(match.percentage || 0) - pct) < 0.01
+            );
+          });
 
-        for (const s of splits) {
-          const splitId = `spl-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-          const uId = s.user_id || s.userId || user.userId;
-          const uName = s.user_name || s.userName || 'Member';
-          const amtOwed = Number(s.amount_owed || s.amountOwed || 0);
-          const pct = Number(s.percentage || 0);
-          const prevSettled = settledMap[uId];
-          const isSettled = prevSettled ? 1 : 0;
-          const settledAt = prevSettled ? prevSettled.settled_at : null;
-          const settleMethod = prevSettled ? prevSettled.settle_method : null;
+        if (!splitsUnchanged) {
+          putStmts.push(db.prepare('DELETE FROM wayfinder_expense_splits WHERE expense_id = ?').bind(targetExpenseId));
 
-          putStmts.push(
-            db.prepare(`
-              INSERT INTO wayfinder_expense_splits (
-                id, expense_id, user_id, user_name, amount_owed, percentage, is_settled, settled_at, settle_method, created_at, updated_at
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
-            `).bind(
-              splitId,
-              targetExpenseId,
-              uId,
-              uName,
-              amtOwed,
-              pct,
-              isSettled,
-              settledAt,
-              settleMethod
-            )
-          );
+          for (const s of splits) {
+            const splitId = `spl-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+            const uId = s.user_id || s.userId || user.userId;
+            const uName = s.user_name || s.userName || 'Member';
+            const amtOwed = Number(s.amount_owed || s.amountOwed || 0);
+            const pct = Number(s.percentage || 0);
+            const prevSettled = settledMap[uId];
+            const isSettled = prevSettled ? 1 : 0;
+            const settledAt = prevSettled ? prevSettled.settled_at : null;
+            const settleMethod = prevSettled ? prevSettled.settle_method : null;
+
+            putStmts.push(
+              db.prepare(`
+                INSERT INTO wayfinder_expense_splits (
+                  id, expense_id, user_id, user_name, amount_owed, percentage, is_settled, settled_at, settle_method, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+              `).bind(
+                splitId,
+                targetExpenseId,
+                uId,
+                uName,
+                amtOwed,
+                pct,
+                isSettled,
+                settledAt,
+                settleMethod
+              )
+            );
+          }
         }
       }
 

@@ -63,35 +63,47 @@ const POLAND_WINTER_2026_PRESET = [
   { category: 'gifts', name: 'Smoked Highland Oscypek Cheese (Vacuum-Sealed)', quantity: 1, weight_grams: 300, bag_type: 'checked', notes: 'Purchased at Kraków Rynek market for holiday feast' }
 ];
 
+let packingTableReady = false;
+let packingTablePromise = null;
+
 async function ensureTable(db) {
-  if (!db) return;
-  try {
-    await db.prepare(`
-      CREATE TABLE IF NOT EXISTS wayfinder_packing_items (
-        id              TEXT PRIMARY KEY,
-        journey_id      TEXT NOT NULL,
-        user_id         TEXT NOT NULL,
-        category        TEXT NOT NULL DEFAULT 'clothing',
-        name            TEXT NOT NULL,
-        quantity        INTEGER NOT NULL DEFAULT 1,
-        weight_grams    INTEGER DEFAULT 0,
-        is_packed       INTEGER NOT NULL DEFAULT 0,
-        is_shared       INTEGER NOT NULL DEFAULT 0,
-        assigned_to     TEXT,
-        bag_type        TEXT NOT NULL DEFAULT 'checked',
-        notes           TEXT,
-        sort_order      INTEGER NOT NULL DEFAULT 0,
-        created_at      TEXT NOT NULL DEFAULT (datetime('now')),
-        updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
-        FOREIGN KEY (journey_id)  REFERENCES wayfinder_journeys(id) ON DELETE CASCADE,
-        FOREIGN KEY (user_id)     REFERENCES users(id) ON DELETE CASCADE
-      )
-    `).run();
-    await db.prepare('CREATE INDEX IF NOT EXISTS idx_wf_packing_journey ON wayfinder_packing_items(journey_id)').run();
-    await db.prepare('CREATE INDEX IF NOT EXISTS idx_wf_packing_user ON wayfinder_packing_items(user_id)').run();
-  } catch (err) {
-    console.error('[packing] ensureTable failed:', err);
-  }
+  if (!db || packingTableReady) return;
+  if (packingTablePromise) return packingTablePromise;
+  packingTablePromise = (async () => {
+    try {
+      await db.batch([
+        db.prepare(`
+          CREATE TABLE IF NOT EXISTS wayfinder_packing_items (
+            id              TEXT PRIMARY KEY,
+            journey_id      TEXT NOT NULL,
+            user_id         TEXT NOT NULL,
+            category        TEXT NOT NULL DEFAULT 'clothing',
+            name            TEXT NOT NULL,
+            quantity        INTEGER NOT NULL DEFAULT 1,
+            weight_grams    INTEGER DEFAULT 0,
+            is_packed       INTEGER NOT NULL DEFAULT 0,
+            is_shared       INTEGER NOT NULL DEFAULT 0,
+            assigned_to     TEXT,
+            bag_type        TEXT NOT NULL DEFAULT 'checked',
+            notes           TEXT,
+            sort_order      INTEGER NOT NULL DEFAULT 0,
+            created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
+            FOREIGN KEY (journey_id)  REFERENCES wayfinder_journeys(id) ON DELETE CASCADE,
+            FOREIGN KEY (user_id)     REFERENCES users(id) ON DELETE CASCADE
+          )
+        `),
+        db.prepare('CREATE INDEX IF NOT EXISTS idx_wf_packing_journey ON wayfinder_packing_items(journey_id)'),
+        db.prepare('CREATE INDEX IF NOT EXISTS idx_wf_packing_user ON wayfinder_packing_items(user_id)')
+      ]);
+      packingTableReady = true;
+    } catch (err) {
+      console.error('[packing] ensureTable failed:', err);
+    } finally {
+      packingTablePromise = null;
+    }
+  })();
+  return packingTablePromise;
 }
 
 function computeStats(items) {
@@ -187,7 +199,9 @@ export async function handlePacking(context, url, method) {
 
   try {
     if (!env.DB) return json({ error: 'Database not available' }, 503);
-    await ensureTable(env.DB);
+    if (method !== 'GET') {
+      await ensureTable(env.DB);
+    }
 
     const journeyId = url.searchParams.get('journey_id') || url.searchParams.get('journeyId') || 'poland-christmas-2026';
 
@@ -203,11 +217,21 @@ export async function handlePacking(context, url, method) {
 
     // --- GET /api/wayfinder/packing ---
     if (method === 'GET') {
-      const rows = await env.DB.prepare(
-        `SELECT * FROM wayfinder_packing_items 
-         WHERE journey_id = ? AND (user_id = ? OR is_shared = 1${scopeSql})
-         ORDER BY sort_order ASC, category ASC, created_at ASC`
-      ).bind(journeyId, user.userId, ...scopeIds).all();
+      let rows;
+      try {
+        rows = await env.DB.prepare(
+          `SELECT * FROM wayfinder_packing_items 
+           WHERE journey_id = ? AND (user_id = ? OR is_shared = 1${scopeSql})
+           ORDER BY sort_order ASC, category ASC, created_at ASC`
+        ).bind(journeyId, user.userId, ...scopeIds).all();
+      } catch (getErr) {
+        if (String(getErr?.message || '').includes('no such table')) {
+          await ensureTable(env.DB);
+          rows = { results: [] };
+        } else {
+          throw getErr;
+        }
+      }
 
       const items = (rows.results || []).map(safeItem);
       const stats = computeStats(items);
@@ -225,12 +249,27 @@ export async function handlePacking(context, url, method) {
       const body = await request.json().catch(() => ({}));
       const action = body.action || '';
 
-      // Action: Apply Poland Winter 2026 Preset
+      // Action: Apply Poland Winter 2026 Preset (deduplicated by category + name)
       if (action === 'apply_preset') {
+        const existingRows = await env.DB.prepare(
+          `SELECT category, name FROM wayfinder_packing_items
+           WHERE journey_id = ? AND (user_id = ? OR is_shared = 1${scopeSql})`
+        ).bind(journeyId, user.userId, ...scopeIds).all();
+
+        const existingKeys = new Set(
+          (existingRows.results || []).map(
+            (r) => `${String(r.category || '').toLowerCase()}::${String(r.name || '').trim().toLowerCase()}`
+          )
+        );
+
         const statements = [];
-        let sortOrder = 0;
+        let sortOrder = (existingRows.results || []).length;
 
         for (const presetItem of POLAND_WINTER_2026_PRESET) {
+          const itemKey = `${String(presetItem.category || '').toLowerCase()}::${String(presetItem.name || '').trim().toLowerCase()}`;
+          if (existingKeys.has(itemKey)) continue;
+          existingKeys.add(itemKey);
+
           const id = generateId();
           statements.push(
             env.DB.prepare(
@@ -265,7 +304,10 @@ export async function handlePacking(context, url, method) {
         const items = (freshRows.results || []).map(safeItem);
         return json({
           success: true,
-          message: `Added ${POLAND_WINTER_2026_PRESET.length} winter expedition packing items.`,
+          message:
+            statements.length > 0
+              ? `Added ${statements.length} winter expedition packing items.`
+              : 'All Poland Winter 2026 preset items are already on your packing list.',
           items,
           stats: computeStats(items)
         });

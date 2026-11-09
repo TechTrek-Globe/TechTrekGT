@@ -1,187 +1,139 @@
-# D1 Runaway Write Audit & Remediation Plan: Finance OS (`personal-budget-db`)
+# Cloudflare D1 Write Remediation Plan: TechTrekGT - Wayfinder Guide (`personal-budget-db`)
 
-**Database**: `personal-budget-db` (`10f220d4-1c10-49e9-b63e-5d4cb08d599f`)  
-**Incident Metric**: 90.45k rows written / 100k daily free tier limit across 16.75k queries in 24 hours.  
-**Target Application**: Finance OS (`e:/TechTrekGT/finance`)  
-**Stack Constraints**: Pure JavaScript (React 19, Vite 6, Cloudflare Workers ESM, strictly no TypeScript), positional `?` SQL bindings (`FIN-AUDIT-001`), zero-touch formatting on adjacent code.
+## Executive Summary
+
+A full-stack surgical audit of **TechTrekGT - Wayfinder Guide** ([`wayfinder/src/worker.js`](file:///e:/TechTrekGT/wayfinder/src/worker.js), [`wayfinder/functions/`](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/expenses.js), and [`wayfinder/src/`](file:///e:/TechTrekGT/wayfinder/src/context/WayfinderContext.jsx)) against the shared Cloudflare D1 database (`personal-budget-db`, ID: `10f220d4-1c10-49e9-b63e-5d4cb08d599f`) identified **seven distinct write amplification mechanisms** in the Wayfinder runtime and client sync pipeline.
+
+The most severe defects are **unguarded per-request DDL and `ALTER TABLE` statements** executing on every single HTTP request to `/api/wayfinder/expenses*`, `/api/wayfinder/packing*`, and `/api/wayfinder/calendar*` (including `GET` requests), **cold-isolate 6-statement DDL batches** firing concurrently across 5 parallel mount `GET` requests inside [`resolveAgendaAccess`](file:///e:/TechTrekGT/wayfinder/functions/utils/agendaAccess.js#L139), **write-on-GET auto-healing** inside [`GET /api/wayfinder/import-jobs/:doc_id`](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/import-jobs.js#L67-L106), **un-debounced client-side `PUT` mutations and un-deduplicated 37-row preset inserts** in [`PackingManager.jsx`](file:///e:/TechTrekGT/wayfinder/src/components/packing/PackingManager.jsx#L169-L218), **ignored `X-Idempotency-Key` headers** across all mutation endpoints paired with an **unbounded retry loop** in [`mutationQueue.js`](file:///e:/TechTrekGT/wayfinder/src/utils/mutationQueue.js#L146-L187), and **un-deduplicated 16-row batch inserts** in the inbound email worker ([`email-worker.js`](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/email-worker.js#L604-L785)).
 
 ---
 
-## 1. Surgical Trace of All Finance OS D1 Write Queries
+## 1. Complete Surgical Trace of Wayfinder D1 Write Queries
 
-Every `INSERT`, `UPDATE`, `DELETE`, `REPLACE`, and `env.DB.batch` operation across `finance/src/worker.js` and `finance/functions/` has been traced:
+Every SQL write statement (`INSERT`, `UPDATE`, `DELETE`, `REPLACE`, `CREATE`, `ALTER`, and `env.DB.batch`) across `wayfinder/` is cataloged below:
 
-| # | File & Function | Endpoint / Trigger | SQL Write Operation(s) | Write Amplification Risk |
+| # | File & Function | Endpoint / Trigger | SQL Operation & Target Table(s) | Write Multiplier / Risk |
 | :--- | :--- | :--- | :--- | :--- |
-| **1** | [`worker.js`](file:///e:/TechTrekGT/finance/src/worker.js#L571-L761) `handleSyncBackup` | `POST /api/sync/backup` | `env.DB.batch`:<br>1. `INSERT INTO user_backups (id, data, data_byte_length, updated_at, updated_at_ms) VALUES (?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET ...`<br>2. *(If `manual === true`)* `INSERT INTO user_backup_versions ...` + `DELETE FROM user_backup_versions WHERE user_id = ? AND id NOT IN (... LIMIT 10)`<br>3. *(On CAS conflict with `versionId`)* `DELETE FROM user_backup_versions WHERE id = ?` | **CRITICAL**: Invoked automatically by client sync loops, initial hydration false-dirty triggers, and stuck offline sync queue flushes. Also lacks a server-side payload equality guard, rewriting the entire JSON blob + index rows even when `excluded.data === user_backups.data`. |
-| **2** | [`ledgerAccess.js`](file:///e:/TechTrekGT/finance/functions/utils/ledgerAccess.js#L9-L53) `ensureLedgerTables` | Called on **every** `/api/sync/*`, `/api/finance/ledgers*`, `/api/admin/stats`, `/api/admin/ledger-membership`, and `/api/auth/register` request when `tablesReady === false` | `db.batch` executing **8 DDL statements** (`3x CREATE TABLE IF NOT EXISTS` + `5x CREATE INDEX IF NOT EXISTS`) on every cold Worker isolate. | **HIGH**: Schema DDL execution on the hot request path across cold Worker isolates. |
-| **3** | [`ledgerAccess.js`](file:///e:/TechTrekGT/finance/functions/utils/ledgerAccess.js#L99-L107) `resolveLedgerAccess` | Called on every `GET /api/sync/restore`, `POST /api/sync/backup`, `GET /api/sync/versions`, `POST /api/sync/restore-version`, and `DELETE /api/sync/versions` | `INSERT OR IGNORE INTO finance_ledgers (id, owner_id, name) VALUES (?, ?, ?)` when `targetId === uid` and no row is found. | **MEDIUM**: Write-on-read behavior during `GET /api/sync/restore` and `GET /api/sync/versions`. |
-| **4** | [`stats.js`](file:///e:/TechTrekGT/finance/functions/api/admin/stats.js#L81-L90) `onRequestGet` | `GET /api/admin/stats` | Unconditional bulk write on every GET poll:<br>`INSERT OR IGNORE INTO finance_ledgers (id, owner_id, name) SELECT u.id, u.id, ... FROM users u WHERE u.id IN (...)` | **HIGH**: Executes a multi-subquery `INSERT OR IGNORE` table scan and write on every admin dashboard read/refresh. |
-| **5** | [`worker.js`](file:///e:/TechTrekGT/finance/src/worker.js#L951-L1009) `handleSyncDeleteVersion` | `DELETE /api/sync/versions` | `DELETE FROM user_backup_versions WHERE id = ? AND user_id = ?` | **LOW**: Manual user action in Cloud Sync modal. |
-| **6** | [`ledger-shares.js`](file:///e:/TechTrekGT/finance/functions/api/finance/ledger-shares.js#L50-L430) `handleLedgerShares` | `GET / POST / PATCH / DELETE /api/finance/ledgers*` | `UPDATE ledger_invites`, `INSERT INTO ledger_shares`, `INSERT OR IGNORE INTO finance_ledgers`, `INSERT INTO user_backups`, `DELETE FROM finance_ledgers/user_backups` | **LOW**: Triggered on explicit ledger creation, sharing, or invite acceptance (except `GET /api/finance/ledgers` which calls `ensureLedgerTables` and `INSERT OR IGNORE INTO finance_ledgers` at line 203). |
-| **7** | [`login.js`](file:///e:/TechTrekGT/finance/functions/api/auth/login.js#L80-L92) `onRequestPost` | `POST /api/auth/login` | `UPDATE users SET last_login = ?, sign_in_count = COALESCE(sign_in_count, 0) + 1 WHERE id = ?` | **LOW**: Fires only on explicit interactive login form submission. |
-| **8** | [`logout.js`](file:///e:/TechTrekGT/finance/functions/api/auth/logout.js#L16-L20) `onRequestPost` | `POST /api/auth/logout` | `UPDATE users SET token_version = COALESCE(token_version, 1) + 1 WHERE id = ?` | **LOW**: Fires only on explicit interactive logout. |
-| **9** | [`register.js`](file:///e:/TechTrekGT/finance/functions/api/auth/register.js), [`verify-email.js`](file:///e:/TechTrekGT/finance/functions/api/auth/verify-email.js), [`forgot-password.js`](file:///e:/TechTrekGT/finance/functions/api/auth/forgot-password.js), [`reset-password.js`](file:///e:/TechTrekGT/finance/functions/api/auth/reset-password.js), [`update-profile.js`](file:///e:/TechTrekGT/finance/functions/api/auth/update-profile.js), [`confirm-email-change.js`](file:///e:/TechTrekGT/finance/functions/api/auth/confirm-email-change.js) | Explicit Auth Flows | `INSERT INTO users`, `UPDATE users`, `INSERT OR IGNORE INTO finance_ledgers` | **LOW**: One-off user account lifecycle actions. |
+| **1** | [`expenses.js` (`ensureTables`)](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/expenses.js#L14-L94) | **Every `GET`, `POST`, `PUT`, `DELETE`** to `/api/wayfinder/expenses*` | 3x `CREATE TABLE IF NOT EXISTS` (`wayfinder_expenses`, `wayfinder_expense_splits`, `wayfinder_expense_settlements`) + **3x `ALTER TABLE wayfinder_expenses ADD COLUMN ...`** | **CRITICAL**: **Zero `tablesReady` guard.** Runs 6 sequential DDL/schema statements on **every single read and write request**, throwing 3 SQLite duplicate-column errors per call. Direct violation of Root State Section 10. |
+| **2** | [`packing.js` (`ensureTable`)](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/packing.js#L66-L95) | **Every `GET`, `POST`, `PUT`, `DELETE`** to `/api/wayfinder/packing*` | `CREATE TABLE IF NOT EXISTS wayfinder_packing_items` + 2x `CREATE INDEX IF NOT EXISTS` | **CRITICAL**: **Zero `tablesReady` guard.** Runs 3 sequential DDL `.run()` calls on every `GET` and mutation request. |
+| **3** | [`calendar.js` (`ensureCalendarTable`)](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/calendar.js#L65-L89) | **Every `GET` and `POST`** to `/api/wayfinder/calendar/feed/:token.ics` & `/api/wayfinder/calendar/token` | `CREATE TABLE IF NOT EXISTS wayfinder_calendar_tokens` + 2x `CREATE INDEX IF NOT EXISTS` | **CRITICAL**: **Zero `tablesReady` guard.** Runs 3 sequential DDL `.run()` calls on every external calendar poll (`GET`) and token check (`GET`). |
+| **4** | [`agendaAccess.js` (`ensureShareTables`)](file:///e:/TechTrekGT/wayfinder/functions/utils/agendaAccess.js#L7-L38) | Called by [`resolveAgendaAccess`](file:///e:/TechTrekGT/wayfinder/functions/utils/agendaAccess.js#L139) on **every endpoint** (`agendas`, `itinerary`, `accommodations`, `documents`, `import-jobs`, `budget`, `email-inboxes`, `packing`, `expenses`) | `db.batch` of 6 DDL statements (`CREATE TABLE IF NOT EXISTS wayfinder_agenda_collaborators`, `wayfinder_agenda_invites`, + 4x `CREATE INDEX IF NOT EXISTS`) | **HIGH**: Runs on `GET` requests whenever a Worker isolate starts. Because [`WayfinderContext.jsx`](file:///e:/TechTrekGT/wayfinder/src/context/WayfinderContext.jsx#L198-L215) fires 5 parallel `GET` requests on mount before `shareTablesReady` resolves, concurrent requests race and execute redundant 6-statement DDL batches. |
+| **5** | [`import-jobs.js` (`onRequestGet`)](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/import-jobs.js#L67-L106) | `GET /api/wayfinder/import-jobs/:doc_id` | `INSERT INTO wayfinder_extraction_jobs` + `env.DB.batch` of up to 8x `INSERT INTO wayfinder_extracted_fields` | **HIGH**: **Write-on-GET Auto-Healing.** A read-only `GET` endpoint mutates 2 tables (up to 9 rows written) whenever a document lacks a job or extracted fields. |
+| **6** | [`packing.js` (`onRequestPost` / `onRequestPut` / `onRequestDelete`)](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/packing.js#L131-L261) | `POST /api/wayfinder/packing` (`apply_preset` or single), `PUT /api/wayfinder/packing/:id`, `DELETE /api/wayfinder/packing/:id` | `env.DB.batch` of 37x `INSERT INTO wayfinder_packing_items` (`POLAND_WINTER_2026_PRESET`), single `INSERT`, `UPDATE`, or `DELETE` | **HIGH**: 1) `apply_preset` has **zero deduplication** (inserts 37 rows + 74 index entries = **111 row writes** every time clicked, unlike `expenses.js` which deduplicates by description). 2) [`PackingManager.jsx`](file:///e:/TechTrekGT/wayfinder/src/components/packing/PackingManager.jsx#L169-L218) fires un-debounced `PUT` requests on every `+`/`-` quantity click or toggle. |
+| **7** | [`email-worker.js` (`handleInboundEmail`)](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/email-worker.js#L604-L785) | Cloudflare Inbound Email Worker & `POST /api/wayfinder/email-inboxes/webhook` | `env.DB.batch` inserting into `wayfinder_documents` (1), `wayfinder_extraction_jobs` (1), `wayfinder_extracted_fields` (8), `wayfinder_itinerary_items` (1), `wayfinder_email_inboxes` (1), `wayfinder_audit_events` (1), `wayfinder_expenses` (1), `wayfinder_expense_splits` (2) + failed-parse error `batch` (2) | **HIGH**: **Up to 16 table rows + index entries per email** with **zero idempotency/deduplication** on `Message-ID` or `(inbox_id, confirmation_number, title, local_date)`. Retried webhooks or duplicate forwards re-insert all 16 rows. |
+| **8** | [`expenses.js` (`onRequestPost` / `onRequestPut` / `onRequestDelete`)](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/expenses.js#L261-L598) | `POST /api/wayfinder/expenses`, `/seed-preset`, `/settle`, `PUT /api/wayfinder/expenses/:id`, `DELETE` | `env.DB.batch` inserting into `wayfinder_expenses` + N `wayfinder_expense_splits` (up to 42 statements on `/seed-preset`); `DELETE` + re-`INSERT` of all splits on `PUT`; `INSERT`/`DELETE` on `wayfinder_expense_settlements` | **MEDIUM**: Every `PUT /api/wayfinder/expenses/:id` unconditionally executes `DELETE FROM wayfinder_expense_splits WHERE expense_id = ?` and re-inserts all splits even if split amounts did not change, plus triggers the 6 DDL statements in `ensureTables`. |
+| **9** | [`calendar.js` (`handleIcsFeed` / `handleTokenCreateOrRotate`)](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/calendar.js#L430-L537) | `GET /api/wayfinder/calendar/feed/:token.ics`, `POST /api/wayfinder/calendar/token` | `UPDATE wayfinder_calendar_tokens SET poll_count = poll_count + 1, last_polled_at = datetime('now')` on `GET`; `UPDATE` (revoke) + `INSERT INTO wayfinder_calendar_tokens` on `POST` | **MEDIUM**: **Write-on-GET telemetry.** Every external calendar poll (Apple/Google/Outlook) writes to `wayfinder_calendar_tokens` + runs 3 unguarded DDL statements. Also, [`CalendarSubscribeModal.jsx`](file:///e:/TechTrekGT/wayfinder/src/components/calendar/CalendarSubscribeModal.jsx#L29-L43) auto-POSTs on modal open when `has_token` is false, and `handleTokenCreateOrRotate(rotate=false)` revokes & re-inserts if called concurrently. |
+| **10** | [`documents.js` (`onRequestPost` / `onRequestPut` / `onRequestDelete`)](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/documents.js#L51-L157) | `POST /api/wayfinder/documents`, `PUT /api/wayfinder/documents/:id`, `DELETE /api/wayfinder/documents/:id` | `env.DB.batch`: `INSERT INTO wayfinder_documents`, `wayfinder_extraction_jobs`, `wayfinder_audit_events` (3 rows on `POST`); `UPDATE` + `INSERT` audit (2 rows on `PUT`); 4x `DELETE` + 1x `INSERT` audit on `DELETE` | **MEDIUM**: Paired with [`DocumentCenter.jsx`](file:///e:/TechTrekGT/wayfinder/src/components/DocumentCenter.jsx#L358-L370), a single file upload executes `uploadDocument` (3 writes + 2 GETs) -> `parseDocument` (10 writes + 2 GETs) -> fallback `saveExtractedFields` (10 writes + 2 GETs) -> `openReviewModal` (1 GET). |
+| **11** | [`gemini-parser.js` (`onRequestPost`)](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/gemini-parser.js#L156-L427) | `POST /api/wayfinder/documents/:id/parse` | `env.DB.batch`: `DELETE FROM wayfinder_extracted_fields WHERE job_id = ?`, 7x `INSERT INTO wayfinder_extracted_fields`, `UPDATE wayfinder_extraction_jobs`, `UPDATE wayfinder_documents`, `INSERT INTO wayfinder_audit_events` | **LOW-MEDIUM**: 11 write statements per AI parse request (plus 3 write statements on failure fallback). |
+| **12** | [`import-jobs.js` (`onRequestPut` / `onRequestPost`)](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/import-jobs.js#L117-L449) | `PUT /api/wayfinder/import-jobs/:doc_id/fields`, `POST /api/wayfinder/import-jobs/:doc_id/approve`, `POST /api/wayfinder/import-jobs/:doc_id/reject` | `PUT`: `DELETE FROM wayfinder_extracted_fields` + N `INSERT`s + 2 `UPDATE`s + 1 audit `INSERT`. `POST /approve`: `INSERT`/`UPDATE` `wayfinder_accommodations` or `wayfinder_itinerary_items` + `wayfinder_expenses` + 2x `wayfinder_expense_splits` + 2 `UPDATE`s + 1 audit `INSERT` | **LOW-MEDIUM**: Intentional user-triggered review actions, but lacks `X-Idempotency-Key` protection against duplicate submissions. |
+| **13** | [`itinerary.js`](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/itinerary.js#L43-L162) & [`accommodations.js`](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/accommodations.js#L35-L129) | `POST`, `PUT`, `DELETE` on `/api/wayfinder/itinerary*` and `/api/wayfinder/accommodations*` | `INSERT`, `UPDATE`, `DELETE` on `wayfinder_itinerary_items` / `wayfinder_accommodations` + `INSERT INTO wayfinder_audit_events` | **LOW**: Intentional CRUD, though `X-Idempotency-Key` sent by `resilientFetch` is ignored on `POST`. |
+| **14** | [`budget.js` (`onRequestPost` / `onRequestDelete`)](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/budget.js#L50-L157) | `POST /api/wayfinder/budget`, `DELETE /api/wayfinder/budget/:id` | `INSERT INTO wayfinder_budget_entries` or `UPDATE wayfinder_budget_entries`; `DELETE FROM wayfinder_budget_entries` | **LOW**: Intentional CRUD. |
+| **15** | [`email-inboxes.js` (`onRequestPost` / `onRequestDelete`)](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/email-inboxes.js#L50-L147) | `POST /api/wayfinder/email-inboxes`, `DELETE /api/wayfinder/email-inboxes/:id` | `UPDATE wayfinder_email_inboxes` (revoke old) + `INSERT INTO wayfinder_email_inboxes` + `INSERT INTO wayfinder_audit_events` | **LOW**: Intentional CRUD (returns existing active inbox if `rotate` is false). |
+| **16** | [`agenda-shares.js`](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/agenda-shares.js#L81-L329) | `POST /api/wayfinder/agendas/:id/invites`, `POST /api/wayfinder/invites/claim`, `PATCH`/`DELETE` collaborators | `INSERT`/`UPDATE`/`DELETE` on `wayfinder_agenda_invites` and `wayfinder_agenda_collaborators` | **LOW**: Intentional collaborator management. |
+| **17** | [`rateLimit.js` (`checkRateLimit`)](file:///e:/TechTrekGT/wayfinder/functions/utils/rateLimit.js#L13-L45) | Auth endpoints (`login`, `register`, `forgot-password`, `reset-password`, `resend-verification`, `delete-account`) | `DELETE FROM rate_limits WHERE reset_time < ?` (10% probability), `INSERT INTO rate_limits` or `UPDATE rate_limits SET attempts = attempts + 1` | **LOW**: Scoped strictly to auth mutation endpoints (not called on `GET /api/auth/me` or data routes). |
+| **18** | [`auth/*.js`](file:///e:/TechTrekGT/wayfinder/functions/api/auth/login.js) & [`admin.js`](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/admin.js) | `/api/auth/register`, `verify-email`, `resend-verification`, `forgot-password`, `reset-password`, `delete-account`, `/api/wayfinder/admin/users/:id` | `INSERT`/`UPDATE`/`DELETE` on `users` (including `token_version = COALESCE(token_version, 0) + 1` on password reset and admin role/status change) | **LOW**: Intentional user lifecycle operations. |
 
 ---
 
-## 2. Root Cause Audit Across All 4 Investigative Scopes
+## 2. Investigative Scope & Root Cause Audit
 
-### Scope 1: Client-to-Cloud Sync Loops (IndexedDB to D1) - **PRIMARY ROOT CAUSE FOUND**
+### Scope 1: Geo-Location & API Caching Loops (Google Places, Geoapify, Weather, Exchange Rates)
+- **Audit Result**: **Confirmed Clean (Zero D1 Writes at Runtime).**
+  - Dual-verified Google Places and Geoapify POI coordinates, addresses, star ratings, and local image paths are statically compiled in [`wayfinder/src/data/poland-2026.js`](file:///e:/TechTrekGT/wayfinder/src/data/poland-2026.js).
+  - Walking route optimization in [`wayfinder/src/utils/routeOptimizer.js`](file:///e:/TechTrekGT/wayfinder/src/utils/routeOptimizer.js) executes 100% in client memory (Haversine + Nearest-Neighbor).
+  - Timeline drag-and-drop reordering in [`ItineraryView.jsx`](file:///e:/TechTrekGT/wayfinder/src/components/ItineraryView.jsx#L49-L116) persists exclusively to browser `localStorage` (`wayfinder_timeline_order_v1`).
+  - [`weather.js`](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/weather.js) and [`exchange-rate.js`](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/exchange-rate.js) use Worker memory caches + `Cache-Control` headers and never touch `env.DB`.
 
-Three compounding defects in [`LedgerDataContext.jsx`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx) and [`api.js`](file:///e:/TechTrekGT/finance/src/utils/api.js) create continuous `POST /api/sync/backup` write storms and CAS (`tt_budget_cloud_version:${userId}`) timestamp mismatches:
+### Scope 2: Client-Driven High-Frequency Writes & Render-Cycle Cascades
+- **Audit Result**: **Multiple Write Amplifiers Identified.**
+  1. **Un-Debounced Packing Item Mutations ([`PackingManager.jsx`](file:///e:/TechTrekGT/wayfinder/src/components/packing/PackingManager.jsx#L169-L218))**:
+     - Clicking `+` or `-` on item quantities (`handleAdjustQty`) or toggling checkboxes (`handleToggleStatus`) immediately invokes `resilientFetch('/api/wayfinder/packing/:id', { method: 'PUT', ... })` on every click without debouncing.
+     - Each `PUT` hits [`packing.js`](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/packing.js#L186-L241), which executes `resolveAgendaAccess` -> `ensureTable` (3 DDL statements) -> `SELECT` -> `UPDATE wayfinder_packing_items`.
+  2. **Un-Deduplicated 37-Row Packing Preset Inserts ([`packing.js`](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/packing.js#L134-L157))**:
+     - Clicking "Poland Winter 2026 Preset" in [`PackingManager.jsx`](file:///e:/TechTrekGT/wayfinder/src/components/packing/PackingManager.jsx#L140-L167) sends `POST /api/wayfinder/packing` with `{ action: 'apply_preset' }`.
+     - Unlike `expenses.js` (which queries existing descriptions before seeding), [`packing.js`](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/packing.js#L139-L150) unconditionally executes `env.DB.batch(stmts)` for all 37 items in `POLAND_WINTER_2026_PRESET`. With 2 indexes on `wayfinder_packing_items`, each click writes **37 table rows + 74 index rows = 111 row writes**, creating duplicate items every time.
+  3. **Ignored `X-Idempotency-Key` & Unbounded Offline Queue Retries ([`mutationQueue.js`](file:///e:/TechTrekGT/wayfinder/src/utils/mutationQueue.js#L140-L189))**:
+     - `mutationQueue.js` attaches `'X-Idempotency-Key': item.idempotencyKey` to queued/replayed mutations, and [`worker.js`](file:///e:/TechTrekGT/wayfinder/src/worker.js#L44) allows `X-Idempotency-Key` in CORS headers, **but zero backend endpoints inspect or deduplicate `X-Idempotency-Key`**.
+     - Furthermore, in [`flushQueue()`](file:///e:/TechTrekGT/wayfinder/src/utils/mutationQueue.js#L140-L189), which is triggered automatically on `window` `focus`, `online`, and page load (`setTimeout(..., 2000)`), any item that fails with a `5xx` or network/serialization error increments `item.attempts` forever with **no `MAX_ATTEMPTS` ceiling** and **no exponential backoff**, firing on every window focus event.
+  4. **Redundant Mount Fetch & Upload Double-Write Fallback ([`DocumentCenter.jsx`](file:///e:/TechTrekGT/wayfinder/src/components/DocumentCenter.jsx#L304-L370))**:
+     - [`WayfinderContext.jsx`](file:///e:/TechTrekGT/wayfinder/src/context/WayfinderContext.jsx#L198-L215) already fetches `fetchItinerary()`, `fetchAccommodations()`, `fetchDocuments()`, and `fetchJobs()` once `isAuthenticated && agendaAccess.loaded` is true.
+     - [`DocumentCenter.jsx`](file:///e:/TechTrekGT/wayfinder/src/components/DocumentCenter.jsx#L304-L306) has a redundant `useEffect` calling `fetchItinerary('poland-christmas-2026')` on mount, and [`PrivateHub.jsx`](file:///e:/TechTrekGT/wayfinder/src/components/PrivateHub.jsx#L24-L26) calls `refreshAgendaAccess()` again on mount even when `WayfinderContext` just loaded it.
+     - During file upload ([`handleFileChange`](file:///e:/TechTrekGT/wayfinder/src/components/DocumentCenter.jsx#L337-L375)), if `parseDocument` fails on the server after already writing fallback rows in [`gemini-parser.js`](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/gemini-parser.js#L406-L423), the `catch` block in `DocumentCenter.jsx` calls `saveExtractedFields(docId, fallbackFields)`, duplicating the `DELETE` + `INSERT` batch.
 
-#### Defect 1A: Initial Seed Hydration False-Dirty Trigger on Every Mount / Reload
-* **Location**: [`LedgerDataContext.jsx`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx#L119-L129) and [`LedgerDataContext.jsx`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx#L785-L819).
-* **Mechanism**:
-  1. When `BudgetMetadataProvider` finishes reading IndexedDB, it sets `isDbLoaded = true` and `initialLedgerSeed = { dailyMatrix, lineItems, transactions }` ([`BudgetMetadataContext.jsx`](file:///e:/TechTrekGT/finance/src/context/BudgetMetadataContext.jsx#L280-L289)).
-  2. On the **first render pass** where `isDbLoaded` becomes `true`, two `useEffect` hooks in `LedgerDataProvider` fire in the same commit:
-     - Effect 1 ([`LedgerDataContext.jsx`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx#L119-L129)) hydrates `dailyMatrix`, `matrixVersion`, `lineItems`, and `transactions` from `initialLedgerSeed` via `setState` calls (which schedule a **second render**).
-     - Effect 2 ([`LedgerDataContext.jsx`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx#L789-L793)) checks `if (isInitialMountRef.current)`, immediately flips `isInitialMountRef.current = false`, captures the **pre-hydrated empty state** in `lastSeenDataRef.current`, and returns.
-  3. On the **second render pass** (when `dailyMatrix`, `matrixVersion`, `lineItems`, and `transactions` actually populate from `initialLedgerSeed`), `isInitialMountRef.current` is already `false`!
-  4. Line 796 evaluates `dataChanged = true` (`lastSeenDataRef.current.ui !== budgetForUI || lastSeenDataRef.current.mv !== matrixVersion`), sets `autoPushPendingRef.current = true`, **overwrites `localStorage.setItem('tt_budget_last_modified:${uid}', String(Date.now()))`**, and starts a 5-second timer to execute `pushCloudBackup(syncPasscode, { auto: true })`.
-  5. **Compounding Reconcile Push**: Because step 4 just stamped `tt_budget_last_modified:${uid} = Date.now()`, when the initial login reconcile `useEffect` ([`LedgerDataContext.jsx`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx#L679-L779)) completes its `GET /api/sync/restore`, it compares `localTime > savedCloudVersion` (line 761). Since `localTime` was just falsified to `Date.now()`, `localTime > savedCloudVersion` evaluates to `true`, triggering an **immediate** `pushCloudBackup` at line 763, followed 5 seconds later by the debounced auto-backup push at line 811!
-  6. Thus, **every single page load, tab open, or refresh unconditionally stamps local data as modified and fires 1 to 2 `POST /api/sync/backup` D1 writes**, even with zero user interaction.
+### Scope 3: Auth & Session Token Churn
+- **Audit Result**: **No D1 Write Loop on Auth Validation; Missing 401 Cookie Purge Identified.**
+  - [`requireAuth`](file:///e:/TechTrekGT/wayfinder/src/worker.js#L140-L194) in `worker.js` validates the HMAC-SHA256 JWT signature in-memory via WebCrypto and does not query or write to D1.
+  - [`GET /api/auth/me`](file:///e:/TechTrekGT/wayfinder/functions/api/auth/me.js#L51-L97) performs a read-only `SELECT` on `users`.
+  - [`POST /api/auth/login`](file:///e:/TechTrekGT/wayfinder/functions/api/auth/login.js#L53-L94) and [`POST /api/auth/logout`](file:///e:/TechTrekGT/wayfinder/functions/api/auth/logout.js#L7-L33) do not write to `users` on normal login/logout (`token_version` is only incremented on password reset or admin user suspension/role change).
+  - **Compliance Gap (Root State Rule 4.3)**: When `requireAuth` in [`worker.js`](file:///e:/TechTrekGT/wayfinder/src/worker.js#L156-L185) or [`me.js`](file:///e:/TechTrekGT/wayfinder/functions/api/auth/me.js#L26-L78) returns `401 Unauthorized` for an expired/invalid `auth_token` cookie or mismatched `token_version`, it does **not** attach `Set-Cookie: auth_token=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0` (and Domain `.techtrekgt.com` in production) to purge the dead cookie from the browser.
 
-#### Defect 1B: Stuck Offline Sync Queue (`cf_pending_sync:${userId}`) + Unconditional Force Flush
-* **Location**: [`api.js`](file:///e:/TechTrekGT/finance/src/utils/api.js#L194-L315) (`pushCloudBackupOptimistic`), [`api.js`](file:///e:/TechTrekGT/finance/src/utils/api.js#L350-L413) (`flushPendingCloudSync`), and [`LedgerDataContext.jsx`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx#L770-L778).
-* **Mechanism**:
-  1. In [`pushCloudBackupOptimistic`](file:///e:/TechTrekGT/finance/src/utils/api.js#L203), `savePendingSync(budgetData, passcode || '', userId)` writes the entire serialized budget into `localStorage` (`cf_pending_sync:${userId}`) **before** calling `fetch('/api/sync/backup')`.
-  2. `clearPendingSync(userId)` is **only** called on `res.ok && data.success` ([`api.js`](file:///e:/TechTrekGT/finance/src/utils/api.js#L294)).
-  3. If the server returns **`409 Conflict`** (due to a multi-tab/multi-device CAS mismatch or Defect 1A), `400`, or `403`, `clearPendingSync(userId)` is **never called**. The rejected payload remains permanently trapped in `cf_pending_sync:${userId}`.
-  4. In [`LedgerDataContext.jsx`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx#L771-L776), the login reconcile `finally` block **unconditionally calls `await flushPendingCloudSync(syncPasscode, currentUserId)`**—even when reconcile just pulled newer data from the cloud or hit a `409 Conflict`!
-  5. Worse still, inside [`flushPendingCloudSync`](file:///e:/TechTrekGT/finance/src/utils/api.js#L372-L380):
-     - If `tt_budget_cloud_version:${userId}` is present, it sends `expectedVersion: Number(savedVerStr)`, which hits `409 Conflict` again and leaves the item stuck in `cf_pending_sync:${userId}` to retry on every page load and `online` event.
-     - If `tt_budget_cloud_version:${userId}` is missing or `0`, line 378 sets `bodyObj.force = true`, silently **force-overwriting** D1 `user_backups` with stale offline queue data!
-
-#### Defect 1C: Zero Client or Server Payload Idempotency Guard
-* **Location**: [`worker.js`](file:///e:/TechTrekGT/finance/src/worker.js#L622-L711) and [`LedgerDataContext.jsx`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx#L330-L380).
-* **Mechanism**:
-  - Neither `pushCloudBackup` on the client nor `handleSyncBackup` on the Worker checks whether the serialized budget JSON (`dataStr`) is identical to the currently stored `user_backups.data`.
-  - Even when the payload is byte-for-byte identical, `handleSyncBackup` executes `env.DB.batch` (`INSERT INTO user_backups ... ON CONFLICT(id) DO UPDATE SET data = excluded.data, updated_at_ms = excluded.updated_at_ms`), advancing `updated_at_ms` in D1 and invalidating other open tabs' `tt_budget_cloud_version:${userId}` timestamps.
-
----
-
-### Scope 2: Web Worker Offloading (`spreadsheet.worker.js`) - **CONFIRMED CLEAN**
-* **Files Audited**: [`spreadsheet.worker.js`](file:///e:/TechTrekGT/finance/src/workers/spreadsheet.worker.js#L1-L41), [`spreadsheetWorkerClient.js`](file:///e:/TechTrekGT/finance/src/utils/spreadsheetWorkerClient.js#L1-L148), and [`SpreadsheetImporter.jsx`](file:///e:/TechTrekGT/finance/src/components/SpreadsheetImporter.jsx#L1-L800).
-* **Findings**:
-  - `spreadsheet.worker.js` is a pure, stateless request-response message handler supporting 4 commands (`INSPECT_WORKBOOK`, `PARSE_SINGLE_SHEET`, `PARSE_SPREADSHEET`, `PARSE_GENERIC_FLAT`).
-  - It is only invoked when a user explicitly drops or selects a file in `SpreadsheetImporter.jsx`, and the worker instance is terminated when `SpreadsheetImporter` unmounts (`terminateSpreadsheetWorker()`).
-  - It does not poll, loop, or mutate React Context state in the background.
-
----
-
-### Scope 3: Auth & Session Token Churn - **CONFIRMED CLEAN (WITH ADMIN / LEDGER GET WRITE SIDE-EFFECTS IDENTIFIED)**
-* **Files Audited**: [`auth.js`](file:///e:/TechTrekGT/finance/functions/utils/auth.js#L1-L1085), [`me.js`](file:///e:/TechTrekGT/finance/functions/api/auth/me.js), [`refresh.js`](file:///e:/TechTrekGT/finance/functions/api/auth/refresh.js), [`login.js`](file:///e:/TechTrekGT/finance/functions/api/auth/login.js), [`logout.js`](file:///e:/TechTrekGT/finance/functions/api/auth/logout.js), [`AuthContext.jsx`](file:///e:/TechTrekGT/finance/src/context/AuthContext.jsx#L1-L437).
-* **Findings**:
-  - [`getAllTokensFromRequest`](file:///e:/TechTrekGT/finance/functions/utils/auth.js#L430-L469) parses `Authorization` and duplicate `Cookie` (`tt_auth`) headers purely in memory and performs **zero** D1 queries.
-  - [`authenticate`](file:///e:/TechTrekGT/finance/functions/utils/auth.js#L504-L607) is strictly read-only (`SELECT ... FROM users WHERE id = ?`) and caches the user profile across KV, Cloudflare Cache API (`caches.default`), and an isolate-local `Map` for `USER_CACHE_TTL_SEC = 60` seconds.
-  - `GET /api/auth/me` and `POST /api/auth/refresh` issue JWTs via WebCrypto without writing to D1. `token_version` is only incremented on explicit `POST /api/auth/logout` or password reset.
-  - **Write-on-GET Side-Effects Found in Adjacent Middleware**:
-    1. [`ensureLedgerTables`](file:///e:/TechTrekGT/finance/functions/utils/ledgerAccess.js#L9-L53) runs an 8-statement DDL `db.batch` on every cold Worker isolate across sync, ledger, and admin routes.
-    2. [`resolveLedgerAccess`](file:///e:/TechTrekGT/finance/functions/utils/ledgerAccess.js#L99-L107) runs `INSERT OR IGNORE INTO finance_ledgers` on read-only `GET /api/sync/restore` and `GET /api/sync/versions` requests.
-    3. [`GET /api/admin/stats`](file:///e:/TechTrekGT/finance/functions/api/admin/stats.js#L81-L90) runs an unconditional bulk `INSERT OR IGNORE INTO finance_ledgers SELECT ...` on every GET request.
-
----
-
-### Scope 4: UI Synchronicity & Contexts (`BudgetMetadataContext` & `LedgerDataContext`) - **ISSUES FOUND**
-
-* **Files Audited**: [`BudgetMetadataContext.jsx`](file:///e:/TechTrekGT/finance/src/context/BudgetMetadataContext.jsx#L1-L800), [`LedgerDataContext.jsx`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx#L1-L1600), [`DataSyncPanel.jsx`](file:///e:/TechTrekGT/finance/src/components/settings/DataSyncPanel.jsx#L1-L131).
-* **Findings**:
-  1. **Stale Closures in `pushCloudBackup` & `moveDailyMatrixCell`**:
-     - [`pushCloudBackup`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx#L330-L380) declares dependencies `[setLastCloudSyncTime, currentUserId]`, omitting `activeLedgerId`, `ledgerRole`, and `ledgerPermissions`. When a user switches ledgers or has their role resolved to `'viewer'`, `pushCloudBackup` executes with stale `activeLedgerId` and `ledgerRole` closure values!
-     - [`moveDailyMatrixCell`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx#L1232-L1268) declares `useCallback(..., [])`, omitting `[ledgerRole, ledgerPermissions]`.
-  2. **`restoreFromBackup` Does Not Clear `autoPushPendingRef` or Update `lastSeenDataRef`**:
-     - In [`restoreFromBackup`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx#L432-L446), `suppressDirtyUntilRef.current = Date.now() + 1500` is set, and state setters are called.
-     - However, in the auto-backup `useEffect` ([`LedgerDataContext.jsx`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx#L796-L800)), `lastSeenDataRef.current` is updated *before* checking `if (Date.now() < suppressDirtyUntilRef.current) return;`, and **`autoPushPendingRef.current` is never reset to `false`** when a cloud restore happens. If `autoPushPendingRef.current` was `true` before the restore, the next dependency change after 1500ms pushes the restored cloud backup right back to D1.
-  3. **`switchLedger` Does Not Sync `cloudVersion`**:
-     - In [`switchLedger`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx#L555-L572), calling `restoreFromBackup(data.budget)` when switching to a shared ledger does not update `cloudVersion` / `cloudVersionRef.current` or `tt_budget_cloud_version:${newLedgerId}`, guaranteeing a `409 Conflict` or stale CAS check on the next edit.
-  4. **`pushCloudBackupOptimistic` Pending Queue Key Mismatch on Shared Ledgers**:
-     - In [`LedgerDataContext.jsx`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx#L370), on `409 Conflict`, `mKey` is read from `tt_budget_last_modified:${currentUserId}` instead of `targetLid`.
-  5. **`DataSyncPanel.jsx` Unscoped Polling**:
-     - In [`DataSyncPanel.jsx`](file:///e:/TechTrekGT/finance/src/components/settings/DataSyncPanel.jsx#L37-L45), a 5-second `setInterval` calls `getPendingSync()` without passing `currentUserId`, reading `cf_pending_sync:legacy` instead of `cf_pending_sync:${currentUserId}`.
-  6. **`finally {}` Loading Flag Audit**:
-     - `BudgetMetadataContext.jsx`: `initLocalStorageOrIndexedDB` properly sets `setIsDbLoaded(true)` in `finally {}` (line 288).
-     - `LedgerDataContext.jsx`: `fetchAvailableLedgers` (`setIsLoadingLedgers(false)` at line 513), `switchLedger` (`setIsLoadingLedgers(false)` at line 570), `pullCloudBackup` (`setIsSyncing(false)` at line 424), `pushCloudBackup` (`setIsSyncing(false)` at line 378), and the login reconcile effect (`setIsSyncing(false)` at line 777) all reset loading flags inside `finally {}` blocks.
+### Scope 4: Webhook, Background Sync & Hot-Path DDL Execution
+- **Audit Result**: **Primary Backend Source of Runaway D1 Writes Identified.**
+  1. **Hot-Path DDL & `ALTER TABLE` on Every Request (`expenses.js`, `packing.js`, `calendar.js`, `agendaAccess.js`)**:
+     - [`expenses.js` `ensureTables(db)`](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/expenses.js#L14-L94) runs **6 sequential DDL statements** (including 3 unconditional `ALTER TABLE wayfinder_expenses ADD COLUMN ...` statements) on **every single `GET`, `POST`, `PUT`, and `DELETE` request** with zero caching flag.
+     - [`packing.js` `ensureTable(db)`](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/packing.js#L66-L95) and [`calendar.js` `ensureCalendarTable(db)`](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/calendar.js#L65-L89) each run **3 sequential DDL statements** on **every single `GET` and `POST`/`PUT`/`DELETE` request** with zero caching flag.
+     - [`agendaAccess.js` `ensureShareTables(db)`](file:///e:/TechTrekGT/wayfinder/functions/utils/agendaAccess.js#L7-L38) uses a boolean `shareTablesReady`, but does not deduplicate concurrent in-flight promises (`shareTablesPromise`) and runs on `GET` requests across every cold isolate.
+  2. **Write-on-GET Auto-Healing in `import-jobs.js`**:
+     - [`GET /api/wayfinder/import-jobs/:doc_id`](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/import-jobs.js#L67-L106) executes `INSERT INTO wayfinder_extraction_jobs` and an 8-statement `env.DB.batch` into `wayfinder_extracted_fields` during a `GET` request if a document has no extraction job or fields.
+  3. **Write-on-GET Telemetry in `calendar.js`**:
+     - [`GET /api/wayfinder/calendar/feed/:token.ics`](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/calendar.js#L482-L488) executes `UPDATE wayfinder_calendar_tokens SET poll_count = poll_count + 1, last_polled_at = datetime('now') WHERE id = ?` on every poll, even if polled minutes apart.
+  4. **Un-Deduplicated Inbound Email Webhook Batch Writes (`email-worker.js`)**:
+     - [`handleInboundEmail`](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/email-worker.js#L604-L785) inserts up to 16 rows across 8 tables (`wayfinder_documents`, `wayfinder_extraction_jobs`, `wayfinder_extracted_fields`, `wayfinder_itinerary_items`, `wayfinder_email_inboxes`, `wayfinder_audit_events`, `wayfinder_expenses`, `wayfinder_expense_splits`) with zero deduplication check on the email or booking confirmation.
 
 ---
 
 ## 3. Phased Remediation Strategy
 
-### Phase 1: Client Sync & React Context Hardening ([`LedgerDataContext.jsx`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx))
+All code changes will strictly adhere to TechTrekGT rules: **Pure JavaScript (ESM/JSX, zero TypeScript)**, **positional `?` SQL parameter bindings**, **zero silent drift**, and **surgical deltas**.
 
-1. **Eliminate Initial Seed Hydration False-Dirty Trigger**:
-   - Introduce `isSeedHydratedRef = useRef(false)`.
-   - In the seed hydration `useEffect` ([`LedgerDataContext.jsx`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx#L119-L129)), mark `isSeedHydratedRef.current = true` only after `initialLedgerSeed` has been applied (or immediately if `isDbLoaded && !initialLedgerSeed`), and set `suppressDirtyUntilRef.current = Date.now() + 1500`.
-   - In the auto-backup `useEffect` ([`LedgerDataContext.jsx`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx#L785-L819)), wait until `isDbLoaded && isSeedHydratedRef.current` before initializing `isInitialMountRef.current = false` and capturing `lastSeenDataRef.current = { ui: budgetForUI, mv: matrixVersion }`.
-   - Ensure initial hydration **never** stamps `tt_budget_last_modified:${uid}` or schedules an automatic cloud backup on page load.
+### Phase 1: Eliminate Hot-Path DDL & `ALTER TABLE` Execution (Backend)
+1. **[`wayfinder/functions/api/wayfinder/expenses.js`](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/expenses.js#L14-L94)**:
+   - Remove the 3 unconditional `ALTER TABLE wayfinder_expenses ADD COLUMN ...` calls from the request hot path (these columns are already defined in the `CREATE TABLE` DDL and live schema, directly satisfying Root State Section 10).
+   - Consolidate the `CREATE TABLE IF NOT EXISTS` statements into a single `db.batch([...])` guarded by an isolate-scoped singleton promise (`let tablesReady = false; let initPromise = null;`) so concurrent requests on a cold isolate share a single initialization pass, and subsequent requests in the isolate execute **zero DDL queries**.
+   - Even better: only invoke `ensureTables(env.DB)` on write methods (`POST`, `PUT`, `DELETE`) or fallback on `no such table` error during `GET`, ensuring `GET /api/wayfinder/expenses` performs **zero write/DDL operations**.
+2. **[`wayfinder/functions/api/wayfinder/packing.js`](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/packing.js#L66-L95)**:
+   - Guard `ensureTable(db)` with an isolate-scoped singleton promise (`let tableReady = false; let initPromise = null;`) using a single `db.batch([...])` and skip calling DDL before read-only `GET` queries (only initialize on write or if `GET` catches `no such table`).
+3. **[`wayfinder/functions/api/wayfinder/calendar.js`](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/calendar.js#L65-L89)**:
+   - Guard `ensureCalendarTable(db)` with an isolate-scoped singleton promise (`let calendarTableReady = false; let initPromise = null;`) using `db.batch([...])` and skip calling DDL before `GET` requests unless `no such table` is encountered.
+4. **[`wayfinder/functions/utils/agendaAccess.js`](file:///e:/TechTrekGT/wayfinder/functions/utils/agendaAccess.js#L7-L38)**:
+   - Deduplicate concurrent cold-start calls to `ensureShareTables(db)` using an in-flight `shareTablesPromise` singleton so 5 parallel mount `GET` requests do not fire 5 overlapping 6-statement `db.batch` calls, and only run DDL on write paths or if `SELECT` throws `no such table`.
 
-2. **Reset Pending Auto-Push & Sync Version on Cloud Restore / Ledger Switch**:
-   - In [`restoreFromBackup`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx#L432-L446), explicitly set `autoPushPendingRef.current = false` and `suppressDirtyUntilRef.current = Date.now() + 2000`.
-   - In the auto-backup `useEffect` ([`LedgerDataContext.jsx`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx#L796-L802)), if `Date.now() < suppressDirtyUntilRef.current`, update `lastSeenDataRef.current = { ui: budgetForUI, mv: matrixVersion }`, set `autoPushPendingRef.current = false`, and return early without stamping `tt_budget_last_modified:${uid}`.
-   - In [`switchLedger`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx#L555-L572), update `cloudVersion` and `tt_budget_cloud_version:${newLedgerId}` using `data.version` from `/api/sync/restore`.
+### Phase 2: Eliminate Write-on-GET Side Effects (Backend)
+1. **[`wayfinder/functions/api/wayfinder/import-jobs.js`](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/import-jobs.js#L67-L106)**:
+   - Remove the `INSERT INTO wayfinder_extraction_jobs` and 8-row `env.DB.batch` (`INSERT INTO wayfinder_extracted_fields`) from `onRequestGet`.
+   - When `GET /api/wayfinder/import-jobs/:doc_id` finds no persisted extraction job or extracted fields, return a **virtual in-memory preview** of the job and default review fields without mutating D1. The rows will only be written to D1 when the user explicitly submits `PUT /api/wayfinder/import-jobs/:doc_id/fields` or `POST /api/wayfinder/documents/:id/parse`.
+2. **[`wayfinder/functions/api/wayfinder/calendar.js`](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/calendar.js#L482-L488)**:
+   - Throttle the `UPDATE wayfinder_calendar_tokens SET poll_count = poll_count + 1, last_polled_at = datetime('now')` inside `handleIcsFeed` (`GET /api/wayfinder/calendar/feed/:token.ics`) so it only executes if `last_polled_at` is `NULL` or older than 6 hours (`datetime(last_polled_at, '+6 hours') < datetime('now')`), cutting calendar poll writes by >90%.
+   - In [`CalendarSubscribeModal.jsx`](file:///e:/TechTrekGT/wayfinder/src/components/calendar/CalendarSubscribeModal.jsx#L29-L43), remove the automatic `generateOrRotateToken(false)` `POST` call from the modal-open `useEffect` (or ensure the user explicitly clicks "Generate Calendar Feed" when `has_token` is false), and in [`calendar.js` `handleTokenCreateOrRotate`](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/calendar.js#L502-L537), when `rotate === false`, return the existing active token (`WHERE user_id = ? AND agenda_id = ? AND revoked_at IS NULL`) instead of revoking and re-inserting a new row.
 
-3. **Fix React `useCallback` Dependency Arrays**:
-   - Update [`pushCloudBackup`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx#L380) dependencies to `[setLastCloudSyncTime, currentUserId, activeLedgerId, ledgerRole, ledgerPermissions]`.
-   - Update [`moveDailyMatrixCell`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx#L1268) dependencies to `[ledgerRole, ledgerPermissions]`.
-   - In `pushCloudBackup` conflict handling (line 370), scope `mKey` to `targetLid` (`tt_budget_last_modified:${targetLid}`).
+### Phase 3: Backend Idempotency Guards & Deduplication (`packing`, `expenses`, `email-worker`)
+1. **Packing Preset Deduplication ([`wayfinder/functions/api/wayfinder/packing.js`](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/packing.js#L134-L157))**:
+   - In `POST /api/wayfinder/packing` (`action === 'apply_preset'`), query existing `(category, item_name)` pairs for `agenda_id` first (matching the pattern in `expenses.js`), and only insert preset items that do not already exist. If all items exist, return `{ success: true, message: 'Preset already applied', count: 0 }` with **zero D1 writes**.
+2. **Expense Update Split Diffing ([`wayfinder/functions/api/wayfinder/expenses.js`](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/expenses.js#L469-L512))**:
+   - In `PUT /api/wayfinder/expenses/:id`, compare existing splits (`user_id`, `share_amount_cents`, `share_ratio`) against incoming `computedSplits`. Only include `DELETE FROM wayfinder_expense_splits` + re-`INSERT` statements in the batch if the split rows actually changed.
+3. **Inbound Email Deduplication ([`wayfinder/functions/api/wayfinder/email-worker.js`](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/email-worker.js#L486-L785))**:
+   - Extract a deterministic fingerprint from the inbound email (`Message-ID` header or a SHA-256 hash of `inbox.id + subject + date + rawBody.slice(0, 512)`).
+   - Before executing the 16-statement `env.DB.batch`, check `wayfinder_documents` (or `wayfinder_itinerary_items` by `agenda_id`, `confirmation_number`, `title`, and `local_date`) to see if this exact email/booking has already been ingested. If a match exists, return `{ status: 'duplicate_ignored', document_id: existing.id }` with **zero D1 writes**.
 
-4. **Client-Side Payload Fingerprint Guard (Idempotency)**:
-   - Maintain `lastSyncedPayloadHashRef = useRef(null)` in `LedgerDataContext.jsx`.
-   - Compute a lightweight deterministic string fingerprint (length + DJB2/FNV-1a hash of the serialized `dailyMatrix`, `lineItems`, `transactions`, and metadata) before executing `pushCloudBackup` when `options.auto === true`.
-   - If the fingerprint matches `lastSyncedPayloadHashRef.current`, skip the network request and D1 write entirely. Update `lastSyncedPayloadHashRef.current` on every successful push or pull.
-
-5. **Guard Login Reconcile `finally` Block**:
-   - In the login reconcile `useEffect` ([`LedgerDataContext.jsx`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx#L770-L778)), only call `flushPendingCloudSync` if reconcile did not just restore newer cloud state or enter a `409 Conflict` state.
-
----
-
-### Phase 2: Offline Sync Queue & CAS Hardening ([`api.js`](file:///e:/TechTrekGT/finance/src/utils/api.js) & [`DataSyncPanel.jsx`](file:///e:/TechTrekGT/finance/src/components/settings/DataSyncPanel.jsx))
-
-1. **Prevent Stuck `409 Conflict` Payloads in `cf_pending_sync:${userId}`**:
-   - In [`pushCloudBackupOptimistic`](file:///e:/TechTrekGT/finance/src/utils/api.js#L194-L315):
-     - Scope `savePendingSync` and `clearPendingSync` to `targetLid = ledgerId || userId`.
-     - If the server responds with `res.status === 409` (CAS version conflict) or `400`/`403` (permanent client/permission rejection), **call `clearPendingSync(targetLid)`** so the rejected payload is not endlessly retried by background queue flushes (conflict resolution is handled via the `syncConflict` UI state and `tt_budget_last_modified:${targetLid}`).
-     - Only retain `cf_pending_sync:${targetLid}` when `!navigator.onLine`, a network/fetch exception occurs, or the server returns a transient error (`5xx` or `429`).
-
-2. **Eliminate Blind `force: true` Overwrites in `flushPendingCloudSync`**:
-   - In [`flushPendingCloudSync`](file:///e:/TechTrekGT/finance/src/utils/api.js#L350-L413):
-     - Never set `bodyObj.force = true` automatically when `savedVerStr` is missing.
-     - If `flushPendingCloudSync` receives a `409 Conflict` or `403 Forbidden`, call `clearPendingSync(userId)` immediately so background `online` / reconcile triggers cannot loop indefinitely.
-
-3. **Fix User-Scoped Queue Check in `DataSyncPanel.jsx`**:
-   - In [`DataSyncPanel.jsx`](file:///e:/TechTrekGT/finance/src/components/settings/DataSyncPanel.jsx#L37-L45), pass `currentUserId` into `getPendingSync(currentUserId)` and include `currentUserId` in the `useEffect` dependency array.
-
----
-
-### Phase 3: Worker Endpoint Idempotency & Write-on-GET Elimination ([`worker.js`](file:///e:/TechTrekGT/finance/src/worker.js), [`ledgerAccess.js`](file:///e:/TechTrekGT/finance/functions/utils/ledgerAccess.js), [`stats.js`](file:///e:/TechTrekGT/finance/functions/api/admin/stats.js))
-
-1. **Server-Side No-Op Write Suppression in `POST /api/sync/backup` ([`worker.js`](file:///e:/TechTrekGT/finance/src/worker.js#L622-L725))**:
-   - During the pre-check query in `handleSyncBackup`:
-     ```sql
-     SELECT updated_at, updated_at_ms, data_byte_length,
-            CASE WHEN data_byte_length = ? AND data = ? THEN 1 ELSE 0 END AS is_identical
-     FROM user_backups WHERE id = ?
-     ```
-   - Using positional bindings `[dataByteLength, dataStr, targetLedgerId]`, SQLite short-circuits the `data = ?` comparison unless `data_byte_length` matches, avoiding unnecessary large-string comparisons in JS while keeping memory overhead near zero.
-   - If `existing?.is_identical === 1 && !isManual`:
-     - Return `200 OK` immediately with `{ success: true, unchanged: true, timestamp: existing.updated_at, version: existing.updated_at_ms, byteLength: existing.data_byte_length }` and execute **zero `env.DB.batch` writes**.
-
-2. **Remove Unconditional Cold-Isolate DDL Batch & Read-Path Writes ([`ledgerAccess.js`](file:///e:/TechTrekGT/finance/functions/utils/ledgerAccess.js))**:
-   - `finance_ledgers`, `ledger_invites`, and `ledger_shares` are already provisioned in [`schema.sql`](file:///e:/TechTrekGT/finance/schema.sql#L140-L185).
-   - Remove the unconditional `await ensureLedgerTables(env.DB)` call from the hot request path; retain `ensureLedgerTables` only as a lazy recovery helper if a query throws a `no such table` error.
-   - In [`resolveLedgerAccess`](file:///e:/TechTrekGT/finance/functions/utils/ledgerAccess.js#L99-L107), when `targetId === uid` and no row exists in `finance_ledgers`, return the virtual owner access object `{ allowed: true, role: 'owner', permissions: ['read', 'write', 'delete', 'manage'], ledger: { id: uid, owner_id: uid, name: 'Personal Ledger' } }` in memory **without executing `INSERT OR IGNORE INTO finance_ledgers` on every read/sync call**.
-   - Similarly, in [`ledger-shares.js`](file:///e:/TechTrekGT/finance/functions/api/finance/ledger-shares.js#L201-L212) (`GET /api/finance/ledgers`), construct the default personal ledger entry in memory if not yet persisted in `finance_ledgers` instead of writing on GET.
-
-3. **Remove Write-on-GET in `GET /api/admin/stats` ([`stats.js`](file:///e:/TechTrekGT/finance/functions/api/admin/stats.js#L81-L90))**:
-   - Delete the `INSERT OR IGNORE INTO finance_ledgers ... SELECT u.id ...` write statement from `GET /api/admin/stats`.
-   - Synthesize default personal ledger rows in memory for finance users who have a `user_backups` record but do not yet have an explicit row in `finance_ledgers`.
+### Phase 4: Client Write Debouncing, Queue Retry Bounds & Auth Cookie Hygiene
+1. **Debounce Packing Item Quantity & Status Updates ([`wayfinder/src/components/packing/PackingManager.jsx`](file:///e:/TechTrekGT/wayfinder/src/components/packing/PackingManager.jsx#L169-L218))**:
+   - Add a per-item debounce timer (`useRef(new Map())`, 400ms delay) in `PackingManager.jsx` for `handleAdjustQty` and `handleToggleStatus`. Optimistic UI state updates immediately on click, while `resilientFetch` (`PUT /api/wayfinder/packing/:id`) fires only once after rapid clicks settle, and skips firing if the settled value matches the last persisted server state.
+2. **Bound Offline Mutation Queue Retries ([`wayfinder/src/utils/mutationQueue.js`](file:///e:/TechTrekGT/wayfinder/src/utils/mutationQueue.js#L140-L189))**:
+   - Enforce `const MAX_ATTEMPTS = 5;` in `flushQueue()`. Drop mutations that exceed `MAX_ATTEMPTS` or fail JSON body parsing so poison-pill queue entries cannot loop forever on every `window` `focus` event.
+3. **Remove Redundant Client Mount & Upload Fallback Calls ([`DocumentCenter.jsx`](file:///e:/TechTrekGT/wayfinder/src/components/DocumentCenter.jsx#L304-L370) & [`PrivateHub.jsx`](file:///e:/TechTrekGT/wayfinder/src/components/PrivateHub.jsx#L24-L26))**:
+   - Remove the duplicate `useEffect(() => { fetchItinerary(...) }, [])` in `DocumentCenter.jsx` (since `WayfinderContext` already loads itinerary on auth).
+   - In `DocumentCenter.jsx` `handleFileChange`, remove the redundant client-side `saveExtractedFields` fallback call when `parseDocument` already persists fallback fields server-side.
+   - In `PrivateHub.jsx`, only call `refreshAgendaAccess()` on mount if `!agendaAccess.loaded`.
+4. **Purge Stale `auth_token` Cookies on `401` ([`wayfinder/src/worker.js`](file:///e:/TechTrekGT/wayfinder/src/worker.js#L156-L185) & [`wayfinder/functions/api/auth/me.js`](file:///e:/TechTrekGT/wayfinder/functions/api/auth/me.js#L26-L78))**:
+   - Attach `Set-Cookie: auth_token=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0` (with `Domain=.techtrekgt.com` on production hostnames) whenever `requireAuth` or `/api/auth/me` rejects an invalid, expired, or revoked cookie, preventing repeated 401 requests from stale browser cookies.
 
 ---
 
-## 4. Verification & Post-Flight Checklist
+## 4. Verification & Post-Flight Documentation Sync
 
-Once approved, implementation will follow this exact sequence:
-1. Apply surgical deltas to [`LedgerDataContext.jsx`](file:///e:/TechTrekGT/finance/src/context/LedgerDataContext.jsx), [`api.js`](file:///e:/TechTrekGT/finance/src/utils/api.js), [`DataSyncPanel.jsx`](file:///e:/TechTrekGT/finance/src/components/settings/DataSyncPanel.jsx), [`worker.js`](file:///e:/TechTrekGT/finance/src/worker.js), [`ledgerAccess.js`](file:///e:/TechTrekGT/finance/functions/utils/ledgerAccess.js), [`ledger-shares.js`](file:///e:/TechTrekGT/finance/functions/api/finance/ledger-shares.js), and [`stats.js`](file:///e:/TechTrekGT/finance/functions/api/admin/stats.js).
-2. Update [`finance/docs/03_features.md`](file:///e:/TechTrekGT/finance/docs/03_features.md), [`finance/docs/04_state.md`](file:///e:/TechTrekGT/finance/docs/04_state.md), and root [`docs/04_state.md`](file:///e:/TechTrekGT/docs/04_state.md) per the mandatory post-flight documentation rule.
-3. Run `npm run build` and `npm run deploy` inside `e:/TechTrekGT/finance` and verify the live Cloudflare Worker deployment.
+1. **Build & Deploy**:
+   - Run `npm run build` inside `e:\TechTrekGT\wayfinder` and verify zero build or bundle errors.
+   - Deploy via `npm run deploy` (`wrangler deploy`) and verify live Worker health.
+2. **Post-Flight Documentation Synchronization**:
+   - Update [`wayfinder/docs/03_features.md`](file:///e:/TechTrekGT/wayfinder/docs/03_features.md) and [`wayfinder/docs/04_state.md`](file:///e:/TechTrekGT/wayfinder/docs/04_state.md) to document the isolate-scoped DDL guards, read-only `GET` guarantees on `import-jobs` and `calendar`, packing preset deduplication, inbound email idempotency, and client-side packing debounce/queue bounds.
+   - Update [`docs/04_state.md`](file:///e:/TechTrekGT/docs/04_state.md) to record the Wayfinder D1 write-amplification remediation.

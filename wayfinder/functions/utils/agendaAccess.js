@@ -3,38 +3,47 @@
 // All queries use positional ? binding.
 
 let tablesReady = false;
+let shareTablesPromise = null;
 
 export async function ensureShareTables(db) {
-  if (tablesReady) return;
-  await db.batch([
-    db.prepare(`CREATE TABLE IF NOT EXISTS wayfinder_agenda_invites (
-      id            TEXT PRIMARY KEY,
-      agenda_id     TEXT NOT NULL,
-      invited_email TEXT NOT NULL COLLATE NOCASE,
-      role          TEXT NOT NULL CHECK(role IN ('viewer','editor','admin')),
-      token_hash    TEXT NOT NULL UNIQUE,
-      status        TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','accepted','revoked')),
-      invited_by    TEXT NOT NULL,
-      created_at    TEXT NOT NULL DEFAULT (datetime('now')),
-      expires_at    TEXT NOT NULL,
-      accepted_at   TEXT,
-      accepted_by   TEXT
-    )`),
-    db.prepare('CREATE INDEX IF NOT EXISTS idx_wf_invites_agenda ON wayfinder_agenda_invites(agenda_id)'),
-    db.prepare('CREATE INDEX IF NOT EXISTS idx_wf_invites_email ON wayfinder_agenda_invites(invited_email)'),
-    db.prepare(`CREATE TABLE IF NOT EXISTS wayfinder_agenda_shares (
-      id         TEXT PRIMARY KEY,
-      agenda_id  TEXT NOT NULL,
-      user_id    TEXT NOT NULL,
-      role       TEXT NOT NULL CHECK(role IN ('viewer','editor','admin')),
-      invite_id  TEXT,
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      UNIQUE(agenda_id, user_id)
-    )`),
-    db.prepare('CREATE INDEX IF NOT EXISTS idx_wf_shares_user ON wayfinder_agenda_shares(user_id)'),
-    db.prepare('CREATE INDEX IF NOT EXISTS idx_wf_shares_agenda ON wayfinder_agenda_shares(agenda_id)'),
-  ]);
-  tablesReady = true;
+  if (!db || tablesReady) return;
+  if (shareTablesPromise) return shareTablesPromise;
+  shareTablesPromise = (async () => {
+    try {
+      await db.batch([
+        db.prepare(`CREATE TABLE IF NOT EXISTS wayfinder_agenda_invites (
+          id            TEXT PRIMARY KEY,
+          agenda_id     TEXT NOT NULL,
+          invited_email TEXT NOT NULL COLLATE NOCASE,
+          role          TEXT NOT NULL CHECK(role IN ('viewer','editor','admin')),
+          token_hash    TEXT NOT NULL UNIQUE,
+          status        TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','accepted','revoked')),
+          invited_by    TEXT NOT NULL,
+          created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+          expires_at    TEXT NOT NULL,
+          accepted_at   TEXT,
+          accepted_by   TEXT
+        )`),
+        db.prepare('CREATE INDEX IF NOT EXISTS idx_wf_invites_agenda ON wayfinder_agenda_invites(agenda_id)'),
+        db.prepare('CREATE INDEX IF NOT EXISTS idx_wf_invites_email ON wayfinder_agenda_invites(invited_email)'),
+        db.prepare(`CREATE TABLE IF NOT EXISTS wayfinder_agenda_shares (
+          id         TEXT PRIMARY KEY,
+          agenda_id  TEXT NOT NULL,
+          user_id    TEXT NOT NULL,
+          role       TEXT NOT NULL CHECK(role IN ('viewer','editor','admin')),
+          invite_id  TEXT,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          UNIQUE(agenda_id, user_id)
+        )`),
+        db.prepare('CREATE INDEX IF NOT EXISTS idx_wf_shares_user ON wayfinder_agenda_shares(user_id)'),
+        db.prepare('CREATE INDEX IF NOT EXISTS idx_wf_shares_agenda ON wayfinder_agenda_shares(agenda_id)'),
+      ]);
+      tablesReady = true;
+    } finally {
+      shareTablesPromise = null;
+    }
+  })();
+  return shareTablesPromise;
 }
 
 export async function isPlatformAdmin(env, user) {
@@ -49,7 +58,6 @@ export async function isPlatformAdmin(env, user) {
 
 // Resolve a journey by id or slug and the caller's role on it.
 export async function resolveAgendaAccess(env, ref, user) {
-  await ensureShareTables(env.DB);
   const journey = await env.DB.prepare(
     'SELECT * FROM wayfinder_journeys WHERE id = ? OR slug = ?'
   ).bind(ref, ref).first();
@@ -57,9 +65,18 @@ export async function resolveAgendaAccess(env, ref, user) {
 
   if (journey.created_by === user.userId) return { journey, role: 'owner' };
 
-  const share = await env.DB.prepare(
-    'SELECT role FROM wayfinder_agenda_shares WHERE agenda_id = ? AND user_id = ?'
-  ).bind(journey.id, user.userId).first();
+  let share = null;
+  try {
+    share = await env.DB.prepare(
+      'SELECT role FROM wayfinder_agenda_shares WHERE agenda_id = ? AND user_id = ?'
+    ).bind(journey.id, user.userId).first();
+  } catch (err) {
+    if (String(err?.message || '').includes('no such table')) {
+      await ensureShareTables(env.DB);
+    } else {
+      throw err;
+    }
+  }
   if (share) return { journey, role: share.role };
 
   if (await isPlatformAdmin(env, user)) return { journey, role: 'admin' };
@@ -69,9 +86,16 @@ export async function resolveAgendaAccess(env, ref, user) {
 // User ids that share this agenda (owner + accepted collaborators + inviters).
 export async function getCollaboratorIds(env, journey) {
   if (!journey) return [];
-  const rows = await env.DB.prepare(
-    'SELECT user_id FROM wayfinder_agenda_shares WHERE agenda_id = ?'
-  ).bind(journey.id).all();
+  let rows = { results: [] };
+  try {
+    rows = await env.DB.prepare(
+      'SELECT user_id FROM wayfinder_agenda_shares WHERE agenda_id = ?'
+    ).bind(journey.id).all();
+  } catch (err) {
+    if (String(err?.message || '').includes('no such table')) {
+      await ensureShareTables(env.DB);
+    }
+  }
   const ids = new Set((rows.results || []).map(r => r.user_id));
   if (journey.created_by && journey.created_by !== 'system') ids.add(journey.created_by);
   return [...ids];

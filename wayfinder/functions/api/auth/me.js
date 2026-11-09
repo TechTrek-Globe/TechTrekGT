@@ -16,7 +16,10 @@ export async function onRequestGet(context) {
     if (!payload) {
       return new Response(JSON.stringify({ error: 'Unauthorized: Invalid or expired token' }), {
         status: 401,
-        headers: { 'Content-Type': 'application/json' }
+        headers: {
+          'Content-Type': 'application/json',
+          'Set-Cookie': 'auth_token=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0'
+        }
       });
     }
 

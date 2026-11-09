@@ -64,7 +64,43 @@ export async function handleImportJobs(context, url, method) {
       'SELECT * FROM wayfinder_extraction_jobs WHERE document_id = ?'
     ).bind(docId).first();
 
-    // Auto-heal missing extraction job for user documents (e.g. email-forwarded attachments)
+    // --- GET: retrieve job + fields (strictly read-only; no D1 writes on GET) ---
+    if (method === 'GET') {
+      const nowIso = new Date().toISOString();
+      const virtualJob = job || {
+        id: `virtual-job-${docId}`,
+        document_id: docId,
+        status: 'ready_for_review',
+        created_at: doc.upload_date || nowIso,
+      };
+
+      const fields = await env.DB.prepare(
+        'SELECT * FROM wayfinder_extracted_fields WHERE document_id = ? ORDER BY field_name'
+      ).bind(docId).all();
+
+      let fieldResults = fields.results || [];
+      if (fieldResults.length === 0) {
+        const linkedItem = await env.DB.prepare(
+          'SELECT * FROM wayfinder_itinerary_items WHERE source_document_id = ?'
+        ).bind(docId).first();
+
+        const initialFields = generateInitialFields(doc, linkedItem);
+        fieldResults = initialFields.map((f, idx) => ({
+          id: `virtual-fld-${docId}-${idx}`,
+          extraction_job_id: virtualJob.id,
+          document_id: docId,
+          field_name: f.field_name,
+          extracted_value: f.extracted_value,
+          display_value: f.display_value || f.extracted_value,
+          confidence: f.confidence || 'high',
+          verification_status: 'unverified',
+        }));
+      }
+
+      return json({ job: virtualJob, fields: fieldResults });
+    }
+
+    // Auto-heal missing extraction job only on mutation (POST / PUT) requests
     if (!job) {
       const jobId = generateId();
       const nowIso = new Date().toISOString();
@@ -75,36 +111,35 @@ export async function handleImportJobs(context, url, method) {
       job = { id: jobId, document_id: docId, status: 'ready_for_review', created_at: nowIso };
     }
 
-    // --- GET: retrieve job + fields ---
-    if (method === 'GET') {
-      let fields = await env.DB.prepare(
-        'SELECT * FROM wayfinder_extracted_fields WHERE document_id = ? ORDER BY field_name'
-      ).bind(docId).all();
-
-      // If no extracted fields exist yet, auto-populate from linked itinerary item or doc metadata
-      if (!fields.results || fields.results.length === 0) {
+    // If approving a document whose virtual fields have not yet been persisted, materialize them first
+    if (method === 'POST' && action === 'approve') {
+      const existingCount = await env.DB.prepare(
+        'SELECT COUNT(*) as cnt FROM wayfinder_extracted_fields WHERE document_id = ?'
+      ).bind(docId).first();
+      if (!existingCount || existingCount.cnt === 0) {
         const linkedItem = await env.DB.prepare(
           'SELECT * FROM wayfinder_itinerary_items WHERE source_document_id = ?'
         ).bind(docId).first();
-
         const initialFields = generateInitialFields(doc, linkedItem);
         if (initialFields.length > 0) {
-          const insertStmts = initialFields.map(f => {
-            const fid = generateId();
-            return env.DB.prepare(
+          const insertStmts = initialFields.map((f) =>
+            env.DB.prepare(
               `INSERT INTO wayfinder_extracted_fields
                (id, extraction_job_id, document_id, field_name, extracted_value, display_value, confidence, verification_status)
                VALUES (?, ?, ?, ?, ?, ?, ?, 'unverified')`
-            ).bind(fid, job.id, docId, f.field_name, f.extracted_value, f.display_value || f.extracted_value, f.confidence || 'high');
-          });
+            ).bind(
+              generateId(),
+              job.id,
+              docId,
+              f.field_name,
+              f.extracted_value,
+              f.display_value || f.extracted_value,
+              f.confidence || 'high'
+            )
+          );
           await env.DB.batch(insertStmts);
-          fields = await env.DB.prepare(
-            'SELECT * FROM wayfinder_extracted_fields WHERE document_id = ? ORDER BY field_name'
-          ).bind(docId).all();
         }
       }
-
-      return json({ job, fields: fields.results });
     }
 
     // --- POST parse: parse document with Gemini 2.5 Flash / 3.8 Flash structured outputs ---

@@ -613,6 +613,28 @@ export async function handleInboundEmail(message, env) {
       fields.snippet,
     ].filter(Boolean).join('\n');
 
+    // Idempotency guard: prevent duplicate 16-row batch writes if Cloudflare retries delivery or user forwards twice
+    const resolvedDate = fields.local_date || journey.start_date || '2026-12-03';
+    if (fields.confirmation_number) {
+      const existingByConf = await env.DB.prepare(
+        `SELECT id FROM wayfinder_itinerary_items
+         WHERE journey_id = ? AND user_id = ? AND notes LIKE ?`
+      ).bind(inbox.journey_id, inbox.user_id, `%Confirmation: ${fields.confirmation_number}%`).first();
+      if (existingByConf) {
+        console.log(`[email-worker] duplicate confirmation ${fields.confirmation_number} ignored (${existingByConf.id})`);
+        return;
+      }
+    } else {
+      const existingByTitle = await env.DB.prepare(
+        `SELECT id FROM wayfinder_itinerary_items
+         WHERE journey_id = ? AND user_id = ? AND title = ? AND local_date = ? AND notes LIKE '%Source: email-forward%'`
+      ).bind(inbox.journey_id, inbox.user_id, fields.title, resolvedDate).first();
+      if (existingByTitle) {
+        console.log(`[email-worker] duplicate email booking '${fields.title}' on ${resolvedDate} ignored (${existingByTitle.id})`);
+        return;
+      }
+    }
+
     const itemId  = generateId();
     const auditId = generateId();
     let docId = null;

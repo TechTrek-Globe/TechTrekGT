@@ -85,10 +85,17 @@ async function requireAuth(request, env) {
   const token = getTokenFromRequest(request);
   const payload = await verifyToken(token, env.JWT_SECRET);
   if (!payload) {
-    return { ok: false, error: new Response(JSON.stringify({ error: 'Unauthorized' }), {
-      status: 401,
-      headers: { 'Content-Type': 'application/json' },
-    })};
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) {
+      headers['Set-Cookie'] = 'auth_token=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0';
+    }
+    return {
+      ok: false,
+      error: new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers,
+      }),
+    };
   }
   return { ok: true, payload };
 }

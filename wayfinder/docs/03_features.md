@@ -709,4 +709,26 @@ Ensures reliable transactional email delivery and unobstructed user interaction 
   - Fixed Structural Frame: Header and footer configured with `shrink-0`, guaranteeing permanent visibility of modal titles, status descriptions, close button (`X`), and action links.
   - Scrollable Form Body: Form container configured with `overflow-y-auto flex-1`, ensuring form controls, security questions, and verification inputs remain fully accessible across short mobile viewports and zoomed desktop displays.
 
+## 36. Cloudflare D1 Write-Volume Remediation & Idempotency Hardening
+
+Eliminates runaway D1 write amplification across Wayfinder backend endpoints, inbound email webhooks, and client sync loops:
+
+- Isolate-Scoped DDL Singleton Locks & Zero Hot-Path `ALTER TABLE` ([expenses.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/expenses.js), [packing.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/packing.js), [calendar.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/calendar.js), [agendaAccess.js](file:///e:/TechTrekGT/wayfinder/functions/utils/agendaAccess.js)):
+  - Removed unconditional per-request `ALTER TABLE wayfinder_expenses ADD COLUMN ...` statements from `expenses.js`.
+  - Guarded `ensureTables` (`expenses.js`), `ensureTable` (`packing.js`), `ensureCalendarTable` (`calendar.js`), and `ensureShareTables` (`agendaAccess.js`) with module-scoped boolean flags (`tablesReady`) and in-flight singleton promises so concurrent requests never race DDL batches.
+  - Bypassed DDL execution on `GET` requests unless SQLite returns a `no such table` error on a fresh database.
+- Strict Read-Only `GET` Enforcement & Telemetry Throttling ([import-jobs.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/import-jobs.js), [calendar.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/calendar.js), [CalendarSubscribeModal.jsx](file:///e:/TechTrekGT/wayfinder/src/components/calendar/CalendarSubscribeModal.jsx)):
+  - `GET /api/wayfinder/import-jobs/:doc_id` synthesizes virtual extraction job and field previews in memory when no rows exist in D1, deferring physical `INSERT` operations until an explicit `POST /parse`, `POST /fields`, or `POST /approve` mutation.
+  - `GET /api/wayfinder/calendar/feed/:token.ics` throttles `poll_count` and `last_polled_at` `UPDATE` writes to at most once every 6 hours per feed token.
+  - `CalendarSubscribeModal.jsx` checks token status via `GET /api/wayfinder/calendar/token` without auto-firing a `POST` mutation on modal open; token generation only occurs when the user clicks "Enable Live Feed".
+- Idempotent Preset Seeding, Split Diffing & Inbound Email Deduplication ([packing.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/packing.js), [expenses.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/expenses.js), [email-worker.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/email-worker.js)):
+  - `POST /api/wayfinder/packing` (`action: 'apply_preset'`) deduplicates against existing `(category, name)` items in `wayfinder_packing_items`, avoiding 37-row + 74-index duplicate batch writes.
+  - `PUT /api/wayfinder/expenses/:id` compares incoming splits against existing `wayfinder_expense_splits` rows (`user_id`, `amount_owed`, `percentage`) and skips `DELETE` + re-`INSERT` statements when split allocations are unchanged.
+  - `handleInboundEmail` in `email-worker.js` checks `wayfinder_itinerary_items` by `confirmation_number` or `(title, local_date)` before executing the 16-statement `env.DB.batch`, preventing duplicate document, itinerary, and expense writes on retried or re-forwarded emails.
+- Client Write Debouncing, Queue Retry Bounds & Stale Cookie Purging ([PackingManager.jsx](file:///e:/TechTrekGT/wayfinder/src/components/packing/PackingManager.jsx), [mutationQueue.js](file:///e:/TechTrekGT/wayfinder/src/utils/mutationQueue.js), [worker.js](file:///e:/TechTrekGT/wayfinder/src/worker.js), [me.js](file:///e:/TechTrekGT/wayfinder/functions/api/auth/me.js)):
+  - `PackingManager.jsx` coalesces rapid `+`/`-` quantity clicks and checkbox toggles per item using a 400ms debounce timer (`scheduleDebouncedItemPut`) and cancels pending timers if the item is deleted.
+  - `mutationQueue.js` enforces a maximum of 5 retry attempts (`nextAttempts >= 5`) for 5xx and network errors in `flushQueue()`, preventing poison-pill mutations from looping on every window focus event.
+  - `requireAuth` (`worker.js`) and `GET /api/auth/me` (`me.js`) attach `Set-Cookie: auth_token=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0` on HTTP 401 responses when an invalid or expired token is presented.
+
+
 

@@ -300,11 +300,6 @@ export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole
     }
   };
 
-  // Load itinerary items on mount so synced bookings are visible
-  useEffect(() => {
-    if (fetchItinerary) fetchItinerary('poland-christmas-2026');
-  }, [fetchItinerary]);
-
   // Check URL query for selected doc
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);

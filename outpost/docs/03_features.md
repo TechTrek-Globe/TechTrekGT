@@ -532,15 +532,15 @@ Reconciled the Break-Even Floor Price calculation across the table and pricing h
 
 ## Gemini AI Context-Aware eBay Listing Details Generator [ACTION ID: AI-001 / EBAY-010]
 
-Integrated Google Gemini API (`gemini-3.8-flash`) into the Outpost eBay listing generation pipeline to dynamically produce context-aware, HTML-formatted Condition and Key Details cards based on actual item metadata, specs, and seller notes.
+Integrated Google Gemini API (`gemini-3.5-flash-lite` primary with `gemini-3.5-flash` fallback) into the Outpost eBay listing generation pipeline to dynamically produce context-aware, HTML-formatted Condition and Key Details cards based on actual item metadata, specs, and seller notes.
 
 ### AI Listing Generator Capabilities
 
 1. **Serverless AI Generation Endpoint (`functions/api/ai/generate-ebay-details.js`)**:
    - Route: `POST /api/ai/generate-ebay-details` registered in `src/worker.js` with session authentication (`requireAuth` verifying HttpOnly `auth_token` and `users.token_version`).
    - Ingests item metadata payload (`title`, `brand`, `productType`, `condition`, `conditionHeader`, `conditionSubheader`, `notes`, `specs`, `features`).
-   - Queries Google Gemini API (`gemini-3.8-flash`) using `fetchWithTimeout` enforcing a strict 15-second timeout via `AbortSignal.timeout(15000)` per AUDIT-003.
-   - Dual API Resilience: Prioritizes modern Interactions API (`POST /v1beta/interactions`) with automatic fallback to `generateContent` endpoint if Interactions API is unconfigured.
+   - Queries Google Gemini API using `fetchWithTimeout` targeting the high-performance `gemini-3.5-flash-lite` model via `generateContent` (delivering sub-2-second generation latency) with resilient automatic fallback to `gemini-3.5-flash`.
+   - Dual Model Resilience: Calls `gemini-3.5-flash-lite` with a 10-second timeout, falling back gracefully to `gemini-3.5-flash` with a 15-second timeout if the primary request encounters an issue.
    - Strict Output Sanitization: Strips markdown code fences (` ```html `) and strictly enforces the platform zero em-dash rule (replacing any Unicode em or en dashes with standard hyphens).
 2. **Dynamic Template Injection & Fallback Architecture (`src/utils/ebayTemplate.js`)**:
    - `generateEbayListingHtml(item)` accepts optional `aiGeneratedMiddleSection`.

@@ -50,7 +50,7 @@ function extractTextFromGeminiResponse(data) {
  * POST /api/ai/generate-ebay-details
  *
  * Dynamically generates context-aware eBay listing HTML cards (Condition and Key Details)
- * using the Google Gemini API (gemini-3.8-flash).
+ * using the Google Gemini API (gemini-3.5-flash-lite with gemini-3.5-flash fallback).
  *
  * Headers: Cookie: auth_token=...
  * Body:
@@ -151,57 +151,52 @@ export async function onRequestPost(context) {
     let generatedText = '';
     const cleanApiKey = apiKey.trim();
 
-    try {
-      // First attempt: Gemini Interactions API
-      const interactionsUrl = 'https://generativelanguage.googleapis.com/v1beta/interactions';
-      const interactionsRes = await fetchWithTimeout(interactionsUrl, {
+    const callGenerateContent = async (model, timeoutMs = 12000) => {
+      const generateContentUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(cleanApiKey)}`;
+      return fetchWithTimeout(generateContentUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-goog-api-key': cleanApiKey,
-          'Api-Revision': '2026-05-20'
+          'x-goog-api-key': cleanApiKey
         },
         body: JSON.stringify({
-          model: 'gemini-3.8-flash',
-          system_instruction: systemInstruction,
-          input: userPrompt,
-          store: false
-        })
-      }, 15000);
-
-      if (interactionsRes.ok) {
-        const data = await interactionsRes.json().catch(() => ({}));
-        generatedText = extractTextFromGeminiResponse(data);
-      } else {
-        const errBody = await interactionsRes.text().catch(() => '');
-        console.warn(`[generate-ebay-details] Interactions API returned ${interactionsRes.status}: ${errBody.slice(0, 200)}. Falling back to generateContent.`);
-
-        // Second attempt fallback: generateContent endpoint
-        const generateContentUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${encodeURIComponent(cleanApiKey)}`;
-        const fallbackRes = await fetchWithTimeout(generateContentUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
+          systemInstruction: {
+            parts: [{ text: systemInstruction }]
           },
-          body: JSON.stringify({
-            systemInstruction: {
-              parts: [{ text: systemInstruction }]
-            },
-            contents: [
-              {
-                role: 'user',
-                parts: [{ text: userPrompt }]
-              }
-            ]
-          })
-        }, 15000);
+          contents: [
+            {
+              role: 'user',
+              parts: [{ text: userPrompt }]
+            }
+          ]
+        })
+      }, timeoutMs);
+    };
 
+    try {
+      // Primary attempt: gemini-3.5-flash-lite for fast, low-latency generation (~1-2s)
+      try {
+        const primaryRes = await callGenerateContent('gemini-3.5-flash-lite', 10000);
+        if (primaryRes.ok) {
+          const data = await primaryRes.json().catch(() => ({}));
+          generatedText = extractTextFromGeminiResponse(data);
+        } else {
+          const errBody = await primaryRes.text().catch(() => '');
+          console.warn(`[generate-ebay-details] Primary gemini-3.5-flash-lite returned ${primaryRes.status}: ${errBody.slice(0, 200)}. Falling back to gemini-3.5-flash.`);
+        }
+      } catch (primaryErr) {
+        console.warn(`[generate-ebay-details] Primary gemini-3.5-flash-lite exception: ${primaryErr.message}. Falling back to gemini-3.5-flash.`);
+      }
+
+      // Secondary attempt fallback: gemini-3.5-flash if primary attempt produced no text
+      if (!generatedText) {
+        const fallbackRes = await callGenerateContent('gemini-3.5-flash', 15000);
         if (fallbackRes.ok) {
           const fallbackData = await fallbackRes.json().catch(() => ({}));
           generatedText = extractTextFromGeminiResponse(fallbackData);
         } else {
           const fallbackErr = await fallbackRes.text().catch(() => '');
-          console.error(`[generate-ebay-details] generateContent API failed (${fallbackRes.status}):`, fallbackErr.slice(0, 300));
+          console.error(`[generate-ebay-details] Fallback gemini-3.5-flash failed (${fallbackRes.status}):`, fallbackErr.slice(0, 300));
           return err(`Gemini API request failed (${fallbackRes.status}). Please check API key configuration.`, 502);
         }
       }
